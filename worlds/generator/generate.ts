@@ -67,7 +67,7 @@ const ACT_TIME = {
   },
 };
 
-export const GENERATOR_VERSION = "0.36.0";
+export const GENERATOR_VERSION = "0.37.0";
 const DAY = 86_400;
 const MONTH = 30 * DAY;
 const YEAR = 365 * DAY;
@@ -360,8 +360,19 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
 
   // ---- structures ----
   const structures: any[] = [];
-  // The basic laws, less the tax on rent (the town raises rates instead: docs/behaviour/public-finance.md).
-  const records: any[] = law.records.filter((r) => r.id !== "law-tax");
+  // The basic laws. The example code holds no sum of money: where a law names one it stands there as {name}, and is
+  // written in here from the profile, as the town writes its money; the law carries the sum itself too (`data`).
+  const SUMS: Record<string, number> = { fine: V.town_finance.unpermitted_building_fine };
+  const records: any[] = (law.records as any[]).map((r) => {
+    const named = new Set<string>();
+    const fill = (text: string) => text.replace(/\{(\w+)\}/g, (_, name: string) => {
+      if (!Number.isSafeInteger(SUMS[name])) throw new Error(`law ${r.id}: its words name a sum, {${name}}, that the profile ${P.id} does not give`);
+      named.add(name);
+      return asWritten(SUMS[name]!);
+    });
+    const text = fill(r.text), adico = r.adico ? Object.fromEntries(Object.entries(r.adico as Record<string, string>).map(([k, v]) => [k, fill(v)])) : undefined;
+    return named.size ? { ...r, text, ...(adico ? { adico } : {}), data: { ...(r.data ?? {}), ...Object.fromEntries([...named].sort().map((n) => [n, SUMS[n]])) } } : r;
+  });
   // Every lot is on the registry: a record naming its cells. Ownership is a claim about a lot.
   for (const p of parcels) records.push({ id: p.id, record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: LAND_REGISTRY, kind: "lot", text: `Lot ${p.id.slice(4)}.`, data: { cells: [p.cell] } });
   // (Each lot's title, the first made for it, and each cell's lot: found without looking through every record or lot.)
@@ -1174,6 +1185,10 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   const TEN = V.tenancy;
   const rentRule = TEN.rent_review_months !== undefined || TEN.rent_increase_notice_days !== undefined;
   if (rentRule) records.push(rentIncreaseLaw(TEN.rent_review_months ?? 0, TEN.rent_increase_notice_days ?? 0));
+  // The law on ending a tenancy, from the profile's notices (until 2026-10-09 the example code's own words, with one
+  // place's figures in them, in every town).
+  if (TEN.end_notice_days !== undefined || TEN.tenant_notice_days !== undefined)
+    records.push(scheduledLaw("schedule-tenancy", "law-tenancy", { notice: (TEN.end_notice_days ?? 0) * DAY, tenant_notice: (TEN.tenant_notice_days ?? 0) * DAY }));
   const IA = V.industrial_action;
   const ballotRule = IA.ballot_turnout_bps !== undefined || IA.ballot_pass_bps !== undefined;
   if (ballotRule) records.push(industrialActionLaw(IA.ballot_turnout_bps ?? 0, IA.ballot_pass_bps ?? 0, IA.notice_days ?? 0));
@@ -1279,7 +1294,9 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     // (Notices of building work given to the town; the permits the town has granted and the fines it has laid, its
     // own; the sites it goes to; and the land register, asked who owns the one lot.)
     [laws, K.mine("notices", ["building_notice"]), K.mine("permits", { records: ["claim", "claim_release", "withdrawal"] }), goAndSee("sites"), lotByGround, titlesOf, dealingsIn],
-    code("city.inspector", { sites: "sites", register: { lots: "lots", titles: "titles", dealings: "dealings" }, valuer: "outside" }));
+    code("city.inspector", { sites: "sites", register: { lots: "lots", titles: "titles", dealings: "dealings" }, valuer: "outside",
+      // (The fine is the planning law's, the profile's figure; the law's words and the office's practice are one sum.)
+      fine: V.town_finance.unpermitted_building_fine }));
   const civic = (id: string, kinds: string[]) => K.published(id, kinds);
   // The town budget's lines, and what each pays for: the finance office's brief, and the council proposal form's fields.
   const budgetLines: Record<string, string> = {

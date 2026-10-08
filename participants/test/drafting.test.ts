@@ -75,13 +75,9 @@ test("the example schedules: each is well formed, and the example law that names
     for (const part of [law.text, ...Object.values(law.adico ?? {}), law.formal?.condition ?? ""]) expect(part).not.toMatch(/[{}]/);
     expect(Object.keys(law.data.figures)).toEqual(Object.keys(d.figures));
   }
-  const named = (basic.records as any[]).filter((r) => r.data?.schedule);
-  expect(named.map((r) => r.id)).toEqual(["law-tenancy"]);
-  for (const r of named) {
-    const s = schedules.records.find((x) => x.id === r.data.schedule)!;
-    const law = draftLaw(s.id, s.data as unknown as LawSchedule, Object.fromEntries(Object.entries(r.data.figures).map(([k, f]: [string, any]) => [k, f.value])));
-    expect({ text: r.text, adico: r.adico, formal: r.formal, data: r.data }).toEqual({ text: law.text, adico: law.adico, formal: law.formal, data: law.data });
-  }
+  // The example code itself holds no law made from figures: each is written from its schedule with a place's own
+  // (the generated towns' are held to their schedules in orchestrator/test/generality.test.ts).
+  expect((basic.records as any[]).filter((r) => r.data?.schedule)).toEqual([]);
 });
 
 test("an amendment that passes: the clerk publishes the law rewritten by its schedule in place of the one in force, and readers of laws follow", () => {

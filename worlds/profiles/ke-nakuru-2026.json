@@ -734,6 +734,8 @@
     ],
     "labour_force_participation_bps": 7000,
     "tenancy": {
+      "end_notice_days": 60,
+      "tenant_notice_days": 30,
       "rent_review_months": 12,
       "rent_increase_notice_days": 30,
       "after_fixed_term": "periodic"
@@ -825,6 +827,7 @@
       "person_min_savings": 30000
     },
     "town_finance": {
+      "unpermitted_building_fine": 18000000,
       "parks_per_year": 54000000,
       "payment_approval_over": 20000000
     },
@@ -1364,6 +1367,9 @@
     "industry": "[PLACEHOLDER] [PLACEHOLDER] The KNBS Gross County Product 2024 report (https://www.knbs.or.ke/wp-content/uploads/2025/01/2024-Gross-County-Product.pdf) was opened (Nakuru is the fourth largest county economy; GCP KSh 785,747 million in 2023, current prices) but gives value added by county and sector, not the labour and input shares of output a firm needs; factory_labour_share_bps 20% and factory_input_share_bps 67% are carried over from the other profile (its source was ABS Input-Output Tables); retail purchases 78% and labour 10% are estimates for a small town where retail margins run near 20%. KNBS Supply and Use Tables would give Kenyan shares (not found).",
     "prices": "[PLACEHOLDER] [PLACEHOLDER] an item of goods worth KSh 500 at world prices (the unit the town counts in); imports 15% dearer. For scale, KNBS, Consumer Price Indices and Inflation Rates, September 2026, national average retail prices: sifted maize flour 2 kg KSh 152.00; sugar 1 kg KSh 165.79; beans 1 kg KSh 182.76; cooking oil 1 litre KSh 359.36; tomatoes 1 kg KSh 106.44; fresh cow milk 1 litre KSh 77.54; charcoal 1 kg KSh 99.52; petrol 1 litre KSh 214.95. inputs_per_kg KSh 50 (the order of maize grain at the farm gate; not found in the CPI release) and materials_per_kg KSh 6 (cement is about KSh 14 a kg; blocks and sand cost less; no source opened) are placeholders.",
     "tenancy": "[PLACEHOLDER] Placeholders: most tenancies in Kenyan small towns are month to month and often unwritten; rent is reviewed rarely or yearly; a landlord needs to give a month's notice of rent increase or ending (the Rent Restriction Act, Cap 296, for low-rent dwellings, and the Distress for Rent Act, Cap 293; the Landlord and Tenant (Shops, Hotels and Catering Establishments) Act, Cap 301, for business premises; the acts were not opened: to confirm).",
+    "tenancy.end_notice_days": "Placeholder: the example legal code's notice a landlord must give to end a tenancy, 60 days, carried over unchanged (nobody's acts are checked against it yet). To source from this place's tenancy law.",
+    "tenancy.tenant_notice_days": "Placeholder: the example legal code's notice a tenant may leave on, 30 days, carried over unchanged. To source from this place's tenancy law.",
+    "town_finance.unpermitted_building_fine": "Placeholder: the fine the town's planning law sets for building without a permit, KSh 180,000: the first profile's figure scaled by this profile's ratio for its placeholders, 3.6. To source from this place's planning law.",
     "values": "[PLACEHOLDER] Placeholder: Schwartz's ten basic values, in the pan-cultural order of importance Schwartz and Bardi found across 56 nations ('Value hierarchies across cultures', Journal of Cross-Cultural Psychology 32(3), 2001; to confirm), as importance from 7,000 down to 3,400 basis points, each with a spread of 1,500; carried over unchanged from the other profile. To source for this place: the World Values Survey / Afrobarometer Schwartz-style items for Kenya.",
     "industrial_action": "[PLACEHOLDER] Labour Relations Act 2007 (Kenya), s 76: a strike or lock-out is lawful after a dispute has been reported and conciliated and after at least seven days' written notice (taken as 7 days); the Act does not set a ballot quorum, so 50% turnout and 50% approval are placeholders carried over; the Act does not require pay during a strike (the Employment Act 2007, s 80: wages are not paid during a lawful strike unless agreed; recalled, to confirm). The Act was not opened.",
     "world_price_process": "[PLACEHOLDER] Placeholder: carried over from the other profile. To estimate from KNBS, Consumer Price Index (food and commodity series) or the world prices Kenya pays (the sd in this profile is not a place figure).",

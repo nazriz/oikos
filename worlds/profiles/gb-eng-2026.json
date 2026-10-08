@@ -755,6 +755,8 @@
   ],
   "labour_force_participation_bps": 7910,
   "tenancy": {
+   "end_notice_days": 60,
+   "tenant_notice_days": 30,
    "rent_review_months": 12,
    "rent_increase_notice_days": 61,
    "after_fixed_term": "periodic"
@@ -846,6 +848,7 @@
    "person_min_savings": 100000
   },
   "town_finance": {
+   "unpermitted_building_fine": 5000000,
    "parks_per_year": 15000000,
    "payment_approval_over": 5000000
   },
@@ -1393,6 +1396,9 @@
   "labour_force_participation_bps": "The economic activity rate for people aged 16 to 64, 79.1% (100% less the economic inactivity rate of 20.9%) for April to June 2026 (ONS, Labour market overview, UK: August 2026; search summary, to confirm).",
   "labour_force_share_by_age": "ILOSTAT, 'Labour force participation rate by sex and age (%)', five-year bands (dataflow DF_EAP_DWAP_SEX_AGE_RT, https://sdmx.ilo.org/rest/data/ILO,DF_EAP_DWAP_SEX_AGE_RT/all?startPeriod=2019; the data file opened and these figures read from it, 2026-10-08), persons, the United Kingdom, national, annual 2025, from the ONS Labour Force Survey: ages 25 to 54, 87.434%; 55 to 59, 76.772%; 60 to 64, 60.117%; 65 and over, 13.141%. National, not England (no table by age for the region was found); not checked against the ONS (table A05)'s own table (to confirm). How it is used: the first band is the reference; someone in the labour force stops work at the start of a later band with the chance these shares give, and those still in at the last band never stop. The survey's last band is open (65 and over), so nobody is drawn to stop after 65, and those who work on are older on average than they are in fact: to split when the shares at 65 to 69, 70 to 74 and 75 and over are opened. The profile's own participation figure (labour_force_participation_bps) still says how many are in the labour force at the reference ages; this curve says only how that share falls with age.",
   "tenancy": "Renters' Rights Act 2025, in force from 1 May 2026 (to confirm): assured tenancies are periodic, with fixed terms abolished; a landlord may raise the rent once a year by a section 13 notice giving at least two months' notice (taken as 61 days), which the tenant may challenge at the First-tier Tribunal. rent_review_months 12. after_fixed_term 'periodic' fits: every tenancy is periodic.",
+  "tenancy.end_notice_days": "Placeholder: the example legal code's notice a landlord must give to end a tenancy, 60 days, carried over unchanged (nobody's acts are checked against it yet). To source from this place's tenancy law.",
+  "tenancy.tenant_notice_days": "Placeholder: the example legal code's notice a tenant may leave on, 30 days, carried over unchanged. To source from this place's tenancy law.",
+  "town_finance.unpermitted_building_fine": "Placeholder: the fine the town's planning law sets for building without a permit, 50,000 pounds: the first profile's figure carried over, as this profile's other town figures are. To source from this place's planning law.",
   "values": "PLACEHOLDER carried over from au-vic-2026: Schwartz's ten basic values, in the pan-cultural order of importance Schwartz and Bardi found across 56 nations ('Value hierarchies across cultures', Journal of Cross-Cultural Psychology 32(3), 2001; to confirm), as importance from 7,000 down to 3,400 basis points, each with a spread of 1,500. To source for this place: the European Social Survey's Schwartz items for the UK, rescaled.",
   "industrial_action": "Trade Union Act 2016 ballot rules as amended by the Employment Rights Act 2025: a ballot needs at least 50% of those entitled to vote to vote and more than 50% of votes in favour (and, for important public services, at least 40% of all entitled in favour). The Act repeals the 50% turnout threshold once e-balloting is in place and cuts the notice of industrial action from 14 to 10 days (search summaries of the Act, to confirm what was in force at October 2026; the turnout repeal was expected April to August 2026): the profile keeps 50% turnout and 10 days. paid_during_action false: employers need not pay workers on strike. Structural gaps: the 40% test, the separate need for a ballot per bargaining unit, and the statutory ballot mandate lapsing.",
   "world_price_process": "PLACEHOLDER carried over from au-vic-2026: world prices move each month by a mean-reverting random process (sd of the monthly move in basis points of the base price; the share of a gap kept each month). To estimate from ONS, Import and export price indices (UK trade).",

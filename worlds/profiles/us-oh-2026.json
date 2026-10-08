@@ -772,6 +772,8 @@
     ],
     "labour_force_participation_bps": 8171,
     "tenancy": {
+      "end_notice_days": 60,
+      "tenant_notice_days": 30,
       "rent_review_months": 12,
       "rent_increase_notice_days": 30,
       "after_fixed_term": "periodic"
@@ -863,6 +865,7 @@
       "person_min_savings": 100000
     },
     "town_finance": {
+      "unpermitted_building_fine": 5000000,
       "parks_per_year": 15000000,
       "payment_approval_over": 5000000
     },
@@ -1407,6 +1410,9 @@
     "labour_force_participation_bps": "U.S. Census Bureau, American Community Survey 2020-2024 5-year estimates, Wyandot County, Ohio (county seat Upper Sandusky; a rural county of 21,598 people), table B23001, read through the Census Reporter API (https://api.censusreporter.org/1.0/data/show/latest?table_ids=B23001&geo_ids=05000US39175, opened). Share of people aged 20 to 64 in the labour force: 9651 of 11811 (81.7%). (The profile's definition is adults 18 to the retirement age; the table's age groups start at 20 for this range, so 18-19 are left out.)",
     "labour_force_share_by_age": "ILOSTAT, 'Labour force participation rate by sex and age (%)', five-year bands (dataflow DF_EAP_DWAP_SEX_AGE_RT, https://sdmx.ilo.org/rest/data/ILO,DF_EAP_DWAP_SEX_AGE_RT/all?startPeriod=2019; the data file opened and these figures read from it, 2026-10-08), persons, the United States, national, annual 2025, from the Current Population Survey: ages 25 to 54, 83.559%; 55 to 59, 74.988%; 60 to 64, 58.712%; 65 and over, 19.089%. National, not Ohio (no table by age for the region was found); not checked against the BLS's own table (to confirm). The open band is split here with the BLS's own table: Current Population Survey, table 3, 2025 annual averages (https://www.bls.gov/cps/cpsaat03.htm), participation at 65 to 69, 33.3%; 70 to 74, 18.8%; 75 and over, 8.5% (read from that page by a research agent on 2026-10-08, not re-read here: to confirm; its 55 to 59 and 60 to 64 agree with the figures above). So here people are drawn to stop at 55, 60, 65, 70 or 75, and about a tenth of those in the labour force never do. How it is used: the first band is the reference; someone in the labour force stops work at the start of a later band with the chance these shares give, and those still in at the last band never stop. The profile's own participation figure (labour_force_participation_bps) still says how many are in the labour force at the reference ages; this curve says only how that share falls with age.",
     "tenancy": "Ohio Revised Code chapter 5321 (Landlord-Tenant Act) has no rent control and no limit on how often rent may be raised; the usual notice to change a periodic tenancy is 30 days (to confirm). The 12 months is a practice (a standard lease runs a year, rent changes at renewal), not a legal limit; after a fixed term a tenancy that continues is month-to-month (periodic). Structural gap: the profile cannot say 'no statutory limit'.",
+    "tenancy.end_notice_days": "Placeholder: the example legal code's notice a landlord must give to end a tenancy, 60 days, carried over unchanged (nobody's acts are checked against it yet). To source from this place's tenancy law.",
+    "tenancy.tenant_notice_days": "Placeholder: the example legal code's notice a tenant may leave on, 30 days, carried over unchanged. To source from this place's tenancy law.",
+    "town_finance.unpermitted_building_fine": "Placeholder: the fine the town's planning law sets for building without a permit, $50,000: the first profile's figure carried over, as this profile's other town figures are. To source from this place's planning law.",
     "values": "Placeholder, carried over unchanged from the other profile: Schwartz's ten basic values, in the pan-cultural order of importance Schwartz and Bardi found across 56 nations (benevolence, universalism, self-direction, security, conformity, hedonism, achievement, tradition, stimulation, power; Schwartz and Bardi 2001, Journal of Cross-Cultural Psychology 32(3)); means and spreads are not a place's. To replace with a U.S. sample's (World Values Survey; European Social Survey does not cover the U.S.).",
     "industrial_action": "The National Labor Relations Act (29 U.S.C. 151-169) requires no strike ballot and no notice before a strike in a private workplace, except 10 days' notice before a strike at a health-care institution (s 8(g)) and 60 days' notice to the other side before a contract ends (s 8(d)); unions' own constitutions usually require a strike-authorisation vote by a majority (some two-thirds) of those voting. turnout and pass shares (50% each) are placeholders carried over from the other profile's legal quorum; notice_days 0. Strike pay is small (paid_during_action false). Structural gap: no legal ballot, so the rule's thresholds describe union practice.",
     "world_price_process": "Placeholder, carried over from the other profile: world prices move each month by a mean-reverting random process (sd of the monthly move, in basis points of the base price; the share of a gap from the base kept each month). To estimate from BLS import/export price indexes (not done).",

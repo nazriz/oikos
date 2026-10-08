@@ -746,6 +746,8 @@
     ],
     "labour_force_participation_bps": 6120,
     "tenancy": {
+      "end_notice_days": 60,
+      "tenant_notice_days": 30,
       "rent_review_months": 12,
       "rent_increase_notice_days": 90,
       "after_fixed_term": "periodic"
@@ -837,6 +839,7 @@
       "person_min_savings": 300000
     },
     "town_finance": {
+      "unpermitted_building_fine": 15100000,
       "parks_per_year": 45300000,
       "payment_approval_over": 15100000
     },
@@ -1377,6 +1380,9 @@
     "labour_force_participation_bps": "MoSPI, Periodic Labour Force Survey, calendar year 2024, urban Tamil Nadu, usual status (PS+SS), persons aged 15-59: labour force participation rate 61.2% (male 84.8%, female 38.3%); aged 15 and over: 54.5%; worker population ratio 15+ 52.4%; unemployment rate 15+ 3.8% (opened via MoSPI eSankhyiki data server (mcp.mospi.gov.in), opened 2026-10-08).",
     "labour_force_share_by_age": "ILOSTAT, 'Labour force participation rate by sex and age (%)', five-year bands (dataflow DF_EAP_DWAP_SEX_AGE_RT, https://sdmx.ilo.org/rest/data/ILO,DF_EAP_DWAP_SEX_AGE_RT/all?startPeriod=2019; the data file opened and these figures read from it, 2026-10-08), persons, India, national, annual 2025, from MoSPI's Periodic Labour Force Survey: ages 25 to 54, 69.825%; 55 to 59, 65.427%; 60 to 64, 48.675%; 65 and over, 26.431%. National, not urban Tamil Nadu (the series is all India, rural and urban together) (no table by age for the region was found); not checked against MoSPI's own table (to confirm). How it is used: the first band is the reference; someone in the labour force stops work at the start of a later band with the chance these shares give, and those still in at the last band never stop. The survey's last band is open (65 and over), so nobody is drawn to stop after 65, and those who work on are older on average than they are in fact: to split when the shares at 65 to 69, 70 to 74 and 75 and over are opened. The profile's own participation figure (labour_force_participation_bps) still says how many are in the labour force at the reference ages; this curve says only how that share falls with age.",
     "tenancy": "Tamil Nadu Regulation of Rights and Responsibilities of Landlords and Tenants Act 2017: rent is revised by agreement, typically once a year (11-month agreements are customary), and a landlord gives three months' notice in writing of a revision (to confirm the sections, and whether the Act is in force as written). A tenant who stays on after the term holds over month to month (to confirm).",
+    "tenancy.end_notice_days": "Placeholder: the example legal code's notice a landlord must give to end a tenancy, 60 days, carried over unchanged (nobody's acts are checked against it yet). To source from this place's tenancy law.",
+    "tenancy.tenant_notice_days": "Placeholder: the example legal code's notice a tenant may leave on, 30 days, carried over unchanged. To source from this place's tenancy law.",
+    "town_finance.unpermitted_building_fine": "Placeholder: the fine the town's planning law sets for building without a permit, ₹151,000: the first profile's figure scaled by this profile's ratio for its placeholders, 3.02. To source from this place's planning law.",
     "values": "PLACEHOLDER carried over unchanged: Schwartz's ten basic values, in the pan-cultural order found across 56 nations (Schwartz & Bardi 2001, 'Value hierarchies across cultures', Journal of Cross-Cultural Psychology 32). Indian samples tend to rank tradition, conformity and security higher; not adjusted (to source, e.g. World Values Survey India wave).",
     "industrial_action": "Industrial Relations Code 2020 (in force from 21 November 2025; to confirm), s 62: no worker in an industrial establishment may strike without notice within 60 days before striking, and not within 14 days of giving it (taken here as 14 days' notice). No strike ballot is required, so the turnout and approval thresholds are 0 (the structure has no 'no ballot' form). Employees on strike are not paid ('no work, no pay'; to confirm the section).",
     "world_price_process": "PLACEHOLDER carried over unchanged: world prices move each month by a mean-reverting random process (sd of the monthly move in basis points; the share of a gap from the base kept each month). To estimate from India's Wholesale Price Index (Office of the Economic Adviser, by commodity).",

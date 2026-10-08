@@ -4,6 +4,7 @@
 import { expect, test } from "bun:test";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
+import { draftLaw } from "@oikos/participants";
 import { generate } from "@oikos/worlds/generator/generate";
 import { PROFILE_DIR, type Profile } from "@oikos/worlds/generator/profile";
 
@@ -183,3 +184,94 @@ test("platform code names none of a generated world's entities, accounts or buil
   }
   expect(found).toEqual([]);
 });
+
+// ---- no money and no place's figure in the example legal code; a generated town's words are in its own money ----
+// (Found by the live check of 2026-10-09: the planning law said "a fine of $50,000" in the euro and the yen town, and
+// seats copied it into their notebooks.)
+
+/** Every sign a currency is written with, and every word for one: the profiles' own (their signs, codes and words),
+ * and the common ones besides. */
+const ALL_SIGNS = [...new Set(["$", "€", "£", "¥", "₹", "₩", "₽", "₦", "₱", "฿", ...profiles.map((p) => p.values.currency.symbol).filter(Boolean) as string[]])];
+const ALL_MONEY_WORDS = [...new Set(["dollar", "dollars", "euro", "euros", "pound", "pounds", "yen", "rupee", "rupees", "peso", "pesos", "shilling", "shillings", "cent", "cents", "pence", "penny", "paise",
+  ...profiles.flatMap((p) => [p.values.currency.code, ...((p.values.currency as any).unit_words ?? []), ...((p.values.currency as any).minor_words ?? [])])])];
+/** (Words for a currency that are also plain words of the language the world is written in.) */
+const PLAIN_WORDS = new Set(["real"]);
+const moneyWordIn = (s: string, own: Set<string> = new Set()) => ALL_MONEY_WORDS.find((w) => !own.has(w) && !PLAIN_WORDS.has(w) && new RegExp(`(?<![\\w-])${w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\w-])`, "i").test(s));
+const signIn = (s: string, own: string[] = []) => ALL_SIGNS.find((x) => !own.some((o) => o.includes(x)) && s.includes(x));
+
+/** A record's words: what a person reads of it (its text, its breakdown, an agreement's words, a form's or a
+ * schedule's descriptions and labels, a proposal's own words). Not its rule (a formal condition is arithmetic in the
+ * units the world holds things in) and not its data. */
+function wordsOf(r: any): [string, string][] {
+  const out: [string, string][] = [];
+  const add = (where: string, v: unknown) => { if (typeof v === "string") out.push([`${r.id}.${where}`, v]); };
+  add("text", r.text);
+  for (const [k, v] of Object.entries(r.adico ?? {})) add(`adico.${k}`, v);
+  add("terms.text", r.terms?.text);
+  for (const [i, c] of (r.terms?.commitments ?? []).entries()) add(`terms.commitments.${i}`, c?.does?.text);
+  const d = r.data ?? {};
+  for (const k of ["text", "title", "proposal"]) add(`data.${k}`, d[k]);
+  for (const [k, v] of Object.entries(d.adico ?? {})) add(`data.adico.${k}`, v);
+  for (const group of ["fields", "figures"]) for (const [k, f] of Object.entries(d[group] ?? {})) for (const part of ["description", "label"]) add(`data.${group}.${k}.${part}`, (f as any)?.[part]);
+  return out;
+}
+
+test("the example legal code holds no sum of money, no currency and no figure: a law's figures are a place's, written in when a world is made", () => {
+  const dir = join(root, "worlds/law");
+  const found: string[] = [];
+  for (const f of readdirSync(dir).filter((x) => x.endsWith(".json"))) {
+    for (const r of JSON.parse(readFileSync(join(dir, f), "utf8")).records) for (const [where, s] of wordsOf(r)) {
+      const sign = signIn(s), word = moneyWordIn(s);
+      if (sign) found.push(`${f} ${where}: the sign ${sign}`);
+      if (word) found.push(`${f} ${where}: the word "${word}"`);
+      if (/\d/.test(s)) found.push(`${f} ${where}: a figure, in "${s.slice(0, 80)}"`);
+    }
+  }
+  expect(found).toEqual([]);
+  // (The rule catches what it is for.)
+  expect(signIn("a fine of $50,000")).toBe("$");
+  expect(moneyWordIn("a fine of 50,000 dollars")).toBe("dollars");
+  expect(moneyWordIn("a real estate")).toBeUndefined();
+});
+
+test("every word a generated town is given is in its own money: no other place's sign or word, and no sum as a bare count of the smallest unit", () => {
+  const spec = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")) as any;
+  const found: string[] = [];
+  for (const p of profiles) {
+    const cur = p.values.currency as any;
+    const own = new Set<string>([cur.code, ...(cur.unit_words ?? []), ...(cur.minor_words ?? [])]);
+    const c = generate({ ...spec, citizens: 60, profile: p.id });
+    const words: [string, string][] = c.world.records.flatMap(wordsOf);
+    // (What its offices are told in words: a budget line's description, a seat's framing, a channel's title.)
+    const told = (where: string, v: unknown): void => {
+      if (typeof v === "string") { if (/\s/.test(v)) words.push([where, v]); }
+      else if (Array.isArray(v)) v.forEach((x, i) => told(`${where}.${i}`, x));
+      else if (v && typeof v === "object") for (const [k, x] of Object.entries(v)) told(`${where}.${k}`, x);
+    };
+    for (const x of c.participants) told(`${x.id}.framing`, x.framing), told(`${x.id}.params`, x.controller?.params);
+    for (const x of c.positions) told(`position ${x.id}.title`, x.title), told(`position ${x.id}.channels`, (x.channels ?? []).map((ch: any) => ch.title));
+    expect(words.length).toBeGreaterThan(100);
+    for (const [where, s] of words) {
+      const sign = signIn(s, cur.symbol ? [cur.symbol] : []), word = moneyWordIn(s, own);
+      if (sign) found.push(`${p.id} ${where}: the sign ${sign}, in "${s.slice(0, 80)}"`);
+      if (word) found.push(`${p.id} ${where}: the word "${word}", in "${s.slice(0, 80)}"`);
+      // A sum written as people write it has its sign or its marks; five digits and more in a row is a count of the
+      // smallest unit, or seconds. (An id is no number: it has letters or marks beside its digits.)
+      const bare = /(?<![\w.,:-])\d{5,}(?![\w.,:-]*\w)/.exec(s);
+      if (bare) found.push(`${p.id} ${where}: a bare figure ${bare[0]}, in "${s.slice(0, 80)}"`);
+    }
+    // The planning law's fine is the profile's, in its words and in what the inspector is told.
+    const planning = c.world.records.find((r: any) => r.id === "law-planning");
+    expect(planning.data.fine).toBe(p.values.town_finance.unpermitted_building_fine);
+    expect(planning.text).not.toMatch(/[{}]/);
+    expect(c.participants.find((x: any) => x.controller?.impl === "city.inspector").controller.params.fine).toBe(planning.data.fine);
+    // Every law made from figures reads exactly as its schedule writes it from the figures it carries.
+    for (const r of c.world.records.filter((x: any) => x.kind === "law" && x.data?.schedule)) {
+      const s = c.world.records.find((x: any) => x.id === r.data.schedule);
+      expect(s).toBeDefined();
+      const law = draftLaw(s.id, s.data, Object.fromEntries(Object.entries(r.data.figures).map(([k, f]: [string, any]) => [k, f.value])));
+      expect({ text: r.text, adico: r.adico, formal: r.formal, data: r.data }).toEqual({ text: law.text, adico: law.adico, formal: law.formal, data: law.data });
+    }
+  }
+  expect(found).toEqual([]);
+}, 120_000);

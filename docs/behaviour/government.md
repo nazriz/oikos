@@ -18,7 +18,8 @@ The genesis records that set this up are world content, made by the generator:
 - `signatories-city` tells the bank that only the `finance` seat may instruct payments from `acc-city`;
 - `proc-payments` is the payments procedure: wages and bills only within the budget adopted for the year (while a year has none, as the charter allows: below, "The budget year"), and any one payment over the profile's figure only with the mayor's written approval;
 - `budget-year-1` and the four kinds of paper it rests on: the budget the town opens with ("The budget year");
-- `law-rates` sets the rate in the dollar of value, the instalments and the penalty interest (docs/behaviour/public-finance.md). The generated town no longer has the rent tax (`law-tax`), which had no source;
+- `law-rates` sets the rate in the dollar of value, the instalments and the penalty interest (docs/behaviour/public-finance.md). The generated town has no rent tax (`law-tax` had no source, and is gone from the example code since 2026-10-09; a world that wants one writes its law);
+- `law-planning`'s fine and `law-tenancy`'s notices are the profile's (docs/profiles.md, "Sums and figures in a town's laws"): the example code holds no sum and no figure;
 - the law schedules (`schedule-...`, kind `law_schedule`) and a form to amend each one's law (`form-amend-...`): see "Laws made from figures" below.
 
 ## The budget year (2026-10-09)
@@ -94,7 +95,7 @@ A law written from a schedule carries its figures openly: `data.schedule`, and `
 |---|---|---|---|
 | `schedule-rent-increases` | `law-rent-increases` | `review` (least time between increases), `notice` | on a notice of rent increase; landlords, tenants and the tribunal check against it |
 | `schedule-industrial-action` | `law-industrial-action` | `turnout`, `majority` (percent), `notice` | on a notice of industrial action; the union checks against it |
-| `schedule-tenancy` | `law-tenancy` | `notice` (the landlord's, to end a tenancy), `tenant_notice` | none: nobody's acts are checked against it yet, and the clerk says so |
+| `schedule-tenancy` | `law-tenancy` (written from the profile's notices since 2026-10-09; until then the example code's own words) | `notice` (the landlord's, to end a tenancy), `tenant_notice` | none: nobody's acts are checked against it yet, and the clerk says so |
 
 These laws speak for the town (the first two spoke for the world outside until 2026-10-05): a council amends its own laws, and only the one a law speaks for can withdraw it.
 

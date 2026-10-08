@@ -758,6 +758,8 @@
   ],
   "labour_force_participation_bps": 7400,
   "tenancy": {
+   "end_notice_days": 60,
+   "tenant_notice_days": 30,
    "rent_review_months": 12,
    "rent_increase_notice_days": 30,
    "after_fixed_term": "periodic"
@@ -849,6 +851,7 @@
    "person_min_savings": 55000
   },
   "town_finance": {
+   "unpermitted_building_fine": 2750000,
    "parks_per_year": 8250000,
    "payment_approval_over": 6272559
   },
@@ -1408,6 +1411,9 @@
   "labour_force_participation_bps": "Derived estimate: IBGE, PNAD Continua 2nd quarter 2026, Minas Gerais (SIDRA table 4093): participation 64.0% of people aged 14 and over (11.45 million in the labour force of 17.89 million); rescaled to ages 15-64 using the Census 2022 age structure of the state (14.3 million aged 15-64) and an assumed 0.65 million workers aged 65 and over, giving about 74%. The 65+ assumption is not data.",
   "labour_force_share_by_age": "ILOSTAT, 'Labour force participation rate by sex and age (%)', five-year bands (dataflow DF_EAP_DWAP_SEX_AGE_RT, https://sdmx.ilo.org/rest/data/ILO,DF_EAP_DWAP_SEX_AGE_RT/all?startPeriod=2019; the data file opened and these figures read from it, 2026-10-08), persons, Brazil, national, annual 2025, from IBGE's PNAD Contínua: ages 25 to 54, 80.376%; 55 to 59, 63.138%; 60 to 64, 46.679%; 65 and over, 16.059%. National, not Minas Gerais (no table by age for the region was found); not checked against IBGE (SIDRA)'s own table (to confirm). How it is used: the first band is the reference; someone in the labour force stops work at the start of a later band with the chance these shares give, and those still in at the last band never stop. The survey's last band is open (65 and over), so nobody is drawn to stop after 65, and those who work on are older on average than they are in fact: to split when the shares at 65 to 69, 70 to 74 and 75 and over are opened. The profile's own participation figure (labour_force_participation_bps) still says how many are in the labour force at the reference ages; this curve says only how that share falls with age.",
   "tenancy": "Lei do Inquilinato (Lei 8.245/1991): rent may be adjusted once a year (after 12 months) by the contract's index (IGP-M or IPCA); the 30-day notice is a placeholder; a fixed-term lease that runs on without the landlord objecting becomes indeterminate (art. 46 and 56; to confirm the section numbers). (cited from knowledge of the text; not opened in this pass; to confirm)",
+  "tenancy.end_notice_days": "Placeholder: the example legal code's notice a landlord must give to end a tenancy, 60 days, carried over unchanged (nobody's acts are checked against it yet). To source from this place's tenancy law.",
+  "tenancy.tenant_notice_days": "Placeholder: the example legal code's notice a tenant may leave on, 30 days, carried over unchanged. To source from this place's tenancy law.",
+  "town_finance.unpermitted_building_fine": "Placeholder: the fine the town's planning law sets for building without a permit, R$ 27.500: the first profile's figure scaled by this profile's ratio for its placeholders, 0.55. To source from this place's planning law.",
   "values": "Placeholder: carried over unchanged from the reference profile (Schwartz value means set by assumption). To replace from the World Values Survey wave 7 (Brazil, 2018) or the European Social Survey's Schwartz portrait scales (to confirm).",
   "industrial_action": "Lei de Greve (Lei 7.783/1989): strikes are allowed after assembly vote and 48 hours' notice (72 hours for essential services); wages for strike days are normally not paid unless negotiated (TST jurisprudence; to confirm). Turnout and pass shares are placeholders carried over. (cited from knowledge of the text; not opened in this pass; to confirm)",
   "world_price_process": "Placeholder: carried over unchanged from the reference profile (volatility and persistence of world prices).",

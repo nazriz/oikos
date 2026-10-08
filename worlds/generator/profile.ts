@@ -61,7 +61,7 @@ export interface Profile {
     labour_force_share_by_age?: { from: number; bps: number }[];
     /** Tenancy law. A place with no rule on how often a rent may rise or on what notice leaves both figures out (no
      * such law is written); landlords then review rents as often as `rent_review_practice_months` says, if it's given. */
-    tenancy: { rent_review_months?: number; rent_increase_notice_days?: number; rent_review_practice_months?: number; after_fixed_term?: "periodic" };
+    tenancy: { end_notice_days?: number; tenant_notice_days?: number; rent_review_months?: number; rent_increase_notice_days?: number; rent_review_practice_months?: number; after_fixed_term?: "periodic" };
     values: { [value: string]: { mean_bps: number; sd_bps: number } };
     /** The law on industrial action. A place that requires no ballot leaves both ballot figures out; one that requires
      * no notice either leaves that out too (and no such law is written). */
@@ -79,7 +79,7 @@ export interface Profile {
      * and a factory's opening money isn't stated: the generator works out their working capital.) */
     opening: { bank: number; town: number; builder: number; landlord: number; person_min_savings: number };
     /** The town's own money rules: its yearly parks line, and the payment its procedure needs the mayor's approval over. */
-    town_finance: { parks_per_year: number; payment_approval_over: number };
+    town_finance: { parks_per_year: number; payment_approval_over: number; unpermitted_building_fine: number };
     retiree_savings: [number, number];
     /** Support paid from outside the town, as its law's list of payments (docs/behaviour/boundary.md): each says who
      * qualifies, how much and for how long, and where it is paid from (`paid_from`: one of `public_finance.funds`; left
