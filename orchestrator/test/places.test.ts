@@ -412,6 +412,64 @@ test("every town opens with its first year's budget on file: adopted by its coun
   }
 }, SLOW);
 
+test("every standing payment a town opens with says who gave it, when and under what; the town's rest on its own signatory rule, and what it is paid or charged from outside has a paper behind it", () => {
+  for (const id of ids) {
+    const c = town(id);
+    const P = loadProfile(id);
+    const rec = (rid: string) => c.world.records.find((r: any) => r.id === rid);
+    const written = (n: number) => formatMoney(n, P.values.currency, n % 10 ** P.values.currency.minor_units === 0 ? { decimals: false } : {});
+    const standing = c.world.records.filter((r: any) => r.kind === "request" && r.author === "genesis" && Number.isInteger(r.data?.every));
+    expect(standing.length).toBeGreaterThan(100);
+    // Every one: an instruction to the bank from whoever it speaks for, given before the year began.
+    for (const r of standing) expect(r.text).toMatch(/^Standing instruction to the bank, given (by \S+|for the town by its finance officer, the signatory the town has named for its account \(signatories-city\),) before the year began: pay /);
+    // Every one that pays under an agreement cites it and names it in its words. (The one kind that rests on none is a
+    // household member's share of the rent: an arrangement inside a household, and its words say whose lease it is.)
+    for (const r of standing) {
+      if (r.id.startsWith("share-")) expect(r.text).toContain("who holds the lease");
+      else {
+        expect(rec(r.basis)?.record).toBe("agreement");
+        expect(r.text).toContain(` ${r.basis}`);
+      }
+    }
+    // The town's: only its finance officer may instruct on its account, by the mandate the bank holds, and each of
+    // its instructions was given in that post. Its words give the sum as the town writes money, how it comes from
+    // the agreed wage, and the first pay day.
+    const mandate = rec("signatories-city");
+    expect(mandate).toMatchObject({ kind: "signatories", speaks_for: "city", addressed_to: ["bank"], basis: "law-charter", data: { account: "acc-city", positions: ["finance"] } });
+    expect(mandate.text).toContain("given by resolution of the council before the year began");
+    expect(mandate.text).toContain("only the finance officer puts a hold on a standing instruction, changes one or withdraws one");
+    const towns = standing.filter((r: any) => r.speaks_for === "city");
+    expect(towns.length).toBeGreaterThan(0);
+    for (const r of towns) {
+      expect(mandate.data.positions).toContain(r.in_position);
+      const job = rec(r.basis), gross = Number(job.terms.commitments[0].does.outcome.money.amount), net = Number(r.data.outcome.money.amount);
+      expect(r.text).toContain(written(net));
+      if (net < gross) expect(r.text).toContain(`(the agreed ${written(gross)} less ${written(gross - net)} withheld under law-income-tax)`);
+      expect(r.text).toContain(`first on year 1, day ${r.data.first / DAY + 1}.`);
+      // (The agreement it pays under was signed for the town by the office that takes its crew on.)
+      expect(c.world.records.find((x: any) => x.record === "signature" && x.agreement === job.id && x.as === "city")).toMatchObject({ in_position: "works" });
+      expect(c.positions.some((x: any) => x.id === "works" && x.entity === "city")).toBe(true);
+    }
+    // What the town is paid from outside: the funder's determination is on file with it, and says what the grants
+    // office pays by (the same figures the office is given).
+    for (const g of c.participants.filter((x: any) => x.controller.impl === "world.grants")) {
+      const q = g.controller.params, paper = rec(`grant-${q.to}`);
+      expect(paper).toMatchObject({ kind: "grant_determination", speaks_for: "outside", addressed_to: [q.to], author: "genesis", at: 0, data: { per_resident_per_year: String(q.per_resident_per_year), every_days: q.every_days, first_day: q.first_day, account: q.to_account } });
+      expect(c.positions.find((x: any) => x.id === paper.in_position)?.holder).toBe(g.id);
+      expect(paper.text).toContain(`${written(q.per_resident_per_year)} a year for each resident`);
+      expect(paper.text).toContain(`every ${q.every_days} days from year 1, day ${q.first_day + 1}`);
+    }
+    expect(rec("grant-city")).toBeDefined();
+    // What the town is charged from outside: the landfill's charge is on file with it, where the place has one.
+    const landfill = c.participants.find((x: any) => x.controller.impl === "world.disposal").controller.params;
+    if (landfill.price_per_tonne === undefined) expect(rec("landfill-charges")).toBeUndefined();
+    else {
+      expect(rec("landfill-charges")).toMatchObject({ kind: "charges_notice", speaks_for: "outside", addressed_to: ["city"], data: { price_per_tonne: String(landfill.price_per_tonne), every_days: landfill.every_days } });
+      expect(rec("landfill-charges").text).toContain(`${written(landfill.price_per_tonne)} a tonne`);
+    }
+  }
+}, SLOW);
+
 test("a council with almost no reserves opens with the same budget and a hundredth of the money: a budget it cannot meet", () => {
   const plain = generate({ ...spec, profile: ids[0] }), lean = generate({ ...spec, profile: ids[0], scenario: "lean-council" });
   const lines = (c: any) => c.world.records.find((r: any) => r.id === "budget-year-1").data.lines;

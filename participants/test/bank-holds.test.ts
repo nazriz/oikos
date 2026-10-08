@@ -88,19 +88,23 @@ test("a letter to the bank is answered with the writer's own standing instructio
   at(m, 12 * DAY, [hold("h1", 12 * DAY, "c1", ["so-1"])]);
   const letter = (from: string) => notes(at(m, 13 * DAY, [], [{ id: `m-${from}`, from: `${from}-self`, text: "What do you hold for me?" }]))[0]![1] as string;
   const mine = letter("c1");
-  expect(mine).toContain("Your standing instructions with us: so-1: $1,000.00 from acc-c1 to acc-landlord every 10 days, next due day 21, on hold (h1); so-2: $25.00 from acc-c1 to acc-union every 30 days, next due day 31. ");
+  expect(mine).toContain("Your standing instructions with us: so-1: $1,000.00 from acc-c1 to acc-landlord every 10 days, next due day 21, given on year 1, day 1, on hold (h1); so-2: $25.00 from acc-c1 to acc-union every 30 days, next due day 31, given on year 1, day 1. ");
   expect(mine).toEndWith("To end a standing instruction, withdraw it by its reference; to pause one, put a hold on it by its reference, and withdraw the hold to resume.");
   expect(mine).not.toContain("so-3");
-  expect(letter("c2")).toContain("Your standing instructions with us: so-3: $1,000.00 from acc-c2 to acc-landlord every 10 days, next due day 21. ");
+  expect(letter("c2")).toContain("Your standing instructions with us: so-3: $1,000.00 from acc-c2 to acc-landlord every 10 days, next due day 21, given on year 1, day 1. ");
   // Once the hold is lifted the list no longer says it is held; someone with none is told so.
   at(m, 14 * DAY, [lifted("w1", 14 * DAY, "h1")]);
-  expect(letter("c1")).toContain("so-1: $1,000.00 from acc-c1 to acc-landlord every 10 days, next due day 21; so-2");
+  expect(letter("c1")).toContain("so-1: $1,000.00 from acc-c1 to acc-landlord every 10 days, next due day 21, given on year 1, day 1; so-2");
+  // An instruction the customer opened with, given in a post of theirs and resting on an agreement: the list says so.
+  const town = bank();
+  at(town, 0, [order("so-w", 0, "firm", { author: "genesis", in_position: "firm-boss", basis: "job-c9" })]);
+  expect(notes(at(town, DAY, [], [{ id: "m1", from: "boss-1", as: "firm-boss", from_entity: "firm", text: "Who set this up?" }]))[0]![1]).toContain("so-w: $1,000.00 from acc-firm to acc-landlord every 10 days, next due day 11, given before the year began in your post firm-boss, citing job-c9. ");
   const none = bank();
   expect(notes(at(none, DAY, [], [{ id: "m1", from: "c1-self", text: "Hello." }]))[0]![1]).toContain("You have no standing instructions with us. ");
   // A long list is cut where the bank's parameter says, and says how many more there are.
   const short = bank({ letter_lists: 1 });
   at(short, 0, [order("so-1", 0, "c1"), order("so-2", 0, "c1")]);
-  expect(notes(at(short, DAY, [], [{ id: "m1", from: "c1-self", text: "Hello." }]))[0]![1]).toContain("so-1: $1,000.00 from acc-c1 to acc-landlord every 10 days, next due day 11; and 1 more. ");
+  expect(notes(at(short, DAY, [], [{ id: "m1", from: "c1-self", text: "Hello." }]))[0]![1]).toContain("so-1: $1,000.00 from acc-c1 to acc-landlord every 10 days, next due day 11, given on year 1, day 1; and 1 more. ");
 });
 
 test("holds and their lifting, with the bank going through orders only when due and going through every one at every plan: the same payments and the same letters", () => {

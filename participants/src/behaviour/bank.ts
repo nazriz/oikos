@@ -10,7 +10,7 @@
 
 import { cents, smallestNow } from "../money";
 import type { Observation, StatementRecord, Transaction } from "../contracts";
-import { channels } from "../contracts";
+import { basesOf, channels } from "../contracts";
 import { DAY, wait, type BehaviourModule, type ParticipantContext } from "../module";
 import { refusalText } from "../llm/words";
 import * as C from "../calls";
@@ -74,7 +74,7 @@ export const bankPaymentSystem: BehaviourModule = {
     { what: "request", why: "A bank keeps its own customers' instructions: every standing order and payment request it is asked to carry out is addressed to it." },
     { what: "accounts", why: "The ledger is the bank's own book: it keeps its customers' accounts, and pays from them as they instruct." },
   ],
-  version: "0.14.0", // 0.14.0: it keeps a ledger of what it has paid in and out of each account, and a letter is answered with a statement from it (until then, with the payments new at that look: nearly always none)
+  version: "0.15.0", // 0.15.0: its list of a customer's standing instructions says of each who gave it, when, and what it cites. 0.14.0: it keeps a ledger of what it has paid in and out of each account, and a letter is answered with a statement from it (until then, with the payments new at that look: nearly always none)
   doc: "docs/behaviour/bank-payment-system.md",
   cadence: () => DAY,
   firstWake: () => 0,
@@ -412,7 +412,10 @@ export const bankPaymentSystem: BehaviourModule = {
       const order = (r: StatementRecord) => {
         const m = r.data!.outcome.money, every = r.data!.every as number, next = nextDue.get(r.id);
         const on = (holdsOn.get(r.id) ?? []).filter((h) => book.withdrawnAt.get(h.hold) === undefined).map((h) => h.hold);
-        return `${r.id}: ${usd(cents(m.amount))} from ${m.from} to ${m.to} every ${every % DAY === 0 ? `${every / DAY} day${every === DAY ? "" : "s"}` : `${every} seconds`}${next !== undefined ? `, next due day ${Math.floor(next / DAY) + 1}` : ""}${on.length ? `, on hold (${on.join(", ")})` : ""}`;
+        // (Who gave it and when, and what it cites: what the instruction itself says, which is the customer's own paper.)
+        const cited = basesOf(r);
+        const given = `, given ${r.author === "genesis" ? "before the year began" : `on ${dateWords(r.at)}`}${r.in_position ? ` in your post ${r.in_position}` : ""}${cited.length ? `, citing ${cited.join(", ")}` : ""}`;
+        return `${r.id}: ${usd(cents(m.amount))} from ${m.from} to ${m.to} every ${every % DAY === 0 ? `${every / DAY} day${every === DAY ? "" : "s"}` : `${every} seconds`}${next !== undefined ? `, next due day ${Math.floor(next / DAY) + 1}` : ""}${given}${on.length ? `, on hold (${on.join(", ")})` : ""}`;
       };
       return `Report from ${obs.entity}: ${mine.map(statement).join(" ")} ` +
         (orders.length ? `Your standing instructions with us: ${orders.slice(0, lettersList).map(order).join("; ")}${orders.length > lettersList ? `; and ${orders.length - lettersList} more` : ""}. ` : "You have no standing instructions with us. ") +

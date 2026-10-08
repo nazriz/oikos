@@ -1,4 +1,4 @@
-# `bank.payment_system` (v0.14.0)
+# `bank.payment_system` (v0.15.0)
 
 **Seat:** a bank's automated payment system (acts as the bank). **Source:** `participants/src/behaviour/bank.ts`.
 
@@ -21,7 +21,7 @@ The bank's own procedure, applied before paying:
 - **Requests it can't carry out get a reply, once:** an account it doesn't keep, no valid amount or account to pay, or something other than a payment. So does a payment that physics refused, with the reason in plain words.
 - **The money must be there.** If it isn't, the payment is not made and the holder is sent a message saying so. The obligation behind it, such as rent, simply stays unpaid; what follows is up to the creditor. The message's words are fixed ("Payment of … to … (request …) failed: insufficient funds."), and kept in one place with how a reader knows them (`PAYMENT_FAILED`, `participants/src/behaviour/common.ts`): a code tenant counts rent as missed on exactly this note, and on none of the bank's others. That due date isn't tried again: a standing order's next payment is its next due date's.
 
-- **Letters.** A letter to the bank is answered with **a statement of each of the writer's own accounts** (0.14.0: the section "A statement" below; until then with "their latest payments", which was nearly always "No payments yet"), and (0.12.0) **their own standing instructions, each by its reference**: its amount, the account it pays from and the account it pays, how often, its next due day, and whether it is on hold and under which hold. Nobody else's are listed. A real bank sends this list on request; here it is how a customer who has no reference for an instruction comes to have one, so that it can be withdrawn or held by name. At most `letter_lists` are listed, in order of reference, and the letter says how many more there are.
+- **Letters.** A letter to the bank is answered with **a statement of each of the writer's own accounts** (0.14.0: the section "A statement" below; until then with "their latest payments", which was nearly always "No payments yet"), and (0.12.0) **their own standing instructions, each by its reference**: its amount, the account it pays from and the account it pays, how often, its next due day, (0.15.0) who gave it and when and what it cites ("given before the year began in your post finance, citing job-c0004": what the instruction itself says, which is the customer's own paper), and whether it is on hold and under which hold. Nobody else's are listed. A real bank sends this list on request; here it is how a customer who has no reference for an instruction comes to have one, so that it can be withdrawn or held by name. At most `letter_lists` are listed, in order of reference, and the letter says how many more there are.
 
 It batches up to 32 payments per action. If a batch is refused because the world changed under it, it retries those payments one at a time.
 
@@ -47,6 +47,17 @@ Real retail banking: payments are made on the account holder's instruction; stan
 **Where the rule comes from** (docs/research/references.md, "A bank statement"; to confirm, not opened). A payment service provider gives its customer, for each transaction, a reference identifying it, the amount, the date, and where appropriate the payee or payer and what was sent with the payment; statements are given periodically and on request.
 
 **Leaves out.** A statement sent unasked at the month's end to every customer (a real bank's routine: here a letter a customer a month that no code customer reads; a seat asks). The payee's name (an account's id is what the world has). Entries older than the latest `statement_lists` once they have scrolled off (they stay in the totals of a period that includes them). Charges and interest (the bank has neither).
+
+## The instructions a town opens with (generator 0.39.0, 2026-10-09)
+
+Every standing payment a generated town starts with was set up before the run began, as its agreements were. Until generator 0.39.0 each said only "Please pay c0004's wages every 14 days.", made by the world's beginning; the town's were marked as made in its finance officer's post and nothing said so in words. Three pilots' seats asked who had issued them and on what authority, and nothing on file answered (live check 2, finding 2).
+
+- **Each instruction says of itself** who gave it, when, and what it pays under: "Standing instruction to the bank, given for the town by its finance officer, the signatory the town has named for its account (signatories-city), before the year began: pay c0004's wages under employment agreement job-c0004, $2,393.34 (the agreed $3,000 less $606.66 withheld under law-income-tax) every 14 days, first on year 1, day 9." A person's: "given by c0412 before the year began: pay my rent under lease lease-c0412 every month." Each cites its agreement (`basis`), as before. The one kind with no agreement behind it is a household member's share of the rent, and it says whose lease the rent is under.
+- **The town's mandate** (`signatories-city`) says whose it is and what it covers: "The town's mandate to its bank for its account, given by resolution of the council before the year began: payments from the account are instructed only by the finance officer, and only the finance officer puts a hold on a standing instruction, changes one or withdraws one. The mandate stands until the council replaces it." It rests on the charter.
+- **The town's side of each opening employment agreement** is signed in the post of the office that takes its crew on (the works manager).
+- **The bank's list** of a customer's standing instructions gives the same for each (above, "Letters").
+
+**Where the rule comes from** (docs/research/references.md, "What the second live check found"; to confirm). A bank acts for an organisation on a mandate: a resolution of its governing body naming who may sign, which the bank holds and checks instructions against. A payroll payment rests on the contract of employment and on the payroll authority that set it up.
 
 ## A hold (0.12.0)
 

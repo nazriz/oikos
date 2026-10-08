@@ -6,7 +6,7 @@
 // support payments, industry shares...) comes from the spec's profile (worlds/profiles/, docs/profiles.md), and what
 // isn't there is derived from it here by general formulas, or is a placeholder of the town's own shape.
 
-import { adultAgeBands, bedroomsNeeded, drawHousehold, drawSavings, formatMoney, modules, Randomness, chargesInWords, forAge, forOutOfWork, linesInWords, paymentsInWords, tabledLines, yearInDays, stopsWorkAt, withholding, yearsOfSchooling, draftLaw, type HouseholdSpec, type IncomeTaxLaw, type Issued, type LawSchedule, type PaymentRule, type Taken } from "@oikos/participants";
+import { adultAgeBands, bedroomsNeeded, drawHousehold, drawSavings, formatMoney, forms as formWords, modules, Randomness, chargesInWords, forAge, forOutOfWork, linesInWords, paymentsInWords, tabledLines, yearInDays, stopsWorkAt, withholding, yearsOfSchooling, draftLaw, type HouseholdSpec, type IncomeTaxLaw, type Issued, type LawSchedule, type PaymentRule, type Taken } from "@oikos/participants";
 import law from "../law/basic.json";
 import schedules from "../law/schedules.json";
 import { loadProfile, type Profile } from "./profile";
@@ -67,7 +67,7 @@ const ACT_TIME = {
   },
 };
 
-export const GENERATOR_VERSION = "0.38.0";
+export const GENERATOR_VERSION = "0.39.0";
 const DAY = 86_400;
 const MONTH = 30 * DAY;
 const YEAR = 365 * DAY;
@@ -779,10 +779,16 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
         { who: c.id, does: { outcome: { occupancy: { who: c.id, in: w.space } } } },
       ],
       termination: [{ party: w.employer, notice: 14 * DAY }, { party: c.id, notice: 14 * DAY }] } });
-    for (const party of [w.employer, c.id]) records.push({ id: `${ag}-sig-${party}`, record: "signature", author: "genesis", at: 0, visible_to: [w.employer, c.id], speaks_for: party, agreement: ag, as: party });
+    // (The town's side is signed by the office that takes its crew on: its works manager.)
+    for (const party of [w.employer, c.id]) records.push({ id: `${ag}-sig-${party}`, record: "signature", author: "genesis", at: 0, visible_to: [w.employer, c.id], speaks_for: party, ...(party === "city" ? { in_position: "works" } : {}), agreement: ag, as: party });
     // (The town's wages are instructed by its finance officer, the signatory the bank knows.)
+    // The instruction says of itself who gave it and when, under whose authority, which agreement it pays under and
+    // how its sum comes from the agreed wage (docs/behaviour/bank-payment-system.md, "The instructions a town opens with").
+    const firstPay = (1 + pick.below(V.pay_period_days)) * DAY, taxWithheld = withholding(taxLaw, w.wage, PAY);
+    const sumWords = `${asWritten(w.wage - taxWithheld)}${taxWithheld > 0 ? ` (the agreed ${asWritten(w.wage)} less ${asWritten(taxWithheld)} withheld under ${taxLaw.id})` : ""}`;
     records.push({ id: `${ag}-wages`, record: "statement", author: "genesis", at: 0, visible_to: [w.employer, "bank"], speaks_for: w.employer, ...(w.employer === "city" ? { in_position: "finance" } : {}), kind: "request", addressed_to: ["bank"], basis: ag,
-      text: `Please pay ${c.id}'s wages every ${V.pay_period_days} days.`, data: { outcome: { money: { from: `acc-${w.employer}`, to: `acc-${c.id}`, amount: String(w.wage - withholding(taxLaw, w.wage, PAY)), for: "wages" } }, every: PAY, first: (1 + pick.below(V.pay_period_days)) * DAY } });
+      text: `Standing instruction to the bank, given ${w.employer === "city" ? "for the town by its finance officer, the signatory the town has named for its account (signatories-city)," : `by ${w.employer}`} before the year began: pay ${c.id}'s wages under employment agreement ${ag}, ${sumWords} every ${V.pay_period_days} days, first on ${formWords.dateWords(firstPay)}.`,
+      data: { outcome: { money: { from: `acc-${w.employer}`, to: `acc-${c.id}`, amount: String(w.wage - taxWithheld), for: "wages" } }, every: PAY, first: firstPay } });
     if (!RD) occupancy.push({ occupant: c.id, space: w.space }); // (with the round, at home at the start: they go to work at its hour)
     // Union members at the start: the profile's membership rate for the work's industry, dues by standing order.
     if (unionPick.below(10_000) < (U.membership_bps[w.industry] ?? U.membership_bps.other ?? 0)) {
@@ -795,7 +801,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
         termination: [{ party: "union", notice: MONTH }, { party: c.id, notice: Math.max(1, U.resignation_notice_days * DAY) }] } });
       for (const party of ["union", c.id]) records.push({ id: `${mem}-sig-${party}`, record: "signature", author: "genesis", at: 0, visible_to: ["union", c.id], speaks_for: party, agreement: mem, as: party });
       records.push({ id: `${mem}-dues`, record: "statement", author: "genesis", at: 0, visible_to: [c.id, "bank"], speaks_for: c.id, kind: "request", addressed_to: ["bank"], basis: mem,
-        text: "Please pay my union dues monthly.", data: { outcome: { money: { from: `acc-${c.id}`, to: "acc-union", amount: String(U.dues_per_month), for: "Union dues." } }, every: MONTH, first: (1 + unionPick.below(30)) * DAY } });
+        text: `Standing instruction to the bank, given by ${c.id} before the year began: pay my union dues under membership agreement ${mem} every month.`, data: { outcome: { money: { from: `acc-${c.id}`, to: "acc-union", amount: String(U.dues_per_month), for: "Union dues." } }, every: MONTH, first: (1 + unionPick.below(30)) * DAY } });
     }
   }
   // The town's children, at the same participation once they're adults (drawn now: whether they'll look for work).
@@ -921,7 +927,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
           text: `bank lent ${lh} ${asWritten(principal)} for their home, ${home.space}; ${lh} repays ${asWritten(payment)} a month for ${months} more months (${OW.mortgage_rate_bps / 100}% a year).` } });
         for (const party of parties) records.push({ id: `${loan}-sig-${party}`, record: "signature", author: "genesis", at: 0, visible_to: parties, speaks_for: party, agreement: loan, as: party });
         records.push({ id: `${loan}-repay`, record: "statement", author: "genesis", at: 0, visible_to: [lh, "bank"], speaks_for: lh, kind: "request", addressed_to: ["bank"], basis: loan,
-          text: "Please pay my mortgage repayments monthly.", data: { outcome: { money: { from: `acc-${lh}`, to: "acc-bank", amount: String(payment), for: "Loan repayment." } }, every: MONTH, first: (2 + ownPick.below(29)) * DAY } });
+          text: `Standing instruction to the bank, given by ${lh} before the year began: pay my mortgage repayments under loan agreement ${loan} every month.`, data: { outcome: { money: { from: `acc-${lh}`, to: "acc-bank", amount: String(payment), for: "Loan repayment." } }, every: MONTH, first: (2 + ownPick.below(29)) * DAY } });
       }
       for (const m of h.members) occupancy.push({ occupant: m.id, space: home.space });
       continue;
@@ -944,14 +950,14 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     // (Each tenancy's rent day; the others' shares of it reach the leaseholder the day before, as a household arranges it.)
     const rentDay = 2 + pick.below(29);
     records.push({ id: `${ag}-rent`, record: "statement", author: "genesis", at: 0, visible_to: [lh, "bank"], speaks_for: lh, kind: "request", addressed_to: ["bank"], basis: ag,
-      text: "Please pay my rent monthly.", data: { outcome: { money: { from: `acc-${lh}`, to: `acc-${home.landlord}`, amount: String(home.rent), for: "rent" } }, every: MONTH, first: rentDay * DAY } });
+      text: `Standing instruction to the bank, given by ${lh} before the year began: pay my rent under lease ${ag} every month.`, data: { outcome: { money: { from: `acc-${lh}`, to: `acc-${home.landlord}`, amount: String(home.rent), for: "rent" } }, every: MONTH, first: rentDay * DAY } });
     // The other adults who earn pay the leaseholder an even share of the rent.
     const earners = h.members.filter((m) => (monthlyPay.get(m.id) ?? 0) > 0);
     for (const m of others) {
       if (!earners.includes(m)) continue;
       const due = Math.floor(home.rent / earners.length);
       records.push({ id: `share-${m.id}`, record: "statement", author: "genesis", at: 0, visible_to: [m.id, "bank"], speaks_for: m.id, kind: "request", addressed_to: ["bank"],
-        text: "Please pay my share of the rent monthly.", data: { outcome: { money: { from: `acc-${m.id}`, to: `acc-${lh}`, amount: String(due), for: "Household share of the rent." } }, every: MONTH, first: (rentDay - 1) * DAY } });
+        text: `Standing instruction to the bank, given by ${m.id} before the year began: pay my share of our household's rent to ${lh}, who holds the lease, every month.`, data: { outcome: { money: { from: `acc-${m.id}`, to: `acc-${lh}`, amount: String(due), for: "Household share of the rent." } }, every: MONTH, first: (rentDay - 1) * DAY } });
     }
     for (const m of h.members) occupancy.push({ occupant: m.id, space: home.space });
   }
@@ -1216,6 +1222,18 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   const participants: any[] = [];
   const positions: any[] = [];
   /** An office of an organisation, held by a system participant running `controller` (whose job module it also is). */
+  /**
+   * A grant from outside, paid by a `world.grants` office: its parameters, and the funder's determination, on file with
+   * whoever is paid from before the year began (the paper behind the sum a budget expects: what is paid for each
+   * resident, by whose count, how often and into which account).
+   */
+  const GRANT_EVERY_DAYS = 91, GRANT_FIRST_DAY = 30;
+  const grantOf = (from: string, to: string, account: string, perResident: number) => {
+    records.push({ id: `grant-${to}`, record: "statement", author: "genesis", at: 0, visible_to: ["outside", to], speaks_for: "outside", in_position: from, kind: "grant_determination", addressed_to: [to],
+      text: `Grant determination, made before the year began: ${asWritten(perResident)} a year for each resident, by the statistician's latest published estimate of the town's population, paid into ${account} every ${GRANT_EVERY_DAYS} days from ${formWords.dateWords(GRANT_FIRST_DAY * DAY)}. Each payment comes with a notice of the sum and the count it was reckoned on.`,
+      data: { per_resident_per_year: String(perResident), every_days: GRANT_EVERY_DAYS, first_day: GRANT_FIRST_DAY, account } });
+    return code("world.grants", { account: "acc-outside", to, to_account: account, per_resident_per_year: perResident, every_days: GRANT_EVERY_DAYS, first_day: GRANT_FIRST_DAY });
+  };
   const office = (id: string, entity: string, title: string, role: string | undefined, channels: any[], controller: any, extra: any = {}) => {
     const holder = `${id}-system`;
     participants.push({ id: holder, kind: "system", owner: entity, title, controller, framing: extra.framing ?? unstated, ...(extra.on_opt_out ? { on_opt_out: extra.on_opt_out } : {}), ...(extra.lanes ? { lanes: extra.lanes } : {}) });
@@ -1363,9 +1381,9 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
         term_days: Math.round((ED.school_days_per_year / 4) * (7 / 5)), school_ages: ED.school_ages, ...(RD ? { starts: (RD.school_start_hour + 0.5) * HOUR } : {}) }));
     // Their funding: the staff's wages a year, per home seen (what world.grants counts), paid quarterly.
     office("outside-health-funding", "outside", "Health funding", undefined, [{ id: "ledger", kind: "accounts" }, K.published("population", ["population_estimate"])],
-      code("world.grants", { account: "acc-outside", to: "clinic", to_account: "acc-clinic", per_resident_per_year: Math.ceil(yearly(HE.doctor_wage_per_pay_period, doctors) / residentsAtStart) }));
+      grantOf("outside-health-funding", "clinic", "acc-clinic", Math.ceil(yearly(HE.doctor_wage_per_pay_period, doctors) / residentsAtStart)));
     office("outside-school-funding", "outside", "School funding", undefined, [{ id: "ledger", kind: "accounts" }, K.published("population", ["population_estimate"])],
-      code("world.grants", { account: "acc-outside", to: "school", to_account: "acc-school", per_resident_per_year: Math.ceil(yearly(ED.teacher_wage_per_pay_period, teachers) / residentsAtStart) }));
+      grantOf("outside-school-funding", "school", "acc-school", Math.ceil(yearly(ED.teacher_wage_per_pay_period, teachers) / residentsAtStart)));
   }
   // The tribunal (world-expansion 5), the state's: its member hears applications and makes orders, under the laws in
   // force; its registrar enforces unpaid orders to pay, by an order to the debtor's bank.
@@ -1405,7 +1423,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
         working_day: WORKING_DAY, task_seconds: CR.investigation_hours * HOUR, tribunal: "tribunal", ...look,
         ...(found ? { calls_channel: "calls", registry: "city" } : {}) }));
     office("outside-police-funding", "outside", "Police funding", undefined, [{ id: "ledger", kind: "accounts" }, K.published("population", ["population_estimate"])],
-      code("world.grants", { account: "acc-outside", to: "police", to_account: "acc-police", per_resident_per_year: Math.ceil(((CR.officer_wage_per_pay_period * officers * YEAR) / PAY) / Math.max(1, homes.length)) }));
+      grantOf("outside-police-funding", "police", "acc-police", Math.ceil(((CR.officer_wage_per_pay_period * officers * YEAR) / PAY) / Math.max(1, homes.length))));
   }
   // The union's organiser: members (and applications to join), the claims it makes and the answers, its ballots' votes,
   // and the shops' prices (what its claims follow).
@@ -1420,8 +1438,11 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   office("outside-statistics", "outside", "Statistician", undefined, [K.board("adverts", ["price_list"], { placed: true }),
     K.mine("registrations", ["birth_registration", "death_registration", "arrival", "departure"])],
     code("world.statistics", { adverts: "adverts", population: everyone.length }));
+  // (Its charge, on file with the town from before the year began: the paper behind the invoices it sends.)
+  if (LEVY !== undefined) records.push({ id: "landfill-charges", record: "statement", author: "genesis", at: 0, visible_to: ["outside", "city"], speaks_for: "outside", in_position: "outside-landfill", kind: "charges_notice", addressed_to: ["city"],
+    text: `The landfill's charge, notified before the year began: ${asWritten(LEVY)} a tonne of waste brought to it, invoiced every 30 days on the dockets of what was brought.`, data: { kind: "waste", price_per_tonne: String(LEVY), every_days: 30 } });
   office("outside-landfill", "outside", "Landfill", undefined, [K.mine("dockets", ["disposal_docket"])],
-    code("world.disposal", { kind: "waste", ...(LEVY === undefined ? {} : { price_per_tonne: LEVY }), account: "acc-outside" }));
+    code("world.disposal", { kind: "waste", ...(LEVY === undefined ? {} : { price_per_tonne: LEVY }), account: "acc-outside", every_days: 30 }));
   // Rates (docs/behaviour/public-finance.md): the rates officer levies them on the valuer's valuations, under the rating law.
   office("rates", "city", "Rates officer", "rates_officer", [{ id: "treasury", kind: "accounts" }, laws, mine("rates-business"), K.kept("valuations", ["valuation"])], code("city.rates_officer"));
   // From outside the town (a higher government's offices, D31): the valuer, and grants to the town.
@@ -1429,7 +1450,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   office("outside-valuer", "outside", "Valuer", undefined, [K.kept("roll", ["property_roll", "acquisition_notice"]), K.mine("requests", ["valuation_request"]), priceLists],
     code("world.valuer", { land_value: landValue, builder: "builder", rating: "city", exempt: rateExempt }));
   office("outside-grants", "outside", "Grants to local government", undefined, [{ id: "ledger", kind: "accounts" }, K.published("population", ["population_estimate"])],
-    code("world.grants", { account: "acc-outside", to: "city", to_account: "acc-city", per_resident_per_year: V.public_finance.grants_per_resident_per_year }));
+    grantOf("outside-grants", "city", "acc-city", V.public_finance.grants_per_resident_per_year));
   office("registry", "city", "Registrar of births, deaths and marriages", "registrar", [K.mine("notifications", ["death_notification", "birth_notification"]), deaths,
     ], // (Its entries go to those concerned: docs/behaviour/deaths.md, "Who is told". Sent every one as of right: the
     // support office, and a retirement fund where there is one. Written to when the town administers an estate: the
@@ -1449,7 +1470,8 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   const approvalOver = asWritten(V.town_finance.payment_approval_over);
   // The town tells its bank who may instruct payments from its account: the finance officer (the position, whoever holds it).
   records.push({ id: "signatories-city", record: "statement", author: "genesis", at: 0, visible_to: ["city", "bank"], speaks_for: "city", kind: "signatories", addressed_to: ["bank"],
-    text: "Payments from the town's account may be instructed only by the finance officer.", data: { account: "acc-city", positions: ["finance"] } });
+    text: "The town's mandate to its bank for its account, given by resolution of the council before the year began: payments from the account are instructed only by the finance officer, and only the finance officer puts a hold on a standing instruction, changes one or withdraws one. The mandate stands until the council replaces it.",
+    basis: "law-charter", data: { account: "acc-city", positions: ["finance"] } });
   records.push({ id: "proc-payments", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", kind: "procedure", basis: "law-charter", addressed_to: ["city"],
     text: `The finance officer pays the town's wages and bills only within the budget the council has adopted for the year. While a year has no adopted budget, the finance officer pays only as the charter allows: what the town is already bound to pay, at no more each month than a twelfth of the budget last adopted. Any one payment over ${approvalOver} needs the mayor's written approval.`,
     adico: { attribute: "the finance officer", deontic: "must_not", aim: "pay the town's wages and bills", condition: `outside the budget adopted for the year (or, while the year has none, beyond what the charter allows in the meantime), or over ${approvalOver} in one payment without the mayor's written approval` } });
