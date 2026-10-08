@@ -257,7 +257,7 @@ class Resolver {
       case "money": return this.money(c, bind);
       case "goods": return this.goods(c);
       case "take": return this.take(c);
-      case "work": return this.work(c);
+      case "work": return this.work(c, bind);
       case "account": return this.account(c, bind);
       case "structure": return this.structure(c, bind);
       case "occupancy": return this.occupancy(c);
@@ -304,8 +304,10 @@ class Resolver {
 
   /** Work (phase B): units of a task at a place, by the people named (`by`: one, or a list). Nobody named: work that
    * takes no one's time (using things up). */
-  private work(c: Call): Block[] {
+  private work(c: Call, bind?: string): Block[] {
     const task = this.need(c, "task", "What work?");
+    if (this.has(c, "every")) return this.standingWork(c, task, bind);
+    if (this.has(c, "first") || this.has(c, "until")) throw new Ask("Work asked for once is done now. When it starts and how long it goes on are said of work done again and again: say how often.");
     // A survey (nature): of a species or a field, in these cells, a unit each.
     const survey = this.id(c, "survey");
     const cells = survey ? this.ids(c, "cells") : undefined;
@@ -324,6 +326,30 @@ class Resolver {
       investigate = { from: this.k.entityOf(from), at: takenAt, kind: this.need(c, "kind", "Taken: what?") };
     }
     return [{ block: "work", task, units: Number(units), at, performers: by, ...(on ? { on } : {}), ...(survey && cells ? { survey: { of: survey, cells } } : {}), ...(investigate ? { investigate } : {}) }];
+  }
+
+  /**
+   * A standing work order (contracts/calls.md): work to be done again and again, by the organisation's own staff, put
+   * on the organisation's own file. What task, where, on what and by whom (if said), how often, from when and for how
+   * long. Nothing is done here and the kernel does nothing with it: the staff whose work it is follow it, each time
+   * it falls due, in their own hours, while it stands. It is changed by withdrawing it and making another, and put
+   * on hold like any standing paper.
+   */
+  private standingWork(c: Call, task: string, bind?: string): Block[] {
+    if (this.has(c, "survey") || this.has(c, "investigate")) throw new Ask("A survey or an investigation is asked for each time, with what it is of: it can't be a standing order.");
+    const at = this.need(c, "at", "Where?");
+    const every = this.seconds(c, "every")!;
+    if (every <= 0) throw new Ask("How often?");
+    const first = this.seconds(c, "first");
+    const until = this.seconds(c, "until");
+    const by = this.has(c, "by") ? [...new Set(this.ids(c, "by")!.map((p) => this.k.entityOf(p)))] : undefined;
+    const on = this.has(c, "on") ? [...new Set(this.ids(c, "on")!)] : undefined;
+    const units = this.quantity(c, "units");
+    const me = this.id(c, "for") ?? this.me;
+    const text = `Standing work order: ${task} at ${at}${on ? `, on ${on.join(", ")}` : ""}${by ? `, by ${by.join(", ")}` : ""}${units ? `, ${units} each time` : ""}, every ${durationWords(every)}${first !== undefined ? `, the first in ${durationWords(first)}` : ""}${until !== undefined ? `, for ${durationWords(until)}` : ""}.`;
+    return [{ block: "publish", kind: "work_order", text, speaks_for: me, addressed_to: [me], visible_to: [...new Set([me, ...(by ?? [])])],
+      data: { work: { task, at, ...(on ? { on } : {}), ...(by ? { by } : {}), ...(units ? { units: Number(units) } : {}) }, every, ...(first !== undefined ? { first } : {}), ...(until !== undefined ? { until: this.k.t + until } : {}) },
+      ...(bind ? { ref: bind } : {}) }];
   }
 
   /** Taking goods another holds, where we are (crime: world-expansion 7.3). */
@@ -640,9 +666,11 @@ class Resolver {
       if (!acts) throw new Ask(`You don't know of a standing paper called ${x} that someone acts on. Look it up and name it by its id, or say who is to hold it.`);
       for (const a of acts) if (a !== me && !to.includes(a)) to.push(a);
     }
-    if (!to.length) throw new Ask(`${held.join(", ")} ${held.length > 1 ? "are" : "is"} yours to act on: nobody else needs telling.`);
+    // (What is addressed to nobody but the organisation itself is acted on by its own people: the hold goes on its
+    // own file, where they read it. A standing work order is such a paper.)
+    const own = !to.length;
     const text = this.str(c, "text") || `Please hold ${held.join(", ")}: nothing is to be done under ${held.length > 1 ? "them" : "it"} until this is withdrawn.`;
-    return [{ block: "publish", kind: "hold", text, addressed_to: to, data: { holds: held }, visible_to: [me, ...to], ...common }];
+    return [{ block: "publish", kind: "hold", text, addressed_to: own ? [me] : to, data: { holds: held }, visible_to: own ? [me] : [me, ...to], ...common }];
   }
 
   private form(c: Call, bind?: string): Block[] {

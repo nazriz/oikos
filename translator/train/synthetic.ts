@@ -36,7 +36,9 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { calls, type Currency } from "@oikos/participants";
-import { amountWritings, askable, FIELD_TYPES, goldText, howOften, implausible, sampler, shapeOf, shuffled, type FormField, type FormSpec, type Gold, type WrittenCurrency } from "./data";
+// (The papers offices issue, as their modules declare them: read for their names, fields and types only.)
+import * as PAPERS from "../../participants/src/behaviour/papers";
+import { amountWritings, FIELD_TYPES, goldText, howOften, implausible, literals, sampler, shapeOf, shuffled, whyNot, type FormField, type FormSpec, type Gold, type WrittenCurrency } from "./data";
 
 /**
  * How invented worlds write their money: a sign before the amount or only a code; two decimal places, none, or three;
@@ -169,6 +171,8 @@ const FIELD_NAMES: { [type: string]: string[] } = {
   person: ["person", "tenant", "occupant", "witness", "contact"],
   structure: ["structure", "building", "property"],
   position: ["office", "post", "reports_to"],
+  list: ["members", "children", "witnesses", "parcels", "signatories", "copies_to", "attached", "also_tell", "sites", "parties"],
+  date: ["date", "from_day", "due", "starts", "ends", "born_at", "closes", "hearing", "effective", "inspected_on"],
 };
 const OPTIONS = [["landlords", "tenants", "neither"], ["law", "budget", "motion"], ["low", "medium", "high"], ["residential", "commercial", "industrial", "rural"], ["new", "renewal"], ["spring", "summer", "autumn", "winter"], ["granted", "refused", "deferred"], ["cash", "transfer"], ["urgent", "routine"], ["north", "south", "east", "west", "centre"], ["owner", "tenant", "agent"], ["small", "medium", "large", "huge"], ["weekdays", "weekends", "both"], ["indoor", "outdoor"], ["temporary", "permanent"]];
 
@@ -184,6 +188,10 @@ const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(
 /** One program's draws: a world's money, and the names of whatever it mentions by id. */
 class Draw {
   names: { [id: string]: string } = {};
+  /** What kind of program a recipe made, where it is one a part can be asked for by name (`Gold.tag`), and what
+   * else its writer is to be told (`Gold.notes`). */
+  tag?: string;
+  notes: string[] = [];
   currency: Currency;
   constructor(readonly rand: () => number, currencies: Currency[]) {
     this.currency = this.pick(currencies);
@@ -235,8 +243,7 @@ class Draw {
     return s;
   }
   /** (Never the bare word for it: `mayor`, `clerk` and `works` read as the office-holder, not as an id.) */
-  officeId(): string {
-    const w = this.pick(OFFICE_WORDS);
+  officeId(w: string = this.pick(OFFICE_WORDS)): string {
     const s = this.maybe(0.45) ? `${slug(this.pick(PLACES))}-${w}` : this.maybe(0.6) ? `pos.${this.int(1, 600)}` : `${w}-${this.int(1, 30)}`;
     this.names[s] = this.officeName(w);
     return s;
@@ -332,6 +339,15 @@ class Draw {
   }
   notice(): V {
     return tx(this.pick(["7 days", "14 days", "21 days", "28 days", "30 days", "45 days", "60 days", "a week", "two weeks", "a fortnight", "a month", "2 months", "4 weeks", "6 weeks"]));
+  }
+  /** A day, as reports write one: of a year, or (the first year's) by itself. */
+  date(): V {
+    return tx(this.maybe(0.7) ? `year ${this.int(1, 12)}, day ${this.int(1, 365)}` : `day ${this.int(1, 365)}`);
+  }
+  /** Several things of one kind, by id: one to four, each once (one alone is written bare: data.ts `goldText`). */
+  several(kind: "person" | "org" | "record" | "lot" | "structure" = this.pick(["person", "person", "org", "record", "lot", "structure"])): V {
+    const one = () => (kind === "person" ? this.personId() : kind === "org" ? this.orgId() : kind === "record" ? `rec.${this.int(1, 40000)}` : kind === "lot" ? (this.lot() as { id: string }).id : this.structureId());
+    return list([...new Set(Array.from({ length: this.pick([1, 2, 2, 3, 3, 4]) }, one))]);
   }
   count(max = 400): V {
     return tx(this.maybe(0.1) ? this.pick(["one", "two", "three", "four", "five", "six", "ten", "twelve"]) : String(this.maybe(0.6) ? this.int(1, 20) : this.int(1, max)));
@@ -451,6 +467,19 @@ const RECIPES: { [fn in Exclude<calls.Fn, "form">]: (d: Draw) => Lines } = {
     const r = d.rand();
     if (r < 0.12) return [call("work", { task: id("survey"), at: d.maybe(0.5) ? d.lot() : d.structure(), survey: d.word(SURVEYED), cells: list(Array.from({ length: d.int(1, 4) }, () => d.cellId())), by: d.maybe(0.7) ? by() : undefined, units: d.maybe(0.3) ? d.count(8) : undefined })];
     if (r < 0.22) return [call("work", { task: id("investigate"), units: d.count(12), at: d.structure(), by: d.maybe(0.8) ? by() : undefined, investigate: d.party(["org", "person"]), taken_at: d.structure(), kind: d.word(GOODS) })];
+    // A standing order: the work as a routine for one's own staff (what, where, how often), and now and then what it
+    // is done to (one thing or several), who does it, how much each time, how long until the first and for how long.
+    if (r < 0.5) {
+      const task = d.pick(TASKS);
+      const on = !d.maybe(0.4) ? undefined : DONE_TO_PEOPLE.includes(task) ? id(d.spaceId()) : d.maybe(0.5) ? d.structure() : d.several(d.pick(["structure", "structure", "lot"]));
+      d.tag = "standing_work";
+      return [call("work", {
+        task: id(task), at: d.maybe(0.85) ? d.structure() : d.ground(), every: tx(d.pick(howOften(d.pick(["1 day", "1 day", "2 days", "7 days", "7 days", "7 days", "14 days", "14 days", "28 days", "30 days", "3 weeks", "90 days"])))),
+        on, by: !d.maybe(0.45) ? undefined : d.maybe(0.6) ? id(d.personId()) : d.several("person"), units: d.maybe(0.3) ? d.count(12) : undefined,
+        first: d.maybe(0.2) ? tx(d.pick(["1 day", "2 days", "3 days", "7 days", "a week", "10 days", "14 days", "a fortnight", "a month"])) : undefined,
+        until: d.maybe(0.3) ? tx(d.maybe(0.6) ? `${d.int(2, 12)} weeks` : d.pick(["30 days", "60 days", "90 days", "3 months", "6 months", "a year", "a month", "a fortnight"])) : undefined,
+      })];
+    }
     // What it's done to, where the work is done to something: a building, or (teaching, treating) a person or a room of people.
     const task = d.pick(TASKS);
     const on = !d.maybe(0.5) ? undefined : DONE_TO_BUILDINGS.includes(task) ? d.structure() : DONE_TO_PEOPLE.includes(task) ? (d.maybe() ? d.person() : id(d.spaceId())) : undefined;
@@ -503,11 +532,25 @@ const RECIPES: { [fn in Exclude<calls.Fn, "form">]: (d: Draw) => Lines } = {
   statement: (d) => {
     // A hold on something standing (one record, or a few), and an entry on one's own file.
     if (d.maybe(0.14)) {
-      const held = Array.from({ length: d.maybe(0.6) ? 1 : d.int(2, 4) }, () => (d.job() as { id: string }).id);
+      // (A third of them are standing work orders, an office's own routines, held by id like any standing paper.)
+      const orders = d.maybe(1 / 3);
+      const held = Array.from({ length: d.maybe(0.6) ? 1 : d.int(2, 4) }, () => ((orders ? d.rec() : d.job()) as { id: string }).id);
+      if (orders) {
+        d.tag = "standing_work_hold";
+        d.notes.push(`What is put on hold is ${held.length > 1 ? "standing work orders, each" : "a standing work order:"} a routine set for the office's own staff (a round, a roster, a schedule). Say that that is what ${held.length > 1 ? "they are" : "it is"}, in words of your own, beside the id: it is paused, stays on record and is to be taken up again.`);
+      }
       return [call("statement", { hold: held.length === 1 ? id(held[0]!) : list([...new Set(held)]), basis: d.maybe(0.08) ? d.record() : undefined })];
     }
     if (d.maybe(0.12)) return [call("statement", { kind: id("entry"), visible: id("own"), text: d.entryWords(), basis: d.maybe(0.5) ? d.rec() : undefined })];
-    if (d.maybe(0.15)) return [call("statement", { withdraw: d.rec(), text: d.maybe(0.3) ? tx(d.pick(["It was issued in error.", "It has been replaced.", "The matter is settled.", "The figures were wrong."])) : undefined })];
+    if (d.maybe(0.15)) {
+      // (A quarter of what is withdrawn is a standing work order: the routine ended for good, with no words of its own.)
+      if (d.maybe(0.25)) {
+        d.tag = "standing_work_withdraw";
+        d.notes.push("What is withdrawn is a standing work order: a routine set for the office's own staff (a round, a roster, a schedule). Say that that is what it is, in words of your own, beside the id: the routine is ended for good, not paused.");
+        return [call("statement", { withdraw: d.rec() })];
+      }
+      return [call("statement", { withdraw: d.rec(), text: d.maybe(0.3) ? tx(d.pick(["It was issued in error.", "It has been replaced.", "The matter is settled.", "The figures were wrong."])) : undefined })];
+    }
     const to = d.rand();
     const kind = d.pick(STATEMENTS);
     return [call("statement", { kind: id(kind), text: d.publicWords(kind), to: to < 0.2 ? d.party() : to < 0.3 ? list([d.orgId(), d.personId()]) : undefined, visible: d.maybe(0.3) ? id("public") : undefined, basis: d.maybe(0.2) ? d.record() : undefined, for: d.maybe(0.12) ? id(d.orgId()) : undefined, on: d.maybe(0.12) ? d.lot() : undefined })];
@@ -577,14 +620,15 @@ const DEPENDENT: { [fn: string]: ((d: Draw) => Lines)[] } = {
 
 /** A program worth keeping, as gold: it parses back, passes the contract, is askable and is a plausible thing to ask
  * for (`dropped` counts, by reason, the ones that aren't plausible); otherwise undefined. */
-function goldOf(lines: Lines, d: Draw, source: string, forms?: FormSpec[], dropped?: { [reason: string]: number }): Gold | undefined {
+function goldOf(lines: Lines, d: Draw, source: string, forms?: FormSpec[], dropped?: { [reason: string]: number }, o: { /** As many values as this, where a sentence or two's ten is too few (an office's paper has more). */ most?: number } = {}): Gold | undefined {
   let p: calls.Program;
   try {
     p = calls.parseProgram(calls.programText(calls.programOf(...lines)));
   } catch {
     return undefined;
   }
-  if (calls.contractErrors(p).length || !askable(p)) return undefined;
+  const not = whyNot(p);
+  if (calls.contractErrors(p).length || (not !== undefined && !(not === "more than ten values" && literals(p).length <= (o.most ?? 10)))) return undefined;
   const why = implausible(p, { invented: true, ...(forms ? { forms } : {}) });
   if (why) {
     if (dropped) dropped[why] = (dropped[why] ?? 0) + 1;
@@ -594,7 +638,7 @@ function goldOf(lines: Lines, d: Draw, source: string, forms?: FormSpec[], dropp
   const mentioned = new Set<string>();
   const walk = (v: V) => ("id" in v ? mentioned.add(v.id) : "json" in v && Array.isArray(v.json) ? v.json.forEach((x) => mentioned.add(String(x))) : "call" in v ? Object.values(v.call.args).forEach(walk) : undefined);
   if (!("none" in p)) for (const l of p.lines) Object.values(l.call.args).forEach(walk);
-  return { program, shape: shapeOf(calls.parseProgram(program)), names: Object.fromEntries(Object.entries(d.names).filter(([k]) => mentioned.has(k))), source, origin: "synthetic", currency: d.currency, ...(forms ? { forms } : {}) };
+  return { program, shape: shapeOf(calls.parseProgram(program)), names: Object.fromEntries(Object.entries(d.names).filter(([k]) => mentioned.has(k))), source, origin: "synthetic", currency: d.currency, ...(forms ? { forms } : {}), ...(d.tag ? { tag: d.tag } : {}), ...(d.notes.length ? { notes: [...d.notes] } : {}) };
 }
 
 export interface SyntheticOptions {
@@ -625,12 +669,18 @@ export function synthetic(o: SyntheticOptions = {}): Gold[] {
     if (!calls.ARGS[fn]) continue;
     if (fn === "form") {
       // About five ways of filling in each form: enough forms that none is learned by heart.
-      out.push(...syntheticForms({ sets: Math.ceil(per / 10), perForm: 5, seed: o.seed ?? 1, ...(o.currencies ? { currencies: o.currencies } : {}), ...(o.dropped ? { dropped: o.dropped } : {}) }).slice(0, per));
+      // A fifth of them directions on an office's own form, a fifth papers of an office's own (`directions`,
+      // `papers`); the rest forms handed in to whoever takes them.
+      const common = { seed: o.seed ?? 1, ...(o.currencies ? { currencies: o.currencies } : {}), ...(o.dropped ? { dropped: o.dropped } : {}) };
+      const own = [...directions({ ...common, n: Math.floor(per / 5) }), ...papers({ ...common, n: Math.floor(per / 5) })];
+      out.push(...syntheticForms({ sets: Math.ceil(per / 10), perForm: 5, ...common }).slice(0, per - own.length), ...own);
       continue;
     }
     const rand = sampler(hash(`${o.seed ?? 1}:${fn}`));
     const seen = new Set<string>();
     const dependent = DEPENDENT[fn] ?? [];
+    // (One letter in eight directs an office in something it would take a form for, were one listed: `directions`.)
+    if (fn === "message") for (const g of directions({ seed: o.seed ?? 1, ...(o.currencies ? { currencies: o.currencies } : {}), ...(o.dropped ? { dropped: o.dropped } : {}), n: Math.floor(per / 8), unlisted: true })) (seen.add(g.program), out.push(g));
     for (let tries = 0; seen.size < per && tries < per * 40; tries++) {
       const d = new Draw(rand, o.currencies ?? everyCurrency());
       const lines = dependent.length && rand() < (o.dependent ?? 0.12) ? d.pick(dependent)(d) : RECIPES[fn](d);
@@ -670,6 +720,8 @@ function fieldValue(d: Draw, f: FormField): V {
     case "person": return id(d.personId());
     case "structure": return d.structure();
     case "position": return id(d.officeId());
+    case "list": return d.several();
+    case "date": return d.date();
     default: return d.record();
   }
 }
@@ -761,6 +813,199 @@ export function syntheticForms(o: FormOptions = {}): Gold[] {
       n++;
     }
   }));
+  return out;
+}
+
+// ---------------------------------------------------------------- an office's own forms: directions and papers
+
+const fd = (type: string, description: string, o: { required?: boolean; options?: string[] } = {}): FormField => ({ type, ...(o.required ? { required: true } : {}), ...(o.options ? { options: o.options } : {}), description });
+const YES_NO = ["yes", "no"];
+/**
+ * What an office can be directed in, on a form of its own: each a subject (the form is named for the office and it:
+ * `parks_staffing`, `harbour_rounds`) and the form's fields, the first required. Invented, in the shapes the worlds'
+ * own offices take directions in (participants: an office's `takes`): a yes or no on something the office does of its
+ * own accord, how often, how many, how long, how much. No place's offices or figures.
+ */
+const DIRECTION_SUBJECTS: { subject: string; fields: [string, FormField][] }[] = [
+  { subject: "staffing", fields: [["recruit", fd("choice", "Whether the office recruits: yes, it advertises and fills the posts it is short of; no, it advertises none and takes nobody on", { required: true, options: YES_NO })], ["posts", fd("count", "The most staff it is to have")]] },
+  { subject: "collection", fields: [["every", fd("duration", "How often each address on the round is collected from", { required: true })]] },
+  { subject: "rounds", fields: [["every", fd("duration", "How often the round is made", { required: true })], ["crew", fd("count", "How many go out on each round")], ["shift", fd("choice", "When in the day it goes out", { options: ["morning", "afternoon", "night"] })]] },
+  { subject: "opening", fields: [["open", fd("choice", "Which days the counter is open", { required: true, options: ["weekdays", "weekends", "both"] })], ["hours", fd("count", "How many hours a day it is open")]] },
+  { subject: "enforcement", fields: [["fines", fd("choice", "Whether a breach the office finds is fined: yes, as it does of its own accord; no, it is recorded and nothing more", { required: true, options: YES_NO })], ["fine", fd("amount", "The fine for a breach, where it is to be other than the usual one")], ["grace", fd("duration", "How long someone is given to put a breach right before anything is done")]] },
+  { subject: "recovery", fields: [["interest", fd("choice", "Whether what is left unpaid after its due day is charged interest", { required: true, options: YES_NO })], ["after", fd("duration", "How long something is overdue before the office chases it")]] },
+  { subject: "purchasing", fields: [["limit", fd("amount", "The most the office may spend on one purchase without asking", { required: true })], ["tender_above", fd("amount", "The sum above which a purchase is put out to tender")]] },
+  { subject: "inspections", fields: [["every", fd("duration", "How often each place is inspected", { required: true })], ["notice", fd("duration", "How much notice is given of an inspection")], ["priority", fd("choice", "Which are taken first", { options: ["complaints", "routine"] })]] },
+  { subject: "reminders", fields: [["send", fd("choice", "Whether the office sends reminders of what is due", { required: true, options: YES_NO })], ["after", fd("duration", "How long after the due day a reminder goes out")]] },
+  { subject: "overtime", fields: [["allow", fd("choice", "Whether the office's staff work overtime", { required: true, options: YES_NO })], ["cap", fd("count", "The most hours of it a week")]] },
+  { subject: "repairs", fields: [["within", fd("duration", "How soon a fault reported is to be put right", { required: true })], ["ceiling", fd("amount", "The most to be spent on one repair without asking")]] },
+  { subject: "intake", fields: [["accept", fd("choice", "Whether the office takes in new applications", { required: true, options: YES_NO })], ["weekly", fd("count", "The most it takes in a week")]] },
+  { subject: "patrols", fields: [["every", fd("duration", "How often a patrol goes out", { required: true })], ["pairs", fd("choice", "Whether patrols go out in pairs", { options: YES_NO })]] },
+  { subject: "stock", fields: [["reorder", fd("choice", "Whether the office reorders by itself when stock runs low", { required: true, options: YES_NO })], ["keep", fd("count", "How many of each thing it is to keep in store")], ["budget", fd("amount", "The most to be spent on stock in a month")]] },
+];
+
+export interface OwnFormOptions {
+  /** How many programs (default 60). */
+  n?: number;
+  /** Ways each form is filled in (default 5). */
+  perForm?: number;
+  seed?: number;
+  currencies?: Currency[];
+  dropped?: { [reason: string]: number };
+}
+
+/** The offices of one invented organisation that take directions, with the forms each takes them on: a set, as one
+ * person knows of them. For a seed and a set's number, always the same. */
+function directionSet(seed: number, si: number, currencies: Currency[], taken: Set<string>): { d: Draw; forms: FormSpec[] } {
+  const d = new Draw(sampler(hash(`${seed}:directions ${si}`)), currencies);
+  d.currency = currencies[si % currencies.length]!;
+  const forms: FormSpec[] = [];
+  const words = shuffled(OFFICE_WORDS, d.rand).slice(0, d.pick([1, 1, 2, 2, 3]));
+  // (Two offices of a set now and then take the same direction, each on its own form: whose it is, is the office's.)
+  const shared = d.maybe(0.5) ? d.pick(DIRECTION_SUBJECTS) : undefined;
+  for (const [i, w] of words.entries()) {
+    const to = d.officeId(w);
+    const subjects = [...new Set([...(shared && i < 2 ? [shared] : []), ...shuffled(DIRECTION_SUBJECTS, d.rand).slice(0, d.pick([1, 1, 2, 3]))])];
+    for (const s of subjects) {
+      const form = `${w}_${s.subject}`;
+      if (taken.has(form)) continue;
+      taken.add(form);
+      forms.push({ form, to, office: "direction", fields: Object.fromEntries(s.fields) });
+    }
+  }
+  return { d, forms };
+}
+
+/** A direction's answers in a few plain words, for a writer who has no form to go by. */
+const answersSaid = (spec: FormSpec, args: { [k: string]: V }): string =>
+  Object.entries(args).map(([k, v]) => `${k.replace(/_/g, " ")}: ${"id" in v ? v.id : "text" in v ? v.text : ""} (${spec.fields[k]?.description ?? k})`).join("; ");
+
+/**
+ * Directions to offices, as gold programs. `unlisted: false` (`tag: "direction"`): the office's own form for the
+ * direction filled in (`form(form=parks_staffing, to=<the office>, recruit=no)`), shown with the form, alone or beside
+ * others of its set (another direction the same office takes; the same direction as another office takes it).
+ * `unlisted: true` (`tag: "direction_unlisted"`): the same directions for someone who knows of no form for them: by
+ * the translator's rules a letter to the office, `message(to=<the office>, text=…)`, asked for indirectly, its words
+ * the writer's (data.ts `planOf`) from what the direction says (`notes`). It is shown with no form, or with other forms
+ * of the set that are not that office's form for that direction, so that what decides between the two is the form
+ * listed and nothing in how the request is worded. Both are made of the same sets of forms, for a seed always the same.
+ */
+export function directions(o: OwnFormOptions & { unlisted?: boolean } = {}): Gold[] {
+  const out: Gold[] = [];
+  const seen = new Set<string>();
+  const taken = new Set<string>();
+  const currencies = o.currencies ?? everyCurrency();
+  const want = o.n ?? 60;
+  for (let si = 0; out.length < want && si < want * 4 + 8; si++) {
+    const set = directionSet(o.seed ?? 1, si, currencies, taken);
+    for (const [fi, spec] of set.forms.entries()) {
+      const rand = sampler(hash(`${o.seed ?? 1}:direction ${si}.${fi}${o.unlisted ? " unlisted" : ""}`));
+      for (let n = 0, tries = 0; n < (o.unlisted ? Math.ceil((o.perForm ?? 5) / 2) : o.perForm ?? 5) && tries < 40 && out.length < want; tries++) {
+        const d = new Draw(rand, currencies);
+        d.currency = set.d.currency;
+        d.names[spec.to] = set.d.names[spec.to]!;
+        // (How often, how soon and how many, as offices are told them: days and weeks, a few dozen at most.)
+        const value = (k: string, f: FormField): V =>
+          f.type === "duration" ? tx(d.pick([...(k === "every" ? ["weekly", "fortnightly", "monthly", "daily"] : []), "a week", "7 days", "2 weeks", "14 days", "a fortnight", "10 days", "3 days", "2 days", "21 days", "28 days", "30 days", "a month", "6 weeks", "90 days"]))
+          : f.type === "count" ? d.count(40) : fieldValue(d, f);
+        const filled = Object.fromEntries(Object.entries(spec.fields).filter(([, f]) => f.required || d.maybe(0.45)).map(([k, f]) => [k, value(k, f)]));
+        const others = set.forms.filter((x) => x !== spec);
+        let g: Gold | undefined;
+        if (o.unlisted) {
+          // Who is directed: the office by its id, or now and then by what it is called.
+          const to = d.maybe(0.8) ? id(spec.to) : tx(d.names[spec.to]!);
+          d.tag = "direction_unlisted";
+          d.notes.push(`What the office is directed to do, to be put in your own words between the marks (there is no form for it: it is said to the office): ${answersSaid(spec, filled)}.`);
+          const shown = d.maybe(0.4) ? [] : shuffled(others, rand).slice(0, d.pick([1, 1, 2]));
+          g = goldOf([call("message", { to, text: tx(Object.entries(filled).map(([k, v]) => `${k.replace(/_/g, " ")} ${"id" in v ? v.id : "text" in v ? v.text : ""}`).join(", ")) })], d, `synthetic: direction with no form (${spec.form})`, shown.length ? shown : undefined, o.dropped);
+        } else {
+          d.tag = "direction";
+          const shown = shuffled([spec, ...shuffled(others, rand).slice(0, d.pick([0, 1, 1, 2]))], rand);
+          g = goldOf([call("form", { form: id(spec.form), to: id(spec.to), ...filled })], d, `synthetic: direction ${spec.form}`, shown, o.dropped);
+        }
+        if (!g || seen.has(g.program)) continue;
+        seen.add(g.program);
+        out.push(g);
+        n++;
+      }
+    }
+  }
+  return out;
+}
+
+const PAPER_WORDS = ["burial", "stall", "rates", "tender", "vacancy", "mooring", "allotment", "hall", "market", "water", "waste", "tree", "kennel", "road", "school", "clinic", "depot", "harbour", "footpath", "festival", "grazing", "well", "ferry", "tenancy", "meter", "weighbridge", "library", "stores"];
+const PAPER_ENDS = ["registration", "register", "entry", "advertisement", "listing", "approval", "certificate", "licence", "order", "decision", "result", "notice", "warning", "docket", "return", "receipt", "roll", "summons", "permit"];
+
+/** An invented paper of an office's own: a name of two words, and two to eight fields of every type, lists and dates
+ * among them more often than chance would have it. */
+function inventPaper(d: Draw, taken: Set<string>, to: string, types: string[]): FormSpec {
+  let form = "";
+  for (let tries = 0; tries < 200 && (!form || taken.has(form)); tries++) form = `${d.pick(PAPER_WORDS)}_${d.pick(PAPER_ENDS)}`;
+  taken.add(form);
+  const fields: FormSpec["fields"] = {};
+  const n = d.int(2, 8);
+  for (let i = 0; i < n; i++) {
+    const type = i === 0 ? types.shift() ?? d.pick(FIELD_TYPES) : d.maybe(0.3) ? d.pick(["list", "date"]) : d.pick(FIELD_TYPES);
+    const free = FIELD_NAMES[type]!.filter((x) => !(x in fields));
+    const name = free.length ? d.pick(free) : `${type}_${i + 1}`;
+    fields[name] = { type, ...(d.maybe(i === 0 ? 0.8 : 0.4) ? { required: true } : {}), ...(type === "choice" ? { options: d.maybe(0.25) ? YES_NO : optionsFor(d) } : {}) };
+  }
+  return { form, to, office: "paper", fields };
+}
+
+/** The papers the worlds' own offices issue (participants: papers.ts), as forms someone holding such an office knows
+ * of: each form's name, fields, types and what each field is for, as its module declares them. Whose office it is,
+ * is invented with everything else (`to`). In the order declared. */
+export function declaredPapers(): Omit<FormSpec, "to">[] {
+  const all = Object.values(PAPERS).flatMap((x): PAPERS_Issued[] => (Array.isArray(x) ? x : typeof x === "object" && x && "form" in x && "fields" in x ? [x as PAPERS_Issued] : []));
+  // (A paper two offices issue under one name is the first's here: one form to a name.)
+  return all.filter((p, i) => all.findIndex((x) => x.form === p.form) === i).map((p) => ({ form: p.form, office: "paper" as const, fields: Object.fromEntries(Object.entries(p.fields).map(([k, f]) => [k, { type: f.type, ...(f.required ? { required: true } : {}), ...(f.options ? { options: [...f.options] } : {}), ...(f.description ? { description: f.description } : {}) }])) }));
+}
+type PAPERS_Issued = (typeof PAPERS.REGISTRY)[number];
+
+/**
+ * Papers of an office's own, filled in, as gold programs (`tag: "paper"`): the office's stationery (`to` is the
+ * office, the asker's own), every required field and some of the others, shown alone or beside another of the same
+ * office's. Most are invented (`inventPaper`); every third set (unless `declared: false`) is of the papers the
+ * worlds' own offices issue (`declaredPapers`), under an invented office. A paper has more to say than a sentence or
+ * two holds: up to fourteen values. For a seed, always the same.
+ */
+export function papers(o: OwnFormOptions & { declared?: boolean } = {}): Gold[] {
+  const out: Gold[] = [];
+  const seen = new Set<string>();
+  const taken = new Set<string>();
+  const currencies = o.currencies ?? everyCurrency();
+  const want = o.n ?? 60;
+  const real = declaredPapers();
+  const types: string[] = [];
+  for (let si = 0; out.length < want && si < want * 4 + 8; si++) {
+    const rand = sampler(hash(`${o.seed ?? 1}:papers ${si}`));
+    const sd = new Draw(rand, currencies);
+    sd.currency = currencies[si % currencies.length]!;
+    const to = sd.officeId();
+    if (types.length < 4) types.push(...shuffled(FIELD_TYPES, rand));
+    // A set: one office's stationery, two or three papers. Every third set is of the worlds' own papers (each once
+    // for a seed, while there are any left: a split by form keeps a paper's examples together).
+    const declared = si % 3 === 2 && o.declared !== false ? real.filter((p) => !taken.has(p.form)) : [];
+    const set: FormSpec[] = declared.length
+      ? shuffled(declared, rand).slice(0, 2).map((p) => (taken.add(p.form), { ...p, to }))
+      : Array.from({ length: sd.int(2, 3) }, () => inventPaper(sd, taken, to, types));
+    for (const spec of set) for (let n = 0, tries = 0; n < (o.perForm ?? 5) && tries < 60 && out.length < want; tries++) {
+      const d = new Draw(rand, currencies);
+      d.currency = sd.currency;
+      d.names[to] = sd.names[to]!;
+      d.tag = "paper";
+      const filled = Object.entries(spec.fields).filter(([, f]) => f.required || d.maybe(0.4));
+      const fields = filled.length ? filled : Object.entries(spec.fields).slice(0, 1);
+      // (Who a paper is about is as often a person as an organisation.)
+      const value = (f: FormField): V => (f.type === "entity" && d.maybe(0.6) ? id(d.personId()) : f.type === "text" && d.maybe(0.5) ? tx(d.pick(PURPOSES)) : fieldValue(d, f));
+      const shown = shuffled([spec, ...shuffled(set.filter((x) => x !== spec), rand).slice(0, d.pick([0, 1, 1]))], rand);
+      const g = goldOf([call("form", { form: id(spec.form), to: id(to), ...Object.fromEntries(fields.map(([k, f]) => [k, value(f)])) })], d, `synthetic: paper ${spec.form}`, shown, o.dropped, { most: 14 });
+      if (!g || seen.has(g.program)) continue;
+      seen.add(g.program);
+      out.push(g);
+      n++;
+    }
+  }
   return out;
 }
 

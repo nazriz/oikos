@@ -9,6 +9,8 @@ real-world rule for payments under a hold are in docs/decisions.md ("A hold, an 
 look_first") and docs/behaviour/bank-payment-system.md ("A hold"). Steps 3 and 4 wait as part C says. The rest of
 this document is as it was proposed.*
 
+*Step 4 of part C was built on 2026-10-09, with standing work orders: docs/decisions.md ("Offices that take written directions", "Forms for an office's own papers", "Standing instructions for work"); docs/behaviour/directions.md, office-papers.md, standing-work.md.*
+
 ## Summary
 
 - Of 442 requests seats made with `do` in 22 runs, 185 were drafted and confirmed, 179 got no draft and 78 were drafted

@@ -116,6 +116,7 @@ export function manifest(name: string): object {
     ...(m.boundary?.length ? { boundary: m.boundary } : {}),
     ...(m.takes?.length ? { takes: m.takes } : {}),
     ...(m.issues?.length ? { issues: m.issues } : {}),
+    ...(m.routines?.length ? { routines: m.routines } : {}),
   };
 }
 

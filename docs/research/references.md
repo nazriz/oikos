@@ -316,3 +316,13 @@ No source below was opened (one attempt, at the Victorian Act on AustLII, was re
 | Where the council appoints a chief executive, staff answer to that officer and a councillor must not direct them | Local Government Act 2020 (Vic), ss 46 and 124 **(to confirm)**; Local Government and Housing Act 1989 (England and Wales), s 4, the head of paid service **(to confirm)** | Why who may direct is a record (`proc-directions`) and not a rule of the platform; the open question of a chief executive seat |
 | Where the mayor is the executive, the mayor directs the administration | Niedersächsisches Kommunalverfassungsgesetz § 85 **(to confirm)**; Local Autonomy Act (Japan), arts 147 to 154 **(to confirm)**; Ohio Revised Code 733.03 **(to confirm)** | `proc-directions` naming the mayor in the generated town |
 | A council acts by resolution, which its officers carry out | Ordinary council procedure, as docs/behaviour/government.md has it **(to confirm: no source opened)** | `proc-directions` naming the council clerk |
+
+## An office's own papers, and standing work (docs/behaviour/office-papers.md, standing-work.md; docs/decisions.md, 2026-10-09)
+
+No source was opened for these: each is common practice, stated to be confirmed.
+
+| Idea | Citation | Used in |
+|---|---|---|
+| An office issues its papers on its own prescribed forms: a register entry made from a notification, with the particulars the law lists | Registration of births, deaths and marriages statutes and their prescribed forms **(to confirm; docs/behaviour/deaths.md has the sources opened for who reports a death)** | `issues` on a module; `participants/src/behaviour/papers.ts`; `FormWrites` |
+| Routine work is set once, as a roster, a round, a timetable or a standing work order, and staff follow it until it is changed; the manager manages by exception | Common practice in local government services, clinics and schools: a council's waste collection schedule and service standards, a clinic's sessional roster, a school timetable, a utility's billing cycle **(to confirm: none opened)**. Management by exception as a term: Taylor, F. W. (1911), *Shop Management* / *The Principles of Scientific Management* **(to confirm: named from memory)** | `work(…, every=…)` (contracts/calls.md); `StandingWork` (`participants/src/behaviour/common.ts`); `routines` and `part` on the offices' modules |
+| A suspended standing instruction is not followed while suspended and nothing is made up afterwards | As for a held standing payment (the section "A hold on a standing payment" above) | A hold on a standing work order |

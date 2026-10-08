@@ -195,6 +195,8 @@ Every seat is told honestly what it is ("a simulated town used for research on A
 
 ## Gaps found (nothing here was changed)
 
+*Closed since, on 2026-10-09 (docs/decisions.md, the three entries of that day): gap 1 (a standing work order: `work` with `every`, followed by the office's staff: docs/behaviour/standing-work.md), gap 2 (billing and notices are the clerks' routine under one order: no bulk act was needed) and gap 4 (the works office's advertisement and the registrar's entries are forms of the office's own: docs/behaviour/office-papers.md). Works, `clinic-manager`, `principal`, `water-operations`, `energy-operations` and `rates` can be seats; `builder-foreman` and `fund-trustee` not yet; `bank-payments` no. A seat with routines has a staff post beside it (`<office>-staff`): the queue files name seats only and need no change. The matrix above is as planned and was not changed.*
+
 **Offices that cannot honestly be seats yet**
 1. **No way to give standing instructions for work.** A code office dispatches each task itself; a person in that office would tell staff what the routine is. Payments have `every`; work has nothing like it. This is what keeps works, the clinic, the school, the utilities, the builder and (at volume) shops and factories from being seats: who actually does this is the staff, on a roster.
 2. **No bulk act for an office that bills or notifies everyone** (rates notices, utility bills): hundreds of acts an instalment at eight an answer.

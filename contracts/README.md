@@ -222,6 +222,11 @@ A model call that fails (after its adapter's own time limits and retries) is rec
   - **`FieldType`** gains `list` (several ids) and `date` ("year 1, day 12", or a moment in seconds). A form's `count` may be nought.
   - A form that has `writes` and an `office` is that office's stationery: both resolvers know it only at a seat that holds the office.
   - The call language's schema and the blocks are unchanged. `contracts/test/forms.json` now has 29 cases.
+- **Standing work orders** (2026-10-09; docs/behaviour/standing-work.md):
+  - `calls.schema.json`: **`work` takes `every`, `first` and `until`** (`units` was already optional in the schema; the resolver asks for it only of work done now). `work(task=…, at=…, every=…)` resolves to `publish` of kind `work_order` on the organisation's own file (calls.md has its data). No new block; the kernel does nothing with it.
+  - **A hold on a paper addressed to one's own organisation** now resolves to a hold on its own file (addressed to and seen by that organisation), where it was answered "is yours to act on: nobody else needs telling" (`contracts/test/holds.json`, one case changed).
+  - `module.schema.json`: **`routines`** (optional): the routine tasks a module's office's staff do by standing order (`task`, `what`, and `at`: the parameter that says where).
+  - Both resolvers are held to `contracts/test/standing-work.json` (12 cases).
 - **A form's summary in words** (both resolvers): a form-made statement's text says an amount as the world writes its money and a length of time in days ("every 14 days"), where it said the bare integer.
 
 ## Changes from v0.7 (v0.8, closed 2026-10-02; docs/design/world-expansion.md)

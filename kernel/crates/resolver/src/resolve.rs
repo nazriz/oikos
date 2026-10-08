@@ -319,7 +319,7 @@ impl Resolver<'_> {
             "money" => self.money(c, bind),
             "goods" => self.goods(c),
             "take" => self.take(c),
-            "work" => self.work(c),
+            "work" => self.work(c, bind),
             "account" => self.account(c, bind),
             "structure" => self.structure(c, bind),
             "occupancy" => self.occupancy(c),
@@ -383,8 +383,14 @@ impl Resolver<'_> {
     }
 
     /// Work: units of a task at a place, by the people named.
-    fn work(&self, c: &Call) -> R<Vec<Json>> {
+    fn work(&self, c: &Call, bind: Option<&str>) -> R<Vec<Json>> {
         let task = self.need(c, "task", "What work?")?;
+        if Self::has(c, "every") {
+            return self.standing_work(c, task, bind);
+        }
+        if Self::has(c, "first") || Self::has(c, "until") {
+            return ask("Work asked for once is done now. When it starts and how long it goes on are said of work done again and again: say how often.");
+        }
         // A survey (nature): of a species or a field, in these cells, a unit each.
         let survey = self.id(c, "survey")?;
         let cells = if survey.is_some() { self.ids(c, "cells")?.filter(|l| !l.is_empty()) } else { None };
@@ -418,6 +424,93 @@ impl Resolver<'_> {
             }
         };
         Ok(vec![obj(vec![("block", some("work")), ("task", some(task)), ("units", some(units.parse::<i64>().unwrap_or(0))), ("at", some(at)), ("performers", some(json!(by))), ("on", on.map(Json::from)), ("survey", survey), ("investigate", investigate)])])
+    }
+
+    /// A standing work order: work to be done again and again by the organisation's own staff, put on its own file.
+    /// Nothing is done here; the staff whose work it is follow it each time it falls due, while it stands.
+    /// (translator/src/resolver.ts is the same, step for step.)
+    fn standing_work(&self, c: &Call, task: String, bind: Option<&str>) -> R<Vec<Json>> {
+        if Self::has(c, "survey") || Self::has(c, "investigate") {
+            return ask("A survey or an investigation is asked for each time, with what it is of: it can't be a standing order.");
+        }
+        let at = self.need(c, "at", "Where?")?;
+        let every = Self::seconds(c, "every")?.unwrap_or(0);
+        if every <= 0 {
+            return ask("How often?");
+        }
+        let first = Self::seconds(c, "first")?;
+        let until = Self::seconds(c, "until")?;
+        let by: Option<Vec<String>> = if Self::has(c, "by") {
+            let mut v: Vec<String> = vec![];
+            for p in self.ids(c, "by")?.unwrap_or_default() {
+                let e = self.k.entity_of(&p);
+                if !v.contains(&e) {
+                    v.push(e);
+                }
+            }
+            Some(v)
+        } else {
+            None
+        };
+        let on: Option<Vec<String>> = if Self::has(c, "on") {
+            let mut v: Vec<String> = vec![];
+            for p in self.ids(c, "on")?.unwrap_or_default() {
+                if !v.contains(&p) {
+                    v.push(p);
+                }
+            }
+            Some(v)
+        } else {
+            None
+        };
+        let units = Self::quantity(c, "units")?;
+        let me = self.speaks_for(c)?;
+        let mut text = format!("Standing work order: {task} at {at}");
+        if let Some(o) = &on {
+            text.push_str(&format!(", on {}", o.join(", ")));
+        }
+        if let Some(b) = &by {
+            text.push_str(&format!(", by {}", b.join(", ")));
+        }
+        if let Some(u) = &units {
+            text.push_str(&format!(", {u} each time"));
+        }
+        text.push_str(&format!(", every {}", duration_words(every)));
+        if let Some(f) = first {
+            text.push_str(&format!(", the first in {}", duration_words(f)));
+        }
+        if let Some(u) = until {
+            text.push_str(&format!(", for {}", duration_words(u)));
+        }
+        text.push('.');
+        let mut seen = vec![me.clone()];
+        for b in by.iter().flatten() {
+            if !seen.contains(b) {
+                seen.push(b.clone());
+            }
+        }
+        let mut work = serde_json::Map::new();
+        work.insert("task".into(), json!(task));
+        work.insert("at".into(), json!(at));
+        if let Some(o) = &on {
+            work.insert("on".into(), json!(o));
+        }
+        if let Some(b) = &by {
+            work.insert("by".into(), json!(b));
+        }
+        if let Some(u) = &units {
+            work.insert("units".into(), json!(u.parse::<i64>().unwrap_or(0)));
+        }
+        let mut data = serde_json::Map::new();
+        data.insert("work".into(), Json::Object(work));
+        data.insert("every".into(), json!(every));
+        if let Some(f) = first {
+            data.insert("first".into(), json!(f));
+        }
+        if let Some(u) = until {
+            data.insert("until".into(), json!(self.k.t + u));
+        }
+        Ok(vec![obj(vec![("block", some("publish")), ("kind", some("work_order")), ("text", some(text)), ("speaks_for", some(me.clone())), ("addressed_to", some(json!([me]))), ("visible_to", some(json!(seen))), ("data", some(Json::Object(data))), ("ref", bind.map(|b| json!(b)))])])
     }
 
     /// Taking goods another holds, where we are (crime: world-expansion 7.3).
@@ -928,13 +1021,16 @@ impl Resolver<'_> {
             }
         }
         let several = held.len() > 1;
-        if to.is_empty() {
-            return ask(format!("{} {} yours to act on: nobody else needs telling.", held.join(", "), if several { "are" } else { "is" }));
-        }
+        // (What is addressed to nobody but the organisation itself is acted on by its own people: the hold goes on
+        // its own file, where they read it. A standing work order is such a paper.)
+        let own = to.is_empty();
         let text = Self::str_(c, "text")?.filter(|t| !t.is_empty()).unwrap_or_else(|| format!("Please hold {}: nothing is to be done under {} until this is withdrawn.", held.join(", "), if several { "them" } else { "it" }));
-        let mut seen = vec![me];
-        seen.extend(to.iter().cloned());
-        let mut v = vec![("block", some("publish")), ("kind", some("hold")), ("text", some(text)), ("addressed_to", some(json!(to))), ("data", some(json!({ "holds": held }))), ("visible_to", some(json!(seen)))];
+        let mut seen = vec![me.clone()];
+        if !own {
+            seen.extend(to.iter().cloned());
+        }
+        let addressed = if own { vec![me] } else { to };
+        let mut v = vec![("block", some("publish")), ("kind", some("hold")), ("text", some(text)), ("addressed_to", some(json!(addressed))), ("data", some(json!({ "holds": held }))), ("visible_to", some(json!(seen)))];
         // (What the call says of who sees it stands in place of that.)
         for (k, x) in common {
             if x.is_some() {
@@ -1265,6 +1361,25 @@ mod tests {
         k.absorb(&table["observation"]);
         let cases = table["cases"].as_array().unwrap();
         assert!(cases.len() >= 29);
+        for c in cases {
+            let name = c["name"].as_str().unwrap();
+            let program = parse_program(c["program"].as_str().unwrap()).unwrap_or_else(|e| panic!("{name}: {e:?}"));
+            match resolve(&program, &k, &|_| None, c["as"].as_str()) {
+                Resolution::Blocks(b) => assert_eq!(json!(b), c["blocks"], "{name}"),
+                Resolution::Questions { questions, .. } => assert_eq!(json!(questions), c["asks"], "{name}"),
+            }
+        }
+    }
+
+    /// Standing work orders: the table this resolver and the repository's TypeScript one are both held to
+    /// (contracts/test/standing-work.json; translator/test/standing-work.test.ts reads the same file).
+    #[test]
+    fn standing_work_as_the_shared_table_says() {
+        let table: Json = serde_json::from_str(include_str!("../../../../contracts/test/standing-work.json")).unwrap();
+        let mut k = Knowledge::new(Currency::from_config(&table["currency"]));
+        k.absorb(&table["observation"]);
+        let cases = table["cases"].as_array().unwrap();
+        assert!(cases.len() >= 12);
         for c in cases {
             let name = c["name"].as_str().unwrap();
             let program = parse_program(c["program"].as_str().unwrap()).unwrap_or_else(|e| panic!("{name}: {e:?}"));

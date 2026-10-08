@@ -33,6 +33,13 @@
       "default": "",
       "source": "placeholder"
     },
+    "part": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
+      "source": "placeholder"
+    },
     "price_per_kl": {
       "schema": {
         "type": "integer",
@@ -91,6 +98,18 @@
     {
       "what": "acquisition_notice",
       "why": "Its customer roll: each notice that land it supplies has changed hands is given to it."
+    }
+  ],
+  "routines": [
+    {
+      "task": "draw_water",
+      "at": "works",
+      "what": "Each day the works draws from the river what the town uses, by the published estimate of how many live in it, and says so when the river cannot give it."
+    },
+    {
+      "task": "bill",
+      "at": "works",
+      "what": "Before each round of bills a reader goes round the meters; then each property's owner is sent a bill for the service charge and what its meter shows was used. How often the bills go out is the order's."
     }
   ]
 }

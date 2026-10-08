@@ -11,6 +11,7 @@ import { basesOf } from "../contracts";
 import { need, params, type BehaviourModule, type ParticipantContext } from "../module";
 import { because, Book, DAY, outOfTime, say, type Step } from "./common";
 import { Staffing, stepper } from "./firms";
+import { StandingWork } from "./common";
 import * as P from "./papers";
 
 /** Schooling: who goes to school (the ages), and what adults have had (their highest level, as years). */
@@ -31,6 +32,10 @@ export function yearsOfSchooling(age: number, s: SchoolingSpec, pick: (n: number
 
 export const principal: BehaviourModule = {
   name: "school.principal",
+  routines: [
+    { task: "teach", at: "building", what: "Each school day, each classroom with pupils in it is taught by one of the teachers at work." },
+    { task: "enrol", at: "building", what: "The school office answers each enrolment: a place in the least full classroom for a child of school age, or a letter saying why not; and gives each leaver a certificate of their years." },
+  ],
   issues: [P.JOB_ADVERTISEMENT],
   issuesWith: (p) => P.staffingOwn({ role: p.role ?? "teacher", industry: p.industry ?? "education", workplace: p.workplace, notice_days: p.notice_days ?? 14 }),
   keeps: [
@@ -55,10 +60,14 @@ export const principal: BehaviourModule = {
       school_ages: [5, 17] as [number, number], // from the year one turns the first, to the end of the year one is the second
       year: 365 * DAY,
       channel: "premises", // its view of the building, who is where in it
+      // Which part of the office this is (docs/behaviour/standing-work.md): "" the whole office, as code runs one;
+      // "seat" the office-holder alone, who sets the standing work orders; "staff" its staff, who follow them.
+      part: "" as "" | "seat" | "staff",
     }, ctx.params);
     need(p, ["building", "workplace", "account"], "school.principal");
     const me = ctx.entity;
     const book = new Book();
+    const routines = new StandingWork(me, p.part);
     const staffing = new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, workplace: p.workplace, role: p.role, industry: p.industry });
     let view: SiteStructure | undefined;
     const pupils = new Map<string, { since: number; years_before: number; born_at?: number }>(); // who's been in our classrooms
@@ -76,14 +85,18 @@ export const principal: BehaviourModule = {
       (obs) => {
         const t = obs.t;
         const steps: Step[] = [];
-        steps.push(...staffing.routine(obs, book, p.account, { target: p.teachers, wage: p.wage, canPost: staffing.workers(book, t).length < p.teachers,
+        steps.push(...routines.set(book, [
+          { task: p.teach_task, at: p.building, every: DAY, why: "Setting the teachers' work: every classroom with pupils taught each school day, as a standing work order." },
+          { task: "enrol", at: p.building, every: DAY, why: "Setting the school office's work: enrolments answered and leavers' certificates given, as a standing work order." }]));
+        const enrolling = routines.does(book, "enrol", t, { every: DAY });
+        if (p.part !== "staff") steps.push(...staffing.routine(obs, book, p.account, { target: p.teachers, wage: p.wage, canPost: staffing.workers(book, t).length < p.teachers,
           why: `The school's establishment is ${p.teachers} teachers; we have ${staffing.workers(book, t).length}: posting a job.` }));
 
         // ---- enrolment: a place for each child of school age who asks, in the least full classroom ----
         const inRoom = (space: string) => [...new Set(view?.spaces.find((sp) => sp.space === space)?.occupants ?? [])];
         // (Our roll: the places we've given, the world's pupils' among them.)
         const placed = new Map(book.open("school_place").filter((x) => x.speaks_for === me).map((x) => [String((x.addressed_to ?? [])[0]), x]));
-        for (const r of book.open("school_enrolment").filter((x) => (x.addressed_to ?? []).includes(me) && !answered.has(x.id))) {
+        for (const r of enrolling ? book.open("school_enrolment").filter((x) => (x.addressed_to ?? []).includes(me) && !answered.has(x.id)) : []) {
           answered.add(r.id);
           const who = r.speaks_for!;
           if (placed.has(who)) continue; // (already has a place)
@@ -103,7 +116,7 @@ export const principal: BehaviourModule = {
         // ---- a school day: each classroom with pupils, taught by a teacher at work ----
         const day = Math.floor(t / DAY);
         const schoolDay = day % 7 < 5 && day % 91 < p.term_days;
-        if (schoolDay && taughtDay !== day) {
+        if (schoolDay && taughtDay !== day && routines.does(book, p.teach_task, t, { every: DAY })) {
           taughtDay = day;
           const mine = new Set(staffing.workers(book, t));
           const here = inRoom(p.workplace).filter((w) => mine.has(w)).sort();
@@ -122,7 +135,7 @@ export const principal: BehaviourModule = {
 
         // ---- leaving: a pupil past school age gets a certificate of their years (one who has died, nothing) ----
         const dead = new Set(book.all("death_registration").map((r) => r.data?.deceased as string));
-        for (const [who, x] of pupils) {
+        for (const [who, x] of enrolling ? pupils : []) {
           const age = x.born_at !== undefined && Number.isFinite(x.born_at) ? Math.floor((t - x.born_at) / year) : undefined;
           if (!dead.has(who) && (age === undefined || age <= p.school_ages[1])) continue;
           pupils.delete(who);

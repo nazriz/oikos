@@ -10,7 +10,7 @@ import * as C from "../calls";
 import type { SiteStructure, StatementRecord } from "../contracts";
 import { basesOf, channels } from "../contracts";
 import { need, params, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
-import { nextLook, because, Book, cellsOf, DAY, draftLaw, figureWords, heldValue, jobTerms, Letters, lotOf, message, MONTH, ownAccount, pay, publishedCount, publishedPrice, record, say, type LawFigure, type LawSchedule, type Step, usd, variableToday, vote, withdraw, outOfTime, team, lookUp, goSee, visited, VISIT_MAX, Directions } from "./common";
+import { nextLook, because, Book, cellsOf, DAY, draftLaw, figureWords, heldValue, jobTerms, Letters, lotOf, message, MONTH, ownAccount, pay, publishedCount, publishedPrice, record, say, type LawFigure, type LawSchedule, type Step, usd, variableToday, vote, withdraw, outOfTime, team, lookUp, goSee, visited, VISIT_MAX, Directions, StandingWork } from "./common";
 import { Staffing, staffingForm, staffingUnder, stepper } from "./firms";
 import { incomeTaxLaw, withholding } from "./tax";
 import { ownLand } from "./institutions";
@@ -608,6 +608,7 @@ export const taxClerk: BehaviourModule = {
  */
 export const ratesOfficer: BehaviourModule = {
   name: "city.rates_officer",
+  routines: [{ task: "levy", at: "office", what: "At each instalment the rating law sets, the rates clerks send every owner on the rate book a notice of their share and record it as owed to the town; each month they add the law's penalty interest to what is overdue and write to the owner. When the notices go out is the law's: the order says only that they are to be sent." }],
   keeps: [
     { what: "valuation", why: "The rating authority keeps the rate book: the valuer sends it the valuation of every rateable lot, which is what it levies on." },
   ],
@@ -621,10 +622,16 @@ export const ratesOfficer: BehaviourModule = {
     const p = params({ law: "law-rates", first_day: 30,
       // Whose written directions it follows (docs/behaviour/directions.md): the town's own rule, a record the world
       // names (none: it follows nobody's); and how often it follows one it is given.
-      directed_under: "", direction_compliance_bps: 10_000 }, ctx.params);
+      directed_under: "", direction_compliance_bps: 10_000,
+      // Which part of the office this is (docs/behaviour/standing-work.md): "" the whole office, as code runs one;
+      // "seat" the rates officer alone, who sets the standing work order; "staff" the rates clerks, who follow it.
+      part: "" as "" | "seat" | "staff",
+      office: "", // where its clerks work, as a standing order names it (none given: the office itself)
+    }, ctx.params);
     const book = new Book();
     const letters = new Letters();
     const directions = new Directions(ctx, { under: p.directed_under, compliance_bps: p.direction_compliance_bps, office_words: "the rates office" });
+    const routines = new StandingWork(ctx.entity, p.part);
     const settled = new Set<string>(); // claims a payment into our account has named
     const lastInterest = new Map<string, number>(); // overdue claim -> when interest was last charged
     let next = p.first_day * DAY;
@@ -653,10 +660,12 @@ export const ratesOfficer: BehaviourModule = {
         const dueDays: number = terms.due_days ?? 30;
         const interestBps: number = terms.penalty_interest_bps ?? 0;
         if (!acc) return steps;
+        steps.push(...routines.set(book, [{ task: "levy", at: p.office || ctx.position || "office", every: Math.floor(365 / instalments) * DAY, why: "Setting the rates clerks' work: the notices sent at each instalment and interest added to what is overdue, as a standing work order." }]));
+        const levying = routines.does(book, "levy", t, { every: DAY });
         // Notices: each owner's share of a year's rates on what they own, as last valued. (Not before there are valuations:
         // until 2026-10-02 the first instalment went out on the first morning, before the valuer had valued anything,
         // levied nothing, and the next waited a quarter.)
-        if (law && t >= next && ratePpm > 0 && book.open("valuation").length) {
+        if (levying && law && t >= next && ratePpm > 0 && book.open("valuation").length) {
           next = t + Math.floor(365 / instalments) * DAY;
           const latest = new Map<string, StatementRecord>(); // lot -> its latest valuation
           for (const v of book.open("valuation").sort((a, b) => a.at - b.at)) latest.set(v.data?.lot, v);
@@ -680,8 +689,8 @@ export const ratesOfficer: BehaviourModule = {
         // Overdue: penalty interest, monthly, on what's still unpaid after its due date (unless a recovery direction
         // that stands, from whoever the town says may direct us, says to add none).
         const recovery = directions.standing(book, "rates_recovery");
-        steps.push(...directions.letters(book, (d) => (d.data?.interest === "no" ? "No penalty interest is added to overdue rates while it stands; the rates are still owed." : "Overdue rates are charged the law's penalty interest.")));
-        if (interestBps > 0 && recovery?.data?.interest !== "no") for (const c of book.ofType("claim").filter((r) => r.record === "claim" && r.position === "right" && r.holder === me && r.about?.kind === "rates") as any[]) {
+        if (p.part !== "staff") steps.push(...directions.letters(book, (d) => (d.data?.interest === "no" ? "No penalty interest is added to overdue rates while it stands; the rates are still owed." : "Overdue rates are charged the law's penalty interest.")));
+        if (levying && interestBps > 0 && recovery?.data?.interest !== "no") for (const c of book.ofType("claim").filter((r) => r.record === "claim" && r.position === "right" && r.holder === me && r.about?.kind === "rates") as any[]) {
           if (settled.has(c.id) || t < c.about.due) continue;
           if (t - (lastInterest.get(c.id) ?? c.about.due) < 30 * DAY) continue;
           lastInterest.set(c.id, t);
@@ -716,6 +725,10 @@ export const ratesOfficer: BehaviourModule = {
  */
 export const works: BehaviourModule = {
   name: "city.works",
+  routines: [
+    { task: "collect", at: "depot", what: "The crew at the depot collects waste from each address on the round as often as the order says, homes complained about first, as far as its hours go, and takes what it has collected to the landfill each week with a docket." },
+    { task: "maintain", at: "depot", what: "With the hours the round leaves, the crew keeps up the most worn of the town's own assets, and someone is sent to inspect an asset nobody has seen." },
+  ],
   issues: [P.JOB_ADVERTISEMENT, ...P.WORKS],
   issuesWith: (p) => ({ ...P.staffingOwn({ role: p.role ?? "works crew", industry: p.industry, workplace: p.workplace, notice_days: p.notice_days ?? 14 }), landfill: p.landfill }),
   keeps: [{ what: "service_address", why: "The round is the works office's own: it makes an entry for each address its crew collects from, and adds to it as homes are built." }],
@@ -746,12 +759,17 @@ export const works: BehaviourModule = {
       // Whose written directions it follows (docs/behaviour/directions.md): the town's own rule, a record the world
       // names (none: it follows nobody's); and how often it follows one it is given.
       directed_under: "", direction_compliance_bps: 10_000,
+      // Which part of the office this is (docs/behaviour/standing-work.md): "" the whole office, as code runs one;
+      // "seat" the works manager alone, who sets the standing work orders; "staff" the crew, who follow them.
+      part: "" as "" | "seat" | "staff",
     }, ctx.params);
     need(p, ["depot", "workplace", "landfill"], "city.works");
     const me = ctx.entity;
     const book = new Book();
     const letters = new Letters();
     const directions = new Directions(ctx, { under: p.directed_under, compliance_bps: p.direction_compliance_bps, office_words: "the works office" });
+    const routines = new StandingWork(me, p.part);
+    const staffOnly = p.part === "staff";
     const staffing = new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, workplace: p.workplace, role: p.role, ...(p.industry ? { industry: p.industry } : {}), does: { hire: true, pay: false }, own: "role_or_unnamed" });
     // Each building as we last saw it: as the crew that worked on it left it, or as whoever we sent to inspect it found it.
     const known = new Map<string, SiteStructure>();
@@ -778,7 +796,7 @@ export const works: BehaviourModule = {
       (obs) => {
         book.absorb(obs);
         staffing.absorb(obs);
-        letters.take(obs, book);
+        if (!staffOnly) letters.take(obs, book);
         // The round: our own register of addresses, and homes we have had notice of since (told of the work as it began).
         const reg = p.round ? obs.channels[p.round] : undefined;
         if (reg?.kind === "records") for (const r of reg.records) if (r.record === "statement" && r.kind === "service_address" && typeof r.data?.structure === "string") addresses.add(r.data.structure);
@@ -812,20 +830,29 @@ export const works: BehaviourModule = {
         const m = Math.floor(t / MONTH);
         if (m !== month) {
           month = m;
-          if (workers.length > target) steps.push(...staffing.letGo(book, t, `The adopted budget's ${p.staff_line} line (${usd(line)}) pays for a crew of ${target}, and we have ${workers.length}: letting one go.`, "Redundancy: the budget doesn't pay for the position."));
+          if (workers.length > target && !staffOnly) steps.push(...staffing.letGo(book, t, `The adopted budget's ${p.staff_line} line (${usd(line)}) pays for a crew of ${target}, and we have ${workers.length}: letting one go.`, "Redundancy: the budget doesn't pay for the position."));
         }
         // A staffing direction that stands (from whoever the town says may direct us): whether to recruit, and the most
         // posts to fill. It stands nobody down: the budget's crew is still what we keep.
         const staffingDir = directions.standing(book, "works_staffing");
         const directed = staffingUnder(staffingDir);
         const hireTo = Math.min(target, directed.posts ?? Infinity);
-        steps.push(...staffing.routine(obs, book, "", { target: hireTo, wage: p.wage, canPost: !!budget && hireTo > workers.length, recruit: directed.recruit,
+        // (Taking on and standing down are the office-holder's: its staff, where they are a post of their own, do neither.)
+        if (!staffOnly) steps.push(...staffing.routine(obs, book, "", { target: hireTo, wage: p.wage, canPost: !!budget && hireTo > workers.length, recruit: directed.recruit,
           ...(staffingDir ? { stopped: `Direction ${staffingDir.id} says not to recruit: taking our advertisements down.` } : {}),
           why: `The adopted budget's ${p.staff_line} line (${usd(line)}) pays for a crew of ${target}${hireTo < target ? ` (and direction ${staffingDir!.id} says to fill ${hireTo})` : ""}; we have ${workers.length}: posting a job.` }));
         // How often each address is collected from: as directed, while a direction on it stands; else our own round.
         const collectionDir = directions.standing(book, "works_collection");
         const collectEvery = Number.isSafeInteger(collectionDir?.data?.every) && collectionDir!.data!.every >= DAY ? (collectionDir!.data!.every as number) : p.collect_every_days * DAY;
-        steps.push(...directions.letters(book, (d, form) => form === "works_staffing"
+        // The routine work, and by what it is done: the whole office by its own practice; its staff by the standing
+        // work order in force for each task, and not at all with none; the office-holder alone sets the orders, once.
+        const collecting = routines.does(book, p.collect_task, t, { every: collectEvery });
+        const maintaining = routines.does(book, p.maintain_task, t, { every: DAY });
+        steps.push(...routines.set(book, [
+          ...(p.collect_labour > 0 ? [{ task: p.collect_task, at: p.depot, every: p.collect_every_days * DAY, why: `Setting the crew's round: collection from every address on it every ${p.collect_every_days} days, as a standing work order.` }] : []),
+          ...(p.maintain_labour > 0 ? [{ task: p.maintain_task, at: p.depot, every: DAY, why: "Setting the crew's upkeep of the town's assets, each working day with the hours the round leaves, as a standing work order." }] : []),
+        ]));
+        if (!staffOnly) steps.push(...directions.letters(book, (d, form) => form === "works_staffing"
           ? (staffingUnder(d).recruit ? `The office recruits up to ${Math.min(target, staffingUnder(d).posts ?? Infinity)} crew.` : "The office advertises no post, takes down the advertisements it has out and takes nobody on.")
           : `The crew collects from each address every ${Math.round(Number(d.data?.every) / DAY)} days, as its hours allow.`));
 
@@ -837,7 +864,7 @@ export const works: BehaviourModule = {
         }
 
         // ---- weekly: what's been collected, to the landfill ----
-        if (t >= nextDispose) {
+        if (routines.part !== "seat" && t >= nextDispose) {
           nextDispose = t + p.dispose_every_days * DAY;
           const q = atDepot;
           if (q > 0) {
@@ -859,16 +886,18 @@ export const works: BehaviourModule = {
         // (Those here with the most time between them, the work shared evenly: someone who's done a day's work elsewhere
         // today joins tomorrow.)
         const present = team([...new Set(room?.occupants ?? [])].filter((w) => mine.has(w)).sort(), (w) => p.working_day - (used.get(w) ?? 0)).who;
-        if (day % 7 < p.work_days && present.length) {
+        if (day % 7 < p.work_days && present.length && routines.part !== "seat") {
           const left = () => Math.min(...present.map((w) => p.working_day - (used.get(w) ?? 0))) * present.length;
           const spend = (seconds: number) => { for (const w of present) used.set(w, (used.get(w) ?? 0) + Math.ceil(seconds / present.length)); };
           const job = (task: string, units: number, on: string) => C.call("work", { task, units: C.text(String(units)), at: p.depot, by: C.json(present), on });
           // Collection: homes complained about, then those longest since a collection, as far as the crew's hours go
           // (a round's work in steps of up to 30 homes).
           const round: { on: string; call: C.Call; before?: number; full: boolean; fit: number; of: number }[] = [];
-          if (p.collect_labour > 0 && p.collect_per_unit > 0) {
-            const due = [...addresses].sort().map((structure) => ({ structure, st: known.get(structure) }))
-              .filter((b) => complained.has(b.structure) || t - (collectedAt.get(b.structure) ?? -Infinity) >= collectEvery - DAY / 2)
+          if (p.collect_labour > 0 && p.collect_per_unit > 0 && collecting) {
+            // (An order that names addresses is for those; one that names none is for the round.)
+            const named = collecting.order?.on;
+            const due = [...addresses].sort().filter((structure) => !named || named.includes(structure)).map((structure) => ({ structure, st: known.get(structure) }))
+              .filter((b) => complained.has(b.structure) || t - (collectedAt.get(b.structure) ?? -Infinity) >= collecting.every - DAY / 2)
               .sort((a, b) => Number(complained.has(b.structure)) - Number(complained.has(a.structure)) || (collectedAt.get(a.structure) ?? -1) - (collectedAt.get(b.structure) ?? -1) || (a.structure < b.structure ? -1 : 1));
             for (const b of due) {
               // An address the crew has been to and found nothing kept of waste at: not a home; off the round.
@@ -933,7 +962,7 @@ export const works: BehaviourModule = {
             steps.push(st);
           }
           // Maintenance: the most worn of the town's assets, with the hours left.
-          if (p.maintain_labour > 0 && p.maintain_per_unit > 0) {
+          if (p.maintain_labour > 0 && p.maintain_per_unit > 0 && maintaining) {
             const worn = assets.map((a) => known.get(a)).filter((b): b is SiteStructure => !!b).map((b) => ({ b, wear: variableToday(b.variables?.[p.wear], t) ?? 0 })).filter((x) => x.b.variables?.[p.wear] && x.wear > p.maintain_over)
               .sort((a, b) => b.wear - a.wear || (a.b.structure < b.b.structure ? -1 : 1));
             const upkeep: C.Call[] = [];
@@ -949,7 +978,10 @@ export const works: BehaviourModule = {
           }
         }
 
-        steps.push(...letters.answer(() => {
+        // (The office-holder, with the crew a post of its own, reports what is its to know: the crew, the budget, the
+        // directions it follows and the standing orders it has set. The round is the crew's.)
+        if (routines.part === "seat") steps.push(...letters.answer(() => `Report from the works office: a crew of ${workers.length} (the adopted budget's ${p.staff_line} line, ${usd(line)}, pays for ${target} at ${usd(annual)} a year each, ${usd(p.wage)} every ${Math.round(p.period / DAY)} days). Standing work orders the crew follows: ${routines.words(book, t)}.`));
+        else if (!staffOnly) steps.push(...letters.answer(() => {
           // (A home never collected from is overdue a week after it was first due, not from the beginning of time: pilot 7
           // found every home "a week or more overdue" on the first morning, and the mayor kept asking why.)
           const overdue = [...addresses].sort().filter((s) => t - (collectedAt.get(s) ?? knownSince.get(s) ?? t) >= collectEvery + 7 * DAY);
@@ -970,7 +1002,7 @@ export const works: BehaviourModule = {
       // An asset of the town's we have never seen (at the start, every one; later, what the town has had built):
       // someone is sent to inspect it, a visit's worth at a time, once each.
       () => {
-        if (!p.inspections) return [];
+        if (!p.inspections || routines.part === "seat" || (staffOnly && !routines.order(book, p.maintain_task, book.now))) return [];
         const go = ownLand(book, me).flatMap((x) => x.structures.map((st) => st.structure)).filter((a) => !known.has(a) && !inspecting.has(a)).slice(0, VISIT_MAX);
         for (const a of go) inspecting.add(a);
         return go.length ? [goSee(p.inspections, go)] : [];

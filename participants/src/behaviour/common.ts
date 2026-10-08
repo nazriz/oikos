@@ -452,6 +452,18 @@ export class Book {
     return this.withdrawn.has(at) ? undefined : this.records.get(at);
   }
 
+  /**
+   * Is a standing paper on hold (contracts/calls.md, a hold): does a hold that stands name it, made in the name of
+   * whoever the paper speaks for (or, with `by`, of one of those)? Whoever acts on a standing paper asks this before
+   * acting on it: the bank of a payment instruction, an office of a direction given to it, an office's staff of a
+   * standing work order, an employer's own people of its advertisement. A hold by anyone else is nothing to them.
+   */
+  onHold(id: string, by?: string[]): boolean {
+    const r = this.records.get(id);
+    const whose = by ?? (r && "speaks_for" in r && r.speaks_for ? [r.speaks_for] : []);
+    return this.standingOf("hold").some((h) => !!h.speaks_for && whose.includes(h.speaks_for) && Array.isArray(h.data?.holds) && h.data.holds.includes(id));
+  }
+
   /** Seen to be withdrawn, with nothing standing in its place (a law repealed, a procedure revoked). */
   repealed(id: string): boolean {
     return this.withdrawn.has(id) && !this.current(id);
@@ -1059,8 +1071,10 @@ export class Directions {
   /** The direction in force on a form: the latest standing one from a post that may direct us, if we follow it. */
   standing(book: Book, form: string): StatementRecord | undefined {
     const may = this.may(book);
+    // (A direction its giver has put on hold is not followed while the hold stands: the one before it is not
+    // revived; the office goes by its own practice.)
     const d = this.filed(book, form).filter((x) => x.in_position !== undefined && may.includes(x.in_position)).at(-1);
-    if (!d) return undefined;
+    if (!d || book.onHold(d.id)) return undefined;
     return this.ctx.rng(`direction-${d.id}`).below(10_000) < (this.o.compliance_bps ?? 10_000) ? d : undefined;
   }
 
@@ -1086,6 +1100,70 @@ export class Directions {
       }
     }
     return steps;
+  }
+}
+
+/** A standing work order as the staff read it (contracts/calls.md, a standing work order). */
+export interface WorkOrder { id: string; task: string; at?: string; on?: string[]; by?: string[]; units?: number; every: number; from: number; until?: number }
+
+/**
+ * Standing work (docs/behaviour/standing-work.md). An office's routine work is its staff's: they follow the
+ * organisation's standing work orders (statements of kind `work_order` on its own file: what task, where, how often,
+ * and perhaps on what, by whom, from when and until when), each time one falls due, in their own hours, until it is
+ * replaced, withdrawn or put on hold. Which part of an office a participant does is its `part`:
+ *  - "" (the whole office, as code runs one): it does its routine by its own practice, with no order;
+ *  - "seat" (the office-holder alone, where a model holds the office and its staff are a post of their own): it
+ *    makes the standing orders and does none of the routine;
+ *  - "staff" (the office's staff): they do the routine a standing order in force is for, and nothing else of the
+ *    office's business.
+ */
+export class StandingWork {
+  private readonly made = new Set<string>();
+  constructor(private readonly me: string, readonly part: "" | "seat" | "staff") {}
+
+  /** The standing order in force for a task: our latest one standing for it, begun, not ended, and not on hold. */
+  order(book: Book, task: string, t: number): WorkOrder | undefined {
+    const r = book.standingOf("work_order").filter((x) => x.speaks_for === this.me && x.data?.work?.task === task).reduce<StatementRecord | undefined>((a, b) => (!a || b.at >= a.at ? b : a), undefined);
+    if (!r) return undefined;
+    const d = r.data ?? {};
+    const from = r.at + (Number.isSafeInteger(d.first) ? d.first : 0);
+    if (!Number.isSafeInteger(d.every) || d.every <= 0 || t < from || (Number.isSafeInteger(d.until) && t >= d.until)) return undefined;
+    if (book.onHold(r.id, [this.me])) return undefined;
+    const list = (x: unknown) => (Array.isArray(x) && x.every((y) => typeof y === "string") ? (x as string[]) : undefined);
+    const w = d.work;
+    return { id: r.id, task, every: d.every, from, ...(typeof w.at === "string" ? { at: w.at } : {}), ...(list(w.on) ? { on: list(w.on)! } : {}), ...(list(w.by) ? { by: list(w.by)! } : {}),
+      ...(Number.isSafeInteger(w.units) ? { units: w.units } : {}), ...(Number.isSafeInteger(d.until) ? { until: d.until } : {}) };
+  }
+
+  /**
+   * Whether this participant does a routine task now, and by what: the whole office by its own practice (`own`: how
+   * often); the staff by the order in force (none: they don't); the office-holder never.
+   */
+  does(book: Book, task: string, t: number, own: { every: number }): { every: number; order?: WorkOrder } | undefined {
+    if (this.part === "seat") return undefined;
+    if (this.part === "") return own;
+    const order = this.order(book, task, t);
+    return order ? { every: order.every, order } : undefined;
+  }
+
+  /** For the office-holder: a standing order for each routine that has none on file, made once (what it does after
+   * that, replacing one, holding it, is managing by exception). */
+  set(book: Book, routines: { task: string; at: string; every: number; why: string }[]): Step[] {
+    if (this.part !== "seat") return [];
+    const steps: Step[] = [];
+    for (const r of routines) {
+      if (this.made.has(r.task)) continue;
+      this.made.add(r.task);
+      if (book.all("work_order").some((x) => x.speaks_for === this.me && x.data?.work?.task === r.task)) continue;
+      steps.push(because(r.why, C.call("work", { task: r.task, at: r.at, every: C.secs(r.every) })));
+    }
+    return steps;
+  }
+
+  /** The standing orders of ours that stand, in words, for a report. */
+  words(book: Book, t: number): string {
+    const all = book.standingOf("work_order").filter((x) => x.speaks_for === this.me);
+    return all.length ? all.map((x) => `${x.id} (${x.data?.work?.task} every ${Math.round(Number(x.data?.every) / DAY)} days${this.order(book, String(x.data?.work?.task), t)?.id === x.id ? "" : ", not in force"})`).join(", ") : "none";
   }
 }
 

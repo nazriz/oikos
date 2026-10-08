@@ -91,6 +91,13 @@
       "default": 28800,
       "source": "the hours it sees patients (placeholder)"
     },
+    "part": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
+      "source": "placeholder"
+    },
     "period": {
       "schema": {
         "type": "integer"
@@ -218,6 +225,13 @@
           }
         }
       }
+    }
+  ],
+  "routines": [
+    {
+      "task": "treat",
+      "at": "building",
+      "what": "Each working day, in the hours the clinic is open, its doctors see those who have asked for care and are waiting, in the order they asked, as far as the doctors' hours go, and each patient is told they have been seen."
     }
   ]
 }

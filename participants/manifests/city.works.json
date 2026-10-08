@@ -153,6 +153,13 @@
       "default": 14,
       "source": "placeholder"
     },
+    "part": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
+      "source": "placeholder"
+    },
     "period": {
       "schema": {
         "type": "integer"
@@ -367,6 +374,18 @@
           "quantity": "=quantity"
         }
       }
+    }
+  ],
+  "routines": [
+    {
+      "task": "collect",
+      "at": "depot",
+      "what": "The crew at the depot collects waste from each address on the round as often as the order says, homes complained about first, as far as its hours go, and takes what it has collected to the landfill each week with a docket."
+    },
+    {
+      "task": "maintain",
+      "at": "depot",
+      "what": "With the hours the round leaves, the crew keeps up the most worn of the town's own assets, and someone is sent to inspect an asset nobody has seen."
     }
   ]
 }

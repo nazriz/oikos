@@ -56,6 +56,9 @@ export const ADDED: [choice: string, what: string][] = [
   ["arg:hold", "a hold on something standing: statement(hold=...) (2026-10-08)"],
   ["const:own", "an entry on one's own file: statement(kind=entry, visible=own, ...) (2026-10-08)"],
   ["none:look_first", "the refusal for what needs something found out first: none(look_first) (2026-10-08)"],
+  // (A standing work order, a direction on an office's form and a paper on an office's own form are made of choices
+  // an older model already has, but for this one: it can spell them and was never taught when to.)
+  ["arg:until", "a standing work order that ends: work(..., every=..., until=...) (2026-10-09); and it was not taught standing work orders (work with every=), directions on an office's form or papers on an office's own form at all"],
 ];
 
 /** What of `ADDED` a model with this closed set cannot say. */

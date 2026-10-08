@@ -94,7 +94,9 @@ export class Preview {
             const held = b.data.holds as string[];
             const many = held.length > 1;
             const rest = this.also(b.data, ["holds"], " With these details: ");
-            return [`You will instruct ${b.addressed_to.map((x: string) => this.who(x)).join(", ")} to hold ${held.join(", ")}${named(b)}${this.seenBy(b.visible_to)}${citing(b)}. ${many ? "They stay" : "It stays"} on record. This by itself stops nothing and settles nothing: whoever you instruct acts on it, or doesn't, and whatever ${many ? "they were" : "it was"} for is still owed. To resume ${many ? "them" : "it"}, withdraw this instruction. Your instruction will read: "${b.text}".${rest}${this.rule(b)}`,
+            // (On its own file, where what is held is the organisation's own to act on: its own staff read it.)
+            const ownFile = b.addressed_to.every((x: string) => this.k.entityOf(x) === this.me);
+            return [`You will ${ownFile ? "tell your own staff, on your own file," : `instruct ${b.addressed_to.map((x: string) => this.who(x)).join(", ")}`} to hold ${held.join(", ")}${named(b)}${this.seenBy(b.visible_to)}${citing(b)}. ${many ? "They stay" : "It stays"} on record. This by itself stops nothing and settles nothing: whoever you instruct acts on it, or doesn't, and whatever ${many ? "they were" : "it was"} for is still owed. To resume ${many ? "them" : "it"}, withdraw this instruction. Your instruction will read: "${b.text}".${rest}${this.rule(b)}`,
               ["kind", "text", "data", "addressed_to", "adico", "formal", ...RECORD]];
         }
         // A direction on an office's own form: what is filed, with whom, and that following it is the office's to do.
@@ -103,6 +105,12 @@ export class Preview {
           const office: string = filedOn.data.office;
           const title = this.k.positionWords.get(office)?.title;
           return [`You will give ${title ? `the ${title} (${office})` : office} a written direction on its ${String(filedOn.data.form).replace(/_/g, " ")} form (${filedOn.id})${named(b)}${this.seenBy(b.visible_to)}: "${b.text}". This by itself changes nothing: the office follows a direction only from those its organisation's rules say may direct it, and writes back to say whether it does. It stands until you replace it with another or withdraw it.${this.rule(b)}`,
+            ["kind", "text", "data", "addressed_to", "adico", "formal", ...RECORD]];
+        }
+        // A standing work order: on the organisation's own file, for its staff to follow. Nothing is done now.
+        if (b.kind === "work_order" && b.data?.work && b.data?.every) {
+          const others = (Array.isArray(b.visible_to) ? b.visible_to : []).filter((x: string) => this.k.entityOf(x) !== (b.speaks_for ?? this.me));
+          return [`You will put a standing work order on ${this.k.entityOf(b.speaks_for ?? this.me) === this.me ? "your own file" : `the file of ${this.who(b.speaks_for)}`}${others.length ? `, shown to ${others.map((x: string) => this.who(x)).join(", ")}` : ""}: "${b.text}". Nothing is done now: the staff whose work it is follow it each time it falls due, in their own working hours, while it stands. To change it, withdraw it and make another; to pause it, put it on hold.${citing(b, " It cites ")}${this.rule(b)}`,
             ["kind", "text", "data", "addressed_to", "adico", "formal", ...RECORD]];
         }
         const d = this.details(b.data);

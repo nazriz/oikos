@@ -84,6 +84,17 @@ export const CASES: Case[] = [
   { id: "go-and-see", request: "Visit str.9 today and record whether the waste there has been collected.", expect: ["none(no_such_act)"] },
   { id: "cancel-for-good", request: "Cancel the standing payment rec.90 from acc-city.", expect: ["statement(withdraw=rec.90)"], note: "ending it for good is a withdrawal" },
   { id: "unknown-form", request: "Fill in the dog licence form for Rex.", expect: ["none(unknown_form)"], note: "no such form is known" },
+  // Standing work, a direction on an office's own form, and a paper of one's own office (seen; added 2026-10-09:
+  // contracts/calls.md). The test's mayor knows the works office's two direction forms and two papers of its own.
+  { id: "standing-work-routine", request: "From now on the crew is to collect at str.7 every week.", expect: ['work(task=collect, at=str.7, every="every week")', 'work(task=collect, at=str.7, every="week")', 'work(task=collect, at=str.7, every="weekly")'], note: "work done again and again is one standing order: no units, nobody named" },
+  { id: "standing-work-roster", request: "Set a standing roster: c0042 and c0043 are to clean apts-3 and apts-4, working out of str.7, every 2 weeks for the next 8 weeks.",
+    expect: ['work(task=clean, at=str.7, on=["apts-3","apts-4"], by=["c0042","c0043"], every="every 2 weeks", until="8 weeks")', 'work(task=clean, at=str.7, on=["apts-3","apts-4"], by=["c0042","c0043"], every="2 weeks", until="8 weeks")'], note: "what it is done to and who does it as lists; for how long is until=" },
+  { id: "standing-work-hold", request: "Pause the standing work order rec.95 until I say to resume it; the round is not cancelled.", expect: ["statement(hold=rec.95)"], note: "a standing order is paused like any standing paper" },
+  { id: "direction-staffing", request: "Direct the works office to stop recruiting until I say otherwise.", expect: ["form(form=works_staffing, to=works, recruit=no)"], note: "the works office's own form for it is listed: the direction is that form, not a letter" },
+  { id: "direction-collection", request: "The works office is to collect from each address fortnightly from now on.", expect: ['form(form=works_collection, to=works, every="fortnightly")'] },
+  { id: "paper-invoice-approval", request: "Approve invoice rec.640 for payment, in writing.", expect: ["form(form=invoice_approval, to=mayor, invoice=rec.640)", "form(form=invoice_approval, invoice=rec.640)"], note: "a paper of the mayor's own office, on its own form" },
+  { id: "paper-nomination", request: 'Enter my nomination for the office of mayor [mayor]: the name on the ballot is "Dana Reyes", the platform "Mend the roads before anything else.", I hold the office now, and what I stand for is roads and thrift.',
+    expect: ['form(form=nomination, to=mayor, office=mayor, name="Dana Reyes", platform="Mend the roads before anything else.", incumbent=yes, values=["roads","thrift"])'], note: "a yes the wording implies; a field that takes several is a list" },
 
   // Seen, from the pilots (2026-10-03): requests a model mayor made that the translator got wrong (docs/real-models.md,
   // pilots 7c–7e), reworded a little. These may be tuned on.

@@ -89,6 +89,21 @@
       },
       "maxItems": 16
     },
+    "routines": {
+      "type": "array",
+      "description": "The routine tasks its office's staff do by standing work order (docs/behaviour/standing-work.md; contracts/calls.md, a standing work order): for each, the task's name as an order names it, what doing it is, in words, and which parameter says where it is done. Where a model holds the office, a world gives the office's staff a post of their own, run by this module, which does a routine only while a standing order of the organisation's is in force for it; the office-holder sets the orders.",
+      "items": {
+        "type": "object",
+        "required": ["task", "what", "at"],
+        "additionalProperties": false,
+        "properties": {
+          "task": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$" },
+          "what": { "type": "string", "minLength": 20, "maxLength": 1000 },
+          "at": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$", "description": "The parameter that holds the place the work is done at." }
+        }
+      },
+      "maxItems": 16
+    },
     "issues": {
       "type": "array",
       "description": "The papers its office issues, each as a form of the office's own stationery (docs/behaviour/office-papers.md): the form's fields, and how they are written into the statement the rest of the world reads (outcomes.schema.json, FormWrites). In `writes`, a string \"@name\" stands for something of the office's own that a world fills in when it publishes the form. A world publishes these for an office a model holds; filled in, each makes the paper the module itself makes.",

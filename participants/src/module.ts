@@ -136,7 +136,22 @@ export interface Issued {
   writes: { kind: string; text: string; data?: unknown; to?: unknown[]; visible?: "public" | unknown[]; basis?: string; offer?: unknown; assertion?: unknown };
 }
 
+/**
+ * A routine task an office's staff do by standing work order (docs/behaviour/standing-work.md): the task's name as an
+ * order names it, what doing it is, in words, and which of the module's parameters says where it is done. Where a
+ * model holds the office, the staff are a post of their own that follows the office's standing orders; the office-
+ * holder sets them.
+ */
+export interface Routine {
+  task: string;
+  what: string;
+  /** The parameter that holds the place the work is done at (the depot, the clinic). */
+  at: string;
+}
+
 export interface BehaviourModule {
+  /** The routine tasks its office's staff do by standing work order (docs/behaviour/standing-work.md). */
+  routines?: Routine[];
   /** The papers it issues, each as a form of the office's own stationery (docs/behaviour/office-papers.md). */
   issues?: Issued[];
   /** What of the office's own the forms it issues carry, from its parameters: the values of each "@name" in `issues`. */
