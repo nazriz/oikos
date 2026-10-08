@@ -50,6 +50,8 @@ export const spawnClaudeCode: ClaudeCodeRunner = (args, stdin, cwd, timeoutMs) =
 
 /** What is the same call after call for one seat: its instructions, then the tools and how an answer is given. */
 export function claudeCodeSystem(req: LlmRequest): string {
+  // (An answer asked for as one object of a shape of the caller's own: no tools to describe.)
+  if (req.answer) return [req.system, "", "=== How you answer ===\nGive your answer in the structured output asked for, and nothing besides."].join("\n");
   const tools = (req.tools ?? []).map((t) => `- ${t.name}: ${t.description}\n  input schema: ${JSON.stringify(t.input_schema)}`).join("\n");
   return [
     req.system,
@@ -68,6 +70,21 @@ export function answerFrom(result: any, tools: string[], nextId: () => string): 
   const o = result.structured_output;
   if (o !== undefined && o !== null) return readAnswerObject(o, tools, JSON.stringify(o), nextId);
   return readAnswerText(String(result.result ?? ""), tools, nextId);
+}
+
+/** A call's answer where the caller asked for one object of its own shape (`answer`): that object as a tool_use block of
+ * the name given, or, if what came back is not an object, one unread block. */
+export function objectAnswer(result: any, name: string, nextId: () => string): ContentBlock[] {
+  let o = result.structured_output;
+  if (o === undefined || o === null) {
+    try {
+      o = JSON.parse(String(result.result ?? "").trim().replace(/^```(?:json)?\s*\n/i, "").replace(/\n```$/, ""));
+    } catch {
+      o = undefined;
+    }
+  }
+  if (!o || typeof o !== "object" || Array.isArray(o)) return [{ type: "text", text: String(result.result ?? "").slice(0, 4000), unread: "it wasn't in the form asked for" }];
+  return [{ type: "tool_use", id: nextId(), name, input: o }];
 }
 
 export class ClaudeCodeAdapter implements LlmAdapter {
@@ -93,7 +110,7 @@ export class ClaudeCodeAdapter implements LlmAdapter {
       writeFileSync(system, claudeCodeSystem(req));
       const names = (req.tools ?? []).map((t) => t.name);
       const args = ["-p", "--model", this.model.split("@")[0]!, ...(this.effort ? ["--effort", this.effort] : []), "--system-prompt-file", system, "--tools", "", "--output-format", "json", "--no-session-persistence", "--setting-sources", "",
-        "--strict-mcp-config", "--disable-slash-commands", "--exclude-dynamic-system-prompt-sections", ...(names.length ? ["--json-schema", JSON.stringify(answerSchema(names))] : [])];
+        "--strict-mcp-config", "--disable-slash-commands", "--exclude-dynamic-system-prompt-sections", ...(req.answer ? ["--json-schema", JSON.stringify(req.answer.schema)] : names.length ? ["--json-schema", JSON.stringify(answerSchema(names))] : [])];
       const timeoutMs = this.o.timeoutMs ?? 180_000;
       const attempts = this.o.attempts ?? 3;
       // (A seat's answer that can't be read is not asked for again here: the seat is told what couldn't be read, once, in its
@@ -108,7 +125,8 @@ export class ClaudeCodeAdapter implements LlmAdapter {
         } catch {
           result = undefined;
         }
-        content = result && !result.is_error ? answerFrom(result, names, () => `claude-code-${++this.calls}`) : [];
+        const nextId = () => `claude-code-${++this.calls}`;
+        content = !result || result.is_error ? [] : req.answer ? objectAnswer(result, req.answer.name, nextId) : answerFrom(result, names, nextId);
         const unread = content.some((b) => b.type === "text" && b.unread !== undefined);
         const failed = r.timedOut || r.code !== 0 || !result || result.is_error || (unread && askAgain && n < attempts);
         // (What it said only when it failed: a word in a good answer isn't a limit.)

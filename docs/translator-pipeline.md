@@ -51,13 +51,42 @@ there and whole is skipped.
    example of a test-only pilot's run.
 9. **Export** (`translator/model/export.ts`, arguments by name): the steps the model is trained on, in `data/`.
 10. **Train** (`"train": true`): `pod.sh run data NAME:ENCODER:SEED …` rents a GPU, sets it up, sends the trainer and `data/`,
-    queues the runs, brings each home as it ends and scores it here (`translator-eval --model decide/NAME --real`; the held-out
-    test is read by the eval itself, on this machine, and never leaves it), ends the pod when all are home or at the deadline
-    (the watchdog; `deadlineHours`, 6 if absent). With `"train": false` the pipeline stops after the export.
+    queues the runs, brings each home as it ends, ends the pod, and then scores each run here (`translator-eval --model
+    decide/NAME --real`; the held-out test is read by the eval itself, on this machine, and never leaves it). With
+    `"train": false` the pipeline stops after the export. See "The pod" below.
+11. **Score on the test sets made here**: each run on each file of step 7 (`translator-eval --model decide/NAME --only-sets
+    --set FILE` does the same by hand, for a trained model or any other): right, no draft, wrong draft, in all and by pilot,
+    seat model, profile, origin and function. The counts go in the manifest (`test_scores`), every answer in the run's
+    `eval-sets.json`.
 
-Writers and readers hand their file in through a `hand_in` tool, as a list of objects: the Claude Code adapter cuts a reply of
-plain words at 4,000 characters. A reply of words is still read if a model gives one. A program whose every quotation mark came
-escaped by hand (a model doing in a tool's JSON what the tool already does) is read as meant (`undoubled`).
+Writers and readers hand their file in as one object of a given shape (`answers`, a list with an object for each line, every
+field a plain string): a model called through Claude Code or the Codex CLI is asked for exactly that shape as its answer
+(`--json-schema`, `--output-schema`), and any other adapter is given it as a tool's input. Nothing in it is a string of JSON
+for the model to escape by hand: the first form was (a tool whose input the adapters carry as a string), and one reader
+escaped the quotation marks of 25 of 34 programs. A reply of plain words is still read if a model gives one (the Claude Code
+adapter cuts those at 4,000 characters). A program whose every quotation mark came escaped by hand is still read as meant
+(`undoubled`) and counted in the manifest (`escaped_by_hand_and_repaired`); in 160 answers through the new form there was none.
+
+## The pod
+
+`translator/model/pod/pod.sh run DATA NAME:ENCODER:SEED …` (the pipeline calls it; it can be run by hand, with
+`OIKOS_POD_STATE` and `OIKOS_POD_MODELS` naming a state folder and where runs come home). It needs `RUNPOD_API_KEY` in
+`~/.zshenv` (never written anywhere, nor put on a command line) and the key pair `~/.ssh/oikos_runpod`.
+
+- **The pod is ended on every way out**: when the runs are home, on a failure at any step, on a signal (INT, TERM, HUP), and
+  at the time limit (`deadlineHours` in the config, `SECONDS_LIMIT` by hand; 6 hours if absent), whatever is going on then.
+  Two things do it: `run` on its way out, and a watchdog of its own process, which also ends the pod when the `run` that
+  rented it is gone without having done so (killed outright, a lost session).
+- **Ended means seen gone**: ending is asked of the provider until the pod is no longer among the account's pods, and on the
+  way out every pod carrying the batch's name (`oikos-translator-<folder>-<hash>`) is ended too. `pod/pod.log` says what the
+  provider then lists. If that cannot be confirmed, the exit code is 5 and the pipeline's status says so: look at once.
+  `pod.sh pods` lists the account's pods; `pod.sh stop` ends this batch's.
+- **Learned by hand, kept**: the pod is asked for with a public IP (without it there may be no SSH port to reach); the
+  torch build is the cu128 one (recent cards); a card under 20 GB takes its steps in parts of 4,096 tokens
+  (`--token-budget 4096`: the same loss, in more parts). Dearer than `OIKOS_POD_MAX_PER_HOUR` (1) is not taken.
+- **Scoring is after the pod is ended**, on this machine. Runs that are home and not scored are scored with no pod rented.
+- Exit codes: 0 all home and scored; 1 a run failed there, the queue stopped, or a run was not scored; 3 the pod stopped
+  answering; 4 the time limit; 5 a pod could not be confirmed ended.
 
 ## The config
 
@@ -69,7 +98,7 @@ escaped by hand (a model doing in a tool's JSON what the tool already does) is r
     { "path": "/Users/clawd/oikos/runs/pilot-12", "test": true }
   ],
   "writers": { "claude-code": "claude-code/claude-sonnet-5-5", "codex": "codex/gpt-6.1-sol" },
-  "readers": ["claude-code/claude-haiku-5-5", "codex/gpt-6-luna"],
+  "readers": ["claude-code/claude-sonnet-5-5", "codex/gpt-6.1-sol"],
   "situations": 120,
   "testSituations": 40,
   "realRequests": 300,
@@ -85,24 +114,57 @@ escaped by hand (a model doing in a tool's JSON what the tool already does) is r
 `out` is a new folder (an existing one is resumed). `pilots`: folders of logs; `test: true` marks one test-only (the pilot's own
 mark cannot be taken away from here). `writers`: the seat's provider (`claude-code`) or its whole model name, to a
 `provider/model`; the longest match wins. `readers`: two different `provider/model`s (checked; `gpt-6-astra` is refused
-anywhere). `budget`: the spending limit in USD for every model call the run makes (required; a Codex call costs nothing per
+anywhere); see "The readers" below for why these two. `budget`: the spending limit in USD for every model call the run makes (required; a Codex call costs nothing per
 call, and its subscription limits apply). Optional: `testSituations` (as `situations`), `requestsPerSituation` (8), `realRequests`,
 `writtenRequests` (all), `every` (3), `seed` (1), `repeat` (4), `validationDays` (10), `testsInValidationReal` (false: put the
 test lane's examples into validation-real as well, which makes `real_right` in a run's report count them, and so no longer
 comparable with earlier runs), `waitMinutes` (20) and `maxWaitHours` (12) for usage limits, `writerCallChars`, `readerBatch`,
-`readerBatchChars`, `trainExtra` (flags for `train.py`), `deadlineHours`, `name` (for the runs: `<name>-s<seed>`).
+`readerBatchChars`, `callMinutes` (15: how long one call to a writer or reader may take), `trainExtra` (flags for
+`train.py`), `deadlineHours`, `name` (for the runs: `<name>-s<seed>`).
+
+## The readers
+
+Two different models, of different families: the point of reading twice, blind, is that two readers who agree did not
+make the same mistake for the same reason. **The default pair is Sonnet 5.5 (through Claude Code) and gpt-6.1-sol (through
+the Codex CLI).** Measured 2026-10-08 on 40 requests of pilot 11, 34 of them with a label two earlier readers had settled
+(`runs/reader-comparison-2026-10-08/`, made with `bun orchestrator/src/reader-compare.ts <config.json>`, which measures any
+candidates the same way):
+
+| Reader | Read whole | With the settled labels | Seconds a request | Cost a request, as reported |
+|---|---|---|---|---|
+| claude-code/claude-sonnet-5-5 | 40/40 | 34/34 | 1.4 | 0.0115 USD |
+| claude-code/claude-haiku-5-5@low | 40/40 | 24/34 | 1.5 | 0.0162 USD |
+| codex/gpt-6-luna | 39/40 | 29/34 | 0.8 | none per call |
+| codex/gpt-6.1-sol | 40/40 | 34/34 | 2.0 | none per call |
+
+Agreement between two (of 40): Sonnet with sol 36, Sonnet with luna 31, sol with luna 31, Sonnet with Haiku 24, Haiku with
+luna 25, Haiku with sol 24. The labels were settled by Haiku 5.5 and Sonnet 5.5, which flatters those two; sol's 34 of 34
+is the independent one. Haiku at low effort ends a copied text with a full stop the request's words don't have (8 of its 10
+misses) and refuses two requests to hold payments. No answer of the 160 came with quotation marks escaped by hand.
+
+**The fallback** when one of the pair cannot be had: gpt-6-luna in place of sol (still two families; fewer examples, since
+it agrees with Sonnet on 31 of 40 and not 36); if Claude Code is what cannot be had, sol with luna (one family: the last
+resort, and to be said in the run's notes). Haiku 5.5 at low effort is not a reader to choose: it costs no less as reported
+and agrees least. With the default writers, each reader also reads requests its own model wrote; the other reader never did.
+
+What "cost as reported" is: Claude Code's own figure for a call on the plan. In the comparison's four Claude calls it is
+exactly the tokens at one rate for both models (per million: 5 input, 25 output, 0.5 cache read, 6.25 cache write), so it
+measures tokens used and not either model's price. Haiku used 1.7 times Sonnet's output tokens for the same answers.
 
 ## What is written under `out`
 
 `config.json`, `manifest.json` (below), `pipeline.log`, `calls.jsonl` (the ledger: every call's usage and cost, its prompt and
 its answer: model runs are training data and are kept), `lanes/<train|test>/…` (situations, `selected.json`, `written/` and
 `read/` with a file for each call, `requests/`, `label/`), `tests/`, `joined/`, `data/` (the export), `models/` (runs home from
-the pod, with `eval.json`), `pod/` (the batch's pod state).
+the pod, each with `eval.json`, the fixed tests, and `eval-sets.json`, the test sets made here), `pod/` (the batch's pod
+state; `pod.log` has each pod rented, its price, when it was ended and what the provider then listed).
 
 The manifest has: the sources (test-only or not, and why; their logs; the seat models), commits (this repo, dirty or not; each
 pilot's `commit.txt`), the translator prompt's version, the models, the counts at every step, agreement by function (of the
 requests both readers answered, how many became examples), what was dropped and why (`by_reason` of the label step; the join's
-counts), the test sets made, the data folder, the model runs with their scores, and usage and cost in total and by model.
+counts), the test sets made, the data folder, the model runs with their scores on the fixed tests (`runs`) and on the test sets
+made here (`test_scores`: by run and set, in all and by pilot, seat model, profile, origin and function), and usage and
+cost in total and by model.
 The command prints a short plain report from it.
 
 ## Resuming
@@ -111,8 +173,9 @@ The same command, with the same config, goes on. Each call, batch and step leave
 inputs; one that is whole and has the same fingerprint is skipped (so a rerun makes no model call), and a stale one (the
 instructions changed, say) is renamed `….stale-N`, never deleted. A usage limit is waited out (`waitMinutes`, up to
 `maxWaitHours`) and the call made again; after that the run stops with a status in the manifest and exit code 3. The
-spending limit is the run's, not the sitting's: what earlier sittings spent is read back from `calls.jsonl`. A pod of the batch
-that is still up is used again; runs already home and scored are not queued again.
+spending limit is the run's, not the sitting's: what earlier sittings spent is read back from `calls.jsonl`. Runs already home
+are not trained again (a run home and not scored is scored with no pod); a pod is never left up to be used again: a run cut
+short on the pod is trained again from its start on a new one.
 
 ## What is never done
 
@@ -125,7 +188,8 @@ that is still up is used again; runs already home and scored are not queued agai
 
 ## Not built
 
-- Scoring a model on the pipeline's own test sets: `translator-eval` has no input for them yet. `testsInValidationReal` is the
-  stand-in (the trainer scores `validation-real` every epoch), at the cost of comparability.
+- Scoring a prompt-driven model on the test sets from the pipeline itself: it scores the runs it trained; any other model is
+  scored by hand (`oikos translator-eval --model provider/model --only-sets --set <out>/tests/<file>.jsonl`).
+- Resuming a training run on the pod after the pod is ended: the checkpoint is not brought home, so it starts again.
 - A third reader to settle disagreements (the label step drops them).
 - Choosing among the trained runs: the manifest lists them, and a person chooses.

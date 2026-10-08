@@ -8,7 +8,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { MockAdapter, UsageLimitReached, type ContentBlock, type LlmRequest, type Price } from "@oikos/participants/llm";
-import { implausiblyUniform, objectsIn, pilotMeta, plainReport, runPipeline, undoubled, unionBasis, type Hooks, type PipelineConfig } from "../src/pipeline";
+import { HAND_IN, implausiblyUniform, objectsIn, pilotMeta, plainReport, runPipeline, undoubled, unionBasis, type Hooks, type PipelineConfig } from "../src/pipeline";
 import { inSituInstructions } from "../src/in-situ";
 
 const root = mkdtempSync(join(tmpdir(), "oikos-pipeline-"));
@@ -222,16 +222,18 @@ test("the standing set is joined; its examples from a test-only pilot, or in a t
   const base = rows(join(out1, "joined/train.jsonl"))[0];
   const ours = { ...base, id: "standing-1", source: "runs/elsewhere/x/d1/1" };
   const theirs = { ...base, id: "runs/pilot-b/x/d1/1/w-1", source: "runs/pilot-b/x/d1/1" };
+  // (As a pilot's own requests are named: from the runs folder on, without `runs/`.)
+  const theirsToo = { ...base, id: "pilot-b/draft.x.9", source: "pilot-b/x/d2/1" };
   const inWords = { ...base, id: "standing-3", source: "runs/elsewhere/y/d1/1", request: rows(join(out1, "tests/test-pilots-real.jsonl"))[0].request };
-  writeFileSync(join(standing, "train.jsonl"), [ours, theirs, inWords].map((e) => JSON.stringify(e)).join("\n") + "\n");
+  writeFileSync(join(standing, "train.jsonl"), [ours, theirs, theirsToo, inWords].map((e) => JSON.stringify(e)).join("\n") + "\n");
   writeFileSync(join(standing, "validation.jsonl"), JSON.stringify(ours) + "\n");
   const out = join(root, "out-standing");
   const m = await runPipeline(config(out, { standing }), hooks({ writer: 0, readerA: 0, readerB: 0, seen: [] }));
   expect(m.status).toBe("complete");
-  expect(m.steps["join"]).toMatchObject({ standing: { train: 3, validation: 1, validation_real: 0 }, dropped_standing_from_test_runs: 1 });
+  expect(m.steps["join"]).toMatchObject({ standing: { train: 4, validation: 1, validation_real: 0 }, dropped_standing_from_test_runs: 2 });
   const train = rows(join(out, "joined/train.jsonl"));
   expect(train.filter((e) => e.id === "standing-1").length).toBe(1);
-  expect(train.some((e) => e.id === theirs.id || e.id === "standing-3")).toBe(false);
+  expect(train.some((e) => e.id === theirs.id || e.id === theirsToo.id || e.id === "standing-3")).toBe(false);
   expect(rows(join(out, "joined/validation.jsonl")).length).toBe(1);
 });
 
@@ -263,6 +265,78 @@ test("a reader whose answers are implausibly uniform is rejected, and the run st
   expect(existsSync(join(out, "lanes/train/label"))).toBe(false);
 });
 
+test("after training, each run is scored on the test sets made here, by pilot, seat model and profile; the same command again scores nothing twice", async () => {
+  // (The test-only pilot's batch.json names the profile its town was generated from.)
+  writeFileSync(join(root, "runs", "pilot-b", "batch.json"), JSON.stringify({ spec: { profile: "some-profile" } }));
+  const out = join(root, "out-train");
+  const c: Counts = { writer: 0, readerA: 0, readerB: 0, seen: [] };
+  const base = hooks(c);
+  let asked = 0, pods = 0;
+  // The trained model, as a mock: right on everything but the requests to be shown something, where it drafts.
+  const model = new MockAdapter("m-s1", { translator: (req) => {
+    asked++;
+    const request = /^Request: (.*)$/m.exec(req.messages[0]!.content as string)![1]!;
+    return [{ type: "tool_use", id: "c", name: "call", input: { program: request.startsWith("Show me") ? "account(close=acc-old)" : program(request, "A") } }];
+  } });
+  const h: Hooks = {
+    ...base,
+    adapter: (name) => (name === "decide/m-s1" ? { adapter: model, prices: { "mock/m-s1": { input: 0, output: 0, cache_read: 0, cache_write: 0 } } } : base.adapter!(name)),
+    // (In place of the rented GPU: the run's folder as the pod script leaves it.)
+    pod: ({ runs, models }) => {
+      pods++;
+      for (const r of runs) {
+        mkdirSync(join(models, r.name), { recursive: true });
+        writeFileSync(join(models, r.name, "report.json"), JSON.stringify({ epochs: [{ validation_right: 9, of: 10, real_right: 3, real_of: 4 }] }));
+        writeFileSync(join(models, r.name, "eval.json"), "{}");
+        writeFileSync(join(models, r.name, "eval.log"), `Translator test set on decide/${r.name}: seen 1/1 right, 0 no draft, 0 wrong drafts; held out not run.\nReal requests (the pilots' seats, word for word) on decide/${r.name}: 2/2 right, 0 no draft, 0 wrong drafts.\n`);
+      }
+      return 0;
+    },
+  };
+  const cfg = config(out, { train: true, encoder: "some/encoder", seeds: [1], name: "m" });
+  const m = await runPipeline(cfg, h);
+  expect(m.status).toBe("complete");
+  expect(pods).toBe(1);
+  expect(m.runs["m-s1"]).toMatchObject({ encoder: "some/encoder", seed: 1, validation: [9, 10], validation_real: [3, 4] });
+  // Every test set with examples is scored, each of its lines once.
+  const sets = Object.entries(m.tests).filter(([, t]) => t.examples > 0);
+  expect(sets.length).toBeGreaterThanOrEqual(2);
+  const scores = m.test_scores!["m-s1"]!;
+  expect(Object.keys(scores).sort()).toEqual(sets.map(([n]) => n).sort());
+  for (const [name, t] of sets) expect(scores[name]!.all.of).toBe(t.examples);
+  expect(asked).toBe(sets.reduce((a, [, t]) => a + t.examples, 0));
+  // The lines say where they are from, and the scores are counted by it.
+  const real = Object.entries(m.tests).find(([n]) => n.startsWith("test pilots, their seats' real"))!;
+  const lines = rows(real[1].file);
+  expect(lines.every((l) => l.pilot === "pilot-b" && l.profile === "some-profile" && l.seat_model === "codex/some-model")).toBe(true);
+  const s = scores[real[0]]!;
+  expect(Object.keys(s.by.pilot!)).toEqual(["pilot-b"]);
+  expect(Object.keys(s.by.profile!)).toEqual(["some-profile"]);
+  expect(Object.keys(s.by.seat_model!)).toEqual(["codex/some-model"]);
+  expect(s.forms_not_as_written).toBe(0);
+  // Right, no draft and wrong draft add up; the request to be shown something was drafted, which is a wrong draft.
+  expect(s.all.passed + s.all.no_draft + s.all.wrong_draft).toBe(s.all.of);
+  expect(s.by.function!["none(not_an_act)"]).toEqual({ passed: 0, of: 1, no_draft: 0, wrong_draft: 1 });
+  expect(s.all.passed).toBe(s.all.of - 1);
+  // The held-back third of the training pilot's real requests is a set too, of that pilot (whose folder names no profile).
+  const held = scores[Object.keys(scores).find((n) => n.startsWith("held back"))!]!;
+  expect(Object.keys(held.by.pilot!)).toEqual(["pilot-a"]);
+  expect(held.by.profile).toBeUndefined();
+  // Each answer is kept with the run; the report says the scores.
+  const kept = JSON.parse(readFileSync(join(out, "models", "m-s1", "eval-sets.json"), "utf8"));
+  expect(kept.sets[real[0]].results.length).toBe(real[1].examples);
+  expect(plainReport(m)).toContain(`run m-s1 on "${real[0]}": ${s.all.passed}/${s.all.of} right`);
+  // Again: no pod, no scoring.
+  const again = await runPipeline(cfg, h);
+  expect(pods).toBe(1);
+  expect(asked).toBe(sets.reduce((a, [, t]) => a + t.examples, 0));
+  expect(again.test_scores).toEqual(m.test_scores);
+  // A pod script that fails stops the run, to be resumed.
+  const failed = await runPipeline(config(join(root, "out-train-2"), { train: true, encoder: "some/encoder", name: "n" }), { ...h, pod: () => 5 });
+  expect(failed.status).toContain("stopped (training)");
+  expect(failed.status).toContain("COULD NOT BE CONFIRMED ENDED");
+});
+
 test("the config is checked before any model is called: two different readers, no gpt-6-astra, a spending limit", async () => {
   const ok = config("/tmp/x");
   const refuses = (o: Partial<PipelineConfig>, why: RegExp) => expect(runPipeline({ ...ok, ...o }, hooks({ writer: 0, readerA: 0, readerB: 0, seen: [] }))).rejects.toThrow(why);
@@ -279,6 +353,18 @@ test("replies are read as files: lines, a fenced block, or a list", () => {
   expect(objectsIn('```json\n{"id":"a"}\n```').length).toBe(1);
   expect(objectsIn('[{"id":"a"},{"id":"b"}]').length).toBe(2);
   expect(objectsIn("Here you are:\n{\"id\":\"a\"}\nDone.").length).toBe(1);
+});
+
+test("the file is handed in as an object of a closed shape, every field a plain string: the same shape as an answer and as a tool's input", () => {
+  for (const form of [HAND_IN.reader, HAND_IN.writer]) {
+    expect(form.answer.name).toBe("hand_in");
+    expect(form.tools[0]!.input_schema).toEqual(form.answer.schema);
+    const item = (form.answer.schema as any).properties.answers.items;
+    expect(item.additionalProperties).toBe(false);
+    expect(item.required).toEqual(Object.keys(item.properties));
+  }
+  expect(Object.keys((HAND_IN.reader.answer.schema as any).properties.answers.items.properties)).toEqual(["id", "program"]);
+  expect(first.steps["train/read mock/reader-b"].escaped_by_hand_and_repaired).toBe(0);
 });
 
 test("a program a model escaped by hand inside the tool's JSON is read as it meant it; any other is left alone", () => {

@@ -13,6 +13,8 @@ import { leaks } from "./held-out";
 
 export { heldOutPath, leaks, loadHeldOut } from "./held-out";
 // The real requests (the pilots' seats, word for word), run and scored by shape: the third group.
+// A file of labelled requests (a test set the training pipeline made), scored against its labels: the fourth group.
+export { dimensionsOf, evaluateSet, loadSet, passesSet, setKnowledge, setReportText, shownAsWritten, tallyText, type SetCase, type SetReport, type SetResult } from "./set-run";
 export { evaluateReal, passesReal, realKnowledge, realReportText, shapeOf, PILOT_CASES, GAPS, type RealCase, type RealReport, type RealResult } from "./pilot-run";
 
 /** The test town's money: its profile's (the cases' amounts are written in it). */
