@@ -8,6 +8,7 @@ import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { MockAdapter, type LlmRequest } from "@oikos/participants/llm";
 import { generate } from "@oikos/worlds/generator/generate";
+import { logLines } from "../src/logs";
 import { runWorld } from "../src/run";
 
 const root = join(import.meta.dir, "../..");
@@ -63,4 +64,43 @@ test("a seat that looks into its office's papers at every sitting is shown lists
   const later = finance.filter((p) => p.text.includes("new since you last looked") || p.text.includes("Nothing new there since you last looked"));
   expect(later.length).toBeGreaterThan(3);
   expect(later.at(-1)!.text).not.toContain("[asset-register] asset register, from the start, from city: \"The town's asset register\"\n- [asset-register]");
+}, 120_000);
+
+test("a mayor's letters all go, whatever it writes as what they are about; none is lost without a word", async () => {
+  let n = 0;
+  const use = (name: string, input: object) => ({ type: "tool_use" as const, id: `t${++n}`, name, input });
+  const shown: string[] = [];
+  let sitting = 0;
+  const adapter = new MockAdapter("mock", {
+    participant: (req: LlmRequest) => {
+      shown.push(shownLast(req));
+      if (req.messages.length > 1 || ++sitting > 1) return [use("done_for_now", { days: 7 })];
+      // As the first real mayor wrote: what it is about in words, as an id, and not at all.
+      return [use("write", { to: ["bank"], text: "Please confirm the town's account is in order.", as: "mayor", about: "acc-city payments" }),
+        use("write", { to: ["finance"], text: "What does the payments procedure allow before a budget is adopted?", as: "mayor", about: "proc-payments" }),
+        use("write", { to: ["council-clerk"], text: "When is the next ballot?", as: "mayor" })];
+    },
+    debrief: () => [{ type: "text", text: "Noted." }],
+  });
+  const out = join(root, "runs", "test-seat-letters");
+  rmSync(out, { recursive: true, force: true });
+  await runWorld({ config: generate({ ...spec, mayor: "llm" }), runId: "town.seed1", outDir: out, until: 3 * DAY, adapter, recordObservations: "none" });
+  const letters: any[] = [], rejected: string[] = [];
+  let debrief = "";
+  for await (const line of logLines(join(out, "town.seed1.jsonl"))) {
+    if (line.includes('"rejected_action"') || line.includes('"not_sent"')) rejected.push(line);
+    if (line.includes('"annotation":"debrief"')) debrief = JSON.parse(line).body.data.prompt;
+    if (!line.includes('"block":"message"') || !line.includes('"kind":"command"')) continue;
+    const e = JSON.parse(line);
+    if (e.body.participant === "mayor-system") letters.push(...e.body.blocks);
+  }
+  expect(rejected).toEqual([]);
+  expect(letters).toEqual([
+    { block: "message", to: ["bank"], text: "About: acc-city payments\n\nPlease confirm the town's account is in order." },
+    { block: "message", to: ["finance"], text: "What does the payments procedure allow before a budget is adopted?", re: "proc-payments" },
+    { block: "message", to: ["council-clerk"], text: "When is the next ballot?" },
+  ]);
+  // It is told each went, and its own record of the run counts what was sent.
+  expect(shown[1]).toContain('Done: your letter to bank (headed "About: acc-city payments": what it is about is not one id, so it heads the letter).');
+  expect(debrief).toContain("3 letters of yours were sent, you asked for 0 things to be done");
 }, 120_000);

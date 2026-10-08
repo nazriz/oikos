@@ -19,7 +19,7 @@ import type { ContentBlock, LlmMessage, ToolSpec } from "./adapter";
 import { callModel, ModelCallFailed, promptTooLong, type LlmIO } from "./call";
 import { kindSaid, LOOK_CHARS_MAX, NOTHING_FOUND, NOTHING_NEW, renderObservation, renderStanding, type Looked } from "./render";
 
-export const LLM_PARTICIPANT_VERSION = "0.13.0"; // 0.13.0: a look into papers answers with a list (a paper is read when asked for by its id, a long one a part at a time), one look and one whole prompt have a ceiling, a prompt its model would not take is never sent again unchanged; 0.12.0: told that a paper is named by its id, and one it cannot name is looked up first; 0.11.0: a place it is not at is gone to (someone is sent, and what they found is told when they are back); 0.10.0: who is who is looked up by name, a register someone else keeps is asked about one named thing, a board is searched (docs/design/knowing.md); 0.9.0: an answer read exactly or not at all (told and asked once more when not), a way out of the study not clearly meant is asked about; 0.8.0: looks kept ready for every sitting; no turn when nothing came of looking into whole reports; a notebook added to or changed in part
+export const LLM_PARTICIPANT_VERSION = "0.13.0"; // 0.13.0: a letter whose about is not one id goes with it at its head, and nothing a seat sends is lost without a word; a look into papers answers with a list (a paper is read when asked for by its id, a long one a part at a time), one look and one whole prompt have a ceiling, a prompt its model would not take is never sent again unchanged; 0.12.0: told that a paper is named by its id, and one it cannot name is looked up first; 0.11.0: a place it is not at is gone to (someone is sent, and what they found is told when they are back); 0.10.0: who is who is looked up by name, a register someone else keeps is asked about one named thing, a board is searched (docs/design/knowing.md); 0.9.0: an answer read exactly or not at all (told and asked once more when not), a way out of the study not clearly meant is asked about; 0.8.0: looks kept ready for every sitting; no turn when nothing came of looking into whole reports; a notebook added to or changed in part
 
 export interface LlmParticipantConfig {
   participant: string;
@@ -254,8 +254,8 @@ export function tools(c: LlmParticipantConfig): ToolSpec[] {
       input_schema: { type: "object", required: ["what"], properties: { what: { type: "string" }, as: AS, why: { type: "string", description: "Why (optional; kept on record)." } } } },
     { name: "confirm", description: "Confirm or decline something waiting for you to confirm, by its reference.",
       input_schema: { type: "object", required: ["ref", "decision"], properties: { ref: { type: "string" }, decision: { enum: ["confirm", "decline"] }, note: { type: "string" } } } },
-    { name: "write", description: "Write to people or organisations, by id. The words go exactly as you write them.",
-      input_schema: { type: "object", required: ["to", "text"], properties: { to: { type: "array", items: { type: "string" } }, text: { type: "string" }, as: AS, about: { type: "string", description: "The reference it's about (optional)." } } } },
+    { name: "write", description: "Write to people or organisations, by id. The words go exactly as you write them. If the letter is about one thing that has an id (a paper, an account, a lot), give that id as about, and the letter is filed as about it. If what it is about is anything else (some words, or several things), say so in about all the same: it is put at the head of the letter as its subject line, and the letter is sent.",
+      input_schema: { type: "object", required: ["to", "text"], properties: { to: { type: "array", items: { type: "string" } }, text: { type: "string" }, as: AS, about: { type: "string", description: "What it's about (optional): one id, or a subject line in words." } } } },
     { name: "done_for_now", description: c.sessions
         ? `That's all for now. You're back after the given number of days, at that day's sitting (given none: after ${c.cadenceDays}); sooner, at the next sitting, if someone writes to you. You can use it alongside other actions: they're done, and you'll see how they went when you're back.`
         : "That's all for now. You'll be back after the given number of days, or sooner if someone writes to you. You can use it alongside other actions: they're done, and you're back after the days given, when you'll see how they went.",
@@ -310,6 +310,14 @@ export interface LlmController {
 }
 
 type Use = Extract<ContentBlock, { type: "tool_use" }>;
+/** The most a letter, a request or a note can run to (the contracts' limit on free text), and the most a letter goes to. */
+export const TEXT_MAX = 16_384;
+const TO_MAX = 64;
+/** Whether something is written as an id (the contracts' forms: one a world gives, one made in the run, a cell of
+ * ground, a room of a building): only that can be a letter's reference or whom it goes to. */
+export const isId = (s: string) => /^([a-z][a-z0-9_-]{0,63}|(ent|acc|str|rec|act|msg|par|pos|cnd)\.[0-9]{1,15}|cell\.[0-9]{1,6}\.[0-9]{1,6}|([a-z][a-z0-9_-]{0,63}|str\.[0-9]{1,15})\/[a-z][a-z0-9_-]{0,63}\.[0-9]{1,6})$/.test(s);
+/** An id as written, without the brackets a report shows it in. */
+const bare = (s: string) => s.trim().replace(/^\[(.*)\]$/, "$1").trim();
 /** The look that follows one for a kind of paper that found nothing: the folder's latest, looked through for kinds like it. */
 type Follow = { said: string; action: ParticipantAction; looked: [string, Looked] };
 const text = (x: unknown): x is string => typeof x === "string" && x.length > 0;
@@ -396,7 +404,9 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
   const toolset = tools(c);
   let notes = "";
   // What it did, as recorded, for its debrief (it has no other memory of the run: pilot 9's mayor couldn't say).
-  const tally = { requests: 0, confirmed: 0, declined: 0, letters: 0, looks: 0, first: -1, last: -1 };
+  // (Letters: those that went, by what came back from sending each, beside those it wrote.)
+  const tally = { requests: 0, confirmed: 0, declined: 0, letters: 0, written: 0, looks: 0, first: -1, last: -1 };
+  let sending = false; // the action just carried out was a letter (the next report says whether it went)
   let messages: LlmMessage[] = [];
   // The last answer's tool uses (the APIs need a result for every one): each action's result is the report after it.
   let pending: { id: string; name: string }[] = [];
@@ -476,7 +486,8 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
     if (q.follows !== undefined) return q.action; // (the same look, gone on with: not another)
     if (q.action.type === "propose") tally.requests++;
     if (q.action.type === "sign") q.action.decision === "accept" ? tally.confirmed++ : tally.declined++;
-    if (q.action.type === "message") tally.letters++;
+    if (q.action.type === "message") tally.written++;
+    sending = q.action.type === "message";
     if (opening) return q.action; // (looked up for it as the sitting opens: not something it did then)
     if (q.action.type === "look") tally.looks++;
     [tally.first, tally.last] = [tally.first < 0 ? obs.t : tally.first, obs.t];
@@ -529,7 +540,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
   };
 
   /** What a tool use asks for, as an action; or, if it can't be done as written, what it was and why not, in words. */
-  const read = (use: Use, held: Set<string>): { what: string } & ({ action: ParticipantAction; label?: string; looked?: [string, Looked]; kindSaid?: Follow } | { why: string }) => {
+  const read = (use: Use, held: Set<string>): { what: string } & ({ action: ParticipantAction; label?: string; looked?: [string, Looked]; kindSaid?: Follow; clipped?: string; subject?: string } | { why: string }) => {
     const i = use.input;
     const what = use.name === "do" ? (text(i?.what) ? `what you asked for (${quote(i.what)})` : "something you asked for")
       : use.name === "confirm" ? (text(i?.ref) ? `your answer on ${i.ref}` : "your answer on something waiting for you to confirm")
@@ -543,24 +554,39 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
       i.as === undefined ? {} : !text(i.as) ? "the post you named couldn't be read" : !held.has(i.as) ? `you don't hold the post ${quote(i.as)}` : { as: i.as };
     if (use.name === "do") {
       if (!text(i.what)) return no("it didn't say what to do");
+      if (i.what.length > TEXT_MAX) return no(`it ran to ${i.what.length.toLocaleString("en")} characters, and what you ask for can be at most ${TEXT_MAX.toLocaleString("en")}`);
       const as = post();
       if (typeof as === "string") return no(as);
-      return { what, action: { type: "propose", text: i.what, ...as, ...(text(i.why) ? { reasoning: i.why } : {}) } };
+      // (Why is kept on record: too long a reason is kept as far as a record holds, never the cause of the act being lost.)
+      return { what, action: { type: "propose", text: i.what, ...as, ...(text(i.why) ? { reasoning: i.why.slice(0, TEXT_MAX) } : {}) }, ...(text(i.why) && i.why.length > TEXT_MAX ? { clipped: `why (${i.why.length} characters; ${TEXT_MAX} kept)` } : {}) };
     }
     if (use.name === "confirm") {
       if (!text(i.ref)) return no("it didn't say which one");
       if (i.decision !== "confirm" && i.decision !== "decline") return no('it has to say "confirm" or "decline"');
-      return { what, action: { type: "sign", draft: i.ref, decision: i.decision === "confirm" ? "accept" : "reject", ...(text(i.note) ? { note: i.note } : {}) },
-        ...(i.decision === "confirm" ? { label: "What you confirmed" } : {}) };
+      return { what, action: { type: "sign", draft: i.ref, decision: i.decision === "confirm" ? "accept" : "reject", ...(text(i.note) ? { note: i.note.slice(0, TEXT_MAX) } : {}) },
+        ...(i.decision === "confirm" ? { label: "What you confirmed" } : {}), ...(text(i.note) && i.note.length > TEXT_MAX ? { clipped: `note (${i.note.length} characters; ${TEXT_MAX} kept)` } : {}) };
     }
     if (use.name === "write") {
       if (text(i.to)) return no("who it's for has to be given as a list");
       if (!Array.isArray(i.to) || !i.to.length) return no("the letter had no one to go to");
       if (!i.to.every(text)) return no("one of those it was for couldn't be read");
       if (!text(i.text)) return no("the letter had no words");
+      // Whom it goes to, each by id (written in brackets or not). Nothing that can't be delivered is sent on and lost.
+      const to: string[] = [...new Set((i.to as string[]).map(bare))];
+      const strangers = to.filter((x) => !isId(x));
+      if (strangers.length) return no(`${strangers.map((x) => quote(x, 60)).join(" and ")} ${strangers.length === 1 ? "isn't an id" : "aren't ids"}: a letter goes to people and organisations by the ids your reports give them (to find one, look them up in who's who)`);
+      if (to.length > TO_MAX) return no(`a letter goes to at most ${TO_MAX} at once, and this named ${to.length}`);
+      if (i.about !== undefined && i.about !== null && typeof i.about !== "string") return no("what it's about couldn't be read");
+      // What it is about: one id is the letter's reference; anything else heads the letter as its subject line, and
+      // the letter goes (2026-10-09: three of one mayor's four letters were lost for an `about` in words).
+      const about = typeof i.about === "string" ? i.about.trim() : "";
+      const re = about && isId(bare(about)) ? bare(about) : undefined;
+      const words = about && !re ? `About: ${about}\n\n${i.text}` : i.text;
+      if (words.length > TEXT_MAX) return no(`the letter ran to ${words.length.toLocaleString("en")} characters, and a letter can be at most ${TEXT_MAX.toLocaleString("en")}`);
       const as = post();
       if (typeof as === "string") return no(as);
-      return { what, action: { type: "message", to: i.to, text: i.text, ...as, ...(text(i.about) ? { re: i.about } : {}) }, label: `Your letter to ${i.to.join(", ")}` };
+      return { what, action: { type: "message", to, text: words, ...as, ...(re ? { re } : {}) }, label: `Your letter to ${to.join(", ")}${about && !re ? ` (headed "About: ${about.length > 80 ? `${about.slice(0, 80)}…` : about}": what it is about is not one id, so it heads the letter)` : ""}`,
+        ...(about && !re ? { subject: about } : {}) };
     }
     if (use.name === "look" && reports.size) {
       if (!text(i.report)) return no("it didn't say which report");
@@ -680,6 +706,8 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
       if (obs.inbox.length) mail = true;
       // This report is the result of the action just carried out, if one was.
       const wasResult = current !== undefined;
+      if (current && sending && obs.outcomes.some((x) => x.status === "applied")) tally.letters++;
+      sending = false;
       if (current) {
         // A look for a kind of paper that found nothing: the folder's latest papers are looked through for kinds like
         // it (no turn is taken for it), and what that shows stands where "nothing found" stood.
@@ -889,7 +917,8 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
           }
           throw e;
         }
-        // Answered: it has now seen all of it.
+        // Answered: it has now seen all of it. (A day it sat, whatever it did: its record of the run says from when to when.)
+        [tally.first, tally.last] = [tally.first < 0 ? obs.t : tally.first, obs.t];
         messages = [...sending, { role: "assistant", content: res.content }];
         carried = [];
         missed = [];
@@ -970,6 +999,10 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
             continue;
           }
           queue.push({ id: use.id, action: r.action, ...(r.label ? { label: r.label } : {}), ...(r.looked ? { looked: r.looked } : {}), ...(r.kindSaid ? { kindSaid: r.kindSaid } : {}) });
+          // (Kept on record, so that how often it happens can be counted: a subject line made of an `about` in words;
+          // a reason or a note longer than a record holds.)
+          if (r.subject !== undefined) await note({ letter_about_in_words: { about: r.subject.slice(0, 400), to: (r.action as any).to } });
+          if (r.clipped) await note({ clipped: r.clipped, use: use.name });
           if (use.name !== "look") continue;
           lookIds.add(use.id);
           // A look to keep ready for every sitting from now on (it's made now too); or one it made last sitting as well,
@@ -1017,7 +1050,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
       // reaction to an experience it can't remember is no reaction).
       const day = (t: number) => Math.floor(t / 86_400) + 1;
       const did = tally.first < 0 ? "You didn't act during the run." :
-        `From day ${day(tally.first)} to day ${day(tally.last)} you wrote ${tally.letters} letter${tally.letters === 1 ? "" : "s"}, asked for ${tally.requests} thing${tally.requests === 1 ? "" : "s"} to be done (confirming ${tally.confirmed}, declining ${tally.declined}), and looked something up ${tally.looks} time${tally.looks === 1 ? "" : "s"}.`;
+        `From day ${day(tally.first)} to day ${day(tally.last)} ${tally.letters} letter${tally.letters === 1 ? "" : "s"} of yours ${tally.letters === 1 ? "was" : "were"} sent${tally.written > tally.letters ? ` (${tally.written - tally.letters} more that you wrote ${tally.written - tally.letters === 1 ? "was" : "were"} not: you were told at the time)` : ""}, you asked for ${tally.requests} thing${tally.requests === 1 ? "" : "s"} to be done (confirming ${tally.confirmed}, declining ${tally.declined}), and looked something up ${tally.looks} time${tally.looks === 1 ? "" : "s"}.`;
       const content = `${text}\n\nFor reference, your own record of the run. Your notebook, as you left it: ${notes || "(empty)"}\n${did}`;
       const res = await callModel(io, {
         purpose: "debrief", subject: c.participant, system: c.framing.system ?? "", maxTokens: c.maxTokens ?? 2000,

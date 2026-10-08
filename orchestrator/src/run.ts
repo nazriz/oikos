@@ -603,6 +603,17 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     return r;
   };
 
+  /**
+   * Something a seat sent that the engine would not take as it was written (it breaks the contract: never logged as an
+   * act). Nothing a seat sends is ever lost without a word: it is noted (`not_sent`, with the engine's reason, which is
+   * for the log), and the seat is told at its next turn, in its own terms, what was not sent or done. Code
+   * participants' acts are noted as before (`rejected_action`).
+   */
+  const notSent = async (u: Unit, what: "letter" | "act" | "confirmed", text: string, data: object) => {
+    await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { ...data, ...(u.llm ? { not_sent: { what, why: k.lastError.slice(0, 500), told: text } } : {}) } } });
+    if (u.llm) u.notices.push({ t, text });
+  };
+
   /** A confirmed (or declined) draft: the signoff is recorded, and if accepted the acts go to the kernel with their full provenance. */
   const submit = async (u: Unit, p: { draft: Draft; hash: string; reasoning?: string }, decision: "accept" | "reject", note?: string) => {
     const d = p.draft;
@@ -611,7 +622,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     const as = d.as ?? capacityOf(u);
     const r = await begin(u, { command: "act", participant: u.participant, ...(as ? { as } : {}), blocks: d.blocks,
       provenance: { via: "translator", proposal: d.proposal, draft: d.id, draft_hash: p.hash, translator: d.translator, call: d.call, resolver: d.resolver }, ...(p.reasoning ? { reasoning: p.reasoning } : {}) });
-    if (r === null) await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { rejected_draft: d.id } } });
+    if (r === null) await notSent(u, "confirmed", `What you confirmed (${d.id}) could not be put into effect as it was drawn up, and nothing was done. You could ask for it again, in other words.`, { rejected_draft: d.id });
   };
 
   /** A participant whose decisions keep failing (D59): its stand-in carries it on if the world names one (as after
@@ -737,8 +748,10 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       const blocks = action.type === "act" ? action.blocks : [{ block: "message", to: action.to, text: action.text, ...(action.re ? { re: action.re } : {}) }];
       const r = await begin(u, { command: "act", participant: u.participant, ...asField, blocks, provenance: { via: "direct" }, ...(action.type === "act" && action.reasoning && keepReasoning(u) ? { reasoning: action.reasoning } : {}) });
       if (r === null) {
-        // Off-contract: never logged by the kernel, so record the attempt ourselves.
-        await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { rejected_action: JSON.stringify(action).slice(0, 4000) } } });
+        // Off-contract: never logged by the kernel, so record the attempt ourselves; and a seat is told (never silence).
+        const words = action.type === "message" ? `Your letter to ${action.to.join(", ")} (${JSON.stringify(action.text.length > 60 ? `${action.text.slice(0, 60)}…` : action.text)}) was not sent: it could not be delivered as it was written. Nothing went. You could write it again, to each by their id.`
+          : "What you did could not be carried out as it was written, and nothing was done.";
+        await notSent(u, action.type === "message" ? "letter" : "act", words, { rejected_action: JSON.stringify(action).slice(0, 4000) });
       }
       return true;
     }
@@ -784,7 +797,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
         return true;
       }
       const r = await begin(u, { command: "act", participant: u.participant, ...asField, blocks: res.blocks, provenance: { via: "call", call: written ? action.call : calls.programText(program), resolver: RESOLVER }, ...(action.reasoning && keepReasoning(u) ? { reasoning: action.reasoning } : {}) });
-      if (r === null) await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { rejected_action: JSON.stringify(res.blocks).slice(0, 4000), call: calls.programText(program) } } });
+      if (r === null) await notSent(u, "act", "What you did could not be carried out as it was written, and nothing was done.", { rejected_action: JSON.stringify(res.blocks).slice(0, 4000), call: calls.programText(program) });
       return true;
     }
     if (!L) {

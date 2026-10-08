@@ -202,6 +202,9 @@ export class Kernel {
     }
   }
 
+  /** Why the last request that `tryRequestMany` gave null for was not taken (the kernel's words: for the log, never for a participant). */
+  lastError = "";
+
   /** Send one request; resolves to the reply, or throws KernelError on {ok:false}. */
   async request(req: object): Promise<any> {
     this.onRequest?.(req);
@@ -223,11 +226,12 @@ export class Kernel {
   async tryRequestMany(reqs: object[]): Promise<(any | null)[]> {
     if (!reqs.length) return [];
     for (const r of reqs) this.onRequest?.(r);
-    if (this.session) return reqs.map((r) => {
-      const reply = this.local(r);
+    const taken = (reply: any) => {
+      if (!reply.ok) this.lastError = String(reply.error ?? "");
       return reply.ok ? reply : null;
-    });
-    return (await this.exchange(reqs)).map((reply) => (reply.ok ? reply : null));
+    };
+    if (this.session) return reqs.map((r) => taken(this.local(r)));
+    return (await this.exchange(reqs)).map(taken);
   }
 
   /** Like request, but returns null instead of throwing on a protocol error. */

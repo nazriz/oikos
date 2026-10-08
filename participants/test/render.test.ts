@@ -32,9 +32,11 @@ test("reports use the world's words: titles, totals, tallies; never the machiner
 });
 
 test("outcomes and notices are told in plain words", () => {
-  const text = renderObservation(obs({}, { outcomes: [{ action: "act.9", t: 0, status: "refused", refusal: { code: "insufficient_funds" } }], notices: [{ t: 0, text: "Please state the amount itself." }] }), { lastAction: "What you confirmed" });
+  const text = renderObservation(obs({}, { outcomes: [{ action: "act.9", t: 0, status: "refused", refusal: { code: "insufficient_funds" } }], notices: [{ t: 0, text: "Please state the amount itself.", re: "draft.x.1" }, { t: 0, text: "Your letter to bank was not sent." }] }), { lastAction: "What you confirmed" });
   expect(text).toContain("What you confirmed couldn't be done: the account doesn't have enough money.");
   expect(text).toContain("A note on your request: Please state the amount itself.");
+  // (Something it is told that is not about a request stands as it is said.)
+  expect(text).toContain("\nYour letter to bank was not sent.");
   expect(text).not.toContain("act.9");
 });
 

@@ -601,7 +601,8 @@ export function renderObservation(obs: Observation, o: RenderOptions = {}): stri
   if (obs.body) out.push(...describeBody(obs.body, obs.t));
   if (obs.positions?.length) out.push(`You hold ${obs.positions.length === 1 ? "a post" : "these posts"}: ${obs.positions.map((p) => `${p.title ?? words(p.role ?? p.position)} (${p.position}), for ${p.entity}`).join("; ")}.`);
   for (const x of obs.outcomes) out.push(...outcomeLines(x, o.lastAction ?? "What you did", obs.t));
-  for (const n of obs.notices ?? []) out.push(`A note on your request: ${n.text}`);
+  // (A note about something it asked to be done names it; anything else it is told stands as it is said.)
+  for (const n of obs.notices ?? []) out.push(n.re ? `A note on your request: ${n.text}` : n.text);
   if (obs.inbox.length) {
     out.push("", "## Letters");
     for (const m of obs.inbox) out.push(`- From ${m.from} (${when(m.t)})${m.re ? `, about ${m.re}` : ""}: "${m.text}"`);
