@@ -1,8 +1,8 @@
 {
   "id": "us-oh-2026",
-  "place": "A town of a few thousand people in rural Ohio (Midwest), United States",
+  "place": "A town of a few thousand people in rural Ohio, United States (modelled on Wyandot County, Ohio)",
   "as_of": "2026-10",
-  "about": "Every place-specific figure the town generator uses for a rural Ohio town, with its source. Written by an agent working from web search and memory: many figures are placeholders (the source says so) and every figure not marked as opened is to confirm. Where the profile structure cannot say what this place's rule is, the source says so (structural gaps). A world for another place and time is another profile; the platform's code holds none of these (docs/profiles.md).",
+  "about": "Every place-specific figure the town generator uses for a small town in rural Ohio, with its source. County-level figures are for Wyandot County (county seat Upper Sandusky, 21,598 people, ACS 2020-2024), wages for the BLS West Northwestern Ohio nonmetropolitan area, life tables and birth rates national (NCHS), river and climate for the Sandusky River gauge and Upper Sandusky station. Where a source says 'placeholder' the figure is an estimate or carried over from the other profile; 'opened' means the primary table or page was read. Where the profile structure cannot say what this place's rule is, the source says so. A world for another place and time is another profile; the platform's code holds none of these (docs/profiles.md).",
   "values": {
     "currency": {
       "code": "USD",
@@ -19,11 +19,11 @@
       ]
     },
     "households": {
-      "lone_bps": 2950,
-      "group_bps": 400,
-      "couple_bps": 3000,
-      "couple_children_bps": 2450,
-      "one_parent_bps": 1200,
+      "lone_bps": 2856,
+      "group_bps": 444,
+      "couple_bps": 3554,
+      "couple_children_bps": 1718,
+      "one_parent_bps": 1428,
       "children_couple": [
         3550,
         4350,
@@ -34,10 +34,10 @@
         3300,
         1550
       ],
-      "same_sex_couple_bps": 120,
-      "lone_parent_female_bps": 7900,
-      "adult_female_bps": 5100,
-      "child_male_bps": 5122,
+      "same_sex_couple_bps": 144,
+      "lone_parent_female_bps": 5595,
+      "adult_female_bps": 5121,
+      "child_male_bps": 4922,
       "adult_ages": [
         18,
         99
@@ -55,17 +55,17 @@
         {
           "from": 0,
           "to": 4,
-          "bps": 540
+          "bps": 550
         },
         {
           "from": 5,
           "to": 9,
-          "bps": 580
+          "bps": 715
         },
         {
           "from": 10,
           "to": 14,
-          "bps": 610
+          "bps": 567
         },
         {
           "from": 15,
@@ -75,72 +75,72 @@
         {
           "from": 20,
           "to": 24,
-          "bps": 600
+          "bps": 499
         },
         {
           "from": 25,
           "to": 29,
-          "bps": 580
+          "bps": 534
         },
         {
           "from": 30,
           "to": 34,
-          "bps": 610
+          "bps": 596
         },
         {
           "from": 35,
           "to": 39,
-          "bps": 610
+          "bps": 763
         },
         {
           "from": 40,
           "to": 44,
-          "bps": 580
+          "bps": 480
         },
         {
           "from": 45,
           "to": 49,
-          "bps": 570
+          "bps": 585
         },
         {
           "from": 50,
           "to": 54,
-          "bps": 600
+          "bps": 625
         },
         {
           "from": 55,
           "to": 59,
-          "bps": 660
+          "bps": 810
         },
         {
           "from": 60,
           "to": 64,
-          "bps": 690
+          "bps": 576
         },
         {
           "from": 65,
           "to": 69,
-          "bps": 620
+          "bps": 687
         },
         {
           "from": 70,
           "to": 74,
-          "bps": 520
+          "bps": 492
         },
         {
           "from": 75,
           "to": 79,
-          "bps": 390
+          "bps": 303
         },
         {
           "from": 80,
           "to": 84,
-          "bps": 230
+          "bps": 293
         },
         {
           "from": 85,
           "to": 99,
-          "bps": 390
+          "bps": 305
         }
       ]
     },
@@ -473,26 +473,26 @@
       ]
     },
     "wages_per_fortnight": {
-      "shop": 124000,
-      "factory": 176000,
-      "construction": 216000
+      "shop": 130960,
+      "factory": 199520,
+      "construction": 236000
     },
     "rents_per_month": {
       "apartment_units": [
         {
           "bedrooms": 1,
           "count": 3,
-          "rent": 75000
+          "rent": 61400
         },
         {
           "bedrooms": 2,
           "count": 7,
-          "rent": 90000
+          "rent": 82400
         },
         {
           "bedrooms": 3,
           "count": 2,
-          "rent": 105000
+          "rent": 96800
         }
       ],
       "house_types": [
@@ -500,20 +500,20 @@
           "id": "house",
           "bedrooms": 3,
           "share_bps": 5500,
-          "rent": 115000
+          "rent": 96800
         },
         {
           "id": "large-house",
           "bedrooms": 4,
           "share_bps": 4500,
-          "rent": 135000
+          "rent": 96700
         }
       ]
     },
     "spending": {
       "saving_bps": 410,
       "wealth_effect_bps_per_year": 300,
-      "essentials_per_month": 45000,
+      "essentials_per_month": 35942,
       "shops_known": 7,
       "shop_search_bps_per_month": 2500
     },
@@ -521,51 +521,51 @@
       {
         "from": 18,
         "pct": [
-          20000,
-          100000,
-          300000,
-          800000,
-          2500000
+          36180,
+          179820,
+          540000,
+          1441800,
+          4498200
         ]
       },
       {
         "from": 25,
         "pct": [
-          30000,
-          120000,
-          450000,
-          1300000,
-          4000000
+          36180,
+          179820,
+          540000,
+          1441800,
+          4498200
         ]
       },
       {
         "from": 35,
         "pct": [
-          35000,
-          150000,
-          550000,
-          1800000,
-          6000000
+          50250,
+          249750,
+          750000,
+          2002500,
+          6247500
         ]
       },
       {
         "from": 45,
         "pct": [
-          40000,
-          170000,
-          750000,
-          2500000,
-          8000000
+          58960,
+          293040,
+          880000,
+          2349600,
+          7330400
         ]
       },
       {
         "from": 55,
         "pct": [
-          50000,
-          220000,
-          1000000,
-          3500000,
-          12000000
+          52930,
+          263070,
+          790000,
+          2109300,
+          6580700
         ]
       }
     ],
@@ -718,7 +718,7 @@
         "rate": 0
       }
     ],
-    "labour_force_participation_bps": 7900,
+    "labour_force_participation_bps": 8171,
     "tenancy": {
       "rent_review_months": 12,
       "rent_increase_notice_days": 30,
@@ -864,7 +864,7 @@
       "rates_instalments": 2,
       "rates_due_days": 30,
       "rates_penalty_interest_bps": 800,
-      "median_house_price": 19000000,
+      "median_house_price": 16340000,
       "rates_exempt_kinds": [
         "health_service",
         "school",
@@ -883,11 +883,11 @@
     },
     "unions": {
       "membership_bps": {
-        "manufacturing": 800,
-        "retail": 450,
-        "construction": 1030,
-        "public_administration": 2800,
-        "other": 900
+        "manufacturing": 770,
+        "retail": 400,
+        "construction": 1110,
+        "public_administration": 3290,
+        "other": 1000
       },
       "dues_per_month": 5500,
       "resignation_notice_days": 14,
@@ -943,7 +943,7 @@
     },
     "health": {
       "doctors_per_1000": 0.4,
-      "doctor_wage_per_fortnight": 923100,
+      "doctor_wage_per_fortnight": 872300,
       "consult_minutes": 30,
       "seek_care_bps": 9000,
       "treats": [
@@ -1001,7 +1001,7 @@
       }
     },
     "ownership": {
-      "house_owner_bps": 7500,
+      "house_owner_bps": 8422,
       "mortgage_bps_by_age": [
         {
           "from": 18,
@@ -1016,8 +1016,8 @@
           "bps": 1500
         }
       ],
-      "mortgage_payment_per_month": 140000,
-      "mortgage_rate_bps": 650,
+      "mortgage_payment_per_month": 128100,
+      "mortgage_rate_bps": 728,
       "mortgage_years_left": [
         5,
         30
@@ -1035,15 +1035,15 @@
     "utilities": {
       "water": {
         "litres_per_person_per_day": 310,
-        "price_per_kl": 240,
-        "service_per_quarter": 6000,
+        "price_per_kl": 277,
+        "service_per_quarter": 6300,
         "river_inflow_kl_per_cell_per_day": 1000,
         "river_decay_bps_per_day": 1000,
         "river_flow_bps_per_day": 5000
       },
       "energy": {
-        "kwh_per_household_per_day": 24,
-        "price_per_kwh": 17,
+        "kwh_per_household_per_day": 29,
+        "price_per_kwh": 19,
         "supply_per_day": 30,
         "grid_price_per_kwh": 9,
         "grid_emissions_g_per_kwh": 450
@@ -1051,18 +1051,18 @@
     },
     "climate": {
       "rain_by_month_bps": [
-        11000,
-        11500,
-        14000,
-        14000,
-        11500,
-        9000,
-        7000,
-        5500,
-        5000,
-        6000,
-        8500,
-        10500
+        15918,
+        16569,
+        21200,
+        16714,
+        11215,
+        8646,
+        5173,
+        2569,
+        2279,
+        2822,
+        5825,
+        11070
       ],
       "storm_bps_per_month": 1000,
       "storm_days": [
@@ -1104,7 +1104,7 @@
       "detection_bps": 1300,
       "investigation_hours": 4,
       "police_per_1000": 2.4,
-      "officer_wage_per_fortnight": 250000
+      "officer_wage_per_fortnight": 240000
     },
     "justice": {
       "hearing_after_days": 21,
@@ -1118,24 +1118,24 @@
         5,
         17
       ],
-      "students_per_teacher": 16.5,
+      "students_per_teacher": 16.4,
       "school_days_per_year": 180,
       "hours_per_day": 6.5,
-      "teacher_wage_per_fortnight": 238500,
+      "teacher_wage_per_fortnight": 268000,
       "attainment": [
         {
           "label": "Less than high school",
-          "share_bps": 950,
+          "share_bps": 516,
           "years": 10
         },
         {
           "label": "High school graduate (or equivalent)",
-          "share_bps": 3700,
+          "share_bps": 4774,
           "years": 12
         },
         {
           "label": "Some college, no degree",
-          "share_bps": 2000,
+          "share_bps": 1751,
           "years": 13
         },
         {
@@ -1145,7 +1145,7 @@
         },
         {
           "label": "Bachelor's degree or above",
-          "share_bps": 2350,
+          "share_bps": 1959,
           "years": 16
         }
       ],
@@ -1281,9 +1281,9 @@
   },
   "sources": {
     "currency": "United States dollars, in cents: written with a dollar sign before the amount (\"$1,234.56\"), or in words as dollars (informally bucks) and cents. ISO 4217: USD, two decimal places.",
-    "households": "Placeholders estimated from memory of the shape of the U.S. Census Bureau's American Community Survey 2023 for Ohio (not opened, so every share here is to confirm against ACS tables B11001, B11016, B09005 and DP02 for a place of a few thousand in a non-metropolitan Ohio county). What was found: Ohio's average household size was 2.38 in 2023 and 44.2% of its households were married-couple families (ACS 2023 1-year, as reported by Greater Ohio Policy Center, https://greaterohio.org/blog/2024/12/18/us-census-releases-2023-population-data, search snippet only). Lone person about 29.5%, group (unrelated adults) about 4%, couple without children at home about 30%, couple with children at home (of any age up to 24) about 24.5%, one parent about 12%: estimated to sum to 100% and to give an average size near 2.4. children_couple, children_one_parent, adult_ages, mother_age_at_first_birth, group_size: carried over unchanged from another profile (no U.S. figure sought). same_sex_couple_bps: about 1.2% of couple households, a placeholder (ACS shows roughly 1%; to confirm). child_male_bps: 105 boys per 100 girls at birth, 51.2% (the U.S. ratio is about 105; NCHS, Births: Final Data, to confirm the year). lone_parent_female_bps and adult_female_bps: placeholders (ACS: about 79% of lone-parent households are headed by women, to confirm).",
-    "households.age_bands_bps": "Placeholder: five-year age shares for a rural Ohio place, shaped from memory by the Census Bureau's ACS 2023 age-by-sex table (B01001) for Ohio (median age about 40; non-metropolitan Ohio counties are older, so 60-69 are weighted up); the 85+ band takes the remainder so the shares sum to 10,000. Not opened: to confirm against ACS 5-year table B01001 for a named non-metropolitan Ohio county. 85 and over taken to 99.",
-    "households.child_max_age": "The census counts a household's own children of any age living with their parents; children at home are drawn up to 24 (a simplification: older children at home are left out). Same rule as in the other profile; no place-specific figure.",
+    "households": "U.S. Census Bureau, American Community Survey 2020-2024 5-year estimates, Wyandot County, Ohio (county seat Upper Sandusky; a rural county of 21,598 people), table B11001, B11003, B09019 and B01001, read through the Census Reporter API (https://api.censusreporter.org/1.0/data/show/latest?table_ids=B11001, B11003, B09019 and B01001&geo_ids=05000US39175, opened). Of 8999 households: lone person 2570 (28.6%), not-living-alone nonfamily (group) 400 (4.4%), other family (one parent or relatives, any age of child) 1285 (14.3%), married couple with own children under 18 1546 (17.2%); the remaining married couples (no own child under 18, so couples whose children are grown or at home aged 18-24, which the table cannot separate) take the rest, 35.5%. same_sex_couple_bps: same-sex spouses 78 of 5,411 couples (B09019). lone_parent_female_bps: female householders with own children under 18, 334 of 597 lone-parent families (B11003). adult_female_bps and child_male_bps: from B01001 (adults 18+, children under 18). children_couple, children_one_parent, adult_ages, mother_age_at_first_birth, group_size: rule parameters carried over unchanged from the other profile (the number of children per family was not sought; placeholders). Mean household size is 21,334 people in households over 8,999 households = 2.37.",
+    "households.age_bands_bps": "U.S. Census Bureau, American Community Survey 2020-2024 5-year estimates, Wyandot County, Ohio (county seat Upper Sandusky; a rural county of 21,598 people), table B01001, read through the Census Reporter API (https://api.censusreporter.org/1.0/data/show/latest?table_ids=B01001&geo_ids=05000US39175, opened). Five-year age shares of all 21,598 residents (sexes added; 15-19, 20-24, 60-64 and 65-69 are made from the table's finer groups); 85 and over taken to 99.",
+    "households.child_max_age": "A rule parameter carried over: children at home are drawn up to age 24 (a simplification: the census counts a household's own children of any age living with their parents). No place-specific figure.",
     "life.qx_per_100000": "NCHS (CDC), National Vital Statistics Reports vol. 74 no. 6, United States Life Tables, 2023, Table 2 (males) and Table 3 (females), the probability of dying between exact ages x and x+1, ages 0-99, times 100,000 and rounded (opened: https://ftp.cdc.gov/pub/Health_Statistics/NCHS/Publications/NVSR/74-06/Table02.xlsx and Table03.xlsx). Age 100: the table's last row is an open interval (100 and older, qx = 1), so the age-100 entry is a placeholder extrapolated from the ratio of the age-99 to the age-98 value. National, not Ohio's: Ohio's life expectancy is a little below the national one (to confirm against NCHS state life tables).",
     "life.illness": "Placeholder carried over from the other profile, which shaped it by the age gradient of hospitalisations; to replace with U.S. age-specific rates (AHRQ HCUP National Inpatient Sample; not sought).",
     "life.injury": "Placeholder: about 650 nonfatal injury hospitalisations per 100,000 people a year in the United States (estimated from memory of CDC WISQARS nonfatal injury reports; not opened, to confirm). Severity split: placeholder.",
@@ -1293,16 +1293,16 @@
     "life.found_alone_after": "Carried over from the other profile: no U.S. figure was found, so Japan's is used, the one country found to count it (National Police Agency of Japan, people who died alone at home). Placeholder for this place; to replace if a U.S. medical-examiner study of time to discovery is found.",
     "fertility_per_10000": "NCHS (CDC), Births in the United States, 2024, Data Brief 535 (https://www.cdc.gov/nchs/products/databriefs/db535.htm, opened): births per 1,000 women by age 15-19 12.6, 20-24 55.8, 25-29 89.5, 30-34 93.7, 35-39 54.3, 40-44 12.7 (times 10: configs are integers). Ages 45-49: 1.2 per 1,000 is a placeholder from memory of NCHS 2023 (the brief did not give it; to confirm). National rates, not Ohio's.",
     "ordinary_hours_per_week": "Fair Labor Standards Act (29 U.S.C. 207): overtime at one and a half times after 40 hours a week; 40 is the standard full-time week (U.S. Department of Labor). There is no statutory maximum of ordinary hours as there is in some countries: the overtime threshold is used (a structural gap).",
-    "wages_per_fortnight": "United States pay is commonly biweekly: 80 hours. Shop: placeholder $15.50 an hour (Ohio's minimum wage is $11.00 an hour from 1 January 2026 for employers with gross receipts of $405,000 or more, https://www.newsfromthestates.com/article/ohios-minimum-wage-increases-11-hour-2026, search result only, to confirm at the Ohio Department of Commerce; BLS Occupational Employment and Wage Statistics: a nonmetropolitan northern Ohio cashier mean of $12.85 an hour was seen in a search snippet from an earlier year, https://www.bls.gov/oes/2023/may/oes412011.htm, so $15.50 for a full-time retail worker with some seniority is an estimate). Factory $22.00 an hour and construction $27.00 an hour: placeholders estimated from memory of BLS OEWS mean wages for Ohio production and construction occupations (not opened; to confirm at https://www.bls.gov/oes/current/oes_oh.htm). Each times 80 hours.",
-    "rents_per_month": "Placeholders. Found: Ohio's median monthly rent about $1,090 in 2024 (search result citing Census Bureau ACS, https://usafacts.org/answers/how-much-do-households-spend-on-rent/state/ohio/; to confirm), and metropolitan Ohio one- and two-bedroom rents of $683-1,149 and $860-1,404 (HUD Fair Market Rents, 2024, as listed by a search). A small rural town rents well below the state median, so units are put at $750, $900 and $1,050 and houses at $1,150 and $1,350 a month: estimated, to replace with HUD Fair Market Rents for the chosen county (FY2026, https://www.huduser.gov/portal/datasets/fmr.html, not opened) and ACS table B25031 (median gross rent by bedrooms).",
-    "spending.saving_bps": "The personal saving rate, 4.1% in August 2026 (Bureau of Economic Analysis, Personal Income and Outlays, August 2026, https://bea.gov/news/2026/personal-income-and-outlays-august-2026, found in a search result, summary seen but not the table; to confirm).",
+    "wages_per_fortnight": "BLS, Occupational Employment and Wage Statistics, May 2025, West Northwestern Ohio nonmetropolitan area (area code 3900001; the page https://www.bls.gov/oes/2023/may/oes_3900001.htm names it; its county list was not opened, but the area is the one Ohio nonmetropolitan area covering the north-west, which includes Wyandot County to the best of my knowledge, to confirm), read through the BLS Public Data API (https://api.bls.gov/publicAPI/v2/timeseries/data/, opened), series OEUM3900001000000412031 03 (retail salespersons, mean hourly wage $16.37 x 80 hours = $1,309.60), OEUM3900001000000510000 03 (production occupations, $24.94 x 80 = $1,995.20), OEUM3900001000000470000 03 (construction and extraction occupations, $29.50 x 80 = $2,360.00; spaces in the series ids removed). US pay is commonly biweekly: 80 hours. (The Ohio minimum wage is $11.00 an hour from 1 January 2026, per the Ohio Department of Commerce's announcement https://com.ohio.gov/about-us/media-center/news/ohio+minimum+wage+set+to+increase+in+2026, as returned by search; the page itself and the 2026 poster PDF could not be read for the figure.)",
+    "rents_per_month": "U.S. Census Bureau, American Community Survey 2020-2024 5-year estimates, Wyandot County, Ohio (county seat Upper Sandusky; a rural county of 21,598 people), table B25031 (median gross rent by bedrooms) and B25064, read through the Census Reporter API (https://api.censusreporter.org/1.0/data/show/latest?table_ids=B25031 (median gross rent by bedrooms) and B25064&geo_ids=05000US39175, opened). Median gross rent: 1 bedroom $614, 2 bedrooms $824, 3 bedrooms $968, 4 bedrooms $967 a month (all $827). The 4-bedroom median is no higher than the 3-bedroom one because few such rentals are sampled; used as published. Gross rent includes utilities paid by the tenant. HUD Fair Market Rents (https://www.huduser.gov/portal/datasets/fmr.html) were not opened.",
+    "spending.saving_bps": "The personal saving rate, 4.1% in August 2026 (BEA, Personal Income and Outlays, August 2026, https://www.bea.gov/news/2026/personal-income-and-outlays-august-2026, opened: 'personal saving as a percentage of DPI was 4.1 percent').",
     "spending.wealth_effect_bps_per_year": "About 3 cents of consumption a year per dollar of wealth: carried over from the other profile, which took it from an Australian study. U.S. estimates of the housing wealth effect are similar in size (Case, Quigley and Shiller 2005, 'Comparing Wealth Effects: The Stock Market versus the Housing Market', Advances in Macroeconomics 5(1); the figure used is to confirm). Placeholder for this place.",
-    "spending.essentials_per_month": "Placeholder: what a person spends however little comes in, about $450 a month (food, transport and phone; estimated, to check against BLS Consumer Expenditure Survey 2024 lowest-quintile food-at-home and transportation).",
+    "spending.essentials_per_month": "BLS, Consumer Expenditure Surveys 2024, Midwest region (series CXUFOODHOMELB1103M $5,846 and CXUUTILSLB1103M $4,376 a year per consumer unit, via https://api.bls.gov/publicAPI/v2/timeseries/data/, opened): food at home plus utilities, fuels and public services, per consumer unit, divided by 2.37 persons per household (ACS, Wyandot County) and 12 months = $359 a person a month. Other Midwest annual means for reference: total expenditures $74,707, shelter $13,657, transportation $12,901, health care $6,246.",
     "spending.shops_known": "How many sellers a household deals with and knows the prices of: 7 (Lengnick 2013, 'Agent-based macroeconomics: A baseline model', Journal of Economic Behavior & Organization 86, Table 1: n = 7 type A connections). A model's figure, not a place's.",
     "spending.shop_search_bps_per_month": "The monthly chance that a household looks at the price of a seller it does not deal with: 25% (Lengnick 2013, Table 1). A model's figure, not a place's.",
-    "savings_by_age": "Placeholders: an adult's cash and deposits (not retirement accounts, not property), by age: the 10th, 25th, 50th, 75th and 90th percentiles; drawn between them, and above the 90th up to three times it. Shaped from memory by the Federal Reserve's Survey of Consumer Finances 2022 (transaction accounts by age of family head; medians of a few thousand dollars under 35 rising to about $8,000-10,000 at 55-64; not opened, to confirm at https://www.federalreserve.gov/econres/scfindex.htm); SCF counts families, not adults.",
+    "savings_by_age": "The 50th percentile of each age group is the median value of transaction accounts among families that hold them, by age of the reference person, 2022 Survey of Consumer Finances: under 35 $5,400; 35-44 $7,500; 45-54 $8,800; 55-64 $7,900; 65-74 $13,500 (Federal Reserve Board, SCF 2022 bulletin tables, Table 6, https://www.federalreserve.gov/econres/files/scf2022_tables_internal_nominal_historical.xlsx, opened). The under-35 median is used for ages 18 and 25. 10th, 25th, 75th and 90th percentiles: placeholders, the median times 0.07, 0.33, 2.7 and 8.3 (the spread is not in the bulletin tables). Families, not adults; holders only (98% of families hold such an account).",
     "retirement_age": "Social Security full retirement age is 67 for anyone born in 1960 or later (Social Security Administration, 'Retirement Benefits: Full retirement age', Social Security Act s 216(l); to confirm). Benefits can be claimed from 62 at a permanent reduction; the profile structure has one age (a structural gap).",
-    "retiree_savings": "Placeholder: savings at retirement, $100,000-300,000, around the median retirement-account balance of households aged 65-74 that have one (Survey of Consumer Finances 2022, about $200,000; recalled, not opened; to confirm).",
+    "retiree_savings": "Median retirement-account value among families holding one, age 65-74, $199,600 (SCF 2022 bulletin Table 6, opened, as above). The range $100,000-300,000 around it is a placeholder.",
     "support.pension": "Social Security retirement benefit: the average retired worker's benefit is about $2,071 a month from January 2026 after the 2.8% cost-of-living adjustment (Social Security Administration, announced 24 October 2025; reported by https://www.advisorperspectives.com/articles/2025/10/25/us-retirees-get-2-8-increase-2026-social-security-checks and others; the SSA fact sheet returned 403, so the figure is to confirm at https://www.ssa.gov/news/en/cola/factsheets/2026.html). Paid monthly (every 30 days here), from the full retirement age; an average benefit stands in for the formula (a worker's benefit depends on 35 years of earnings; spouses', survivors', Medicare and SSI left out).",
     "support.unemployment": "Unemployment compensation: placeholder of $400 a week ($800 a fortnight), estimated from Ohio's rule that the weekly benefit is about half of the claimant's average weekly wage up to a maximum of $624 for a claimant with no dependents in 2026 (Ohio Department of Job and Family Services; maximum reported by search results such as https://remotelaws.com/unemployment/us-states/ohio/, not primary, to confirm at https://jfs.ohio.gov); typical wages above give half-pay of $310-440 a week. Lasts at most 26 weeks in Ohio (Ohio Revised Code 4141.30; to confirm): the profile has no time limit (a structural gap). Open from age 18 (no age rule in the law; the other profile starts at 22 for a youth-allowance reason). Work-search and wage-history tests left out.",
     "firm_ownership.forms_bps": "Carried over from the other profile as placeholders (shops and landlords closely held small businesses, the factory widely held). U.S. support for the shape: the great majority of U.S. employer firms are small (U.S. Census Bureau, Statistics of U.S. Businesses: about 89% of employer firms have fewer than 20 employees; recalled, not opened, to confirm). Shares not re-estimated.",
@@ -1312,14 +1312,14 @@
     "retirement_fund": "For a world that asks for one (off unless asked for). member_bps: about 53% of private-industry workers participate in an employer retirement plan (BLS, National Compensation Survey: Employee Benefits in the United States, March 2024: 70% have access, 53% participate; recalled, not opened; to confirm). drawdown_bps_by_age: the least a tax-deferred account must pay out a year from age 73, 1 / the IRS Uniform Lifetime Table divisor (26.5 at 73, 24.6 at 75, 20.2 at 80, 16.0 at 85, 12.2 at 90, 8.9 at 95; IRS Publication 590-B, Table III; recalled, to confirm); before 73 the 4% is a placeholder. share_bps_of_local, pension_every_days and cost_bps_of_income: carried over from the other profile, placeholders (a U.S. 401(k) is an account with no required pension: a structural gap, modelled as the nearest thing the profile has).",
     "industry": "Placeholders to confirm: manufacturing's compensation of employees (about 17%) and intermediate inputs (about 72%) as shares of gross output (recalled from Bureau of Economic Analysis, Industry Economic Accounts, GDP by Industry / Input-Output Accounts; not opened); retail trade's purchases of goods (70%) and wages (14%) as shares of sales, carried over from the other profile and not re-estimated.",
     "prices": "Unit conventions carried over from the other profile, not place figures: an item of goods worth $100 at world prices (the unit the town counts in); imports 10% dearer (freight and margins); inputs $2.50 a kg; building materials $1.25 a kg (docs/behaviour/building.md). Placeholders: not checked against U.S. price indexes.",
-    "labour_force_participation_bps": "Placeholder: the share of working-age adults (18 to the retirement age) in the labour force. The national participation rate (16 and over) was 61.8% in September 2026, which includes retirees (BLS, The Employment Situation, September 2026, https://www.bls.gov/news.release/empsit.nr0.htm, opened); the rate among people aged 25-54 is about 83% (recalled; to confirm against BLS CPS table A-10 / FRED LNS11300060), so about 79% for 18-66.",
+    "labour_force_participation_bps": "U.S. Census Bureau, American Community Survey 2020-2024 5-year estimates, Wyandot County, Ohio (county seat Upper Sandusky; a rural county of 21,598 people), table B23001, read through the Census Reporter API (https://api.censusreporter.org/1.0/data/show/latest?table_ids=B23001&geo_ids=05000US39175, opened). Share of people aged 20 to 64 in the labour force: 9651 of 11811 (81.7%). (The profile's definition is adults 18 to the retirement age; the table's age groups start at 20 for this range, so 18-19 are left out.)",
     "tenancy": "Ohio Revised Code chapter 5321 (Landlord-Tenant Act) has no rent control and no limit on how often rent may be raised; the usual notice to change a periodic tenancy is 30 days (to confirm). The 12 months is a practice (a standard lease runs a year, rent changes at renewal), not a legal limit; after a fixed term a tenancy that continues is month-to-month (periodic). Structural gap: the profile cannot say 'no statutory limit'.",
     "values": "Placeholder, carried over unchanged from the other profile: Schwartz's ten basic values, in the pan-cultural order of importance Schwartz and Bardi found across 56 nations (benevolence, universalism, self-direction, security, conformity, hedonism, achievement, tradition, stimulation, power; Schwartz and Bardi 2001, Journal of Cross-Cultural Psychology 32(3)); means and spreads are not a place's. To replace with a U.S. sample's (World Values Survey; European Social Survey does not cover the U.S.).",
     "industrial_action": "The National Labor Relations Act (29 U.S.C. 151-169) requires no strike ballot and no notice before a strike in a private workplace, except 10 days' notice before a strike at a health-care institution (s 8(g)) and 60 days' notice to the other side before a contract ends (s 8(d)); unions' own constitutions usually require a strike-authorisation vote by a majority (some two-thirds) of those voting. turnout and pass shares (50% each) are placeholders carried over from the other profile's legal quorum; notice_days 0. Strike pay is small (paid_during_action false). Structural gap: no legal ballot, so the rule's thresholds describe union practice.",
     "world_price_process": "Placeholder, carried over from the other profile: world prices move each month by a mean-reverting random process (sd of the monthly move, in basis points of the base price; the share of a gap from the base kept each month). To estimate from BLS import/export price indexes (not done).",
-    "credit.cash_rate_bps": "The Federal Reserve's federal funds target range, 3.75% to 4.00% (FOMC decision of 17 September 2026, https://www.federalreserve.gov/monetarypolicy/openmarket.htm, opened); 3.88% is its midpoint.",
+    "credit.cash_rate_bps": "The Federal Reserve's federal funds target range, 3.75% to 4.00% (FOMC, 17 September 2026, https://www.federalreserve.gov/monetarypolicy/openmarket.htm, opened); 3.88% is its midpoint.",
     "credit.funding_spread_bps": "Placeholder: what a small bank pays over the policy rate for its funding.",
-    "credit.lending_rate_bps": "People: placeholder of 12.3%, around the average interest rate on 24-month personal loans at commercial banks (Federal Reserve, G.19 Consumer Credit, recalled from 2025, not opened; to confirm for 2026). Organisations: placeholder of 8.5%, the bank prime rate (the federal funds upper bound plus 3 points, 7.00%) plus about 1.5 points for a small-business loan (to confirm).",
+    "credit.lending_rate_bps": "Placeholders: people 12.3% (around the average interest rate on 24-month personal loans at commercial banks, Federal Reserve G.19, recalled from 2025, not opened); organisations 8.5%, the bank prime rate (federal funds upper bound 4.00% plus 3 points = 7.00%, by convention) plus about 1.5 points for a small-business loan (estimated).",
     "credit.serviceability_buffer_bps": "The United States has no stress-test buffer for retail lending: the Ability-to-Repay rule (12 CFR 1026.43, CFPB) asks a lender to assess repayment ability at the note's rate (to confirm), so 0.",
     "credit.max_repayment_share_bps": "Placeholders: people 28% (the 'front-end' housing-ratio guideline of conventional lenders; the 43% debt-to-income limit of the CFPB's former qualified mortgage standard covered all debts; to confirm); organisations 20% of what comes in.",
     "credit.arrears_days": "Placeholder: a month behind is arrears (a lender's first notice).",
@@ -1329,14 +1329,14 @@
     "opening": "Carried over from the other profile, placeholders to source: what each organisation holds on the first day (the bank's own funds $500,000; the town $2,000,000; the builder $300,000; each landlord $600,000; a shop $30,000; a factory $400,000), and the least an adult in the labour force has saved ($1,000). Not re-estimated for this place.",
     "town_finance.parks_per_year": "Placeholder, carried over: the town's yearly parks line, $150,000.",
     "town_finance.payment_approval_over": "Placeholder, carried over: the town's payments procedure needs the mayor's written approval for any payment over $50,000. (An Ohio village's council authorises expenditures by ordinance, Ohio Revised Code ch. 731 and 5705; to confirm. Not modelled.)",
-    "public_finance.income_tax": "A combined schedule on gross income for a single resident, 2026. Federal: standard deduction $16,100 (nil to that), then 10% to $12,400 of taxable income, 12% to $50,400, 22% to $105,700, 24% to $201,775, 32% to $256,225, 35% to $640,600, 37% above (IRS, Rev. Proc. 2025-32, tax year 2026 inflation adjustments; recalled, not opened; to confirm), so each federal band starts $16,100 higher in gross income. Ohio: a flat 2.75% above $26,050 for 2026 (Ohio Department of Taxation; Ohio HB 96 of 2025; recalled, to confirm), added to the federal rate from $26,050 up. levy_bps 765 is the employee's payroll tax, FICA: Social Security 6.2% and Medicare 1.45% from the first dollar (IRS; the Social Security wage cap of $184,500 for 2026 is not modelled). Left out: Ohio's municipal (city/village) income tax of 1-3% of wages (the main revenue of Ohio municipalities), school-district income taxes, the earned income tax credit, child tax credit, itemised deductions, and employer payroll taxes. Structural gaps: no tax credits, no wage cap, no separate local tax.",
-    "public_finance.grants_per_resident_per_year": "Placeholder: Ohio's Local Government Fund distributes about $430 million a year to counties, municipalities and townships (Ohio Department of Taxation / Office of Budget and Management; recalled, not opened; to confirm), over about 11.8 million residents: about $36 a resident.",
-    "public_finance.rates_per_resident_per_year": "Placeholder: the property-tax revenue of a village or township (excluding the school district, which the profile treats as separate) is estimated at about $700 a resident a year (Ohio effective property tax rates of about 1.4% of market value; the share going to a municipality or township is a fraction, roughly a quarter to a third; estimated, to replace with the Ohio Auditor of State's local-government financial data and the Ohio Department of Taxation's tax-rate abstracts). Left out: the municipal income tax, a large part of an Ohio village's revenue.",
+    "public_finance.income_tax": "A combined schedule on gross income for a single resident, 2026. Federal: IRS Revenue Procedure 2025-32 (tax year 2026 inflation adjustments; https://www.irs.gov/pub/irs-drop/rp-25-32.pdf, opened): standard deduction $16,100; single brackets 10% to $12,400, 12% to $50,400, 22% to $105,700, 24% to $201,775, 32% to $256,225, 35% to $640,600, 37% above; each band starts $16,100 higher in gross income. Ohio: a flat 2.75% above $26,050 for tax year 2026 (Ohio Legislative Service Commission / Department of Taxation material on HB 96 of 2025, as returned by search; not opened; the quoted '$332 plus 2.75% of income above $26,050' suggests a small base amount that is not modelled; to confirm), added from $26,050. levy_bps 765: the employee's FICA, Social Security 6.2% and Medicare 1.45% (IRS; the 2026 wage cap of $184,500 per the SSA fact sheet, not modelled). Left out: Ohio's municipal income tax (1-3% of wages, the main revenue of Ohio municipalities), school-district income taxes, credits (earned income, child), itemised deductions. Structural gaps: no credits, no wage cap, no separate local tax.",
+    "public_finance.grants_per_resident_per_year": "Placeholder: Ohio's Local Government Fund is about 1.7% of state general revenue fund tax revenues (Ohio Legislative Service Commission, as returned by search; the LSC pdf could not be fetched), about $36 a resident (estimated from a recalled total of about $430 million over 11.8 million residents).",
+    "public_finance.rates_per_resident_per_year": "Placeholder (not found at a primary source): estimated at about $700 a resident a year of property-tax revenue for a village or township, outside the school district. Tried: the Wyandot County auditor's Tax-Rates.pdf (403 to this client) and Ohio Department of Taxation's pages (404). A third-party estimate gives an effective property-tax rate of 1.28% for Upper Sandusky (Ownwell, https://www.ownwell.com/trends/ohio/wyandot-county/upper-sandusky, search snippet; not primary). Left out: the municipal income tax.",
     "public_finance.rates_instalments": "Ohio Revised Code 323.12: real property taxes are payable in two half-year instalments (January and July; to confirm). Two.",
     "public_finance.rates_due_days": "Placeholder: an instalment falls due 30 days after its notice.",
     "public_finance.rates_penalty_interest_bps": "Placeholder of 8% a year: Ohio charges a penalty of 5% then 10% of delinquent real property tax (ORC 323.121) and interest on delinquent taxes at the federal short-term rate plus 3 points (ORC 5703.47; both recalled, to confirm the current rate). The profile has only an annual interest rate.",
     "public_finance.rates_exempt_kinds": "Public property used for a public purpose, and charitable, educational and public health property, are exempt from Ohio real property tax (Ohio Revised Code chapter 5709; to confirm): here, the clinic's, the school's, the police station's and the utilities'.",
-    "public_finance.median_house_price": "Placeholder: a typical home in a small Ohio town, about $190,000 (Zillow Home Value Index, 2026, for Bellevue OH $191,099 and Fremont OH $179,334, from search results at https://www.zillow.com/bellevue-oh/home-values/ and https://www.zillow.com/fremont-oh/home-values/; indexes of typical value, not a median sale price; to confirm against ACS B25077 median value for the chosen place). The land value of a lot is derived from it: this less what the builder charges to build a house.",
+    "public_finance.median_house_price": "U.S. Census Bureau, American Community Survey 2020-2024 5-year estimates, Wyandot County, Ohio (county seat Upper Sandusky; a rural county of 21,598 people), table B25077, read through the Census Reporter API (https://api.censusreporter.org/1.0/data/show/latest?table_ids=B25077&geo_ids=05000US39175, opened). Median value of owner-occupied housing units, $163,400 (an owner's estimate of value, not a sale price).",
     "services.waste_per_person_per_day_g": "Municipal solid waste generated, 4.9 pounds per person per day in the United States (U.S. EPA, Advancing Sustainable Materials Management: 2018 Fact Sheet, recalled; to confirm and update to the latest edition), 2,223 grams.",
     "services.landfill_levy_per_tonne": "Placeholder: Ohio's state solid-waste disposal fees total on the order of $5 a ton (Ohio Revised Code 3734.57; recalled, to confirm), with county and district fees on top. Left out: what the landfill charges on top (its gate fee).",
     "services.council_staff_per_1000": "Placeholder: local government employment other than schools in the United States is on the order of 10-12 per 1,000 residents (U.S. Census Bureau, Annual Survey of Public Employment and Payroll; recalled, not opened; to confirm); a small village runs lower, so 8. In the town, all of them are the town's.",
@@ -1344,8 +1344,8 @@
     "services.asset_life_years": "Placeholder, carried over: a park or civic building wears out in 15 years without upkeep.",
     "services.upkeep_hours_per_week_per_asset": "Placeholder, carried over: a crew member's half a day a week keeps a park or the hall up.",
     "services.complain_bps": "Placeholder, carried over: the chance a week that a household whose waste has gone two weeks uncollected writes to the town.",
-    "unions.membership_bps": "Placeholders. Found: the union membership rate was 10.0% of wage and salary workers in 2025, 5.9% in the private sector and 32.9% in the public sector (BLS, Union Members 2025, released 18 February 2026, https://www.bls.gov/news.release/archives/union2_02182026.htm, search summary seen but not the tables). By industry (manufacturing about 8%, retail about 4.5%, construction about 10%, public administration about 28%, other about 9%) recalled from the 2024 tables, not opened: to confirm. Ohio's overall rate is a little above the national one.",
-    "unions.dues_per_month": "Placeholder: about $55 a month, around 1.3% of a full-time worker's earnings, typical of large U.S. unions (to source from union constitutions or DOL OLMS LM-2 reports).",
+    "unions.membership_bps": "BLS, Union Members 2025 (released 18 February 2026), Table 3, 2025 annual averages, percent of employed wage and salary workers who are union members: manufacturing 7.7, retail trade 4.0, construction 11.1, all 10.0 (used for 'other'); the public sector 32.9% (used for public administration: the release's public-administration row was not found, and this includes teachers). https://www.bls.gov/news.release/union2.t03.htm and https://www.bls.gov/news.release/union2.nr0.htm, opened. Ohio's overall rate was 11.6% in 2025 (Table 5).",
+    "unions.dues_per_month": "Placeholder: about $55 a month, around 1.3% of a full-time worker's earnings; not sourced (union constitutions and DOL OLMS LM-2 reports would give it).",
     "unions.resignation_notice_days": "Placeholder: in the United States a member of a union can resign at any time, subject to the union's constitution and any dues-checkoff revocation window (National Labor Relations Act s 8(b)(1)(A); to confirm). 14 days carried over from the other profile as the closest.",
     "unions.claim_margin_bps": "Placeholder, carried over: a union claims the year's rise in prices and 2% more.",
     "unions.meeting_every_days": "Placeholder: a members' meeting a month.",
@@ -1359,13 +1359,13 @@
     "elections": "Ohio villages elect a mayor and a council at municipal elections held in odd-numbered years (Ohio Revised Code ch. 731 and 3501.01; village mayors serve four-year terms, to confirm; voting is voluntary, by plurality (first past the post) and often non-partisan). This town elects its mayor directly. turnout_bps: 35% is a placeholder (turnout in Ohio's odd-year municipal elections is far below presidential years; to replace with the Ohio Secretary of State's election results for a village). stand_bps and news_readers_bps: placeholders. Structural gap: the generator's text says every adult must enrol and vote (compulsory), which is false here.",
     "health": "The clinic stands for the town's health system (a primary-care practice and the hospital it refers to; a liberty). doctors_per_1000: about 40 primary care physicians per 100,000 in rural U.S. counties (HRSA / National Rural Health Association; recalled, not opened; to confirm). doctor_wage_per_fortnight: $240,000 a year, around the mean wage of family medicine physicians (BLS OEWS; recalled, to confirm). consult_minutes, seek_care_bps, treats, off_work_severities: placeholders carried over (hospital-level conditions, so nearly everyone with one is treated; care shortens them by a fifth). Left out: health insurance, which pays for care in the United States, and who has none.",
     "round": "Working hours 8 to 4, Monday to Friday, for everyone, shops included (a liberty: retail and hospitality work weekends and evenings, not modelled); school 8 to 3 on school days (Ohio schools run about 7:30-8:00 to 2:45-3:30; recalled). Travel: off the roads, a 25 m cell on foot in about 18 seconds (walking about 1.4 m/s: Bohannon 1997; to confirm); on a road, about 2 seconds (about 25 mph, Ohio's speed limit in municipal residence and business districts, Ohio Revised Code 4511.21, to confirm; about 90% of Ohio workers drive to work, ACS commuting tables, recalled); slower across water, wetland and bush (placeholders). Roads: the town builds toward buildings more than three cells (75 m) from one (placeholder), within a roads budget of about $300 a resident a year (placeholder, carried over).",
-    "ownership": "house_owner_bps: about 75% of separate houses in a small Ohio town are owner-occupied (Ohio's homeownership rate is about 66-67% overall; for single-family houses the share is higher; ACS B25032, recalled, not opened; to confirm); flats here are all rented (a liberty). mortgage_bps_by_age: carried over (placeholder: most under 45 have one, few over 65; to confirm against the Survey of Consumer Finances). mortgage_payment_per_month: placeholder of $1,400, around Ohio's median monthly owner costs with a mortgage (ACS B25088; recalled, to confirm). mortgage_rate_bps: 6.5%, a placeholder in the range of Freddie Mac's Primary Mortgage Market Survey for September 2026 (6.71% on 3 September and 6.95% on 17 September for the 30-year fixed, from search results, not opened; a stock of older mortgages sits at lower rates, hence 6.5%). mortgage_years_left: placeholder. market: deposit 10% (about the first-time buyer's median down payment, National Association of Realtors, Profile of Home Buyers and Sellers; recalled, to confirm; conventional loans ask 20% to avoid private mortgage insurance); costs about 6% (buyer's closing costs plus seller's agent fees; Ohio has no state transfer tax, only a county conveyance fee; estimated, to confirm); a 30-year term; buy_bps_per_month, relist_days, cut_bps and floor_bps: placeholders carried over.",
-    "utilities": "Water: residential use about 82 gallons (310 litres) a person a day (Water Research Foundation / AWWA, Residential End Uses of Water, 2016; recalled, to confirm); price: placeholder of $2.40 a kilolitre for water and sewer together and $60 a quarter in service charges (estimated, to confirm against a village's rate ordinance); bills go to owners. The river's inflow, flow and losses are placeholders, carried over, sized so a small town's draw is a small share of a modest river's water. Energy (electricity): an Ohio household uses about 8,700-9,000 kWh a year, about 24 a day (U.S. EIA, Ohio State Electricity Profile; recalled, to confirm); the residential price about 17 cents a kWh in 2026 and a fixed charge of about 30 cents a day (EIA Electric Power Monthly, Table 5.6.A; recalled, to confirm); what the retailer pays the grid (wholesale and network): placeholder; grid emissions about 0.45 kg CO2e a kWh (EPA eGRID, RFC West subregion; recalled, to confirm).",
-    "climate": "Weather drawn for each run (docs/behaviour/weather.md). Humid continental climate: Ohio averages about 39 inches (1,000 mm) of precipitation a year with a winter-spring peak in streamflow and a late-summer to autumn low (NOAA NCEI, nClimDiv Ohio; recalled, not opened, to confirm). rain_by_month_bps: shape of river flow by month, a placeholder (high March-April, lowest August-October). storm_*: a heavy-rain or flash-flood spell in about one month in ten, one to three days, at two and a half times the usual inflow (placeholder; Ohio's common disasters are flooding and severe storms, with tornadoes, which are not modelled). drought_*: about one year in ten begins a drought of three to twelve months at 40% of usual inflow (placeholder; to calibrate against the U.S. Drought Monitor's Ohio history). Heatwaves: three to five days in June-August, about one summer week in sixteen (placeholder). The urban heat island units and heat-illness slope are carried over from the other profile (placeholders). warning_lead_days: the National Weather Service warns a couple of days ahead (placeholder). Left out: winter (snow, ice, cold waves), tornadoes.",
+    "ownership": "U.S. Census Bureau, American Community Survey 2020-2024 5-year estimates, Wyandot County, Ohio (county seat Upper Sandusky; a rural county of 21,598 people), table B25032 and B25088, read through the Census Reporter API (https://api.censusreporter.org/1.0/data/show/latest?table_ids=B25032 and B25088&geo_ids=05000US39175, opened). house_owner_bps: of one-unit houses (detached and attached), 6362 owner-occupied and 1192 renter-occupied: 84.2% owned (flats here are all rented: a liberty). mortgage_payment_per_month: median selected monthly owner costs with a mortgage, $1,281 (B25088). mortgage_rate_bps: 7.28%, the 30-year fixed-rate average of Freddie Mac's Primary Mortgage Market Survey as of 1 October 2026 (https://www.freddiemac.com/pmms, opened; 6.34% a year earlier; an older stock of mortgages is at lower rates). mortgage_bps_by_age: placeholder (most under 45 have one, few over 65). mortgage_years_left: placeholder. market: deposit 10% (placeholder near the first-time buyer's median down payment, National Association of Realtors, not opened; conventional loans ask 20%); costs 6% (buyer's closing costs plus seller's agent fees; estimated; Ohio has no state transfer tax); a 30-year term; buy_bps_per_month, relist_days, cut_bps and floor_bps: placeholders carried over.",
+    "utilities": "Water: City of Upper Sandusky, Ohio (Wyandot County seat) water tariff, $10.50 per 1,000 gallons ($2.77 a kilolitre) with a $21.00 monthly minimum ($63 a quarter, used as the service charge) (https://www.uppersanduskyoh.com/department/public_works/water_sewer/index.php, opened; no effective date on the page; a search snippet gave $10.25 and $20.50, so the rate may have changed). The sewer charge of $14.50 per 1,000 gallons with a $29.00 monthly minimum on the same page has no place in the profile's water block and is left out (a structural gap: the town's real bill is more than double). litres_per_person_per_day 310: about 82 gallons a person a day (Water Research Foundation / AWWA, Residential End Uses of Water, 2016; recalled, to confirm). The river's inflow, flow and losses are placeholders, carried over. Energy: Ohio residential sales 52,552,770 MWh over 5,014,959 customers in 2020 (EIA, State Electricity Profiles / Electric Power Annual sales_annual.xlsx and customers_annual.xlsx, https://www.eia.gov/electricity/data/state/, opened; the files held no later year) = 10.5 MWh a customer a year, 29 kWh a day. price_per_kwh: Ohio residential average price 19.45 cents per kWh in July 2026 (EIA, Electric Power Monthly, Table 5.6.A, released 24 September 2026, opened), rounded to 19. supply_per_day (30 cents), grid_price_per_kwh (9) and grid_emissions_g_per_kwh (450): placeholders from memory of utility fixed charges, wholesale prices and EPA eGRID's RFC West emissions; not opened, to confirm.",
+    "climate": "Weather drawn for each run (docs/behaviour/weather.md). rain_by_month_bps: the Sandusky River near Upper Sandusky, Ohio (USGS gauge 04196500; the river runs through Wyandot County), mean flow by calendar month over the water years 1921-2026 in cubic feet per second (Jan 440, Feb 458, Mar 586, Apr 462, May 310, Jun 239, Jul 143, Aug 71, Sep 63, Oct 78, Nov 161, Dec 306) as basis points of the twelve-month mean of 276 (USGS National Water Information System, monthly mean statistics, https://waterservices.usgs.gov/nwis/stat/?format=rdb&sites=04196500&statReportType=monthly&statTypeCd=mean&parameterCd=00060, opened). Climate normals 1991-2020 at Upper Sandusky (NOAA NCEI, station USC00338534, https://www.ncei.noaa.gov/data/normals-monthly/1991-2020/access/USC00338534.csv, opened): annual precipitation 40.2 inches, mean temperature 25.2 F in January and 72.9 F in July, an average 15.7 days a year at or above 90 F (June 3.9, July 5.7, August 3.9). The storm, drought and heatwave rates (storm_*, drought_*, heatwave_*) and the heat-island units are placeholders: not derived from the gauge record or the Drought Monitor; the heatwave week chance was not checked against the 15.7 hot days; warning_lead_days placeholder. Left out: winter (snow, ice), tornadoes.",
     "hazards": "Floods (world-expansion 7.3), placeholders sized against the river as modelled (about 9,000 kL a 25 m cell in the usual flow): it spills over its banks past 12,000, 30% of the excess a day; a building floods with water above 300 kL on its cell; wetland soaks up 500 kL a cell a day. Flooding is among Ohio's most frequent disaster types (FEMA disaster declarations; recalled, not opened, to confirm), and county and village emergency management run relief (Ohio Revised Code ch. 5502; to confirm): here the town hall.",
     "crime": "Crime (world-expansion 7.2), deliberately rare and driven by circumstance only (need and opportunity, and the chance of being caught: Becker 1968; Cohen and Felson 1979), never by any group. take_bps_per_month_in_need, caught_bps_reckoned and take_quantity: placeholders carried over. detection_bps: about 13% of larceny-theft offences known to police are cleared (FBI, Uniform Crime Reporting clearance rates; recalled, not opened; to confirm). police_per_1000: about 2.4 sworn officers per 1,000 residents in the United States (FBI, Law Enforcement Employees; recalled, to confirm; small Ohio villages often have fewer). officer_wage_per_fortnight: $65,000 a year for a patrol officer in a small Ohio department (BLS OEWS for Ohio police and sheriff's patrol officers; estimated, to confirm). investigation_hours: placeholder.",
     "justice": "The tribunal is the local court of first instance (an Ohio municipal or county court: small claims, civil and eviction ('forcible entry and detainer') dockets; Ohio Revised Code ch. 1923 and 1925; hearing dates 5-15 days after service for an eviction and 15-40 days for small claims; recalled and to confirm). hearing_after_days: three weeks, a placeholder carried over. pay_within_days, apply_after_days: placeholders. challenge_bps: the share of tenants given an unlawful rent increase who go to court, and apply_bps: the share of workers owed wages who pursue a claim (placeholders: few do; Ohio wage claims go to the Ohio Department of Commerce, Wage and Hour Bureau, or to court; to source). Enforcement of an unpaid money judgment by garnishing a bank account or wages (ORC ch. 2716; to confirm).",
-    "education": "school_ages: Ohio children must attend school from age 6 until 18 (Ohio Revised Code 3321.01; kindergarten from 5 is common; to confirm), so 5 to 17. students_per_teacher: about 16.5 pupils per full-time-equivalent teacher in Ohio's public schools (NCES, Common Core of Data; recalled, to confirm). school_days_per_year: about 180 (Ohio sets minimum hours, 910 a year for grades 1-12, ORC 3313.48, which schools meet in about 175-180 days; to confirm). hours_per_day: about 6.5 (placeholder). teacher_wage_per_fortnight: about $62,000 a year for a rural Ohio teacher (the Ohio average is above $65,000, NEA Rankings and Estimates; recalled, to confirm). attainment: placeholder shares for persons 25 and over in a rural Ohio place, shaped by ACS table S1501 for Ohio (about 91% hold a high school diploma, about 31% a bachelor's degree or above statewide; rural counties are lower; recalled, not opened). return_per_year_bps: about 9% (Card 1999, 'The Causal Effect of Education on Earnings', Handbook of Labor Economics 3A; estimates run 6-15%; recalled, to confirm), taken as productivity and applied linearly in the time a task takes (docs/behaviour/education.md). max_years: the skill scale's top (placeholder).",
+    "education": "U.S. Census Bureau, American Community Survey 2020-2024 5-year estimates, Wyandot County, Ohio (county seat Upper Sandusky; a rural county of 21,598 people), table B15003, read through the Census Reporter API (https://api.censusreporter.org/1.0/data/show/latest?table_ids=B15003&geo_ids=05000US39175, opened). attainment: people 25 and over (15227): no high school diploma 5.2%, high school or GED 47.7%, some college 17.5%, associate 10.0%, bachelor's or above 19.6%, as years of schooling 10, 12, 13, 14, 16 (the years are a placeholder mapping). students_per_teacher: 16.4 pupils per teacher in Ohio's public schools, fall 2022 (NCES, Digest of Education Statistics 2023, Table 208.40, https://nces.ed.gov/programs/digest/d23/tables/dt23_208.40.asp, opened). teacher_wage_per_fortnight: $69,680 a year, mean wage of elementary school teachers (except special education) in the West Northwestern Ohio nonmetropolitan area, May 2025 (BLS OEWS series OEUM390000100000025202104, https://api.bls.gov/publicAPI/v2/timeseries/data/, opened), over 26 fortnights. school_ages 5 to 17 (compulsory 6 to 18 in Ohio Revised Code 3321.01; kindergarten from 5), school_days_per_year 180 (minimum hours, ORC 3313.48): tried https://codes.ohio.gov, which did not connect from here, so these remain recalled, to confirm. hours_per_day 6.5: placeholder. return_per_year_bps: about 9% (Card 1999, 'The Causal Effect of Education on Earnings', Handbook of Labor Economics 3A; estimates run 6-15%; recalled, to confirm), applied linearly in the time a task takes (docs/behaviour/education.md). max_years: the skill scale's top (placeholder).",
     "nature": "Nature (docs/design/world-expansion.md 2). cell_m: a cell is a 25 m lot (carried over). The landscape around the town (margin_cells, block_cells, shares_bps, woodland_patches): placeholders for a farming township in glaciated western or north-western Ohio, mostly cropland (corn and soybeans) with woodlots and stream corridors; shaped by the NLCD land-cover mix of rural Ohio counties (recalled, not opened; to confirm at https://www.mrlc.gov). The covers' succession (cleared land to grassland in a year; old-field scrub to woodland in about 40 years; to confirm for Ohio), the pollution figures (agricultural runoff, per farmland cell, carried over), survey_hours_per_ha, survey_staff and spin_up_years are placeholders carried over.",
     "nature.species": "Real species of the region, with figures mostly placeholders and each to confirm. Eastern box turtle (Terrapene carolina carolina): a species of conservation concern in Ohio (Ohio Division of Wildlife, state-listed species, pub 5356, https://dam.assets.ohio.gov/image/upload/ohiodnr.gov/documents/wildlife/state-listed-species/Pub%205356%20Ohio%20Listed%20Species_R0722.pdf, found in a search, not opened), long-lived (adult survival of about 92-95% a year, so mortality 800), home range of 1-5 ha (recalled, to confirm), slow reproduction, killed on roads (barriers: built, farmland); densities by cover are placeholders. Blanchard's cricket frog (Acris blanchardi): a small frog of pond and stream edges in the Midwest, in decline (Indiana lists it as a species of special concern per an Indiana DNR search result; the Ohio status is to confirm), a short-lived breeder with high turnover (growth and mortality as the other profile's frog, a placeholder); density, range and dispersal are placeholders. Northern cardinal (Cardinalis cardinalis): the common conspicuous control; territories of about 1-2 ha held by a pair (Cornell Lab, Birds of the World; recalled, to confirm); densities by cover placeholders. Growth, mortality, dispersal, min_viable and detection are placeholders, as in the other profile. The Indiana bat (Myotis sodalis), endangered in Ohio, with a summer home range of about 210 ha in a Big Darby Creek (Pickaway County) study (seen in a search snippet only), was considered and left out: its home range is far larger than the modelled landscape."
   },
@@ -1399,6 +1399,21 @@
       "what": "union_membership_pct_of_employees",
       "value": 10.0,
       "source": "BLS, Union Members 2025, released 18 February 2026 (wage and salary workers; https://www.bls.gov/news.release/archives/union2_02182026.htm; search summary)"
+    },
+    {
+      "what": "union_membership_pct_ohio",
+      "value": 11.6,
+      "source": "BLS, Union Members 2025, Table 5 (Ohio; https://www.bls.gov/news.release/union2.t05.htm, opened)"
+    },
+    {
+      "what": "median_gross_rent_usd_county",
+      "value": 827,
+      "source": "ACS 2020-2024 5-year, Wyandot County, Ohio, table B25064 (via Census Reporter, opened)"
+    },
+    {
+      "what": "median_house_value_usd_county",
+      "value": 163400,
+      "source": "ACS 2020-2024 5-year, Wyandot County, Ohio, table B25077 (via Census Reporter, opened)"
     }
   ]
 }
