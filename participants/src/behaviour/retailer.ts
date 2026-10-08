@@ -22,7 +22,7 @@ import { Deliveries, goodsPrices, held, order, OrderBook, priceList, UNDELIVERAB
  */
 export const retailer: BehaviourModule = {
   name: "firm.retailer",
-  version: "0.8.4", // 0.8.4: takes on the share of its hands the world gives by the day; 0.8.3: registers the share of its jobs the world gives for shops (firms.md, "Jobs an employer does not register")
+  version: "0.9.0", // 0.9.0: a business run by its owner alone (operator), stocked for a few days and drawn on by its owner; 0.8.4: takes on the share of its hands the world gives by the day; 0.8.3: registers the share of its jobs the world gives for shops (firms.md, "Jobs an employer does not register")
   doc: "docs/behaviour/retailer.md",
   cadence: () => DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(24) * 3600,
@@ -79,6 +79,15 @@ export const retailer: BehaviourModule = {
         // shop just founded, the listings of property for sale and the notices of sales, searched for its own premises.
         trade_board: "", sale_board: "", sold_board: "",
         search_limit: 20, // how many lists or listings a search reads
+        // A business its owner runs alone (docs/behaviour/entry.md, "A person working for themself"): the person who
+        // serves, in the space they work from (`workplace`: a room of their home, a pitch); it takes on nobody. Its
+        // stock and what it keeps in hand are for `stock_days` of sales (30: a shop's month), and every `draw_days` what
+        // it holds beyond that goes to its owner (0: at the month's end, out of the month's earnings, as a shop pays).
+        operator: null as string | null,
+        stock_days: 30,
+        draw_days: 0,
+        premises_cell: "", // where its prices are put up (it is not shown the ground: a home or a market is not one business's premises)
+        open_from: 0, open_until: 0, // the hours of a working day its owner is there (seconds into the day; both 0: whenever, as at home)
         founder: null as string | null,
         capital: 0,
         listing: null as string | null,
@@ -131,6 +140,9 @@ export const retailer: BehaviourModule = {
     let headcountWhy = "";
     let monthStart = -1;
     let nextRestock = 0;
+    let nextDraw = -1;
+    /** A month's sales, as the days of them we stock and keep money for. */
+    const stockFor = (monthly: number) => (p.stock_days === 30 ? monthly : Math.ceil((monthly * p.stock_days) / 30));
     const books = { last: null as number | null, in: 0, out: 0, next: 0 }; // the stocktake's books
     // Setting up (a shop just founded): our account asked for, the capital called, the premises bought.
     const setup = { accountAsked: false, capitalCalled: false, founderAccount: undefined as string | undefined, registered: false, purchased: false, ready: !p.founder };
@@ -235,7 +247,8 @@ export const retailer: BehaviourModule = {
         if (winding.due(t)) return winding.finish(t, book, acc.account, acc.balance, (x) => distribute(book, me, acc, x, "Wound up: what's left, to our shareholders by their shares").steps);
         const trading = winding.state === "trading";
         const workers = staffing.workers(book, t);
-        if (headcount < 0) headcount = Math.max(workers.length, p.min_staff); // (a new shop starts by hiring its minimum)
+        if (headcount < 0) headcount = p.operator ? 0 : Math.max(workers.length, p.min_staff); // (a new shop starts by hiring its minimum)
+        const hands = p.operator ? 1 : workers.length; // (who serves: its staff, or its owner alone)
         if (monthStart < 0) monthStart = acc.balance;
         const stock = held(obs, p.premises, p.kind);
         // The stocktake (crime: docs/behaviour/crime.md), monthly: what's here against our books (last count, what came,
@@ -274,12 +287,12 @@ export const retailer: BehaviourModule = {
           // Lengnick's firms deliver what their labour makes; a shop delivers what its staff's hours can serve. Short of
           // hands for last month's demand, it's short as a firm short of stock is: it may raise its price, and never
           // cuts it while it turns customers away.
-          const canServe = Math.floor((workers.length * hoursPerWorkerMonth) / p.serve_labour);
+          const canServe = Math.floor((hands * hoursPerWorkerMonth) / p.serve_labour);
           const moved = movePrice(p, rng, price, stock, lastDemand, marginalCost, canServe);
           price = moved.price;
           if (moved.why) priceWhy = moved.why;
           // Headcount: a worker at a time towards the hands last month's sales needed.
-          const needed = Math.min(p.max_staff, Math.max(p.min_staff, Math.ceil((lastDemand * p.serve_labour * 10_000) / (hoursPerWorkerMonth * p.utilisation_bps))));
+          const needed = p.operator ? 0 : Math.min(p.max_staff, Math.max(p.min_staff, Math.ceil((lastDemand * p.serve_labour * 10_000) / (hoursPerWorkerMonth * p.utilisation_bps))));
           headcount = workers.length;
           headcountWhy = why.length ? `; ${why.join("; ")}` : "";
           if (needed > workers.length) {
@@ -292,8 +305,8 @@ export const retailer: BehaviourModule = {
           // Out of the month's earnings, what we hold beyond the buffer goes to the shareholders: a month's wages, a
           // month's stock at cost, and Lengnick's chi of the wage bill.
           const bill = Math.floor((Math.max(workers.length, headcount) * wage * MONTH) / p.period);
-          const buffer = bill + lastDemand * unitCost + Math.floor((bill * p.chi_bps) / 10_000);
-          const out = payOut(book, me, acc, acc.balance, buffer, acc.balance - monthStart, `a month's wages and stock, and ${p.chi_bps / 100}% of the wage bill`);
+          const buffer = bill + stockFor(lastDemand) * unitCost + Math.floor((bill * p.chi_bps) / 10_000);
+          const out = p.draw_days > 0 ? { steps: [], paid: 0 } : payOut(book, me, acc, acc.balance, buffer, acc.balance - monthStart, `a month's wages and stock, and ${p.chi_bps / 100}% of the wage bill`);
           monthStart = acc.balance - out.paid;
           steps.push(...out.steps);
         }
@@ -303,13 +316,13 @@ export const retailer: BehaviourModule = {
         steps.push(...bargaining.steps(book, t, staffing, acc.account, acc.balance, (rise) => { wage = Math.floor((wage * (10_000 + rise)) / 10_000); }));
         steps.push(...staffing.routine(obs, book, acc.account, {
           // Only with room at the workplace (someone let go may still be there, working out their notice).
-          target: trading ? Math.min(p.max_staff, headcount) : 0, wage, canPost: trading && acc.balance >= Math.floor(((workers.length + 1) * wage * MONTH) / p.period) && roomAtWork(obs, workers.length) > 0,
+          target: trading && !p.operator ? Math.min(p.max_staff, headcount) : 0, wage, canPost: trading && !p.operator && acc.balance >= Math.floor(((workers.length + 1) * wage * MONTH) / p.period) && roomAtWork(obs, workers.length) > 0,
           why: `Short of this month's headcount (${workers.length} of ${headcount}${headcountWhy}): posting a job at ${usd(wage)} every ${p.period / DAY} days.`,
         }));
         steps.push(...borrowing.steps(book, t, acc.account));
         // Insolvent (it can't pay its debts as they fall due): wind up.
         const insolvent = winding.insolvent(t, book, { balance: acc.balance, noCredit: !borrowing.canApply(t) && !borrowing.waiting(t), defaulted: borrowing.impaired });
-        const idle = insolvent ? null : winding.idle(t, workers.length > 0 || staffing.offered(book, t).length > 0);
+        const idle = insolvent ? null : winding.idle(t, !!p.operator || workers.length > 0 || staffing.offered(book, t).length > 0);
         if (insolvent) steps.push(...winding.begin(t, book, staffing, insolvent));
         else if (idle) steps.push(...winding.begin(t, book, staffing, idle, true));
         // Debts recorded against us (unpaid wages, a fine...), paid while we can, keeping the next pay period's wages; more
@@ -342,14 +355,14 @@ export const retailer: BehaviourModule = {
           const old = book.open("price_list").filter((r) => r.speaks_for === me);
           publishedPrice = price;
           steps.push(because(old.length ? priceWhy || `Our price is now ${usd(price)}.` : "Publishing our price.", ...old.map((r) => withdraw(r.id, "Superseded.")),
-            priceList({ [p.kind]: price }, acc.account, `${p.kind} at ${usd(price)} each, at ${p.premises}: delivered to your home, or kept here for you. Order and pay with the order.`, { at: p.premises }, me, p.shopfront ? premisesOf(obs)?.cell : undefined)));
+            priceList({ [p.kind]: price }, acc.account, `${p.kind} at ${usd(price)} each, at ${p.premises}: delivered to your home, or kept here for you. Order and pay with the order.`, { at: p.premises }, me, p.shopfront ? premisesOf(obs)?.cell ?? (p.premises_cell || undefined) : undefined)));
         }
 
         // ---- restocking, weekly: below the middle of Lengnick's band of last month's sales, up to its top ----
         if (t >= nextRestock && offers.length && winding.state === "trading") {
           nextRestock = t + 7 * DAY;
-          const top = Math.ceil((p.phi_high_bps * lastDemand) / 10_000);
-          const mid = Math.ceil((((p.phi_low_bps + p.phi_high_bps) / 2) * lastDemand) / 10_000);
+          const top = Math.ceil((p.phi_high_bps * stockFor(lastDemand)) / 10_000);
+          const mid = Math.ceil((((p.phi_low_bps + p.phi_high_bps) / 2) * stockFor(lastDemand)) / 10_000);
           const have = stock + onOrder;
           const best = offers[0]!;
           // As much as we can pay for, keeping the next pay period's wages aside (and at least the supplier's minimum).
@@ -373,14 +386,30 @@ export const retailer: BehaviourModule = {
           }
         }
 
+        // ---- the owner's draw (a business run by its owner alone): every so often, what it holds beyond the money for
+        // its stock (the top of its band, or a supplier's least order if that is more) goes to its owner ----
+        if (p.draw_days > 0 && winding.state === "trading") {
+          if (nextDraw < 0) nextDraw = t + p.draw_days * DAY;
+          if (t >= nextDraw) {
+            nextDraw = t + p.draw_days * DAY;
+            const keep = Math.max(Math.ceil((p.phi_high_bps * stockFor(lastDemand)) / 10_000), offers[0]?.min ?? 0) * (unitCost || offers[0]?.unit || 0);
+            if (acc.balance > keep) steps.push(...distribute(book, me, acc, acc.balance - keep, `We hold ${usd(acc.balance)} and keep ${usd(keep)} for stock: the rest is our owner's`).steps);
+          }
+        }
+
         // ---- serving: paid orders, oldest first, as far as today's hands and our stock go ----
         const day = Math.floor(t / DAY);
         if (day !== usedDay) {
           usedDay = day;
           used.clear();
         }
-        const mine = new Set(workers);
-        const present = [...new Set(channels.cells(obs).filter((c) => c.structure?.structure === p.premises).flatMap((c) => c.structure!.spaces.flatMap((sp) => (sp.kind === "workplace" ? sp.occupants ?? [] : []))))].filter((w) => mine.has(w)).sort();
+        const mine = new Set(p.operator ? [p.operator] : workers);
+        // (Its owner, where they work from: the room of their home, their pitch.)
+        // (Its owner knows where they are: at home, there whenever; at a pitch, in its hours on working days. Out for
+        // some other reason, the work is refused and the order waits, as when a shop's hand has just left.)
+        const tod = t - Math.floor(t / DAY) * DAY;
+        const present = p.operator ? (!p.open_until || (workDay(t) && tod >= p.open_from && tod < p.open_until) ? [p.operator] : [])
+          : [...new Set(channels.cells(obs).filter((c) => c.structure?.structure === p.premises).flatMap((c) => c.structure!.spaces.flatMap((sp) => (sp.kind === "workplace" ? sp.occupants ?? [] : []))))].filter((w) => mine.has(w)).sort();
         // Every paid order joins the queue: what customers wanted, served or not.
         const { paid, unpaid } = orders.due(book, t);
         for (const o of paid) {

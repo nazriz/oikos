@@ -118,7 +118,7 @@ interface Job { agreement: string; employer: string; wage: number; period: numbe
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.42.1", // 0.42.1: work by the day (a day's pay known as pay; no claim for a day not worked); 0.42.0: reads the support law, stops work at an age of its own (0.41.0 on its branch), with main's 0.41.1
+  version: "0.43.0", // 0.43.0: someone who works for themself (own_work): not out of work, their income what the business pays them, at their pitch in working hours; 0.42.1: work by the day (a day's pay known as pay; no claim for a day not worked); 0.42.0: reads the support law, stops work at an age of its own (0.41.0 on its branch), with main's 0.41.1
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -147,6 +147,10 @@ export const citizen: BehaviourModule = {
       retirement_age: null as number | null,
       stops_work_at: null as number | "never" | null,
       stop_work_curve: null as { from: number; bps: number }[] | null,
+      // Working for ourselves (docs/behaviour/entry.md, "A person working for themself"): the business we run alone,
+      // the account it pays our drawings from, where we work from when that is not our home, and what it was
+      // expected to bring in a month before it had (none: we work for an employer, or look for work).
+      own_work: null as { firm: string; account: string; at?: string; expect_per_month: number } | null,
       in_labour_force: true, // false: not looking for work (studying, caring...), and not claiming support for being out of it
       // A child born here: whether they'll look for work as an adult, at the world's participation (the template for
       // those who won't; "": every child takes `child_template`).
@@ -473,7 +477,12 @@ export const citizen: BehaviourModule = {
     let retired = false; // we have stopped work
     const inflows: { t: number; amount: number }[] = []; // money that came in (refunds counted negative), for what our income is
     // (Work by the day is paid for the days worked: the working days of a month, not every day of it.)
-    const wageIncome = () => (!job ? 0 : job.period === DAY ? Math.floor((job.wage * 30 * (p.round?.work_days ?? 5)) / 7) : Math.floor((job.wage * MONTH) / job.period));
+    // What our own business has paid us (our drawings), for what it brings in a month: over the days our income is
+    // reckoned on; before that many days have passed, what it was expected to.
+    const drawings: { t: number; amount: number }[] = [];
+    const ownWork = p.own_work;
+    const ownIncome = (t: number) => (!ownWork ? 0 : t < p.income_window_days * DAY ? ownWork.expect_per_month : Math.floor((drawings.reduce((x, d) => x + d.amount, 0) * MONTH) / (p.income_window_days * DAY)));
+    const wageIncome = () => ownIncome(book.now) + (!job ? 0 : job.period === DAY ? Math.floor((job.wage * 30 * (p.round?.work_days ?? 5)) / 7) : Math.floor((job.wage * MONTH) / job.period));
     // (Support for being out of work isn't income once we're in work: we stop claiming it. Counting it, a household applied
     // for a home only that income could afford, and then couldn't sign.)
     const supportIncome = (lastingOnly: boolean) => [...benefits.values()].filter((b) => b.lasting || (!lastingOnly && !job)).reduce((x, b) => x + Math.floor((b.amount * MONTH) / b.every), 0);
@@ -683,6 +692,7 @@ export const citizen: BehaviourModule = {
           continue;
         }
         inflows.push({ t: tx.t, amount: cents(tx.amount) });
+        if (ownWork && tx.from === ownWork.account) drawings.push({ t: tx.t, amount: cents(tx.amount) });
         // Our wages, as agreed: the wage, less the income tax the law says our employer withholds.
         // (A day's pay for work by the day: less what the law takes from a day's pay, reckoned over the working week.)
         if (job && (cents(tx.amount) === job.wage || cents(tx.amount) === job.wage - withholding(incomeTaxLaw(book), job.wage, job.period === DAY ? dayPayPeriod(p.round?.work_days ?? 5) : job.period))) {
@@ -691,6 +701,7 @@ export const citizen: BehaviourModule = {
         }
       }
       while (inflows.length && inflows[0]!.t < obs.t - p.income_window_days * DAY) inflows.shift();
+      while (drawings.length && drawings[0]!.t < obs.t - p.income_window_days * DAY) drawings.shift();
       const ads = p.adverts ? obs.channels[p.adverts] : undefined;
       if (ads?.kind === "records" && ads.search) for (const r of ads.records) if (r.speaks_for) lookedUp.add(r.speaks_for);
       const sale = p.sale_board ? obs.channels[p.sale_board] : undefined;
@@ -1150,7 +1161,7 @@ export const citizen: BehaviourModule = {
         }
       }
       const circumstances = (): Circumstances => ({ monthly_income: householdIncome(), savings: acc.balance, homeless: !home && !livingAt, essentials: p.essentials });
-      if (!job && joblessSince === null) joblessSince = t;
+      if (!job && !ownWork && joblessSince === null) joblessSince = t;
 
       // Offers made to us: sign what we asked for and can afford.
       for (const r of fresh) {
@@ -1580,7 +1591,7 @@ export const citizen: BehaviourModule = {
         if (w.children && f.children_born_at.filter((b) => Math.floor((t - b) / year) < w.children!.under_age).length < w.children.least) return false;
         return true;
       };
-      const looking = !job && !retired && p.in_labour_force;
+      const looking = !job && !ownWork && !retired && p.in_labour_force; // (working for ourselves, we are not out of work)
       const stopgaps = rules.filter(forOutOfWork);
       // (The first the law lists that we may have; one we already draw is kept until an earlier one is granted.)
       const preferred = !looking ? undefined : stopgaps.find((r) => claiming.has(r.id)) ?? stopgaps.find((r) => !blocked(r) && !ranOut.has(r.id) && fits(r));
@@ -1616,7 +1627,7 @@ export const citizen: BehaviourModule = {
         claiming.delete(payment);
       }
       // Looking for work: where someone told us about first, then the best-paid posting.
-      if ((!job || (searchingWork && !switching)) && !retired && p.in_labour_force) {
+      if ((!job || (searchingWork && !switching)) && !ownWork && !retired && p.in_labour_force) {
         // In work, only postings that pay better than ours, elsewhere.
         const better = (j: StatementRecord) => !job || (j.speaks_for !== job.employer && (j.data?.wage ?? 0) * job.period > job.wage * (j.data?.period ?? job.period));
         const told = job ? [] : leadFound.jobs.filter((j) => !applied.has(j.id));
@@ -1929,7 +1940,7 @@ export const citizen: BehaviourModule = {
           steps.push(because("Catching up with someone we know.", message([who], CATCHING_UP.ask)));
         }
       }
-      for (const [want, needed, chance] of [["home", isLeaseholder() && !home, p.ask_home_bps], ["work", !job, p.ask_work_bps]] as [Want, boolean, number][]) {
+      for (const [want, needed, chance] of [["home", isLeaseholder() && !home, p.ask_home_bps], ["work", !job && !ownWork, p.ask_work_bps]] as [Want, boolean, number][]) {
         if (!needed) {
           delete askedAt[want];
           continue;
@@ -2059,6 +2070,8 @@ export const citizen: BehaviourModule = {
       // (On strike from the moment we know of the stoppage, not only once we have walked out: someone who learned of it
       // in the middle of something else went in to work the next morning, until 2026-10-09.)
       if (job?.workplace && !offSick && !striking && t < jobEnds(job) && workday(t, r.work_days) && tod(t) >= r.work_start && tod(t) < r.work_end) return job.workplace;
+      // (Working for ourselves from somewhere other than home, a pitch: there in working hours.)
+      if (ownWork?.at && !offSick && workday(t, r.work_days) && tod(t) >= r.work_start && tod(t) < r.work_end) return ownWork.at;
       return home_;
     };
     /** The next time where we belong may change: work and school starting or ending, on working days. */
@@ -2576,11 +2589,11 @@ export const citizen: BehaviourModule = {
           // Told about a building? Look there first: what's on offer in it now.
           // (Only someone who wants what a building might offer: a home, or work. Someone out of work and not looking
           // for any, retired say, used to ask to look at nothing, which is refused: found in the stress run of 2026-10-06.)
-          if (looking === null && lookedAt !== obs.t && acc && leads.length && (needHome || (!job && !retired && p.in_labour_force))) {
+          if (looking === null && lookedAt !== obs.t && acc && leads.length && (needHome || (!job && !ownWork && !retired && p.in_labour_force))) {
             const lead = leads.pop()!;
             const looks: LookRequest[] = [];
             if (needHome) looks.push(ask.board("homes", { most: p.search_limit, where: [{ field: "data.structure", op: "=", value: lead }, { field: "data.rent", op: "<=", value: budget }, ...roomy] }));
-            if (!job && !retired && p.in_labour_force) looks.push(ask.board("jobs", { most: p.search_limit, where: [{ field: "data.workplace", op: "=", value: lead }] }));
+            if (!job && !ownWork && !retired && p.in_labour_force) looks.push(ask.board("jobs", { most: p.search_limit, where: [{ field: "data.workplace", op: "=", value: lead }] }));
             leadFound.homes = [];
             leadFound.jobs = [];
             looking = "leads";
@@ -2589,7 +2602,7 @@ export const citizen: BehaviourModule = {
           // Hunting? Look at what's on offer (the next step, at once, has the results).
           const looks: LookRequest[] = [];
           // In work: a month's chance of looking for something better paid.
-          if (job && !switching && !retired && p.in_labour_force && obs.t >= nextJobSearch) {
+          if (job && !ownWork && !switching && !retired && p.in_labour_force && obs.t >= nextJobSearch) {
             nextJobSearch = obs.t + MONTH;
             // Looking for a better job (CONSUMAT, docs/design/ai-citizens.md 3b): every month if our life falls short of
             // what we want; otherwise now and then, the more open we are.
@@ -2598,7 +2611,7 @@ export const citizen: BehaviourModule = {
           }
           if (lookedAt !== obs.t && acc) {
             if (needHome) looks.push(ask.board("homes", { most: p.search_limit, where: [{ field: "data.rent", op: "<=", value: budget }, ...roomy], by: "data.rent", desc: true }));
-            if ((!job || searchingWork) && !retired && p.in_labour_force) looks.push(ask.board("jobs", { most: p.search_limit, by: "data.wage", desc: true }));
+            if ((!job || searchingWork) && !ownWork && !retired && p.in_labour_force) looks.push(ask.board("jobs", { most: p.search_limit, by: "data.wage", desc: true }));
             // The listings of property for sale, when we're looking: waiting on a purchase (the seller's own listings,
             // to know it still stands), or with this month's chance of buying a home or founding a business coming up.
             if (p.sale_board) {

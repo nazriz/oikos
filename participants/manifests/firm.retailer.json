@@ -1,6 +1,6 @@
 {
   "name": "firm.retailer",
-  "version": "0.8.4",
+  "version": "0.9.0",
   "doc": "docs/behaviour/retailer.md",
   "params": {
     "bank": {
@@ -64,6 +64,14 @@
         "description": "what it expects to sell in a month, before it knows"
       },
       "default": 250,
+      "source": "placeholder"
+    },
+    "draw_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 0,
       "source": "placeholder"
     },
     "founder": {
@@ -153,6 +161,26 @@
       "default": 14,
       "source": "placeholder"
     },
+    "open_from": {
+      "schema": {
+        "type": "integer",
+        "description": "the hours of a working day its owner is there (seconds into the day; both 0: whenever, as at home)"
+      },
+      "default": 0,
+      "source": "placeholder"
+    },
+    "open_until": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 0,
+      "source": "placeholder"
+    },
+    "operator": {
+      "schema": {},
+      "default": null,
+      "source": "placeholder"
+    },
     "period": {
       "schema": {
         "type": "integer"
@@ -188,6 +216,14 @@
       "schema": {
         "type": "string",
         "description": "the shop: where it keeps and sells things"
+      },
+      "default": "",
+      "source": "placeholder"
+    },
+    "premises_cell": {
+      "schema": {
+        "type": "string",
+        "description": "where its prices are put up (it is not shown the ground: a home or a market is not one business's premises)"
       },
       "default": "",
       "source": "placeholder"
@@ -316,6 +352,14 @@
         "type": "string"
       },
       "default": "",
+      "source": "placeholder"
+    },
+    "stock_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 30,
       "source": "placeholder"
     },
     "stocktake_days": {
