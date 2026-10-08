@@ -188,3 +188,25 @@ test("who wrote an instruction is looked up before it is read: each writer once,
   expect((step(DAY, [], known) as any).type).toBe("wait");
   expect((step(2 * DAY, [], known) as any).type).toBe("wait");
 });
+
+test("a payment that fell due before its standing order was withdrawn is still made; nothing due after is", () => {
+  // (The bank goes through its instructions a day apart. An employer that replaced a wage order in the hours after
+  // its pay day, for a new rate, lost its worker that pay: found 2026-10-08.)
+  const m = bank();
+  const so = request("so-1", 0, "c1", 100_000, { every: MONTH, first: 0 });
+  expect(at(m, 0, [so], { c1: 900_000 }).map((c) => c.args.per_request)).toEqual(["so-1"]);
+  expect(at(m, MONTH - DAY / 2, [], { c1: 900_000 })).toEqual([]);
+  // Due at a month; withdrawn two hours after, and replaced by an order whose first payment is a month on. The bank
+  // next looks half a day after the due time.
+  const gone = { id: "w-1", at: MONTH + 7200, record: "withdrawal", author: "c1-self", speaks_for: "c1", withdraws: "so-1", visible_to: ["bank", "c1"] };
+  const next = request("so-2", MONTH + 7200, "c1", 110_000, { every: MONTH, first: MONTH - 7200 });
+  const did = at(m, MONTH + DAY / 2, [gone, next], { c1: 900_000 });
+  expect(did.map((c) => [c.fn, c.args.per_request, c.args.amount])).toEqual([["money", "so-1", "$1000.00"]]);
+  // After that the old order pays nothing more, and the new one pays on its own dates.
+  expect(at(m, MONTH + 2 * DAY, [], { c1: 900_000 })).toEqual([]);
+  expect(at(m, 2 * MONTH + DAY / 2, [], { c1: 900_000 }).map((c) => [c.args.per_request, c.args.amount])).toEqual([["so-2", "$1100.00"]]);
+  // An order withdrawn before its next due time pays nothing more.
+  const m2 = bank();
+  expect(at(m2, 0, [so], { c1: 900_000 }).length).toBe(1);
+  expect(at(m2, MONTH + DAY / 2, [{ ...gone, at: MONTH - 7200 }], { c1: 900_000 })).toEqual([]);
+});

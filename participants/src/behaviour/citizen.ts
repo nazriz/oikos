@@ -1575,7 +1575,7 @@ export const citizen: BehaviourModule = {
           applied.add(best.id);
           if (typeof best.data?.industry === "string") industryOf.set(best.speaks_for, best.data.industry);
           const how = d!.strategy === "imitate" ? ", where people we know told us to look or work" : d!.strategy === "compare" ? ", with an employer we know" : ", weighing each job's pay and hours";
-          steps.push(because(`Applying for a job at ${usd(best.data?.wage ?? 0)} a fortnight${job ? `, better than ours (${usd(job.wage)})` : ""}${how}.`,
+          steps.push(because(`Applying for a job at ${usd(best.data?.wage ?? 0)} a pay period${job ? `, better than ours (${usd(job.wage)})` : ""}${how}.`,
             say("job_application", "Application for the advertised job.", { to: [best.speaks_for], visible: [me, best.speaks_for], data: { posting: best.id, account: acc.account }, basis: best.id })));
         }
       }
@@ -2416,11 +2416,15 @@ export const citizen: BehaviourModule = {
 
     return {
       /** Our job and home, as we have them (truth audits). */
-      beliefs: (): Belief[] => departed ? [] : [
+      // (Someone leaving has given notice on everything and holds nothing more to be true of the town; found
+      // 2026-10-08: one who took a job and left in the same wake, with a step still queued behind the leaving, was
+      // never marked gone, and a letter weeks later woke them still believing in the job.)
+      beliefs: (): Belief[] => departed || leaving ? [] : [
         ...(job ? [{ of: "agreement" as const, agreement: job.agreement, in_force: true }] : []),
         ...(home && !home.owned ? [{ of: "agreement" as const, agreement: home.agreement, in_force: true }] : []),
       ],
       step(obs): ParticipantAction | Promise<ParticipantAction> {
+        if (leaving && obs.body && !obs.body.present) departed = true; // gone from the world: nothing more is ours to do
         if (departed) return wait(ctx.world.runEnd + DAY);
         absorb(obs);
         // (Taken out of the world with our household, or gone from it: nothing more here.)

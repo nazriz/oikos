@@ -625,6 +625,13 @@ export class Staffing {
     return this.staff(book, t).map((a) => a.terms.parties[1] as string);
   }
 
+  /** How many of our staff are staying: those we haven't given notice. (Someone working out their notice is still on
+   * the staff and still paid, so a firm that lets people go until it can cover its wages counts those who stay: counted
+   * with those going, one shortfall let the whole staff go, one after another, in a day.) */
+  staying(book: Book, t: number): number {
+    return this.staff(book, t).filter((a) => !this.noticed.has(a.id)).length;
+  }
+
   /**
    * The routine: start wages for new hires and stop them for the dead and the departed; offer each posting's job to
    * one applicant at random (at the posting's wage); post a job at `wage` while short of `target` and `canPost`.
@@ -1154,7 +1161,7 @@ function creditorAccount(book: Book, holder: string): string | undefined {
 
 export const employer: BehaviourModule = {
   name: "firm.employer",
-  version: "0.6.2",
+  version: "0.6.3",
   doc: "docs/behaviour/firms.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -1193,7 +1200,7 @@ export const employer: BehaviourModule = {
         why: `Short-staffed (${staff.length + staffing.offered(book, t).length} of ${p.target_staff}) with ${p.buffer_periods} pay periods of the wage bill in hand: posting a job.`,
       });
       // Can't cover the next pay period: lay off the most recent hire.
-      if (staff.length && acc.balance < staff.length * p.wage) {
+      if (staff.length && acc.balance < staffing.staying(book, t) * p.wage) {
         steps.push(...staffing.letGo(book, t, `Can't cover the next pay period (${usd(acc.balance)} for ${staff.length} staff): laying off the most recent hire.`, "Redundancy: we can't cover the wage bill."));
       }
 

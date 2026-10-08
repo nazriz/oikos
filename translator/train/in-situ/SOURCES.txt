@@ -4,7 +4,8 @@ readers the same instructions the hand-run steps used; a text copied word for wo
 reader-task-0.7.5.txt       word for word: runs/translator-data-2026-10-06b/reader-task-0.7.5.txt, the task the hand-run readers
                             were given (it names two files, the prompt and a blind file; kept for the record).
 reader-call.txt             the same task worded for a call: the prompt is the system message and the blind lines are in the
-                            message; the rest is the task's own words. Written for the pipeline, 2026-10-08.
+                            message; the rest is the task's own words. Written for the pipeline, 2026-10-08; its last paragraph
+                            (how the file is handed in) reworded the same day for an answer of a given shape.
 writer-instructions.txt     word for word: runs/translator-data-in-situ/pilot-10-situ/writer-instructions.txt, which is what
                             `inSituInstructions()` (orchestrator/src/in-situ.ts) wrote on 2026-10-07; a test holds the file to the
                             function's output (change both together, and say so in docs/decisions.md).

@@ -98,3 +98,20 @@ test("a shop with no staff serves nobody: what it can't serve within three days 
     expect(n.data.refund).toBeGreaterThan(0);
   }
 }, 300_000);
+
+test("shops at one wholesale price don't all order from the same factory: each has its own order among them", async () => {
+  // (By name, every shop of a town ordered from its first factory, which could fill a few of the orders and refunded
+  // the rest a week on, while the other factories' goods stood unsold and households went without: found 2026-10-08.)
+  const config = generate({ ...base, citizens: 300, shops: 9, factories: 3, apartment_blocks: 5, houses: 54, landlords: 6, grid: { w: 24, h: 15 } });
+  const { recs } = await run("suppliers", config, 21 * DAY);
+  const toFactories = recs.filter((r) => r.kind === "order" && /^shop-/.test(r.speaks_for) && (r.addressed_to ?? []).some((x: string) => /^factory-/.test(x)));
+  // (After the first day, when not every factory's price list is out yet: each shop's first order once all are.)
+  const first = new Map<string, string>();
+  for (const o of toFactories) if (o.at >= DAY && !first.has(o.speaks_for)) first.set(o.speaks_for, o.addressed_to.find((x: string) => /^factory-/.test(x)));
+  expect(first.size).toBeGreaterThan(3);
+  expect(new Set(first.values()).size).toBeGreaterThan(1);
+  // And more than one factory's goods reached the shops in those weeks.
+  const ids = new Set(toFactories.map((o) => o.id));
+  const came = recs.filter((r) => r.kind === "delivery_note" && ids.has(r.data?.order) && r.data.delivered > 0);
+  expect(new Set(came.map((n) => n.speaks_for)).size).toBeGreaterThan(1);
+}, 600_000);

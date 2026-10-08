@@ -94,12 +94,20 @@ test("a child born here is brought home by the parent who bore them and added to
     if (365 * DAY - b.t < 14 * DAY) continue; // born in the run's last fortnight
     if (ev.some((e) => e.event === "person_left" && e.person === b.parents[0] && e.t < b.t)) continue; // born away (the mother had left town)
     expect(records.some((r) => r.data.members.some((m: any) => m.person === b.person && m.sex === b.sex))).toBe(true);
-    const home = ev.find((e) => e.event === "occupied" && e.occupant === b.person);
+    // (Their first move into a home: a newborn that is hurt may be at the clinic before it is brought home, as one was
+    // in this town from 2026-10-08.)
+    const home = ev.find((e) => e.event === "occupied" && e.occupant === b.person && !String(e.space).startsWith("clinic-"));
     if (home) expect(home.by).toBe(`${b.parents[0]}-self`);
   }
   // Nothing refused but same-moment races (D58; and a new employer naming, on their first day, someone who has
   // already worked a full day at the job they just left: acts take time, so starting the new job is a moment of its own) and moving into a home still being left, as above;
   // and, with the daily round, a partner gone to work while a conception was under way, or someone who died mid-trip;
   // and a house a landlord put up on the river, found under water (its lease then ended).
-  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left", "too_far", "participant_inactive", "flooded"].includes(e.code))).toEqual([]);
+  // (And, when the run's course changed on 2026-10-08: someone moved into a home by one of the household who, while
+  // that act was under way, got there themselves, or the other way about; whichever arrives second finds them already
+  // there. A year of the larger town on main has one too. And a household that takes a new lease on the home it
+  // already lives in: whoever signs it, out at the time, moves the children "in", and one is at home already.)
+  const arrivedMeanwhile = (e: any) => { const m = e.code === "already_present" ? /^(\S+) is already in (\S+)$/.exec(e.detail ?? "") : null;
+    return !!m && (`${m[1]}-self` !== e.participant || ev.some((x) => x.event === "occupied" && x.occupant === m[1] && x.space === m[2] && x.t <= e.t && x.t >= e.t - 3600)); };
+  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left", "too_far", "participant_inactive", "flooded"].includes(e.code) && !arrivedMeanwhile(e))).toEqual([]);
 }, 300_000);

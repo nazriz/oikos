@@ -111,8 +111,9 @@ test("an offer too low: a ballot, notice, stoppages without pay, then an agreeme
     return recs.some((r) => r.record === "withdrawal" && r.speaks_for === "factory-1" && r.at >= st.at && r.at < end);
   })).toBe(true);
   expect(ev.filter((e) => e.event === "occupied" && strikers.includes(e.occupant) && e.space === "factory-1-works/workplace.1" && e.t >= back.at).length).toBeGreaterThan(strikers.length / 2);
-  // No making at the works while everyone's out.
-  expect(ev.some((e) => e.event === "worked" && e.task === "make" && e.at === "factory-1-works" && e.t > first.at + DAY / 2 && e.t < back.at)).toBe(false);
+  // No making at the works by anyone who is out. (Someone taken on after the stoppage was called is no party to it,
+  // and works: one was, in this town, since 2026-10-08.)
+  expect(ev.some((e) => e.event === "worked" && e.task === "make" && e.at === "factory-1-works" && e.t > first.at + DAY / 2 && e.t < back.at && e.performers.some((p: string) => strikers.includes(p)))).toBe(false);
   // The offers rise after each stoppage, and it ends in an agreement.
   const offers = recs.filter((r) => r.kind === "wage_offer" && r.speaks_for === "factory-1").map((r) => r.data.rise_bps);
   for (let i = 1; i < offers.length; i++) expect(offers[i]).toBeGreaterThanOrEqual(offers[i - 1]);

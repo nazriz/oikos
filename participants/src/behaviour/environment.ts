@@ -7,7 +7,7 @@
 
 import * as C from "../calls";
 import { cents } from "../money";
-import type { LookRequest, SiteStructure } from "../contracts";
+import type { SiteStructure } from "../contracts";
 import { channels } from "../contracts";
 import { need, params, type BehaviourModule, type ParticipantContext } from "../module";
 import { ask, Asked, nextLook, because, Book, DAY, lotOf, MONTH, say, type Step, usd, withdraw, outOfTime, team } from "./common";
@@ -152,13 +152,13 @@ export const environment: BehaviourModule = {
       // Which lot each cell is on where we found a listed species: the land registry's to say, asked about the one
       // cell (once each), before the round's report names the lots.
       () => {
+        // (One search of the register is answered to a look: one cell now, and the next as this is asked again.)
         if (!p.lots) return [];
-        const looks: LookRequest[] = [];
         for (const s of p.species) {
           if (!s.listed) continue;
-          for (const [cell, k] of found.get(s.id) ?? []) if (k > 0 && !lotOf(book, cell) && looks.length < 16 && asked.first(`ground:${cell}`)) looks.push(ask.about(p.lots, "data.cells", cell, { most: 1 }));
+          for (const [cell, k] of found.get(s.id) ?? []) if (k > 0 && !lotOf(book, cell) && asked.first(`ground:${cell}`)) return [ask.about(p.lots, "data.cells", cell, { most: 1 })];
         }
-        return looks;
+        return [];
       },
     );
 

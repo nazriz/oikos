@@ -233,18 +233,24 @@ export const inspector: BehaviourModule = {
       undefined,
       // Before it judges: who owns each lot notified (the registry, asked about the one lot), and the site itself, gone to.
       (obs) => {
+        // (One search of a register is answered to a look: one for each of its channels now, and the rest as this is
+        // asked again, until there is nothing more to ask.)
         const looks: LookRequest[] = [];
+        const used = new Set<string>();
         const go: string[] = [];
         for (const n of notices) {
           if (n.removes || !n.structure) continue;
           const lot = n.lot ?? (n.at ? lotOf(book, n.at) : undefined);
-          if (lot) looks.push(...ownerLooks(book, asked, p.register, lot));
-          else if (n.at && asked.first(`ground:${n.at}`)) looks.push(ask.about(p.register.lots, "data.cells", n.at, { most: 1 }));
+          if (lot) looks.push(...ownerLooks(book, asked, p.register, lot, used));
+          else if (n.at && !used.has(p.register.lots) && asked.first(`ground:${n.at}`)) {
+            used.add(p.register.lots);
+            looks.push(ask.about(p.register.lots, "data.cells", n.at, { most: 1 }));
+          }
           // (To the ground notified, where the notice says it: a building may be gone, its ground is always there.)
           if (!sitesSeen.has(n.structure) && go.length < VISIT_MAX && asked.first(`site:${n.id}`, obs.t)) go.push(n.at ?? n.structure);
         }
         if (go.length) looks.push(goSee(p.sites, go));
-        return looks.slice(0, 16);
+        return looks;
       },
     ));
   },
@@ -268,7 +274,7 @@ export const inspector: BehaviourModule = {
  */
 export const builder: BehaviourModule = {
   name: "firm.builder",
-  version: "0.12.0", // 0.12.0: goes to a lot before building on it, sees its sites as its crew works on them, and gives notice of building work; no longer shown the town
+  version: "0.12.1", // 0.12.1: with what 0.11.2 changed; 0.12.0: goes to a lot before building on it, sees its sites as its crew works on them, and gives notice of building work; no longer shown the town
   doc: "docs/behaviour/institutions.md",
   cadence: () => DAY,
   create(ctx: ParticipantContext) {
@@ -308,27 +314,31 @@ export const builder: BehaviourModule = {
     const planAsked = new Asked();
     // When we last went to see each cell of ground or building (our own going: what we remember of it is as old as that).
     const wentAt = new Map<string, number>();
-    const sightOf = (r: { id: string; at: number }, places: string[]) => !p.sites || places.every((c) => (wentAt.get(c) ?? -1) >= r.at);
+    /** Where on a lot our foreman goes to look: the first of its cells we have not seen built on (a lot is one place
+     * to go to; a block of many cells is not walked cell by cell). */
+    const groundToSee = (lot: string): string | undefined => cellsOf(book, lot).find((c) => builtCell.get(c) !== true);
     const plansToRead = (obs: Observation): LookRequest[] => {
-      const looks: LookRequest[] = [];
+      // (One search of the register is answered to a look, and one going sets out at a time: this is asked again
+      // until there is nothing more to ask.)
+      let plan: LookRequest | undefined, visit: LookRequest | undefined;
       for (const r of book.ofType("agreement")) {
         if (r.record !== "agreement" || !r.terms.parties.includes(obs.entity) || handled.has(r.id)) continue;
         const job = commitmentOf(r, obs.entity).outcome?.structure;
         const lot = job?.on;
-        if (p.register && lot && !book.records.has(lot) && planAsked.first(lot)) {
-          looks.push(ask.one(p.register.lots, lot));
+        if (!plan && p.register && lot && !book.records.has(lot) && planAsked.first(lot)) {
+          plan = ask.one(p.register.lots, lot);
           plansOut.add(lot);
         }
         // The foreman goes to the lot (or to what is to come down) once the client has signed, before we take the job
         // on: what stands there is seen by going, not known.
-        if (!p.sites || looks.length || !book.signedBy(r.id, r.terms.parties.find((x) => x !== obs.entity) ?? "")) continue;
-        const places = job?.remove ? [job.remove] : lot ? cellsOf(book, lot).slice(0, VISIT_MAX) : [];
-        if (places.length && planAsked.first(`site:${r.id}`)) {
-          looks.push(goSee(p.sites, places));
-          going.set(r.id, places);
+        if (visit || !p.sites || !book.signedBy(r.id, r.terms.parties.find((x) => x !== obs.entity) ?? "")) continue;
+        const place = job?.remove ?? (lot ? groundToSee(lot) : undefined);
+        if (place && planAsked.first(`site:${r.id}:${place}`)) {
+          visit = goSee(p.sites, [place]);
+          going.set(r.id, [place]);
         }
       }
-      return looks.slice(0, 16);
+      return [...(plan ? [plan] : []), ...(visit ? [visit] : [])];
     };
     const staffing = new Staffing(ctx, ctx.entity, { period: p.period, notice_days: p.notice_days, workplace: p.workplace || undefined, role: "construction worker", ...(p.industry ? { industry: p.industry } : {}) });
     // What's recorded against us to pay (rates on our yard, a fine), paid as a firm pays its debts (we don't wind up).
@@ -437,8 +447,11 @@ export const builder: BehaviourModule = {
           // (Not before our foreman has been to the lot, or to what is to come down, since the contract was made.)
           // (A lot the register has no plan of can't be gone to: the job is taken as it was, and fails where it would have.)
           if (job?.on && !job.remove && p.sites) {
-            const ground = cellsOf(book, job.on).slice(0, VISIT_MAX);
-            if (ground.length ? !sightOf(r, ground) : !!p.register && !noPlan.has(job.on)) continue;
+            // (Seen: a cell of the lot gone to since the contract and found free, or every cell of it seen built on.)
+            const cells = cellsOf(book, job.on);
+            const free = cells.some((c) => builtCell.get(c) === false && (wentAt.get(c) ?? -1) >= r.at);
+            const full = cells.length > 0 && cells.every((c) => builtCell.get(c) === true);
+            if (cells.length ? !free && !full : !!p.register && !noPlan.has(job.on)) continue;
           }
           going.delete(r.id);
           // (Not before we know our own price for it: we wait for our supplier's prices, as a firm would.)
@@ -587,8 +600,8 @@ export const builder: BehaviourModule = {
           target: want, wage: wage, canPost: acc.balance >= bill + wage,
           why: `${Math.round(inHand / 3600)} hours of work in hand need ${want} hands to do within ${p.horizon_days} days; we have ${crewNow.length}: posting a job.`,
         }));
-        if ((crewNow.length > want && t - lastLetGo >= p.let_go_every_days * DAY) || (crewNow.length && acc.balance < crewNow.length * wage)) {
-          const broke = acc.balance < crewNow.length * wage;
+        if ((crewNow.length > want && t - lastLetGo >= p.let_go_every_days * DAY) || (crewNow.length && acc.balance < staffing.staying(book, t) * wage)) {
+          const broke = acc.balance < staffing.staying(book, t) * wage;
           const s = staffing.letGo(book, t, broke ? `Can't cover the next pay period (${usd(acc.balance)} for ${crewNow.length}): letting the most recent hire go.` : `${Math.round(inHand / 3600)} hours of work in hand need ${want} hands; we have ${crewNow.length}: letting the most recent hire go.`,
             broke ? "Redundancy: we can't cover the wage bill." : "Redundancy: there isn't the work.");
           if (s.length) lastLetGo = t;

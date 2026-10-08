@@ -840,16 +840,26 @@ export function visited(obs: Observation, channel: string): SiteCell[] {
 }
 
 /**
- * What to ask the land register so as to know who owns a lot: the titles to it, and then the dealings in each of those
- * (each asked once; `asked` remembers). Return them from a stepper's `looks`: the answers come with the next
- * observation, into the same book, and `ownerOf` (behaviour/institutions.ts) then reads the owner from them.
- * `known`: true once both have been asked and answered.
+ * What to ask the land register next so as to know who owns a lot: the titles to it, and then the dealings in each of
+ * those (each asked once; `asked` remembers). One search of a register is answered to a look, so at most one is
+ * returned for each of the register's channels, and none for a channel already in `used` (what this look is asking
+ * already): return them from a stepper's `looks`, which asks again until there is nothing more to ask. The answers
+ * come with the next observation, into the same book, and `ownerOf` (behaviour/institutions.ts) reads the owner.
  */
-export function ownerLooks(book: Book, asked: Asked, register: { titles: string; dealings: string }, lot: string, most = 20): Asking[] {
-  const out: Asking[] = [];
-  if (asked.first(`titles:${lot}`)) out.push(ask.about(register.titles, "about.object", lot, { most }));
-  else for (const c of book.claimsBy("object", lot)) if (c.about?.kind === "ownership" && asked.first(`dealings:${c.id}`)) out.push(ask.about(register.dealings, "claim", c.id, { most, oldest: true }));
-  return out;
+export function ownerLooks(book: Book, asked: Asked, register: { titles: string; dealings: string }, lot: string, used: Set<string> = new Set(), most = 20): Asking[] {
+  if (asked.since(`titles:${lot}`) < 0) {
+    if (used.has(register.titles)) return [];
+    used.add(register.titles);
+    asked.first(`titles:${lot}`);
+    return [ask.about(register.titles, "about.object", lot, { most })];
+  }
+  for (const c of book.claimsBy("object", lot)) {
+    if (c.about?.kind !== "ownership" || asked.since(`dealings:${c.id}`) >= 0 || used.has(register.dealings)) continue;
+    used.add(register.dealings);
+    asked.first(`dealings:${c.id}`);
+    return [ask.about(register.dealings, "claim", c.id, { most, oldest: true })];
+  }
+  return [];
 }
 
 /** How many look-ups one look carries at most (the contract's: a look names up to 16 channels). */

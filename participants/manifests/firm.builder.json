@@ -1,6 +1,6 @@
 {
   "name": "firm.builder",
-  "version": "0.12.0",
+  "version": "0.12.1",
   "doc": "docs/behaviour/institutions.md",
   "params": {
     "build_markup_bps": {

@@ -3,7 +3,10 @@
 Turns a short spec (`worlds/town.yaml`) and a **profile** (`worlds/profiles/`, docs/profiles.md: every place-specific figure, with its source) into a full, explicit contracts v0.5 world config. The generator's code holds no place's figures; what it needs beyond the profile it derives by general formulas:
 - **a factory's item:** its labour share of the world price, as hours at the factory wage; its input share, as kg of inputs;
 - **a shop's item:** its retail price from the purchases share; its serving time from the labour share, at the shop wage;
-- **shops' opening staff:** from the sales the town's expected incomes would make;
+- **shops' opening staff:** from the sales the town's expected incomes would make, by the citizens' own rule of spending: wages after what employers withhold, pensions by how often they are paid, the payment to the unemployed where there is one, the rent of the homes that are let, never less than the essentials, and the profile's share a year of savings beyond the months kept in hand;
+- **an hour's pay and the working day:** a pay period's wage over the hours worked in it; the working day is the profile's working week over the days people work;
+- **an item of goods:** the town's unit; its price is the profile's `prices.goods_world` if stated (checked for being a size whole numbers can carry), else what half an hour of factory work makes;
+- **a firm's opening money:** its working capital (a shop: a month's stock and three months' wages; a factory: a month's wages and a month's inputs), never a stated sum (docs/profiles.md);
 - **world prices** move as the profile's `world_price_process` says; a spec's `shocks` script changes to a price or to demand (docs/behaviour/boundary.md);
 - **the world market's demand**, if the spec doesn't set it: what the factories' opening staff make, less the town's own purchases (a boundary condition, set by rule). It's deterministic from the spec's seed, using the kernel's keyed randomness. The kernel never generates anything; it receives this output. Everything generated is example **content** (D23).
 
