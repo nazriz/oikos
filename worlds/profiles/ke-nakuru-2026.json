@@ -1,0 +1,1421 @@
+{
+  "id": "ke-nakuru-2026",
+  "place": "A small town in Nakuru County, Kenya (a market town in the Rift Valley highlands, like Njoro or Molo)",
+  "as_of": "2026-10",
+  "about": "Every place-specific figure the town generator uses, with its source. A world for another place and time is another profile; the platform's code holds none of these (docs/profiles.md).",
+  "values": {
+    "currency": {
+      "code": "KES",
+      "minor_units": 2,
+      "symbol": "KSh",
+      "unit_words": [
+        "shilling",
+        "shillings",
+        "bob"
+      ],
+      "minor_words": [
+        "cent",
+        "cents"
+      ]
+    },
+    "households": {
+      "lone_bps": 1700,
+      "group_bps": 400,
+      "couple_bps": 1200,
+      "couple_children_bps": 4600,
+      "one_parent_bps": 2100,
+      "children_couple": [
+        2800,
+        3200,
+        4000
+      ],
+      "children_one_parent": [
+        4000,
+        3200,
+        2800
+      ],
+      "same_sex_couple_bps": 0,
+      "lone_parent_female_bps": 8500,
+      "adult_female_bps": 5200,
+      "child_male_bps": 5030,
+      "adult_ages": [
+        18,
+        99
+      ],
+      "mother_age_at_first_birth": [
+        18,
+        26
+      ],
+      "child_max_age": 24,
+      "group_size": [
+        2,
+        3
+      ],
+      "age_bands_bps": [
+        {
+          "from": 0,
+          "to": 4,
+          "bps": 1302
+        },
+        {
+          "from": 5,
+          "to": 9,
+          "bps": 1201
+        },
+        {
+          "from": 10,
+          "to": 14,
+          "bps": 1226
+        },
+        {
+          "from": 15,
+          "to": 19,
+          "bps": 1132
+        },
+        {
+          "from": 20,
+          "to": 24,
+          "bps": 945
+        },
+        {
+          "from": 25,
+          "to": 29,
+          "bps": 873
+        },
+        {
+          "from": 30,
+          "to": 34,
+          "bps": 724
+        },
+        {
+          "from": 35,
+          "to": 39,
+          "bps": 668
+        },
+        {
+          "from": 40,
+          "to": 44,
+          "bps": 472
+        },
+        {
+          "from": 45,
+          "to": 49,
+          "bps": 436
+        },
+        {
+          "from": 50,
+          "to": 54,
+          "bps": 273
+        },
+        {
+          "from": 55,
+          "to": 59,
+          "bps": 252
+        },
+        {
+          "from": 60,
+          "to": 64,
+          "bps": 148
+        },
+        {
+          "from": 65,
+          "to": 69,
+          "bps": 131
+        },
+        {
+          "from": 70,
+          "to": 74,
+          "bps": 79
+        },
+        {
+          "from": 75,
+          "to": 79,
+          "bps": 67
+        },
+        {
+          "from": 80,
+          "to": 84,
+          "bps": 30
+        },
+        {
+          "from": 85,
+          "to": 99,
+          "bps": 41
+        }
+      ]
+    },
+    "life": {
+      "qx_per_100000": {
+        "male": [
+          3600,
+          450,
+          300,
+          200,
+          150,
+          100,
+          100,
+          100,
+          100,
+          100,
+          120,
+          120,
+          120,
+          120,
+          120,
+          189,
+          193,
+          199,
+          204,
+          211,
+          217,
+          225,
+          233,
+          241,
+          250,
+          260,
+          271,
+          283,
+          296,
+          310,
+          324,
+          341,
+          358,
+          377,
+          398,
+          420,
+          444,
+          470,
+          499,
+          529,
+          562,
+          598,
+          637,
+          679,
+          725,
+          774,
+          828,
+          886,
+          948,
+          1016,
+          1090,
+          1169,
+          1255,
+          1349,
+          1449,
+          1558,
+          1677,
+          1804,
+          1942,
+          2092,
+          2254,
+          2428,
+          2617,
+          2822,
+          3043,
+          3281,
+          3539,
+          3818,
+          4119,
+          4444,
+          4795,
+          5173,
+          5582,
+          6022,
+          6497,
+          7008,
+          7559,
+          8153,
+          8791,
+          9478,
+          10216,
+          11008,
+          11859,
+          12771,
+          13749,
+          14796,
+          15915,
+          17112,
+          18388,
+          19749,
+          21198,
+          22737,
+          24372,
+          26103,
+          27933,
+          29865,
+          31900,
+          34037,
+          36277,
+          38618,
+          30000
+        ],
+        "female": [
+          3600,
+          450,
+          300,
+          200,
+          150,
+          100,
+          100,
+          100,
+          100,
+          100,
+          120,
+          120,
+          120,
+          120,
+          120,
+          190,
+          195,
+          199,
+          204,
+          210,
+          216,
+          222,
+          229,
+          236,
+          243,
+          252,
+          260,
+          270,
+          280,
+          291,
+          302,
+          315,
+          328,
+          343,
+          358,
+          375,
+          392,
+          411,
+          432,
+          454,
+          477,
+          502,
+          529,
+          558,
+          589,
+          622,
+          658,
+          696,
+          737,
+          781,
+          828,
+          878,
+          932,
+          990,
+          1052,
+          1119,
+          1190,
+          1267,
+          1349,
+          1436,
+          1530,
+          1631,
+          1739,
+          1855,
+          1979,
+          2111,
+          2254,
+          2406,
+          2569,
+          2743,
+          2930,
+          3130,
+          3344,
+          3573,
+          3818,
+          4080,
+          4360,
+          4660,
+          4980,
+          5323,
+          5689,
+          6079,
+          6497,
+          6942,
+          7418,
+          7925,
+          8466,
+          9043,
+          9657,
+          10312,
+          11008,
+          11749,
+          12537,
+          13374,
+          14263,
+          15207,
+          16207,
+          17267,
+          18388,
+          19574,
+          26000
+        ]
+      },
+      "illness": {
+        "by_age": [
+          {
+            "from": 0,
+            "bps": 600
+          },
+          {
+            "from": 5,
+            "bps": 350
+          },
+          {
+            "from": 15,
+            "bps": 600
+          },
+          {
+            "from": 45,
+            "bps": 900
+          },
+          {
+            "from": 65,
+            "bps": 1800
+          },
+          {
+            "from": 85,
+            "bps": 4500
+          }
+        ],
+        "severity": [
+          {
+            "label": "serious",
+            "share_bps": 8000,
+            "days": [
+              3,
+              14
+            ],
+            "fatal_bps": 0
+          },
+          {
+            "label": "severe",
+            "share_bps": 2000,
+            "days": [
+              14,
+              60
+            ],
+            "fatal_bps": 0
+          }
+        ]
+      },
+      "injury": {
+        "bps": 210,
+        "severity": [
+          {
+            "label": "minor",
+            "share_bps": 6000,
+            "days": [
+              3,
+              14
+            ],
+            "fatal_bps": 0
+          },
+          {
+            "label": "serious",
+            "share_bps": 4000,
+            "days": [
+              14,
+              90
+            ],
+            "fatal_bps": 0
+          }
+        ]
+      },
+      "birth": {
+        "ages": [
+          15,
+          49
+        ],
+        "gestation_days": 266,
+        "female_bps": 4926
+      },
+      "treatable": {
+        "share_bps_by_age": [
+          {
+            "from": 0,
+            "bps": 1500
+          },
+          {
+            "from": 75,
+            "bps": 0
+          }
+        ],
+        "band": "severe"
+      },
+      "work_injury_bps": {
+        "factory": 160,
+        "shop": 116
+      },
+      "found_alone_after": [
+        {
+          "within_days": 1,
+          "bps": 3691
+        },
+        {
+          "within_days": 3,
+          "bps": 2062
+        },
+        {
+          "within_days": 7,
+          "bps": 1359
+        },
+        {
+          "within_days": 30,
+          "bps": 1959
+        },
+        {
+          "within_days": 365,
+          "bps": 929
+        }
+      ]
+    },
+    "wages_per_fortnight": {
+      "shop": 765759,
+      "factory": 830769,
+      "construction": 923077
+    },
+    "rents_per_month": {
+      "apartment_units": [
+        {
+          "bedrooms": 1,
+          "count": 3,
+          "rent": 600000
+        },
+        {
+          "bedrooms": 2,
+          "count": 7,
+          "rent": 1000000
+        },
+        {
+          "bedrooms": 3,
+          "count": 2,
+          "rent": 1400000
+        }
+      ],
+      "house_types": [
+        {
+          "id": "house",
+          "bedrooms": 3,
+          "share_bps": 5500,
+          "rent": 1600000
+        },
+        {
+          "id": "large-house",
+          "bedrooms": 4,
+          "share_bps": 4500,
+          "rent": 2200000
+        }
+      ]
+    },
+    "spending": {
+      "saving_bps": 500,
+      "wealth_effect_bps_per_year": 300,
+      "essentials_per_month": 600000,
+      "shops_known": 7,
+      "shop_search_bps_per_month": 2500
+    },
+    "savings_by_age": [
+      {
+        "from": 18,
+        "pct": [
+          10000,
+          50000,
+          200000,
+          600000,
+          1500000
+        ]
+      },
+      {
+        "from": 25,
+        "pct": [
+          30000,
+          150000,
+          500000,
+          1500000,
+          4000000
+        ]
+      },
+      {
+        "from": 35,
+        "pct": [
+          50000,
+          250000,
+          800000,
+          2500000,
+          7000000
+        ]
+      },
+      {
+        "from": 45,
+        "pct": [
+          50000,
+          300000,
+          1000000,
+          3000000,
+          9000000
+        ]
+      },
+      {
+        "from": 55,
+        "pct": [
+          50000,
+          300000,
+          1200000,
+          4000000,
+          12000000
+        ]
+      }
+    ],
+    "retirement_age": 70,
+    "retiree_savings": [
+      3000000,
+      15000000
+    ],
+    "support": {
+      "pension": {
+        "amount": 200000,
+        "every_days": 30,
+        "from_age": 70
+      },
+      "unemployment": {
+        "amount": 0,
+        "every_days": 30,
+        "from_age": 18
+      }
+    },
+    "firm_ownership": {
+      "forms_bps": {
+        "factory": {
+          "closely_held": 5000,
+          "outside": 4000,
+          "widely_held": 1000
+        },
+        "shop": {
+          "closely_held": 9500,
+          "outside": 500,
+          "widely_held": 0
+        },
+        "landlord": {
+          "closely_held": 9500,
+          "outside": 500,
+          "widely_held": 0
+        }
+      },
+      "closely_held": {
+        "households_bps": [
+          8500,
+          1200,
+          300
+        ],
+        "owner_wealth_fifth_bps": [
+          100,
+          200,
+          400,
+          800,
+          8500
+        ]
+      },
+      "widely_held": {
+        "outside_bps": 5000
+      },
+      "direct_holders": {
+        "by_wealth_fifth_bps": [
+          0,
+          100,
+          200,
+          400,
+          1500
+        ],
+        "firms_held": [
+          1,
+          3
+        ]
+      }
+    },
+    "retirement_fund": {
+      "share_bps_of_local": 4000,
+      "member_bps": 1250,
+      "pension_every_days": 30,
+      "drawdown_bps_by_age": [
+        {
+          "from": 0,
+          "bps": 400
+        },
+        {
+          "from": 60,
+          "bps": 500
+        },
+        {
+          "from": 70,
+          "bps": 600
+        },
+        {
+          "from": 80,
+          "bps": 700
+        }
+      ],
+      "cost_bps_of_income": 500
+    },
+    "industry": {
+      "factory_labour_share_bps": 2000,
+      "factory_input_share_bps": 6700,
+      "retail_purchases_share_bps": 7800,
+      "retail_labour_share_bps": 1000
+    },
+    "prices": {
+      "goods_world": 50000,
+      "goods_import_markup_bps": 1500,
+      "inputs_per_kg": 5000,
+      "materials_per_kg": 600
+    },
+    "ordinary_hours_per_week": 52,
+    "fertility_per_10000": [
+      {
+        "from": 15,
+        "rate": 730
+      },
+      {
+        "from": 20,
+        "rate": 1790
+      },
+      {
+        "from": 25,
+        "rate": 1600
+      },
+      {
+        "from": 30,
+        "rate": 1300
+      },
+      {
+        "from": 35,
+        "rate": 900
+      },
+      {
+        "from": 40,
+        "rate": 400
+      },
+      {
+        "from": 45,
+        "rate": 100
+      },
+      {
+        "from": 50,
+        "rate": 0
+      }
+    ],
+    "labour_force_participation_bps": 7000,
+    "tenancy": {
+      "rent_review_months": 12,
+      "rent_increase_notice_days": 30,
+      "after_fixed_term": "periodic"
+    },
+    "values": {
+      "benevolence": {
+        "mean_bps": 7000,
+        "sd_bps": 1500
+      },
+      "universalism": {
+        "mean_bps": 6600,
+        "sd_bps": 1500
+      },
+      "self_direction": {
+        "mean_bps": 6200,
+        "sd_bps": 1500
+      },
+      "security": {
+        "mean_bps": 5800,
+        "sd_bps": 1500
+      },
+      "conformity": {
+        "mean_bps": 5400,
+        "sd_bps": 1500
+      },
+      "hedonism": {
+        "mean_bps": 5000,
+        "sd_bps": 1500
+      },
+      "achievement": {
+        "mean_bps": 4600,
+        "sd_bps": 1500
+      },
+      "tradition": {
+        "mean_bps": 4200,
+        "sd_bps": 1500
+      },
+      "stimulation": {
+        "mean_bps": 3800,
+        "sd_bps": 1500
+      },
+      "power": {
+        "mean_bps": 3400,
+        "sd_bps": 1500
+      }
+    },
+    "industrial_action": {
+      "ballot_turnout_bps": 5000,
+      "ballot_pass_bps": 5000,
+      "notice_days": 7,
+      "paid_during_action": false
+    },
+    "world_price_process": {
+      "goods": {
+        "sd_bps": 150,
+        "persistence_bps": 9000
+      },
+      "inputs": {
+        "sd_bps": 400,
+        "persistence_bps": 9000
+      },
+      "materials": {
+        "sd_bps": 300,
+        "persistence_bps": 9000
+      }
+    },
+    "credit": {
+      "cash_rate_bps": 875,
+      "funding_spread_bps": 300,
+      "lending_rate_bps": {
+        "person": 1800,
+        "organisation": 1434
+      },
+      "serviceability_buffer_bps": 300,
+      "max_repayment_share_bps": {
+        "person": 6667,
+        "organisation": 2000
+      },
+      "arrears_days": 30,
+      "default_days": 90,
+      "max_months": 60,
+      "reserve": 150000000
+    },
+    "opening": {
+      "bank": 180000000,
+      "town": 720000000,
+      "builder": 100000000,
+      "landlord": 200000000,
+      "shop": 10000000,
+      "factory": 140000000,
+      "person_min_savings": 30000
+    },
+    "town_finance": {
+      "parks_per_year": 54000000,
+      "payment_approval_over": 20000000
+    },
+    "public_finance": {
+      "income_tax": {
+        "brackets": [
+          {
+            "from": 0,
+            "rate_bps": 0
+          },
+          {
+            "from": 28800000,
+            "rate_bps": 2500
+          },
+          {
+            "from": 38800000,
+            "rate_bps": 3000
+          },
+          {
+            "from": 600000000,
+            "rate_bps": 3250
+          },
+          {
+            "from": 960000000,
+            "rate_bps": 3500
+          }
+        ],
+        "levy_bps": 425,
+        "levy_from": 0
+      },
+      "grants_per_resident_per_year": 600000,
+      "rates_per_resident_per_year": 50000,
+      "rates_instalments": 4,
+      "rates_due_days": 30,
+      "rates_penalty_interest_bps": 1000,
+      "median_house_price": 500000000,
+      "rates_exempt_kinds": [
+        "health_service",
+        "school",
+        "utility",
+        "police"
+      ]
+    },
+    "services": {
+      "waste_per_person_per_day_g": 400,
+      "landfill_levy_per_tonne": 0,
+      "council_staff_per_1000": 6,
+      "collect_seconds_per_10kg": 12,
+      "asset_life_years": 15,
+      "upkeep_hours_per_week_per_asset": 4,
+      "complain_bps": 3000
+    },
+    "unions": {
+      "membership_bps": {
+        "manufacturing": 2000,
+        "retail": 800,
+        "construction": 500,
+        "public_administration": 4500,
+        "other": 1500
+      },
+      "dues_per_month": 30000,
+      "resignation_notice_days": 30,
+      "claim_margin_bps": 200,
+      "meeting_every_days": 30,
+      "teaching": "Together, workers win better pay and conditions than each alone."
+    },
+    "groups": {
+      "kinds": [
+        {
+          "kind": "sport",
+          "name": "football club",
+          "every_days": 7,
+          "lasts_minutes": 120
+        },
+        {
+          "kind": "religious",
+          "name": "church",
+          "every_days": 7,
+          "lasts_minutes": 150,
+          "teaching": "There is a God who made the world and cares how we live.",
+          "held_at_start_bps": 8580
+        },
+        {
+          "kind": "arts",
+          "name": "choir and drama group",
+          "every_days": 14,
+          "lasts_minutes": 120
+        },
+        {
+          "kind": "hobby",
+          "name": "youth and farmers' group",
+          "every_days": 14,
+          "lasts_minutes": 120
+        },
+        {
+          "kind": "interest",
+          "name": "chama (savings group)",
+          "every_days": 14,
+          "lasts_minutes": 120
+        }
+      ],
+      "per_kind_per_1000_people": 1,
+      "taking_part_bps": 5000,
+      "leave_notice_days": 0
+    },
+    "elections": {
+      "term_years": 5,
+      "method": "plurality",
+      "turnout_bps": 6540,
+      "stand_bps": 200,
+      "news_readers_bps": 3000
+    },
+    "health": {
+      "doctors_per_1000": 0.2,
+      "doctor_wage_per_fortnight": 9507692,
+      "consult_minutes": 30,
+      "seek_care_bps": 9000,
+      "treats": [
+        {
+          "kind": "illness",
+          "severity": "serious",
+          "consults": 1,
+          "days_kept_bps": 8000,
+          "fatal_kept_bps": 5000
+        },
+        {
+          "kind": "illness",
+          "severity": "severe",
+          "consults": 2,
+          "days_kept_bps": 8000,
+          "fatal_kept_bps": 5000
+        },
+        {
+          "kind": "injury",
+          "severity": "minor",
+          "consults": 1,
+          "days_kept_bps": 8000,
+          "fatal_kept_bps": 5000
+        },
+        {
+          "kind": "injury",
+          "severity": "serious",
+          "consults": 2,
+          "days_kept_bps": 8000,
+          "fatal_kept_bps": 5000
+        }
+      ],
+      "off_work_severities": [
+        "serious",
+        "severe"
+      ]
+    },
+    "round": {
+      "work_start_hour": 8,
+      "work_end_hour": 17,
+      "work_days": 5,
+      "school_start_hour": 8,
+      "school_end_hour": 16,
+      "travel_seconds_per_cell": 18,
+      "travel_by_cover": {
+        "water": 120,
+        "wetland": 30,
+        "woodland": 25,
+        "scrub": 25
+      },
+      "roads": {
+        "seconds_per_cell": 3,
+        "within_cells": 3,
+        "budget_per_resident": 60000
+      }
+    },
+    "ownership": {
+      "house_owner_bps": 6000,
+      "mortgage_bps_by_age": [
+        {
+          "from": 18,
+          "bps": 300
+        },
+        {
+          "from": 45,
+          "bps": 500
+        },
+        {
+          "from": 65,
+          "bps": 100
+        }
+      ],
+      "mortgage_payment_per_month": 3500000,
+      "mortgage_rate_bps": 1300,
+      "mortgage_years_left": [
+        5,
+        20
+      ],
+      "market": {
+        "buy_bps_per_month": 50,
+        "deposit_bps": 1500,
+        "costs_bps": 600,
+        "mortgage_months": 240,
+        "relist_days": 30,
+        "cut_bps": 500,
+        "floor_bps": 8000
+      }
+    },
+    "utilities": {
+      "water": {
+        "litres_per_person_per_day": 50,
+        "price_per_kl": 9500,
+        "service_per_quarter": 90000,
+        "river_inflow_kl_per_cell_per_day": 1000,
+        "river_decay_bps_per_day": 1000,
+        "river_flow_bps_per_day": 5000
+      },
+      "energy": {
+        "kwh_per_household_per_day": 3,
+        "price_per_kwh": 2500,
+        "supply_per_day": 400,
+        "grid_price_per_kwh": 1500,
+        "grid_emissions_g_per_kwh": 100
+      }
+    },
+    "climate": {
+      "rain_by_month_bps": [
+        6286,
+        6857,
+        10286,
+        17143,
+        14857,
+        8000,
+        9714,
+        12000,
+        8000,
+        8571,
+        11429,
+        6857
+      ],
+      "storm_bps_per_month": 1000,
+      "storm_days": [
+        2,
+        4
+      ],
+      "storm_bps": 25000,
+      "drought_bps_per_year": 1000,
+      "drought_months": [
+        6,
+        24
+      ],
+      "drought_bps": 4000,
+      "summer_months": [
+        1,
+        2,
+        3
+      ],
+      "heatwave_bps_per_week": 0,
+      "heatwave_days": [
+        3,
+        5
+      ],
+      "heat_units": 10,
+      "built_heat_units": 12,
+      "heat_illness_bps_per_unit": 100,
+      "warning_lead_days": 2
+    },
+    "hazards": {
+      "river_bank_kl": 12000,
+      "spill_bps_per_day": 3000,
+      "flood_above_kl": 300,
+      "wetland_soak_kl_per_day": 500
+    },
+    "crime": {
+      "take_bps_per_month_in_need": 200,
+      "caught_bps_reckoned": 3000,
+      "take_quantity": 5,
+      "detection_bps": 2000,
+      "investigation_hours": 4,
+      "police_per_1000": 1.95,
+      "officer_wage_per_fortnight": 1352123
+    },
+    "justice": {
+      "hearing_after_days": 30,
+      "pay_within_days": 30,
+      "challenge_bps": 2000,
+      "apply_bps": 3000,
+      "apply_after_days": 30
+    },
+    "education": {
+      "school_ages": [
+        6,
+        17
+      ],
+      "students_per_teacher": 36,
+      "school_days_per_year": 195,
+      "hours_per_day": 7,
+      "teacher_wage_per_fortnight": 1846154,
+      "attainment": [
+        {
+          "label": "No level completed",
+          "share_bps": 1600,
+          "years": 4
+        },
+        {
+          "label": "Primary",
+          "share_bps": 4800,
+          "years": 8
+        },
+        {
+          "label": "Secondary",
+          "share_bps": 2450,
+          "years": 12
+        },
+        {
+          "label": "Middle-level college or technical training",
+          "share_bps": 700,
+          "years": 14
+        },
+        {
+          "label": "University",
+          "share_bps": 450,
+          "years": 16
+        }
+      ],
+      "return_per_year_bps": 1100,
+      "max_years": 20
+    },
+    "nature": {
+      "cell_m": 25,
+      "landscape": {
+        "margin_cells": 100,
+        "block_cells": 16,
+        "shares_bps": {
+          "woodland": 1500,
+          "scrub": 1000,
+          "grassland": 1500,
+          "farmland": 5500,
+          "wetland": 500
+        },
+        "woodland_patches": 2
+      },
+      "covers": [
+        {
+          "id": "woodland"
+        },
+        {
+          "id": "scrub",
+          "succeeds_to": {
+            "cover": "woodland",
+            "after_years": 40
+          }
+        },
+        {
+          "id": "grassland"
+        },
+        {
+          "id": "cleared",
+          "succeeds_to": {
+            "cover": "grassland",
+            "after_years": 1
+          }
+        },
+        {
+          "id": "farmland"
+        },
+        {
+          "id": "wetland"
+        },
+        {
+          "id": "riverbank"
+        }
+      ],
+      "default_cover": "grassland",
+      "cleared_cover": "cleared",
+      "river_cover": "riverbank",
+      "pollution": {
+        "decay_bps_per_day": 300,
+        "diffusion_bps_per_day": 800,
+        "flow_bps_per_day": 5000,
+        "per_factory_per_day": 40,
+        "per_farmland_cell_per_day": 1
+      },
+      "species": [
+        {
+          "id": "black-and-white-colobus",
+          "name": "black-and-white colobus",
+          "density_per_ha": {
+            "woodland": 0.6,
+            "riverbank": 0.4
+          },
+          "home_range_ha": 15,
+          "growth_bps_per_year": 1500,
+          "mortality_bps_per_year": 800,
+          "dispersal_bps_per_year": 500,
+          "dispersal_m": 100,
+          "barriers": [
+            "built",
+            "farmland",
+            "grassland"
+          ],
+          "min_viable": 4,
+          "detection_bps": 6000,
+          "listed": true
+        },
+        {
+          "id": "grey-crowned-crane",
+          "name": "grey crowned crane",
+          "density_per_ha": {
+            "wetland": 0.1,
+            "farmland": 0.01,
+            "grassland": 0.01
+          },
+          "home_range_ha": 40,
+          "growth_bps_per_year": 1500,
+          "mortality_bps_per_year": 1000,
+          "dispersal_bps_per_year": 2000,
+          "dispersal_m": 2000,
+          "min_viable": 2,
+          "tolerance": {
+            "pollution": {
+              "above": 400,
+              "mortality_bps_per_day": 20
+            }
+          },
+          "detection_bps": 8000,
+          "listed": true
+        },
+        {
+          "id": "hadada-ibis",
+          "name": "hadada ibis",
+          "density_per_ha": {
+            "grassland": 0.3,
+            "riverbank": 0.5,
+            "farmland": 0.15,
+            "wetland": 0.2
+          },
+          "home_range_ha": 5,
+          "growth_bps_per_year": 4000,
+          "mortality_bps_per_year": 2500,
+          "dispersal_bps_per_year": 1500,
+          "dispersal_m": 1000,
+          "min_viable": 1,
+          "detection_bps": 9000,
+          "conspicuous": true
+        }
+      ],
+      "survey_hours_per_ha": 1,
+      "survey_staff": 1,
+      "spin_up_years": 10
+    }
+  },
+  "sources": {
+    "currency": "Kenyan shillings, in cents: written \"KSh1,234.56\" (the sign KSh; informally a shilling is a 'bob'), or in words as shillings and cents. ISO 4217: KES, two decimal places (Central Bank of Kenya; to confirm the sign against its notes: KSh is the abbreviation in common official use).",
+    "households": "Placeholders, shaped by what was found, not read from a table. Found: Nakuru County, 2019 census (KNBS, 2019 Kenya Population and Housing Census, Volume II): 616,046 households, average size 3.6; KDHS 2022 (KNBS and ICF): mean household size about 4 (rural about 4, urban about 3), 34% of households headed by women (36% rural). Not found (the census household-type table and KDHS Table 2.7 could not be opened): the shares by type. lone_bps, group_bps, couple_bps, couple_children_bps, one_parent_bps are estimates (lone 17%, group 4%, couple without children 12%, couple with children 46%, one parent 21%; the one-parent share is set so that about a third of households are headed by a woman, with lone women and widows counted), children_*, lone_parent_female_bps (85%, widows and separated mothers), mother_age_at_first_birth (median age at first birth near 20 in KDHS 2022; to confirm), group_size, adult_female_bps (census 2019: 50.9% of the population is female, 1,084,835 of 2,162,202 in Nakuru County, but adults skew female), child_male_bps (2019 census: 1,077,272 males to 1,084,835 females in Nakuru; boys slightly outnumber girls at birth). same_sex_couple_bps is 0: same-sex relations are criminalised in Kenya (Penal Code s 162) and no count exists. Extended-family households (grandparents, uncles, relatives and fostered children living together) are common in Kenya and the household types here cannot express them; see the profile's gaps report. adult_ages 18 to 99: the bounds.",
+    "households.age_bands_bps": "KNBS, 2019 Kenya Population and Housing Census, Nakuru County, population by ten-year age group: 0-9 540,825; 10-19 509,948; 20-29 393,073; 30-39 300,955; 40-49 196,203; 50-59 113,710; 60-69 60,394; 70-79 31,681; 80-89 11,713; 90+ 3,564 (as reproduced by citypopulation.de, Nakuru; the KNBS single-year table was not opened: to confirm). Derived: each ten-year band is split into two five-year bands, the younger a little larger (52% to 55%, a placeholder for a falling profile); 85 and over is half of 80-89 plus 90+, taken to 99. The county includes the city of Nakuru; a small town is probably younger-rural still.",
+    "households.child_max_age": "Placeholder: a child living with parents counts up to 24 (adult children stay at home longer in Kenya, with housing costs and school fees; no figure found).",
+    "life.qx_per_100000": "Modelled, not a published table: no Kenyan abridged life table by single year of age was found. Fitted to WHO Global Health Observatory, life expectancy at birth, Kenya, 2021: 64.4 years for males, 69.2 for females (as reported by statisticsoftheworld.com; to confirm), and infant mortality of 36 per 1,000 (WHO, 2021). Between: ages 1-4 and 5-14 set to plausible values (placeholders); from 15 a Makeham curve, mu(x) = 0.0013 + B*exp(c*x), with B and c chosen so that e0 matches (males c=0.08, females c=0.07). The shape of adult mortality in a country with a large HIV and tuberculosis burden is not captured by a smooth curve (docs/profiles gaps).",
+    "life.illness": "Placeholder: carried over unchanged from the other profile's placeholder (an age gradient of hospital-level illness); no Kenyan figure found. To replace with age-specific admission rates from KNBS, Kenya Household Health Expenditure and Utilisation Survey 2018.",
+    "life.injury": "Placeholder: carried over unchanged from the other profile's placeholder; no Kenyan figure found (road traffic injuries, many on motorcycle taxis, are a large share in Kenya: NTSA).",
+    "life.birth": "ages 15 to 49 and gestation of 266 days after conception (biology). female_bps 4926: 103 boys per 100 girls at birth (a standard sex ratio at birth; no Kenyan figure was opened: to confirm).",
+    "life.treatable": "Placeholder: carried over from the other profile; no Kenyan figure found (treatable deaths are more common where care is scarce, 0.2 doctors per 1,000: to estimate from the Lancet Commission on quality of care or WHO amenable mortality).",
+    "life.found_alone_after": "Placeholder: carried over from the other profile (Japan's counts of people who died alone at home). No Kenyan figure exists; in Kenya, with extended families and burial customs, a person living alone is found sooner as a rule. To replace.",
+    "life.work_injury_bps": "Placeholder: carried over from the other profile; to source from Kenya's Directorate of Occupational Safety and Health Services (DOSHS) and KNBS, Economic Survey, work injuries.",
+    "fertility_per_10000": "Approximate, from KNBS and ICF, Kenya Demographic and Health Survey 2022, age-specific fertility rates (births per 1,000 women a year): 15-19 73 and 20-24 179 are as reported (Nation, Eve Woman and Standard coverage of the report); total fertility rate 3.4 (3.9 rural, 2.8 urban). The other age groups' rates (25-29 160, 30-34 130, 35-39 90, 40-44 40, 45-49 10) are estimates to total about 3.4 children a woman; the report's Table 5.1 could not be opened (to confirm). Per 10,000 women.",
+    "ordinary_hours_per_week": "Regulation of Wages (General) Order, Kenya: ordinary working hours for day workers not exceeding 52 hours a week (the Employment Act 2007 allows more rest than the Order's limit; recalled, not opened: to confirm). Hours bound the wage's hourly rate.",
+    "wages_per_fortnight": "Shop: Regulation of Wages (General) (Amendment) Order, 2026 (Legal Notices 95 and 96 of 2026, in force from 1 May 2026, a 12% rise; Kenya Gazette Supplement 128, 29 May 2026): minimum monthly wage for shop assistants and salespeople in 'all other areas' (outside the five cities and the former municipalities), KSh 16,591.44, as summarised by a web search result of WageIndicator's table, whose own wage table is behind a login (to confirm against the Gazette). Converted from a month to a fortnight by 12/26 (the world pays fortnightly: see the gaps report). Factory and construction: placeholders, KSh 18,000 and KSh 20,000 a month, set near the 2026 cities' minimum for machine attendants (KSh 20,454.86 and artisans' ungraded KSh 24,358.79, FKE announcement, kenyans.co.ke, 2026) scaled down to small-town pay; actual pay in small-town informal manufacturing and building is largely unrecorded (see the gaps report). Average formal earnings per employee, KSh 694,253 a year in 2025 (KNBS, Economic Survey 2026), are a national mean skewed by Nairobi and the public sector.",
+    "rents_per_month": "Placeholders, estimated from listings seen but not from a survey: a decent two-bedroom house in a safe Nakuru neighbourhood goes for as low as KSh 14,000 and 2-bedroom houses at Bahati for KSh 20,000 (Kenyans.co.ke, 'Towns in Kenya with lowest rental prices'; Kenya Property Centre, Nakuru averages, June 2026, whose Njoro and Molo listings were empty). Small towns are cheaper than the city, and a one-room house in a Kenyan small town is often KSh 2,000 to 5,000 (no source found). KNBS, Kenya Housing Survey 2018/19 gives rents by county (to source).",
+    "spending.saving_bps": "Placeholder: household saving, 5%. Kenya's gross national savings were about 14% of GDP (National Treasury; to confirm), mostly by firms and government; households in rural Kenya save little. To source from KNBS, Kenya National Accounts.",
+    "spending.wealth_effect_bps_per_year": "Placeholder: carried over from the other profile (a model parameter).",
+    "spending.shops_known": "Placeholder: carried over from the other profile.",
+    "spending.shop_search_bps_per_month": "Placeholder: carried over from the other profile.",
+    "spending.essentials_per_month": "Placeholder: KSh 6,000 a person a month, scaled from the official rural poverty line of KSh 3,252 a month per adult equivalent in 2015/16 (food poverty line KSh 1,954; KNBS, Basic Report on Well-Being in Kenya, KIHBS 2015/16) by about 85% of the price rise since (a rough estimate; to update with KNBS, Kenya Continuous Household Survey 2022, poverty lines, to confirm).",
+    "retirement_age": "Placeholder, and a compromise: the public service retires at 60 (Public Service Commission), but most workers in Kenya (informal work, farming) carry on until they can't, and the old-age transfer (Inua Jamii) starts at 70, so here retirement is at 70, the age the transfer is paid. See the gaps report.",
+    "savings_by_age": "Placeholders shaped by KNBS and CBK, FinAccess Household Survey 2021 and 2024 (most adults hold small balances in M-Pesa, a Sacco or a group; the report was not opened: to confirm): an adult's cash and deposits (mobile money, bank, Sacco, chama), percentiles 10, 25, 50, 75 and 90 by age. Median about KSh 5,000 at 25-34.",
+    "retiree_savings": "Placeholder: KSh 30,000 to 150,000 at retirement (NSSF lump sums and a few years' savings; no figure found).",
+    "support.pension": "Inua Jamii Senior Citizens Scheme (Older Persons Cash Transfer, State Department for Social Protection): KSh 2,000 a month to people aged 70 and over, men and women, not already on a pension (a universal minimum old-age income since 2017); about 1.2 million beneficiaries; payments are made monthly, in practice often late and in two-month lumps (Citizen Digital, 'Gov't disburses Ksh.2.4B to over 1.2 million Kenyans under Inua Jamii programme', October 2025; HelpAge Kenya). Eligibility by age 70 only; the exclusion of those on another pension is left out.",
+    "support.unemployment": "Kenya has no unemployment benefit. This entry is a gap: the structure requires a payment, so it is set to zero cents (a payment of nothing, from age 18). If the world rejects a zero payment, the generator needs an optional payment (see the gaps report). Closest real things: the Inua Jamii cash transfers for orphans and vulnerable children and for persons with severe disabilities (KSh 2,000 a month), which are not for the unemployed; NSSF has no unemployment cover.",
+    "firm_ownership.forms_bps": "Placeholders: most Kenyan shops and landlords are sole proprietorships and family businesses (KNBS, 2016 Micro, Small and Medium Establishments Basic Report: 1.56 million licensed MSMEs, plus 5.0 million unlicensed; recalled, to confirm), so shops and landlords are 95% closely held; a small-town factory is more often a branch or an outsider's (maize milling, dairy, a tea or flour company) or a family firm.",
+    "firm_ownership.closely_held": "Placeholder: carried over from the other profile (a household owns most closely held firms; the weights by wealth).",
+    "firm_ownership.widely_held": "Placeholder: 50% of a widely held firm (a company listed on the Nairobi Securities Exchange) is from outside the town; foreign investors held about 40% of the exchange's market value in some years (Nairobi Securities Exchange; to confirm).",
+    "firm_ownership.direct_holders": "Placeholder: very few Kenyans hold shares directly (about 1.5 million Central Depository accounts, CDSC, for about 30 million adults; recalled, to confirm), so the shares of the wealth fifths are far below the other profile's.",
+    "retirement_fund": "Placeholders, for a world that asks for one, after the National Social Security Fund (NSSF Act 2013: contributions of 6% by the worker and 6% by the employer, up to an upper earnings limit; pension access at 60, early at 50). member_bps 12.5%: formal wage employment of 3.3 million (KNBS, Economic Survey 2026) over a labour force of about 24.7 million is 13%. Other figures: estimates; the NSSF's reports were not opened. A fund that pays lump sums, not pensions, is the common case in Kenya; the fund here pays a pension (see the gaps report).",
+    "industry": "Placeholders to confirm: manufacturing's compensation of employees and intermediate inputs as shares of output (about 20% and 67%, carried over from the other profile; KNBS, Supply and Use Tables, to source); retail's purchases (78%) and wages (10%) as shares of sales, estimated for a small town where retail margins run near 20%.",
+    "prices": "Placeholders: an item of goods worth KSh 500 at world prices (the unit the town counts in; the other profile's is 100 dollars, and Kenyan shop wages are of the same order of shillings as its wage in dollars divided by about 3.5, so the unit is scaled); imports 15% dearer (freight, duty and margins); inputs KSh 50 a kg (the order of the farm-gate price of maize grain, about KSh 4,500 a 90 kg bag; reported by the National Cereals and Produce Board, to confirm); building materials KSh 6 a kg (cement about KSh 14 a kg at KSh 700 a 50 kg bag, blocks and sand much less; no source opened; docs/behaviour/building.md).",
+    "tenancy": "Placeholders: most tenancies in Kenyan small towns are month to month and often unwritten; rent is reviewed rarely or yearly; a landlord needs to give a month's notice of rent increase or ending (the Rent Restriction Act, Cap 296, for low-rent dwellings, and the Distress for Rent Act, Cap 293; the Landlord and Tenant (Shops, Hotels and Catering Establishments) Act, Cap 301, for business premises; the acts were not opened: to confirm).",
+    "values": "Placeholder: Schwartz's ten basic values, in the pan-cultural order of importance Schwartz and Bardi found across 56 nations ('Value hierarchies across cultures', Journal of Cross-Cultural Psychology 32(3), 2001; to confirm), as importance from 7,000 down to 3,400 basis points, each with a spread of 1,500; carried over unchanged from the other profile. To source for this place: the World Values Survey / Afrobarometer Schwartz-style items for Kenya.",
+    "industrial_action": "Labour Relations Act 2007 (Kenya), s 76: a strike or lock-out is lawful after a dispute has been reported and conciliated and after at least seven days' written notice (taken as 7 days); the Act does not set a ballot quorum, so 50% turnout and 50% approval are placeholders carried over; the Act does not require pay during a strike (the Employment Act 2007, s 80: wages are not paid during a lawful strike unless agreed; recalled, to confirm). The Act was not opened.",
+    "world_price_process": "Placeholder: carried over from the other profile. To estimate from KNBS, Consumer Price Index (food and commodity series) or the world prices Kenya pays (the sd in this profile is not a place figure).",
+    "credit.cash_rate_bps": "Central Bank of Kenya, Central Bank Rate: 8.75% (cut by 25 points from 9.00% in February 2026, held on 8 April, 9 June and 11 August 2026; khusoko.com reports of Monetary Policy Committee decisions, which cite the CBK; CBK, 36th MPC Report, April 2026).",
+    "credit.funding_spread_bps": "Placeholder: 3%, the bank's cost of deposits over the policy rate (no figure found; CBK, Monthly Economic Indicators, interest rates).",
+    "credit.lending_rate_bps": "organisation: 14.34%, the average commercial banks' lending rate in August 2026 (Central Bank of Kenya, Commercial banks weighted average interest rates, as reported by khusoko.com; 14.70% in March, 14.39% in July). person: placeholder, 18%, above the average for unsecured personal loans (no figure opened; digital lenders charge far more).",
+    "credit.serviceability_buffer_bps": "Placeholder: carried over from the other profile (a lender's stress buffer).",
+    "credit.max_repayment_share_bps": "person: 66.67%, the legal ceiling: Employment Act 2007, s 19(3), allows deductions from an employee's wages only so far as the employee is left at least a third of the wages (recalled, the Act was not opened: to confirm); lenders to employees in Kenya (banks, Saccos) use it as the 'two-thirds rule'. organisation: 20% of what comes in, a placeholder carried over.",
+    "credit.arrears_days": "Placeholder: 30 days in arrears is the bank's own definition here; the CBK's Prudential Guidelines classify a loan as 'substandard' after 90 days (to confirm).",
+    "credit.default_days": "Placeholder: default after 90 days (CBK Prudential Guidelines, loan classification; recalled, to confirm).",
+    "credit.max_months": "Placeholder: carried over from the other profile (a model parameter).",
+    "credit.reserve": "Placeholder: KSh 1.5 million the lending office keeps back, scaled from the other profile by the ratio of the two countries' shop wages (about 3.6); no real figure.",
+    "opening": "Placeholders, to source: what each organisation holds on the first day (the bank's own funds KSh 1.8 million; the town KSh 7.2 million; the builder KSh 1 million; each landlord KSh 2 million; a shop KSh 100,000; a factory KSh 1.4 million) and the least an adult in the labour force has saved (KSh 300), the other profile's figures scaled by the ratio of the two countries' shop wages in local units (about 3.6), and the shop and factory figures scaled by the wage bill. No Kenyan source.",
+    "town_finance.parks_per_year": "Placeholder: KSh 540,000 a year (scaled from the other profile's by the same ratio of 3.6; no source).",
+    "town_finance.payment_approval_over": "Placeholder: KSh 200,000 (a county's public procurement thresholds are far higher; the Public Procurement and Asset Disposal Act 2015 sets them; to source).",
+    "public_finance.income_tax": "Kenya Revenue Authority, PAYE rates for 2026 (Income Tax Act, Third Schedule, as in force after the Finance Act 2023; the Finance Bill 2026's proposed changes to the bands were not in the published Bill and are not law as far as found): 10% on the first KSh 24,000 a month, 25% on the next KSh 8,333, 30% to KSh 500,000, 32.5% to KSh 800,000, 35% above; less a personal relief of KSh 2,400 a month. Here as a yearly schedule: the first 24,000 a month (KSh 288,000 a year) is taxed at 0 because the relief (KSh 2,400) exactly cancels 10% of it; every band above is the statutory rate. Not expressible: the relief for those on more than the first band; NSSF (6%), which is deducted before PAYE; and insurance relief. The levy stands for the Social Health Insurance Fund contribution (2.75% of gross pay: Social Health Insurance Act 2023) and the Affordable Housing Levy (1.5%: Affordable Housing Act 2024), 4.25% together, from the first shilling (SHIF has a minimum KSh 300; left out). Sources: KRA; the Finance Act 2023 and 2024 summaries (cliffedekkerhofmeyr.com; countrytaxcalc.com), not the Acts themselves (to confirm).",
+    "public_finance.grants_per_resident_per_year": "Placeholder: about KSh 6,000 a resident a year, the order of a county's equitable share (Controller of Budget; County Allocation of Revenue Act 2025, Nakuru County, not opened: to confirm and to replace with equitable share over the county's population, 2,162,202 in 2019).",
+    "public_finance.rates_per_resident_per_year": "Placeholder: KSh 500 a resident a year, a small part of a county's own-source revenue (Nakuru County Finance Act and Rating Act 2019: land rates, plot rents; the Controller of Budget's County Budget Implementation Review Report gives own-source revenue by county; not opened).",
+    "public_finance.rates_instalments": "Placeholder: 4 a year.",
+    "public_finance.rates_due_days": "Placeholder: an instalment falls due 30 days after its notice.",
+    "public_finance.rates_penalty_interest_bps": "Placeholder: carried over from the other profile (10% a year on arrears).",
+    "public_finance.median_house_price": "Placeholder: KSh 5 million for a three-bedroom house in a small town; no survey found (the CBK, Kenya Residential Property Price Index, and the Hass Property Index give Nakuru prices; not opened).",
+    "public_finance.rates_exempt_kinds": "Land owned by schools, health services, utilities and police is not rateable (the Rating Act 2019 exempts public institutions' land: recalled, to confirm).",
+    "services.waste_per_person_per_day_g": "Placeholder: 400 g a person a day in a small town (urban Kenya generates 0.3 to 0.6 kg a person a day; NEMA, National Solid Waste Management Strategy 2015, to confirm; not opened).",
+    "services.landfill_levy_per_tonne": "Kenya has no landfill levy (NEMA / Sustainable Waste Management Act 2022 has producer responsibility but no per-tonne levy; recalled, to confirm). Set to 0.",
+    "services.council_staff_per_1000": "Placeholder: carried over from the other profile (6 per 1,000); Kenyan counties employ more per head on average in towns than rural (Controller of Budget; to source).",
+    "services.collect_seconds_per_10kg": "Placeholder: carried over unchanged from the other profile (a model parameter).",
+    "services.asset_life_years": "Placeholder: carried over unchanged from the other profile (a model parameter).",
+    "services.upkeep_hours_per_week_per_asset": "Placeholder: carried over unchanged from the other profile (a model parameter).",
+    "services.complain_bps": "Placeholder: carried over unchanged from the other profile (a model parameter).",
+    "unions.membership_bps": "Placeholders, shaped by: Danish Trade Union Development Agency, Kenya Labour Market Profile 2024 (union density of total employment 15% in 2018; collective bargaining agreements covered 14% of wage employees in 2021, mainly education), and COTU-K's claim of 2.5 million members in 43 affiliated unions against about 3.3 million formal wage jobs (KNBS, Economic Survey 2026); the figures are not consistent with each other (to confirm). Public administration and teaching (KNUT, KUPPET) are the most unionised; manufacturing and retail far less. Keyed by the industries employers' postings name.",
+    "unions.dues_per_month": "Placeholder: KSh 300 a month (union dues in Kenya are a fixed sum or a percentage, 'agency fees' of 2% of basic pay for non-members in some CBAs; no figure found).",
+    "unions.resignation_notice_days": "Labour Relations Act 2007, s 48: a member may resign on a month's written notice (recalled, the Act was not opened: to confirm); taken as 30 days.",
+    "unions.claim_margin_bps": "Placeholder: carried over unchanged from the other profile.",
+    "unions.meeting_every_days": "Placeholder: carried over unchanged from the other profile.",
+    "unions.teaching": "Placeholder: carried over unchanged from the other profile.",
+    "groups.kinds": "The kinds of social group the other profile counts (sport; religious; arts; craft or hobby; other special interest), here with Kenyan forms: a football club, a church (services of two to three hours on Sunday; weekly), a choir and drama group, a youth or farmers' group, and a chama (a rotating savings and credit group meeting every two weeks: Kenyans' most common group; FinAccess 2021 found a large share of adults in chamas, to confirm). How often each meets and for how long are placeholders. held_at_start_bps 8580: the Christian share of Nakuru County, 2019 census: Protestant 703,882 + Evangelical 647,780 + Catholic 349,526 + African instituted churches 154,007 = 1,855,195 of 2,162,202 people (KNBS, 2019 Census, Volume IV, religion by county, as reproduced by Wikipedia's Nakuru County article and the Kenya Religion Statistics 2019 PDF; to confirm against Volume IV). Whether people come is theirs: the survey's participation is a calibration target, not a rate given to anyone.",
+    "groups.taking_part_bps": "Placeholder: 50% (no Kenyan survey of group participation was found; chamas, churches and Saccos are widespread: FinAccess).",
+    "groups.per_kind_per_1000_people": "Placeholder: carried over from the other profile (1 group of each kind per 1,000 people).",
+    "groups.leave_notice_days": "Placeholder: a person may leave at once.",
+    "elections": "Constitution of Kenya 2010, Article 101 and 177: general elections every five years (term_years 5; the last on 9 August 2022, the next in August 2027); the county governor, members of the national assembly and ward representatives are elected by first past the post (plurality; the president needs 50% + 1). Turnout 65.4% of 22.1 million registered voters at the 2022 general election (IEBC chair's declaration, reported by Nation and Mwananchi, 2022; 64.77% on the final count). Voting is voluntary. stand_bps (the chance an adult stands when an election is called: 2%) and news_readers_bps (3,000, radio and newspaper reach in a small town; Reuters Institute Digital News Report: Kenya, to source) are placeholders. The town elects its mayor (a county government has a governor and a town has a municipal board under the Urban Areas and Cities Act 2011; a liberty).",
+    "health": "The clinic stands for the town's health system (a sub-county hospital and dispensaries; a liberty). doctors_per_1000: 0.2 (Kenya has about 0.2 doctors per 1,000 people; KMPDC register: 17,749 locally registered doctors, 11,751 practising, 2024-25; as reported by Statista and the Kenya Times; to confirm; a town of 1,000 has one fifth of a doctor, so the generator will round to the clinic's minimum). doctor_wage_per_fortnight: a medical officer in a lower-level public facility earns about KSh 206,000 a month in total pay (Salaries and Remuneration Commission rates as reported by The Kenya Times, 'How much Kenyan doctors earn'; to confirm), converted by 12/26. consult_minutes, seek_care_bps, treats and off_work_severities: placeholders carried over (docs/behaviour/life.md); in Kenya many people do not reach care: seek_care is set high because the conditions modelled are hospital-level, which the profile cannot qualify (see the gaps report).",
+    "round": "Working hours 8 to 5, Monday to Friday, for everyone (a liberty: many work Saturday mornings and shops open Sunday; the Employment Act's rest day and the Regulation of Wages Order's 52-hour week); school 8 to 4 (Ministry of Education, primary and secondary day schools, about 8:00 to 15:30 or 16:00; recalled, to confirm). Travel: off the roads a 25 m cell on foot in about 18 seconds (walking about 1.4 m/s: Bohannon 1997; to confirm; most people in a Kenyan small town walk or use motorcycle taxis, boda boda); roads: 3 seconds a cell (about 30 km/h, the speed of a boda boda in town; placeholder); slower across water, wetland and bush (placeholders); the town builds toward buildings more than three cells from a road, within a roads budget of KSh 600 a resident a year (placeholder; the Controller of Budget's county development expenditure on roads, to source).",
+    "ownership": "Placeholders: house_owner_bps 60%: nationally about 62% of Kenyan households own their home (rural higher, urban far lower: KNBS, 2019 census, Volume XIV 'Housing', recalled, to confirm); flats here are all rented. Mortgages are rare: the Kenya Mortgage Refinance Company counts about 30,000 mortgage loans in a country of 15 million households (KMRC, to confirm), so mortgage_bps_by_age is 1-5%. mortgage_payment_per_month: KSh 35,000 (placeholder, for a loan of about KSh 3 million over 20 years at 13%). mortgage_rate_bps 13%: CBK reports mortgage rates of about 13 to 14% (to confirm). Deposit 15% (banks ask 10 to 20%), costs about 6% of the price (stamp duty 4%, legal and valuation fees), a term of 20 years (placeholders).",
+    "utilities": "Water: NAWASSCO (Nakuru Water and Sanitation Services Company) domestic tariff 2024/25 to 2029/30, WASREB-approved: KSh 95 a cubic metre for 1 to 6 m3, 123 for 7 to 20 m3, 135 for 21 to 50 m3 (WASREB, Nakuru tariff approval, wasreb.go.ke, 2025, as reported by Nation and Kenyans.co.ke; 2026/27: KSh 98 for the first block). price_per_kl taken as KSh 95 (the lifeline block). service_per_quarter: KSh 900 (meter and service charge, KSh 300 a month; placeholder, to confirm). litres_per_person_per_day: 50 (a placeholder; WASREB's Impact Report gives average consumption in the low tens of litres in small towns, to confirm). The river's inflow, flow and losses are placeholders. Energy: Kenya Power domestic tariff 2026: DC1 up to 30 units a month KSh 12.14 a kWh, DC2 31 to 100 units KSh 16.50, DC3 over 100 KSh 18.57, before fuel-energy, forex, inflation, WRMA, REP and EPRA levies (KSh 4.70 a unit in August 2026) and 16% VAT; roughly KSh 25 a unit all in (Kenya Times, 'How Kenya Power charges you', 2026; Eastleigh Voice, 2026; EPRA, tariff approvals; to confirm). kwh_per_household_per_day 3: a placeholder; many Kenyan households use under 100 kWh a month. supply_per_day: KSh 4, a placeholder fixed charge. grid_price_per_kwh: KSh 15, what the town pays for the grid's power (placeholder). grid_emissions_g_per_kwh: about 100 g, as about 85% of Kenya's electricity is geothermal, hydro and wind (Ember; KenGen; to confirm). Cooking is mostly with charcoal, firewood and LPG, not modelled.",
+    "climate": "Weather drawn for each run (docs/behaviour/weather.md). rain_by_month_bps: the Rift Valley highlands have two rainy seasons, the 'long rains' in March to May and the 'short rains' in October to December (Kenya Meteorological Department, seasonal forecasts, meteo.go.ke); the monthly shape (mm: 55 60 90 150 130 70 85 105 70 75 100 60) is an estimate for Nakuru County's highlands, not a station record (to replace with KMD station normals for Njoro, Molo or Nakuru). storm_*: heavy-rain spells, in about one month in ten (1,000 bps), at two and a half times the usual inflow (the April to May 2024 floods and the 2023 El Nino rains, which flooded Nakuru, Baringo and the Lake Nakuru basin; placeholder). drought_*: about one year in ten begins a drought of 6 to 24 months at 40% of usual inflow (Kenya's 2020 to 2023 drought ran five failed rainy seasons, mainly in the arid north; the highlands less; placeholder). Heatwaves: none to speak of at 1,800 to 2,400 m (Nakuru town stands at about 1,850 m; daily highs near 25 to 28 C); heatwave_bps_per_week is 0, and the summer months are the dry, warmer January to March (see the gaps report: the structure has no cold or frost, which does occur in Molo and the Mau at night).",
+    "hazards": "Placeholders carried over from the other profile (the river's banks and spill, how deep before a building floods, wetland's soaking). Flood hazard in Nakuru County is real (the 2024 floods; Njoro and the Lake Nakuru and Baringo basins flood; the County Fact Sheets give the hazard map; not opened) but the figures here are not a Kenyan river's.",
+    "crime": "Crime (world-expansion 7.2), deliberately rare and driven by circumstance only. take_bps_per_month_in_need, caught_bps_reckoned, take_quantity, investigation_hours and detection_bps: placeholders carried over (about one theft in five solved; no Kenyan clearance rate found: KNBS reports offences reported, not cleared; Nakuru County recorded 4,664 crimes in 2024: KNBS, Economic Survey 2025, as reported by Nation; Nairobi, Kiambu and Meru ranked above). police_per_1000: 1.95, one officer to 512 people in 2024 (104,080 officers, Kenya Police and Administration Police; KNBS, Economic Survey 2025, as reported by Eastleigh Voice). officer_wage_per_fortnight: a new police constable starts at KSh 29,296 a month from July 2026 (National Police Service Commission pay rise, as reported by The Star and AllAfrica, March 2026; to confirm), by 12/26.",
+    "justice": "The tribunal stands for the Small Claims Court and the Magistrates' Courts (Small Claims Court Act 2016: claims up to KSh 1 million; judgment within 60 days of the hearing, median 53 days to conclude cases in 2023: Judiciary of Kenya, as reported by Nation and Nairobi Law Monthly; to confirm), and for the Business Premises Rent Tribunal (Landlord and Tenant (Shops, Hotels and Catering Establishments) Act, Cap 301) and the Rent Restriction Tribunal. hearing_after_days: 30, a placeholder (the Small Claims Court's first hearing within weeks). challenge_bps, apply_bps, apply_after_days, pay_within_days: placeholders carried over (few Kenyans go to court over small sums: the Judiciary's State of the Judiciary report, to source).",
+    "education": "school_ages: 6 to 17 (Basic Education Act 2013: free and compulsory basic education; CBC: Grade 1 at 6, Grade 12 at 17; Ministry of Education; to confirm). students_per_teacher: 36, between the pupil-teacher ratios of public primary schools (41:1) and public secondary schools (27:1) (KNBS, Economic Survey, as reported by Nation / Standard; weighted by years: derived). school_days_per_year: about 195 (three terms of 13 weeks; Ministry of Education, school calendar 2026; to confirm). hours_per_day: 7 (8 to 4 with breaks; placeholder). teacher_wage_per_fortnight: KSh 40,000 a month, a placeholder for a primary or junior-school teacher in TSC grade B5 to C1 (basic KSh 28,000 to 41,000 in the 2025-2029 TSC-KNUT CBA, plus house and other allowances; Education News Kenya, 2025; to confirm), by 12/26. attainment: KNBS, 2019 census, highest level of education completed: of those who ever attended, close to half (18 million of 36.2 million) completed primary, 25% secondary, 9% did not complete any level, 3.5% university, 7% middle-level or TVET (Nation, Africa Check summaries; Nakuru County's own table, Table 2.4 of Volume IV, could not be opened); shares here are rounded, adjusted to total 100% and so national and partly derived; years of schooling 4, 8, 12, 14, 16 (placeholders). return_per_year_bps: 11%, after the world average of about 9% and sub-Saharan Africa's 12% a year of schooling (Psacharopoulos and Patrinos, Returns to Investment in Education: A Decennial Review, 2018; to confirm).",
+    "nature": "Nature (docs/design/world-expansion.md 2). cell_m: a 25 m lot. Landscape around a Rift Valley highland town: mostly farmland (maize, wheat, dairy and horticulture), with eucalyptus and indigenous forest remnants of the Mau, scrub, grazing land and wetlands (placeholders, shaped by Nakuru County land use; the County Integrated Development Plan has the proportions, not opened). The covers' succession, the pollution figures, survey_hours_per_ha and survey_staff are placeholders carried over from the other profile; spin_up_years: nature is run alone this long before the start so it begins in its own balance.",
+    "nature.species": "Real species of the region; the demographic and detection figures are placeholders except where stated. Black-and-white colobus (Colobus guereza matschiei, the Mau Forest guereza; protected; common in forest fragments, 'sometimes at high density' in small disturbed patches: Primate Conservation 29 (2015), 'Distribution and conservation status of the Mount Kilimanjaro guereza colobus'; densities from 20 to over 90 per km2 in other sites, e.g. 94.4 per km2 in Wof-Washa, Ethiopia; here 0.6 per ha, 60 per km2, a placeholder; troops of about eight use 15 ha, a placeholder). Barriers: built and farmland and grassland (an arboreal animal). Grey crowned crane (Balearica regulorum; IUCN Endangered; Kenya's population fell from about 37,000 in 1987 to under 10,000 by 2024: Citizen Digital, Standard Media, the National Museums of Kenya; crude densities of 0.13 to 0.14 per km2 around Nairobi in a 2023-24 study, i.e. 0.0013 per ha; Lake Nakuru and Nakuru County hold some of the largest numbers); wetlands for roosting and breeding, foraging on farmland and grassland: here 0.1 a hectare on wetland and 0.01 on farmland and grassland, home range 40 ha, placeholders; sensitive to wetland pollution, drainage and poisoning. Hadada ibis (Bostrychia hagedash), a common and conspicuous control, densities by cover placeholders. Growth, mortality, dispersal, min_viable and detection: placeholders. Rothschild's giraffe (89 counted in Lake Nakuru National Park in 2011-12: PMC5751992) was considered but is a park animal, not a town's edge.",
+    "nature.landscape": "Placeholders; see nature.",
+    "nature.pollution": "Placeholder: carried over from the other profile (a model parameter).",
+    "nature.covers": "Placeholder: carried over from the other profile (cleared land to grassland in a year; scrub to woodland in about 40 years; in a highland climate, regrowth is quicker: to source).",
+    "nature.survey_hours_per_ha": "Placeholder: carried over.",
+    "nature.survey_staff": "Placeholder: carried over.",
+    "nature.spin_up_years": "Nature is run alone this long before the start, so it begins in its own balance (as ecological and climate models spin up).",
+    "nature.cell_m": "Placeholder: carried over (a model parameter).",
+    "nature.default_cover": "Placeholder: carried over (a model parameter).",
+    "nature.cleared_cover": "Placeholder: carried over (a model parameter).",
+    "nature.river_cover": "Placeholder: carried over (a model parameter).",
+    "labour_force_participation_bps": "Placeholder: 70% of adults aged 18 to the retirement age (here 70) are in the labour force, from 67.4% of those 15 and over in 2025 (ILO modelled estimate via Trading Economics; KNBS Quarterly Labour Force Report not opened: to confirm). 'In the labour force' here includes farming and informal work, which the world cannot place (see the gaps report)."
+  },
+  "targets": [
+    {
+      "what": "unemployment_rate_pct",
+      "value": 5.4,
+      "source": "Kenya's unemployment rate in 2025, as compiled by Trading Economics from the ILO modelled estimate and KNBS (rural about 4.8%, urban about 8.1%, same source; the Quarterly Labour Force Report of KNBS was not opened: to confirm)"
+    },
+    {
+      "what": "participation_rate_pct",
+      "value": 67.4,
+      "source": "Labour force participation rate, Kenya, 2025: 67.39% (Trading Economics, from ILO modelled estimates; the KNBS Quarterly Labour Force Report was not opened: to confirm)"
+    },
+    {
+      "what": "employment_to_population_pct",
+      "value": 63.8,
+      "source": "Derived: participation 67.4% times (1 - 5.4% unemployment) of the working-age population (same sources; to confirm)"
+    },
+    {
+      "what": "informal_share_of_employment_pct",
+      "value": 84.0,
+      "source": "Derived: 18.1 million in the informal sector in 2025 (KNBS, Economic Survey 2026, as reported by Capital FM) against 3.3 million formal wage jobs (same source), 18.1 / (18.1 + 3.3) = 84.6% (the survey's own total of formal employment may include formal self-employed; to confirm). A town of formal wage jobs only cannot be measured against this: see the gaps report"
+    },
+    {
+      "what": "formal_wage_employment_growth_pct",
+      "value": 2.8,
+      "source": "KNBS, Economic Survey 2026: wage employment up 2.8% to 3.3 million in 2025 (Capital FM, 'Kenya adds 882,100 jobs in 2025')"
+    },
+    {
+      "what": "total_fertility_rate",
+      "value": 3.4,
+      "source": "KNBS and ICF, Kenya Demographic and Health Survey 2022 (rural 3.9, urban 2.8)"
+    },
+    {
+      "what": "life_expectancy_at_birth_years",
+      "value": 66.8,
+      "source": "National Treasury, Kenya (up from 63.5 in 2022), reported by Kenyans.co.ke; WHO 2021: males 64.4, females 69.2"
+    },
+    {
+      "what": "female_headed_households_pct",
+      "value": 34.0,
+      "source": "KNBS and ICF, Kenya Demographic and Health Survey 2022 (rural 36%, urban 31%), reported by Citizen Digital"
+    },
+    {
+      "what": "mean_household_size",
+      "value": 3.6,
+      "source": "KNBS, 2019 Kenya Population and Housing Census, Nakuru County (616,046 households, 2,162,202 people)"
+    },
+    {
+      "what": "police_to_population_ratio",
+      "value": 512,
+      "source": "KNBS, Economic Survey 2025: one officer per 512 people in 2024 (104,080 officers), as reported by Eastleigh Voice"
+    },
+    {
+      "what": "social_group_participation_pct",
+      "value": 50.0,
+      "source": "Placeholder target, no Kenyan survey found (the other profile's, ABS General Social Survey 2019: 50.0%); to replace with FinAccess 2024's share of adults in chamas or other groups"
+    },
+    {
+      "what": "central_bank_rate_pct",
+      "value": 8.75,
+      "source": "Central Bank of Kenya, Monetary Policy Committee, 11 August 2026 (held)"
+    },
+    {
+      "what": "average_lending_rate_pct",
+      "value": 14.34,
+      "source": "Central Bank of Kenya, commercial banks' weighted average lending rate, August 2026 (as reported by khusoko.com)"
+    },
+    {
+      "what": "voter_turnout_pct",
+      "value": 65.4,
+      "source": "IEBC, 2022 general election, declared by the chairperson (reported by Nation, 2022)"
+    }
+  ]
+}
