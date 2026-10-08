@@ -1,8 +1,8 @@
 // Anthropic models through Claude Code's non-interactive mode (`claude -p`), so a Claude plan's sign-in can stand in
 // for an API key. Each call runs `claude -p` once: our system prompt (and the tools, which are the same call after
-// call) replace Claude Code's own; the conversation goes in on stdin; the answer comes back as one JSON object in the
-// shape the Codex adapter's schema has, which we read as a tool use or text. Token counts, cached ones too, come from
-// the result.
+// call) replace Claude Code's own; the conversation goes in on stdin; the answer comes back as one structured object in
+// the shape the Codex adapter's schema has (`--json-schema`), which we read, exactly or not at all (answer.ts), as tool
+// uses or text. Token counts, cached ones too, come from the result.
 //
 // Caveats, recorded with every run that uses it (docs/real-models.md):
 //  - It is not free: `claude -p` draws on the plan's monthly Agent SDK credit, at API rates; when that is
@@ -10,9 +10,11 @@
 //    like any priced model, and the price is the model's published API price.
 //  - Claude Code keeps what is the same from call to call cached for an hour by itself (the system prompt and tools):
 //    that is why the tools are put with the system prompt and not with the conversation.
-//  - The answer's shape is asked for in words, not forced with --json-schema: forced, Claude Code takes two to four
-//    turns of the model for one answer and writes the cache again each time (measured 2026-10-07 on one seat-sized
-//    call: forced cost about twice what asked did; docs/real-models.md). An answer that is no such object is asked for again, then taken as words.
+//  - How the answer is asked for was chosen on a measurement (2026-10-08, docs/real-models.md): asked for as an object
+//    in words, Sonnet 5.5 wrote its own tool-use markup instead in about half of 19 sittings replayed (and Haiku 5.5 in
+//    1 in 13), and asked for in that markup it was read whole in 79%; the schema, which Claude Code answers through a
+//    tool of its own, was read whole in every one of 38, at 2 to 8 model turns but a cost within 10% of the others
+//    (the turns re-read what is cached).
 //  - Claude Code makes a small call to a smaller model of its own beside ours, which our counts leave out; and the
 //    cost it reports for a call is more than its token counts come to at the published price (about twice, same
 //    measurement: why is not known). With OIKOS_CLAUDE_CODE_LOG=<file>, each call's counts and cost as Claude Code
@@ -23,9 +25,10 @@
 import { appendFileSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { LlmAdapter, LlmRequest, LlmResponse } from "./adapter";
+import type { ContentBlock, LlmAdapter, LlmRequest, LlmResponse } from "./adapter";
+import { readAnswerObject, readAnswerText } from "./answer";
 import { UsageLimitReached } from "./call";
-import { answerContent, leadingObject, runBounded, transcript } from "./codex";
+import { answerSchema, runBounded, transcript } from "./codex";
 
 /** What Claude Code says when no call will go through for a while: the plan's limit or credit is used up, or its own
  * retries on rate limits gave up. Only those: any other failure is retried and then reported. */
@@ -53,60 +56,18 @@ export function claudeCodeSystem(req: LlmRequest): string {
     ...(tools
       ? ["", "=== Tools you can use ===", tools, "",
         // (How many tools an answer may use is the instructions' to say: a participant's say several, the translator's one.)
-        "=== How you answer ===\nAnswer with one JSON object and nothing else (no words before or after it, no code fence): {\"tool\": the tool you use, \"input_json\": its input, a JSON object written as a string, \"also\": [{\"tool\": …, \"input_json\": …}, …], \"text\": any words to say besides, which may be empty}. If you use more than one tool in this answer, as your instructions allow, the first goes in `tool` and every other one in `also`, each with its own input_json, in the order they're to be carried out. With only the one, `also` is an empty list."]
+        "=== How you answer ===\nGive your answer in the structured output asked for: the tool you use in `tool`, its input as a JSON object in input_json; any further tools, if your instructions allow several, in `also`, each with its own input_json, in the order they're to be carried out."]
       : []),
   ].join("\n");
 }
 
-/** The object an answer is, if it is one in the shape asked for (a code fence around it, or stray words after it, are
- * let pass); with no tools, its words. */
-export function answerOf(said: string, tools: string[]): { tool?: string; input_json?: string; also?: { tool?: string; input_json?: string }[]; text?: string } | undefined {
-  if (!tools.length) return { text: said.slice(0, 4000) };
-  const o: any = leadingObject(said.trim().replace(/^```(?:json)?\s*/i, ""));
-  if (!o || typeof o.tool !== "string" || !tools.includes(o.tool)) return invoked(said, tools);
-  const input = (v: unknown) => (typeof v === "string" ? v : JSON.stringify(v ?? {}));
-  const also = Array.isArray(o.also) ? o.also.filter((u: any) => u && typeof u.tool === "string" && tools.includes(u.tool)).map((u: any) => ({ tool: u.tool, input_json: input(u.input_json) })) : [];
-  return { tool: o.tool, input_json: input(o.input_json), also, ...(typeof o.text === "string" && o.text ? { text: o.text } : {}) };
-}
-
-/** An answer written as the model's own tool-use markup (`<invoke name="look"><parameter name="report">…</parameter>
- * </invoke>`, one after another) instead of the object asked for: the same uses, read as it meant them. In pilot 10 one
- * seat answer in nine came so, and unread it ended the sitting with nothing done. A parameter's value is what stands
- * between its tags: a list, an object, a number or true/false where it is written as one, else its text. A use of a
- * tool that isn't one of the seat's is left out; with none left there is no answer.
- *
- * Read with care, because such an answer can run on past what the seat meant (pilot 11: a finance seat's answer gave
- * its looks, its notebook and "done", then the same again, then a letter, an opt-out and a decline each filled in
- * with "x": taken as acts, the seat was out of the run on a word it never said). So: nothing after the first
- * `done_for_now` is read; a use whose values are all placeholders ("x", "...", empty) is no use; and a use that
- * repeats one already read is read once. */
-const PLACEHOLDER = /^\s*(?:x+|\.{2,}|…|<[^>]*>|todo|tbd|placeholder)?\s*$/i;
-const filledIn = (v: unknown): boolean => (typeof v === "string" ? !PLACEHOLDER.test(v) : Array.isArray(v) ? v.some(filledIn) : v !== null && typeof v === "object" ? Object.values(v).some(filledIn) : true);
-export function invoked(said: string, tools: string[]): { tool?: string; input_json?: string; also?: { tool?: string; input_json?: string }[]; text?: string } | undefined {
-  const uses: { tool: string; input_json: string }[] = [];
-  for (const m of said.matchAll(/<invoke name="([^"]+)">([\s\S]*?)<\/invoke>/g)) {
-    if (!tools.includes(m[1]!)) continue;
-    const input: { [k: string]: unknown } = {};
-    for (const p of m[2]!.matchAll(/<parameter name="([^"]+)">([\s\S]*?)<\/parameter>/g)) {
-      const v = p[2]!;
-      let value: unknown = v;
-      if (/^\s*(?:[\[{]|-?\d+(?:\.\d+)?\s*$|true\s*$|false\s*$)/.test(v)) {
-        try {
-          value = JSON.parse(v);
-        } catch {
-          // not data after all: its text
-        }
-      }
-      input[p[1]!] = value;
-    }
-    const values = Object.values(input);
-    if (values.length && !values.some(filledIn)) continue;
-    const use = { tool: m[1]!, input_json: JSON.stringify(input) };
-    if (!uses.some((u) => u.tool === use.tool && u.input_json === use.input_json)) uses.push(use);
-    if (m[1] === "done_for_now") break;
-  }
-  if (!uses.length) return undefined;
-  return { tool: uses[0]!.tool, input_json: uses[0]!.input_json, also: uses.slice(1) };
+/** A call's answer as content blocks, read exactly or not at all (answer.ts): the structured output Claude Code returns
+ * for the schema, or, failing that, a reply that is exactly the same object. With no tools, its words. */
+export function answerFrom(result: any, tools: string[], nextId: () => string): ContentBlock[] {
+  if (!tools.length) return [{ type: "text", text: String(result.result ?? "").slice(0, 4000) }];
+  const o = result.structured_output;
+  if (o !== undefined && o !== null) return readAnswerObject(o, tools, JSON.stringify(o), nextId);
+  return readAnswerText(String(result.result ?? ""), tools, nextId);
 }
 
 export class ClaudeCodeAdapter implements LlmAdapter {
@@ -130,13 +91,16 @@ export class ClaudeCodeAdapter implements LlmAdapter {
     try {
       const system = join(dir, "system.txt");
       writeFileSync(system, claudeCodeSystem(req));
+      const names = (req.tools ?? []).map((t) => t.name);
       const args = ["-p", "--model", this.model.split("@")[0]!, ...(this.effort ? ["--effort", this.effort] : []), "--system-prompt-file", system, "--tools", "", "--output-format", "json", "--no-session-persistence", "--setting-sources", "",
-        "--strict-mcp-config", "--disable-slash-commands", "--exclude-dynamic-system-prompt-sections"];
+        "--strict-mcp-config", "--disable-slash-commands", "--exclude-dynamic-system-prompt-sections", ...(names.length ? ["--json-schema", JSON.stringify(answerSchema(names))] : [])];
       const timeoutMs = this.o.timeoutMs ?? 180_000;
       const attempts = this.o.attempts ?? 3;
-      const names = (req.tools ?? []).map((t) => t.name);
+      // (A seat's answer that can't be read is not asked for again here: the seat is told what couldn't be read, once, in its
+      // own exchange, which is recorded. The other purposes, with no one to tell, are asked again as before.)
+      const askAgain = req.purpose !== "participant";
       let result: any;
-      let answer: ReturnType<typeof answerOf>;
+      let content: ContentBlock[] = [];
       for (let n = 1; ; n++) {
         const r = await this.run(args, transcript(req.messages), dir, timeoutMs);
         try {
@@ -144,9 +108,9 @@ export class ClaudeCodeAdapter implements LlmAdapter {
         } catch {
           result = undefined;
         }
-        answer = result && !result.is_error ? answerOf(String(result.result ?? ""), names) : undefined;
-        // (An answer that isn't the object asked for is a failed attempt, but the last one's words are kept.)
-        const failed = r.timedOut || r.code !== 0 || !result || result.is_error || (!answer && n < attempts);
+        content = result && !result.is_error ? answerFrom(result, names, () => `claude-code-${++this.calls}`) : [];
+        const unread = content.some((b) => b.type === "text" && b.unread !== undefined);
+        const failed = r.timedOut || r.code !== 0 || !result || result.is_error || (unread && askAgain && n < attempts);
         // (What it said only when it failed: a word in a good answer isn't a limit.)
         const said = failed && !r.timedOut ? [r.stderr, typeof result?.result === "string" ? result.result : "", result?.api_error_status === 429 ? "429" : ""].find((s) => CLAUDE_CODE_LIMITED.test(s)) : undefined;
         if (said) throw new UsageLimitReached(`the Claude plan's limit for claude -p was reached (${said.trim().slice(0, 300)}): the run stops here; resume it once the limit resets (oikos resume <log>)`);
@@ -159,7 +123,7 @@ export class ClaudeCodeAdapter implements LlmAdapter {
       const usage = { input_tokens: u.input_tokens ?? 0, output_tokens: u.output_tokens ?? 0, cache_read_tokens: u.cache_read_input_tokens ?? 0, cache_write_tokens: u.cache_creation_input_tokens ?? 0, ...(typeof result.total_cost_usd === "number" ? { reported_cost_microusd: Math.ceil(result.total_cost_usd * 1e6) } : {}) };
       const log = this.o.log ?? process.env.OIKOS_CLAUDE_CODE_LOG;
       if (log) appendFileSync(log, JSON.stringify({ subject: req.subject, purpose: req.purpose, model: this.model, input_tokens: usage.input_tokens, output_tokens: usage.output_tokens, cache_read_tokens: usage.cache_read_tokens, cache_write_tokens: usage.cache_write_tokens, turns: result.num_turns, reported_usd: result.total_cost_usd, by_model: result.modelUsage, ms: result.duration_ms }) + "\n");
-      return { content: answerContent(answer ?? { text: String(result.result ?? "").slice(0, 4000) }, () => `claude-code-${++this.calls}`), usage };
+      return { content, usage };
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
