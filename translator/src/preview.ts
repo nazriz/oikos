@@ -19,7 +19,7 @@ export class Preview {
   /** `me`: the entity it acts for (its person, or the organisation of the position it acts in). */
   /** `called`: what someone the seat names is called, where the seat's own knowledge has no name for them (its own
    * organisation and that organisation's posts; anyone whose name is published). */
-  constructor(private k: Knowledge, private me = k.entity, private called: (id: string) => string | undefined = () => undefined) {}
+  constructor(private k: Knowledge, private me = k.entity, private called: (id: string) => string | undefined = () => undefined, /** The post the act is done in, if one. */ private as?: string) {}
   /** Someone by name and id (by id alone where no name is known). */
   private named(id: string): string {
     const known = this.k.name(id);
@@ -139,7 +139,17 @@ export class Preview {
         if (b.kind === "direction" && typeof filedOn?.data?.office === "string") {
           const office: string = filedOn.data.office;
           const title = this.k.positionWords.get(office)?.title;
-          return [`You will give ${title ? `the ${title} (${office})` : office} a written direction on its ${String(filedOn.data.form).replace(/_/g, " ")} form (${filedOn.id})${named(b)}${this.seenBy(b.visible_to)}: "${b.text}". This by itself changes nothing: the office follows a direction only from those its organisation's rules say may direct it, and writes back to say whether it does. It stands until you replace it with another or withdraw it.${this.rule(b)}`,
+          // Whose directions the office follows is its organisation's published rule: where the seat has that rule and
+          // the post it writes in is not one of those named, the preview says so before anything is filed (a works
+          // manager was twice offered a direction to its own office with nothing said: 2026-10-09). Only what the rule
+          // itself says, which the seat has on file.
+          const post = this.as ?? (this.k.held.size === 1 ? [...this.k.held][0] : undefined);
+          const may = this.k.mayDirect(office);
+          const titled = (p: string) => this.k.positionWords.get(p)?.title ? `the ${this.k.positionWords.get(p)!.title} (${p})` : p;
+          const not = may && post && !may.posts.includes(post)
+            ? ` The office will not follow it: by the rule on directions (${may.rule}) it takes written directions only from ${may.posts.map(titled).join(" and ") || "nobody"}, and this one is given as ${titled(post)}.${post === office ? " A direction is how others direct an office; what its own staff are to do as routine is set by a standing work order on its own file." : ""}`
+            : "";
+          return [`You will give ${title ? `the ${title} (${office})` : office} a written direction on its ${String(filedOn.data.form).replace(/_/g, " ")} form (${filedOn.id})${named(b)}${this.seenBy(b.visible_to)}: "${b.text}".${not} This by itself changes nothing: the office follows a direction only from those its organisation's rules say may direct it, and writes back to say whether it does. It stands until you replace it with another or withdraw it.${this.rule(b)}`,
             ["kind", "text", "data", "addressed_to", "adico", "formal", ...RECORD]];
         }
         // A standing work order: on the organisation's own file, for its staff to follow. Nothing is done now.

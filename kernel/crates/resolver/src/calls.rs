@@ -656,7 +656,8 @@ fn word(w: &str) -> Option<i64> {
 pub fn parse_duration(s: &str) -> Result<i64, UnitError> {
     let err = || UnitError(format!("not a duration: {s}"));
     let mut t = s.trim().to_lowercase().split_whitespace().collect::<Vec<_>>().join(" ");
-    for p in ["every ", "per "] {
+    // ("once a week", "once every 2 weeks": how often, as people say it.)
+    for p in ["once ", "every ", "per "] {
         if let Some(r) = t.strip_prefix(p) {
             t = r.to_string();
         }
@@ -792,6 +793,8 @@ mod tests {
         assert_eq!(parse_amount(&format!("${}", "9".repeat(37))).unwrap_err().0, format!("too large: ${}", "9".repeat(37)));
         assert_eq!(parse_duration("30 days").unwrap(), 30 * DAY);
         assert_eq!(parse_duration("every 3 months").unwrap(), 90 * DAY);
+        assert_eq!(parse_duration("once a week").unwrap(), 7 * DAY);
+        assert_eq!(parse_duration("once every 2 weeks").unwrap(), 14 * DAY);
         assert_eq!(parse_duration("monthly").unwrap(), 30 * DAY);
         assert_eq!(parse_duration("a year").unwrap(), 365 * DAY);
         assert_eq!(parse_duration("12-month").unwrap(), 360 * DAY);
