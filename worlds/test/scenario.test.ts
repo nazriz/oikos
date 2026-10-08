@@ -109,14 +109,31 @@ test("each scenario changes what it says it changes", () => {
   const jobs = (c: any) => c.world.records.filter((r: any) => r.record === "agreement" && r.terms?.template === "employment").length;
   const under = applyScenarios({ ...spec, scenario: "jobs-slump" }, loadProfile(spec.profile!));
   expect(under.town.employed_bps).toBe(10_000 - 2 * (10_000 - spec.employed_bps));
-  expect(jobs(town("jobs-slump"))).toBeLessThan(jobs(base));
+  // Fewer jobs for it, over several towns. (Who has a job is a draw for each person, and the further five in a hundred
+  // the slump puts out of work may fall on nobody in one small town: it did in the town drawn from this spec's own
+  // seed after the ages fixes of 2026-10-08, 82 jobs either way, where this had been "fewer than the plain town's".)
+  // (Twelve towns, not three: a town under the slump is not the plain town with fewer jobs but another draw of it,
+  // because the first person the slump leaves without a job has no pay day drawn, and everyone after them is drawn
+  // differently. So the two differ by chance as well as by the slump: with people stopping work at ages of their
+  // own, three towns came to 262 jobs plain and 267 under the slump; twelve come to 1,055 and 1,011.)
+  const seeds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+  const plains = seeds.map((seed) => generate({ ...spec, seed }) as any);
+  const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
+  expect(sum(seeds.map((seed) => jobs(generate({ ...spec, seed, scenario: "jobs-slump" }))))).toBeLessThan(sum(plains.map(jobs)));
   // An ageing town: the share aged 65 and over is what half as many again in those bands comes to.
   const over65 = (c: any) => { const p = c.world.entities.filter((e: any) => e.kind === "person"); return p.filter((e: any) => -e.born_at >= 65 * YEAR).length / p.length; };
   const census = P.households.age_bands_bps!;
   const old = census.filter((b) => b.from >= 65).reduce((a, b) => a + b.bps, 0), all = census.reduce((a, b) => a + b.bps, 0);
   const expected = (1.5 * old) / (all + 0.5 * old);
-  expect(over65(town("ageing-town"))).toBeGreaterThan(over65(base) * 1.15);
   expect(Math.abs(over65(town("ageing-town")) - expected)).toBeLessThan(0.07);
+  // And older than the plain town, held over several towns against what each should be: the plain ones the census's
+  // own share, the ageing ones the share above. (This was "more than 1.15 times the plain town's", one town against
+  // one; a town of 200 is a draw, and the plain town drawn from this spec's seed since the ages fixes of 2026-10-08 is
+  // an old one, 29% of it 65 and over where the census has 22%.)
+  const plainShare = sum(plains.map(over65)) / seeds.length, ageingShare = sum(seeds.map((seed) => over65(generate({ ...spec, seed, scenario: "ageing-town" })))) / seeds.length;
+  expect(ageingShare).toBeGreaterThan(plainShare);
+  expect(Math.abs(plainShare - old / all)).toBeLessThan(0.04);
+  expect(Math.abs(ageingShare - expected)).toBeLessThan(0.04);
   // A housing shortage: a tenth fewer houses and blocks, for the same people.
   const homes = (c: any) => c.world.structures.filter((s: any) => /^(house|apts)-/.test(s.id)).length;
   expect(homes(town("housing-shortage"))).toBe(Math.round(spec.houses * 0.9) + Math.round(spec.apartment_blocks * 0.9));

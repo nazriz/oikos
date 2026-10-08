@@ -754,7 +754,7 @@ impl<W: std::io::Write> Done for Run<W> {
             .unwrap_or(0);
         later.rotate_left(i);
         later.extend(r.events);
-        Ok(Response { seq: r.seq, events: later, observation: None })
+        Ok(Response { seq: r.seq, events: later, observation: None, logged: vec![] })
     }
 }
 

@@ -13,7 +13,7 @@ import { DuckDBInstance, type DuckDBConnection } from "@duckdb/node-api";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { basename, join } from "node:path";
 
-export const MEASURE_VERSION = "0.5.0";
+export const MEASURE_VERSION = "0.5.1";
 
 const QUERY_DIR = join(import.meta.dir, "../queries");
 

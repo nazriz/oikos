@@ -6,7 +6,7 @@
 // support payments, industry shares...) comes from the spec's profile (worlds/profiles/, docs/profiles.md), and what
 // isn't there is derived from it here by general formulas, or is a placeholder of the town's own shape.
 
-import { adultAgeBands, drawHousehold, drawSavings, formatMoney, Randomness, chargesInWords, forAge, forOutOfWork, paymentsInWords, stopsWorkAt, withholding, yearsOfSchooling, draftLaw, type HouseholdSpec, type IncomeTaxLaw, type LawSchedule, type PaymentRule } from "@oikos/participants";
+import { adultAgeBands, bedroomsNeeded, drawHousehold, drawSavings, formatMoney, Randomness, chargesInWords, forAge, forOutOfWork, paymentsInWords, stopsWorkAt, withholding, yearsOfSchooling, draftLaw, type HouseholdSpec, type IncomeTaxLaw, type LawSchedule, type PaymentRule } from "@oikos/participants";
 import law from "../law/basic.json";
 import schedules from "../law/schedules.json";
 import { loadProfile, type Profile } from "./profile";
@@ -50,7 +50,7 @@ const ACT_TIME = {
   },
 };
 
-export const GENERATOR_VERSION = "0.31.0";
+export const GENERATOR_VERSION = "0.33.0";
 const DAY = 86_400;
 const MONTH = 30 * DAY;
 const YEAR = 365 * DAY;
@@ -180,8 +180,9 @@ export function townLife(P: Profile, care?: { treated_bps: number; fatal_kept_bp
   };
 }
 
-/** How many bodies a home with this many bedrooms could physically hold: generous (what's suitable is content). */
-const capacityFor = (bedrooms: number) => 2 * bedrooms + 2;
+/** How many bodies a home could physically hold where a profile doesn't say: so many for each bedroom and so many
+ * besides. Generous (what's suitable is content). */
+const HOME_ROOM = { bodies_per_bedroom: 2, bodies_besides: 2 };
 
 /** The law schedules a world is given (worlds/law/schedules.json): how each law made from figures is written from them. */
 const SCHEDULES = schedules.records as unknown as { id: string; data: LawSchedule }[];
@@ -245,7 +246,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   // Money in words, as the town writes it (its currency's sign, grouping and decimal places; whole units without their
   // decimals, as a rule or a round figure is written).
   const perUnit = 10 ** V.currency.minor_units;
-  const asWritten = (n: number) => (V.currency.minor_units && n % perUnit === 0 ? formatMoney(n, V.currency).slice(0, -(V.currency.minor_units + 1)) : formatMoney(n, V.currency));
+  const asWritten = (n: number) => formatMoney(n, V.currency, n % perUnit === 0 ? { decimals: false } : {});
   const toWholeUnit = (n: number) => Math.round(n / perUnit) * perUnit;
   const R = new Randomness(BigInt(spec.seed));
   const rng = (k: string) => R.stream(["generator", k]);
@@ -539,6 +540,9 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   for (const s of shops) accounts.push({ id: `acc-${s}`, holder: s, custodian: "bank", balance: 0 }); // (its working capital, below)
   for (const f of factories) accounts.push({ id: `acc-${f}`, holder: f, custodian: "bank", balance: 0 }); // (its working capital, below)
 
+  // A home's physical room stands for its floor area, which is a place's own (the profile's `homes`).
+  const HM = V.homes ?? HOME_ROOM;
+  const capacityFor = (bedrooms: number) => HM.bodies_per_bedroom * bedrooms + HM.bodies_besides;
   const occupancy: any[] = [];
   // Households first (docs/behaviour/households.md): who lives together, their ages and sexes, as the census counts them.
   const H: HouseholdSpec = { ...V.households, ...spec.households };
@@ -779,6 +783,9 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
 
   // Homes: the housed share of households, the neediest (by the occupancy standard) into the most bedrooms, as far as they go.
   const need = (h: Household) => {
+    // (By the place's own standard where its profile states one. Where it states none, the reckoning below is kept as
+    // it was: it leaves out the youngest children of different sexes sharing, so a town's first homes are dealt as before.)
+    if (H.occupancy) return bedroomsNeeded({ leaseholder: h.leaseholder, members: h.members.map((m) => ({ person: m.id, born_at: m.born_at, sex: m.sex })), couples: h.couples }, 0, YEAR, H.occupancy);
     if (h.members.length === 1) return 0;
     const inCouple = new Set(h.couples.flat());
     const kidsOf = (sex: string) => h.members.filter((m) => !m.adult && m.sex === sex).length;
@@ -1333,6 +1340,8 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       { id: "lots", kind: "records", match: { statement_kinds: ["lot"] }, on_request: true }, ...(theirCells.length ? [{ id: "own-sites", kind: "sites", area: theirCells, occupants: "names" }] : []), deaths, lawBook],
       code("firm.landlord", { base_rent: { apartments: units.map((u) => ({ bedrooms: u.bedrooms, rent: u.rent })), ...Object.fromEntries(houseTypes.map((h) => [h.id, [{ bedrooms: h.bedrooms, rent: h.rent }]])) }, outside_account: "acc-outside",
         city: "city", city_account: "acc-city", builder: "builder", compliance_bps: spec.landlord_compliance_bps ?? 10_000, register: { lots: "lots" },
+        // (Whom it will let to: no more people to a bedroom than the place's own standard has, where the profile states one.)
+        ...(H.occupancy ? { max_people_per_bedroom: H.occupancy.per_bedroom } : {}),
         // Their practice: reviewing rents as often as the law allows here, with the notice it asks (the law itself is a record).
         // (Where no law says, how often is their own practice, if the profile gives one; else rents in a tenancy stay.)
         ...(rentRule ? { rent_review_months: TEN.rent_review_months ?? TEN.rent_review_practice_months ?? null, rent_increase_notice_days: TEN.rent_increase_notice_days ?? 0 } : { rent_review_months: TEN.rent_review_practice_months ?? null }), ...(V.tenancy.after_fixed_term ? { after_term: V.tenancy.after_fixed_term } : {}) }));
@@ -1411,6 +1420,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   const life = townLife(P, HE && severeKept !== undefined ? { treated_bps: HE.seek_care_bps, fatal_kept_bps: severeKept } : undefined);
   const citizenController = code("citizen.default", { outside_account: "acc-outside", bank: "bank", registry: "city", child_protection: "city", population: adultCount,
     complain_to: "city", complain_bps: V.services.complain_bps,
+    ...(H.occupancy ? { occupancy: H.occupancy } : {}),
     ...(HE && ED ? { school: { entity: "school", building: "school-building", ages: ED.school_ages },
       care: { entity: "clinic", waiting: "clinic-centre/waiting.1", seek_bps: HE.seek_care_bps, severities: [...new Set(HE.treats.map((x) => x.severity).filter((x): x is string => !!x))], off_work: HE.off_work_severities, wait_days: 2 } } : {}),
     ...(UT ? { utilities: { energy: "energy-co" } } : {}),

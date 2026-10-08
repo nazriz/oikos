@@ -30,7 +30,18 @@ async function town(name: string, negligent: boolean, days: number, standBps?: n
   const recs = ev.filter((e) => e.event === "recorded").map((e) => e.record);
   const result = recs.find((r) => r.kind === "ballot_result" && r.data?.office === "mayor");
   const incumbent = recs.find((r) => r.kind === "nomination" && r.data?.incumbent)?.author;
-  return { recs, result, incumbent, appointed: ev.filter((e) => e.event === "appointed" && e.position === "mayor") };
+  // What each elector thought of the town's government when they voted, as they gave it for their vote.
+  const approval = new Map<string, number>();
+  for (const e of log) {
+    const m = e.kind === "command" && /^Voting: ranking .*our approval of the town's government: (-?\d+)\)/.exec(e.body.reasoning ?? "");
+    if (m) approval.set(e.body.participant, Number(m[1]));
+  }
+  // Where the incumbent stands in each vote's ranking: 0 first, 1 last.
+  const ballot = recs.find((r) => r.kind === "ballot" && r.id === result?.data?.ballot);
+  const number = (ballot?.data?.candidates ?? []).find((c: any) => c.candidate === incumbent);
+  const places = recs.filter((r) => r.record === "vote" && r.ballot === ballot?.id).map((v) => String(v.choice).split(">")).filter((x) => x.length > 1)
+    .map((x) => x.indexOf(String(number?.number ?? number?.candidate)) / (x.length - 1));
+  return { recs, result, incumbent, approval, places, appointed: ev.filter((e) => e.event === "appointed" && e.position === "mayor") };
 }
 
 test("instant runoff: the last is out until someone has a majority", () => {
@@ -78,12 +89,30 @@ test("an election in a town run well, and in a town whose mayor funds no works c
   expect(Math.floor(alone.result.at / DAY)).toBe(POLL - 30);
   expect(alone.recs.some((r) => r.kind === "ballot" && r.data?.electorate === "roll")).toBe(false);
 
-  // A mayor who funds no works crew loses support (the waste piles up, and people complain): its first preferences well
-  // below the kept town's, the same number standing. Whether that loses it the election depends on the town: with many
-  // standing the vote splits, and where people are better off they forgive more. Not tested: who wins.
+  // A mayor who funds no works crew loses support: the waste piles up, people complain, and their anger at the town
+  // lowers what they think of its government, which is what they rank the incumbent by. The same town, the same seed
+  // and the same people, with and without a crew. Held, as the rule has it:
+  //  - electors think less of the government: on average, and most of those who voted in both towns;
+  //  - within the neglected town, those who complained think less of it than those who did not;
+  //  - so the incumbent stands lower in the voters' rankings.
+  // Not held: its share of first preferences, or who wins. Both turn on how many stand and what they stand for, which
+  // is each town's draw (the vote splits among whoever stands). (Until 2026-10-08 this was "first preferences under
+  // three quarters of the kept town's", true of the one town it was written against: with the same rule at work the
+  // next town drawn gave 18.4% against 22.3%, fourteen standing in one and eighteen in the other.)
   const neglect = await town("neglected", true, POLL + 5, 1000);
-  const share = (r: any, who: string) => (r.data.rounds[0][who] ?? 0) / Object.values(r.data.rounds[0] as { [k: string]: number }).reduce((a, b) => a + b, 0);
-  expect(share(neglect.result, neglect.incumbent)).toBeLessThan(share(kept.result, kept.incumbent) * 0.75);
+  const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+  expect(kept.approval.size).toBeGreaterThan(0);
+  expect(neglect.approval.size).toBeGreaterThan(0);
+  expect(mean([...neglect.approval.values()])).toBeLessThan(mean([...kept.approval.values()]));
+  const both = [...kept.approval.keys()].filter((p) => neglect.approval.has(p));
+  expect(both.filter((p) => neglect.approval.get(p)! < kept.approval.get(p)!).length * 2).toBeGreaterThan(both.length);
+  const complained = new Set(neglect.recs.filter((r) => r.kind === "complaint").map((r) => `${r.speaks_for}-self`));
+  const [angry, content] = [true, false].map((c) => [...neglect.approval].filter(([p]) => complained.has(p) === c).map(([, a]) => a));
+  expect(angry!.length).toBeGreaterThan(0);
+  expect(content!.length).toBeGreaterThan(0);
+  expect(mean(angry!)).toBeLessThan(mean(content!));
+  expect(neglect.places.length).toBeGreaterThan(0);
+  expect(mean(neglect.places)).toBeGreaterThan(mean(kept.places));
   // (Not compared: how many complain. A kept town's one-person crew can leave, and six weeks pass before the next starts.)
 
   // A mayor who doesn't stand again: a resident is elected, appointed, and carries on from the office's record (nothing

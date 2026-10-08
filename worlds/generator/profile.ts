@@ -39,6 +39,10 @@ export interface Profile {
       apartment_units: { bedrooms: number; count: number; rent: number }[];
       house_types: { id: string; bedrooms: number; share_bps: number; rent: number }[];
     };
+    /** A home's physical room: how many bodies it could hold for each bedroom, and how many besides. It stands for floor
+     * area, which differs by place. Left out: the generator's own (generous) figures. What is suitable is not this but
+     * the occupancy standard (`households.occupancy`). */
+    homes?: { bodies_per_bedroom: number; bodies_besides: number };
     spending: { saving_bps: number; wealth_effect_bps_per_year: number; essentials_per_month: number; shops_known: number; shop_search_bps_per_month: number };
     /** An adult's savings (cash and deposits), by age: percentiles 10, 25, 50, 75, 90 (cents). */
     savings_by_age?: { from: number; pct: [number, number, number, number, number] }[];

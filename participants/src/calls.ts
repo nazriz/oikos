@@ -4,7 +4,7 @@
 // these tables convert it, deterministically.
 
 import { canonical } from "./canon";
-import { currencyNow, type Currency } from "./money";
+import { currencyNow, marksOf, type Currency } from "./money";
 import CALLS_SCHEMA from "../../contracts/calls.schema.json";
 
 export const FUNCTIONS = ["money", "goods", "work", "account", "structure", "occupancy", "entity", "claim", "agreement", "statement", "vote", "message", "form", "presence", "birth", "harm", "position", "system", "take"] as const;
@@ -259,10 +259,22 @@ export class UnitError extends Error {}
 
 /** The words and letters that multiply the digits before them. (Words for numbers, as people who count in them
  * write them: no currency's.) */
-const MULTIPLIERS: [string, bigint][] = [["thousand", 1_000n], ["million", 1_000_000n], ["billion", 1_000_000_000n], ["trillion", 1_000_000_000_000n], ["lakh", 100_000n], ["lakhs", 100_000n], ["crore", 10_000_000n], ["crores", 10_000_000n], ["k", 1_000n], ["m", 1_000_000n], ["b", 1_000_000_000n], ["t", 1_000_000_000_000n]];
+const MULTIPLIERS: [string, bigint][] = [["thousand", 1_000n], ["million", 1_000_000n], ["billion", 1_000_000_000n], ["trillion", 1_000_000_000_000n], ["k", 1_000n], ["m", 1_000_000n], ["b", 1_000_000_000n], ["t", 1_000_000_000_000n]];
 const NUMBER_WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight"];
 const isDigit = (c: string | undefined) => c !== undefined && c >= "0" && c <= "9";
 const isPlainLetter = (c: string | undefined) => c !== undefined && c >= "a" && c <= "z";
+
+const normalGroup = (g: string): string => (g === "’" ? "'" : /\s/.test(g) ? " " : g);
+
+/** What the config settles about the two marks: the decimal mark and the mark between groups, each only where the
+ * config says it (directly, or by saying the other). A space or an apostrophe is the same however it is written. */
+function statedMarks(cur: Currency): { decimal: string | undefined; group: string | undefined } {
+  const other = (c: string) => (c === "," ? "." : ",");
+  const g = cur.group_mark;
+  const decimal = cur.decimal_mark ?? (g === "," || g === "." ? other(g) : undefined);
+  const group = g === undefined ? (cur.decimal_mark === undefined ? undefined : other(cur.decimal_mark)) : g === "\u2019" ? "'" : /\s/.test(g) ? " " : g;
+  return { decimal, group };
+}
 
 /**
  * An amount as written, in the currency's smallest unit, exact, as the contracts write it (a decimal string, D58).
@@ -274,16 +286,20 @@ const isPlainLetter = (c: string | undefined) => c !== undefined && c >= "a" && 
  *  - the digits, with their separators. A comma and a point together: the one written last is the decimal mark and
  *    the other groups the digits. Either of them written more than once groups the digits. A point written once is
  *    a decimal point. A comma written once groups the digits if three follow it, and is a decimal comma if one or two
- *    do. Digits are grouped in threes, or (with commas) the last three and then twos;
- *  - a multiplier (k, m, b, t; thousand, million, billion, trillion; lakh, crore), only where a marker or the end
- *    follows it;
+ *    do. Digits are grouped in threes, or (with commas, or where the currency's `grouping` is [3, 2]) the last
+ *    three and then twos. Where the currency says its marks (`decimal_mark`, `group_mark`) a mark written once is
+ *    what it says: its decimal mark is the decimals, its group mark groups the digits if exactly three follow it and
+ *    a whole of one to three digits (not starting with a zero) comes before it; a space or an apostrophe between
+ *    groups of digits is read only where the currency's group mark is one;
+ *  - a multiplier (k, m, b, t; thousand, million, billion, trillion; and the currency's own `number_words`), only
+ *    where a marker or the end follows it;
  *  - then a marker again, or a word for the smallest unit (then whole digits and no multiplier).
  * Bare digits are whole units. Nothing finer than the smallest unit, and no arithmetic on anything but the digits
  * written.
  *
- * What is not read, because it could be two numbers and a currency's config doesn't say which (it has no field for
- * how digits are grouped): a point written once with three digits after it, in a currency of fewer than three
- * decimals (a decimal point with a decimal too many, or thousands grouped by a point). Another currency's sign, code
+ * What is not read, because it could be two numbers and a currency's config doesn't say which: a point written once
+ * with three digits after it, in a currency of fewer than three decimals, whose config says neither its decimal mark
+ * nor that a point groups digits (a decimal point with a decimal too many, or thousands grouped by a point). Another currency's sign, code
  * or words are not this world's money, and are not read; nor is a number written out in words.
  * (The kernel's resolver reads the same, step for step: `parse_amount`. contracts/test/amounts.json holds what both
  * must read and what both must refuse.)
@@ -291,7 +307,11 @@ const isPlainLetter = (c: string | undefined) => c !== undefined && c >= "a" && 
 export function parseAmount(s: string, cur: Currency): string {
   const err = () => new UnitError(`not an amount: ${s}`);
   const grouping = () => new UnitError(`badly grouped digits: ${s}`);
-  const t = s.trim().toLowerCase().split(/\s+/).filter(Boolean).join(" ");
+  const { decimal: statedDec, group: statedGrp } = statedMarks(cur);
+  const spacedGroups = statedGrp === " ";
+  const apostropheGroups = statedGrp === "'";
+  let t = s.trim().toLowerCase().split(/\s+/).filter(Boolean).join(" ");
+  if (apostropheGroups) t = t.replaceAll("\u2019", "'");
   const code = cur.code.toLowerCase();
   const symbol = cur.symbol?.toLowerCase();
   const minor = cur.minor_units;
@@ -324,7 +344,8 @@ export function parseAmount(s: string, cur: Currency): string {
   }
   // The digits and their separators (a separator is one only between two digits).
   let end = 0;
-  while (end < rest.length && (isDigit(rest[end]) || ((rest[end] === "," || rest[end] === ".") && isDigit(rest[end + 1])))) end++;
+  const threeThenNot = (at: number) => isDigit(rest[at + 1]) && isDigit(rest[at + 2]) && isDigit(rest[at + 3]) && !isDigit(rest[at + 4]);
+  while (end < rest.length && (isDigit(rest[end]) || ((rest[end] === "," || rest[end] === "." || (apostropheGroups && rest[end] === "'")) && isDigit(rest[end + 1])) || (spacedGroups && rest[end] === " " && threeThenNot(end)))) end++;
   const number = rest.slice(0, end);
   rest = space(rest.slice(end));
   // Which separator is the decimal mark, if either is.
@@ -332,9 +353,19 @@ export function parseAmount(s: string, cur: Currency): string {
   const points = number.split(".").length - 1;
   let mark = "";
   if (commas > 0 && points > 0) mark = number.lastIndexOf(",") > number.lastIndexOf(".") ? "," : ".";
-  else if (points === 1) mark = ".";
-  else if (commas === 1 && number.length - number.indexOf(",") - 1 < 3) mark = ",";
-  const group = mark === "," || (mark === "" && points > 0) ? "." : ",";
+  else if (commas + points === 1) {
+    // A mark written once. What the currency says settles it; else a point is the decimals, and a comma is the
+    // decimals if one or two digits follow it.
+    const sep = points === 1 ? "." : ",";
+    const at = number.indexOf(sep);
+    const head = number.slice(0, at);
+    const afterLen = number.length - at - 1;
+    if (statedDec === sep) mark = sep;
+    else if (statedGrp === sep && afterLen === 3 && !head.startsWith("0")) mark = "";
+    else if (sep === ".") mark = ".";
+    else if (afterLen < 3) mark = ",";
+  }
+  const group = [" ", "'"].find((g) => number.includes(g)) ?? (mark === "," || (mark === "" && points > 0) ? "." : ",");
   const cut = mark === "" ? number.length : number.lastIndexOf(mark);
   const whole = number.slice(0, cut);
   const frac = number.slice(cut + 1);
@@ -342,7 +373,9 @@ export function parseAmount(s: string, cur: Currency): string {
   if (frac.length > Math.max(minor, 3)) throw err();
   let mult = 1n;
   let hasMult = false;
-  for (const [w, m] of MULTIPLIERS) {
+  // (The place's own words first, the longest first: one that begins another is tried before it.)
+  const own: [string, bigint][] = Object.entries(cur.number_words ?? {}).map(([w, v]): [string, bigint] => [w.toLowerCase(), BigInt(v)]).filter(([w]) => w !== "").sort((a, b) => b[0].length - a[0].length);
+  for (const [w, m] of [...own, ...MULTIPLIERS]) {
     const r = after(rest, w);
     if (r === undefined) continue;
     // (A multiplier only when a marker, a word for the smallest unit, or the end follows.)
@@ -364,12 +397,13 @@ export function parseAmount(s: string, cur: Currency): string {
   if (groups.length > 1) {
     const first = groups[0]!.length;
     const threes = first <= 3 && groups.slice(1).every((g) => g.length === 3);
-    const twos = group === "," && groups.length > 2 && first <= 2 && groups.slice(1, -1).every((g) => g.length === 2) && groups[groups.length - 1]!.length === 3;
+    const twosRead = cur.grouping ? cur.grouping.length > 1 && group === normalGroup(marksOf(cur).group) : group === ",";
+    const twos = twosRead && groups.length > 2 && first <= 2 && groups.slice(1, -1).every((g) => g.length === 2) && groups[groups.length - 1]!.length === 3;
     if (!threes && !twos) throw grouping();
   }
   if (inMinor && (frac !== "" || hasMult)) throw err();
   // (The one that could be two numbers is said to be so: one to three digits, a point, three digits.)
-  if (frac.length > minor && mult === 1n && mark === "." && frac.length === 3 && commas === 0 && whole.length <= 3 && whole[0] !== "0") throw new UnitError(`a point with three digits after it can be read two ways: ${s}`);
+  if (frac.length > minor && mult === 1n && mark === "." && statedDec === undefined && frac.length === 3 && commas === 0 && whole.length <= 3 && whole[0] !== "0") throw new UnitError(`a point with three digits after it can be read two ways: ${s}`);
   if (frac.length > minor && mult === 1n) throw new UnitError(minor === 0 ? `this money has no decimals: ${s}` : `more than ${NUMBER_WORDS[minor] ?? "that many"} decimals: ${s}`);
   const perUnit = inMinor ? 1n : 10n ** BigInt(minor);
   // The decimals, carried exactly: what's written, times the multiplier, must come to whole smallest units.

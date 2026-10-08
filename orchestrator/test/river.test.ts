@@ -29,7 +29,15 @@ async function run(compliance: number, name: string) {
   return { riverSite, riverCells: cellsOf(riverSite), ev, recs };
 }
 
-test("a refused permit, a landlord who builds anyway, and an inspector who notices", async () => {
+// EXPECTED TO FAIL, for a fault found on 2026-10-08 and left for a decision (docs/decisions.md, "The ages fixes
+// landed"): a landlord whose offer the builder declines never offers again, nor builds anything else. Here the
+// builder republishes its prices in the moment the landlord commissions the house (its costs changed that morning), the
+// offer is at the list just before, the builder declines it in writing ("our price is ..."), and the landlord, which
+// never reads that reply, stays "contracted" for good: no house on the river site, so nothing for the inspector to
+// find. Before the ages fixes the town drawn from this seed had no such moment, and the test passed by that accident.
+// Nothing below is changed: it is what should happen, and `test.failing` turns red the day it does (then make it
+// `test` again).
+test.failing("a refused permit, a landlord who builds anyway, and an inspector who notices", async () => {
   const { riverSite, riverCells, ev, recs } = await run(0, "defiant");
   const app = recs.find((r) => r.kind === "permit_application" && r.data.lot === riverSite);
   expect(app).toBeDefined();

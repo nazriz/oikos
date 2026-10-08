@@ -13,19 +13,78 @@ const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
 const MONTH = 30 * DAY;
 const spec = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")) as any;
+const profile = JSON.parse(readFileSync(join(root, `worlds/profiles/${spec.profile}.json`), "utf8")).values;
+const OW = profile.ownership, CR = profile.credit;
+
+/** Who owns what in a town as generated: people's titles; for each, the lot, the lot its holder lives on, whether the
+ * holder heads their household, and the household's members; and how many houses have a household living in them. */
+function ownership(config: any) {
+  const recs = config.world.records as any[];
+  const titles = recs.filter((r) => r.record === "claim" && r.about?.kind === "ownership" && /^c\d+$/.test(r.holder));
+  const lotOf = new Map<string, string>(recs.filter((r) => r.kind === "lot").flatMap((r) => (r.data.cells as string[]).map((c) => [c, r.id] as [string, string])));
+  const houses = (config.world.structures as any[]).filter((s) => s.id.startsWith("house-"));
+  const at = new Map<string, string>(houses.map((s) => [s.id, s.at]));
+  const home = new Map<string, string>((config.world.occupancy as any[]).filter((o) => o.space.includes("/dwelling.")).map((o) => [o.occupant, o.space.split("/")[0]]));
+  const households = recs.filter((r) => r.kind === "household");
+  const owned = titles.map((t) => {
+    const h = households.find((x) => x.data.members.some((m: any) => m.person === t.holder));
+    return { holder: t.holder as string, lot: t.about.object as string, livesOn: lotOf.get(at.get(home.get(t.holder) ?? "") ?? ""), heads: h?.data.leaseholder === t.holder, members: (h?.data.members ?? []).map((m: any) => m.person as string) };
+  });
+  const lived = houses.filter((s) => [...home.values()].includes(s.id)).length;
+  return { titles, owned, lived };
+}
+
+/** Each person's pay a month at the start, from the jobs the town begins with (the wage their employer commits to). */
+function monthlyPay(config: any) {
+  const pay = new Map<string, number>();
+  for (const r of config.world.records as any[]) {
+    if (r.terms?.template !== "employment") continue;
+    const [employer, worker] = r.terms.parties;
+    const c = r.terms.commitments.find((x: any) => x.who === employer && x.does?.outcome?.money);
+    if (c) pay.set(worker, (pay.get(worker) ?? 0) + Math.floor((Number(c.does.outcome.money.amount) * MONTH) / Number(c.every)));
+  }
+  return pay;
+}
+
+test("houses are owner-occupied at the profile's share, over many towns", () => {
+  // One town's count is a draw (38 houses); the share is the profile's over twenty towns' houses, within five points.
+  let owned = 0, lived = 0;
+  for (let seed = 1; seed <= 20; seed++) {
+    const o = ownership(generate({ ...spec, seed }));
+    owned += o.titles.length;
+    lived += o.lived;
+  }
+  expect(lived).toBeGreaterThan(0);
+  expect(Math.abs((10_000 * owned) / lived - OW.house_owner_bps)).toBeLessThan(500);
+}, 300_000);
 
 test("owners own their houses, repay their mortgages, pay rates, and pass their titles to their heirs", async () => {
   const config = generate({ ...spec, years: 1 });
   // Far more deaths than life, so a year of a small town has owners' deaths to follow.
   config.life.other_causes.by_age = [{ from: 0, bps: 0 }, { from: 25, bps: 5000 }];
-  const titles = config.world.records.filter((r: any) => r.record === "claim" && r.about?.kind === "ownership" && /^c\d+$/.test(r.holder));
-  const houses = config.world.structures.filter((s: any) => s.id.startsWith("house-")).length;
-  expect(titles.length).toBeGreaterThan(houses * 0.5);
-  expect(titles.length).toBeLessThan(houses * 0.95);
-  // Mortgages: owners' only, within 30% of the household's pay.
+  const { titles, owned, lived } = ownership(config);
+  // Owner-occupied: each owner lives in the house on the lot they hold, and is the head of the household there.
+  for (const o of owned) expect({ holder: o.holder, livesOn: o.livesOn, heads: o.heads }).toEqual({ holder: o.holder, livesOn: o.lot, heads: true });
+  // How many own is a draw for each house lived in, at the profile's share: this town's count is within four standard
+  // deviations of it. (Until 2026-10-08 this was "between 50% and 95% of the houses", which one town of 38 houses in
+  // forty misses by its draw alone; the share itself is held over many towns, in the test below.)
+  const share = OW.house_owner_bps / 10_000;
+  expect(Math.abs(titles.length - lived * share)).toBeLessThanOrEqual(4 * Math.sqrt(lived * share * (1 - share)));
+  // Mortgages: owners' only, and only what the household's pay would have got: repayments within the bank's share of
+  // it (the profile's), and no more than the profile's usual repayment. A household with no pay has none.
   const loans = config.world.records.filter((r: any) => r.terms?.template === "loan");
-  expect(loans.length).toBeGreaterThan(5);
-  for (const l of loans) expect(titles.map((x: any) => x.holder)).toContain(l.terms.parties[1]);
+  expect(loans.length).toBeGreaterThan(0);
+  const pay = monthlyPay(config);
+  for (const l of loans) {
+    const borrower = l.terms.parties[1];
+    const o = owned.find((x) => x.holder === borrower);
+    expect(o).toBeDefined();
+    const repayment = Number(l.terms.commitments.find((c: any) => c.who === borrower).does.outcome.money.amount);
+    const income = o!.members.reduce((a: number, m: string) => a + (pay.get(m) ?? 0), 0);
+    expect(repayment).toBeGreaterThan(0);
+    expect(repayment).toBeLessThanOrEqual(Math.floor((income * CR.max_repayment_share_bps.person) / 10_000));
+    expect(repayment).toBeLessThanOrEqual(OW.mortgage_payment_per_month);
+  }
 
   const out = join(root, "runs", "test-ownership");
   rmSync(out, { recursive: true, force: true });

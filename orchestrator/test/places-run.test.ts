@@ -7,6 +7,7 @@ import { expect, test } from "bun:test";
 import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { exportLogs, query, runQuery } from "@oikos/measure";
+import { bedroomsNeeded, OCCUPANCY } from "@oikos/participants";
 import { generate, generateFrom } from "@oikos/worlds/generator/generate";
 import { loadProfile } from "@oikos/worlds/generator/profile";
 import { runWorld } from "../src/run";
@@ -115,4 +116,73 @@ test("a town paid monthly, with no payment to the unemployed and no rent or ball
   expect(recs.filter((r: any) => r.kind === "benefit_claim" && r.data?.payment === "pension").length).toBeGreaterThan(0);
   // The landfill, which charges nothing here, sent no invoice.
   expect(recs.filter((r: any) => r.kind === "invoice" && r.speaks_for === "outside" && /disposal|waste/.test(r.text ?? "")).length).toBe(0);
+}, 600_000);
+
+// Extended households (docs/behaviour/households.md): the profile whose census gives three-generation households (a
+// quarter of its households), in the small town.
+type Household = { leaseholder: string; members: { person: string; born_at: number; sex: "female" | "male"; parents?: string[] }[]; couples: [string, string][] };
+const householdsOf = (config: any): Household[] => config.world.records.filter((r: any) => r.kind === "household").map((r: any) => r.data);
+const threeGenerations = (h: Household) => h.members.some((m) => m.parents?.some((p) => h.members.find((x) => x.person === p)?.parents?.length));
+
+test("a town with extended households runs: three generations share a home and its rent", async () => {
+  const P = loadProfile("jp-akita-2026");
+  expect(P.values.households.extended_bps).toBeGreaterThan(0);
+  // (Every home let, so that each housed household has a lease and a rent to share.)
+  const config = generateFrom({ ...base, ownership: false }, P);
+  const three = householdsOf(config).filter(threeGenerations);
+  const home0 = new Map<string, string>(config.world.occupancy.filter((o: any) => o.space.includes("/dwelling.")).map((o: any) => [o.occupant, o.space]));
+  const housed = three.filter((h) => home0.has(h.leaseholder));
+  expect(housed.length).toBeGreaterThan(0);
+  const { s, out, ev } = await run("extended", config, 45 * DAY);
+  // Nothing refused but the usual races (as the households test lists them, with the daily round).
+  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left", "too_far", "participant_inactive", "flooded"].includes(e.code)).map((e) => e.code)).toEqual([]);
+  // The household's money rules as they are, applied to the larger household: in a rented home every other adult with
+  // pay has a standing order for a share of the rent to the leaseholder, grandparent and grown child alike, and the
+  // bank pays it.
+  const leased = housed.filter((h) => config.world.records.some((r: any) => r.terms?.template === "lease" && r.terms.parties[1] === h.leaseholder));
+  const employed = new Set<string>(config.world.records.filter((r: any) => r.terms?.template === "employment").map((r: any) => r.terms.parties[1]));
+  const orders: string[] = [];
+  for (const h of leased) for (const m of h.members) {
+    if (m.person === h.leaseholder || !employed.has(m.person)) continue;
+    const order = config.world.records.find((r: any) => r.id === `share-${m.person}`);
+    expect(order?.data.outcome.money).toMatchObject({ from: `acc-${m.person}`, to: `acc-${h.leaseholder}`, for: "Household share of the rent." });
+    orders.push(order.id);
+  }
+  expect(orders.length).toBeGreaterThan(0);
+  // (Not every one for the whole run: a share is told again when someone's pay changes, and stops with their job.)
+  expect(ev.some((e) => e.event === "transfer" && orders.includes(e.per_instruction))).toBe(true);
+  // And the town is measured as any other.
+  const m = join(out, "measure");
+  await exportLogs([s.logPath], m);
+  const [hh] = await runQuery(m, "town/households");
+  expect(Number(hh!.households)).toBeGreaterThan(0);
+  for (const k of ["overcrowded", "over_three_a_room"]) expect(Number.isFinite(Number(hh![k] ?? 0))).toBe(true);
+}, 600_000);
+
+test("crowding is measured by the town's own standard and by one yardstick that is the same everywhere", async () => {
+  // A town of small homes (studios that hold six, and a few one-bedroom houses), with a standard of its own stated:
+  // the measure, on the town's first hour, counts what the standard's own rule counts for the same households and homes.
+  const P = structuredClone(loadProfile("jp-akita-2026"));
+  P.values.households.occupancy = { per_bedroom: 3, own_from_age: 21, mixed_under_age: 10, living_room_slept_in: true };
+  P.values.homes = { bodies_per_bedroom: 2, bodies_besides: 6 };
+  const rent = P.values.rents_per_month.apartment_units[0]!.rent;
+  for (const [name, profile] of [["own-standard", P], ["common-standard", { ...P, values: { ...P.values, households: { ...P.values.households, occupancy: undefined } } }]] as const) {
+    const config = generateFrom({ ...base, apartment_blocks: 6, houses: 4, apartment_units: [{ bedrooms: 0, count: 12, rent }], house_types: [{ id: "house", bedrooms: 1, share_bps: 10_000, rent }] }, profile);
+    const { s, out } = await run(name, config, 3600);
+    const m = join(out, "measure");
+    await exportLogs([s.logPath], m);
+    const [hh] = await runQuery(m, "town/households");
+    const types = new Map<string, any>(config.catalogue.structure_types.map((t: any) => [t.id, t]));
+    const bedrooms = new Map<string, number>();
+    for (const st of config.world.structures) for (const sp of types.get(st.type)?.spaces ?? []) if (sp.kind === "dwelling") for (let k = 1; k <= sp.count; k++) bedrooms.set(`${st.id}/dwelling.${k}`, sp.attrs.bedrooms);
+    const home = new Map<string, string>(config.world.occupancy.filter((o: any) => bedrooms.has(o.space)).map((o: any) => [o.occupant, o.space]));
+    const housed = householdsOf(config).filter((h) => home.has(h.leaseholder));
+    const S = profile.values.households.occupancy ?? OCCUPANCY;
+    const crowded = housed.filter((h) => bedroomsNeeded(h, 3600, 365 * DAY, S) > bedrooms.get(home.get(h.leaseholder)!)!);
+    const overThree = housed.filter((h) => h.members.length > 3 * (bedrooms.get(home.get(h.leaseholder)!)! + 1));
+    expect(crowded.length).toBeGreaterThan(0);
+    expect(overThree.length).toBeGreaterThan(0);
+    expect({ name, overcrowded: Number(hh!.overcrowded), people: Number(hh!.people_overcrowded ?? 0) }).toEqual({ name, overcrowded: crowded.length, people: crowded.reduce((a, h) => a + h.members.length, 0) });
+    expect({ name, over: Number(hh!.over_three_a_room), people: Number(hh!.people_over_three_a_room ?? 0) }).toEqual({ name, over: overThree.length, people: overThree.reduce((a, h) => a + h.members.length, 0) });
+  }
 }, 600_000);

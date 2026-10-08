@@ -41,7 +41,7 @@ import { amountWritings, askable, FIELD_TYPES, goldText, howOften, implausible, 
 /**
  * How invented worlds write their money: a sign before the amount or only a code; two decimal places, none, or three;
  * words for the unit and its smallest part, or none; and, in the last few, a way of writing numbers that is not the
- * first worlds' (data.ts `Writing`): a decimal comma with points between the thousands, the sign after the digits or
+ * first worlds' (the config's own fields for it, data.ts `WrittenCurrency`): a decimal comma with points between the thousands, the sign after the digits or
  * spaced from them, digits grouped in twos with the words for those groups, a sign of letters, a sign other
  * currencies share written with letters of the code. None is any place's: the model is to learn that an amount is
  * whatever span is written as one. (`$` is among them because a real world's may be; nothing depends on it.)
@@ -58,18 +58,18 @@ export const CURRENCIES: WrittenCurrency[] = [
   { code: "ORO", minor_units: 0, unit_words: ["oro", "oros"] },
   { code: "DNR", minor_units: 3, unit_words: ["dinar", "dinars"], minor_words: ["fils"] },
   { code: "LRA", minor_units: 3, symbol: "₤", unit_words: ["lira", "lire"] },
-  { code: "GLD", minor_units: 2, symbol: "₲", unit_words: ["gulden", "guldens"], minor_words: ["stiver", "stivers"], written: { decimal_mark: ",", symbol_after: true } },
-  { code: "NVO", minor_units: 2, symbol: "N$", unit_words: ["novo", "novos"], minor_words: ["centimo", "centimos"], written: { decimal_mark: ",", symbol_spaced: true } },
-  { code: "RPA", minor_units: 2, symbol: "₨", unit_words: ["rupa", "rupas"], minor_words: ["pai", "pais"], written: { grouping: "twos", symbol_spaced: true } },
-  { code: "TSH", minor_units: 2, symbol: "TSh", unit_words: ["shilling", "shillings", "bob"], minor_words: ["cent", "cents"], written: { symbol_spaced: true } },
-  { code: "PSO", minor_units: 2, symbol: "$", unit_words: ["peso", "pesos"], minor_words: ["centavo", "centavos"], written: { country_sign: true } },
-  { code: "ZEN", minor_units: 0, symbol: "圓", unit_words: ["zen"], written: { symbol_after: true } },
+  { code: "GLD", minor_units: 2, symbol: "₲", unit_words: ["gulden", "guldens"], minor_words: ["stiver", "stivers"], decimal_mark: ",", symbol_after: true },
+  { code: "NVO", minor_units: 2, symbol: "N$", unit_words: ["novo", "novos"], minor_words: ["centimo", "centimos"], decimal_mark: ",", symbol_spaced: true },
+  { code: "RPA", minor_units: 2, symbol: "₨", unit_words: ["rupa", "rupas"], minor_words: ["pai", "pais"], grouping: [3, 2], symbol_spaced: true, number_words: { lakh: 100_000, lakhs: 100_000, crore: 10_000_000, crores: 10_000_000 } },
+  { code: "TSH", minor_units: 2, symbol: "TSh", unit_words: ["shilling", "shillings", "bob"], minor_words: ["cent", "cents"], symbol_spaced: true },
+  { code: "PSO", minor_units: 2, symbol: "$", unit_words: ["peso", "pesos"], minor_words: ["centavo", "centavos"], country_sign: true },
+  { code: "ZEN", minor_units: 0, symbol: "圓", unit_words: ["zen"], symbol_after: true },
 ];
 
 /**
- * The money of the worlds there are: each profile's currency (worlds/profiles/), as its profile gives it. A profile
- * says nothing of how numbers are written there (it has no field for it), so these are written the ways every world's
- * money is. In the order of the profiles' file names; one that is an invented world's exactly is not said twice.
+ * The money of the worlds there are: each profile's currency (worlds/profiles/), as its profile gives it, with the
+ * way its place writes numbers where the profile says it (the config's own fields); where it does not, these are
+ * written the ways every world's money is. In the order of the profiles' file names; one that is an invented world's exactly is not said twice.
  */
 export function worldsCurrencies(dir = join(import.meta.dir, "../../worlds/profiles")): Currency[] {
   const out: Currency[] = [];

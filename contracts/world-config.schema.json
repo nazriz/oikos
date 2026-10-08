@@ -1069,7 +1069,39 @@
                 "items": {
                   "$ref": "#/$defs/CurrencyWord"
                 }
+              },
+              "decimal_mark": {
+                "description": "The mark its place writes before the decimals: a point or a comma. Absent: a point, unless group_mark is a point (then a comma). Presentation only: amounts are shown with it, and read by it where a mark alone could mean two numbers (with a comma, 1.234 is one thousand two hundred and thirty-four, and 1,234 has three decimals).",
+                "enum": [".", ","]
+              },
+              "group_mark": {
+                "description": "The mark its place writes between groups of digits: a comma, a point, a space (plain, no-break or narrow no-break; all read as one), or an apostrophe (straight or curly). Absent: a comma, or a point where decimal_mark is a comma. Presentation only. Not the decimal mark.",
+                "enum": [",", ".", " ", "\u00a0", "\u202f", "'", "\u2019"]
+              },
+              "grouping": {
+                "description": "How its place groups digits: [3] in threes; [3, 2] the last three, then twos (1,23,45,678). Absent: threes when written; when read, threes, and twos too where the group mark is a comma.",
+                "enum": [[3], [3, 2]]
+              },
+              "symbol_after": {
+                "description": "Its sign (or code) is written after the digits. Absent or false: before.",
+                "type": "boolean"
+              },
+              "symbol_spaced": {
+                "description": "A space stands between its sign and the digits. Absent or false: none. A code, being letters, is always set off by a space.",
+                "type": "boolean"
+              },
+              "number_words": {
+                "description": "The words its place writes for large numbers, with their values (in lower case; the general ones, thousand and million, k and m, are read in any currency and need not be listed). A number followed by one is that many times its value; they are read, never written.",
+                "type": "object",
+                "propertyNames": { "$ref": "#/$defs/CurrencyWord" },
+                "additionalProperties": { "type": "integer", "minimum": 10, "maximum": 1000000000000 }
               }
+            },
+            "not": {
+              "anyOf": [
+                { "required": ["decimal_mark", "group_mark"], "properties": { "decimal_mark": { "const": "," }, "group_mark": { "const": "," } } },
+                { "required": ["decimal_mark", "group_mark"], "properties": { "decimal_mark": { "const": "." }, "group_mark": { "const": "." } } }
+              ]
             }
           }
         },
