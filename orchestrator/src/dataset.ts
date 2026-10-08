@@ -4,6 +4,7 @@
 
 import { mkdirSync, statSync } from "node:fs";
 import { basename, join } from "node:path";
+import { actEnds } from "./act-ends";
 import { logLines, runOf } from "./logs";
 import type { CorpusExample } from "./corpus";
 
@@ -118,16 +119,10 @@ export async function exportDataset(logPath: string, outDir: string, o: DatasetO
   // how it ended by its action; and what it made is the records and letters written straight after it was applied.
   // (Until 2026-10-09 the end was looked for under the act's own command, where it never is once acts take time:
   // every refused act was written as applied.)
-  const startedBy = new Map<string, number>(); // an action under way -> the command that began it
-  const underWay = new Set<number>(); // commands whose action has started and not yet ended
+  const ends = actEnds();
+  const underWay = ends.underWay;
   let applying: { seq: number; cause: number } | undefined; // the act just applied, whose records follow
-  const actOf = (b: any): number => (typeof b.action === "string" && startedBy.has(b.action) ? startedBy.get(b.action)! : b.cause);
-  const ended = (b: any): number => {
-    const seq = actOf(b);
-    if (typeof b.action === "string") startedBy.delete(b.action);
-    underWay.delete(seq);
-    return seq;
-  };
+  const ended = (b: any): number => ends.ended(b);
   // (In the order given, each once how its act ended is known; an act still under way holds back those after it.)
   const flushActions = (before: number) => {
     for (const [seq, row] of actionRows) {
@@ -226,8 +221,7 @@ export async function exportDataset(logPath: string, outDir: string, o: DatasetO
           ...(b.provenance?.call ? { call: b.provenance.call } : {}), blocks: b.blocks ?? [], applied: true });
       }
     } else if (e.kind === "event" && b.event === "action_started" && typeof b.action === "string") {
-      startedBy.set(b.action, b.cause);
-      underWay.add(b.cause);
+      ends.started(b);
       applying = undefined;
     } else if (e.kind === "event" && b.event === "action_applied") {
       const seq = ended(b);

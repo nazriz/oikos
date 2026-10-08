@@ -8,6 +8,7 @@
 // language-model run's log).
 
 import { statSync } from "node:fs";
+import { actEnds } from "./act-ends";
 import { currentLogs, logLines, runOf } from "./logs";
 
 export interface CorpusExample {
@@ -56,6 +57,7 @@ export function corpusReader(run: string): { take(e: any): void; rows(): CorpusE
   const systems = new Map<string, string>();
   const ex = new Map<string, CorpusExample>();
   const bySeq = new Map<number, string>(); // command seq -> draft
+  const ends = actEnds();
   const get = (draft: string, t: number, participant = "") => {
     let x = ex.get(draft);
     if (!x) ex.set(draft, (x = { run, draft, t, participant, synthetic: false, exchange: [], retries: [], result: "unknown" }));
@@ -91,9 +93,15 @@ export function corpusReader(run: string): { take(e: any): void; rows(): CorpusE
       } else if (e.kind === "command" && b.command === "act" && b.provenance?.via === "translator" && b.provenance.draft) {
         bySeq.set(e.seq, b.provenance.draft);
         get(b.provenance.draft, e.t, b.participant).executed = { seq: e.seq, applied: true };
-      } else if (e.kind === "event" && b.event === "action_refused" && bySeq.has(b.cause)) {
-        const x = ex.get(bySeq.get(b.cause)!)!;
-        x.executed = { seq: b.cause, applied: false, refusal: { code: b.code, ...(b.detail ? { detail: b.detail } : {}) } };
+      } else if (e.kind === "event" && b.event === "action_started") {
+        ends.started(b);
+      } else if (e.kind === "event" && (b.event === "action_applied" || b.event === "action_refused")) {
+        // (The end is logged under the clock step that ended the act, so it is joined to the act by its action.)
+        const seq = ends.ended(b);
+        if (b.event === "action_refused" && bySeq.has(seq)) {
+          const x = ex.get(bySeq.get(seq)!)!;
+          x.executed = { seq, applied: false, refusal: { code: b.code, ...(b.detail ? { detail: b.detail } : {}) } };
+        }
       }
     },
     rows() {
