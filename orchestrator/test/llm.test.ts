@@ -113,7 +113,7 @@ test("a participant is told when a request can't be done, declines an unfaithful
   expect(ann.find((a) => a.annotation === "debrief")?.data.response).toBe("Thanks for asking.");
   // It's reminded of its own run in the debrief (pilot 9's mayor had no record of what it did): its notebook, and a
   // tally of what it did.
-  expect(ann.find((a) => a.annotation === "debrief")?.data.prompt).toMatch(/Your notebook, as you left it: [\s\S]*(You didn't act during the run\.|From day \d+ to day \d+ you wrote \d+ letters?)/);
+  expect(ann.find((a) => a.annotation === "debrief")?.data.prompt).toMatch(/Your notebook, as you left it: [\s\S]*(You didn't act during the run\.|From day \d+ to day \d+ \d+ letters? of yours (was|were) sent)/);
 }, 300_000);
 
 test("opting out with no statement at all is honoured, and recorded as leaving the study (not as stepping down from the office)", async () => {
