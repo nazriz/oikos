@@ -362,16 +362,27 @@ pub fn program_text(p: &Program) -> String {
 #[derive(Debug, Clone, PartialEq)]
 pub struct UnitError(pub String);
 
-/// How a world's money is written (its config's `world.currencies` entry): the sign or code before an amount, the
-/// words after it, and how many decimal places its smallest unit is. The platform has none of its own: every amount
-/// in words is read and written in a currency the world declares.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// How a world's money is written (its config's `world.currencies` entry): the sign or code before an amount (or
+/// after it), the words after it, how many decimal places its smallest unit is, and how its place writes numbers:
+/// the decimal mark, the mark and size of groups of digits, a space beside the sign, the words for large numbers.
+/// The platform has none of its own: every amount in words is read and written in a currency the world declares.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Currency {
     pub code: String,
     pub minor_units: u8,
     pub symbol: Option<String>,
     pub unit_words: Vec<String>,
     pub minor_words: Vec<String>,
+    /// '.' or ','; absent: a point, unless the group mark is a point.
+    pub decimal_mark: Option<char>,
+    /// As the config writes it (a space may be a no-break one); absent: a comma, or a point where the decimal mark is a comma.
+    pub group_mark: Option<char>,
+    /// [3] or [3, 2]; absent: threes written, threes (and twos with commas) read.
+    pub grouping: Option<Vec<u8>>,
+    pub symbol_after: bool,
+    pub symbol_spaced: bool,
+    /// The place's words for large numbers (lower case) and their values.
+    pub number_words: Vec<(String, u128)>,
 }
 
 impl Currency {
@@ -384,10 +395,46 @@ impl Currency {
             symbol: v["symbol"].as_str().map(String::from),
             unit_words: words("unit_words"),
             minor_words: words("minor_words"),
+            decimal_mark: v["decimal_mark"].as_str().and_then(|m| m.chars().next()),
+            group_mark: v["group_mark"].as_str().and_then(|m| m.chars().next()),
+            grouping: v["grouping"].as_array().map(|g| g.iter().filter_map(|n| n.as_u64().and_then(|n| u8::try_from(n).ok())).collect()),
+            symbol_after: v["symbol_after"].as_bool().unwrap_or(false),
+            symbol_spaced: v["symbol_spaced"].as_bool().unwrap_or(false),
+            number_words: v["number_words"].as_object().into_iter().flatten().filter_map(|(w, n)| Some((w.to_lowercase(), u128::from(n.as_u64()?)))).collect(),
         })
+    }
+
+    /// The decimal mark this place writes, and the group mark.
+    fn marks(&self) -> (char, char) {
+        let dec = self.decimal_mark.unwrap_or(if self.group_mark == Some('.') { ',' } else { '.' });
+        (dec, self.group_mark.unwrap_or(if dec == ',' { '.' } else { ',' }))
+    }
+
+    /// What the config settles about the two marks: the decimal mark and the mark between groups, each only where
+    /// the config says it (directly, or by saying the other).
+    fn stated(&self) -> (Option<char>, Option<char>) {
+        let other = |c: char| if c == ',' { '.' } else { ',' };
+        let plain = |c: char| c == ',' || c == '.';
+        let dec = self.decimal_mark.or(self.group_mark.filter(|g| plain(*g)).map(other));
+        let grp = self.group_mark.map(group_char).or(self.decimal_mark.map(other));
+        (dec, grp)
     }
 }
 
+/// A group mark as it is read: every kind of space is one space, either apostrophe is one.
+fn group_char(c: char) -> char {
+    match c {
+        '\u{2019}' => '\'',
+        c if c.is_whitespace() => ' ',
+        c => c,
+    }
+}
+
+/// The large-number words every currency is read with (a place's own are its `number_words`).
+const MULTIPLIERS: [(&str, u128); 8] = [
+    ("thousand", 1_000), ("million", 1_000_000), ("billion", 1_000_000_000), ("trillion", 1_000_000_000_000),
+    ("k", 1_000), ("m", 1_000_000), ("b", 1_000_000_000), ("t", 1_000_000_000_000),
+];
 const NUMBER_WORDS: [&str; 9] = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight"];
 
 /// An amount as written, in the currency's smallest unit, exact, as a decimal string.
@@ -399,15 +446,20 @@ const NUMBER_WORDS: [&str; 9] = ["zero", "one", "two", "three", "four", "five", 
 ///  - the digits, with their separators. A comma and a point together: the one written last is the decimal mark and
 ///    the other groups the digits. Either of them written more than once groups the digits. A point written once is
 ///    a decimal point. A comma written once groups the digits if three follow it, and is a decimal comma if one or two
-///    do. Digits are grouped in threes, or (with commas) the last three and then twos;
-///  - a multiplier (k, m, b, t; thousand, million, billion, trillion; lakh, crore), only where a marker or the end
-///    follows it;
+///    do. Digits are grouped in threes, or (with commas, or where the currency's `grouping` is [3, 2]) the last
+///    three and then twos. Where the currency says its marks (`decimal_mark`, `group_mark`) a mark written once is
+///    what it says: its decimal mark is the decimals, its group mark groups the digits if exactly three follow it and
+///    a whole of one to three digits (not starting with a zero) comes before it; a space or an apostrophe between
+///    groups of digits is read only where the currency's group mark is one;
+///  - a multiplier (k, m, b, t; thousand, million, billion, trillion; and the currency's own `number_words`), only
+///    where a marker or the end follows it;
 ///  - then a marker again, or a word for the smallest unit (then whole digits and no multiplier).
 /// Bare digits are whole units. Nothing finer than the smallest unit, and no arithmetic on anything but the digits
 /// written.
 ///
 /// What is not read, because it could be two numbers and a currency's config doesn't say which: a point written once
-/// with three digits after it, in a currency of fewer than three decimals. Another currency's sign, code or words are
+/// with three digits after it, in a currency of fewer than three decimals, whose config says neither its decimal mark
+/// nor that a point groups digits. Another currency's sign, code or words are
 /// not this world's money, and are not read; nor is a number written out in words.
 /// (participants/src/calls.ts `parseAmount` is the same, step for step; contracts/test/amounts.json holds what both
 /// must read and what both must refuse.)
@@ -434,6 +486,10 @@ pub fn parse_amount(s: &str, cur: &Currency) -> Result<String, UnitError> {
     let is_unit = |w: &str| markers.iter().any(|m| m == w);
     let is_minor = |w: &str| minors.iter().any(|m| m == w);
     let digit = |c: Option<char>| c.is_some_and(|c| c.is_ascii_digit());
+    let (stated_dec, stated_grp) = cur.stated();
+    let spaced_groups = stated_grp == Some(' ');
+    let apostrophe_groups = stated_grp == Some('\'');
+    let t = if apostrophe_groups { t.replace('\u{2019}', "'") } else { t };
     let mut rest = t.as_str();
     if !digit(rest.chars().next()) {
         // A marker first: one that has the digits straight after it.
@@ -454,7 +510,12 @@ pub fn parse_amount(s: &str, cur: &Currency) -> Result<String, UnitError> {
     // The digits and their separators (a separator is one only between two digits).
     let bytes = rest.as_bytes();
     let mut end = 0;
-    while end < bytes.len() && (bytes[end].is_ascii_digit() || ((bytes[end] == b',' || bytes[end] == b'.') && bytes.get(end + 1).is_some_and(|b| b.is_ascii_digit()))) {
+    let three_then_not_digit = |at: usize| bytes.get(at + 1..at + 4).is_some_and(|d| d.iter().all(|b| b.is_ascii_digit())) && !bytes.get(at + 4).is_some_and(|b| b.is_ascii_digit());
+    while end < bytes.len()
+        && (bytes[end].is_ascii_digit()
+            || ((bytes[end] == b',' || bytes[end] == b'.' || (apostrophe_groups && bytes[end] == b'\'')) && bytes.get(end + 1).is_some_and(|b| b.is_ascii_digit()))
+            || (spaced_groups && bytes[end] == b' ' && three_then_not_digit(end)))
+    {
         end += 1;
     }
     let number = &rest[..end];
@@ -465,14 +526,33 @@ pub fn parse_amount(s: &str, cur: &Currency) -> Result<String, UnitError> {
     let points = number.matches('.').count();
     let mark = if commas > 0 && points > 0 {
         Some(if number.rfind(',') > number.rfind('.') { ',' } else { '.' })
-    } else if points == 1 {
-        Some('.')
-    } else if commas == 1 && number.len() - number.find(',').unwrap_or(0) - 1 < 3 {
-        Some(',')
+    } else if commas + points == 1 {
+        // A mark written once. What the currency says settles it; else a point is the decimals, and a comma is the
+        // decimals if one or two digits follow it.
+        let s = if points == 1 { '.' } else { ',' };
+        let at = number.find(s).unwrap_or(0);
+        let (head, after) = (&number[..at], number.len() - at - 1);
+        if stated_dec == Some(s) {
+            Some(s)
+        } else if stated_grp == Some(s) && after == 3 && !head.starts_with('0') {
+            None
+        } else if s == '.' {
+            Some('.')
+        } else if after < 3 {
+            Some(',')
+        } else {
+            None
+        }
     } else {
         None
     };
-    let group = if mark == Some(',') || (mark.is_none() && points > 0) { '.' } else { ',' };
+    let group = if let Some(g) = [' ', '\''].into_iter().find(|g| number.contains(*g)) {
+        g
+    } else if mark == Some(',') || (mark.is_none() && points > 0) {
+        '.'
+    } else {
+        ','
+    };
     let (whole, frac) = match mark.and_then(|m| number.rfind(m)) {
         Some(cut) => (&number[..cut], &number[cut + 1..]),
         None => (number, ""),
@@ -483,11 +563,10 @@ pub fn parse_amount(s: &str, cur: &Currency) -> Result<String, UnitError> {
     if frac.len() > minor.max(3) {
         return Err(err());
     }
-    let mults: [(&str, u128); 12] = [
-        ("thousand", 1_000), ("million", 1_000_000), ("billion", 1_000_000_000), ("trillion", 1_000_000_000_000),
-        ("lakh", 100_000), ("lakhs", 100_000), ("crore", 10_000_000), ("crores", 10_000_000),
-        ("k", 1_000), ("m", 1_000_000), ("b", 1_000_000_000), ("t", 1_000_000_000_000),
-    ];
+    // (The place's own words first, the longest first: one that begins another is tried before it.)
+    let mut own: Vec<(&str, u128)> = cur.number_words.iter().filter(|(w, _)| !w.is_empty()).map(|(w, m)| (w.as_str(), *m)).collect();
+    own.sort_by_key(|(w, _)| std::cmp::Reverse(w.chars().count()));
+    let mults: Vec<(&str, u128)> = own.into_iter().chain(MULTIPLIERS).collect();
     let mut mult: u128 = 1;
     let mut has_mult = false;
     for (w, m) in mults {
@@ -514,7 +593,8 @@ pub fn parse_amount(s: &str, cur: &Currency) -> Result<String, UnitError> {
         let first = groups[0].len();
         let last = groups.len() - 1;
         let threes = first <= 3 && groups[1..].iter().all(|g| g.len() == 3);
-        let twos = group == ',' && groups.len() > 2 && first <= 2 && groups[1..last].iter().all(|g| g.len() == 2) && groups[last].len() == 3;
+        let twos_read = cur.grouping.as_ref().map_or(group == ',', |g| g.len() > 1 && group == group_char(cur.marks().1));
+        let twos = twos_read && groups.len() > 2 && first <= 2 && groups[1..last].iter().all(|g| g.len() == 2) && groups[last].len() == 3;
         if !threes && !twos {
             return Err(grouping());
         }
@@ -523,7 +603,7 @@ pub fn parse_amount(s: &str, cur: &Currency) -> Result<String, UnitError> {
         return Err(err());
     }
     // (The one that could be two numbers is said to be so: one to three digits, a point, three digits.)
-    if frac.len() > minor && mult == 1 && mark == Some('.') && frac.len() == 3 && commas == 0 && whole.len() <= 3 && !whole.starts_with('0') {
+    if frac.len() > minor && mult == 1 && mark == Some('.') && stated_dec.is_none() && frac.len() == 3 && commas == 0 && whole.len() <= 3 && !whole.starts_with('0') {
         return Err(UnitError(format!("a point with three digits after it can be read two ways: {s}")));
     }
     if frac.len() > minor && mult == 1 {
@@ -641,8 +721,9 @@ pub fn parse_count(s: &str) -> Result<i64, UnitError> {
     }
 }
 
-/// An amount in the currency's smallest unit as people write it: its sign (or its code and a space), the whole units
-/// grouped in threes, and its decimals.
+/// An amount in the currency's smallest unit as people write it: its sign (or its code and a space) before the digits
+/// or, where the currency says so, after them; the whole units grouped as the currency groups them (in threes unless
+/// it says [3, 2]) with its group mark; its decimals after its decimal mark.
 pub fn format_money(amount: &str, cur: &Currency) -> String {
     let (neg, digits) = match amount.strip_prefix('-') {
         Some(d) => (true, d),
@@ -652,24 +733,28 @@ pub fn format_money(amount: &str, cur: &Currency) -> String {
     let digits = if digits.is_empty() { "0" } else { digits };
     let minor = usize::from(cur.minor_units);
     let (whole, frac) = if digits.len() > minor { digits.split_at(digits.len() - minor) } else { ("0", digits) };
-    let mut out = String::from(if neg { "-" } else { "" });
-    match &cur.symbol {
-        Some(x) => out.push_str(x),
-        None => {
-            out.push_str(&cur.code);
-            out.push(' ');
-        }
-    }
+    let (dec, grp) = cur.marks();
+    let second = match cur.grouping.as_deref() {
+        Some([_, s]) => usize::from(*s),
+        _ => 3,
+    };
+    let mut number = String::new();
     for (i, c) in whole.chars().enumerate() {
-        if i > 0 && (whole.len() - i) % 3 == 0 {
-            out.push(',');
+        let from_right = whole.len() - i;
+        if i > 0 && (from_right == 3 || (from_right > 3 && (from_right - 3) % second == 0)) {
+            number.push(grp);
         }
-        out.push(c);
+        number.push(c);
     }
     if minor > 0 {
-        out.push_str(&format!(".{frac:0>minor$}"));
+        number.push(dec);
+        number.push_str(&format!("{frac:0>minor$}"));
     }
-    out
+    // (A code, being letters, is always set off from the digits.)
+    let sign = cur.symbol.as_deref().unwrap_or(&cur.code);
+    let gap = if cur.symbol.is_none() || cur.symbol_spaced { " " } else { "" };
+    let body = if cur.symbol_after { format!("{number}{gap}{sign}") } else { format!("{sign}{gap}{number}") };
+    if neg { format!("-{body}") } else { body }
 }
 
 #[cfg(test)]
@@ -679,7 +764,7 @@ mod tests {
     /// A currency as a test's world declares it (the platform has none of its own).
     fn currency(code: &str, minor_units: u8, symbol: Option<&str>, unit_words: &[&str], minor_words: &[&str]) -> Currency {
         let own = |w: &[&str]| w.iter().map(|x| x.to_string()).collect();
-        Currency { code: code.into(), minor_units, symbol: symbol.map(String::from), unit_words: own(unit_words), minor_words: own(minor_words) }
+        Currency { code: code.into(), minor_units, symbol: symbol.map(String::from), unit_words: own(unit_words), minor_words: own(minor_words), ..Default::default() }
     }
 
     #[test]
@@ -745,6 +830,12 @@ mod tests {
             }
         }
         assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+        // What each currency writes an amount as: the same words as the TypeScript writer.
+        for case in table["writes"].as_array().unwrap() {
+            let (name, n, want) = (case[0].as_str().unwrap(), case[1].as_str().unwrap(), case[2].as_str().unwrap());
+            let cur = Currency::from_config(&table["currencies"][name]).unwrap();
+            assert_eq!(format_money(n, &cur), want, "{name} {n}");
+        }
         // What a world writes an amount as reads back as that amount.
         for cur in table["currencies"].as_object().unwrap().values() {
             let cur = Currency::from_config(cur).unwrap();

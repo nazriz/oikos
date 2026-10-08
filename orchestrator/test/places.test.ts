@@ -16,7 +16,7 @@
 import { expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { bedroomsNeeded, formatMoney, OCCUPANCY, type OccupancyStandard } from "@oikos/participants";
+import { bedroomsNeeded, calls, formatMoney, OCCUPANCY, type OccupancyStandard } from "@oikos/participants";
 import { generate, generateFrom } from "@oikos/worlds/generator/generate";
 import { loadProfile, PROFILE_DIR, type Profile } from "@oikos/worlds/generator/profile";
 
@@ -123,7 +123,7 @@ test("money in a generated town's laws and papers is written as its currency is,
     const P = loadProfile(id);
     const cur = P.values.currency;
     const c = town(id);
-    const whole = (n: number) => (cur.minor_units && n % 10 ** cur.minor_units === 0 ? formatMoney(n, cur).slice(0, -(cur.minor_units + 1)) : formatMoney(n, cur));
+    const whole = (n: number) => formatMoney(n, cur, cur.minor_units && n % 10 ** cur.minor_units === 0 ? { decimals: false } : {});
     const tax = c.world.records.find((r: any) => r.id === "law-income-tax");
     for (const b of P.values.public_finance.income_tax.brackets) expect(tax.text).toContain(`above ${whole(b.from)}`);
     expect(tax.text).toContain(`from ${whole(P.values.public_finance.income_tax.levy_from)}`);
@@ -135,7 +135,11 @@ test("money in a generated town's laws and papers is written as its currency is,
     }
     // The finance office's brief gives the crew's yearly wage in whole units of the money.
     const finance = c.participants.find((p: any) => p.controller.impl === "city.finance_officer").controller.params;
-    expect(finance.budget_lines.staff).toMatch(new RegExp(`about ${(cur.symbol ?? `${cur.code} `).replace(/[$]/g, "\\$")}[0-9,]+ a year each`));
+    // (The figure is a sum in whole units, written as the place writes it: it reads back in the place's money to whole units.)
+    const figure = /about (.+?) a year each/.exec(finance.budget_lines.staff)?.[1];
+    expect(figure).toBeDefined();
+    const staff = BigInt(calls.parseAmount(figure!, cur));
+    expect([staff % 10n ** BigInt(cur.minor_units), formatMoney(staff, cur, { decimals: false })]).toEqual([0n, figure!]);
   }
   // (A currency with no decimal places is among them.)
   expect(ids.map((id) => loadProfile(id).values.currency.minor_units)).toContain(0);
