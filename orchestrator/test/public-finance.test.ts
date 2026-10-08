@@ -5,7 +5,7 @@
 import { expect, test } from "bun:test";
 import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { annualTax, withholding, type IncomeTaxLaw } from "@oikos/participants";
+import { annualTax, taxLawOf, withholding } from "@oikos/participants";
 import { generate } from "@oikos/worlds/generator/generate";
 import { runWorld } from "../src/run";
 
@@ -14,7 +14,7 @@ const DAY = 86_400;
 const base = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")) as any;
 
 test("income tax: marginal rates on a year's income, a levy from its threshold, withheld per pay", () => {
-  const law: IncomeTaxLaw = { id: "l", brackets: [{ from: 0, rate_bps: 0 }, { from: 1_000_000, rate_bps: 2000 }, { from: 5_000_000, rate_bps: 4000 }], levy_bps: 100, levy_from: 2_000_000, collector: "o", account: "a" };
+  const law = taxLawOf("l", { brackets: [{ from: 0, rate_bps: 0 }, { from: 1_000_000, rate_bps: 2000 }, { from: 5_000_000, rate_bps: 4000 }], levy_bps: 100, levy_from: 2_000_000, collector: "o", account: "a" })!;
   expect(annualTax(law, 500_000)).toBe(0); // below the threshold, and the levy's
   expect(annualTax(law, 3_000_000)).toBe(400_000 + 30_000); // 20% of $20,000, and 1% of $30,000
   expect(annualTax(law, 6_000_000)).toBe(800_000 + 400_000 + 60_000);
@@ -34,7 +34,7 @@ test("wages are paid net of the tax withheld, which is paid over; rates are levi
   const ev = log.filter((e) => e.kind === "event").map((e) => ({ t: e.t, ...e.body }));
   const recs = ev.filter((e) => e.event === "recorded").map((e) => e.record);
   const taxLaw = config.world.records.find((r: any) => r.id === "law-income-tax");
-  const law: IncomeTaxLaw = { id: taxLaw.id, ...taxLaw.data };
+  const law = taxLawOf(taxLaw.id, taxLaw.data, taxLaw.speaks_for)!;
   // Wages: every standing order for wages pays the agreed wage less what the law withholds.
   const jobs = new Map([...config.world.records, ...recs].filter((r: any) => r.record === "agreement" && r.terms.template === "employment").map((a: any) => [a.id, a]));
   const wageOrders = [...config.world.records, ...recs].filter((r: any) => r.record === "statement" && r.kind === "request" && jobs.has(r.basis) && r.data?.every);

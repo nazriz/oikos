@@ -18,7 +18,7 @@ import type { LookRequest, Observation, Offer, ParticipantAction, StatementRecor
 import { basesOf, channels } from "../contracts";
 import { params, wait, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
 import { distribute } from "./lengnick";
-import { incomeTaxLaw, withholding } from "./tax";
+import { incomeTaxLaw, withheld, type Charge } from "./tax";
 import { ask, Asked, because, between, Book, PAYEE_DIED, breaches, noting, callAction, usd, cellsOf, commitmentOf, DAY, jobTerms, leaseTerms, MONTH, notice, offer, ownAccount, pay, publishedPrice, say, stoodEmpty, structureOf, withdraw, type Step } from "./common";
 
 /**
@@ -529,6 +529,9 @@ export const landlord: BehaviourModule = {
  * standing order through the firm's bank, notice, and a worker's death. What headcount and wage to aim for is the
  * module's own rule; this is how any employer carries it out.
  */
+type Withheld = { total: number; parts: { charge: Charge; amount: number }[] };
+const NOTHING_WITHHELD: Withheld = { total: 0, parts: [] };
+
 export class Staffing {
   private readonly orders = new Map<string, string>(); // agreement -> wage standing order
   private readonly pendingOrder = new Map<string, string>(); // step marker -> agreement
@@ -537,12 +540,21 @@ export class Staffing {
   /** Whom our bank has told us has died: someone a standing order of ours pays (docs/behaviour/deaths.md). */
   private readonly bankSaysDead = new Set<string>();
   private n = 0; // unique names for standing orders we create
-  // Income tax withheld from wages (docs/behaviour/public-finance.md): what each wage order withholds a pay, what we've
-  // withheld and not yet paid over, and when we next pay it over.
-  private readonly withholds = new Map<string, number>(); // wage standing order -> withheld each pay
-  private readonly pendingWithhold = new Map<string, number>(); // step marker -> withheld each pay
-  private withheld = 0;
+  // What the tax law's charges take from wages (docs/behaviour/public-finance.md): what each wage order withholds a pay,
+  // charge by charge; what we've withheld under each charge and not yet paid over; and when we next pay it over.
+  private readonly withholds = new Map<string, Withheld>(); // wage standing order -> withheld each pay
+  private readonly pendingWithhold = new Map<string, Withheld>(); // step marker -> withheld each pay
+  private readonly owed = new Map<string, { charge: Charge; law: string; amount: number }>(); // charge -> withheld, not yet paid over
+  private readonly paidSince = new Map<string, number>(); // agreement -> gross wages paid since our last report
   private nextRemit = -1;
+  private lawId: string | undefined; // the tax law we last read
+  private owe(law: string | undefined, w: Withheld, agreement?: string, gross = 0) {
+    for (const x of w.parts) {
+      const o = this.owed.get(x.charge.id) ?? { charge: x.charge, law: law ?? "", amount: 0 };
+      this.owed.set(x.charge.id, { charge: x.charge, law: law ?? o.law, amount: o.amount + x.amount });
+    }
+    if (agreement && gross > 0) this.paidSince.set(agreement, (this.paidSince.get(agreement) ?? 0) + gross);
+  }
 
   /** Wages our orders have paid, gross (what they paid, and what they withheld), since we began. */
   wagesPaid = 0;
@@ -578,12 +590,12 @@ export class Staffing {
       this.pendingWithhold.delete(ref);
     }
     // Wages paid by our standing orders: what each withheld is now owed to the collector.
-    const ours = new Set(this.orders.values());
+    const ours = new Map([...this.orders].map(([agreement, order]) => [order, agreement]));
     for (const tx of channels.transactions(obs)) {
       if (!tx.per_instruction || !ours.has(tx.per_instruction)) continue;
-      const w = this.withholds.get(tx.per_instruction) ?? 0;
-      this.withheld += w;
-      this.wagesPaid += cents(tx.amount) + w;
+      const w = this.withholds.get(tx.per_instruction) ?? NOTHING_WITHHELD;
+      this.owe(this.lawId, w, ours.get(tx.per_instruction), cents(tx.amount) + w.total);
+      this.wagesPaid += cents(tx.amount) + w.total;
     }
   }
 
@@ -642,13 +654,19 @@ export class Staffing {
   routine(obs: Observation, book: Book, account: string, want: { target: number; wage: number; canPost: boolean; why?: string }): Step[] {
     const t = obs.t;
     const me = this.me;
-    // Genesis standing orders for existing staff (what each withholds: the agreed wage less what it pays).
+    // Genesis standing orders for existing staff (what each withholds: the agreed wage less what it pays; charge by
+    // charge as the law reckons it, where that comes to the same).
+    const law = incomeTaxLaw(book);
+    this.lawId = law?.id ?? this.lawId;
     for (const r of book.open("request")) for (const b of r.speaks_for === me ? basesOf(r) : []) if (b && !this.orders.has(b)) {
       this.orders.set(b, r.id);
       const a = book.records.get(b);
       const gross = a?.record === "agreement" ? cents(commitmentOf(a, me).outcome?.money?.amount ?? 0) : 0;
       const net = cents(r.data?.outcome?.money?.amount ?? 0);
-      if (gross > net && net > 0) this.withholds.set(r.id, gross - net);
+      if (gross > net && net > 0) {
+        const w = withheld(law, gross, Number(r.data?.every) || this.o.period);
+        this.withholds.set(r.id, w.total === gross - net ? w : { total: gross - net, parts: law?.charges[0] ? [{ charge: law.charges[0], amount: gross - net }] : [] });
+      }
     }
     const contracts = this.contracts(book);
     const staff = this.staff(book, t);
@@ -658,9 +676,8 @@ export class Staffing {
     const doesPay = this.o.does?.pay !== false;
     const doesHire = this.o.does?.hire !== false;
 
-    // Newly signed: start paying wages by standing order, at the wage agreed less the income tax the law says to
+    // Newly signed: start paying wages by standing order, at the wage agreed less what the tax law's charges say to
     // withhold.
-    const law = incomeTaxLaw(book);
     for (const a of doesPay ? staff : []) {
       // (Not a job we've given notice on: a worker who died has their order withdrawn, and isn't a new hire.)
       if (this.orders.has(a.id) || this.stopped.has(a.id) || this.noticed.has(a.id) || [...this.pendingOrder.values()].includes(a.id)) continue;
@@ -671,8 +688,8 @@ export class Staffing {
       if (!to) continue;
       const ref = `wo${this.n++}`;
       this.pendingOrder.set(ref, a.id);
-      const tax = withholding(law, pays.wage, pays.period);
-      if (tax > 0) this.pendingWithhold.set(ref, tax);
+      const w = withheld(law, pays.wage, pays.period), tax = w.total;
+      if (tax > 0) this.pendingWithhold.set(ref, w);
       steps.push(because(tax > 0 ? `A new hire has signed: starting their wages by standing order, ${usd(pays.wage - tax)} after the ${usd(tax)} of income tax the law says to withhold.` : "A new hire has signed: starting their wages by standing order.",
         [ref, pay(to, pays.wage - tax, { from: account, every: pays.period, first: pays.period, basis: a.id, for: `Wages for ${worker}.` })]));
     }
@@ -726,16 +743,43 @@ export class Staffing {
     if (doesPay && t >= this.nextRemit) {
       this.nextRemit = t + MONTH;
       const balance = channels.accounts(obs).find((a) => a.account === account)?.balance;
-      if (this.withheld > 0 && law?.account && balance !== undefined) {
-        const owed = this.withheld;
+      const due = [...this.owed.values()].filter((x) => x.amount > 0 && x.charge.account && x.charge.collector);
+      if (due.length && balance !== undefined) {
         // (Keeping the next pay period's wages aside: they go first.)
         const keep = staff.reduce((x, a) => x + jobTerms(a, a.terms.parties[1]).wage, 0);
-        const paid = Math.min(owed, Math.max(0, cents(balance) - keep));
-        this.withheld = owed - paid;
-        steps.push(because(paid === owed ? `Monthly: paying over the ${usd(owed)} of income tax we withheld from wages.` : `Monthly: we owe ${usd(owed)} of income tax withheld from wages and have ${usd(paid)}: paying that, and still owing the rest.`,
-          say("withholding_report", `Income tax withheld from wages, owed: ${usd(owed)}; paid now: ${usd(paid)}.`, { to: [law.collector], visible: [me, law.collector], basis: law.id, data: { withheld: owed, paid, period_end: t, account } }),
-          ...(paid > 0 ? [pay(law.account, paid, { from: account, for: "Income tax withheld from wages." })] : [])));
+        let left = Math.max(0, cents(balance) - keep);
+        // Who was paid what since we last reported, for a charge whose report names each worker.
+        const lines = [...this.paidSince].map(([agreement, gross]) => ({ worker: (book.records.get(agreement) as any)?.terms?.parties?.[1] as string | undefined, gross }))
+          .filter((x): x is { worker: string; gross: number } => !!x.worker).sort((a, b) => (a.worker < b.worker ? -1 : a.worker > b.worker ? 1 : 0));
+        // One report to each collector, in the law's order, with what is paid into each of its accounts.
+        for (const collector of [...new Set(due.map((x) => x.charge.collector))]) {
+          const parts = due.filter((x) => x.charge.collector === collector).map((x) => {
+            const paid = Math.min(x.amount, left);
+            left -= paid;
+            this.owed.set(x.charge.id, { ...x, amount: x.amount - paid });
+            return { charge: x.charge, owed: x.amount, paid };
+          });
+          const owed = parts.reduce((x, c) => x + c.owed, 0), paid = parts.reduce((x, c) => x + c.paid, 0);
+          const accounts = [...new Set(parts.map((c) => c.charge.account))];
+          const itemised = parts.some((c) => c.charge.itemised);
+          const basis = due.find((x) => x.charge.collector === collector)!.law || law?.id;
+          if (accounts.length === 1 && !itemised) {
+            steps.push(because(paid === owed ? `Monthly: paying over the ${usd(owed)} of income tax we withheld from wages.` : `Monthly: we owe ${usd(owed)} of income tax withheld from wages and have ${usd(paid)}: paying that, and still owing the rest.`,
+              say("withholding_report", `Income tax withheld from wages, owed: ${usd(owed)}; paid now: ${usd(paid)}.`, { to: [collector], visible: [me, collector], ...(basis ? { basis } : {}), data: { withheld: owed, paid, period_end: t, account } }),
+              ...(paid > 0 ? [pay(accounts[0]!, paid, { from: account, for: "Income tax withheld from wages." })] : [])));
+            continue;
+          }
+          // Several accounts, or a charge reported worker by worker: the report says what is owed and paid under each
+          // charge, and (where a charge asks it) each worker's pay in the period.
+          const named = (c: Charge) => c.name ?? c.id;
+          steps.push(because(paid === owed ? `Monthly: paying over the ${usd(owed)} we withheld from wages (${parts.map((c) => `${named(c.charge)} ${usd(c.owed)}`).join(", ")}).` : `Monthly: we owe ${usd(owed)} withheld from wages and have ${usd(paid)}: paying that, and still owing the rest.`,
+            say("withholding_report", `Withheld from wages, owed: ${usd(owed)}; paid now: ${usd(paid)}. ${parts.map((c) => `${named(c.charge)}: owed ${usd(c.owed)}, paid ${usd(c.paid)}`).join("; ")}.`, { to: [collector], visible: [me, collector], ...(basis ? { basis } : {}),
+              data: { withheld: owed, paid, period_end: t, account, charges: parts.map((c) => ({ charge: c.charge.id, to: c.charge.account, withheld: c.owed, paid: c.paid })), ...(itemised ? { staff: lines } : {}) } }),
+            ...accounts.map((to) => ({ to, sum: parts.filter((c) => c.charge.account === to).reduce((x, c) => x + c.paid, 0), what: parts.filter((c) => c.charge.account === to).map((c) => named(c.charge)).join(", ") }))
+              .filter((x) => x.sum > 0).map((x) => pay(x.to, x.sum, { from: account, for: `Withheld from wages: ${x.what}.` }))));
+        }
       }
+      this.paidSince.clear();
     }
 
     // A posting unfilled at an old wage (ours has moved since): published again at the wage we offer now.
@@ -779,7 +823,7 @@ export class Staffing {
   raise(book: Book, t: number, account: string, riseBps: number, why: string): Step[] {
     const law = incomeTaxLaw(book);
     const lines: C.Call[] = [];
-    const refs: [string, string, number][] = [];
+    const refs: [string, string, Withheld][] = [];
     for (const a of this.staff(book, t)) {
       const wage = Math.floor((this.wageOf(a) * (10_000 + riseBps)) / 10_000);
       this.gross.set(a.id, wage);
@@ -787,15 +831,15 @@ export class Staffing {
       const to = this.payee(book, a);
       if (!order || !to || this.stopped.has(a.id)) continue;
       const period = jobTerms(a, a.terms.parties[1]).period;
-      const tax = withholding(law, wage, period);
+      const tax = withheld(law, wage, period);
       const ref = `wo${this.n++}`;
-      lines.push(withdraw(order, "Superseded: a new wage."), [ref, pay(to, wage - tax, { from: account, every: period, first: Math.max(DAY, this.nextDue(book, order, t) - t), basis: a.id, for: `Wages for ${a.terms.parties[1]}.` })] as any);
+      lines.push(withdraw(order, "Superseded: a new wage."), [ref, pay(to, wage - tax.total, { from: account, every: period, first: Math.max(DAY, this.nextDue(book, order, t) - t), basis: a.id, for: `Wages for ${a.terms.parties[1]}.` })] as any);
       refs.push([ref, a.id, tax]);
       this.orders.delete(a.id);
     }
     for (const [ref, id, tax] of refs) {
       this.pendingOrder.set(ref, id);
-      if (tax > 0) this.pendingWithhold.set(ref, tax);
+      if (tax.total > 0) this.pendingWithhold.set(ref, tax);
     }
     const out: Step[] = [];
     for (let i = 0; i < lines.length; i += 30) out.push(because(why, ...lines.slice(i, i + 30)));
@@ -833,13 +877,16 @@ export class Staffing {
       const period = jobTerms(a, a.terms.parties[1]).period;
       const wage = this.wageOf(a);
       const earned = Math.max(0, Math.floor((wage * Math.min(period, Math.max(0, since - lastDue))) / period));
-      const tax = Math.floor((withholding(law, wage, period) * earned) / Math.max(1, wage));
-      this.withheld += tax;
+      const each = withheld(law, wage, period), perPay = each.total;
+      // (For the part of a pay period worked: that part of what a whole pay withholds, charge by charge.)
+      const tax = Math.floor((perPay * earned) / Math.max(1, wage));
+      const part = each.parts.map((c) => ({ charge: c.charge, amount: Math.floor((c.amount * earned) / Math.max(1, wage)) }));
+      if (part[0]) part[0].amount += tax - part.reduce((x, c) => x + c.amount, 0);
+      this.owe(law?.id, { total: tax, parts: part }, a.id, earned);
       this.wagesPaid += earned;
       const ref = `wo${this.n++}`;
       this.pendingOrder.set(ref, a.id);
-      const perPay = withholding(law, wage, period);
-      if (perPay > 0) this.pendingWithhold.set(ref, perPay);
+      if (perPay > 0) this.pendingWithhold.set(ref, each);
       if (earned - tax > 0) lines.push(pay(to, earned - tax, { from: account, for: `Wages for ${a.terms.parties[1]} to the strike.` }));
       lines.push([ref, pay(to, wage - perPay, { from: account, every: period, first: period, basis: a.id, for: `Wages for ${a.terms.parties[1]}.` })]);
     }

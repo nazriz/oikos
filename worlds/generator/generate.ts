@@ -6,7 +6,7 @@
 // support payments, industry shares...) comes from the spec's profile (worlds/profiles/, docs/profiles.md), and what
 // isn't there is derived from it here by general formulas, or is a placeholder of the town's own shape.
 
-import { adultAgeBands, drawHousehold, drawSavings, formatMoney, Randomness, withholding, yearsOfSchooling, draftLaw, type HouseholdSpec, type IncomeTaxLaw, type LawSchedule } from "@oikos/participants";
+import { adultAgeBands, drawHousehold, drawSavings, formatMoney, Randomness, taxLawOf, withholding, yearsOfSchooling, draftLaw, type HouseholdSpec, type LawSchedule } from "@oikos/participants";
 import law from "../law/basic.json";
 import schedules from "../law/schedules.json";
 import { loadProfile, type Profile } from "./profile";
@@ -336,7 +336,8 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   const MATERIALS_PRICE = V.prices.materials_per_kg;
   // The income tax law, from the profile (the outside world's: for a town, a higher government's), which employers
   // withhold under.
-  const taxLaw: IncomeTaxLaw = { id: "law-income-tax", ...V.public_finance.income_tax, collector: "outside", account: "acc-outside" };
+  const TAX = { ...V.public_finance.income_tax, collector: "outside", account: "acc-outside" };
+  const taxLaw = taxLawOf("law-income-tax", TAX)!;
   // A factory's item: its labour share of the world price in hours at the factory wage; its input share in kg of inputs.
   const MAKE = {
     labour: Math.round((share(V.industry.factory_labour_share_bps, WORLD.goods_export) / hourly(wages.factory)) * HOUR),
@@ -1011,9 +1012,9 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     .reduce((x, r) => x + landValue + (onLot.has(cellOf.get(r.about.object)) ? buildPrice(onLot.get(cellOf.get(r.about.object))!.type) : 0), 0);
   const ratePpm = rateable > 0 ? Math.round((V.public_finance.rates_per_resident_per_year * everyone.length * 1_000_000) / rateable) : 0;
   records.push({ id: taxLaw.id, record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "outside", kind: "law",
-    text: `Income tax: on a year's income, ${taxLaw.brackets.map((b) => `${b.rate_bps / 100}% above ${asWritten(b.from)}`).join(", ")}; and a levy of ${taxLaw.levy_bps / 100}% of the whole from ${asWritten(taxLaw.levy_from)}. Employers withhold it from each pay, reckoned as a year's income, and pay what they withheld to ${taxLaw.account} monthly.`,
+    text: `Income tax: on a year's income, ${TAX.brackets.map((b) => `${b.rate_bps / 100}% above ${asWritten(b.from)}`).join(", ")}; and a levy of ${TAX.levy_bps / 100}% of the whole from ${asWritten(TAX.levy_from)}. Employers withhold it from each pay, reckoned as a year's income, and pay what they withheld to ${TAX.account} monthly.`,
     adico: { attribute: "employers", deontic: "must", aim: "withhold income tax from each pay and pay it over", condition: "monthly" },
-    data: { tax: "income", brackets: taxLaw.brackets, levy_bps: taxLaw.levy_bps, levy_from: taxLaw.levy_from, collector: taxLaw.collector, account: taxLaw.account } });
+    data: { tax: "income", brackets: TAX.brackets, levy_bps: TAX.levy_bps, levy_from: TAX.levy_from, collector: TAX.collector, account: TAX.account } });
   records.push({ id: "law-rates", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", kind: "law", basis: "law-charter",
     text: `Rates: every owner of land in the town (but the town) owes the town ${ratePpm / 10_000}% of its value a year, as the valuer values it, in ${V.public_finance.rates_instalments} instalments, each due ${V.public_finance.rates_due_days} days after its notice. Or else: interest at ${V.public_finance.rates_penalty_interest_bps / 100}% a year on what's overdue.`,
     adico: { attribute: "owners of land in the town", deontic: "must", aim: "pay rates on its value", condition: `in ${V.public_finance.rates_instalments} instalments a year`, or_else: `interest at ${V.public_finance.rates_penalty_interest_bps / 100}% a year` },

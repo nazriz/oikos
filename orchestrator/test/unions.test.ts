@@ -5,7 +5,7 @@
 import { expect, test } from "bun:test";
 import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { withholding, type IncomeTaxLaw } from "@oikos/participants";
+import { taxLawOf, withholding } from "@oikos/participants";
 import { generate, industrialActionLaw } from "@oikos/worlds/generator/generate";
 import { runWorld } from "../src/run";
 
@@ -27,7 +27,7 @@ test("claims are answered by offers; those accepted become enterprise agreements
   const config = generate(base);
   const { ev, recs } = await run("bargaining", config, 150);
   const taxLaw = config.world.records.find((r: any) => r.id === "law-income-tax");
-  const law: IncomeTaxLaw = { id: taxLaw.id, ...taxLaw.data };
+  const law = taxLawOf(taxLaw.id, taxLaw.data, taxLaw.speaks_for)!;
   const claims = recs.filter((r) => r.kind === "wage_claim" && r.speaks_for === "union");
   expect(claims.length).toBeGreaterThanOrEqual(3);
   // Every claim is answered by its employer with an offer no more than the claim.
