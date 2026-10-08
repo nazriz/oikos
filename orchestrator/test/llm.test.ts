@@ -197,8 +197,10 @@ test("offices answer the mayor's letters with their reports, in figures", async 
   expect(read).toContain("Report from the finance office: the town's account acc-city holds");
   // The bank answers too (pilot 9: 34 letters, no reply), with the writer's own accounts: the town's, as the mayor
   // wrote in its office.
-  expect(read).toMatch(/Report from bank: your accounts with us: acc-city, balance \$[\d,]+\.\d\d/);
-  expect(read.match(/Report from bank: your accounts with us/g)?.length).toBeGreaterThanOrEqual(2);
+  // (A statement of the account from the bank's ledger, with its balance, and since when it runs.)
+  expect(read).toMatch(/Report from bank: Statement of acc-city, year 1, day 1 to year 1, day \d+: [^"]*[Bb]alance (carried forward )?\$[\d,]+\.\d\d/);
+  expect(read.match(/Report from bank: Statement of acc-city/g)?.length).toBeGreaterThanOrEqual(2);
+  expect(read).not.toContain("No payments yet");
   expect(read).toContain("council proposal form");
   // The budget brief: what the budget can pay for; what a park costs is the builder's published price, not something finance was told.
   expect(read).toContain("The budget's lines: "); expect(read).toContain("parks, for building a park");

@@ -9,11 +9,12 @@
 // accounts, ignore instructions, or pay the wrong people. Physics doesn't stop it.
 
 import { cents, smallestNow } from "../money";
-import type { Observation, StatementRecord } from "../contracts";
+import type { Observation, StatementRecord, Transaction } from "../contracts";
 import { channels } from "../contracts";
 import { DAY, wait, type BehaviourModule, type ParticipantContext } from "../module";
 import { refusalText } from "../llm/words";
 import * as C from "../calls";
+import { dateWords } from "../forms";
 import { because, Book, callAction, Letters, message, pay, PAYEE_DIED, PAYMENT_FAILED, type Step, usd, Asked, whoWrote } from "./common";
 
 interface Payment { instruction: string; from: string; to: string; amount: number; due: number; settles?: string }
@@ -73,7 +74,7 @@ export const bankPaymentSystem: BehaviourModule = {
     { what: "request", why: "A bank keeps its own customers' instructions: every standing order and payment request it is asked to carry out is addressed to it." },
     { what: "accounts", why: "The ledger is the bank's own book: it keeps its customers' accounts, and pays from them as they instruct." },
   ],
-  version: "0.13.0", // 0.13.0: main's 0.12.0 (it honours a hold, and lists a customer's standing instructions) with this branch's look-up of who wrote and the payment due before its order was withdrawn
+  version: "0.14.0", // 0.14.0: it keeps a ledger of what it has paid in and out of each account, and a letter is answered with a statement from it (until then, with the payments new at that look: nearly always none)
   doc: "docs/behaviour/bank-payment-system.md",
   cadence: () => DAY,
   firstWake: () => 0,
@@ -109,6 +110,25 @@ export const bankPaymentSystem: BehaviourModule = {
     // each counts (when it was given, plus the notice the bank asks for). A hold is lifted by withdrawing it.
     const holdNotice: number = Math.max(0, ctx.params.hold_notice ?? 86_400); // how long before a due date a hold must be given to stop that payment (seconds)
     const lettersList: number = Math.max(0, ctx.params.letter_lists ?? 40); // how many of a customer's standing instructions a letter lists
+    // The bank's ledger (docs/behaviour/bank-payment-system.md, "A statement"). What it is shown of a payment it is
+    // shown once, when the payment is made; a statement written later needs the bank to have kept it. For each account:
+    // how many entries there have been and what they come to, in and out, and the latest of them (as many as a
+    // statement lists). And for each customer written to, where the account's ledger stood at their last statement:
+    // a statement runs from the one before it.
+    const statementLists: number = Math.max(1, ctx.params.statement_lists ?? 40); // how many entries a statement lists, the latest, before giving the rest as a count within the totals
+    interface Ledger { n: number; paidIn: number; paidOut: number; latest: Transaction[] }
+    const ledgers = new Map<string, Ledger>();
+    const statedTo = new Map<string, { n: number; paidIn: number; paidOut: number; t: number }>(); // "<writer> <account>" -> where the ledger stood at the last statement to them
+    let ledgerFrom: number | undefined; // when the ledger begins: the bank's first look
+    const enter = (account: string, x: Transaction, out: boolean) => {
+      let l = ledgers.get(account);
+      if (!l) ledgers.set(account, (l = { n: 0, paidIn: 0, paidOut: 0, latest: [] }));
+      l.n++;
+      if (out) l.paidOut += cents(x.amount);
+      else l.paidIn += cents(x.amount);
+      l.latest.push(x);
+      if (l.latest.length > 2 * statementLists) l.latest.splice(0, l.latest.length - statementLists);
+    };
     let holdCursor = 0;
     const holdsOn = new Map<string, { hold: string; from: number }[]>();
     let holdNotes: Step = [];
@@ -359,11 +379,33 @@ export const bankPaymentSystem: BehaviourModule = {
     // accounts here, their balances and their latest payments, and how to instruct the bank.
     const letters = new Letters();
     let replies: Step[] = [];
-    const accountReport = (obs: Observation, holder?: string) => {
+    const accountReport = (obs: Observation, holder: string | undefined, writer: string) => {
       const mine = channels.accounts(obs).filter((a) => a.custodian === obs.entity && a.holder === holder).sort((a, b) => (a.account < b.account ? -1 : 1));
       if (!mine.length) return `Report from ${obs.entity}: we hold no account for you. To open one, ask us for one in writing.`;
       const ids = new Set(mine.map((a) => a.account));
-      const recent = channels.transactions(obs).filter((x) => ids.has(x.from) || ids.has(x.to)).sort((a, b) => b.t - a.t).slice(0, 8);
+      // A statement of each account, from the bank's ledger: what was paid in and out since the last statement to
+      // this writer (the first: since the ledger began), by date, with the account paid or paying, what the payer
+      // said it was for, and the references a customer may know (their own instruction; what a payment settles).
+      // The payer's instruction is not named to whoever was paid: it is the payer's paper.
+      const statement = (a: (typeof mine)[number]) => {
+        const l = ledgers.get(a.account) ?? { n: 0, paidIn: 0, paidOut: 0, latest: [] };
+        const key = `${writer} ${a.account}`, before = statedTo.get(key);
+        const since = before ?? { n: 0, paidIn: 0, paidOut: 0, t: ledgerFrom ?? obs.t };
+        statedTo.set(key, { n: l.n, paidIn: l.paidIn, paidOut: l.paidOut, t: obs.t });
+        const n = l.n - since.n, paidIn = l.paidIn - since.paidIn, paidOut = l.paidOut - since.paidOut;
+        const balance = cents(a.balance);
+        const period = `${dateWords(since.t)} to ${dateWords(obs.t)}${before ? " (since our last statement to you)" : ""}`;
+        if (!n) return `Statement of ${a.account}, ${period}: nothing was paid in or out. Balance ${usd(balance)}.`;
+        const listed = l.latest.slice(-Math.min(n, statementLists, l.latest.length));
+        const entry = (x: Transaction) => {
+          const out = x.from === a.account;
+          const what = x.memo ? ` (${x.memo.replace(/\.$/, "")})` : "";
+          return `${dateWords(x.t)}: paid ${out ? `out ${usd(cents(x.amount))} to ${x.to}` : `in ${usd(cents(x.amount))} from ${x.from}`}${what}${out && x.per_instruction ? `, under your instruction ${x.per_instruction}` : ""}${x.settles ? `, settling ${x.settles}` : ""}`;
+        };
+        return `Statement of ${a.account}, ${period}: balance brought forward ${usd(balance - paidIn + paidOut)}. ${listed.map(entry).join("; ")}. ` +
+          (n > listed.length ? `Those are the latest ${listed.length} of ${n} entries; the ${n - listed.length} before them are in the totals. ` : "") +
+          `In all ${usd(paidOut)} paid out and ${usd(paidIn)} paid in. Balance carried forward ${usd(balance)}.`;
+      };
       // The writer's own standing instructions, each by its reference (what it is named by to withdraw it or to hold
       // it): from an account of theirs, in their name. Nobody else's.
       const orders = [...standing.values()].filter((r) => r.speaks_for === holder && ids.has(r.data?.outcome?.money?.from)).sort((a, b) => (a.id < b.id ? -1 : 1));
@@ -372,8 +414,7 @@ export const bankPaymentSystem: BehaviourModule = {
         const on = (holdsOn.get(r.id) ?? []).filter((h) => book.withdrawnAt.get(h.hold) === undefined).map((h) => h.hold);
         return `${r.id}: ${usd(cents(m.amount))} from ${m.from} to ${m.to} every ${every % DAY === 0 ? `${every / DAY} day${every === DAY ? "" : "s"}` : `${every} seconds`}${next !== undefined ? `, next due day ${Math.floor(next / DAY) + 1}` : ""}${on.length ? `, on hold (${on.join(", ")})` : ""}`;
       };
-      return `Report from ${obs.entity}: your accounts with us: ${mine.map((a) => `${a.account}, balance ${usd(cents(a.balance))}`).join("; ")}. ` +
-        (recent.length ? `Latest payments: ${recent.map((x) => `day ${Math.floor(x.t / 86_400) + 1}: ${usd(cents(x.amount))} ${ids.has(x.from) ? `to ${x.to}` : `from ${x.from}`}${x.memo ? ` (${x.memo})` : ""}${x.per_instruction ? `, under your instruction ${x.per_instruction}` : ""}`).join("; ")}. ` : "No payments yet. ") +
+      return `Report from ${obs.entity}: ${mine.map(statement).join(" ")} ` +
         (orders.length ? `Your standing instructions with us: ${orders.slice(0, lettersList).map(order).join("; ")}${orders.length > lettersList ? `; and ${orders.length - lettersList} more` : ""}. ` : "You have no standing instructions with us. ") +
         "We pay on your written instruction (a request to pay, once or every so often), from an account you hold, if its balance covers it. To end a standing instruction, withdraw it by its reference; to pause one, put a hold on it by its reference, and withdraw the hold to resume.";
     };
@@ -381,6 +422,12 @@ export const bankPaymentSystem: BehaviourModule = {
     return {
       step(obs) {
         book.absorb(obs);
+        // Into the ledger: each payment in or out of an account, as the bank is shown it (once).
+        ledgerFrom ??= obs.t;
+        for (const x of channels.transactions(obs)) {
+          enter(x.from, x, true);
+          if (x.to !== x.from) enter(x.to, x, false);
+        }
         letters.take(obs, book);
         if (queuedAt !== obs.t && (obs.woke_for !== "done" || queue.length === 0)) { // (a wake's payments, planned when it begins or its plan is done: the stepper)
           // Who wrote the instructions it is about to read for the first time: looked up first, each writer once
@@ -407,8 +454,8 @@ export const bankPaymentSystem: BehaviourModule = {
         if (refusals.length) return callAction(because("Telling account holders about requests we couldn't carry out.", ...refusals.splice(0, 32)));
         if (holdNotes.length) return callAction(because("Answering instructions to hold standing payments: what is held and from when, or that there is nothing of theirs by that reference.", ...holdNotes.splice(0, 32)));
         // (Who wrote: the organisation of the position written in, or the participant's person, from the directory.)
-        replies.push(...letters.answer(({ participant, as, entity }) => accountReport(obs, entity ?? (as ? book.positions.get(as)?.entity : book.participantPerson.get(participant))),
-          "A letter to the bank: answering with the writer's own accounts and latest payments."));
+        replies.push(...letters.answer(({ participant, as, entity }) => accountReport(obs, entity ?? (as ? book.positions.get(as)?.entity : book.participantPerson.get(participant)), as ?? participant),
+          "A letter to the bank: answering with a statement of the writer's own accounts (what was paid in and out since the last one) and their standing instructions."));
         if (replies.length) return callAction(replies.shift()!);
         if (opens.length) return callAction(because("Opening accounts people asked for.", ...opens.splice(0, 32)));
         if (queue.length === 0) return wait();

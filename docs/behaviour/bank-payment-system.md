@@ -1,4 +1,4 @@
-# `bank.payment_system` (v0.12.0)
+# `bank.payment_system` (v0.14.0)
 
 **Seat:** a bank's automated payment system (acts as the bank). **Source:** `participants/src/behaviour/bank.ts`.
 
@@ -21,13 +21,32 @@ The bank's own procedure, applied before paying:
 - **Requests it can't carry out get a reply, once:** an account it doesn't keep, no valid amount or account to pay, or something other than a payment. So does a payment that physics refused, with the reason in plain words.
 - **The money must be there.** If it isn't, the payment is not made and the holder is sent a message saying so. The obligation behind it, such as rent, simply stays unpaid; what follows is up to the creditor. The message's words are fixed ("Payment of … to … (request …) failed: insufficient funds."), and kept in one place with how a reader knows them (`PAYMENT_FAILED`, `participants/src/behaviour/common.ts`): a code tenant counts rent as missed on exactly this note, and on none of the bank's others. That due date isn't tried again: a standing order's next payment is its next due date's.
 
-- **Letters.** A letter to the bank is answered with the writer's own accounts and balances, their latest payments, and (0.12.0) **their own standing instructions, each by its reference**: its amount, the account it pays from and the account it pays, how often, its next due day, and whether it is on hold and under which hold. Nobody else's are listed. A real bank sends this list on request; here it is how a customer who has no reference for an instruction comes to have one, so that it can be withdrawn or held by name. At most `letter_lists` are listed, in order of reference, and the letter says how many more there are.
+- **Letters.** A letter to the bank is answered with **a statement of each of the writer's own accounts** (0.14.0: the section "A statement" below; until then with "their latest payments", which was nearly always "No payments yet"), and (0.12.0) **their own standing instructions, each by its reference**: its amount, the account it pays from and the account it pays, how often, its next due day, and whether it is on hold and under which hold. Nobody else's are listed. A real bank sends this list on request; here it is how a customer who has no reference for an instruction comes to have one, so that it can be withdrawn or held by name. At most `letter_lists` are listed, in order of reference, and the letter says how many more there are.
 
 It batches up to 32 payments per action. If a batch is refused because the world changed under it, it retries those payments one at a time.
 
 ## Where the rule comes from
 
 Real retail banking: payments are made on the account holder's instruction; standing orders and direct debits are standing instructions the bank executes on schedule; a payment without funds fails, and the customer is notified. This is deliberately **procedure-following behaviour with no discretion**. The interesting variations (a bank that freezes accounts, favours some customers, obeys or ignores court orders, or is run by an AI) are other modules, or LLM seats.
+
+## A statement (0.14.0, 2026-10-09)
+
+**The fault it replaces.** A letter to the bank was answered with the writer's accounts and "Latest payments: ...", or "No payments yet." The list was read from what the bank was shown at the look in which it wrote the answer. A participant is shown a payment once, at its first look after the payment is made (perception is what changed, not a snapshot), and the bank answers its letters at the start of a day's work, before it pays anything: by then every payment of the day before had been shown to it at an earlier look and was gone. So the bank said "No payments yet" to a customer whose wages it had paid the day before, in every pilot, on every day asked (live check 2, finding 2: two pilots' seats spent the month on that sentence, and one mayor withdrew six wage instructions). The ledger is the bank's own register (`keeps`: "accounts"); it had simply never written anything down.
+
+**What the bank keeps.** A ledger of each account: every payment in or out as the bank is shown it, counted, summed in and out, and the latest `statement_lists` (40) kept entry by entry. And, for each writer it has sent a statement of an account, where that account's ledger stood then.
+
+**What a statement says.** For each of the writer's accounts: the period (from the last statement to that writer, or from when the ledger began, to the day of writing), the balance brought forward, each entry in date order (the date; paid out or paid in; the sum; the account paid or paying; what the payer said it was for; and its references), the totals paid out and in, and the balance carried forward. Dates and sums are written as the town writes them. With nothing in the period it says so, and since when.
+
+> Report from bank: Statement of acc-city, year 1, day 1 to year 1, day 10: balance brought forward $20,000.00. year 1, day 3: paid out $1,000.00 to acc-c0004 (wages), under your instruction job-c0004-wages; year 1, day 3: paid in $240.00 from acc-c0118 (rates), settling rec.2291. In all $1,000.00 paid out and $240.00 paid in. Balance carried forward $19,240.00. Your standing instructions with us: ...
+
+- **References.** A payment out names the customer's own instruction it was made under, and what it settles if the instruction said. A payment in names what it settles (the payee's own invoice or claim, as the payer gave it) and what the payer said it was for. It does not name the payer's instruction: that is the payer's paper, and its reference is nothing the payee could otherwise know.
+- **Whose period.** A statement runs from the last one to the same writer (the position written in, or the person). Two officers of one organisation each have their own: a mayor who writes the day after the finance officer is not told "nothing since yesterday".
+- **More entries than a statement lists.** The latest `statement_lists` are listed; the statement says how many came before them in the period, and they are in its totals.
+- **For every customer:** a person, a firm, the town. Whoever holds no account is told so and nothing else.
+
+**Where the rule comes from** (docs/research/references.md, "A bank statement"; to confirm, not opened). A payment service provider gives its customer, for each transaction, a reference identifying it, the amount, the date, and where appropriate the payee or payer and what was sent with the payment; statements are given periodically and on request.
+
+**Leaves out.** A statement sent unasked at the month's end to every customer (a real bank's routine: here a letter a customer a month that no code customer reads; a seat asks). The payee's name (an account's id is what the world has). Entries older than the latest `statement_lists` once they have scrolled off (they stay in the totals of a period that includes them). Charges and interest (the bank has neither).
 
 ## A hold (0.12.0)
 
@@ -69,6 +88,7 @@ Both gaps were there before holds (either payment can be withdrawn for good with
 | `max_batch` | `32` | Payments per action |
 | `hold_notice` | `86400` (a day) | How long before a due date a hold must have been given to stop that payment, in seconds. `0`: a hold stops whatever falls due from the moment it is given. From the cut-offs payment law gives for revoking a standing order (above) |
 | `letter_lists` | `40` | How many of a customer's standing instructions a letter lists before saying how many more there are |
+| `statement_lists` | `40` | How many entries of an account the bank keeps one by one, and a statement lists (the latest); earlier ones in a statement's period are counted and in its totals |
 | `review_all` | `false` | Go through every standing order at every plan, due or not. The same payments and replies either way (`participants/test/bank.test.ts` holds the two side by side); it is there to check the shorter way against |
 
 ## What it goes through at a plan

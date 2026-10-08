@@ -1,6 +1,6 @@
 {
   "name": "bank.payment_system",
-  "version": "0.13.0",
+  "version": "0.14.0",
   "doc": "docs/behaviour/bank-payment-system.md",
   "params": {
     "amount": {
@@ -52,6 +52,13 @@
     "settles": {
       "schema": {},
       "source": "the world gives it (no default)"
+    },
+    "statement_lists": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 40,
+      "source": "placeholder"
     },
     "to": {
       "schema": {},
