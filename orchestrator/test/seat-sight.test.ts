@@ -117,7 +117,7 @@ test("a council whose clerk, councillors and mayor are all the mock votes and de
   // module looks in.)
   const out = join(root, "runs", "test-seat-council");
   rmSync(out, { recursive: true, force: true });
-  await runWorld({ config: generate({ ...spec, mayor: "llm", model_seats: "council-clerk,councillor-1,councillor-2,councillor-3,councillor-4,councillor-5" }), runId: "town.seed1", outDir: out, until: 20 * DAY, recordObservations: "none" });
+  await runWorld({ config: generate({ ...spec, opening_budget: false, mayor: "llm", model_seats: "council-clerk,councillor-1,councillor-2,councillor-3,councillor-4,councillor-5" }), runId: "town.seed1", outDir: out, until: 20 * DAY, recordObservations: "none" });
   const council: { day: number; who: string; what: string }[] = [];
   for await (const line of logLines(join(out, "town.seed1.jsonl"))) {
     if (!line.includes('"kind":"command"') || !(line.includes('"ballot') || line.includes('"block":"vote"'))) continue;
