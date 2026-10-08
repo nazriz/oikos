@@ -29,6 +29,17 @@ A shop buys goods wholesale and sells them to households. Selling takes its staf
 - **Restocking keeps back** the next pay period's wages for this month's headcount (the staff it has or is hiring to), so a new shop's first stock doesn't take the wages of its first hire. It also lets someone go if it can't cover the next pay period, and doesn't hire again that month.
 - **Dividends:** out of the month's earnings, what it holds beyond a buffer (a month's wages and stock, and χ of the wage bill) goes to its shareholders (in the generated town its owners, one household or a few, or a company elsewhere: [firm-ownership.md](firm-ownership.md)).
 
+## What a shop knows (0.7.0, 0.8.0; docs/no-god-view.md)
+
+Until 0.8.0 a shop was shown every price list and buying offer in town and was handed every factory as its suppliers.
+
+| | Rule | Source |
+|---|---|---|
+| **Its own prices** | Put up at its premises (`shopfront`): seen by those within reach, found by those who look (docs/behaviour/citizen.md, "Which shops a household knows"). | — |
+| **Whom it is shown** | The price lists of the suppliers the world names for it (the world market) and of the builder (what its premises are worth), and its own. | — |
+| **Producers** | At each week's restock it looks through what producers advertise to the trade (`trade_board`: one search, the first `search_limit` (20) lists with a minimum order above one, which is what wholesale is) and whoever it finds there joins its suppliers; it buys from the cheapest, as before. So a factory is found by advertising, a new one too, and a shop's first restock, before any producer has advertised, is from the world market. | Wholesalers send their trade lists to retailers and retailers look for suppliers in trade directories (to confirm: no source opened; the rule narrows what was shown to what the code reads) |
+| **A shop just founded** | Looks up the standing listings of the premises it was founded to buy, and any notice of their sale (`sale_board`, `sold_board`, by the building), at each plan until it has bought them or they are gone (none standing at two looks a day apart, and not sold to it). | — |
+
 ## Where the rules come from
 
 Lengnick (2013) is the model: its firms sell to households who visit them, and its inventory band, price and wage rules are used as in [producer.md](producer.md). What's added, and why:

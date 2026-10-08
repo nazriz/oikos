@@ -60,5 +60,15 @@
     }
   },
   "perceives": [],
-  "state": "none"
+  "state": "none",
+  "boundary": [
+    {
+      "what": "future",
+      "why": "A researcher's scripted shocks to world prices and demand are a scenario's boundary condition: this module is the world market and applies each from its day, publishing nothing of one before it comes."
+    },
+    {
+      "what": "every:factory",
+      "why": "The outside world's demand for the town's goods is a boundary condition, split when the world is made among the factories that export."
+    }
+  ]
 }

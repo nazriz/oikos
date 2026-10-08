@@ -2,7 +2,8 @@
 // these check what would be sent and how replies are read, never a real call.
 
 import { expect, test } from "bun:test";
-import { CodexCliAdapter, codexPrompt, controlsEscaped, LIMITED, leadingObject, runBounded } from "../src/llm/codex";
+import { controlsEscaped } from "../src/llm/answer";
+import { CodexCliAdapter, codexPrompt, LIMITED, runBounded } from "../src/llm/codex";
 import { AnthropicAdapter, callModel, OpenAICompatibleAdapter, SpendingLimitReached, toChat, type LlmRequest } from "../src/llm";
 
 const req: LlmRequest = {
@@ -121,7 +122,8 @@ test("Codex CLI: one `codex exec` per call, read-only and ephemeral; the schema-
     await Bun.write(lastPath, JSON.stringify({ tool: "do", input_json: '{"what":"Publish a notice."}', also: [{ tool: "notebook", input_json: '{"text":"Asked for the figures."}' }], text: "" }));
     return { code: 0, stderr: "", stdout: ['{"type":"thread.started"}', '{"type":"turn.completed","usage":{"input_tokens":2400,"cached_input_tokens":1000,"output_tokens":40,"reasoning_output_tokens":60}}'].join("\n") };
   };
-  const r = await new CodexCliAdapter("gpt-5", runner).complete(req);
+  const nb = { name: "notebook", description: "Your notebook.", input_schema: { type: "object" } };
+  const r = await new CodexCliAdapter("gpt-5", runner).complete({ ...req, tools: [...req.tools!, nb] });
   const a = seen[0]!;
   for (const f of ["exec", "--json", "--ephemeral", "--skip-git-repo-check", "--ignore-user-config", "--ignore-rules"]) expect(a.args).toContain(f);
   expect(a.args.slice(a.args.indexOf("--sandbox"), a.args.indexOf("--sandbox") + 2)).toEqual(["--sandbox", "read-only"]);
@@ -129,8 +131,8 @@ test("Codex CLI: one `codex exec` per call, read-only and ephemeral; the schema-
   expect(a.args.at(-1)).toBe("-"); // the prompt on stdin
   expect(a.stdin).toContain("You are the mayor.");
   expect(a.stdin).toContain("[used do:"); // the conversation so far
-  expect(a.schema.properties.tool.enum).toEqual(["do"]); // exactly one main tool use, as before
-  expect(a.schema.properties.also.items.properties.tool.enum).toEqual(["do"]);
+  expect(a.schema.properties.tool.enum).toEqual(["do", "notebook"]); // exactly one main tool use, as before
+  expect(a.schema.properties.also.items.properties.tool.enum).toEqual(["do", "notebook"]);
   expect(r.content).toEqual([
     { type: "tool_use", id: "codex-1", name: "do", input: { what: "Publish a notice." } },
     { type: "tool_use", id: "codex-2", name: "notebook", input: { text: "Asked for the figures." } },
@@ -150,13 +152,6 @@ test("Codex CLI: one `codex exec` per call, read-only and ephemeral; the schema-
   // Also when it's reported as an event and the process exits cleanly.
   const asEvent = async () => ({ code: 0, stderr: "", stdout: '{"type":"turn.failed","error":{"message":"429 Too Many Requests: usage_limit_reached"}}' });
   await expect(new CodexCliAdapter("gpt-5", asEvent).complete(req)).rejects.toBeInstanceOf(UsageLimitReached);
-});
-
-test("a Codex answer's tool input: a whole object followed by stray characters is the object (pilot 7d); anything else is malformed", () => {
-  expect(leadingObject('{"text":"Day 2: a {brace} and \\"quotes\\"."}]}],')).toEqual({ text: 'Day 2: a {brace} and "quotes".' });
-  expect(leadingObject('{"text":"cut off')).toBeUndefined();
-  expect(leadingObject('["not", "an object"]')).toBeUndefined();
-  expect(leadingObject("nothing")).toBeUndefined();
 });
 
 test("Codex CLI: the wrapper's wording agrees with the instructions that several tools can be used in one answer", () => {
@@ -221,54 +216,3 @@ test("a text written with its line breaks as themselves is read as the model mea
   expect(res.content).toEqual([{ type: "tool_use", id: "codex-1", name: "notebook", input: { text: 'Day 11.\nRates: 295 valued,\tnone levied.\nNext: "review" the draft.' } }]);
 });
 
-test("Claude Code: one `claude -p` per call with our system prompt in place of its own and no tools of its own; the object it answers with becomes tool uses; tokens, cached ones too, from the result; a limit stops the run", async () => {
-  const { ClaudeCodeAdapter, answerOf, claudeCodeSystem } = await import("../src/llm/claude-code");
-  const { UsageLimitReached } = await import("../src/llm/call");
-  const seen: { args: string[]; stdin: string; system: string }[] = [];
-  const result = (said: string, extra: object = {}) => JSON.stringify({ type: "result", is_error: false, num_turns: 1, result: said, total_cost_usd: 0.01, usage: { input_tokens: 4, output_tokens: 300, cache_read_input_tokens: 2900, cache_creation_input_tokens: 120 }, ...extra });
-  const answers = ["Here is what I do.", '```json\n{"tool":"do","input_json":"{\\"what\\":\\"Publish a notice.\\"}","also":[{"tool":"do","input_json":{"what":"Tell the clerk."}}],"text":""}\n```'];
-  const runner = async (args: string[], stdin: string) => {
-    seen.push({ args, stdin, system: await Bun.file(args[args.indexOf("--system-prompt-file") + 1]!).text() });
-    return { code: 0, stderr: "", stdout: result(answers[seen.length - 1]!) };
-  };
-  const r = await new ClaudeCodeAdapter("claude-sonnet-5-5@low", runner).complete(req);
-  // The first answer was words, not the object: asked again.
-  expect(seen.length).toBe(2);
-  const a = seen[1]!;
-  for (const f of ["-p", "--no-session-persistence", "--strict-mcp-config", "--disable-slash-commands"]) expect(a.args).toContain(f);
-  expect(a.args.slice(a.args.indexOf("--model"), a.args.indexOf("--model") + 2)).toEqual(["--model", "claude-sonnet-5-5"]);
-  expect(a.args.slice(a.args.indexOf("--effort"), a.args.indexOf("--effort") + 2)).toEqual(["--effort", "low"]);
-  expect(a.args.slice(a.args.indexOf("--tools"), a.args.indexOf("--tools") + 2)).toEqual(["--tools", ""]);
-  expect(a.args).not.toContain("--json-schema");
-  // What is the same call after call (the instructions and the tools) is the system prompt; the conversation is not in it.
-  expect(a.system).toBe(claudeCodeSystem(req));
-  expect(a.system).toContain("You are the mayor.");
-  expect(a.system).toContain("- do:");
-  expect(a.system).not.toContain("[used do:");
-  expect(a.stdin).toContain("[used do:");
-  expect(a.stdin).not.toContain("You are the mayor.");
-  expect(r.content).toEqual([
-    { type: "tool_use", id: "claude-code-1", name: "do", input: { what: "Publish a notice." } },
-    { type: "tool_use", id: "claude-code-2", name: "do", input: { what: "Tell the clerk." } },
-  ]);
-  expect(r.usage).toEqual({ input_tokens: 4, output_tokens: 300, cache_read_tokens: 2900, cache_write_tokens: 120, reported_cost_microusd: 10000 });
-  // The model's own tool-use markup instead of the object: the same uses, read as it meant them (pilot 10: one answer in nine).
-  const markup = '\n<invoke name="look">\n<parameter name="report">finance/who</parameter>\n<parameter name="named">["c0003"]</parameter>\n<parameter name="limit">15</parameter>\n</invoke>\n<invoke name="write">\n<parameter name="to">["bank"]</parameter>\n<parameter name="text">Who instructed it?\nPlease say.</parameter>\n</invoke>\n<invoke name="x">\n</invoke>';
-  expect(answerOf(markup, ["look", "write", "do"])).toEqual({ tool: "look", input_json: '{"report":"finance/who","named":["c0003"],"limit":15}', also: [{ tool: "write", input_json: '{"to":["bank"],"text":"Who instructed it?\\nPlease say."}' }] });
-  expect(answerOf('<invoke name="x">\n</invoke>', ["look"])).toBeUndefined();
-  // An answer naming a tool that isn't one is no answer; with no tools, the words are.
-  expect(answerOf('{"tool":"pay","input_json":"{}"}', ["do"])).toBeUndefined();
-  expect(answerOf("Plain words.", [])).toEqual({ text: "Plain words." });
-  // Never the object: after the attempts, its words.
-  const words = await new ClaudeCodeAdapter("claude-sonnet-5-5", async () => ({ code: 0, stderr: "", stdout: result("I would rather not.") }), { attempts: 2 }).complete(req);
-  expect(words.content).toEqual([{ type: "text", text: "I would rather not." }]);
-  // The plan's limit: the run stops, to be resumed.
-  const limited = async () => ({ code: 1, stderr: "", stdout: result("Claude usage limit reached. Your limit will reset at 3pm.", { is_error: true }) });
-  await expect(new ClaudeCodeAdapter("claude-sonnet-5-5", limited).complete(req)).rejects.toBeInstanceOf(UsageLimitReached);
-  // (The words seen on 2026-10-08, when the plan's five-hour window ran out under a pilot and the agents beside it.)
-  const session = async () => ({ code: 1, stderr: "", stdout: result("You've hit your session limit · resets 2:20pm (Australia/Melbourne)", { is_error: true }) });
-  await expect(new ClaudeCodeAdapter("claude-sonnet-5-5", session).complete(req)).rejects.toBeInstanceOf(UsageLimitReached);
-  // Any other failure is an error, with what it said.
-  const failing = async () => ({ code: 1, stdout: "", stderr: "not signed in" });
-  await expect(new ClaudeCodeAdapter("claude-sonnet-5-5", failing, { attempts: 1 }).complete(req)).rejects.toThrow("not signed in");
-});

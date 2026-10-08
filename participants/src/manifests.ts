@@ -13,6 +13,8 @@ export interface Manifest {
   decisions?: string[];
   beliefs?: { name: string; about: string }[];
   state?: string;
+  keeps?: { what: string; why: string }[];
+  boundary?: { what: string; why: string }[];
 }
 
 const DIR = join(import.meta.dir, "../manifests");

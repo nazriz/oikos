@@ -80,9 +80,13 @@ test("an elector votes once on a ballot open to the roll, in secret (for the tow
   expect(cast[0]!.args.visible).toEqual(["city"]);
   expect(["1>2", "2>1"]).toContain(cast[0]!.args.choice);
   expect(votes(await p.wake(94 * DAY, { transactions: wages(94 * DAY) }))).toEqual([]);
-  // Not on the roll: no vote. Seen only at its close: no vote.
-  const off = await resident();
-  expect(votes(await off.p.wake(87 * DAY, { records: election("b1", 86 * DAY, 100 * DAY, ["c2", "c3"]), transactions: wages(87 * DAY) }))).toEqual([]);
+  // Not on the roll: no vote. (Until citizen 0.37.0 an elector read the published roll for their name. Nobody is sent
+  // the roll now, docs/no-god-view.md: an elector knows they are on it by having enrolled before the ballot was put.
+  // So "off the roll" is someone who enrolled only after it: here on day 1, for a ballot put on day 0.)
+  const off = await resident({}, { enrolled: false });
+  expect(off.said.filter((c) => c.fn === "statement" && c.args.kind === "enrolment").length).toBe(1);
+  expect(votes(await off.p.wake(87 * DAY, { records: election("b1", DAY, 100 * DAY, ["c2", "c3"]), transactions: wages(87 * DAY) }))).toEqual([]);
+  // Seen only at its close: no vote.
   const late = await resident();
   expect(votes(await late.p.wake(100 * DAY, { records: open, transactions: wages(100 * DAY) }))).toEqual([]);
   // The council's ballots aren't the electors'.

@@ -11,7 +11,7 @@ import type { LookRequest, Observation, StatementRecord } from "../contracts";
 import { channels } from "../contracts";
 import { standingClaims } from "../law";
 import { need, params, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
-import { nextLook, because, Book, prohibitions, holdsOf, noting, cellsOf, commitmentOf, DAY, Letters, lotOf, ownAccount, record, say, sign, type Step, usd, withdraw, outOfTime, team } from "./common";
+import { ask, Asked, nextLook, because, Book, prohibitions, holdsOf, noting, cellsOf, commitmentOf, DAY, Letters, lotOf, ownAccount, record, say, sign, type Step, usd, withdraw, outOfTime, team } from "./common";
 import { Deliveries, goodsPrices, held, order } from "./trade";
 import { Bargaining, Staffing, stepper, WindingUp } from "./firms";
 
@@ -191,7 +191,7 @@ export const inspector: BehaviourModule = {
  */
 export const builder: BehaviourModule = {
   name: "firm.builder",
-  version: "0.11.0",
+  version: "0.11.1",
   doc: "docs/behaviour/institutions.md",
   cadence: () => DAY,
   create(ctx: ParticipantContext) {
@@ -222,15 +222,14 @@ export const builder: BehaviourModule = {
     need(p, ["supplier"], "firm.builder");
     const book = new Book();
     // The plan of a lot a client asks us to build on, looked up in the register when the job comes in, once.
-    const planAsked = new Set<string>();
+    const planAsked = new Asked();
     const plansToRead = (obs: Observation): LookRequest[] => {
       if (!p.register) return [];
       for (const r of book.ofType("agreement")) {
         if (r.record !== "agreement" || !r.terms.parties.includes(obs.entity)) continue;
         const lot = commitmentOf(r, obs.entity).outcome?.structure?.on;
-        if (!lot || book.records.has(lot) || planAsked.has(lot)) continue;
-        planAsked.add(lot);
-        return [{ channel: p.register.lots, query: { where: [{ field: "id", op: "=", value: lot }], limit: 1 } }];
+        if (!lot || book.records.has(lot) || !planAsked.first(lot)) continue;
+        return [ask.one(p.register.lots, lot)];
       }
       return [];
     };
@@ -485,10 +484,28 @@ export const builder: BehaviourModule = {
  */
 export const registry: BehaviourModule = {
   name: "city.registry",
-  version: "0.4.0",
+  keeps: [
+    { what: "lot", why: "In this town the registrar also keeps the register of land: it passes a dead owner's titles to their heirs. The plans of the lots are that register's." },
+    { what: "records:claim", why: "The register of land it keeps: every title." },
+    { what: "records:claim_transfer", why: "The register of land it keeps: every dealing in a title." },
+    { what: "records:claim_release", why: "The register of land it keeps: every title given up." },
+    { what: "records:withdrawal", why: "The register of land it keeps: what has been struck from it." },
+  ],
+  version: "0.5.0",
   doc: "docs/behaviour/institutions.md",
   cadence: () => DAY,
-  create(_ctx: ParticipantContext) {
+  create(ctx: ParticipantContext) {
+    const p = params(
+      {
+        // Who is sent every entry as of right (a support office that pays by age; where a place's law sends its
+        // registry's entries): the world gives them.
+        feeds: [] as string[],
+        // Whom the town writes to when it is left to administer an estate, the death reported by nobody of the family
+        // (the banks, the utilities): the world gives them.
+        estate_tells: [] as string[],
+      },
+      ctx.params,
+    );
     const book = new Book();
     const registered = new Set<string>();
     const letters = new Letters();
@@ -506,8 +523,14 @@ export const registry: BehaviourModule = {
           if (!who || registered.has(who) || !(n.addressed_to ?? []).includes(me)) continue;
           registered.add(who);
           const d = n.data;
-          steps.push(because(`A death is reported to us (${who}, by ${n.speaks_for}): registering it.`, say("death_registration", `Death registered: ${who}.`, {
-            basis: n.id, visible: "public",
+          // The entry is the register's, and nobody is shown the register (docs/no-god-view.md). It is sent to whoever
+          // reported the death, to those they named as having had dealings with the dead person, to those sent every
+          // entry as of right, and, where nobody of the family reported it, to those the town writes to as the
+          // estate's administrator (docs/behaviour/deaths.md, "Who is told").
+          const family = Array.isArray(d.children);
+          const told = [...new Set([n.speaks_for, ...((Array.isArray(d.tell) ? d.tell : []) as unknown[]), ...p.feeds, ...(family ? [] : p.estate_tells)].filter((x): x is string => typeof x === "string" && x !== me))];
+          steps.push(because(`A death is reported to us (${who}, by ${n.speaks_for}): registering it, and telling ${told.join(", ") || "nobody else"}.`, say("death_registration", `Death registered: ${who}.`, {
+            basis: n.id, to: told, visible: [me, ...told],
             data: { deceased: who, reported_by: n.speaks_for, ...(d.partner ? { partner: d.partner } : {}), children: d.children ?? [], without_adult: d.without_adult ?? [] },
           })));
           // The land the deceased held passes to their heir, as the succession law says (the partner; else the eldest adult

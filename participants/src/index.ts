@@ -16,7 +16,7 @@ export { adultAgeBands, drawHousehold, drawSavings, bedroomsNeeded, type DrawnHo
 export { yearsOfSchooling, type SchoolingSpec } from "./behaviour/school";
 import type { BehaviourModule } from "./module";
 import { bankPaymentSystem } from "./behaviour/bank";
-import { disposal, exportDemand, funding, grants, idle, migration, trade, transfers, valuer, weather } from "./behaviour/world";
+import { disposal, exportDemand, funding, grants, idle, migration, statistics, trade, transfers, valuer, weather } from "./behaviour/world";
 import { lending } from "./behaviour/credit";
 import { organiser } from "./behaviour/union";
 import { citizen } from "./behaviour/citizen";
@@ -48,6 +48,7 @@ export const modules: { [name: string]: BehaviourModule & { source: string } } =
       [funding, "behaviour/world.ts"],
       [weather, "behaviour/world.ts"],
       [valuer, "behaviour/world.ts"],
+      [statistics, "behaviour/world.ts"],
       [grants, "behaviour/world.ts"],
       [disposal, "behaviour/world.ts"],
       [lending, "behaviour/credit.ts"],

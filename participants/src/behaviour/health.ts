@@ -14,7 +14,7 @@ const HOUR = 3600;
 
 export const practice: BehaviourModule = {
   name: "clinic.practice",
-  version: "0.2.0",
+  version: "0.2.1",
   doc: "docs/behaviour/health.md",
   // (When it opens each working day, and whenever a patient asks: someone who comes in and asks is seen then, if it's
   // open.)

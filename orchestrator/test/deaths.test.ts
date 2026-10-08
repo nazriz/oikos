@@ -37,8 +37,16 @@ test("a death is seen, reported, registered, and the world's people act on it", 
     return (hh?.members ?? []).filter((m: any) => m.person !== d.person && (diedAt.get(m.person) ?? Infinity) > d.t && d.t - m.born_at >= 18 * 365 * DAY && (leftTown.get(m.person) ?? Infinity) > d.t + 3 * DAY).map((m: any) => m.person);
   };
   const early = died.filter((d) => d.t < 365 * DAY - 14 * DAY && homeOf.has(d.person));
-  const shared = early.filter((d) => housemates(d).length > 0);
-  const alone = early.filter((d) => housemates(d).length === 0);
+  // (Living there: an adult of the household who had been in that home before the death. Since citizen 0.39.0 a year
+  // of this town has a family new to town whose leaseholder took a home and died in it within the week, before the
+  // others, still sleeping at their work, ever went there; and someone else, not of the household, still living in
+  // it. Those others of the household never lived with them; whoever does live there reports it: below.)
+  const beenIn = new Set(ev.filter((e) => e.event === "occupied").map((e) => `${e.occupant}|${e.space}`));
+  const livedWith = (d: { person: string; t: number }) => housemates(d).filter((m) => beenIn.has(`${m}|${homeOf.get(d.person)}`));
+  const stillThere = (d: { person: string; t: number }) => [...new Set(ev.filter((e) => e.event === "occupied" && e.space === homeOf.get(d.person) && e.occupant !== d.person && e.t > d.t && e.t <= d.t + 3 * DAY).map((e) => e.occupant as string))];
+  const shared = early.filter((d) => housemates(d).length > 0 && (livedWith(d).length > 0 || stillThere(d).length === 0));
+  const withOthers = early.filter((d) => !shared.includes(d) && stillThere(d).length > 0);
+  const alone = early.filter((d) => !shared.includes(d) && !withOthers.includes(d));
   expect(shared.length).toBeGreaterThan(3);
   expect(alone.length).toBeGreaterThan(1);
   // Someone who lived with another adult: reported by one of them, every time, the next time one is awake at home
@@ -51,6 +59,13 @@ test("a death is seen, reported, registered, and the world's people act on it", 
     const r = regs.get(d.person);
     expect(r, `${d.person}'s death is registered`).toBeDefined();
     expect(housemates(d), `${d.person}'s death is reported by someone they lived with`).toContain(r.data.reported_by);
+    expect(r.t - d.t).toBeLessThanOrEqual(3 * DAY);
+  }
+  // Someone whose home is also lived in by people not of their household: one of those reports it, as soon.
+  for (const d of withOthers) {
+    const r = regs.get(d.person);
+    expect(r, `${d.person}'s death is registered`).toBeDefined();
+    expect(stillThere(d), `${d.person}'s death is reported by someone living there`).toContain(r.data.reported_by);
     expect(r.t - d.t).toBeLessThanOrEqual(3 * DAY);
   }
   // Someone with nobody at home: found by their landlord or the police, and never before the home has stood empty for

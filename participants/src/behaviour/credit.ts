@@ -102,6 +102,9 @@ export function payout(payment: number, annualBps: number, monthsLeft: number): 
  */
 export const lending: BehaviourModule = {
   name: "bank.lending",
+  keeps: [
+    { what: "request", why: "The bank's own files: its customers' instructions, among them the repayments of the loans this office made." },
+  ],
   version: "0.3.0",
   doc: "docs/behaviour/credit.md",
   cadence: () => DAY,

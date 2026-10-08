@@ -3,7 +3,7 @@
 // its own book of the records relevant to it, as a person would.
 
 import * as C from "../calls";
-import type { Assertion, Observation, Offer, Outcome as ActOutcome, Practice, Reading, Record, ParticipantAction, Registry, StatementRecord } from "../contracts";
+import type { Assertion, LookRequest, Observation, Offer, Outcome as ActOutcome, Practice, Reading, Record, ParticipantAction, Registry, StatementRecord } from "../contracts";
 import { channels } from "../contracts";
 import { cents, moneyNow } from "../money";
 import { evaluate } from "../law";
@@ -766,6 +766,66 @@ export function ownAccount(obs: Observation): { account: string; balance: number
   return a && { account: a.account, balance: cents(a.balance), custodian: a.custodian, currency: a.currency };
 }
 
+// ------------------------------------------------------------------ asking whoever keeps it (docs/no-god-view.md)
+//
+// Nobody has a god's view. A participant is shown its own records, what is addressed to it and its own premises;
+// anything else it needs it asks for, from whoever keeps it, the one thing at a time: a lot's plan from the land
+// register by the lot's id, the agreements at its own workplace by its employer's name, one shop's price list by the
+// shop. `ask` is the way to do that, and the only way a behaviour should come to know of what someone else keeps: a
+// search through a channel of its own that is shown only on request (contracts: a look with a query), answered with
+// what matches now. It is for this that such channels exist; a channel that shows a whole register unasked is refused
+// by orchestrator/test/no-god-view.test.ts unless the module is that register's keeper and says so (`keeps`).
+//
+// How to use it: return the requests from a stepper's `looks` (behaviour/firms.ts), or as a `look` action; the answer
+// comes with the next observation, in the same book as everything else seen. Ask once for what doesn't change (`Asked`
+// remembers), and never for more than the decision in hand needs: every search names something (an id, an owner, a
+// place) or is cut to the few a person would read (`most`), which the module takes from its parameters.
+
+/** One search of a channel shown on request (contracts/participant-api.schema.json: LookRequest). */
+export type Asking = LookRequest & { query: NonNullable<LookRequest["query"]> };
+
+export const ask = {
+  /** The one record with this id: a lot's plan, a title, a listing someone gave us the number of. */
+  one: (channel: string, id: string): Asking => ({ channel, query: { where: [{ field: "id", op: "=", value: id }], limit: 1 } }),
+  /**
+   * The records that say `value` at `field` (`speaks_for`: one shop's price list, one person's enrolment; `claim`: the
+   * dealings in one title; `data.employer`: the agreements at one workplace; `about.object`: the titles to one lot),
+   * at most `most` of them. `since`: made at or after then. `standing`: only those not withdrawn. `newest`: the latest
+   * first (so `most: 1` is the current one); `oldest`: in the order made.
+   */
+  about: (channel: string, field: string, value: string | number | boolean, o: { most: number; since?: number; standing?: boolean; newest?: boolean; oldest?: boolean }): Asking => ({
+    channel,
+    query: { ...(o.standing ? { standing: true } : {}), where: [{ field, op: "=", value }, ...(o.since !== undefined ? [{ field: "at", op: ">=" as const, value: o.since }] : [])],
+      ...(o.newest ? { order: { field: "at", desc: true } } : o.oldest ? { order: { field: "at" } } : {}), limit: o.most },
+  }),
+  /**
+   * A reader's few: the first `most` standing records of a board (a listings page, the petitions board), by `by` if
+   * given (`data.rent`, dearest first with `desc`), under conditions the reader sets (`where`). Never a way round the
+   * rule: `most` is how many a person would read, from the module's parameters.
+   */
+  board: (channel: string, o: { most: number; where?: NonNullable<Asking["query"]["where"]>; by?: string; desc?: boolean }): Asking => ({
+    channel, query: { standing: true, ...(o.where?.length ? { where: o.where } : {}), ...(o.by ? { order: { field: o.by, ...(o.desc ? { desc: true } : {}) } } : {}), limit: o.most },
+  }),
+};
+
+/** What has been asked for already, so that it is asked once: `asked.first(lot)` is true the first time only. With a
+ * time, again once something newer than the last asking calls for it (`asked.since(title) < transfer.at`). */
+export class Asked {
+  private readonly when = new Map<string, number>();
+  first(key: string, t = 0): boolean {
+    if (this.when.has(key)) return false;
+    this.when.set(key, t);
+    return true;
+  }
+  /** When this was last asked (never: before any time). */
+  since(key: string): number {
+    return this.when.get(key) ?? -1;
+  }
+  again(key: string, t: number): void {
+    this.when.set(key, t);
+  }
+}
+
 // ------------------------------------------------------------------ acting through calls
 //
 // Code participants act the way every participant does (D36, P14): they say
@@ -897,6 +957,16 @@ export class Letters {
 export const PAYMENT_FAILED = {
   note: (amount: string, to: string, request: string) => `Payment of ${amount} to ${to} (request ${request}) failed: insufficient funds.`,
   is: (text: string) => /^Payment of .+ to \S+ \(request \S+\) failed: insufficient funds\.$/.test(text),
+};
+
+/**
+ * What a bank writes, once, to whoever has a standing order paying into the account of someone it has been told has
+ * died (docs/behaviour/deaths.md): how an employer, who is on no register and is told by no registry, comes to know
+ * that the person it pays has died. The words are here, once, so the bank and its readers can't drift apart.
+ */
+export const PAYEE_DIED = {
+  note: (holder: string, to: string, request: string) => `Your payments to ${to} (request ${request}): the account's holder, ${holder}, has died. They go to the estate until you stop them.`,
+  who: (text: string): string | undefined => /^Your payments to \S+ \(request \S+\): the account's holder, (\S+), has died\./.exec(text)?.[1],
 };
 
 /** An amount in words, for reasons and letters, as the world writes its money (money.ts). */

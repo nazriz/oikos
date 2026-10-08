@@ -1,6 +1,6 @@
 {
   "name": "citizen.default",
-  "version": "0.37.0",
+  "version": "0.39.1",
   "doc": "docs/behaviour/citizen.md",
   "params": {
     "accept_fewer_bedrooms_after_days": {
@@ -11,6 +11,13 @@
       "unit": "days",
       "default": 60,
       "source": "still hunting after this long: accept one bedroom fewer than the standard asks, and so on (placeholder)"
+    },
+    "adverts": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
+      "source": "placeholder"
     },
     "aggrieved_bps": {
       "schema": {
@@ -431,6 +438,13 @@
       "default": null,
       "source": "placeholder"
     },
+    "sale_board": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
+      "source": "placeholder"
+    },
     "saving_bps": {
       "schema": {
         "type": "integer",
@@ -473,6 +487,23 @@
       "unit": "days",
       "default": 14,
       "source": "placeholder"
+    },
+    "shop_search_bps": {
+      "schema": {
+        "type": "integer",
+        "description": "Lengnick 2013, Table 1: the monthly chance of looking at another seller's price (0.25)"
+      },
+      "unit": "bps",
+      "default": 2500,
+      "source": "Lengnick 2013, Table 1: the monthly chance of looking at another seller's price (0.25)"
+    },
+    "shops_known": {
+      "schema": {
+        "type": "integer",
+        "description": "Lengnick 2013, Table 1: sellers a household deals with (7): how many it looks up, knowing none"
+      },
+      "default": 7,
+      "source": "Lengnick 2013, Table 1: sellers a household deals with (7): how many it looks up, knowing none"
     },
     "strike_vote_yes_bps": {
       "schema": {
@@ -517,6 +548,13 @@
         "enterprise_openness": 0.4,
         "enterprise_achievement": 0.3
       },
+      "source": "placeholder"
+    },
+    "tell_on_leaving": {
+      "schema": {
+        "type": "array"
+      },
+      "default": [],
       "source": "placeholder"
     },
     "tenancy_schedule": {

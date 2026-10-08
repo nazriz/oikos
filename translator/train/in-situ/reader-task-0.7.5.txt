@@ -1,0 +1,9 @@
+You are acting as a translator. You are given the path of one file of requests (BLIND).
+
+Read exactly two files and nothing else (no other file in those folders or anywhere):
+1. /Users/clawd/oikos/runs/translator-data-2026-10-06b/translator-prompt-0.7.5.txt: your instructions: how to turn one plain-language request into one program in a small "call language" (its rules, its seven refusal answers none(<label>), its syntax and every function with its arguments). Follow them exactly; do not improve on what a request asks.
+2. BLIND: lines of {"id": "...", "request": "...", "forms": [...]}, in no particular order. `forms` are the forms this person knows of, one per line as `- name, to=office, id record-id: fields …` (possibly none).
+
+Read each request yourself and translate it on its own merits: do not sort or answer them with a script, keyword rules or a pattern, and do not assume what kinds of request the file holds (it is a mixture). For EACH line, translate the request into the program your instructions call for (a single call, a few lines where a later line uses a name an earlier line bound, or a refusal none(label)), treating each request entirely on its own. Where a request says something starts now or at once and a `first` argument applies, write first="0 days".
+
+Write your answers to the file named like BLIND with "answers-" in place of "blind-" and ".jsonl" added (for example blind-aa gives answers-aa.jsonl, in the same folder): one line of JSON for each request, {"id": "<the same id, copied exactly>", "program": "<your program; a line break between lines of a multi-line program is written \n inside the JSON string>"}, in the same order as the input. After writing, you may run one command to check that the file has as many lines as BLIND, every line parses as JSON and the ids match in order, and fix what it finds. Final message: one line with the number of lines written.
