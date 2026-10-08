@@ -666,14 +666,14 @@ impl World {
                 let created = (!res.created.is_empty()).then_some(res.created);
                 let mut events = vec![Timed::new(t, EventBody::ActionApplied { action: action.clone(), participant: participant.into(), position: pos.clone(), created: created.clone() })];
                 events.extend(res.events);
-                (events, Outcome { action, t, status: OutcomeStatus::Applied, created, refusal: None, surveyed: res.surveyed, investigated: res.investigated })
+                (events, Outcome { action, t, status: OutcomeStatus::Applied, created, refusal: None, surveyed: res.surveyed, investigated: res.investigated, seen: res.seen })
             }
             Err(r) => (
                 vec![Timed::new(
                     t,
                     EventBody::ActionRefused { action: action.clone(), participant: participant.into(), position: pos.clone(), block: r.block, code: r.code, detail: r.detail.clone() },
                 )],
-                Outcome { action, t, status: OutcomeStatus::Refused, created: None, refusal: Some(refusal_info(&r)), surveyed: None, investigated: None },
+                Outcome { action, t, status: OutcomeStatus::Refused, created: None, refusal: Some(refusal_info(&r)), surveyed: None, investigated: None, seen: None },
             ),
         };
         let key = pos.unwrap_or_else(|| SELF.into());

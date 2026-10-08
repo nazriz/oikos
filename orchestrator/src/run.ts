@@ -419,7 +419,12 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     const entityName = (cfg.world?.entities ?? []).find((e: any) => e.id === entity)?.name;
     // What kind of report each is: with it, the seat can look into its papers, its buildings and ground, and who's who.
     const kinds = new Map<string, string>(chans.map((x) => [x.path, x.ch.kind]));
-    const config = { participant: p.id, entity, entityName, onRequest, kinds, title: office?.title ?? p.title, role: office?.role, framing: p.framing, standing: standingIds, titles, cadenceDays: pp.cadence_days ?? 7, draftText,
+    // And which way each reaches it (docs/design/knowing.md): a register asked of its keeper is asked about one named
+    // thing (by which fields), a board searched, who's who looked up, a place gone to.
+    const boards = new Set<string>((cfg.knowing?.published ?? []).filter((x: any) => x.board).map((x: any) => x.what));
+    const ways = new Map<string, { way: string; by?: string[]; board?: boolean }>(chans.filter((x) => x.ch.way).map((x) => [x.path, { way: x.ch.way, ...(x.ch.by ? { by: x.ch.by } : {}),
+      ...(x.ch.way === "published" && !x.ch.from && (x.ch.match?.statement_kinds ?? []).some((k: string) => boards.has(k)) ? { board: true } : {}) }]));
+    const config = { participant: p.id, entity, entityName, onRequest, kinds, ways, title: office?.title ?? p.title, role: office?.role, framing: p.framing, standing: standingIds, titles, cadenceDays: pp.cadence_days ?? 7, draftText,
       ...(pp.sessions ? { sessions: pp.sessions } : {}), ...(pp.max_actions ? { maxActions: pp.max_actions } : {}) };
     const controller = createLlmParticipant(config, io);
     const module: BehaviourModule = { name: "llm.participant", version: LLM_PARTICIPANT_VERSION, doc: "docs/design/m2-llm-participants.md", cadence: () => cadence, create: () => controller as unknown as Controller };

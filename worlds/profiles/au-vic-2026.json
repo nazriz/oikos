@@ -4,6 +4,7 @@
   "as_of": "2026-09",
   "about": "Every place-specific figure the town generator uses, with its source. A world for another place and time is another profile; the platform's code holds none of these (docs/profiles.md).",
   "values": {
+    "knowing": { "visit_seconds": 1800, "title_search_fee": 810, "index_search_fee": 923 },
     "currency": {
       "code": "AUD",
       "minor_units": 2,
@@ -834,6 +835,9 @@
     }
   },
   "sources": {
+    "knowing.visit_seconds": "How long looking at one place takes someone who has gone there (an inspection at a notified stage, a valuer's external look, a welfare check at the door), beside the way there and back. Half an hour: a placeholder. No source was found for any of the three (docs/behaviour/knowing.md, section 3).",
+    "knowing.title_search_fee": "What a search of one title costs online: 8.10 (LANDATA service charges 2025-2026, Land Use Victoria, read 2026-10-08 in the Internet Archive's copy of 2026-02-05: 'Folio Search 9.70 20.50 8.10'; the 2026-27 schedule was not reachable). Recorded, not charged: nobody pays for a search yet (docs/behaviour/knowing.md, 'Leaves out').",
+    "knowing.index_search_fee": "What finding a title by anything but its own number (an address, a lot on a plan) costs on top: 9.23 (the same schedule: Land Index Search). Recorded, not charged.",
     "currency": "Australian dollars, in cents: written with a dollar sign before the amount (\"$1,234.56\"), or in words as dollars (informally bucks) and cents. ISO 4217: AUD, two decimal places.",
     "health": "The clinic stands for the town's health system (general practice and the hospital it refers to; a liberty: a town of 200 has neither). doctors_per_1000: about 120 full-time-equivalent GPs per 100,000 people (Department of Health and Aged Care, GP workforce statistics, 2023; to confirm). doctor_wage_per_fortnight: a salaried GP in community health, about $180,000 a year (placeholder, to source from the Victorian public sector's agreements). consult_minutes: a long consultation (MBS item 36 is 20-40 minutes; placeholder for care of a hospital-level condition). seek_care_bps, treats and off_work_severities: placeholders (the conditions here are hospital-level, so nearly everyone with one is treated; care shortens them by a fifth; fatal_kept_bps has no effect while conditions don't kill: docs/behaviour/life.md). Nobody works with a serious or severe condition (a hospital stay): placeholder.",
     "round": "Working hours 9 to 5, Monday to Friday, for everyone, shops included (a liberty: shops open Saturdays with rostered staff, not modelled); school 9 to 3 on school days (Victorian school hours are about 8:50 to 3:20). Travel: off the roads, a 25 m cell on foot in about 18 seconds (walking about 1.4 m/s: Bohannon 1997; to confirm); on a road, about 2 seconds (45 km/h, under the default urban limit of 50 km/h, Road Safety Road Rules 2017 (Vic); to confirm; most regional Victorians drive to work: ABS Census 2021, method of travel to work); slower across water, wetland and bush (placeholders). Roads: the town builds toward buildings more than three cells (75 m) from one (placeholder), within a roads budget of about $300 a resident a year (Victorian councils' spending on local roads, Victorian Local Government Grants Commission; placeholder, to confirm).",

@@ -21,7 +21,7 @@ A wind tunnel for AI stewardship: a configurable, living, visual simulated world
 - Every run records token usage and cost.
 - Respect VISION §15 (welfare of AI participants) when designing participants, framings and scenarios.
 - **The platform is general: no place in the code.** Every place-specific figure (census shares, wages, rents, rates, currency...) lives in a profile (`worlds/profiles/`), with its source; modules and generators have neutral names and no place's figures as defaults (docs/profiles.md). `orchestrator/test/generality.test.ts` enforces it.
-- **Nobody has a god's view.** No participant is shown a whole register, population or map, or the run's future; it asks whoever keeps a thing for the one thing it needs (`ask` in `participants/src/behaviour/common.ts`). A keeper's own register is declared on its module, with the reason (docs/no-god-view.md). `orchestrator/test/no-god-view.test.ts` enforces it.
+- **Nobody has a god's view: information lives with whoever keeps it.** It reaches a participant in four ways only: it is theirs; they are there (anywhere else they go to look, which takes time); it was published; or they asked its keeper for one named thing. Only a register's keeper sees it whole, declared on its module with the reason. A channel says which way it is, and the contract and the kernel refuse anything else: a whole register, map or directory cannot be written (docs/no-god-view.md, docs/design/knowing.md). `orchestrator/test/no-god-view.test.ts` is the backstop.
 
 ## Stack
 Rust (kernel) · TypeScript on **Bun, not Node** (participants, translator, orchestrator) · Three.js on WebGPU (renderer) · Apache-2.0.

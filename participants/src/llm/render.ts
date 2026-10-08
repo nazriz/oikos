@@ -56,7 +56,7 @@ export function outcomeLines(x: Outcome, what: string, now: number): string[] {
   const o = x as Outcome & { [k: string]: any };
   const value = (v: unknown): string => (v !== null && typeof v === "object" ? details(v, Infinity) : String(v));
   const more = (from: object, said: string[]) => Object.entries(from).filter(([k]) => !said.includes(k)).map(([k, v]) => ` ${cap(k)}: ${value(v)}.`).join("");
-  const rest = Object.entries(o).filter(([k]) => !["action", "t", "status", "created", "refusal", "surveyed", "investigated"].includes(k)).map(([k, v]) => `  ${cap(k)}: ${value(v)}.`);
+  const rest = Object.entries(o).filter(([k]) => !["action", "t", "status", "created", "refusal", "surveyed", "investigated", "seen"].includes(k)).map(([k, v]) => `  ${cap(k)}: ${value(v)}.`);
   const at = o.t !== undefined && Math.floor(o.t / DAY) !== Math.floor(now / DAY) ? ` (${when(o.t)})` : "";
   if (o.status !== "applied") {
     const part = o.refusal?.block;
@@ -77,6 +77,8 @@ export function outcomeLines(x: Outcome, what: string, now: number): string[] {
     const found = !i.taken ? "nothing of the kind was found to have been taken there" : i.taker ? `it was taken, by ${i.taker}` : "it was taken, but who took it wasn't found";
     out.push(`  What the investigation into ${into} found: ${found}.${more(i, ["from", "at", "kind", "taken", "taker"])}`);
   }
+  // Work on a building: those who did it were there, and this is how they left it.
+  if (o.seen) out.push("  As those who did the work left it:", ...describeBuildings([o.seen as SiteStructure], "", now).map((l) => l.split("\n").map((x) => `  ${x}`).join("\n")));
   return [...out, ...rest];
 }
 
@@ -478,7 +480,7 @@ export function renderObservation(obs: Observation, o: RenderOptions = {}): stri
       const nameOf = new Map(ch.entities.filter((e) => e.participant).map((e) => [e.participant!, `${e.name} (${e.entity})`]));
       const office = (p: (typeof ch.positions)[number]) => `${p.title ?? words(p.role ?? p.position)} (${p.position}), for ${p.entity}: ${p.holder ? (nameOf.get(p.holder) ?? p.held_by ?? "filled") : "vacant"}`;
       if (asked?.named?.length) {
-        // Who it asked after, by id or by name (or part of one): people, organisations and posts, one by one.
+        // Who it asked after: the people, organisations and posts its look-ups found, one by one.
         const names = asked.named.map(plain).filter(Boolean);
         const limit = asked.limit ?? 20;
         const entities = ch.entities.filter((e) => names.some((n) => plain(e.entity) === n || plain(e.name).includes(n) || plain(e.kind) === n));
@@ -489,14 +491,14 @@ export function renderObservation(obs: Observation, o: RenderOptions = {}): stri
         if (lines.length > limit) out.push(`(${lines.length - limit} more not listed: ask for more at once, or name them more closely.)`);
         continue;
       }
+      // Nobody is shown who's who: what stands here is its own address book, those it has looked up so far.
       const orgs = ch.entities.filter((e) => e.kind !== "person").map((e) => `${e.name} (${e.entity})`);
-      // Posts with a public role (mayor, councillor…) are listed with who holds them; the rest are only counted.
-      const offices = ch.positions.filter((p) => p.role).map(office);
-      const others = ch.positions.length - offices.length;
-      out.push("", `## ${title(id)}`, `Organisations: ${orgs.join(", ") || "none"}.`,
-        ...(offices.length ? [`Posts: ${offices.slice(0, 60).join("; ")}${offices.length > 60 ? `; and ${offices.length - 60} more` : ""}${others ? `; and ${others} other post${others === 1 ? "" : "s"} in organisations' own offices` : ""}.`] : []),
-        `People: ${ch.entities.filter((e) => e.kind === "person").length}.`,
-        ...look(id, "To find a person, an organisation or a post, name them (an id, or a name or part of one)"));
+      const people = ch.entities.filter((e) => e.kind === "person").map((e) => `${e.name} (${e.entity})`);
+      const offices = ch.positions.map(office);
+      const few = (xs: string[], most: number) => `${xs.slice(0, most).join("; ")}${xs.length > most ? `; and ${xs.length - most} more` : ""}`;
+      out.push("", `## ${title(id)}`, ...(orgs.length + people.length + offices.length ? ["Those you have looked up so far:",
+        ...(orgs.length ? [`Organisations: ${few(orgs, 40)}.`] : []), ...(offices.length ? [`Posts: ${few(offices, 60)}.`] : []), ...(people.length ? [`People: ${few(people, 40)}.`] : [])] : ["You have looked nobody up yet."]),
+        ...look(id, "To find out who someone is, name them (a person or an organisation by its id or full name; a post by its id, its title or what it is, such as mayor)"));
     }
   }
   // Somewhere it looked that isn't there to be seen (a report it no longer has): said.

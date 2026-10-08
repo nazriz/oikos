@@ -83,7 +83,10 @@ test("a body, posts, buildings with their spaces, and the directory's posts read
   expect(text).toContain("apts-1/dwelling.0, a dwelling (bedrooms: 2): 3 people (room for 6): you, c2, c3");
   expect(text).toContain("Open ground: 2 cells (cell.1.0; cell.2.0, water).");
   expect(text).toContain("## Mayor: Who");
-  expect(text).toContain("Posts: Mayor (mayor), for city: Ada (ada-p); Town clerk (clerk), for city: vacant; and 1 other post in organisations' own offices.");
+  // (Who's who is its own address book now: those it has looked up, each post set out, none merely counted. Until
+  // 2026-10-08 it was shown every post in the town, and the ones without a public role were counted.)
+  expect(text).toContain("Those you have looked up so far:");
+  expect(text).toContain("Posts: Mayor (mayor), for city: Ada (ada-p); Town clerk (clerk), for city: vacant;");
   expect(text).not.toContain("till-system");
 });
 
@@ -167,7 +170,9 @@ test("everything that comes back from an act is told: what it made, what a surve
   const api = JSON.parse(await Bun.file(new URL("../../contracts/participant-api.schema.json", import.meta.url)).text());
   const done = { action: "act.9", t: 0, status: "applied", created: { new_lease: "rec.12" },
     surveyed: { of: "river_trout", cells: { "cell.1.2": 14, "cell.1.3": 0 } },
-    investigated: { from: "shop-1", at: "shop-1/store.1", kind: "goods", taken: true, taker: "c0042" } };
+    investigated: { from: "shop-1", at: "shop-1/store.1", kind: "goods", taken: true, taker: "c0042" },
+    seen: { structure: "house-3", type: "house", at: "cell.2.2", w: 1, h: 1, complete: true, variables: { wear: { value: 12, per_day: 1, as_of_day: 0, min: 0, max: 100 } },
+      spaces: [{ space: "house-3/dwelling.1", kind: "dwelling", capacity: 4, count: 2 }] } };
   const refused = { action: "act.10", t: 0, status: "refused", refusal: { code: "insufficient_funds", block: 2, detail: "block 2: acc-city holds 100 cents" } };
   // (Between them they carry every part the participant API lets an outcome have: a part added there is added here.)
   expect(new Set([...Object.keys(done), ...Object.keys(refused)])).toEqual(new Set(Object.keys(api.$defs.Outcome.properties)));
@@ -178,6 +183,10 @@ test("everything that comes back from an act is told: what it made, what a surve
   expect(text).toContain("It made: rec.12 (new lease).");
   expect(text).toContain("What the survey of river trout found, place by place (estimates): cell.1.2: 14; cell.1.3: 0. In all: 14.");
   expect(text).toContain("What the investigation into goods taken from shop-1 at shop-1/store.1 found: it was taken, by c0042.");
+  // Work on a building: how the crew left it (how many are in it, never who, at someone else's building).
+  expect(text).toContain("As those who did the work left it:");
+  expect(text).toContain("house house-3, at cell.2.2: wear 12, rising 1 a day");
+  expect(text).toContain("house-3/dwelling.1, a dwelling: 2 people (room for 4)");
   const no = renderObservation(obs({}, { outcomes: [refused] }), { lastAction: "What you confirmed" });
   expect(no).toContain("What you confirmed couldn't be done: the account doesn't have enough money (item 3).");
   // The act's own number and the engine's wording of why not are the platform's: never shown (principle 14).
@@ -290,7 +299,10 @@ test("who's who, looked into: people, organisations and posts by id or by part o
   const who = { kind: "directory", entities: [{ entity: "city", kind: "town", name: "Millbrook" }, { entity: "c0001", kind: "person", name: "Ada Lovelace", participant: "ada" }, { entity: "c0002", kind: "person", name: "Bo Diddley" }],
     positions: [{ position: "mayor", entity: "city", title: "Mayor", role: "mayor", holder: "ada" }, { position: "clerk", entity: "city", title: "Town clerk", role: "clerk" }] };
   const o = { lookable: new Set(["who"]) };
-  expect(renderObservation(obs({ who }), o)).toContain('People: 2.\n(To find a person, an organisation or a post, name them (an id, or a name or part of one): look at "Who" (who).)');
+  // Nobody is shown who's who (docs/design/knowing.md): what a seat has of it is whom it has looked up, by name, and
+  // how to look someone up. (Until 2026-10-08: "People: 2." of a directory it was shown whole.)
+  expect(renderObservation(obs({ who }), o)).toContain('Those you have looked up so far:\nOrganisations: Millbrook (city).\nPosts: Mayor (mayor), for city: Ada Lovelace (c0001); Town clerk (clerk), for city: vacant.\nPeople: Ada Lovelace (c0001); Bo Diddley (c0002).\n(To find out who someone is, name them (a person or an organisation by its id or full name; a post by its id, its title or what it is, such as mayor): look at "Who" (who).)');
+  expect(renderObservation(obs({ who: { kind: "directory", entities: [], positions: [] } }), o)).toContain("You have looked nobody up yet.");
   const found = renderObservation(obs({ who }), { ...o, looked: new Map([["who", { named: ["lovelace", "clerk"] }]]) });
   expect(found).toContain("## Who: who you looked for\n- Ada Lovelace (c0001), a person\n- post: Mayor (mayor), for city: Ada Lovelace (c0001)\n- post: Town clerk (clerk), for city: vacant");
   expect(found).not.toContain("Bo Diddley");

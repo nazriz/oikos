@@ -10,7 +10,7 @@ import * as C from "../calls";
 import type { SiteStructure, StatementRecord } from "../contracts";
 import { basesOf, channels } from "../contracts";
 import { need, params, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
-import { nextLook, because, Book, cellsOf, DAY, draftLaw, figureWords, heldValue, jobTerms, Letters, lotOf, message, MONTH, ownAccount, pay, publishedCount, publishedPrice, record, say, type LawFigure, type LawSchedule, type Step, usd, variableToday, vote, withdraw, outOfTime, team } from "./common";
+import { nextLook, because, Book, cellsOf, DAY, draftLaw, figureWords, heldValue, jobTerms, Letters, lotOf, message, MONTH, ownAccount, pay, publishedCount, publishedPrice, record, say, type LawFigure, type LawSchedule, type Step, usd, variableToday, vote, withdraw, outOfTime, team, lookUp } from "./common";
 import { Staffing, stepper } from "./firms";
 import { incomeTaxLaw, withholding } from "./tax";
 import { ownerOf } from "./institutions";
@@ -203,15 +203,18 @@ export const mayorCode: BehaviourModule = {
  */
 export const councilClerk: BehaviourModule = {
   name: "city.council_clerk",
-  version: "0.6.1",
+  version: "0.7.0",
   doc: "docs/behaviour/government.md",
   cadence: () => DAY,
   create(ctx: ParticipantContext) {
-    const p = params({ vote_days: 14 }, ctx.params);
+    const p = params({ vote_days: 14,
+      who: "", // its channel onto who's who, where it looks up its council's members ("": it knows them as it is shown them)
+      members_role: "councillor", members_every_days: 30 }, ctx.params);
     const book = new Book();
     const balloted = new Set<string>();
     const closed = new Set<string>();
     const letters = new Letters();
+    let membersAsked = -Infinity;
     return stepper(
       (obs) => {
         book.absorb(obs);
@@ -222,6 +225,7 @@ export const councilClerk: BehaviourModule = {
         const t = obs.t;
         const steps: Step[] = [];
         // The council's members are its councillor positions: a vote counts when made in one (one per position; the latest).
+        // (As the clerk last looked them up: its own council's list of members, below.)
         const councillors = new Set((channels.directory(obs)?.positions ?? []).filter((x) => x.role === "councillor" && x.entity === me).map((x) => x.position));
         for (const prop of book.open("proposal")) {
           if (balloted.has(prop.id) || !(prop.addressed_to ?? []).includes(me)) continue;
@@ -290,6 +294,14 @@ export const councilClerk: BehaviourModule = {
             `A law proposed on that form stands as its words: no rule is set down with it for acts to be checked against.${amendable(book, me, true)}`;
         }));
         return steps;
+      },
+      undefined,
+      // Its council's members: the holders of the town's councillor posts, looked up (nobody is shown who's who), at
+      // its first wake and again every so often, as a council's own list of members is kept up.
+      (obs) => {
+        if (!p.who || obs.t - membersAsked < p.members_every_days * DAY) return [];
+        membersAsked = obs.t;
+        return [lookUp.holders(p.who, obs.entity!, p.members_role)];
       },
     );
   },

@@ -20,6 +20,8 @@ export class View {
   private accounts = new Map<string, Map<string, AccountItem>>();
   private holdings = new Map<string, Map<string, HoldingItem>>();
   private sites = new Map<string, { as_of: number; cells: Map<string, SiteCell> }>();
+  /** Places gone to (a visit's channel): when each cell was last seen, and the cells the latest visit saw. */
+  private visits = new Map<string, { seen_at: { [cell: string]: number }; fresh: string[] }>();
   private directories = new Map<string, { entities: Map<string, DirectoryData["entities"][number]>; positions: Map<string, PositionItem> }>();
   private kept = new Map<string, Map<string, Record>>();
   /** Each channel's current picture as a sorted list, rebuilt only when the channel changed. */
@@ -60,6 +62,14 @@ export class View {
         v.as_of = ch.as_of;
         for (const c of ch.cells) v.cells.set(c.cell, c);
         this.sites.set(id, v);
+        // What a visit found is what was there when the looker was: kept as memory, each cell with when it was seen.
+        if (ch.visited) {
+          const m = this.visits.get(id) ?? { seen_at: {}, fresh: [] };
+          m.seen_at = { ...m.seen_at };
+          for (const c of ch.cells) m.seen_at[c.cell] = ch.as_of;
+          m.fresh = ch.cells.map((c) => c.cell);
+          this.visits.set(id, m);
+        }
         if (ch.cells.length || ch.whole) this.cache.delete(id);
       } else if (ch.kind === "directory") {
         const v = this.directories.get(id) ?? { entities: new Map(), positions: new Map() };
@@ -85,7 +95,11 @@ export class View {
     };
     for (const [id, m] of this.accounts) channels[id] = { kind: "accounts", accounts: cached(id, () => byKey(m)), transactions: txs(id) };
     for (const [id, m] of this.holdings) channels[id] = { kind: "holdings", holdings: cached(id, () => byKey(m)) };
-    for (const [id, v] of this.sites) channels[id] = { kind: "sites", as_of: v.as_of, cells: cached(id, () => byKey(v.cells)) };
+    for (const [id, v] of this.sites) {
+      const visit = this.visits.get(id);
+      // (The cells its latest visit saw are said once, with the observation that brings them.)
+      channels[id] = { kind: "sites", as_of: v.as_of, cells: cached(id, () => byKey(v.cells)), ...(visit ? { visited: true as const, seen_at: visit.seen_at, fresh: obs.channels[id]?.kind === "sites" ? visit.fresh : [] } : {}) };
+    }
     for (const [id, v] of this.directories) {
       const d = cached(id, () => ({ entities: byKey(v.entities), positions: byKey(v.positions) }));
       channels[id] = { kind: "directory", entities: d.entities, positions: d.positions };

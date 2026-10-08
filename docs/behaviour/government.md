@@ -43,7 +43,7 @@ Params: `responsiveness_bps` 7000, `petition_threshold_bps` 1500, `population` 2
 It wakes daily.
 - It counts only the council's ballots (`electorate: "council"`), not the town's elections.
 - It puts each proposal addressed to the town to a council ballot, open for `vote_days` (14).
-- At close, it counts the latest vote of each **councillor seat**, checked against the directory's roles, so votes from anyone else don't count. Only votes made before the closing time count (0.6.1: until then a vote made after the close was counted if it reached the clerk before its daily count).
+- At close, it counts the latest vote of each **councillor seat**, so votes from anyone else don't count. Its council's members are the holders of the town's councillor posts, which it looks up (0.7.0: at its first wake and every `members_every_days`, 30, as a council keeps its own list of members; nobody is shown who's who, and until 0.7.0 the clerk read them off a directory of every entity and post in the town). Only votes made before the closing time count (0.6.1: until then a vote made after the close was counted if it reached the clerk before its daily count).
 - A proposal passes with more yes than no *and* a majority of all councillors (so abstentions count against).
 - It publishes the `ballot_result`. If the proposal passed, it publishes the law or budget itself, with the ballot as its basis.
 - It drafts: a proposal on a law's amendment form that passes is written into law by the law's schedule (next section).

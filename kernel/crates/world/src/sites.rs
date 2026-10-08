@@ -77,6 +77,11 @@ pub struct SiteSpace {
     /// Its last few departures (who left, why, when), where the channel shows who's there.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub left: Option<Vec<crate::state::Departure>>,
+    /// From outside (where who is there can't be told): when someone was last seen leaving it (moving out, being put
+    /// out, going from the world), of its last few departures. Never who; and a death inside is not seen from outside,
+    /// so a home that has emptied with nobody seen leaving is one a neighbour may wonder about.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub seen_leaving: Option<i64>,
 }
 
 /// What a visit found: the cells of the places gone to, as they were when the looker was there.
@@ -100,7 +105,14 @@ pub fn site_cell(s: &Statics, st: &State, id: &Id, me: &str, names: bool) -> Sit
         seen: st.nature.as_deref().map_or(vec![], |n| {
             s.config.catalogue.species.iter().filter(|sp| sp.conspicuous && n.populations.get(&sp.id).is_some_and(|m| m.get(id).is_some_and(|x| *x > 0))).map(|sp| sp.id.clone()).collect()
         }),
-        structure: c.structure.as_ref().map(|sid| {
+        structure: c.structure.as_ref().map(|sid| site_structure(s, st, sid, me, names)),
+    }
+}
+
+/// A building as someone there sees it (`names` as for a cell). The building must stand.
+pub fn site_structure(s: &Statics, st: &State, sid: &Id, me: &str, names: bool) -> SiteStructure {
+    {
+        {
             let x = &st.structures[sid];
             let f = s.types[&x.structure_type].footprint;
             let occ = st.occupancy.get(sid);
@@ -143,12 +155,13 @@ pub fn site_cell(s: &Statics, st: &State, id: &Id, me: &str, names: bool) -> Sit
                             count: bodies.map_or(0, |b| b.len()) as u32,
                             occupants: known.then(|| bodies.map(|b| b.iter().cloned().collect()).unwrap_or_default()),
                             left: known.then(|| st.departures.get(&space).map(|l| (**l).clone())).flatten(),
+                            seen_leaving: if known { None } else { st.departures.get(&space).and_then(|l| l.iter().filter(|d| d.reason != crate::events::VacateReason::Died).map(|d| d.at).max()) },
                             space,
                         }
                     })
                     .collect(),
             }
-        }),
+        }
     }
 }
 

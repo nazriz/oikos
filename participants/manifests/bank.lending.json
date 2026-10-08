@@ -1,6 +1,6 @@
 {
   "name": "bank.lending",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "doc": "docs/behaviour/credit.md",
   "params": {
     "arrears_days": {
@@ -108,6 +108,14 @@
         "description": "kept in the bank's own account, cents"
       },
       "default": 5000000,
+      "source": "placeholder"
+    },
+    "who": {
+      "schema": {
+        "type": "string",
+        "description": "its channel onto who's who, where it looks up what kind of applicant it has (\"\": it knows what it is shown)"
+      },
+      "default": "",
       "source": "placeholder"
     }
   },

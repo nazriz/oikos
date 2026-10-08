@@ -3,11 +3,11 @@
 // factories, shops) apply when short, take the loan offered, and repay by standing order. Documented in
 // docs/behaviour/credit.md.
 
-import type { Observation } from "../contracts";
+import type { LookRequest, Observation } from "../contracts";
 import { channels } from "../contracts";
 import { cents } from "../money";
 import { params, type BehaviourModule, type ParticipantContext } from "../module";
-import { because, Book, commitmentOf, DAY, MONTH, offer, ownAccount, pay, record, say, sign, type Step, usd } from "./common";
+import { because, Book, commitmentOf, DAY, MONTH, offer, ownAccount, pay, record, say, sign, type Step, usd, Asked, lookUp, LOOKS_MAX } from "./common";
 import { stepper } from "./firms";
 
 /**
@@ -105,7 +105,7 @@ export const lending: BehaviourModule = {
   keeps: [
     { what: "request", why: "The bank's own files: its customers' instructions, among them the repayments of the loans this office made." },
   ],
-  version: "0.3.0",
+  version: "0.4.0",
   doc: "docs/behaviour/credit.md",
   cadence: () => DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(24) * 3600,
@@ -125,10 +125,12 @@ export const lending: BehaviourModule = {
         reserve: 5_000_000, // kept in the bank's own account, cents
         funding_from: null as string | null, // who lends the bank money when it's short (an entity outside)
         funding_rate_bps: 500, // what that funding costs, a year
+        who: "", // its channel onto who's who, where it looks up what kind of applicant it has ("": it knows what it is shown)
       },
       ctx.params,
     );
     const me = ctx.entity;
+    const asked = new Asked();
     const book = new Book();
     const decided = new Set<string>();
     const loans = new Map<string, Loan>(); // agreement -> loan
@@ -211,7 +213,7 @@ export const lending: BehaviourModule = {
           }
         }
         if (!acc) return steps;
-        const kindOf = (e: string) => (book.entityKind.get(e) === "person" ? "person" : "organisation"); // (the directory says)
+        const kindOf = (e: string) => (book.entityKind.get(e) === "person" ? "person" : "organisation"); // (as the directory said when it was looked up)
         const accounts = new Map(channels.accounts(obs).map((a) => [a.account, a]));
         // Regular income, as a lender reads a statement: the least that came in in any of the last three months (a
         // one-off sum isn't income; without three months of history there's nothing to lend against).
@@ -332,6 +334,19 @@ export const lending: BehaviourModule = {
           }
         }
         return steps;
+      },
+      undefined,
+      // What kind of applicant each new application is from (a person, or an organisation: the bank's rates and its
+      // rule on income differ): looked up before it is decided, each applicant once. Nobody is shown who's who.
+      (obs) => {
+        if (!p.who) return [];
+        const out: LookRequest[] = [];
+        for (const a of book.open("loan_application")) {
+          const applicant = a.speaks_for;
+          if (out.length >= LOOKS_MAX || decided.has(a.id) || !applicant || !(a.addressed_to ?? []).includes(obs.entity!)) continue;
+          if (!book.entityKind.has(applicant) && asked.first(applicant)) out.push(lookUp.entity(p.who, applicant));
+        }
+        return out;
       },
     );
   },

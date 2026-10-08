@@ -504,3 +504,30 @@ test("the notebook is added to, or changed where a passage stands, without writi
   await p.step(obs(8 * DAY), ctx);
   expect(shown(calls[3]!)).toContain("Your notebook: Short.\nDay 2.\n(13 of the 4000 characters it holds are used.)\n");
 });
+
+test("who's who is looked up by name, a register someone else keeps is asked about one named thing, and a board is searched: a look that names nothing is answered in words, never with everything", async () => {
+  // (docs/design/knowing.md: until 2026-10-08 a seat was shown the whole directory and could read a register through.)
+  const ways = new Map<string, { way: string; by?: string[]; board?: boolean }>([["mayor/who", { way: "ask" }], ["mayor/titles", { way: "ask", by: ["id", "about.object"] }], ["mayor/jobs", { way: "published", board: true }], ["mayor/files", { way: "mine" }]]);
+  const office = { ...seat, ways, kinds: new Map([...seat.kinds, ["mayor/titles", "records"], ["mayor/jobs", "records"]]), onRequest: ["mayor/files", "mayor/titles", "mayor/jobs"],
+    titles: new Map([...seat.titles, ["mayor/titles", "The land register (ask the registry)"], ["mayor/jobs", "Jobs advertised"]]) };
+  const { tools } = await import("../src/llm/participant");
+  const said = tools({ participant: "mayor-system", entity: "city", framing: { disclosure: "simulation", reason: "test" }, cadenceDays: 7, draftText: () => "", ...office } as any).find((x) => x.name === "look")!.description;
+  expect(said).toContain("Nobody is shown it: name who you're looking for");
+  expect(said).toContain('"The land register (ask the registry)" (mayor/titles): say which one, by id (its own number) or about.object (what it is a title to)');
+  const { p, calls } = harness([
+    [use("a", "look", { report: "mayor/who", named: ["finance", "Ada Lovelace"] })],
+    [use("b", "look", { report: "mayor/who" }), use("c", "look", { report: "mayor/titles" }), use("d", "look", { report: "mayor/titles", find: [{ field: "date", op: ">", value: "day 1" }] }),
+      use("e", "look", { report: "mayor/titles", find: [{ field: "about.object", value: "lot-12" }] })],
+    [use("f", "look", { report: "mayor/jobs" })],
+  ], office);
+  // Named: one look-up each.
+  expect(await p.step(obs(0), ctx)).toEqual({ type: "look", looks: [{ channel: "mayor/who", who: { name: "finance" } }, { channel: "mayor/who", who: { name: "Ada Lovelace" } }] });
+  // Nobody named, no lot or title named, only a date: none of these is sent; the one that names its lot is.
+  expect(await p.step(obs(60), ctx)).toEqual({ type: "look", looks: [{ channel: "mayor/titles", query: { where: [{ field: "about.object", op: "=", value: "lot-12" }], order: { field: "at", desc: true }, limit: 20 } }] });
+  // A board with nothing to find: its latest few, as a search (it is never read through).
+  const next = await p.step(obs(120), ctx);
+  expect(next).toEqual({ type: "look", looks: [{ channel: "mayor/jobs", query: { order: { field: "at", desc: true }, limit: 20 } }] });
+  const told = shown(calls.at(-1)!);
+  expect(told).toContain("nobody is shown who's who: say whom you are looking for");
+  expect(told).toContain("whoever keeps that register answers a question about one thing, never everything: say which, by id (its own number) or about.object (what it is a title to)");
+});

@@ -53,6 +53,8 @@ pub struct Exec<'a> {
     /// A survey's estimates, for the actor alone (nature).
     pub surveyed: Option<Value>,
     pub investigated: Option<Value>,
+    /// The building last worked on, as those who worked on it left it (for the actor alone).
+    pub seen: Option<crate::sites::SiteStructure>,
 }
 
 pub struct ExecResult {
@@ -60,6 +62,8 @@ pub struct ExecResult {
     pub created: BTreeMap<String, Id>,
     pub surveyed: Option<Value>,
     pub investigated: Option<Value>,
+    /// The building last worked on, as those who worked on it left it (for the actor alone).
+    pub seen: Option<crate::sites::SiteStructure>,
 }
 
 /// Can this participant act now? (Active, or opted out with a stand-in carrying on.)
@@ -88,14 +92,14 @@ pub fn exec_action(s: &Statics, st: &mut State, participant: &str, position: Opt
         }
         None => p.person.clone().ok_or_else(|| refuse(RefusalCode::NotInPosition, format!("{participant} is a system: it acts only in a position")))?,
     };
-    let mut ex = Exec { s, st, participant, position, entity, action, refs: BTreeMap::new(), events: vec![], surveyed: None, investigated: None };
+    let mut ex = Exec { s, st, participant, position, entity, action, refs: BTreeMap::new(), events: vec![], surveyed: None, investigated: None, seen: None };
     for (i, b) in blocks.iter().enumerate() {
         ex.block(b, i).map_err(|mut r| {
             r.block.get_or_insert(i);
             r
         })?;
     }
-    Ok(ExecResult { events: ex.events, created: ex.refs, surveyed: ex.surveyed, investigated: ex.investigated })
+    Ok(ExecResult { events: ex.events, created: ex.refs, surveyed: ex.surveyed, investigated: ex.investigated, seen: ex.seen })
 }
 
 // ---------------- life: shared by acts and scheduled effects ----------------
@@ -1050,6 +1054,9 @@ impl<'a> Exec<'a> {
             let taker = found.as_ref().filter(|_| rng.below(10_000) < chance as u64).map(|x| x.by.clone());
             self.investigated = Some(serde_json::json!({ "from": from, "at": at, "kind": iv.kind, "taken": found.is_some(), "taker": taker }));
         }
+        // Those who did it were there: what the building is like as they leave it is theirs to know (a demolition's
+        // last day leaves nothing to see).
+        let worked_on_building = bodies.is_none() && on.is_some() && self.st.structures.contains_key(&target);
         if task == TASK_BUILD {
             let needed = self.s.types[&self.st.structures[&target].structure_type].build_labour;
             let s = self.st.structures.get_mut(&target).unwrap();
@@ -1058,7 +1065,7 @@ impl<'a> Exec<'a> {
             if s.labour_done >= needed && s.completes_at.is_none() {
                 s.complete = true;
                 self.st.touch_structure(&target);
-                self.emit(EventBody::StructureCompleted { structure: target });
+                self.emit(EventBody::StructureCompleted { structure: target.clone() });
             } else {
                 self.st.touch_structure(&target);
             }
@@ -1072,6 +1079,9 @@ impl<'a> Exec<'a> {
             } else {
                 self.st.touch_structure(&target);
             }
+        }
+        if worked_on_building && self.st.structures.contains_key(&target) {
+            self.seen = Some(crate::sites::site_structure(self.s, self.st, &target, &self.entity, false));
         }
         Ok(())
     }

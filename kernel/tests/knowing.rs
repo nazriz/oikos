@@ -280,6 +280,33 @@ fn going_to_look_takes_time_and_shows_what_is_there_then() {
 }
 
 #[test]
+fn those_who_work_on_a_building_see_it_and_a_neighbour_sees_someone_leave_but_not_who() {
+    let mut run = Run::start(base(), "knowing-seen", Vec::new(), None).unwrap();
+    // Carol mends the house from the shop: the outcome of the work says what the house is like as she leaves it.
+    let cmd = direct("developer-system", Some("developer"), serde_json::from_value(json!([{"block": "work", "task": "mend", "units": 1, "at": "s-shop", "performers": ["carol"], "on": "s-house"}])).unwrap()).unwrap();
+    step(&mut run, &cmd).unwrap();
+    let o = run.command(&Command::Observe { participant: "developer-system".into(), only: None }).unwrap().observation.unwrap();
+    let seen = o.outcomes.last().and_then(|x| x.seen.as_ref()).expect("the crew was there");
+    assert_eq!(seen.structure, "s-house");
+    assert!(seen.variables.as_ref().is_some_and(|v| v.contains_key("wear")));
+    assert_eq!(seen.spaces[0].occupants, None, "at someone else's house they see how many, not who");
+    // Alice lives next to the flats. From outside she sees how many are in bob's flat, and nobody leaving yet.
+    let flat = |o: &Observation| match o.channels.get("street") {
+        Some(ChannelData::Sites { cells, .. }) => cells.iter().filter_map(|c| c.structure.as_ref()).flat_map(|s| s.spaces.iter()).find(|sp| sp.space == "s-flats/dwelling.1").cloned(),
+        _ => None,
+    };
+    let before = flat(&run.command(&Command::Observe { participant: "alice-self".into(), only: None }).unwrap().observation.unwrap()).unwrap();
+    assert_eq!((before.count, before.seen_leaving, before.left.is_none()), (1, None, true));
+    // Bob goes from the world: she sees that someone left, and when; never who.
+    run.command(&Command::Advance { to: DAY }).unwrap();
+    let cmd = direct("bob-self", None, serde_json::from_value(json!([{"block": "leave"}])).unwrap()).unwrap();
+    step(&mut run, &cmd).unwrap();
+    let after = flat(&run.command(&Command::Observe { participant: "alice-self".into(), only: None }).unwrap().observation.unwrap()).unwrap();
+    assert_eq!((after.count, after.left.is_none()), (0, true));
+    assert!(after.seen_leaving.is_some_and(|t| t >= DAY));
+}
+
+#[test]
 fn a_visit_is_the_same_every_time() {
     let go = || {
         let mut c = base();

@@ -1,6 +1,6 @@
 {
   "name": "world.migration",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "doc": "docs/behaviour/boundary.md",
   "params": {
     "households": {
@@ -100,6 +100,14 @@
       "schema": {
         "type": "string",
         "description": "the template for those who aren't (\"\": everyone takes `template`)"
+      },
+      "default": "",
+      "source": "placeholder"
+    },
+    "who": {
+      "schema": {
+        "type": "string",
+        "description": "its channel onto who's who, where it looks up how to reach those it brought (\"\": as it is shown)"
       },
       "default": "",
       "source": "placeholder"

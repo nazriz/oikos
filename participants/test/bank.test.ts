@@ -164,3 +164,27 @@ test("going through standing orders only when they're due gives the payments and
     expect(told).toBeGreaterThan(20);
   }
 });
+
+test("who wrote an instruction is looked up before it is read: each writer once, a look's worth at a time; nobody is shown who's who", () => {
+  // The bank with a look-up of who's who (`who`: its channel onto it) and nothing known of anyone yet.
+  const m = bankPaymentSystem.create(context("bank-pay-system", "bank", { who: "who" }, { position: "bank-pay" }));
+  const nobody = { kind: "directory", positions: [], entities: [] };
+  const step = (t: number, records: any[], directory: any) => m.step({ t, participant: "bank-pay-system", entity: "bank", as: "bank-pay", status: "active", outcomes: [], inbox: [], drafts: [],
+    channels: { requests: { kind: "records", records }, custody: custody({ c1: 500_000, c2: 500_000, firm: 500_000 }), who: directory } } as unknown as Observation, {} as any);
+  const fromClerk = statement("so-3", 0, "request", { author: "boss-self", in_position: "firm-clerk", speaks_for: "firm", addressed_to: ["bank"], visible_to: ["firm", "bank"],
+    data: { outcome: { money: { from: "acc-firm", to: "acc-landlord", amount: "700", for: "Rent." } }, every: MONTH, first: 0 } });
+  // Three instructions arrive from two people and a firm's clerk: before reading them, it asks who each writer is.
+  const first = step(0, [request("so-1", 0, "c1", 100_000, { every: MONTH, first: 0 }), request("so-2", 0, "c2", 50_000, { every: MONTH, first: 0 }), fromClerk, request("so-4", 0, "c1", 5, { every: MONTH, first: 0 })], nobody);
+  expect(first).toEqual({ type: "look", looks: [{ channel: "who", who: { participant: "c1-self" } }, { channel: "who", who: { participant: "c2-self" } }, { channel: "who", who: { position: "firm-clerk" } }] });
+  // The answers come at once (its address book now names them), and it pays as their holders instructed.
+  const known = { kind: "directory", positions: [{ position: "firm-clerk", entity: "firm" }], entities: who.entities };
+  const paid = step(0, [], known) as any;
+  expect(paid.type).toBe("call");
+  expect((paid.call.match(/per_request=/g) ?? []).length).toBe(4);
+  // Someone the directory does not know (the look-up found nobody) is asked after once, and their instruction is not
+  // their account holder's: never paid, and never asked about again.
+  const stranger = statement("so-9", DAY, "request", { author: "ghost", speaks_for: "c1", addressed_to: ["bank"], visible_to: ["c1", "bank"], data: { outcome: { money: { from: "acc-c1", to: "acc-landlord", amount: "9", for: "x" } } } });
+  expect(step(DAY, [stranger], known)).toEqual({ type: "look", looks: [{ channel: "who", who: { participant: "ghost" } }] });
+  expect((step(DAY, [], known) as any).type).toBe("wait");
+  expect((step(2 * DAY, [], known) as any).type).toBe("wait");
+});

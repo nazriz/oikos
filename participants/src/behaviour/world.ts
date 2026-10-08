@@ -3,10 +3,10 @@
 // params.purchases = [{ to: account, amount: cents, every: seconds, memo? }].
 
 import * as C from "../calls";
-import { channels, type ParticipantAction, type SiteStructure, type StatementRecord } from "../contracts";
+import { channels, type LookRequest, type ParticipantAction, type SiteStructure, type StatementRecord } from "../contracts";
 import { DAY, need, params, wait, type BehaviourModule } from "../module";
 import { cents } from "../money";
-import { ask, because, Book, callAction, MONTH, pay, publishedPrice, say, usd, withdraw, type Step } from "./common";
+import { ask, because, Book, callAction, MONTH, pay, publishedPrice, say, usd, withdraw, type Step, Asked, lookUp, LOOKS_MAX } from "./common";
 import { ownerOf } from "./institutions";
 import { stepper } from "./firms";
 import { fill, held, OrderBook, priceList } from "./trade";
@@ -568,7 +568,7 @@ export const idle: BehaviourModule = {
  */
 export const migration: BehaviourModule = {
   name: "world.migration",
-  version: "0.4.0",
+  version: "0.5.0",
   doc: "docs/behaviour/boundary.md",
   cadence: () => 30 * DAY,
   firstWake: () => 30 * DAY,
@@ -590,10 +590,12 @@ export const migration: BehaviourModule = {
         // Where bodies have a skill (schooling): the years each newcomer has had, as the world's people have, and how much
         // of the variable a year is (null: newcomers start at the variable's initial).
         schooling: null as (SchoolingSpec & { variable: string; per_year: number }) | null,
+        who: "", // its channel onto who's who, where it looks up how to reach those it brought ("": as it is shown)
       },
       ctx.params,
     );
     if (!p.households) throw new Error("world.migration: params.households is required (the world's household mix)");
+    const asked = new Asked();
     const H: HouseholdSpec = p.households;
     /** What an adult brings: the world's savings by age, else a few months' income from elsewhere. */
     const savingsOf = (age: number, r: { below(n: number): number }) => {
@@ -624,8 +626,14 @@ export const migration: BehaviourModule = {
           }
           expecting = null;
         }
-        // Paperwork for households whose members we can now reach (the directory names their participants).
+        // Paperwork for households whose members we can now reach: each newcomer looked up once they have crossed
+        // (who acts as them: nobody is shown who's who), the answer coming at once.
         const reachOf = new Map([...book.participantPerson].map(([par, person]) => [person, par]));
+        if (p.who && !expecting) {
+          const whom: LookRequest[] = [];
+          for (const h of pending) for (const person of h.persons!) if (whom.length < LOOKS_MAX && !reachOf.has(person) && asked.first(person)) whom.push(lookUp.entity(p.who, person));
+          if (whom.length) return { type: "look", looks: whom };
+        }
         for (let i = pending.length - 1; i >= 0; i--) {
           const h = pending[i]!;
           if (!h.persons!.every((x) => reachOf.has(x))) continue;

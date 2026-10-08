@@ -606,6 +606,7 @@ fn holds(r: &Record, c: &crate::config::Condition) -> bool {
 }
 
 use crate::sites::site_cell;
+pub use crate::sites::site_structure;
 
 /// How an observation is built.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

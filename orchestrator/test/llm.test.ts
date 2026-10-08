@@ -452,7 +452,7 @@ test("a model mayor can look into its reports as a code mayor reads them: which 
   expect(first.who).not.toContain("## Survey of the town");
   expect(first.wear!.match(/^- .*: wear /gm)!.length).toBe(20);
   expect(first.wear).toContain("(39 more not listed: ask for more at once, or name the ones you want.)");
-  expect(first.who).toContain("## Who's who: who you looked for\n- post: Finance officer (finance), for city: ");
+  expect(first.who).toContain("## Who's who (look someone up: a person, an organisation or a post, by name or id): who you looked for\n- post: Finance officer (finance), for city: ");
   expect(first.papers).toContain("what you looked up (1 found)\n- [signatories-city] signatories from city, to bank:");
   expect(first.hall).toMatch(/- civic town-hall, at [^:\n]+: wear 0, rising [\d,]+ a day\n  - town-hall\//);
   expect(first.hall).toContain("Nothing is known here by this name: nowhere-1.");

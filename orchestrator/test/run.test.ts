@@ -12,8 +12,11 @@ function riverbendWithIdleParticipants(): any {
   for (const p of c.participants) if (p.controller.type === "code" && p.controller.impl !== "bank.payment_system") p.controller.impl = "idle";
   // The mayor too (a language model in the example): nobody but the bank does anything.
   c.participants.find((p: any) => p.id === "mayor-system").controller = { type: "code", impl: "idle" };
-  // The bank needs to see who's who to verify who is instructing it.
-  c.positions.find((p: any) => p.id === "bank-payments").channels.push({ id: "who", kind: "directory", way: "whole" });
+  // The bank needs to know who is instructing it: it looks each writer up (nobody is shown who's who; until 2026-10-08
+  // this test gave it the whole directory to read).
+  const desk = c.positions.find((p: any) => p.id === "bank-payments");
+  desk.channels.push({ id: "who", kind: "directory", way: "ask", on_request: true });
+  desk.role_module = { ...desk.role_module, params: { ...(desk.role_module?.params ?? {}), who: "who" } };
   return c;
 }
 

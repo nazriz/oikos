@@ -380,6 +380,10 @@
         "investigated": {
           "description": "What an investigation found, for the one who investigated only: whether goods were taken as said, and the taker if found (null: not found).",
           "type": "object"
+        },
+        "seen": {
+          "description": "Work done on a building (those doing it were there): the building as they left it, for the one whose work it was. The last worked on, if the act worked on several. How a crew knows what it left behind without anyone being shown the town.",
+          "$ref": "#/$defs/SiteStructure"
         }
       }
     },
@@ -441,7 +445,7 @@
           "$ref": "#/$defs/Query"
         },
         "who": {
-          "description": "A look-up in a directory: exactly one of an entity (alone: its entry; with `role`: that organisation's positions of that role), a participant (the person it acts as), a position, or a name (the entities of exactly that name and the positions of exactly that title). At most 20 entries, in id order.",
+          "description": "A look-up in a directory: exactly one of an entity (alone: its entry; with `role`: that organisation's positions of that role), a participant (the person it acts as), a position, or a name (the entities of exactly that name or id, the positions of exactly that title, role or id, and the person a participant of that id acts as; capitals aside). At most 20 entries to a look-up, in id order. Several look-ups through the same directory in one look are answered together.",
           "oneOf": [
             {
               "type": "object",
@@ -935,158 +939,7 @@
                     "$ref": "urn:oikos:contracts:0.8:common#/$defs/Label"
                   },
                   "structure": {
-                    "description": "The building standing on this cell (the same on every cell of its footprint).",
-                    "type": "object",
-                    "required": [
-                      "structure",
-                      "type",
-                      "at",
-                      "w",
-                      "h",
-                      "complete",
-                      "spaces"
-                    ],
-                    "additionalProperties": false,
-                    "properties": {
-                      "structure": {
-                        "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
-                      },
-                      "type": {
-                        "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId"
-                      },
-                      "at": {
-                        "$ref": "urn:oikos:contracts:0.8:common#/$defs/CellId"
-                      },
-                      "w": {
-                        "type": "integer",
-                        "minimum": 1
-                      },
-                      "h": {
-                        "type": "integer",
-                        "minimum": 1
-                      },
-                      "built_by": {
-                        "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
-                      },
-                      "complete": {
-                        "type": "boolean"
-                      },
-                      "completes_at": {
-                        "$ref": "urn:oikos:contracts:0.8:common#/$defs/SimTime"
-                      },
-                      "coming_down": {
-                        "description": "Being brought down (phase B).",
-                        "const": true
-                      },
-                      "variables": {
-                        "description": "Its state variables (phase B), each as a value on a day with its rate now and bounds: today's value is value + per_day x (days since), within bounds.",
-                        "type": "object",
-                        "propertyNames": {
-                          "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId"
-                        },
-                        "additionalProperties": {
-                          "type": "object",
-                          "required": [
-                            "value",
-                            "as_of_day",
-                            "per_day",
-                            "min",
-                            "max"
-                          ],
-                          "additionalProperties": false,
-                          "properties": {
-                            "value": {
-                              "type": "integer"
-                            },
-                            "as_of_day": {
-                              "type": "integer"
-                            },
-                            "per_day": {
-                              "type": "integer"
-                            },
-                            "min": {
-                              "type": "integer"
-                            },
-                            "max": {
-                              "type": "integer"
-                            }
-                          }
-                        }
-                      },
-                      "spaces": {
-                        "type": "array",
-                        "items": {
-                          "type": "object",
-                          "required": [
-                            "space",
-                            "kind",
-                            "capacity",
-                            "count"
-                          ],
-                          "additionalProperties": false,
-                          "properties": {
-                            "space": {
-                              "$ref": "urn:oikos:contracts:0.8:common#/$defs/SpaceId"
-                            },
-                            "kind": {
-                              "$ref": "urn:oikos:contracts:0.8:common#/$defs/Label"
-                            },
-                            "capacity": {
-                              "type": "integer",
-                              "minimum": 1
-                            },
-                            "attrs": {
-                              "$ref": "urn:oikos:contracts:0.8:common#/$defs/OpaqueObject"
-                            },
-                            "count": {
-                              "description": "How many bodies are in it.",
-                              "type": "integer",
-                              "minimum": 0
-                            },
-                            "occupants": {
-                              "description": "Who, where that can be told: in the capacity's own buildings, or through a channel that shows names. Absent: only how many.",
-                              "type": "array",
-                              "items": {
-                                "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
-                              }
-                            },
-                            "left": {
-                              "description": "Its last few departures (who left, why, when), where the channel shows who's there: those who share it see someone move out, be removed or die.",
-                              "type": "array",
-                              "maxItems": 5,
-                              "items": {
-                                "type": "object",
-                                "required": [
-                                  "occupant",
-                                  "reason",
-                                  "at"
-                                ],
-                                "additionalProperties": false,
-                                "properties": {
-                                  "occupant": {
-                                    "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
-                                  },
-                                  "reason": {
-                                    "enum": [
-                                      "left",
-                                      "removed",
-                                      "demolition",
-                                      "departed",
-                                      "died"
-                                    ]
-                                  },
-                                  "at": {
-                                    "type": "integer",
-                                    "minimum": -9007199254740991,
-                                    "maximum": 9007199254740991
-                                  }
-                                }
-                              }
-                            }
-                          }
-                        }
-                      }
-                    }
+                    "$ref": "#/$defs/SiteStructure"
                   },
                   "seen": {
                     "description": "Nature: conspicuous species anyone there would notice (never how many).",
@@ -1417,6 +1270,165 @@
         "reader": {
           "type": "string",
           "maxLength": 64
+        }
+      }
+    },
+    "SiteStructure": {
+      "description": "The building standing on this cell (the same on every cell of its footprint).",
+      "type": "object",
+      "required": [
+        "structure",
+        "type",
+        "at",
+        "w",
+        "h",
+        "complete",
+        "spaces"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "structure": {
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+        },
+        "type": {
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId"
+        },
+        "at": {
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/CellId"
+        },
+        "w": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "h": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "built_by": {
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+        },
+        "complete": {
+          "type": "boolean"
+        },
+        "completes_at": {
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/SimTime"
+        },
+        "coming_down": {
+          "description": "Being brought down (phase B).",
+          "const": true
+        },
+        "variables": {
+          "description": "Its state variables (phase B), each as a value on a day with its rate now and bounds: today's value is value + per_day x (days since), within bounds.",
+          "type": "object",
+          "propertyNames": {
+            "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "required": [
+              "value",
+              "as_of_day",
+              "per_day",
+              "min",
+              "max"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "value": {
+                "type": "integer"
+              },
+              "as_of_day": {
+                "type": "integer"
+              },
+              "per_day": {
+                "type": "integer"
+              },
+              "min": {
+                "type": "integer"
+              },
+              "max": {
+                "type": "integer"
+              }
+            }
+          }
+        },
+        "spaces": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "space",
+              "kind",
+              "capacity",
+              "count"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "space": {
+                "$ref": "urn:oikos:contracts:0.8:common#/$defs/SpaceId"
+              },
+              "kind": {
+                "$ref": "urn:oikos:contracts:0.8:common#/$defs/Label"
+              },
+              "capacity": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "attrs": {
+                "$ref": "urn:oikos:contracts:0.8:common#/$defs/OpaqueObject"
+              },
+              "count": {
+                "description": "How many bodies are in it.",
+                "type": "integer",
+                "minimum": 0
+              },
+              "occupants": {
+                "description": "Who, where that can be told: in the capacity's own buildings, or through a channel that shows names. Absent: only how many.",
+                "type": "array",
+                "items": {
+                  "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+                }
+              },
+              "left": {
+                "description": "Its last few departures (who left, why, when), where the channel shows who's there: those who share it see someone move out, be removed or die.",
+                "type": "array",
+                "maxItems": 5,
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "occupant",
+                    "reason",
+                    "at"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "occupant": {
+                      "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+                    },
+                    "reason": {
+                      "enum": [
+                        "left",
+                        "removed",
+                        "demolition",
+                        "departed",
+                        "died",
+                        "flooded"
+                      ]
+                    },
+                    "at": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  }
+                }
+              },
+              "seen_leaving": {
+                "description": "From outside (where who is there can't be told): when someone was last seen leaving this space (moving out, being put out, going from the world), of its last few departures. Never who; a death inside is not seen from outside, so a home that has emptied with nobody seen leaving is one a neighbour may wonder about.",
+                "$ref": "urn:oikos:contracts:0.8:common#/$defs/SimTime"
+              }
+            }
+          }
         }
       }
     }

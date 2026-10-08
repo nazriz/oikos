@@ -8,7 +8,7 @@ A bank's lending office. It wakes daily.
 
 **Applications.** Anyone the bank keeps an account for may apply (`loan_application`: amount, months, the account, what it's for). The bank decides by its rules, on what it can see of the applicant's account (it keeps it: it sees every payment in and out, as a lender reads statements):
 - **Regular income** is the least that came into the account in any of the last three months. A one-off sum isn't income, and without three months of history there's nothing to lend against.
-- **Serviceability:** the new repayment, assessed at the loan's rate plus a buffer, plus what the applicant already repays the bank, must be within a share of that income. The share differs for people and organisations.
+- **Serviceability:** the new repayment, assessed at the loan's rate plus a buffer, plus what the applicant already repays the bank, must be within a share of that income. The share differs for people and organisations: which an applicant is, the lending office looks up before it decides (0.4.0: one look-up for each applicant; nobody is shown who's who).
 - **Refused:** anyone in default with the bank, or behind on a loan.
 
 It answers every application (`loan_decision`, with the reason if it's declined), and offers a loan agreement when it approves. The repayment is fixed over the term (the credit-foncier formula, in ordinary arithmetic so every machine agrees).
@@ -31,7 +31,7 @@ the loan marks it repaid in full.
 
 What happens to a debt in default beyond that (collection, a court) is law content not yet written. Firms in default go to insolvency (phase C, stage C3).
 
-**Parameters** (place-specific ones from the world's profile): `rate_bps` (people, organisations), `buffer_bps`, `max_share_bps` (people, organisations), `max_months`, `arrears_days`, `default_days`, `reserve`, `funding_from`, `funding_rate_bps`.
+**Parameters** (place-specific ones from the world's profile): `rate_bps` (people, organisations), `buffer_bps`, `max_share_bps` (people, organisations), `max_months`, `arrears_days`, `default_days`, `reserve`, `funding_from`, `funding_rate_bps`; `who` (its channel onto who's who; none: it knows what it is shown).
 
 **Where the rules come from:**
 - Serviceability, assessed at the rate plus a buffer, is how Australian lenders assess, under APRA's prudential guidance (the buffer is 3 percentage points in the first profile).

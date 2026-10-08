@@ -28,6 +28,9 @@ export interface Profile {
       /** Deaths care could prevent: the share of each age's deaths that's treatable, carried by an illness band. */
       treatable?: { share_bps_by_age: { from: number; bps: number }[]; band: string };
     };
+    /** Who knows what (docs/behaviour/knowing.md): how long looking at one place gone to takes; what a search of the
+     * land register costs (recorded; nobody is charged yet). */
+    knowing?: { visit_seconds: number; title_search_fee?: number; index_search_fee?: number };
     ordinary_hours_per_week: number;
     wages_per_fortnight: { shop: number; factory: number; construction: number };
     rents_per_month: {

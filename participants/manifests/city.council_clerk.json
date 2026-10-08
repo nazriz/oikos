@@ -1,14 +1,37 @@
 {
   "name": "city.council_clerk",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "doc": "docs/behaviour/government.md",
   "params": {
+    "members_every_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 30,
+      "source": "placeholder"
+    },
+    "members_role": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "councillor",
+      "source": "placeholder"
+    },
     "vote_days": {
       "schema": {
         "type": "integer"
       },
       "unit": "days",
       "default": 14,
+      "source": "placeholder"
+    },
+    "who": {
+      "schema": {
+        "type": "string",
+        "description": "its channel onto who's who, where it looks up its council's members (\"\": it knows them as it is shown them)"
+      },
+      "default": "",
       "source": "placeholder"
     }
   },

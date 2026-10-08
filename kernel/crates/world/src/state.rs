@@ -496,6 +496,10 @@ pub struct Outcome {
     /// A survey's estimates (nature), seen only by the one who surveyed: `{of, cells: {cell: estimate}}`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub surveyed: Option<serde_json::Value>,
+    /// Work done on a building (docs/design/knowing.md: those doing it were there): the building as they left it, seen
+    /// only by the one whose work it was. The last worked on, if the act worked on several.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub seen: Option<crate::sites::SiteStructure>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
