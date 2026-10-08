@@ -9,6 +9,7 @@ import { cents } from "../money";
 import { params, type BehaviourModule, type ParticipantContext } from "../module";
 import { because, Book, commitmentOf, DAY, MONTH, offer, ownAccount, pay, record, say, sign, type Step, usd, Asked, lookUp, LOOKS_MAX } from "./common";
 import { stepper } from "./firms";
+import * as P from "./papers";
 
 /**
  * The monthly repayment on a loan (the credit-foncier formula: fixed payments that repay principal and interest over
@@ -109,6 +110,8 @@ export function payout(payment: number, annualBps: number, monthsLeft: number): 
  */
 export const lending: BehaviourModule = {
   name: "bank.lending",
+  issues: P.LENDING,
+  issuesWith: (p) => ({ funder: p.funding_from ?? undefined }),
   keeps: [
     { what: "request", why: "The bank's own files: its customers' instructions, among them the repayments of the loans this office made." },
     { what: "accounts", why: "The bank's own ledger: it keeps its customers' accounts, and a lending office reads what an applicant holds with it." },

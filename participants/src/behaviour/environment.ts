@@ -12,11 +12,14 @@ import { channels } from "../contracts";
 import { need, params, type BehaviourModule, type ParticipantContext } from "../module";
 import { ask, Asked, nextLook, because, Book, DAY, Directions, lotOf, MONTH, say, type Step, usd, withdraw, outOfTime, team } from "./common";
 import { Staffing, staffingForm, staffingUnder, stepper } from "./firms";
+import * as P from "./papers";
 
 const YEAR = 365 * DAY;
 
 export const environment: BehaviourModule = {
   name: "city.environment",
+  issues: [P.JOB_ADVERTISEMENT, ...P.ENVIRONMENT],
+  issuesWith: (p) => ({ ...P.staffingOwn({ role: p.role ?? "environmental scientist", industry: p.industry, workplace: p.workplace, notice_days: p.notice_days ?? 14 }), planning: p.planning }),
   takes: [staffingForm("environment_staffing", "the environment office", "environmental scientists")],
   version: "0.4.0", // 0.4.0: takes a written direction on its staffing (docs/behaviour/directions.md); 0.3.0: samples habitat from its own habitat map and asks the land registry which lot a cell is on; no longer shown the district or the register of lots
   doc: "docs/behaviour/environment.md",

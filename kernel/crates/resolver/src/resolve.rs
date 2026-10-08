@@ -8,6 +8,7 @@
 //! The same as translator/src/resolver.ts, which it replaces in the engine.
 
 use crate::calls::{self, Call, Program, Value};
+use crate::forms;
 use crate::knowledge::Knowledge;
 use serde_json::{json, Map, Value as Json};
 use std::collections::BTreeSet;
@@ -1026,7 +1027,21 @@ impl Resolver<'_> {
             let x: Option<Json> = match t["type"].as_str().unwrap_or_default() {
                 "amount" => self.amount(c, field)?.map(Json::from),
                 "duration" => Self::seconds(c, field)?.map(Json::from),
-                "count" => Some(json!(unit(calls::parse_count(&Self::str_(c, field)?.unwrap_or_default()))?)),
+                // (A count on a form may be nought: a vote with nobody against.)
+                "count" => {
+                    let s = Self::str_(c, field)?.unwrap_or_default();
+                    let t = s.trim();
+                    if (1..=15).contains(&t.len()) && t.bytes().all(|b| b.is_ascii_digit()) {
+                        Some(json!(t.parse::<i64>().unwrap_or_default()))
+                    } else {
+                        Some(json!(unit(calls::parse_count(&s))?))
+                    }
+                }
+                "list" => self.ids(c, field)?.map(|v| json!(v)),
+                "date" => match Self::str_(c, field)? {
+                    None => None,
+                    Some(s) => Some(json!(forms::parse_date(&s).map_err(Stop::Ask)?)),
+                },
                 "text" | "structure_type" => Self::str_(c, field)?.map(Json::from),
                 "choice" => {
                     let s = Self::str_(c, field)?.unwrap_or_default();
@@ -1043,12 +1058,37 @@ impl Resolver<'_> {
                 data.insert(field.clone(), x);
             }
         }
-        let unknown: Vec<&str> = c.args.iter().map(|(k, _)| k.as_str()).filter(|a| !["to", "form", "for"].contains(a) && !fields.contains_key(*a)).collect();
+        // (A paper of the office's own may be given its words as they are to stand, where the form has no field of that name.)
+        let own_words = spec["writes"].is_object() && !fields.contains_key("text");
+        let unknown: Vec<&str> = c.args.iter().map(|(k, _)| k.as_str()).filter(|a| !["to", "form", "for"].contains(a) && !fields.contains_key(*a) && !(*a == "text" && own_words)).collect();
         if !unknown.is_empty() {
             return ask(format!("The {form_name} form has no {} field. Its fields are: {}.", unknown.join(" or "), fields.keys().cloned().collect::<Vec<_>>().join(", ")));
         }
         if !missing.is_empty() {
             return ask(format!("The {form_name} needs: {}.", missing.join(", ")));
+        }
+        // A paper of the office's own (contracts: FormWrites): written from the fields as the form says, the statement
+        // the rest of the world reads. It does not cite the form.
+        if spec["writes"].is_object() {
+            let me = self.id(c, "for")?.unwrap_or_else(|| self.me.clone());
+            let own = if own_words && Self::has(c, "text") { Self::str_(c, "text")? } else { None };
+            let money = |a: &str| {
+                self.currency().map(|cur| calls::format_money(a, cur)).map_err(|s| match s {
+                    Stop::Ask(m) | Stop::Unit(m) => m,
+                })
+            };
+            let paper = forms::write_paper(spec, &data, &me, self.k.t, &money, own.as_deref()).map_err(Stop::Ask)?;
+            let mut block = Map::new();
+            block.insert("block".into(), json!("publish"));
+            for (k, v) in paper {
+                let v = if k == "text" { json!(slice16(v.as_str().unwrap_or_default(), 16384)) } else { v };
+                block.insert(k, v);
+            }
+            block.insert("speaks_for".into(), json!(me));
+            if let Some(r) = bind {
+                block.insert("ref".into(), json!(r));
+            }
+            return Ok(vec![Json::Object(block)]);
         }
         // What was filled in, in words: an amount as the world writes its money, a length of time in days.
         let mut said: Vec<String> = vec![];
@@ -1224,7 +1264,7 @@ mod tests {
         let mut k = Knowledge::new(Currency::from_config(&table["currency"]));
         k.absorb(&table["observation"]);
         let cases = table["cases"].as_array().unwrap();
-        assert!(cases.len() >= 12);
+        assert!(cases.len() >= 29);
         for c in cases {
             let name = c["name"].as_str().unwrap();
             let program = parse_program(c["program"].as_str().unwrap()).unwrap_or_else(|e| panic!("{name}: {e:?}"));

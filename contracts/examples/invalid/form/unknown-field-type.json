@@ -6,7 +6,7 @@
   ],
   "fields": {
     "when": {
-      "type": "date"
+      "type": "money"
     }
   }
 }

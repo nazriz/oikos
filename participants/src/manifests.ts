@@ -15,6 +15,7 @@ export interface Manifest {
   state?: string;
   keeps?: { what: string; why: string }[];
   boundary?: { what: string; why: string }[];
+  issues?: { form: string; title: string; fields: { [name: string]: { type: string; required?: boolean; options?: string[]; description: string } }; writes: { kind: string; text: string; [k: string]: unknown } }[];
   takes?: { form: string; title: string; fields: { [name: string]: { type: string; required?: boolean; options?: string[]; description: string } }; follows: string }[];
 }
 

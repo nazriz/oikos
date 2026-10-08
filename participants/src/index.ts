@@ -6,6 +6,7 @@ export * from "./law";
 export * from "./canon";
 export * from "./money";
 export * as calls from "./calls";
+export * as forms from "./forms";
 export { View } from "./view";
 export { ASKING, CONSULT_THINGS } from "./behaviour/citizen";
 export { drawPerson, NEEDS, VALUES, type PopulationValues } from "./behaviour/mind";

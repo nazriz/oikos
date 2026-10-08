@@ -142,5 +142,167 @@
     }
   },
   "perceives": [],
-  "state": "none"
+  "state": "none",
+  "issues": [
+    {
+      "form": "job_advertisement",
+      "title": "Job advertisement",
+      "fields": {
+        "wage": {
+          "type": "amount",
+          "required": true,
+          "description": "The wage for each pay period."
+        },
+        "period": {
+          "type": "duration",
+          "required": true,
+          "description": "The pay period: how often the wage is paid."
+        },
+        "posts": {
+          "type": "count",
+          "required": true,
+          "description": "How many posts this advertisement is for."
+        },
+        "account": {
+          "type": "account",
+          "description": "The account the wages are paid from, where the office itself pays them."
+        }
+      },
+      "writes": {
+        "kind": "job_posting",
+        "text": "Hiring: {wage} every {period}.",
+        "data": {
+          "wage": "#wage",
+          "period": "=period",
+          "role": "@role",
+          "industry": "@industry",
+          "workplace": "@workplace_structure",
+          "space": "@workplace"
+        },
+        "offer": {
+          "by": "=self",
+          "to": {
+            "min_age_years": 18
+          },
+          "take_up": "apply",
+          "available": "=posts",
+          "terms": {
+            "template": "employment",
+            "commitments": [
+              {
+                "who": "=self",
+                "does": {
+                  "outcome": {
+                    "money": {
+                      "from": "=account",
+                      "amount": "=wage",
+                      "for": "wages"
+                    }
+                  }
+                },
+                "every": "=period"
+              },
+              "@occupancy"
+            ],
+            "termination": "@termination"
+          }
+        }
+      }
+    },
+    {
+      "form": "charge",
+      "title": "A charge laid before the tribunal",
+      "fields": {
+        "against": {
+          "type": "entity",
+          "required": true,
+          "description": "Who is charged."
+        },
+        "victim": {
+          "type": "entity",
+          "required": true,
+          "description": "Who was wronged."
+        },
+        "report": {
+          "type": "record",
+          "required": true,
+          "description": "The report it comes from."
+        },
+        "amount": {
+          "type": "amount",
+          "required": true,
+          "description": "The value of what was taken."
+        },
+        "account": {
+          "type": "account",
+          "required": true,
+          "description": "The account the victim is to be paid into."
+        },
+        "found": {
+          "type": "entity",
+          "description": "The evidence: who was found with the goods."
+        },
+        "found_at": {
+          "type": "structure",
+          "description": "The evidence: where."
+        },
+        "goods": {
+          "type": "text",
+          "description": "The evidence: what goods."
+        }
+      },
+      "writes": {
+        "kind": "tribunal_application",
+        "text": "Charge against {against}, on report {report}.",
+        "basis": "=report",
+        "to": [
+          "@tribunal"
+        ],
+        "visible": [
+          "=self",
+          "@tribunal",
+          "=against"
+        ],
+        "data": {
+          "kind": "charge",
+          "against": "=against",
+          "victim": "=victim",
+          "report": "=report",
+          "amount": "#amount",
+          "account": "=account",
+          "evidence": {
+            "found": "=found",
+            "at": "=found_at",
+            "goods": "=goods"
+          }
+        }
+      }
+    },
+    {
+      "form": "death_notification",
+      "title": "Notification of a death, to the registrar",
+      "fields": {
+        "deceased": {
+          "type": "entity",
+          "required": true,
+          "description": "Who has died."
+        },
+        "found_at": {
+          "type": "space",
+          "description": "Where they were found."
+        }
+      },
+      "writes": {
+        "kind": "death_notification",
+        "text": "Notification of a death: {deceased}.",
+        "to": [
+          "@registry"
+        ],
+        "data": {
+          "deceased": "=deceased",
+          "found_at": "=found_at"
+        }
+      }
+    }
+  ]
 }

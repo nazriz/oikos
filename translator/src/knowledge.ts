@@ -169,7 +169,13 @@ export class Knowledge {
 
   /** Forms the participant has seen and that still stand. */
   get forms(): StatementRecord[] {
-    return [...this.formsById.values()].filter((f) => !this.withdrawn.has(f.id));
+    return [...this.formsById.values()].filter((f) => !this.withdrawn.has(f.id) && this.ours(f));
+  }
+
+  /** An office's own stationery (a form that writes a paper of that office's: contracts, FormWrites) is known to
+   * whoever holds the office, and is no form of anyone else's. Every other form is whoever has seen it's. */
+  private ours(f: StatementRecord): boolean {
+    return !(f.data?.writes && typeof f.data?.office === "string") || this.held.has(f.data.office);
   }
 
   /** Where the entity holds some of a kind (phase B). */
@@ -180,7 +186,7 @@ export class Knowledge {
   /** The standing form, by its name or its record's id, published by an institution a participant, position or entity id names. */
   form(to: string, name: string): StatementRecord | undefined {
     const ent = this.entityOf(to);
-    const named = [...this.formsById.values()].filter((f) => !this.withdrawn.has(f.id) && (f.data?.form === name || f.id === name));
+    const named = this.forms.filter((f) => f.data?.form === name || f.id === name);
     // One office's own form (a direction it takes, a paper it issues) is that office's: named by the office, it is
     // that one and no other of the same name.
     const offices = named.filter((f) => f.data?.office === to);

@@ -9,7 +9,7 @@
 //   - it uses only what the participant knows (P8). Ids the participant states outright
 //     are passed through: if one doesn't exist, physics says so.
 
-import { calls, formatMoney, type Block } from "@oikos/participants";
+import { calls, formatMoney, forms, type Block } from "@oikos/participants";
 import { Knowledge } from "./knowledge";
 
 type Call = calls.Call;
@@ -61,11 +61,7 @@ export function asLabel(s: string): string {
 
 
 /** A length of time in words: whole days where it is whole days ("14 days", "1 day"), seconds otherwise. */
-export function durationWords(seconds: number): string {
-  if (seconds % 86_400 !== 0) return `${seconds} seconds`;
-  const days = seconds / 86_400;
-  return days === 1 ? "1 day" : `${days} days`;
-}
+export const durationWords = forms.durationWords;
 
 /** Resolve a program. `typeOf` gives a structure type from the world's catalogue, for building on a lot. */
 export function resolve(program: calls.Program, k: Knowledge, typeOf: (type: string) => StructureTypeInfo | undefined = () => undefined, as?: string): Resolution {
@@ -672,7 +668,7 @@ class Resolver {
       const where = [...new Set(elsewhere.map((x) => Knowledge.formOf(x)))];
       throw new Ask(`The ${name.replace(/_/g, " ")} form isn't one ${to} takes: it goes to ${where.join(" or ")}.`);
     }
-    const spec = f.data as { form: string; submit_as: string; submit_to: string[]; fields: { [k: string]: { type: string; required?: boolean; options?: string[] } } };
+    const spec = f.data as { form: string; submit_as: string; submit_to: string[]; fields: { [k: string]: { type: string; required?: boolean; options?: string[] } }; writes?: forms.FormWrites };
     const data: { [k: string]: unknown } = {};
     const missing: string[] = [];
     for (const [field, t] of Object.entries(spec.fields)) {
@@ -683,17 +679,29 @@ class Resolver {
       data[field] =
         t.type === "amount" ? this.amount(c, field)
         : t.type === "duration" ? this.seconds(c, field)
-        : t.type === "count" ? calls.parseCount(this.str(c, field)!)
+        // (A count on a form may be nought: a vote with nobody against.)
+        : t.type === "count" ? (/^[0-9]{1,15}$/.test(this.str(c, field)!.trim()) ? Number(this.str(c, field)!.trim()) : calls.parseCount(this.str(c, field)!))
         : t.type === "text" ? this.str(c, field)
         : t.type === "choice" ? this.choice(c, field, t.options ?? [])
         : t.type === "space" ? this.space(this.id(c, field)!)
         // A kind of building names a catalogue entry, not anyone: quoted or not, it's the same word.
         : t.type === "structure_type" ? this.str(c, field)
+        : t.type === "list" ? this.ids(c, field)
+        : t.type === "date" ? this.date(c, field)
         : this.id(c, field);
     }
-    const unknown = Object.keys(c.args).filter((a) => !["to", "form", "for"].includes(a) && !(a in spec.fields));
+    // (A paper of the office's own may be given its words as they are to stand, where the form has no field of that name.)
+    const ownWords = !!spec.writes && !("text" in spec.fields);
+    const unknown = Object.keys(c.args).filter((a) => !["to", "form", "for"].includes(a) && !(a in spec.fields) && !(a === "text" && ownWords));
     if (unknown.length) throw new Ask(`The ${spec.form.replace(/_/g, " ")} form has no ${unknown.join(" or ")} field. Its fields are: ${Object.keys(spec.fields).join(", ")}.`);
     if (missing.length) throw new Ask(`The ${spec.form.replace(/_/g, " ")} needs: ${missing.join(", ")}.`);
+    // A paper of the office's own (contracts: FormWrites): written from the fields as the form says, the statement
+    // the rest of the world reads. It does not cite the form.
+    if (spec.writes) {
+      const me = this.id(c, "for") ?? this.me;
+      const paper = this.written(() => forms.writePaper(spec as forms.FormData, data as forms.Filled, { self: me, now: this.k.t, money: (a) => this.sum(a), ...(ownWords && this.has(c, "text") ? { text: this.str(c, "text")! } : {}) }));
+      return [{ block: "publish", ...paper, text: paper.text.slice(0, 16384), speaks_for: me, ...(bind ? { ref: bind } : {}) }];
+    }
     // What was filled in, in words: an amount as the world writes its money, a length of time in days.
     const words = (k: string, x: unknown): string => {
       const type = spec.fields[k]?.type;
@@ -703,6 +711,20 @@ class Resolver {
     };
     const summary = Object.entries(data).map(([k, x]) => `${k.replace(/_/g, " ")} ${words(k, x)}`).join(", ");
     return [{ block: "publish", kind: spec.submit_as, speaks_for: this.id(c, "for") ?? this.me, addressed_to: spec.submit_to, basis: f.id, text: `${spec.form.replace(/_/g, " ")}: ${summary}.`.slice(0, 16384), data, ...(bind ? { ref: bind } : {}) }];
+  }
+
+  /** A date as written ("year 1, day 12"), as the moment that day begins. */
+  private date(c: Call, field: string): number {
+    return this.written(() => forms.parseDate(this.str(c, field)!));
+  }
+  /** What a form's own reading says is wrong is a question back. */
+  private written<T>(f: () => T): T {
+    try {
+      return f();
+    } catch (e) {
+      if (e instanceof forms.FormError) throw new Ask(e.message);
+      throw e;
+    }
   }
 
   private choice(c: Call, field: string, options: string[]): string {

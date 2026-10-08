@@ -231,5 +231,203 @@
       "about": "agreement"
     }
   ],
-  "state": "none"
+  "state": "none",
+  "issues": [
+    {
+      "form": "rental_listing",
+      "title": "A home advertised to let",
+      "fields": {
+        "structure": {
+          "type": "structure",
+          "required": true,
+          "description": "The building."
+        },
+        "space": {
+          "type": "space",
+          "required": true,
+          "description": "The home in it."
+        },
+        "type": {
+          "type": "structure_type",
+          "required": true,
+          "description": "The kind of building."
+        },
+        "rent": {
+          "type": "amount",
+          "required": true,
+          "description": "The rent a month."
+        },
+        "account": {
+          "type": "account",
+          "required": true,
+          "description": "The account the rent is paid into."
+        },
+        "bedrooms": {
+          "type": "count",
+          "description": "How many bedrooms."
+        },
+        "then": {
+          "type": "choice",
+          "options": [
+            "periodic"
+          ],
+          "description": "What follows the lease's term: periodic, if it continues until ended by notice."
+        }
+      },
+      "writes": {
+        "kind": "rental_listing",
+        "text": "To let: {space}, {rent} a month.",
+        "data": {
+          "structure": "=structure",
+          "space": "=space",
+          "type": "=type",
+          "bedrooms": "=bedrooms",
+          "rent": "#rent"
+        },
+        "offer": {
+          "by": "=self",
+          "take_up": "apply",
+          "available": 1,
+          "terms": {
+            "template": "lease",
+            "then": "=then",
+            "commitments": [
+              {
+                "who": "=self",
+                "does": {
+                  "outcome": {
+                    "occupancy": {
+                      "in": "=space"
+                    }
+                  }
+                }
+              },
+              {
+                "who": "taker",
+                "does": {
+                  "outcome": {
+                    "money": {
+                      "to": "=account",
+                      "amount": "=rent",
+                      "for": "rent"
+                    }
+                  }
+                },
+                "every": 2592000
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "form": "rent_increase",
+      "title": "Notice of a rent increase",
+      "fields": {
+        "lease": {
+          "type": "record",
+          "required": true,
+          "description": "The lease."
+        },
+        "tenant": {
+          "type": "entity",
+          "required": true,
+          "description": "The tenant."
+        },
+        "rent": {
+          "type": "amount",
+          "required": true,
+          "description": "The new rent a month."
+        },
+        "was": {
+          "type": "amount",
+          "required": true,
+          "description": "The rent now."
+        },
+        "from": {
+          "type": "date",
+          "required": true,
+          "description": "The day the new rent starts."
+        },
+        "last_from": {
+          "type": "date",
+          "required": true,
+          "description": "The day the rent now paid started."
+        }
+      },
+      "writes": {
+        "kind": "rent_increase",
+        "text": "Notice of rent increase: {rent} a month from {from} (now {was}).",
+        "basis": "=lease",
+        "to": [
+          "=tenant"
+        ],
+        "visible": [
+          "=self",
+          "=tenant"
+        ],
+        "data": {
+          "lease": "=lease",
+          "rent": "#rent",
+          "from": "=from",
+          "was": "#was",
+          "last_from": "=last_from"
+        }
+      }
+    },
+    {
+      "form": "tax_report",
+      "title": "Return of rent received, to the town",
+      "fields": {
+        "rent_received": {
+          "type": "amount",
+          "required": true,
+          "description": "The rent received in the period."
+        },
+        "account": {
+          "type": "account",
+          "required": true,
+          "description": "The account it was received into."
+        },
+        "period_end": {
+          "type": "date",
+          "required": true,
+          "description": "The day the period ended."
+        }
+      },
+      "writes": {
+        "kind": "tax_report",
+        "text": "Rent received this month: {rent_received}.",
+        "to": [
+          "@city"
+        ],
+        "data": {
+          "period_end": "=period_end",
+          "rent_received": "#rent_received",
+          "account": "=account"
+        }
+      }
+    },
+    {
+      "form": "death_notification",
+      "title": "Notification of a death, to the registrar",
+      "fields": {
+        "deceased": {
+          "type": "entity",
+          "required": true,
+          "description": "Who has died."
+        }
+      },
+      "writes": {
+        "kind": "death_notification",
+        "text": "Notification of a death: {deceased}.",
+        "to": [
+          "@city"
+        ],
+        "data": {
+          "deceased": "=deceased"
+        }
+      }
+    }
+  ]
 }

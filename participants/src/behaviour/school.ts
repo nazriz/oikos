@@ -11,6 +11,7 @@ import { basesOf } from "../contracts";
 import { need, params, type BehaviourModule, type ParticipantContext } from "../module";
 import { because, Book, DAY, outOfTime, say, type Step } from "./common";
 import { Staffing, stepper } from "./firms";
+import * as P from "./papers";
 
 /** Schooling: who goes to school (the ages), and what adults have had (their highest level, as years). */
 export interface SchoolingSpec { school_ages: [number, number]; attainment: { label: string; share_bps: number; years: number }[] }
@@ -30,6 +31,8 @@ export function yearsOfSchooling(age: number, s: SchoolingSpec, pick: (n: number
 
 export const principal: BehaviourModule = {
   name: "school.principal",
+  issues: [P.JOB_ADVERTISEMENT],
+  issuesWith: (p) => P.staffingOwn({ role: p.role ?? "teacher", industry: p.industry ?? "education", workplace: p.workplace, notice_days: p.notice_days ?? 14 }),
   keeps: [
     { what: "school_enrolment", why: "A school keeps its own roll: every pupil's enrolment is made with it." },
     { what: "school_place", why: "The places it has given, each to a pupil on its own roll." },

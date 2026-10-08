@@ -14,6 +14,7 @@ import { nextLook, because, Book, cellsOf, DAY, draftLaw, figureWords, heldValue
 import { Staffing, staffingForm, staffingUnder, stepper } from "./firms";
 import { incomeTaxLaw, withholding } from "./tax";
 import { ownLand } from "./institutions";
+import * as P from "./papers";
 
 const YEAR = 365 * DAY;
 
@@ -29,6 +30,8 @@ const YEAR = 365 * DAY;
  */
 export const mayorCode: BehaviourModule = {
   name: "city.mayor_code",
+  issues: P.MAYOR,
+  issuesWith: (p) => ({ electoral: p.electoral }),
   version: "0.11.0", // 0.11.0: knows the town's land from the town's own papers and goes to see a lot before applying to build on it; nominates to the electoral body; no longer shown a survey of the town or the land register
   doc: "docs/behaviour/government.md",
   cadence: () => 7 * DAY,
@@ -248,6 +251,7 @@ export const mayorCode: BehaviourModule = {
  */
 export const councilClerk: BehaviourModule = {
   name: "city.council_clerk",
+  issues: P.COUNCIL_CLERK,
   version: "0.8.0", // 0.8.0: seats whoever the electoral body declares elected to an office of the town
   doc: "docs/behaviour/government.md",
   cadence: () => DAY,
@@ -712,6 +716,8 @@ export const ratesOfficer: BehaviourModule = {
  */
 export const works: BehaviourModule = {
   name: "city.works",
+  issues: [P.JOB_ADVERTISEMENT, ...P.WORKS],
+  issuesWith: (p) => ({ ...P.staffingOwn({ role: p.role ?? "works crew", industry: p.industry, workplace: p.workplace, notice_days: p.notice_days ?? 14 }), landfill: p.landfill }),
   keeps: [{ what: "service_address", why: "The round is the works office's own: it makes an entry for each address its crew collects from, and adds to it as homes are built." }],
   takes: [
     staffingForm("works_staffing", "the works office", "works crew"),

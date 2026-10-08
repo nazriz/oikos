@@ -20,6 +20,7 @@ import { params, wait, type Belief, type BehaviourModule, type ParticipantContex
 import { distribute } from "./lengnick";
 import { incomeTaxLaw, withholding } from "./tax";
 import { ask, Asked, because, between, Book, PAYEE_DIED, breaches, noting, callAction, usd, cellsOf, commitmentOf, DAY, jobTerms, leaseTerms, MONTH, notice, offer, ownAccount, pay, publishedPrice, say, stoodEmpty, structureOf, withdraw, type Step } from "./common";
+import * as P from "./papers";
 
 /**
  * A participant observes after every action, not just when it wakes: `absorb` takes
@@ -90,6 +91,8 @@ export function receipts(obs: Observation, account: string): Map<string, number>
 
 export const landlord: BehaviourModule = {
   name: "firm.landlord",
+  issues: P.LANDLORD,
+  issuesWith: (p) => ({ city: p.city }),
   version: "0.13.2", // 0.13.2: a certified copy of a registration made on someone else's report counts as the registration; an offer the builder declines is made again at its price
   doc: "docs/behaviour/firms.md",
   cadence: () => 7 * DAY,

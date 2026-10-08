@@ -26,5 +26,187 @@
     }
   },
   "perceives": [],
-  "state": "none"
+  "state": "none",
+  "issues": [
+    {
+      "form": "death_registration",
+      "title": "Entry in the register of deaths",
+      "fields": {
+        "deceased": {
+          "type": "entity",
+          "required": true,
+          "description": "Who has died."
+        },
+        "notification": {
+          "type": "record",
+          "required": true,
+          "description": "The notification of the death that the entry is made on."
+        },
+        "reported_by": {
+          "type": "entity",
+          "required": true,
+          "description": "Who reported the death: they are sent the entry."
+        },
+        "partner": {
+          "type": "entity",
+          "description": "The dead person's partner, if the notification names one."
+        },
+        "children": {
+          "type": "list",
+          "description": "The dead person's children, as the notification names them."
+        },
+        "without_adult": {
+          "type": "list",
+          "description": "Children left with no adult at home, as the notification names them."
+        },
+        "tell": {
+          "type": "list",
+          "description": "Those the notification asks to be told, who are sent the entry too."
+        },
+        "estate": {
+          "type": "list",
+          "description": "Those written to where nobody of the family reported the death and the estate is to be administered."
+        }
+      },
+      "writes": {
+        "kind": "death_registration",
+        "text": "Death registered: {deceased}.",
+        "basis": "=notification",
+        "to": [
+          "=reported_by",
+          "=tell",
+          "@feeds",
+          "=estate"
+        ],
+        "visible": [
+          "=self",
+          "=reported_by",
+          "=tell",
+          "@feeds",
+          "=estate"
+        ],
+        "data": {
+          "deceased": "=deceased",
+          "reported_by": "=reported_by",
+          "partner": "=partner",
+          "children": "=children",
+          "without_adult": "=without_adult"
+        }
+      }
+    },
+    {
+      "form": "death_certificate",
+      "title": "Certified copy of an entry of death",
+      "fields": {
+        "deceased": {
+          "type": "entity",
+          "required": true,
+          "description": "Who has died."
+        },
+        "registration": {
+          "type": "record",
+          "required": true,
+          "description": "The entry in the register."
+        },
+        "informant": {
+          "type": "entity",
+          "required": true,
+          "description": "Whom the copy is for."
+        }
+      },
+      "writes": {
+        "kind": "death_certificate",
+        "text": "Death of {deceased}: registered (entry {registration}).",
+        "basis": "=registration",
+        "to": [
+          "=informant"
+        ],
+        "data": {
+          "deceased": "=deceased",
+          "registration": "=registration"
+        }
+      }
+    },
+    {
+      "form": "birth_registration",
+      "title": "Entry in the register of births",
+      "fields": {
+        "child": {
+          "type": "entity",
+          "required": true,
+          "description": "The child."
+        },
+        "notification": {
+          "type": "record",
+          "required": true,
+          "description": "The notification of the birth."
+        },
+        "reported_by": {
+          "type": "entity",
+          "required": true,
+          "description": "Who reported the birth: they are sent the entry."
+        },
+        "born_at": {
+          "type": "date",
+          "description": "When the child was born, as the notification gives it."
+        },
+        "mother": {
+          "type": "entity",
+          "description": "The child's mother."
+        }
+      },
+      "writes": {
+        "kind": "birth_registration",
+        "text": "Birth registered: {child}.",
+        "basis": "=notification",
+        "to": [
+          "=reported_by",
+          "@feeds"
+        ],
+        "visible": [
+          "=self",
+          "=reported_by",
+          "@feeds"
+        ],
+        "data": {
+          "child": "=child",
+          "born_at": "=born_at",
+          "mother": "=mother"
+        }
+      }
+    },
+    {
+      "form": "transmission_application",
+      "title": "Application to the land registry for a dead owner's land to pass",
+      "fields": {
+        "deceased": {
+          "type": "entity",
+          "required": true,
+          "description": "The owner who has died."
+        },
+        "heir": {
+          "type": "entity",
+          "required": true,
+          "description": "Whom the land passes to, as the law of succession says."
+        },
+        "notification": {
+          "type": "record",
+          "required": true,
+          "description": "The notification of the death."
+        }
+      },
+      "writes": {
+        "kind": "transmission_application",
+        "text": "Transmission on death: whatever land {deceased} held passes to {heir}.",
+        "basis": "=notification",
+        "to": [
+          "@land_registry"
+        ],
+        "data": {
+          "deceased": "=deceased",
+          "heir": "=heir"
+        }
+      }
+    }
+  ]
 }

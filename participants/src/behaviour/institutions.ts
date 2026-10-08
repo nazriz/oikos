@@ -14,6 +14,7 @@ import { need, params, type Belief, type BehaviourModule, type ParticipantContex
 import { ask, Asked, Directions, goSee, ownerLooks, visited, VISIT_MAX, nextLook, because, Book, prohibitions, holdsOf, noting, cellsOf, commitmentOf, DAY, Letters, lotOf, ownAccount, record, say, sign, type Step, usd, withdraw, outOfTime, team } from "./common";
 import { Deliveries, goodsPrices, held, order } from "./trade";
 import { Bargaining, Staffing, stepper, WindingUp } from "./firms";
+import * as P from "./papers";
 
 /** Who the registry says owns a lot: the latest standing ownership claim, following transfers. */
 export function ownerOf(book: Book, lot: string): string | undefined {
@@ -75,6 +76,7 @@ export function ownLand(book: Book, owner: string): OwnLot[] {
  */
 export const planningOfficer: BehaviourModule = {
   name: "city.planning_officer",
+  issues: P.PLANNING,
   version: "0.9.0", // 0.9.0: the town's land from the town's own papers; no longer shown the land register or a survey of the town
   doc: "docs/behaviour/institutions.md",
   cadence: () => 7 * DAY,
@@ -156,6 +158,8 @@ export const planningOfficer: BehaviourModule = {
  */
 export const inspector: BehaviourModule = {
   name: "city.inspector",
+  issues: P.INSPECTOR,
+  issuesWith: (p) => ({ valuer: p.valuer }),
   takes: [{ form: "inspector_enforcement", title: "Enforcement direction to the building inspector",
     fields: {
       fines: { type: "choice", options: ["yes", "no"], required: true, description: "Whether a breach the inspector finds is fined and ordered demolished: yes, as the office does of its own accord; no, it is recorded and nothing more." },
@@ -294,6 +298,8 @@ export const inspector: BehaviourModule = {
  */
 export const builder: BehaviourModule = {
   name: "firm.builder",
+  issues: [P.JOB_ADVERTISEMENT],
+  issuesWith: (p) => P.staffingOwn({ role: "construction worker", industry: p.industry, workplace: p.workplace, notice_days: p.notice_days ?? 14 }),
   version: "0.12.1", // 0.12.1: with what 0.11.2 changed; 0.12.0: goes to a lot before building on it, sees its sites as its crew works on them, and gives notice of building work; no longer shown the town
   doc: "docs/behaviour/institutions.md",
   cadence: () => DAY,
@@ -724,6 +730,8 @@ export const landRegistry: BehaviourModule = {
  */
 export const registry: BehaviourModule = {
   name: "city.registry",
+  issues: P.REGISTRY,
+  issuesWith: (p) => ({ feeds: p.feeds ?? [], land_registry: p.land_registry }),
   version: "0.7.0", // 0.7.0: keeps no register of land: it applies to the land registry for a dead owner's titles to pass; 0.6.0: registers births
   doc: "docs/behaviour/institutions.md",
   cadence: () => DAY,

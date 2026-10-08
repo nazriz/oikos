@@ -97,8 +97,8 @@ export interface Kept {
 
 /** A field of a form (contracts/outcomes.schema.json, FormData): what whoever fills it in is asked for. */
 export interface FormField {
-  /** amount, duration, count, text, choice (one of `options`), or what an id names (lot, cell, space, structure_type,
-   * account, entity, structure, record). */
+  /** amount, duration, date, count, text, choice (one of `options`), list (several ids), or what an id names (lot,
+   * cell, space, structure_type, account, entity, structure, record). */
   type: string;
   required?: boolean;
   options?: string[];
@@ -121,7 +121,26 @@ export interface Taken {
   follows: string;
 }
 
+/**
+ * A paper an office issues, as a form of its own stationery (docs/behaviour/office-papers.md): the form's fields, and
+ * how they are written into the statement the rest of the world reads (`writes`: forms.ts). Where a model holds the
+ * office, the world publishes the form for it, and filling it in makes the same paper the module itself makes. In
+ * `writes`, a string "@name" stands for something of the office's own that the world fills in when it publishes the
+ * form (`issuesWith`: its account, its premises, whom it sends every entry to); one that the office does not have
+ * leaves its key, or its place in a list, out.
+ */
+export interface Issued {
+  form: string;
+  title: string;
+  fields: { [name: string]: FormField };
+  writes: { kind: string; text: string; data?: unknown; to?: unknown[]; visible?: "public" | unknown[]; basis?: string; offer?: unknown; assertion?: unknown };
+}
+
 export interface BehaviourModule {
+  /** The papers it issues, each as a form of the office's own stationery (docs/behaviour/office-papers.md). */
+  issues?: Issued[];
+  /** What of the office's own the forms it issues carry, from its parameters: the values of each "@name" in `issues`. */
+  issuesWith?(params: { [k: string]: any }): { [name: string]: unknown };
   /** The written directions it takes, each on a form its office publishes (docs/behaviour/directions.md). An office
    * follows only what is filed on its form by someone its organisation says may direct it. */
   takes?: Taken[];

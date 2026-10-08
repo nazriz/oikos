@@ -85,5 +85,86 @@
       },
       "follows": "While a direction with fines no stands, the inspector still goes to the sites it is told of and still tells the valuer what was built, but lays no fine and makes no demolition order on a breach: it records the breach in its report. With fines yes, it fines and orders as before, at the amount given if one is."
     }
+  ],
+  "issues": [
+    {
+      "form": "valuation_request",
+      "title": "Request to the valuer for a supplementary valuation",
+      "fields": {
+        "notice": {
+          "type": "record",
+          "required": true,
+          "description": "The notice of building work it follows from."
+        },
+        "lot": {
+          "type": "lot",
+          "description": "The lot."
+        },
+        "structure": {
+          "type": "structure",
+          "description": "What was built."
+        },
+        "structure_type": {
+          "type": "structure_type",
+          "description": "The kind of building."
+        },
+        "removed": {
+          "type": "structure",
+          "description": "What was demolished."
+        }
+      },
+      "writes": {
+        "kind": "valuation_request",
+        "text": "Supplementary valuation asked for, on notice {notice}.",
+        "basis": "=notice",
+        "to": [
+          "@valuer"
+        ],
+        "data": {
+          "lot": "=lot",
+          "structure": "=structure",
+          "structure_type": "=structure_type",
+          "removed": "=removed"
+        }
+      }
+    },
+    {
+      "form": "demolition_order",
+      "title": "Order to demolish a building",
+      "fields": {
+        "owner": {
+          "type": "entity",
+          "required": true,
+          "description": "The owner ordered to demolish it."
+        },
+        "structure": {
+          "type": "structure",
+          "required": true,
+          "description": "The building."
+        },
+        "law": {
+          "type": "record",
+          "required": true,
+          "description": "The law it was built in breach of."
+        },
+        "lot": {
+          "type": "lot",
+          "description": "The lot it stands on."
+        }
+      },
+      "writes": {
+        "kind": "demolition_order",
+        "text": "Order: demolish {structure}, built in breach of {law}.",
+        "basis": "=law",
+        "to": [
+          "=owner"
+        ],
+        "data": {
+          "structure": "=structure",
+          "lot": "=lot",
+          "law": "=law"
+        }
+      }
+    }
   ]
 }

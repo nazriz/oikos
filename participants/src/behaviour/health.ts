@@ -9,11 +9,14 @@ import type { SiteStructure } from "../contracts";
 import { need, params, type BehaviourModule, type ParticipantContext } from "../module";
 import { because, Book, DAY, outOfTime, say, type Step } from "./common";
 import { Staffing, stepper } from "./firms";
+import * as P from "./papers";
 
 const HOUR = 3600;
 
 export const practice: BehaviourModule = {
   name: "clinic.practice",
+  issues: [P.JOB_ADVERTISEMENT],
+  issuesWith: (p) => P.staffingOwn({ role: p.role ?? "doctor", industry: p.industry ?? "health_care", workplace: p.workplace, notice_days: p.notice_days ?? 14 }),
   version: "0.2.1",
   doc: "docs/behaviour/health.md",
   // (When it opens each working day, and whenever a patient asks: someone who comes in and asks is seen then, if it's

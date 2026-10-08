@@ -12,13 +12,14 @@
 // debriefs) and only language understanding is faked. A mock can't read
 // prose, so it reads the request's structured context instead.
 
-import { parseProgram, programText } from "../calls";
+import { amountText, call, json, parseProgram, programText, secs, text, type Value } from "../calls";
 import { slice, type LookRequest, type ParticipantAction } from "../contracts";
+import { fieldsFor, type FormData, type Paper } from "../forms";
 import type { Controller, ParticipantContext } from "../module";
-import { inCurrency } from "../money";
+import { formatMoney, inCurrency, type Currency } from "../money";
 import type { ContentBlock, LlmRequest, MockPolicy } from "./adapter";
 
-export const MOCK_VERSION = "0.4.0"; // 0.4.0: a brain's looks are made through the seat's own look (asking a register, looking someone up, sending someone to a place)
+export const MOCK_VERSION = "0.5.0"; // 0.5.0: a paper the brain issues is asked for on the office's own form for it, where it has one; 0.4.0: a brain's looks are made through the seat's own look (asking a register, looking someone up, sending someone to a place)
 
 export interface MockBrain {
   controller: Controller;
@@ -49,8 +50,73 @@ function lookAsTool(l: LookRequest, capacity: string): object {
   return { report, ...(find.length ? { find } : {}), ...(l.query?.limit ? { limit: l.query.limit } : {}), ...(l.query?.standing ? { current_only: true } : {}) };
 }
 
+/** A call's value as plain data. */
+const plain = (v: Value | undefined): unknown => (v === undefined ? undefined : "id" in v ? v.id : "text" in v ? v.text : "json" in v ? v.json : undefined);
+
+/**
+ * A paper a code brain issues, said as a seat would say it: on the office's own form for it, where the office has one
+ * that writes exactly that paper (docs/behaviour/office-papers.md). The brain makes a typed statement; a person in
+ * the office fills in the form. A line is turned only if the form, filled in with what is worked out here, writes
+ * the statement back to the letter (`fieldsFor` checks by writing it); anything else is said as the brain said it.
+ */
+export function onOwnForms(program: string, stationery: FormData[], o: { self: string; now: number; currency: Currency }): { program: string; turned: number; kept: string[] } {
+  const p = parseProgram(program);
+  if ("none" in p) return { program, turned: 0, kept: [] };
+  let turned = 0;
+  const kept: string[] = [];
+  const lines = p.lines.map((l) => {
+    const a = l.call.args;
+    if (l.call.fn !== "statement" || !a.kind || a.withdraw || a.hold) return l;
+    const kind = String(plain(a.kind) ?? "");
+    const extra = Object.keys(a).filter((k) => !["kind", "text", "to", "data", "offer", "assertion", "visible", "basis", "for"].includes(k));
+    const forms = stationery.filter((f) => f.writes?.kind === kind);
+    if (!forms.length) return l;
+    const visible = a.visible === undefined ? undefined : "id" in a.visible && a.visible.id === "public" ? "public" as const : plain(a.visible);
+    const to = a.to === undefined ? undefined : "json" in a.to ? a.to.json : [plain(a.to)];
+    const basis = a.basis === undefined ? undefined : plain(a.basis);
+    const self = a.for ? String(plain(a.for)) : o.self;
+    const ok = !extra.length && typeof plain(a.text) === "string" && (visible === undefined || visible === "public" || Array.isArray(visible)) && (basis === undefined || typeof basis === "string") && (to === undefined || Array.isArray(to));
+    if (ok) {
+      const paper: Paper = { kind, text: plain(a.text) as string, ...(to !== undefined ? { addressed_to: to as string[] } : {}), ...(a.data ? { data: plain(a.data) } : {}), ...(visible !== undefined ? { visible_to: visible as "public" | string[] } : {}),
+        ...(basis !== undefined ? { basis: basis as string } : {}), ...(a.offer ? { offer: plain(a.offer) } : {}), ...(a.assertion ? { assertion: plain(a.assertion) } : {}) };
+      for (const f of forms) {
+        const got = fieldsFor(f, paper, { self, now: o.now, money: (x) => formatMoney(x, o.currency) });
+        if (!got) continue;
+        const args: { [k: string]: any } = { form: f.form, ...(f.office ? { to: f.office } : {}), ...(a.for ? { for: self } : {}) };
+        let exact = true;
+        for (const [name, v] of Object.entries(got.fields)) {
+          const type = f.fields[name]!.type;
+          if (type === "amount") { if (Number.isSafeInteger(Number(v))) args[name] = amountText(Number(v)); else exact = false; }
+          else if (type === "duration") args[name] = secs(v as number);
+          else if (type === "date" || type === "count") args[name] = text(String(v));
+          else if (type === "list") args[name] = json(v);
+          else if (type === "text") args[name] = text(v as string);
+          else args[name] = v as string;
+        }
+        if (got.text !== undefined) args.text = text(got.text);
+        if (!exact) continue;
+        turned++;
+        return { ...l, call: call("form", args) };
+      }
+    }
+    kept.push(kind);
+    return l;
+  });
+  return { program: turned ? programText({ lines }) : program, turned, kept };
+}
+
 export function mockPolicies(brains: Map<string, MockBrain>): { participant: MockPolicy; translator: MockPolicy; debrief: MockPolicy; consult: MockPolicy } {
   const queues = new Map<string, (ParticipantAction & { type: "call" | "message" })[]>();
+  /** Each seat's own stationery, as it has been shown it: the forms that write a paper of its office's. */
+  const stationery = new Map<string, Map<string, FormData>>();
+  const see = (id: string, capacity: string, obs: { channels: { [k: string]: any } }) => {
+    const mine = stationery.get(id) ?? new Map<string, FormData>();
+    stationery.set(id, mine);
+    for (const ch of Object.values(obs.channels)) for (const r of ch.kind === "records" ? ch.records : []) {
+      if (r.record === "statement" && r.kind === "form" && r.data?.writes && r.data.office === capacity) mine.set(r.id, r.data as FormData);
+      if (r.record === "withdrawal") mine.delete(r.withdraws);
+    }
+  };
   let n = 0;
   const tool = (name: string, input: object): ContentBlock => ({ type: "tool_use", id: `mock-${++n}`, name, input });
 
@@ -72,10 +138,12 @@ export function mockPolicies(brains: Map<string, MockBrain>): { participant: Moc
     queues.set(id, q);
     // What it was shown while away from its desk (office hours), first: the brain reads every observation, in order.
     for (const m of (req.context.missed ?? []) as typeof obs[]) {
+      see(id, brain.capacity, m);
       inCurrency(brain.ctx.world.currency);
       const x = (await brain.controller.step(slice(m, brain.capacity, brain.ctx.entity), brain.ctx)) as ParticipantAction;
       if (x.type === "call" || x.type === "message") q.push(x);
     }
+    see(id, brain.capacity, obs);
     inCurrency(brain.ctx.world.currency);
     const a = (await brain.controller.step(slice(obs, brain.capacity, brain.ctx.entity), brain.ctx)) as ParticipantAction;
     if (a.type === "call" || a.type === "message") q.push(a);
@@ -103,7 +171,12 @@ export function mockPolicies(brains: Map<string, MockBrain>): { participant: Moc
     const next = q.shift();
     const as = brain.capacity === "self" ? {} : { as: brain.capacity };
     if (next?.type === "message") return [tool("write", { to: next.to, text: next.text, ...as, ...(next.re ? { about: next.re } : {}) })];
-    if (next) return [tool("notebook", { text: `Last request on day ${Math.floor(obs.t / 86_400)}.` }), tool("do", { what: PREFIX + next.call, ...as })];
+    if (next) {
+      // A paper of the office's own is asked for on the office's form for it, as whoever holds the office would.
+      inCurrency(brain.ctx.world.currency);
+      const said = onOwnForms(next.call, [...(stationery.get(id)?.values() ?? [])].sort((x, y) => (x.form < y.form ? -1 : 1)), { self: brain.ctx.entity, now: obs.t, currency: brain.ctx.world.currency });
+      return [tool("notebook", { text: `Last request on day ${Math.floor(obs.t / 86_400)}.` }), tool("do", { what: PREFIX + said.program, ...as })];
+    }
     return [tool("done_for_now", {})];
   };
 

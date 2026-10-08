@@ -88,9 +88,51 @@
         "$ref": "#/$defs/Taken"
       },
       "maxItems": 16
+    },
+    "issues": {
+      "type": "array",
+      "description": "The papers its office issues, each as a form of the office's own stationery (docs/behaviour/office-papers.md): the form's fields, and how they are written into the statement the rest of the world reads (outcomes.schema.json, FormWrites). In `writes`, a string \"@name\" stands for something of the office's own that a world fills in when it publishes the form. A world publishes these for an office a model holds; filled in, each makes the paper the module itself makes.",
+      "items": {
+        "$ref": "#/$defs/Issued"
+      },
+      "maxItems": 32
     }
   },
   "$defs": {
+    "Issued": {
+      "type": "object",
+      "required": [
+        "form",
+        "title",
+        "fields",
+        "writes"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "form": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{0,63}$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 200
+        },
+        "fields": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^[a-z_][a-z0-9_]{0,31}$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/Field"
+          },
+          "maxProperties": 32
+        },
+        "writes": {
+          "$ref": "urn:oikos:contracts:0.8:outcomes#/$defs/FormWrites"
+        }
+      }
+    },
     "Taken": {
       "type": "object",
       "required": [

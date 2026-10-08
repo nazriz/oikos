@@ -11,6 +11,7 @@ import { Bargaining, Staffing, stepper, WindingUp } from "./firms";
 import { Borrowing } from "./credit";
 import { distribute, LENGNICK, movePrice, moveWage, payOut } from "./lengnick";
 import { Deliveries, goodsPrices, held, order, OrderBook, priceList, UNDELIVERABLE, type Order } from "./trade";
+import * as P from "./papers";
 
 /**
  * A shop. It buys goods from the cheapest of its suppliers (local factories' wholesale, or the world market's imports)
@@ -22,6 +23,8 @@ import { Deliveries, goodsPrices, held, order, OrderBook, priceList, UNDELIVERAB
  */
 export const retailer: BehaviourModule = {
   name: "firm.retailer",
+  issues: [P.JOB_ADVERTISEMENT, ...P.TRADE],
+  issuesWith: (p) => ({ ...P.staffingOwn({ role: p.role ?? "shop assistant", industry: p.industry, workplace: p.workplace, notice_days: p.notice_days ?? 14 }), police: p.police }),
   version: "0.8.2",
   doc: "docs/behaviour/retailer.md",
   cadence: () => DAY,

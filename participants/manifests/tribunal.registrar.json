@@ -13,5 +13,63 @@
     }
   },
   "perceives": [],
-  "state": "none"
+  "state": "none",
+  "issues": [
+    {
+      "form": "garnishee_order",
+      "title": "Order to a debtor's bank to pay an unpaid order of the tribunal",
+      "fields": {
+        "order": {
+          "type": "record",
+          "required": true,
+          "description": "The tribunal's order left unpaid."
+        },
+        "debtor": {
+          "type": "entity",
+          "required": true,
+          "description": "Who owes."
+        },
+        "creditor": {
+          "type": "entity",
+          "required": true,
+          "description": "Who is owed."
+        },
+        "amount": {
+          "type": "amount",
+          "required": true,
+          "description": "How much."
+        },
+        "pay_into": {
+          "type": "account",
+          "required": true,
+          "description": "The account it is to be paid into."
+        },
+        "claim": {
+          "type": "record",
+          "description": "The claim it settles, if the order names one."
+        }
+      },
+      "writes": {
+        "kind": "garnishee_order",
+        "text": "Order to pay {amount} from what {debtor} holds, into {pay_into}, under {order}.",
+        "basis": "=order",
+        "to": [
+          "@banks"
+        ],
+        "visible": [
+          "@banks",
+          "=self",
+          "=debtor",
+          "=creditor"
+        ],
+        "data": {
+          "order": "=order",
+          "debtor": "=debtor",
+          "amount": "#amount",
+          "to": "=pay_into",
+          "claim": "=claim"
+        }
+      }
+    }
+  ]
 }

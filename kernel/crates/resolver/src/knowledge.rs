@@ -525,7 +525,13 @@ impl Knowledge {
 
     /// Standing forms (their records).
     pub fn standing_forms(&self) -> Vec<&Value> {
-        self.forms.values().map(|f| &**f).filter(|f| !self.withdrawn.contains(f["id"].as_str().unwrap_or_default())).collect()
+        // (An office's own stationery, the papers it issues, is known only to a seat that holds the office.)
+        self.forms
+            .values()
+            .map(|f| &**f)
+            .filter(|f| !self.withdrawn.contains(f["id"].as_str().unwrap_or_default()))
+            .filter(|f| !(f["data"].get("writes").is_some_and(|w| !w.is_null()) && f["data"]["office"].as_str().is_some_and(|o| !self.held.contains(o))))
+            .collect()
     }
 
     /// The standing form, by its name or its record's id, published by an institution a participant, position or
