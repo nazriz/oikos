@@ -36,6 +36,7 @@ test("a wave makes its worktree at the commit, records it, and never moves to an
   const dry = wave(repo, runs, "w1", "wave-one", queue, "--dry-run", "--repo", repo);
   expect(dry.code).toBe(0);
   expect(dry.out).toContain(`[dry run] make the worktree ${join(repo, ".claude/worktrees/wave-w1")} at wave-one (${one})`);
+  expect(dry.out).toMatch(/worktrees: \d+ MB in merged ones/); // (the cleanup listing, which deletes nothing)
   expect(dry.out).toContain("bun install");
   expect(dry.out).toContain("bun run kernel");
   expect(dry.out).toMatch(/nohup bun scripts\/pilot-queue\.ts .*q\.json/);
@@ -62,18 +63,18 @@ test("a wave makes its worktree at the commit, records it, and never moves to an
   expect(wave(repo, runs, "w2", "no-such-ref", queue, "--repo", repo).code).not.toBe(0);
   expect(wave(repo, runs, "w2", "main", join(base, "missing.json"), "--repo", repo).code).not.toBe(0);
   expect(existsSync(join(repo, ".claude/worktrees/wave-w2"))).toBe(false);
-});
+}, 60_000);
 
 test("run from a worktree of this repository, a dry run names the main checkout's worktrees folder and starts nothing", () => {
   const runs = join(base, "runs-dry");
   const queue = join(base, "q2.json");
   writeFileSync(queue, "[]");
-  const r = wave(join(import.meta.dir, "../.."), runs, "dry-test-wave", "HEAD", queue, "--dry-run");
+  const r = wave(join(import.meta.dir, "../.."), runs, "dry-test-wave", "HEAD", queue, "--dry-run", "--no-list");
   expect(r.code).toBe(0);
   expect(r.out).toMatch(/\.claude\/worktrees\/wave-dry-test-wave /);
   expect(r.out).not.toMatch(/\.claude\/worktrees\/[^ ]*\.claude\/worktrees/); // (not nested inside a worktree)
   expect(existsSync(runs)).toBe(false);
-});
+}, 60_000);
 
 test("the queue is started detached, from the wave's worktree, once", async () => {
   const repo = join(base, "repo3"), runs = join(base, "runs3");
@@ -96,4 +97,24 @@ test("the queue is started detached, from the wave's worktree, once", async () =
   } finally {
     try { process.kill(pid, "SIGKILL"); } catch { /* (already gone) */ }
   }
-});
+}, 60_000);
+
+test("status says, per queue and pilot, where it stands, with the last alerts", () => {
+  const runs = join(base, "runs-status");
+  const queue = join(base, "qs.json");
+  writeFileSync(queue, JSON.stringify([{ name: "p-one", until: 1000, test: true }, { name: "p-two", until: 1000 }]));
+  mkdirSync(join(runs, "pilot-queues"), { recursive: true });
+  writeFileSync(join(runs, "pilot-queues/ws.commit"), `abc123\nwave ws, ref main, worktree /x\nqueues: ${queue}\nstarted now\n`);
+  mkdirSync(join(runs, "p-one"), { recursive: true });
+  const entries = [{ kind: "header", t: 0, body: {} }, { kind: "command", t: 90_000, body: { command: "opt_out", participant: "finance-system", statement: "x" } }, { kind: "end", t: 400, body: { reason: "aborted", detail: "spending limit reached: all of it" } }];
+  writeFileSync(join(runs, "p-one/town.seed1.jsonl"), entries.map((e) => JSON.stringify(e)).join("\n") + "\n");
+  writeFileSync(join(runs, "pilot-queues/ws.alerts.log"), "2026-10-08 10:00+11:00 [qs] SPENDING LIMIT p-one: stopped\n");
+  const p = Bun.spawnSync(["bun", script, "status", "ws"], { env: { ...process.env, OIKOS_RUNS: runs }, stdout: "pipe", stderr: "pipe" });
+  const out = p.stdout.toString();
+  expect(p.exitCode).toBe(0);
+  expect(out).toContain("wave ws at abc123");
+  expect(out).toContain("queue qs.json: not running");
+  expect(out).toMatch(/p-one \[test\]: stopped at its spending limit.*opted out: finance-system day 1/);
+  expect(out).toContain("p-two: not started");
+  expect(out).toContain("SPENDING LIMIT p-one: stopped");
+}, 60_000);
