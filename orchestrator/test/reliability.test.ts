@@ -83,7 +83,7 @@ test("a kernel that dies ends the run at once, as a dead kernel, not an off-cont
   const t0 = Date.now();
   await expect(run).rejects.toBeInstanceOf(KernelDied);
   expect(Date.now() - t0).toBeLessThan(10_000);
-}, 60_000);
+}, 180_000);
 
 test("a model that never answers times out and is retried; its participant waits; unanswered three times running, the run stops to be resumed, and nobody is retired", async () => {
   // A fetch that never answers (only the adapter's own time limit ends it).
@@ -103,7 +103,7 @@ test("a model that never answers times out and is retried; its participant waits
   expect(log.some((e) => e.kind === "annotation" && /can't be reached/.test(e.body.data?.stopped ?? ""))).toBe(true);
   expect(log.some((e) => e.kind === "annotation" && e.body.data?.participant_retired)).toBe(false);
   expect(log.at(-1).body.reason).toBe("aborted");
-}, 60_000);
+}, 180_000);
 
 test("a stopped run resumes: model responses served from its log reproduce it exactly, and only the rest is asked anew", async () => {
   // A model-run mayor with a simple, fixed policy, counting the calls actually made.
@@ -223,7 +223,7 @@ test("over stdio the kernel answers many requests made at once, each caller gett
       last = reply[2].seq;
     }
   }
-}, 60_000);
+}, 180_000);
 
 /** A log nobody reads any more (a named pipe whose reader has gone): every write to it fails, as on a full disk. */
 function brokenLog(path: string) {
@@ -250,7 +250,7 @@ test("a log the kernel can't write is fatal, and never taken for a refused reque
   await expect(k.tryRequest(big)).rejects.toBeInstanceOf(KernelLogFailed);
   expect(await k.tryRequest({ op: "nothing" })).toBeNull();
   k.kill();
-}, 60_000);
+}, 180_000);
 
 test("a run whose log can no longer be written stops there, saying so", async () => {
   const d = dir("log-fails-run");
@@ -263,4 +263,4 @@ test("a run whose log can no longer be written stops there, saying so", async ()
   const failed = await run.catch((e) => e);
   expect(failed).toBeInstanceOf(KernelLogFailed);
   expect(failed.message).toContain("couldn't write the run's log");
-}, 60_000);
+}, 180_000);

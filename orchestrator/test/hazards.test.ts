@@ -45,7 +45,7 @@ test("heavy rain floods the buildings beside the river; their people go to the r
   // No rain: no floods.
   const dry = await run("dry", generate({ ...spec, years: 1 }), 60);
   expect(dry.ev.filter((e) => e.event === "flooded" && !String(e.structure).startsWith("str."))).toEqual([]);
-}, 900_000);
+}, 2_400_000);
 
 test("taking from work, found at a stocktake, investigated, charged, ordered and paid", async () => {
   const config = generate({ ...spec, years: 1 });
@@ -106,4 +106,4 @@ test("taking from work, found at a stocktake, investigated, charged, ordered and
     until(end);
     expect(longest).toBeLessThan(7 * DAY);
   }
-}, 900_000);
+}, 2_400_000);

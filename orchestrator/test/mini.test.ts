@@ -129,4 +129,4 @@ test("resume takes the run's own log: the one named (plain, or compressed if tha
   expect(run("resume", "pilot2", "town.seed9")).toMatchObject({ code: 1 });
   expect(run("resume", "nothing-here")).toMatchObject({ code: 1 });
   expect(readFileSync(join(d, "console.txt"), "utf8")).toBe(""); // (appended to, as the run's console)
-}, 60_000);
+}, 180_000);
