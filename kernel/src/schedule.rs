@@ -15,6 +15,7 @@
 //! - **Guards:** at most three news wakes a unit a tick (then the next tick); more than `MAX_COHORTS_PER_MOMENT`
 //!   cohorts at one moment stops the run.
 
+use crate::events::{Event, EventBody, VacateReason};
 use crate::state::State;
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};
@@ -60,6 +61,18 @@ pub struct Scheduler {
     queue: BTreeSet<(i64, String)>,
     moment_at: i64,
     cohorts_now: u32,
+}
+
+/// What an event means for wakes, as `Scheduler::note` reads it.
+enum News<'a> {
+    /// An act begun: who, in what capacity, and when it's done.
+    Started { participant: &'a str, capacity: Option<&'a str>, done: i64 },
+    /// A message, to these participants.
+    Delivered(Vec<&'a str>),
+    /// Something happened to this person's own body.
+    Body(&'a str),
+    /// A record made (its JSON).
+    Recorded(&'a Value),
 }
 
 /// What the host should do next.
@@ -256,54 +269,81 @@ impl Scheduler {
     /// What a command's events mean for wakes: news for those it reaches; an act begun keeps its unit busy until done.
     pub fn note(&mut self, st: Option<&State>, events: &[Value], t: i64) {
         for e in events {
-            match e["event"].as_str() {
-                Some("action_started") => {
-                    let p = e["participant"].as_str().unwrap_or_default();
-                    let cap = e["as"].as_str();
-                    let done = e["done"].as_i64().unwrap_or(t);
-                    // The unit that acted: a code unit's capacity, or the language-model participant.
-                    let key = [format!("{p}|{}", cap.unwrap_or("self")), p.to_string()].into_iter().find(|k| self.units.contains_key(k));
-                    if let Some(u) = key.and_then(|k| self.units.get_mut(&k)) {
-                        u.done_at = Some(u.done_at.map_or(done, |d| d.max(done)));
-                    }
-                }
-                Some("message_delivered") => {
-                    for to in e["to"].as_array().into_iter().flatten().filter_map(Value::as_str) {
-                        let keys = self.units_of(to).filter(|(_, u)| u.next_wake > t && !Self::busy(u, t)).map(|(k, _)| k.clone()).collect();
-                        self.wake_now(keys, t);
-                    }
-                }
-                // Something happening to one's own body (falling ill, getting better, being treated) is felt at once.
-                // (Flooded out of where one was is felt at once too.)
-                Some("vacated") if e["reason"].as_str() == Some("flooded") => {
-                    let (Some(st), Some(person)) = (st, e["occupant"].as_str()) else { continue };
-                    let keys = self.acting_for(st, person, "", t);
-                    self.wake_now(keys, t);
-                }
-                Some("condition_began" | "condition_ended" | "condition_treated") => {
-                    let (Some(st), Some(person)) = (st, e["person"].as_str()) else { continue };
-                    let keys = self.acting_for(st, person, "", t);
-                    self.wake_now(keys, t);
-                }
-                Some("recorded") => {
-                    let Some(st) = st else { continue };
-                    let r = &e["record"];
-                    let mut named: BTreeSet<&str> = BTreeSet::new();
-                    for f in ["holder", "counterparty", "as", "to"] {
-                        if let Some(x) = r[f].as_str() {
-                            named.insert(x);
-                        }
-                    }
-                    for x in r["addressed_to"].as_array().into_iter().chain(r["terms"]["parties"].as_array()).flatten().filter_map(Value::as_str) {
-                        named.insert(x);
-                    }
-                    let author = r["author"].as_str().unwrap_or_default();
-                    for entity in named {
-                        let keys = self.acting_for(st, entity, author, t);
-                        self.wake_now(keys, t);
+            let news = match e["event"].as_str() {
+                Some("action_started") => News::Started { participant: e["participant"].as_str().unwrap_or_default(), capacity: e["as"].as_str(), done: e["done"].as_i64().unwrap_or(t) },
+                Some("message_delivered") => News::Delivered(e["to"].as_array().into_iter().flatten().filter_map(Value::as_str).collect()),
+                Some("vacated") if e["reason"].as_str() == Some("flooded") => match e["occupant"].as_str() {
+                    Some(person) => News::Body(person),
+                    None => continue,
+                },
+                Some("condition_began" | "condition_ended" | "condition_treated") => match e["person"].as_str() {
+                    Some(person) => News::Body(person),
+                    None => continue,
+                },
+                Some("recorded") => News::Recorded(&e["record"]),
+                _ => continue,
+            };
+            self.news(st, news, t);
+        }
+    }
+
+    /// `note`, for events in their own shape (no JSON is made of them, but of a record: its fields are read by name).
+    pub fn note_events(&mut self, st: Option<&State>, events: &[Event], t: i64) {
+        for e in events {
+            match &e.body {
+                EventBody::ActionStarted { participant, position, done, .. } => self.news(st, News::Started { participant, capacity: position.as_deref(), done: *done }, t),
+                EventBody::MessageDelivered { to, .. } => self.news(st, News::Delivered(to.iter().map(String::as_str).collect()), t),
+                EventBody::Vacated { occupant, reason: VacateReason::Flooded, .. } => self.news(st, News::Body(occupant), t),
+                EventBody::ConditionBegan { person, .. } | EventBody::ConditionEnded { person, .. } | EventBody::ConditionTreated { person, .. } => self.news(st, News::Body(person), t),
+                EventBody::Recorded { record } => {
+                    if st.is_some() {
+                        let record = serde_json::to_value(&**record).expect("records serialize");
+                        self.news(st, News::Recorded(&record), t);
                     }
                 }
                 _ => {}
+            }
+        }
+    }
+
+    fn news(&mut self, st: Option<&State>, news: News, t: i64) {
+        match news {
+            News::Started { participant: p, capacity: cap, done } => {
+                // The unit that acted: a code unit's capacity, or the language-model participant.
+                let key = [format!("{p}|{}", cap.unwrap_or("self")), p.to_string()].into_iter().find(|k| self.units.contains_key(k));
+                if let Some(u) = key.and_then(|k| self.units.get_mut(&k)) {
+                    u.done_at = Some(u.done_at.map_or(done, |d| d.max(done)));
+                }
+            }
+            News::Delivered(to) => {
+                for to in to {
+                    let keys = self.units_of(to).filter(|(_, u)| u.next_wake > t && !Self::busy(u, t)).map(|(k, _)| k.clone()).collect();
+                    self.wake_now(keys, t);
+                }
+            }
+            // Something happening to one's own body (falling ill, getting better, being treated) is felt at once.
+            // (Flooded out of where one was is felt at once too.)
+            News::Body(person) => {
+                let Some(st) = st else { return };
+                let keys = self.acting_for(st, person, "", t);
+                self.wake_now(keys, t);
+            }
+            News::Recorded(r) => {
+                let Some(st) = st else { return };
+                let mut named: BTreeSet<&str> = BTreeSet::new();
+                for f in ["holder", "counterparty", "as", "to"] {
+                    if let Some(x) = r[f].as_str() {
+                        named.insert(x);
+                    }
+                }
+                for x in r["addressed_to"].as_array().into_iter().chain(r["terms"]["parties"].as_array()).flatten().filter_map(Value::as_str) {
+                    named.insert(x);
+                }
+                let author = r["author"].as_str().unwrap_or_default();
+                for entity in named {
+                    let keys = self.acting_for(st, entity, author, t);
+                    self.wake_now(keys, t);
+                }
             }
         }
     }

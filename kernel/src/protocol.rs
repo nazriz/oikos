@@ -55,7 +55,11 @@ impl Session {
     }
 
     fn reply(&mut self, req: &Value) -> Reply {
-        let done = if req.get("op").and_then(Value::as_str) == Some("command") { command(self, req).map(Reply::Line) } else { handle(self, req).map(Reply::Value) };
+        let done = match req.get("op").and_then(Value::as_str) {
+            Some("command") => command(self, req).map(Reply::Line),
+            Some("next") => next(self, req),
+            _ => handle(self, req).map(Reply::Value),
+        };
         done.unwrap_or_else(refused)
     }
 
@@ -147,30 +151,74 @@ fn command(session: &mut Session, req: &Value) -> Result<String, String> {
     let r = run.as_mut().ok_or("no run started")?;
     let cmd: Command = serde_json::from_value(req.get("command").cloned().ok_or("missing command")?).map_err(|e| format!("bad command: {e}"))?;
     let mut resp = r.command(&cmd).map_err(|e| e.to_string())?;
-    let events = serde_json::to_value(&resp.events).map_err(|e| e.to_string())?;
     let observed = match resp.observation.as_mut() {
         Some(obs) => Some(r.observed(obs).map_err(|e| e.to_string())?),
         None => None,
     };
     // What the seat now knows: each observation delivered to it, as it received it.
-    if let (Command::Observe { participant, only } | Command::Look { participant, only, .. }, Some(o)) = (&cmd, &observed) {
+    if let (Command::Observe { participant, only } | Command::Look { participant, only, .. }, Some(o), Some(obs)) = (&cmd, &observed, &resp.observation) {
         let key = only.as_ref().map_or_else(|| participant.clone(), |o| format!("{participant}|{o}"));
-        knowledge.entry(key).or_insert_with(|| oikos_resolver::Knowledge::new(currency.clone())).absorb_sharing(&o.value, &o.shown, registers);
+        knowledge.entry(key).or_insert_with(|| oikos_resolver::Knowledge::new(currency.clone())).absorb_seen(&crate::kernel::seen(obs), &o.shown, registers);
     }
     if let Some(s) = sched.as_mut() {
-        s.note(Some(r.kernel().state()), events.as_array().map(Vec::as_slice).unwrap_or_default(), r.kernel().t());
+        s.note_events(Some(r.kernel().state()), &resp.events, r.kernel().t());
     }
     // (For a host that keeps the records it's handed, those it has had before are written as their ids.)
     let written = observed.as_ref().map(|o| o.wire.as_ref().unwrap_or(&o.canonical));
-    let mut line = Vec::with_capacity(written.map_or(0, |w| w.len()) + 256);
+    let mut line = Vec::with_capacity(written.map_or(0, |w| w.len()) + 256 + resp.logged.iter().map(|b| b.len() + 1).sum::<usize>());
     line.extend_from_slice(b"{\"events\":");
-    serde_json::to_writer(&mut line, &events).map_err(|e| e.to_string())?;
+    write_events(&resp, &mut line)?;
     if let Some(w) = written {
         line.extend_from_slice(b",\"observation\":");
         line.extend_from_slice(w);
     }
     line.extend_from_slice(format!(",\"ok\":true,\"seq\":{}}}", resp.seq).as_bytes());
     String::from_utf8(line).map_err(|e| e.to_string())
+}
+
+/// A command's events, as a JSON list: each as it was logged (its canonical JSON), where there's no doubt that reads
+/// the same as the list written the plain way (members in the same order: so for ASCII, which is every event so far).
+fn write_events(resp: &crate::run::Response, line: &mut Vec<u8>) -> Result<(), String> {
+    if resp.logged.len() != resp.events.len() || !resp.logged.iter().all(|b| b.is_ascii()) {
+        let events = serde_json::to_value(&resp.events).map_err(|e| e.to_string())?;
+        return serde_json::to_writer(line, &events).map_err(|e| e.to_string());
+    }
+    line.push(b'[');
+    for (i, b) in resp.logged.iter().enumerate() {
+        if i > 0 {
+            line.push(b',');
+        }
+        line.extend_from_slice(b);
+    }
+    line.push(b']');
+    Ok(())
+}
+
+/// What's next for the host (crate::schedule): the end, a cohort to wake, or time moved on (logged as the host's
+/// advance was: its events are the host's to read, as any command's). The reply to an advance is written as a line:
+/// `{"advanced":to,"events":[..],"ok":true,"seq":n}`.
+fn next(session: &mut Session, req: &Value) -> Result<Reply, String> {
+    let Session { run, sched, .. } = session;
+    let r = run.as_mut().ok_or("no run started")?;
+    let until = req["until"].as_i64().ok_or("missing until")?;
+    let s = sched.as_mut().ok_or("no run started")?;
+    match s.next(r.kernel().t(), until)? {
+        crate::schedule::Next::End => Ok(Reply::Value(json!({ "ok": true, "end": true }))),
+        crate::schedule::Next::Cohort(c) => {
+            let mut v = crate::schedule::Scheduler::cohort_json(&c, r.kernel().t());
+            v["ok"] = Value::Bool(true);
+            Ok(Reply::Value(v))
+        }
+        crate::schedule::Next::Advance { to } => {
+            let resp = r.command(&Command::Advance { to }).map_err(|e| e.to_string())?;
+            s.note_events(Some(r.kernel().state()), &resp.events, r.kernel().t());
+            let mut line = Vec::with_capacity(64 + resp.logged.iter().map(|b| b.len() + 1).sum::<usize>());
+            line.extend_from_slice(format!("{{\"advanced\":{to},\"events\":").as_bytes());
+            write_events(&resp, &mut line)?;
+            line.extend_from_slice(format!(",\"ok\":true,\"seq\":{}}}", resp.seq).as_bytes());
+            String::from_utf8(line).map(Reply::Line).map_err(|e| e.to_string())
+        }
+    }
 }
 
 /// The world's structure types (its catalogue), by id.
@@ -262,27 +310,6 @@ fn handle(session: &mut Session, req: &Value) -> Result<Value, String> {
             let t = r.kernel().t();
             sched.as_mut().ok_or("no run started")?.finished(str_field("key")?, req["until"].as_i64(), t);
             Ok(json!({ "ok": true }))
-        }
-        "next" => {
-            let until = req["until"].as_i64().ok_or("missing until")?;
-            let s = sched.as_mut().ok_or("no run started")?;
-            match s.next(r.kernel().t(), until)? {
-                crate::schedule::Next::End => Ok(json!({ "ok": true, "end": true })),
-                crate::schedule::Next::Cohort(c) => {
-                    let mut v = crate::schedule::Scheduler::cohort_json(&c, r.kernel().t());
-                    v["ok"] = Value::Bool(true);
-                    Ok(v)
-                }
-                crate::schedule::Next::Advance { to } => {
-                    // Time moves on (logged as the host's advance was): its events are the host's to read, as any command's.
-                    let resp = r.command(&Command::Advance { to }).map_err(|e| e.to_string())?;
-                    let mut v = serde_json::to_value(&resp).map_err(|e| e.to_string())?;
-                    s.note(Some(r.kernel().state()), v["events"].as_array().map(Vec::as_slice).unwrap_or_default(), r.kernel().t());
-                    v["ok"] = Value::Bool(true);
-                    v["advanced"] = json!(to);
-                    Ok(v)
-                }
-            }
         }
         "check" => {
             let blocks: Vec<Block> =

@@ -154,8 +154,9 @@ pub struct SiteCell {
     pub y: i64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub terrain: Option<String>,
+    /// (One building's is shared by the cells it stands on: built once for a look, not once for each cell.)
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub structure: Option<SiteStructure>,
+    pub structure: Option<Arc<SiteStructure>>,
     /// Nature: conspicuous species anyone there would notice (never how many).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub seen: Vec<Id>,
@@ -372,6 +373,11 @@ pub struct RecordIndex {
     /// cell -> records placed there (and withdrawals of them).
     by_place: BTreeMap<Id, Vec<u64>>,
     accounts: Option<AccountsByEntity>,
+    /// Which accounts, entities and positions have changed, and when (their change stamps): what a channel that
+    /// delivers changes reads, where going through every one would cost more.
+    account_changes: Changes<Arc<crate::state::Account>>,
+    entity_changes: Changes<crate::state::Entity>,
+    position_changes: Changes<crate::state::Position>,
     /// entity -> (its `moved` stamp, the footprints of the buildings it's in then).
     places: BTreeMap<Id, (u64, Vec<Rect>)>,
     /// entity -> how near -> (its `moved` stamp, the cells within that of where it is then): worked out from `places`,
@@ -380,6 +386,86 @@ pub struct RecordIndex {
     /// place -> its cells, and a channel's list of cells -> the same as a set: the same for the whole run.
     place_cells: BTreeMap<Id, std::sync::Arc<BTreeSet<Id>>>,
     listed_cells: BTreeMap<Vec<Id>, std::sync::Arc<BTreeSet<Id>>>,
+}
+
+/// Which of a map's values have changed, by change stamp: kept by comparing the map as it is with the map as it was
+/// at the last look (the state's maps are persistent, and the two share everything untouched between them, so only
+/// what was touched is compared). Derived from the state (never part of it, never hashed). It answers "which ids
+/// might have a stamp above this one" without going through the map; whoever asks still reads each one's stamp.
+#[derive(Debug)]
+struct Changes<V> {
+    /// The map at the last look, and the state's change stamp then.
+    seen: Option<crate::state::Map<Id, V>>,
+    synced: u64,
+    /// The stamp at the first look: changes after it are all in `log`.
+    from: u64,
+    /// Ids, numbered as they first appear in `log`.
+    ids: Vec<Id>,
+    numbers: BTreeMap<Id, u32>,
+    /// (stamp, id's number), in stamp order: an id's value had that stamp at some look.
+    log: Vec<(u64, u32)>,
+}
+
+impl<V> Default for Changes<V> {
+    fn default() -> Self {
+        Changes { seen: None, synced: 0, from: 0, ids: vec![], numbers: BTreeMap::new(), log: vec![] }
+    }
+}
+
+impl<V: Clone + PartialEq> Changes<V> {
+    /// Take in the map as it is now, at the state's change stamp `stamp`; `changed`: a value's own stamp.
+    fn sync(&mut self, now: &crate::state::Map<Id, V>, stamp: u64, changed: impl Fn(&V) -> u64) {
+        // (Stamps only go up in one world: a map from before the last look is another world's, and starts afresh.)
+        if stamp < self.synced {
+            *self = Changes::default();
+        }
+        match &self.seen {
+            None => self.from = stamp,
+            Some(seen) if seen.ptr_eq(now) => return,
+            Some(seen) => {
+                let start = self.log.len();
+                for d in seen.diff(now) {
+                    let (id, v) = match d {
+                        imbl::ordmap::DiffItem::Add(id, v) | imbl::ordmap::DiffItem::Update { new: (id, v), .. } => (id, v),
+                        imbl::ordmap::DiffItem::Remove(..) => continue,
+                    };
+                    let c = changed(v);
+                    if c > self.synced {
+                        let n = match self.numbers.get(id) {
+                            Some(n) => *n,
+                            None => {
+                                let n = self.ids.len() as u32;
+                                self.ids.push(id.clone());
+                                self.numbers.insert(id.clone(), n);
+                                n
+                            }
+                        };
+                        self.log.push((c, n));
+                    }
+                }
+                self.log[start..].sort_unstable();
+            }
+        }
+        self.seen = Some(now.clone());
+        self.synced = stamp;
+    }
+
+    /// The log's entries with a stamp above `after`; None if it doesn't go back that far.
+    fn tail(&self, after: u64) -> Option<&[(u64, u32)]> {
+        (self.seen.is_some() && after >= self.from).then(|| &self.log[self.log.partition_point(|(c, _)| *c <= after)..])
+    }
+
+    /// Every id whose value's stamp is above `after` (and perhaps others), in id order, if that's known and there
+    /// are at most `most` entries to go through.
+    fn since(&self, after: u64, most: usize) -> Option<Vec<&Id>> {
+        let tail = self.tail(after).filter(|t| t.len() <= most)?;
+        let mut numbers: Vec<u32> = tail.iter().map(|(_, n)| *n).collect();
+        numbers.sort_unstable();
+        numbers.dedup();
+        let mut ids: Vec<&Id> = numbers.into_iter().map(|n| &self.ids[n as usize]).collect();
+        ids.sort_unstable();
+        Some(ids)
+    }
 }
 
 /// entity -> accounts it holds or keeps, for the account set identified by
@@ -639,8 +725,11 @@ fn holds(r: &Record, c: &crate::config::Condition) -> bool {
     }
 }
 
-fn site_cell(s: &Statics, st: &State, id: &Id, me: &str, names: bool) -> SiteCell {
-    let c = &st.cells[id];
+/// The buildings a sites channel has shown so far in one look, each as it shows it (the same for every cell a
+/// building stands on).
+type Shown = Vec<(Id, Arc<SiteStructure>)>;
+
+fn site_cell(s: &Statics, st: &State, id: &Id, c: &crate::state::Cell, me: &str, names: bool, shown: &mut Shown) -> SiteCell {
     SiteCell {
         cell: id.clone(),
         x: c.x,
@@ -650,12 +739,15 @@ fn site_cell(s: &Statics, st: &State, id: &Id, me: &str, names: bool) -> SiteCel
             s.config.catalogue.species.iter().filter(|sp| sp.conspicuous && n.populations.get(&sp.id).is_some_and(|m| m.get(id).is_some_and(|x| *x > 0))).map(|sp| sp.id.clone()).collect()
         }),
         structure: c.structure.as_ref().map(|sid| {
+            if let Some((_, structure)) = shown.iter().rev().find(|(shown, _)| shown == sid) {
+                return structure.clone();
+            }
             let x = &st.structures[sid];
             let f = s.types[&x.structure_type].footprint;
             let occ = st.occupancy.get(sid);
             // Who is in a building: known in one's own, and where the channel shows names; otherwise how many.
             let known = names || occ.is_some_and(|m| m.values().any(|b| b.contains(me)));
-            SiteStructure {
+            let structure = Arc::new(SiteStructure {
                 structure: sid.clone(),
                 structure_type: x.structure_type.clone(),
                 at: x.at.clone(),
@@ -696,7 +788,9 @@ fn site_cell(s: &Statics, st: &State, id: &Id, me: &str, names: bool) -> SiteCel
                         }
                     })
                     .collect(),
-            }
+            });
+            shown.push((sid.clone(), structure.clone()));
+            structure
         }),
     }
 }
@@ -793,14 +887,22 @@ fn build(s: &Statics, st: &State, index: &mut RecordIndex, participant: &str, mo
             let changed = |c: u64| after.is_none_or(|a| c > a);
             let data = match &ch.kind {
                 ChannelKind::Accounts => {
-                    let mut accounts: Vec<AccountItem> = index
-                        .accounts_of(st, &me)
-                        .iter()
-                        .filter_map(|id| {
-                            let a = &st.accounts[id];
-                            changed(a.changed).then(|| AccountItem { account: id.clone(), holder: a.holder.clone(), custodian: a.custodian.clone(), currency: a.currency.clone(), balance: a.balance, closed: None })
-                        })
-                        .collect();
+                    let item = |id: &Id, a: &crate::state::Account| AccountItem { account: id.clone(), holder: a.holder.clone(), custodian: a.custodian.clone(), currency: a.currency.clone(), balance: a.balance, closed: None };
+                    index.account_changes.sync(&st.accounts, st.counters.change, |a| a.changed);
+                    // Whoever has many accounts (a bank keeps a town's) is shown the few that changed since its last
+                    // look from the list of changes, not by going through them all: the same accounts.
+                    let mine = index.accounts_of(st, &me).len();
+                    let recent: Option<Vec<Id>> = after.and_then(|a| index.account_changes.since(a, mine)).map(|ids| ids.into_iter().cloned().collect());
+                    let mut accounts: Vec<AccountItem> = match &recent {
+                        Some(ids) => ids.iter().filter_map(|id| st.accounts.get(id).filter(|a| (a.holder == me || a.custodian == me) && changed(a.changed)).map(|a| item(id, a))).collect(),
+                        None => index.accounts_of(st, &me).iter().filter_map(|id| Some(&st.accounts[id]).filter(|a| changed(a.changed)).map(|a| item(id, a))).collect(),
+                    };
+                    #[cfg(debug_assertions)]
+                    if recent.is_some() {
+                        let mut plain: Vec<AccountItem> = index.accounts_of(st, &me).iter().filter_map(|id| Some(&st.accounts[id]).filter(|a| changed(a.changed)).map(|a| item(id, a))).collect();
+                        plain.sort_by(|a, b| a.account.cmp(&b.account));
+                        assert_eq!(accounts, plain, "the list of changed accounts and the accounts themselves disagree for {me}");
+                    }
                     if after.is_some() {
                         for (id, x) in st.closed_accounts.iter() {
                             if (x.holder == me || x.custodian == me) && changed(x.changed) {
@@ -850,12 +952,12 @@ fn build(s: &Statics, st: &State, index: &mut RecordIndex, participant: &str, mo
                 }
                 ChannelKind::Sites { occupants, .. } => {
                     let names = *occupants == Some(Occupants::Names);
-                    let site = |id: &Id| st.cells.get(id).filter(|c| changed(c.changed)).map(|_| site_cell(s, st, id, &me, names));
+                    let mut shown: Shown = vec![];
                     ChannelData::Sites {
                         as_of: st.t,
                         cells: match scope.as_ref().unwrap() {
                             // (Every cell: read as they're walked, not looked up again one by one.)
-                            Scope::Everywhere => st.cells.iter().filter(|(_, c)| changed(c.changed)).map(|(id, _)| site_cell(s, st, id, &me, names)).collect(),
+                            Scope::Everywhere => st.cells.iter().filter(|(_, c)| changed(c.changed)).map(|(id, c)| site_cell(s, st, id, c, &me, names, &mut shown)).collect(),
                             // A scope that's much of the ground (a whole place) is walked beside the state's cells,
                             // both being in id order: the same cells in the same order as looking each one up.
                             Scope::Cells(ps) if ps.len() * 8 > st.cells.len() => {
@@ -869,43 +971,51 @@ fn build(s: &Statics, st: &State, index: &mut RecordIndex, participant: &str, mo
                                         break;
                                     }
                                     if wanted.peek().is_some_and(|w| *w == id) && changed(c.changed) {
-                                        cells.push(site_cell(s, st, id, &me, names));
+                                        cells.push(site_cell(s, st, id, c, &me, names, &mut shown));
                                     }
                                 }
                                 cells
                             }
-                            Scope::Cells(ps) => ps.iter().filter_map(site).collect(),
+                            Scope::Cells(ps) => ps.iter().filter_map(|id| st.cells.get(id).filter(|c| changed(c.changed)).map(|c| site_cell(s, st, id, c, &me, names, &mut shown))).collect(),
                         },
                         whole,
                     }
                 }
-                ChannelKind::Directory => ChannelData::Directory {
-                    entities: st
-                        .entities
-                        .iter()
-                        .filter(|(_, e)| changed(e.changed))
-                        .map(|(id, e)| EntityItem { entity: id.clone(), kind: e.kind.clone(), name: e.name.clone(), participant: e.body.as_ref().and_then(|b| b.participant.clone()) })
-                        .collect(),
-                    positions: st
-                        .positions
-                        .iter()
-                        .filter(|(_, x)| changed(x.changed))
-                        .map(|(id, x)| PositionItem {
-                            position: id.clone(),
-                            entity: x.entity.clone(),
-                            title: x.title.clone(),
-                            role: x.role.clone(),
-                            holder: x.holder.clone(),
-                            held_by: x.holder.as_ref().and_then(|h| {
-                                let hp = st.participants.get(h)?;
-                                match &hp.person {
-                                    Some(person) => st.entities.get(person).map(|e| e.name.clone()),
-                                    None => hp.def.title.clone(),
-                                }
-                            }),
-                        })
-                        .collect(),
-                },
+                ChannelKind::Directory => {
+                    let entity = |(id, e): (&Id, &crate::state::Entity)| EntityItem { entity: id.clone(), kind: e.kind.clone(), name: e.name.clone(), participant: e.body.as_ref().and_then(|b| b.participant.clone()) };
+                    let position = |(id, x): (&Id, &crate::state::Position)| PositionItem {
+                        position: id.clone(),
+                        entity: x.entity.clone(),
+                        title: x.title.clone(),
+                        role: x.role.clone(),
+                        holder: x.holder.clone(),
+                        held_by: x.holder.as_ref().and_then(|h| {
+                            let hp = st.participants.get(h)?;
+                            match &hp.person {
+                                Some(person) => st.entities.get(person).map(|e| e.name.clone()),
+                                None => hp.def.title.clone(),
+                            }
+                        }),
+                    };
+                    // What has changed since the last look is read from the lists of changes (in id order, as the
+                    // maps are), where they go back that far; a first look goes through everyone.
+                    index.entity_changes.sync(&st.entities, st.counters.change, |e| e.changed);
+                    index.position_changes.sync(&st.positions, st.counters.change, |x| x.changed);
+                    let entities: Vec<EntityItem> = match after.and_then(|a| index.entity_changes.since(a, st.entities.len())) {
+                        Some(ids) => ids.into_iter().filter_map(|id| st.entities.get(id).filter(|e| changed(e.changed)).map(|e| (id, e))).map(entity).collect(),
+                        None => st.entities.iter().filter(|(_, e)| changed(e.changed)).map(entity).collect(),
+                    };
+                    let positions: Vec<PositionItem> = match after.and_then(|a| index.position_changes.since(a, st.positions.len())) {
+                        Some(ids) => ids.into_iter().filter_map(|id| st.positions.get(id).filter(|x| changed(x.changed)).map(|x| (id, x))).map(position).collect(),
+                        None => st.positions.iter().filter(|(_, x)| changed(x.changed)).map(position).collect(),
+                    };
+                    #[cfg(debug_assertions)]
+                    {
+                        assert_eq!(entities, st.entities.iter().filter(|(_, e)| changed(e.changed)).map(entity).collect::<Vec<_>>(), "the list of changed entities and the entities themselves disagree");
+                        assert_eq!(positions, st.positions.iter().filter(|(_, x)| changed(x.changed)).map(position).collect::<Vec<_>>(), "the list of changed positions and the positions themselves disagree");
+                    }
+                    ChannelData::Directory { entities, positions }
+                }
             };
             if mode == Mode::Look {
                 let cursor = if matches!(ch.kind, ChannelKind::Records { .. }) { st.counters.record_seq } else { st.counters.change };

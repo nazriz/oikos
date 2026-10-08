@@ -39,12 +39,18 @@ pub struct Knowledge {
     pub names: Vec<(String, String)>,
     /// participant -> the person it acts as.
     pub participant_person: Vec<(String, String)>,
+    /// Where each entity stands in `names`, and each participant in `participant_person` (kept with them by
+    /// `set_ordered`, the only way into either): a directory of a whole town is taken in without looking through the
+    /// list for each line of it.
+    names_at: BTreeMap<String, usize>,
+    participant_at: BTreeMap<String, usize>,
     /// position -> the organisation it acts for.
     pub positions: BTreeMap<String, String>,
     /// position -> what it's called, as the participant has been told: (its title, its role), either possibly empty.
     pub position_words: BTreeMap<String, (String, String)>,
     pub held: BTreeSet<String>,
-    pub structures: BTreeMap<String, StructureFact>,
+    /// (What's known of a building is shared with whoever else was shown it the same.)
+    pub structures: BTreeMap<String, Arc<StructureFact>>,
     pub cells: BTreeMap<String, CellFact>,
     /// lot -> its cells. (Shared with every seat that has seen the lot: a register of lots is shown to many. The
     /// map itself is a persistent one, so seats that learned the same register at one look share it too: `Registers`.)
@@ -115,10 +121,16 @@ pub struct CellFacts {
     cell: String,
     fact: CellFact,
     /// The building on it: its id, and what's known of it.
-    structure: Option<(String, StructureFact)>,
+    structure: Option<(String, Arc<StructureFact>)>,
 }
 
 impl CellFacts {
+    /// What a cell adds, said outright by whoever has the cell in a shape of its own: as `of` reads it from the
+    /// cell's JSON (a terrain that is no word at all is none; a building is its id and what's known of it).
+    pub fn new(cell: &str, x: i64, y: i64, terrain: Option<&str>, structure: Option<(&str, Arc<StructureFact>)>) -> CellFacts {
+        CellFacts { cell: cell.to_string(), fact: CellFact { x, y, terrain: terrain.filter(|x| !x.is_empty()).map(String::from), built: structure.is_some() }, structure: structure.map(|(id, fact)| (id.to_string(), fact)) }
+    }
+
     pub fn of(c: &Value) -> CellFacts {
         let st = &c["structure"];
         CellFacts {
@@ -126,7 +138,7 @@ impl CellFacts {
             fact: CellFact { x: c["x"].as_i64().unwrap_or(0), y: c["y"].as_i64().unwrap_or(0), terrain: s(&c["terrain"]).filter(|x| !x.is_empty()).map(String::from), built: st.is_object() },
             structure: st.is_object().then(|| {
                 let spaces = st["spaces"].as_array().into_iter().flatten().filter_map(|sp| s(&sp["space"]).map(String::from)).collect();
-                (s(&st["structure"]).unwrap_or_default().into(), StructureFact { type_: s(&st["type"]).unwrap_or_default().into(), at: s(&st["at"]).unwrap_or_default().into(), spaces })
+                (s(&st["structure"]).unwrap_or_default().into(), Arc::new(StructureFact { type_: s(&st["type"]).unwrap_or_default().into(), at: s(&st["at"]).unwrap_or_default().into(), spaces }))
             }),
         }
     }
@@ -176,10 +188,109 @@ pub struct Shown {
     pub cells: Vec<Arc<CellFacts>>,
 }
 
-fn set_ordered(v: &mut Vec<(String, String)>, k: &str, val: &str) {
-    match v.iter_mut().find(|(x, _)| x == k) {
-        Some(e) => e.1 = val.to_string(),
-        None => v.push((k.to_string(), val.to_string())),
+/// An observation as a seat's knowledge takes it in (`Knowledge::absorb_seen`): what it reads of one, and nothing
+/// else of it. Read from the observation's JSON (`Seen::of`), or put together by whoever holds the observation in a
+/// shape of its own (the same thing, read the same way: where JSON has no member, a word here is empty).
+#[derive(Debug, Clone, Default)]
+pub struct Seen<'a> {
+    /// The seat's own entity (empty: none).
+    pub entity: &'a str,
+    pub t: Option<i64>,
+    /// The positions it holds.
+    pub positions: Vec<SeenPosition<'a>>,
+    /// Its channels, by path, in path order.
+    pub channels: Vec<(&'a str, SeenChannel<'a>)>,
+}
+
+#[derive(Debug, Clone)]
+pub struct SeenPosition<'a> {
+    pub position: &'a str,
+    pub entity: &'a str,
+    pub title: &'a str,
+    pub role: &'a str,
+}
+
+#[derive(Debug, Clone)]
+pub struct SeenAccount<'a> {
+    pub account: &'a str,
+    pub holder: &'a str,
+    pub custodian: &'a str,
+    pub closed: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct SeenHolding<'a> {
+    pub kind: &'a str,
+    pub at: &'a str,
+    /// Nothing is left of it there.
+    pub gone: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct SeenEntity<'a> {
+    pub entity: &'a str,
+    pub name: &'a str,
+    pub participant: Option<&'a str>,
+}
+
+/// A channel as delivered: what a seat's knowledge reads of its kind. A records or sites channel's own records or
+/// cells here are those in the observation itself; those handed over beside it are `Shown`.
+#[derive(Debug, Clone)]
+pub enum SeenChannel<'a> {
+    Accounts(Vec<SeenAccount<'a>>),
+    Holdings(Vec<SeenHolding<'a>>),
+    Sites(Vec<CellFacts>),
+    Directory { entities: Vec<SeenEntity<'a>>, positions: Vec<SeenPosition<'a>> },
+    Records(Vec<RecordFacts>),
+    Other,
+}
+
+impl<'a> Seen<'a> {
+    /// An observation's JSON, read.
+    pub fn of(obs: &'a Value) -> Seen<'a> {
+        let list = |v: &'a Value| v.as_array().into_iter().flatten();
+        let position = |p: &'a Value| Some(SeenPosition { position: s(&p["position"])?, entity: s(&p["entity"])?, title: s(&p["title"]).unwrap_or_default(), role: s(&p["role"]).unwrap_or_default() });
+        Seen {
+            entity: s(&obs["entity"]).unwrap_or_default(),
+            t: obs["t"].as_i64(),
+            positions: list(&obs["positions"]).filter_map(position).collect(),
+            channels: obs["channels"]
+                .as_object()
+                .into_iter()
+                .flat_map(|m| m.iter())
+                .map(|(path, ch)| {
+                    let channel = match s(&ch["kind"]) {
+                        Some("accounts") => SeenChannel::Accounts(
+                            list(&ch["accounts"])
+                                .map(|a| SeenAccount { account: s(&a["account"]).unwrap_or_default(), holder: s(&a["holder"]).unwrap_or_default(), custodian: s(&a["custodian"]).unwrap_or_default(), closed: a["closed"].as_bool() == Some(true) })
+                                .collect(),
+                        ),
+                        Some("holdings") => SeenChannel::Holdings(
+                            list(&ch["holdings"]).map(|h| SeenHolding { kind: s(&h["kind"]).unwrap_or_default(), at: s(&h["at"]).unwrap_or_default(), gone: h["quantity"].as_str() == Some("0") }).collect(),
+                        ),
+                        Some("sites") => SeenChannel::Sites(list(&ch["cells"]).map(CellFacts::of).collect()),
+                        Some("directory") => SeenChannel::Directory {
+                            entities: list(&ch["entities"]).map(|e| SeenEntity { entity: s(&e["entity"]).unwrap_or_default(), name: s(&e["name"]).unwrap_or_default(), participant: s(&e["participant"]) }).collect(),
+                            positions: list(&ch["positions"]).filter_map(position).collect(),
+                        },
+                        Some("records") => SeenChannel::Records(list(&ch["records"]).map(RecordFacts::of).collect()),
+                        _ => SeenChannel::Other,
+                    };
+                    (path.as_str(), channel)
+                })
+                .collect(),
+        }
+    }
+}
+
+fn set_ordered(v: &mut Vec<(String, String)>, at: &mut BTreeMap<String, usize>, k: &str, val: &str) {
+    debug_assert_eq!(at.get(k).copied(), v.iter().position(|(x, _)| x == k), "the list and where each stands in it disagree");
+    match at.get(k) {
+        Some(i) => v[*i].1 = val.to_string(),
+        None => {
+            at.insert(k.to_string(), v.len());
+            v.push((k.to_string(), val.to_string()));
+        }
     }
 }
 
@@ -208,66 +319,65 @@ impl Knowledge {
     /// As `absorb_with`, by a holder of many seats' knowledge: a register of lots a seat is shown whole is held once
     /// between the seats shown it (`Registers`). What the seat knows is the same.
     pub fn absorb_sharing(&mut self, obs: &Value, shown: &BTreeMap<String, Shown>, registers: &mut Registers) {
-        self.entity = s(&obs["entity"]).unwrap_or_default().to_string();
-        self.t = obs["t"].as_i64().unwrap_or(self.t);
-        for p in obs["positions"].as_array().into_iter().flatten() {
-            if let (Some(pos), Some(ent)) = (s(&p["position"]), s(&p["entity"])) {
-                self.positions.insert(pos.into(), ent.into());
-                self.position_words.insert(pos.into(), (s(&p["title"]).unwrap_or_default().into(), s(&p["role"]).unwrap_or_default().into()));
-                self.held.insert(pos.into());
-            }
+        self.absorb_seen(&Seen::of(obs), shown, registers);
+    }
+
+    /// As `absorb_sharing`, for an observation read already (`Seen`): by whoever has it in a shape of its own, and
+    /// needn't make JSON of it to say what it holds.
+    pub fn absorb_seen(&mut self, obs: &Seen, shown: &BTreeMap<String, Shown>, registers: &mut Registers) {
+        self.entity = obs.entity.to_string();
+        self.t = obs.t.unwrap_or(self.t);
+        for p in &obs.positions {
+            self.positions.insert(p.position.into(), p.entity.into());
+            self.position_words.insert(p.position.into(), (p.title.into(), p.role.into()));
+            self.held.insert(p.position.into());
         }
-        for (path, ch) in obs["channels"].as_object().into_iter().flat_map(|m| m.iter()) {
-            match s(&ch["kind"]) {
-                Some("accounts") => {
-                    for a in ch["accounts"].as_array().into_iter().flatten() {
-                        let id = s(&a["account"]).unwrap_or_default().to_string();
-                        if a["closed"].as_bool() == Some(true) {
-                            self.accounts.remove(&id);
+        for (path, ch) in &obs.channels {
+            match ch {
+                SeenChannel::Accounts(accounts) => {
+                    for a in accounts {
+                        if a.closed {
+                            self.accounts.remove(a.account);
                         } else {
-                            self.accounts.insert(id, AccountFact { holder: s(&a["holder"]).unwrap_or_default().into(), custodian: s(&a["custodian"]).unwrap_or_default().into() });
+                            self.accounts.insert(a.account.to_string(), AccountFact { holder: a.holder.into(), custodian: a.custodian.into() });
                         }
                     }
                 }
-                Some("holdings") => {
-                    for h in ch["holdings"].as_array().into_iter().flatten() {
-                        let (kind, at) = (s(&h["kind"]).unwrap_or_default(), s(&h["at"]).unwrap_or_default());
-                        let key = format!("{at}|{kind}");
-                        if h["quantity"].as_str() == Some("0") {
+                SeenChannel::Holdings(holdings) => {
+                    for h in holdings {
+                        let key = format!("{}|{}", h.at, h.kind);
+                        if h.gone {
                             self.holdings.remove(&key);
                         } else {
-                            self.holdings.insert(key, (kind.into(), at.into()));
+                            self.holdings.insert(key, (h.kind.into(), h.at.into()));
                         }
                     }
                 }
-                Some("sites") => {
-                    for c in ch["cells"].as_array().into_iter().flatten() {
-                        self.see(&CellFacts::of(c));
+                SeenChannel::Sites(cells) => {
+                    for c in cells {
+                        self.see(c);
                     }
-                    for facts in shown.get(path).into_iter().flat_map(|x| &x.cells) {
+                    for facts in shown.get(*path).into_iter().flat_map(|x| &x.cells) {
                         self.see(facts);
                     }
                 }
-                Some("directory") => {
-                    for e in ch["entities"].as_array().into_iter().flatten() {
-                        let id = s(&e["entity"]).unwrap_or_default();
-                        set_ordered(&mut self.names, id, s(&e["name"]).unwrap_or_default());
-                        if let Some(p) = s(&e["participant"]) {
-                            set_ordered(&mut self.participant_person, p, id);
+                SeenChannel::Directory { entities, positions } => {
+                    for e in entities {
+                        set_ordered(&mut self.names, &mut self.names_at, e.entity, e.name);
+                        if let Some(p) = e.participant {
+                            set_ordered(&mut self.participant_person, &mut self.participant_at, p, e.entity);
                         }
                     }
-                    for p in ch["positions"].as_array().into_iter().flatten() {
-                        if let (Some(pos), Some(ent)) = (s(&p["position"]), s(&p["entity"])) {
-                            self.positions.insert(pos.into(), ent.into());
-                            self.position_words.insert(pos.into(), (s(&p["title"]).unwrap_or_default().into(), s(&p["role"]).unwrap_or_default().into()));
-                        }
+                    for p in positions {
+                        self.positions.insert(p.position.into(), p.entity.into());
+                        self.position_words.insert(p.position.into(), (p.title.into(), p.role.into()));
                     }
                 }
-                Some("records") => {
-                    for r in ch["records"].as_array().into_iter().flatten() {
-                        self.learn(&RecordFacts::of(r));
+                SeenChannel::Records(records) => {
+                    for r in records {
+                        self.learn(r);
                     }
-                    let beside = shown.get(path).map_or(&[][..], |x| &x.records);
+                    let beside = shown.get(*path).map_or(&[][..], |x| &x.records);
                     // (A whole register of lots, to a seat that knows of none: the map of it, shared.)
                     match if self.lots.is_empty() { registers.of(beside) } else { None } {
                         Some(lots) => self.lots = lots,
@@ -278,7 +388,7 @@ impl Knowledge {
                         }
                     }
                 }
-                _ => {}
+                SeenChannel::Other => {}
             }
         }
     }
@@ -298,7 +408,7 @@ impl Knowledge {
             self.lots.remove(w.as_str());
         }
         if let Some((e, n)) = &facts.declares {
-            set_ordered(&mut self.names, e, n);
+            set_ordered(&mut self.names, &mut self.names_at, e, n);
         }
         if let Some((id, r)) = &facts.form {
             self.forms.insert(id.clone(), r.clone());
@@ -312,12 +422,12 @@ impl Knowledge {
     }
 
     fn name_of(&self, e: &str) -> Option<&str> {
-        self.names.iter().find(|(k, _)| k == e).map(|(_, v)| v.as_str())
+        self.names_at.get(e).map(|i| self.names[*i].1.as_str())
     }
 
     /// The entity an id refers to: a participant's person, a position's organisation, or the entity itself.
     pub fn entity_of(&self, id: &str) -> String {
-        self.participant_person.iter().find(|(k, _)| k == id).map(|(_, v)| v.clone()).or_else(|| self.positions.get(id).cloned()).unwrap_or_else(|| id.to_string())
+        self.participant_at.get(id).map(|i| self.participant_person[*i].1.clone()).or_else(|| self.positions.get(id).cloned()).unwrap_or_else(|| id.to_string())
     }
 
     /// The entity acting in a capacity: a position's organisation, or (as itself) the seat's own.

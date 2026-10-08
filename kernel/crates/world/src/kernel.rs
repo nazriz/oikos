@@ -446,6 +446,12 @@ impl World {
     pub fn precheck_as(&self, cmd: &Command, body: &Value) -> Result<(), ProtocolError> {
         canon::check_integers(body).map_err(|e| ProtocolError(e.to_string()))?;
         crate::contracts::check(&crate::contracts::contracts().command, body).map_err(|e| ProtocolError(format!("command {e}")))?;
+        self.precheck_in_world(cmd)
+    }
+
+    /// The part of `precheck` that asks the world (does the participant exist, is the time ahead...), for a command
+    /// whose shape is known to keep to the contract.
+    pub fn precheck_in_world(&self, cmd: &Command) -> Result<(), ProtocolError> {
         let exists = |p: &str| if self.state.participants.contains_key(p) { Ok(()) } else { perr(format!("unknown participant {p}")) };
         match cmd {
             Command::Act { participant, position, thinking, .. } => {

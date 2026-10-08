@@ -86,6 +86,9 @@ pub struct Response {
     pub events: Vec<Event>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub observation: Option<Observation>,
+    /// Each event's canonical JSON, as it was logged (for whoever passes the events on: they needn't be written again).
+    #[serde(skip)]
+    pub logged: Vec<Vec<u8>>,
 }
 
 pub struct Run<W: Write> {
@@ -95,6 +98,9 @@ pub struct Run<W: Write> {
     ended: bool,
     /// The last command's observation as it was hashed, if it was (see `take_observed`).
     observed: Option<crate::kernel::Observed>,
+    /// Requests to observe whose shape has been checked against the contract (participant -> capacities asked for):
+    /// the same one, asked again, keeps to it as it did. (A wake is one of these, and there are a few thousand kinds.)
+    observes_checked: std::collections::BTreeMap<String, std::collections::BTreeSet<Option<String>>>,
 }
 
 impl<W: Write> Run<W> {
@@ -133,7 +139,7 @@ impl<W: Write> Run<W> {
         canon::write_object(members, &mut bytes, |key, x, out| if key == "config" { out.extend_from_slice(&loaded.canonical) } else { canon::write_value(x, out) });
         let mut log = LogWriter::new(out, anchors, anchor_every);
         log.append_canonical(0, Kind::Header, &bytes)?;
-        Ok(Run { checkpoint_every, kernel, log, ended: false, observed: None })
+        Ok(Run { checkpoint_every, kernel, log, ended: false, observed: None, observes_checked: Default::default() })
     }
 
     /// The full picture a participant's channels cover right now (the perception invariant's reference). Changes nothing; not logged.
@@ -165,25 +171,38 @@ impl<W: Write> Run<W> {
         self.not_ended()?;
         // (Its JSON once, for the check and for the log; checked once, before it's logged: nothing changes the world
         // between that and applying it.)
-        let body = serde_json::to_value(cmd).map_err(|e| ProtocolError(e.to_string()))?;
-        self.kernel.precheck_as(cmd, &body)?;
+        let known = match cmd {
+            Command::Observe { participant, only } => self.observes_checked.get(participant).is_some_and(|x| x.contains(only)),
+            _ => false,
+        };
         let from = self.kernel.t();
-        let seq = self.log.append(from, Kind::Command, body)?.seq;
+        let seq = if known {
+            self.kernel.precheck_in_world(cmd)?;
+            self.log.append_as(from, Kind::Command, cmd)?.0
+        } else {
+            let body = serde_json::to_value(cmd).map_err(|e| ProtocolError(e.to_string()))?;
+            self.kernel.precheck_as(cmd, &body)?;
+            if let Command::Observe { participant, only } = cmd {
+                self.observes_checked.entry(participant.clone()).or_default().insert(only.clone());
+            }
+            self.log.append(from, Kind::Command, body)?.seq
+        };
         self.observed = None;
         let Output { events, observation, observed } = self.kernel.apply_prechecked(cmd)?;
         self.observed = observed;
+        let mut events_logged = Vec::with_capacity(events.len());
         let mut logged = Vec::with_capacity(events.len());
         for mut timed in events {
             timed.event.cause = seq;
-            self.log.append(timed.t, Kind::Event, serde_json::to_value(&timed.event).expect("events serialize"))?;
-            logged.push(timed.event);
+            logged.push(self.log.append_as(timed.t, Kind::Event, &timed.event)?.1);
+            events_logged.push(timed.event);
         }
         if let Command::Advance { to } = cmd {
             if to / self.checkpoint_every > from / self.checkpoint_every {
                 self.checkpoint()?;
             }
         }
-        Ok(Response { seq, events: logged, observation })
+        Ok(Response { seq, events: events_logged, observation, logged })
     }
 
     /// The observation the last command returned, in JSON: as it was hashed for the log, so the protocol's reply
