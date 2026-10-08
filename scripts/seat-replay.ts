@@ -29,7 +29,7 @@ const shownLast = (r: LlmRequest) => { const c = r.messages.at(-1)!.content; ret
 
 let n = 0;
 const use = (name: string, input: object) => ({ type: "tool_use" as const, id: `t${++n}`, name, input });
-const prompts: { seat: string; size: number; text: string; fresh: boolean }[] = [];
+const prompts: { seat: string; size: number; system: number; text: string; fresh: boolean }[] = [];
 const sittings: { [seat: string]: number } = {};
 const previews: string[] = [];
 let written = 0;
@@ -46,7 +46,7 @@ const requests: [string, string][] = [
 const adapter = new MockAdapter("mock", {
   participant: (req: LlmRequest) => {
     const fresh = req.messages.length === 1;
-    prompts.push({ seat: req.subject, size: sizeOf(req), text: shownLast(req), fresh });
+    prompts.push({ seat: req.subject, size: sizeOf(req), system: req.system.length, text: shownLast(req), fresh });
     const s = fresh ? (sittings[req.subject] = (sittings[req.subject] ?? 0) + 1) : sittings[req.subject]!;
     const drafts = (req.context.observation.drafts ?? []) as { id: string; summary: string }[];
     if (req.subject.startsWith("finance")) {
@@ -81,7 +81,7 @@ console.log(`${world}, ${days} days: final state ${s.stateHash}`);
 for (const seat of [...new Set(prompts.map((p) => p.seat))].sort()) {
   const mine = prompts.filter((p) => p.seat === seat);
   const opening = mine.filter((p) => p.fresh).map((p) => p.size), all = mine.map((p) => p.size);
-  console.log(`${seat}: ${sittings[seat] ?? 0} sittings, ${mine.length} prompts; a sitting's opening prompt: largest ${Math.max(...opening)}, median ${median(opening)}; any prompt: largest ${Math.max(...all)}, median ${median(all)} characters`);
+  console.log(`${seat}: ${sittings[seat] ?? 0} sittings, ${mine.length} prompts; a sitting's opening prompt: largest ${Math.max(...opening)}, median ${median(opening)}; any prompt: largest ${Math.max(...all)}, median ${median(all)} characters (of each, its standing instructions with what is on file: ${median(mine.map((p) => p.system))})`);
   if (process.argv.includes("--show")) console.log(`--- ${seat}, its second prompt, as shown last:\n${mine[1]?.text}\n---`);
 }
 let sent = 0;
