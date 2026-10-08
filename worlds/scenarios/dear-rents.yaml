@@ -1,0 +1,21 @@
+# Homes cost more to rent: every rent the profile gives is a quarter higher, for the same wages and the same homes.
+# Who then can't find or keep a home, who petitions, and what the town is asked to do about it follow.
+id: dear-rents
+about: Every rent is a quarter higher than the profile gives, for the same wages.
+bears_on: [mayor, council-clerk, councillors, tribunal-member, planning, landlords]
+changes:
+  - in: profile
+    path: rents_per_month.apartment_units
+    where: { field: bedrooms, at_least: 0 }
+    of: rent
+    times_bps: 12500
+    basis: >-
+      Asking rents have risen by about a quarter within three years in a tight market: one national index of rents
+      rose 22.2% from September 2020 to 2023, and 30.4% over 38 months from July 2020 (CoreLogic's rental reviews, as
+      reported; read in search results only, to confirm).
+  - in: profile
+    path: rents_per_month.house_types
+    where: { field: bedrooms, at_least: 0 }
+    of: rent
+    times_bps: 12500
+    basis: As for apartments.

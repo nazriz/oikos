@@ -1,0 +1,20 @@
+# Half the doctors: the clinic's establishment is half the profile's for the town's size. Who is seen, how long they
+# wait, and what care does are as ever.
+id: doctor-shortage
+about: The clinic has half the doctors for the town's size that the profile gives.
+bears_on: [clinic-manager, mayor, outside-health-funding]
+status: inert
+inert_because: >-
+  The clinic sees only conditions of the kind a hospital admits, about one in three days in a town of a thousand,
+  and one doctor can give about twenty consultations a day: with half the doctors every patient is still seen the
+  day they ask. The clinic's grant and balance halve and nothing else moves. It needs routine care (the visits a
+  practice lives on), so that a doctor's day is full (health.consult_minutes, health.treats;
+  docs/behaviour/health.md, 'Leaves out').
+changes:
+  - in: profile
+    path: health.doctors_per_1000
+    times_bps: 5000
+    basis: >-
+      Rural and remote places have about half the doctors a head of cities, or fewer (United States: about 13
+      physicians per 10,000 people in rural areas against about 31 in urban ones: 13.1 and 31.2, National Rural Health
+      Association, About rural health care).

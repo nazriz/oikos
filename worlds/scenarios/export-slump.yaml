@@ -1,0 +1,22 @@
+# The world wants less of what the town makes: the world market takes a quarter less of the factories' goods from the first
+# day. What a factory has in hand is not touched: the generator works its opening money out from its wages and inputs
+# (its working capital), and no figure of a profile states it.
+id: export-slump
+about: The world market takes a quarter less of the factories' goods from the first day.
+bears_on: [mayor, finance, union-organiser, bank-lending, factory managers]
+status: inert
+inert_because: >-
+  The factories sell a quarter less abroad and no office is shown anything of it in 240 days. A factory with more
+  stock than it sells stops making, keeps paying its staff, and lets one worker go a month once its stock passes a
+  whole month's demand (it starts with a quarter of one): nine more redundancies in 240 days across ten factories,
+  and the share out of work doesn't move. Nobody reports a factory's orders or idle days to the town. It bites when
+  the producer's rule sheds staff as fast as firms in a slump do, or when someone tells an office (docs/behaviour/producer.md, 'Headcount').
+changes:
+  - in: town
+    path: shocks
+    add: { from_day: 0, kind: goods, what: demand, factor_bps: 7500 }
+    basis: >-
+      In 2009 the volume of world merchandise exports fell by 12.2%, and that of a manufacturing exporter harder hit
+      by 24.9% (Japan; the United States 13.9%, the European Union 14.8%: World Trade Organization, press release 598,
+      March 2010). The size is the harder-hit exporter's; the world's (the size first tried) showed nothing in 120 days.
+      A condition of the world market as the run finds it, not a change during it.

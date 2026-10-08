@@ -1,0 +1,16 @@
+# A hot summer: the run starts with the first hot month, in a summer with about the most heatwave days in twenty.
+id: hot-summer
+about: The run starts with the first hot month, in a summer with about as many heatwave days as one summer in twenty has.
+bears_on: [clinic-manager, mayor, energy-operations]
+season:
+  starts_in: hot_months
+  basis: Not a size; the calendar. The hot months come first in the run.
+weather:
+  rank_by: heatwave_days
+  percentile: 95
+  draws: 199
+  over_days: 90
+  basis: >-
+    A one-in-twenty season is a usual level for describing a climate's extremes (twenty-year return values in the
+    Intergovernmental Panel on Climate Change's 2012 special report on extreme events; to confirm). Here: the summer
+    at the 95th percentile of 199 drawn from the profile's climate, by its days of heatwave.
