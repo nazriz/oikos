@@ -29,7 +29,7 @@ import { answerContent, leadingObject, runBounded, transcript } from "./codex";
 
 /** What Claude Code says when no call will go through for a while: the plan's limit or credit is used up, or its own
  * retries on rate limits gave up. Only those: any other failure is retried and then reported. */
-export const CLAUDE_CODE_LIMITED = /usage[ _-]?limit|rate[ _-]?limit|too many requests|\b429\b|credit balance|out of (extra |usage )?credits?|limit reached/i;
+export const CLAUDE_CODE_LIMITED = /usage[ _-]?limit|session[ _-]?limit|weekly[ _-]?limit|hit your [a-z -]*limit|rate[ _-]?limit|too many requests|\b429\b|credit balance|out of (extra |usage )?credits?|limit reached/i;
 
 /** Runs the claude binary: args, stdin and a working directory in; stdout out; ended if it takes longer than
  * `timeoutMs`. Injectable for tests. */
@@ -41,7 +41,8 @@ export type ClaudeCodeRunner = (args: string[], stdin: string, cwd: string, time
  * counted as its own.) */
 export const spawnClaudeCode: ClaudeCodeRunner = (args, stdin, cwd, timeoutMs) => {
   const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => k !== "ANTHROPIC_API_KEY" && !/^CLAUDE(CODE$|_CODE_|_PID$|_EFFORT$)/.test(k)));
-  return runBounded(["claude", ...args], stdin, cwd, timeoutMs, undefined, undefined, env);
+  // (OIKOS_CLAUDE_BIN: which Claude Code to run, where the first on the path is too old for a model: Fable 5.1 wants 2.1.251 or newer.)
+  return runBounded([process.env.OIKOS_CLAUDE_BIN || "claude", ...args], stdin, cwd, timeoutMs, undefined, undefined, env);
 };
 
 /** What is the same call after call for one seat: its instructions, then the tools and how an answer is given. */
@@ -72,7 +73,15 @@ export function answerOf(said: string, tools: string[]): { tool?: string; input_
  * </invoke>`, one after another) instead of the object asked for: the same uses, read as it meant them. In pilot 10 one
  * seat answer in nine came so, and unread it ended the sitting with nothing done. A parameter's value is what stands
  * between its tags: a list, an object, a number or true/false where it is written as one, else its text. A use of a
- * tool that isn't one of the seat's is left out; with none left there is no answer. */
+ * tool that isn't one of the seat's is left out; with none left there is no answer.
+ *
+ * Read with care, because such an answer can run on past what the seat meant (pilot 11: a finance seat's answer gave
+ * its looks, its notebook and "done", then the same again, then a letter, an opt-out and a decline each filled in
+ * with "x": taken as acts, the seat was out of the run on a word it never said). So: nothing after the first
+ * `done_for_now` is read; a use whose values are all placeholders ("x", "...", empty) is no use; and a use that
+ * repeats one already read is read once. */
+const PLACEHOLDER = /^\s*(?:x+|\.{2,}|…|<[^>]*>|todo|tbd|placeholder)?\s*$/i;
+const filledIn = (v: unknown): boolean => (typeof v === "string" ? !PLACEHOLDER.test(v) : Array.isArray(v) ? v.some(filledIn) : v !== null && typeof v === "object" ? Object.values(v).some(filledIn) : true);
 export function invoked(said: string, tools: string[]): { tool?: string; input_json?: string; also?: { tool?: string; input_json?: string }[]; text?: string } | undefined {
   const uses: { tool: string; input_json: string }[] = [];
   for (const m of said.matchAll(/<invoke name="([^"]+)">([\s\S]*?)<\/invoke>/g)) {
@@ -90,7 +99,11 @@ export function invoked(said: string, tools: string[]): { tool?: string; input_j
       }
       input[p[1]!] = value;
     }
-    uses.push({ tool: m[1]!, input_json: JSON.stringify(input) });
+    const values = Object.values(input);
+    if (values.length && !values.some(filledIn)) continue;
+    const use = { tool: m[1]!, input_json: JSON.stringify(input) };
+    if (!uses.some((u) => u.tool === use.tool && u.input_json === use.input_json)) uses.push(use);
+    if (m[1] === "done_for_now") break;
   }
   if (!uses.length) return undefined;
   return { tool: uses[0]!.tool, input_json: uses[0]!.input_json, also: uses.slice(1) };

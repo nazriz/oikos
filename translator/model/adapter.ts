@@ -100,6 +100,12 @@ export function formsMisfit(program: string, forms: string[]): Misfit | undefine
   return undefined;
 }
 
+/** Under this sureness of its whole answer the model asks back (unless told another with OIKOS_DECIDE_THRESHOLD).
+ * Low on purpose: a long right answer is many decisions and its sureness their product (pilot 11: a budget form of
+ * five amounts, right, at 0.15 to 0.22), and a draft is only an offer. On the real test at 0.1: 144 right, 15 wrong
+ * drafts, 21 asked back; at 0.5: 131, 7, 42 (docs/decisions.md, 2026-10-08). */
+export const CUT_OFF = 0.1;
+
 export class DecideAdapter implements LlmAdapter {
   provider = "decide";
   private proc?: ChildProcess;
@@ -107,7 +113,10 @@ export class DecideAdapter implements LlmAdapter {
   private buffer = "";
   private queue: Promise<unknown> = Promise.resolve();
   /** Each answer's sureness and time, in the order asked (for whoever measures). */
-  answers: { sure: number; ms: number; program: string; parts?: { choices: number; places: number; texts: number; least: number }; unsure?: object }[] = [];
+  answers: { sure: number; ms: number; program: string; steps?: number; parts?: { choices: number; places: number; texts: number; least: number }; unsure?: object }[] = [];
+  /** Who was last asked back because the model was unsure (by the participant a draft is for): their next request is
+   * drafted however unsure it is. */
+  private askedBack = new Set<string>();
   constructor(public model: string, private o: { dir?: string; threshold?: number; unchecked?: boolean } = {}) {}
 
   private start(): void {
@@ -143,7 +152,7 @@ export class DecideAdapter implements LlmAdapter {
   }
 
   /** The program for a request and the forms known, and how sure the model is. */
-  async translate(request: string, forms: string[]): Promise<{ program: string; sure: number; ms: number; unsure?: object }> {
+  async translate(request: string, forms: string[], o: { draft?: boolean } = {}): Promise<{ program: string; sure: number; ms: number; unsure?: object; asked?: boolean }> {
     const input = inputOf(request, forms);
     const ps = pieces(input);
     const breaks: number[] = [];
@@ -155,7 +164,9 @@ export class DecideAdapter implements LlmAdapter {
     // What was unclear, where it asks back: the part of its answer it was least sure of (what to do, which thing is
     // meant, or which words are to be copied), or what about a form doesn't fit the form as shown.
     let unsure: object | undefined;
-    if (a.sure < (this.o.threshold ?? 0)) {
+    let asked = false;
+    if (!o.draft && a.sure < (this.o.threshold ?? CUT_OFF)) {
+      asked = true;
       const least = a.parts ? (["choices", "places", "texts"] as const).reduce((x, y) => (a.parts[y] < a.parts[x] ? y : x)) : "choices";
       program = "none(unclear)";
       unsure = { kind: least === "places" ? "which" : least === "texts" ? "words" : "act" };
@@ -166,15 +177,20 @@ export class DecideAdapter implements LlmAdapter {
       program = `none(${misfit.label})`;
       unsure = misfit.label === "unclear" ? misfit.unsure : undefined;
     }
-    this.answers.push({ sure: a.sure, ms: a.ms, program, ...(a.parts ? { parts: a.parts } : {}), ...(unsure ? { unsure } : {}) });
-    return { program, sure: a.sure, ms: a.ms, ...(unsure ? { unsure } : {}) };
+    this.answers.push({ sure: a.sure, ms: a.ms, program, steps: a.steps.length, ...(a.parts ? { parts: a.parts } : {}), ...(unsure ? { unsure } : {}) });
+    return { program, sure: a.sure, ms: a.ms, ...(unsure ? { unsure } : {}), ...(asked ? { asked } : {}) };
   }
 
   async complete(req: LlmRequest): Promise<LlmResponse> {
     const first = req.messages.find((m) => m.role === "user");
     const text = typeof first?.content === "string" ? first.content : (first?.content ?? []).map((b) => (b.type === "text" ? b.text : "")).join("");
     const { request, forms } = shown(text);
-    const { program, unsure } = await this.translate(request, forms);
+    // A translator offers; the participant sees the draft and decides (Naz, 2026-10-08). So the model asks back only
+    // where it is very unsure, and never twice running: whoever was just asked back for that is given the model's
+    // best draft the next time they ask, to confirm or decline. (Who is asking: the draft's id without its number.)
+    const who = req.ref?.replace(/\.\d+$/, "");
+    const { program, unsure, asked } = await this.translate(request, forms, { draft: !!who && this.askedBack.has(who) });
+    if (who) asked ? this.askedBack.add(who) : this.askedBack.delete(who);
     return { content: [{ type: "tool_use", id: "decide", name: req.tools?.[0]?.name ?? "call", input: { program, ...(unsure ? { unsure } : {}) } }], usage: { input_tokens: 0, output_tokens: 0 }, estimated: true };
   }
 

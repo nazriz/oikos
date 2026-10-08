@@ -256,6 +256,12 @@ test("Claude Code: one `claude -p` per call with our system prompt in place of i
   const markup = '\n<invoke name="look">\n<parameter name="report">finance/who</parameter>\n<parameter name="named">["c0003"]</parameter>\n<parameter name="limit">15</parameter>\n</invoke>\n<invoke name="write">\n<parameter name="to">["bank"]</parameter>\n<parameter name="text">Who instructed it?\nPlease say.</parameter>\n</invoke>\n<invoke name="x">\n</invoke>';
   expect(answerOf(markup, ["look", "write", "do"])).toEqual({ tool: "look", input_json: '{"report":"finance/who","named":["c0003"],"limit":15}', also: [{ tool: "write", input_json: '{"to":["bank"],"text":"Who instructed it?\\nPlease say."}' }] });
   expect(answerOf('<invoke name="x">\n</invoke>', ["look"])).toBeUndefined();
+  // What runs on past "done" is not acted on, a use filled in with placeholders is no use, and a repeat is read once (pilot 11: a seat
+  // was put out of the run by an opt-out reading "x" that followed its real answer).
+  const ranOn = '<invoke name="look">\n<parameter name="report">finance/files</parameter>\n</invoke>\n<invoke name="look">\n<parameter name="report">finance/files</parameter>\n</invoke>\n<invoke name="done_for_now">\n<parameter name="days">1</parameter>\n</invoke>\n<invoke name="write">\n<parameter name="to">["mayor"]</parameter>\n<parameter name="text">x</parameter>\n</invoke>\n<invoke name="opt_out">\n<parameter name="statement">x</parameter>\n</invoke>';
+  expect(answerOf(ranOn, ["look", "write", "done_for_now", "opt_out"])).toEqual({ tool: "look", input_json: '{"report":"finance/files"}', also: [{ tool: "done_for_now", input_json: '{"days":1}' }] });
+  expect(answerOf('<invoke name="opt_out">\n<parameter name="statement">x</parameter>\n</invoke>', ["opt_out"])).toBeUndefined();
+  expect(answerOf('<invoke name="opt_out">\n<parameter name="statement">I would rather not go on.</parameter>\n</invoke>', ["opt_out"])).toEqual({ tool: "opt_out", input_json: '{"statement":"I would rather not go on."}', also: [] });
   // An answer naming a tool that isn't one is no answer; with no tools, the words are.
   expect(answerOf('{"tool":"pay","input_json":"{}"}', ["do"])).toBeUndefined();
   expect(answerOf("Plain words.", [])).toEqual({ text: "Plain words." });
@@ -265,6 +271,9 @@ test("Claude Code: one `claude -p` per call with our system prompt in place of i
   // The plan's limit: the run stops, to be resumed.
   const limited = async () => ({ code: 1, stderr: "", stdout: result("Claude usage limit reached. Your limit will reset at 3pm.", { is_error: true }) });
   await expect(new ClaudeCodeAdapter("claude-sonnet-5-5", limited).complete(req)).rejects.toBeInstanceOf(UsageLimitReached);
+  // (The words seen on 2026-10-08, when the plan's five-hour window ran out under a pilot and the agents beside it.)
+  const session = async () => ({ code: 1, stderr: "", stdout: result("You've hit your session limit · resets 2:20pm (Australia/Melbourne)", { is_error: true }) });
+  await expect(new ClaudeCodeAdapter("claude-sonnet-5-5", session).complete(req)).rejects.toBeInstanceOf(UsageLimitReached);
   // Any other failure is an error, with what it said.
   const failing = async () => ({ code: 1, stdout: "", stderr: "not signed in" });
   await expect(new ClaudeCodeAdapter("claude-sonnet-5-5", failing, { attempts: 1 }).complete(req)).rejects.toThrow("not signed in");
