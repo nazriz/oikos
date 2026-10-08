@@ -13,7 +13,7 @@ A factory whose workers' hours turn inputs into goods, which it sells wholesale 
 
 **Inputs.**
 - **The rule** is an (s, S) rule (Scarf 1960): when inputs held plus inputs on order fall below a month's production at its current staff, it orders up to a month and a half's.
-- **Buying** is from its supplier (the world market) at its published price, paid with the order ([trade.md](trade.md)).
+- **Buying** is from its supplier (the world market) at its published price, paid with the order ([trade.md](trade.md)): as much as it can pay for with the next pay period's wages kept aside for the staff it has or is hiring to, as a shop does when it restocks ([retailer.md](retailer.md)); the rest when money comes in. (2026-10-08: until then the whole balance could go on an order, and a works holding a month's inputs spent its payroll on the next half month's.)
 
 **Selling.**
 - **Wholesale.** It publishes a wholesale price list (at least `min_order`, 50, to an order) and fills paid orders from stock, refunding what it can't deliver.

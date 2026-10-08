@@ -239,7 +239,12 @@ export const producer: BehaviourModule = {
         }
 
         // ---- inputs: (s, S): below a month's use (with what's on order), order up to a month and a half's ----
+        // As much as we can pay for, keeping the next pay period's wages aside for the staff we have or are hiring to, as a
+        // shop does when it restocks (docs/behaviour/retailer.md): inputs are bought a month ahead of their use, and
+        // wages fall due within the fortnight. (Until 2026-10-08 the whole balance went on an order: a works holding a
+        // month's inputs spent its payroll on the next half month's, and gave its staff notice for want of the payroll.)
         const plan = monthlyUnits(workers.length);
+        let spare = acc.balance - Math.max(workers.length, headcount) * wage;
         for (const [kind, per] of Object.entries(p.per_unit).sort(([a], [b]) => (a < b ? -1 : 1))) {
           if (winding.state !== "trading") break; // winding up: no more buying
           const have = held(obs, p.works, kind) + (onOrder.get(kind) ?? 0);
@@ -247,11 +252,14 @@ export const producer: BehaviourModule = {
           const up = Math.floor((plan * per * 3) / 2);
           const unit = supply.prices[kind];
           if (have >= s || unit === undefined || !supply.account) continue;
-          const q = Math.max(up - have, supply.min_order ?? 1); // at least what the supplier sells in one order
-          if (acc.balance < q * unit) continue;
+          const least = supply.min_order ?? 1; // at least what the supplier sells in one order
+          const want = Math.max(up - have, least);
+          const q = Math.min(want, Math.floor(spare / unit));
+          if (q < least || q <= 0) continue;
+          spare -= q * unit;
           onOrder.set(kind, (onOrder.get(kind) ?? 0) + q);
           const st = order({ me, seller: p.supplier, sellerAccount: supply.account, kind, quantity: q, unitPrice: unit, at: p.works, from: acc.account,
-            why: `Our ${kind} (${have} with what's on order) are below a month's production (${s}): ordering ${q}, up to a month and a half's.` });
+            why: `Our ${kind} (${have} with what's on order) are below a month's production (${s}): ordering ${q}, ${q < want ? `as many as we can pay for with the next pay period's wages kept aside (${want} would take us up to a month and a half's)` : "up to a month and a half's"}.` });
           st.then = (out) => {
             const id = out.created?.order;
             if (id) orderQty.set(id, { kind, quantity: q });
