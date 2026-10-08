@@ -1,0 +1,70 @@
+[
+ {
+  "name": "w2-01-council",
+  "world": "worlds/town-1000.yaml",
+  "sets": [
+   "seed=101",
+   "profile=au-vic-2026",
+   "mayor=llm",
+   "model_seats=council-clerk,councillor-1,councillor-2,councillor-3,councillor-4,councillor-5"
+  ],
+  "model": "claude-code/claude-sonnet-5-5",
+  "translator": "claude-code/claude-sonnet-5-5",
+  "translator_choice": "sonnet",
+  "until": 3888000,
+  "budget": 10,
+  "env": {
+   "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
+   "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
+  },
+  "note": "Wave 2b (plan of 2026-10-09, third version), for the translator's data. Profile au-vic-2026; a town of its own, generated from seed 101; 1,000 people; 45 days. Seats: mayor, council-clerk, councillor-1, councillor-2, councillor-3, councillor-4, councillor-5, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt). Every draft is confirmed or declined by its seat. HELD BACK until the council clerk's fault is settled: it depends on a clerk that is a seat counting votes. A council of models: a clerk who puts ballots and declares results, councillors who vote, and a mayor who may direct the code-run works office. The first of the three: the test of a clerk that is a seat."
+ },
+ {
+  "name": "w2-03-election",
+  "world": "worlds/town-1000.yaml",
+  "sets": [
+   "seed=103",
+   "profile=de-ni-2026",
+   "mayor=llm",
+   "model_seats=editor,council-clerk"
+  ],
+  "args": [
+   "--scenario",
+   "election-due"
+  ],
+  "model": "claude-code/claude-sonnet-5-5",
+  "translator": "claude-code/claude-sonnet-5-5",
+  "translator_choice": "sonnet",
+  "until": 6480000,
+  "budget": 15,
+  "env": {
+   "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
+   "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
+  },
+  "note": "Wave 2b (plan of 2026-10-09, third version), for the translator's data. Profile de-ni-2026; a town of its own, generated from seed 103; 1,000 people; 75 days; starting conditions election-due. Seats: mayor, editor, council-clerk, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt). Every draft is confirmed or declined by its seat. HELD BACK until the council clerk's fault is settled: it depends on a clerk that is a seat counting votes. An election due on day 60, run by the code electoral commission, in a place that writes a decimal comma: a nomination, the paper's items, and a clerk who seats whoever is declared elected."
+ },
+ {
+  "name": "w2-07-election",
+  "world": "worlds/town-1000.yaml",
+  "sets": [
+   "seed=107",
+   "profile=au-vic-2026",
+   "mayor=llm",
+   "model_seats=council-clerk,councillor-1,councillor-2,councillor-3"
+  ],
+  "args": [
+   "--scenario",
+   "election-due"
+  ],
+  "model": "claude-code/claude-haiku-5-5",
+  "translator": "claude-code/claude-sonnet-5-5",
+  "translator_choice": "sonnet",
+  "until": 6480000,
+  "budget": 105,
+  "env": {
+   "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
+   "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
+  },
+  "note": "Wave 2b (plan of 2026-10-09, third version), for the translator's data. Profile au-vic-2026; a town of its own, generated from seed 107; 1,000 people; 75 days; starting conditions election-due. Seats: mayor, council-clerk, councillor-1, councillor-2, councillor-3, all on claude-code/claude-haiku-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt). Every draft is confirmed or declined by its seat. HELD BACK until the council clerk's fault is settled: it depends on a clerk that is a seat counting votes. An election with a model mayor standing and a model clerk to seat the winner, on the smaller model."
+ }
+]

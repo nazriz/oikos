@@ -1,0 +1,83 @@
+[
+ {
+  "name": "w2-41-works",
+  "world": "worlds/town-1000.yaml",
+  "sets": [
+   "seed=141",
+   "profile=us-oh-2026",
+   "mayor=llm",
+   "model_seats=works,registry"
+  ],
+  "model": "claude-code/claude-haiku-5-5",
+  "translator": "claude-code/claude-sonnet-5-5",
+  "translator_choice": "trained-ok",
+  "until": 6480000,
+  "budget": 100,
+  "env": {
+   "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
+   "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
+  },
+  "note": "Wave 2b (plan of 2026-10-09, third version), for the translator's data. Profile us-oh-2026; a town of its own, generated from seed 141; 1,000 people; 75 days. Seats: mayor, works, registry, all on claude-code/claude-haiku-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt); this pilot may have our own retrained translator instead, if its scores allow when the stage starts. Every draft is confirmed or declined by its seat. The works office and the registry on the smaller model, with a model mayor, in the town with the most deaths to register."
+ },
+ {
+  "name": "w2-02-housing",
+  "world": "worlds/town-1000.yaml",
+  "sets": [
+   "seed=102",
+   "profile=gb-eng-2026",
+   "model_seats=landlord-1-office,landlord-2-office,tribunal-member,tribunal-registrar"
+  ],
+  "args": [
+   "--scenario",
+   "dear-rents"
+  ],
+  "model": "claude-code/claude-haiku-5-5",
+  "translator": "claude-code/claude-sonnet-5-5",
+  "translator_choice": "trained-ok",
+  "until": 3888000,
+  "budget": 65,
+  "env": {
+   "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
+   "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
+  },
+  "note": "Wave 2b (plan of 2026-10-09, third version), for the translator's data. Profile gb-eng-2026; a town of its own, generated from seed 102; 1,000 people; 45 days; starting conditions dear-rents. Seats: landlord-1-office, landlord-2-office, tribunal-member, tribunal-registrar, all on claude-code/claude-haiku-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt); this pilot may have our own retrained translator instead, if its scores allow when the stage starts. Every draft is confirmed or declined by its seat. Landlords and the tribunal on the smaller model where rents are dear: leases, notices, orders."
+ },
+ {
+  "name": "w2-36-offices",
+  "world": "worlds/town-1000.yaml",
+  "sets": [
+   "seed=136",
+   "profile=us-oh-2026",
+   "model_seats=rates,water-operations,principal"
+  ],
+  "model": "claude-code/claude-haiku-5-5",
+  "translator": "claude-code/claude-sonnet-5-5",
+  "translator_choice": "sonnet",
+  "until": 2592000,
+  "budget": 30,
+  "env": {
+   "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
+   "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
+  },
+  "note": "Wave 2b (plan of 2026-10-09, third version), for the translator's data. Profile us-oh-2026; a town of its own, generated from seed 136; 1,000 people; 30 days. Seats: rates, water-operations, principal, all on claude-code/claude-haiku-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt). Every draft is confirmed or declined by its seat. A PROBE: stop it by its own rule (plan.md, the stopping rules). A probe: three offices with routines on the smaller model."
+ },
+ {
+  "name": "w2-30-trade",
+  "world": "worlds/town-1000.yaml",
+  "sets": [
+   "seed=130",
+   "profile=au-vic-2026",
+   "model_seats=shop-2-manager,factory-2-manager"
+  ],
+  "model": "claude-code/claude-haiku-5-5",
+  "translator": "claude-code/claude-sonnet-5-5",
+  "translator_choice": "sonnet",
+  "until": 2592000,
+  "budget": 35,
+  "env": {
+   "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
+   "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
+  },
+  "note": "Wave 2b (plan of 2026-10-09, third version), for the translator's data. Profile au-vic-2026; a town of its own, generated from seed 130; 1,000 people; 30 days. Seats: shop-2-manager, factory-2-manager, all on claude-code/claude-haiku-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt). Every draft is confirmed or declined by its seat. A PROBE: stop it by its own rule (plan.md, the stopping rules). The trade probe on the smaller model."
+ }
+]
