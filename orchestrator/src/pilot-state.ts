@@ -85,6 +85,40 @@ export async function runState(dir: string, until: number): Promise<RunState> {
   return { log, ...(t !== undefined ? { t } : {}), ...(ended ? { ended } : {}), ...(detail ? { detail } : {}), ...(by ? { by } : {}), stop };
 }
 
+/** The sign-ins a queue entry's calls go through: its seats' model's and its translator's (`provider/model`). */
+export function providersOf(p: { model?: string; translator?: string }): string[] {
+  return [...new Set([p.model, p.translator].filter((m): m is string => !!m).map((m) => m.split("/")[0]!))];
+}
+
+/** Whose limit a run stopped at, of the sign-ins its entry uses: read from the stop's own words (each adapter names
+ * itself); where the words name none of them, every one the entry uses (nothing of it is tried until the wait is over). */
+export function limitedProviders(detail: string, of: string[]): string[] {
+  const named = of.filter((p) => detail.includes(`${p}/`) || (p === "claude-code" ? /claude/i.test(detail) : new RegExp(`\\b${p.replace(/[^a-z0-9]/gi, ".")}\\b`, "i").test(detail)));
+  return named.length ? named : of;
+}
+
+/**
+ * Which entry a queue takes up next: the first in the queue's order that is not settled (done, or left) and none of
+ * whose sign-ins is at a limit still being waited out (`limitedUntil`: sign-in to the time it is tried again). So a pilot
+ * stopped at a limit is parked, those after it that need another sign-in go on, and it is come back to, before anything
+ * later in the queue, once its wait is over. With nothing that can run and something parked: `waitUntil`, the earliest
+ * time one can be tried. With everything settled: neither.
+ */
+export function nextPilot<P extends { name: string; model?: string; translator?: string }>(queue: P[], settled: Set<string>, limitedUntil: Map<string, number>, now: number): { pick?: P; waitUntil?: number } {
+  let waitUntil: number | undefined;
+  for (const p of queue) {
+    if (settled.has(p.name)) continue;
+    const until = Math.max(0, ...providersOf(p).map((x) => limitedUntil.get(x) ?? 0));
+    if (until <= now) return { pick: p };
+    waitUntil = Math.min(waitUntil ?? Infinity, until);
+  }
+  return waitUntil === undefined ? {} : { waitUntil };
+}
+
+/** A pilot parked at a usage limit, as the queue writes it beside its status log (`<queue>.parked.json`). */
+export interface Parked { name: string; day: number; providers: string[]; since: string; next_try: string }
+export const parkedPath = (queueFile: string) => queueFile.replace(/\.json$/, "") + ".parked.json";
+
 /** A time as the status log writes it: local, with its offset from UTC (2026-10-08 14:05+11:00). */
 export function localStamp(d = new Date()): string {
   const p = (n: number) => String(Math.abs(n)).padStart(2, "0");

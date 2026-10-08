@@ -10,13 +10,13 @@
 // --dry-run says what it would do and does nothing. --no-build and --no-start are for trying the worktree part alone.
 // --mock [--mock-days N] runs every pilot of the queue files on the mock instead (scripts/pilot-mock.ts), from the wave's
 // worktree, into <runs>/pilot-queues/<wave>.mock/, and starts nothing. `bun scripts/pilot-wave.ts status <wave>` says,
-// per queue and pilot, where it stands, and the last alerts (<runs>/pilot-queues/<wave>.alerts.log). Starting a wave
+// per queue and pilot, where it stands (which are parked at a usage limit, and when each is next tried), and the last alerts (<runs>/pilot-queues/<wave>.alerts.log). Starting a wave
 // also lists the worktrees that scripts/worktree-clean.ts could free (it never deletes by itself).
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir, platform } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { lastAlerts } from "../orchestrator/src/pilot-alerts";
-import { runState, scanOptOuts } from "../orchestrator/src/pilot-state";
+import { parkedPath, runState, scanOptOuts, type Parked } from "../orchestrator/src/pilot-state";
 import { describe, scan } from "./worktree-clean";
 import { warm } from "./worktree-warm";
 
@@ -40,6 +40,10 @@ if (args[0] === "status") {
     const pidFile = join(runs, "pilot-queues", `${w}.${basename(file).replace(/\.json$/, "")}.pid`);
     const pid = existsSync(pidFile) ? Number(readFileSync(pidFile, "utf8").trim()) : 0;
     console.log(`queue ${basename(file)}: ${pid && (() => { try { process.kill(pid, 0); return true; } catch { return false; } })() ? `running (pid ${pid})` : "not running"}`);
+    // (What the queue itself says it has parked at a usage limit, and when each is next tried.)
+    let parked: Parked[] = [];
+    try { parked = JSON.parse(readFileSync(parkedPath(file), "utf8")); } catch { /* (no queue has run from this file, or its note is half written) */ }
+    if (parked.length) console.log(`  PARKED at a usage limit: ${parked.map((x) => `${x.name} (${x.providers.join(", ")}; day ${x.day}; next try ${x.next_try})`).join("; ")}`);
     for (const p of JSON.parse(readFileSync(file, "utf8")) as any[]) {
       const d = join(runs, p.name);
       const st = await runState(d, p.until);
@@ -51,7 +55,8 @@ if (args[0] === "status") {
       }
       const rep = join(d, "pilot-report.json");
       if (existsSync(rep)) { try { const t = JSON.parse(readFileSync(rep, "utf8")).translator_report; if (t) more += `; ${t.requests} requests, ${t.matters_through_within_two_tries} of ${t.matters} matters through within two tries`; } catch { /* (a report half written) */ } }
-      const where = { none: "not started", done: "done", usage_limit: "waiting at a usage limit", spending_limit: "stopped at its spending limit", signal: "asked to stop", failed: "stopped (failed or running)" }[st.stop];
+      const park = parked.find((x) => x.name === p.name);
+      const where = { none: "not started", done: "done", usage_limit: park ? `PARKED at a usage limit (${park.providers.join(", ")}; next try ${park.next_try})` : "stopped at a usage limit", spending_limit: "stopped at its spending limit", signal: "asked to stop", failed: "stopped (failed or running)" }[st.stop];
       console.log(`  ${p.name}${p.test ? " [test]" : ""}: ${where}${st.t !== undefined ? `, day ${day(st.t)} of ${day(p.until)}` : ""}${st.detail && st.stop !== "done" ? ` (${String(st.detail).slice(0, 100)})` : ""}${more}`);
     }
   }
