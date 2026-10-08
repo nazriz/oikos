@@ -44,6 +44,7 @@
  "orchestrator/test/river.test.ts": 121.6,
  "orchestrator/test/run-machinery.test.ts": 97.6,
  "orchestrator/test/run.test.ts": 24.8,
+ "orchestrator/test/scenarios.test.ts": 300,
  "orchestrator/test/services.test.ts": 137.2,
  "orchestrator/test/tenancy.test.ts": 153.6,
  "orchestrator/test/training.test.ts": 10,
@@ -93,5 +94,6 @@
  "translator/test/train-seats.test.ts": 7.2,
  "translator/test/train.test.ts": 4,
  "translator/test/translator.test.ts": 0.3,
- "worlds/test/generate.test.ts": 3.4
+ "worlds/test/generate.test.ts": 3.4,
+ "worlds/test/scenario.test.ts": 6
 }

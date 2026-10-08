@@ -1,0 +1,17 @@
+# A tenth fewer homes for the same people: fewer houses and apartment blocks than the town's description says. Who is
+# housed at the start, rents, the home market and building follow from that.
+id: housing-shortage
+about: The town has a tenth fewer houses and apartment blocks than its description says, for the same people.
+bears_on: [planning, mayor, inspector, landlords, builder-foreman]
+changes:
+  - in: town
+    path: houses
+    times_bps: 9000
+    basis: >-
+      Estimates of how far a country's housing falls short of what its people need run to about a tenth of the stock
+      or more (Centre for Cities 2023, The housebuilding crisis: a backlog of 4.3 million homes in Britain, against
+      about 30 million; to confirm).
+  - in: town
+    path: apartment_blocks
+    times_bps: 9000
+    basis: As for houses.

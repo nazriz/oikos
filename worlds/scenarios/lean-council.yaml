@@ -1,0 +1,19 @@
+# A town with little in the bank and less coming from above: its opening balance is a tenth of the profile's, and the
+# grants a higher government pays it are halved. Rates, wages and bills are as ever; whether it runs short follows.
+id: lean-council
+about: The town starts with a tenth of the money the profile gives it, and the grants it gets from above are half the profile's.
+bears_on: [finance, mayor, rates, works, council-clerk]
+changes:
+  - in: profile
+    path: opening.town
+    times_bps: 1000
+    basis: >-
+      Placeholder for a council whose reserves are nearly spent (councils do reach that: section 114 notices in England,
+      e.g. Northamptonshire 2018, Croydon 2020, Birmingham 2023; to confirm). The size has no source, as the profile's
+      own opening balance has none.
+  - in: profile
+    path: public_finance.grants_per_resident_per_year
+    times_bps: 5000
+    basis: >-
+      Central government funding to English local authorities fell by about half in real terms from 2010-11 to 2017-18
+      (National Audit Office 2018, Financial sustainability of local authorities 2018: 49.1%; to confirm).

@@ -1,0 +1,12 @@
+# A police station below strength: its establishment is 86% of the profile's for the town's size. What is reported,
+# investigated and found follows from its officers' hours as ever.
+id: police-understrength
+about: The police station has 14% fewer officers for the town's size than the profile gives.
+bears_on: [police-oic, tribunal-member, mayor]
+changes:
+  - in: profile
+    path: crime.police_per_1000
+    times_bps: 8600
+    basis: >-
+      Police officer numbers in England and Wales fell by about 14% from March 2010 to March 2017 (Home Office, Police
+      workforce, England and Wales statistics; to confirm).

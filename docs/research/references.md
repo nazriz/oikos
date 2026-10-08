@@ -219,3 +219,26 @@ Sources opened on 2026-10-08 unless marked.
 | Idea | Citation | Used in |
 |---|---|---|
 | Values that are the same are held once and found again by what they are made of (hash consing; the flyweight) | Goto, E. (1974), "Monocopy and associative algorithms in extended Lisp", Technical Report 74-03, University of Tokyo **(to confirm)**; Gamma, E., Helm, R., Johnson, R. & Vlissides, J. (1994), *Design Patterns*, Addison-Wesley (Flyweight) | A book's shelves: a list shown whole to many readers is one shelf, found by its records, with each reader's differences beside it (`Book`, `Pages`) |
+
+## Scenarios: the size of each shift (docs/scenarios.md; worlds/scenarios/)
+
+Every one of these is cited from memory: none was checked against its source when the scenarios were written
+(2026-10-08), so all are **(to confirm)**. Two sizes have no source at all and say so in their files: the town's and
+the factories' opening balances under `lean-council` and `export-slump` (the profile's own are placeholders).
+
+| Idea | Citation | Used in |
+|---|---|---|
+| The flood planned against is the one with a 1% chance in any year (annual exceedance probability) | Ball, J. et al. (eds) (2019), *Australian Rainfall and Runoff: A Guide to Flood Estimation*, Commonwealth of Australia; the base flood of the United States National Flood Insurance Program (44 CFR 59.1) **(to confirm)** | `wet-year`: the climate's year at the 99th percentile by its wettest spell |
+| Choosing a year by where it stands among a climate's own years, leaving the climate as it is | The practice of design events and return periods in hydrology (as above); rainfall deciles: Gibbs, W. J. & Maher, J. V. (1967), *Rainfall deciles as drought indicators*, Bureau of Meteorology Bulletin 48 **(to confirm)** | `chooseWeather` (worlds/generator/weather.ts) |
+| Water suppliers plan against a drought of a stated rarity, one year in a hundred to five hundred | Environment Agency, *Water resources planning guideline* (England): resilience to a 1-in-200-year drought, moving to 1-in-500 **(to confirm)** | `dry-year`: the 1st percentile by the river's inflow |
+| A one-in-twenty season as a level for describing a climate's extremes | IPCC (2012), *Managing the Risks of Extreme Events and Disasters to Advance Climate Change Adaptation* (twenty-year return values) **(to confirm)** | `hot-summer`: the 95th percentile by heatwave days |
+| Councils do run out of reserves | Section 114 notices under the Local Government Finance Act 1988 (England): Northamptonshire 2018, Croydon 2020, Birmingham 2023 **(to confirm)** | `lean-council`: that the condition is real; its size is a placeholder |
+| Grants from a higher government can halve within a decade | National Audit Office (2018), *Financial sustainability of local authorities 2018*: government funding down 49.1% in real terms, 2010-11 to 2017-18 **(to confirm)** | `lean-council`: grants at half |
+| World trade fell by about an eighth in one year | World Trade Organization (2010), press release 598: the volume of world merchandise trade fell 12.2% in 2009 **(to confirm)** | `export-slump`: the world market's demand at 88% |
+| Unemployment about doubles in a deep recession | United States Bureau of Labor Statistics, Current Population Survey: 5.0% in December 2007, 10.0% in October 2009 **(to confirm)** | `jobs-slump`: twice the share out of work |
+| Places differ by half again in their share of people 65 and over | OECD population statistics, 2022: about 29% in Japan, about 18% across the OECD **(to confirm)** | `ageing-town`: the age bands from 65 at one and a half times |
+| A country's housing can fall short of need by about a tenth of the stock | Watling, S. & Breach, A. (2023), *The housebuilding crisis: The UK's 4 million missing homes*, Centre for Cities **(to confirm)** | `housing-shortage`: a tenth fewer homes |
+| Older works put out about two and a half times the pollution for what they make | Shapiro, J. S. & Walker, R. (2018), "Why Is Pollution from US Manufacturing Declining? The Roles of Environmental Regulation, Productivity, and Trade", *American Economic Review* 108(12), 3814–3854: emissions down about 60%, 1990 to 2008 **(to confirm)** | `dirty-industry`: each factory's pollution at two and a half times |
+| Rural places have half the doctors a head of cities, or fewer | National Rural Health Association (United States): about 13 physicians per 10,000 people in rural areas, about 31 in urban ones **(to confirm)** | `doctor-shortage`: half the doctors |
+| A police force can lose a seventh of its officers in a few years | Home Office, *Police workforce, England and Wales* (statistical bulletins): about 14% fewer officers, March 2010 to March 2017 **(to confirm)** | `police-understrength`: 86% of the establishment |
+| Wholesale electricity prices can double within a year | International Energy Agency (2023), *Electricity Market Report 2023* **(to confirm)** | `energy-price-shock`: the grid's price doubled |

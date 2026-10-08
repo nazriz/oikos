@@ -1,0 +1,17 @@
+# A wet year: the run starts at the wet half of the year, and its weather is the climate's own year with about the
+# wettest spell in a hundred. Whether the river floods the town follows from the rain and the river as always.
+id: wet-year
+about: The run starts as the wet half of the year begins, in a year whose wettest spell is about the worst in a hundred of the climate's own.
+bears_on: [mayor, works, planning, environment, water-operations]
+season:
+  starts_in: wet_half
+  basis: Not a size; the calendar. A run of half a year should hold the months the river runs highest.
+weather:
+  rank_by: wettest_spell
+  percentile: 99
+  draws: 199
+  over_days: 180
+  basis: >-
+    The flood planned against is by convention the one with a 1% chance in any year (annual exceedance probability;
+    Ball et al. 2019, Australian Rainfall and Runoff; the base flood of the United States National Flood Insurance
+    Program; to confirm). Here: the year at the 99th percentile of 199 drawn from the profile's climate, by its wettest five days.

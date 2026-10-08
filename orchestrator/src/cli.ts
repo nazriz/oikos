@@ -10,6 +10,9 @@
 //     the whole batch: each run gets the per-run limit or what's left, whichever is less.
 //     With --model, --translator-model runs the translator on its own model (e.g. a smaller one); without, it only
 //     prices the cost projection.
+//   oikos run ... [--scenario NAME[+NAME...]]: the starting conditions a generated world is put under (docs/scenarios.md;
+//     worlds/scenarios/): the same as --set scenario=NAME, and the runs go to runs/<world>.<NAME> unless --out says.
+//   oikos scenarios: the scenarios there are, and what each shifts.
 //   oikos run ... [--overwrite]: runs are never overwritten: a run into a folder that already holds its log refuses to
 //     start (choose another --out, or resume it). --overwrite replaces it, for tests' own folders; never the default,
 //     and never a log that holds a real model's answers.
@@ -111,6 +114,10 @@ const flag = (name: string, dflt?: string) => {
 };
 const flags = (name: string) => rest.flatMap((x, i) => (x === `--${name}` && rest[i + 1] !== undefined ? [rest[i + 1]!] : []));
 const has = (name: string) => rest.includes(`--${name}`);
+/** The run's `--set`s; `--scenario NAME` is one of them (the world's description names its starting conditions). */
+const sets = () => [...flags("set"), ...(flag("scenario") ? [`scenario=${flag("scenario")}`] : [])];
+/** Where a batch under named starting conditions goes, unless told: a folder of its own beside the plain world's. */
+const scenarioOut = (world: string) => (flag("scenario") ? join("runs", `${world.split("/").at(-1)!.replace(/\.(json|ya?ml)$/, "")}.${flag("scenario")!.replace(/[^A-Za-z0-9+-]+/g, "+")}`) : undefined);
 /** Positional arguments: everything that isn't a flag or a flag's value. */
 const positional = () => rest.filter((x, i) => !x.startsWith("--") && !(i > 0 && rest[i - 1]!.startsWith("--") && !["--no-measure", "--list", "--compress", "--no-compress", "--actions", "--consult", "--overwrite", "--force", "--real", "--only-real", "--blind", "--briefs", "--no-spares"].includes(rest[i - 1]!)));
 
@@ -146,13 +153,13 @@ function stopOnSignal(): StopSignal {
   return stop;
 }
 
-const usage = "usage: oikos run <world> [--seeds N] [--parallel P] [--out DIR] [--until S] [--set k=v] [--modules FILE] [--translator-model m] [--no-measure] [--overwrite] [--model provider/model --budget USD [--base-url URL]] | resume <log.jsonl[.zst]|DIR> [--until S] [--model ... as for run] | measure <DIR> [QUERY...] [--sql SQL] [--list] | diff <BASELINE> <CHANGE> [QUERY...] | health <DIR> [--profile NAME] | cost <DIR> [--translator-model m] | translator-eval --model provider/model [--budget USD] [--out FILE] [--real | --only-real] [--jobs N] | replay <log.jsonl> | story <log.jsonl> [participant]";
+const usage = "usage: oikos run <world> [--seeds N] [--parallel P] [--out DIR] [--until S] [--set k=v] [--scenario NAME[+NAME]] [--modules FILE] [--translator-model m] [--no-measure] [--overwrite] [--model provider/model --budget USD [--base-url URL]] | resume <log.jsonl[.zst]|DIR> [--until S] [--model ... as for run] | measure <DIR> [QUERY...] [--sql SQL] [--list] | diff <BASELINE> <CHANGE> [QUERY...] | health <DIR> [--profile NAME] | cost <DIR> [--translator-model m] | translator-eval --model provider/model [--budget USD] [--out FILE] [--real | --only-real] [--jobs N] | scenarios | replay <log.jsonl> | story <log.jsonl> [participant]";
 
 try {
   if (cmd === "run" && positional()[0]) {
     const r = await runBatch({
-      world: positional()[0]!, seeds: Number(flag("seeds", "1")), out: flag("out"), parallel: flag("parallel") ? Number(flag("parallel")) : undefined,
-      until: flag("until") ? Number(flag("until")) : undefined, sets: flags("set"), translatorModel: flag("translator-model"), measure: !has("no-measure"), log: console.log,
+      world: positional()[0]!, seeds: Number(flag("seeds", "1")), out: flag("out") ?? scenarioOut(positional()[0]!), parallel: flag("parallel") ? Number(flag("parallel")) : undefined,
+      until: flag("until") ? Number(flag("until")) : undefined, sets: sets(), translatorModel: flag("translator-model"), measure: !has("no-measure"), log: console.log,
       model: flag("model"), budgetUsd: flag("budget") ? Number(flag("budget")) : undefined, baseUrl: flag("base-url"), modules: flag("modules"),
       recordObservations: flag("record-observations"), logDetail: flag("log"), compress: !has("no-compress"), keep: flag("keep") as "log" | "measures" | undefined,
       batchBudgetUsd: flag("batch-budget") ? Number(flag("batch-budget")) : undefined, consult: has("consult"), consultAvoid: flag("consult-avoid"),
@@ -177,8 +184,17 @@ try {
       for (const f of r.failed) console.log(`  seed ${f.seed}: ${f.reason}`);
       process.exitCode = 1;
     }
+  } else if (cmd === "scenarios") {
+    // The starting conditions a generated world can be put under (docs/scenarios.md): each, and what it shifts.
+    const { loadScenario, scenarioIds } = await import("@oikos/worlds/generator/scenario");
+    for (const s of scenarioIds().map(loadScenario)) {
+      console.log(`${s.id}: ${s.about}`);
+      for (const c of s.changes ?? []) console.log(`    ${c.in}.${c.path}${c.where ? ` (rows with ${c.where.field}${c.where.at_least !== undefined ? ` from ${c.where.at_least}` : ""}${c.where.at_most !== undefined ? ` to ${c.where.at_most}` : ""}: ${c.of})` : ""}: ${c.set !== undefined ? `set to ${c.set}` : c.times_bps !== undefined ? `times ${c.times_bps / 10_000}` : c.shortfall_times_bps !== undefined ? `its shortfall times ${c.shortfall_times_bps / 10_000}` : `with ${JSON.stringify(c.add)}`}`);
+      if (s.season) console.log(`    the run starts in: ${s.season.starts_in}`);
+      if (s.weather) console.log(`    the weather: the climate's year at percentile ${s.weather.percentile} of ${s.weather.draws}, by ${s.weather.rank_by} over ${s.weather.over_days} days`);
+    }
   } else if (cmd === "run-one" && positional()[0]) {
-    await runOne({ world: positional()[0]!, seed: Number(flag("seed")), out: flag("out", "runs")!, until: flag("until") ? Number(flag("until")) : undefined, sets: flags("set"),
+    await runOne({ world: positional()[0]!, seed: Number(flag("seed")), out: flag("out", "runs")!, until: flag("until") ? Number(flag("until")) : undefined, sets: sets(),
       model: flag("model"), translatorModel: flag("translator-model"), budgetUsd: flag("budget") ? Number(flag("budget")) : undefined, baseUrl: flag("base-url"), modules: flag("modules"),
       recordObservations: flag("record-observations"), logDetail: flag("log"), consult: has("consult"), consultAvoid: flag("consult-avoid"), overwrite: has("overwrite"), stop: stopOnSignal() });
   } else if (cmd === "resume" && positional()[0]) {
@@ -212,7 +228,7 @@ try {
   } else if (cmd === "consult-audit" && positional()[0]) {
     // The sparse mind's robustness audit (docs/design/ai-citizens.md 4), on the world's own questions and people.
     const { consultAudit, auditText } = await import("./audit");
-    const { config } = await loadWorld(positional()[0]!, flags("set"));
+    const { config } = await loadWorld(positional()[0]!, sets());
     const m = flag("model") ? chooseModel(flag("model")!, { budgetUsd: flag("budget") ? Number(flag("budget")) : undefined, baseUrl: flag("base-url") }) : undefined;
     const adapter = m?.adapter ?? new MockAdapter("mock", mockPolicies(new Map()));
     const { report, annotations } = await consultAudit({ config, adapter, prices: { ...PRICES, ...(m?.prices ?? {}) }, ...(m?.budget ? { budget: m.budget } : {}),

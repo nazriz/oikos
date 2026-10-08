@@ -1,0 +1,18 @@
+# A dry year: the run starts at the dry half of the year, in a year with about the least coming down the river in a
+# hundred of the climate's own (in the first profile's climate: a drought that begins within the half-year).
+id: dry-year
+about: The run starts as the dry half of the year begins, in a year when about the least comes down the river in a hundred of the climate's own.
+bears_on: [water-operations, mayor, environment]
+season:
+  starts_in: dry_half
+  basis: Not a size; the calendar. A run of half a year should hold the months the river runs lowest.
+weather:
+  rank_by: inflow
+  percentile: 1
+  draws: 199
+  over_days: 180
+  basis: >-
+    Water suppliers plan against a drought of a stated rarity, of the order of one year in a hundred to one in five
+    hundred (England's water resources planning guideline: resilience to a 1-in-200-year drought, moving to 1-in-500;
+    to confirm). Here: the year at the 1st percentile of 199 drawn from the profile's climate, by what the river is
+    sent in the first half-year.

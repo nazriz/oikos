@@ -1,0 +1,13 @@
+# Dear energy: the grid's price to the energy retailer is twice the profile's from the first day. What the retailer
+# charges, and whether it can go on, are the retailer's.
+id: energy-price-shock
+about: The grid sells energy to the town's retailer at twice the profile's price from the first day.
+bears_on: [energy-operations, mayor, finance]
+changes:
+  - in: town
+    path: shocks
+    add: { from_day: 0, kind: energy, what: price, factor_bps: 20000 }
+    basis: >-
+      Wholesale electricity prices at least doubled within a year in the 2021-22 energy crisis (International Energy
+      Agency, Electricity Market Report 2023; to confirm). A condition of the world market as the run finds it, not a
+      change during it.
