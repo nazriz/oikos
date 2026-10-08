@@ -823,7 +823,6 @@
     "industrial_action": {
       "ballot_turnout_bps": 5000,
       "ballot_pass_bps": 5000,
-      "notice_days": 0,
       "paid_during_action": false
     },
     "world_price_process": {
@@ -847,7 +846,6 @@
         "person": 1230,
         "organisation": 850
       },
-      "serviceability_buffer_bps": 0,
       "max_repayment_share_bps": {
         "person": 2800,
         "organisation": 2000
@@ -1414,12 +1412,12 @@
     "tenancy.tenant_notice_days": "Placeholder: the example legal code's notice a tenant may leave on, 30 days, carried over unchanged. To source from this place's tenancy law.",
     "town_finance.unpermitted_building_fine": "Placeholder: the fine the town's planning law sets for building without a permit, $50,000: the first profile's figure carried over, as this profile's other town figures are. To source from this place's planning law.",
     "values": "Placeholder, carried over unchanged from the other profile: Schwartz's ten basic values, in the pan-cultural order of importance Schwartz and Bardi found across 56 nations (benevolence, universalism, self-direction, security, conformity, hedonism, achievement, tradition, stimulation, power; Schwartz and Bardi 2001, Journal of Cross-Cultural Psychology 32(3)); means and spreads are not a place's. To replace with a U.S. sample's (World Values Survey; European Social Survey does not cover the U.S.).",
-    "industrial_action": "The National Labor Relations Act (29 U.S.C. 151-169) requires no strike ballot and no notice before a strike in a private workplace, except 10 days' notice before a strike at a health-care institution (s 8(g)) and 60 days' notice to the other side before a contract ends (s 8(d)); unions' own constitutions usually require a strike-authorisation vote by a majority (some two-thirds) of those voting. turnout and pass shares (50% each) are placeholders carried over from the other profile's legal quorum; notice_days 0. Strike pay is small (paid_during_action false). Structural gap: no legal ballot, so the rule's thresholds describe union practice.",
+    "industrial_action": "(Left out since 2026-10-09: the notice of industrial action, which stood here as nought for a rule the place does not have. The note is its author's, as written.) The National Labor Relations Act (29 U.S.C. 151-169) requires no strike ballot and no notice before a strike in a private workplace, except 10 days' notice before a strike at a health-care institution (s 8(g)) and 60 days' notice to the other side before a contract ends (s 8(d)); unions' own constitutions usually require a strike-authorisation vote by a majority (some two-thirds) of those voting. turnout and pass shares (50% each) are placeholders carried over from the other profile's legal quorum; notice_days 0. Strike pay is small (paid_during_action false). Structural gap: no legal ballot, so the rule's thresholds describe union practice.",
     "world_price_process": "Placeholder, carried over from the other profile: world prices move each month by a mean-reverting random process (sd of the monthly move, in basis points of the base price; the share of a gap from the base kept each month). To estimate from BLS import/export price indexes (not done).",
     "credit.cash_rate_bps": "The Federal Reserve's federal funds target range, 3.75% to 4.00% (FOMC, 17 September 2026, https://www.federalreserve.gov/monetarypolicy/openmarket.htm, opened); 3.88% is its midpoint.",
     "credit.funding_spread_bps": "Placeholder: what a small bank pays over the policy rate for its funding.",
     "credit.lending_rate_bps": "Placeholders: people 12.3% (around the average interest rate on 24-month personal loans at commercial banks, Federal Reserve G.19, recalled from 2025, not opened); organisations 8.5%, the bank prime rate (federal funds upper bound 4.00% plus 3 points = 7.00%, by convention) plus about 1.5 points for a small-business loan (estimated).",
-    "credit.serviceability_buffer_bps": "The United States has no stress-test buffer for retail lending: the Ability-to-Repay rule (12 CFR 1026.43, CFPB) asks a lender to assess repayment ability at the note's rate (to confirm), so 0.",
+    "credit.serviceability_buffer_bps": "(Left out since 2026-10-09: the serviceability buffer, which stood here as nought for a rule the place does not have. The note is its author's, as written.) The United States has no stress-test buffer for retail lending: the Ability-to-Repay rule (12 CFR 1026.43, CFPB) asks a lender to assess repayment ability at the note's rate (to confirm), so 0.",
     "credit.max_repayment_share_bps": "Placeholders: people 28% (the 'front-end' housing-ratio guideline of conventional lenders; the 43% debt-to-income limit of the CFPB's former qualified mortgage standard covered all debts; to confirm); organisations 20% of what comes in.",
     "credit.arrears_days": "Placeholder: a month behind is arrears (a lender's first notice).",
     "credit.default_days": "Non-accrual at 90 days past due (FFIEC, Instructions for Consolidated Reports of Condition and Income (Call Report), Schedule RC-N; to confirm). Charge-off of consumer loans comes later (120-180 days), not modelled.",

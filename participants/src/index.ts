@@ -11,7 +11,7 @@ export { View } from "./view";
 export { ASKING, CONSULT_THINGS } from "./behaviour/citizen";
 export { drawPerson, NEEDS, VALUES, type PopulationValues } from "./behaviour/mind";
 export { repayment } from "./behaviour/credit";
-export { draftLaw, figureWords, heldIn, heldValue, type LawFigure, type LawFigures, type LawSchedule } from "./behaviour/common";
+export { draftLaw, figureGiven, figureWords, heldIn, heldValue, type LawFigure, type LawFigures, type LawSchedule } from "./behaviour/common";
 export { annualTax, chargesInWords, chargesOn, taxLawOf, withheld, withholding, type Band, type Charge, type IncomeTaxLaw } from "./behaviour/tax";
 export { forAge, forHousehold, forOutOfWork, paymentsInWords, stopsWorkAt, supportLaw, type Declared, type PaymentRule } from "./behaviour/payments";
 export { adultAgeBands, drawHousehold, drawSavings, bedroomsNeeded, OCCUPANCY, type DrawnHousehold, type Extension, type HouseholdSpec, type OccupancyStandard } from "./behaviour/household";

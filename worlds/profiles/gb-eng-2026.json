@@ -915,7 +915,6 @@
    "rates_per_resident_per_year": 85210,
    "rates_instalments": 10,
    "rates_due_days": 30,
-   "rates_penalty_interest_bps": 0,
    "median_house_price": 27100000,
    "rates_exempt_kinds": [
     "health_service",
@@ -1420,7 +1419,7 @@
   "public_finance.rates_per_resident_per_year": "Derived: North Yorkshire Council's council tax requirement for its own purposes in 2026-27, GBP 524,458,818 (North Yorkshire Council, Council Tax Resolution Report, February 2026; Band D GBP 2,036.32; tax base 257,552 Band D equivalents), over 615,492 residents (ONS Census 2021, TS007A via Nomis) = GBP 852 a resident a year. Excludes the police (GBP 335.86 Band D) and fire (GBP 116.62) precepts and parish precepts; total Band D GBP 2,544.34. Council tax in England is a charge on each dwelling by valuation band, not a rate on land value.",
   "public_finance.rates_instalments": "Council Tax (Administration and Enforcement) Regulations 1992: council tax is payable in ten monthly instalments by default (April to January), or twelve on request (to confirm).",
   "public_finance.rates_due_days": "PLACEHOLDER carried over: an instalment falls due 30 days after its notice.",
-  "public_finance.rates_penalty_interest_bps": "0: council tax carries no statutory penalty interest in England; unpaid instalments lead to a reminder, a final notice, a summons and a liability order, with costs (Council Tax Regulations 1992, to confirm). The profile's interest on arrears is set to zero, a structural gap: the enforcement path (liability order, then attachment of earnings or bailiffs) is not represented.",
+  "public_finance.rates_penalty_interest_bps": "(Left out since 2026-10-09: the interest on overdue rates, which stood here as nought for a rule the place does not have. The note is its author's, as written.) 0: council tax carries no statutory penalty interest in England; unpaid instalments lead to a reminder, a final notice, a summons and a liability order, with costs (Council Tax Regulations 1992, to confirm). The profile's interest on arrears is set to zero, a structural gap: the enforcement path (liability order, then attachment of earnings or bailiffs) is not represented.",
   "public_finance.rates_exempt_kinds": "PLACEHOLDER carried over from au-vic-2026: land used for public purposes is not rateable. In England council tax is only on dwellings; non-domestic (business) rates cover shops, offices, factories and also schools and hospitals, which are rated but funded centrally, so this list is the nearest the structure allows: the clinic's, the school's, the police station's and the utilities'. A structural gap.",
   "public_finance.median_house_price": "ONS, UK House Price Index: average price GBP 271,000 in North Yorkshire in April 2026 (provisional; search summary of ONS 'Housing prices in North Yorkshire', to confirm). An average, not a median (the ONS House Price Statistics for Small Areas median is to source). The land value of a lot is derived from it: this less what the builder charges to build a house.",
   "services.waste_per_person_per_day_g": "ESTIMATE: about 390 kg of household waste per person a year in England (DEFRA, Local authority collected waste management statistics, 2023/24; remembered, not opened: PLACEHOLDER, to confirm), a day's worth in grams (1,068).",

@@ -703,7 +703,6 @@
         "person": 2400,
         "organisation": 1535
       },
-      "serviceability_buffer_bps": 0,
       "max_repayment_share_bps": {
         "person": 3000,
         "organisation": 2000
@@ -1350,7 +1349,7 @@
     "credit.cash_rate_bps": "Banco de México, target for the overnight interbank interest rate: 6.50% (held on 24 September 2026, unanimous; reported by https://www.poresto.com/mexico/2026/9/24/banxico-mantiene-tasa-de-interes-en-650-y-preve-que-inflacion-llegue-a-la-meta-hasta-finales-de-2027.html , a news report of the decision; the Banxico statement itself not opened: to confirm).",
     "credit.funding_spread_bps": "Placeholder: what a small bank pays over the policy rate for funding. Banks' spreads in Mexico are wide; 2 points is an estimate, to source from Banxico's Reporte de Estabilidad Financiera.",
     "credit.lending_rate_bps": "Organisations: SME loans average about 15.35% a year (Banco de México via a press digest, https://vanguardia.com.mx/dinero/creditos-cada-vez-mas-caros-en-mexico-HE7017966 ; date of the figure not confirmed, 'datos anteriores': to confirm against Banxico's interest-rate series for business credit). People: personal loans at 21% to nearly 30% a year according to Banxico data cited by the press (https://www.merca20.com/?p=12577970 and the Bloomberg Línea / Excélsior reports; not opened); 24% is taken as the middle of that range, a placeholder.",
-    "credit.serviceability_buffer_bps": "Placeholder: Mexican bank regulation (CNBV) has no stress buffer on the rate like Australia's (APRA); set to 0. A gap in the profile structure's meaning: it is a rule, not a figure.",
+    "credit.serviceability_buffer_bps": "(Left out since 2026-10-09: the serviceability buffer, which stood here as nought for a rule the place does not have. The note is its author's, as written.) Placeholder: Mexican bank regulation (CNBV) has no stress buffer on the rate like Australia's (APRA); set to 0. A gap in the profile structure's meaning: it is a rule, not a figure.",
     "credit.max_repayment_share_bps": "Placeholder: the most of a borrower's monthly income a lender lets repayments take (people 30%, a common lending guide; organisations 20% of what comes in), carried over from au-vic-2026. Mexican banks' rule of thumb (payment-to-income of about 30-35% for mortgages) was not found in a source.",
     "credit.arrears_days": "Placeholder: a month behind is arrears (a lender's first notice).",
     "credit.default_days": "Cartera vencida: a loan is past due after 90 days without payment under the CNBV's Disposiciones de carácter general aplicables a las instituciones de crédito (Criterios contables, Anexo 33; summarised, page not opened: to confirm).",

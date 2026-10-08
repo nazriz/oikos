@@ -10,7 +10,7 @@ import * as C from "../calls";
 import type { SiteStructure, StatementRecord } from "../contracts";
 import { basesOf, channels } from "../contracts";
 import { need, params, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
-import { nextLook, because, Book, cellsOf, DAY, draftLaw, figureWords, heldValue, jobTerms, Letters, lotOf, message, MONTH, ownAccount, pay, publishedCount, publishedPrice, record, say, type LawFigure, type LawSchedule, type Step, usd, variableToday, vote, withdraw, outOfTime, team, lookUp, goSee, visited, VISIT_MAX, Directions, StandingWork } from "./common";
+import { nextLook, because, Book, cellsOf, DAY, draftLaw, figureGiven, figureWords, heldValue, jobTerms, Letters, lotOf, message, MONTH, ownAccount, pay, publishedCount, publishedPrice, record, say, type LawFigure, type LawSchedule, type Step, usd, variableToday, vote, withdraw, outOfTime, team, lookUp, goSee, visited, VISIT_MAX, Directions, StandingWork } from "./common";
 import { Staffing, staffingForm, staffingUnder, stepper } from "./firms";
 import { incomeTaxLaw, withholding } from "./tax";
 import { ownLand } from "./institutions";
@@ -279,7 +279,7 @@ export const mayorCode: BehaviourModule = {
 export const councilClerk: BehaviourModule = {
   name: "city.council_clerk",
   issues: P.COUNCIL_CLERK,
-  version: "0.9.0", // 0.9.0: a proposal already balloted and a ballot already declared, by the office's own papers, are not put or counted again; a budget is for the year its proposal names
+  version: "0.9.1", // 0.9.1: amends a law of optional figures (one added, one taken away by nought, a law made from one figure); 0.9.0: a proposal already balloted and a ballot already declared, by the office's own papers, are not put or counted again; a budget is for the year its proposal names
   doc: "docs/behaviour/government.md",
   cadence: () => DAY,
   create(ctx: ParticipantContext) {
@@ -351,7 +351,9 @@ export const councilClerk: BehaviourModule = {
             // The amended law, by the schedule the law was made with: the figures given, the rest as they stand in the law
             // in force now (it may have been amended since the proposal was made).
             const values: { [k: string]: number } = { ...Object.fromEntries(Object.entries(am.law?.data?.figures ?? {}).map(([k, f]: [string, any]) => [k, f?.value])), ...am.given };
-            const missing = Object.keys(am.s.figures).filter((k) => !Number.isSafeInteger(values[k]));
+            // (What the law can't be written without: a figure it must have; or, where it may do without each, any at all.)
+            const needed = Object.entries(am.s.figures).filter(([k, f]) => !f.optional && !figureGiven(f, values[k])).map(([k]) => k);
+            const missing = needed.length ? needed : Object.entries(am.s.figures).some(([k, f]) => figureGiven(f, values[k])) ? [] : Object.keys(am.s.figures);
             // (A schedule that can't be written from, a fault in the world's content: nothing is enacted, and the result says so.)
             const law = missing.length ? undefined : (() => { try { return draftLaw(am.schedule.id, am.s, values); } catch { return undefined; } })();
             if (missing.length) note = ` Nothing is enacted: ${am.s.title} is no longer in force, and the proposal doesn't give ${missing.map((k) => am.s.figures[k]!.label ?? k).join(" or ")}.`;
@@ -1090,7 +1092,9 @@ function changes(am: Amendment, before: "now" | "was" = "now"): string {
   return Object.entries(am.given).map(([k, v]) => {
     const f: LawFigure = am.s.figures[k]!;
     const now = am.law?.data?.figures?.[k]?.value;
-    return `${f.label ?? k} ${figureWords(f, v)}${Number.isSafeInteger(now) ? ` (${now === v ? "unchanged" : `${before} ${figureWords(f, now)}`})` : ""}`;
+    // (An optional figure given as nought is the requirement taken away; one the law in force doesn't have is "none".)
+    const words = (x: number | undefined) => (figureGiven(f, x) ? figureWords(f, x) : "none");
+    return `${f.label ?? k} ${words(v)}${am.law ? ` (${words(now) === words(v) ? "unchanged" : `${before} ${words(now)}`})` : ""}`;
   }).join("; ");
 }
 

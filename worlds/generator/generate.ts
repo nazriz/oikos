@@ -67,7 +67,7 @@ const ACT_TIME = {
   },
 };
 
-export const GENERATOR_VERSION = "0.37.0";
+export const GENERATOR_VERSION = "0.38.0";
 const DAY = 86_400;
 const MONTH = 30 * DAY;
 const YEAR = 365 * DAY;
@@ -210,8 +210,6 @@ const HOME_ROOM = { bodies_per_bedroom: 2, bodies_besides: 2 };
 
 /** The law schedules a world is given (worlds/law/schedules.json): how each law made from figures is written from them. */
 const SCHEDULES = schedules.records as unknown as { id: string; data: LawSchedule }[];
-/** Schedules for laws only some places have: given to a town that has the law. */
-const WHERE_USED = new Set(["schedule-industrial-action-notice"]);
 const scheduleOf = (id: string): LawSchedule => {
   const r = SCHEDULES.find((x) => x.id === id);
   if (!r) throw new Error(`no law schedule ${id}`);
@@ -219,7 +217,7 @@ const scheduleOf = (id: string): LawSchedule => {
 };
 
 /** A law of the town's written from figures by its schedule (its words, its breakdown, its rule), carrying the figures. */
-function scheduledLaw(schedule: string, id: string, values: { [figure: string]: number }, at = 0): any {
+function scheduledLaw(schedule: string, id: string, values: { [figure: string]: number | undefined }, at = 0): any {
   return { id, record: "statement", author: "genesis", at, visible_to: "public", speaks_for: "city", kind: "law", basis: "law-charter", ...draftLaw(schedule, scheduleOf(schedule), values) };
 }
 
@@ -1173,26 +1171,29 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     text: `Support payments. ${paymentsInWords(PAYMENTS, asWritten, (r) => `${payeeName(r.account)} (${r.account})`)}. A person claims a payment from whoever pays it, stating their date of birth, the account to pay and what the payment asks them to declare.`,
     adico: { attribute: "the payments office", deontic: "must", aim: "pay each person who claims a payment and fits its rule", condition: "on the payment's schedule, for as long as the payment lasts" },
     data: { support: "payments", payments: PAYMENTS } });
+  // (A place that charges no interest on overdue rates states none, and its law says nothing of it.)
+  const ratesInterest = V.public_finance.rates_penalty_interest_bps ?? 0;
   records.push({ id: "law-rates", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", kind: "law", basis: "law-charter",
-    text: `Rates: every owner of land in the town (but the town) owes the town ${ratePpm / 10_000}% of its value a year, as the valuer values it, in ${V.public_finance.rates_instalments} instalments, each due ${V.public_finance.rates_due_days} days after its notice. Or else: interest at ${V.public_finance.rates_penalty_interest_bps / 100}% a year on what's overdue.`,
-    adico: { attribute: "owners of land in the town", deontic: "must", aim: "pay rates on its value", condition: `in ${V.public_finance.rates_instalments} instalments a year`, or_else: `interest at ${V.public_finance.rates_penalty_interest_bps / 100}% a year` },
-    data: { tax: "rates", rate_ppm: ratePpm, instalments: V.public_finance.rates_instalments, due_days: V.public_finance.rates_due_days, penalty_interest_bps: V.public_finance.rates_penalty_interest_bps } });
+    text: `Rates: every owner of land in the town (but the town) owes the town ${ratePpm / 10_000}% of its value a year, as the valuer values it, in ${V.public_finance.rates_instalments} instalments, each due ${V.public_finance.rates_due_days} days after its notice.${ratesInterest ? ` Or else: interest at ${ratesInterest / 100}% a year on what's overdue.` : ""}`,
+    adico: { attribute: "owners of land in the town", deontic: "must", aim: "pay rates on its value", condition: `in ${V.public_finance.rates_instalments} instalments a year`, ...(ratesInterest ? { or_else: `interest at ${ratesInterest / 100}% a year` } : {}) },
+    data: { tax: "rates", rate_ppm: ratePpm, instalments: V.public_finance.rates_instalments, due_days: V.public_finance.rates_due_days, ...(ratesInterest ? { penalty_interest_bps: ratesInterest } : {}) } });
   // Laws on rent increases and on industrial action, from the profile: records the landlords and the union (and
   // employers) read, and lawmakers can change, never module parameters (docs/profiles.md). Each is written from its
   // figures by a schedule and carries them; they're the town's own, so its council can amend them.
-  // (A place with no rule on rent increases, or none on industrial action, has no such law: nothing is written with
-  // figures of nought standing in. A rule with one figure of its two is taken with the other at nought, which binds nothing.)
+  // (A place with no rule on rent increases, or none on industrial action, has no such law, and one with some of a
+  // law's requirements has a law that says those and nothing of the rest: each figure of these schedules is optional,
+  // and no law says "nought days" or "0%". A figure a profile still states as nought is taken as not stated.)
+  const stated = (...figures: (number | undefined)[]) => figures.some((x) => x !== undefined && x > 0);
   const TEN = V.tenancy;
-  const rentRule = TEN.rent_review_months !== undefined || TEN.rent_increase_notice_days !== undefined;
+  const rentRule = stated(TEN.rent_review_months, TEN.rent_increase_notice_days);
   if (rentRule) records.push(rentIncreaseLaw(TEN.rent_review_months ?? 0, TEN.rent_increase_notice_days ?? 0));
   // The law on ending a tenancy, from the profile's notices (until 2026-10-09 the example code's own words, with one
   // place's figures in them, in every town).
-  if (TEN.end_notice_days !== undefined || TEN.tenant_notice_days !== undefined)
+  if (stated(TEN.end_notice_days, TEN.tenant_notice_days))
     records.push(scheduledLaw("schedule-tenancy", "law-tenancy", { notice: (TEN.end_notice_days ?? 0) * DAY, tenant_notice: (TEN.tenant_notice_days ?? 0) * DAY }));
   const IA = V.industrial_action;
-  const ballotRule = IA.ballot_turnout_bps !== undefined || IA.ballot_pass_bps !== undefined;
-  if (ballotRule) records.push(industrialActionLaw(IA.ballot_turnout_bps ?? 0, IA.ballot_pass_bps ?? 0, IA.notice_days ?? 0));
-  else if (IA.notice_days !== undefined) records.push(scheduledLaw("schedule-industrial-action-notice", "law-industrial-action", { notice: IA.notice_days * DAY }));
+  // (A ballot's turnout, the share of its votes, the notice: whichever of the three the place requires.)
+  if (stated(IA.ballot_turnout_bps, IA.ballot_pass_bps, IA.notice_days)) records.push(industrialActionLaw(IA.ballot_turnout_bps ?? 0, IA.ballot_pass_bps ?? 0, IA.notice_days ?? 0));
   if (!IA.paid_during_action) records.push({ id: "law-no-pay-for-action", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "outside", kind: "law",
     text: "An employer must not pay employees for time on protected industrial action.",
     adico: { attribute: "employers", deontic: "must_not", aim: "pay employees", condition: "for time on protected industrial action" } });
@@ -1506,9 +1507,8 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   // Laws made from figures: the clerk's schedules (how each is written from its figures: world content), and for each
   // a form to amend it, its figures as the fields. The clerk writes the amended law by the same schedule
   // (docs/behaviour/government.md), so whoever reads the law in force reads its amendment the same way.
-  // (A schedule for a law only some places have is given, with its form, where the town has that law.)
-  const lawsBy = new Set(records.filter((r) => r.kind === "law").map((r) => r.data?.schedule));
-  for (const s of SCHEDULES) if (!WHERE_USED.has(s.id) || lawsBy.has(s.id)) records.push(s, amendmentForm(s));
+  // (Every schedule is given, with its form: a council whose town has no such law can make one on the form.)
+  for (const s of SCHEDULES) records.push(s, amendmentForm(s));
   // The planning office publishes the form it expects applications on (docs/design/translator-and-resolver.md §9.3).
   records.push({ id: "form-permit", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", kind: "form",
     text: "Planning permit application: the lot and the kind of building.",

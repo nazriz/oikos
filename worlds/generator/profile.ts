@@ -119,7 +119,7 @@ export interface Profile {
       rates_per_resident_per_year: number;
       rates_instalments: number;
       rates_due_days: number;
-      rates_penalty_interest_bps: number;
+      rates_penalty_interest_bps?: number;
       /** Kinds of organisation whose land isn't rateable (schools, public health), besides the outside world's. */
       rates_exempt_kinds?: string[];
       median_house_price: number;

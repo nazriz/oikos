@@ -234,3 +234,82 @@ test("offices that apply a law or a procedure by its id stop once it's withdrawn
   expect(run(tax, obs(DAY, [taxLaw, report("tr-1", DAY)], account))).toContain("claim(");
   expect(run(tax, obs(8 * DAY, [withdrawal("w4", 8 * DAY, "law-tax"), report("tr-2", 8 * DAY)], account))).toBe("");
 });
+
+// ------------------------------------------------------------------ figures a law may do without (2026-10-09)
+
+// A law no world has, of two requirements a place may have or not: the clerk and the drafting need nothing else.
+const BELLS: LawSchedule = {
+  title: "the law on ringing bells", form: "amend_bells",
+  figures: { rest: { type: "duration", unit: "days", optional: true, label: "rest between ringings" }, share: { type: "count", unit: "percent", held_in: "basis points", per_unit: 100, optional: true, label: "neighbours who must agree" } },
+  text: "Bells may be rung only as this law allows. << ;;They rest at least {rest} between ringings.;;At least {share}% of the neighbours have agreed.>>",
+  adico: { attribute: "ringers", deontic: "must_not", aim: "ring bells", condition: "<<, or ;;within {rest} of the last ringing;;without {share}% of the neighbours agreeing>>" },
+  formal: "block.block == 'publish' && block.kind == 'ringing' && (<< || ;;block.data.since < {rest:seconds};;block.data.agreed * 10000 < {share:basis_points} * block.data.neighbours>>)",
+};
+
+test("a figure a law may do without: its clause is written where it is given and left out where it is not, nought counting as not given; no law says nought or counts in seconds", () => {
+  const both = draftLaw("schedule-bells", BELLS, { rest: 2 * DAY, share: 6000 });
+  expect(both.text).toBe("Bells may be rung only as this law allows. They rest at least 2 days between ringings. At least 60% of the neighbours have agreed.");
+  expect(both.adico!.condition).toBe("within 2 days of the last ringing, or without 60% of the neighbours agreeing");
+  expect(both.formal!.condition).toBe(`block.block == 'publish' && block.kind == 'ringing' && (block.data.since < ${2 * DAY} || block.data.agreed * 10000 < 6000 * block.data.neighbours)`);
+  // One of the two, not stated or stated as nought: the same law.
+  for (const values of [{ share: 6000 }, { rest: 0, share: 6000 }, { rest: undefined, share: 6000 }]) {
+    const one = draftLaw("schedule-bells", BELLS, values);
+    expect(one.text).toBe("Bells may be rung only as this law allows. At least 60% of the neighbours have agreed.");
+    expect(one.adico!.condition).toBe("without 60% of the neighbours agreeing");
+    expect(one.formal!.condition).toBe("block.block == 'publish' && block.kind == 'ringing' && (block.data.agreed * 10000 < 6000 * block.data.neighbours)");
+    expect(one.data.figures).toEqual({ share: { value: 6000, unit: "basis points" } });
+  }
+  expect(draftLaw("schedule-bells", BELLS, { rest: 7 * DAY }).text).toBe("Bells may be rung only as this law allows. They rest at least 7 days between ringings.");
+  // None of them: there is no law to write.
+  expect(() => draftLaw("schedule-bells", BELLS, {})).toThrow(/none of its figures/);
+  expect(() => draftLaw("schedule-bells", BELLS, { rest: 0, share: 0 })).toThrow(/none of its figures/);
+  // A figure a law can't do without is still a gap (the dogs' law).
+  expect(() => draftLaw("schedule-dogs", DOGS, { dogs: 2, alone: 3600 })).toThrow(/no figure share/);
+  // Words for a duration: never seconds; nought is nought of the schedule's unit; what is not there is "none".
+  expect(figureWords({ type: "duration", unit: "days" }, 0)).toBe("0 days");
+  expect(figureWords({ type: "duration", unit: "months" }, 0)).toBe("0 months");
+  expect(figureWords({ type: "duration", unit: "days" }, 129_600)).toBe("36 hours");
+  expect(figureWords({ type: "duration", unit: "days" }, 43_230)).toBe("0.5 days");
+  expect(figureWords({ type: "duration", unit: "days" }, undefined)).toBe("none");
+  // The world's schedules: each writes a law from any one of its figures alone, in whole sentences.
+  for (const s of schedules.records) {
+    const d = s.data as unknown as LawSchedule;
+    for (const [k, f] of Object.entries(d.figures)) {
+      expect(f.optional).toBe(true);
+      const law = draftLaw(s.id, d, { [k]: f.type === "duration" ? 7 * DAY : 4000 });
+      for (const part of [law.text, ...Object.values(law.adico ?? {}), law.formal?.condition ?? ""]) expect(part).not.toMatch(/[{}<>;]{2}|[{}]|\(\)|\s{2}|^\s|\s$/);
+      expect(law.text).toMatch(/\.$/);
+      expect(Object.keys(law.data.figures)).toEqual([k]);
+    }
+  }
+});
+
+test("the clerk amends a law of optional figures: a requirement added, one taken away by nought, and a law made where the town had none", () => {
+  const bellSchedule = stmt("schedule-bells", 0, "law_schedule", { visible_to: ["city"], data: BELLS });
+  const bellForm = stmt("form-amend-bells", 0, "form", { data: { form: "amend_bells", amends: "schedule-bells", submit_as: "proposal", submit_to: ["city"], fields: { rest: { type: "duration" }, share: { type: "count", per_unit: 100 }, affects: { type: "choice", options: ["tenants", "development", "neither"] } } } });
+  const passed = (records: any[], data: object) => {
+    const clerk = councilClerk.create(ctx("clerk", {}, "council-clerk"));
+    const p = proposal("p1", DAY, { basis: "form-amend-bells", data: { ...data, affects: "neither" } });
+    const opened = run(clerk, obs(DAY, [bellSchedule, bellForm, ...records, p]));
+    const b = ballot("b1", DAY, "p1");
+    run(clerk, obs(2 * DAY, [b, ...votes("b1", 2 * DAY, ["yes", "yes", "yes"])]));
+    return { opened, closed: run(clerk, obs(16 * DAY, [])) };
+  };
+  const law = stmt("law-bells", 0, "law", { ...draftLaw("schedule-bells", BELLS, { share: 6000 }) });
+  // A requirement the law in force does not have, added.
+  const added = passed([law], { rest: 3 * DAY });
+  expect(lines(added.opened, "ballot")[0]).toContain("rest between ringings 3 days (now none)");
+  expect(lines(added.closed, "law")[0]).toContain("They rest at least 3 days between ringings. At least 60% of the neighbours have agreed.");
+  // One taken away: given as nought.
+  const full = stmt("law-bells", 0, "law", { ...draftLaw("schedule-bells", BELLS, { rest: 3 * DAY, share: 6000 }) });
+  const removed = passed([full], { share: 0 });
+  expect(lines(removed.opened, "ballot")[0]).toContain("neighbours who must agree none (now 60%)");
+  expect(lines(removed.closed, "law")[0]).toContain('text="Bells may be rung only as this law allows. They rest at least 3 days between ringings. (As amended');
+  // The last one taken away: nothing is enacted, and the result says so.
+  const emptied = passed([law], { share: 0 });
+  expect(lines(emptied.closed, "law")).toEqual([]);
+  expect(lines(emptied.closed, "ballot_result")[0]).toContain("Nothing is enacted");
+  // No law in force: one figure is enough to make it.
+  const made = passed([], { rest: 5 * DAY });
+  expect(lines(made.closed, "law")[0]).toContain("They rest at least 5 days between ringings. (Made by the council on ballot b1.)");
+});
