@@ -1,0 +1,84 @@
+[
+ {
+  "name": "w2-10-works",
+  "world": "worlds/town-1000.yaml",
+  "sets": [
+   "seed=110",
+   "profile=gb-eng-2026",
+   "model_seats=works,registry,environment",
+   "works_crew_at_start=0"
+  ],
+  "model": "claude-code/claude-sonnet-5-5",
+  "translator": "claude-code/claude-sonnet-5-5",
+  "translator_choice": "sonnet",
+  "until": 15552000,
+  "budget": 30,
+  "env": {
+   "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
+   "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
+  },
+  "note": "Wave 2a (plan of 2026-10-09, third version), for the translator's data. Profile gb-eng-2026; a town of its own, generated from seed 110; 1,000 people; 180 days; the works crew still to be taken on. Seats: works, registry, environment, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt). Every draft is confirmed or declined by its seat. A PROBE: stop it by its own rule (plan.md, the stopping rules). Depends on a seat being shown that its office has no staff (a fault being fixed). The works office and the registry held by a model, under a code mayor: standing work orders set once, a crew advertised for and taken on, deaths entered on the register's form. Half a year, because that is what gives a registrar a handful of deaths."
+ },
+ {
+  "name": "w2-44-utilities",
+  "world": "worlds/town-1000.yaml",
+  "sets": [
+   "seed=144",
+   "profile=au-vic-2026",
+   "model_seats=water-operations,energy-operations,rates"
+  ],
+  "args": [
+   "--scenario",
+   "energy-price-shock"
+  ],
+  "model": "claude-code/claude-sonnet-5-5",
+  "translator": "claude-code/claude-sonnet-5-5",
+  "translator_choice": "sonnet",
+  "until": 3888000,
+  "budget": 10,
+  "env": {
+   "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
+   "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
+  },
+  "note": "Wave 2a (plan of 2026-10-09, third version), for the translator's data. Profile au-vic-2026; a town of its own, generated from seed 144; 1,000 people; 45 days; starting conditions energy-price-shock. Seats: water-operations, energy-operations, rates, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt). Every draft is confirmed or declined by its seat. A PROBE: stop it by its own rule (plan.md, the stopping rules). A probe: the two utilities and the rates office: supply, billing and the levy as standing orders."
+ },
+ {
+  "name": "w2-09-trade",
+  "world": "worlds/town-1000.yaml",
+  "sets": [
+   "seed=109",
+   "profile=au-vic-2026",
+   "model_seats=shop-1-manager,factory-1-manager"
+  ],
+  "model": "claude-code/claude-sonnet-5-5",
+  "translator": "claude-code/claude-sonnet-5-5",
+  "translator_choice": "sonnet",
+  "until": 2592000,
+  "budget": 10,
+  "env": {
+   "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
+   "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
+  },
+  "note": "Wave 2a (plan of 2026-10-09, third version), for the translator's data. Profile au-vic-2026; a town of its own, generated from seed 109; 1,000 people; 30 days. Seats: shop-1-manager, factory-1-manager, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt). Every draft is confirmed or declined by its seat. A PROBE: stop it by its own rule (plan.md, the stopping rules). A probe: one shop and one factory of many, for goods and work; serving and making are still by hand (plan.md, the gaps)."
+ },
+ {
+  "name": "w2-14-largest",
+  "world": "worlds/town-1000.yaml",
+  "sets": [
+   "seed=114",
+   "profile=au-vic-2026",
+   "mayor=llm",
+   "model_seats=finance,landlord-1-office"
+  ],
+  "model": "claude-code/claude-fable-5-1",
+  "translator": "claude-code/claude-sonnet-5-5",
+  "translator_choice": "trained-ok",
+  "until": 3888000,
+  "budget": 60,
+  "env": {
+   "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
+   "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
+  },
+  "note": "Wave 2a (plan of 2026-10-09, third version), for the translator's data. Profile au-vic-2026; a town of its own, generated from seed 114; 1,000 people; 45 days. Seats: mayor, finance, landlord-1-office, all on claude-code/claude-fable-5-1. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt); this pilot may have our own retrained translator instead, if its scores allow when the stage starts. Every draft is confirmed or declined by its seat. The largest model in the familiar offices with a landlord beside them: the measure of what it costs and how it works a seat, before its two longer pilots."
+ }
+]
