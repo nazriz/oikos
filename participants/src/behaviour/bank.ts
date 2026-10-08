@@ -9,7 +9,7 @@
 // accounts, ignore instructions, or pay the wrong people. Physics doesn't stop it.
 
 import { cents, smallestNow } from "../money";
-import type { Observation, StatementRecord, Transaction } from "../contracts";
+import type { Observation, Record, StatementRecord, Transaction } from "../contracts";
 import { basesOf, channels } from "../contracts";
 import { DAY, wait, type BehaviourModule, type ParticipantContext } from "../module";
 import { refusalText } from "../llm/words";
@@ -74,7 +74,7 @@ export const bankPaymentSystem: BehaviourModule = {
     { what: "request", why: "A bank keeps its own customers' instructions: every standing order and payment request it is asked to carry out is addressed to it." },
     { what: "accounts", why: "The ledger is the bank's own book: it keeps its customers' accounts, and pays from them as they instruct." },
   ],
-  version: "0.15.0", // 0.15.0: its list of a customer's standing instructions says of each who gave it, when, and what it cites. 0.14.0: it keeps a ledger of what it has paid in and out of each account, and a letter is answered with a statement from it (until then, with the payments new at that look: nearly always none)
+  version: "0.16.0", // 0.16.0: a withdrawal of a standing instruction, of a hold, or an instruction that replaces another, is acted on only from whoever may instruct on the paying account; anyone else is answered and the instruction stands. 0.15.0: its list of a customer's standing instructions says of each who gave it, when, and what it cites. 0.14.0: it keeps a ledger of what it has paid in and out of each account, and a letter is answered with a statement from it (until then, with the payments new at that look: nearly always none)
   doc: "docs/behaviour/bank-payment-system.md",
   cadence: () => DAY,
   firstWake: () => 0,
@@ -104,7 +104,14 @@ export const bankPaymentSystem: BehaviourModule = {
     // every plan as they always were.
     const byDue = new Soonest();
     const undated = new Set<string>();
-    let withdrawnSeen = 0;
+    // What has been withdrawn, as the bank acts on it (docs/behaviour/bank-payment-system.md, "Who may withdraw"): an
+    // instruction or a hold, and when its withdrawal took effect. A withdrawal is a record anyone can make of any
+    // paper; the bank acts on one only from whoever may instruct on the account the instruction pays from, as it does
+    // for the instruction itself and for a hold. The others it answers, once.
+    const ended = new Map<string, number>();
+    let withdrawalCursor = 0;
+    let unplaced: Extract<Record, { record: "withdrawal" }>[] = []; // withdrawals of a paper it has not been shown yet
+    let withdrawalNotes: Step = [];
     // Holds (docs/behaviour/bank-payment-system.md, "A hold"): a customer's instruction not to pay under a standing
     // order while the hold stands. Read once as they arrive; each order's accepted holds, with the time from which
     // each counts (when it was given, plus the notice the bank asks for). A hold is lifted by withdrawing it.
@@ -149,7 +156,6 @@ export const bankPaymentSystem: BehaviourModule = {
     };
     const plan = (obs: Observation) => {
       const me = obs.entity;
-      const withdrawn = book.withdrawn;
       const kept = channels.accounts(obs).filter((a) => a.custodian === me);
       // (The accounts it keeps, by id: made when first asked for. Balances are read where they're used.)
       let byId: Map<string, (typeof kept)[number]> | undefined;
@@ -165,28 +171,70 @@ export const bankPaymentSystem: BehaviourModule = {
       const fresh = all.slice(cursor).filter((r) => (r.addressed_to ?? []).includes(me));
       cursor = all.length;
       for (const r of fresh) {
-        if (Number.isInteger(r.data?.every) && r.data!.every > 0 && !Array.isArray(r.data?.payments) && !withdrawn.has(r.id)) {
+        if (Number.isInteger(r.data?.every) && r.data!.every > 0 && !Array.isArray(r.data?.payments) && !ended.has(r.id)) {
           standing.set(r.id, r);
           if (!nextDue.has(r.id)) undated.add(r.id);
         }
       }
-      // (Those withdrawn since the last plan: the set only grows, in the order they were withdrawn.)
+      /** May whoever made this record instruct on this account: written for its holder, by one of the holder's own
+       * seats, and where the holder has named signatories for the account, in one of those posts. */
+      const mayInstruct = (r: { author: string; in_position?: string; speaks_for?: string }, acc: (typeof kept)[number] | undefined): boolean => {
+        if (!acc || r.speaks_for !== acc.holder || (verifyAuthor && book.authorEntity(r as Record) !== acc.holder)) return false;
+        const named = signatories(acc.holder, acc.account);
+        return !named || r.author === "genesis" || named.includes(r.in_position ?? "");
+      };
+      /** Why not, in one sentence that tells the writer nothing they could not know: one of the account holder's own
+       * people who is not a signatory is told that; anyone else, that there is nothing of theirs by that reference. */
+      const whyNot = (r: { author: string; in_position?: string; speaks_for?: string }, acc: (typeof kept)[number] | undefined): string | undefined =>
+        acc && r.speaks_for === acc.holder && (!verifyAuthor || book.authorEntity(r as Record) === acc.holder) ? `${r.in_position ?? r.author} is not an authorised signatory for ${acc.account}` : undefined;
+      const payingAccount = (order: StatementRecord | undefined) => (order ? custody().get(order.data?.outcome?.money?.from ?? order.data?.from) : undefined);
+      // Withdrawals that have arrived since the last plan, and instructions that say they replace another. Each is
+      // acted on only from whoever may instruct on the account; the rest are answered, and what they named stands.
+      const justEnded: string[] = [];
+      const lifts: { w: (typeof unplaced)[number]; hold: StatementRecord; to: string[] }[] = [];
+      const withdrawals = book.ofType("withdrawal");
+      const toPlace = [...unplaced, ...withdrawals.slice(withdrawalCursor)];
+      withdrawalCursor = withdrawals.length;
+      unplaced = [];
+      for (const w of toPlace) {
+        const target = book.records.get(w.withdraws);
+        if (!target) {
+          if (unplaced.length < 256) unplaced.push(w); // (the paper it names has not reached us yet: looked at again next plan)
+          continue;
+        }
+        if (target.record !== "statement" || !(target.addressed_to ?? []).includes(me) || ended.has(target.id)) continue;
+        const to = [w.author === "genesis" ? w.speaks_for ?? me : w.in_position ?? w.author];
+        if (target.kind === "request") {
+          const acc = payingAccount(target);
+          if (mayInstruct(w, acc)) {
+            ended.set(target.id, w.at);
+            justEnded.push(target.id);
+          } else if (standing.has(target.id) || !done.has(target.id)) {
+            const why = whyNot(w, acc);
+            withdrawalNotes.push(message(to, why ? `Withdrawal ${w.id} is not acted on, and ${target.id} stands: ${why}.` : `Withdrawal ${w.id} does not apply to ${target.id}: we have no standing instruction of yours by that reference.`, w.id));
+          }
+        } else if (target.kind === "hold") lifts.push({ w, hold: target, to }); // (looked at once the holds that have arrived are read: below)
+      }
+      // (An instruction that names the one it replaces: the earlier one ends when the later was given, if whoever gave
+      // the later may instruct on the account the earlier pays from. Otherwise the earlier stands; the later is
+      // answered for itself, below, as any instruction is.)
+      for (const r of fresh) {
+        const old = typeof r.data?.replaces === "string" ? book.records.get(r.data.replaces) : undefined;
+        if (old?.record !== "statement" || old.kind !== "request" || !(old.addressed_to ?? []).includes(me) || ended.has(old.id) || !mayInstruct(r, payingAccount(old))) continue;
+        ended.set(old.id, r.at);
+        justEnded.push(old.id);
+      }
       // (A payment that fell due before its order was withdrawn is still made: the bank goes through its plans a day
       // apart, and an order replaced in the hours after its pay day, a wage at a new rate say, would lose that pay.)
       const lastCall = new Map<string, { order: StatementRecord; until: number }>();
-      if (withdrawn.size !== withdrawnSeen) {
-        let i = 0;
-        for (const id of withdrawn) {
-          if (i++ < withdrawnSeen) continue;
-          const r = standing.get(id);
-          if (!r) continue;
-          const until = book.withdrawnAt.get(id) ?? obs.t;
-          const next = nextDue.get(id) ?? r.at + (Number.isInteger(r.data?.first) ? (r.data!.first as number) : (r.data!.every as number));
-          if (next <= until) lastCall.set(id, { order: r, until });
-          standing.delete(id);
-          undated.delete(id);
-        }
-        withdrawnSeen = withdrawn.size;
+      for (const id of justEnded) {
+        const r = standing.get(id);
+        if (!r) continue;
+        const until = ended.get(id) ?? obs.t;
+        const next = nextDue.get(id) ?? r.at + (Number.isInteger(r.data?.first) ? (r.data!.first as number) : (r.data!.every as number));
+        if (next <= until) lastCall.set(id, { order: r, until });
+        standing.delete(id);
+        undated.delete(id);
       }
       // Holds that have arrived since the last plan. One counts for a standing order the bank has from whoever may
       // instruct on the account it pays from (the same check as for any instruction); for anything else the writer
@@ -194,14 +242,16 @@ export const bankPaymentSystem: BehaviourModule = {
       const holds = book.all("hold");
       for (const h of holds.slice(holdCursor)) {
         if (!(h.addressed_to ?? []).includes(me) || !Array.isArray(h.data?.holds)) continue;
-        const taken: string[] = [], not: string[] = [];
+        const taken: string[] = [], not: string[] = [], unsigned: string[] = [];
         for (const id of [...new Set(h.data!.holds as unknown[])].filter((x): x is string => typeof x === "string").slice(0, 64)) {
           const order = standing.get(id);
-          const acc = order ? custody().get(order.data?.outcome?.money?.from) : undefined;
-          const named = acc ? signatories(acc.holder, acc.account) : undefined;
-          const may = !!acc && h.speaks_for === acc.holder && (!verifyAuthor || book.authorEntity(h) === acc.holder) && (!named || h.author === "genesis" || named.includes(h.in_position ?? ""));
-          if (!order || !may) {
-            not.push(id);
+          const acc = payingAccount(order);
+          if (!order || !mayInstruct(h, acc)) {
+            // (One of the account holder's own people who is not a signatory is told so; anyone else is told nothing
+            // of whose the instruction is.)
+            const why = order ? whyNot(h, acc) : undefined;
+            if (why) unsigned.push(`Hold ${h.id} is not in place on ${id}: ${why}.`);
+            else not.push(id);
             continue;
           }
           const from = h.at + holdNotice;
@@ -212,19 +262,32 @@ export const bankPaymentSystem: BehaviourModule = {
           const first = next >= from ? next : next + Math.ceil((from - next) / every) * every;
           taken.push(`${id}, from the payment due on day ${Math.floor(first / DAY) + 1}`);
         }
-        if (!taken.length && !not.length) continue;
+        if (!taken.length && !not.length && !unsigned.length) continue;
         holdNotes.push(message([h.author === "genesis" ? h.speaks_for ?? me : h.in_position ?? h.author], [
           ...(taken.length ? [HOLD_NOTE.taken(h.id, taken)] : []),
+          ...unsigned,
           ...(not.length ? [`Hold ${h.id} does not apply to ${not.join(", ")}: we have no standing instruction of yours by that reference.`] : []),
         ].join(" "), h.id));
       }
       holdCursor = holds.length;
+      // Holds withdrawn: a hold is lifted by whoever may instruct on the accounts its orders pay from, every one of
+      // them. (The accounts as they were when the hold was taken: an order since ended is no longer looked at.)
+      for (const { w, hold, to } of lifts) {
+        const orders = [...holdsOn].filter(([, on]) => on.some((h) => h.hold === hold.id)).map(([order]) => order);
+        if (!orders.length) continue; // (a hold we never took: nothing to lift)
+        const accounts = orders.map((order) => payingAccount(standing.get(order) ?? (book.records.get(order) as StatementRecord | undefined)));
+        if (accounts.every((acc) => mayInstruct(w, acc))) ended.set(hold.id, w.at);
+        else {
+          const why = whyNot(w, accounts.find((acc) => !mayInstruct(w, acc)));
+          withdrawalNotes.push(message(to, why ? `Withdrawal ${w.id} is not acted on, and hold ${hold.id} stands: ${why}.` : `Withdrawal ${w.id} does not apply to ${hold.id}: we have no hold of yours by that reference.`, w.id));
+        }
+      }
       /** Whether a payment under an order, due at a time, is under a hold: one that counted by then and had not been lifted. */
       const held = (order: string, at: number): boolean => {
         const on = holdsOn.get(order);
         if (!on) return false;
         return on.some((h) => {
-          const lifted = book.withdrawnAt.get(h.hold);
+          const lifted = ended.get(h.hold);
           return h.from <= at && (lifted === undefined || lifted > at);
         });
       };
@@ -251,7 +314,7 @@ export const bankPaymentSystem: BehaviourModule = {
       const deaths = book.all("death_registration");
       const dead = new Set(deaths.map((r) => r.data?.deceased as string));
       for (const ins of instructions) {
-        if ((withdrawn.has(ins.id) && !lastCall.has(ins.id)) || dead.has(ins.speaks_for ?? "")) continue;
+        if ((ended.has(ins.id) && !lastCall.has(ins.id)) || dead.has(ins.speaks_for ?? "")) continue;
         // Requests the bank can't carry out get a reply, once, as a real bank's would (§9.3).
         const cannot = (why: string) => {
           if (done.has(ins.id)) return;
@@ -411,7 +474,7 @@ export const bankPaymentSystem: BehaviourModule = {
       const orders = [...standing.values()].filter((r) => r.speaks_for === holder && ids.has(r.data?.outcome?.money?.from)).sort((a, b) => (a.id < b.id ? -1 : 1));
       const order = (r: StatementRecord) => {
         const m = r.data!.outcome.money, every = r.data!.every as number, next = nextDue.get(r.id);
-        const on = (holdsOn.get(r.id) ?? []).filter((h) => book.withdrawnAt.get(h.hold) === undefined).map((h) => h.hold);
+        const on = (holdsOn.get(r.id) ?? []).filter((h) => ended.get(h.hold) === undefined).map((h) => h.hold);
         // (Who gave it and when, and what it cites: what the instruction itself says, which is the customer's own paper.)
         const cited = basesOf(r);
         const given = `, given ${r.author === "genesis" ? "before the year began" : `on ${dateWords(r.at)}`}${r.in_position ? ` in your post ${r.in_position}` : ""}${cited.length ? `, citing ${cited.join(", ")}` : ""}`;
@@ -436,7 +499,9 @@ export const bankPaymentSystem: BehaviourModule = {
           // Who wrote the instructions it is about to read for the first time: looked up first, each writer once
           // (docs/behaviour/bank-payment-system.md, "Who wrote it"). The answers come at once, and it plans knowing them.
           // (And who wrote a hold it is about to read: a hold is its customer's instruction too.)
-          const whom = whoWrote(book, asked, who, [...book.all("request").slice(cursor), ...book.all("hold").slice(holdCursor)].filter((r) => (r.addressed_to ?? []).includes(obs.entity!)));
+          const whom = whoWrote(book, asked, who, [...[...book.all("request").slice(cursor), ...book.all("hold").slice(holdCursor)].filter((r) => (r.addressed_to ?? []).includes(obs.entity!)),
+            // (And who wrote a withdrawal it is about to read: only whoever may instruct on an account ends an instruction on it.)
+            ...book.ofType("withdrawal").slice(withdrawalCursor)]);
           if (whom.length) return { type: "look", looks: whom };
           // Payments a busy moment didn't get to (a wake allows only so many actions) are made first at the next: they're
           // already counted as due (a one-off as handled, a standing order's next date moved on), so never dropped.
@@ -455,6 +520,7 @@ export const bankPaymentSystem: BehaviourModule = {
         }
         inFlight = [];
         if (refusals.length) return callAction(because("Telling account holders about requests we couldn't carry out.", ...refusals.splice(0, 32)));
+        if (withdrawalNotes.length) return callAction(because("Answering withdrawals of standing instructions and holds that we do not act on: whoever gave them may not instruct on the account, or there is nothing of theirs by that reference.", ...withdrawalNotes.splice(0, 32)));
         if (holdNotes.length) return callAction(because("Answering instructions to hold standing payments: what is held and from when, or that there is nothing of theirs by that reference.", ...holdNotes.splice(0, 32)));
         // (Who wrote: the organisation of the position written in, or the participant's person, from the directory.)
         replies.push(...letters.answer(({ participant, as, entity }) => accountReport(obs, entity ?? (as ? book.positions.get(as)?.entity : book.participantPerson.get(participant)), as ?? participant),

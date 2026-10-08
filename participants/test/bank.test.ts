@@ -136,7 +136,12 @@ test("going through standing orders only when they're due gives the payments and
         records.push(statement(id, t, "request", { ...by, addressed_to: [pick(["bank", "bank", "bank", "other-bank"])], visible_to: [who, "bank"], data }));
       }
       const some = (what: number) => rng.below(what) === 0;
-      if (written.length && some(6)) records.push({ id: `w${++n}`, at: t, record: "withdrawal", author: "x", withdraws: pick(written).id, visible_to: ["bank"] });
+      // (A withdrawal: mostly by whoever wrote the order, in whose name it was; now and then by someone else, or by nobody the bank can place.)
+      if (written.length && some(6)) {
+        const w = pick(written);
+        const own = { author: w.author, ...(w.in_position ? { in_position: w.in_position } : {}), speaks_for: w.speaks_for };
+        records.push({ id: `w${++n}`, at: t, record: "withdrawal", ...pick<object>([own, own, own, { author: `${pick(people)}-self`, speaks_for: pick(people) }, { author: "x" }]), withdraws: w.id, visible_to: ["bank"] });
+      }
       if (some(8)) records.push(statement(`s${++n}`, t, "signatories", { author: "clerk-1", in_position: "firm-clerk", speaks_for: "firm", addressed_to: ["bank"], visible_to: ["bank"], data: { account: "acc-firm", positions: [pick(["firm-clerk", "firm-boss"])] } }));
       if (some(60)) records.push(statement(`d${++n}`, t, "death_registration", { speaks_for: "city", data: { deceased: pick(people), partner: pick(people), adult_children: [pick(people)] } }));
       if (some(40)) records.push(statement(`g${++n}`, t, "garnishee_order", { speaks_for: "tribunal", addressed_to: ["bank"], visible_to: ["bank"], data: { debtor: pick(people), to: `acc-${pick(people)}`, amount: "1500", claim: "claim-1" } }));
