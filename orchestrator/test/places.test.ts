@@ -16,7 +16,7 @@
 import { expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { formatMoney } from "@oikos/participants";
+import { bedroomsNeeded, formatMoney, OCCUPANCY, type OccupancyStandard } from "@oikos/participants";
 import { generate, generateFrom } from "@oikos/worlds/generator/generate";
 import { loadProfile, PROFILE_DIR, type Profile } from "@oikos/worlds/generator/profile";
 
@@ -240,4 +240,90 @@ test("wages are paid on the profile's pay period: a month's pay monthly makes th
   expect(Math.abs(fb.shops[0]!.serve_labour - fa.shops[0]!.serve_labour)).toBeLessThanOrEqual(1);
   expect([...fb.staff]).toEqual([...fa.staff]);
   for (const x of fa.factories) expect(Math.abs(fb.balance(x.entity) - fa.balance(x.entity))).toBeLessThan(0.001 * fa.balance(x.entity));
+}, SLOW);
+
+// ---- extended households, the occupancy standard and a home's room (docs/behaviour/households.md) ----
+
+type HouseholdRecord = { leaseholder: string; members: { person: string; born_at: number; sex: "female" | "male"; parents?: string[] }[]; couples: [string, string][] };
+/** A town's households as their records list them. */
+const householdsOf = (c: any): HouseholdRecord[] => c.world.records.filter((r: any) => r.kind === "household").map((r: any) => r.data);
+/** More than a family, as the record shows it: the head's own parent lives with them; or the head's child has a partner
+ * or children of their own there; or a family (a couple, or someone's children) has an adult in it who is nobody's
+ * partner, parent or child and does not head it. */
+function extended(h: HouseholdRecord): boolean {
+  const partnered = (p: string) => h.couples.some((c) => c.includes(p));
+  const head = h.members.find((m) => m.person === h.leaseholder)!;
+  if (head.parents?.length) return true;
+  if (h.members.some((m) => m.parents?.includes(h.leaseholder) && (partnered(m.person) || h.members.some((k) => k.parents?.includes(m.person))))) return true;
+  const family = h.couples.length > 0 || h.members.some((m) => m.parents?.length);
+  return family && h.members.some((m) => m.person !== h.leaseholder && !m.parents?.length && !partnered(m.person));
+}
+/** Each dwelling of a town, with what its kind of building gives it (how many bodies it holds, its bedrooms), and who lives where. */
+function dwellings(c: any) {
+  const types = new Map<string, any>(c.catalogue.structure_types.map((t: any) => [t.id, t]));
+  const of = new Map<string, { capacity: number; bedrooms: number }>();
+  for (const s of c.world.structures) for (const sp of types.get(s.type)?.spaces ?? []) if (sp.kind === "dwelling") for (let k = 1; k <= sp.count; k++) of.set(`${s.id}/dwelling.${k}`, { capacity: sp.capacity, bedrooms: sp.attrs.bedrooms });
+  const home = new Map<string, string>(c.world.occupancy.filter((o: any) => of.has(o.space)).map((o: any) => [o.occupant, o.space]));
+  return { of, home };
+}
+
+test("extended households are generated only where a profile states them, at its share, and everyone has room", () => {
+  for (const id of ids) {
+    const H = loadProfile(id).values.households;
+    const c = town(id);
+    const hh = householdsOf(c);
+    const found = hh.filter(extended);
+    if (!H.extended_bps) expect({ id, extended: found.length }).toEqual({ id, extended: 0 });
+    else {
+      // How many is a draw at the profile's share of households: within four standard deviations of it.
+      const p = H.extended_bps / (H.lone_bps + H.group_bps + H.couple_bps + H.couple_children_bps + H.one_parent_bps + H.extended_bps);
+      expect(found.length).toBeGreaterThan(0);
+      expect(Math.abs(found.length - hh.length * p)).toBeLessThanOrEqual(4 * Math.sqrt(hh.length * p * (1 - p)));
+      // The parents a household's record names are the person's parents in the world too.
+      const entity = new Map<string, any>(c.world.entities.map((e: any) => [e.id, e]));
+      for (const h of found) for (const m of h.members) if (m.parents) expect(entity.get(m.person).parents).toEqual(m.parents);
+    }
+    // In every town, whatever its households: nobody is put where there isn't the room, and a household with a home
+    // is all in the one home.
+    const { of, home } = dwellings(c);
+    const living = new Map<string, number>();
+    for (const space of home.values()) living.set(space, (living.get(space) ?? 0) + 1);
+    for (const [space, n] of living) expect({ id, space, fits: n <= of.get(space)!.capacity }).toEqual({ id, space, fits: true });
+    for (const h of hh) expect(new Set(h.members.map((m) => home.get(m.person))).size).toBe(1);
+  }
+}, SLOW);
+
+test("the occupancy standard and a home's physical room are the profile's where it states them, and nobody's where it doesn't", () => {
+  const params = (c: any, impl: string) => [...c.participants, ...(c.templates ?? [])].filter((x: any) => x.controller?.impl === impl).map((x: any) => x.controller.params);
+  // Not stated (no profile states either today): no citizen or landlord is given a standard, so each keeps its module's
+  // own, and a home holds two for each bedroom and two besides: every town as it was.
+  for (const id of ids) {
+    const P = loadProfile(id);
+    expect(P.values.households.occupancy).toBeUndefined();
+    expect(P.values.homes).toBeUndefined();
+    const c = town(id);
+    expect(params(c, "citizen.default").length).toBeGreaterThan(0);
+    expect(params(c, "citizen.default").every((p: any) => !("occupancy" in p))).toBe(true);
+    expect(params(c, "firm.landlord").every((p: any) => !("max_people_per_bedroom" in p))).toBe(true);
+    for (const d of dwellings(c).of.values()) expect(d.capacity).toBe(2 * d.bedrooms + 2);
+  }
+  // Stated: the people judge homes by it, landlords let by its ceiling, and homes hold what the profile says.
+  const P = copy(ids[0]!);
+  P.values.households.occupancy = { per_bedroom: 3, own_from_age: 21, mixed_under_age: 10, living_room_slept_in: true };
+  P.values.homes = { bodies_per_bedroom: 3, bodies_besides: 1 };
+  const c = generateFrom(spec, P);
+  expect(params(c, "citizen.default").length).toBeGreaterThan(0);
+  for (const p of params(c, "citizen.default")) expect(p.occupancy).toEqual(P.values.households.occupancy);
+  for (const p of params(c, "firm.landlord")) expect(p.max_people_per_bedroom).toBe(3);
+  for (const d of dwellings(c).of.values()) expect(d.capacity).toBe(3 * d.bedrooms + 1);
+  // The same people (the standard and the room change no draw), and their first homes dealt by that standard: with
+  // more to a bedroom and the living room slept in, no more households start short of the bedrooms their standard asks
+  // than start short by the common one in the town as it is.
+  const plain = generateFrom(spec, copy(ids[0]!));
+  expect(householdsOf(c)).toEqual(householdsOf(plain));
+  const short = (t: any, S: OccupancyStandard) => {
+    const { of, home } = dwellings(t);
+    return householdsOf(t).filter((h) => home.has(h.leaseholder) && bedroomsNeeded(h, 0, 365 * DAY, S) > of.get(home.get(h.leaseholder)!)!.bedrooms).length;
+  };
+  expect(short(c, P.values.households.occupancy)).toBeLessThanOrEqual(short(plain, OCCUPANCY));
 }, SLOW);
