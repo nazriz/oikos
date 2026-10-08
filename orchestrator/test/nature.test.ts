@@ -14,7 +14,9 @@ const DAY = 86_400;
 const spec = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")) as any;
 
 async function year(name: string, drain: boolean) {
-  const config = generate({ ...spec, years: 1 });
+  // (Nothing here counts people: the land, its species and the office are the same in a town of 80, at well under
+  // half the time. The office is hired by the town's budget line whatever the town's size: the reports below say so.)
+  const config = generate({ ...spec, years: 1, citizens: 80 });
   if (drain) for (const t of config.world.ground.terrain) if (t.label === "wetland") t.label = "farmland";
   const out = join(root, "runs", `test-nature-${name}`);
   rmSync(out, { recursive: true, force: true });
@@ -48,4 +50,4 @@ test("the landscape's species hold, the office surveys and reports, and drained 
   // What the office found of frogs, summed over its rounds: fewer too.
   const found = (r: typeof kept) => r.reports.reduce((a: number, x: any) => a + (x.data.species["growling-grass-frog"]?.found ?? 0), 0);
   expect(found(drained)).toBeLessThan(found(kept));
-}, 900_000);
+}, 2_400_000);

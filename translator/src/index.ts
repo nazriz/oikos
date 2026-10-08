@@ -53,7 +53,7 @@ export interface TranslateRequest {
   knowledge: Knowledge;
 }
 
-export type Translation = { ok: true; draft: Draft; hash: string } | { ok: false; notices: string[]; call?: string; raw?: unknown; invalid?: string[] };
+export type Translation = { ok: true; draft: Draft; hash: string } | { ok: false; notices: string[]; call?: string; raw?: unknown; invalid?: string[]; asked_back?: true };
 
 export type KernelCheck = (participant: string, position: string | undefined, blocks: Block[]) => Promise<{ ok: boolean; refusal?: any; error?: string }>;
 
@@ -285,7 +285,7 @@ export function createTranslator(io: LlmIO, check: KernelCheck, typeOf: (type: s
     // Asked back with what was unclear: said to the participant as it is. Asking the translator again would get the
     // same answer (it has said what it couldn't tell), so this ends the exchange.
     const said = "none" in program && program.none === "unclear" ? unsureText(out?.input?.unsure, req) : undefined;
-    if (said) return { ok: false, notices: [said], call, final: true };
+    if (said) return { ok: false, notices: [said], call, final: true, asked_back: true };
     const r = resolver ? await resolver(req, program) : resolve(program, req.knowledge, typeOf, req.as);
     if (!r.ok && r.questions.some((q) => MALFORMED.test(q))) return { ok: false, notices: [NOT_PUT], call, invalid: [...(r.invalid ?? []), ...r.questions] };
     // A question another attempt can't answer (which account? which cell?) goes to the participant as it is: the call

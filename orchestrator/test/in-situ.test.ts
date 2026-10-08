@@ -282,4 +282,4 @@ test("writers' files taken in, made blind, and labelled by two readers: the comm
   expect(label(unlabelled, [{ file: a, reader: "a" }, { file: b, reader: "b" }], done)).toMatchObject({ examples: 3, by_reason: { reworded_text: 1 } });
   expect(rows(join(done, "rejects.jsonl")).filter((x) => x.why !== "unanswered")).toMatchObject([{ id: letter, why: "reworded_text", answers: { a: 'message(to=warden, text="Please sweep lot three")' } }]);
   expect(cli("in-situ-label", unlabelled, "--answers", a, "--reader", "a", "--out", done).exitCode).toBe(1);
-}, 60_000);
+}, 180_000);

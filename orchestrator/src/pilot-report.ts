@@ -12,8 +12,8 @@ import { currentLogs, logLines, runOf } from "./logs";
 import { NOT_CHECKED, NOT_PUT } from "../../translator/src/index";
 
 /** The sentences a translator that asked back says (translator/src/index.ts `unsureText`): which one, which words, a
- * form's fields or options. The plain "could you say it more plainly" is the refusal `none(unclear)`'s own text and
- * can't be told from a refusal, so it is counted as one. */
+ * form's fields or options. A log from before the run recorded `asked_back` is told by these; the plain "could you say it more plainly"
+ * is the refusal `none(unclear)`'s own text, so in such a log it is counted as a refusal. */
 export const ASK_BACK = [
   /^It isn't clear which one you mean\./, /^It isn't clear which words are to go as they stand\./,
   /^The .+ needs: /, /^The .+ form has no such field as was given\./, /^On the .+ form, .+ is one of: /,
@@ -29,8 +29,9 @@ interface Request { id: string; seat: string; n: number; t: number; ending: Endi
 
 /** The ending of a request that failed, from its translation_failure: `call` is what the translator said (none(label)
  * is a refusal), `reason` the sentence the seat was given. */
-export function endingOf(call: string | undefined, reason: string): { ending: Ending; label?: string } {
-  if (ASK_BACK.some((r) => r.test(reason))) return { ending: "asked_back" };
+export function endingOf(call: string | undefined, reason: string, askedBack?: boolean): { ending: Ending; label?: string } {
+  // The run records an ask-back (`asked_back` on the annotation); a log from before that is told by the sentence.
+  if (askedBack === true || (!askedBack && ASK_BACK.some((r) => r.test(reason)))) return { ending: "asked_back" };
   const label = /^none\((\w+)\)$/.exec(call ?? "")?.[1];
   if (label) return { ending: "refused", label };
   if (!call || reason === NOT_PUT || reason === NOT_CHECKED) return { ending: "not_put" };
@@ -159,7 +160,7 @@ export async function reportOfLog(dir: string, log: string): Promise<any> {
       const r = req(b.data?.draft ?? "", e.t);
       if (!r) continue;
       const reason = String(b.data?.reason ?? "");
-      Object.assign(r, endingOf(b.data?.call, reason), { sentence: reason });
+      Object.assign(r, endingOf(b.data?.call, reason, b.data?.asked_back === true ? true : undefined), { sentence: reason });
       if (r.ending === "asked_back") askBacks.push({ draft: r.id, t: e.t, sentence: reason });
     } else if (b.annotation === "signoff") {
       // The seat's answer to a draft: accept (confirmed) or reject (declined).

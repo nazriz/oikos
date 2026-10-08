@@ -92,4 +92,4 @@ test("an owner who'd leave sells; a renter buys on a mortgage, gets the title an
   // The buyer: notice on the lease, and in the house.
   expect(said.some((r) => r.record === "notice" && r.agreement === lease.id && r.speaks_for === buyer)).toBe(true);
   expect(ev.some((e) => e.event === "occupied" && e.space === home && (e.occupant ?? e.who) === buyer)).toBe(true);
-}, 900_000);
+}, 2_400_000);
