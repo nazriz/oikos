@@ -427,7 +427,7 @@
       }
     },
     "LookRequest": {
-      "description": "Look through one of the participant's channels now (attention). On-request channels are perceived only this way. A look through a records channel may carry a query: a search, which returns what matches now rather than what changed.",
+      "description": "Look through one of the participant's channels now (attention). On-request channels are perceived only this way. A look through a records channel may carry a query: a search, which returns what matches now rather than what changed; through a register asked of its keeper (`way: ask`) it must, and the query must name its subject (`field = value` on one of the channel's `by` fields); through a board it must, within the board's `most`. A look through a directory must say whom (`who`). A look through a map of places gone to (`way: visit`) must say where (`visit`): it takes the looker's time, and what it finds arrives when it ends.",
       "type": "object",
       "required": [
         "channel"
@@ -439,6 +439,82 @@
         },
         "query": {
           "$ref": "#/$defs/Query"
+        },
+        "who": {
+          "description": "A look-up in a directory: exactly one of an entity (alone: its entry; with `role`: that organisation's positions of that role), a participant (the person it acts as), a position, or a name (the entities of exactly that name and the positions of exactly that title). At most 20 entries, in id order.",
+          "oneOf": [
+            {
+              "type": "object",
+              "required": [
+                "entity"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "entity": {
+                  "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+                },
+                "role": {
+                  "$ref": "urn:oikos:contracts:0.8:common#/$defs/Label"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "required": [
+                "participant"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "participant": {
+                  "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "required": [
+                "position"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "position": {
+                  "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "required": [
+                "name"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                }
+              }
+            }
+          ]
+        },
+        "visit": {
+          "description": "Going to look: the places gone to, in order (a building, or a cell of ground). The looker is busy for the way there and back and the world's time to look at each place; what was there then comes with the observation after.",
+          "type": "object",
+          "required": [
+            "places"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "places": {
+              "type": "array",
+              "items": {
+                "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+              },
+              "minItems": 1,
+              "maxItems": 16
+            }
+          }
         }
       }
     },
@@ -517,9 +593,9 @@
       }
     },
     "QueryField": {
-      "description": "A place in a record: id (the record's own), record (its kind of record), kind (a statement's kind), at, author, speaks_for, basis, claim (the claim a transfer or a release names), data.<path> (a statement's data) or about.<path> (a claim's contents).",
+      "description": "A place in a record: id (the record's own), record (its kind of record), kind (a statement's kind), at, author, speaks_for, basis, claim (the claim a transfer or a release names), holder (who holds a claim), data.<path> (a statement's data) or about.<path> (a claim's contents).",
       "type": "string",
-      "pattern": "^(id|record|kind|at|author|speaks_for|basis|claim|(data|about)(\\.[A-Za-z0-9_-]+)+)$"
+      "pattern": "^(id|record|kind|at|author|speaks_for|basis|claim|holder|(data|about)(\\.[A-Za-z0-9_-]+)+)$"
     },
     "ResolverId": {
       "type": "object",
@@ -827,6 +903,10 @@
             },
             "whole": {
               "description": "The capacity's entity has moved since its last look through this channel (which looks near it): these cells are the whole of its new surroundings, in place of the old.",
+              "const": true
+            },
+            "visited": {
+              "description": "This is what a visit found: the places gone to, as they were at `as_of` (the participant's memory of them, not a standing view).",
               "const": true
             },
             "cells": {

@@ -233,7 +233,8 @@ impl Scheduler {
     pub fn note(&mut self, st: Option<&State>, events: &[Value], t: i64) {
         for e in events {
             match e["event"].as_str() {
-                Some("action_started") => {
+                // (Gone to look at somewhere: busy until back, as with an act.)
+                Some("action_started" | "visit_started") => {
                     let p = e["participant"].as_str().unwrap_or_default();
                     let cap = e["as"].as_str();
                     let done = e["done"].as_i64().unwrap_or(t);

@@ -91,6 +91,21 @@ describe("invalid examples", () => {
   }
 });
 
+// Worlds a schema cannot rule out, and the kernel refuses to load (docs/design/knowing.md: a register for a seat that
+// does not keep it, a kind nobody published, premises claimed twice). Each is well formed; kernel/tests/knowing.rs
+// loads every one and expects it refused, with the reason its description gives.
+describe("examples the kernel refuses to load are well formed", () => {
+  const dir = join(root, "examples/refused/world-config");
+  for (const file of readdirSync(dir).filter((f) => f.endsWith(".json")).sort()) {
+    test(`world-config/${file}`, () => {
+      const v = validator(TARGETS["world-config"]!);
+      const ok = v(readJson(join(dir, file)));
+      if (!ok) console.error(JSON.stringify(v.errors, null, 2));
+      expect(ok).toBe(true);
+    });
+  }
+});
+
 // Targeted mutations of the valid world config: each must be rejected.
 describe("world-config mutations are rejected", () => {
   const base = () => readJson(join(root, "examples/valid/world-config/riverbend-mini.json"));

@@ -681,6 +681,7 @@ pub fn scheduled(s: &Statics, st: &mut State, item: Scheduled) -> Vec<Timed> {
         }
         // (Acts in progress are the kernel's to apply: Kernel::advance.)
         Sched::Act { .. } => vec![],
+        Sched::Visit { participant, position, channel, places, cells, names } => crate::sites::end(s, st, &participant, position.as_deref(), &channel, places, &cells, names),
         Sched::BirthDue { parents, name, template } => {
             let Some(b) = st.body(&parents[0]) else { return vec![] };
             if !b.alive {
@@ -1185,15 +1186,25 @@ impl<'a> Exec<'a> {
         Ok(at)
     }
 
-    fn check_new_channels(&self, owner: &str, channels: &[Channel]) -> R<()> {
-        check_channels(owner, channels, &|e| self.st.entities.contains_key(e), &|c| self.st.cells.contains_key(c), &|p| {
-            self.s.config.world.places.iter().any(|x| x.id == p)
-        })
-        .map_err(|e| refuse(RefusalCode::UnknownEntity, e))
+    /// A new position's channels are held to what the world's own are (docs/design/knowing.md): no whole view can be
+    /// made during a run that couldn't be written in the world's config.
+    fn check_new_channels(&self, owner: &str, organisation: &str, channels: &[Channel]) -> R<()> {
+        // (Premises change hands during a run: a shop's are bought by whoever founds the next one there, while the old
+        // firm's seat names them still. So a new office's are held to a building or two, not to being nobody else's.)
+        let seat = crate::config::Seat {
+            organisation: Some(organisation),
+            knowing: &self.s.config.knowing,
+            premises_most: Some(crate::config::NEW_PREMISES_MAX),
+            entity_exists: &|e| self.st.entities.contains_key(e),
+            cell_exists: &|c| self.st.cells.contains_key(c),
+            place_exists: &|p| self.s.config.world.places.iter().any(|x| x.id == p),
+            premises_of: &|_| None,
+        };
+        check_channels(owner, channels, &seat).map_err(|e| refuse(RefusalCode::UnknownEntity, e))
     }
 
     fn new_position(&mut self, entity: &str, title: &Option<String>, role: &Option<String>, channels: &[Channel], role_module: &Option<Value>, holder: Option<Id>) -> R<Id> {
-        self.check_new_channels("the position", channels)?;
+        self.check_new_channels("the position", entity, channels)?;
         let id = self.st.mint("pos");
         let c = self.st.stamp();
         self.st.positions.insert(

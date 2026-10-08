@@ -298,7 +298,13 @@ impl Kernel {
     pub fn apply_prechecked(&mut self, cmd: &Command) -> Result<Output, ProtocolError> {
         match cmd {
             Command::Observe { participant, only } => Ok(self.observe(participant, only.as_deref(), &[])),
-            Command::Look { participant, only, looks } => Ok(self.observe(participant, only.as_deref(), looks)),
+            Command::Look { participant, only, looks } => {
+                // Visits begin (the world's: they take the looker's time); the rest is perceived now.
+                let mut events = self.world.begin_visits(participant, looks);
+                let mut out = self.observe(participant, only.as_deref(), looks);
+                events.append(&mut out.events);
+                Ok(Output { events, ..out })
+            }
             _ => Ok(Output { events: self.world.apply_prechecked(cmd)?.events, observation: None, observed: None }),
         }
     }
@@ -314,8 +320,22 @@ impl Kernel {
 
     fn observe(&mut self, participant: &str, only: Option<&str>, looks: &[LookRequest]) -> Output {
         let (obs, seen, drained) = observe::observe(self.world.statics(), self.world.state(), &mut self.index, participant, only, looks);
-        let (outcomes, inbox) = self.world.deliver(participant, only, seen, drained);
+        let (outcomes, inbox, visits) = self.world.deliver(participant, only, seen, drained);
         let mut obs = Observation { outcomes, inbox, ..obs };
+        // What its visits found, through the channel each was asked through (a later one over an earlier).
+        for v in visits {
+            match obs.channels.get_mut(&v.channel) {
+                Some(ChannelData::Sites { as_of, cells, .. }) => {
+                    *as_of = v.as_of;
+                    cells.retain(|c| !v.cells.iter().any(|n| n.cell == c.cell));
+                    cells.extend(v.cells);
+                    cells.sort_by(|a, b| a.cell.cmp(&b.cell));
+                }
+                _ => {
+                    obs.channels.insert(v.channel, ChannelData::Sites { as_of: v.as_of, cells: v.cells, whole: None, visited: Some(true) });
+                }
+            }
+        }
         // A lean log keeps no observation hashes (the log's `detail`): hashing a whole observation is much of the cost.
         if self.world.statics().config.log.detail.as_deref() == Some("lean") {
             return Output { events: vec![], observation: Some(obs), observed: None };

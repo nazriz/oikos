@@ -485,6 +485,52 @@ impl World {
                         Some((pos, id)) => self.state.positions.get(pos).and_then(|x| x.channels.iter().find(|c| c.id == id)),
                     };
                     let Some(ch) = ch else { return perr(format!("{participant} has no channel {}", l.channel)) };
+                    // Each way of knowing is looked through its own way (docs/design/knowing.md): a register is asked
+                    // about one named thing, a board read a few at a time, a directory looked up, a place gone to.
+                    use crate::config::{ChannelKind as K, CmpOp, Way};
+                    match (&ch.kind, &l.who) {
+                        (K::Directory { way }, who) => {
+                            if *way == Way::Ask && who.is_none() {
+                                return perr(format!("channel {}: say whom you are looking up (`who`): nobody is shown the directory", l.channel));
+                            }
+                            if who.as_ref().is_some_and(|w| !w.well_formed()) {
+                                return perr("a look-up names one entity (with or without a role), one participant, one position, or a name");
+                            }
+                        }
+                        (_, Some(_)) => return perr(format!("channel {} isn't a directory, so nobody can be looked up in it", l.channel)),
+                        _ => {}
+                    }
+                    match (&ch.kind, &l.visit) {
+                        (K::Sites { way: Way::Visit, .. }, Some(v)) => {
+                            if v.places.is_empty() || v.places.len() > 16 {
+                                return perr("a visit goes to 1..=16 places");
+                            }
+                            if let Some(p) = v.places.iter().find(|p| crate::sites::place_cells(&self.state, p).is_none()) {
+                                return perr(format!("no building or cell {p} to go to"));
+                            }
+                        }
+                        (K::Sites { way: Way::Visit, .. }, None) => return perr(format!("channel {}: say where to go (`visit`): it shows nothing until someone goes", l.channel)),
+                        (_, Some(_)) => return perr(format!("channel {} isn't one of places gone to", l.channel)),
+                        _ => {}
+                    }
+                    if let K::Records { way, filter, of, by, .. } = &ch.kind {
+                        let named = |fields: &[String]| l.query.as_ref().and_then(|q| q.conditions.as_ref()).and_then(|cs| cs.iter().find(|c| c.op == CmpOp::Eq && fields.contains(&c.field))).map(|c| c.field.clone());
+                        match way {
+                            Way::Ask => {
+                                let by = by.as_deref().unwrap_or(&[]);
+                                let Some(field) = named(by) else {
+                                    return perr(format!("channel {}: a keeper answers a question about one thing: name it by {}", l.channel, by.join(" or ")));
+                                };
+                                let _ = (of, filter, field); // (how many it gives in one answer is the keeper's: perception cuts the answer to it)
+                            }
+                            Way::Published => {
+                                if self.s.config.knowing.board_most(filter).is_some() && l.query.is_none() {
+                                    return perr(format!("channel {}: a board is read by searching it, a few at a time", l.channel));
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
                     if let Some(q) = &l.query {
                         if !matches!(ch.kind, crate::config::ChannelKind::Records { .. }) {
                             return perr(format!("channel {} isn't a records channel, so it can't be searched", l.channel));
@@ -653,7 +699,7 @@ impl World {
     /// A participant has been given its observation (perception built it, read-only): what it looked through is marked
     /// seen, the transactions it was shown are drained, and the outcomes and messages waiting for it in the capacities
     /// observed are handed over, in order.
-    pub fn deliver(&mut self, participant: &str, only: Option<&str>, looks: Vec<(Id, crate::state::Look)>, drained: Vec<Id>) -> (Vec<Outcome>, Vec<crate::state::Message>) {
+    pub fn deliver(&mut self, participant: &str, only: Option<&str>, looks: Vec<(Id, crate::state::Look)>, drained: Vec<Id>) -> (Vec<Outcome>, Vec<crate::state::Message>, Vec<crate::sites::Visited>) {
         let p = Arc::make_mut(self.state.participants.get_mut(participant).expect("a participant perceived"));
         for (id, look) in looks {
             p.looks.insert(id, look);
@@ -663,22 +709,47 @@ impl World {
         }
         let mut outcomes = vec![];
         let mut inbox = vec![];
+        let mut visits = vec![];
         let keys: Vec<Id> = p.pending.keys().filter(|k| only.is_none_or(|o| o == k.as_str())).cloned().collect();
         for k in keys {
             if let Some(mut x) = p.pending.remove(&k) {
                 outcomes.append(&mut x.outcomes);
                 inbox.append(&mut x.inbox);
+                visits.append(&mut x.visits);
             }
         }
         outcomes.sort_by(|a, b| (a.t, &a.action).cmp(&(b.t, &b.action)));
         inbox.sort_by(|a, b| (a.t, &a.id).cmp(&(b.t, &b.id)));
-        (outcomes, inbox)
+        // (In the order they ended; of two ending together, by the channel asked through.)
+        visits.sort_by(|a, b| (a.as_of, &a.channel).cmp(&(b.as_of, &b.channel)));
+        (outcomes, inbox, visits)
+    }
+
+    /// The visits a look asks for begin (docs/design/knowing.md, section 8): each takes its looker's time, and what
+    /// it finds comes with the observation after it ends. The rest of the look is perception's.
+    pub fn begin_visits(&mut self, participant: &str, looks: &[crate::config::LookRequest]) -> Vec<Timed> {
+        let mut events = vec![];
+        for l in looks {
+            let Some(v) = &l.visit else { continue };
+            let (key, channels) = match l.channel.split_once('/') {
+                None => (SELF.to_string(), self.state.participants[participant].def.channels.clone()),
+                Some((pos, _)) => match self.state.positions.get(pos) {
+                    Some(x) => (pos.to_string(), x.channels.clone()),
+                    None => continue,
+                },
+            };
+            let id = l.channel.rsplit('/').next().unwrap_or(&l.channel);
+            let Some(crate::config::ChannelKind::Sites { occupants, .. }) = channels.iter().find(|c| c.id == id).map(|c| c.kind.clone()) else { continue };
+            let names = occupants == Some(crate::config::Occupants::Names);
+            events.extend(crate::sites::begin(&self.s, &mut self.state, participant, &key, &l.channel, &channels, &v.places, names));
+        }
+        events
     }
 }
 
 /// A field a search may use (a look's query): the record's own, the claim a transfer or release names, or a
 /// structured field in its data or `about`.
 pub fn known_field(f: &str) -> bool {
-    matches!(f, "id" | "record" | "kind" | "at" | "author" | "speaks_for" | "basis" | "claim")
+    matches!(f, "id" | "record" | "kind" | "at" | "author" | "speaks_for" | "basis" | "claim" | "holder")
         || f.strip_prefix("data.").or_else(|| f.strip_prefix("about.")).is_some_and(|p| !p.is_empty() && p.split('.').all(|x| !x.is_empty()))
 }

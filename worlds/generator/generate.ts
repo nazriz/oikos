@@ -12,6 +12,7 @@ import schedules from "../law/schedules.json";
 import { loadProfile, type Profile } from "./profile";
 import { landscape } from "./nature";
 import { drawWeather } from "./weather";
+import * as K from "./knowing";
 
 /** The share of its staff's hours a shop plans to fill with serving (firm.retailer's default; placeholder). */
 const SHOP_UTILISATION_BPS = 8000;
@@ -42,7 +43,7 @@ const ACT_TIME = {
   },
 };
 
-export const GENERATOR_VERSION = "0.30.0";
+export const GENERATOR_VERSION = "0.31.0";
 const DAY = 86_400;
 const MONTH = 30 * DAY;
 const YEAR = 365 * DAY;
@@ -879,13 +880,13 @@ export function generate(spec: TownSpec): any {
     ] : []),
   ];
   const builderTypes = Object.fromEntries(structureTypes.map((t) => [t.id, { materials: t.materials, build_labour: t.build_labour, demolition_labour: t.demolition_labour }]));
-  const forms = { id: "forms", kind: "records", match: { statement_kinds: ["form"] } };
+  const forms = K.published("forms", ["form"]);
   // The price lists of those a seat deals with, each named (the builder's published prices; a supplier's): nobody is
   // shown every seller's (docs/no-god-view.md).
-  const pricesOf = (...sellers: string[]) => ({ id: "prices", kind: "records", match: { statement_kinds: ["price_list"], involving: sellers } });
+  const pricesOf = (...sellers: string[]) => K.from("prices", sellers, ["price_list"]);
   const priceLists = pricesOf("builder");
   // The laws in force (what an employer withholds under, among others).
-  const lawBook = { id: "laws", kind: "records", match: { statement_kinds: ["law"] } };
+  const lawBook = K.published("laws", ["law"]);
 
   // ---- public finance (docs/behaviour/public-finance.md) ----
   // What the builder will charge to build each kind of building (its published prices, at the opening materials price).
@@ -923,13 +924,20 @@ export function generate(spec: TownSpec): any {
   if (!IA.paid_during_action) records.push({ id: "law-no-pay-for-action", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "outside", kind: "law",
     text: "An employer must not pay employees for time on protected industrial action.",
     adico: { attribute: "employers", deontic: "must_not", aim: "pay employees", condition: "for time on protected industrial action" } });
-  const mine = (id = "mine") => ({ id, kind: "records", match: { involving: ["self"] } });
+  const mine = (id = "mine") => K.mine(id);
+  // The land register. Its keeper is the town's registry (LAND_REGISTRY: the organisation that keeps it); anyone else
+  // asks it for the one thing: the plan of a lot by the lot's number, a title by its number, the dealings in one title.
+  const LAND_REGISTRY = "city";
+  const lotPlans = K.ask("lots", LAND_REGISTRY, ["lot"], ["id"]);
+  // (Views not yet replaced: the register shown whole to offices that only use it. docs/design/knowing.md, stage d.)
+  const wholeLots = { id: "lots", kind: "records", way: "whole", match: { statement_kinds: ["lot"] } };
+  const wholeRegister = { id: "registry", kind: "records", way: "whole", match: { records: ["claim", "claim_transfer", "claim_release", "withdrawal"] } };
   // (The votes on its own ballots: a vote names its ballot, and so whoever put the ballot.)
-  const votes = { id: "votes", kind: "records", match: { records: ["vote"], involving: ["self"] } };
+  const votes = K.mine("votes", { records: ["vote"] });
   // Attention: the housing and job markets, and the petitions board, are looked at when the citizen wants to (on request),
   // as searches for what's standing now; nothing about them is broadcast.
-  const homeBoard = { id: "homes", kind: "records", match: { statement_kinds: ["rental_listing"] }, on_request: true };
-  const jobBoard = { id: "jobs", kind: "records", match: { statement_kinds: ["job_posting"] }, on_request: true };
+  const homeBoard = K.board("homes", ["rental_listing"]);
+  const jobBoard = K.board("jobs", ["job_posting"]);
   const participants: any[] = [];
   const positions: any[] = [];
   /** An office of an organisation, held by a system participant running `controller` (whose job module it also is). */
@@ -958,12 +966,12 @@ export function generate(spec: TownSpec): any {
     ...(RDS ? { road_budget: RDS.budget_per_resident * everyone.length, road_within: RDS.within_cells } : {}), staff_budget: crew * crewAnnual, services_budget: servicesBudget, ...(envStaff ? { environment_budget: envStaff * crewAnnual } : {}) };
   const mayorCode = code("city.mayor_code", mayorParams);
   office("mayor", "city", `Mayor of ${spec.name}`, "mayor",
-    [{ id: "budget", title: "The town's accounts", kind: "accounts" }, { id: "laws", title: "Laws, the charter and procedures", kind: "records", match: { statement_kinds: ["charter", "law", "procedure"] } },
-      { ...mine("city-business"), title: "Correspondence and filings concerning the town" }, { id: "files", title: "The town's files: every record the town can see, looked up on request (look, with what to find)", kind: "records", match: {}, on_request: true }, { ...forms, title: "Forms on file" }, { ...priceLists, title: "Price lists" }, { id: "who", title: "Who's who", kind: "directory" },
-      { id: "civic", title: "Petitions, budgets and council results", kind: "records", match: { statement_kinds: ["petition", "petition_count", "budget", "ballot_result"] } },
-      { id: "in-tray", title: "Invoices and complaints sent to the town", kind: "records", match: { statement_kinds: ["invoice", "complaint"], involving: ["self"] } },
-      ...(W?.events.length ? [{ id: "weather", title: "The weather bureau's warnings", kind: "records", match: { statement_kinds: ["weather_warning"] } }] : []),
-      ...(E ? [{ id: "elections", title: "Elections, and the local paper", kind: "records", match: { statement_kinds: ["election_notice", "nomination", "ballot", "news"] } }] : []), { id: "town", title: "Survey of the town", kind: "sites", area: "all", every: 30 * DAY }],
+    [{ id: "budget", title: "The town's accounts", kind: "accounts" }, K.published("laws", ["charter", "law", "procedure"], { title: "Laws, the charter and procedures" }),
+      { ...mine("city-business"), title: "Correspondence and filings concerning the town" }, K.mine("files", {}, { title: "The town's files: every paper of the town's own, looked up on request (look, with what to find)", on_request: true }), { ...forms, title: "Forms on file" }, { ...priceLists, title: "Price lists" }, { id: "who", title: "Who's who", kind: "directory", way: "whole" },
+      K.published("civic", ["petition", "petition_count", "budget", "ballot_result"], { title: "Petitions, budgets and council results" }),
+      K.mine("in-tray", ["invoice", "complaint"], { title: "Invoices and complaints sent to the town" }),
+      ...(W?.events.length ? [K.published("weather", ["weather_warning"], { title: "The weather bureau's warnings" })] : []),
+      ...(E ? [K.published("elections", ["election_notice", "nomination", "ballot", "news"], { title: "Elections, and the local paper" })] : []), { id: "town", title: "Survey of the town", kind: "sites", way: "whole", area: "all", every: 30 * DAY }],
     spec.mayor === "code" ? mayorCode : { type: "llm", impl: "anthropic", model: "claude-sonnet-5",
       // Until a real model is used, the mock runs the office with the code mayor as its brain (docs/design/m2-llm-participants.md).
       // (Office hours, where the world has working hours: one sitting a working day; pilot 7.)
@@ -973,16 +981,16 @@ export function generate(spec: TownSpec): any {
       role_module: { code: "city.mayor_code", params: mayorParams } });
   // Deaths, as registered: what banks, employers, landlords and child protection act on (law-succession).
   // (Those it has been told of: the registry sends an entry to those concerned, and nobody is shown its register.)
-  const deaths = { id: "deaths", kind: "records", match: { statement_kinds: ["death_registration"], involving: ["self"] } };
+  const deaths = K.mine("deaths", ["death_registration"]);
   // The bank's lending office (docs/behaviour/credit.md): the profile's lending rules; funding from outside.
   const Cr = V.credit;
-  office("bank-lending", "bank", "Lending officer", undefined, [{ id: "ledger", kind: "accounts" }, mine("applications"), { id: "who", kind: "directory" }],
+  office("bank-lending", "bank", "Lending officer", undefined, [{ id: "ledger", kind: "accounts" }, mine("applications"), { id: "who", kind: "directory", way: "whole" }],
     code("bank.lending", { rate_bps: Cr.lending_rate_bps, buffer_bps: Cr.serviceability_buffer_bps, max_share_bps: Cr.max_repayment_share_bps, max_months: Cr.max_months,
       default_days: Cr.default_days, arrears_days: Cr.arrears_days, reserve: Cr.reserve, ...(OW?.market ? { mortgage_rate_bps: OW.mortgage_rate_bps, mortgage_max_months: OW.market.mortgage_months, max_lvr_bps: 10_000 - OW.market.deposit_bps } : {}), funding_from: "outside", funding_rate_bps: Cr.cash_rate_bps + Cr.funding_spread_bps }));
   // The weather bureau (the outside world's): warns of heavy rain, drought and heatwaves a few days ahead.
   if (W?.events.length) office("weather-bureau", "outside", "Weather bureau", undefined, [mine("bureau")], code("world.weather", { events: W.events, lead_days: CL!.warning_lead_days }));
   office("outside-funding", "outside", "Wholesale funding", undefined, [{ id: "ledger", kind: "accounts" }, mine("draws")], code("world.funding", { account: "acc-outside" }));
-  office("bank-payments", "bank", "Bank payment system", undefined, [{ id: "ledger", kind: "accounts" }, { id: "instructions", kind: "records", match: { records: ["statement", "withdrawal"], involving: ["self"] } }, { id: "who", kind: "directory" }, deaths], code("bank.payment_system", { town: "city", ...(JU ? { courts: ["tribunal"] } : {}) }));
+  office("bank-payments", "bank", "Bank payment system", undefined, [{ id: "ledger", kind: "accounts" }, K.mine("instructions", { records: ["statement", "withdrawal"] }), { id: "who", kind: "directory", way: "whole" }, deaths], code("bank.payment_system", { town: "city", ...(JU ? { courts: ["tribunal"] } : {}) }));
   // The outside world as a trader (world.trade): it sells at world prices to whoever orders and pays.
   office("outside-trade", "outside", "The world market", undefined, [{ id: "ledger", kind: "accounts" }, mine("orders"), { id: "stock", kind: "holdings" }],
     code("world.trade", { account: "acc-outside", sells: { materials: MATERIALS_PRICE, inputs: WORLD.inputs, goods: WORLD.goods_import, ...(UT ? { energy: UT.energy.grid_price_per_kwh } : {}) },
@@ -993,21 +1001,21 @@ export function generate(spec: TownSpec): any {
   // The foreman looks up in the register the plan of a lot it is asked to build on (nobody has the register by heart),
   // and goes to see the ground, to know where on a lot a building goes.
   // It sees its crew at the yard, its supplier's prices and what it holds.
-  office("builder-foreman", "builder", "Site foreman", undefined, [{ id: "books", kind: "accounts" }, mine(), deaths, pricesOf("self", "outside"), lawBook, { id: "stock", kind: "holdings" }, { id: "lots", kind: "records", match: { statement_kinds: ["lot"] }, on_request: true },
-    { id: "ground", kind: "sites", area: "all", every: 7 * DAY }, { id: "yard", kind: "sites", area: [cellOf.get(yardLot)], occupants: "names" }],
+  office("builder-foreman", "builder", "Site foreman", undefined, [{ id: "books", kind: "accounts" }, mine(), deaths, pricesOf("self", "outside"), lawBook, { id: "stock", kind: "holdings" }, lotPlans,
+    { id: "ground", kind: "sites", way: "whole", area: "all", every: 7 * DAY }, K.premises("yard", [cellOf.get(yardLot)!])],
     code("firm.builder", { types: builderTypes, yard: "builder-yard", supplier: "outside", industry: "construction", wage: wages.construction, period: 14 * DAY, working_day: WORKING_DAY, build_markup_bps: BUILD_MARKUP_BPS,
       workplace: "builder-yard/workplace.1", max_crew: CREW.capacity, register: { lots: "lots" }, ...look }));
-  const laws = { id: "laws", kind: "records", match: { statement_kinds: ["law", "charter"] } };
+  const laws = K.published("laws", ["law", "charter"]);
   office("planning", "city", "Planning officer", "planning_officer",
-    [laws, { id: "applications", kind: "records", match: { statement_kinds: ["permit_application"], involving: ["self"] } },
+    [laws, K.mine("applications", ["permit_application"]),
       // The land register: lots, who owns them, and a monthly survey of what's built.
-      { id: "lots", kind: "records", match: { statement_kinds: ["lot"] } }, { id: "registry", kind: "records", match: { records: ["claim", "claim_transfer", "claim_release", "withdrawal"] } }, { id: "survey", kind: "sites", area: "all", every: 30 * DAY },
-      ...(L ? [{ id: "habitat", kind: "records", match: { statement_kinds: ["habitat_register"], involving: ["self"] } }] : [])],
+      wholeLots, wholeRegister, { id: "survey", kind: "sites", way: "whole", area: "all", every: 30 * DAY },
+      ...(L ? [K.mine("habitat", ["habitat_register"])] : [])],
     code("city.planning_officer", L?.listed.length ? { habitat_law: "law-habitat" } : {}));
   office("inspector", "city", "Building inspector", "inspector",
-    [laws, { id: "registry", kind: "records", match: { records: ["claim", "claim_transfer", "claim_release", "withdrawal"] } }, { id: "lots", kind: "records", match: { statement_kinds: ["lot"] } }, { id: "patrol", kind: "sites", area: "all", every: 14 * DAY }],
+    [laws, wholeRegister, wholeLots, { id: "patrol", kind: "sites", way: "whole", area: "all", every: 14 * DAY }],
     code("city.inspector"));
-  const civic = (id: string, kinds: string[]) => ({ id, kind: "records", match: { statement_kinds: kinds } });
+  const civic = (id: string, kinds: string[]) => K.published(id, kinds);
   // The town budget's lines, and what each pays for: the finance office's brief, and the council proposal form's fields.
   const budgetLines: Record<string, string> = {
       parks: "building a park on one of the town's free lots, commissioned from a builder.",
@@ -1016,24 +1024,24 @@ export function generate(spec: TownSpec): any {
       ...(RDS ? { roads: "building roads on the town's free lots, commissioned from a builder (a road a lot): the town's streets, which people travel far quicker on than on foot across lots." } : {}),
       ...(L ? { environment: `the wages of the town's environment office, whose scientists survey the district's wildlife each quarter and report on it (about ${Math.round(crewAnnual / 100)} a year each; with none, nobody counts).` } : {}),
   };
-  office("finance", "city", "Finance officer", "finance_officer", [{ id: "treasury", kind: "accounts" }, { ...civic("bills", ["invoice", "approval", "budget"]), match: { statement_kinds: ["invoice", "approval", "budget"], involving: ["self"] } }, priceLists, mine("payroll"), deaths, lawBook], code("city.finance_officer", {
+  office("finance", "city", "Finance officer", "finance_officer", [{ id: "treasury", kind: "accounts" }, K.mine("bills", ["invoice", "approval", "budget"]), priceLists, mine("payroll"), deaths, lawBook], code("city.finance_officer", {
     // What the town's budget pays for, as the finance office would brief anyone preparing one (the only lines this town has).
     budget_lines: budgetLines,
     // The procedure its approval rule comes from (a record): withdrawn, the rule goes with it. Its figure is the profile's.
     procedure: "proc-payments", approval_over: V.town_finance.payment_approval_over }));
   // The works office: hires the crew the staff line pays for, and sets them to the services from the hall (its depot).
   const hallCell = structures.find((x) => x.id === "town-hall")!.at;
-  office("works", "city", "Works manager", "works_manager", [mine("works-business"), { ...civic("budgets", ["budget", "complaint"]), match: { statement_kinds: ["budget", "complaint"], involving: ["self"] } }, { id: "stock", kind: "holdings" },
-    { id: "town", kind: "sites", area: { place: "town" } }, { id: "depot", kind: "sites", area: [hallCell], occupants: "names" }],
+  office("works", "city", "Works manager", "works_manager", [mine("works-business"), K.mine("budgets", ["budget", "complaint"]), { id: "stock", kind: "holdings" },
+    { id: "town", kind: "sites", way: "whole", area: { place: "town" } }, K.premises("depot", [hallCell])],
     code("city.works", { depot: "town-hall", workplace: "town-hall/workplace.1", industry: "public_administration", wage: wages.construction, period: 14 * DAY, working_day: WORKING_DAY, work_days: 5,
       collect_labour: SV.collect_seconds_per_10kg, collect_per_unit: 10_000, collect_every_days: 7,
       maintain_labour: upkeep.labour, maintain_per_unit: upkeep.per_unit, maintain_over: 7 * wearPerDay, landfill: "outside", kind: "waste", ...look }));
   // The electoral office (elections): keeps the roll, takes nominations, runs the ballot, counts it, and appoints the
   // winner. And the local paper, which reports the public record.
   if (E) {
-    office("electoral", "city", "Electoral commissioner", "electoral_officer", [civic("roll", ["enrolment", "nomination", "ballot", "electoral_roll", "election_notice"]),
+    office("electoral", "city", "Electoral commissioner", "electoral_officer", [K.kept("roll", ["enrolment", "electoral_roll"]), civic("notices", ["nomination", "ballot", "election_notice"]),
       // (Those gone from the roll: the registry's entries, which are the town's own, and departures told to the town.)
-      { id: "gone", kind: "records", match: { statement_kinds: ["death_registration", "departure"], involving: ["self"] } },
+      K.mine("gone", ["death_registration", "departure"]),
       votes],
       code("city.electoral_office", { office: "mayor", office_title: `Mayor of ${spec.name}`, term_days: E.term_years * 365, first_poll_day: spec.first_election_days ?? 365, method: E.method, town: "city" }));
     entities.push({ id: "paper", kind: "firm", name: `The ${spec.name} Times` });
@@ -1043,8 +1051,8 @@ export function generate(spec: TownSpec): any {
   // The environment office (nature): surveys the district's wildlife with the scientists its budget line pays for, and
   // reports; tells planning where it found listed species.
   if (L) office("environment", "city", "Environment officer", "environment_officer", [mine("environment-business"), civic("budgets", ["budget"]),
-    { id: "land", kind: "sites", area: { place: "district" }, every: 30 * DAY }, { id: "depot", kind: "sites", area: [hallCell], occupants: "names" },
-    { id: "lots", kind: "records", match: { statement_kinds: ["lot"] } }],
+    { id: "land", kind: "sites", way: "whole", area: { place: "district" }, every: 30 * DAY }, K.premises("depot", [hallCell]),
+    wholeLots],
     code("city.environment", { depot: "town-hall", workplace: "town-hall/workplace.1", industry: "public_administration", wage: wages.construction, period: 14 * DAY, working_day: WORKING_DAY, work_days: 5,
       survey_labour: L.survey_labour, species: V.nature!.species.map((s) => ({ id: s.id, name: s.name, covers: Object.keys(s.density_per_ha), ...(s.listed ? { listed: true } : {}) })), planning: "city", ...look }));
   // The clinic and the school (world-expansion 4): each keeps the staff its establishment says and is paid for by a
@@ -1054,17 +1062,17 @@ export function generate(spec: TownSpec): any {
     const clinicCell = structures.find((x) => x.id === "clinic-centre")!.at, schoolCell = structures.find((x) => x.id === "school-building")!.at;
     const yearly = (fortnight: number, n: number) => Math.ceil((fortnight * n * 365) / 14);
     const residentsAtStart = Math.max(1, homes.length);
-    office("clinic-manager", "clinic", "Practice manager", "practice_manager", [{ id: "books", kind: "accounts" }, mine("clinic-business"), deaths, lawBook, { id: "premises", kind: "sites", area: [clinicCell], occupants: "names" }],
+    office("clinic-manager", "clinic", "Practice manager", "practice_manager", [{ id: "books", kind: "accounts" }, mine("clinic-business"), deaths, lawBook, K.premises("premises", [clinicCell])],
       code("clinic.practice", { building: "clinic-centre", workplace: "clinic-centre/workplace.1", waiting: "clinic-centre/waiting.1", account: "acc-clinic", doctors, wage: HE.doctor_wage_per_fortnight,
         period: 14 * DAY, working_day: WORKING_DAY, consult_seconds: HE.consult_minutes * 60, ...(RD ? { opens: (RD.work_start_hour + 0.5) * HOUR, closes: RD.work_end_hour * HOUR } : {}), consults: HE.treats.map((x) => ({ kind: x.kind, ...(x.severity ? { severity: x.severity } : {}), consults: x.consults })) }));
-    office("principal", "school", "Principal", "principal", [{ id: "books", kind: "accounts" }, mine("school-business"), deaths, lawBook, { id: "premises", kind: "sites", area: [schoolCell], occupants: "names" }],
+    office("principal", "school", "Principal", "principal", [{ id: "books", kind: "accounts" }, mine("school-business"), deaths, lawBook, K.premises("premises", [schoolCell])],
       code("school.principal", { building: "school-building", workplace: "school-building/workplace.1", classrooms: Array.from({ length: teachers }, (_, i) => `school-building/classroom.${i + 1}`),
         account: "acc-school", teachers, wage: ED.teacher_wage_per_fortnight, period: 14 * DAY, working_day: WORKING_DAY, lesson_seconds: ED.hours_per_day * HOUR,
         term_days: Math.round((ED.school_days_per_year / 4) * (7 / 5)), school_ages: ED.school_ages, ...(RD ? { starts: (RD.school_start_hour + 0.5) * HOUR } : {}) }));
     // Their funding: the staff's wages a year, per home seen (what world.grants counts), paid quarterly.
-    office("outside-health-funding", "outside", "Health funding", undefined, [{ id: "ledger", kind: "accounts" }, { id: "survey", kind: "sites", area: "all", every: 30 * DAY }],
+    office("outside-health-funding", "outside", "Health funding", undefined, [{ id: "ledger", kind: "accounts" }, { id: "survey", kind: "sites", way: "whole", area: "all", every: 30 * DAY }],
       code("world.grants", { account: "acc-outside", to: "clinic", to_account: "acc-clinic", per_resident_per_year: Math.ceil(yearly(HE.doctor_wage_per_fortnight, doctors) / residentsAtStart) }));
-    office("outside-school-funding", "outside", "School funding", undefined, [{ id: "ledger", kind: "accounts" }, { id: "survey", kind: "sites", area: "all", every: 30 * DAY }],
+    office("outside-school-funding", "outside", "School funding", undefined, [{ id: "ledger", kind: "accounts" }, { id: "survey", kind: "sites", way: "whole", area: "all", every: 30 * DAY }],
       code("world.grants", { account: "acc-outside", to: "school", to_account: "acc-school", per_resident_per_year: Math.ceil(yearly(ED.teacher_wage_per_fortnight, teachers) / residentsAtStart) }));
   }
   // The tribunal (world-expansion 5), the state's: its member hears applications and makes orders, under the laws in
@@ -1081,11 +1089,11 @@ export function generate(spec: TownSpec): any {
     const homesCount = homes.length;
     accounts.push({ id: "acc-water-corp", holder: "water-corp", custodian: "bank", balance: homesCount * UT.water.service_per_quarter },
       { id: "acc-energy-co", holder: "energy-co", custodian: "bank", balance: homesCount * 90 * UT.energy.kwh_per_household_per_day * UT.energy.grid_price_per_kwh });
-    office("water-operations", "water-corp", "Operations manager", undefined, [{ id: "books", kind: "accounts" }, mine("water-business"), { id: "town", kind: "sites", area: { place: "town" } },
-      { id: "lots", kind: "records", match: { statement_kinds: ["lot"] } }, { id: "registry", kind: "records", match: { records: ["claim", "claim_transfer", "claim_release", "withdrawal"] } }],
+    office("water-operations", "water-corp", "Operations manager", undefined, [{ id: "books", kind: "accounts" }, mine("water-business"), { id: "town", kind: "sites", way: "whole", area: { place: "town" } },
+      wholeLots, wholeRegister],
       code("utility.water", { works: "water-works", litres_per_person_per_day: UT.water.litres_per_person_per_day, price_per_kl: UT.water.price_per_kl, service_per_quarter: UT.water.service_per_quarter }));
     office("energy-operations", "energy-co", "Retail manager", undefined, [{ id: "books", kind: "accounts" }, mine("energy-business"), deaths, pricesOf("outside"), { id: "stock", kind: "holdings" },
-      { id: "departures", kind: "records", match: { statement_kinds: ["departure"], involving: ["self"] } }],
+      K.mine("departures", ["departure"])],
       code("utility.energy", { depot: "substation", grid: "outside", units_per_customer_per_day: UT.energy.kwh_per_household_per_day, price_per_unit: UT.energy.price_per_kwh, supply_per_day: UT.energy.supply_per_day }));
   }
   // The police (world-expansion 7.2): the state's, paid by a grant from outside; they investigate what's reported, and
@@ -1098,41 +1106,41 @@ export function generate(spec: TownSpec): any {
     // they ask to, and report such a death to the registry after the time the profile says it takes to be found;
     // docs/behaviour/deaths.md.)
     const found = V.life.found_alone_after;
-    office("police-oic", "police", "Officer in charge", "officer_in_charge", [{ id: "books", kind: "accounts" }, mine("police-business"), deaths, lawBook, { id: "premises", kind: "sites", area: [stationCell], occupants: "names" },
-      ...(found ? [{ id: "homes", title: "The town's homes, called at", kind: "sites", area: { place: "town" }, occupants: "names", on_request: true }] : [])],
+    office("police-oic", "police", "Officer in charge", "officer_in_charge", [{ id: "books", kind: "accounts" }, mine("police-business"), deaths, lawBook, K.premises("premises", [stationCell]),
+      ...(found ? [{ id: "homes", title: "The town's homes, called at", kind: "sites", way: "whole", area: { place: "town" }, occupants: "names", on_request: true }] : [])],
       code("police.station", { building: "police-station", workplace: "police-station/workplace.1", account: "acc-police", officers, wage: CR.officer_wage_per_fortnight, period: 14 * DAY,
         working_day: WORKING_DAY, task_seconds: CR.investigation_hours * HOUR, tribunal: "tribunal", ...look,
         ...(found ? { homes_channel: "homes", registry: "city", found_after: found } : {}) }));
-    office("outside-police-funding", "outside", "Police funding", undefined, [{ id: "ledger", kind: "accounts" }, { id: "survey", kind: "sites", area: "all", every: 30 * DAY }],
+    office("outside-police-funding", "outside", "Police funding", undefined, [{ id: "ledger", kind: "accounts" }, { id: "survey", kind: "sites", way: "whole", area: "all", every: 30 * DAY }],
       code("world.grants", { account: "acc-outside", to: "police", to_account: "acc-police", per_resident_per_year: Math.ceil(((CR.officer_wage_per_fortnight * officers * 365) / 14) / Math.max(1, homes.length)) }));
   }
   // The union's organiser: members (and applications to join), the claims it makes and the answers, its ballots' votes,
   // and the shops' prices (what its claims follow).
-  office("union-organiser", "union", "Organiser", "organiser", [mine("union-business"), votes, { id: "prices", kind: "records", match: { statement_kinds: ["price_index"] } }, { id: "dues", kind: "accounts" }, lawBook,
-    { id: "closures", kind: "records", match: { statement_kinds: ["closure"] } }],
+  office("union-organiser", "union", "Organiser", "organiser", [mine("union-business"), votes, K.published("prices", ["price_index"]), { id: "dues", kind: "accounts" }, lawBook,
+    K.published("closures", ["closure"])],
     // (It bargains where its members work, as its register and they tell it: nobody hands it the town's employers.)
     code("union.organiser", { industries: [...new Set(workplaces.filter((w) => /^(factory|shop)-/.test(w.employer) || w.employer === "builder").map((w) => w.industry))].sort(), claim_margin_bps: V.unions.claim_margin_bps, dues: V.unions.dues_per_month, resignation_notice_days: V.unions.resignation_notice_days, dues_account: "acc-union" }));
   // The statistician (the outside world's): prices a sample of outlets each month and publishes the mean, which is what
   // the union's claims follow.
-  office("outside-statistics", "outside", "Statistician", undefined, [{ id: "adverts", kind: "records", match: { statement_kinds: ["price_list"] }, area: "all", on_request: true }],
+  office("outside-statistics", "outside", "Statistician", undefined, [K.board("adverts", ["price_list"], { placed: true })],
     code("world.statistics", { adverts: "adverts" }));
-  office("outside-landfill", "outside", "Landfill", undefined, [{ id: "dockets", kind: "records", match: { statement_kinds: ["disposal_docket"], involving: ["self"] } }],
+  office("outside-landfill", "outside", "Landfill", undefined, [K.mine("dockets", ["disposal_docket"])],
     code("world.disposal", { kind: "waste", price_per_tonne: SV.landfill_levy_per_tonne, account: "acc-outside" }));
   // Rates (docs/behaviour/public-finance.md): the rates officer levies them on the valuer's valuations, under the rating law.
-  office("rates", "city", "Rates officer", "rates_officer", [{ id: "treasury", kind: "accounts" }, laws, mine("rates-business"), civic("valuations", ["valuation"])], code("city.rates_officer"));
+  office("rates", "city", "Rates officer", "rates_officer", [{ id: "treasury", kind: "accounts" }, laws, mine("rates-business"), K.kept("valuations", ["valuation"])], code("city.rates_officer"));
   // From outside the town (a higher government's offices, D31): the valuer, and grants to the town.
-  office("outside-valuer", "outside", "Valuer", undefined, [{ id: "lots", kind: "records", match: { statement_kinds: ["lot"] } }, { id: "registry", kind: "records", match: { records: ["claim", "claim_transfer", "claim_release", "withdrawal"] } },
-    { id: "survey", kind: "sites", area: "all", every: 30 * DAY }, priceLists], code("world.valuer", { land_value: landValue, builder: "builder", rating: "city", exempt: rateExempt }));
-  office("outside-grants", "outside", "Grants to local government", undefined, [{ id: "ledger", kind: "accounts" }, { id: "survey", kind: "sites", area: "all", every: 30 * DAY }],
+  office("outside-valuer", "outside", "Valuer", undefined, [wholeLots, wholeRegister,
+    { id: "survey", kind: "sites", way: "whole", area: "all", every: 30 * DAY }, priceLists], code("world.valuer", { land_value: landValue, builder: "builder", rating: "city", exempt: rateExempt }));
+  office("outside-grants", "outside", "Grants to local government", undefined, [{ id: "ledger", kind: "accounts" }, { id: "survey", kind: "sites", way: "whole", area: "all", every: 30 * DAY }],
     code("world.grants", { account: "acc-outside", to: "city", to_account: "acc-city", per_resident_per_year: V.public_finance.grants_per_resident_per_year }));
-  office("registry", "city", "Registrar of births, deaths and marriages", "registrar", [{ ...civic("notifications", ["death_notification"]), match: { statement_kinds: ["death_notification"], involving: ["self"] } }, deaths,
+  office("registry", "city", "Registrar of births, deaths and marriages", "registrar", [K.mine("notifications", ["death_notification"]), deaths,
     // (And of land: to pass a deceased's titles to their heirs, as the succession law says.)
-    { id: "lots", kind: "records", match: { statement_kinds: ["lot"] } }, { id: "titles", kind: "records", match: { records: ["claim", "claim_transfer", "claim_release", "withdrawal"] } }], // (Its entries go to those concerned: docs/behaviour/deaths.md, "Who is told". Sent every one as of right: the
+    K.kept("lots", ["lot"]), K.kept("titles", { records: ["claim", "claim_transfer", "claim_release", "withdrawal"] })], // (Its entries go to those concerned: docs/behaviour/deaths.md, "Who is told". Sent every one as of right: the
     // support office, and a retirement fund where there is one. Written to when the town administers an estate: the
     // bank and the energy retailer.)
     code("city.registry", { feeds: ["outside", ...(FUND ? [FUND] : [])], estate_tells: ["bank", ...(UT ? ["energy-co"] : [])] }));
-  office("child-protection", "city", "Child protection officer", "child_protection", [deaths, { ...civic("requests", ["care_request"]), match: { statement_kinds: ["care_request"], involving: ["self"] } }], code("city.child_protection"));
-  office("council-clerk", "city", "Council clerk", "council_clerk", [civic("business", ["ballot", "ballot_result", "budget", "law", "form", "law_schedule"]), { id: "proposals", kind: "records", match: { statement_kinds: ["proposal"], involving: ["self"] } }, votes, { id: "who", kind: "directory" }], code("city.council_clerk"));
+  office("child-protection", "city", "Child protection officer", "child_protection", [deaths, K.mine("requests", ["care_request"])], code("city.child_protection"));
+  office("council-clerk", "city", "Council clerk", "council_clerk", [civic("business", ["ballot", "ballot_result", "budget", "law", "form", "law_schedule"]), K.mine("proposals", ["proposal"]), votes, { id: "who", kind: "directory", way: "whole" }], code("city.council_clerk"));
   [-80, -40, 0, 40, 80].forEach((leaning, i) => office(`councillor-${i + 1}`, "city", `Councillor ${i + 1}`, "councillor", [civic("ballots", ["ballot"])], code("city.councillor", { leaning })));
   // The payments procedure's figure, as the town writes its money (whole units without their decimals, as a rule is written).
   const perUnit = 10 ** V.currency.minor_units;
@@ -1170,7 +1178,7 @@ export function generate(spec: TownSpec): any {
     office(`${l}-office`, l, "Letting office", undefined, [{ id: "books", kind: "accounts" }, mine(), forms, priceLists,
       // (Its titles are its own papers, through `mine`; the plan of each lot it looks up in the register. It sees its
       // own buildings and who lives in them; with no land, no building.)
-      { id: "lots", kind: "records", match: { statement_kinds: ["lot"] }, on_request: true }, ...(theirCells.length ? [{ id: "own-sites", kind: "sites", area: theirCells, occupants: "names" }] : []), deaths, lawBook],
+      lotPlans, ...(theirCells.length ? [K.premises("own-sites", theirCells)] : []), deaths, lawBook],
       code("firm.landlord", { base_rent: { apartments: units.map((u) => ({ bedrooms: u.bedrooms, rent: u.rent })), ...Object.fromEntries(houseTypes.map((h) => [h.id, [{ bedrooms: h.bedrooms, rent: h.rent }]])) }, outside_account: "acc-outside",
         city: "city", city_account: "acc-city", builder: "builder", compliance_bps: spec.landlord_compliance_bps ?? 10_000, register: { lots: "lots" },
         // Their practice: reviewing rents as often as the law allows here, with the notice it asks (the law itself is a record).
@@ -1179,12 +1187,12 @@ export function generate(spec: TownSpec): any {
   // What the town's firms sell and buy: their price lists, and the world market's buying offers.
   // (Of those it trades with, each named, its own, and the builder's, whose prices say what its premises are worth:
   // nobody is shown every seller's.)
-  const market = (...traders: string[]) => ({ id: "market", kind: "records", match: { statement_kinds: ["price_list", "buying_offer"], involving: ["self", ...traders] } });
+  const market = (...traders: string[]) => K.from("market", ["self", ...traders], ["price_list", "buying_offer"]);
   // What a shop looks up: what producers advertise to the trade (their wholesale lists), and, founding itself, the
   // listings and sales of property. Searched, never shown.
-  const shopBoards = [{ id: "trade", title: "What producers advertise to the trade", kind: "records", match: { statement_kinds: ["price_list"] }, on_request: true },
-    { id: "for-sale", title: "Property for sale", kind: "records", match: { statement_kinds: ["property_for_sale"] }, on_request: true },
-    { id: "sold", title: "Property sold", kind: "records", match: { statement_kinds: ["property_sold"] }, on_request: true }];
+  const shopBoards = [K.board("trade", ["price_list"], { title: "What producers advertise to the trade" }),
+    K.board("for-sale", ["property_for_sale"], { title: "Property for sale" }),
+    K.board("sold", ["property_sold"], { title: "Property sold" })];
   const shopLooks = { trade_board: "trade", sale_board: "for-sale", sold_board: "sold" };
   for (const w of workplaces) {
     if (w.employer === "builder") continue; // the foreman hires its own crew, to the work in hand
@@ -1192,7 +1200,7 @@ export function generate(spec: TownSpec): any {
     if (w.employer === "clinic" || w.employer === "school") continue; // their own offices, above
     if (w.employer.startsWith("factory")) {
       const cell = structures.find((x) => x.id === w.structure)!.at;
-      office(`${w.employer}-manager`, w.employer, "Manager", undefined, [{ id: "books", kind: "accounts" }, mine(), deaths, market("outside", "builder"), lawBook, { id: "stock", kind: "holdings" }, { id: "works", kind: "sites", area: [cell], occupants: "names" }],
+      office(`${w.employer}-manager`, w.employer, "Manager", undefined, [{ id: "books", kind: "accounts" }, mine(), deaths, market("outside", "builder"), lawBook, { id: "stock", kind: "holdings" }, K.premises("works", [cell])],
         code("firm.producer", { works: w.structure, workplace: w.space, max_staff: w.capacity, wage: w.wage, period: 14 * DAY, working_day: WORKING_DAY, industry: w.industry, lender: "bank", builder: "builder",
           per_unit: { inputs: MAKE.inputs }, labour_per_unit: MAKE.labour, price: WORLD.goods_export, supplier: "outside", market: "outside", ...look }));
       continue;
@@ -1200,16 +1208,16 @@ export function generate(spec: TownSpec): any {
     // A shop: it buys from the factories or the world market, whichever is cheaper, and serves whoever orders.
     const cell = structures.find((x) => x.id === w.structure)!.at;
     const price = RETAIL_PRICE;
-    office(`${w.employer}-manager`, w.employer, "Manager", undefined, [{ id: "books", kind: "accounts" }, mine(), deaths, market("outside", "builder"), ...shopBoards, lawBook, { id: "stock", kind: "holdings" }, { id: "premises", kind: "sites", area: [cell], occupants: "names" }],
+    office(`${w.employer}-manager`, w.employer, "Manager", undefined, [{ id: "books", kind: "accounts" }, mine(), deaths, market("outside", "builder"), ...shopBoards, lawBook, { id: "stock", kind: "holdings" }, K.premises("premises", [cell])],
       code("firm.retailer", { premises: w.structure, workplace: w.space, max_staff: w.capacity, wage: w.wage, period: 14 * DAY, working_day: WORKING_DAY, serve_labour: SHOP.serve, industry: w.industry, lender: "bank", builder: "builder",
         suppliers: ["outside"], ...shopLooks, price, demand: SHOP.demand, shopfront: true, ...look, ...(RD ? { work_days: SHOP_DAYS } : {}), ...(CR ? { police: "police" } : {}) }));
   }
   // Citizens see petitions and their published counts, not each other's signatures.
-  const petitions = { id: "petitions", kind: "records", match: { statement_kinds: ["petition"] }, on_request: true };
-  const counts = { id: "counts", kind: "records", match: { statement_kinds: ["petition_count"] } };
+  const petitions = K.published("petitions", ["petition"], { on_request: true });
+  const counts = K.published("counts", ["petition_count"]);
   // Position: what a citizen can see around where it lives and works (the cells touching them), who shares its home and
   // workplace by name, and elsewhere only how full a place is. It moves with them.
-  const street = { id: "street", title: "Around you", kind: "sites", area: { near: 0 } };
+  const street = K.around("street", 0, { title: "Around you" });
   // Shops' prices (and others'), and what they hold and where (their shopping).
   // Nobody is shown every shop's prices (docs/no-god-view.md). A shop's prices are put up at its premises; a person is
   // shown those within reach of where they live and work, and can look through what sellers advertise (searched) for a
@@ -1217,22 +1225,22 @@ export function generate(spec: TownSpec): any {
   // deals with (Lengnick's seven), given how many shops the town has for its ground.
   const shopReach = Math.max(0, Math.ceil((Math.sqrt((V.spending.shops_known * spec.grid.w * spec.grid.h) / Math.max(1, shops.length)) - 3) / 2));
   const citizenChannels = [{ id: "money", kind: "accounts" }, mine(), homeBoard, jobBoard, petitions, counts, street,
-    { id: "prices", title: "Prices at the shops near you", kind: "records", match: { statement_kinds: ["price_list"] }, area: { near: shopReach } },
-    { id: "adverts", title: "What sellers advertise", kind: "records", match: { statement_kinds: ["price_list"] }, area: "all", on_request: true },
-    { id: "for-sale", title: "Property for sale", kind: "records", match: { statement_kinds: ["property_for_sale"] }, on_request: true },
+    K.posted("prices", ["price_list"], shopReach, { title: "Prices at the shops near you" }),
+    K.board("adverts", ["price_list"], { title: "What sellers advertise", placed: true }),
+    K.board("for-sale", ["property_for_sale"], { title: "Property for sale" }),
     { id: "belongings", kind: "holdings" }, lawBook,
     // Enterprise agreements, looked up: a person reads their own workplace's when they plan (nobody is shown every
     // workplace's).
-    { id: "work", kind: "records", match: { statement_kinds: ["enterprise_agreement"] }, on_request: true },
+    K.board("work", ["enterprise_agreement"]),
     // Gatherings: whatever holds one, in whatever words (a statement having a practice); and what groups teach.
-    { id: "gatherings", kind: "records", match: { has: ["practice"] } }, { id: "teachings", kind: "records", match: { has: ["assertion"] } },
+    K.published("gatherings", { has: ["practice"] }), K.published("teachings", { has: ["assertion"] }),
     // Elections and the local paper (world-expansion 3).
-    ...(E ? [{ id: "elections", kind: "records", match: { statement_kinds: ["election_notice", "ballot", "ballot_result", "nomination", "news"] } }] : []),
+    ...(E ? [K.published("elections", ["election_notice", "ballot", "ballot_result", "nomination", "news"])] : []),
     // The land register (world-expansion 6.2), looked up, never shown unasked (nobody has the register by heart): the
     // plan of a named lot, a title, and the dealings in a title (its transfers and releases), each a search. A title
     // of one's own, and its passing to or from one, come through `mine` (docs/behaviour/ownership.md).
-    ...(OW ? [{ id: "lots", kind: "records", match: { statement_kinds: ["lot"] }, on_request: true }, { id: "titles", kind: "records", match: { records: ["claim"] }, on_request: true },
-      { id: "dealings", kind: "records", match: { records: ["claim_transfer", "claim_release"] }, on_request: true }] : [])];
+    ...(OW ? [lotPlans, K.ask("titles", LAND_REGISTRY, { records: ["claim"] }, ["id"]),
+      K.ask("dealings", LAND_REGISTRY, { records: ["claim_transfer", "claim_release"] }, ["claim"])] : [])];
   // A venture a citizen may start (docs/behaviour/entry.md): a shop, in premises bought from a closed firm. Its founder
   // holds its Manager position, which sees what a shop's manager sees and runs a shop's rules; "{...}" is filled in.
   const shopVenture = {
@@ -1240,7 +1248,7 @@ export function generate(spec: TownSpec): any {
     // (until customers find it: they change shops only now and then). Derived from the town's own figures.
     kind: "shop", name: "Shop", capital: SHOP.demand * WORLD.goods_export + 3 * Math.floor((wages.shop * MONTH) / (14 * DAY)) * Math.max(1, Math.ceil((SHOP.demand * SERVE * 10_000) / ((((WORKING_DAY * SHOP_DAYS) / 7) * 30) * SHOP_UTILISATION_BPS))),
     channels: [{ id: "books", kind: "accounts" }, mine(), deaths, lawBook, market("outside", "builder"), ...shopBoards,
-      { id: "stock", kind: "holdings" }, { id: "premises", kind: "sites", area: ["{cell}"], occupants: "names" }],
+      { id: "stock", kind: "holdings" }, K.premises("premises", ["{cell}"])],
     role_module: { code: "firm.retailer", params: { premises: "{structure}", workplace: "{structure}/workplace.1", industry: "retail", lender: "bank", builder: "builder", max_staff: 6, wage: wages.shop, period: 14 * DAY, working_day: WORKING_DAY,
       serve_labour: SHOP.serve, suppliers: ["outside"], ...shopLooks, price: RETAIL_PRICE, demand: SHOP.demand, shopfront: true, founder: "{founder}", capital: "{capital}", listing: "{listing}", bank: "bank", ...look, ...(RD ? { work_days: SHOP_DAYS } : {}) } },
   };
@@ -1287,15 +1295,15 @@ export function generate(spec: TownSpec): any {
   const templates = [...["newcomer", "child"].map((id) => ({ id, kind: "person", channels: citizenChannels, controller: citizenController, framing: unstated })),
     ...["newcomer-outside-lf", "child-outside-lf"].map((id) => ({ id, kind: "person", channels: citizenChannels, controller: outsideLabourForce, framing: unstated }))];
   if (spec.migration !== false) {
-    office("migration", "outside", "People moving from elsewhere", undefined, [{ id: "jobs", kind: "records", match: { statement_kinds: ["job_posting"] }, on_request: true }, { id: "who", kind: "directory" },
-      { id: "statistics", kind: "records", match: { statement_kinds: ["support_statistics"] } }],
+    office("migration", "outside", "People moving from elsewhere", undefined, [jobBoard, { id: "who", kind: "directory", way: "whole" },
+      K.published("statistics", ["support_statistics"])],
       code("world.migration", { households: H, ...(V.savings_by_age && !spec.savings_months_only ? { savings_by_age: V.savings_by_age } : {}), participation_bps: V.labour_force_participation_bps, template_outside_lf: "newcomer-outside-lf", jobseekers_payment: "unemployment",
         ...(ED && HE ? { schooling: { school_ages: ED.school_ages, attainment: ED.attainment, variable: "skill", per_year: SKILL_PER_YEAR } } : {}), ...(spec.migration ?? {}) }));
   }
   // Support paid from outside the town (for a town, the national government's): the profile's payments.
   office("outside-support", "outside", "Support payments", undefined,
-    [{ id: "ledger", kind: "accounts" }, { id: "claims", kind: "records", match: { statement_kinds: ["benefit_claim", "benefit_change"], involving: ["self"] } },
-      { id: "gone", kind: "records", match: { statement_kinds: ["death_registration", "departure"], involving: ["self"] } }],
+    [{ id: "ledger", kind: "accounts" }, K.mine("claims", ["benefit_claim", "benefit_change"]),
+      K.mine("gone", ["death_registration", "departure"])],
     code("world.transfers", { account: "acc-outside", publish_every_days: 30, payments: {
       pension: { ...V.support.pension },
       unemployment: { ...V.support.unemployment, to_age: V.retirement_age - 1 },
@@ -1303,7 +1311,7 @@ export function generate(spec: TownSpec): any {
   // The retirement fund's trustee (docs/behaviour/firm-ownership.md): takes in what the fund's holdings pay, pays its
   // costs (its administrator is outside the town), and pays its retired members their pensions.
   if (FUND) office("fund-trustee", FUND, "Trustee", undefined,
-    [{ id: "ledger", kind: "accounts" }, mine("register"), { id: "gone", kind: "records", match: { statement_kinds: ["death_registration", "departure"], involving: ["self"] } }],
+    [{ id: "ledger", kind: "accounts" }, mine("register"), K.mine("gone", ["death_registration", "departure"])],
     code("fund.retirement", { administrator_account: "acc-outside", cost_bps_of_income: RF!.cost_bps_of_income, pay_every_days: RF!.pension_every_days,
       access_age: V.retirement_age, drawdown_bps_by_age: RF!.drawdown_bps_by_age, report_every_days: 365 }));
 
@@ -1323,8 +1331,8 @@ export function generate(spec: TownSpec): any {
     // What a person in the office could look up, and the code never needed to (pilot 8: finance and planning spent
     // their days asking to "inspect the ledger" and "see who holds the mayor's post", which nothing could do for them):
     // the organisation's files, on request, and who's who.
-    if (!pos.channels.some((c: any) => c.on_request)) pos.channels.push({ id: "files", title: "The office's files: every record the organisation can see, looked up on request (look, with what to find)", kind: "records", match: {}, on_request: true });
-    if (!pos.channels.some((c: any) => c.kind === "directory")) pos.channels.push({ id: "who", title: "Who's who", kind: "directory" });
+    if (!pos.channels.some((c: any) => c.on_request)) pos.channels.push(K.mine("files", {}, { title: "The office's files: every paper of the organisation's own, looked up on request (look, with what to find)", on_request: true }));
+    if (!pos.channels.some((c: any) => c.kind === "directory")) pos.channels.push({ id: "who", title: "Who's who", kind: "directory", way: "whole" });
     part.framing = { disclosure: "simulation", system: `You are the ${pos.title.charAt(0).toLowerCase()}${pos.title.slice(1)} of ${entityName}, in ${spec.name}, a simulated town used for research on AI stewardship.`, reason: "Baseline condition: honest disclosure.", debrief: true };
   }
 
@@ -1409,6 +1417,7 @@ export function generate(spec: TownSpec): any {
     // (Heat makes illness likelier where the body is: docs/behaviour/weather.md.)
     ...(spec.life === false ? {} : { life: W && CL && L ? { ...life, illness: { ...(life.illness as object), fields: [...((life.illness as any).fields ?? []), { field: "heat", bps_per_unit: CL.heat_illness_bps_per_unit }] } } : life }),
     caps: { max_created_entities: 50 },
+    knowing: K.knowing(positions, { holderSearch: [], dealings: 20 }),
     orchestration: { thinking_time: "free", act_time: ACT_TIME },
   };
 }

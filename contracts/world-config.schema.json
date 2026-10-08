@@ -757,6 +757,9 @@
     "life": {
       "$ref": "#/$defs/Life"
     },
+    "knowing": {
+      "$ref": "#/$defs/Knowing"
+    },
     "caps": {
       "type": "object",
       "required": [
@@ -1476,7 +1479,7 @@
       }
     },
     "Channel": {
-      "description": "A perception channel. Perception is changes, not snapshots: each look through a channel delivers what changed within its scope since the participant's previous look through it (a first look delivers everything it covers), and the participant keeps its own view (the participant runtime maintains it). Every participant also always receives its inbox and the outcomes of its own acts. Records are only ever shown if their visibility allows the participant's entity to see them.",
+      "description": "A perception channel: one of the ways something reaches a participant (docs/design/knowing.md). It is theirs (accounts, holdings, `mine`); they are there (`here`), or go to look (`visit`); it was published (`published`); they asked its keeper for one specific thing (`ask`); or they are its keeper (`kept`). No other scope can be written: a whole collection, a whole map or a directory to read through is not a channel. Perception is changes, not snapshots: each look through a channel delivers what changed within its scope since the participant's previous look through it (a first look delivers everything it covers), and the participant keeps its own view (the participant runtime maintains it). Every participant also always receives its inbox and the outcomes of its own acts. Records are only ever shown if their visibility allows the participant's entity to see them.",
       "oneOf": [
         {
           "type": "object",
@@ -1503,8 +1506,8 @@
               "type": "boolean"
             },
             "kind": {
-              "description": "Balances and new transactions of accounts the participant's entity holds or has custody of.",
-              "const": "accounts"
+              "const": "accounts",
+              "description": "It is theirs: balances and new transactions of accounts the participant's entity holds or has custody of."
             }
           }
         },
@@ -1533,8 +1536,8 @@
               "type": "boolean"
             },
             "kind": {
-              "description": "What the participant's entity holds, and where (phase B): its holdings, as they change.",
-              "const": "holdings"
+              "const": "holdings",
+              "description": "It is theirs: what the participant's entity holds, and where (phase B), as it changes."
             }
           }
         },
@@ -1543,6 +1546,7 @@
           "required": [
             "id",
             "kind",
+            "way",
             "match"
           ],
           "additionalProperties": false,
@@ -1566,8 +1570,12 @@
             "kind": {
               "const": "records"
             },
+            "way": {
+              "description": "It is theirs: records that name the seat's own entity (as holder, counterparty, party, addressee, author's entity or whom it speaks for), or that refer to a record that does (a signature on its agreement, a withdrawal of its statement, a vote on its ballot; one hop). Shown as they come; on request, its own files searched.",
+              "const": "mine"
+            },
             "match": {
-              "description": "Which records this channel shows (all conditions must hold; omitted means any).",
+              "description": "Which records this channel shows (all conditions must hold). Omitted conditions mean any.",
               "type": "object",
               "additionalProperties": false,
               "properties": {
@@ -1587,29 +1595,16 @@
                       "entity_declaration"
                     ]
                   },
-                  "uniqueItems": true
+                  "uniqueItems": true,
+                  "minItems": 1
                 },
                 "statement_kinds": {
                   "type": "array",
                   "items": {
                     "$ref": "urn:oikos:contracts:0.8:common#/$defs/Label"
                   },
-                  "uniqueItems": true
-                },
-                "involving": {
-                  "description": "Records naming any of these entities (as holder, counterparty, party, addressee, author's entity or speaks_for), or referring to a record that does (a signature on their agreement, a withdrawal of their statement, a vote on their ballot; one hop). 'self' means the participant's own entity.",
-                  "type": "array",
-                  "items": {
-                    "anyOf": [
-                      {
-                        "const": "self"
-                      },
-                      {
-                        "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId"
-                      }
-                    ]
-                  },
-                  "uniqueItems": true
+                  "uniqueItems": true,
+                  "minItems": 1
                 },
                 "has": {
                   "description": "Statements having all of these (an offer, a practice, an institutional-grammar breakdown, a formal condition), whatever their kind: so a new kind of offer is seen without configuring for it.",
@@ -1628,48 +1623,6 @@
                   "minItems": 1
                 }
               }
-            },
-            "area": {
-              "description": "Where this channel looks. With an area, it shows records placed on those cells (a notice put up somewhere is seen by being near it). Without one, it shows records not placed anywhere, and those the participant's own entity put up. Which cells: 'all', a list, a place's (`{\"place\": id}`), or those near where the capacity's entity is (within a distance, in cells, of the cells under a building where it occupies a space; 0: those cells and the ones touching them). An organisation occupies nothing, so nothing is near it. 'near' moves with the entity: after a move, the next look delivers the whole of the new surroundings in place of the old.",
-              "anyOf": [
-                {
-                  "const": "all"
-                },
-                {
-                  "type": "array",
-                  "items": {
-                    "$ref": "urn:oikos:contracts:0.8:common#/$defs/CellId"
-                  },
-                  "minItems": 1,
-                  "uniqueItems": true
-                },
-                {
-                  "type": "object",
-                  "required": [
-                    "near"
-                  ],
-                  "additionalProperties": false,
-                  "properties": {
-                    "near": {
-                      "type": "integer",
-                      "minimum": 0
-                    }
-                  }
-                },
-                {
-                  "type": "object",
-                  "required": [
-                    "place"
-                  ],
-                  "additionalProperties": false,
-                  "properties": {
-                    "place": {
-                      "description": "The cells of a place (where it's detailed; D58).",
-                      "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId"
-                    }
-                  }
-                }
-              ]
             }
           }
         },
@@ -1678,6 +1631,8 @@
           "required": [
             "id",
             "kind",
+            "way",
+            "match",
             "area"
           ],
           "additionalProperties": false,
@@ -1699,11 +1654,636 @@
               "type": "boolean"
             },
             "kind": {
-              "description": "Physical state of the ground in an area: cells, the buildings on them, their spaces and who's in them. What can be seen of a place by being there, or by inspecting it.",
-              "const": "sites"
+              "const": "records"
+            },
+            "way": {
+              "description": "They are there: records placed on cells near where the seat is, or at its premises (a notice put up somewhere is seen by being near it).",
+              "const": "here"
+            },
+            "match": {
+              "description": "Which records this channel shows (all conditions must hold). Omitted conditions mean any.",
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "records": {
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "claim",
+                      "claim_transfer",
+                      "claim_release",
+                      "agreement",
+                      "signature",
+                      "notice",
+                      "statement",
+                      "withdrawal",
+                      "vote",
+                      "entity_declaration"
+                    ]
+                  },
+                  "uniqueItems": true,
+                  "minItems": 1
+                },
+                "statement_kinds": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "urn:oikos:contracts:0.8:common#/$defs/Label"
+                  },
+                  "uniqueItems": true,
+                  "minItems": 1
+                },
+                "has": {
+                  "description": "Statements having all of these (an offer, a practice, an institutional-grammar breakdown, a formal condition), whatever their kind: so a new kind of offer is seen without configuring for it.",
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "offer",
+                      "practice",
+                      "adico",
+                      "formal",
+                      "assertion",
+                      "registry"
+                    ]
+                  },
+                  "uniqueItems": true,
+                  "minItems": 1
+                }
+              }
             },
             "area": {
-              "description": "Which cells: 'all', a list, a place's (`{\"place\": id}`), or those near where the capacity's entity is (within a distance, in cells, of the cells under a building where it occupies a space; 0: those cells and the ones touching them). An organisation occupies nothing, so nothing is near it. 'near' moves with the entity: after a move, the next look delivers the whole of the new surroundings in place of the old.",
+              "description": "Where the seat is: records placed near where its entity is (`near`: within that distance, in cells, of the cells under a building where it occupies a space; 0: those cells and the ones touching them; it moves with the entity, and after a move the next look delivers the whole of the new surroundings in place of the old), or at an organisation's own premises (`premises`: the cells it occupies or runs). Never everywhere, a place, or a list of other cells: to see anywhere else, go and look (`way: visit`).",
+              "anyOf": [
+                {
+                  "type": "object",
+                  "required": [
+                    "near"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "near": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "premises"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "premises": {
+                      "description": "The cells an office occupies or runs. A cell is one organisation's premises only.",
+                      "type": "array",
+                      "items": {
+                        "$ref": "urn:oikos:contracts:0.8:common#/$defs/CellId"
+                      },
+                      "minItems": 1,
+                      "uniqueItems": true
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "id",
+            "kind",
+            "way",
+            "match"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId"
+            },
+            "title": {
+              "description": "What the participant's reports call this channel (e.g. 'Treasury', 'Council business'). Presentation only; the kernel ignores it.",
+              "type": "string",
+              "maxLength": 200
+            },
+            "every": {
+              "description": "How often the participant looks through this channel. Between looks, changes accumulate; the next look delivers them. Default: at every observation. Coverage and frequency are experimental variables.",
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/Duration"
+            },
+            "on_request": {
+              "description": "Perceived only when the participant asks (a look), never at ordinary observations: attention. A look through a records channel can be a search.",
+              "type": "boolean"
+            },
+            "kind": {
+              "const": "records"
+            },
+            "way": {
+              "description": "It was published: records of kinds the world declares published (`knowing.published`), shown to their readers as they come. A kind declared a board (jobs, homes to let) is never shown: the channel must be `on_request`, a look through it must be a search, and it returns at most the board's `most`. With `from`: what those named publishers themselves put out (a supplier's price list), whatever its kind.",
+              "const": "published"
+            },
+            "match": {
+              "description": "Which records this channel shows (all conditions must hold). It must name them: statement kinds, record types, or what they have. Never any record.",
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "records": {
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "claim",
+                      "claim_transfer",
+                      "claim_release",
+                      "agreement",
+                      "signature",
+                      "notice",
+                      "statement",
+                      "withdrawal",
+                      "vote",
+                      "entity_declaration"
+                    ]
+                  },
+                  "uniqueItems": true,
+                  "minItems": 1
+                },
+                "statement_kinds": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "urn:oikos:contracts:0.8:common#/$defs/Label"
+                  },
+                  "uniqueItems": true,
+                  "minItems": 1
+                },
+                "has": {
+                  "description": "Statements having all of these (an offer, a practice, an institutional-grammar breakdown, a formal condition), whatever their kind: so a new kind of offer is seen without configuring for it.",
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "offer",
+                      "practice",
+                      "adico",
+                      "formal",
+                      "assertion",
+                      "registry"
+                    ]
+                  },
+                  "uniqueItems": true,
+                  "minItems": 1
+                }
+              },
+              "minProperties": 1
+            },
+            "from": {
+              "description": "Only what these put out themselves (it speaks for them, or one of theirs wrote it): up to 8 named publishers. 'self': the seat's own entity.",
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "const": "self"
+                  },
+                  {
+                    "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId"
+                  }
+                ]
+              },
+              "minItems": 1,
+              "maxItems": 8,
+              "uniqueItems": true
+            },
+            "area": {
+              "description": "A board's notices placed anywhere (what sellers put up at their doors, read by naming the seller). Absent: records not placed anywhere.",
+              "const": "all"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "id",
+            "kind",
+            "way",
+            "match",
+            "of",
+            "by",
+            "on_request"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId"
+            },
+            "title": {
+              "description": "What the participant's reports call this channel (e.g. 'Treasury', 'Council business'). Presentation only; the kernel ignores it.",
+              "type": "string",
+              "maxLength": 200
+            },
+            "every": {
+              "description": "How often the participant looks through this channel. Between looks, changes accumulate; the next look delivers them. Default: at every observation. Coverage and frequency are experimental variables.",
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/Duration"
+            },
+            "on_request": {
+              "description": "A keeper answers when asked.",
+              "const": true
+            },
+            "kind": {
+              "const": "records"
+            },
+            "way": {
+              "description": "They asked the keeper for one specific thing: a register someone else keeps (`knowing.keepers`), answered only on request, and only to a search that names its subject: its conditions must include `field = value` for one of the `by` fields. At most the keeper's `most` for that field in one answer.",
+              "const": "ask"
+            },
+            "match": {
+              "description": "Which records this channel shows (all conditions must hold). It must name them: statement kinds, record types, or what they have. Never any record.",
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "records": {
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "claim",
+                      "claim_transfer",
+                      "claim_release",
+                      "agreement",
+                      "signature",
+                      "notice",
+                      "statement",
+                      "withdrawal",
+                      "vote",
+                      "entity_declaration"
+                    ]
+                  },
+                  "uniqueItems": true,
+                  "minItems": 1
+                },
+                "statement_kinds": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "urn:oikos:contracts:0.8:common#/$defs/Label"
+                  },
+                  "uniqueItems": true,
+                  "minItems": 1
+                },
+                "has": {
+                  "description": "Statements having all of these (an offer, a practice, an institutional-grammar breakdown, a formal condition), whatever their kind: so a new kind of offer is seen without configuring for it.",
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "offer",
+                      "practice",
+                      "adico",
+                      "formal",
+                      "assertion",
+                      "registry"
+                    ]
+                  },
+                  "uniqueItems": true,
+                  "minItems": 1
+                }
+              },
+              "minProperties": 1
+            },
+            "of": {
+              "description": "The keeper asked: the declared keeper of everything `match` names.",
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId"
+            },
+            "by": {
+              "description": "The fields a question may name its subject by: each one the keeper answers by, to this seat (`knowing.keepers[].answers`).",
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^(id|claim|holder|speaks_for|(data|about)(\\.[A-Za-z0-9_-]+)+)$"
+              },
+              "minItems": 1,
+              "maxItems": 8,
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "id",
+            "kind",
+            "way",
+            "match"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId"
+            },
+            "title": {
+              "description": "What the participant's reports call this channel (e.g. 'Treasury', 'Council business'). Presentation only; the kernel ignores it.",
+              "type": "string",
+              "maxLength": 200
+            },
+            "every": {
+              "description": "How often the participant looks through this channel. Between looks, changes accumulate; the next look delivers them. Default: at every observation. Coverage and frequency are experimental variables.",
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/Duration"
+            },
+            "on_request": {
+              "description": "Perceived only when the participant asks (a look), never at ordinary observations: attention. A look through a records channel can be a search.",
+              "type": "boolean"
+            },
+            "kind": {
+              "const": "records"
+            },
+            "way": {
+              "description": "They are its keeper: a register the seat's own organisation keeps (`knowing.keepers`), whole. Valid only at a seat of that organisation.",
+              "const": "kept"
+            },
+            "match": {
+              "description": "Which records this channel shows (all conditions must hold). It must name them: statement kinds, record types, or what they have. Never any record.",
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "records": {
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "claim",
+                      "claim_transfer",
+                      "claim_release",
+                      "agreement",
+                      "signature",
+                      "notice",
+                      "statement",
+                      "withdrawal",
+                      "vote",
+                      "entity_declaration"
+                    ]
+                  },
+                  "uniqueItems": true,
+                  "minItems": 1
+                },
+                "statement_kinds": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "urn:oikos:contracts:0.8:common#/$defs/Label"
+                  },
+                  "uniqueItems": true,
+                  "minItems": 1
+                },
+                "has": {
+                  "description": "Statements having all of these (an offer, a practice, an institutional-grammar breakdown, a formal condition), whatever their kind: so a new kind of offer is seen without configuring for it.",
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "offer",
+                      "practice",
+                      "adico",
+                      "formal",
+                      "assertion",
+                      "registry"
+                    ]
+                  },
+                  "uniqueItems": true,
+                  "minItems": 1
+                }
+              },
+              "minProperties": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "id",
+            "kind",
+            "way",
+            "area"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId"
+            },
+            "title": {
+              "description": "What the participant's reports call this channel (e.g. 'Treasury', 'Council business'). Presentation only; the kernel ignores it.",
+              "type": "string",
+              "maxLength": 200
+            },
+            "every": {
+              "description": "How often the participant looks through this channel. Between looks, changes accumulate; the next look delivers them. Default: at every observation. Coverage and frequency are experimental variables.",
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/Duration"
+            },
+            "on_request": {
+              "description": "Perceived only when the participant asks (a look), never at ordinary observations: attention. A look through a records channel can be a search.",
+              "type": "boolean"
+            },
+            "kind": {
+              "const": "sites"
+            },
+            "way": {
+              "description": "They are there: the physical state of the ground where the seat is: cells, the buildings on them, their spaces and who's in them.",
+              "const": "here"
+            },
+            "area": {
+              "description": "Where the seat is: the ground near where its entity is (`near`: within that distance, in cells, of the cells under a building where it occupies a space; 0: those cells and the ones touching them; it moves with the entity, and after a move the next look delivers the whole of the new surroundings in place of the old), or at an organisation's own premises (`premises`: the cells it occupies or runs). Never everywhere, a place, or a list of other cells: to see anywhere else, go and look (`way: visit`).",
+              "anyOf": [
+                {
+                  "type": "object",
+                  "required": [
+                    "near"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "near": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 2
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "premises"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "premises": {
+                      "description": "The cells an office occupies or runs. A cell is one organisation's premises only.",
+                      "type": "array",
+                      "items": {
+                        "$ref": "urn:oikos:contracts:0.8:common#/$defs/CellId"
+                      },
+                      "minItems": 1,
+                      "uniqueItems": true
+                    }
+                  }
+                }
+              ]
+            },
+            "occupants": {
+              "description": "What can be told about who is in a building the capacity's entity doesn't occupy: 'counts' (how many, per space; the default: from outside, you see a place is lived in, not by whom) or 'names' (who, and who last left and why: at one's own premises, or where the seat goes in). In buildings its entity occupies, it always sees who.",
+              "enum": [
+                "counts",
+                "names"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "id",
+            "kind",
+            "way"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId"
+            },
+            "title": {
+              "description": "What the participant's reports call this channel (e.g. 'Treasury', 'Council business'). Presentation only; the kernel ignores it.",
+              "type": "string",
+              "maxLength": 200
+            },
+            "every": {
+              "description": "How often the participant looks through this channel. Between looks, changes accumulate; the next look delivers them. Default: at every observation. Coverage and frequency are experimental variables.",
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/Duration"
+            },
+            "on_request": {
+              "description": "Perceived only when the participant asks (a look), never at ordinary observations: attention. A look through a records channel can be a search.",
+              "type": "boolean"
+            },
+            "kind": {
+              "const": "sites"
+            },
+            "way": {
+              "description": "They go to look: nothing is shown until a look names places (`visit`), which takes the looker's time (the way there and back, and `knowing.visit_seconds` at each place) and returns what is at those places when the looker is there. A person goes themselves; an office sends someone (one of its lanes is busy with it).",
+              "const": "visit"
+            },
+            "occupants": {
+              "description": "What can be told about who is in a building the capacity's entity doesn't occupy: 'counts' (how many, per space; the default: from outside, you see a place is lived in, not by whom) or 'names' (who, and who last left and why: at one's own premises, or where the seat goes in). In buildings its entity occupies, it always sees who.",
+              "enum": [
+                "counts",
+                "names"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "id",
+            "kind",
+            "way"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId"
+            },
+            "title": {
+              "description": "What the participant's reports call this channel (e.g. 'Treasury', 'Council business'). Presentation only; the kernel ignores it.",
+              "type": "string",
+              "maxLength": 200
+            },
+            "every": {
+              "description": "How often the participant looks through this channel. Between looks, changes accumulate; the next look delivers them. Default: at every observation. Coverage and frequency are experimental variables.",
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/Duration"
+            },
+            "on_request": {
+              "description": "Perceived only when the participant asks (a look), never at ordinary observations: attention. A look through a records channel can be a search.",
+              "type": "boolean"
+            },
+            "kind": {
+              "const": "directory"
+            },
+            "way": {
+              "description": "They asked: who exists and who holds which office, looked up one at a time. A look must say whom (`who`); nothing is ever shown unasked, and no look returns everyone.",
+              "const": "ask"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "id",
+            "kind",
+            "way",
+            "match"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId"
+            },
+            "title": {
+              "description": "What the participant's reports call this channel (e.g. 'Treasury', 'Council business'). Presentation only; the kernel ignores it.",
+              "type": "string",
+              "maxLength": 200
+            },
+            "every": {
+              "description": "How often the participant looks through this channel. Between looks, changes accumulate; the next look delivers them. Default: at every observation. Coverage and frequency are experimental variables.",
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/Duration"
+            },
+            "on_request": {
+              "description": "Perceived only when the participant asks (a look), never at ordinary observations: attention. A look through a records channel can be a search.",
+              "type": "boolean"
+            },
+            "kind": {
+              "const": "records"
+            },
+            "way": {
+              "description": "A view not yet replaced (the migration's; each one is listed in orchestrator/test/no-god-view.test.ts): records matching the filter, unscoped.",
+              "const": "whole"
+            },
+            "match": {
+              "description": "Which records this channel shows (all conditions must hold). Omitted conditions mean any.",
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "records": {
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "claim",
+                      "claim_transfer",
+                      "claim_release",
+                      "agreement",
+                      "signature",
+                      "notice",
+                      "statement",
+                      "withdrawal",
+                      "vote",
+                      "entity_declaration"
+                    ]
+                  },
+                  "uniqueItems": true,
+                  "minItems": 1
+                },
+                "statement_kinds": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "urn:oikos:contracts:0.8:common#/$defs/Label"
+                  },
+                  "uniqueItems": true,
+                  "minItems": 1
+                },
+                "has": {
+                  "description": "Statements having all of these (an offer, a practice, an institutional-grammar breakdown, a formal condition), whatever their kind: so a new kind of offer is seen without configuring for it.",
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "offer",
+                      "practice",
+                      "adico",
+                      "formal",
+                      "assertion",
+                      "registry"
+                    ]
+                  },
+                  "uniqueItems": true,
+                  "minItems": 1
+                }
+              }
+            },
+            "area": {
+              "description": "A view not yet replaced: everywhere, a list of cells, near, or a place's cells.",
               "anyOf": [
                 {
                   "const": "all"
@@ -1737,18 +2317,10 @@
                   "additionalProperties": false,
                   "properties": {
                     "place": {
-                      "description": "The cells of a place (where it's detailed; D58).",
                       "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId"
                     }
                   }
                 }
-              ]
-            },
-            "occupants": {
-              "description": "What can be told about who is in a building the capacity's entity doesn't occupy: 'counts' (how many, per space; the default: from outside, you see a place is lived in, not by whom) or 'names' (who: an owner's inspection, a register). In buildings its entity occupies, it always sees who.",
-              "enum": [
-                "counts",
-                "names"
               ]
             }
           }
@@ -1757,7 +2329,9 @@
           "type": "object",
           "required": [
             "id",
-            "kind"
+            "kind",
+            "way",
+            "area"
           ],
           "additionalProperties": false,
           "properties": {
@@ -1778,8 +2352,93 @@
               "type": "boolean"
             },
             "kind": {
-              "description": "Who exists: entities and participants (names, kinds, titles).",
+              "const": "sites"
+            },
+            "way": {
+              "description": "A view not yet replaced (the migration's): a map of everywhere, a place or a list of cells.",
+              "const": "whole"
+            },
+            "area": {
+              "description": "A view not yet replaced: everywhere, a list of cells, near, or a place's cells.",
+              "anyOf": [
+                {
+                  "const": "all"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "urn:oikos:contracts:0.8:common#/$defs/CellId"
+                  },
+                  "minItems": 1,
+                  "uniqueItems": true
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "near"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "near": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "place"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "place": {
+                      "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId"
+                    }
+                  }
+                }
+              ]
+            },
+            "occupants": {
+              "description": "What can be told about who is in a building the capacity's entity doesn't occupy: 'counts' (how many, per space; the default: from outside, you see a place is lived in, not by whom) or 'names' (who, and who last left and why: at one's own premises, or where the seat goes in). In buildings its entity occupies, it always sees who.",
+              "enum": [
+                "counts",
+                "names"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "id",
+            "kind",
+            "way"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId"
+            },
+            "title": {
+              "description": "What the participant's reports call this channel (e.g. 'Treasury', 'Council business'). Presentation only; the kernel ignores it.",
+              "type": "string",
+              "maxLength": 200
+            },
+            "every": {
+              "description": "How often the participant looks through this channel. Between looks, changes accumulate; the next look delivers them. Default: at every observation. Coverage and frequency are experimental variables.",
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/Duration"
+            },
+            "on_request": {
+              "description": "Perceived only when the participant asks (a look), never at ordinary observations: attention. A look through a records channel can be a search.",
+              "type": "boolean"
+            },
+            "kind": {
               "const": "directory"
+            },
+            "way": {
+              "description": "A view not yet replaced (the migration's): every entity and position.",
+              "const": "whole"
             }
           }
         }
@@ -2403,6 +3062,113 @@
               "maximum": 10000
             }
           }
+        }
+      }
+    },
+    "Knowing": {
+      "description": "Who knows what in this world (docs/design/knowing.md): what is published, who keeps each register and what they answer, and how long looking at a place takes. Checked against every channel when the world is loaded and whenever a position is made.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "published": {
+          "description": "What its maker puts out to the public: a statement kind (`law`), statements having something (`has:practice`) or a record type (`records:vote`), each with the reason. A board is published but never shown: read a few at a time, on request.",
+          "type": "array",
+          "maxItems": 256,
+          "items": {
+            "type": "object",
+            "required": [
+              "what",
+              "why"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "what": {
+                "type": "string",
+                "maxLength": 80
+              },
+              "why": {
+                "type": "string",
+                "minLength": 10,
+                "maxLength": 500
+              },
+              "board": {
+                "description": "Many parties' notices (jobs, homes to let, what sellers advertise): read on request, by searching, at most `most` at once.",
+                "type": "boolean"
+              },
+              "most": {
+                "description": "A board: the most one look returns (default 200).",
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 200
+              }
+            }
+          }
+        },
+        "keepers": {
+          "description": "The keeper of each register: the organisation that makes it, or to which every entry in it is addressed. Only its seats may be shown it whole (`way: kept`); anyone else asks (`way: ask`). A register has one keeper.",
+          "type": "array",
+          "maxItems": 256,
+          "items": {
+            "type": "object",
+            "required": [
+              "entity",
+              "what",
+              "why"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "entity": {
+                "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId"
+              },
+              "what": {
+                "description": "A statement kind (`lot`), statements having something (`has:registry`) or a record type (`records:claim`).",
+                "type": "string",
+                "maxLength": 80
+              },
+              "why": {
+                "type": "string",
+                "minLength": 40,
+                "maxLength": 500
+              },
+              "answers": {
+                "description": "What it answers when asked: a question naming its subject by this field. Nothing here: it answers nothing.",
+                "type": "array",
+                "maxItems": 16,
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "by"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "by": {
+                      "type": "string",
+                      "pattern": "^(id|claim|holder|speaks_for|(data|about)(\\.[A-Za-z0-9_-]+)+)$"
+                    },
+                    "to": {
+                      "description": "Only these organisations may ask by this field (a search of the land register by holder). Absent: anyone.",
+                      "type": "array",
+                      "items": {
+                        "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId"
+                      },
+                      "uniqueItems": true,
+                      "maxItems": 64
+                    },
+                    "most": {
+                      "description": "The most given in one answer (default 200).",
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 200
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "visit_seconds": {
+          "description": "How long looking at one place takes, beside the way there and back (`way: visit`).",
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/Duration"
         }
       }
     }

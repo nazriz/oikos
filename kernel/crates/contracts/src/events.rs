@@ -382,6 +382,25 @@ pub enum EventBody {
         participant: Id,
         observation_hash: String,
     },
+    /// Someone has set out to look at places (docs/design/knowing.md): busy with it from `starts`, there and back by
+    /// `done`, when they see what is there.
+    VisitStarted {
+        participant: Id,
+        #[serde(default, rename = "as", skip_serializing_if = "Option::is_none")]
+        position: Option<Id>,
+        channel: Id,
+        places: Vec<Id>,
+        starts: i64,
+        done: i64,
+    },
+    /// They have looked: what was there is theirs to see at their next observation.
+    Visited {
+        participant: Id,
+        #[serde(default, rename = "as", skip_serializing_if = "Option::is_none")]
+        position: Option<Id>,
+        channel: Id,
+        places: Vec<Id>,
+    },
     ParticipantOptedOut {
         participant: Id,
         statement: String,
@@ -429,6 +448,8 @@ impl EventBody {
             EventBody::EntityCreated { .. } => "entity_created",
             EventBody::MessageDelivered { .. } => "message_delivered",
             EventBody::Observation { .. } => "observation",
+            EventBody::VisitStarted { .. } => "visit_started",
+            EventBody::Visited { .. } => "visited",
             EventBody::ParticipantOptedOut { .. } => "participant_opted_out",
         }
     }

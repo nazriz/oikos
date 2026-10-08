@@ -82,13 +82,13 @@ channel now says **which way** it is (`way`), and each way allows only its own s
 | `records`, `match: {}`, `on_request` (the office's files, for a model seat) | `way: "mine"`, `on_request` | A search of one's own files |
 | `records` unscoped, of a published kind (laws, the paper, election notices, budgets...) | `way: "published"` | Each kind must be declared in `knowing.published` with its reason |
 | `records` unscoped, `on_request`, of a market (jobs, homes to let, for sale, sold, adverts, workplace agreements) | `way: "published"`, `on_request`, the kind declared a **board** | A look must be a search and returns at most the board's `most` |
-| `records` with `area: {near}` or a list of own cells | `way: "here"`, `area: {near}` or `"premises"` | Lists of cells are gone |
+| `records` with `area: {near}` or a list of own cells | `way: "here"`, `area: {near}` or `{premises: [cells]}` | Lists of other cells are gone |
 | `records` with `area: "all"`, `on_request` (what sellers advertise, searched) | `way: "published"`, a board, `area: "all"` | Placed notices anywhere, read a few at a time by naming the seller |
 | `records` unscoped onto a register (lots, titles, dealings) for its keeper | `way: "kept"` | Valid only at a seat of the declared keeper |
 | `records` unscoped onto a register, `on_request`, for anyone else | `way: "ask"`, `of: <keeper>`, `by: [fields]` | A look must be a search with `=` on one of the `by` fields |
 | `records` unscoped onto anything else, shown unasked | **ceases to exist** | Not expressible |
 | `sites` with `area: {near}` | `way: "here"` | `near` at most 2 for a map |
-| `sites` with a list of own cells (a shop's premises, a landlord's buildings) | `way: "here"`, `area: "premises"` | The position's `premises` (new field): the cells it occupies or runs; a cell is one organisation's premises only |
+| `sites` with a list of own cells (a shop's premises, a landlord's buildings) | `way: "here"`, `area: {premises: [cells]}` | The cells the office occupies or runs; a cell is one organisation's premises only, and a person has none (as built: the cells stay on the channel, named for what they are, rather than moving to a new field of the position, which would have needed new fields on the acts that make a position) |
 | `sites` with `area: "all"`, `{place}`, or a long list | **ceases to exist** | Replaced by `way: "visit"` (going to look) |
 | `directory` shown whole, asked for or not | **ceases to exist** | `way: "ask"`: a look-up that names whom (section 7) |
 | `occupants: "names"` on a map of other people's buildings | only on `here` at one's own premises, or on a `visit` channel whose seat goes in | From outside, counts |
@@ -110,7 +110,8 @@ condition is refused (the look is rejected: nothing is returned and nothing is m
   search of the register is not open to everyone as a folio search is (to be confirmed against the sources in
   docs/behaviour/knowing.md): here the registry answers it only to the bodies the config lists (`to` on the keeper's
   answer), and to nobody else. A holder's own titles are theirs already (`mine`).
-- **How many:** at most the keeper's `most` for that field (a title's dealings: 20), never more than 200.
+- **How many:** at most the keeper's `most` for that field (a title's dealings: 20), never more than 200. An ask for
+  more is not refused: the answer is cut to what the keeper gives at once.
 - **What a keeper will not answer:** anything without a subject ("all titles", "all lots newer than"), an order over
   the whole register, a field it does not answer by, or an asker not listed for a restricted field.
 - **Cost.** A search is answered at once and costs the asker nothing but the look (for a model seat, a turn of its
@@ -126,8 +127,9 @@ corporation, the valuer. In the profile's place they do not search the register 
 acquires land lodges a notice of acquisition, which goes to the revenue office, the council and the water authority;
 valuations go to the owner and the rating authority. So here:
 
-- The land registry addresses each dealing it registers (a transfer, a new title) to the bodies its config names
-  (`notify`), and each of them keeps a **roll of its own** from what it is sent: its own records, `mine`.
+- The land registry addresses each dealing it registers (a transfer, a new title) to the bodies its module is told
+  to notify (a parameter of the registry's module: behaviour, not contract), and each of them keeps a **roll of its
+  own** from what it is sent: its own records, `mine`.
 - At the start of a run each such body already holds its roll as its own papers (a roll made before the run began,
   one record for each property, addressed to it by the registry at genesis).
 - What a roll does not say, the office finds out by asking for the one thing (a lot's plan) or going to look (what is
@@ -223,24 +225,22 @@ not found, the bureau stays a declared boundary module with that reason.
 `contracts/world-config.schema.json`:
 
 - **`Channel`** (records, sites, directory): new required `way`.
-  - records: `"mine" | "here" | "published" | "ask" | "kept"`. `match.involving` removed. `area` is `"premises"` or
-    `{near}` (way `here`), or `"all"` (way `published`, a board's placed notices), else absent; lists of cells and
-    `{place}` removed. New `from` (way `published`: up to 8 named publishers). New `of` and `by` (way `ask`: the
-    keeper, and the fields asked by). `match` must name `records`, `statement_kinds` or `has` for `published`, `ask`
+  - records: `"mine" | "here" | "published" | "ask" | "kept"`. `match.involving` removed. `area` is `{near}` or
+    `{premises: [cells]}` (way `here`), or `"all"` (way `published`, a board's placed notices), else absent; lists of
+    cells and `{place}` removed. New `from` (way `published`: up to 8 named publishers). New `of` and `by` (way `ask`:
+    the keeper, and the fields asked by). `match` must name `records`, `statement_kinds` or `has` for `published`, `ask`
     and `kept` (never "any record").
-  - sites: `"here" | "visit"`. `area` is `"premises"` or `{near}` (`here`), absent (`visit`); `"all"`, lists and
-    `{place}` removed.
+  - sites: `"here" | "visit"`. `area` is `{near}` (at most 2) or `{premises: [cells]}` (`here`), absent (`visit`);
+    `"all"`, lists and `{place}` removed.
   - directory: `way: "ask"` only.
   - During the migration only: `way: "whole"` (the old unscoped forms), each one listed in the guard's `OWED`.
     Removed from the schema when `OWED` is empty.
-- **`Position.premises`** (new, optional): the cells the office occupies or runs. A cell is the premises of one
-  organisation only.
 - **`knowing`** (new, top level, optional): `published` (list of `{ what, why, board?, most? }`), `keepers` (list of
-  `{ entity, what, why, answers?: [{ by, to?, most? }], notify?: [entity] }`), `visit_seconds`.
+  `{ entity, what, why, answers?: [{ by, to?, most? }] }`), `visit_seconds`.
 - Load-time validation (the kernel refuses the config): a channel whose way does not allow its scope; a published
-  kind not declared; a `kept` channel at a seat that is not the keeper's; an ask of a keeper, by a field, that the
-  keeper does not answer to that asker; premises claimed by two organisations; `near` so large it covers half the
-  ground. The same checks apply to a position or participant made during a run.
+  kind not declared; a board shown unasked; a `kept` channel at a seat that is not the keeper's; an ask of a keeper, by
+  a field, that the keeper does not answer to that asker; premises claimed by two organisations, or by a person. A position made during a run is checked the same, but for
+  premises: those change hands, so a new office's are held to a building or two (4 cells), not to being nobody else's.
 
 `contracts/participant-api.schema.json`:
 
@@ -253,8 +253,8 @@ not found, the bureau stays a declared boundary module with that reason.
 `contracts/log.schema.json`: new events `visit_started` (participant, position, channel, places, starts, done) and
 `visited` (participant, position, channel, places).
 
-`contracts/module.schema.json`: `keeps` entries may say what the keeper answers (`answers`), copied by the generator
-into the world's config.
+`contracts/module.schema.json`: unchanged. A module's `keeps` says what it keeps and why; what a keeper answers, to
+whom and how many at once is the world's to say (`worlds/generator/knowing.ts`), since it names the world's bodies.
 
 `contracts/blocks.schema.json`, `calls.schema.json`: unchanged. Going to look is a look, not an act, so the call
 language and the translator's data do not change.

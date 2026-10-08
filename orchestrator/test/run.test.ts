@@ -13,7 +13,7 @@ function riverbendWithIdleParticipants(): any {
   // The mayor too (a language model in the example): nobody but the bank does anything.
   c.participants.find((p: any) => p.id === "mayor-system").controller = { type: "code", impl: "idle" };
   // The bank needs to see who's who to verify who is instructing it.
-  c.positions.find((p: any) => p.id === "bank-payments").channels.push({ id: "who", kind: "directory" });
+  c.positions.find((p: any) => p.id === "bank-payments").channels.push({ id: "who", kind: "directory", way: "whole" });
   return c;
 }
 

@@ -13,7 +13,7 @@ use oikos_kernel::Command;
 fn town() -> Run<Vec<u8>> {
     let mut c = riverbend();
     let bob = c["participants"].as_array_mut().unwrap().iter_mut().find(|s| s["id"] == "bob-self").unwrap();
-    bob["channels"].as_array_mut().unwrap().push(json!({"id": "board", "kind": "records", "match": {"statement_kinds": ["notice"]}, "on_request": true}));
+    bob["channels"].as_array_mut().unwrap().push(json!({"id": "board", "kind": "records", "way": "published", "match": {"statement_kinds": ["notice"]}, "on_request": true}));
     Run::start(c, "attention", Vec::new(), None).unwrap()
 }
 
@@ -85,9 +85,9 @@ fn a_statement_taken_down_is_news_wherever_statements_like_it_are_shown() {
     // names withdrawals, and both showed him the city's notice: when the city takes it down, each tells him so, once.
     let mut c = riverbend();
     let bob = c["participants"].as_array_mut().unwrap().iter_mut().find(|s| s["id"] == "bob-self").unwrap();
-    bob["channels"].as_array_mut().unwrap().push(json!({"id": "book", "kind": "records", "match": {"statement_kinds": ["notice"]}}));
-    bob["channels"].as_array_mut().unwrap().push(json!({"id": "rules", "kind": "records", "match": {"has": ["formal"]}}));
-    bob["channels"].as_array_mut().unwrap().push(json!({"id": "statements", "kind": "records", "match": {"records": ["statement"], "statement_kinds": ["notice"]}}));
+    bob["channels"].as_array_mut().unwrap().push(json!({"id": "book", "kind": "records", "way": "published", "match": {"statement_kinds": ["notice"]}}));
+    bob["channels"].as_array_mut().unwrap().push(json!({"id": "rules", "kind": "records", "way": "published", "match": {"has": ["formal"]}}));
+    bob["channels"].as_array_mut().unwrap().push(json!({"id": "statements", "kind": "records", "way": "published", "match": {"records": ["statement"], "statement_kinds": ["notice"]}}));
     let mut run = Run::start(c, "attention-withdrawn", Vec::new(), None).unwrap();
     let seen = |run: &mut Run<Vec<u8>>, channel: &str| -> Vec<String> {
         let o = run.command(&Command::Observe { participant: "bob-self".into(), only: None }).unwrap().observation.unwrap();
@@ -143,7 +143,7 @@ fn a_channel_can_show_whatever_is_offered_whatever_it_is_called() {
     // configured for is seen as soon as it's put up, and a statement of the same kind without one isn't.
     let mut c = riverbend();
     let bob = c["participants"].as_array_mut().unwrap().iter_mut().find(|s| s["id"] == "bob-self").unwrap();
-    bob["channels"].as_array_mut().unwrap().push(json!({"id": "offers", "kind": "records", "match": {"has": ["offer"]}}));
+    bob["channels"].as_array_mut().unwrap().push(json!({"id": "offers", "kind": "records", "way": "published", "match": {"has": ["offer"]}}));
     let mut run = Run::start(c, "attention-offers", Vec::new(), None).unwrap();
     let offered = post(&mut run, "mayor", json!([{"block": "publish", "kind": "festival_fund", "speaks_for": "city", "text": "Give to the harvest festival fund.",
         "offer": {"take_up": "join", "terms": {"commitments": [{"who": "taker", "does": {"outcome": {"money": {"to": "acc-city", "amount": "500"}}}, "every": 2_592_000}]}}, "ref": "o"}]));
@@ -166,8 +166,8 @@ fn a_register_is_searched_for_a_named_record_and_for_what_became_of_a_title() {
     // a lot's own id, by what a title is about, and by the title a transfer or a release names.
     let mut c = riverbend();
     let bob = c["participants"].as_array_mut().unwrap().iter_mut().find(|s| s["id"] == "bob-self").unwrap();
-    for (id, m) in [("lots", json!({"statement_kinds": ["lot"]})), ("titles", json!({"records": ["claim"]})), ("dealings", json!({"records": ["claim_transfer", "claim_release"]}))] {
-        bob["channels"].as_array_mut().unwrap().push(json!({"id": id, "kind": "records", "match": m, "on_request": true}));
+    for (id, m, by) in [("lots", json!({"statement_kinds": ["lot"]}), json!(["id"])), ("titles", json!({"records": ["claim"]}), json!(["id", "about.object"])), ("dealings", json!({"records": ["claim_transfer", "claim_release"]}), json!(["claim", "id"]))] {
+        bob["channels"].as_array_mut().unwrap().push(json!({"id": id, "kind": "records", "way": "ask", "of": "city", "by": by, "match": m, "on_request": true}));
     }
     let mut run = Run::start(c, "attention-register", Vec::new(), None).unwrap();
     let found = |run: &mut Run<Vec<u8>>, looks: serde_json::Value| -> std::collections::BTreeMap<String, Vec<String>> {
@@ -200,11 +200,9 @@ fn a_register_is_searched_for_a_named_record_and_for_what_became_of_a_title() {
     // A title by its own id; a release is found by the title it names; a statement names no claim.
     let got = found(&mut run, json!([
         {"channel": "titles", "query": {"where": [{"field": "id", "op": "=", "value": "title-p00"}]}},
-        {"channel": "dealings", "query": {"where": [{"field": "claim", "op": "=", "value": "title-p00"}]}},
-        {"channel": "lots", "query": {"where": [{"field": "claim", "op": "=", "value": "title-p00"}]}}]));
+        {"channel": "dealings", "query": {"where": [{"field": "claim", "op": "=", "value": "title-p00"}]}}]));
     assert_eq!(got["titles"], vec!["title-p00".to_string()]);
     assert_eq!(got["dealings"], vec![released]);
-    assert!(got["lots"].is_empty());
     // By id, only what the channel shows and the other conditions allow: a title isn't found among the lots, nor one
     // that fails another condition, nor a record there is none of.
     let got = found(&mut run, json!([
@@ -212,8 +210,20 @@ fn a_register_is_searched_for_a_named_record_and_for_what_became_of_a_title() {
         {"channel": "titles", "query": {"where": [{"field": "id", "op": "=", "value": "title-p11"}, {"field": "about.object", "op": "=", "value": "p00"}]}},
         {"channel": "dealings", "query": {"where": [{"field": "id", "op": "=", "value": "nothing"}]}}]));
     assert!(got.values().all(|v| v.is_empty()), "{got:?}");
-    // Every id but one (the long way, through the register): the lots a plain reading gives, less that one.
-    let got = found(&mut run, json!([{"channel": "lots", "query": {"where": [{"field": "id", "op": "!=", "value": "p11"}], "limit": 50}}]));
-    assert_eq!(got["lots"].len(), 5);
-    assert!(!got["lots"].contains(&"p11".to_string()));
+    // The register answers a question about one named thing, and nothing else (docs/design/knowing.md). Until
+    // 2026-10-08 the last look here read every lot but one ("id != p11", fifty at a time), and a lot could be asked
+    // for by a field the register has no entry under; both are refused now, before they reach the log: a look with no
+    // subject, one that names it by a field the keeper does not answer by, one that only says what it is not, and
+    // the register read through with no search at all.
+    let refused = |run: &mut Run<Vec<u8>>, looks: serde_json::Value| run.command(&Command::Look { participant: "bob-self".into(), only: None, looks: serde_json::from_value(looks).unwrap() }).is_err();
+    assert!(refused(&mut run, json!([{"channel": "lots", "query": {"where": [{"field": "id", "op": "!=", "value": "p11"}], "limit": 50}}])));
+    assert!(refused(&mut run, json!([{"channel": "lots", "query": {"where": [{"field": "claim", "op": "=", "value": "title-p00"}]}}])));
+    assert!(refused(&mut run, json!([{"channel": "lots", "query": {"standing": true, "limit": 200}}])));
+    assert!(refused(&mut run, json!([{"channel": "titles"}])));
+    // Nor does anyone not listed for it get a holder's titles by naming the holder: bob's channel could not even be
+    // written with `by: ["holder"]` (the world would not load); asked through the channel he has, it is refused.
+    assert!(refused(&mut run, json!([{"channel": "titles", "query": {"where": [{"field": "holder", "op": "=", "value": "alice"}]}}])));
+    // And one answer is as many as the keeper gives at once: the titles to one lot, at most 20 here.
+    let got = found(&mut run, json!([{"channel": "titles", "query": {"where": [{"field": "about.object", "op": "=", "value": "p11"}], "limit": 200}}]));
+    assert_eq!(got["titles"], vec!["title-p11".to_string()]);
 }

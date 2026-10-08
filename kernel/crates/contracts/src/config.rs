@@ -42,6 +42,9 @@ pub struct Config {
     pub templates: Vec<Template>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub life: Option<Life>,
+    /// Who knows what: what is published, who keeps each register (docs/design/knowing.md).
+    #[serde(default, skip_serializing_if = "Knowing::is_empty")]
+    pub knowing: Knowing,
     pub caps: Caps,
     /// Enforced by the orchestrator; the kernel only records it.
     pub orchestration: Value,
@@ -852,6 +855,21 @@ impl ParticipantCfg {
     }
 }
 
+/// The way something reaches a participant (docs/design/knowing.md): it is theirs (`mine`), they are there (`here`)
+/// or go to look (`visit`), it was published (`published`), they asked its keeper for one thing (`ask`), or they are
+/// its keeper (`kept`). `whole`: a view not yet replaced (the migration's; each one is listed in the guard's test).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Way {
+    Mine,
+    Here,
+    Visit,
+    Published,
+    Ask,
+    Kept,
+    Whole,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum ChannelKind {
@@ -859,21 +877,36 @@ pub enum ChannelKind {
     /// What the capacity's entity holds, and where (phase B): its holdings that changed since the last look.
     Holdings,
     Records {
+        way: Way,
         #[serde(rename = "match")]
         filter: RecordFilter,
         /// Where the channel looks: only records placed there are seen through it.
         /// Without an area, the channel sees records that aren't placed anywhere.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         area: Option<Area>,
+        /// Published: only what these put out (their own lists), whatever its kind. "self": the capacity's entity.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        from: Option<Vec<Id>>,
+        /// Ask: the keeper asked.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        of: Option<Id>,
+        /// Ask: the fields a question may name its subject by (each one the keeper answers by).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        by: Option<Vec<String>>,
     },
     Sites {
-        area: Area,
+        way: Way,
+        /// Here: where. Visit: none (a look names the places gone to).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        area: Option<Area>,
         /// What can be told about who is in a space the capacity's entity doesn't occupy itself:
         /// how many (the default), or who.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         occupants: Option<Occupants>,
     },
-    Directory,
+    Directory {
+        way: Way,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -899,24 +932,46 @@ pub struct RecordFilter {
     pub records: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub statement_kinds: Option<Vec<String>>,
-    /// Entity ids, or "self" for the entity of the capacity looking (the person, or a position's organisation).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub involving: Option<Vec<String>>,
     /// Statements having all of these parts ("offer", "practice", "adico", "formal"), whatever their kind.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub has: Option<Vec<String>>,
 }
 
+impl RecordFilter {
+    /// The collections a filter names, as the world's `knowing` names them: a statement kind (`lot`), statements
+    /// having something (`has:practice`), a record type (`records:claim`). None: it names none (any record).
+    pub fn collections(&self) -> Option<Vec<String>> {
+        if let Some(k) = &self.statement_kinds {
+            Some(k.clone())
+        } else if let Some(h) = &self.has {
+            Some(h.iter().map(|x| format!("has:{x}")).collect())
+        } else {
+            self.records.as_ref().map(|r| r.iter().map(|x| format!("records:{x}")).collect())
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Area {
+    /// Wherever it is put up: a board's placed notices (published, read on request). A map of everything is a whole
+    /// view (the migration's).
     All(AllMarker),
+    /// (A whole view not yet replaced: a list of cells.)
     Cells(Vec<Id>),
     /// Every cell within this distance of a cell under a building where the capacity's entity occupies a
     /// space (in cells; 0 is those cells and the ones touching them). Moves with it.
     Near(Near),
-    /// The cells of a place (where it's detailed).
+    /// The cells an office occupies or runs: one organisation's only.
+    Premises(Premises),
+    /// (A whole view not yet replaced: the cells of a place, where it's detailed.)
     Place(PlaceArea),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Premises {
+    pub premises: Vec<Id>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -1047,8 +1102,32 @@ pub fn terrain_at(ground: &Ground, x: i64, y: i64) -> Option<&str> {
     ground.terrain.iter().rev().find(|a| x >= a.x && x < a.x + a.w && y >= a.y && y < a.y + a.h).map(|a| a.label.as_str())
 }
 
-/// Check a set of channels: ids unique, entities and cells they name exist, distances sensible.
-pub fn check_channels(owner: &str, channels: &[Channel], entity_exists: &dyn Fn(&str) -> bool, cell_exists: &dyn Fn(&str) -> bool, place_exists: &dyn Fn(&str) -> bool) -> Result<(), String> {
+/// Whose channels are being checked, and against what (docs/design/knowing.md).
+pub struct Seat<'a> {
+    /// An organisation's seat (a position): its organisation. None: a person's own channels.
+    pub organisation: Option<&'a str>,
+    /// What the world says is published and who keeps what.
+    pub knowing: &'a Knowing,
+    /// The most cells a seat's premises may name (an office made during a run); None: as many as are its own.
+    pub premises_most: Option<usize>,
+    pub entity_exists: &'a dyn Fn(&str) -> bool,
+    pub cell_exists: &'a dyn Fn(&str) -> bool,
+    pub place_exists: &'a dyn Fn(&str) -> bool,
+    /// The organisation whose premises a cell already is, if any.
+    pub premises_of: &'a dyn Fn(&str) -> Option<String>,
+}
+
+/// How far a map may look near where its seat is (cells): the street outside, not the town.
+pub const SITES_NEAR_MAX: i64 = 2;
+/// How many cells the premises of an office made during a run may name.
+pub const NEW_PREMISES_MAX: usize = 4;
+/// How many publishers a channel may name (`from`).
+pub const FROM_MAX: usize = 8;
+
+/// Check a set of channels: ids unique; what they name exists; and each one's scope is one its way allows, so that
+/// no seat but a register's keeper is given a whole collection, a whole map or a directory to read through
+/// (docs/design/knowing.md, section 4).
+pub fn check_channels(owner: &str, channels: &[Channel], seat: &Seat) -> Result<(), String> {
     let mut ids = BTreeSet::new();
     for ch in channels {
         if !ids.insert(ch.id.as_str()) {
@@ -1057,32 +1136,259 @@ pub fn check_channels(owner: &str, channels: &[Channel], entity_exists: &dyn Fn(
         if ch.id.contains('/') {
             return Err(format!("{owner} channel {}: a channel id can't contain '/'", ch.id));
         }
-        if let ChannelKind::Records { filter, .. } = &ch.kind {
-            for e in filter.involving.iter().flatten().filter(|e| *e != SELF) {
-                if !entity_exists(e) {
-                    return Err(format!("{owner} channel {}: unknown entity {e:?}", ch.id));
-                }
-            }
-        }
-        let area = match &ch.kind {
-            ChannelKind::Records { area, .. } => area.as_ref(),
-            ChannelKind::Sites { area, .. } => Some(area),
-            _ => None,
+        let no = |why: String| Err(format!("{owner} channel {}: {why}", ch.id));
+        let (way, area) = match &ch.kind {
+            ChannelKind::Accounts | ChannelKind::Holdings => continue,
+            ChannelKind::Records { way, area, .. } | ChannelKind::Sites { way, area, .. } => (*way, area.as_ref()),
+            ChannelKind::Directory { way } => (*way, None),
         };
+        // What an area names must exist, whatever the way.
         match area {
             Some(Area::Cells(cs)) => {
-                for c in cs {
-                    if !cell_exists(c) {
-                        return Err(format!("{owner} channel {} names unknown cell {c}", ch.id));
-                    }
+                if let Some(c) = cs.iter().find(|c| !(seat.cell_exists)(c)) {
+                    return no(format!("unknown cell {c}"));
                 }
             }
-            Some(Area::Near(n)) if n.near < 0 => return Err(format!("{owner} channel {}: near must be 0 or more", ch.id)),
-            Some(Area::Place(p)) if !place_exists(&p.place) => return Err(format!("{owner} channel {} names unknown place {}", ch.id, p.place)),
+            Some(Area::Premises(p)) => {
+                if p.premises.is_empty() {
+                    return no("premises must name at least one cell".into());
+                }
+                if let Some(c) = p.premises.iter().find(|c| !(seat.cell_exists)(c)) {
+                    return no(format!("unknown cell {c}"));
+                }
+            }
+            Some(Area::Near(n)) if n.near < 0 => return no("near must be 0 or more".into()),
+            Some(Area::Place(p)) if !(seat.place_exists)(&p.place) => return no(format!("unknown place {}", p.place)),
             _ => {}
+        }
+        // A view not yet replaced (the migration's): as it was.
+        if way == Way::Whole {
+            continue;
+        }
+        // Where a seat is: near it (a map, the street outside and no further; notices put up, as far as the world says
+        // its people get about), or its premises (an organisation's, and no other organisation's; for an office made
+        // during a run, a building or two: premises change hands, so the old holder's seat may name them still).
+        let here = |map: bool| -> Result<(), String> {
+            match area {
+                Some(Area::Near(n)) => {
+                    if map && n.near > SITES_NEAR_MAX {
+                        return no(format!("a map of where one is looks at most {SITES_NEAR_MAX} cells around (to see further, go and look)"));
+                    }
+                    Ok(())
+                }
+                Some(Area::Premises(p)) => {
+                    let Some(org) = seat.organisation else { return no("premises are an organisation's (a person is where their body is: near)".into()) };
+                    if seat.premises_most.is_some_and(|most| p.premises.len() > most) {
+                        return no(format!("a new office's premises are a building or two (at most {} cells), not a district", seat.premises_most.unwrap_or(0)));
+                    }
+                    for c in &p.premises {
+                        if let Some(other) = (seat.premises_of)(c).filter(|o| o != org) {
+                            return no(format!("{c} is {other}'s premises already: a cell is one organisation's premises only"));
+                        }
+                    }
+                    Ok(())
+                }
+                _ => no("what is here is near where one is (`near`) or at one's premises (`premises`): a whole map or a list of other cells is not expressible".into()),
+            }
+        };
+        match &ch.kind {
+            ChannelKind::Accounts | ChannelKind::Holdings => {}
+            ChannelKind::Directory { .. } => {
+                if way != Way::Ask {
+                    return no("a directory is looked up (`way: ask`), never shown".into());
+                }
+            }
+            ChannelKind::Sites { .. } => match way {
+                Way::Here => here(true)?,
+                Way::Visit => {
+                    if area.is_some() {
+                        return no("a visit goes to the places a look names: it has no area".into());
+                    }
+                }
+                _ => return no("a map is of where one is (`here`) or of where one goes (`visit`)".into()),
+            },
+            ChannelKind::Records { filter, from, of, by, .. } => {
+                if way != Way::Published && from.is_some() {
+                    return no("`from` is for what named publishers put out (`way: published`)".into());
+                }
+                if way != Way::Ask && (of.is_some() || by.is_some()) {
+                    return no("`of` and `by` are for asking a keeper (`way: ask`)".into());
+                }
+                let named = || filter.collections().ok_or_else(|| format!("{owner} channel {}: say which records (statement kinds, record types, or what they have): never any record", ch.id));
+                match way {
+                    Way::Mine => {
+                        if area.is_some() {
+                            return no("one's own papers are not at a place: no area".into());
+                        }
+                    }
+                    Way::Here => here(false)?,
+                    Way::Published => {
+                        if let Some(from) = from {
+                            if from.is_empty() || from.len() > FROM_MAX {
+                                return no(format!("`from` names 1 to {FROM_MAX} publishers"));
+                            }
+                            if let Some(e) = from.iter().find(|e| *e != SELF && !(seat.entity_exists)(e)) {
+                                return no(format!("unknown entity {e:?}"));
+                            }
+                            if area.is_some() {
+                                return no("a named publisher's lists are not looked for at a place: no area".into());
+                            }
+                            named()?;
+                            continue;
+                        }
+                        let kinds = named()?;
+                        let mut boards = 0;
+                        for k in &kinds {
+                            let Some(p) = seat.knowing.published.iter().find(|p| &p.what == k) else {
+                                return no(format!("{k} is not published in this world (`knowing.published`): it is somebody's, to be asked for"));
+                            };
+                            boards += usize::from(p.board == Some(true));
+                        }
+                        if boards != 0 && boards != kinds.len() {
+                            return no("a board is read on request, a publication is shown: not both through one channel".into());
+                        }
+                        if boards != 0 && ch.on_request != Some(true) {
+                            return no("a board is read a few at a time, on request: nobody is shown one".into());
+                        }
+                        match area {
+                            None => {}
+                            Some(Area::All(_)) if boards != 0 => {}
+                            _ => return no("what is published is not at a place (a board's placed notices: `all`; a notice put up somewhere is seen by being near it: `way: here`)".into()),
+                        }
+                    }
+                    Way::Kept => {
+                        let Some(org) = seat.organisation else { return no("a register's keeper is an organisation".into()) };
+                        if area.is_some() {
+                            return no("a register is not at a place: no area".into());
+                        }
+                        for k in named()? {
+                            if !seat.knowing.keepers.iter().any(|x| x.entity == org && x.what == k) {
+                                return no(format!("{org} is not the keeper of {k} (`knowing.keepers`): it asks whoever is"));
+                            }
+                        }
+                    }
+                    Way::Ask => {
+                        let (Some(of), Some(by)) = (of, by) else { return no("an ask names the keeper asked (`of`) and what it is asked by (`by`)".into()) };
+                        if ch.on_request != Some(true) {
+                            return no("a keeper answers when asked: on request".into());
+                        }
+                        if area.is_some() {
+                            return no("a register is not at a place: no area".into());
+                        }
+                        if by.is_empty() {
+                            return no("`by` names at least one field".into());
+                        }
+                        for k in named()? {
+                            let Some(keeper) = seat.knowing.keepers.iter().find(|x| &x.entity == of && x.what == k) else {
+                                return no(format!("{of} is not the keeper of {k} (`knowing.keepers`)"));
+                            };
+                            for f in by {
+                                let Some(a) = keeper.answers.iter().find(|a| &a.by == f) else {
+                                    return no(format!("{of} does not answer about {k} by {f}"));
+                                };
+                                if let Some(to) = &a.to {
+                                    if !seat.organisation.is_some_and(|org| to.iter().any(|t| t == org)) {
+                                        return no(format!("{of} answers about {k} by {f} only to {}", to.join(", ")));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Way::Visit => return no("records are not gone to: a visit is a map's".into()),
+                    Way::Whole => {}
+                }
+            }
         }
     }
     Ok(())
+}
+
+/// The cells each organisation's seats name as premises, by cell (the first to name it).
+pub fn premises_of_positions<'a>(positions: impl Iterator<Item = (&'a str, &'a [Channel])>) -> BTreeMap<Id, Id> {
+    let mut m = BTreeMap::new();
+    for (org, channels) in positions {
+        for ch in channels {
+            let area = match &ch.kind {
+                ChannelKind::Records { area, .. } | ChannelKind::Sites { area, .. } => area.as_ref(),
+                _ => None,
+            };
+            if let Some(Area::Premises(p)) = area {
+                for c in &p.premises {
+                    m.entry(c.clone()).or_insert_with(|| org.to_string());
+                }
+            }
+        }
+    }
+    m
+}
+
+/// What a world says of who knows what (docs/design/knowing.md): what is published, who keeps each register and
+/// what they answer, and how long looking at a place takes.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Knowing {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub published: Vec<Published>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub keepers: Vec<Keeper>,
+    /// Seconds to look at one place gone to (beside the way there and back).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub visit_seconds: Option<i64>,
+}
+
+impl Knowing {
+    pub fn is_empty(&self) -> bool {
+        self.published.is_empty() && self.keepers.is_empty() && self.visit_seconds.is_none()
+    }
+
+    /// The most one look returns of a board (the least of the boards the filter names); None: not a board.
+    pub fn board_most(&self, filter: &RecordFilter) -> Option<u32> {
+        let kinds = filter.collections()?;
+        kinds.iter().filter_map(|k| self.published.iter().find(|p| &p.what == k).filter(|p| p.board == Some(true))).map(|p| p.most.unwrap_or(SEARCH_MAX)).min()
+    }
+
+    /// The most a keeper returns to one question by this field (the least over the collections the filter names).
+    pub fn answer_most(&self, of: &str, filter: &RecordFilter, by: &str) -> u32 {
+        let kinds = filter.collections().unwrap_or_default();
+        kinds.iter().filter_map(|k| self.keepers.iter().find(|x| x.entity == of && &x.what == k)).filter_map(|x| x.answers.iter().find(|a| a.by == by)).map(|a| a.most.unwrap_or(SEARCH_MAX)).min().unwrap_or(SEARCH_MAX)
+    }
+}
+
+/// The most records any one search returns.
+pub const SEARCH_MAX: u32 = 200;
+
+/// Something its maker puts out to the public. A board (jobs, homes to let) is read a few at a time, on request.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Published {
+    pub what: String,
+    pub why: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub board: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub most: Option<u32>,
+}
+
+/// The keeper of a register: the office that makes it, or to which every entry in it is addressed.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Keeper {
+    pub entity: Id,
+    pub what: String,
+    pub why: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub answers: Vec<Answer>,
+}
+
+/// What a keeper answers: a question naming its subject by this field, to these (absent: anyone), at most so many.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Answer {
+    pub by: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub to: Option<Vec<Id>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub most: Option<u32>,
 }
 
 /// Check a template's traits: values, `{"uniform": [lo, hi]}` with lo <= hi, or `{"pick": {value: weight, ...}}`
@@ -1569,6 +1875,51 @@ pub fn validate(c: &Config) -> Result<(), String> {
         }
     }
 
+    // Who knows what (docs/design/knowing.md): each thing published once, each register with one keeper who exists
+    // and answers by fields a search can use; then every channel is checked against it.
+    let k = &c.knowing;
+    let mut said = BTreeSet::new();
+    for p in &k.published {
+        if !said.insert(p.what.as_str()) {
+            return Err(format!("knowing.published names {} twice", p.what));
+        }
+        if p.most.is_some_and(|n| n == 0 || n > SEARCH_MAX) || (p.most.is_some() && p.board != Some(true)) {
+            return Err(format!("knowing.published {}: `most` is a board's, 1..={SEARCH_MAX}", p.what));
+        }
+    }
+    let mut kept = BTreeSet::new();
+    for x in &k.keepers {
+        entity(&x.entity)?;
+        if !kept.insert((x.entity.as_str(), x.what.as_str())) {
+            return Err(format!("knowing.keepers names {} as keeper of {} twice", x.entity, x.what));
+        }
+        if said.contains(x.what.as_str()) {
+            return Err(format!("knowing: {} is published and kept: one or the other", x.what));
+        }
+        for a in &x.answers {
+            if !matches!(a.by.as_str(), "id" | "claim" | "holder" | "speaks_for") && a.by.strip_prefix("data.").or_else(|| a.by.strip_prefix("about.")).is_none_or(|p| p.is_empty()) {
+                return Err(format!("knowing.keepers {} {}: {} isn't a field a question can name its subject by", x.entity, x.what, a.by));
+            }
+            if a.most.is_some_and(|n| n == 0 || n > SEARCH_MAX) {
+                return Err(format!("knowing.keepers {} {}: `most` is 1..={SEARCH_MAX}", x.entity, x.what));
+            }
+            for t in a.to.iter().flatten() {
+                entity(t)?;
+            }
+        }
+    }
+    if k.visit_seconds.is_some_and(|s| !(0..=30 * 86_400).contains(&s)) {
+        return Err("knowing.visit_seconds is out of range".into());
+    }
+    let premises = premises_of_positions(c.positions.iter().map(|p| (p.entity.as_str(), p.channels.as_slice())));
+    let entity_exists = |e: &str| entities.contains_key(e);
+    let premises_of = |cell: &str| premises.get(cell).cloned();
+    macro_rules! seat {
+        ($organisation:expr) => {
+            Seat { organisation: $organisation, knowing: k, premises_most: None, entity_exists: &entity_exists, cell_exists: &cell_exists, place_exists: &place_exists, premises_of: &premises_of }
+        };
+    }
+
     // Participants: persons have bodies of their own; systems belong to organisations.
     let mut bodies = BTreeSet::new();
     for p in &c.participants {
@@ -1595,14 +1946,14 @@ pub fn validate(c: &Config) -> Result<(), String> {
                 }
             }
         }
-        check_channels(&format!("participant {}", p.id), &p.channels, &|e| entities.contains_key(e), &cell_exists, &place_exists)?;
+        check_channels(&format!("participant {}", p.id), &p.channels, &seat!(None))?;
         check_traits(&format!("participant {}", p.id), &p.traits)?;
     }
     for t in &c.templates {
         if t.kind == ParticipantKind::System && !t.channels.is_empty() {
             return Err(format!("template {}: a system has no personal channels", t.id));
         }
-        check_channels(&format!("template {}", t.id), &t.channels, &|e| entities.contains_key(e), &cell_exists, &place_exists)?;
+        check_channels(&format!("template {}", t.id), &t.channels, &seat!(None))?;
         check_traits(&format!("template {}", t.id), &t.traits)?;
     }
 
@@ -1616,7 +1967,7 @@ pub fn validate(c: &Config) -> Result<(), String> {
                 return Err(format!("position {} is held by unknown participant {h}", p.id));
             }
         }
-        check_channels(&format!("position {}", p.id), &p.channels, &|e| entities.contains_key(e), &cell_exists, &place_exists)?;
+        check_channels(&format!("position {}", p.id), &p.channels, &seat!(Some(p.entity.as_str())))?;
     }
 
     // Life: bands must make sense.
@@ -1740,6 +2091,46 @@ pub struct LookRequest {
     /// A search (records channels only): what matches now, rather than what changed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub query: Option<Query>,
+    /// A look-up (a directory): whom.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub who: Option<Who>,
+    /// Going to look (a map whose way is `visit`): where.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub visit: Option<Visit>,
+}
+
+/// Whom a directory is asked about: one entity, one participant, one position, a name, or an organisation's holders
+/// of one role (`entity` with `role`).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Who {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub entity: Option<Id>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub participant: Option<Id>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub position: Option<Id>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub role: Option<String>,
+}
+
+impl Who {
+    /// Exactly one of the forms: an entity (with or without a role), a participant, a position, or a name.
+    pub fn well_formed(&self) -> bool {
+        matches!(
+            (&self.entity, &self.participant, &self.position, &self.name, &self.role),
+            (Some(_), None, None, None, _) | (None, Some(_), None, None, None) | (None, None, Some(_), None, None) | (None, None, None, Some(_), None)
+        )
+    }
+}
+
+/// The places a visit goes to, in order: buildings, or cells of ground.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Visit {
+    pub places: Vec<Id>,
 }
 
 /// A search over records: mechanical matching, never interpretation.

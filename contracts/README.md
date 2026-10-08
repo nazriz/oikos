@@ -4,6 +4,12 @@
 before it was built (docs/design/world-expansion.md; the list is under "Changes from v0.7"). This is the interface the
 AI side builds against. A further change opens v0.9, proposed and signed off as before.*
 
+*Change note, 2026-10-08 (**knowing**; approved by Naz the same day: "I approve all changes"): how anything reaches a
+participant changed. A channel now says which **way** it is, and a whole view (a register for a seat that does not
+keep it, a map of anywhere a seat is not, a directory to read through) can no longer be written. The changes are
+listed under "Changes since v0.8 closed". **This opens v0.9.** The schemas' ids still say 0.8: renumbering touches
+every world, log and dataset, and is to be scheduled.*
+
 *History: v0.2 replaced v0.1, which put law, authority and ownership inside the kernel ([the audit](../docs/audit-kernel-law.md), D18–D27); v0.3 added the translator and resolver, perception as changes, attention and opting out (D40); v0.4 a world whose cast and land can change ([design](../docs/design/v0.4-cast-and-land.md)); v0.5 readiness for scale (D58); v0.6–0.7 the citizens' minds and assertions ([contracts-0.7](../docs/design/contracts-0.7.md)); v0.8 the world expansion.*
 
 These schemas are the constitution. Humans review them and the invariant tests; implementations sit behind them. Changing a contract is an explicit, signed-off decision. A researcher should be able to write a participant's controller, a world or a measurement from this directory alone.
@@ -19,7 +25,7 @@ These schemas are the constitution. Humans review them and the invariant tests; 
 | [`calls.md`](calls.md), [`calls.schema.json`](calls.schema.json) | The call language: structured intents the resolver turns into a participant's own acts |
 | [`outcomes.schema.json`](outcomes.schema.json) | Shared encodings: requests, commitments as outcomes, forms |
 
-`bun test` checks that every schema compiles under JSON Schema 2020-12 strict mode, every valid example passes, and every invalid example is rejected (143 tests). The examples include Riverbend rebuilt for v0.4 and a valid empty world.
+`bun test` checks that every schema compiles under JSON Schema 2020-12 strict mode, every valid example passes, and every invalid example is rejected (187 tests; `examples/refused/` holds worlds that are well formed and that the kernel refuses to load, checked by `kernel/tests/knowing.rs`). The examples include Riverbend rebuilt for v0.4 and a valid empty world.
 
 ---
 
@@ -104,22 +110,26 @@ To pay, an account holder publishes an `instruction` addressed to their bank. Th
 
 **Debt and credit are supported** through agreements plus paired claims: loans, mortgages (with security over property), overdrafts, interest and arrears. The lender's people apply interest and schedules. **The liberty:** lenders lend only money they actually hold, so there is no money creation by lending out deposits. Derivatives, securitisation and securities markets are out of scope.
 
-## Participants and perception
+## Participants and perception: the four ways (2026-10-08; docs/design/knowing.md)
 
-Perception comes only through channels, plus the participant's inbox and the outcomes of its own acts. A person has its own channels; a position has channels its holder perceives while holding it:
+Perception comes only through channels, plus the participant's inbox and the outcomes of its own acts. A person has its own channels; a position has channels its holder perceives while holding it. **Information lives with whoever keeps it, and a channel is one of the four ways it reaches a participant**; nothing else can be written:
 
-| Channel | Covers |
-|---|---|
-| `accounts` | Accounts the entity acted for holds or has custody of, and their transactions |
-| `records` | Records matching a filter (record type, statement kind, entities involved) that the participant is allowed to see |
-| `sites` | The physical state of an area, cell by cell: the building on each (on every cell of its footprint), construction, and each space's occupancy (count; names where the channel shows them, with the space's last few departures: who left, why and when, so a household sees a member die). This is how an inspector *notices*. |
-| `directory` | Who exists (and which participant each person is), and the positions: whose, and who holds them |
+| Way | Channel | Covers |
+|---|---|---|
+| **It is theirs** | `accounts`, `holdings` | Accounts the entity acted for holds or has custody of, and their transactions; what it holds, and where |
+| | `records`, `way: "mine"` | Records naming the seat's own entity (as holder, counterparty, party, addressee, author's entity or whom it speaks for), or referring to a record that does (one hop). On request: its own files, searched |
+| **They are there** | `sites` or `records`, `way: "here"` | The ground (cell by cell: the building on each, construction, each space's occupancy: a count; names in one's own building or where the channel shows them, with the space's last few departures), or the notices put up, **near** where the seat's entity is (`{near}`: the cells of the buildings its body occupies and those within that distance; it moves with the body) or at an organisation's own **premises** (`{premises: [cells]}`; a cell is one organisation's premises only). A map looks at most 2 cells around |
+| | `sites`, `way: "visit"` | **Going to look.** Nothing is shown until a look names 1 to 16 places (`visit`). The looker is busy for the way there and back and the world's `knowing.visit_seconds` at each place (a person's own time; one of an office's lanes), and what was at those places then arrives with the observation after (`visited`). Logged as `visit_started` and `visited` |
+| **It was published** | `records`, `way: "published"` | Kinds the world declares published (`knowing.published`, each with its reason), shown to their readers as they come. A kind declared a **board** (jobs, homes to let, what sellers advertise) is never shown: the channel is `on_request`, a look through it must be a search, and it returns at most the board's `most`. With `from`: what up to 8 named publishers themselves put out (a supplier's price list) |
+| **They asked the keeper for one specific thing** | `records`, `way: "ask"` | A register someone else keeps (`knowing.keepers`), answered only on request and only to a search that names its subject: `field = value` on one of the channel's `by` fields, each a field the keeper answers by, to this seat. At most the keeper's `most` in one answer |
+| | `directory`, `way: "ask"` | Who exists and who holds which office, looked up one at a time: a look says whom (`who`: one entity, optionally with a role for that organisation's holders of it; one participant; one position; or a name). At most 20 entries. Nothing is ever shown unasked |
+| **They are its keeper** | `records`, `way: "kept"` | A register the seat's own organisation keeps, whole. Valid only at a seat of the organisation `knowing.keepers` names for it |
 
-**Perception is changes, not snapshots (D42).** Each look through a channel delivers what changed within its scope since the previous look through it in that capacity. A first look delivers everything the channel covers. The runtime keeps a **view** per capacity (`participants/src/view.ts`) and gives the controller the current picture. A kernel invariant test checks that a view built from looks always equals the full picture (`kernel/tests/perception.rs`), and an orchestrator test checks it on a running town. Any channel can have `every`; between looks, changes accumulate.
+The kernel refuses a world (and a position made during a run) whose channels say anything else: a published kind not declared, a board shown unasked, a register for a seat that is not its keeper's, an ask of a non-keeper or by a field the keeper does not answer by to that seat, premises claimed twice or by a person. During the migration only, `way: "whole"` carries the views not yet replaced; it leaves the schema when none are left.
 
-**Position (D44):** a channel can look **near** where its entity is (the cells of the buildings its body occupies); when the body moves, the whole of the new surroundings replaces the old.
+**Perception is changes, not snapshots (D42).** Each look through a channel delivers what changed within its scope since the previous look through it in that capacity. A first look delivers everything the channel covers. The runtime keeps a **view** per capacity (`participants/src/view.ts`) and gives the controller the current picture: for a directory what it has looked up, for places gone to what it saw when it was there. A kernel invariant test checks that a view built from looks always equals the full picture (`kernel/tests/perception.rs`), and an orchestrator test checks it on a running town. Any channel can have `every`; between looks, changes accumulate.
 
-**Attention (D43):** a channel with `on_request` is perceived only when asked, with a `look`. A look through a records channel can be a **search**: records still standing, conditions on named fields, an order and a limit. The matching is mechanical. A search's fields: `record`, `kind`, `at`, `author`, `speaks_for`, `basis`, `data.<path>`, `about.<path>`; and (proposed 2026-10-08, for sign-off: docs/decisions.md, "Nobody has the land register by heart") `id`, a record's own, and `claim`, the claim a transfer or a release names, so that a register can be asked for one named record and for what became of one title instead of being shown whole.
+**Attention (D43):** a channel with `on_request` is perceived only when asked, with a `look`. A look through a records channel can be a **search**: records still standing, conditions on named fields, an order and a limit. The matching is mechanical. A search's fields: `id`, `record`, `kind`, `at`, `author`, `speaks_for`, `basis`, `claim` (the claim a transfer or a release names), `holder` (who holds a claim), `data.<path>`, `about.<path>`.
 
 **Every participant can always opt out of the study** (VISION §15; D38), which is not resigning an office; `on_opt_out` says whether its positions then fall vacant or a code stand-in carries on. Every framing records its disclosure and a mandatory reason.
 
@@ -183,6 +193,17 @@ A model call that fails (after its adapter's own time limits and retries) is rec
 6. **The construction payment liberty** (the physical-acts section above). **Accepted only to unblock us; must be fleshed out later**: builders should buy materials from suppliers through their banks, or construction should become a task with inputs (D24). Tracked in docs/decisions.md, under "Open".
 7. **A seat acts as exactly one entity.** *(Superseded in v0.4: a participant acts as itself, or for an organisation in a position it holds.)*
 8. **`sites` channels have a refresh interval** (since v0.3, any channel's `every`), so detection can be delayed and partial. Coverage and frequency are experimental variables.
+
+## Changes since v0.8 closed (2026-10-08: knowing; opens v0.9; docs/design/knowing.md)
+
+- **`Channel.way`** (required on records, sites and directory channels): `mine`, `here`, `visit`, `published`, `ask`, `kept`. Each way allows only its own scope (the table under "Participants and perception").
+- **Removed:** `match.involving` (a seat's own papers are `mine`; a named supplier's lists are `published` with `from`); `area` as a list of cells or a place, and `"all"` for a map (`"all"` remains only for a board's placed notices); a records channel that names nothing (`match: {}`) except through `mine`; a directory shown whole.
+- **New on a channel:** `area: {premises: [cells]}` (an organisation's own ground); `from` (published); `of`, `by` (ask).
+- **New top-level `knowing`:** `published` (`{ what, why, board?, most? }`), `keepers` (`{ entity, what, why, answers?: [{ by, to?, most? }] }`), `visit_seconds`. `what` is a statement kind (`lot`), statements having something (`has:practice`) or a record type (`records:claim`).
+- **`LookRequest`:** `who` (a directory look-up) and `visit` (`{ places }`). **`QueryField`:** `holder`. **`ChannelData` (sites):** `visited`.
+- **Log:** events `visit_started` and `visited`.
+- **Load-time validation** as listed above; the same when a position is made during a run (`create_position`, `create_entity`'s first position).
+- **Unchanged:** blocks, records, the call language, outcomes, datasets. Going to look is a look, not an act.
 
 ## Changes from v0.7 (v0.8, closed 2026-10-02; docs/design/world-expansion.md)
 

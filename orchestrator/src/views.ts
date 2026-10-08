@@ -1,7 +1,11 @@
-// What each kind of seat in a world is shown whole (docs/no-god-view.md). Nobody has a god's view: a seat is shown its
-// own records, its addressed mail and its own premises, and asks whoever keeps anything else for the one thing it
-// needs. This reads a world's config and lists every view that is a whole collection: a register, a population, a map,
-// or the run's future. It decides nothing; orchestrator/test/no-god-view.test.ts holds the list to what is declared.
+// What each kind of seat in a world is shown whole (docs/no-god-view.md; docs/design/knowing.md). Information lives
+// with whoever keeps it, and reaches a seat in four ways: it is theirs, they are there (or go to look), it was
+// published, or they asked its keeper for one thing. The contract lets a channel say nothing else, and the kernel
+// refuses a world that gives a register to a seat that does not keep it. This is the backstop behind that: it reads a
+// world's config and lists every view that is still a whole collection: a keeper's register (which must be declared),
+// a seat's own files when they hold a whole collection, premises that are most of the ground, a parameter naming
+// everyone of a kind, or the run's future. It decides nothing; orchestrator/test/no-god-view.test.ts holds the list to
+// what is declared.
 
 /** One whole view: which module's seats have it, how it reaches them, and what it is a whole of. */
 export interface WholeView {
@@ -26,38 +30,7 @@ export const WHOLE = { least: 25, share_bps: 9000 };
  * naming the one bank is not). */
 export const POPULATION = 5;
 
-/**
- * What is put out to the whole public by whoever makes it, so that being shown it is being one of its readers, not
- * having a view of the town: the law as promulgated, an office's public notices, the paper, a notice board. Each with
- * the reason. A market is not one of these: every seller's prices and every home for sale are many parties' offers,
- * found by going and looking (a search), and neither is a register, a roll or a file (docs/no-god-view.md).
- */
-export const PUBLISHED: { [what: string]: string } = {
-  law: "The law in force is promulgated to everyone it binds.",
-  charter: "The town's charter is public, as its laws are.",
-  procedure: "A public body's adopted procedures are published with its laws.",
-  law_schedule: "How a law is written from its figures is published with the law.",
-  form: "An office's forms are put out for anyone to use.",
-  news: "The local paper is printed for whoever reads it.",
-  election_notice: "The electoral office's notice of an election is given to the whole town.",
-  nomination: "Who stands for office is announced to the electors.",
-  ballot: "A question put to a vote is put before those who vote on it, and the public.",
-  ballot_result: "The result of a vote is declared in public.",
-  weather_warning: "The bureau's warnings are broadcast.",
-  budget: "A public body's adopted budget is a public document.",
-  petition: "A petition is put up for the public to read and sign.",
-  petition_count: "A petition's organiser publishes how many have signed.",
-  petition_response: "A public body's answer to a petition is given in public.",
-  permit_decision: "Planning decisions are entered in a register open to the public.",
-  environment_report: "The environment office publishes its report.",
-  support_statistics: "Published statistics.",
-  price_index: "Published statistics.",
-  closure: "A firm's winding up is given by public notice.",
-  "has:practice": "A notice of a gathering is put up for whoever may come.",
-  "has:assertion": "What is put forward to be believed (a teaching, a platform, a report) is addressed to the public.",
-};
-
-type Channel = { id: string; kind: string; on_request?: boolean; match?: { records?: string[]; statement_kinds?: string[]; involving?: string[]; has?: string[] }; area?: unknown };
+type Channel = { id: string; kind: string; way?: string; on_request?: boolean; match?: { records?: string[]; statement_kinds?: string[]; has?: string[] }; area?: unknown; from?: string[] };
 type Rec = { id: string; record: string; kind?: string; visible_to: "public" | string[]; speaks_for?: string; holder?: string; counterparty?: string; addressed_to?: string[]; terms?: { parties?: string[] }; as?: string; [k: string]: unknown };
 
 /** What a record is filed under: a statement's kind, or its record type. */
@@ -85,6 +58,8 @@ function dated(v: unknown): boolean {
 
 /** Every whole view in a world's config, one line for each module, way in and thing (docs/no-god-view.md). */
 export function wholeViews(config: any): WholeView[] {
+  // (What the world publishes is read, not kept: never a whole view.)
+  const published = new Set<string>((config.knowing?.published ?? []).map((p: { what: string }) => p.what));
   const records: Rec[] = config.world.records ?? [];
   const entities: { id: string; kind: string }[] = config.world.entities ?? [];
   const total = new Map<string, number>();
@@ -99,46 +74,53 @@ export function wholeViews(config: any): WholeView[] {
 
   const found = new Map<string, WholeView>();
   const add = (module: string, through: string, what: string, seat: string) => {
+    if (published.has(what)) return;
     const key = `${module}|${through}|${what}`;
     const had = found.get(key);
     if (had) had.seats++;
     else found.set(key, { module, through, what, seat, seats: 1 });
   };
 
+  /** The collections a filter names: a statement kind, statements having something, a record type; none: every record. */
+  const collections = (m: NonNullable<Channel["match"]>): string[] =>
+    m.statement_kinds ?? m.has?.map((h) => `has:${h}`) ?? m.records?.map((t) => `records:${t}`) ?? ["records:*"];
   const channelsOf = (module: string, seat: string, entity: string | undefined, channels: Channel[]) => {
     for (const ch of channels ?? []) {
-      // Records asked for are a search (attention, not a view). A map or a directory can't be searched: asked for, it
-      // comes whole, so being shown it only on request doesn't make it less than all of it.
-      if (ch.on_request && ch.kind === "records") continue;
       const through = `channel:${ch.id}`;
-      if (ch.kind === "directory") add(module, through, "directory", seat);
-      else if (ch.kind === "sites") {
-        if (ch.area === "all" || (ch.area && typeof ch.area === "object" && "place" in ch.area) || (Array.isArray(ch.area) && cells > 0 && ch.area.length * 2 >= cells)) add(module, through, "map", seat);
-      } else if (ch.kind === "records") {
-        const m = ch.match ?? {};
-        const bounded = Array.isArray(ch.area) || (ch.area && typeof ch.area === "object" && "near" in ch.area);
-        if (bounded) continue; // what is put up on its own premises, or near where it is
-        if (!m.involving) {
-          // Shown every record of what it names that it is let see.
-          if (m.statement_kinds) for (const k of m.statement_kinds) add(module, through, k, seat);
-          else if (m.has) for (const h of m.has) add(module, through, `has:${h}`, seat);
-          else if (m.records) for (const t of m.records) add(module, through, `records:${t}`, seat);
-          else add(module, through, "records:*", seat);
-          continue;
-        }
-        // Its own files: whole only if they hold a whole collection (counted on the records the world starts with).
-        if (!entity) continue;
-        const want = new Set(m.involving.map((e) => (e === "self" ? entity : e)));
-        const shown = new Map<string, number>();
-        for (const r of records) {
-          if (m.records && !m.records.includes(r.record)) continue;
-          if (m.statement_kinds && !(r.record === "statement" && m.statement_kinds.includes(r.kind ?? ""))) continue;
-          if (r.visible_to !== "public" && !r.visible_to.includes(entity) && r.speaks_for !== entity) continue;
-          if (!named(r).some((e) => want.has(e))) continue;
-          shown.set(collection(r), (shown.get(collection(r)) ?? 0) + 1);
-        }
-        for (const [what, n] of shown) if (n >= WHOLE.least && n * 10_000 >= (total.get(what) ?? 0) * WHOLE.share_bps) add(module, through, what, seat);
+      // A view not yet replaced (the migration's `way: "whole"`): whatever it shows, it shows whole.
+      if (ch.way === "whole") {
+        if (ch.on_request && ch.kind === "records") continue; // a search of it, as before
+        if (ch.kind === "directory") add(module, through, "directory", seat);
+        else if (ch.kind === "sites") add(module, through, "map", seat);
+        else for (const what of collections(ch.match ?? {})) add(module, through, what, seat);
+        continue;
       }
+      // What a seat is asked about, goes to, reads as published, or sees where it is, is not a whole view: the kernel
+      // holds each to its scope. Premises that are half the ground are a map all the same.
+      if (ch.kind === "sites" || ch.way === "here") {
+        const premises = (ch.area as { premises?: string[] } | undefined)?.premises;
+        if (ch.kind === "sites" && premises && cells > 0 && premises.length * 2 >= cells) add(module, through, "map", seat);
+        continue;
+      }
+      if (ch.kind !== "records" || ch.way === "ask" || ch.way === "published") continue;
+      // Its keeper's register: whole, and to be declared.
+      if (ch.way === "kept") {
+        for (const what of collections(ch.match ?? {})) add(module, through, what, seat);
+        continue;
+      }
+      // Its own files (`mine`): whole only if they hold a whole collection (counted on the records the world starts with).
+      // (Looked through only on request, they are searched: each search is cut to what the contract allows.)
+      if (!entity || ch.on_request) continue;
+      const m = ch.match ?? {};
+      const shown = new Map<string, number>();
+      for (const r of records) {
+        if (m.records && !m.records.includes(r.record)) continue;
+        if (m.statement_kinds && !(r.record === "statement" && m.statement_kinds.includes(r.kind ?? ""))) continue;
+        if (r.visible_to !== "public" && !r.visible_to.includes(entity) && r.speaks_for !== entity) continue;
+        if (!named(r).includes(entity)) continue;
+        shown.set(collection(r), (shown.get(collection(r)) ?? 0) + 1);
+      }
+      for (const [what, n] of shown) if (n >= WHOLE.least && n * 10_000 >= (total.get(what) ?? 0) * WHOLE.share_bps) add(module, through, what, seat);
     }
   };
 

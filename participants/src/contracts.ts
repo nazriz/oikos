@@ -111,7 +111,9 @@ export type ParticipantAction =
   | { type: "look"; looks: LookRequest[] }
   | { type: "opt_out"; statement: string };
 
-/** Look through a channel now (attention); a records channel can be searched (contracts/participant-api.schema.json, Query). */
+/** Look through a channel now (attention); a records channel can be searched (contracts/participant-api.schema.json, Query).
+ * A register asked of its keeper must be searched by naming its subject; a directory is looked up (`who`); a place
+ * is gone to (`visit`), which takes the looker's time (docs/design/knowing.md). */
 export interface LookRequest {
   channel: Id;
   query?: {
@@ -120,6 +122,11 @@ export interface LookRequest {
     order?: { field: string; desc?: boolean };
     limit?: number;
   };
+  /** A look-up in a directory: one entity (with `role`: that organisation's positions of that role), one participant,
+   * one position, or a name. */
+  who?: { entity: Id; role?: string } | { participant: Id } | { position: Id } | { name: string };
+  /** Going to look: the places gone to (buildings, or cells of ground), in order. */
+  visit?: { places: Id[] };
 }
 
 export interface Outcome {
@@ -165,7 +172,7 @@ export type ChannelData =
   | { kind: "accounts"; accounts: { account: Id; holder: Id; custodian: Id; currency: string; balance: string; closed?: true }[]; transactions: Transaction[] }
   | { kind: "holdings"; holdings: HoldingItem[] }
   | { kind: "records"; records: Record[]; search?: true; whole?: true }
-  | { kind: "sites"; as_of: number; cells: SiteCell[]; whole?: true }
+  | { kind: "sites"; as_of: number; cells: SiteCell[]; whole?: true; /** What a visit found: the places gone to, as they were at `as_of`. */ visited?: true }
   | { kind: "directory"; entities: { entity: Id; kind: string; name: string; participant?: Id }[]; positions: PositionItem[] };
 
 /**

@@ -132,25 +132,24 @@ fn the_river_scenario_an_illegal_building_goes_up_because_physics_allows_it() {
     assert!(run.kernel().state().records.contains_key("title-p12"));
     assert_eq!(run.kernel().state().structures[&house].built_by.as_deref(), Some("buildco"));
 
-    // The inspector patrols the river every 14 days. Their first observation was at t=0...
+    // The inspector is shown none of the river bank: it sees what stands there by going (docs/design/knowing.md).
+    // Until 2026-10-08 this test had a patrol channel over the bank's cells, looked through every 14 days; a map of
+    // somewhere a seat is not can no longer be written, so the same thing is checked of a visit: nothing comes
+    // unasked, and what a visit brings is what was there when the inspector was.
     let first = run.command(&Command::Observe { participant: "inspector-system".into(), only: None }).unwrap().observation.unwrap();
-    // A look delivers what changed since the last look through the channel; a channel that isn't due is absent.
-    let saw = |o: &oikos_kernel::observe::Observation| match o.channels.get("inspector/river-patrol") {
-        Some(ChannelData::Sites { cells, .. }) => cells.iter().find(|p| p.cell == "cell.2.1").is_some_and(|p| p.structure.is_some()),
-        None => false,
-        _ => unreachable!(),
-    };
-    assert!(saw(&first), "a first look delivers everything the patrol covers");
-    // ...so a building started after a look isn't seen until the next one, which delivers the change.
+    assert!(!first.channels.contains_key("inspector/river-patrol"), "nothing of the bank is shown to someone who hasn't gone");
+    let built = |cells: &[oikos_kernel::observe::SiteCell]| cells.iter().find(|p| p.cell == "cell.2.1").is_some_and(|p| p.structure.is_some());
+    assert!(built(&go_and_see(&mut run, "inspector-system", "inspector/river-patrol", &["cell.2.1"])), "going there, it sees the house");
+    // ...and a building started after a visit isn't seen until someone goes again.
     let mut run = town();
-    run.command(&Command::Observe { participant: "inspector-system".into(), only: None }).unwrap();
+    assert!(!built(&go_and_see(&mut run, "inspector-system", "inspector/river-patrol", &["cell.2.1"])), "bare ground when it went");
     act(&mut run, "builder", json!([{"block": "construct", "at": "cell.2.1", "structure_type": "house", "materials_at": "s-shop"}]));
     run.command(&Command::Advance { to: 13 * DAY }).unwrap();
     let before = run.command(&Command::Observe { participant: "inspector-system".into(), only: None }).unwrap().observation.unwrap();
-    assert!(!saw(&before), "day 13: the patrol hasn't been by yet");
-    run.command(&Command::Advance { to: 14 * DAY }).unwrap();
-    let after = run.command(&Command::Observe { participant: "inspector-system".into(), only: None }).unwrap().observation.unwrap();
-    assert!(saw(&after), "day 14: the patrol sees it");
+    assert!(!before.channels.contains_key("inspector/river-patrol"), "day 13: nobody has been by, so nothing is seen");
+    assert!(built(&go_and_see(&mut run, "inspector-system", "inspector/river-patrol", &["cell.2.1"])), "going again, it sees it");
+    // A visit takes the looker's time, and says so: half an hour at the place in this world (`knowing.visit_seconds`).
+    assert!(run.kernel().state().t >= 13 * DAY + 1800);
 }
 
 #[test]
@@ -253,10 +252,16 @@ fn agreements_execute_nothing_by_themselves() {
 
 #[test]
 fn visibility_decides_who_perceives_what() {
-    // Give Bob a channel showing every record, so only visibility can hide one from him.
+    // Give Bob a channel onto every kind of record, so only visibility can hide one from him. No channel shows "any
+    // record" any more (docs/design/knowing.md): for this test the world declares every kind of record published, and
+    // Bob reads them all.
     let mut c = riverbend();
+    let kinds = ["claim", "claim_transfer", "claim_release", "agreement", "signature", "notice", "statement", "withdrawal", "vote", "entity_declaration"];
+    let published = c["knowing"]["published"].as_array_mut().unwrap();
+    published.extend(kinds.iter().map(|k| json!({"what": format!("records:{k}"), "why": "For this test, every record is published: only visibility hides one."})));
+    c["knowing"]["keepers"] = json!([]);
     let bob = c["participants"].as_array_mut().unwrap().iter_mut().find(|s| s["id"] == "bob-self").unwrap();
-    bob["channels"].as_array_mut().unwrap().push(json!({"id": "everything", "kind": "records", "match": {}}));
+    bob["channels"].as_array_mut().unwrap().push(json!({"id": "everything", "kind": "records", "way": "published", "match": {"records": kinds}}));
     let mut run = Run::start(c, "visibility", Vec::new(), None).unwrap();
     let sees = |run: &mut Run<Vec<u8>>, participant: &str, id: &str| {
         let obs = run.command(&Command::Observe { participant: participant.into(), only: None }).unwrap().observation.unwrap();
