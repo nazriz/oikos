@@ -142,6 +142,10 @@ export function withheld(law: IncomeTaxLaw | undefined, gross: number, period: n
   return { total, parts: taking.filter((c) => c.amount > 0) };
 }
 
+/** The span a day's pay is reckoned over, for what the law takes from it: a day's pay is pay for a working day, so a
+ * year's is the working days of a year of it (the week over its working days), not every day of the year. */
+export const dayPayPeriod = (workDaysAWeek: number) => Math.round((7 * 86_400) / Math.min(7, Math.max(1, workDaysAWeek)));
+
 /** What's withheld from a pay of `gross` every `period` seconds, in all (rounded down). No law: nothing. */
 export function withholding(law: IncomeTaxLaw | undefined, gross: number, period: number): number {
   return withheld(law, gross, period).total;

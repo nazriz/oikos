@@ -99,7 +99,8 @@ An outcome says:
 | Area | Kinds | Facts |
 |---|---|---|
 | shop | `served` | ordered, delivered, refund, order |
-| job | `hired`; `paid` (each pay); `unpaid`; `rise`; `ended` | wage, period_days, days_without; amount, agreed, paid_at, days_since_last, period_days; periods_missed, owed; rise_bps; by (self, other, term), held_days |
+| job | `hired`; `paid` (each pay; a day's, for work by the day); `unpaid`; `no_work` (work by the day that brought no pay); `rise`; `ended` | wage, period_days, days_without; amount, agreed, paid_at, days_since_last, period_days; periods_missed, owed; rise_bps; by (self, other, term), held_days |
+| own_work | `drawn` (what the person's own business paid them; follows no decision) | amount, paid_at |
 | home | `lease_signed`; `moved_in`, `not_in_yet`; `rent_increase`; `renewed`; `notice_received`; `ended` | rent, days_without; why; rent, was, from, bearable, challenged; by, held_days |
 | practice | `attended`, `turned_away`; `stayed`; `expected` | host, others, meaning |
 | membership | `joined`; `rise_won`; `stoppage_called` | with, dues; employer, rise_bps |

@@ -937,7 +937,7 @@
                 "type": "string"
               },
               "kind": {
-                "description": "What happened, in a word. shop: served. job: hired, paid, unpaid, rise, ended. home: lease_signed, moved_in, not_in_yet, rent_increase, renewed, notice_received, ended. practice: attended, turned_away, stayed, expected. membership: joined, rise_won, stoppage_called. goal: met, not_met. venture: founded, refused, capital_called. petition: signatures, closed. Any area: told (another's experience, as they told it). belief: told. A reader should take a kind it does not know as a fact of that name.",
+                "description": "What happened, in a word. shop: served. job: hired, paid, unpaid, no_work (work by the day that brought no pay), rise, ended. own_work: drawn (what the citizen's own business paid them). home: lease_signed, moved_in, not_in_yet, rent_increase, renewed, notice_received, ended. practice: attended, turned_away, stayed, expected. membership: joined, rise_won, stoppage_called. goal: met, not_met. venture: founded, refused, capital_called. petition: signatures, closed. Any area: told (another's experience, as they told it). belief: told. A reader should take a kind it does not know as a fact of that name.",
                 "type": "string",
                 "maxLength": 64
               },
@@ -1126,7 +1126,7 @@
           "$ref": "urn:oikos:contracts:0.8:common#/$defs/SimTime"
         },
         "kind": {
-          "description": "What happened, in a word. shop: served. job: hired, paid, unpaid, rise, ended. home: lease_signed, moved_in, not_in_yet, rent_increase, renewed, notice_received, ended. practice: attended, turned_away, stayed, expected. membership: joined, rise_won, stoppage_called. goal: met, not_met. venture: founded, refused, capital_called. petition: signatures, closed. Any area: told (another's experience, as they told it). belief: told. A reader should take a kind it does not know as a fact of that name.",
+          "description": "What happened, in a word. shop: served. job: hired, paid, unpaid, no_work (work by the day that brought no pay), rise, ended. own_work: drawn (what the citizen's own business paid them). home: lease_signed, moved_in, not_in_yet, rent_increase, renewed, notice_received, ended. practice: attended, turned_away, stayed, expected. membership: joined, rise_won, stoppage_called. goal: met, not_met. venture: founded, refused, capital_called. petition: signatures, closed. Any area: told (another's experience, as they told it). belief: told. A reader should take a kind it does not know as a fact of that name.",
           "type": "string",
           "maxLength": 64
         },

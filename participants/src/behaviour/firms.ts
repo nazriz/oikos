@@ -12,13 +12,13 @@
 // through its bank, pays suppliers (the outside world) a share of its
 // revenue, and lays off when it can't cover a pay period.
 
-import { cents, smallestNow } from "../money";
+import { cents, moneyNow } from "../money";
 import * as C from "../calls";
 import type { LookRequest, Observation, Offer, ParticipantAction, StatementRecord } from "../contracts";
 import { basesOf, channels } from "../contracts";
 import { params, wait, type Belief, type BehaviourModule, type ParticipantContext, type Taken } from "../module";
 import { distribute } from "./lengnick";
-import { incomeTaxLaw, withheld, type Charge } from "./tax";
+import { dayPayPeriod, incomeTaxLaw, withheld, type Charge } from "./tax";
 import { ask, Asked, because, between, Book, PAYEE_DIED, breaches, noting, callAction, usd, cellsOf, commitmentOf, DAY, jobTerms, leaseTerms, MONTH, notice, offer, ownAccount, pay, publishedPrice, say, stoodEmpty, structureOf, withdraw, type Step } from "./common";
 import * as P from "./papers";
 
@@ -260,7 +260,7 @@ export const landlord: BehaviourModule = {
             template: "lease", term: months * MONTH, ...(p.after_term ? { then: p.after_term } : {}), ourNotice: p.landlord_notice_days * DAY, theirNotice: p.tenant_notice_days * DAY,
             we: C.call("occupancy", { who: tenant, in: listing.data.space }),
             they: pay(acc.account, listing.data.rent, { every: MONTH, for: "rent" }),
-            text: `${tenant} rents home ${listing.data.space} from ${me} for ${smallestNow(listing.data.rent)} a month, for ${months} months${household.length ? `, to live there with their household: ${household.join(", ")}` : ""}.`,
+            text: `${tenant} rents home ${listing.data.space} from ${me} for ${moneyNow(listing.data.rent)} a month, for ${months} months${household.length ? `, to live there with their household: ${household.join(", ")}` : ""}.`,
             basis: pick.id,
           })],
           withdraw(listingId, "Let."),
@@ -287,7 +287,7 @@ export const landlord: BehaviourModule = {
             template: "lease", term: ends - t + months * MONTH, ...(p.after_term ? { then: p.after_term } : {}), ourNotice: p.landlord_notice_days * DAY, theirNotice: p.tenant_notice_days * DAY,
             we: C.call("occupancy", { who: tenant, in: lt.space }),
             they: pay(acc.account, rent, { every: MONTH, for: "rent" }),
-            text: `${tenant} rents home ${lt.space} from ${me} for ${smallestNow(rent)} a month, renewing their lease (${a.id}) for ${months} months from day ${Math.floor(ends / DAY)}${household ? `, to live there with their household: ${household}` : ""}.`,
+            text: `${tenant} rents home ${lt.space} from ${me} for ${moneyNow(rent)} a month, renewing their lease (${a.id}) for ${months} months from day ${Math.floor(ends / DAY)}${household ? `, to live there with their household: ${household}` : ""}.`,
             basis: a.id,
           })]));
       }
@@ -295,7 +295,7 @@ export const landlord: BehaviourModule = {
       // Vacancies: list each free unit, at a markup over what we currently get for homes in that building.
       const openListings = book.open("rental_listing").filter((l) => l.speaks_for === me);
       const listing = (o: (typeof owned)[number], rent: number) =>
-        say("rental_listing", `Home to let: ${o.space}${o.bedrooms ? `, ${o.bedrooms} bedrooms` : ""}, ${smallestNow(rent)} a month.`, { data: { structure: o.structure, space: o.space, type: o.type, ...(o.bedrooms ? { bedrooms: o.bedrooms } : {}), rent },
+        say("rental_listing", `Home to let: ${o.space}${o.bedrooms ? `, ${o.bedrooms} bedrooms` : ""}, ${moneyNow(rent)} a month.`, { data: { structure: o.structure, space: o.space, type: o.type, ...(o.bedrooms ? { bedrooms: o.bedrooms } : {}), rent },
           // The lease it's for (2a): the home to occupy, the rent monthly.
           offer: { by: me, take_up: "apply", available: 1, terms: { template: "lease", ...(p.after_term ? { then: p.after_term } : {}), commitments: [
             { who: me, does: { outcome: { occupancy: { in: o.space } } } },
@@ -438,7 +438,7 @@ export const landlord: BehaviourModule = {
           const reported = obeys(`tax-${t}`) ? income : Math.floor(income / 2);
           tax = Math.min(acc.balance, Math.floor((reported * p.tax_rate_bps) / 10_000));
           steps.push(because(reported === income ? "Monthly: reporting rent received to the town, and paying tax at the rate the law sets." : "Monthly: reporting rent received to the town (only half of it), and paying tax on that.",
-            say("tax_report", `Rent received this month: ${smallestNow(reported)}.`, { to: [p.city], data: { period_end: t, rent_received: reported, account: acc.account } }),
+            say("tax_report", `Rent received this month: ${moneyNow(reported)}.`, { to: [p.city], data: { period_end: t, rent_received: reported, account: acc.account } }),
             ...(tax > 0 ? [pay(p.city_account, tax, { from: acc.account, for: "Tax on rent received." })] : []),
           ));
         }
@@ -625,6 +625,12 @@ export function staffingUnder(d: StatementRecord | undefined): { recruit: boolea
 type Withheld = { total: number; parts: { charge: Charge; amount: number }[] };
 const NOTHING_WITHHELD: Withheld = { total: 0, parts: [] };
 
+/** Work by the day (docs/behaviour/firms.md, "Work by the day"): an employment agreement whose pay is a day's. The hand
+ * is paid for each day worked, by a payment that day and no standing order, and either side ends it without notice. */
+export const byTheDay = (a: any): boolean => a?.record === "agreement" && a.terms?.template === "employment" && a.terms.commitments?.some((c: any) => c.who === a.terms.parties[0] && c.every === DAY && c.does?.outcome?.money);
+/** The notice such an agreement gives: none (the least a term can say). */
+export const NO_NOTICE = 1;
+
 export class Staffing {
   private readonly orders = new Map<string, string>(); // agreement -> wage standing order
   private readonly pendingOrder = new Map<string, string>(); // step marker -> agreement
@@ -662,7 +668,60 @@ export class Staffing {
   /** `own`: when several offices of one organisation hire (the town's works and environment offices), which staff and
    * postings are this office's: those in its `role` ("role"), or those or ones that name no role (the staff the world
    * started with: "role_or_unnamed"). Absent: all of the organisation's (a payroll). */
-  constructor(private readonly ctx: ParticipantContext, private readonly me: string, private readonly o: { period: number; notice_days: number; workplace?: string; role: string; industry?: string; does?: { hire?: boolean; pay?: boolean }; own?: "role" | "role_or_unnamed" }) {}
+  /** `registered_bps`: of the jobs this employer fills, the share it puts on its payroll returns (10,000, or nothing
+   * said: all of them). A job it does not register is paid whole: nothing is withheld from it and no report names
+   * its worker (docs/behaviour/firms.md, "Jobs an employer does not register"). */
+  constructor(private readonly ctx: ParticipantContext, private readonly me: string, private readonly o: { period: number; notice_days: number; workplace?: string; role: string; industry?: string; does?: { hire?: boolean; pay?: boolean }; own?: "role" | "role_or_unnamed"; registered_bps?: number; casual_bps?: number; day_wage?: number; work_days?: number; week_days?: number }) {}
+  // Work by the day (`casual_bps`: of the jobs this employer fills, the share it fills by the day; `day_wage`: what it
+  // pays for a day, at the wage it began with; `work_days`: the days of the week it works; `week_days`: the working days of the world's week, over which a day's
+  // pay is reckoned as a year's for what the law withholds). Whom we have paid for
+  // which day; and the wage we began with, by which the day's pay moves as ours does.
+  private readonly paidOn = new Map<string, number>(); // agreement -> the day we last paid for
+  private wage0: number | undefined;
+  private dayWage(wage: number): number {
+    return Math.max(1, Math.round(((this.o.day_wage ?? 0) * wage) / Math.max(1, this.wage0 ?? wage)));
+  }
+  /** Whether the job we post next is one by the day (the share the world gives; drawn for each posting). */
+  private postsByTheDay(t: number): boolean {
+    const share = this.o.casual_bps ?? 0;
+    return share > 0 && (this.o.day_wage ?? 0) > 0 && this.ctx.rng(`by-the-day-${t}`).below(10_000) < share;
+  }
+  /** A posting: for a job on a standing wage, or (the employer's share of them) for work by the day. */
+  private posting(t: number, wage: number, account: string, byDay = this.postsByTheDay(t)): C.Call {
+    const place = this.o.workplace ? { workplace: structureOf(this.o.workplace), space: this.o.workplace } : {};
+    if (byDay) {
+      const day = this.dayWage(wage);
+      return say("job_posting", `Hiring by the day: ${moneyNow(day)} for each day worked.`, { data: { wage: day, period: DAY, by_the_day: true, role: this.o.role, ...(this.o.industry ? { industry: this.o.industry } : {}), ...place },
+        offer: { by: this.me, to: { min_age_years: 18 }, take_up: "apply", available: 1, terms: { template: "employment",
+          commitments: [{ who: this.me, does: { outcome: { money: { ...(account ? { from: account } : {}), amount: String(day), for: "a day's work" } } }, every: DAY },
+            ...(this.o.workplace ? [{ who: "taker", does: { outcome: { occupancy: { in: this.o.workplace } } } } as const] : [])],
+          termination: [{ party: this.me, notice: NO_NOTICE }, { party: "taker" as const, notice: NO_NOTICE }] } } });
+    }
+    return say("job_posting", `Hiring: ${moneyNow(wage)} every ${this.o.period / DAY} days.`, { data: { wage, period: this.o.period, role: this.o.role, ...(this.o.industry ? { industry: this.o.industry } : {}), ...place }, offer: this.jobOffer(wage, account) });
+  }
+  // Jobs we have not registered: our own note of each (a record only we see), from the start or made when we took
+  // the worker on; and the jobs we have already decided about.
+  private readonly offBooks = new Set<string>();
+  private readonly decided = new Set<string>();
+  private notesRead = 0;
+  /** Whether a job is one we do not register (decided once, when its wages start; a note of ours says so after). */
+  private readNotes(book: Book) {
+    const notes = book.all("off_books");
+    for (; this.notesRead < notes.length; this.notesRead++) {
+      const r = notes[this.notesRead]!;
+      if (r.speaks_for === this.me && r.data?.agreement) this.offBooks.add(String(r.data.agreement));
+    }
+  }
+  private unregistered(book: Book, agreement: string): { off: boolean; note?: C.Call } {
+    this.readNotes(book);
+    if (this.offBooks.has(agreement)) return { off: true };
+    const share = this.o.registered_bps ?? 10_000;
+    if (share >= 10_000 || this.decided.has(agreement)) return { off: false };
+    this.decided.add(agreement);
+    if (this.ctx.rng(`registers-${agreement}`).below(10_000) < share) return { off: false };
+    this.offBooks.add(agreement);
+    return { off: true, note: say("off_books", `Not on our payroll returns: ${agreement}.`, { visible: [this.me], basis: agreement, data: { agreement } }) };
+  }
   /** The role an employment agreement names ("... works for X as <role> for <the wage> every N days."), if any. */
   private roleOf(a: any): string | undefined {
     return / as (.+?) for (?:(?! for ).)+ every \d+ days\.$/.exec(a.terms?.text ?? "")?.[1];
@@ -687,7 +746,7 @@ export class Staffing {
     for (const tx of channels.transactions(obs)) {
       if (!tx.per_instruction || !ours.has(tx.per_instruction)) continue;
       const w = this.withholds.get(tx.per_instruction) ?? NOTHING_WITHHELD;
-      this.owe(this.lawId, w, ours.get(tx.per_instruction), cents(tx.amount) + w.total);
+      if (!this.offBooks.has(ours.get(tx.per_instruction)!)) this.owe(this.lawId, w, ours.get(tx.per_instruction), cents(tx.amount) + w.total);
       this.wagesPaid += cents(tx.amount) + w.total;
     }
   }
@@ -747,14 +806,15 @@ export class Staffing {
   /** `recruit: false`: the office has been directed not to recruit (docs/behaviour/directions.md): it advertises no
    * post, takes its standing advertisements down (saying why: `stopped`), and makes no offer to an applicant, while
    * that stands. Those it employs, their pay and their notice go on as they were. */
-  routine(obs: Observation, book: Book, account: string, want: { target: number; wage: number; canPost: boolean; why?: string; recruit?: boolean; stopped?: string }): Step[] {
+  routine(obs: Observation, book: Book, account: string, want: { target: number; wage: number; canPost: boolean; why?: string; recruit?: boolean; stopped?: string; /** Whether there is work today for hands by the day (nothing said: yes). */ work?: boolean }): Step[] {
     const t = obs.t;
     const me = this.me;
     // Genesis standing orders for existing staff (what each withholds: the agreed wage less what it pays; charge by
     // charge as the law reckons it, where that comes to the same).
     const law = incomeTaxLaw(book);
     this.lawId = law?.id ?? this.lawId;
-    for (const r of book.open("request")) for (const b of r.speaks_for === me ? basesOf(r) : []) if (b && !this.orders.has(b)) {
+    this.readNotes(book);
+    for (const r of book.open("request")) for (const b of r.speaks_for === me && r.data?.every ? basesOf(r) : []) if (b && !this.orders.has(b)) {
       this.orders.set(b, r.id);
       const a = book.records.get(b);
       const gross = a?.record === "agreement" ? cents(commitmentOf(a, me).outcome?.money?.amount ?? 0) : 0;
@@ -783,6 +843,7 @@ export class Staffing {
     for (const a of doesPay ? staff : []) {
       // (Not a job we've given notice on: a worker who died has their order withdrawn, and isn't a new hire.)
       if (this.orders.has(a.id) || this.stopped.has(a.id) || this.noticed.has(a.id) || [...this.pendingOrder.values()].includes(a.id)) continue;
+      if (byTheDay(a)) continue; // (paid for each day worked, below: no standing order)
       const worker = a.terms.parties[1];
       const pays = { ...jobTerms(a, worker) };
       pays.wage = this.gross.get(a.id) ?? pays.wage;
@@ -790,8 +851,15 @@ export class Staffing {
       if (!to) continue;
       const ref = `wo${this.n++}`;
       this.pendingOrder.set(ref, a.id);
-      const w = withheld(law, pays.wage, pays.period), tax = w.total;
+      // (A job we do not register is paid whole: nothing withheld, and our returns will not name it.)
+      const reg = this.unregistered(book, a.id);
+      const w = reg.off ? NOTHING_WITHHELD : withheld(law, pays.wage, pays.period), tax = w.total;
       if (tax > 0) this.pendingWithhold.set(ref, w);
+      if (reg.off) {
+        steps.push(because("A new hire has signed: starting their wages by standing order, whole. This job is not going on our payroll returns.",
+          [ref, pay(to, pays.wage, { from: account, every: pays.period, first: pays.period, basis: a.id, for: `Wages for ${worker}.` })], ...(reg.note ? [reg.note] : [])));
+        continue;
+      }
       steps.push(because(tax > 0 ? `A new hire has signed: starting their wages by standing order, ${usd(pays.wage - tax)} after the ${usd(tax)} of income tax the law says to withhold.` : "A new hire has signed: starting their wages by standing order.",
         [ref, pay(to, pays.wage - tax, { from: account, every: pays.period, first: pays.period, basis: a.id, for: `Wages for ${worker}.` })]));
     }
@@ -819,6 +887,34 @@ export class Staffing {
       this.orders.delete(a.id);
     }
 
+    // Work by the day: each hand who is at work today is paid the day's wage today, once, by a payment of its own
+    // (less what the law withholds from a day's pay, where the job is one we register). A day we have no work for
+    // them (`want.work` false), a day that is not a working day, a hand who is not there: no pay, and nothing owed.
+    // Short of the money for all of them, we pay those we can, the longest with us first.
+    this.wage0 ??= want.wage;
+    const hands = doesPay ? staff.filter((a) => byTheDay(a) && !this.noticed.has(a.id)) : [];
+    const today = Math.floor(t / DAY);
+    if (hands.length && want.work !== false && today % 7 < (this.o.work_days ?? 5)) {
+      const here = this.o.workplace ? new Set(channels.cells(obs).flatMap((c) => (c.structure?.structure === structureOf(this.o.workplace!) ? c.structure.spaces.filter((sp) => sp.space === this.o.workplace).flatMap((sp) => sp.occupants ?? []) : []))) : undefined;
+      let left = cents(channels.accounts(obs).find((x) => x.account === account)?.balance ?? 0);
+      const lines: C.Call[] = [];
+      for (const a of hands) {
+        const worker = a.terms.parties[1] as string;
+        if (this.paidOn.get(a.id) === today || (here && !here.has(worker))) continue;
+        const day = this.wageOf(a); // (the day's pay agreed, with any rise since)
+        const to = this.payee(book, a);
+        if (!to || day > left) continue;
+        const reg = this.unregistered(book, a.id);
+        const w = reg.off ? NOTHING_WITHHELD : withheld(law, day, dayPayPeriod(this.o.week_days ?? 5));
+        this.paidOn.set(a.id, today);
+        left -= day;
+        if (!reg.off) this.owe(law?.id, w, a.id, day);
+        this.wagesPaid += day;
+        lines.push(pay(to, day - w.total, { from: account, basis: a.id, for: `A day's work: ${worker}.` }), ...(reg.note ? [reg.note] : []));
+      }
+      for (let i = 0; i < lines.length; i += 30) steps.push(because(`Paying today's hands for the day (${lines.length} by the day).`, ...lines.slice(i, i + 30)));
+    }
+
     // Hiring: one applicant at random per posting, at the posting's wage.
     const posts = this.postings(book);
     const apps = book.open("job_application").filter((a) => (a.addressed_to ?? []).includes(me) && !this.handled.has(a.id));
@@ -832,12 +928,22 @@ export class Staffing {
       const chosen = this.ctx.rng(`hire-${post.id}`).pick(mine);
       const worker = chosen.speaks_for!;
       const wage = Number.isInteger(post.data?.wage) ? (post.data!.wage as number) : want.wage;
+      if (post.data?.by_the_day) {
+        steps.push(because(`Taking on a hand by the day: an applicant picked at random among ${mine.length}.`,
+          ["job", offer(worker, { template: "employment", ourNotice: NO_NOTICE, theirNotice: NO_NOTICE,
+            we: pay(chosen.data?.account ?? worker, wage, { every: DAY, for: "a day's work" }),
+            they: this.o.workplace ? C.call("occupancy", { who: worker, in: this.o.workplace }) : undefined,
+            text: `${worker} works for ${me} by the day, for ${moneyNow(wage)} for each day worked; either may end it at once.`, basis: chosen.id })],
+          withdraw(post.id, "Filled.")));
+        offersNow++;
+        continue;
+      }
       steps.push(because(`Hiring for our posting: an applicant picked at random among ${mine.length}.`,
         ["job", offer(worker, {
           template: "employment", ourNotice: this.o.notice_days * DAY, theirNotice: this.o.notice_days * DAY,
           we: pay(chosen.data?.account ?? worker, wage, { every: this.o.period, for: "wages" }),
           they: this.o.workplace ? C.call("occupancy", { who: worker, in: this.o.workplace }) : undefined,
-          text: `${worker} works for ${me} as ${post.data?.role ?? "staff"} for ${smallestNow(wage)} every ${this.o.period / DAY} days.`,
+          text: `${worker} works for ${me} as ${post.data?.role ?? "staff"} for ${moneyNow(wage)} every ${this.o.period / DAY} days.`,
           basis: chosen.id,
         })],
         withdraw(post.id, "Filled."),
@@ -857,7 +963,7 @@ export class Staffing {
         const keep = staff.reduce((x, a) => x + jobTerms(a, a.terms.parties[1]).wage, 0);
         let left = Math.max(0, cents(balance) - keep);
         // Who was paid what since we last reported, for a charge whose report names each worker.
-        const lines = [...this.paidSince].map(([agreement, gross]) => ({ worker: (book.records.get(agreement) as any)?.terms?.parties?.[1] as string | undefined, gross }))
+        const lines = [...this.paidSince].filter(([agreement]) => !this.offBooks.has(agreement)).map(([agreement, gross]) => ({ worker: (book.records.get(agreement) as any)?.terms?.parties?.[1] as string | undefined, gross }))
           .filter((x): x is { worker: string; gross: number } => !!x.worker).sort((a, b) => (a.worker < b.worker ? -1 : a.worker > b.worker ? 1 : 0));
         // One report to each collector, in the law's order, with what is paid into each of its accounts.
         for (const collector of [...new Set(due.map((x) => x.charge.collector))]) {
@@ -893,15 +999,15 @@ export class Staffing {
     }
 
     // A posting unfilled at an old wage (ours has moved since): published again at the wage we offer now.
-    for (const post of doesHire ? posts : []) if (!apps.some((a) => a.data?.posting === post.id) && Number.isInteger(post.data?.wage) && post.data!.wage !== want.wage && want.canPost) {
-      steps.push(because(`Our posting is still open, at ${usd(post.data!.wage as number)}; we offer ${usd(want.wage)} now: posting it again at that.`, withdraw(post.id, "Superseded: a new wage."),
-        say("job_posting", `Hiring: ${smallestNow(want.wage)} every ${this.o.period / DAY} days.`, { data: { wage: want.wage, period: this.o.period, role: this.o.role, ...(this.o.industry ? { industry: this.o.industry } : {}), ...(this.o.workplace ? { workplace: structureOf(this.o.workplace), space: this.o.workplace } : {}) }, offer: this.jobOffer(want.wage, account) })));
+    for (const post of doesHire ? posts : []) if (!apps.some((a) => a.data?.posting === post.id) && Number.isInteger(post.data?.wage) && post.data!.wage !== (post.data?.by_the_day ? this.dayWage(want.wage) : want.wage) && want.canPost) {
+      steps.push(because(`Our posting is still open, at ${usd(post.data!.wage as number)}; we offer ${usd(post.data?.by_the_day ? this.dayWage(want.wage) : want.wage)} now: posting it again at that.`, withdraw(post.id, "Superseded: a new wage."),
+        this.posting(t, want.wage, account, !!post.data?.by_the_day)));
     }
 
     // Post a job if short-staffed (and the module says we can).
     const have = staff.length + offered.length + offersNow;
     if (doesHire && have < want.target && posts.length === 0 && want.canPost) {
-      steps.push(because(want.why ?? `Short-staffed (${have} of ${want.target}): posting a job.`, say("job_posting", `Hiring: ${smallestNow(want.wage)} every ${this.o.period / DAY} days.`, { data: { wage: want.wage, period: this.o.period, role: this.o.role, ...(this.o.industry ? { industry: this.o.industry } : {}), ...(this.o.workplace ? { workplace: structureOf(this.o.workplace), space: this.o.workplace } : {}) }, offer: this.jobOffer(want.wage, account) })));
+      steps.push(because(want.why ?? `Short-staffed (${have} of ${want.target}): posting a job.`, this.posting(t, want.wage, account)));
     }
     return steps;
   }
@@ -941,7 +1047,7 @@ export class Staffing {
       const to = this.payee(book, a);
       if (!order || !to || this.stopped.has(a.id)) continue;
       const period = jobTerms(a, a.terms.parties[1]).period;
-      const tax = withheld(law, wage, period);
+      const tax = this.offBooks.has(a.id) ? NOTHING_WITHHELD : withheld(law, wage, period);
       const ref = `wo${this.n++}`;
       lines.push(withdraw(order, "Superseded: a new wage."), [ref, pay(to, wage - tax.total, { from: account, every: period, first: Math.max(DAY, this.nextDue(book, order, t) - t), basis: a.id, for: `Wages for ${a.terms.parties[1]}.` })] as any);
       refs.push([ref, a.id, tax]);
@@ -987,12 +1093,12 @@ export class Staffing {
       const period = jobTerms(a, a.terms.parties[1]).period;
       const wage = this.wageOf(a);
       const earned = Math.max(0, Math.floor((wage * Math.min(period, Math.max(0, since - lastDue))) / period));
-      const each = withheld(law, wage, period), perPay = each.total;
+      const each = this.offBooks.has(a.id) ? NOTHING_WITHHELD : withheld(law, wage, period), perPay = each.total;
       // (For the part of a pay period worked: that part of what a whole pay withholds, charge by charge.)
       const tax = Math.floor((perPay * earned) / Math.max(1, wage));
       const part = each.parts.map((c) => ({ charge: c.charge, amount: Math.floor((c.amount * earned) / Math.max(1, wage)) }));
       if (part[0]) part[0].amount += tax - part.reduce((x, c) => x + c.amount, 0);
-      this.owe(law?.id, { total: tax, parts: part }, a.id, earned);
+      if (!this.offBooks.has(a.id)) this.owe(law?.id, { total: tax, parts: part }, a.id, earned);
       this.wagesPaid += earned;
       const ref = `wo${this.n++}`;
       this.pendingOrder.set(ref, a.id);

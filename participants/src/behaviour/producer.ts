@@ -25,7 +25,7 @@ export const producer: BehaviourModule = {
   name: "firm.producer",
   issues: [P.JOB_ADVERTISEMENT, ...P.TRADE],
   issuesWith: (p) => ({ ...P.staffingOwn({ role: p.role ?? "factory worker", industry: p.industry, workplace: p.workplace, notice_days: p.notice_days ?? 14 }) }),
-  version: "0.4.2",
+  version: "0.4.4", // 0.4.4: takes on the share of its hands the world gives by the day; 0.4.3: registers the share of its jobs the world gives for its kind
   doc: "docs/behaviour/producer.md",
   cadence: () => DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(24) * 3600,
@@ -46,6 +46,12 @@ export const producer: BehaviourModule = {
         wage: 150_000, // the wage it offers new hires, cents per period
         period: 14 * DAY,
         notice_days: 14,
+        // Of the jobs it fills, the share it puts on its payroll returns (the world's figure for employers of its kind;
+        // 10,000: all). One it does not register is paid whole, and reported to nobody (docs/behaviour/firms.md).
+        registered_bps: 10_000,
+        // Work by the day (docs/behaviour/firms.md): of the jobs it fills, the share it fills by the day, and what it
+        // pays for a day (the world's figures for employers of its kind; 0: every job is on a standing wage).
+        casual_bps: 0, day_wage: 0,
         working_day: 8 * 3600,
         work_days: 5, // of every 7 look_at: 0, look_days: 5, // when its staff are in (a time of day on working days: the world's; 0, whenever it wakes)
         price: 6000, // its wholesale price, cents each
@@ -67,7 +73,7 @@ export const producer: BehaviourModule = {
     need(p, ["supplier", "market"], "firm.producer");
     const me = ctx.entity;
     const book = new Book();
-    const staffing = new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, workplace: p.workplace, role: p.role, ...(p.industry ? { industry: p.industry } : {}) });
+    const staffing = new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, registered_bps: p.registered_bps, casual_bps: p.casual_bps, day_wage: p.day_wage, work_days: p.work_days, week_days: p.look_days, workplace: p.workplace, role: p.role, ...(p.industry ? { industry: p.industry } : {}) });
     const borrowing = new Borrowing(me, p.lender);
     const bargaining = new Bargaining(me);
     const winding = new WindingUp(me, { short_days: p.short_days, wind_up_days: p.wind_up_days, idle_days: p.idle_days, reprice_days: p.reprice_days, reprice_bps: p.reprice_bps });

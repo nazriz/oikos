@@ -21,3 +21,26 @@ test("the mock participant says its brain's calls, and confirms only a draft who
   const good = (await p.participant(obs([{ id: "d2", proposal: said, call: 'statement(kind=notice, text="Hello.")' }]))) as any[];
   expect(good[0].input).toMatchObject({ ref: "d2", decision: "confirm" });
 });
+
+test("a look the brain asks for while reading what it missed between sittings is made at the sitting, not dropped", async () => {
+  // A brain that, like a code mayor, sends someone to see a lot once (it remembers having asked) and then waits for
+  // what they found. Read outside office hours, its look could not be made; it was dropped, and it never asked again.
+  let asked = false;
+  const seen: number[] = [];
+  const brain = { step: (o: any) => (seen.push(o.t), asked ? { type: "wait" as const } : ((asked = true), { type: "look" as const, looks: [{ channel: "town", visit: { places: ["cell.3.4"] } }, { channel: "who", who: { name: "clerk" } }] })) };
+  const ctx = { participant: "ada", entity: "city", position: "mayor", rng: (p: string) => new Randomness(1n).stream([p]), world: {} as any, params: {} };
+  const p = mockPolicies(new Map([["ada", { controller: brain, ctx, capacity: "mayor" }]]));
+  const o = (t: number) => ({ t, drafts: [], channels: {}, entity: "city", inbox: [], outcomes: [] });
+  // A sitting at nine, with what it was shown at six that morning (before hours) among what it missed.
+  const said = (await p.participant({ context: { participant: "ada", observation: o(9 * 3600), missed: [o(6 * 3600)] } } as any)) as any[];
+  expect(seen).toEqual([6 * 3600, 9 * 3600]);
+  expect(said.map((b) => [b.name, b.input])).toEqual([["look", { report: "mayor/town", named: ["cell.3.4"] }], ["look", { report: "mayor/who", named: ["clerk"] }]]);
+  // Made once: the next turn has nothing owed.
+  expect(((await p.participant({ context: { participant: "ada", observation: o(9 * 3600) } } as any)) as any[]).map((b) => b.name)).toEqual(["done_for_now"]);
+  // More looks than one answer takes: the rest are made at the next turn.
+  let many = false;
+  const wide = { step: () => (many ? { type: "wait" as const } : ((many = true), { type: "look" as const, looks: Array.from({ length: 10 }, (_, i) => ({ channel: `r${i}`, query: { where: [{ field: "id", op: "=" as const, value: `x${i}` }] } })) })) };
+  const q = mockPolicies(new Map([["ada", { controller: wide, ctx, capacity: "mayor" }]]));
+  expect(((await q.participant({ context: { participant: "ada", observation: o(0) } } as any)) as any[]).length).toBe(8);
+  expect(((await q.participant({ context: { participant: "ada", observation: o(0) } } as any)) as any[]).map((b) => b.input.report)).toEqual(["mayor/r8", "mayor/r9"]);
+});

@@ -1,4 +1,4 @@
--- Rent against household income at the end of each run (households with a lease and someone earning): the median share, and the share of households paying over 30% of gross income ("rental stress"). Income is wages under employment agreements still in force, by the pay period each agreement states; rent is the leaseholder's latest lease. Calibration targets: docs/calibration.md.
+-- Rent against household income at the end of each run (households with a lease and someone earning): the median share, and the share of households paying over 30% of gross income ("rental stress"). Income is wages under employment agreements still in force, by the pay period each agreement states (work by the day: the day's pay for five days of each seven), and, for someone with a business of their own, what it paid them over the run's last 90 days, by the month; rent is the leaseholder's latest lease. Calibration targets: docs/calibration.md.
 with signed as (select distinct json_extract_string(body, '$.agreement') as agreement, run_id from records where record = 'signature'),
 noticed as (select distinct json_extract_string(body, '$.agreement') as agreement, run_id from records where record = 'notice'),
 agreements as (
@@ -12,15 +12,22 @@ leases as (
 jobs as (
   select a.run_id, a.second as worker,
     sum((json_extract_string(list_filter(a.commitments, c -> json_extract_string(c, '$.who') = a.first)[1], '$.does.outcome.money.amount'))::HUGEINT * 2592000
-      / (json_extract_string(list_filter(a.commitments, c -> json_extract_string(c, '$.who') = a.first)[1], '$.every'))::BIGINT) as monthly
+      / (json_extract_string(list_filter(a.commitments, c -> json_extract_string(c, '$.who') = a.first)[1], '$.every'))::BIGINT
+      * (case when (json_extract_string(list_filter(a.commitments, c -> json_extract_string(c, '$.who') = a.first)[1], '$.every'))::BIGINT = 86400 then 5 else 7 end) / 7) as monthly
   from agreements a where a.template = 'employment' and not exists (select 1 from noticed n where n.run_id = a.run_id and n.agreement = a.id) group by all),
+drawn as (
+  select p.run_id, p.person as worker, sum(t.amount) / 3 as monthly
+  from participants p join runs r on r.run_id = p.run_id join transfers t on t.run_id = p.run_id and t."from" = json_extract_string(p.params, '$.own_work.account') and t.t > r.end_t - 90 * 86400
+    join accounts a on a.run_id = t.run_id and a.account = t."to" and a.holder = p.person
+  where json_extract_string(p.params, '$.own_work.account') is not null group by all),
 hh as (
   select r.run_id, json_extract_string(r.body, '$.data.leaseholder') as leaseholder, from_json(json_extract(r.body, '$.data.members'), '["JSON"]') as members
   from records r where r.kind = 'household' and not exists (select 1 from records w where w.run_id = r.run_id and w.withdraws = r.id)),
 people as (select hh.run_id, hh.leaseholder, json_extract_string(m, '$.person') as person from hh, unnest(hh.members) as u(m)),
 income as (
-  select p.run_id, p.leaseholder, sum(coalesce(j.monthly, 0)) as monthly
+  select p.run_id, p.leaseholder, sum(coalesce(j.monthly, 0) + coalesce(d.monthly, 0)) as monthly
   from (select distinct run_id, leaseholder, person from people) p left join jobs j on j.run_id = p.run_id and j.worker = p.person
+    left join drawn d on d.run_id = p.run_id and d.worker = p.person
   group by all),
 shares as (
   select i.run_id, i.leaseholder, le.rent, i.monthly, 100.0 * le.rent / i.monthly as pct

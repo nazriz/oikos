@@ -74,5 +74,5 @@ test("the preview of a direction says what is filed and to whom, and nothing of 
 });
 
 test("a length of time in words", () => {
-  expect([86_400, 14 * 86_400, 3600, 0].map(durationWords)).toEqual(["1 day", "14 days", "3600 seconds", "0 days"]);
+  expect([86_400, 14 * 86_400, 3600, 0].map(durationWords)).toEqual(["1 day", "14 days", "1 hour", "0 days"]);
 });

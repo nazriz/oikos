@@ -1,6 +1,6 @@
 # Profile depth: what nine places need that the structure cannot yet say (proposal)
 
-**Status:** a proposal (2026-10-08). **Sections 3, 4 and 5 (tracks D and E) are built** (2026-10-09; docs/decisions.md, "A payment and a tax are published laws their offices read"): what was built, what differs from the proposal below and what was left to the citizen redesign and to a yearly assessment are there and in docs/behaviour/public-finance.md, boundary.md and citizen.md. The rest awaits Naz's sign-off. No code, contract or profile figure was changed to write
+**Status:** a proposal (2026-10-08). **Section 1 (track F) is built as far as recommended** (2026-10-09; docs/decisions.md, "Informal work: unregistered jobs, work by the day, and people working for themselves"): parts a and b, and the opening state of c for the kinds that trade; who takes such work up and when is listed in docs/design/ai-citizens.md (Open, 5). Its two unverified points were tried and hold. **Sections 3, 4 and 5 (tracks D and E) are built** (2026-10-09; docs/decisions.md, "A payment and a tax are published laws their offices read"): what was built, what differs from the proposal below and what was left to the citizen redesign and to a yearly assessment are there and in docs/behaviour/public-finance.md, boundary.md and citizen.md. The rest awaits Naz's sign-off. No code, contract or profile figure was changed to write
 it, and nothing was run: where it says what a town would do, that is read from the code and the profiles' figures, and
 says so.
 

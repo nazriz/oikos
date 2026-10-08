@@ -365,6 +365,22 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     params: sortedKeys(params ?? {}) as any,
   });
   const isLlm = (p: Part) => p.controller?.type === "llm";
+  /** Who someone is in the world, by any id of theirs: a participant's own id is the platform's, and no seat is shown
+   * it (principle 14). An office's system is known by the post it holds, a person's seat by the person; a post by its
+   * title and whose it is; anyone else by what they are called. What a letter's signature and a paper's author say. */
+  const entityNames = new Map<string, string>((cfg.world?.entities ?? []).map((e: any) => [e.id, e.name]));
+  const whoIs = (id: string): { id: string; name?: string; of?: string } | undefined => {
+    const p = parts.get(id);
+    if (p) {
+      const posts = p.kind === "system" ? held(id) : [];
+      if (posts.length === 1) return { id: posts[0]!.id, name: posts[0]!.title ?? p.title, of: posts[0]!.entity };
+      const e = p.person ?? p.owner;
+      return e ? { id: e, ...(entityNames.get(e) ? { name: entityNames.get(e)! } : {}) } : undefined;
+    }
+    const x = positions.get(id);
+    if (x) return { id, ...(x.title ? { name: x.title } : {}), of: x.entity };
+    return entityNames.has(id) ? { id, name: entityNames.get(id)! } : undefined;
+  };
 
   /** A code unit for one capacity of a participant, if there's a module to run it. */
   const codeUnit = async (p: Part, cap: string, controller = p.controller, wakeAt?: number): Promise<Unit | undefined> => {
@@ -428,7 +444,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     const boards = new Set<string>((cfg.knowing?.published ?? []).filter((x: any) => x.board).map((x: any) => x.what));
     const ways = new Map<string, { way: string; by?: string[]; board?: boolean }>(chans.filter((x) => x.ch.way).map((x) => [x.path, { way: x.ch.way, ...(x.ch.by ? { by: x.ch.by } : {}),
       ...(x.ch.way === "published" && !x.ch.from && (x.ch.match?.statement_kinds ?? []).some((k: string) => boards.has(k)) ? { board: true } : {}) }]));
-    const config = { participant: p.id, entity, entityName, onRequest, kinds, ways, title: office?.title ?? p.title, role: office?.role, framing: p.framing, standing: standingIds, titles, cadenceDays: pp.cadence_days ?? 7, draftText,
+    const config = { whoIs, participant: p.id, entity, entityName, onRequest, kinds, ways, title: office?.title ?? p.title, role: office?.role, framing: p.framing, standing: standingIds, titles, cadenceDays: pp.cadence_days ?? 7, draftText,
       ...(pp.sessions ? { sessions: pp.sessions } : {}), ...(pp.max_actions ? { maxActions: pp.max_actions } : {}),
       // Folders that hold some kinds of paper only (by the channel's own id, as `standing` is given), and the most a prompt may be.
       ...(pp.folders ? { folders: new Map<string, string[]>(Object.entries(pp.folders as { [id: string]: string[] }).flatMap(([id, kinds]) => chans.filter((x) => x.path === id || x.path.endsWith(`/${id}`)).map((x) => [x.path, kinds] as [string, string[]]))) } : {}),
@@ -446,7 +462,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       if (brainModule) {
         await hashSource(brainModule);
         const bctx = { ...ctx, params: sortedKeys(pp.mock?.params ?? {}) as any };
-        brains.set(p.id, { controller: brainModule.create(bctx), ctx: bctx, capacity: office?.id ?? "self", rejectBps: pp.mock?.reject_bps, optOutAt: pp.mock?.opt_out_at });
+        brains.set(p.id, { controller: brainModule.create(bctx), ctx: bctx, capacity: office?.id ?? "self", cadence: brainModule.cadence(bctx), rejectBps: pp.mock?.reject_bps, optOutAt: pp.mock?.opt_out_at });
         bindings[p.id] = { ...bindings[p.id], mock_brain: b };
       }
     }
@@ -817,7 +833,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
         await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { translation_retry: { draft: draftId, attempt: i + 1, reason: x.reason, ...(x.call ? { call: x.call } : {}) } } } });
       if (!tr.ok) {
         await k.request({ op: "annotate", annotation: { annotation: "translation_failure", subject: u.participant, data: { draft: draftId, proposal: action.text, reason: tr.notices.join(" "), ...(tr.asked_back ? { asked_back: true } : {}), ...(tr.call ? { call: tr.call } : {}), ...(tr.invalid ? { invalid: tr.invalid } : {}), ...(tr.raw !== undefined ? { raw: JSON.stringify(tr.raw) } : {}) } } });
-        for (const text of tr.notices) u.notices.push({ t, text, re: draftId });
+        for (const text of tr.notices) u.notices.push({ t, text: aboutRequest(action.text, text), re: draftId });
         return true;
       }
       // A draft the log won't take (something in it breaks the contract: a kind that isn't a label, an id that isn't
@@ -826,7 +842,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       const drafted = await k.tryRequest({ op: "annotate", annotation: { annotation: "draft", draft: tr.draft } });
       if (drafted === null) {
         await k.request({ op: "annotate", annotation: { annotation: "translation_failure", subject: u.participant, data: { draft: draftId, proposal: action.text, reason: NOT_CHECKED, call: tr.draft.call, invalid: ["the draft breaks the contract and couldn't be recorded"] } } });
-        u.notices.push({ t, text: NOT_CHECKED, re: draftId });
+        u.notices.push({ t, text: aboutRequest(action.text, NOT_CHECKED), re: draftId });
         return true;
       }
       const pending = { draft: tr.draft, hash: tr.hash, ...(action.reasoning ? { reasoning: action.reasoning } : {}) };
@@ -838,7 +854,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     if (action.type === "sign") {
       const i = L.drafts.findIndex((d) => d.draft.id === action.draft);
       if (i < 0) {
-        u.notices.push({ t, text: `There's nothing waiting for you to confirm called ${action.draft}.`, re: action.draft });
+        u.notices.push({ t, text: `There's nothing waiting for you to confirm called ${action.draft}.` });
         return true;
       }
       const [pending] = L.drafts.splice(i, 1);
@@ -847,6 +863,10 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     }
     return true;
   };
+
+  /** What a seat is told of a request of its own that came to nothing: which request, in its own words, that nothing
+   * was filed or done, and then what is asked of it. Never a bare remark that could be read as about something else. */
+  const aboutRequest = (asked: string, text: string) => `About what you asked for (${JSON.stringify(asked.length > 120 ? `${asked.slice(0, 120)}…` : asked)}): nothing was filed or done. ${text}`;
 
   /** The capacity an action is done in: the unit's own, or the one it names, or its only one. */
   const asOf = (u: Unit, action: ParticipantAction): string | undefined => (u.capacity && u.capacity !== "self" ? u.capacity : ("as" in action && action.as) || capacityOf(u));
@@ -865,7 +885,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     unwritten.push({ key: u.key, notes });
     const tr = await translating.run(notes, async () => {
       try {
-        return await translator.translate({ draftId, participant: u.participant, as, proposal: action.text, knowledge: u.knowledge });
+        return await translator.translate({ draftId, participant: u.participant, as, proposal: action.text, knowledge: u.knowledge, called: (id) => whoIs(id)?.name });
       } catch (e) {
         if (!(e instanceof ModelCallFailed)) throw e;
         if (++unanswered >= MAX_FAILURES_IN_A_ROW) throw new ModelUnreachable(`the model can't be reached (${unanswered} calls in a row failed; the last, the translator's: ${String(e.message).slice(0, 300)}): the run stops here; resume it once it can be (oikos resume <log>)`);

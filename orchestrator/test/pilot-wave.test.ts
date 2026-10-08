@@ -102,7 +102,11 @@ test("the queue is started detached, from the wave's worktree, once", async () =
 test("status says, per queue and pilot, where it stands, with the last alerts", () => {
   const runs = join(base, "runs-status");
   const queue = join(base, "qs.json");
-  writeFileSync(queue, JSON.stringify([{ name: "p-one", until: 1000, test: true }, { name: "p-two", until: 1000 }]));
+  writeFileSync(queue, JSON.stringify([{ name: "p-one", until: 1000, test: true }, { name: "p-two", until: 1000 }, { name: "p-three", until: 90_000 }]));
+  // (A pilot the queue has parked at a usage limit: its log's end, and the queue's own note beside the queue file.)
+  mkdirSync(join(runs, "p-three"), { recursive: true });
+  writeFileSync(join(runs, "p-three/town.seed1.jsonl"), [{ kind: "header", t: 0, body: {} }, { kind: "end", t: 86_400, body: { reason: "aborted", detail: "the Codex subscription's usage limit was reached" } }].map((e) => JSON.stringify(e)).join("\n") + "\n");
+  writeFileSync(queue.replace(/\.json$/, ".parked.json"), JSON.stringify([{ name: "p-three", day: 1, providers: ["codex"], since: "2026-10-09 04:43+11:00", next_try: "2026-10-09 05:03+11:00" }]));
   mkdirSync(join(runs, "pilot-queues"), { recursive: true });
   writeFileSync(join(runs, "pilot-queues/ws.commit"), `abc123\nwave ws, ref main, worktree /x\nqueues: ${queue}\nstarted now\n`);
   mkdirSync(join(runs, "p-one"), { recursive: true });
@@ -116,5 +120,7 @@ test("status says, per queue and pilot, where it stands, with the last alerts", 
   expect(out).toContain("queue qs.json: not running");
   expect(out).toMatch(/p-one \[test\]: stopped at its spending limit.*opted out: finance-system day 1/);
   expect(out).toContain("p-two: not started");
+  expect(out).toContain("  PARKED at a usage limit: p-three (codex; day 1; next try 2026-10-09 05:03+11:00)");
+  expect(out).toContain("p-three: PARKED at a usage limit (codex; next try 2026-10-09 05:03+11:00), day 1 of 1");
   expect(out).toContain("SPENDING LIMIT p-one: stopped");
 }, 60_000);

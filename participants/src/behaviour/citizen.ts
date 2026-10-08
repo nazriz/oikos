@@ -33,7 +33,7 @@ import * as C from "../calls";
 import { ask, Asked, because, Book, breaches, noted, callAction, commitmentOf, DAY, nextLook, usd, jobTerms, record, leaseTerms, message, MONTH, moveIn, moveOut, notice, pay, PAYMENT_FAILED, petitionSignatures, publishedCount, say, sign, stoodEmpty, structureOf, variableToday, vote, withdraw, type Step, ownBanked } from "./common";
 import { ADULT_YEARS, ageAt, bedroomsNeeded, hear, householdOf, SAYING, type Heard, type HouseholdData, type Member, type OccupancyStandard } from "./household";
 import { Deliveries, goodsPrices, offerOf as shopOffer, order } from "./trade";
-import { incomeTaxLaw, withholding } from "./tax";
+import { dayPayPeriod, incomeTaxLaw, withholding } from "./tax";
 import { declarationFor, forHousehold, forOutOfWork, stopsWorkAt, supportLaw, type PaymentRule } from "./payments";
 import { Borrowing, loanFor } from "./credit";
 import { factsOf, Feelings, Mind, MIND_DEFAULTS, MIND_VERSION, Pursuit, satisfaction, Ties, type Circumstances, type Facts, type MindParams, type NeedLevels, type PopulationValues, type Value } from "./mind";
@@ -118,7 +118,7 @@ interface Job { agreement: string; employer: string; wage: number; period: numbe
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.42.0", // 0.42.0: reads the support law, stops work at an age of its own (0.41.0 on its branch), with main's 0.41.1
+  version: "0.43.1", // 0.43.1: tells their own business when they move home; 0.43.0: someone who works for themself (own_work): not out of work, their income what the business pays them, at their pitch in working hours; 0.42.1: work by the day (a day's pay known as pay; no claim for a day not worked); 0.42.0: reads the support law, stops work at an age of its own (0.41.0 on its branch), with main's 0.41.1
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -147,6 +147,11 @@ export const citizen: BehaviourModule = {
       retirement_age: null as number | null,
       stops_work_at: null as number | "never" | null,
       stop_work_curve: null as { from: number; bps: number }[] | null,
+      // Working for ourselves (docs/behaviour/entry.md, "A person working for themself"): the business we run alone,
+      // the account it pays our drawings from, where we work from when that is not our home, and what it was
+      // expected to bring in a month before it had (none: we work for an employer, or look for work).
+      // (`home`: the dwelling it trades from, where it trades from our home: we tell it when we live somewhere else.)
+      own_work: null as { firm: string; account: string; at?: string; home?: string; expect_per_month: number } | null,
       in_labour_force: true, // false: not looking for work (studying, caring...), and not claiming support for being out of it
       // A child born here: whether they'll look for work as an adult, at the world's participation (the template for
       // those who won't; "": every child takes `child_template`).
@@ -522,7 +527,14 @@ export const citizen: BehaviourModule = {
     const stopAge: number | null = p.stops_work_at === "never" ? null : p.stops_work_at ?? (p.stop_work_curve ? stopsWorkAt(p.stop_work_curve, ctx.rng("stops-work").below(10_000)) ?? null : p.retirement_age);
     let retired = false; // we have stopped work
     const inflows: { t: number; amount: number }[] = []; // money that came in (refunds counted negative), for what our income is
-    const wageIncome = () => (job ? Math.floor((job.wage * MONTH) / job.period) : 0);
+    // (Work by the day is paid for the days worked: the working days of a month, not every day of it.)
+    // What our own business has paid us (our drawings), for what it brings in a month: over the days our income is
+    // reckoned on; before that many days have passed, what it was expected to.
+    const drawings: { t: number; amount: number }[] = [];
+    const ownWork = p.own_work;
+    let tradingFrom: string | null = ownWork?.home ?? null; // where our business, worked from home, has been told it trades
+    const ownIncome = (t: number) => (!ownWork ? 0 : t < p.income_window_days * DAY ? ownWork.expect_per_month : Math.floor((drawings.reduce((x, d) => x + d.amount, 0) * MONTH) / (p.income_window_days * DAY)));
+    const wageIncome = () => ownIncome(book.now) + (!job ? 0 : job.period === DAY ? Math.floor((job.wage * 30 * (p.round?.work_days ?? 5)) / 7) : Math.floor((job.wage * MONTH) / job.period));
     // (Support for being out of work isn't income once we're in work: we stop claiming it. Counting it, a household applied
     // for a home only that income could afford, and then couldn't sign.)
     const supportIncome = (lastingOnly: boolean) => [...benefits.values()].filter((b) => b.lasting || (!lastingOnly && !job)).reduce((x, b) => x + Math.floor((b.amount * MONTH) / b.every), 0);
@@ -739,8 +751,14 @@ export const citizen: BehaviourModule = {
           continue;
         }
         inflows.push({ t: tx.t, amount: cents(tx.amount) });
+        if (ownWork && tx.from === ownWork.account) {
+          drawings.push({ t: tx.t, amount: cents(tx.amount) });
+          // (For the record: what our own business paid us. The mind makes nothing of it; it follows no decision.)
+          outcome({ t: obs.t, domain: "own_work", option: ownWork.firm, kind: "drawn", way: "mine", facts: { amount: cents(tx.amount), paid_at: tx.t } });
+        }
         // Our wages, as agreed: the wage, less the income tax the law says our employer withholds.
-        if (job && (cents(tx.amount) === job.wage || cents(tx.amount) === job.wage - withholding(incomeTaxLaw(book), job.wage, job.period))) {
+        // (A day's pay for work by the day: less what the law takes from a day's pay, reckoned over the working week.)
+        if (job && (cents(tx.amount) === job.wage || cents(tx.amount) === job.wage - withholding(incomeTaxLaw(book), job.wage, job.period === DAY ? dayPayPeriod(p.round?.work_days ?? 5) : job.period))) {
           const since = tx.t - (job.paidAt ?? job.since);
           job.paidAt = tx.t;
           // an employer that pays, as agreed
@@ -748,6 +766,7 @@ export const citizen: BehaviourModule = {
         }
       }
       while (inflows.length && inflows[0]!.t < obs.t - p.income_window_days * DAY) inflows.shift();
+      while (drawings.length && drawings[0]!.t < obs.t - p.income_window_days * DAY) drawings.shift();
       const ads = p.adverts ? obs.channels[p.adverts] : undefined;
       if (ads?.kind === "records" && ads.search) for (const r of ads.records) if (r.speaks_for) lookedUp.add(r.speaks_for);
       const sale = p.sale_board ? obs.channels[p.sale_board] : undefined;
@@ -1108,11 +1127,29 @@ export const citizen: BehaviourModule = {
         home = null;
         homelessSince = t;
       }
+      // Our own business, worked from our home: when we live somewhere else (or nowhere), we tell it, and it trades
+      // from there (its stock goes with us). Where our new home stands we know from having been there.
+      if (ownWork && !ownWork.at) {
+        const dwelling = home?.movedIn ? home.space : livingAt ?? null;
+        const where = dwelling ? channels.cells(obs).find((c) => c.structure?.structure === structureOf(dwelling))?.cell : undefined;
+        if (dwelling !== tradingFrom && (dwelling === null || where)) {
+          tradingFrom = dwelling;
+          steps.push(because(dwelling ? `We live at ${dwelling} now: our business trades from there.` : "We have no home to trade from: our business stops trading until we do.",
+            say("trading_from", dwelling ? `Trading from ${dwelling} now.` : "Not trading: nowhere to trade from.", { to: [ownWork.firm], visible: [me, ownWork.firm], data: dwelling ? { space: dwelling, structure: structureOf(dwelling), cell: where } : { nowhere: true } })));
+        }
+      }
       // Wages not paid: a pay period (and a few days' grace) without them, we resign, and claim what we're owed, as an
       // employee can (docs/behaviour/citizen.md). The claim is a debt recorded against the employer.
       if (job && !job.claimed && t < jobEnds(job) && !striking) {
         const last = job.paidAt ?? job.since;
-        if (t - last > job.period + 5 * DAY) {
+        if (t - last > job.period + 5 * DAY && job.period === DAY) {
+          // Work by the day that has brought no pay for most of a week: there is no work there for us. Nothing is owed
+          // for a day not worked, so there is nothing to claim; we end it, as its terms let either side, and look elsewhere.
+          job.claimed = true;
+          outcome({ t, domain: "job", option: job.employer, kind: "no_work", way: "mine", facts: { days_since_last: Math.floor((t - last) / DAY), period_days: 1 } });
+          steps.push(because(`No pay from our work by the day for ${Math.floor((t - last) / DAY)} days: there is no work for us there. Ending it.`, notice(job.agreement, "No work by the day for us here.")));
+          job.leftAt = t;
+        } else if (t - last > job.period + 5 * DAY) {
           job.claimed = true;
           const missed = Math.max(1, Math.floor((t - last) / job.period));
           // an employer that didn't pay: remembered
@@ -1210,7 +1247,7 @@ export const citizen: BehaviourModule = {
         }
       }
       const circumstances = (): Circumstances => ({ monthly_income: householdIncome(), savings: acc.balance, homeless: !home && !livingAt, essentials: p.essentials });
-      if (!job && joblessSince === null) joblessSince = t;
+      if (!job && !ownWork && joblessSince === null) joblessSince = t;
 
       // Offers made to us: sign what we asked for and can afford.
       for (const r of fresh) {
@@ -1655,7 +1692,7 @@ export const citizen: BehaviourModule = {
         if (w.children && f.children_born_at.filter((b) => Math.floor((t - b) / year) < w.children!.under_age).length < w.children.least) return false;
         return true;
       };
-      const looking = !job && !retired && p.in_labour_force;
+      const looking = !job && !ownWork && !retired && p.in_labour_force; // (working for ourselves, we are not out of work)
       const stopgaps = rules.filter(forOutOfWork);
       // (The first the law lists that we may have; one we already draw is kept until an earlier one is granted.)
       const preferred = !looking ? undefined : stopgaps.find((r) => claiming.has(r.id)) ?? stopgaps.find((r) => !blocked(r) && !ranOut.has(r.id) && fits(r));
@@ -1691,7 +1728,7 @@ export const citizen: BehaviourModule = {
         claiming.delete(payment);
       }
       // Looking for work: where someone told us about first, then the best-paid posting.
-      if ((!job || (searchingWork && !switching)) && !retired && p.in_labour_force) {
+      if ((!job || (searchingWork && !switching)) && !ownWork && !retired && p.in_labour_force) {
         // In work, only postings that pay better than ours, elsewhere.
         const better = (j: StatementRecord) => !job || (j.speaks_for !== job.employer && (j.data?.wage ?? 0) * job.period > job.wage * (j.data?.period ?? job.period));
         const told = job ? [] : leadFound.jobs.filter((j) => !applied.has(j.id));
@@ -2017,7 +2054,7 @@ export const citizen: BehaviourModule = {
           steps.push(because("Catching up with someone we know.", message([who], CATCHING_UP.ask)));
         }
       }
-      for (const [want, needed, chance] of [["home", isLeaseholder() && !home, p.ask_home_bps], ["work", !job, p.ask_work_bps]] as [Want, boolean, number][]) {
+      for (const [want, needed, chance] of [["home", isLeaseholder() && !home, p.ask_home_bps], ["work", !job && !ownWork, p.ask_work_bps]] as [Want, boolean, number][]) {
         if (!needed) {
           delete askedAt[want];
           continue;
@@ -2167,6 +2204,8 @@ export const citizen: BehaviourModule = {
       // (On strike from the moment we know of the stoppage, not only once we have walked out: someone who learned of it
       // in the middle of something else went in to work the next morning, until 2026-10-09.)
       if (job?.workplace && !offSick && !striking && t < jobEnds(job) && workday(t, r.work_days) && tod(t) >= r.work_start && tod(t) < r.work_end) return job.workplace;
+      // (Working for ourselves from somewhere other than home, a pitch: there in working hours.)
+      if (ownWork?.at && !offSick && workday(t, r.work_days) && tod(t) >= r.work_start && tod(t) < r.work_end) return ownWork.at;
       return home_;
     };
     /** The next time where we belong may change: work and school starting or ending, on working days. */
@@ -2697,11 +2736,11 @@ export const citizen: BehaviourModule = {
           // Told about a building? Look there first: what's on offer in it now.
           // (Only someone who wants what a building might offer: a home, or work. Someone out of work and not looking
           // for any, retired say, used to ask to look at nothing, which is refused: found in the stress run of 2026-10-06.)
-          if (looking === null && lookedAt !== obs.t && acc && leads.length && (needHome || (!job && !retired && p.in_labour_force))) {
+          if (looking === null && lookedAt !== obs.t && acc && leads.length && (needHome || (!job && !ownWork && !retired && p.in_labour_force))) {
             const lead = leads.pop()!;
             const looks: LookRequest[] = [];
             if (needHome) looks.push(ask.board("homes", { most: p.search_limit, where: [{ field: "data.structure", op: "=", value: lead }, { field: "data.rent", op: "<=", value: budget }, ...roomy] }));
-            if (!job && !retired && p.in_labour_force) looks.push(ask.board("jobs", { most: p.search_limit, where: [{ field: "data.workplace", op: "=", value: lead }] }));
+            if (!job && !ownWork && !retired && p.in_labour_force) looks.push(ask.board("jobs", { most: p.search_limit, where: [{ field: "data.workplace", op: "=", value: lead }] }));
             leadFound.homes = [];
             leadFound.jobs = [];
             looking = "leads";
@@ -2710,7 +2749,7 @@ export const citizen: BehaviourModule = {
           // Hunting? Look at what's on offer (the next step, at once, has the results).
           const looks: LookRequest[] = [];
           // In work: a month's chance of looking for something better paid.
-          if (job && !switching && !retired && p.in_labour_force && obs.t >= nextJobSearch) {
+          if (job && !ownWork && !switching && !retired && p.in_labour_force && obs.t >= nextJobSearch) {
             nextJobSearch = obs.t + MONTH;
             // Looking for a better job (CONSUMAT, docs/design/ai-citizens.md 3b): every month if our life falls short of
             // what we want; otherwise now and then, the more open we are.
@@ -2719,7 +2758,7 @@ export const citizen: BehaviourModule = {
           }
           if (lookedAt !== obs.t && acc) {
             if (needHome) looks.push(ask.board("homes", { most: p.search_limit, where: [{ field: "data.rent", op: "<=", value: budget }, ...roomy], by: "data.rent", desc: true }));
-            if ((!job || searchingWork) && !retired && p.in_labour_force) looks.push(ask.board("jobs", { most: p.search_limit, by: "data.wage", desc: true }));
+            if ((!job || searchingWork) && !ownWork && !retired && p.in_labour_force) looks.push(ask.board("jobs", { most: p.search_limit, by: "data.wage", desc: true }));
             // The listings of property for sale, when we're looking: waiting on a purchase (the seller's own listings,
             // to know it still stands), or with this month's chance of buying a home or founding a business coming up.
             if (p.sale_board) {

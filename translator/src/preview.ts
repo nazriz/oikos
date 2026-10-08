@@ -17,7 +17,16 @@ const span = duration;
 
 export class Preview {
   /** `me`: the entity it acts for (its person, or the organisation of the position it acts in). */
-  constructor(private k: Knowledge, private me = k.entity) {}
+  /** `called`: what someone the seat names is called, where the seat's own knowledge has no name for them (its own
+   * organisation and that organisation's posts; anyone whose name is published). */
+  constructor(private k: Knowledge, private me = k.entity, private called: (id: string) => string | undefined = () => undefined) {}
+  /** Someone by name and id (by id alone where no name is known). */
+  private named(id: string): string {
+    const known = this.k.name(id);
+    const e = this.k.entityOf(id);
+    const name = known === e ? this.called(e) : undefined;
+    return name && name !== e ? `${name} (${e})` : known;
+  }
 
   /** An amount as the world writes its money. */
   private sum(amount: string | number): string {
@@ -28,7 +37,7 @@ export class Preview {
     if (!id) return "someone";
     if (id.startsWith("$")) return `the new ${id.slice(1)}`;
     const e = this.k.entityOf(id);
-    return e === this.me || e === this.k.entity ? "you" : this.k.name(id);
+    return e === this.me || e === this.k.entity ? "you" : this.named(id);
   }
   /**
    * Whoever something is addressed or sent to, as the seat knows them. Never "you" for the organisation it acts for or
@@ -40,13 +49,13 @@ export class Preview {
     if (!id) return "someone";
     if (id.startsWith("$")) return `the new ${id.slice(1)}`;
     if (this.k.positions.has(id)) {
-      const title = this.k.positionWords.get(id)?.title;
+      const title = this.k.positionWords.get(id)?.title ?? this.called(id);
       return title ? `the ${title.charAt(0).toLowerCase()}${title.slice(1)} (${id})` : id;
     }
     const e = this.k.entityOf(id);
-    if (e !== this.me) return e === this.k.entity ? "you" : this.k.name(id);
+    if (e !== this.me) return e === this.k.entity ? "you" : this.named(id);
     // Itself, or the organisation it acts for (which a post of its own is a post of).
-    return [...this.k.positions.values()].includes(e) ? `${this.k.name(id)}, which you act for` : "you";
+    return [...this.k.positions.values()].includes(e) ? `${this.named(id)}, which you act for` : "you";
   }
   /** A paper's details as a person reads them: on a form, each field as the form says it is (an amount, a length of time, a date). */
   private read(data: unknown, form?: string): unknown {

@@ -51,6 +51,8 @@ export interface TranslateRequest {
   proposal: string;
   /** What the participant knows (the resolver and the preview use it; the translator sees only its forms). */
   knowledge: Knowledge;
+  /** What someone is called, for the preview, where the seat's own knowledge has no name for them. */
+  called?: (id: string) => string | undefined;
 }
 
 export type Translation = { ok: true; draft: Draft; hash: string } | { ok: false; notices: string[]; call?: string; raw?: unknown; invalid?: string[]; asked_back?: true };
@@ -274,6 +276,40 @@ const MALFORMED = /should name something, not (data|a call)\.$|should be written
 /** Resolver questions another attempt at the call could fix (a name it didn't recognise, a refusal's own text). */
 const RETRYABLE = /^You don't know of anyone or anything called|^It isn't clear what should happen|^That's for someone else to decide|^Please state the amount itself|^Please take this one step at a time|^You haven't seen a form by that name|^That's something to look up or read|^Nothing here does that as such|^That needs something found out first/;
 
+/** A resolver's answer that a value in the call could not be read as what its place takes (an amount, a length of
+ * time, a count): which value, and what it should have been. */
+const UNIT_FAULT = /^(not an amount|badly grouped digits|a point with three digits after it can be read two ways|this money has no decimals|more than \S+(?: \S+)? decimals|fraction of [^:]*|too large|not a duration|not a count): (.*)\. Please say it another way\.$/s;
+const unitFault = (q: string): { value: string; what: string } | undefined => {
+  const m = UNIT_FAULT.exec(q);
+  return m ? { value: m[2]!, what: m[1] === "not a duration" ? "a length of time" : m[1] === "not a count" ? "a number" : "an amount" } : undefined;
+};
+/** The form a call fills in, as the seat has it (its name, and what each of its fields takes), if it fills one in. */
+function formOf(program: calls.Program, k: Knowledge): { name: string; fields: { [field: string]: { type?: string } } } | undefined {
+  if (!("lines" in program)) return undefined;
+  for (const l of program.lines) {
+    if (l.call.fn !== "form") continue;
+    const v = l.call.args.form as any;
+    const name: string | undefined = v?.id ?? v?.text;
+    const f = name === undefined ? undefined : k.forms.find((x) => x.data?.form === name || x.id === name);
+    if (f) return { name: String(f.data?.form ?? name).replace(/_/g, " "), fields: (f.data?.fields ?? {}) as { [field: string]: { type?: string } } };
+  }
+  return undefined;
+}
+/**
+ * What a seat is asked when the draft made of its request failed its own checks on a figure the seat never wrote (the
+ * live check of 2026-10-09: a translator wrote parks="c0007", and the seat read "not an amount: c0007. Please say it
+ * another way." of a request that named no such amount). Nothing of the failed draft is said: only that nothing was
+ * filed, and what the form it can see takes, so that it can say its request again.
+ */
+export function askAgain(what: string, form?: { name: string; fields: { [field: string]: { type?: string } } }): string {
+  const KIND: { [what: string]: [string, string] } = { "an amount": ["amount", "amounts"], "a length of time": ["duration", "lengths of time"], "a number": ["count", "numbers"] };
+  const [type, plural] = KIND[what] ?? KIND["an amount"]!;
+  const takes = form ? Object.entries(form.fields).filter(([, f]) => f?.type === type).map(([k]) => k.replace(/_/g, " ")) : [];
+  return form
+    ? `It could not be set out on the ${form.name} form from what you said${takes.length ? `: the form takes these ${plural}: ${takes.join(", ")}` : ""}. Please say it again, giving each one you mean as a figure and leaving out any you don't.`
+    : `It could not be drawn up from what you said: ${what} in it could not be made out. Please say it again, with each figure written out.`;
+}
+
 export function createTranslator(io: LlmIO, check: KernelCheck, typeOf: (type: string) => StructureTypeInfo | undefined, id = "translator", attempts = 2, resolver?: ResolveFn) {
   const tid: TranslatorId = { id, version: TRANSLATOR_VERSION, model: `${io.adapter.provider}/${io.adapter.model}` };
   const seen = new Set<string>();
@@ -295,6 +331,15 @@ export function createTranslator(io: LlmIO, check: KernelCheck, typeOf: (type: s
     if (said) return { ok: false, notices: [said], call, final: true, asked_back: true };
     const r = resolver ? await resolver(req, program) : resolve(program, req.knowledge, typeOf, req.as);
     if (!r.ok && r.questions.some((q) => MALFORMED.test(q))) return { ok: false, notices: [NOT_PUT], call, invalid: [...(r.invalid ?? []), ...r.questions] };
+    // A figure the draft could not be read at. If the seat wrote it, it is asked about its own words. If it did not (the
+    // call put something there that the request never said), the call is at fault: it is tried again, and if that
+    // fails too the seat is asked for its request again in terms of the form it can see, never shown the draft's fault.
+    const fault = r.ok ? undefined : r.questions.map(unitFault).find((x) => x !== undefined);
+    if (!r.ok && fault) {
+      const wrote = fault.value.trim() !== "" && req.proposal.toLowerCase().includes(fault.value.trim().toLowerCase());
+      if (wrote) return { ok: false, notices: [`"${fault.value}", as you wrote it, could not be read as ${fault.what}. Please say it again with that written as a plain figure.`], call, final: true, asked_back: true };
+      return { ok: false, notices: [askAgain(fault.what, formOf(program, req.knowledge))], call, invalid: [...(r.invalid ?? []), ...r.questions.map((q) => `the call gave something the request did not: ${q}`)], asked_back: true };
+    }
     // A question another attempt can't answer (which account? which cell?) goes to the participant as it is: the call
     // was right, and something isn't known. Another attempt helps only where the call itself is the trouble: it's
     // invalid, a refusal, or names something by a name nobody has (2026-10-03: asked again after "which account?",
@@ -306,7 +351,7 @@ export function createTranslator(io: LlmIO, check: KernelCheck, typeOf: (type: s
     const warnings = lawWarnings(r.blocks, req.knowledge, typeOf, req.as);
     const draft: Draft = {
       id: req.draftId, participant: req.participant, ...(req.as ? { as: req.as } : {}), proposal: req.proposal.slice(0, 16384), call, resolver: RESOLVER,
-      blocks: r.blocks, summary: new Preview(req.knowledge, req.knowledge.actingFor(req.as)).of(r.blocks).slice(0, 16384),
+      blocks: r.blocks, summary: new Preview(req.knowledge, req.knowledge.actingFor(req.as), req.called).of(r.blocks).slice(0, 16384),
       check: { ok: k.ok, ...(k.refusal ? { refusal: k.refusal } : {}), ...(warnings.length ? { warnings } : {}) },
       translator: tid,
     };

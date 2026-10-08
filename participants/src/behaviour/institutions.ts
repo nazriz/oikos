@@ -5,7 +5,7 @@
 // and applies them to what it can see, because that is its job, and
 // (depending on its parameters) it may do the job well, badly, or not at all.
 
-import { amount, cents, smallestNow } from "../money";
+import { amount, cents, moneyNow } from "../money";
 import * as C from "../calls";
 import type { LookRequest, Observation, SiteStructure, StatementRecord } from "../contracts";
 import { channels } from "../contracts";
@@ -300,7 +300,7 @@ export const builder: BehaviourModule = {
   name: "firm.builder",
   issues: [P.JOB_ADVERTISEMENT],
   issuesWith: (p) => P.staffingOwn({ role: "construction worker", industry: p.industry, workplace: p.workplace, notice_days: p.notice_days ?? 14 }),
-  version: "0.12.1", // 0.12.1: with what 0.11.2 changed; 0.12.0: goes to a lot before building on it, sees its sites as its crew works on them, and gives notice of building work; no longer shown the town
+  version: "0.12.3", // 0.12.3: takes on the share of its hands the world gives by the day, and pays them for the days there is building to do; 0.12.2: registers the share of its jobs the world gives for its kind; 0.12.1: with what 0.11.2 changed; 0.12.0: goes to a lot before building on it, sees its sites as its crew works on them, and gives notice of building work; no longer shown the town
   doc: "docs/behaviour/institutions.md",
   cadence: () => DAY,
   create(ctx: ParticipantContext) {
@@ -321,6 +321,12 @@ export const builder: BehaviourModule = {
         min_crew: 2, // a core crew, kept through quiet times
         horizon_days: 90, // the crew it wants: enough to do the work in hand within this
         notice_days: 14,
+        // Of the jobs it fills, the share it puts on its payroll returns (the world's figure for employers of its kind;
+        // 10,000: all). One it does not register is paid whole, and reported to nobody (docs/behaviour/firms.md).
+        registered_bps: 10_000,
+        // Work by the day (docs/behaviour/firms.md): of the jobs it fills, the share it fills by the day, and what it
+        // pays for a day (the world's figures for employers of its kind; 0: every job is on a standing wage).
+        casual_bps: 0, day_wage: 0,
         let_go_every_days: 7, // at most one let go in this time
         // The land register, where this world keeps one to look things up in: our channel onto its plans of lots.
         // (None: whatever plans we know are those we're shown.)
@@ -366,7 +372,7 @@ export const builder: BehaviourModule = {
       }
       return [...(plan ? [plan] : []), ...(visit ? [visit] : [])];
     };
-    const staffing = new Staffing(ctx, ctx.entity, { period: p.period, notice_days: p.notice_days, workplace: p.workplace || undefined, role: "construction worker", ...(p.industry ? { industry: p.industry } : {}) });
+    const staffing = new Staffing(ctx, ctx.entity, { period: p.period, notice_days: p.notice_days, registered_bps: p.registered_bps, casual_bps: p.casual_bps, day_wage: p.day_wage, work_days: p.work_days, week_days: p.look_days, workplace: p.workplace || undefined, role: "construction worker", ...(p.industry ? { industry: p.industry } : {}) });
     // What's recorded against us to pay (rates on our yard, a fine), paid as a firm pays its debts (we don't wind up).
     const dues = new WindingUp(ctx.entity, { short_days: 0, wind_up_days: 0, idle_days: 0, reprice_days: 0, reprice_bps: 0 });
     let lastLetGo = -Infinity;
@@ -535,7 +541,7 @@ export const builder: BehaviourModule = {
         const inYard = new Map<string, number>();
         const stock = (k: string) => inYard.get(k) ?? held(obs, p.yard, k);
         for (const w of [...waiting]) {
-          const invoice = w.price ? [say("invoice", `Invoice: ${smallestNow(w.price)} for ${w.remove ? `demolishing ${w.remove}` : `building a ${w.type} on ${w.on}`}.`, { to: [w.client], basis: w.agreement, data: { outcome: { money: { to: acc.account, amount: w.price, for: w.remove ? `demolishing ${w.remove}` : `building a ${w.type} on ${w.on}` } }, agreement: w.agreement } })] : [];
+          const invoice = w.price ? [say("invoice", `Invoice: ${moneyNow(w.price)} for ${w.remove ? `demolishing ${w.remove}` : `building a ${w.type} on ${w.on}`}.`, { to: [w.client], basis: w.agreement, data: { outcome: { money: { to: acc.account, amount: w.price, for: w.remove ? `demolishing ${w.remove}` : `building a ${w.type} on ${w.on}` } }, agreement: w.agreement } })] : [];
           if (w.remove) {
             // We need to know what it is (how long it takes to bring down): once we've seen it, we start.
             const type = typeOf.get(w.remove);
@@ -624,6 +630,7 @@ export const builder: BehaviourModule = {
         steps.push(...bargaining.steps(book, t, staffing, acc.account, acc.balance, (rise) => { wage = Math.floor((wage * (10_000 + rise)) / 10_000); }));
         steps.push(...staffing.routine(obs, book, acc.account, {
           target: want, wage: wage, canPost: acc.balance >= bill + wage,
+          work: inHand > 0, // (hands by the day are paid for the days there is building to do)
           why: `${Math.round(inHand / 3600)} hours of work in hand need ${want} hands to do within ${p.horizon_days} days; we have ${crewNow.length}: posting a job.`,
         }));
         // (Short of the next pay period for those we're keeping: someone already given notice is still crew until it runs
