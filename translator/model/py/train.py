@@ -101,16 +101,52 @@ def form_lines(rows: list[dict]) -> list[Line]:
     return list(seen.values())
 
 
+_JOINS = {"-", "/", "_"}
+# The most forms added beside an example (`--forms-most`; 5 unless given: what every model so far was trained with).
+# A seat of the towns since 2026-10-09 knows of 13 to 18 forms, an office's own stationery among them.
+FORMS_MOST = 5
+
+
+def office_of(line: list[str]) -> list[str]:
+    """The office a form's line says it goes to (`to=...`), as pieces."""
+    for i in range(len(line) - 2):
+        if line[i] == "to" and line[i + 1] == "=":
+            j = i + 2
+            while j < len(line) and line[j] != ",":
+                j += 1
+            return list(line[i + 2:j])
+    return []
+
+
+def names_office(pieces: list[str], request: int, office: list[str]) -> bool:
+    """Whether the request (the first `request` pieces) names this office by its id, whole: not as part of a longer
+    id (acc-works, works-crew, works.3)."""
+    k = len(office)
+    if not k:
+        return False
+    joined = lambda i: 0 <= i < request and (pieces[i] in _JOINS or (pieces[i] == "." and i + 1 < request and any(c.isdigit() for c in pieces[i + 1])))
+    for i in range(request - k + 1):
+        if pieces[i:i + k] == office and not joined(i - 1) and not (i > 0 and pieces[i - 1] == "." and any(c.isdigit() for c in pieces[i])) and not joined(i + k):
+            return True
+    return False
+
+
 def with_forms(row: dict, pool: list[list[str]], rand: random.Random) -> dict:
     """The same example as someone who knows of forms would ask it: a few forms it has nothing to do with are shown
     after what it was shown. A seat always knows of some forms, whatever it asks for, so a model that has only seen
     forms beside requests to fill one in fills one in whenever it sees any. Appended lines move nothing the steps
-    point at. A request for a form nobody knows of is left as it is (another form might be the one it names)."""
+    point at. A request for a form nobody knows of is left as it is (another form might be the one it names).
+    A form that goes to an office the request names is not one it has nothing to do with (since 2026-10-09 an office
+    may have a form of its own for being directed, and a direction to it is then that form filled in, not a letter:
+    the letter shown beside that form would be taught wrong), so such a form is never one of those added."""
     if not pool or row["steps"][0] == "none:unknown_form":
         return row
     pieces, breaks = list(row["pieces"]), list(row["breaks"])
     at = list(row["at"]) if "at" in row else None
-    for line in rand.sample(pool, k=min(len(pool), rand.randint(1, 5))):
+    request = breaks[0] if breaks else len(pieces)
+    for line in rand.sample(pool, k=min(len(pool), rand.randint(1, FORMS_MOST))):
+        if names_office(pieces, request, office_of(line)):
+            continue
         breaks.append(len(pieces)); pieces.extend(line)
         if at is not None and line.at:
             # On a line of its own after what was shown, spaced as it was where it was seen.
@@ -214,9 +250,12 @@ def main() -> None:
     ap.add_argument("--validate-every", type=int, default=5); ap.add_argument("--token-budget", type=int, default=12288)
     ap.add_argument("--batch", type=int, default=48); ap.add_argument("--lr", type=float, default=6e-4)
     ap.add_argument("--renumber", type=float, default=0.0); ap.add_argument("--forms", type=float, default=0.0); ap.add_argument("--dropout", type=float, default=0.1); ap.add_argument("--piece-dropout", type=float, default=0.0)
+    ap.add_argument("--forms-most", type=int, default=5)
     ap.add_argument("--resume", action="store_true"); ap.add_argument("--stop-after", type=int, default=0)
     ap.add_argument("--seed", type=int, default=1); ap.add_argument("--device", default="mps" if torch.backends.mps.is_available() else "cpu")
     a = ap.parse_args()
+    global FORMS_MOST
+    FORMS_MOST = max(1, a.forms_most)
     torch.manual_seed(a.seed); random.seed(a.seed)
     data, out = Path(a.data), Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -263,7 +302,7 @@ def main() -> None:
     else:
         opt = torch.optim.AdamW(model.parameters(), lr=a.lr, weight_decay=0.01)
         sched = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=a.lr, total_steps=steps_total, pct_start=0.06)
-    report = {"parameters": params, "config": {k: v for k, v in cfg.to_json().items() if k != "vocabulary"}, "seed": a.seed, "renumber": a.renumber, "forms": a.forms, "epochs": []}
+    report = {"parameters": params, "config": {k: v for k, v in cfg.to_json().items() if k != "vocabulary"}, "seed": a.seed, "renumber": a.renumber, "forms": a.forms, "forms_most": FORMS_MOST, "epochs": []}
     if a.encoder:
         report.update({"encoder_lr": a.encoder_lr, "lr": a.lr, "left_out": left_out})
     best, first = -1, 1

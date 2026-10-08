@@ -112,7 +112,8 @@ function hooks(counts: Counts, o: { uniformB?: boolean; limitOnce?: boolean; pri
     ["mock/reader-a", new MockAdapter("reader-a", { consult: reader("A") })],
     ["mock/reader-b", new MockAdapter("reader-b", { consult: reader("B") })],
   ]);
-  return { slept, sleep: async (ms) => void slept.push(ms), log: () => {}, adapter: (name) => ({ adapter: adapters.get(name)!, prices: { [name]: zero } }) };
+  // (No held-out cases unless a test gives some: what this machine has is not a test's to read.)
+  return { slept, heldOut: false, sleep: async (ms) => void slept.push(ms), log: () => {}, adapter: (name) => ({ adapter: adapters.get(name)!, prices: { [name]: zero } }) };
 }
 
 const config = (out: string, o: Partial<PipelineConfig> = {}): PipelineConfig => ({
@@ -182,7 +183,7 @@ test("a third of each kind of the training pilots' real requests is held back as
   expect(held.every((e) => e.origin === "pilot")).toBe(true);
   expect(held.length).toBe(Object.values(real.reduce((o: any, e: any) => ((o[e.shape.split("(")[0]] = (o[e.shape.split("(")[0]] ?? 0) + 1), o), {})).reduce((a: number, n: any) => a + Math.round(n / 3), 0));
   const j = first.steps["join"];
-  expect(j.new_in_training + j.new_validation_real + j.held_back_as_tests + j.dropped_new_same_as_a_test).toBe(j.new_examples);
+  expect(j.new_in_training + j.new_validation_real + j.held_back_as_tests + j.dropped_new_same_as_a_test + j.dropped_new_sharing_held_out_wording).toBe(j.new_examples);
   expect(rows(join(out1, "joined/train.jsonl")).length).toBe(4 * j.new_in_training);
 });
 
@@ -235,6 +236,16 @@ test("the standing set is joined; its examples from a test-only pilot, or in a t
   expect(train.filter((e) => e.id === "standing-1").length).toBe(1);
   expect(train.some((e) => e.id === theirs.id || e.id === theirsToo.id || e.id === "standing-3")).toBe(false);
   expect(rows(join(out, "joined/validation.jsonl")).length).toBe(1);
+  // Nor does anything that shares five words running with a held-out case join, standing or new: the case is given
+  // here in place of this machine's (the check reads them; nothing else does), and what is dropped is counted.
+  expect(m.steps["join"]).toMatchObject({ checked_against_held_out: false, dropped_standing_sharing_held_out_wording: 0 });
+  const secret = "the heron stood quite still beside the weir";
+  const shared = { ...base, id: "standing-4", source: "runs/elsewhere/z/d1/1", request: `Tell the clerk that ${secret} all morning.` };
+  writeFileSync(join(standing, "train.jsonl"), [ours, shared].map((e) => JSON.stringify(e)).join("\n") + "\n");
+  const out2 = join(root, "out-standing-held-out");
+  const withCase = await runPipeline(config(out2, { standing }), { ...hooks({ writer: 0, readerA: 0, readerB: 0, seen: [] }), heldOut: [{ id: "h-x", request: `Write that ${secret}.`, expect: ["none(unclear)"] }] });
+  expect(withCase.steps["join"]).toMatchObject({ checked_against_held_out: true, dropped_standing_sharing_held_out_wording: 1 });
+  expect(rows(join(out2, "joined/train.jsonl")).map((e) => e.id).filter((id) => id.startsWith("standing-"))).toEqual(["standing-1"]);
 });
 
 test("a usage limit is waited out (the call made again after the wait); a spending limit stops the run, kept across resumes", async () => {
