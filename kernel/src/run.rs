@@ -151,6 +151,16 @@ impl<W: Write> Run<W> {
         &self.kernel
     }
 
+    /// These observations will be asked for next: see `Kernel::plan`.
+    pub fn plan(&mut self, observations: Vec<(String, Option<String>)>) {
+        self.kernel.plan(observations);
+    }
+
+    /// How many threads observations are made ready on, and how many at least together: see `Kernel::share`.
+    pub fn share(&mut self, threads: usize, at_least: Option<usize>) {
+        self.kernel.share(threads, at_least);
+    }
+
     /// The host keeps the records it's handed: see `Kernel::refer_to_records`.
     pub fn refer_to_records(&mut self) {
         self.kernel.refer_to_records();

@@ -370,6 +370,11 @@ impl Scheduler {
         keys
     }
 
+    /// What each of a cohort's units looks as when it wakes: its participant, in its capacity (none: in all).
+    pub fn looks(&self, cohort: &[(String, &'static str, i64)]) -> Vec<(String, Option<String>)> {
+        cohort.iter().filter_map(|(key, _, _)| self.units.get(key)).map(|u| (u.participant.clone(), u.capacity.clone())).collect()
+    }
+
     pub fn cohort_json(cohort: &[(String, &'static str, i64)], t: i64) -> Value {
         json!({ "t": t, "cohort": cohort.iter().map(|(k, w, s)| json!({ "key": k, "woke_for": w, "since": s })).collect::<Vec<_>>() })
     }

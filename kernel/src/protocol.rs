@@ -205,6 +205,9 @@ fn next(session: &mut Session, req: &Value) -> Result<Reply, String> {
     match s.next(r.kernel().t(), until)? {
         crate::schedule::Next::End => Ok(Reply::Value(json!({ "ok": true, "end": true }))),
         crate::schedule::Next::Cohort(c) => {
+            // (Everyone woken looks next, in this order, before anything acts: their observations may be made ready
+            // together. The host is free to ask otherwise; nothing depends on it.)
+            r.plan(s.looks(&c));
             let mut v = crate::schedule::Scheduler::cohort_json(&c, r.kernel().t());
             v["ok"] = Value::Bool(true);
             Ok(Reply::Value(v))

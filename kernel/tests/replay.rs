@@ -32,9 +32,30 @@ impl Write for Shared {
 
 /// Execute ops live, with an annotation after every command; returns (log, anchors, final state).
 fn live(params: &WorldParams, ops: &[Op], finish: bool) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
+    let (log, anchors, state, _) = live_planning(params, ops, finish, None);
+    (log, anchors, state)
+}
+
+/// `live`, with observations planned ahead (`Run::plan`) every `every` ops, to be made ready on three threads:
+/// everyone, in each way they could be asked to observe, starting from a different one each time (so what's asked for
+/// next is sometimes the next planned, sometimes further on, sometimes never asked for at all). Also returns how
+/// many observations were delivered as they had been made ready.
+fn live_planning(params: &WorldParams, ops: &[Op], finish: bool, every: Option<usize>) -> (Vec<u8>, Vec<u8>, Vec<u8>, u64) {
     let anchors = Shared::default();
     let mut run = Run::start(world(params), "replay-test", Vec::new(), Some(Box::new(anchors.clone()))).unwrap();
+    if every.is_some() {
+        run.share(3, Some(1));
+    }
     for (i, op) in ops.iter().enumerate() {
+        if every.is_some_and(|n| i % n == 0) {
+            let st = run.kernel().state();
+            let mut who: Vec<(String, Option<String>)> = st.participants.keys().flat_map(|p| [(p.clone(), None), (p.clone(), Some("self".to_string()))]).collect();
+            who.extend(st.positions.iter().filter_map(|(id, x)| Some((x.holder.clone()?, Some(id.clone())))));
+            who.push(("nobody".to_string(), None));
+            let n = who.len();
+            who.rotate_left(i % n);
+            run.plan(who);
+        }
         if let Some(cmd) = concretize(&run, op) {
             if step(&mut run, &cmd).is_none() {
                 continue;
@@ -48,9 +69,10 @@ fn live(params: &WorldParams, ops: &[Op], finish: bool) -> (Vec<u8>, Vec<u8>, Ve
         run.finish("completed", None).unwrap();
     }
     let state = run.kernel().canonical_state().unwrap();
+    let from_ready = run.kernel().from_ready();
     let log = run.into_log();
     let a = anchors.0.borrow().clone();
-    (log, a, state)
+    (log, a, state, from_ready)
 }
 
 proptest! {
@@ -69,6 +91,32 @@ proptest! {
         prop_assert_eq!(anchors, anchors2);
         prop_assert_eq!(state, state2);
     }
+
+    /// Observations made ready ahead, several at once on other threads, are the observations built when asked for:
+    /// the same log, byte for byte, and the same world, however often they're planned.
+    #[test]
+    fn observations_made_ready_ahead_change_nothing(ops in proptest::collection::vec(op_strategy(), 1..60), every in 1usize..6) {
+        let (log, anchors, state) = live(&default_params(), &ops, true);
+        let (log2, anchors2, state2, _) = live_planning(&default_params(), &ops, true, Some(every));
+        prop_assert!(log == log2, "planning observations ahead changed the log");
+        prop_assert_eq!(anchors, anchors2);
+        prop_assert_eq!(state, state2);
+    }
+}
+
+#[test]
+fn observations_planned_are_delivered_as_made_ready() {
+    // Everyone looks, someone pays, everyone looks again, time moves on, everyone looks: with every look planned
+    // ahead, most are delivered as they were made ready, and the log is the one written without.
+    let mut ops: Vec<Op> = (0..12).map(|actor| Op::Observe { actor }).collect();
+    ops.push(Op::Smart { kind: 0, a: 0, b: 1, flag: false });
+    ops.extend((0..12).map(|actor| Op::Observe { actor }));
+    ops.push(Op::Advance { ticks: 800 });
+    ops.extend((0..12).map(|actor| Op::Observe { actor }));
+    let (log, _, state) = live(&default_params(), &ops, true);
+    let (log2, _, state2, from_ready) = live_planning(&default_params(), &ops, true, Some(1));
+    assert!(log == log2 && state == state2, "planning observations ahead changed the run");
+    assert!(from_ready >= 30, "only {from_ready} of 36 observations were delivered as made ready");
 }
 
 #[test]

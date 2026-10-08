@@ -667,6 +667,20 @@ impl World {
         inbox.sort_by(|a, b| (a.t, &a.id).cmp(&(b.t, &b.id)));
         (outcomes, inbox)
     }
+
+    /// The outcomes and messages waiting for a participant in the capacities it would observe in, in the order
+    /// `deliver` hands them over; nothing is handed over.
+    pub fn waiting(st: &State, participant: &str, only: Option<&str>) -> (Vec<Outcome>, Vec<crate::state::Message>) {
+        let mut outcomes = vec![];
+        let mut inbox = vec![];
+        for (_, x) in st.participants[participant].pending.iter().filter(|(k, _)| only.is_none_or(|o| o == k.as_str())) {
+            outcomes.extend(x.outcomes.iter().cloned());
+            inbox.extend(x.inbox.iter().cloned());
+        }
+        outcomes.sort_by(|a, b| (a.t, &a.action).cmp(&(b.t, &b.action)));
+        inbox.sort_by(|a, b| (a.t, &a.id).cmp(&(b.t, &b.id)));
+        (outcomes, inbox)
+    }
 }
 
 /// A field a search may use (a look's query): the record's own, the claim a transfer or release names, or a
