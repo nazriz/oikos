@@ -112,5 +112,11 @@
     }
   },
   "perceives": [],
-  "state": "none"
+  "state": "none",
+  "keeps": [
+    {
+      "what": "request",
+      "why": "The bank's own files: its customers' instructions, among them the repayments of the loans this office made."
+    }
+  ]
 }

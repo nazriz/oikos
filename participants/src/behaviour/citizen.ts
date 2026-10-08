@@ -30,7 +30,7 @@ import { basesOf, channels, cites } from "../contracts";
 import { DECISIONS, params, wait, type Belief, type BehaviourModule, type ConsultAnswer, type DecisionRecord, type ParticipantContext } from "../module";
 import type { Rng } from "../rng";
 import * as C from "../calls";
-import { because, Book, breaches, noted, callAction, commitmentOf, DAY, nextLook, usd, jobTerms, record, leaseTerms, message, MONTH, moveIn, moveOut, notice, pay, PAYMENT_FAILED, petitionSignatures, publishedCount, say, sign, structureOf, variableToday, vote, withdraw, type Step, ownBanked } from "./common";
+import { ask, Asked, because, Book, breaches, noted, callAction, commitmentOf, DAY, nextLook, usd, jobTerms, record, leaseTerms, message, MONTH, moveIn, moveOut, notice, pay, PAYMENT_FAILED, petitionSignatures, publishedCount, say, sign, structureOf, variableToday, vote, withdraw, type Step, ownBanked } from "./common";
 import { ADULT_YEARS, ageAt, bedroomsNeeded, hear, householdOf, SAYING, type Heard, type HouseholdData, type Member } from "./household";
 import { Deliveries, goodsPrices, offerOf as shopOffer, order } from "./trade";
 import { incomeTaxLaw, withholding } from "./tax";
@@ -452,8 +452,8 @@ export const citizen: BehaviourModule = {
     // Nobody is shown the register. A title of ours reaches us as our own paper (held from the start, or passed to us);
     // what that paper doesn't say is looked up where it is kept, once: the plan of its lot, and, for a title that came
     // to us from someone else, the title itself and the dealings in it (was it theirs to pass on?).
-    const planAsked = new Set<string>(); // lots whose plan we've asked the register for
-    const titleAsked = new Map<string, number>(); // a title -> when we last asked the register about it
+    const planAsked = new Asked(); // lots whose plan we've asked the register for
+    const titleAsked = new Asked(); // a title -> when we last asked the register about it
     /** In the order made (a record the kernel numbered is later than one it didn't, and than a lower number). */
     const madeBefore = (a: Record, b: Record) => {
       const n = (r: Record) => (r.id.startsWith("rec.") ? Number(r.id.slice(4)) : -1);
@@ -479,16 +479,14 @@ export const citizen: BehaviourModule = {
       const reg = p.register;
       if (!reg) return [];
       for (const r of book.ofType("claim_transfer") as any[]) {
-        if (r.to !== me || (titleAsked.get(r.claim) ?? -1) >= r.at) continue;
-        titleAsked.set(r.claim, t);
-        return [{ channel: reg.titles, query: { where: [{ field: "id", op: "=", value: r.claim }], limit: 1 } },
-          { channel: reg.dealings, query: { where: [{ field: "claim", op: "=", value: r.claim }], order: { field: "at" }, limit: p.search_limit } }];
+        if (r.to !== me || titleAsked.since(r.claim) >= r.at) continue;
+        titleAsked.again(r.claim, t);
+        return [ask.one(reg.titles, r.claim), ask.about(reg.dealings, "claim", r.claim, { most: p.search_limit, oldest: true })];
       }
       for (const title of ourTitles()) {
         const lot = title.about.object;
-        if (book.records.has(lot) || planAsked.has(lot)) continue;
-        planAsked.add(lot);
-        return [{ channel: reg.lots, query: { where: [{ field: "id", op: "=", value: lot }], limit: 1 } }];
+        if (book.records.has(lot) || !planAsked.first(lot)) continue;
+        return [ask.one(reg.lots, lot)];
       }
       return [];
     };
@@ -2295,8 +2293,8 @@ export const citizen: BehaviourModule = {
           if (looking === null && lookedAt !== obs.t && acc && leads.length && (needHome || (!job && !retired && p.in_labour_force))) {
             const lead = leads.pop()!;
             const looks: LookRequest[] = [];
-            if (needHome) looks.push({ channel: "homes", query: { standing: true, where: [{ field: "data.structure", op: "=", value: lead }, { field: "data.rent", op: "<=", value: budget }, ...roomy], limit: p.search_limit } });
-            if (!job && !retired && p.in_labour_force) looks.push({ channel: "jobs", query: { standing: true, where: [{ field: "data.workplace", op: "=", value: lead }], limit: p.search_limit } });
+            if (needHome) looks.push(ask.board("homes", { most: p.search_limit, where: [{ field: "data.structure", op: "=", value: lead }, { field: "data.rent", op: "<=", value: budget }, ...roomy] }));
+            if (!job && !retired && p.in_labour_force) looks.push(ask.board("jobs", { most: p.search_limit, where: [{ field: "data.workplace", op: "=", value: lead }] }));
             leadFound.homes = [];
             leadFound.jobs = [];
             looking = "leads";
@@ -2313,12 +2311,12 @@ export const citizen: BehaviourModule = {
             searchingWork = unsatisfied || pursuing("better work") || ctx.rng(`job-search-${obs.t}`).below(10_000) < Math.round(mind.person.temperament.openness / 10);
           }
           if (lookedAt !== obs.t && acc) {
-            if (needHome) looks.push({ channel: "homes", query: { standing: true, where: [{ field: "data.rent", op: "<=", value: budget }, ...roomy], order: { field: "data.rent", desc: true }, limit: p.search_limit } });
-            if ((!job || searchingWork) && !retired && p.in_labour_force) looks.push({ channel: "jobs", query: { standing: true, order: { field: "data.wage", desc: true }, limit: p.search_limit } });
+            if (needHome) looks.push(ask.board("homes", { most: p.search_limit, where: [{ field: "data.rent", op: "<=", value: budget }, ...roomy], by: "data.rent", desc: true }));
+            if ((!job || searchingWork) && !retired && p.in_labour_force) looks.push(ask.board("jobs", { most: p.search_limit, by: "data.wage", desc: true }));
             // A glance at the petitions board: what's standing now.
-            looks.push({ channel: "petitions", query: { standing: true, limit: 10 } });
+            looks.push(ask.board("petitions", { most: 10 }));
             // And at the notices at work: an enterprise agreement at our own workplace, made since we started there.
-            if (job && p.work_board) looks.push({ channel: p.work_board, query: { where: [{ field: "data.employer", op: "=", value: job.employer }, { field: "at", op: ">=", value: job.since }], limit: p.search_limit } });
+            if (job && p.work_board) looks.push(ask.about(p.work_board, "data.employer", job.employer, { most: p.search_limit, since: job.since }));
           }
           if (looks.length) {
             lookedAt = obs.t;

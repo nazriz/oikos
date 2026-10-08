@@ -78,5 +78,15 @@
     }
   },
   "perceives": [],
-  "state": "none"
+  "state": "none",
+  "keeps": [
+    {
+      "what": "enrolment",
+      "why": "The electoral office keeps the roll: every elector's enrolment is lodged with it."
+    },
+    {
+      "what": "electoral_roll",
+      "why": "The roll it publishes at each election is its own."
+    }
+  ]
 }

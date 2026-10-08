@@ -15,6 +15,7 @@
  "orchestrator/test/entry.test.ts": 107.7,
  "orchestrator/test/gatherings.test.ts": 32.3,
  "orchestrator/test/generality.test.ts": 1,
+ "orchestrator/test/no-god-view.test.ts": 1.5,
  "orchestrator/test/government.test.ts": 43.1,
  "orchestrator/test/hazards.test.ts": 92.2,
  "orchestrator/test/health.test.ts": 0.3,

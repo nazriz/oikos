@@ -36,6 +36,10 @@ export function instantRunoff(candidates: string[], rankings: string[][]): { win
 
 export const electoralOffice: BehaviourModule = {
   name: "city.electoral_office",
+  keeps: [
+    { what: "enrolment", why: "The electoral office keeps the roll: every elector's enrolment is lodged with it." },
+    { what: "electoral_roll", why: "The roll it publishes at each election is its own." },
+  ],
   version: "0.3.1",
   doc: "docs/behaviour/elections.md",
   cadence: () => DAY,

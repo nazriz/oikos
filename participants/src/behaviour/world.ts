@@ -6,7 +6,7 @@ import * as C from "../calls";
 import { channels, type ParticipantAction, type SiteStructure, type StatementRecord } from "../contracts";
 import { DAY, need, params, wait, type BehaviourModule } from "../module";
 import { cents } from "../money";
-import { because, Book, callAction, MONTH, pay, publishedPrice, say, usd, withdraw, type Step } from "./common";
+import { ask, because, Book, callAction, MONTH, pay, publishedPrice, say, usd, withdraw, type Step } from "./common";
 import { ownerOf } from "./institutions";
 import { stepper } from "./firms";
 import { fill, held, OrderBook, priceList } from "./trade";
@@ -54,6 +54,10 @@ export const exportDemand: BehaviourModule = {
  */
 export const trade: BehaviourModule = {
   name: "world.trade",
+  boundary: [
+    { what: "future", why: "A researcher's scripted shocks to world prices and demand are a scenario's boundary condition: this module is the world market and applies each from its day, publishing nothing of one before it comes." },
+    { what: "every:factory", why: "The outside world's demand for the town's goods is a boundary condition, split when the world is made among the factories that export." },
+  ],
   version: "0.2.0",
   doc: "docs/behaviour/boundary.md",
   cadence: () => DAY,
@@ -331,6 +335,9 @@ export const funding: BehaviourModule = {
  */
 export const weather: BehaviourModule = {
   name: "world.weather",
+  boundary: [
+    { what: "future", why: "The weather is fixed before the run, like the ground: this module stands for it at the world's edge, and is handed the spells to come so that it can warn of each a few days ahead. Nothing in the world can know or change them otherwise." },
+  ],
   version: "0.1.0",
   doc: "docs/behaviour/weather.md",
   cadence: () => DAY,
@@ -587,7 +594,7 @@ export const migration: BehaviourModule = {
         }
         if (looked !== obs.t && obs.woke_for !== "done" && todo.length === 0 && !expecting) {
           looked = obs.t;
-          return { type: "look", looks: [{ channel: "jobs", query: { standing: true, limit: p.search_limit } }] };
+          return { type: "look", looks: [ask.board("jobs", { most: p.search_limit })] };
         }
         if (looked === obs.t && postings.length && todo.length === 0 && !expecting && !pending.length) {
           const monthly = postings.map((x) => Math.floor(((x.data?.wage ?? 0) * 30 * DAY) / (x.data?.period ?? 14 * DAY)));

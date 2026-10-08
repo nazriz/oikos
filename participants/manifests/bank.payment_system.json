@@ -59,5 +59,11 @@
     }
   },
   "perceives": [],
-  "state": "none"
+  "state": "none",
+  "keeps": [
+    {
+      "what": "request",
+      "why": "A bank keeps its own customers' instructions: every standing order and payment request it is asked to carry out is addressed to it."
+    }
+  ]
 }

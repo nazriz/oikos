@@ -59,6 +59,9 @@ class Soonest {
 
 export const bankPaymentSystem: BehaviourModule = {
   name: "bank.payment_system",
+  keeps: [
+    { what: "request", why: "A bank keeps its own customers' instructions: every standing order and payment request it is asked to carry out is addressed to it." },
+  ],
   version: "0.10.0",
   doc: "docs/behaviour/bank-payment-system.md",
   cadence: () => DAY,

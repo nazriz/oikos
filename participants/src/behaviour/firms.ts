@@ -19,7 +19,7 @@ import { basesOf, channels } from "../contracts";
 import { params, wait, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
 import { distribute } from "./lengnick";
 import { incomeTaxLaw, withholding } from "./tax";
-import { because, between, Book, breaches, noting, callAction, usd, cellsOf, commitmentOf, DAY, jobTerms, leaseTerms, MONTH, notice, offer, ownAccount, pay, publishedPrice, say, structureOf, withdraw, type Step } from "./common";
+import { ask, Asked, because, between, Book, breaches, noting, callAction, usd, cellsOf, commitmentOf, DAY, jobTerms, leaseTerms, MONTH, notice, offer, ownAccount, pay, publishedPrice, say, structureOf, withdraw, type Step } from "./common";
 
 /**
  * A participant observes after every action, not just when it wakes: `absorb` takes
@@ -137,14 +137,13 @@ export const landlord: BehaviourModule = {
     const me = ctx.entity;
     const book = new Book();
     // Our titles are our own papers; the plan of each lot is looked up in the register, once.
-    const planAsked = new Set<string>();
+    const planAsked = new Asked();
     const ownLotsNow = () => book.ofType("claim").flatMap((r) => (r.record === "claim" && r.holder === me && r.about?.kind === "ownership" ? [r.about.object as string] : [])).sort();
     const plansToRead = (): LookRequest[] => {
       if (!p.register) return [];
       for (const lot of ownLotsNow()) {
-        if (book.records.has(lot) || planAsked.has(lot)) continue;
-        planAsked.add(lot);
-        return [{ channel: p.register.lots, query: { where: [{ field: "id", op: "=", value: lot }], limit: 1 } }];
+        if (book.records.has(lot) || !planAsked.first(lot)) continue;
+        return [ask.one(p.register.lots, lot)];
       }
       return [];
     };

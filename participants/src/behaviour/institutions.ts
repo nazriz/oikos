@@ -11,7 +11,7 @@ import type { LookRequest, Observation, StatementRecord } from "../contracts";
 import { channels } from "../contracts";
 import { standingClaims } from "../law";
 import { need, params, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
-import { nextLook, because, Book, prohibitions, holdsOf, noting, cellsOf, commitmentOf, DAY, Letters, lotOf, ownAccount, record, say, sign, type Step, usd, withdraw, outOfTime, team } from "./common";
+import { ask, Asked, nextLook, because, Book, prohibitions, holdsOf, noting, cellsOf, commitmentOf, DAY, Letters, lotOf, ownAccount, record, say, sign, type Step, usd, withdraw, outOfTime, team } from "./common";
 import { Deliveries, goodsPrices, held, order } from "./trade";
 import { Bargaining, Staffing, stepper, WindingUp } from "./firms";
 
@@ -222,15 +222,14 @@ export const builder: BehaviourModule = {
     need(p, ["supplier"], "firm.builder");
     const book = new Book();
     // The plan of a lot a client asks us to build on, looked up in the register when the job comes in, once.
-    const planAsked = new Set<string>();
+    const planAsked = new Asked();
     const plansToRead = (obs: Observation): LookRequest[] => {
       if (!p.register) return [];
       for (const r of book.ofType("agreement")) {
         if (r.record !== "agreement" || !r.terms.parties.includes(obs.entity)) continue;
         const lot = commitmentOf(r, obs.entity).outcome?.structure?.on;
-        if (!lot || book.records.has(lot) || planAsked.has(lot)) continue;
-        planAsked.add(lot);
-        return [{ channel: p.register.lots, query: { where: [{ field: "id", op: "=", value: lot }], limit: 1 } }];
+        if (!lot || book.records.has(lot) || !planAsked.first(lot)) continue;
+        return [ask.one(p.register.lots, lot)];
       }
       return [];
     };
@@ -485,6 +484,14 @@ export const builder: BehaviourModule = {
  */
 export const registry: BehaviourModule = {
   name: "city.registry",
+  keeps: [
+    { what: "death_registration", why: "The registrar keeps the register of deaths: it makes every entry in it." },
+    { what: "lot", why: "In this town the registrar also keeps the register of land: it passes a dead owner's titles to their heirs. The plans of the lots are that register's." },
+    { what: "records:claim", why: "The register of land it keeps: every title." },
+    { what: "records:claim_transfer", why: "The register of land it keeps: every dealing in a title." },
+    { what: "records:claim_release", why: "The register of land it keeps: every title given up." },
+    { what: "records:withdrawal", why: "The register of land it keeps: what has been struck from it." },
+  ],
   version: "0.4.0",
   doc: "docs/behaviour/institutions.md",
   cadence: () => DAY,
