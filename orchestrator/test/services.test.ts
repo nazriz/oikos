@@ -61,7 +61,8 @@ test("a crew the budget pays for collects the waste, takes it to the landfill, a
 }, 600_000);
 
 test("with no staff in the budget the crew is let go, nobody collects the waste, and people complain to the town", async () => {
-  const config = generate({ ...base, mayor: "code" });
+  // (No budget on file at the start: the one the council adopts is the mayor's, with no staff line.)
+  const config = generate({ ...base, mayor: "code", opening_budget: false });
   config.participants.find((p: any) => p.id === "mayor-system").controller.params.staff_budget = 0;
   const { ev, recs } = await run("no-crew", config, 100);
   // Once the budget is adopted, the crew is let go (with notice); after that, nothing is collected.

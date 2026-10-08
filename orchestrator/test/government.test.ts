@@ -157,7 +157,9 @@ test("the generated town: every law made from figures reads as its schedule writ
 
 test("budget, park and rates run through the town's own procedures", async () => {
   // (Landlords who pay what they owe: whether they do is a propensity, not what's tested here.)
-  const config = generate({ ...spec, citizens: 80, mayor: "code", landlord_compliance_bps: 10_000 });
+  // (A town whose council has adopted no budget, so the first weeks hold the mayor's proposal and the council's vote on it:
+  // a generated town opens with its first year's budget on file otherwise.)
+  const config = generate({ ...spec, citizens: 80, mayor: "code", landlord_compliance_bps: 10_000, opening_budget: false });
   // A payment from the town's account instructed by the mayor, a post the town
   // has not named as a signatory: the bank should decline it.
   config.world.records.push({ id: "mayor-direct", record: "statement", author: "mayor-system", in_position: "mayor", speaks_for: "city", at: 0, visible_to: ["city", "bank"], kind: "request", addressed_to: ["bank"],

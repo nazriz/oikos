@@ -333,3 +333,59 @@ test("the occupancy standard and a home's physical room are the profile's where 
   };
   expect(short(c, P.values.households.occupancy)).toBeLessThanOrEqual(short(plain, OCCUPANCY));
 }, SLOW);
+
+test("every town opens with its first year's budget on file: adopted by its council on the papers its own procedure leaves, with the lines its mayor's office tables", () => {
+  const YEAR = 365 * DAY;
+  for (const id of ids) {
+    const c = town(id);
+    const P = loadProfile(id);
+    const rec = (rid: string) => c.world.records.find((r: any) => r.id === rid);
+    const written = (n: number) => formatMoney(n, P.values.currency, n % 10 ** P.values.currency.minor_units === 0 ? { decimals: false } : {});
+    const budget = rec("budget-year-1"), ballot = rec(budget.basis), proposal = rec(ballot.data.proposal), result = c.world.records.find((r: any) => r.kind === "ballot_result" && r.data.ballot === ballot.id);
+    // The papers: a proposal in the mayor's post on the council proposal form, the clerk's ballot of the council, a
+    // vote for each councillor's post, the result, and the budget resting on the ballot, in the town's name.
+    const form = rec("form-council-proposal");
+    expect(proposal).toMatchObject({ kind: "proposal", in_position: "mayor", speaks_for: "city", addressed_to: ["city"], basis: form.id, author: "genesis", at: 0 });
+    for (const k of Object.keys(proposal.data)) expect(Object.keys(form.data.fields)).toContain(k);
+    expect(proposal.data).toMatchObject({ kind: "budget", year: 1 });
+    expect(ballot).toMatchObject({ kind: "ballot", in_position: "council-clerk", basis: proposal.id, data: { proposal: proposal.id, electorate: "council", options: ["yes", "no"], closes_at: 0, tags: ["budget"] } });
+    const councillors = c.positions.filter((x: any) => x.role === "councillor").map((x: any) => x.id).sort();
+    const votes = c.world.records.filter((r: any) => r.record === "vote" && r.ballot === ballot.id);
+    expect(votes.map((v: any) => v.in_position).sort()).toEqual(councillors);
+    expect(result).toMatchObject({ in_position: "council-clerk", basis: ballot.id, data: { ballot: ballot.id, yes: votes.filter((v: any) => v.choice === "yes").length, no: 0, passed: true } });
+    expect(budget).toMatchObject({ kind: "budget", in_position: "council-clerk", speaks_for: "city", visible_to: "public", basis: ballot.id, author: "genesis", at: 0 });
+    // The budget is what the clerk's own form for an adopted budget writes: a year, and the town's lines.
+    expect(Object.keys(budget.data).sort()).toEqual(["lines", "year"]);
+    expect(budget.data.year).toBe(1);
+    const finance = c.participants.find((p: any) => p.controller.impl === "city.finance_officer").controller.params;
+    for (const k of Object.keys(budget.data.lines)) expect(Object.keys(finance.budget_lines)).toContain(k);
+    // Its lines are the ones the mayor's office is given to table each year, and the proposal's amounts are the same.
+    const mayor = c.participants.find((p: any) => p.id === "mayor-system").controller.params;
+    expect(budget.data.lines).toEqual({ parks: mayor.park_budget, ...(mayor.road_budget ? { roads: mayor.road_budget } : {}), ...(mayor.staff_budget ? { staff: mayor.staff_budget } : {}), ...(mayor.services_budget ? { services: mayor.services_budget } : {}), ...(mayor.environment_budget ? { environment: mayor.environment_budget } : {}) });
+    for (const [k, v] of Object.entries(budget.data.lines)) expect(proposal.data[k]).toBe(String(v));
+    // The staff lines cover the wages the town is bound to at the start: every agreement it employs someone under, for a year.
+    const wages = c.world.records.filter((r: any) => r.record === "agreement" && r.terms.template === "employment" && r.terms.parties[0] === "city")
+      .reduce((sum: number, a: any) => sum + Math.floor((Number(a.terms.commitments[0].does.outcome.money.amount) * YEAR) / a.terms.commitments[0].every), 0);
+    expect(wages).toBeGreaterThan(0);
+    expect((budget.data.lines.staff ?? 0) + (budget.data.lines.environment ?? 0)).toBeGreaterThanOrEqual(wages);
+    // Its words say each line and the sum as the town writes its money, the year in days, and that the council adopted it.
+    for (const v of [...Object.values(budget.data.lines), Object.values(budget.data.lines).reduce((a: number, x: any) => a + x, 0)] as number[]) expect(budget.text).toContain(written(v));
+    expect(budget.text).toContain("year 1 (day 0 to day 364)");
+    expect(budget.text).toContain(`Adopted by the council before the year began (ballot ${ballot.id}).`);
+    // The procedure the finance office follows names the budget for the year, and what holds while a year has none.
+    expect(rec("proc-payments").text).toContain("only within the budget the council has adopted for the year");
+    expect(rec("law-charter").text).toContain("at no more each month than a twelfth of the budget last adopted");
+    // The mayor's office tables the next year's before the year ends.
+    expect(mayor.budget_lead_days).toBeGreaterThan(c.participants.find((p: any) => p.controller.impl === "city.council_clerk").controller.params.vote_days);
+  }
+}, SLOW);
+
+test("a council with almost no reserves opens with the same budget and a hundredth of the money: a budget it cannot meet", () => {
+  const plain = generate({ ...spec, profile: ids[0] }), lean = generate({ ...spec, profile: ids[0], scenario: "lean-council" });
+  const lines = (c: any) => c.world.records.find((r: any) => r.id === "budget-year-1").data.lines;
+  const held = (c: any) => Number(c.world.accounts.find((a: any) => a.holder === "city").balance);
+  expect(lines(lean)).toEqual(lines(plain));
+  expect(held(lean) * 100).toBe(held(plain));
+  // What it holds is less than a month of what the budget spends.
+  expect(held(lean) * 12).toBeLessThan(Object.values(lines(lean)).reduce((a: number, v: any) => a + v, 0));
+}, SLOW);

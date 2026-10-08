@@ -27,7 +27,9 @@ const rows = (path: string) => readFileSync(path, "utf8").trim().split("\n").fil
 test("a run's dataset: a manifest, and every translation, decision, act and recorded observation, each valid", async () => {
   const out = join(root, "runs", "test-dataset");
   rmSync(out, { recursive: true, force: true });
-  const config = generate({ ...spec, citizens: 80, mayor: "llm" });
+  // (A town whose council has adopted no budget, so the first weeks hold the mayor's proposal and the council's vote on it:
+  // a generated town opens with its first year's budget on file otherwise.)
+  const config = generate({ ...spec, citizens: 80, mayor: "llm", opening_budget: false });
   const citizen = config.participants.find((p: any) => p.controller?.impl === "citizen.default").id;
   const s = await runWorld({ config, runId: "dataset", outDir: out, until: 40 * DAY, recordObservations: ["mayor-system", citizen] });
   const dir = join(out, "dataset.dataset");

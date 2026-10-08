@@ -52,7 +52,9 @@ const directing = (inner: string): BehaviourModule => ({
 });
 
 async function town(name: string, who: { position: string; module: string }, script: Script, until: number) {
-  const config = generate({ ...spec, citizens: 120, nature: false, works_crew_at_start: 0 });
+  // (No budget on file at the start: the works office recruits once the council adopts one, about a fortnight in,
+  // which is when these tests' directions are standing or not.)
+  const config = generate({ ...spec, citizens: 120, nature: false, works_crew_at_start: 0, opening_budget: false });
   const pos = config.positions.find((x: any) => x.id === who.position);
   const part = config.participants.find((x: any) => x.id === pos.holder);
   expect(part.controller.impl).toBe(who.module);

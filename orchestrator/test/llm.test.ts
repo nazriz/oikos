@@ -18,7 +18,9 @@ const spec = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")
 const lines = (path: string) => readFileSync(path, "utf8").trim().split("\n").map((l) => JSON.parse(l));
 
 function town(tweak: (c: any) => void = () => {}) {
-  const c = generate({ ...spec, citizens: 80, mayor: "llm" });
+  // (A town whose council has adopted no budget, so the first weeks hold the mayor's proposal and the council's vote on it:
+  // a generated town opens with its first year's budget on file otherwise.)
+  const c = generate({ ...spec, citizens: 80, mayor: "llm", opening_budget: false });
   tweak(c);
   return c;
 }
@@ -393,7 +395,9 @@ test("a round's requests are translated at once, and recorded in the cohort's or
 }, 300_000);
 
 test("other offices handed to a model (mocked) do their jobs through words, translation and confirmation", async () => {
-  const config = generate({ ...spec, citizens: 80, mayor: "llm", model_seats: "planning,finance" });
+  // (A town whose council has adopted no budget, so the first weeks hold the mayor's proposal and the council's vote on it:
+  // a generated town opens with its first year's budget on file otherwise.)
+  const config = generate({ ...spec, citizens: 80, mayor: "llm", model_seats: "planning,finance", opening_budget: false });
   for (const id of ["planning-system", "finance-system"]) expect(config.participants.find((p: any) => p.id === id).controller.type).toBe("llm");
   expect(() => generate({ ...spec, citizens: 80, model_seats: ["nobody"] })).toThrow(/no office "nobody"/);
   const s = await run("seats", config, 60 * DAY);
