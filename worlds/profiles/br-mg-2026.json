@@ -1,0 +1,1465 @@
+{
+ "id": "br-mg-2026",
+ "place": "A small town of a few thousand people in the interior of Minas Gerais, Brazil (Cerrado / Atlantic Forest transition)",
+ "as_of": "2026-10",
+ "about": "Every place-specific figure the town generator uses for a small town in interior Minas Gerais, Brazil, with its source. State and national statistics stand in for a town where no municipal figure was found; many figures are marked placeholders, with what they were estimated from. Fortnightly wages and payments are the monthly Brazilian figures converted (x 12 / 26) because the structure pays on 14 days. A world for another place and time is another profile; the platform's code holds none of these (docs/profiles.md).",
+ "values": {
+  "currency": {
+   "code": "BRL",
+   "minor_units": 2,
+   "symbol": "R$",
+   "unit_words": [
+    "real",
+    "reais",
+    "conto"
+   ],
+   "minor_words": [
+    "centavo",
+    "centavos"
+   ]
+  },
+  "households": {
+   "lone_bps": 1890,
+   "group_bps": 650,
+   "couple_bps": 2020,
+   "couple_children_bps": 3790,
+   "one_parent_bps": 1650,
+   "children_couple": [
+    4600,
+    3600,
+    1800
+   ],
+   "children_one_parent": [
+    5600,
+    3000,
+    1400
+   ],
+   "same_sex_couple_bps": 100,
+   "lone_parent_female_bps": 8700,
+   "adult_female_bps": 5000,
+   "child_male_bps": 5120,
+   "adult_ages": [
+    18,
+    99
+   ],
+   "mother_age_at_first_birth": [
+    19,
+    32
+   ],
+   "child_max_age": 24,
+   "group_size": [
+    2,
+    3
+   ],
+   "age_bands_bps": [
+    {
+     "from": 0,
+     "to": 4,
+     "bps": 578
+    },
+    {
+     "from": 5,
+     "to": 9,
+     "bps": 612
+    },
+    {
+     "from": 10,
+     "to": 14,
+     "bps": 615
+    },
+    {
+     "from": 15,
+     "to": 19,
+     "bps": 664
+    },
+    {
+     "from": 20,
+     "to": 24,
+     "bps": 743
+    },
+    {
+     "from": 25,
+     "to": 29,
+     "bps": 748
+    },
+    {
+     "from": 30,
+     "to": 34,
+     "bps": 750
+    },
+    {
+     "from": 35,
+     "to": 39,
+     "bps": 772
+    },
+    {
+     "from": 40,
+     "to": 44,
+     "bps": 794
+    },
+    {
+     "from": 45,
+     "to": 49,
+     "bps": 678
+    },
+    {
+     "from": 50,
+     "to": 54,
+     "bps": 649
+    },
+    {
+     "from": 55,
+     "to": 59,
+     "bps": 617
+    },
+    {
+     "from": 60,
+     "to": 64,
+     "bps": 544
+    },
+    {
+     "from": 65,
+     "to": 69,
+     "bps": 436
+    },
+    {
+     "from": 70,
+     "to": 74,
+     "bps": 321
+    },
+    {
+     "from": 75,
+     "to": 79,
+     "bps": 215
+    },
+    {
+     "from": 80,
+     "to": 84,
+     "bps": 141
+    },
+    {
+     "from": 85,
+     "to": 99,
+     "bps": 123
+    }
+   ]
+  },
+  "life": {
+   "qx_per_100000": {
+    "male": [
+     1325,
+     78,
+     63,
+     50,
+     41,
+     33,
+     28,
+     24,
+     22,
+     21,
+     21,
+     23,
+     28,
+     36,
+     49,
+     70,
+     99,
+     133,
+     169,
+     197,
+     216,
+     225,
+     229,
+     232,
+     235,
+     240,
+     244,
+     247,
+     249,
+     249,
+     248,
+     246,
+     246,
+     248,
+     253,
+     260,
+     270,
+     281,
+     295,
+     310,
+     327,
+     344,
+     363,
+     383,
+     404,
+     428,
+     453,
+     483,
+     516,
+     554,
+     596,
+     644,
+     696,
+     753,
+     814,
+     879,
+     946,
+     1016,
+     1089,
+     1167,
+     1253,
+     1352,
+     1467,
+     1600,
+     1751,
+     1914,
+     2083,
+     2247,
+     2403,
+     2553,
+     2704,
+     2876,
+     3082,
+     3337,
+     3647,
+     4007,
+     4406,
+     4829,
+     5267,
+     5727,
+     6228,
+     6813,
+     7521,
+     8373,
+     9371,
+     10458,
+     11555,
+     12568,
+     13428,
+     14149,
+     14908,
+     15707,
+     16550,
+     17438,
+     18373,
+     19359,
+     20397,
+     21491,
+     22644,
+     23859,
+     25139
+    ],
+    "female": [
+     1121,
+     71,
+     56,
+     44,
+     35,
+     29,
+     24,
+     21,
+     19,
+     19,
+     19,
+     20,
+     21,
+     24,
+     27,
+     31,
+     36,
+     40,
+     44,
+     48,
+     51,
+     53,
+     56,
+     58,
+     61,
+     64,
+     67,
+     71,
+     74,
+     78,
+     81,
+     85,
+     89,
+     94,
+     99,
+     106,
+     113,
+     121,
+     131,
+     142,
+     153,
+     166,
+     179,
+     193,
+     206,
+     221,
+     236,
+     253,
+     271,
+     292,
+     315,
+     341,
+     369,
+     400,
+     433,
+     468,
+     505,
+     544,
+     587,
+     635,
+     689,
+     751,
+     824,
+     908,
+     1002,
+     1104,
+     1208,
+     1310,
+     1407,
+     1501,
+     1600,
+     1718,
+     1869,
+     2066,
+     2315,
+     2618,
+     2969,
+     3353,
+     3759,
+     4188,
+     4653,
+     5186,
+     5823,
+     6591,
+     7499,
+     8509,
+     9557,
+     10561,
+     11453,
+     12236,
+     13073,
+     13967,
+     14923,
+     15943,
+     17034,
+     18199,
+     19444,
+     20774,
+     22194,
+     23713,
+     25334
+    ]
+   },
+   "illness": {
+    "by_age": [
+     {
+      "from": 0,
+      "bps": 600
+     },
+     {
+      "from": 5,
+      "bps": 350
+     },
+     {
+      "from": 15,
+      "bps": 600
+     },
+     {
+      "from": 45,
+      "bps": 900
+     },
+     {
+      "from": 65,
+      "bps": 1800
+     },
+     {
+      "from": 85,
+      "bps": 4500
+     }
+    ],
+    "severity": [
+     {
+      "label": "serious",
+      "share_bps": 8000,
+      "days": [
+       3,
+       14
+      ],
+      "fatal_bps": 0
+     },
+     {
+      "label": "severe",
+      "share_bps": 2000,
+      "days": [
+       14,
+       60
+      ],
+      "fatal_bps": 0
+     }
+    ]
+   },
+   "injury": {
+    "bps": 210,
+    "severity": [
+     {
+      "label": "minor",
+      "share_bps": 6000,
+      "days": [
+       3,
+       14
+      ],
+      "fatal_bps": 0
+     },
+     {
+      "label": "serious",
+      "share_bps": 4000,
+      "days": [
+       14,
+       90
+      ],
+      "fatal_bps": 0
+     }
+    ]
+   },
+   "birth": {
+    "ages": [
+     15,
+     49
+    ],
+    "gestation_days": 266,
+    "female_bps": 4880
+   },
+   "treatable": {
+    "share_bps_by_age": [
+     {
+      "from": 0,
+      "bps": 1500
+     },
+     {
+      "from": 75,
+      "bps": 0
+     }
+    ],
+    "band": "severe"
+   },
+   "work_injury_bps": {
+    "factory": 180,
+    "shop": 100
+   },
+   "found_alone_after": [
+    {
+     "within_days": 1,
+     "bps": 3691
+    },
+    {
+     "within_days": 3,
+     "bps": 2062
+    },
+    {
+     "within_days": 7,
+     "bps": 1359
+    },
+    {
+     "within_days": 30,
+     "bps": 1959
+    },
+    {
+     "within_days": 365,
+     "bps": 929
+    }
+   ]
+  },
+  "wages_per_fortnight": {
+   "shop": 74815,
+   "factory": 110769,
+   "construction": 101538
+  },
+  "rents_per_month": {
+   "apartment_units": [
+    {
+     "bedrooms": 1,
+     "count": 3,
+     "rent": 55000
+    },
+    {
+     "bedrooms": 2,
+     "count": 7,
+     "rent": 75000
+    },
+    {
+     "bedrooms": 3,
+     "count": 2,
+     "rent": 95000
+    }
+   ],
+   "house_types": [
+    {
+     "id": "house",
+     "bedrooms": 3,
+     "share_bps": 5500,
+     "rent": 95000
+    },
+    {
+     "id": "large-house",
+     "bedrooms": 4,
+     "share_bps": 4500,
+     "rent": 130000
+    }
+   ]
+  },
+  "spending": {
+   "saving_bps": 400,
+   "wealth_effect_bps_per_year": 300,
+   "essentials_per_month": 65000,
+   "shops_known": 7,
+   "shop_search_bps_per_month": 2500
+  },
+  "savings_by_age": [
+   {
+    "from": 18,
+    "pct": [
+     4000,
+     20000,
+     80000,
+     240000,
+     600000
+    ]
+   },
+   {
+    "from": 25,
+    "pct": [
+     20000,
+     80000,
+     300000,
+     900000,
+     2000000
+    ]
+   },
+   {
+    "from": 35,
+    "pct": [
+     30000,
+     120000,
+     400000,
+     1200000,
+     2800000
+    ]
+   },
+   {
+    "from": 45,
+    "pct": [
+     40000,
+     160000,
+     500000,
+     1500000,
+     3400000
+    ]
+   },
+   {
+    "from": 55,
+    "pct": [
+     60000,
+     200000,
+     700000,
+     2000000,
+     4600000
+    ]
+   }
+  ],
+  "retirement_age": 65,
+  "retiree_savings": [
+   3000000,
+   7000000
+  ],
+  "support": {
+   "pension": {
+    "amount": 162100,
+    "every_days": 30,
+    "from_age": 65
+   },
+   "unemployment": {
+    "amount": 67766,
+    "every_days": 30,
+    "from_age": 18
+   }
+  },
+  "firm_ownership": {
+   "forms_bps": {
+    "factory": {
+     "closely_held": 7000,
+     "outside": 3000,
+     "widely_held": 0
+    },
+    "shop": {
+     "closely_held": 9000,
+     "outside": 1000,
+     "widely_held": 0
+    },
+    "landlord": {
+     "closely_held": 9000,
+     "outside": 1000,
+     "widely_held": 0
+    }
+   },
+   "closely_held": {
+    "households_bps": [
+     8500,
+     1200,
+     300
+    ],
+    "owner_wealth_fifth_bps": [
+     100,
+     200,
+     400,
+     800,
+     8500
+    ]
+   },
+   "widely_held": {
+    "outside_bps": 8000
+   },
+   "direct_holders": {
+    "by_wealth_fifth_bps": [
+     800,
+     2500,
+     3500,
+     5000,
+     7200
+    ],
+    "firms_held": [
+     1,
+     4
+    ]
+   }
+  },
+  "retirement_fund": {
+   "share_bps_of_local": 3000,
+   "member_bps": 500,
+   "pension_every_days": 30,
+   "drawdown_bps_by_age": [
+    {
+     "from": 0,
+     "bps": 400
+    },
+    {
+     "from": 65,
+     "bps": 500
+    },
+    {
+     "from": 75,
+     "bps": 600
+    },
+    {
+     "from": 80,
+     "bps": 700
+    },
+    {
+     "from": 85,
+     "bps": 900
+    },
+    {
+     "from": 90,
+     "bps": 1100
+    },
+    {
+     "from": 95,
+     "bps": 1400
+    }
+   ],
+   "cost_bps_of_income": 1500
+  },
+  "industry": {
+   "factory_labour_share_bps": 2000,
+   "factory_input_share_bps": 6700,
+   "retail_purchases_share_bps": 7000,
+   "retail_labour_share_bps": 1400
+  },
+  "prices": {
+   "goods_world": 3500,
+   "goods_import_markup_bps": 1000,
+   "inputs_per_kg": 90,
+   "materials_per_kg": 45
+  },
+  "ordinary_hours_per_week": 44,
+  "fertility_per_10000": [
+   {
+    "from": 15,
+    "rate": 380
+   },
+   {
+    "from": 20,
+    "rate": 740
+   },
+   {
+    "from": 25,
+    "rate": 770
+   },
+   {
+    "from": 30,
+    "rate": 690
+   },
+   {
+    "from": 35,
+    "rate": 420
+   },
+   {
+    "from": 40,
+    "rate": 105
+   },
+   {
+    "from": 45,
+    "rate": 9
+   },
+   {
+    "from": 50,
+    "rate": 0
+   }
+  ],
+  "labour_force_participation_bps": 7200,
+  "tenancy": {
+   "rent_review_months": 12,
+   "rent_increase_notice_days": 30,
+   "after_fixed_term": "periodic"
+  },
+  "values": {
+   "benevolence": {
+    "mean_bps": 7000,
+    "sd_bps": 1500
+   },
+   "universalism": {
+    "mean_bps": 6600,
+    "sd_bps": 1500
+   },
+   "self_direction": {
+    "mean_bps": 6200,
+    "sd_bps": 1500
+   },
+   "security": {
+    "mean_bps": 5800,
+    "sd_bps": 1500
+   },
+   "conformity": {
+    "mean_bps": 5400,
+    "sd_bps": 1500
+   },
+   "hedonism": {
+    "mean_bps": 5000,
+    "sd_bps": 1500
+   },
+   "achievement": {
+    "mean_bps": 4600,
+    "sd_bps": 1500
+   },
+   "tradition": {
+    "mean_bps": 4200,
+    "sd_bps": 1500
+   },
+   "stimulation": {
+    "mean_bps": 3800,
+    "sd_bps": 1500
+   },
+   "power": {
+    "mean_bps": 3400,
+    "sd_bps": 1500
+   }
+  },
+  "industrial_action": {
+   "ballot_turnout_bps": 5000,
+   "ballot_pass_bps": 5000,
+   "notice_days": 2,
+   "paid_during_action": false
+  },
+  "world_price_process": {
+   "goods": {
+    "sd_bps": 150,
+    "persistence_bps": 9000
+   },
+   "inputs": {
+    "sd_bps": 400,
+    "persistence_bps": 9000
+   },
+   "materials": {
+    "sd_bps": 300,
+    "persistence_bps": 9000
+   }
+  },
+  "credit": {
+   "cash_rate_bps": 1375,
+   "funding_spread_bps": 300,
+   "lending_rate_bps": {
+    "person": 4500,
+    "organisation": 2600
+   },
+   "serviceability_buffer_bps": 300,
+   "max_repayment_share_bps": {
+    "person": 3500,
+    "organisation": 2000
+   },
+   "arrears_days": 30,
+   "default_days": 90,
+   "max_months": 60,
+   "reserve": 3500000
+  },
+  "opening": {
+   "bank": 17500000,
+   "town": 70000000,
+   "builder": 10500000,
+   "landlord": 21000000,
+   "shop": 1050000,
+   "factory": 14000000,
+   "person_min_savings": 35000
+  },
+  "town_finance": {
+   "parks_per_year": 5250000,
+   "payment_approval_over": 6272559
+  },
+  "public_finance": {
+   "income_tax": {
+    "brackets": [
+     {
+      "from": 0,
+      "rate_bps": 0
+     },
+     {
+      "from": 6000000,
+      "rate_bps": 4081
+     },
+     {
+      "from": 8820000,
+      "rate_bps": 2750
+     }
+    ],
+    "levy_bps": 900,
+    "levy_from": 0
+   },
+   "grants_per_resident_per_year": 300000,
+   "rates_per_resident_per_year": 12000,
+   "rates_instalments": 10,
+   "rates_due_days": 30,
+   "rates_penalty_interest_bps": 1200,
+   "median_house_price": 25000000,
+   "rates_exempt_kinds": [
+    "health_service",
+    "school",
+    "utility",
+    "police"
+   ]
+  },
+  "services": {
+   "waste_per_person_per_day_g": 1040,
+   "landfill_levy_per_tonne": 12000,
+   "council_staff_per_1000": 10,
+   "collect_seconds_per_10kg": 12,
+   "asset_life_years": 15,
+   "upkeep_hours_per_week_per_asset": 4,
+   "complain_bps": 3000
+  },
+  "unions": {
+   "membership_bps": {
+    "manufacturing": 1000,
+    "retail": 600,
+    "construction": 500,
+    "public_administration": 1700,
+    "other": 800
+   },
+   "dues_per_month": 3000,
+   "resignation_notice_days": 0,
+   "claim_margin_bps": 200,
+   "meeting_every_days": 30,
+   "teaching": "Together, workers win better pay and conditions than each alone."
+  },
+  "groups": {
+   "kinds": [
+    {
+     "kind": "sport",
+     "name": "sports club",
+     "every_days": 7,
+     "lasts_minutes": 120
+    },
+    {
+     "kind": "religious",
+     "name": "congregation",
+     "every_days": 7,
+     "lasts_minutes": 90,
+     "teaching": "There is a God who made the world and cares how we live.",
+     "held_at_start_bps": 8360
+    },
+    {
+     "kind": "arts",
+     "name": "arts society",
+     "every_days": 14,
+     "lasts_minutes": 120
+    },
+    {
+     "kind": "hobby",
+     "name": "hobby group",
+     "every_days": 14,
+     "lasts_minutes": 120
+    },
+    {
+     "kind": "interest",
+     "name": "community club",
+     "every_days": 30,
+     "lasts_minutes": 120
+    }
+   ],
+   "per_kind_per_1000_people": 1,
+   "taking_part_bps": 4000,
+   "leave_notice_days": 0
+  },
+  "elections": {
+   "term_years": 4,
+   "method": "plurality",
+   "turnout_bps": 7830,
+   "stand_bps": 200,
+   "news_readers_bps": 4000
+  },
+  "health": {
+   "doctors_per_1000": 1.2,
+   "doctor_wage_per_fortnight": 553846,
+   "consult_minutes": 30,
+   "seek_care_bps": 9000,
+   "treats": [
+    {
+     "kind": "illness",
+     "severity": "serious",
+     "consults": 1,
+     "days_kept_bps": 8000,
+     "fatal_kept_bps": 5000
+    },
+    {
+     "kind": "illness",
+     "severity": "severe",
+     "consults": 2,
+     "days_kept_bps": 8000,
+     "fatal_kept_bps": 5000
+    },
+    {
+     "kind": "injury",
+     "severity": "minor",
+     "consults": 1,
+     "days_kept_bps": 8000,
+     "fatal_kept_bps": 5000
+    },
+    {
+     "kind": "injury",
+     "severity": "serious",
+     "consults": 2,
+     "days_kept_bps": 8000,
+     "fatal_kept_bps": 5000
+    }
+   ],
+   "off_work_severities": [
+    "serious",
+    "severe"
+   ]
+  },
+  "round": {
+   "work_start_hour": 8,
+   "work_end_hour": 17,
+   "work_days": 5,
+   "school_start_hour": 7,
+   "school_end_hour": 12,
+   "travel_seconds_per_cell": 18,
+   "travel_by_cover": {
+    "water": 120,
+    "wetland": 30,
+    "woodland": 25,
+    "scrub": 25
+   },
+   "roads": {
+    "seconds_per_cell": 2,
+    "within_cells": 3,
+    "budget_per_resident": 10500
+   }
+  },
+  "ownership": {
+   "house_owner_bps": 7130,
+   "mortgage_bps_by_age": [
+    {
+     "from": 18,
+     "bps": 2000
+    },
+    {
+     "from": 45,
+     "bps": 1500
+    },
+    {
+     "from": 65,
+     "bps": 300
+    }
+   ],
+   "mortgage_payment_per_month": 110000,
+   "mortgage_rate_bps": 1150,
+   "mortgage_years_left": [
+    5,
+    30
+   ],
+   "market": {
+    "buy_bps_per_month": 100,
+    "deposit_bps": 2000,
+    "costs_bps": 500,
+    "mortgage_months": 360,
+    "relist_days": 30,
+    "cut_bps": 500,
+    "floor_bps": 8000
+   }
+  },
+  "utilities": {
+   "water": {
+    "litres_per_person_per_day": 150,
+    "price_per_kl": 500,
+    "service_per_quarter": 6000,
+    "river_inflow_kl_per_cell_per_day": 1000,
+    "river_decay_bps_per_day": 1000,
+    "river_flow_bps_per_day": 5000
+   },
+   "energy": {
+    "kwh_per_household_per_day": 5,
+    "price_per_kwh": 100,
+    "supply_per_day": 50,
+    "grid_price_per_kwh": 60,
+    "grid_emissions_g_per_kwh": 40
+   }
+  },
+  "climate": {
+   "rain_by_month_bps": [
+    16000,
+    14000,
+    14000,
+    10000,
+    7500,
+    6000,
+    5500,
+    5000,
+    5500,
+    8500,
+    12000,
+    15500
+   ],
+   "storm_bps_per_month": 800,
+   "storm_days": [
+    2,
+    4
+   ],
+   "storm_bps": 25000,
+   "drought_bps_per_year": 800,
+   "drought_months": [
+    6,
+    18
+   ],
+   "drought_bps": 4000,
+   "summer_months": [
+    9,
+    10,
+    11,
+    12,
+    1,
+    2,
+    3
+   ],
+   "heatwave_bps_per_week": 1200,
+   "heatwave_days": [
+    3,
+    5
+   ],
+   "heat_units": 10,
+   "built_heat_units": 12,
+   "heat_illness_bps_per_unit": 100,
+   "warning_lead_days": 2
+  },
+  "hazards": {
+   "river_bank_kl": 12000,
+   "spill_bps_per_day": 3000,
+   "flood_above_kl": 300,
+   "wetland_soak_kl_per_day": 500
+  },
+  "crime": {
+   "take_bps_per_month_in_need": 200,
+   "caught_bps_reckoned": 3000,
+   "take_quantity": 5,
+   "detection_bps": 1000,
+   "investigation_hours": 4,
+   "police_per_1000": 1.9,
+   "officer_wage_per_fortnight": 253846
+  },
+  "justice": {
+   "hearing_after_days": 45,
+   "pay_within_days": 28,
+   "challenge_bps": 2000,
+   "apply_bps": 3000,
+   "apply_after_days": 30
+  },
+  "education": {
+   "school_ages": [
+    4,
+    17
+   ],
+   "students_per_teacher": 17,
+   "school_days_per_year": 200,
+   "hours_per_day": 4,
+   "teacher_wage_per_fortnight": 236798,
+   "attainment": [
+    {
+     "label": "No schooling or primary school not finished",
+     "share_bps": 3730,
+     "years": 5
+    },
+    {
+     "label": "Primary school finished",
+     "share_bps": 810,
+     "years": 9
+    },
+    {
+     "label": "Secondary school not finished",
+     "share_bps": 480,
+     "years": 10
+    },
+    {
+     "label": "Secondary school finished",
+     "share_bps": 2820,
+     "years": 12
+    },
+    {
+     "label": "Higher education not finished",
+     "share_bps": 420,
+     "years": 13
+    },
+    {
+     "label": "Higher education finished",
+     "share_bps": 1740,
+     "years": 16
+    }
+   ],
+   "return_per_year_bps": 1000,
+   "max_years": 20
+  },
+  "nature": {
+   "cell_m": 25,
+   "landscape": {
+    "margin_cells": 100,
+    "block_cells": 16,
+    "shares_bps": {
+     "woodland": 1500,
+     "scrub": 1500,
+     "grassland": 3000,
+     "farmland": 3500,
+     "wetland": 500
+    },
+    "woodland_patches": 2
+   },
+   "covers": [
+    {
+     "id": "woodland"
+    },
+    {
+     "id": "scrub",
+     "succeeds_to": {
+      "cover": "woodland",
+      "after_years": 40
+     }
+    },
+    {
+     "id": "grassland"
+    },
+    {
+     "id": "cleared",
+     "succeeds_to": {
+      "cover": "grassland",
+      "after_years": 1
+     }
+    },
+    {
+     "id": "farmland"
+    },
+    {
+     "id": "wetland"
+    },
+    {
+     "id": "riverbank"
+    }
+   ],
+   "default_cover": "grassland",
+   "cleared_cover": "cleared",
+   "river_cover": "riverbank",
+   "pollution": {
+    "decay_bps_per_day": 300,
+    "diffusion_bps_per_day": 800,
+    "flow_bps_per_day": 5000,
+    "per_factory_per_day": 40,
+    "per_farmland_cell_per_day": 1
+   },
+   "species": [
+    {
+     "id": "black-tufted-marmoset",
+     "name": "black-tufted marmoset",
+     "density_per_ha": {
+      "woodland": 0.8,
+      "scrub": 0.4,
+      "riverbank": 0.8
+     },
+     "home_range_ha": 12,
+     "growth_bps_per_year": 3000,
+     "mortality_bps_per_year": 2000,
+     "dispersal_bps_per_year": 1500,
+     "dispersal_m": 300,
+     "barriers": [
+      "farmland"
+     ],
+     "min_viable": 4,
+     "detection_bps": 6000,
+     "conspicuous": true
+    },
+    {
+     "id": "giant-anteater",
+     "name": "giant anteater",
+     "density_per_ha": {
+      "scrub": 0.003,
+      "grassland": 0.003,
+      "woodland": 0.002
+     },
+     "home_range_ha": 300,
+     "growth_bps_per_year": 1000,
+     "mortality_bps_per_year": 800,
+     "dispersal_bps_per_year": 1000,
+     "dispersal_m": 2000,
+     "barriers": [
+      "built"
+     ],
+     "min_viable": 2,
+     "detection_bps": 2000,
+     "listed": true
+    },
+    {
+     "id": "rufous-bellied-thrush",
+     "name": "rufous-bellied thrush",
+     "density_per_ha": {
+      "woodland": 1.0,
+      "scrub": 0.6,
+      "riverbank": 1.0,
+      "grassland": 0.1
+     },
+     "home_range_ha": 1,
+     "growth_bps_per_year": 6000,
+     "mortality_bps_per_year": 4000,
+     "dispersal_bps_per_year": 1000,
+     "dispersal_m": 500,
+     "min_viable": 1,
+     "detection_bps": 8000,
+     "conspicuous": true
+    },
+    {
+     "id": "broad-snouted-caiman",
+     "name": "broad-snouted caiman",
+     "density_per_ha": {
+      "wetland": 1.0,
+      "riverbank": 1.6
+     },
+     "home_range_ha": 5,
+     "growth_bps_per_year": 2000,
+     "mortality_bps_per_year": 1500,
+     "dispersal_bps_per_year": 800,
+     "dispersal_m": 500,
+     "barriers": [
+      "built"
+     ],
+     "min_viable": 2,
+     "tolerance": {
+      "pollution": {
+       "above": 400,
+       "mortality_bps_per_day": 30
+      }
+     },
+     "detection_bps": 4000,
+     "listed": false
+    }
+   ],
+   "survey_hours_per_ha": 1,
+   "survey_staff": 1,
+   "spin_up_years": 10
+  }
+ },
+ "sources": {
+  "currency": "Brazilian real, in centavos: written R$ before the amount, or in words as reais (informally contos) and centavos. ISO 4217: BRL, two decimal places. Words \"conto\" for an informal unit (to confirm usage in Minas Gerais). Brazilians write R$1.234,56 (dot for thousands, comma for decimals); the currency block has no field for that (a structural gap, reported with this profile).",
+  "households.age_bands_bps": "IBGE, Censo Demografico 2022, SIDRA table 9514 (resident population by sex and age group, Minas Gerais, total 20,539,989), fetched from apisidra.ibge.gov.br on 2026-10-08: shares of the population aged 0 to 99, 85-99 summed from the 85-89, 90-94 and 95-99 groups. State figures stand in for a town of a few thousand (a town is older than the state average; not adjusted).",
+  "households.lone_bps": "IBGE, Censo 2022, household arrangements (Agencia IBGE de Noticias, \"Censo 2022: em 12 anos, proporcao de mulheres responsaveis por domicilios avanca e se equipara a de homens\", 2024; reported again in press on the Census release of family arrangements, 2025): one-person households 18.9% (Minas Gerais 18.3%; the national figure is used; to confirm against the SIDRA table).",
+  "households.group_bps": "IBGE, Censo 2022 (same release): households of several people with no spouse, child or step-child, 6.6% (rounded down to 6.5% so that the five types add to 100%; to confirm).",
+  "households.couple_bps": "IBGE, Censo 2022 (same release): couples without children 20.2% of households (to confirm).",
+  "households.couple_children_bps": "IBGE, Censo 2022 (same release): couple with children of both 30.7% plus couple with a child of one spouse 7.2%, 37.9% (to confirm).",
+  "households.one_parent_bps": "IBGE, Censo 2022 (same release): one parent with children 16.5% (to confirm).",
+  "households.children_couple": "Placeholder: share of couples with 1, 2 and 3+ children. Not found; estimated as one child most common, from Brazil's fertility of about 1.6 children a woman (IBGE Projecao da Populacao 2024). To replace from Census 2022 tables on children per family (SIDRA).",
+  "households.children_one_parent": "Placeholder: share of one-parent households with 1, 2 and 3+ children; estimated as for couples, with fewer children in larger sizes. To replace from Census 2022 tables.",
+  "households.same_sex_couple_bps": "Placeholder: 1.0% of couples; IBGE Census 2022 counted same-sex couples but the share was not retrieved (to confirm; the figure is an order-of-magnitude estimate).",
+  "households.lone_parent_female_bps": "Placeholder: about 87% of one-parent households headed by a woman (estimate from the Census 2022 release on women as household heads; exact share not retrieved; to confirm).",
+  "households.adult_female_bps": "Placeholder: about half (as in the reference profile; the 2022 Census has 51.5% women overall, to confirm).",
+  "households.child_male_bps": "Placeholder: about 51.2% of births male (105 boys per 100 girls, IBGE/SINASC; exact year and figure to confirm).",
+  "households.adult_ages": "Placeholder: bounds of the adult ages drawn from the census bands (as in the reference profile).",
+  "households.mother_age_at_first_birth": "Placeholder: the mean age of Brazilian mothers was 27.7 in 2020 (IBGE, Estatisticas do Registro Civil / Projecao da Populacao, reported in the press; to confirm); first births earlier, here 19 to 32.",
+  "households.child_max_age": "Placeholder: carried over from the reference profile (children stay in the parental home to 24); Brazilian young adults often stay longer (to confirm).",
+  "households.group_size": "Placeholder: carried over (2 to 3 people in a group household).",
+  "life.qx_per_100000": "IBGE, Tabuas Completas de Mortalidade do Brasil 2024 (Brasil, homens and mulheres, probability of death q(x,1) per thousand by single year of age 0 to 89; life expectancy at birth 73.3 men, 79.9 women, total 76.6), downloaded as xlsx from ftp.ibge.gov.br/Tabuas_Completas_de_Mortalidade/Tabuas_Completas_de_Mortalidade_2024/xlsx/. Ages 90 to 100: IBGE closes the table at 90+; the tail here is a placeholder extended at the growth of q from age 88 to 89 (capped at 7% a year, and at 0.6). National figures, not Minas Gerais's.",
+  "life.illness": "Placeholder: carried over unchanged from the reference profile (no Brazilian source searched). To replace from Pesquisa Nacional de Saude 2019 (IBGE) morbidity tables.",
+  "life.injury": "Placeholder: carried over unchanged from the reference profile (no Brazilian source searched).",
+  "life.birth.ages": "Placeholder: carried over (biological window 15 to 49).",
+  "life.birth.gestation_days": "Biology (about 38 weeks from conception), carried over from the reference profile.",
+  "life.birth.female_bps": "Placeholder: 100% minus the male share of births (5,120 bps); see households.child_male_bps.",
+  "life.treatable": "Placeholder: carried over unchanged from the reference profile. To replace from the Ministry of Health, Painel de Mortalidade Evitavel (reducible causes), SIM (to confirm).",
+  "life.found_alone_after": "Placeholder: carried over unchanged from the reference profile; no Brazilian source searched.",
+  "life.work_injury_bps": "Placeholder estimate: INSS Anuario Estatistico de Acidentes do Trabalho (AEAT) records on the order of 600,000 registered work accidents a year among about 45 million formal workers, near 1.4% (figures from memory; to confirm); factory above and shop below that mean by assumption.",
+  "wages_per_fortnight.shop": "The national minimum wage from 1 January 2026, R$1,621 a month (Decreto no 12.797, 31 December 2025, Diario Oficial da Uniao 24 and 31 December 2025), taken as the shop wage (retail floors in collective agreements in Minas Gerais run a little above; to confirm). Converted to 14 days as monthly x 12 / 26 (a gap: Brazil pays by the month).",
+  "wages_per_fortnight.factory": "Placeholder: R$2,400 a month, estimated at 1.5 times the minimum wage (R$1,621) for an industrial worker in a small interior town. To replace from IBGE, PNAD Continua Anual 2025, rendimento medio do trabalho principal by sector for Minas Gerais (the state mean over all workers was R$3,270 a month in 2025, reported by Itatiaia from IBGE; sector tables not retrieved). Converted to 14 days as x 12 / 26.",
+  "wages_per_fortnight.construction": "Placeholder: R$2,200 a month (about 1.36 times the minimum wage), estimated; to replace from PNAD Continua sector tables or the CBIC / SINAPI labour cost for Minas Gerais. Converted to 14 days as x 12 / 26.",
+  "ordinary_hours_per_week": "Constituicao Federal 1988, art. 7, XIII: normal working hours up to eight a day and 44 a week (a proposed constitutional amendment to shorten the week was being debated; check status in 2026; to confirm).",
+  "rents_per_month": "Placeholder: monthly rent R$550 to R$950 for apartments and R$950 to R$1,300 for houses, estimated for a small interior town in Minas Gerais from typical listings (not sourced; about 30 to 60% of a minimum wage). To replace from IBGE Censo 2022 or POF 2017-18 rent tables for municipalities of under 20,000 people.",
+  "spending.saving_bps": "Placeholder: about 4% of household disposable income saved, a low figure for Brazil (IBGE, Contas Nacionais Trimestrais, Conta Economica Integrada, household sector; exact current figure not retrieved; to confirm).",
+  "spending.wealth_effect_bps_per_year": "Placeholder: carried over from the reference profile (a modelling rule).",
+  "spending.essentials_per_month": "Placeholder: about R$650 a person a month, near the DIEESE Cesta Basica de Alimentos for Belo Horizonte (DIEESE publishes it monthly; the 2026 figure was not retrieved; to confirm).",
+  "spending.shops_known": "Placeholder: carried over from the reference profile.",
+  "spending.shop_search_bps_per_month": "Placeholder: carried over from the reference profile.",
+  "savings_by_age": "Placeholder: the reference profile's distribution scaled by 0.2 (the ratio of Brazilian to Australian household financial wealth and income is much lower; no Brazilian survey of savings by age retrieved). To replace from IBGE POF 2017-18 or Banco Central do Brasil, Relatorio de Cidadania Financeira.",
+  "retirement_age": "Placeholder / closest fit: 65. Under Emenda Constitucional 103/2019 the permanent old-age retirement age is 65 for men and 62 for women (urban workers, INSS); rural workers 60 and 55 (Lei 8.213/1991, art. 48 par. 1); the low-income old-age benefit (BPC/LOAS, Lei 8.742/1993) starts at 65. The profile holds one age; see the report on structural gaps.",
+  "retiree_savings": "Placeholder: the reference profile's range scaled by 0.2 (see savings_by_age).",
+  "support.pension": "The old-age benefit at the minimum wage, R$1,621 a month (Decreto 12.797/2025): paid by INSS as aposentadoria por idade or as the low-income BPC (Lei 8.742/1993), starting at 65; most INSS benefits are one minimum wage. Paid every 30 days (a monthly payment; the reference profile pays every 14). Rural pensioners may start at 60 or 55 and the 13th payment is not modelled.",
+  "support.unemployment": "Closest fit: the Bolsa Familia, average benefit about R$677.66 per family in June 2026 (Ministerio do Desenvolvimento e Assistencia Social, reported in the press; primary table not opened; to confirm), paid monthly; from age 18. It is a household-income-tested payment to poor families, not an unemployment payment; seguro-desemprego (3 to 5 instalments, formal workers only) cannot be expressed. See the report on structural gaps.",
+  "firm_ownership.forms_bps": "Placeholder: in a small interior town almost all shops, rented homes and local factories are owned by a person, family or a few partners (SEBRAE, microempresas e empresas de pequeno porte, 99% of firms; to confirm); outside ownership 10 to 30%; no widely held firms.",
+  "firm_ownership.closely_held": "Placeholder: carried over unchanged from the reference profile.",
+  "firm_ownership.widely_held": "Placeholder: carried over unchanged from the reference profile.",
+  "firm_ownership.direct_holders": "Placeholder: carried over unchanged from the reference profile; direct share ownership is far rarer in Brazil (B3, Perfil dos investidores, about 5 million individuals of 160 million adults; to confirm), so this overstates it.",
+  "retirement_fund": "Placeholder, off unless a town asks for it: the general pension is the state's pay-as-you-go INSS; private pension funds (previdencia complementar) cover a small share of workers. member_bps and share_bps_of_local are estimates (5% and 30%); the drawdown and cost figures are carried over from the reference profile.",
+  "industry": "Placeholder: carried over from the reference profile (manufacturing labour and input shares, retail purchases and labour shares). To replace from IBGE, Pesquisa Industrial Anual (PIA-Empresa) and Pesquisa Anual de Comercio (PAC), Brazilian national tables, which give wages and intermediate consumption as shares of output.",
+  "prices": "Placeholder: the reference profile's prices scaled by 0.35, the ratio of hourly shop wages (Brazil R$8.5 against Australia $27.8), so that an item is a comparable amount of work: goods R$35 an item at world prices (the unit the town counts in), inputs R$0.90 a kg, building materials R$0.45 a kg.",
+  "labour_force_participation_bps": "Placeholder: 72% of 15-64 year olds. IBGE, PNAD Continua, 2nd quarter 2026: participation rate 62.1% (June 2026) of everyone aged 14 and over; rescaled to working age by assumption.",
+  "tenancy": "Lei do Inquilinato (Lei 8.245/1991): rent may be adjusted once a year (after 12 months) by the contract's index (IGP-M or IPCA); the 30-day notice is a placeholder; a fixed-term lease that runs on without the landlord objecting becomes indeterminate (art. 46 and 56; to confirm the section numbers).",
+  "values": "Placeholder: carried over unchanged from the reference profile (Schwartz value means set by assumption). To replace from the World Values Survey wave 7 (Brazil, 2018) or the European Social Survey's Schwartz portrait scales (to confirm).",
+  "industrial_action": "Lei de Greve (Lei 7.783/1989): strikes are allowed after assembly vote and 48 hours' notice (72 hours for essential services); wages for strike days are normally not paid unless negotiated (TST jurisprudence; to confirm). Turnout and pass shares are placeholders carried over.",
+  "world_price_process": "Placeholder: carried over unchanged from the reference profile (volatility and persistence of world prices).",
+  "credit.cash_rate_bps": "Banco Central do Brasil, Copom: the Selic target set at 13.75% a year at the 281st meeting, 16 September 2026 (a 25 basis point cut; reported by the press from the Copom statement; the statement not opened; to confirm).",
+  "credit.funding_spread_bps": "Placeholder: 300 basis points over the Selic, a guess for a retail bank's funding cost and intermediation margin. To replace from Banco Central do Brasil, Relatorio de Economia Bancaria (spread medio).",
+  "credit.lending_rate_bps": "Placeholder: persons 45% a year (a blend of personal, overdraft and card credit; rotativo much higher, payroll-deductible consignado near 25%), organisations 26% a year. Estimates from memory of the Banco Central do Brasil, Estatisticas Monetarias e de Credito, average interest rates (SGS); the series were not opened; to confirm.",
+  "credit.serviceability_buffer_bps": "Placeholder: carried over from the reference profile.",
+  "credit.max_repayment_share_bps": "Persons: 35% of salary, the legal ceiling on deductions for payroll-deductible loans (Lei 10.820/2003 as amended; some 5 points are reserved for a card; to confirm the current limit). Organisations: placeholder carried over.",
+  "credit.arrears_days": "Placeholder: 30 days, carried over.",
+  "credit.default_days": "Banco Central do Brasil, Resolucao CMN 2.682/1999 (and 4.966/2021): a loan overdue 90 days is treated as impaired (to confirm the current resolution).",
+  "credit.max_months": "Placeholder: carried over from the reference profile.",
+  "credit.reserve": "Placeholder: the reference profile's figure scaled by 0.35 (the price ratio). The Banco Central's reserve requirement (compulsorio, 20 to 21% of demand and savings deposits) is a share, not an amount.",
+  "opening": "Placeholders: the reference profile's opening balances scaled by 0.35 (the ratio of Brazilian to Australian hourly wages). To source if a town's starting capital needs to be real.",
+  "town_finance.parks_per_year": "Placeholder: the reference profile's figure scaled by 0.35.",
+  "town_finance.payment_approval_over": "Lei 14.133/2021 (new public procurement law), art. 75, II: direct award without tender for goods and services up to R$62,725.59 as updated for 2025 by Decreto 12.343/2024 (the 2026 update was not retrieved; to confirm), used as the level over which a municipal payment gets more formal approval.",
+  "public_finance.income_tax": "Receita Federal, personal income tax from 1 January 2026, Lei 15.270/2025 (sanctioned 26 November 2025): income up to R$5,000 a month fully exempt through a reducer, a declining reducer between R$5,000.01 and R$7,350 (978.62 - 0.133145 x income), the ordinary table (7.5% to 27.5%) from R$7,350. The profile is annual and expresses it as three steps: 0% to R$60,000 a year, a 40.81% marginal band to R$88,200 (the 27.5% rate plus the phase-out of the reducer, an approximation that ignores the simplified deduction of R$607.20 a month), then 27.5% (to confirm against the Receita Federal table). Federal law, collected by the federal government, not the municipality.",
+  "public_finance.income_tax.levy_bps": "Closest fit, placeholder: the employee's social-security contribution to INSS (7.5%, 9%, 12% and 14% bands up to a monthly ceiling about R$8,400 in 2026; 2026 table not retrieved; to confirm), averaged near 9% for typical wages. It funds the INSS pension, not general revenue; no ceiling can be expressed.",
+  "public_finance.income_tax.levy_from": "Placeholder: the INSS contribution applies from the first real earned.",
+  "public_finance.grants_per_resident_per_year": "Placeholder: R$3,000 a resident a year. Small municipalities live on transfers: Fundo de Participacao dos Municipios (FPM) and the state's share of ICMS (Tesouro Nacional, Siconfi / Finbra); estimated from memory of per-capita transfers to towns of under 10,000 people; to confirm for a town.",
+  "public_finance.rates_per_resident_per_year": "Placeholder: R$120 a resident a year in property tax (IPTU) and fees; IPTU yields very little in small interior towns (Tesouro Nacional, Finbra; per-capita figure to confirm).",
+  "public_finance.rates_instalments": "Placeholder: IPTU is typically paid in a lump sum or up to ten monthly instalments, set by each municipality's law.",
+  "public_finance.rates_due_days": "Placeholder: carried over.",
+  "public_finance.rates_penalty_interest_bps": "Codigo Tributario Nacional (Lei 5.172/1966), art. 161, par. 1: 1% a month on late tax unless the local law says otherwise (many municipalities add a 2% fine); 12% a year (to confirm).",
+  "public_finance.rates_exempt_kinds": "Constituicao Federal, art. 150, VI, a: reciprocal immunity of public property from tax; carried over (to confirm that schools and health services are exempt as public bodies).",
+  "public_finance.median_house_price": "Placeholder: R$250,000 for a modest house in a small interior town in Minas Gerais, estimated; FipeZap and QuintoAndar do not cover such towns. To replace from IBGE Censo 2022 or ITBI transaction values.",
+  "services.waste_per_person_per_day_g": "ABRELPE, Panorama dos Residuos Solidos no Brasil (2022-2024 editions): about 1.04 kg of household waste per person per day (figure from memory; to confirm).",
+  "services.landfill_levy_per_tonne": "Closest fit, placeholder: Brazil has no landfill levy; municipalities pay a disposal (tipping) fee to a sanitary landfill, about R$120 a tonne for small towns (estimate; to confirm).",
+  "services.council_staff_per_1000": "Placeholder: 10 council staff per 1,000 residents on works and services. Small Brazilian municipalities employ far more in total, including teachers and health workers (IBGE, MUNIC; to confirm).",
+  "services.collect_seconds_per_10kg": "Placeholder: carried over from the reference profile.",
+  "services.asset_life_years": "Placeholder: carried over from the reference profile.",
+  "services.upkeep_hours_per_week_per_asset": "Placeholder: carried over from the reference profile.",
+  "services.complain_bps": "Placeholder: carried over from the reference profile.",
+  "unions.membership_bps": "Placeholder: unionisation of employed people in Brazil is about 8 to 9% (IBGE, PNAD Continua, Caracteristicas adicionais do mercado de trabalho, 2022 and 2023: 9.2% in 2022; later figure to confirm); sector splits estimated (public administration highest).",
+  "unions.dues_per_month": "Placeholder: about R$30 a month (a typical monthly member contribution of about 1% of a low wage). The compulsory union tax was made voluntary by Lei 13.467/2017.",
+  "unions.resignation_notice_days": "Placeholder: 0; a member may leave at any time (Lei 13.467/2017 made union dues voluntary; to confirm).",
+  "unions.claim_margin_bps": "Placeholder: carried over from the reference profile.",
+  "unions.meeting_every_days": "Placeholder: carried over from the reference profile.",
+  "unions.teaching": "Placeholder: carried over (text).",
+  "groups.kinds": "Placeholder: carried over from the reference profile (kinds, names and rhythms of groups). Religion's held_at_start_bps: 83.6% of people aged 10 and over are Catholic (56.7%) or evangelical (26.9%) (IBGE, Censo Demografico 2022, Religiao, released June 2025). The names of Brazilian groups (for example a football club) are not changed.",
+  "groups.taking_part_bps": "Placeholder: carried over from the reference profile.",
+  "groups.leave_notice_days": "Placeholder: carried over from the reference profile.",
+  "groups.per_kind_per_1000_people": "Placeholder: carried over from the reference profile.",
+  "elections": "Constituicao Federal art. 29, II and Lei 9.504/1997: a mayor (prefeito) is elected directly for four years, in one round by plurality in municipalities of under 200,000 voters; voting is compulsory from 18 to 70. Municipal elections were held on 6 October 2024; the next is October 2028. Turnout 78.3% is the national first-round figure in 2024 (TSE; abstention about 21.7%; from memory; to confirm); stand_bps and news_readers_bps are placeholders carried over.",
+  "health": "Doctors: placeholder, 1.2 per 1,000 for a small interior town (Brazil has about 2.9 doctors per 1,000 overall, concentrated in capitals: CFM/FMUSP, Demografia Medica no Brasil 2025; to confirm). Wage: placeholder, a salaried SUS municipal doctor R$12,000 a month, converted to 14 days (x 12 / 26). The clinic stands for the Unidade Basica de Saude and the nearest hospital (a liberty). Consultation length, care-seeking and treatment shares are placeholders carried over from the reference profile.",
+  "round": "Placeholder hours: 8 to 17 (an hour for lunch), Monday to Friday, for everyone (many shops open Saturdays; a liberty); school 7 to 12, the usual morning shift (LDB, Lei 9.394/1996: at least four hours a day, 800 hours over 200 days). Travel speeds and road figures are carried over from the reference profile (physics: a 25 m cell on foot in 18 seconds; roads slower than the reference's by assumption), and the roads budget is scaled by 0.35 (placeholder).",
+  "ownership.house_owner_bps": "IBGE, Censo 2022: 71.3% of the 72.5 million private permanent occupied dwellings were owned (72.7% of people lived in owned homes; 20.9% in rented homes). National figure, not for houses only; to confirm for Minas Gerais.",
+  "ownership.mortgage_bps_by_age": "Placeholder: Brazilian home-ownership is mostly outright (houses built over time, inherited), few owners have a mortgage (the Caixa Economica Federal and the SBPE finance a small share); shares by age are estimates.",
+  "ownership.mortgage_payment_per_month": "Placeholder: R$1,100 a month, estimated for a modest financed house.",
+  "ownership.mortgage_rate_bps": "Placeholder: about 11.5% a year plus the TR, near Caixa's SBPE rate (Caixa Economica Federal, financiamento imobiliario; current rate not retrieved; to confirm).",
+  "ownership.mortgage_years_left": "Placeholder: carried over.",
+  "ownership.market": "Deposit 20% (SBPE financing up to 80% of a house's value; Caixa; to confirm), costs 5% (ITBI of 2 to 3% plus registry and notary fees; to confirm), 360-month term (up to 35 years). Other market parameters (buy rate, relisting, price cuts) are placeholders carried over.",
+  "utilities.water.litres_per_person_per_day": "SNIS, Diagnostico dos Servicos de Agua e Esgotos: about 150 litres per inhabitant per day nationally (2022 figure of about 148; from memory; to confirm).",
+  "utilities.water.price_per_kl": "Placeholder: R$5.00 a kilolitre of water. Copasa (and Arsae-MG, its regulator) applied a 6.56% adjustment from 22 January 2026; the residential tariff table was not retrieved, so the level is an estimate; to replace from Arsae-MG resolution tables.",
+  "utilities.water.service_per_quarter": "Closest fit, placeholder: Copasa bills a minimum monthly charge covering a first block of consumption rather than a service charge; R$60 a quarter here (to replace from the tariff table).",
+  "utilities.water.river_inflow_kl_per_cell_per_day": "Placeholder: carried over from the reference profile.",
+  "utilities.water.river_decay_bps_per_day": "Placeholder: carried over from the reference profile.",
+  "utilities.water.river_flow_bps_per_day": "Placeholder: carried over from the reference profile.",
+  "utilities.energy.kwh_per_household_per_day": "Placeholder: about 5 kWh a household a day (about 150 kWh a month; EPE, Anuario Estatistico de Energia Eletrica, residential average near 160 kWh a month; from memory; to confirm). Rounded to an integer.",
+  "utilities.energy.price_per_kwh": "Placeholder: about R$1.00 a kWh including taxes. ANEEL homologated the Cemig Distribuicao annual tariff review on 26 May 2026 (low-voltage average effect +5.21%, overall +6.50%), in force from 28 May 2026; the residential tariff in R$/kWh was not retrieved; to confirm.",
+  "utilities.energy.supply_per_day": "Closest fit, placeholder: Brazil bills a minimum \"custo de disponibilidade\" of 30, 50 or 100 kWh a month (single, two or three phase; ANEEL REN 1000/2021) rather than a daily supply charge; R$0.50 a day here.",
+  "utilities.energy.grid_price_per_kwh": "Placeholder: R$0.60 a kWh, the credit a small solar generator receives under the compensation system (Lei 14.300/2022; credits against the energy component of the tariff; to confirm).",
+  "utilities.energy.grid_emissions_g_per_kwh": "Placeholder: about 40 g of CO2 a kWh, the Brazilian grid being mostly hydro (Ministerio da Ciencia, Tecnologia e Inovacao, Fator medio mensal de emissao do SIN; the 2023 annual average was near 39 g; from memory; to confirm).",
+  "climate": "Weather drawn for each run (docs/behaviour/weather.md). rain_by_month_bps: the interior of Minas Gerais has a wet season from October to March and a dry season from April to September (INMET, Normais Climatologicas 1991-2020; shape estimated, peak flow in January and lowest in August; to confirm against ANA river-flow series). Storms, droughts and heatwaves are placeholders carried over: the structure has no wet-season weighting (a gap); Minas Gerais has had severe flooding (January 2020, January 2022, S2iD / Defesa Civil records) and a water crisis (the Southeast drought of 2014 to 2016; to confirm). Heat-wave months set to September to March (INMET heat-wave warnings in the dry spring; placeholder).",
+  "hazards": "Placeholder: carried over from the reference profile (river bank capacity, spill and flood thresholds, wetland soak). Flood records for Minas Gerais municipalities: Defesa Civil / S2iD; to source.",
+  "crime.take_bps_per_month_in_need": "Placeholder: carried over.",
+  "crime.caught_bps_reckoned": "Placeholder: carried over.",
+  "crime.take_quantity": "Placeholder: carried over.",
+  "crime.detection_bps": "Placeholder: about 10% of thefts solved. The clearance rate for property crime in Brazil is low (Forum Brasileiro de Seguranca Publica, Anuario Brasileiro de Seguranca Publica 2026, released July 2026; no clearance figure retrieved). To replace from the Anuario or Minas Gerais SEJUSP data.",
+  "crime.investigation_hours": "Placeholder: carried over.",
+  "crime.police_per_1000": "Placeholder: about 1.9 police a thousand people (the Policia Militar of Minas Gerais has about 40,000 officers for 20.5 million people; from memory; Anuario Brasileiro de Seguranca Publica, efetivo; to confirm). The state police (military for patrol, civil for investigation) stand in for one station.",
+  "crime.officer_wage_per_fortnight": "Placeholder: R$5,500 a month for a military police soldier or corporal in Minas Gerais (estimate; to confirm against the state's Lei de remuneracao), converted to 14 days (x 12 / 26).",
+  "justice.hearing_after_days": "Placeholder: about 45 days. The Juizado Especial Civel (Lei 9.099/1995) is the small-claims court for tenancy and consumer disputes up to 40 minimum wages; the Justica do Trabalho handles wage claims; Conselho Nacional de Justica, Justica em Numeros gives times (to source).",
+  "justice.pay_within_days": "Placeholder: carried over.",
+  "justice.challenge_bps": "Placeholder: carried over.",
+  "justice.apply_bps": "Placeholder: carried over; Brazil has a high labour-claims rate (CNJ, Justica em Numeros; to source).",
+  "justice.apply_after_days": "Placeholder: carried over.",
+  "education.school_ages": "Constituicao Federal art. 208, I (Emenda Constitucional 59/2009): basic education is compulsory and free from 4 to 17.",
+  "education.students_per_teacher": "Placeholder: 17 students a teacher (INEP, Censo Escolar 2024, alunos por docente in municipal schools; from memory; to confirm).",
+  "education.school_days_per_year": "Lei de Diretrizes e Bases (Lei 9.394/1996), art. 24, I: at least 200 school days a year and 800 hours.",
+  "education.hours_per_day": "LDB art. 34: at least four hours of actual teaching a day in primary school.",
+  "education.teacher_wage_per_fortnight": "The national salary floor (piso) of public basic-education teachers, R$5,130.63 a month for 40 hours a week in 2026 (Ministerio da Educacao, portaria of January 2026, a 5.4% rise from R$4,867.77; reported by the press), converted to 14 days (x 12 / 26).",
+  "education.attainment": "IBGE, PNAD Continua Educacao 2025 (2nd quarter 2025), people aged 25 and over: no schooling 6.0%, primary not finished 31.4%, primary finished 8.1%, secondary not finished 4.8%, secondary finished 28.2%, higher education not finished 4.2%, higher finished 17.4% (sum 100.1%; the first two are merged and shown as 37.3%). Years of schooling: 5 for the first group, 9 for primary, 12 for secondary and 16 for degree are the legal lengths (placeholder for 5, 10 and 13). National figure.",
+  "education.return_per_year_bps": "Placeholder: about 10% a year, carried over from the reference profile; Brazilian estimates of the return to schooling are higher, 10 to 15% (for example Menezes-Filho, various; to confirm).",
+  "education.max_years": "Placeholder: carried over.",
+  "nature.cell_m": "A cell is a 25 m lot (as in the reference profile).",
+  "nature.landscape": "Placeholder: the cover around a town in the Cerrado / Atlantic Forest transition of central-south Minas Gerais: pasture and crops about 65%, native forest and savanna woodland (cerradao, mata) 30%, wet meadows (veredas and brejos) 5%. To replace from MapBiomas land-cover collection for the municipality. Block size and woodland patches are placeholders carried over.",
+  "nature.covers": "Placeholder: carried over (succession of cover types).",
+  "nature.default_cover": "Carried over.",
+  "nature.cleared_cover": "Carried over.",
+  "nature.river_cover": "Carried over.",
+  "nature.pollution": "Placeholder: carried over from the reference profile.",
+  "nature.survey_hours_per_ha": "Placeholder: carried over.",
+  "nature.survey_staff": "Placeholder: carried over.",
+  "nature.spin_up_years": "Carried over: nature is run alone this long before the start.",
+  "nature.species": "Callithrix penicillata (native to the Cerrado and Atlantic Forest edge). In Cerrado habitats (cerradao and dense cerrado) of the Brazilian Central Plateau: groups of 4 to 11, home range 8.25 to 18.5 ha, density 0.4 to 0.82 individuals a hectare, higher in gallery forest (Miranda and Faria 2001, Brazilian Journal of Biology / Brazilian Journal of Biology 61; found via search, paper not opened; to confirm). Density 0.8 in woodland and riverbank and 0.4 in scrub; growth, mortality and dispersal are placeholders. | Myrmecophaga tridactyla, Vulnerable (IUCN Red List; ICMBio Livro Vermelho 2018; to confirm). Density about 0.2 to 0.4 animals per square kilometre in Cerrado (0.002 to 0.004 per hectare) and a home range of the order of 300 ha (Medri and Mourao 2005 and Cerrado studies; from memory; to confirm). Growth, mortality and dispersal are placeholders (one pup a year; road-kill is a leading cause of death). | Turdus rufiventris (sabia-laranjeira), the national bird of Brazil, common and conspicuous in towns and woodland. Density and home range are placeholders (no source retrieved; a typical passerine territory is about 1 ha). | Caiman latirostris, found in wetlands and rivers of the Atlantic Forest and Cerrado; in Rio Doce State Park, Minas Gerais, an encounter rate of 4.01 individuals a kilometre of water body was recorded (found via search from Brazilian herpetological literature, paper not opened; to confirm). Converted by the cell size to about 1.6 an hectare of riverbank cell (an estimate); the wetland density, home range, growth and mortality are placeholders. IUCN Least Concern (to confirm). Tolerance of pollution is a placeholder.",
+  "fertility_per_10000": "Placeholder: births a year per 10,000 women by 5-year age group, an estimate shaped to Brazil's total fertility rate of 1.57 children a woman in 2023 (IBGE, Projecao da Populacao 2024 / Estatisticas do Registro Civil, as reported in the press; the age-specific rates themselves were not retrieved; to replace from IBGE Projecao da Populacao 2024, taxas especificas de fecundidade). The five-year rates sum to a total fertility of about 1.56."
+ },
+ "targets": [
+  {
+   "what": "employment_to_population_pct",
+   "value": 58.8,
+   "source": "IBGE, PNAD Continua, 2nd quarter / June 2026: nivel de ocupacao 58.8% (as reported in IBGE's PNAD Contínua quarterly bulletin, pnact_2026_2tri; summary read through a search result, bulletin not opened; to confirm)"
+  },
+  {
+   "what": "unemployment_rate_pct",
+   "value": 5.4,
+   "source": "IBGE, PNAD Continua, 2nd quarter 2026: taxa de desocupacao 5.4% (against 6.1% in the 1st quarter 2026 and 5.8% in the 2nd quarter 2025; read through a search result; to confirm)"
+  },
+  {
+   "what": "participation_rate_pct",
+   "value": 62.1,
+   "source": "IBGE, PNAD Continua, June 2026: taxa de participacao na forca de trabalho 62.1% (62.4% in June 2025; read through a search result; to confirm)"
+  },
+  {
+   "what": "union_membership_pct",
+   "value": 9.2,
+   "source": "IBGE, PNAD Continua, Caracteristicas adicionais do mercado de trabalho (sindicalizacao), 2022: 9.2% of employed people (figure from memory; later years to confirm)"
+  },
+  {
+   "what": "union_membership_pct_of_employees",
+   "value": 9.2,
+   "source": "As union_membership_pct (IBGE, PNAD Continua, 2022; to confirm)"
+  },
+  {
+   "what": "religious_affiliation_change_pts_per_year",
+   "value": -0.26,
+   "source": "Derived: Catholic plus evangelical share of people aged 10 and over fell from 86.7% (65.1 + 21.6) in the 2010 Census to 83.6% (56.7 + 26.9) in 2022 (IBGE, Censo Demografico 2022, Religiao, June 2025): -3.1 points over 12 years; the no-religion share rose from 7.9% to 9.3%"
+  }
+ ]
+}
