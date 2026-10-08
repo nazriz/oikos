@@ -90,7 +90,7 @@ export function receipts(obs: Observation, account: string): Map<string, number>
 
 export const landlord: BehaviourModule = {
   name: "firm.landlord",
-  version: "0.13.1",
+  version: "0.13.2",
   doc: "docs/behaviour/firms.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -158,7 +158,10 @@ export const landlord: BehaviourModule = {
     let nextSpend = MONTH;
 
     const vacancyHistory: { t: number; vacant: number; units: number }[] = [];
-    let dev: { lot: string; stage: "applying" | "applied" | "granted" | "refused" | "contracted"; app?: string } | null = null;
+    // A building of ours in the making: the lot, how far it has got, and, once the builder is asked, how the permit
+    // stood then (`permit`), the agreement we offered (`contract`) and when (`offeredAt`). `told`: what the builder
+    // last wrote that it charges, declining an offer of ours, and when.
+    let dev: { lot: string; stage: "applying" | "applied" | "granted" | "refused" | "contracted"; app?: string; permit?: "granted" | "refused"; contract?: string; offeredAt?: number; notBefore?: number; told?: { price: number; at: number } } | null = null;
     let devCooldownUntil = 0;
     const answered = new Set<string>(); // fines and orders we've responded to
     const rentChanges = new Map<string, { from: number; rent: number }[]>(); // lease -> rent increases we've given notice of
@@ -469,11 +472,46 @@ export const landlord: BehaviourModule = {
           } else dev.stage = "refused"; // building anyway
         }
       }
-      if (dev && (dev.stage === "granted" || dev.stage === "refused") && acc.balance >= price) {
-        const lot = dev.lot;
-        const refused = dev.stage === "refused";
-        dev.stage = "contracted";
-        steps.push(because(refused ? "The permit was refused: building anyway." : "The permit was granted: commissioning the builder.", ["build", C.call("structure", { type: p.develop_type, on: lot, by: p.builder, price: C.amountText(price), from: acc.account })]));
+      // The builder's answer to our offer (it declines in writing, saying why: docs/behaviour/building.md), read with
+      // the week's post: at our first plan a week or more after we offered, never in the moment it comes (a wake is
+      // not always a week apart: news wakes us too). Until 2026-10-08 nothing read it: an offer declined left us
+      // waiting for a building for good, and we never built again. Declined for the price (the list changed as we
+      // offered): the offer is dead, the permit stands, and we decide again below at what the builder charges now, as
+      // with any permit in hand. Declined for the site (the builder says it can't build there): this plan is over, and
+      // we wait as long as after a refusal we accept before thinking of building again.
+      if (dev?.stage === "contracted" && dev.contract && t - (dev.offeredAt ?? t) >= 7 * DAY) {
+        const no = book.all("offer_declined").find((r) => r.data?.agreement === dev!.contract && (r.addressed_to ?? []).includes(me));
+        if (no && no.data?.price !== undefined && dev.permit) {
+          dev.told = { price: cents(no.data.price), at: no.at };
+          dev.stage = dev.permit;
+          dev.contract = undefined;
+        } else if (no) {
+          dev = null;
+          devCooldownUntil = t + 180 * DAY;
+        }
+      }
+      // (What it charges now: its standing list, or its letter to us where we hold no list as late as the letter.)
+      const told = dev?.told;
+      const priceNow = told && !book.open("price_list").some((r) => (r.speaks_for === p.builder || r.author === p.builder) && r.at >= told.at) ? told.price : price;
+      if (dev && (dev.stage === "granted" || dev.stage === "refused") && acc.balance >= priceNow && t >= (dev.notBefore ?? 0)) {
+        const d = dev;
+        const refused = d.stage === "refused";
+        const again = d.told !== undefined;
+        d.permit = refused ? "refused" : "granted";
+        d.stage = "contracted";
+        d.offeredAt = t;
+        const s: Step = because(again ? `The builder declined our offer: its price is now ${usd(priceNow)}, which we can pay. Offering again at that.` : refused ? "The permit was refused: building anyway." : "The permit was granted: commissioning the builder.",
+          ["build", C.call("structure", { type: p.develop_type, on: d.lot, by: p.builder, price: C.amountText(priceNow), from: acc.account })]);
+        // The agreement we offered, to know the builder's answer by. An offer that wasn't made (refused in the moment)
+        // is no offer: the permit stands as it did, and we decide again in a week.
+        s.then = (out) => {
+          if (out.status === "applied" && out.created?.build) d.contract = out.created.build;
+          else if (out.status !== "applied" && dev === d && d.stage === "contracted") {
+            d.stage = d.permit!;
+            d.notBefore = t + 7 * DAY;
+          }
+        };
+        steps.push(s);
       }
       if (dev?.stage === "contracted" && sites.some((s) => cellsOf(book, dev!.lot).includes(s.cell) && s.structure)) dev = null;
 
