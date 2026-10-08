@@ -1,19 +1,26 @@
-# A town with little in the bank and less coming from above: its opening balance is a tenth of the profile's, and the
-# grants a higher government pays it are halved. Rates, wages and bills are as ever; whether it runs short follows.
+# A town with almost nothing in the bank and less coming from above: its opening balance is a hundredth of the
+# profile's, and the grants a higher government pays it are halved. Rates, wages and bills are as ever; whether it
+# runs short before its first rates come in follows.
 id: lean-council
-about: The town starts with a tenth of the money the profile gives it, and the grants it gets from above are half the profile's.
+about: The town starts with a hundredth of the money the profile gives it, and the grants it gets from above are half the profile's.
 bears_on: [finance, mayor, rates, works, council-clerk]
 changes:
   - in: profile
     path: opening.town
-    times_bps: 1000
+    times_bps: 100
     basis: >-
-      Placeholder for a council whose reserves are nearly spent (councils do reach that: section 114 notices in England,
-      e.g. Northamptonshire 2018, Croydon 2020, Birmingham 2023; to confirm). The size has no source, as the profile's
-      own opening balance has none.
+      Councils do run out of reserves (section 114 notices in England: Northamptonshire 2018, Croydon 2020, Birmingham
+      2023; about one upper-tier council in ten would have used up its reserves within three years at the rate of
+      2016-17: National Audit Office 2018). The size has no source, as the profile's own opening balance has none; it
+      is set against what the town spends. The first profile gives its town about two and a third years' spending in
+      hand, and a tenth of that (the size first tried) was never drawn below 84% of itself in 180 days. A hundredth is
+      about nine days' spending, between 2% and 3% of a year's (a minimum of 5% of a year's net spending is commonly
+      advised; to confirm). Measured (1,000 people, 120 days, three seeds): in two the town can't pay its crew's wages
+      from the sixteenth day, before its first rates come in.
   - in: profile
     path: public_finance.grants_per_resident_per_year
     times_bps: 5000
     basis: >-
-      Central government funding to English local authorities fell by about half in real terms from 2010-11 to 2017-18
-      (National Audit Office 2018, Financial sustainability of local authorities 2018: 49.1%; to confirm).
+      Government funding for local authorities in England fell by 49.1% in real terms from 2010-11 to 2017-18
+      (National Audit Office 2018, Financial sustainability of local authorities 2018). In the first profile's town
+      grants are under a tenth of what the town takes in, so this half matters little there.

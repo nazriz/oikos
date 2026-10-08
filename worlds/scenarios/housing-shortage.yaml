@@ -9,8 +9,8 @@ changes:
     times_bps: 9000
     basis: >-
       Estimates of how far a country's housing falls short of what its people need run to about a tenth of the stock
-      or more (Centre for Cities 2023, The housebuilding crisis: a backlog of 4.3 million homes in Britain, against
-      about 30 million; to confirm).
+      or more (Centre for Cities 2023, The housebuilding crisis: a backlog of 4.3 million homes in Britain; against a
+      stock of about 30 million, which is not from that source: to confirm).
   - in: town
     path: apartment_blocks
     times_bps: 9000

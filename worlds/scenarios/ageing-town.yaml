@@ -3,6 +3,12 @@
 id: ageing-town
 about: Half as many again of the town's people are 65 or older as the profile's census gives.
 bears_on: [clinic-manager, registry, finance, outside-support, mayor]
+status: inert
+inert_because: >-
+  The town is older (a smaller labour force, more pensions claimed from the support office outside), and in 120
+  days no office of the town is shown anything it wasn't: deaths and hospital-level illness are a handful in that
+  time whatever the ages, the clinic is far from full, and the town provides nothing by age. It needs routine and
+  aged care, or a run of years (health, as for doctor-shortage).
 changes:
   - in: profile
     path: households.age_bands_bps
@@ -11,4 +17,5 @@ changes:
     times_bps: 15000
     basis: >-
       Places differ about this much in their share of people 65 and over: about 29% in Japan against about 18% across
-      the OECD (OECD population statistics, 2022; to confirm), and more so between towns within a country.
+      the OECD (World Bank, population ages 65 and above as a share of the total: 29.4% and 17.9% in 2022), and more so
+      between towns within a country.

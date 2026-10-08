@@ -8,6 +8,10 @@ changes:
     path: shocks
     add: { from_day: 0, kind: energy, what: price, factor_bps: 20000 }
     basis: >-
-      Wholesale electricity prices at least doubled within a year in the 2021-22 energy crisis (International Energy
-      Agency, Electricity Market Report 2023; to confirm). A condition of the world market as the run finds it, not a
-      change during it.
+      Wholesale electricity prices more than doubled within a year in 2022: the European benchmark averaged 121% above
+      2021's (European Commission, quarterly report on European electricity markets), and one national market's quarter
+      was more than three times the year before's (Australian Energy Market Operator, Quarterly Energy Dynamics Q2
+      2022); both read in search results only, to confirm. Twice, not three times: at three times the profile's price
+      the retailer can't pay for a month's supply, stops buying without a word and goes on billing (a fault of the
+      platform's, in the decisions log), so the larger size shows less. A condition of the world market as the run
+      finds it, not a change during it.

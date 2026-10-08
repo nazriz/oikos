@@ -12,7 +12,8 @@
 //     prices the cost projection.
 //   oikos run ... [--scenario NAME[+NAME...]]: the starting conditions a generated world is put under (docs/scenarios.md;
 //     worlds/scenarios/): the same as --set scenario=NAME, and the runs go to runs/<world>.<NAME> unless --out says.
-//   oikos scenarios: the scenarios there are, and what each shifts.
+//   oikos scenarios [--all]: the scenarios there are, and what each shifts; those marked inert are named last with what
+//     is missing (--all: each in full).
 //   oikos run ... [--overwrite]: runs are never overwritten: a run into a folder that already holds its log refuses to
 //     start (choose another --out, or resume it). --overwrite replaces it, for tests' own folders; never the default,
 //     and never a log that holds a real model's answers.
@@ -160,7 +161,7 @@ function stopOnSignal(): StopSignal {
   return stop;
 }
 
-const usage = "usage: oikos run <world> [--seeds N] [--parallel P] [--out DIR] [--until S] [--set k=v] [--scenario NAME[+NAME]] [--modules FILE] [--translator-model m] [--no-measure] [--overwrite] [--model provider/model --budget USD [--base-url URL]] | resume <log.jsonl[.zst]|DIR> [--until S] [--model ... as for run] | measure <DIR> [QUERY...] [--sql SQL] [--list] | diff <BASELINE> <CHANGE> [QUERY...] | health <DIR> [--profile NAME] | cost <DIR> [--translator-model m] | translator-eval --model provider/model [--budget USD] [--out FILE] [--real | --only-real] [--jobs N] | scenarios | pilot-report <DIR>... [--no-write] | replay <log.jsonl> | story <log.jsonl> [participant]";
+const usage = "usage: oikos run <world> [--seeds N] [--parallel P] [--out DIR] [--until S] [--set k=v] [--scenario NAME[+NAME]] [--modules FILE] [--translator-model m] [--no-measure] [--overwrite] [--model provider/model --budget USD [--base-url URL]] | resume <log.jsonl[.zst]|DIR> [--until S] [--model ... as for run] | measure <DIR> [QUERY...] [--sql SQL] [--list] | diff <BASELINE> <CHANGE> [QUERY...] | health <DIR> [--profile NAME] | cost <DIR> [--translator-model m] | translator-eval --model provider/model [--budget USD] [--out FILE] [--real | --only-real] [--jobs N] | scenarios [--all] | pilot-report <DIR>... [--no-write] | replay <log.jsonl> | story <log.jsonl> [participant]";
 
 try {
   if (cmd === "run" && positional()[0]) {
@@ -193,12 +194,21 @@ try {
     }
   } else if (cmd === "scenarios") {
     // The starting conditions a generated world can be put under (docs/scenarios.md): each, and what it shifts.
+    // Those marked inert (their conditions hold, and nothing of them reaches an office until the platform changes) are
+    // named last with what is missing; --all lists them in full with the rest.
     const { loadScenario, scenarioIds } = await import("@oikos/worlds/generator/scenario");
-    for (const s of scenarioIds().map(loadScenario)) {
-      console.log(`${s.id}: ${s.about}`);
+    const every = scenarioIds().map(loadScenario);
+    for (const s of every.filter((x) => has("all") || x.status !== "inert")) {
+      console.log(`${s.id}${s.status === "inert" ? " [inert]" : ""}: ${s.about}`);
+      if (s.status === "inert") console.log(`    inert: ${s.inert_because!.trim().replace(/\s+/g, " ")}`);
       for (const c of s.changes ?? []) console.log(`    ${c.in}.${c.path}${c.where ? ` (rows with ${c.where.field}${c.where.at_least !== undefined ? ` from ${c.where.at_least}` : ""}${c.where.at_most !== undefined ? ` to ${c.where.at_most}` : ""}: ${c.of})` : ""}: ${c.set !== undefined ? `set to ${c.set}` : c.times_bps !== undefined ? `times ${c.times_bps / 10_000}` : c.shortfall_times_bps !== undefined ? `its shortfall times ${c.shortfall_times_bps / 10_000}` : `with ${JSON.stringify(c.add)}`}`);
       if (s.season) console.log(`    the run starts in: ${s.season.starts_in}`);
       if (s.weather) console.log(`    the weather: the climate's year at percentile ${s.weather.percentile} of ${s.weather.draws}, by ${s.weather.rank_by} over ${s.weather.over_days} days`);
+    }
+    const inert = every.filter((x) => x.status === "inert");
+    if (inert.length && !has("all")) {
+      console.log(`\nInert (can be named; nothing of them reaches an office until the platform changes; --all for each in full):`);
+      for (const s of inert) console.log(`  ${s.id}: ${s.inert_because!.trim().replace(/\s+/g, " ")}`);
     }
   } else if (cmd === "run-one" && positional()[0]) {
     await runOne({ world: positional()[0]!, seed: Number(flag("seed")), out: flag("out", "runs")!, until: flag("until") ? Number(flag("until")) : undefined, sets: sets(),

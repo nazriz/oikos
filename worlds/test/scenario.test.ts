@@ -10,7 +10,7 @@ import { join } from "node:path";
 import { Randomness } from "@oikos/participants";
 import { generate, type TownSpec } from "../generator/generate";
 import { loadProfile, PROFILE_DIR, type Profile } from "../generator/profile";
-import { applyScenarios, checkScenario, loadScenario, namedScenarios, SCENARIO_DIR, scenarioIds, seasonStart, type Scenario } from "../generator/scenario";
+import { applyScenarios, checkScenario, loadScenario, namedScenarios, offeredScenarioIds, SCENARIO_DIR, scenarioIds, seasonStart, type Scenario } from "../generator/scenario";
 import { drawWeather, weatherMeasure } from "../generator/weather";
 
 const root = join(import.meta.dir, "../..");
@@ -92,14 +92,14 @@ test("each scenario changes what it says it changes", () => {
   // An election due: polling day sixty days in.
   expect(office(base, "electoral").first_poll_day).toBe(365);
   expect(office(town("election-due"), "electoral").first_poll_day).toBe(60);
-  // A lean council: a tenth of the opening balance, half the grants; nobody else's money moved.
+  // A lean council: a hundredth of the opening balance, half the grants; nobody else's money moved.
   const lean = town("lean-council");
-  expect(balance(lean, "acc-city")).toBe(Math.round(P.opening.town / 10));
+  expect(balance(lean, "acc-city")).toBe(Math.round(P.opening.town / 100));
   expect(office(lean, "outside-grants").per_resident_per_year).toBe(Math.round(P.public_finance.grants_per_resident_per_year / 2));
   expect(balance(lean, "acc-bank")).toBe(balance(base, "acc-bank"));
-  // An export slump: the world takes 12% less from the first day; what a factory has in hand is as it was (derived).
+  // An export slump: the world takes a quarter less from the first day; what a factory has in hand is as it was (derived).
   const slump = town("export-slump");
-  expect(office(slump, "outside-trade").shocks).toEqual([{ from_day: 0, kind: "goods", what: "demand", factor_bps: 8800 }]);
+  expect(office(slump, "outside-trade").shocks).toEqual([{ from_day: 0, kind: "goods", what: "demand", factor_bps: 7500 }]);
   expect(office(base, "outside-trade").shocks).toEqual([]);
   expect(balance(slump, "acc-factory-1")).toBe(balance(base, "acc-factory-1"));
   expect(office(slump, "outside-trade").buys).toEqual(office(base, "outside-trade").buys); // (the demand itself is the profile's still)
@@ -130,6 +130,10 @@ test("each scenario changes what it says it changes", () => {
   const fig = (id: string) => applyScenarios({ ...spec, scenario: id }, loadProfile(spec.profile!)).profile.values;
   expect(fig("doctor-shortage").health!.doctors_per_1000).toBeCloseTo(P.health!.doctors_per_1000 / 2, 4);
   expect(fig("police-understrength").crime!.police_per_1000).toBeCloseTo(P.crime!.police_per_1000 * 0.86, 4);
+  // Dear rents: every rent a quarter higher; wages as they were.
+  expect(fig("dear-rents").rents_per_month.apartment_units.map((u) => u.rent)).toEqual(P.rents_per_month.apartment_units.map((u) => Math.round(u.rent * 1.25)));
+  expect(fig("dear-rents").rents_per_month.house_types.map((u) => u.rent)).toEqual(P.rents_per_month.house_types.map((u) => Math.round(u.rent * 1.25)));
+  expect(fig("dear-rents").wages_per_pay_period).toEqual(P.wages_per_pay_period);
   // Every other scenario leaves a figure it doesn't name alone.
   expect(fig("doctor-shortage").crime).toEqual(P.crime);
 }, 120_000);
@@ -178,11 +182,11 @@ test("scenarios go together in the order named: multiples multiply, and two that
   expect(namedScenarios(undefined)).toEqual([]);
   const P = loadProfile(spec.profile!).values;
   const both = generate({ ...spec, scenario: ["wet-year", "lean-council"] }) as any;
-  expect(balance(both, "acc-city")).toBe(Math.round(P.opening.town / 10));
+  expect(balance(both, "acc-city")).toBe(Math.round(P.opening.town / 100));
   expect(JSON.stringify(office(both, "weather-bureau").events)).toBe(JSON.stringify(office(town("wet-year"), "weather-bureau").events));
   expect(both.meta.description).toEndWith("Starting conditions: wet-year, lean-council.");
-  // The same one twice: a tenth of a tenth.
-  expect(balance(generate({ ...spec, scenario: "lean-council+lean-council" }) as any, "acc-city")).toBe(Math.round(Math.round(P.opening.town / 10) / 10));
+  // The same one twice: a hundredth of a hundredth.
+  expect(balance(generate({ ...spec, scenario: "lean-council+lean-council" }) as any, "acc-city")).toBe(Math.round(Math.round(P.opening.town / 100) / 100));
   // Two years of weather, two seasons.
   expect(() => generate({ ...spec, scenario: "wet-year+dry-year" })).toThrow(/don't go together/);
   expect(() => generate({ ...spec, scenario: "hot-summer+wet-year" })).toThrow(/don't go together/);
@@ -203,15 +207,37 @@ test("nothing of a scenario is shown to anyone in the world: its name and words 
   expect(base.meta.description).not.toContain("Starting conditions");
 });
 
-test("a town generates under every scenario from every profile, or is told what the profile doesn't describe", () => {
+test("an inert scenario says what is missing, can still be named, and is left out of those offered", () => {
+  const ok: Scenario = { id: "x", about: "A test.", bears_on: [], changes: [{ in: "profile", path: "opening.town", times_bps: 5000, basis: "A placeholder for the test." }] };
+  expect(() => checkScenario({ ...ok, status: "inert" })).toThrow(/inert_because/);
+  expect(() => checkScenario({ ...ok, inert_because: "Nothing reports it." })).toThrow(/inert_because/);
+  expect(() => checkScenario({ ...ok, status: "weak" as "inert", inert_because: "Nothing reports it." })).toThrow(/status/);
+  expect(() => checkScenario({ ...ok, status: "inert", inert_because: "Nothing reports it." })).not.toThrow();
+  const inert = ids.filter((id) => loadScenario(id).status === "inert");
+  expect(inert.length).toBeGreaterThan(0);
+  expect(offeredScenarioIds()).toEqual(ids.filter((id) => !inert.includes(id)));
+  expect(offeredScenarioIds()).toContain("baseline");
+  // Named, an inert one is applied like any other.
+  expect(town(inert[0]!).meta.description).toEndWith(`Starting conditions: ${inert[0]}.`);
+});
+
+// (Each scenario generated from each profile, one by one: orchestrator/test/scenarios.test.ts. Here, quickly: each is
+// applied to each profile's figures, which is where a profile that doesn't describe a thing is found out; and each
+// profile's town is generated once under all that apply to it together.)
+test("every scenario applies to every profile, or says what the profile doesn't describe; each profile's town generates under them together", () => {
   for (const f of readdirSync(PROFILE_DIR).filter((x) => x.endsWith(".json"))) {
-    const profile = (JSON.parse(readFileSync(join(PROFILE_DIR, f), "utf8")) as Profile).id;
+    const P = JSON.parse(readFileSync(join(PROFILE_DIR, f), "utf8")) as Profile;
+    const applies: string[] = [];
     for (const id of ids) {
       try {
-        expect((profile === spec.profile ? town(id) : (generate({ ...spec, profile, scenario: id }) as any)).participants.length).toBeGreaterThan(0);
+        expect(applyScenarios({ ...spec, profile: P.id, scenario: id }, P).applied).toEqual(loadScenario(id).changes?.length || loadScenario(id).season || loadScenario(id).weather ? [id] : []);
+        applies.push(id);
       } catch (e) {
-        expect(String(e)).toMatch(new RegExp(`scenario ${id}: the profile ${profile} has no `));
+        expect(String(e)).toMatch(new RegExp(`scenario ${id}: the profile ${P.id} has no `));
       }
     }
+    expect(applies.length).toBeGreaterThan(ids.length / 2);
+    const together = applies.filter((id) => !loadScenario(id).weather);
+    expect((generate({ ...spec, profile: P.id, scenario: together }) as any).participants.length).toBeGreaterThan(0);
   }
-}, 120_000);
+}, 240_000);

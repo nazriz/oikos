@@ -13,5 +13,5 @@ weather:
   over_days: 180
   basis: >-
     The flood planned against is by convention the one with a 1% chance in any year (annual exceedance probability;
-    Ball et al. 2019, Australian Rainfall and Runoff; the base flood of the United States National Flood Insurance
-    Program; to confirm). Here: the year at the 99th percentile of 199 drawn from the profile's climate, by its wettest five days.
+    the base flood of the United States National Flood Insurance Program: Federal Emergency Management Agency,
+    glossary, "Base flood"; and Ball et al. 2019, Australian Rainfall and Runoff, to confirm). Here: the year at the 99th percentile of 199 drawn from the profile's climate, by its wettest five days.

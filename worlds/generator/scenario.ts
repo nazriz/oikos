@@ -49,6 +49,11 @@ export interface Scenario {
   season?: { starts_in: "wet_half" | "dry_half" | "hot_months"; basis: string };
   /** Which of the climate's own years the run is given (weather.ts, `WeatherChoice`). */
   weather?: WeatherChoice & { basis: string };
+  /** `inert`: measured against the plain town, its conditions hold but nothing of them reaches an office, and they
+   * can't until the platform changes (`inert_because` says what is missing). It can still be named; it is left out
+   * of the scenarios offered by default (`offeredScenarioIds`). Absent: it bites. */
+  status?: "inert";
+  inert_because?: string;
 }
 
 /** What a scenario may change of a town's description, and how. (Not its name, seed, profile or size; not its own
@@ -76,9 +81,11 @@ const fail: (id: string, what: string) => never = (id, what) => {
 export function checkScenario(s: Scenario): Scenario {
   const id = String(s?.id ?? "?");
   if (!/^[a-z][a-z0-9-]*$/.test(id)) fail(id, "its id is lower-case words joined by hyphens");
-  for (const k of Object.keys(s)) if (!["id", "about", "bears_on", "changes", "season", "weather"].includes(k)) fail(id, `"${k}" is nothing a scenario has`);
+  for (const k of Object.keys(s)) if (!["id", "about", "bears_on", "changes", "season", "weather", "status", "inert_because"].includes(k)) fail(id, `"${k}" is nothing a scenario has`);
   if (!s.about?.trim()) fail(id, "says nothing about itself (about)");
   if (!Array.isArray(s.bears_on)) fail(id, "doesn't say which offices it bears on (bears_on)");
+  if (s.status !== undefined && s.status !== "inert") fail(id, "its status, if it has one, is inert");
+  if ((s.status === "inert") !== !!s.inert_because?.trim()) fail(id, "an inert scenario says what is missing (inert_because), and only an inert one does");
   const based = (x: { basis?: string } | undefined, what: string) => { if (!x?.basis?.trim()) fail(id, `${what} gives no basis`); };
   for (const c of s.changes ?? []) {
     const at = `${c.in}.${c.path}`;
@@ -133,6 +140,11 @@ export function loadScenario(id: string): Scenario {
 /** Every scenario there is, by name. */
 export function scenarioIds(): string[] {
   return readdirSync(SCENARIO_DIR).filter((f) => f.endsWith(".yaml")).map((f) => f.slice(0, -5)).sort();
+}
+
+/** The scenarios offered by default: every one but those marked inert (which can still be named). */
+export function offeredScenarioIds(): string[] {
+  return scenarioIds().filter((id) => loadScenario(id).status !== "inert");
 }
 
 /** The scenarios a description names: one, a list, or several in one text ("wet-year+lean-council", or with commas). */

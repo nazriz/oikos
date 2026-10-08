@@ -9,4 +9,5 @@ changes:
     shortfall_times_bps: 20000
     basis: >-
       Unemployment about doubles in a deep recession: in the United States from 5.0% in December 2007 to 10.0% in
-      October 2009 (Bureau of Labor Statistics, Current Population Survey; to confirm).
+      October 2009 (Bureau of Labor Statistics, Current Population Survey, as served by the Federal Reserve Bank of
+      St. Louis: series UNRATE).
