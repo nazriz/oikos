@@ -23,5 +23,116 @@
     }
   },
   "perceives": [],
-  "state": "none"
+  "state": "none",
+  "issues": [
+    {
+      "form": "tribunal_order",
+      "title": "Order of the tribunal on an application",
+      "fields": {
+        "application": {
+          "type": "record",
+          "required": true,
+          "description": "The application decided."
+        },
+        "kind": {
+          "type": "choice",
+          "required": true,
+          "options": [
+            "rent_increase",
+            "debt",
+            "charge"
+          ],
+          "description": "What the application was."
+        },
+        "applicant": {
+          "type": "entity",
+          "required": true,
+          "description": "Who applied."
+        },
+        "against": {
+          "type": "entity",
+          "required": true,
+          "description": "Whom it was against."
+        },
+        "finding": {
+          "type": "choice",
+          "required": true,
+          "options": [
+            "dismissed",
+            "invalid",
+            "valid",
+            "pay",
+            "paid"
+          ],
+          "description": "What is found."
+        },
+        "notice": {
+          "type": "record",
+          "description": "For a rent increase: the notice challenged."
+        },
+        "laws": {
+          "type": "list",
+          "description": "The laws the notice breaches, where it is found invalid."
+        },
+        "claim": {
+          "type": "record",
+          "description": "For a debt: the claim."
+        },
+        "amount": {
+          "type": "amount",
+          "description": "For an order to pay: how much."
+        },
+        "pay_into": {
+          "type": "account",
+          "description": "For an order to pay: the account it is paid into."
+        },
+        "due": {
+          "type": "date",
+          "description": "For an order to pay: the day it is due by."
+        },
+        "victim": {
+          "type": "entity",
+          "description": "For a charge: who was wronged."
+        },
+        "report": {
+          "type": "record",
+          "description": "For a charge: the report it came from."
+        },
+        "paid": {
+          "type": "amount",
+          "description": "For a debt found paid: how much was paid."
+        }
+      },
+      "writes": {
+        "kind": "tribunal_order",
+        "text": "Order on {application}: {finding}.",
+        "basis": "=application",
+        "to": [
+          "=applicant",
+          "=against"
+        ],
+        "visible": [
+          "=applicant",
+          "=against",
+          "=self"
+        ],
+        "data": {
+          "application": "=application",
+          "kind": "=kind",
+          "applicant": "=applicant",
+          "against": "=against",
+          "finding": "=finding",
+          "notice": "=notice",
+          "laws": "=laws",
+          "claim": "=claim",
+          "amount": "#amount",
+          "to": "=pay_into",
+          "due": "=due",
+          "victim": "=victim",
+          "report": "=report",
+          "paid": "#paid"
+        }
+      }
+    }
+  ]
 }

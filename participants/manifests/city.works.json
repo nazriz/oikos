@@ -1,6 +1,6 @@
 {
   "name": "city.works",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "doc": "docs/behaviour/services.md",
   "params": {
     "collect_every_days": {
@@ -47,6 +47,21 @@
         "description": "the channel that shows the depot, with who's there by name"
       },
       "default": "depot",
+      "source": "placeholder"
+    },
+    "directed_under": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
+      "source": "placeholder"
+    },
+    "direction_compliance_bps": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "bps",
+      "default": 10000,
       "source": "placeholder"
     },
     "dispose_every_days": {
@@ -138,6 +153,13 @@
       "default": 14,
       "source": "placeholder"
     },
+    "part": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
+      "source": "placeholder"
+    },
     "period": {
       "schema": {
         "type": "integer"
@@ -220,6 +242,150 @@
     {
       "what": "service_address",
       "why": "The round is the works office's own: it makes an entry for each address its crew collects from, and adds to it as homes are built."
+    }
+  ],
+  "takes": [
+    {
+      "form": "works_staffing",
+      "title": "Staffing direction to the works office",
+      "fields": {
+        "recruit": {
+          "type": "choice",
+          "options": [
+            "yes",
+            "no"
+          ],
+          "required": true,
+          "description": "Whether the works office recruits: yes, it advertises and fills the posts it is short of; no, it advertises none and takes nobody on."
+        },
+        "posts": {
+          "type": "count",
+          "description": "The most works crew it is to have, where that is fewer than its budget pays for. Left out: as many as the budget pays for."
+        }
+      },
+      "follows": "While a direction with recruit no stands, the works office advertises no post, takes down the advertisements it has out and offers nobody employment. With recruit yes it recruits up to what its budget pays for, or up to posts where that is fewer. Nobody is stood down by it and nobody's pay changes."
+    },
+    {
+      "form": "works_collection",
+      "title": "Collection direction to the works office",
+      "fields": {
+        "every": {
+          "type": "duration",
+          "required": true,
+          "description": "How often each address on the round is to be collected from (a week, a fortnight)."
+        }
+      },
+      "follows": "While it stands, the crew collects from each address on the round once in that time, as its hours allow, homes complained about first. With no direction, the office keeps to its own round."
+    }
+  ],
+  "issues": [
+    {
+      "form": "job_advertisement",
+      "title": "Job advertisement",
+      "fields": {
+        "wage": {
+          "type": "amount",
+          "required": true,
+          "description": "The wage for each pay period."
+        },
+        "period": {
+          "type": "duration",
+          "required": true,
+          "description": "The pay period: how often the wage is paid."
+        },
+        "posts": {
+          "type": "count",
+          "required": true,
+          "description": "How many posts this advertisement is for."
+        },
+        "account": {
+          "type": "account",
+          "description": "The account the wages are paid from, where the office itself pays them."
+        }
+      },
+      "writes": {
+        "kind": "job_posting",
+        "text": "Hiring: {wage} every {period}.",
+        "data": {
+          "wage": "#wage",
+          "period": "=period",
+          "role": "@role",
+          "industry": "@industry",
+          "workplace": "@workplace_structure",
+          "space": "@workplace"
+        },
+        "offer": {
+          "by": "=self",
+          "to": {
+            "min_age_years": 18
+          },
+          "take_up": "apply",
+          "available": "=posts",
+          "terms": {
+            "template": "employment",
+            "commitments": [
+              {
+                "who": "=self",
+                "does": {
+                  "outcome": {
+                    "money": {
+                      "from": "=account",
+                      "amount": "=wage",
+                      "for": "wages"
+                    }
+                  }
+                },
+                "every": "=period"
+              },
+              "@occupancy"
+            ],
+            "termination": "@termination"
+          }
+        }
+      }
+    },
+    {
+      "form": "disposal_docket",
+      "title": "Docket for waste delivered to the landfill",
+      "fields": {
+        "kind": {
+          "type": "text",
+          "required": true,
+          "description": "What was delivered."
+        },
+        "quantity": {
+          "type": "count",
+          "required": true,
+          "description": "How much of it."
+        }
+      },
+      "writes": {
+        "kind": "disposal_docket",
+        "text": "Delivered: {quantity} of {kind}.",
+        "to": [
+          "@landfill"
+        ],
+        "visible": [
+          "=self",
+          "@landfill"
+        ],
+        "data": {
+          "kind": "=kind",
+          "quantity": "=quantity"
+        }
+      }
+    }
+  ],
+  "routines": [
+    {
+      "task": "collect",
+      "at": "depot",
+      "what": "The crew at the depot collects waste from each address on the round as often as the order says, homes complained about first, as far as its hours go, and takes what it has collected to the landfill each week with a docket."
+    },
+    {
+      "task": "maintain",
+      "at": "depot",
+      "what": "With the hours the round leaves, the crew keeps up the most worn of the town's own assets, and someone is sent to inspect an asset nobody has seen."
     }
   ]
 }

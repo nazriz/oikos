@@ -28,6 +28,8 @@ const status = file.replace(/\.json$/, "") + ".status.log";
 // scripts/pilot-wave.ts), or this queue file's name.
 const wave = process.env.OIKOS_WAVE ?? (file.split("/").at(-1) ?? "queue").replace(/\.json$/, "");
 const tell = (line: string) => alert(runs, wave, `[${(file.split("/").at(-1) ?? "").replace(/\.json$/, "")}] ${line}`);
+/** How many things seats sent that were not sent, in one pilot, before whoever runs the wave is told. */
+const NOT_SENT_ALERT = 3;
 const POLL_MS = 1000 * Number(process.env.OIKOS_POLL_SECONDS ?? 60);
 const say = (line: string) => { const l = `${localStamp()} ${line}`; console.log(l); appendFileSync(status, l + "\n"); };
 /** The report of a pilot's folder, written beside its log (best effort: a report that fails never stops the queue). */
@@ -54,6 +56,7 @@ for (const p of queue) {
       env: { ...process.env, OIKOS_CLAUDE_CODE_LOG: join(dir, "claude-code.calls.jsonl"), OIKOS_DECIDE_LOG: join(dir, "decide.calls.jsonl"), ...(p.env ?? {}) } });
     // While it runs, its log is looked at for a seat opting out (the `opt_out` command), so that it is heard of then.
     let exited = false;
+    let notSent = 0;
     void child.exited.then(() => { exited = true; });
     const look = async () => {
       const state = await runState(dir, p.until);
@@ -61,6 +64,11 @@ for (const p of queue) {
       const r = await scanOptOuts(state.log, offsets.get(state.log) ?? 0).catch(() => undefined);
       if (!r) return;
       offsets.set(state.log, r.offset);
+      // (A prompt too long for a seat's model: each one. Things a seat sent that were not sent: past the third.)
+      for (const x of r.faults) {
+        if (x.kind === "prompt_too_long") tell(`PROMPT TOO LONG ${p.name}: ${x.participant} on day ${x.day}: its model would not take the prompt (${x.detail}); that sitting was not held`);
+        else if (++notSent === NOT_SENT_ALERT) tell(`NOT SENT ${p.name}: ${notSent} things seats sent were not sent so far (each seat was told why); the latest, ${x.participant} on day ${x.day}: ${x.detail}`);
+      }
       for (const o of r.optOuts) if (!optedOut.has(`${p.name}/${o.participant}`)) { optedOut.add(`${p.name}/${o.participant}`); tell(`OPT-OUT ${p.name}: ${o.participant} opted out on day ${o.day} ${JSON.stringify(o.statement.slice(0, 160))}`); }
     };
     while (!exited) { await Promise.race([child.exited, Bun.sleep(POLL_MS)]); await look(); }

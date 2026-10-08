@@ -1,5 +1,5 @@
 {
-  "description": "An example legal code for a small town: EXAMPLE CONTENT, not a default (D18). A world includes it deliberately. Each statement is a record with plain text, an Institutional Grammar breakdown (who / may-must-must not / what / when / or else) and, where machine-checkable, a formal CEL condition used by code-run institutions and by measurement, never by the kernel.",
+  "description": "An example legal code for a small town: EXAMPLE CONTENT, not a default (D18). A world includes it deliberately. It holds no sum of money and no place's figure: a law whose substance is figures is written from a schedule (schedules.json) with the place's own, and a sum a law names stands here as {name} and is written in as the world writes its money, from its profile, when the world is made. Each statement is a record with plain text, an Institutional Grammar breakdown (who / may-must-must not / what / when / or else) and, where machine-checkable, a formal CEL condition used by code-run institutions and by measurement, never by the kernel.",
   "records": [
     {
       "id": "law-charter",
@@ -9,7 +9,7 @@
       "visible_to": "public",
       "speaks_for": "city",
       "kind": "charter",
-      "text": "The town is governed by an elected mayor and council. The council makes the town's laws by majority vote, on proposals from the mayor or any councillor. The mayor proposes the annual budget and the council approves it. The finance office pays the town's bills within the approved budget. The planning office decides building permits under the planning laws. The building inspector inspects sites and reports breaches."
+      "text": "The town is governed by an elected mayor and council. The council makes the town's laws by majority vote, on proposals from the mayor or any councillor. The mayor proposes each year's budget and the council adopts it before the year begins. The finance office pays the town's wages and bills within the budget adopted for the year. While a year has no adopted budget, the finance office may go on paying what the town is already bound to pay (wages under agreements in force, and what falls due under agreements and laws made before the year began), at no more each month than a twelfth of the budget last adopted; nothing new is undertaken until the council adopts the year's budget, which then covers the whole year, what was paid in the meantime included. The planning office decides building permits under the planning laws. The building inspector inspects sites and reports breaches."
     },
     {
       "id": "law-property",
@@ -30,31 +30,6 @@
       }
     },
     {
-      "id": "law-tenancy",
-      "record": "statement",
-      "author": "genesis",
-      "at": 0,
-      "visible_to": "public",
-      "speaks_for": "city",
-      "kind": "law",
-      "basis": "law-charter",
-      "text": "A landlord may end a tenancy only by giving written notice of at least 60 days, and may not remove a tenant before the notice has run out. A tenant may leave on notice of 30 days. Or else: the removal is unlawful and the tenant may return.",
-      "adico": {
-        "attribute": "landlords",
-        "deontic": "must_not",
-        "aim": "remove a tenant",
-        "condition": "before written notice of at least 60 days has run out",
-        "or_else": "the removal is unlawful; the tenant may return"
-      },
-      "data": {
-        "schedule": "schedule-tenancy",
-        "figures": {
-          "notice": { "value": 5184000, "unit": "seconds" },
-          "tenant_notice": { "value": 2592000, "unit": "seconds" }
-        }
-      }
-    },
-    {
       "id": "law-planning",
       "record": "statement",
       "author": "genesis",
@@ -63,39 +38,17 @@
       "speaks_for": "city",
       "kind": "law",
       "basis": "law-charter",
-      "text": "No building may be built anywhere in town without a permit from the planning office. Or else: a fine of $50,000 and an order to demolish.",
+      "text": "No building may be built anywhere in town without a permit from the planning office. Or else: a fine of {fine} and an order to demolish.",
       "adico": {
         "attribute": "anyone",
         "deontic": "must_not",
         "aim": "build",
         "condition": "without a planning permit for that parcel",
-        "or_else": "a fine of $50,000 and a demolition order"
+        "or_else": "a fine of {fine} and a demolition order"
       },
       "formal": {
         "language": "cel",
         "condition": "block.block == 'construct' && !holds_liberty(actor, 'build', block.lot)"
-      }
-    },
-    {
-      "id": "law-tax",
-      "record": "statement",
-      "author": "genesis",
-      "at": 0,
-      "visible_to": "public",
-      "speaks_for": "city",
-      "kind": "law",
-      "basis": "law-charter",
-      "text": "Anyone who receives rent owes the town 10% of it. Rent received each month must be reported to the town, and the tax paid, by the end of the following month. Or else: a penalty of 20% of the tax owed.",
-      "adico": {
-        "attribute": "anyone receiving rent",
-        "deontic": "must",
-        "aim": "report rent received and pay 10% of it to the town",
-        "condition": "monthly, by the end of the following month",
-        "or_else": "a penalty of 20% of the tax owed"
-      },
-      "data": {
-        "rate_bps": 1000,
-        "penalty_bps": 2000
       }
     },
     {
@@ -107,7 +60,7 @@
       "speaks_for": "city",
       "kind": "law",
       "basis": "law-charter",
-      "text": "When someone dies, their money passes to their partner; if they have none, in equal shares to their children aged 18 or over; if none, to the town. A death is registered with the town's registry, and a bank that learns of it pays no more from the dead person's accounts except to settle the estate.",
+      "text": "When someone dies, their money passes to their partner; if they have none, in equal shares to their adult children; if none, to the town. A death is registered with the town's registry, and a bank that learns of it pays no more from the dead person's accounts except to settle the estate.",
       "adico": {
         "attribute": "the estate of someone who has died",
         "deontic": "must",

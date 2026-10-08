@@ -88,7 +88,24 @@
       "properties": { "outcome": { "$ref": "#/$defs/Outcome" } }
     },
     "FieldType": {
-      "enum": ["lot", "cell", "space", "structure_type", "account", "entity", "structure", "record", "amount", "duration", "count", "text", "choice"]
+      "description": "What a form's field takes. `list`: several ids (a JSON list, or one id). `date`: a day as reports write one (\"year 1, day 12\", or \"day 12\" of the first year), read as the moment it begins; or a moment in seconds, as bare digits.",
+      "enum": ["lot", "cell", "space", "structure_type", "account", "entity", "structure", "record", "amount", "duration", "count", "text", "choice", "list", "date"]
+    },
+    "FormWrites": {
+      "description": "How a form that is a paper of an office's own is written from its fields (participants/src/forms.ts; both resolvers, held to contracts/test/forms.json): the statement's kind, its words, its content, whom it is addressed to, who sees it, what it cites, and what it offers or asserts. Each of data, to, visible, offer and assertion is a template: JSON in which a string \"=name\" is the field as the form reads it (an amount as a decimal string, a length of time or a date in seconds, a count as a number, a list as its ids), \"#name\" the field as a whole number, \"?name\" a yes-or-no choice as true or false, \"+name\" a length of time counted from now, and \"=self\" whoever the paper is made for. A field not given leaves its key, or its place in a list, out; a list given where one item stands is set out in its place. In `text`, {name} is the field in words. Such a form does not cite itself: `basis` names the field that is the paper's basis, if it has one.",
+      "type": "object",
+      "required": ["kind", "text"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/Label" },
+        "text": { "type": "string", "minLength": 1, "maxLength": 2000 },
+        "data": {},
+        "to": { "type": "array", "maxItems": 64 },
+        "visible": { "oneOf": [{ "const": "public" }, { "type": "array", "maxItems": 64 }] },
+        "basis": { "type": "string", "pattern": "^=[a-z_][a-z0-9_]{0,31}$" },
+        "offer": { "type": "object" },
+        "assertion": { "type": "object" }
+      }
     },
     "FormData": {
       "description": "The data of a statement of kind 'form': the input an institution expects. Filling it in publishes a statement of kind 'submit_as', addressed to 'submit_to', with the fields as its data, citing the form as its basis.",
@@ -97,6 +114,8 @@
       "additionalProperties": false,
       "properties": {
         "form": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/Label" },
+        "office": { "description": "The office (a position) whose form it is, where it is one office's and not its whole organisation's: a direction that office takes. A call names such a form's office as its `to`.", "$ref": "#/$defs/Id" },
+        "writes": { "description": "For a paper of the office's own: how it is written from the fields. Without it, the fields are the statement's data, it is addressed to `submit_to`, and it cites the form.", "$ref": "#/$defs/FormWrites" },
         "submit_as": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/Label" },
         "submit_to": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/Id" } },
         "fields": {

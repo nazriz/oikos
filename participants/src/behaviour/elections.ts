@@ -7,6 +7,7 @@ import * as C from "../calls";
 import { need, params, type BehaviourModule, type ParticipantContext } from "../module";
 import { because, Book, DAY, say, type Step } from "./common";
 import { stepper } from "./firms";
+import * as P from "./papers";
 
 /** Instant runoff: each round, the candidate fewest rank first is out, until one has a majority of the ballots still
  * counting. Ties go out together if they're all of the last; otherwise the first in id order. */
@@ -36,6 +37,7 @@ export function instantRunoff(candidates: string[], rankings: string[][]): { win
 
 export const electoralOffice: BehaviourModule = {
   name: "city.electoral_office",
+  issues: P.ELECTORAL,
   keeps: [
     { what: "enrolment", why: "The electoral office keeps the roll: every elector's enrolment is lodged with it." },
     { what: "electoral_roll", why: "The roll it publishes at each election is its own." },

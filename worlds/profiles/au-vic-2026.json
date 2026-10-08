@@ -632,6 +632,8 @@
     ],
     "labour_force_participation_bps": 8000,
     "tenancy": {
+      "end_notice_days": 60,
+      "tenant_notice_days": 30,
       "rent_review_months": 12,
       "rent_increase_notice_days": 60,
       "after_fixed_term": "periodic"
@@ -693,6 +695,7 @@
       "person_min_savings": 100000
     },
     "town_finance": {
+      "unpermitted_building_fine": 5000000,
       "parks_per_year": 15000000,
       "payment_approval_over": 5000000
     },
@@ -938,6 +941,9 @@
     "labour_force_participation_bps": "Placeholder: the share of working-age adults (18 to the retirement age) in the labour force, about 80%; to confirm against ABS, Labour Force, Australia, Table 16 (15-64 year olds). Those outside it (studying, caring, other reasons) don't look for work.",
     "labour_force_share_by_age": "ILOSTAT, 'Labour force participation rate by sex and age (%)', five-year bands (dataflow DF_EAP_DWAP_SEX_AGE_RT, https://sdmx.ilo.org/rest/data/ILO,DF_EAP_DWAP_SEX_AGE_RT/all?startPeriod=2019; the data file opened and these figures read from it, 2026-10-08), persons, Australia, national, annual 2025, from the ABS Labour Force Survey: ages 25 to 54, 87.003%; 55 to 59, 77.523%; 60 to 64, 61.001%; 65 and over, 16.129%. National, not regional Victoria (no table by age for the region was found); not checked against the ABS (Labour Force, Australia, Detailed)'s own table (to confirm). How it is used: the first band is the reference; someone in the labour force stops work at the start of a later band with the chance these shares give, and those still in at the last band never stop. The survey's last band is open (65 and over), so nobody is drawn to stop after 65, and those who work on are older on average than they are in fact: to split when the shares at 65 to 69, 70 to 74 and 75 and over are opened. The profile's own participation figure (labour_force_participation_bps) still says how many are in the labour force at the reference ages; this curve says only how that share falls with age.",
     "tenancy": "Residential Tenancies Act 1997 (Vic), s 44: a residential rent may be increased no more than once every 12 months, with at least 60 days' written notice. After a fixed term, a tenancy continues as a periodic (month-to-month) one unless it's ended by notice or a new agreement (the Act; Consumer Affairs Victoria's guidance on fixed-term agreements, to confirm the section).",
+    "tenancy.end_notice_days": "Placeholder: the example legal code's notice a landlord must give to end a tenancy, 60 days, carried over unchanged (nobody's acts are checked against it yet). To source from this place's tenancy law.",
+    "tenancy.tenant_notice_days": "Placeholder: the example legal code's notice a tenant may leave on, 30 days, carried over unchanged. To source from this place's tenancy law.",
+    "town_finance.unpermitted_building_fine": "Placeholder: the fine the town's planning law sets for building without a permit, $50,000: the figure the example legal code and the inspector's module carried until 2026-10-09. To source from this place's planning law.",
     "values": "Placeholder: Schwartz's ten basic values, in the pan-cultural order of importance Schwartz and Bardi found across 56 nations (benevolence, universalism, self-direction, security, conformity, hedonism, achievement, tradition, stimulation, power: 'Value hierarchies across cultures', Journal of Cross-Cultural Psychology 32(3), 2001; to confirm), as importance from 7,000 down to 3,400 basis points, each with a spread of 1,500. To source for this place: the World Values Survey's Schwartz items for Australia (wave 6), rescaled.",
     "industrial_action": "Fair Work Act 2009 (Cth), Part 3-3: a protected action ballot needs at least 50% of the members on the roll voting (s 459(1)(b)) and more than 50% of the votes approving (s 459(1)(c)); at least 3 working days' written notice of action (s 414(2)(a), taken as 3 days); an employer must not pay employees for a period of protected action (s 470).",
     "world_price_process": "Placeholder: world prices move each month by a mean-reverting random process (sd of the monthly move, in basis points of the base price; the share of a gap from the base kept each month). To estimate from ABS, International Trade Price Indexes (import and export price indexes by commodity).",

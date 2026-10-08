@@ -44,6 +44,10 @@ export class ModelCallFailed extends Error {
   override name = "ModelCallFailed";
 }
 
+/** Whether a failed call's words say the prompt was more than the model takes. Such a call is never made again
+ * unchanged: an adapter does not try it again, and whoever made it sends less next time. */
+export const promptTooLong = (message: string): boolean => /prompt is too long|input is too long|too many (input )?tokens|context[ _](length|window)|maximum context|exceeds? the (model'?s? )?(maximum|context|token)/i.test(message);
+
 export interface LlmIO {
   adapter: LlmAdapter;
   /** Append an annotation to the run's log. */

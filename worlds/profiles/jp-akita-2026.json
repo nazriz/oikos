@@ -748,6 +748,8 @@
     ],
     "labour_force_participation_bps": 8000,
     "tenancy": {
+      "end_notice_days": 60,
+      "tenant_notice_days": 30,
       "rent_review_months": 24,
       "rent_increase_notice_days": 30,
       "after_fixed_term": "periodic"
@@ -839,6 +841,7 @@
       "person_min_savings": 60000
     },
     "town_finance": {
+      "unpermitted_building_fine": 3000000,
       "parks_per_year": 9000000,
       "payment_approval_over": 3000000
     },
@@ -1353,6 +1356,9 @@
     "labour_force_participation_bps": "PLACEHOLDER: the share of working-age adults (18 to the retirement age) in the labour force, about 80%. National Labour Force Survey, August 2026, opened: employment rate 80.3% for ages 15-64 and 62.5% for those 15 and over; unemployment 2.5% (Statistics Bureau of Japan, Labour Force Survey (Basic Tabulation), August 2026, https://www.stat.go.jp/data/roudou/sokuhou/tsuki/pdf/gaiyou.pdf, opened 2026-10-08). Akita's own is not looked up.",
     "labour_force_share_by_age": "ILOSTAT, 'Labour force participation rate by sex and age (%)', five-year bands (dataflow DF_EAP_DWAP_SEX_AGE_RT, https://sdmx.ilo.org/rest/data/ILO,DF_EAP_DWAP_SEX_AGE_RT/all?startPeriod=2019; the data file opened and these figures read from it, 2026-10-08), persons, Japan, national, annual 2025, from the Statistics Bureau's Labour Force Survey: ages 25 to 54, 90.248%; 55 to 59, 85.9%; 60 to 64, 76.9%; 65 and over, 26.5%. National, not Akita (no table by age for the region was found); not checked against the Statistics Bureau's own table (to confirm). The note on retirement_age says about half of 65 to 69 year olds work; a search summary gives the 2025 survey's shares as 54.5% at 65 to 69, 36.2% at 70 to 74 and 12.6% at 75 and over (Statistics Bureau, topics no. 149; not opened: to confirm), which would split the open band. How it is used: the first band is the reference; someone in the labour force stops work at the start of a later band with the chance these shares give, and those still in at the last band never stop. The survey's last band is open (65 and over), so nobody is drawn to stop after 65, and those who work on are older on average than they are in fact: to split when the shares at 65 to 69, 70 to 74 and 75 and over are opened. The profile's own participation figure (labour_force_participation_bps) still says how many are in the labour force at the reference ages; this curve says only how that share falls with age.",
     "tenancy": "Act on Land and House Leases (Shakuchi-shakuya-ho), arts. 26-28, 32: a lease renews unless the landlord gives notice 6 to 12 months ahead and has a justifiable cause; rent is changed by agreement, or by a court if the parties disagree (art. 32); there is no cap or notice period for an increase like some countries' rules. Custom: two-year leases, renewed with a renewal fee (so rent_review_months 24 and 30 days' notice are PLACEHOLDERS from custom). STRUCTURAL GAP: the 'justifiable cause' rule for ending a tenancy. After a fixed term the lease renews as a continuing one ('periodic'). From memory; to confirm.",
+    "tenancy.end_notice_days": "Placeholder: the example legal code's notice a landlord must give to end a tenancy, 60 days, carried over unchanged (nobody's acts are checked against it yet). To source from this place's tenancy law.",
+    "tenancy.tenant_notice_days": "Placeholder: the example legal code's notice a tenant may leave on, 30 days, carried over unchanged. To source from this place's tenancy law.",
+    "town_finance.unpermitted_building_fine": "Placeholder: the fine the town's planning law sets for building without a permit, 3 million yen: the first profile's figure scaled by wages, as this profile's approval threshold is. To source from this place's planning law.",
     "values": "PLACEHOLDER carried over: Schwartz's ten basic values in the cross-national order found by Schwartz and Bardi (J. Cross-Cultural Psychology 32(3), 2001; to confirm). Japan's own order differs (it is higher on conformity, security and tradition, lower on hedonism and stimulation among 56 nations' averages); to replace from the World Values Survey (wave 7) Schwartz items for Japan.",
     "industrial_action": "Trade Union Act and Labour Relations Adjustment Act: no statutory ballot for a private-sector strike beyond a union's own rules (a vote of the members by direct secret ballot is required by the union's constitution under Trade Union Act art. 5(2)(8)); no notice period except 10 days' notice for public-interest businesses (Labour Relations Adjustment Act art. 37); 'no work, no pay' during a strike. ballot_turnout_bps, ballot_pass_bps and notice_days are PLACEHOLDERS; paid_during_action false follows the no-work-no-pay principle. From memory; to confirm.",
     "world_price_process": "PLACEHOLDER: world prices move each month by a mean-reverting random process (sd of the monthly move in basis points; the share of a gap kept each month). To estimate from the Bank of Japan's Corporate Goods Price Index and Import Price Index.",

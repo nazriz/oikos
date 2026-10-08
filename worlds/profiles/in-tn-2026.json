@@ -747,6 +747,8 @@
     ],
     "labour_force_participation_bps": 6120,
     "tenancy": {
+      "end_notice_days": 60,
+      "tenant_notice_days": 30,
       "rent_review_months": 12,
       "rent_increase_notice_days": 90,
       "after_fixed_term": "periodic"
@@ -794,8 +796,6 @@
       }
     },
     "industrial_action": {
-      "ballot_turnout_bps": 0,
-      "ballot_pass_bps": 0,
       "notice_days": 14,
       "paid_during_action": false
     },
@@ -820,7 +820,6 @@
         "person": 1300,
         "organisation": 861
       },
-      "serviceability_buffer_bps": 0,
       "max_repayment_share_bps": {
         "person": 4500,
         "organisation": 2000
@@ -838,6 +837,7 @@
       "person_min_savings": 300000
     },
     "town_finance": {
+      "unpermitted_building_fine": 15100000,
       "parks_per_year": 45300000,
       "payment_approval_over": 15100000
     },
@@ -913,7 +913,6 @@
     },
     "services": {
       "waste_per_person_per_day_g": 400,
-      "landfill_levy_per_tonne": 0,
       "council_staff_per_1000": 2,
       "collect_seconds_per_10kg": 12,
       "asset_life_years": 15,
@@ -1382,13 +1381,16 @@
     "labour_force_participation_bps": "MoSPI, Periodic Labour Force Survey, calendar year 2024, urban Tamil Nadu, usual status (PS+SS), persons aged 15-59: labour force participation rate 61.2% (male 84.8%, female 38.3%); aged 15 and over: 54.5%; worker population ratio 15+ 52.4%; unemployment rate 15+ 3.8% (opened via MoSPI eSankhyiki data server (mcp.mospi.gov.in), opened 2026-10-08).",
     "labour_force_share_by_age": "ILOSTAT, 'Labour force participation rate by sex and age (%)', five-year bands (dataflow DF_EAP_DWAP_SEX_AGE_RT, https://sdmx.ilo.org/rest/data/ILO,DF_EAP_DWAP_SEX_AGE_RT/all?startPeriod=2019; the data file opened and these figures read from it, 2026-10-08), persons, India, national, annual 2025, from MoSPI's Periodic Labour Force Survey: ages 25 to 54, 69.825%; 55 to 59, 65.427%; 60 to 64, 48.675%; 65 and over, 26.431%. National, not urban Tamil Nadu (the series is all India, rural and urban together) (no table by age for the region was found); not checked against MoSPI's own table (to confirm). How it is used: the first band is the reference; someone in the labour force stops work at the start of a later band with the chance these shares give, and those still in at the last band never stop. The survey's last band is open (65 and over), so nobody is drawn to stop after 65, and those who work on are older on average than they are in fact: to split when the shares at 65 to 69, 70 to 74 and 75 and over are opened. The profile's own participation figure (labour_force_participation_bps) still says how many are in the labour force at the reference ages; this curve says only how that share falls with age.",
     "tenancy": "Tamil Nadu Regulation of Rights and Responsibilities of Landlords and Tenants Act 2017: rent is revised by agreement, typically once a year (11-month agreements are customary), and a landlord gives three months' notice in writing of a revision (to confirm the sections, and whether the Act is in force as written). A tenant who stays on after the term holds over month to month (to confirm).",
+    "tenancy.end_notice_days": "Placeholder: the example legal code's notice a landlord must give to end a tenancy, 60 days, carried over unchanged (nobody's acts are checked against it yet). To source from this place's tenancy law.",
+    "tenancy.tenant_notice_days": "Placeholder: the example legal code's notice a tenant may leave on, 30 days, carried over unchanged. To source from this place's tenancy law.",
+    "town_finance.unpermitted_building_fine": "Placeholder: the fine the town's planning law sets for building without a permit, ₹151,000: the first profile's figure scaled by this profile's ratio for its placeholders, 3.02. To source from this place's planning law.",
     "values": "PLACEHOLDER carried over unchanged: Schwartz's ten basic values, in the pan-cultural order found across 56 nations (Schwartz & Bardi 2001, 'Value hierarchies across cultures', Journal of Cross-Cultural Psychology 32). Indian samples tend to rank tradition, conformity and security higher; not adjusted (to source, e.g. World Values Survey India wave).",
-    "industrial_action": "Industrial Relations Code 2020 (in force from 21 November 2025; to confirm), s 62: no worker in an industrial establishment may strike without notice within 60 days before striking, and not within 14 days of giving it (taken here as 14 days' notice). No strike ballot is required, so the turnout and approval thresholds are 0 (the structure has no 'no ballot' form). Employees on strike are not paid ('no work, no pay'; to confirm the section).",
+    "industrial_action": "(Left out since 2026-10-09: the ballot turnout and the share of a ballot's votes, which stood here as nought for a rule the place does not have. The note is its author's, as written.) Industrial Relations Code 2020 (in force from 21 November 2025; to confirm), s 62: no worker in an industrial establishment may strike without notice within 60 days before striking, and not within 14 days of giving it (taken here as 14 days' notice). No strike ballot is required, so the turnout and approval thresholds are 0 (the structure has no 'no ballot' form). Employees on strike are not paid ('no work, no pay'; to confirm the section).",
     "world_price_process": "PLACEHOLDER carried over unchanged: world prices move each month by a mean-reverting random process (sd of the monthly move in basis points; the share of a gap from the base kept each month). To estimate from India's Wholesale Price Index (Office of the Economic Adviser, by commodity).",
     "credit.cash_rate_bps": "Reserve Bank of India, Monetary Policy Statement 2026-27, Resolution of the Monetary Policy Committee, 5 to 7 October 2026 (press release, rbi.org.in, opened 2026-10-08): the MPC voted unanimously to raise the policy repo rate by 25 bps to 5.50 per cent (standing deposit facility 5.25, marginal standing facility and Bank Rate 5.75) and changed the stance to calibrated tightening. (An earlier version of this profile had 5.25, the rate before the meeting.)",
     "credit.funding_spread_bps": "Placeholder: what a small bank pays over the policy rate for its funding.",
     "credit.lending_rate_bps": "organisation: RBI, press release 'Lending and Deposit Rates of Scheduled Commercial Banks - September 2026' (30 September 2026, opened): the weighted average lending rate on fresh rupee loans of scheduled commercial banks was 8.61 per cent in August 2026 (8.96 per cent on outstanding loans); all sectors, not small businesses only (the sector tables are in a PDF that could not be fetched). person: PLACEHOLDER, 13%, personal loans; the sector tables are to be read.",
-    "credit.serviceability_buffer_bps": "0: India has no serviceability buffer rule like Australia's (the APRA buffer); the RBI leaves the affordability test to the lender (fixed-obligation-to-income ratio). The closest the structure allows is none.",
+    "credit.serviceability_buffer_bps": "(Left out since 2026-10-09: the serviceability buffer, which stood here as nought for a rule the place does not have. The note is its author's, as written.) 0: India has no serviceability buffer rule like Australia's (the APRA buffer); the RBI leaves the affordability test to the lender (fixed-obligation-to-income ratio). The closest the structure allows is none.",
     "credit.max_repayment_share_bps": "Placeholders: the most of a borrower's monthly income a lender lets repayments take (people 45%, the fixed-obligation-to-income ratio of 40-50% banks commonly apply to salaried personal loans, not sourced; organisations 20% of what comes in).",
     "credit.arrears_days": "Placeholder: a month behind is arrears (a lender's first notice).",
     "credit.default_days": "Non-performing at 90 days past due (RBI, Master Circular on Income Recognition, Asset Classification and Provisioning; to confirm the current Master Direction).",
@@ -1405,7 +1407,7 @@
     "public_finance.rates_exempt_kinds": "Government buildings, schools and charitable and public-health buildings are exempt from property tax under the municipal laws (to confirm the sections); the same kinds as the other profile are listed.",
     "public_finance.median_house_price": "PLACEHOLDER, ₹20 lakh for a modest house in a small town: Tamil Nadu's guideline values (Registration Department) and listings are to be used (to source). The land value of a lot is derived from it less what the builder charges.",
     "services.waste_per_person_per_day_g": "PLACEHOLDER, 400 g a person a day: urban India generates 0.3-0.5 kg a person a day (Central Pollution Control Board, Annual Report on Solid Waste Management 2020-21; Ministry of Housing and Urban Affairs; neither opened, to confirm Tamil Nadu's figure).",
-    "services.landfill_levy_per_tonne": "0: no landfill levy was found in Tamil Nadu (the Solid Waste Management Rules 2016 provide for user fees and spot fines, not a levy per tonne; to confirm).",
+    "services.landfill_levy_per_tonne": "(Left out since 2026-10-09: the landfill charge, which stood here as nought for a rule the place does not have. The note is its author's, as written.) 0: no landfill levy was found in Tamil Nadu (the Solid Waste Management Rules 2016 provide for user fees and spot fines, not a levy per tonne; to confirm).",
     "services.council_staff_per_1000": "PLACEHOLDER, 2 per 1,000: sanitary workers and council staff in a town panchayat (Solid Waste Management Rules 2016 and Tamil Nadu Municipal Administration Department staffing norms; not opened, to confirm). In the town, all of them are its works crew.",
     "services.collect_seconds_per_10kg": "PLACEHOLDER carried over unchanged: about 12 seconds of work per 10 kg (a push-cart or tipper round in an Indian town is probably slower; to source).",
     "services.asset_life_years": "PLACEHOLDER carried over: a park or civic building wears out in 15 years without upkeep.",

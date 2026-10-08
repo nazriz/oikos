@@ -39,5 +39,70 @@
     }
   },
   "perceives": [],
-  "state": "none"
+  "state": "none",
+  "issues": [
+    {
+      "form": "news_item",
+      "title": "An item in the paper",
+      "fields": {
+        "headline": {
+          "type": "text",
+          "required": true,
+          "description": "What the item says."
+        },
+        "source": {
+          "type": "record",
+          "required": true,
+          "description": "The record it reports."
+        },
+        "kind": {
+          "type": "text",
+          "required": true,
+          "description": "What kind of record that is."
+        },
+        "tone": {
+          "type": "choice",
+          "required": true,
+          "options": [
+            "-1",
+            "0",
+            "1"
+          ],
+          "description": "How it reads for the town's government: -1 against, 0 neither, 1 for."
+        },
+        "about_office": {
+          "type": "choice",
+          "required": true,
+          "options": [
+            "yes",
+            "no"
+          ],
+          "description": "Whether it is about an office up for election."
+        },
+        "edition": {
+          "type": "count",
+          "required": true,
+          "description": "The edition it is in."
+        }
+      },
+      "writes": {
+        "kind": "news",
+        "text": "{headline}",
+        "basis": "=source",
+        "visible": "public",
+        "assertion": {
+          "that": "=headline",
+          "about": [
+            "@town"
+          ]
+        },
+        "data": {
+          "kind": "=kind",
+          "tone": "#tone",
+          "about_office": "?about_office",
+          "edition": "=edition"
+        }
+      }
+    }
+  ]
 }

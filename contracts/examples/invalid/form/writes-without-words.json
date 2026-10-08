@@ -1,0 +1,21 @@
+{
+  "form": "death_registration",
+  "office": "registry",
+  "submit_as": "death_registration",
+  "submit_to": [
+    "city"
+  ],
+  "fields": {
+    "deceased": {
+      "type": "entity",
+      "required": true
+    }
+  },
+  "writes": {
+    "kind": "death_registration",
+    "basis": "notification",
+    "data": {
+      "deceased": "=deceased"
+    }
+  }
+}

@@ -25,7 +25,7 @@ const isEntry = (g: Gold) => /visible=own/.test(g.program);
 
 test("the translator's instructions say the three things, and nothing of any world", () => {
   const s = translatorSystem();
-  expect(TRANSLATOR_VERSION).toBe("0.8.0");
+  expect(TRANSLATOR_VERSION).toBe("0.9.0");
   expect(s).toContain("is statement(hold=<it>), one statement for several");
   expect(s).toContain("Resuming it is withdrawing the hold: statement(withdraw=<the hold>).");
   expect(s).toContain("is statement(kind=entry, visible=own, text=");
@@ -45,7 +45,7 @@ test("the translator's instructions say the three things, and nothing of any wor
 });
 
 test("generated gold: holds of one record or a few, and entries on one's own file, in the money of every world drawn", () => {
-  expect(DATA_VERSION).toBe("0.11.0");
+  expect(DATA_VERSION).toBe("0.12.0");
   const gold = statements();
   const holds = gold.filter(isHold), entries = gold.filter(isEntry);
   expect(holds.length).toBeGreaterThan(60);
@@ -153,7 +153,10 @@ const writer: LlmAdapter = { provider: "stand-in", model: "w", complete: async (
 } };
 
 test("through the pipeline: holds and entries become examples with their spans, look_first refusals are kept as that, and the steps a model learns hold the new choices", async () => {
-  const gold = [...statements().filter((g) => isHold(g) || isEntry(g)).slice(0, 60), ...synthetic({ only: ["money"], perFunction: 200, seed: 6 }).filter((g) => /[(,]every[,)]/.test(g.shape) && !g.program.includes("\n")).slice(0, 20)];
+  // (And standing work orders that end, `until=`, which the language gained on 2026-10-09: translator/model/adapter.ts, ADDED.)
+  const ending = synthetic({ only: ["work"], perFunction: 300, seed: 6 }).filter((g) => g.tag === "standing_work" && /[(,]until[,)]/.test(g.shape)).slice(0, 10);
+  expect(ending.length).toBe(10);
+  const gold = [...statements().filter((g) => isHold(g) || isEntry(g)).slice(0, 60), ...synthetic({ only: ["money"], perFunction: 200, seed: 6 }).filter((g) => /[(,]every[,)]/.test(g.shape) && !g.program.includes("\n")).slice(0, 20), ...ending];
   const back = { model: "stand-in/back", translate: async (q: string, _forms: string[], g?: Gold) => (/^Stop any standing payment|^Take down whichever|^Find who it is/.test(q) ? "none(look_first)" : g?.program ?? "none(unclear)") };
   const r = await generate(gold, { writers: [writer], perGold: 1, styles: ["formal"], refusalFloor: 4, refusalLabels: ["look_first"], seed: 6, back });
   const kept = r.examples.filter((e) => e.kind === "positive");
@@ -164,8 +167,10 @@ test("through the pipeline: holds and entries become examples with their spans, 
   expect(refusals.length).toBeGreaterThanOrEqual(4);
   expect(r.examples.filter((e) => e.kind === "refusal" && e.program !== "none(look_first)")).toEqual([]);
   // Encoded as decisions and copies, and back, exactly; the closed set of choices holds what the language gained.
-  const all = [...holds, ...entries, ...refusals].map((e) => encode(e));
-  [...holds, ...entries, ...refusals].forEach((e, i) => expect(decode(all[i]!.input, all[i]!.steps)).toBe(calls.programText(calls.parseProgram(e.program))));
+  const orders = kept.filter((e) => e.program.startsWith("work(") && e.program.includes("until="));
+  expect(orders.length).toBeGreaterThan(5);
+  const all = [...holds, ...entries, ...refusals, ...orders].map((e) => encode(e));
+  [...holds, ...entries, ...refusals, ...orders].forEach((e, i) => expect(decode(all[i]!.input, all[i]!.steps)).toBe(calls.programText(calls.parseProgram(e.program))));
   const v = vocabulary(all);
   for (const [choice] of ADDED) expect(v).toContain(choice);
   expect(v).toContain("const:entry");
@@ -175,14 +180,14 @@ test("through the pipeline: holds and entries become examples with their spans, 
 test("a model trained before the language gained these still loads: it is known what it cannot say, and an answer outside the language is asked back", () => {
   // A model's closed set is its own (its config.json). One from before 2026-10-08 has none of the three.
   const old = ["eos", ")", "fn:statement", "fn:money", "arg:withdraw", "arg:kind", "arg:text", "arg:visible", "const:public", "none:no_such_act", "none:not_an_act", "none:unclear"];
-  expect(cannotSay(old).map(([choice]) => choice)).toEqual(["arg:hold", "const:own", "none:look_first"]);
-  expect(cannotSay([...old, "arg:hold", "const:own", "none:look_first"])).toEqual([]);
+  expect(cannotSay(old).map(([choice]) => choice)).toEqual(["arg:hold", "const:own", "none:look_first", "arg:until"]);
+  expect(cannotSay([...old, "arg:hold", "const:own", "none:look_first", "arg:until"])).toEqual([]);
   const dir = mkdtempSync(join(tmpdir(), "oikos-old-model-"));
   writeFileSync(join(dir, "config.json"), JSON.stringify({ vocabulary: old, width: 8 }));
   expect(vocabularyOf(dir)).toEqual(old);
   // (Making the adapter starts no model: that happens at the first request.)
   const adapter = new DecideAdapter("old", { dir, quiet: true });
-  expect(adapter.cannot.map(([choice]) => choice)).toEqual(["arg:hold", "const:own", "none:look_first"]);
+  expect(adapter.cannot.map(([choice]) => choice)).toEqual(["arg:hold", "const:own", "none:look_first", "arg:until"]);
   // A folder with no config, or one that isn't a model's: nothing is known, and nothing fails.
   expect(vocabularyOf(join(dir, "nowhere"))).toBeUndefined();
   expect(new DecideAdapter("none", { dir: join(dir, "nowhere"), quiet: true }).cannot).toEqual([]);

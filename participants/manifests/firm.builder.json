@@ -185,5 +185,72 @@
     }
   },
   "perceives": [],
-  "state": "none"
+  "state": "none",
+  "issues": [
+    {
+      "form": "job_advertisement",
+      "title": "Job advertisement",
+      "fields": {
+        "wage": {
+          "type": "amount",
+          "required": true,
+          "description": "The wage for each pay period."
+        },
+        "period": {
+          "type": "duration",
+          "required": true,
+          "description": "The pay period: how often the wage is paid."
+        },
+        "posts": {
+          "type": "count",
+          "required": true,
+          "description": "How many posts this advertisement is for."
+        },
+        "account": {
+          "type": "account",
+          "description": "The account the wages are paid from, where the office itself pays them."
+        }
+      },
+      "writes": {
+        "kind": "job_posting",
+        "text": "Hiring: {wage} every {period}.",
+        "data": {
+          "wage": "#wage",
+          "period": "=period",
+          "role": "@role",
+          "industry": "@industry",
+          "workplace": "@workplace_structure",
+          "space": "@workplace"
+        },
+        "offer": {
+          "by": "=self",
+          "to": {
+            "min_age_years": 18
+          },
+          "take_up": "apply",
+          "available": "=posts",
+          "terms": {
+            "template": "employment",
+            "commitments": [
+              {
+                "who": "=self",
+                "does": {
+                  "outcome": {
+                    "money": {
+                      "from": "=account",
+                      "amount": "=wage",
+                      "for": "wages"
+                    }
+                  }
+                },
+                "every": "=period"
+              },
+              "@occupancy"
+            ],
+            "termination": "@termination"
+          }
+        }
+      }
+    }
+  ]
 }

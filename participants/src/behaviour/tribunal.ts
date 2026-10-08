@@ -9,12 +9,14 @@ import { cents } from "../money";
 import { need, params, type BehaviourModule, type ParticipantContext } from "../module";
 import { because, Book, breaches, noting, DAY, say, type Step, usd } from "./common";
 import { stepper } from "./firms";
+import * as P from "./papers";
 
 /** The kinds of application a tribunal hears here: a notice of rent increase said to breach the law; a debt unpaid. */
 export const APPLICATION_KINDS = ["rent_increase", "debt", "charge"] as const;
 
 export const member: BehaviourModule = {
   name: "tribunal.member",
+  issues: P.TRIBUNAL_MEMBER,
   version: "0.2.1",
   doc: "docs/behaviour/justice.md",
   cadence: () => DAY,
@@ -108,6 +110,8 @@ export const member: BehaviourModule = {
 
 export const registrar: BehaviourModule = {
   name: "tribunal.registrar",
+  issues: P.TRIBUNAL_REGISTRAR,
+  issuesWith: (p) => ({ banks: p.banks ?? [] }),
   version: "0.1.0",
   doc: "docs/behaviour/justice.md",
   cadence: () => DAY,

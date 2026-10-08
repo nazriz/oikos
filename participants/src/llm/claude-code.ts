@@ -27,7 +27,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ContentBlock, LlmAdapter, LlmRequest, LlmResponse } from "./adapter";
 import { readAnswerObject, readAnswerText } from "./answer";
-import { UsageLimitReached } from "./call";
+import { promptTooLong, UsageLimitReached } from "./call";
 import { answerSchema, runBounded, transcript } from "./codex";
 
 /** What Claude Code says when no call will go through for a while: the plan's limit or credit is used up, or its own
@@ -134,7 +134,8 @@ export class ClaudeCodeAdapter implements LlmAdapter {
         if (said) throw new UsageLimitReached(`the Claude plan's limit for claude -p was reached (${said.trim().slice(0, 300)}): the run stops here; resume it once the limit resets (oikos resume <log>)`);
         if (!failed) break;
         const why = r.timedOut ? `no answer within ${Math.round(timeoutMs / 1000)} s` : `exit ${r.code}: ${(r.stderr || String(result?.result ?? r.stdout)).slice(0, 500)}`;
-        if (n >= attempts) throw new Error(`claude -p failed after ${n} attempts (${why})`);
+        // (A prompt too long for the model is the same prompt next time: it is not tried again.)
+        if (n >= attempts || (!r.timedOut && promptTooLong(why))) throw new Error(`claude -p failed after ${n} attempt${n === 1 ? "" : "s"} (${why})`);
         await Bun.sleep(1000 * 2 ** (n - 1));
       }
       const u = result.usage ?? {};

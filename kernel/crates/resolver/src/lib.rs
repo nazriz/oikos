@@ -2,6 +2,7 @@
 //! knows (from the observations the engine delivers), and a call to the seat's own acts.
 
 pub mod calls;
+pub mod forms;
 pub mod knowledge;
 pub mod resolve;
 

@@ -19,31 +19,99 @@ export function when(t: number): string {
   return `year ${Math.floor(t / YEAR) + 1}, day ${Math.floor((t % YEAR) / DAY) + 1}`;
 }
 
+/** A length of time as people say one: whole years, else whole days, else hours and minutes; seconds only where it
+ * comes to nothing rounder. */
 export function duration(s: number): string {
-  if (s % YEAR === 0) return `${s / YEAR} year${s === YEAR ? "" : "s"}`;
-  if (s % DAY === 0) return `${s / DAY} day${s === DAY ? "" : "s"}`;
-  return `${s} seconds`;
+  const n = (x: number, word: string) => `${num(x)} ${word}${x === 1 ? "" : "s"}`;
+  if (s !== 0 && s % YEAR === 0) return n(s / YEAR, "year");
+  if (s !== 0 && s % DAY === 0) return n(s / DAY, "day");
+  if (s !== 0 && s % 3_600 === 0) return n(s / 3_600, "hour");
+  if (s !== 0 && s % 60 === 0) return s > 3_600 ? `${n(Math.floor(s / 3_600), "hour")} ${n((s % 3_600) / 60, "minute")}` : n(s / 60, "minute");
+  return n(s, "second");
+}
+
+// How a paper's details are read: its figures as a person reads them, not as a record holds them. A record holds
+// money in its currency's smallest unit, lengths of time in seconds, moments in seconds since the start and rates in
+// hundredths of a per cent; a detail is known for one of those by the name the world's papers give it (the lists
+// below: names, never a place's figures), by the unit written beside it ({unit, value}), or, on a form, by what the
+// form says the field is. Anything else stands as it is.
+const MONEY_DETAILS = new Set(["amount", "unit_price", "price", "refund", "wage", "rent", "land", "levy_from", "balance", "cost", "fee", "deposit", "bond", "principal", "payment", "carrying"]);
+const MONEY_LISTS = new Set(["prices", "demolition", "goods", "lines", "amounts"]);
+const TIME_SPANS = new Set(["every", "period", "notice", "term"]);
+const MOMENTS = new Set(["at", "until", "first", "closes", "opens", "due"]);
+const whole = (v: unknown): v is number | string => (typeof v === "number" && Number.isSafeInteger(v)) || (typeof v === "string" && /^-?(0|[1-9][0-9]{0,37})$/.test(v));
+const percent = (v: number, per: number) => `${String(Number(((v * 100) / per).toFixed(6)))}%`;
+/** A moment as a date, with the time of day where it is not the day's start (so that two moments never read alike). */
+function moment(t: number): string {
+  const s = ((t % DAY) + DAY) % DAY;
+  const two = (x: number) => String(x).padStart(2, "0");
+  const day = t < 0 ? `${duration(Math.ceil(-t / DAY) * DAY)} before the start` : when(t);
+  return s === 0 ? day : `${day}, ${two(Math.floor(s / 3_600))}:${two(Math.floor((s % 3_600) / 60))}${s % 60 ? `:${two(s % 60)}` : ""}`;
+}
+/** What a form says each of its fields is (`amount`, `duration`, `date`...), for a paper filled in on it. */
+export type FieldKinds = { [field: string]: { type?: string } | undefined };
+
+/** A paper's details with each figure as a person reads it (see above). The shape is kept; a rate's name loses the
+ * unit it carried ("rate_bps": 1600 reads "rate": "16%"). `fields`: the form the details were filled in on. */
+export function readable(x: unknown, how: { fields?: FieldKinds; money?: (a: string | number) => string } = {}, under?: string): unknown {
+  const fields = how.fields;
+  const sum = how.money ?? money;
+  const deeper = { ...(how.money ? { money: how.money } : {}) };
+  if (Array.isArray(x)) return x.map((v) => readable(v, deeper, under));
+  if (x === null || typeof x !== "object") return x;
+  const o = x as { [k: string]: unknown };
+  // A figure with its unit beside it.
+  if (whole(o.value) && typeof o.unit === "string" && Object.keys(o).every((k) => ["unit", "value", "label", "description", "type"].includes(k))) {
+    const v = Number(o.value);
+    const said = o.unit === "seconds" ? duration(v) : o.unit === "bps" ? percent(v, 10_000) : o.unit === "ppm" ? percent(v, 1_000_000) : `${num(v)} ${o.unit}`;
+    return Object.keys(o).length === 2 ? said : { ...Object.fromEntries(Object.entries(o).filter(([k]) => k !== "unit" && k !== "value")), value: said };
+  }
+  const out: { [k: string]: unknown } = {};
+  for (const [k, v] of Object.entries(o)) {
+    const type = fields?.[k]?.type;
+    if (!whole(v) || typeof v === "boolean") {
+      // (A list of prices, a budget's lines: every one of them a sum. Not anything else that happens to have the name.)
+      const sums = MONEY_LISTS.has(k) && v !== null && typeof v === "object" && !Array.isArray(v) && Object.values(v).length > 0 && Object.values(v).every(whole);
+      out[k] = sums ? Object.fromEntries(Object.entries(v as object).map(([n, a]) => [n, sum(a as string)])) : readable(v, deeper, k);
+      continue;
+    }
+    if (type) out[k] = type === "amount" ? sum(v) : type === "duration" ? duration(Number(v)) : type === "date" ? moment(Number(v)) : v;
+    else if (k.endsWith("_bps")) out[k.slice(0, -4)] = percent(Number(v), 10_000);
+    else if (k.endsWith("_ppm")) out[k.slice(0, -4)] = percent(Number(v), 1_000_000);
+    else if (MONEY_DETAILS.has(k) || (k === "from" && under === "brackets")) out[k] = sum(v);
+    else if (TIME_SPANS.has(k) || k.endsWith("_seconds")) out[k.endsWith("_seconds") ? k.slice(0, -8) : k] = duration(Number(v));
+    else if (MOMENTS.has(k) || k.endsWith("_at")) out[k] = moment(Number(v));
+    else out[k] = v;
+  }
+  return out;
 }
 
 /** Long text is cut short, with a mark, except in what the participant looked up (`whole`); `cuts` counts what a
  * report cut, so that it can say so. (Rendering is synchronous: both are set and read within one report.) */
-let whole = false;
+let inFull = false;
 let cuts = 0;
-const clip = (s: string, max = 400) => (whole || s.length <= max ? s : (cuts++, s.slice(0, max) + "…"));
+const clip = (s: string, max = 400) => (inFull || s.length <= max ? s : (cuts++, s.slice(0, max) + "…"));
 const words = (label: string) => label.replace(/_/g, " ");
 const cap = (x: string) => words(x).replace(/^./, (c) => c.toUpperCase());
 const num = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 /** A name as someone might write it, for matching: case, underscores and hyphens don't matter. */
 const plain = (s: string) => s.toLowerCase().replace(/[_-]+/g, " ").trim();
-const details = (x: unknown, max = 400) => {
-  if (x === null || x === undefined || typeof x !== "object") return "";
+const details = (raw: unknown, max = 400) => {
+  if (raw === null || raw === undefined || typeof raw !== "object") return "";
+  const x = readable(raw);
   const entries = Object.entries(x as object);
   const flat = entries.every(([, v]) => v === null || ["string", "number", "boolean"].includes(typeof v));
   return clip(flat ? entries.map(([k, v]) => `${words(k)}: ${v}`).join("; ") : JSON.stringify(x), max);
 };
 /** A statement's details. A form's are always whole: its fields are what it's filled in from, and whoever reads the
  * request made on it sees every one (a long form cut short reads as a form without its last fields). */
-const dataWords = (r: { kind: string; data?: unknown }) => details(r.data, r.kind === "form" ? Infinity : 400);
+const dataWords = (r: { kind: string; data?: unknown }) => details(r.kind === "form" ? formAsShown(r.data) : r.data, r.kind === "form" ? Infinity : 400);
+/** A form's details as whoever fills it in needs them: of a paper of the office's own, its name, whose it is and its
+ * fields (how the paper is put together from them is the form's business, and is shown when it is filled in). */
+function formAsShown(data: unknown): unknown {
+  const d = data as { writes?: { kind?: string }; form?: unknown; office?: unknown; fields?: unknown } | undefined;
+  return d?.writes ? { form: d.form, office: d.office, issues: d.writes.kind, fields: d.fields } : data;
+}
 
 /**
  * What came back from something the participant did, every part of it: what it made, what a survey estimated, what
@@ -309,8 +377,177 @@ function describeSurvey(cells: number, open: number, structures: SiteStructure[]
 const SET_OUT = "Someone has set out. What they find comes with the report after they are back.";
 
 /** What a participant asked to see when it looked at a report: places or people by name, the buildings a measure is
- * above zero or rising at, and how many at most. */
-export interface Looked { named?: string[]; measure?: string; limit?: number; /** Someone was sent to the places named: what they find comes later. */ sent?: true }
+ * above zero or rising at, and how many at most. Of papers: what the list is narrowed by beyond what whoever keeps them
+ * can be asked (`about`, `words`, the kinds in plain words), one paper to read in full (`paper`, a long one from
+ * `fromEntry` on), and a kind asked for that nothing was found under (`kindSaid`: this is the folder's latest
+ * papers, looked through for kinds like it). */
+export interface Looked {
+  named?: string[]; measure?: string; limit?: number; /** Someone was sent to the places named: what they find comes later. */ sent?: true;
+  paper?: string; fromEntry?: number; about?: string; words?: string; kinds?: string[]; kindSaid?: string;
+  /** How many papers at most were asked of whoever keeps them (more than `limit` where the list is narrowed here). */
+  fetched?: number;
+}
+
+/** The most one look adds to what a seat is shown, in characters: a list, a paper, places, people. What is over is cut
+ * at the end of a line, and said. (A paper longer than `PAPER_MAX` is read a part at a time.) */
+export const LOOK_CHARS_MAX = 12_000;
+export const PAPER_MAX = 6_000;
+/** The most one line of a list of papers says of the paper. */
+const GIST_MAX = 160;
+
+/** What a paper is, in a person's words: a statement by its kind, an agreement by what it is an agreement for, a claim
+ * by what it is a claim to; the rest by what they are. What a seat names a kind by, and what a list says. */
+export function paperKind(r: Record): string {
+  switch (r.record) {
+    case "statement": return words(r.kind);
+    case "agreement": return r.terms.template ? `${words(r.terms.template)} agreement` : "agreement";
+    case "claim": return r.about?.kind ? `${words(String(r.about.kind))} claim` : "claim";
+    case "claim_transfer": return "claim transfer";
+    case "claim_release": return "claim release";
+    case "entity_declaration": return "declaration";
+    default: return words(r.record);
+  }
+}
+/** A kind as someone might say it, for matching: case, underscores, hyphens and a plural "s" don't matter. */
+export const kindSaid = (s: string) => plain(s).replace(/\s+/g, " ").replace(/(?<=[a-z]{3})s$/, "");
+/** Whether a paper is of one of the kinds said (a folder's, or what a look asked for). */
+export const ofKind = (r: Record, kinds: string[]) => kinds.some((k) => kindSaid(paperKind(r)) === kindSaid(k));
+/** Whether a paper names an id anywhere in it (its parties, whom it is to, what it cites, its details). */
+const namesId = (r: Record, id: string) => JSON.stringify(r).includes(JSON.stringify(id));
+/** Whether every word asked for is somewhere in a paper (capitals aside). */
+const says = (x: unknown, asked: string) => {
+  const all = JSON.stringify(x).toLowerCase();
+  return asked.toLowerCase().split(/\s+/).filter(Boolean).every((w) => all.includes(w));
+};
+
+/** One paper as a line of a list: its id, what it is, its date, from whom, and a line of what it says. */
+function listLine(r: Record, readings?: { [id: string]: Reading }): string {
+  const who = r.speaks_for ?? (r.author === "genesis" ? undefined : r.author);
+  const date = r.author === "genesis" && r.at === 0 ? "from the start" : when(r.at);
+  const cut = (x: string) => (x.length > GIST_MAX ? `${x.slice(0, GIST_MAX)}…` : x);
+  let gist: string;
+  switch (r.record) {
+    case "statement": gist = r.kind === "request" && r.data?.outcome ? `asks ${(r.addressed_to ?? []).join(", ") || "someone"} to ${outcomeWords(r.data.outcome, r.data.every)}` : `${r.addressed_to?.length ? `to ${r.addressed_to.join(", ")}: ` : ""}"${cut(r.text)}"`; break;
+    case "agreement": gist = `between ${r.terms.parties.join(" and ")}: ${cut(r.terms.commitments.map((x) => `${x.who} will ${x.does?.outcome ? outcomeWords(x.does.outcome, x.every) : "do what its terms say"}`).join("; ") || "no commitments")}${readingWords(readings?.[r.id])}`; break;
+    case "claim": gist = `${r.holder} ${POSITION[r.position] ?? r.position}${r.counterparty ? ` against ${r.counterparty}` : ""}${r.about?.object ? `: ${r.about.object}` : ""}`; break;
+    case "signature": gist = `${r.as} signed ${r.agreement}`; break;
+    case "notice": gist = `${r.as} gave notice on ${r.agreement}`; break;
+    case "withdrawal": gist = `withdraws ${r.withdraws}`; break;
+    case "vote": gist = `"${r.choice}" on ${r.ballot}`; break;
+    case "claim_transfer": gist = `${r.claim} now belongs to ${r.to}`; break;
+    case "claim_release": gist = `${r.claim} was released`; break;
+    case "entity_declaration": gist = `a ${r.kind}, "${r.name}" (${r.entity})`; break;
+  }
+  return `[${r.id}] ${paperKind(r)}, ${date}${who ? `, from ${who}` : ""}: ${gist}`;
+}
+
+/** A list of papers, at most `limit` lines of it: a line to a paper, but a run of claims alike (a registry's titles
+ * to lot after lot, one holder's, of one day) in one line, as a person would be told them. `left`: papers not reached. */
+function listLines(records: Record[], limit: number, readings?: { [id: string]: Reading }): { lines: string[]; left: number } {
+  const lines: string[] = [];
+  let i = 0;
+  while (i < records.length && lines.length < limit) {
+    const r = records[i]!;
+    let j = i + 1;
+    if (r.record === "claim") while (j < records.length && alike(r, records[j]!)) j++;
+    if (j - i >= 4) {
+      const run = records.slice(i, j) as Extract<Record, { record: "claim" }>[];
+      const who = r.speaks_for ?? (r.author === "genesis" ? undefined : r.author);
+      lines.push(`${num(run.length)} ${paperKind(r)}s, ${r.author === "genesis" && r.at === 0 ? "from the start" : when(r.at)}${who ? `, from ${who}` : ""}: ${run[0]!.holder} ${POSITION[run[0]!.position] ?? run[0]!.position}: ${run.slice(0, 6).map((x) => `${x.about?.object ?? x.id} [${x.id}]`).join(", ")}${run.length > 6 ? `, and ${num(run.length - 6)} more (to find one, say what it is about)` : ""}`);
+      i = j;
+    } else lines.push(listLine(records[i++]!, readings));
+  }
+  return { lines, left: records.length - i };
+}
+const alike = (a: Record, b: Record) => a.record === "claim" && b.record === "claim" && a.at === b.at && a.holder === b.holder && a.position === b.position && a.counterparty === b.counterparty && a.about?.kind === b.about?.kind && a.speaks_for === b.speaks_for;
+
+/** One entry of a list in a paper (a lot of a register, an area of a map), in a line: each thing it says by name. */
+function entryWords(raw: unknown): string {
+  const e = readable(raw);
+  if (e === null || typeof e !== "object" || Array.isArray(e)) return clipTo(typeof e === "object" ? JSON.stringify(e) : String(e), 600);
+  const value = (v: unknown): string => (Array.isArray(v) && v.every((x) => x === null || typeof x !== "object") ? v.join(", ") : v !== null && typeof v === "object" ? JSON.stringify(v) : String(v));
+  return clipTo(Object.entries(e).map(([k, v]) => `${words(k)}: ${value(v)}`).join("; "), 600);
+}
+const clipTo = (x: string, max: number) => (x.length > max ? `${x.slice(0, max)}…` : x);
+
+/** One paper in full. A long one (a register, a map) is read a part at a time: its words, then of each list among its
+ * details the entries asked for (from `fromEntry` on, or those that include `words`), as many as fit, with how many
+ * there are and how to ask for more. Never whole. */
+function paperInFull(r: Record, asked: Looked, readings?: { [id: string]: Reading }): string[] {
+  inFull = true;
+  let all: string;
+  try {
+    all = describe(r, readings);
+  } finally {
+    inFull = false;
+  }
+  const narrowed = asked.words !== undefined || (asked.fromEntry ?? 1) > 1;
+  const lists: [string, unknown[]][] = r.record === "statement" && r.data !== null && typeof r.data === "object" ? Object.entries(r.data as object).filter((e): e is [string, unknown[]] => Array.isArray(e[1]) && e[1].length > 1) : [];
+  if (all.length <= PAPER_MAX && !(narrowed && lists.length)) return [`- ${all}`];
+  if (r.record !== "statement" || !lists.length) return [`- ${all.slice(0, PAPER_MAX)}…`, `(Cut short at ${num(PAPER_MAX)} of its ${num(all.length)} characters.)`];
+  const out = [`- [${r.id}] ${paperKind(r)} from ${r.speaks_for ?? r.author}${r.author === "genesis" ? "" : ` (${when(r.at)})`}: "${r.text.length > 2000 ? `${r.text.slice(0, 2000)}…` : r.text}"`];
+  let room = PAPER_MAX - out[0]!.length;
+  for (const [k, v] of Object.entries(r.data as object)) {
+    if (lists.some(([name]) => name === k)) continue;
+    const said = `  ${cap(k)}: ${v !== null && typeof v === "object" ? details(v, 1500) : String(v)}`;
+    out.push(said.length > 1600 ? `${said.slice(0, 1600)}…` : said);
+    room -= out.at(-1)!.length + 1;
+  }
+  for (const [k, entries] of lists) {
+    const picked = entries.map((e, i) => [i + 1, e] as const).filter(([, e]) => asked.words === undefined || says(e, asked.words));
+    const from = Math.max(1, asked.fromEntry ?? 1);
+    const rest = picked.filter(([n]) => n >= from);
+    out.push(`  ${cap(k)}: ${num(entries.length)} entries${asked.words !== undefined ? `, ${num(picked.length)} of them with "${asked.words}"` : ""}.`);
+    let last = 0, shown = 0;
+    for (const [n, e] of rest) {
+      const line = `  ${n}. ${entryWords(e)}`;
+      if (line.length + 1 > room && shown > 0) break;
+      out.push(line);
+      room -= line.length + 1;
+      [last, shown] = [n, shown + 1];
+      if (room <= 0) break;
+    }
+    const more = rest.length - shown;
+    if (!rest.length) out.push(picked.length ? `  (None from entry ${num(from)} on.)` : "  (None.)");
+    else if (more > 0) out.push(`  (${num(shown)} shown, to entry ${num(last)}; ${num(more)} more. For the next: look at this paper again with from_entry: ${last + 1}${asked.words !== undefined ? " and the same words" : "; or give words, for only the entries that include them (a lot's id, say)"}.)`);
+  }
+  return out;
+}
+
+/** What a look into papers found: a list, newest first (each paper's id, what it is, its date, from whom, a line of
+ * what it says), narrowed by what was asked; or the one paper asked for by its id, in full. */
+function lookedPapers(head: string, id: string, records: Record[], asked: Looked | undefined, readings: { [id: string]: Reading } | undefined, folder: string[] | undefined): string[] {
+  const a = asked ?? {};
+  if (a.paper !== undefined) {
+    const r = records.find((x) => x.id === a.paper && (!folder || ofKind(x, folder)));
+    return [`## ${head}: the paper ${a.paper}`, ...(r ? paperInFull(r, a, readings) : ["There is no paper with that id there."])];
+  }
+  const limit = a.limit ?? 20;
+  const narrowed = (r: Record) => (!folder || ofKind(r, folder)) && (a.about === undefined || namesId(r, a.about)) && (a.words === undefined || says(r, a.words));
+  const through = a.fetched !== undefined && records.length >= a.fetched ? `Only the latest ${num(a.fetched)} papers there were looked through: say more closely what to find, to reach earlier ones.` : "";
+  const how = `(To read one in full: look at this report (${id}) with paper: its id.)`;
+  if (a.kindSaid !== undefined) {
+    // Nothing was of the kind asked for, word for word: those of kinds like it, or else which kinds are there.
+    const said = kindSaid(a.kindSaid);
+    const pool = records.filter(narrowed);
+    const like = pool.filter((r) => { const k = kindSaid(paperKind(r)); return k.includes(said) || said.includes(k); });
+    const exact = pool.filter((r) => kindSaid(paperKind(r)) === said);
+    if (exact.length || like.length) {
+      const l = listLines(exact.length ? exact : like, limit, readings);
+      return [`## ${head}: what you looked up (${(exact.length || like.length) - l.left} found)`, ...(exact.length ? [] : [`No paper there is of the kind "${a.kindSaid}", word for word. These are of kinds like it:`]), ...l.lines.map((x) => `- ${x}`),
+        ...(l.left ? [`(${num(l.left)} more: ask for more at once, or say more closely what to find.)`] : []), how];
+    }
+    const kinds = new Map<string, number>();
+    for (const r of pool) kinds.set(paperKind(r), (kinds.get(paperKind(r)) ?? 0) + 1);
+    return [`## ${head}: what you looked up (0 found)`, NOTHING_FOUND, kinds.size ? `(No paper there is of the kind "${a.kindSaid}". The kinds of paper there${through ? `, among the latest ${num(records.length)}` : ""}: ${[...kinds].sort(([x], [y]) => (x < y ? -1 : 1)).map(([k, n]) => `${k} (${num(n)})`).join(", ")}.)` : "(There are no papers there at all.)"];
+  }
+  // (Newest first, as whoever keeps them was asked; said again here, so that a list never depends on it.)
+  const found = records.filter((r) => narrowed(r) && (!a.kinds || ofKind(r, a.kinds))).map((r, n) => [r, n] as const).sort(([x, i], [y, j]) => y.at - x.at || i - j).map(([r]) => r);
+  const shown = listLines(found, limit, readings);
+  const more = shown.left ? `(${num(shown.left)} more found and not listed: ask for more at once, or say more closely what to find.)`
+    : records.length >= (a.fetched ?? limit) && !through ? `(There may be more: at most ${limit} were asked for. Ask for more at once, or say more closely what to find.)` : "";
+  return [`## ${head}: what you looked up (${found.length - shown.left} found)`, ...(found.length ? shown.lines.map((l) => `- ${l}`) : [NOTHING_FOUND]), ...(more ? [more] : []), ...(through ? [`(${through})`] : []), ...(found.length ? [how] : [])];
+}
 
 /** The places a participant asked to see, in full as they are today: buildings by id, by kind, by a room in them or
  * the ground they stand on; open ground by its cell; or every building a measure is above zero or rising at, worst
@@ -394,6 +631,11 @@ export interface RenderOptions {
   lookable?: Set<string>;
   /** What it just looked at, by report: the places or people it named, a measure to list buildings by, how many at most. */
   looked?: Map<string, Looked>;
+  /** Folders that hold papers of some kinds only (by report: the kinds, as a list of papers names them): nothing else
+   * is shown under their name, as it comes or looked up. */
+  folders?: Map<string, string[]>;
+  /** Told of each look cut short at the most one look shows (`LOOK_CHARS_MAX`). */
+  onCut?: (cut: { report: string; characters: number; limit: number }) => void;
 }
 
 /** What a look that finds nothing says: of papers looked up, and of a report with nothing new in it. */
@@ -402,7 +644,7 @@ export const NOTHING_NEW = "Nothing new there since you last looked.";
 
 /** What's new since the participant last looked. */
 export function renderObservation(obs: Observation, o: RenderOptions = {}): string {
-  whole = false;
+  inFull = false;
   const max = o.maxRecords ?? 40;
   const postTitle = new Map((obs.positions ?? []).map((p) => [p.position, p.title ?? words(p.role ?? p.position)]));
   // A post's reports are named after the post (`mayor/budget` reads "Mayor: Budget").
@@ -410,10 +652,20 @@ export function renderObservation(obs: Observation, o: RenderOptions = {}): stri
   /** How to see more of a report, for one that can be looked into; nothing otherwise. */
   const look = (id: string, how: string) => (o.lookable?.has(id) ? [`(${how}: look at "${title(id)}" (${id}).)`] : []);
   const out: string[] = [`It is ${when(obs.t)}.`];
+  /** What one look found, within the most one look shows: cut at the end of a line, and said. */
+  const within = (id: string, lines: string[]): string[] => {
+    const all = lines.join("\n");
+    if (all.length <= LOOK_CHARS_MAX) return lines;
+    o.onCut?.({ report: id, characters: all.length, limit: LOOK_CHARS_MAX });
+    const kept = all.slice(0, LOOK_CHARS_MAX);
+    const at = kept.lastIndexOf("\n");
+    return [...(at > 0 ? kept.slice(0, at) : kept).split("\n"), `(Cut short here: one look shows at most ${num(LOOK_CHARS_MAX)} characters, and this came to ${num(all.length)}. Say more closely what you want to see, or ask for less at once.)`];
+  };
   if (obs.body) out.push(...describeBody(obs.body, obs.t));
   if (obs.positions?.length) out.push(`You hold ${obs.positions.length === 1 ? "a post" : "these posts"}: ${obs.positions.map((p) => `${p.title ?? words(p.role ?? p.position)} (${p.position}), for ${p.entity}`).join("; ")}.`);
   for (const x of obs.outcomes) out.push(...outcomeLines(x, o.lastAction ?? "What you did", obs.t));
-  for (const n of obs.notices ?? []) out.push(`A note on your request: ${n.text}`);
+  // (A note about something it asked to be done names it; anything else it is told stands as it is said.)
+  for (const n of obs.notices ?? []) out.push(n.re ? `A note on your request: ${n.text}` : n.text);
   if (obs.inbox.length) {
     out.push("", "## Letters");
     for (const m of obs.inbox) out.push(`- From ${m.from} (${when(m.t)})${m.re ? `, about ${m.re}` : ""}: "${m.text}"`);
@@ -423,17 +675,9 @@ export function renderObservation(obs: Observation, o: RenderOptions = {}): stri
   for (const [id, ch] of Object.entries(obs.channels)) {
     const asked = o.looked?.get(id);
     if (ch.kind === "records" && ch.search) {
-      // What it looked up: each thing found, one by one and whole (it asked for them); and that nothing was, if so.
-      whole = true;
-      let lines: string[];
-      try {
-        lines = recordLines(ch.records, obs.readings, true);
-      } finally {
-        whole = false;
-      }
-      const limit = asked?.limit ?? 20;
-      out.push("", `## ${title(id)}: what you looked up (${lines.length} found)`, ...(lines.length ? lines.map((l) => `- ${l}`) : [NOTHING_FOUND]));
-      if (lines.length >= limit) out.push(`(There may be more: at most ${limit} were asked for. Ask for more at once, or say more closely what to find.)`);
+      // What it looked up: a list of what was found, newest first, a line to a paper (a person reads what they ask
+      // for: a paper's full text comes when that paper is asked for by its id); and that nothing was, if so.
+      out.push("", ...within(id, lookedPapers(title(id), id, ch.records, asked, obs.readings, o.folders?.get(id))));
       continue;
     }
     if (o.standing?.has(id)) continue;
@@ -452,10 +696,20 @@ export function renderObservation(obs: Observation, o: RenderOptions = {}): stri
       if (!ch.holdings.length) out.push("- (nothing)");
       for (const h of ch.holdings) out.push(`- ${h.quantity.replace(/\B(?=(\d{3})+(?!\d))/g, ",")} ${h.kind} at ${h.at}`);
     } else if (ch.kind === "records") {
-      const fresh = ch.records.filter((r) => !onFile.has(r.id));
+      const kinds = o.folders?.get(id);
+      const fresh = ch.records.filter((r) => !onFile.has(r.id) && (!kinds || ofKind(r, kinds)));
       if (fresh.length === 0) {
         // It looked, and there was nothing: said, not left for it to work out from a report that isn't there.
         if (asked) out.push("", `## ${title(id)}`, NOTHING_NEW);
+        continue;
+      }
+      if (asked) {
+        // It looked into a folder with nothing to find: what has come since it last looked, as a list, newest first.
+        const limit = asked.limit ?? 20;
+        const latest = listLines([...fresh].reverse(), limit, obs.readings);
+        out.push("", ...within(id, [`## ${title(id)}: new since you last looked (${num(fresh.length)})`, ...latest.lines.map((l) => `- ${l}`),
+          ...(latest.left ? [`(${num(latest.left)} earlier ones not listed: say what to find (a kind, who from, since when, what about), or ask for more at once.)`] : []),
+          `(To read one in full: look at this report (${id}) with paper: its id.)`]));
         continue;
       }
       const before = cuts;
@@ -473,15 +727,15 @@ export function renderObservation(obs: Observation, o: RenderOptions = {}): stri
       if (found.length) {
         const seen = [...new Map(found.filter((c) => c.structure).map((c) => [c.structure!.structure, c.structure!])).values()];
         const open = found.filter((c) => !c.structure);
-        out.push("", `## ${title(id)}: what was found there (${when(ch.as_of)})`, ...describeBuildings(seen, obs.entity, ch.as_of, true),
-          ...open.map((c) => `- open ground ${c.cell}${c.terrain ? `, ${words(c.terrain)}` : ""}${c.seen?.length ? `; seen living there: ${c.seen.map(words).join(", ")}` : ""}`), ...scales(seen));
+        out.push("", ...within(id, [`## ${title(id)}: what was found there (${when(ch.as_of)})`, ...describeBuildings(seen, obs.entity, ch.as_of, true),
+          ...open.map((c) => `- open ground ${c.cell}${c.terrain ? `, ${words(c.terrain)}` : ""}${c.seen?.length ? `; seen living there: ${c.seen.map(words).join(", ")}` : ""}`), ...scales(seen)]));
       } else if (asked) out.push("", `## ${title(id)}`, SET_OUT);
       continue;
     } else if (ch.kind === "sites") {
       const structures = channels.structures({ ...obs, channels: { [id]: ch } });
       // What it asked to see there, in full.
       if (asked && (asked.named?.length || asked.measure)) {
-        out.push("", `## ${title(id)}: what you looked at`, ...lookedPlaces(ch.cells, structures, asked, obs.entity, obs.t));
+        out.push("", ...within(id, [`## ${title(id)}: what you looked at`, ...lookedPlaces(ch.cells, structures, asked, obs.entity, obs.t)]));
         continue;
       }
       // A few buildings (the participant's surroundings) one by one; a whole town as a survey.
@@ -538,6 +792,10 @@ export function renderObservation(obs: Observation, o: RenderOptions = {}): stri
  */
 export function renderStanding(obs: Observation, standing: Set<string>): string {
   const out: string[] = [];
+  // An office's own stationery (a form that writes a paper of that office's) is on file for whoever holds the
+  // office: another office of the same organisation is not shown it.
+  const held = new Set((obs.positions ?? []).map((p) => p.position));
+  const othersStationery = (r: { kind?: string; data?: any }) => r.kind === "form" && !!r.data?.writes && typeof r.data?.office === "string" && !held.has(r.data.office);
   const shown = Object.entries(obs.channels).flatMap(([id, ch]) => (standing.has(id) && ch.kind === "records" ? ch.records : []));
   const byId = new Map(shown.map((r) => [r.id, r]));
   const down = new Set<string>();
@@ -549,7 +807,7 @@ export function renderStanding(obs: Observation, standing: Set<string>): string 
   }
   for (const [id, ch] of Object.entries(obs.channels)) {
     if (!standing.has(id) || ch.kind !== "records") continue;
-    for (const r of ch.records) if (r.record === "statement" && !down.has(r.id)) out.push(`- [${r.id}] ${words(r.kind)}${r.speaks_for ? ` of ${r.speaks_for}` : ""}: "${r.text}"${r.data ? ` (${dataWords(r)})` : ""}${ruleWords(r) ? ` ${ruleWords(r)}` : ""}`);
+    for (const r of ch.records) if (r.record === "statement" && !down.has(r.id) && !othersStationery(r)) out.push(`- [${r.id}] ${words(r.kind)}${r.speaks_for ? ` of ${r.speaks_for}` : ""}: "${r.text}"${r.data ? ` (${dataWords(r)})` : ""}${ruleWords(r) ? ` ${ruleWords(r)}` : ""}`);
   }
   return out.join("\n");
 }

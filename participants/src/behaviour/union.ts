@@ -13,6 +13,7 @@ import { params, type Belief, type BehaviourModule, type ParticipantContext } fr
 import { smallestNow } from "../money";
 import { because, Book, breaches, noting, DAY, MONTH, offer, pay, say, type Step } from "./common";
 import { stepper } from "./firms";
+import * as P from "./papers";
 
 interface Dispute {
   stage: "claimed" | "settling" | "balloting" | "notified" | "striking";
@@ -30,6 +31,7 @@ interface Dispute {
 
 export const organiser: BehaviourModule = {
   name: "union.organiser",
+  issues: P.UNION,
   version: "0.5.0",
   doc: "docs/behaviour/unions.md",
   cadence: () => DAY,

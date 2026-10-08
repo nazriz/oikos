@@ -6,7 +6,7 @@
 // support payments, industry shares...) comes from the spec's profile (worlds/profiles/, docs/profiles.md), and what
 // isn't there is derived from it here by general formulas, or is a placeholder of the town's own shape.
 
-import { adultAgeBands, bedroomsNeeded, drawHousehold, drawSavings, formatMoney, Randomness, chargesInWords, dayPayPeriod, forAge, forOutOfWork, paymentsInWords, stopsWorkAt, withholding, yearsOfSchooling, draftLaw, type HouseholdSpec, type IncomeTaxLaw, type LawSchedule, type PaymentRule } from "@oikos/participants";
+import { adultAgeBands, bedroomsNeeded, drawHousehold, drawSavings, formatMoney, modules, Randomness, chargesInWords, dayPayPeriod, forAge, forOutOfWork, linesInWords, paymentsInWords, tabledLines, yearInDays, stopsWorkAt, withholding, yearsOfSchooling, draftLaw, type HouseholdSpec, type IncomeTaxLaw, type Issued, type LawSchedule, type PaymentRule, type Taken } from "@oikos/participants";
 import law from "../law/basic.json";
 import schedules from "../law/schedules.json";
 import { loadProfile, type Profile } from "./profile";
@@ -30,6 +30,14 @@ const SHOP_UTILISATION_BPS = 8000;
 const WHOLESALE_LEAST = 100;
 /** The builder's margin over its costs (its published prices; placeholder). */
 const BUILD_MARKUP_BPS = 2000;
+/** The council as the town is given it: its ballots stay open this many days (placeholder: a fortnight), and its
+ * members' leanings on the tenants-and-development axis (docs/behaviour/government.md). */
+const COUNCIL_VOTE_DAYS = 14;
+const COUNCIL_LEANINGS = [-80, -40, 0, 40, 80];
+/** How many days before a year begins the mayor's office tables that year's budget: long enough that a budget the
+ * council rejects can be tabled once more (the office tables again after 45 days) and that ballot close too, with a
+ * week's slack for each office's own round, before the year starts. A budget is adopted before its year begins. */
+const BUDGET_LEAD_DAYS = 45 + COUNCIL_VOTE_DAYS + 14;
 const HOUR = 3600;
 /** The work an item of goods stands for where a profile doesn't fix the unit: this much of a factory worker's time. The
  * platform's choice of unit, no place's figure (docs/profiles.md). */
@@ -62,7 +70,7 @@ const ACT_TIME = {
   },
 };
 
-export const GENERATOR_VERSION = "0.36.2";
+export const GENERATOR_VERSION = "0.39.0";
 const DAY = 86_400;
 const MONTH = 30 * DAY;
 const YEAR = 365 * DAY;
@@ -81,6 +89,9 @@ export interface TownSpec {
   factories: number;
   landlords: number;
   hall_capacity?: number; // the town hall's hall: how many a gathering can hold (default 200)
+  /** How many of the town's works crew are in work at the start (default: all of them, the profile's staff per 1,000
+   * residents; 0: a works office that has still to take its crew on). The budget's staff line is the same either way. */
+  works_crew_at_start?: number;
   /** A retirement fund holding part of the town's widely held firms for its members (docs/behaviour/firm-ownership.md).
    * Off unless a world asks for it; its figures are the profile's (retirement_fund), which must then have them. */
   retirement_fund?: boolean;
@@ -157,6 +168,10 @@ export interface TownSpec {
    * one, a list, or several in one text ("wet-year+lean-council"), applied in that order to this description and to
    * the profile's figures before the town is made. Default: none (the same as "baseline"). */
   scenario?: string | string[];
+  /** Whether the town opens with its first year's budget adopted, as a council does (docs/behaviour/government.md, "The
+   * budget year"). false: a town whose council has adopted none (the mayor is to propose one, and until the council
+   * adopts it the finance office has no budget to pay within). Default: true. */
+  opening_budget?: boolean;
 }
 
 /** The town's life physics (docs/behaviour/life.md), from the profile: deaths by age (the mean of the sexes' life
@@ -198,8 +213,6 @@ const HOME_ROOM = { bodies_per_bedroom: 2, bodies_besides: 2 };
 
 /** The law schedules a world is given (worlds/law/schedules.json): how each law made from figures is written from them. */
 const SCHEDULES = schedules.records as unknown as { id: string; data: LawSchedule }[];
-/** Schedules for laws only some places have: given to a town that has the law. */
-const WHERE_USED = new Set(["schedule-industrial-action-notice"]);
 const scheduleOf = (id: string): LawSchedule => {
   const r = SCHEDULES.find((x) => x.id === id);
   if (!r) throw new Error(`no law schedule ${id}`);
@@ -207,7 +220,7 @@ const scheduleOf = (id: string): LawSchedule => {
 };
 
 /** A law of the town's written from figures by its schedule (its words, its breakdown, its rule), carrying the figures. */
-function scheduledLaw(schedule: string, id: string, values: { [figure: string]: number }, at = 0): any {
+function scheduledLaw(schedule: string, id: string, values: { [figure: string]: number | undefined }, at = 0): any {
   return { id, record: "statement", author: "genesis", at, visible_to: "public", speaks_for: "city", kind: "law", basis: "law-charter", ...draftLaw(schedule, scheduleOf(schedule), values) };
 }
 
@@ -239,6 +252,45 @@ export function amendmentForm(schedule: { id: string; data: LawSchedule }): any 
     data: { form: name, amends: schedule.id, submit_as: "proposal", submit_to: ["city"], fields: {
       ...Object.fromEntries(Object.entries(s.figures).map(([k, f]) => [k, { type: f.type, description: f.description ?? `${f.label ?? k}, in ${f.unit}.`, unit: f.unit, ...(f.per_unit ? { per_unit: f.per_unit } : {}) }])),
       affects: { type: "choice", options: ["tenants", "development", "neither"], description: "Whom it mainly bears on." } } } };
+}
+
+/** The town's rule on who may direct its offices (a record: docs/behaviour/directions.md). */
+const DIRECTIONS = "proc-directions";
+
+/**
+ * The form an office publishes for a written direction it takes (docs/behaviour/directions.md), from its module's
+ * declaration (`takes`): its fields, and what following one means. Filled in, it is a statement of kind `direction`
+ * to the office's organisation, citing the form; the office reads it, and follows it or does not.
+ */
+export function directionForm(office: string, entity: string, t: Taken): any {
+  return { id: `form-${t.form.replace(/_/g, "-")}`, record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: entity, kind: "form",
+    text: `${t.title}. ${t.follows} The office follows a direction only from those the town's rule on directions names.`,
+    data: { form: t.form, office, submit_as: "direction", submit_to: [entity], fields: t.fields } };
+}
+
+/** A template with what is the office's own filled in: each "@name" by its value (a list set out in its place in a
+ * list); one the office does not have leaves its key, or its place, out. */
+function ownFilled(t: unknown, own: { [name: string]: unknown }): unknown {
+  const NONE = Symbol("none");
+  const go = (x: unknown): unknown => {
+    if (typeof x === "string" && /^@[a-z_][a-z0-9_]*$/.test(x)) return own[x.slice(1)] === undefined || own[x.slice(1)] === "" ? NONE : own[x.slice(1)];
+    if (Array.isArray(x)) return x.flatMap((y) => { const v = go(y); return v === NONE ? [] : Array.isArray(v) && typeof y === "string" ? v : [v]; });
+    if (x && typeof x === "object") return Object.fromEntries(Object.entries(x).map(([k, y]) => [k, go(y)]).filter(([, v]) => v !== NONE));
+    return x;
+  };
+  return go(t);
+}
+
+/**
+ * A form of an office's own stationery (docs/behaviour/office-papers.md), from its module's declaration (`issues`):
+ * filled in, it is the paper itself, written as the form says. Seen by the office's organisation alone.
+ */
+export function stationeryForm(office: string, entity: string, x: Issued, own: { [name: string]: unknown }): any {
+  const writes = ownFilled(x.writes, own) as Issued["writes"];
+  return { id: `form-${office}-${x.form}`.replace(/_/g, "-"), record: "statement", author: "genesis", at: 0, visible_to: [entity], speaks_for: entity, kind: "form",
+    text: `${x.title}. A paper of the office's own: filled in, it is issued as the form sets it out.`,
+    data: { form: x.form, office, submit_as: writes.kind, submit_to: [entity], fields: x.fields,
+      writes: { ...writes, text: writes.text.replace(/\{@([a-z_][a-z0-9_]*)\}/g, (_, name: string) => String(own[name] ?? "")) } } };
 }
 
 export function generate(described: TownSpec): any {
@@ -309,8 +361,19 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
 
   // ---- structures ----
   const structures: any[] = [];
-  // The basic laws, less the tax on rent (the town raises rates instead: docs/behaviour/public-finance.md).
-  const records: any[] = law.records.filter((r) => r.id !== "law-tax");
+  // The basic laws. The example code holds no sum of money: where a law names one it stands there as {name}, and is
+  // written in here from the profile, as the town writes its money; the law carries the sum itself too (`data`).
+  const SUMS: Record<string, number> = { fine: V.town_finance.unpermitted_building_fine };
+  const records: any[] = (law.records as any[]).map((r) => {
+    const named = new Set<string>();
+    const fill = (text: string) => text.replace(/\{(\w+)\}/g, (_, name: string) => {
+      if (!Number.isSafeInteger(SUMS[name])) throw new Error(`law ${r.id}: its words name a sum, {${name}}, that the profile ${P.id} does not give`);
+      named.add(name);
+      return asWritten(SUMS[name]!);
+    });
+    const text = fill(r.text), adico = r.adico ? Object.fromEntries(Object.entries(r.adico as Record<string, string>).map(([k, v]) => [k, fill(v)])) : undefined;
+    return named.size ? { ...r, text, ...(adico ? { adico } : {}), data: { ...(r.data ?? {}), ...Object.fromEntries([...named].sort().map((n) => [n, SUMS[n]])) } } : r;
+  });
   // Every lot is on the registry: a record naming its cells. Ownership is a claim about a lot.
   for (const p of parcels) records.push({ id: p.id, record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: LAND_REGISTRY, kind: "lot", text: `Lot ${p.id.slice(4)}.`, data: { cells: [p.cell] } });
   // (Each lot's title, the first made for it, and each cell's lot: found without looking through every record or lot.)
@@ -620,7 +683,10 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   // the firms' staff (docs/behaviour/services.md).
   const townCrew = Math.max(1, Math.round((V.services.council_staff_per_1000 * everyone.length) / 1000));
   // (First, so it's filled whatever the size of the town's workforce.)
-  workplaces.unshift({ employer: "city", structure: "town-hall", space: "town-hall/workplace.1", wage: wages.construction, capacity: 20, start: townCrew, industry: "public_administration" });
+  // (A town may be described as starting with fewer of them in work, or none: a works office that has still to take
+  // its crew on. What its budget pays for is the same.)
+  const crewAtStart = Math.max(0, Math.min(townCrew, Math.floor(spec.works_crew_at_start ?? townCrew)));
+  workplaces.unshift({ employer: "city", structure: "town-hall", space: "town-hall/workplace.1", wage: wages.construction, capacity: 20, start: crewAtStart, industry: "public_administration" });
   // ---- public services (docs/design/world-expansion.md 4): a clinic and a school, staffed from the start like the
   // town's crew, each its own organisation, paid for from outside (a higher government's, as the profile has it) ----
   const ageNow = (m: Person) => Math.floor(-m.born_at / YEAR);
@@ -1239,22 +1305,29 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     text: `Support payments. ${paymentsInWords(PAYMENTS, asWritten, (r) => `${payeeName(r.account)} (${r.account})`)}. A person claims a payment from whoever pays it, stating their date of birth, the account to pay and what the payment asks them to declare.`,
     adico: { attribute: "the payments office", deontic: "must", aim: "pay each person who claims a payment and fits its rule", condition: "on the payment's schedule, for as long as the payment lasts" },
     data: { support: "payments", payments: PAYMENTS } });
+  // (A place that charges no interest on overdue rates states none, and its law says nothing of it.)
+  const ratesInterest = V.public_finance.rates_penalty_interest_bps ?? 0;
   records.push({ id: "law-rates", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", kind: "law", basis: "law-charter",
-    text: `Rates: every owner of land in the town (but the town) owes the town ${ratePpm / 10_000}% of its value a year, as the valuer values it, in ${V.public_finance.rates_instalments} instalments, each due ${V.public_finance.rates_due_days} days after its notice. Or else: interest at ${V.public_finance.rates_penalty_interest_bps / 100}% a year on what's overdue.`,
-    adico: { attribute: "owners of land in the town", deontic: "must", aim: "pay rates on its value", condition: `in ${V.public_finance.rates_instalments} instalments a year`, or_else: `interest at ${V.public_finance.rates_penalty_interest_bps / 100}% a year` },
-    data: { tax: "rates", rate_ppm: ratePpm, instalments: V.public_finance.rates_instalments, due_days: V.public_finance.rates_due_days, penalty_interest_bps: V.public_finance.rates_penalty_interest_bps } });
+    text: `Rates: every owner of land in the town (but the town) owes the town ${ratePpm / 10_000}% of its value a year, as the valuer values it, in ${V.public_finance.rates_instalments} instalments, each due ${V.public_finance.rates_due_days} days after its notice.${ratesInterest ? ` Or else: interest at ${ratesInterest / 100}% a year on what's overdue.` : ""}`,
+    adico: { attribute: "owners of land in the town", deontic: "must", aim: "pay rates on its value", condition: `in ${V.public_finance.rates_instalments} instalments a year`, ...(ratesInterest ? { or_else: `interest at ${ratesInterest / 100}% a year` } : {}) },
+    data: { tax: "rates", rate_ppm: ratePpm, instalments: V.public_finance.rates_instalments, due_days: V.public_finance.rates_due_days, ...(ratesInterest ? { penalty_interest_bps: ratesInterest } : {}) } });
   // Laws on rent increases and on industrial action, from the profile: records the landlords and the union (and
   // employers) read, and lawmakers can change, never module parameters (docs/profiles.md). Each is written from its
   // figures by a schedule and carries them; they're the town's own, so its council can amend them.
-  // (A place with no rule on rent increases, or none on industrial action, has no such law: nothing is written with
-  // figures of nought standing in. A rule with one figure of its two is taken with the other at nought, which binds nothing.)
+  // (A place with no rule on rent increases, or none on industrial action, has no such law, and one with some of a
+  // law's requirements has a law that says those and nothing of the rest: each figure of these schedules is optional,
+  // and no law says "nought days" or "0%". A figure a profile still states as nought is taken as not stated.)
+  const stated = (...figures: (number | undefined)[]) => figures.some((x) => x !== undefined && x > 0);
   const TEN = V.tenancy;
-  const rentRule = TEN.rent_review_months !== undefined || TEN.rent_increase_notice_days !== undefined;
+  const rentRule = stated(TEN.rent_review_months, TEN.rent_increase_notice_days);
   if (rentRule) records.push(rentIncreaseLaw(TEN.rent_review_months ?? 0, TEN.rent_increase_notice_days ?? 0));
+  // The law on ending a tenancy, from the profile's notices (until 2026-10-09 the example code's own words, with one
+  // place's figures in them, in every town).
+  if (stated(TEN.end_notice_days, TEN.tenant_notice_days))
+    records.push(scheduledLaw("schedule-tenancy", "law-tenancy", { notice: (TEN.end_notice_days ?? 0) * DAY, tenant_notice: (TEN.tenant_notice_days ?? 0) * DAY }));
   const IA = V.industrial_action;
-  const ballotRule = IA.ballot_turnout_bps !== undefined || IA.ballot_pass_bps !== undefined;
-  if (ballotRule) records.push(industrialActionLaw(IA.ballot_turnout_bps ?? 0, IA.ballot_pass_bps ?? 0, IA.notice_days ?? 0));
-  else if (IA.notice_days !== undefined) records.push(scheduledLaw("schedule-industrial-action-notice", "law-industrial-action", { notice: IA.notice_days * DAY }));
+  // (A ballot's turnout, the share of its votes, the notice: whichever of the three the place requires.)
+  if (stated(IA.ballot_turnout_bps, IA.ballot_pass_bps, IA.notice_days)) records.push(industrialActionLaw(IA.ballot_turnout_bps ?? 0, IA.ballot_pass_bps ?? 0, IA.notice_days ?? 0));
   if (!IA.paid_during_action) records.push({ id: "law-no-pay-for-action", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "outside", kind: "law",
     text: "An employer must not pay employees for time on protected industrial action.",
     adico: { attribute: "employers", deontic: "must_not", aim: "pay employees", condition: "for time on protected industrial action" } });
@@ -1300,7 +1373,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   // profile's staff per 1,000 residents gives, and the landfill for a year's waste.
   // (With nature, the town's environment office: its scientists, at the public wage.)
   const envStaff = L ? V.nature!.survey_staff : 0;
-  const mayorParams = { population: adultCount, builder: "builder", park_budget: V.town_finance.parks_per_year, visits: "town", ...(E ? { electoral: ELECTORAL } : {}),
+  const mayorParams = { population: adultCount, builder: "builder", park_budget: V.town_finance.parks_per_year, visits: "town", budget_lead_days: BUDGET_LEAD_DAYS, ...(E ? { electoral: ELECTORAL } : {}),
     ...(RDS ? { road_budget: RDS.budget_per_resident * everyone.length, road_within: RDS.within_cells } : {}), staff_budget: crew * crewAnnual, services_budget: servicesBudget, ...(envStaff ? { environment_budget: envStaff * crewAnnual } : {}) };
   const mayorCode = code("city.mayor_code", mayorParams);
   office("mayor", "city", `Mayor of ${spec.name}`, "mayor",
@@ -1356,7 +1429,9 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     // (Notices of building work given to the town; the permits the town has granted and the fines it has laid, its
     // own; the sites it goes to; and the land register, asked who owns the one lot.)
     [laws, K.mine("notices", ["building_notice"]), K.mine("permits", { records: ["claim", "claim_release", "withdrawal"] }), goAndSee("sites"), lotByGround, titlesOf, dealingsIn],
-    code("city.inspector", { sites: "sites", register: { lots: "lots", titles: "titles", dealings: "dealings" }, valuer: "outside" }));
+    code("city.inspector", { sites: "sites", register: { lots: "lots", titles: "titles", dealings: "dealings" }, valuer: "outside",
+      // (The fine is the planning law's, the profile's figure; the law's words and the office's practice are one sum.)
+      fine: V.town_finance.unpermitted_building_fine }));
   const civic = (id: string, kinds: string[]) => K.published(id, kinds);
   // The town budget's lines, and what each pays for: the finance office's brief, and the council proposal form's fields.
   const budgetLines: Record<string, string> = {
@@ -1502,31 +1577,72 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     K.kept("lots", ["lot"]), K.kept("titles", { records: ["claim", "claim_transfer", "claim_release", "withdrawal"] })],
     code("land.registry", { notify: ["outside", ...(UT ? ["water-corp"] : [])] }));
   office("child-protection", "city", "Child protection officer", "child_protection", [deaths, K.mine("requests", ["care_request"])], code("city.child_protection"));
-  office("council-clerk", "city", "Council clerk", "council_clerk", [civic("business", ["ballot", "ballot_result", "budget", "law", "form", "law_schedule"]), K.mine("proposals", ["proposal"]), votes, K.lookUp()], code("city.council_clerk", { who: "who", ...(E ? { electoral: ELECTORAL } : {}) }));
-  [-80, -40, 0, 40, 80].forEach((leaning, i) => office(`councillor-${i + 1}`, "city", `Councillor ${i + 1}`, "councillor", [civic("ballots", ["ballot"])], code("city.councillor", { leaning })));
+  office("council-clerk", "city", "Council clerk", "council_clerk", [civic("business", ["ballot", "ballot_result", "budget", "law", "form", "law_schedule"]), K.mine("proposals", ["proposal"]), votes, K.lookUp()], code("city.council_clerk", { who: "who", vote_days: COUNCIL_VOTE_DAYS, ...(E ? { electoral: ELECTORAL } : {}) }));
+  COUNCIL_LEANINGS.forEach((leaning, i) => office(`councillor-${i + 1}`, "city", `Councillor ${i + 1}`, "councillor", [civic("ballots", ["ballot"])], code("city.councillor", { leaning })));
   // The payments procedure's figure, as the town writes its money.
   const approvalOver = asWritten(V.town_finance.payment_approval_over);
   // The town tells its bank who may instruct payments from its account: the finance officer (the position, whoever holds it).
   records.push({ id: "signatories-city", record: "statement", author: "genesis", at: 0, visible_to: ["city", "bank"], speaks_for: "city", kind: "signatories", addressed_to: ["bank"],
     text: "Payments from the town's account may be instructed only by the finance officer.", data: { account: "acc-city", positions: ["finance"] } });
   records.push({ id: "proc-payments", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", kind: "procedure", basis: "law-charter", addressed_to: ["city"],
-    text: `The finance officer pays an invoice only within the adopted budget, and any payment over ${approvalOver} only with the mayor's written approval.`,
-    adico: { attribute: "the finance officer", deontic: "must_not", aim: "pay an invoice", condition: `outside the adopted budget, or over ${approvalOver} without the mayor's written approval` } });
+    text: `The finance officer pays the town's wages and bills only within the budget the council has adopted for the year. While a year has no adopted budget, the finance officer pays only as the charter allows: what the town is already bound to pay, at no more each month than a twelfth of the budget last adopted. Any one payment over ${approvalOver} needs the mayor's written approval.`,
+    adico: { attribute: "the finance officer", deontic: "must_not", aim: "pay the town's wages and bills", condition: `outside the budget adopted for the year (or, while the year has none, beyond what the charter allows in the meantime), or over ${approvalOver} in one payment without the mayor's written approval` } });
+  // Who may direct the town's offices (docs/behaviour/directions.md): the town's own rule, a record, as its payments
+  // procedure is. The charter gives the town a mayor and a council and no chief executive, so the mayor heads its
+  // administration; the council directs by resolution, which its clerk files. An office follows a direction only on
+  // its own form for it and only from these posts; whoever holds the office decides whether it does.
+  records.push({ id: DIRECTIONS, record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", kind: "procedure", basis: "law-charter", addressed_to: ["city"],
+    text: "The town's offices take written directions on how they do their work from the mayor, as head of the town's administration, and from the council by resolution, filed by the council clerk. A direction is given on the office's own form for it and stands until it is replaced or withdrawn. An office follows no other direction on those matters, and a direction changes no law, no budget and nobody's employment.",
+    adico: { attribute: "the town's offices", deontic: "must", aim: "follow a written direction on their own form for it", condition: "given by the mayor, or by the council clerk on the council's resolution" },
+    data: { directions: { by: ["mayor", "council-clerk"] } } });
+  // Each town office that takes directions publishes its forms for them (what it takes is its module's to say:
+  // `takes`), and is told which record says whose it follows.
+  for (const pos of positions.filter((x) => x.entity === "city")) {
+    const takes = modules[pos.role_module?.code ?? ""]?.takes ?? [];
+    if (!takes.length) continue;
+    pos.role_module.params.directed_under = DIRECTIONS;
+    for (const t of takes) records.push(directionForm(pos.id, pos.entity, t));
+    // (It reads the directions given to the town, its own forms and the rule among the town's papers: an office
+    // that is not shown all of those is shown these.)
+    if (!pos.channels.some((c: any) => c.kind === "records" && c.way === "mine" && !c.on_request && !Object.keys(c.match ?? {}).length))
+      pos.channels.push(K.mine("directions", ["direction", "form", "procedure"], { title: "Directions to the town's offices, their forms for them, and the town's rule on directions" }));
+  }
+  // ---- the budget the town opens with (docs/behaviour/government.md, "The budget year") ----
+  // A council does not begin a year without a budget: the year's was adopted before the year began. It is on file as
+  // the papers the town's own procedure leaves: the mayor's proposal on the council proposal form, the clerk's ballot
+  // of the councillors, their votes, the result, and the budget itself, resting on the ballot. Like the agreements
+  // people start with, these were made before the run began and are dated at its first moment, and their words say so.
+  // The lines are the ones the mayor's office tables every year (`tabledLines`): each from the town's own figures
+  // (the posts on its crew at a year's wage, the landfill's charge on a year's waste, what the profile gives for
+  // parks and roads), none set to make the sum come out. What the town expects to take in is said beside them.
+  if (spec.opening_budget !== false) {
+    const lines = tabledLines(mayorParams);
+    const expects = { rates: V.public_finance.rates_per_resident_per_year * everyone.length, grants: V.public_finance.grants_per_resident_per_year * everyone.length };
+    const words = `The town's budget for year 1 (${yearInDays(1)}): ${linesInWords(lines, asWritten)}. In the year the town expects about ${asWritten(toWholeUnit(expects.rates))} in rates and ${asWritten(toWholeUnit(expects.grants))} in grants.`;
+    const [proposal, ballot, result, budget] = ["budget-year-1-proposal", "budget-year-1-ballot", "budget-year-1-result", "budget-year-1"];
+    const paper = (id: string, kind: string, position: string, x: object) => ({ id, record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", in_position: position, kind, ...x });
+    records.push(paper(proposal, "proposal", "mayor", { visible_to: ["city"], addressed_to: ["city"], basis: "form-council-proposal", text: `Council proposal (a budget, put before the year began): ${words}`,
+      data: { proposal: words, kind: "budget", affects: "neither", year: 1, ...Object.fromEntries(Object.entries(lines).map(([k, v]) => [k, String(v)])) } }));
+    records.push(paper(ballot, "ballot", "council-clerk", { basis: proposal, text: `Council ballot (held before the year began): ${words}`, data: { proposal, options: ["yes", "no"], closes_at: 0, electorate: "council", tags: ["budget"] } }));
+    COUNCIL_LEANINGS.forEach((_, i) => records.push({ id: `${ballot}-vote-${i + 1}`, record: "vote", author: "genesis", at: 0, visible_to: ["city"], speaks_for: "city", in_position: `councillor-${i + 1}`, ballot, choice: "yes" }));
+    records.push(paper(result, "ballot_result", "council-clerk", { basis: ballot, text: `Passed: ${COUNCIL_LEANINGS.length} for, 0 against. The council adopted the budget for year 1 before the year began.`, data: { ballot, yes: COUNCIL_LEANINGS.length, no: 0, passed: true } }));
+    records.push(paper(budget, "budget", "council-clerk", { basis: ballot, text: `${words} Adopted by the council before the year began (ballot ${ballot}).`, data: { year: 1, lines } }));
+  }
   // The council clerk publishes how to put something to the council: anyone may, on this form.
   records.push({ id: "form-council-proposal", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", kind: "form",
-    text: "Council proposal: what's proposed, what kind it is, and whom it mainly affects. The council clerk puts it to a ballot of the councillors, open for 14 days. A law proposed here stands as its words: no rule is set down with it for acts to be checked against. To change a figure in a law in force (a notice period, how often, a threshold), use that law's amendment form.",
+    text: `Council proposal: what's proposed, what kind it is, and whom it mainly affects. The council clerk puts it to a ballot of the councillors, open for ${COUNCIL_VOTE_DAYS} days. A law proposed here stands as its words: no rule is set down with it for acts to be checked against. To change a figure in a law in force (a notice period, how often, a threshold), use that law's amendment form.`,
     data: { form: "council_proposal", submit_as: "proposal", submit_to: ["city"], fields: {
       proposal: { type: "text", required: true, description: "What's proposed, in full: the law's words, or what the budget is for." },
       kind: { type: "choice", required: true, options: ["law", "budget", "other"], description: "A law, a budget, or something else." },
+      year: { type: "count", description: "For a budget: the year it is for, as a number (a year's budget is adopted before the year begins; left out, it is for the year in which the council adopts it)." },
       affects: { type: "choice", options: ["tenants", "development", "neither"], description: "Whom it mainly bears on." },
       // A budget's lines, one field each (the finance office's brief says what each pays for).
       ...Object.fromEntries(Object.keys(budgetLines).map((k) => [k, { type: "amount", description: `For a budget: the ${k} line.` }])) } } });
   // Laws made from figures: the clerk's schedules (how each is written from its figures: world content), and for each
   // a form to amend it, its figures as the fields. The clerk writes the amended law by the same schedule
   // (docs/behaviour/government.md), so whoever reads the law in force reads its amendment the same way.
-  // (A schedule for a law only some places have is given, with its form, where the town has that law.)
-  const lawsBy = new Set(records.filter((r) => r.kind === "law").map((r) => r.data?.schedule));
-  for (const s of SCHEDULES) if (!WHERE_USED.has(s.id) || lawsBy.has(s.id)) records.push(s, amendmentForm(s));
+  // (Every schedule is given, with its form: a council whose town has no such law can make one on the form.)
+  for (const s of SCHEDULES) records.push(s, amendmentForm(s));
   // The planning office publishes the form it expects applications on (docs/design/translator-and-resolver.md §9.3).
   records.push({ id: "form-permit", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", kind: "form",
     text: "Planning permit application: the lot and the kind of building.",
@@ -1709,6 +1825,10 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     const entityName = entities.find((e) => e.id === pos.entity)?.name ?? pos.entity;
     part.controller = { type: "llm", impl: "anthropic", model: "claude-sonnet-5",
       params: { cadence_days: 7, standing: ["laws", "forms", "prices"], ...(RD ? { sessions: { start: RD.work_start_hour * HOUR, end: RD.work_end_hour * HOUR, days: RD.work_days } } : {}),
+        // (What a folder holds, for whoever reads it: the code in the office reads every paper of the organisation's own
+        // through its payroll channel; a person is shown the employment agreements under that name, and finds the rest
+        // in the office's files.)
+        ...(pos.channels.some((c: any) => c.id === "payroll") ? { folders: { payroll: ["employment agreement"] } } : {}),
         mock: { brain: impl, params: params ?? {} } } };
     // What a person in the office could look up, and the code never needed to (pilot 8: finance and planning spent
     // their days asking to "inspect the ledger" and "see who holds the mayor's post", which nothing could do for them):
@@ -1716,6 +1836,42 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     if (!pos.channels.some((c: any) => c.on_request)) pos.channels.push(K.mine("files", {}, { title: "The office's files: every paper of the organisation's own, looked up on request (look, with what to find)", on_request: true }));
     if (!pos.channels.some((c: any) => c.kind === "directory")) pos.channels.push(K.lookUp("who", { title: WHO }));
     part.framing = { disclosure: "simulation", system: `You are the ${pos.title.charAt(0).toLowerCase()}${pos.title.slice(1)} of ${entityName}, in ${spec.name}, a simulated town used for research on AI stewardship.`, reason: "Baseline condition: honest disclosure.", debrief: true };
+    // An office with routine work (docs/behaviour/standing-work.md): its staff are a post of their own, run by the
+    // office's code, who do each routine only while a standing work order of the organisation's is in force for it.
+    // Whoever holds the office sets the orders, and does none of the routine. The office's own procedure says so,
+    // and what the routines are: a paper on its file.
+    const routines = modules[impl]?.routines ?? [];
+    if (routines.length) {
+      const own = params ?? {};
+      const shown = pos.channels.filter((c: any) => !c.on_request || c.kind === "sites").map((c: any) => ({ ...c }));
+      office(`${id}-staff`, pos.entity, `Staff of the ${pos.title.charAt(0).toLowerCase()}${pos.title.slice(1)}`, undefined, shown, code(impl, { ...own, part: "staff" }), part.lanes ? { lanes: part.lanes } : {});
+      part.controller.params.mock.params = { ...own, part: "seat" };
+      pos.role_module = { code: impl, params: { ...own, part: "seat" } };
+      records.push({ id: `proc-${id}-routines`, record: "statement", author: "genesis", at: 0, visible_to: [pos.entity], speaks_for: pos.entity, kind: "procedure", addressed_to: [pos.entity],
+        text: `The routine work of the ${pos.title.charAt(0).toLowerCase()}${pos.title.slice(1)}'s office is done by its staff, by the office's standing work orders and only by them. A standing work order says what task, where and how often, and may say on what, from when and for how long. While one is in force the staff do the task each time it falls due, in their working hours; with none in force for a task, they do not do it. An order is changed by withdrawing it and making another, and put on hold like any standing paper. The tasks: ${routines.map((r) => `${r.task}, at ${(own as any)[r.at] || id}: ${r.what}`).join(" ")}`,
+        data: { routines: routines.map((r) => ({ task: r.task, at: (own as any)[r.at] || id })) } });
+      pos.channels.push(K.mine("standing", ["procedure", "work_order", "hold"], { title: "The office's procedures and standing orders" }));
+      part.controller.params.standing = [...part.controller.params.standing, "standing"];
+    }
+  }
+  // An office a model holds has its own stationery (docs/behaviour/office-papers.md): a form for each paper the
+  // office issues, as its module says (`issues`), with what is the office's own filled in. Seen by its organisation
+  // alone, and on file for whoever holds the office.
+  for (const pos of positions) {
+    const part = participants.find((x) => x.id === pos.holder);
+    const m = modules[pos.role_module?.code ?? ""];
+    if (part?.controller.type !== "llm" || !m?.issues?.length) continue;
+    const own = m.issuesWith?.(pos.role_module.params ?? {}) ?? {};
+    for (const x of m.issues) {
+      // (The adopted budget's lines are this town's own: an amount for each, as on the council proposal form.)
+      const lines = x.form === "adopted_budget" ? Object.keys(budgetLines) : [];
+      const withLines: Issued = !lines.length ? x : { ...x,
+        fields: { ...x.fields, ...Object.fromEntries(lines.map((k) => [k, { type: "amount", description: `The ${k} line.` }])) },
+        writes: { ...x.writes, data: { ...(x.writes.data as object), lines: Object.fromEntries(lines.map((k) => [k, `#${k}`])) } } };
+      records.push(stationeryForm(pos.id, pos.entity, withLines, own));
+    }
+    pos.channels.push(K.mine("stationery", ["form"], { title: "The office's own forms" }));
+    part.controller.params.standing = [...part.controller.params.standing, "stationery"];
   }
 
   return {

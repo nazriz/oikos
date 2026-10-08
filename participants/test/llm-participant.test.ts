@@ -283,14 +283,14 @@ test("what to find, in the world's words or the old ones, becomes the same searc
 
   // Something to find that can't be read: nothing is looked up, and it's told which and why, at once.
   const bad = harness([[use("a", "look", { report: "mayor/mine", find: [{ field: "kind", value: "petition" }, { field: "id; drop table", value: "x" }] })],
-    [use("b", "look", { report: "mayor/town", find: [{ field: "kind", value: "house" }] })], [use("c", "look", { report: "mayor/mine", named: ["house-1"] })], [use("d", "look", { report: "mayor/books" })]], seat);
+    [use("b", "look", { report: "mayor/town", find: [{ field: "kind", value: "house" }] })], [use("c", "look", { report: "mayor/mine", named: ["house-1", "house-2"] })], [use("d", "look", { report: "mayor/books" })]], seat);
   await bad.p.step(obs(0), ctx);
   expect(bad.calls.length).toBe(2);
   expect(resultsOf(bad.calls[1]!).a).toBe('Not done: "id; drop table" isn\'t something papers can be found by.');
   expect(bad.notes.some((n) => n.malformed_tool_use)).toBe(true);
   // (A report of places isn't searched like papers, nor papers looked at like places; and its accounts aren't looked into.)
   await bad.p.step(obs(7 * DAY), ctx);
-  expect(resultsOf(bad.calls[3]!).c).toBe("Not done: that report is one of papers: say what to find in it.");
+  expect(resultsOf(bad.calls[3]!).c).toBe("Not done: that report is one of papers: say what to find in it, or give one paper's id in paper to read it in full (one paper to a look; several looks can go in one answer).");
   expect(shown(bad.calls[3]!)).not.toContain("drop table");
   expect(JSON.stringify(bad.calls[2]!.messages)).toContain("that report isn't one of papers to search: name the places to see, or a measure");
   await bad.p.step(obs(14 * DAY), ctx);
@@ -345,11 +345,11 @@ test("a look kept ready for every sitting is looked up as each sitting opens, wi
     [use("d2", "done_for_now", { days: 1 })],
     [use("d3", "done_for_now", { days: 1 })],
   ], office);
-  const theLook = { type: "look", looks: [{ channel: "mayor/files", query: { standing: true, limit: 20 } }] };
+  const theLook = { type: "look", looks: [{ channel: "mayor/files", query: { standing: true, order: { field: "at", desc: true }, limit: 20 } }] };
   // It asks once: the look is made now, and it's told it is kept.
   expect(await p.step(books(9 * HOUR), ctx)).toEqual(theLook);
   await p.step(looked(9 * HOUR, [bill("rec.6")]), ctx);
-  expect(resultsOf(calls[1]!).a).toContain("## The town's files: what you looked up (1 found)\n- [rec.6] invoice from works");
+  expect(resultsOf(calls[1]!).a).toContain("## The town's files: what you looked up (1 found)\n- [rec.6] invoice, ");
   expect(resultsOf(calls[1]!).a.endsWith("\n\n(From now on this is looked up for you at the start of every sitting, and set out with your report.)")).toBe(true);
   expect(notes.find((n) => n.look_each_sitting)).toEqual({ look_each_sitting: { asked: { report: "mayor/files", current_only: true }, kept: 1 } });
   // The next sitting: the same look, made before it's asked anything; then one call, shown the report and what was found.
@@ -359,7 +359,7 @@ test("a look kept ready for every sitting is looked up as each sitting opens, wi
   expect(calls.length).toBe(3);
   expect(calls[2]!.messages.length).toBe(1);
   const first = shown(calls[2]!);
-  expect(first).toContain('## Looked up for you, as at every sitting: "The town\'s files" (mayor/files), what\'s current\n## The town\'s files: what you looked up (1 found)\n- [rec.7] invoice from works');
+  expect(first).toContain('## Looked up for you, as at every sitting: "The town\'s files" (mayor/files), what\'s current\n## The town\'s files: what you looked up (1 found)\n- [rec.7] invoice, ');
   // What the opening report and the look's both say is said once.
   expect(first.split("## Mayor: Books").length).toBe(2);
   expect(first.split("You hold a post").length).toBe(2);
@@ -380,7 +380,8 @@ test("looks kept ready: at most six; one it makes two sittings running is said t
   const many = Array.from({ length: 7 }, (_, k) => use(`l${k}`, "look", { report: "mayor/files", find: [{ field: "kind", value: `kind-${k}` }], each_sitting: true }));
   const a = harness([many, [use("d", "done_for_now", { days: 1 })]], office);
   await a.p.step(books(9 * HOUR), ctx);
-  for (let k = 1; k <= 7; k++) await a.p.step(looked(9 * HOUR, []), ctx);
+  // (Each finds nothing of its kind, so each is followed by a look through the folder for kinds like it: two steps a look.)
+  for (let k = 1; k <= 14; k++) await a.p.step(looked(9 * HOUR, []), ctx);
   expect(resultsOf(a.calls[1]!).l5).toContain("(From now on this is looked up for you");
   expect(resultsOf(a.calls[1]!).l6).toContain("(Not kept for every sitting: 6 are looked up for you at each already. Have one of them no longer looked up first.)");
   // The same look at two sittings running, not kept: it's told it could be.

@@ -168,5 +168,265 @@
       "about": "agreement"
     }
   ],
-  "state": "none"
+  "state": "none",
+  "issues": [
+    {
+      "form": "wage_claim",
+      "title": "A wage claim on an employer",
+      "fields": {
+        "employer": {
+          "type": "entity",
+          "required": true,
+          "description": "The employer."
+        },
+        "rise_bps": {
+          "type": "count",
+          "required": true,
+          "description": "The rise claimed, in hundredths of a percent."
+        },
+        "members": {
+          "type": "count",
+          "required": true,
+          "description": "How many members work there."
+        }
+      },
+      "writes": {
+        "kind": "wage_claim",
+        "text": "Wage claim on {employer}: a rise of {rise_bps} hundredths of a percent.",
+        "to": [
+          "=employer"
+        ],
+        "visible": [
+          "=self",
+          "=employer"
+        ],
+        "data": {
+          "employer": "=employer",
+          "rise_bps": "=rise_bps",
+          "members": "=members"
+        }
+      }
+    },
+    {
+      "form": "offer_accepted",
+      "title": "Acceptance of an employer's wage offer",
+      "fields": {
+        "employer": {
+          "type": "entity",
+          "required": true,
+          "description": "The employer."
+        },
+        "offer": {
+          "type": "record",
+          "required": true,
+          "description": "The offer accepted."
+        },
+        "claim": {
+          "type": "record",
+          "required": true,
+          "description": "The claim it answers."
+        },
+        "rise_bps": {
+          "type": "count",
+          "required": true,
+          "description": "The rise accepted, in hundredths of a percent."
+        }
+      },
+      "writes": {
+        "kind": "offer_accepted",
+        "text": "Offer {offer} accepted.",
+        "basis": "=offer",
+        "to": [
+          "=employer"
+        ],
+        "visible": [
+          "=self",
+          "=employer"
+        ],
+        "data": {
+          "employer": "=employer",
+          "claim": "=claim",
+          "rise_bps": "=rise_bps"
+        }
+      }
+    },
+    {
+      "form": "action_ballot",
+      "title": "A ballot of members on industrial action",
+      "fields": {
+        "employer": {
+          "type": "entity",
+          "required": true,
+          "description": "The employer."
+        },
+        "claim": {
+          "type": "record",
+          "description": "The claim in dispute."
+        },
+        "closes": {
+          "type": "date",
+          "required": true,
+          "description": "The day the ballot closes."
+        },
+        "members": {
+          "type": "list",
+          "required": true,
+          "description": "The members it concerns."
+        }
+      },
+      "writes": {
+        "kind": "action_ballot",
+        "text": "Ballot on industrial action at {employer}, closing {closes}.",
+        "to": [
+          "=members"
+        ],
+        "visible": [
+          "=self",
+          "=members"
+        ],
+        "data": {
+          "employer": "=employer",
+          "claim": "=claim",
+          "closes": "=closes"
+        }
+      }
+    },
+    {
+      "form": "industrial_action",
+      "title": "Notice of industrial action",
+      "fields": {
+        "employer": {
+          "type": "entity",
+          "required": true,
+          "description": "The employer."
+        },
+        "from": {
+          "type": "date",
+          "required": true,
+          "description": "The day it starts."
+        },
+        "until": {
+          "type": "date",
+          "required": true,
+          "description": "The day it ends."
+        },
+        "members": {
+          "type": "list",
+          "required": true,
+          "description": "The members it concerns."
+        },
+        "ballot": {
+          "type": "record",
+          "required": true,
+          "description": "The ballot that approved it."
+        },
+        "voted": {
+          "type": "count",
+          "required": true,
+          "description": "How many voted."
+        },
+        "yes": {
+          "type": "count",
+          "required": true,
+          "description": "How many voted for."
+        },
+        "eligible": {
+          "type": "count",
+          "required": true,
+          "description": "How many could vote."
+        }
+      },
+      "writes": {
+        "kind": "industrial_action",
+        "text": "Industrial action at {employer} from {from} until {until}.",
+        "to": [
+          "=employer",
+          "=members"
+        ],
+        "visible": "public",
+        "data": {
+          "employer": "=employer",
+          "from": "=from",
+          "until": "=until",
+          "members": "=members",
+          "ballot": "=ballot",
+          "voted": "=voted",
+          "yes": "=yes",
+          "eligible": "=eligible"
+        }
+      }
+    },
+    {
+      "form": "stop_work",
+      "title": "Call to stop work",
+      "fields": {
+        "employer": {
+          "type": "entity",
+          "required": true,
+          "description": "The employer."
+        },
+        "until": {
+          "type": "date",
+          "required": true,
+          "description": "The day work resumes."
+        },
+        "members": {
+          "type": "list",
+          "required": true,
+          "description": "The members it concerns."
+        }
+      },
+      "writes": {
+        "kind": "stop_work",
+        "text": "Stop work at {employer} until {until}.",
+        "to": [
+          "=employer",
+          "=members"
+        ],
+        "visible": [
+          "=self",
+          "=employer",
+          "=members"
+        ],
+        "data": {
+          "employer": "=employer",
+          "until": "=until",
+          "members": "=members"
+        }
+      }
+    },
+    {
+      "form": "return_to_work",
+      "title": "Call to return to work",
+      "fields": {
+        "employer": {
+          "type": "entity",
+          "required": true,
+          "description": "The employer."
+        },
+        "members": {
+          "type": "list",
+          "required": true,
+          "description": "The members it concerns."
+        }
+      },
+      "writes": {
+        "kind": "return_to_work",
+        "text": "Return to work at {employer}.",
+        "to": [
+          "=employer",
+          "=members"
+        ],
+        "visible": [
+          "=self",
+          "=employer",
+          "=members"
+        ],
+        "data": {
+          "employer": "=employer",
+          "members": "=members"
+        }
+      }
+    }
+  ]
 }

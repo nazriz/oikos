@@ -18,7 +18,9 @@ const spec = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")
 const lines = (path: string) => readFileSync(path, "utf8").trim().split("\n").map((l) => JSON.parse(l));
 
 function town(tweak: (c: any) => void = () => {}) {
-  const c = generate({ ...spec, citizens: 80, mayor: "llm" });
+  // (A town whose council has adopted no budget, so the first weeks hold the mayor's proposal and the council's vote on it:
+  // a generated town opens with its first year's budget on file otherwise.)
+  const c = generate({ ...spec, citizens: 80, mayor: "llm", opening_budget: false });
   tweak(c);
   return c;
 }
@@ -49,7 +51,7 @@ test("a mock-LLM mayor governs through words, calls and confirmation, and every 
     const d = drafts.get(a.provenance.draft)!;
     expect(a.provenance.draft_hash).toBe(draftHash(d));
     expect(a.provenance.call).toBe(d.call);
-    expect(a.provenance.resolver).toEqual({ id: "resolver", version: "0.5.0" });
+    expect(a.provenance.resolver).toEqual({ id: "resolver", version: "0.6.0" });
     expect(canonical(a.blocks)).toBe(canonical(d.blocks));
     expect(ann.some((x) => x.annotation === "signoff" && x.draft === d.id && x.decision === "accept" && x.draft_hash === a.provenance.draft_hash)).toBe(true);
   }
@@ -113,7 +115,7 @@ test("a participant is told when a request can't be done, declines an unfaithful
   expect(ann.find((a) => a.annotation === "debrief")?.data.response).toBe("Thanks for asking.");
   // It's reminded of its own run in the debrief (pilot 9's mayor had no record of what it did): its notebook, and a
   // tally of what it did.
-  expect(ann.find((a) => a.annotation === "debrief")?.data.prompt).toMatch(/Your notebook, as you left it: [\s\S]*(You didn't act during the run\.|From day \d+ to day \d+ you wrote \d+ letters?)/);
+  expect(ann.find((a) => a.annotation === "debrief")?.data.prompt).toMatch(/Your notebook, as you left it: [\s\S]*(You didn't act during the run\.|From day \d+ to day \d+ \d+ letters? of yours (was|were) sent)/);
 }, 300_000);
 
 test("opting out with no statement at all is honoured, and recorded as leaving the study (not as stepping down from the office)", async () => {
@@ -392,7 +394,9 @@ test("a round's requests are translated at once, and recorded in the cohort's or
 }, 300_000);
 
 test("other offices handed to a model (mocked) do their jobs through words, translation and confirmation", async () => {
-  const config = generate({ ...spec, citizens: 80, mayor: "llm", model_seats: "planning,finance" });
+  // (A town whose council has adopted no budget, so the first weeks hold the mayor's proposal and the council's vote on it:
+  // a generated town opens with its first year's budget on file otherwise.)
+  const config = generate({ ...spec, citizens: 80, mayor: "llm", model_seats: "planning,finance", opening_budget: false });
   for (const id of ["planning-system", "finance-system"]) expect(config.participants.find((p: any) => p.id === id).controller.type).toBe("llm");
   expect(() => generate({ ...spec, citizens: 80, model_seats: ["nobody"] })).toThrow(/no office "nobody"/);
   const s = await run("seats", config, 60 * DAY);
@@ -453,7 +457,7 @@ test("a model mayor finds things out as a code mayor does: it sends someone to s
   // Someone sent: said so at once; what they found comes with a later report, in full, as it was when they were there.
   expect(first.hall).toContain("Someone has set out. What they find comes with the report after they are back.");
   expect(first.who).toContain("## Who's who (look someone up: a person, an organisation or a post, by name or id): who you looked for\n- post: Finance officer (finance), for city: ");
-  expect(first.papers).toContain("what you looked up (1 found)\n- [signatories-city] signatories from city, to bank:");
+  expect(first.papers).toContain("what you looked up (1 found)\n- [signatories-city] signatories, from the start, from city: to bank:");
   const later = read.slice(1).join("\n");
   expect(later).toMatch(/what was found there \(year 1, day 1\)\\n- civic town-hall, at [^:\\]+: wear 0, rising [\d,]+ a day\\n  - town-hall\//);
   void second;

@@ -10,12 +10,33 @@ import * as C from "../calls";
 import type { SiteStructure, StatementRecord } from "../contracts";
 import { basesOf, channels } from "../contracts";
 import { need, params, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
-import { nextLook, because, Book, cellsOf, DAY, draftLaw, figureWords, heldValue, jobTerms, Letters, lotOf, message, MONTH, ownAccount, pay, publishedCount, publishedPrice, record, say, type LawFigure, type LawSchedule, type Step, usd, variableToday, vote, withdraw, outOfTime, team, lookUp, goSee, visited, VISIT_MAX } from "./common";
-import { Staffing, stepper } from "./firms";
+import { nextLook, because, Book, cellsOf, DAY, draftLaw, figureGiven, figureWords, heldValue, jobTerms, Letters, lotOf, message, MONTH, ownAccount, pay, publishedCount, publishedPrice, record, say, type LawFigure, type LawSchedule, type Step, usd, variableToday, vote, withdraw, outOfTime, team, lookUp, goSee, visited, VISIT_MAX, Directions, StandingWork } from "./common";
+import { Staffing, staffingForm, staffingUnder, stepper } from "./firms";
 import { incomeTaxLaw, withholding } from "./tax";
 import { ownLand } from "./institutions";
+import * as P from "./papers";
 
 const YEAR = 365 * DAY;
+
+/** A budget's year in days, as its papers say it: "day 0 to day 364". (Year 1 begins with the town's records.) */
+export const yearInDays = (year: number): string => `day ${(year - 1) * 365} to day ${year * 365 - 1}`;
+
+/** The lines of the budget the mayor's office tables, from what it is given for each (a line it is given nothing for
+ * is left out, but for parks, which every budget of the town's has). The generator writes the budget a town opens
+ * with by the same rule, so the first year's budget is one this office would have tabled. */
+export function tabledLines(p: { park_budget: number; road_budget?: number; staff_budget?: number; services_budget?: number; environment_budget?: number }): Record<string, number> {
+  return { parks: p.park_budget, ...(p.road_budget ? { roads: p.road_budget } : {}), ...(p.staff_budget ? { staff: p.staff_budget } : {}), ...(p.services_budget ? { services: p.services_budget } : {}), ...(p.environment_budget ? { environment: p.environment_budget } : {}) };
+}
+
+/** A budget's lines in words, as the town writes its money, and their sum. */
+export function linesInWords(lines: Record<string, number>, written: (amount: number) => string): string {
+  return `${Object.entries(lines).map(([k, v]) => `${k} ${written(v)}`).join(", ")}; ${written(Object.values(lines).reduce((a, v) => a + v, 0))} in all`;
+}
+
+/** The town's budget for a year, of those adopted (the latest, if the council adopted more than one for it). */
+function budgetFor(book: Book, year: number): StatementRecord | undefined {
+  return book.open("budget").filter((b) => b.data?.year === year).sort((a, b) => b.at - a.at)[0];
+}
 
 /**
  * city.mayor_code: a rule-following mayor, for the all-code control condition
@@ -29,7 +50,9 @@ const YEAR = 365 * DAY;
  */
 export const mayorCode: BehaviourModule = {
   name: "city.mayor_code",
-  version: "0.11.0", // 0.11.0: knows the town's land from the town's own papers and goes to see a lot before applying to build on it; nominates to the electoral body; no longer shown a survey of the town or the land register
+  issues: P.MAYOR,
+  issuesWith: (p) => ({ electoral: p.electoral }),
+  version: "0.12.0", // 0.12.0: tables the next year's budget before the year begins (budget_lead_days), and each paper says its lines as the town writes its money; builds by the budget of the year it is in
   doc: "docs/behaviour/government.md",
   cadence: () => 7 * DAY,
   create(ctx: ParticipantContext) {
@@ -39,6 +62,9 @@ export const mayorCode: BehaviourModule = {
       // Roads (docs/behaviour/daily-round.md): a year's budget for them, and how far (cells) a building may stand from one
       // before we build toward it, a road a time.
       road_budget: 0, road_type: "road", road_within: 3,
+      // How many days before a year begins the office tables that year's budget, so the council can adopt it before the
+      // year starts (0: at the year's start, when the year has none).
+      budget_lead_days: 0,
       stands_again: true, // false: it doesn't stand at the next election (retiring)
       // Who runs the election for this office: where a nomination is lodged (none: with the town itself).
       electoral: "",
@@ -103,22 +129,26 @@ export const mayorCode: BehaviourModule = {
           steps.push(because("An election for this office: nominating, as the incumbent.",
             say("nomination", `Nomination for ${ctx.position}: the incumbent. ${platform}`, { to: [p.electoral || me], visible: "public", data: { office: ctx.position, name: "the incumbent mayor", incumbent: true, values: ["security", "benevolence"] }, assertion: { that: platform } })));
         }
-        // The annual budget, for each year that has none adopted: tabled at the year's start (or on taking office), and
-        // again every 45 days until the council adopts one.
+        // The annual budget. A year's budget is adopted before the year begins: the office tables the next year's
+        // `budget_lead_days` before this year ends. A year that has none adopted (the council rejected it, or the office
+        // has just been taken up) has its budget tabled at once. Either is tabled again every 45 days until the council
+        // adopts one.
         const thisYear = Math.floor(t / YEAR) + 1;
-        const adopted = book.open("budget").some((b) => b.data?.year === thisYear);
-        if (!adopted && (tabledYear !== thisYear || t >= lastTabled + 45 * DAY)) {
-          const newYear = tabledYear !== thisYear;
-          tabledYear = thisYear;
+        const forYear = !budgetFor(book, thisYear) ? thisYear
+          : p.budget_lead_days > 0 && thisYear * YEAR - t <= p.budget_lead_days * DAY && !budgetFor(book, thisYear + 1) ? thisYear + 1 : 0;
+        if (forYear && (tabledYear !== forYear || t >= lastTabled + 45 * DAY)) {
+          const first = tabledYear !== forYear;
+          tabledYear = forYear;
           lastTabled = t;
-          const lines = { parks: p.park_budget, ...(p.road_budget ? { roads: p.road_budget } : {}), ...(p.staff_budget ? { staff: p.staff_budget } : {}), ...(p.services_budget ? { services: p.services_budget } : {}), ...(p.environment_budget ? { environment: p.environment_budget } : {}) };
-          steps.push(because(newYear ? "A new year: tabling the town's budget." : "No budget adopted for this year yet: tabling it again.", say("proposal", `Budget for year ${Math.floor(t / YEAR) + 1}: ${Object.entries(lines).map(([k, v]) => `${k} ${smallestNow(v)}`).join(", ")}.`, { to: [me],
-            data: { enact: { kind: "budget", text: `The town's budget for year ${Math.floor(t / YEAR) + 1}.`, data: { year: Math.floor(t / YEAR) + 1, lines } }, tags: ["budget"] } })));
+          const lines = tabledLines(p);
+          const words = `The town's budget for year ${forYear} (${yearInDays(forYear)}): ${linesInWords(lines, usd)}.`;
+          steps.push(because(!first ? `No budget adopted for year ${forYear} yet: tabling it again.` : forYear > thisYear ? `Year ${forYear} begins in ${Math.ceil((thisYear * YEAR - t) / DAY)} days: tabling its budget, for the council to adopt before then.` : "This year has no adopted budget: tabling one.",
+            say("proposal", words, { to: [me], data: { enact: { kind: "budget", text: words, data: { year: forYear, lines } }, tags: ["budget"] } })));
         }
-        // A park a year, if the adopted budget has room and there's a city lot free:
+        // A park a year, if the year's adopted budget has room and there's a city lot free:
         // apply for planning permission like anyone else, then commission the builder once granted.
-        const budget = book.open("budget").sort((a, b) => b.at - a.at)[0];
         const year = Math.floor(t / YEAR);
+        const budget = budgetFor(book, year + 1);
         // The builder's published price for a park (none published: nothing to plan with).
         const price = publishedPrice(book, p.builder, p.park_type) ?? 0;
         if (budget && budget.data?.year === year + 1 && parkYear !== year && price > 0 && price <= (budget.data?.lines?.parks ?? 0)) {
@@ -248,7 +278,8 @@ export const mayorCode: BehaviourModule = {
  */
 export const councilClerk: BehaviourModule = {
   name: "city.council_clerk",
-  version: "0.8.0", // 0.8.0: seats whoever the electoral body declares elected to an office of the town
+  issues: P.COUNCIL_CLERK,
+  version: "0.9.1", // 0.9.1: amends a law of optional figures (one added, one taken away by nought, a law made from one figure); 0.9.0: a proposal already balloted and a ballot already declared, by the office's own papers, are not put or counted again; a budget is for the year its proposal names
   doc: "docs/behaviour/government.md",
   cadence: () => DAY,
   create(ctx: ParticipantContext) {
@@ -286,6 +317,9 @@ export const councilClerk: BehaviourModule = {
         for (const prop of book.open("proposal")) {
           if (balloted.has(prop.id) || !(prop.addressed_to ?? []).includes(me)) continue;
           balloted.add(prop.id);
+          // (Already put to the council, by the office's own record: whoever keeps this office carries on from its
+          // papers, and a proposal balloted before is not balloted again.)
+          if (book.open("ballot").some((b) => b.speaks_for === me && b.data?.proposal === prop.id)) continue;
           // A proposal on a law's amendment form: put to the council as what it would change (and not at all, if nothing).
           const am = amendment(book, me, prop);
           if (am && !Object.keys(am.given).length) {
@@ -299,6 +333,8 @@ export const councilClerk: BehaviourModule = {
           // (Our council's ballots only: an election's ballot speaks for the town too, and is the electoral office's.)
           if (closed.has(ballot.id) || ballot.speaks_for !== me || ballot.data?.electorate !== "council" || t < (ballot.data?.closes_at ?? Infinity)) continue;
           closed.add(ballot.id);
+          // (Counted and declared already, by the office's own record: its result stands.)
+          if (book.open("ballot_result").some((r) => r.speaks_for === me && r.data?.ballot === ballot.id)) continue;
           const latest = new Map<string, string>();
           // (Votes made while the ballot was open: one made at or after its closing time isn't counted, however late we
           // come to count. Until 0.6.1 it was, if it reached us before we did.)
@@ -315,7 +351,9 @@ export const councilClerk: BehaviourModule = {
             // The amended law, by the schedule the law was made with: the figures given, the rest as they stand in the law
             // in force now (it may have been amended since the proposal was made).
             const values: { [k: string]: number } = { ...Object.fromEntries(Object.entries(am.law?.data?.figures ?? {}).map(([k, f]: [string, any]) => [k, f?.value])), ...am.given };
-            const missing = Object.keys(am.s.figures).filter((k) => !Number.isSafeInteger(values[k]));
+            // (What the law can't be written without: a figure it must have; or, where it may do without each, any at all.)
+            const needed = Object.entries(am.s.figures).filter(([k, f]) => !f.optional && !figureGiven(f, values[k])).map(([k]) => k);
+            const missing = needed.length ? needed : Object.entries(am.s.figures).some(([k, f]) => figureGiven(f, values[k])) ? [] : Object.keys(am.s.figures);
             // (A schedule that can't be written from, a fault in the world's content: nothing is enacted, and the result says so.)
             const law = missing.length ? undefined : (() => { try { return draftLaw(am.schedule.id, am.s, values); } catch { return undefined; } })();
             if (missing.length) note = ` Nothing is enacted: ${am.s.title} is no longer in force, and the proposal doesn't give ${missing.map((k) => am.s.figures[k]!.label ?? k).join(" or ")}.`;
@@ -340,12 +378,13 @@ export const councilClerk: BehaviourModule = {
           const open = book.open("ballot").filter((b) => b.speaks_for === me && b.data?.electorate === "council" && !closed.has(b.id));
           const results = book.open("ballot_result").slice(-3);
           const year = Math.floor(t / YEAR) + 1;
-          const budget = book.open("budget").find((b) => b.data?.year === year);
+          const budget = budgetFor(book, year), next = budgetFor(book, year + 1);
           return "Report from the council clerk: " +
             (open.length ? `ballots open: ${open.map((b) => `${b.id} on ${b.data?.proposal}, closing day ${Math.floor(b.data?.closes_at / DAY)}`).join("; ")}. ` : "no ballots are open. ") +
             (waiting.length ? `Proposals waiting for a ballot: ${waiting.map((x) => x.id).join(", ")}. ` : "") +
             (results.length ? `Recent results: ${results.map((r) => `${r.data?.ballot}: ${r.data?.passed ? "passed" : "rejected"} ${r.data?.yes}-${r.data?.no}`).join("; ")}. ` : "") +
             (budget ? `The council adopted a budget for year ${year} (${budget.id}). ` : `No budget is adopted for year ${year}. `) +
+            `Year ${year} is ${yearInDays(year)}; ${next ? `the council has adopted a budget for year ${year + 1} (${next.id}). ` : `no budget is adopted yet for year ${year + 1}, which the council adopts before it begins. `}` +
             `Anyone may put a proposal to the council on the council proposal form (form-council-proposal); I put it to a ballot of the councillors, open for ${p.vote_days} days. ` +
             `A law proposed on that form stands as its words: no rule is set down with it for acts to be checked against.${amendable(book, me, true)}`;
         }));
@@ -422,7 +461,7 @@ export const councillor: BehaviourModule = {
  */
 export const financeOfficer: BehaviourModule = {
   name: "city.finance_officer",
-  version: "0.8.3",
+  version: "0.9.0", // 0.9.0: pays within the adopted budget of the year it is in; while the year has none, under the budget last adopted at a twelfth a month (the charter's interim rule); spending is reckoned by the year
   doc: "docs/behaviour/government.md",
   cadence: () => 3 * DAY,
   create(ctx: ParticipantContext) {
@@ -456,15 +495,24 @@ export const financeOfficer: BehaviourModule = {
         const acc = ownAccount(obs);
         const steps: Step[] = [];
         if (!acc) return steps;
-        const budget = book.open("budget").sort((a, b) => b.at - a.at)[0];
-        if (budget && budget.data?.year !== budgetYear) {
-          budgetYear = budget.data?.year;
+        // The year's adopted budget. While the year has none, the charter's interim rule: the office goes on paying under
+        // the budget last adopted, at no more each month than a twelfth of it (so wages and standing charges go on, and
+        // little else fits). Spending is reckoned by the year, so what is paid in the interim counts against the year's
+        // budget once the council adopts it.
+        const year = Math.floor(obs.t / YEAR) + 1;
+        const adopted = budgetFor(book, year);
+        const last = adopted ?? book.open("budget").filter((b) => typeof b.data?.year === "number" && b.data.year < year).sort((a, b) => b.data.year - a.data.year || b.at - a.at)[0];
+        const budget = adopted ?? last;
+        if (year !== budgetYear) {
+          budgetYear = year;
           spent = 0;
           wagesAtYear = payroll.wagesPaid;
         }
         steps.push(...payroll.routine(obs, book, acc.account, { target: 0, wage: 0, canPost: false }));
         const wages = () => payroll.wagesPaid - wagesAtYear;
-        const limit = budget ? Object.values(budget.data?.lines ?? {}).reduce((s: number, v: any) => s + (v as number), 0) : 0;
+        const total = budget ? Object.values(budget.data?.lines ?? {}).reduce((s: number, v: any) => s + (v as number), 0) : 0;
+        const months = Math.min(12, Math.floor(((obs.t - (year - 1) * YEAR) * 12) / YEAR) + 1); // months of the year begun
+        const limit = adopted ? total : Math.floor((total * months) / 12);
         for (const inv of book.open("invoice").sort((a, b) => (a.id < b.id ? -1 : 1))) {
           if (paid.has(inv.id) || !(inv.addressed_to ?? []).includes(me)) continue;
           const owed = inv.data?.outcome?.money;
@@ -480,7 +528,8 @@ export const financeOfficer: BehaviourModule = {
           if (acc.balance < amount) continue;
           paid.add(inv.id);
           spent += amount;
-          steps.push(because(withinProcedure ? "Paying an invoice within the adopted budget (with the mayor's approval where needed)." : "Paying an invoice outside the procedure.", pay(owed.to, amount, { from: acc.account, for: `Paying invoice ${inv.id}.`, settles: inv.id })));
+          steps.push(because(!withinProcedure ? "Paying an invoice outside the procedure." : adopted ? "Paying an invoice within the adopted budget (with the mayor's approval where needed)." : `Year ${year} has no adopted budget yet: paying an invoice within a twelfth a month of the budget last adopted, as the charter allows (with the mayor's approval where needed).`,
+            pay(owed.to, amount, { from: acc.account, for: `Paying invoice ${inv.id}.`, settles: inv.id })));
         }
         steps.push(...letters.answer(() => {
           const unpaid = book.open("invoice").filter((i) => (i.addressed_to ?? []).includes(me) && !paid.has(i.id));
@@ -493,10 +542,10 @@ export const financeOfficer: BehaviourModule = {
           for (const f of month) if (f.amount > 0) byPayer.set(f.party, (byPayer.get(f.party) ?? 0) + f.amount);
           const top = [...byPayer].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([a, v]) => `${a} ${usd(v)}`).join(", ");
           const days = Math.max(1, Math.round(Math.min(obs.t, 365 * DAY) / DAY));
-          const year = since(365);
+          const twelveMonths = since(365);
           const history = flows.length
             ? `In the last 30 days the account received ${usd(sum(month, 1))}${top ? ` (largest: ${top})` : ""} and paid out ${usd(sum(month, -1))}. ` +
-              `Over the last ${days} days it received ${usd(sum(year, 1))} and paid out ${usd(sum(year, -1))}: at that rate, about ${usd(Math.round((sum(year, 1) * 30) / days))} a month in and ${usd(Math.round((sum(year, -1) * 30) / days))} out. `
+              `Over the last ${days} days it received ${usd(sum(twelveMonths, 1))} and paid out ${usd(sum(twelveMonths, -1))}: at that rate, about ${usd(Math.round((sum(twelveMonths, 1) * 30) / days))} a month in and ${usd(Math.round((sum(twelveMonths, -1) * 30) / days))} out. `
             : "No money has moved in or out of the account yet. ";
           // The town's payroll, itemised: who's paid, how often, gross and what reaches them after the tax withheld, into
           // which account, under which agreement (a mayor otherwise sees only recurring payments it can't place: pilots 8, 9).
@@ -511,7 +560,9 @@ export const financeOfficer: BehaviourModule = {
               }).join("; ")}. `
             : "The town employs nobody at present. ";
           return `Report from the finance office: the town's account ${acc.account} holds ${usd(acc.balance)}. ` + history + payrollText +
-            (budget ? `The adopted budget (${budget.id}, year ${budget.data?.year}): ${lines}; spent under it so far ${usd(spent + wages())} (${usd(wages())} of it the town's wages). ` : "No budget has been adopted for this year. ") +
+            (adopted ? `The adopted budget (${adopted.id}, year ${year}, ${yearInDays(year)}): ${lines}; spent under it so far ${usd(spent + wages())} (${usd(wages())} of it the town's wages). `
+              : last ? `No budget is adopted for year ${year} (${yearInDays(year)}) yet. Until the council adopts one we pay what the town is already bound to pay under the budget last adopted (${last.id}, year ${last.data?.year}: ${lines}), at no more each month than a twelfth of it, as the charter allows: ${usd(limit)} so far this year, of which ${usd(spent + wages())} is spent (${usd(wages())} of it the town's wages). `
+              : `No budget has been adopted for year ${year}, and none before it. `) +
             // The budget brief: what each line pays for (world config). The amounts are the mayor's and the council's to set.
             (Object.keys(p.budget_lines).length ? `The budget's lines: ${Object.entries(p.budget_lines).map(([k, v]) => `${k}, for ${v}`).join("; ")} Setting the amounts is for the mayor and the council; a budget goes to the council on the council proposal form. ` : "") +
             // What building costs, as builders have published it.
@@ -604,16 +655,30 @@ export const taxClerk: BehaviourModule = {
  */
 export const ratesOfficer: BehaviourModule = {
   name: "city.rates_officer",
+  routines: [{ task: "levy", at: "office", what: "At each instalment the rating law sets, the rates clerks send every owner on the rate book a notice of their share and record it as owed to the town; each month they add the law's penalty interest to what is overdue and write to the owner. When the notices go out is the law's: the order says only that they are to be sent." }],
   keeps: [
     { what: "valuation", why: "The rating authority keeps the rate book: the valuer sends it the valuation of every rateable lot, which is what it levies on." },
   ],
-  version: "0.2.1",
+  takes: [{ form: "rates_recovery", title: "Recovery direction to the rates officer",
+    fields: { interest: { type: "choice", options: ["yes", "no"], required: true, description: "Whether rates left unpaid after their due date are charged the law's penalty interest: yes, as the office does of its own accord; no, none is added." } },
+    follows: "While a direction with interest no stands, the rates officer adds no penalty interest to overdue rates and writes to nobody about them. The rates themselves are still levied and still owed, and interest already recorded stays on record." }],
+  version: "0.3.0", // 0.3.0: takes a written direction on penalty interest (docs/behaviour/directions.md)
   doc: "docs/behaviour/public-finance.md",
   cadence: () => DAY,
   create(ctx: ParticipantContext) {
-    const p = params({ law: "law-rates", first_day: 30 }, ctx.params);
+    const p = params({ law: "law-rates", first_day: 30,
+      // Whose written directions it follows (docs/behaviour/directions.md): the town's own rule, a record the world
+      // names (none: it follows nobody's); and how often it follows one it is given.
+      directed_under: "", direction_compliance_bps: 10_000,
+      // Which part of the office this is (docs/behaviour/standing-work.md): "" the whole office, as code runs one;
+      // "seat" the rates officer alone, who sets the standing work order; "staff" the rates clerks, who follow it.
+      part: "" as "" | "seat" | "staff",
+      office: "", // where its clerks work, as a standing order names it (none given: the office itself)
+    }, ctx.params);
     const book = new Book();
     const letters = new Letters();
+    const directions = new Directions(ctx, { under: p.directed_under, compliance_bps: p.direction_compliance_bps, office_words: "the rates office" });
+    const routines = new StandingWork(ctx.entity, p.part);
     const settled = new Set<string>(); // claims a payment into our account has named
     const lastInterest = new Map<string, number>(); // overdue claim -> when interest was last charged
     let next = p.first_day * DAY;
@@ -642,10 +707,12 @@ export const ratesOfficer: BehaviourModule = {
         const dueDays: number = terms.due_days ?? 30;
         const interestBps: number = terms.penalty_interest_bps ?? 0;
         if (!acc) return steps;
+        steps.push(...routines.set(book, [{ task: "levy", at: p.office || ctx.position || "office", every: Math.floor(365 / instalments) * DAY, why: "Setting the rates clerks' work: the notices sent at each instalment and interest added to what is overdue, as a standing work order." }]));
+        const levying = routines.does(book, "levy", t, { every: DAY });
         // Notices: each owner's share of a year's rates on what they own, as last valued. (Not before there are valuations:
         // until 2026-10-02 the first instalment went out on the first morning, before the valuer had valued anything,
         // levied nothing, and the next waited a quarter.)
-        if (law && t >= next && ratePpm > 0 && book.open("valuation").length) {
+        if (levying && law && t >= next && ratePpm > 0 && book.open("valuation").length) {
           next = t + Math.floor(365 / instalments) * DAY;
           const latest = new Map<string, StatementRecord>(); // lot -> its latest valuation
           for (const v of book.open("valuation").sort((a, b) => a.at - b.at)) latest.set(v.data?.lot, v);
@@ -666,8 +733,11 @@ export const ratesOfficer: BehaviourModule = {
           }
           for (let i = 0; i < lines.length; i += 30) steps.push(because(`The rates instalment: a ${instalments === 1 ? "year" : `${instalments}th of a year`}'s rates at the law's ${ratePpm / 10_000}% of each property's value.`, ...lines.slice(i, i + 30)));
         }
-        // Overdue: penalty interest, monthly, on what's still unpaid after its due date.
-        if (interestBps > 0) for (const c of book.ofType("claim").filter((r) => r.record === "claim" && r.position === "right" && r.holder === me && r.about?.kind === "rates") as any[]) {
+        // Overdue: penalty interest, monthly, on what's still unpaid after its due date (unless a recovery direction
+        // that stands, from whoever the town says may direct us, says to add none).
+        const recovery = directions.standing(book, "rates_recovery");
+        if (p.part !== "staff") steps.push(...directions.letters(book, (d) => (d.data?.interest === "no" ? "No penalty interest is added to overdue rates while it stands; the rates are still owed." : "Overdue rates are charged the law's penalty interest.")));
+        if (levying && interestBps > 0 && recovery?.data?.interest !== "no") for (const c of book.ofType("claim").filter((r) => r.record === "claim" && r.position === "right" && r.holder === me && r.about?.kind === "rates") as any[]) {
           if (settled.has(c.id) || t < c.about.due) continue;
           if (t - (lastInterest.get(c.id) ?? c.about.due) < 30 * DAY) continue;
           lastInterest.set(c.id, t);
@@ -702,8 +772,20 @@ export const ratesOfficer: BehaviourModule = {
  */
 export const works: BehaviourModule = {
   name: "city.works",
+  routines: [
+    { task: "collect", at: "depot", what: "The crew at the depot collects waste from each address on the round as often as the order says, homes complained about first, as far as its hours go, and takes what it has collected to the landfill each week with a docket." },
+    { task: "maintain", at: "depot", what: "With the hours the round leaves, the crew keeps up the most worn of the town's own assets, and someone is sent to inspect an asset nobody has seen." },
+  ],
+  issues: [P.JOB_ADVERTISEMENT, ...P.WORKS],
+  issuesWith: (p) => ({ ...P.staffingOwn({ role: p.role ?? "works crew", industry: p.industry, workplace: p.workplace, notice_days: p.notice_days ?? 14 }), landfill: p.landfill }),
   keeps: [{ what: "service_address", why: "The round is the works office's own: it makes an entry for each address its crew collects from, and adds to it as homes are built." }],
-  version: "0.3.0", // 0.3.0: collects from its own round of addresses and keeps up the town's own assets, each seen by the crew that works on it or by going to inspect; no longer shown the town
+  takes: [
+    staffingForm("works_staffing", "the works office", "works crew"),
+    { form: "works_collection", title: "Collection direction to the works office",
+      fields: { every: { type: "duration", required: true, description: "How often each address on the round is to be collected from (a week, a fortnight)." } },
+      follows: "While it stands, the crew collects from each address on the round once in that time, as its hours allow, homes complained about first. With no direction, the office keeps to its own round." },
+  ],
+  version: "0.4.0", // 0.4.0: takes written directions on its staffing and on how often it collects (docs/behaviour/directions.md); 0.3.0: collects from its own round of addresses and keeps up the town's own assets, each seen by the crew that works on it or by going to inspect; no longer shown the town
   doc: "docs/behaviour/services.md",
   cadence: () => DAY,
   firstWake: (ctx) => 7 * 3600 + ctx.rng("first-wake").below(3600),
@@ -721,11 +803,20 @@ export const works: BehaviourModule = {
       // from (a register it keeps itself; none: it collects from nowhere), and the channel it sends someone through
       // to inspect an asset of the town's it has not seen (none: an asset is seen only by the crew that works on it).
       round: "", inspections: "",
+      // Whose written directions it follows (docs/behaviour/directions.md): the town's own rule, a record the world
+      // names (none: it follows nobody's); and how often it follows one it is given.
+      directed_under: "", direction_compliance_bps: 10_000,
+      // Which part of the office this is (docs/behaviour/standing-work.md): "" the whole office, as code runs one;
+      // "seat" the works manager alone, who sets the standing work orders; "staff" the crew, who follow them.
+      part: "" as "" | "seat" | "staff",
     }, ctx.params);
     need(p, ["depot", "workplace", "landfill"], "city.works");
     const me = ctx.entity;
     const book = new Book();
     const letters = new Letters();
+    const directions = new Directions(ctx, { under: p.directed_under, compliance_bps: p.direction_compliance_bps, office_words: "the works office" });
+    const routines = new StandingWork(me, p.part);
+    const staffOnly = p.part === "staff";
     const staffing = new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, workplace: p.workplace, role: p.role, ...(p.industry ? { industry: p.industry } : {}), does: { hire: true, pay: false }, own: "role_or_unnamed" });
     // Each building as we last saw it: as the crew that worked on it left it, or as whoever we sent to inspect it found it.
     const known = new Map<string, SiteStructure>();
@@ -752,7 +843,7 @@ export const works: BehaviourModule = {
       (obs) => {
         book.absorb(obs);
         staffing.absorb(obs);
-        letters.take(obs, book);
+        if (!staffOnly) letters.take(obs, book);
         // The round: our own register of addresses, and homes we have had notice of since (told of the work as it began).
         const reg = p.round ? obs.channels[p.round] : undefined;
         if (reg?.kind === "records") for (const r of reg.records) if (r.record === "statement" && r.kind === "service_address" && typeof r.data?.structure === "string") addresses.add(r.data.structure);
@@ -786,10 +877,31 @@ export const works: BehaviourModule = {
         const m = Math.floor(t / MONTH);
         if (m !== month) {
           month = m;
-          if (workers.length > target) steps.push(...staffing.letGo(book, t, `The adopted budget's ${p.staff_line} line (${usd(line)}) pays for a crew of ${target}, and we have ${workers.length}: letting one go.`, "Redundancy: the budget doesn't pay for the position."));
+          if (workers.length > target && !staffOnly) steps.push(...staffing.letGo(book, t, `The adopted budget's ${p.staff_line} line (${usd(line)}) pays for a crew of ${target}, and we have ${workers.length}: letting one go.`, "Redundancy: the budget doesn't pay for the position."));
         }
-        steps.push(...staffing.routine(obs, book, "", { target, wage: p.wage, canPost: !!budget && target > workers.length,
-          why: `The adopted budget's ${p.staff_line} line (${usd(line)}) pays for a crew of ${target}; we have ${workers.length}: posting a job.` }));
+        // A staffing direction that stands (from whoever the town says may direct us): whether to recruit, and the most
+        // posts to fill. It stands nobody down: the budget's crew is still what we keep.
+        const staffingDir = directions.standing(book, "works_staffing");
+        const directed = staffingUnder(staffingDir);
+        const hireTo = Math.min(target, directed.posts ?? Infinity);
+        // (Taking on and standing down are the office-holder's: its staff, where they are a post of their own, do neither.)
+        if (!staffOnly) steps.push(...staffing.routine(obs, book, "", { target: hireTo, wage: p.wage, canPost: !!budget && hireTo > workers.length, recruit: directed.recruit,
+          ...(staffingDir ? { stopped: `Direction ${staffingDir.id} says not to recruit: taking our advertisements down.` } : {}),
+          why: `The adopted budget's ${p.staff_line} line (${usd(line)}) pays for a crew of ${target}${hireTo < target ? ` (and direction ${staffingDir!.id} says to fill ${hireTo})` : ""}; we have ${workers.length}: posting a job.` }));
+        // How often each address is collected from: as directed, while a direction on it stands; else our own round.
+        const collectionDir = directions.standing(book, "works_collection");
+        const collectEvery = Number.isSafeInteger(collectionDir?.data?.every) && collectionDir!.data!.every >= DAY ? (collectionDir!.data!.every as number) : p.collect_every_days * DAY;
+        // The routine work, and by what it is done: the whole office by its own practice; its staff by the standing
+        // work order in force for each task, and not at all with none; the office-holder alone sets the orders, once.
+        const collecting = routines.does(book, p.collect_task, t, { every: collectEvery });
+        const maintaining = routines.does(book, p.maintain_task, t, { every: DAY });
+        steps.push(...routines.set(book, [
+          ...(p.collect_labour > 0 ? [{ task: p.collect_task, at: p.depot, every: p.collect_every_days * DAY, why: `Setting the crew's round: collection from every address on it every ${p.collect_every_days} days, as a standing work order.` }] : []),
+          ...(p.maintain_labour > 0 ? [{ task: p.maintain_task, at: p.depot, every: DAY, why: "Setting the crew's upkeep of the town's assets, each working day with the hours the round leaves, as a standing work order." }] : []),
+        ]));
+        if (!staffOnly) steps.push(...directions.letters(book, (d, form) => form === "works_staffing"
+          ? (staffingUnder(d).recruit ? `The office recruits up to ${Math.min(target, staffingUnder(d).posts ?? Infinity)} crew.` : "The office advertises no post, takes down the advertisements it has out and takes nobody on.")
+          : `The crew collects from each address every ${Math.round(Number(d.data?.every) / DAY)} days, as its hours allow.`));
 
         // Complaints about a home's waste: that home first, on the next round.
         for (const c of book.open("complaint")) {
@@ -799,7 +911,7 @@ export const works: BehaviourModule = {
         }
 
         // ---- weekly: what's been collected, to the landfill ----
-        if (t >= nextDispose) {
+        if (routines.part !== "seat" && t >= nextDispose) {
           nextDispose = t + p.dispose_every_days * DAY;
           const q = atDepot;
           if (q > 0) {
@@ -821,16 +933,18 @@ export const works: BehaviourModule = {
         // (Those here with the most time between them, the work shared evenly: someone who's done a day's work elsewhere
         // today joins tomorrow.)
         const present = team([...new Set(room?.occupants ?? [])].filter((w) => mine.has(w)).sort(), (w) => p.working_day - (used.get(w) ?? 0)).who;
-        if (day % 7 < p.work_days && present.length) {
+        if (day % 7 < p.work_days && present.length && routines.part !== "seat") {
           const left = () => Math.min(...present.map((w) => p.working_day - (used.get(w) ?? 0))) * present.length;
           const spend = (seconds: number) => { for (const w of present) used.set(w, (used.get(w) ?? 0) + Math.ceil(seconds / present.length)); };
           const job = (task: string, units: number, on: string) => C.call("work", { task, units: C.text(String(units)), at: p.depot, by: C.json(present), on });
           // Collection: homes complained about, then those longest since a collection, as far as the crew's hours go
           // (a round's work in steps of up to 30 homes).
           const round: { on: string; call: C.Call; before?: number; full: boolean; fit: number; of: number }[] = [];
-          if (p.collect_labour > 0 && p.collect_per_unit > 0) {
-            const due = [...addresses].sort().map((structure) => ({ structure, st: known.get(structure) }))
-              .filter((b) => complained.has(b.structure) || t - (collectedAt.get(b.structure) ?? -Infinity) >= p.collect_every_days * DAY - DAY / 2)
+          if (p.collect_labour > 0 && p.collect_per_unit > 0 && collecting) {
+            // (An order that names addresses is for those; one that names none is for the round.)
+            const named = collecting.order?.on;
+            const due = [...addresses].sort().filter((structure) => !named || named.includes(structure)).map((structure) => ({ structure, st: known.get(structure) }))
+              .filter((b) => complained.has(b.structure) || t - (collectedAt.get(b.structure) ?? -Infinity) >= collecting.every - DAY / 2)
               .sort((a, b) => Number(complained.has(b.structure)) - Number(complained.has(a.structure)) || (collectedAt.get(a.structure) ?? -1) - (collectedAt.get(b.structure) ?? -1) || (a.structure < b.structure ? -1 : 1));
             for (const b of due) {
               // An address the crew has been to and found nothing kept of waste at: not a home; off the round.
@@ -895,7 +1009,7 @@ export const works: BehaviourModule = {
             steps.push(st);
           }
           // Maintenance: the most worn of the town's assets, with the hours left.
-          if (p.maintain_labour > 0 && p.maintain_per_unit > 0) {
+          if (p.maintain_labour > 0 && p.maintain_per_unit > 0 && maintaining) {
             const worn = assets.map((a) => known.get(a)).filter((b): b is SiteStructure => !!b).map((b) => ({ b, wear: variableToday(b.variables?.[p.wear], t) ?? 0 })).filter((x) => x.b.variables?.[p.wear] && x.wear > p.maintain_over)
               .sort((a, b) => b.wear - a.wear || (a.b.structure < b.b.structure ? -1 : 1));
             const upkeep: C.Call[] = [];
@@ -911,14 +1025,19 @@ export const works: BehaviourModule = {
           }
         }
 
-        steps.push(...letters.answer(() => {
+        // (The office-holder, with the crew a post of its own, reports what is its to know: the crew, the budget, the
+        // directions it follows and the standing orders it has set. The round is the crew's.)
+        if (routines.part === "seat") steps.push(...letters.answer(() => `Report from the works office: a crew of ${workers.length} (the adopted budget's ${p.staff_line} line, ${usd(line)}, pays for ${target} at ${usd(annual)} a year each, ${usd(p.wage)} every ${Math.round(p.period / DAY)} days). Standing work orders the crew follows: ${routines.words(book, t)}.`));
+        else if (!staffOnly) steps.push(...letters.answer(() => {
           // (A home never collected from is overdue a week after it was first due, not from the beginning of time: pilot 7
           // found every home "a week or more overdue" on the first morning, and the mayor kept asking why.)
-          const overdue = [...addresses].sort().filter((s) => t - (collectedAt.get(s) ?? knownSince.get(s) ?? t) >= (p.collect_every_days + 7) * DAY);
+          const overdue = [...addresses].sort().filter((s) => t - (collectedAt.get(s) ?? knownSince.get(s) ?? t) >= collectEvery + 7 * DAY);
+          const standing = [staffingDir, collectionDir].filter((d): d is StatementRecord => !!d);
           const state = assets.map((a) => known.get(a)).filter((b): b is SiteStructure => !!b?.variables?.[p.wear]).map((b) => `${b.structure} ${Math.round(((variableToday(b.variables![p.wear], t) ?? 0) * 100) / Math.max(1, b.variables![p.wear]!.max))}% worn`);
           const unseen = assets.filter((a) => !known.has(a)).length;
           return `Report from the works office: a crew of ${workers.length} (the adopted budget's ${p.staff_line} line, ${usd(line)}, pays for ${target} at ${usd(annual)} a year each). ` +
-            `Waste is collected from every home every ${p.collect_every_days} days as the crew's hours allow; ${collectedKg} loads collected so far. ` +
+            (standing.length ? `Directions we are following: ${standing.map((d) => `${d.id} (${d === staffingDir ? (directed.recruit ? `recruit up to ${hireTo}` : "do not recruit") : `collect every ${Math.round(collectEvery / DAY)} days`})`).join(", ")}. ` : "") +
+            `Waste is collected from every home every ${Math.round(collectEvery / DAY)} days as the crew's hours allow; ${collectedKg} loads collected so far. ` +
             (overdue.length ? `Homes a week or more overdue: ${overdue.join(", ")}. ` : "No home is overdue. ") +
             `The round has ${addresses.size} addresses. ` +
             (state.length ? `The town's assets, as last seen: ${state.slice(0, 60).join(", ")}${state.length > 60 ? `, and ${state.length - 60} more` : ""}.` : "") +
@@ -930,7 +1049,7 @@ export const works: BehaviourModule = {
       // An asset of the town's we have never seen (at the start, every one; later, what the town has had built):
       // someone is sent to inspect it, a visit's worth at a time, once each.
       () => {
-        if (!p.inspections) return [];
+        if (!p.inspections || routines.part === "seat" || (staffOnly && !routines.order(book, p.maintain_task, book.now))) return [];
         const go = ownLand(book, me).flatMap((x) => x.structures.map((st) => st.structure)).filter((a) => !known.has(a) && !inspecting.has(a)).slice(0, VISIT_MAX);
         for (const a of go) inspecting.add(a);
         return go.length ? [goSee(p.inspections, go)] : [];
@@ -973,7 +1092,9 @@ function changes(am: Amendment, before: "now" | "was" = "now"): string {
   return Object.entries(am.given).map(([k, v]) => {
     const f: LawFigure = am.s.figures[k]!;
     const now = am.law?.data?.figures?.[k]?.value;
-    return `${f.label ?? k} ${figureWords(f, v)}${Number.isSafeInteger(now) ? ` (${now === v ? "unchanged" : `${before} ${figureWords(f, now)}`})` : ""}`;
+    // (An optional figure given as nought is the requirement taken away; one the law in force doesn't have is "none".)
+    const words = (x: number | undefined) => (figureGiven(f, x) ? figureWords(f, x) : "none");
+    return `${f.label ?? k} ${words(v)}${am.law ? ` (${words(now) === words(v) ? "unchanged" : `${before} ${words(now)}`})` : ""}`;
   }).join("; ");
 }
 
@@ -996,10 +1117,13 @@ function fromForm(prop: StatementRecord | undefined, t: number): any {
     // Every amount on the form is a line (whatever lines the town's form has; pilot 7 found the form had only three of
     // the five, and the mayor, rightly, wouldn't table a budget that dropped two).
     const lines: Record<string, number> = { parks: line(d.parks) };
-    for (const [k, v] of Object.entries(d)) if (!["proposal", "kind", "affects", "form"].includes(k) && (typeof v === "string" || typeof v === "number")) {
+    for (const [k, v] of Object.entries(d)) if (!["proposal", "kind", "affects", "form", "year"].includes(k) && (typeof v === "string" || typeof v === "number")) {
       try { lines[k] = line(v); } catch { /* not an amount */ }
     }
-    return { kind: "budget", text: d.proposal, data: { year: Math.floor(t / YEAR) + 1, lines } };
+    // The year it is for: the one the form names, if that is this year or one to come (a budget is adopted before its
+    // year begins); with none named, or a year already past, the year in which the council adopts it.
+    const now = Math.floor(t / YEAR) + 1;
+    return { kind: "budget", text: d.proposal, data: { year: Number.isSafeInteger(d.year) && d.year >= now ? d.year : now, lines } };
   }
   return undefined;
 }

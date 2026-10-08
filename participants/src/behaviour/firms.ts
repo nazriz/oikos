@@ -16,10 +16,11 @@ import { cents, smallestNow } from "../money";
 import * as C from "../calls";
 import type { LookRequest, Observation, Offer, ParticipantAction, StatementRecord } from "../contracts";
 import { basesOf, channels } from "../contracts";
-import { params, wait, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
+import { params, wait, type Belief, type BehaviourModule, type ParticipantContext, type Taken } from "../module";
 import { distribute } from "./lengnick";
 import { dayPayPeriod, incomeTaxLaw, withheld, type Charge } from "./tax";
 import { ask, Asked, because, between, Book, PAYEE_DIED, breaches, noting, callAction, usd, cellsOf, commitmentOf, DAY, jobTerms, leaseTerms, MONTH, notice, offer, ownAccount, pay, publishedPrice, say, stoodEmpty, structureOf, withdraw, type Step } from "./common";
+import * as P from "./papers";
 
 /**
  * A participant observes after every action, not just when it wakes: `absorb` takes
@@ -90,6 +91,8 @@ export function receipts(obs: Observation, account: string): Map<string, number>
 
 export const landlord: BehaviourModule = {
   name: "firm.landlord",
+  issues: P.LANDLORD,
+  issuesWith: (p) => ({ city: p.city }),
   version: "0.13.4", // 0.13.4: main's 0.13.3 (the builder's answer read with the week's post; what is owed counted before building or asking) with a certified copy of a registration made on someone else's report counting as the registration
   doc: "docs/behaviour/firms.md",
   cadence: () => 7 * DAY,
@@ -594,6 +597,27 @@ export const landlord: BehaviourModule = {
 };
 
 /**
+ * The staffing direction an office that hires takes (docs/behaviour/directions.md): whether it recruits, and the most
+ * posts it fills. `office` and `staff` are the form's words for whose it is and whom it hires.
+ */
+export function staffingForm(form: string, office: string, staff: string): Taken {
+  return {
+    form, title: `Staffing direction to ${office}`,
+    fields: {
+      recruit: { type: "choice", options: ["yes", "no"], required: true, description: `Whether ${office} recruits: yes, it advertises and fills the posts it is short of; no, it advertises none and takes nobody on.` },
+      posts: { type: "count", description: `The most ${staff} it is to have, where that is fewer than its budget pays for. Left out: as many as the budget pays for.` },
+    },
+    follows: `While a direction with recruit no stands, ${office} advertises no post, takes down the advertisements it has out and offers nobody employment. With recruit yes it recruits up to what its budget pays for, or up to posts where that is fewer. Nobody is stood down by it and nobody's pay changes.`,
+  };
+}
+
+/** A staffing direction as it bears on hiring (none standing: recruit as the office would). */
+export function staffingUnder(d: StatementRecord | undefined): { recruit: boolean; posts?: number } {
+  const posts = d?.data?.posts;
+  return { recruit: d?.data?.recruit !== "no", ...(Number.isSafeInteger(posts) && posts > 0 ? { posts: posts as number } : {}) };
+}
+
+/**
  * A firm's staff (shared by firm.employer and firm.producer): hiring through job postings and offers, wages by
  * standing order through the firm's bank, notice, and a worker's death. What headcount and wage to aim for is the
  * module's own rule; this is how any employer carries it out.
@@ -779,7 +803,10 @@ export class Staffing {
       ...(Number.isInteger(this.o.notice_days) && this.o.notice_days > 0 ? { termination: [{ party: this.me, notice: this.o.notice_days * DAY }, { party: "taker" as const, notice: this.o.notice_days * DAY }] } : {}) } };
   }
 
-  routine(obs: Observation, book: Book, account: string, want: { target: number; wage: number; canPost: boolean; why?: string; /** Whether there is work today for hands by the day (nothing said: yes). */ work?: boolean }): Step[] {
+  /** `recruit: false`: the office has been directed not to recruit (docs/behaviour/directions.md): it advertises no
+   * post, takes its standing advertisements down (saying why: `stopped`), and makes no offer to an applicant, while
+   * that stands. Those it employs, their pay and their notice go on as they were. */
+  routine(obs: Observation, book: Book, account: string, want: { target: number; wage: number; canPost: boolean; why?: string; recruit?: boolean; stopped?: string; /** Whether there is work today for hands by the day (nothing said: yes). */ work?: boolean }): Step[] {
     const t = obs.t;
     const me = this.me;
     // Genesis standing orders for existing staff (what each withholds: the agreed wage less what it pays; charge by
@@ -803,7 +830,13 @@ export class Staffing {
     const steps: Step[] = [];
     let offersNow = 0;
     const doesPay = this.o.does?.pay !== false;
-    const doesHire = this.o.does?.hire !== false;
+    // (Directed not to recruit: its advertisements come down, and nothing below that hires is done.)
+    const recruiting = want.recruit !== false;
+    const doesHire = this.o.does?.hire !== false && recruiting;
+    if (!recruiting && this.o.does?.hire !== false) {
+      const up = this.postings(book);
+      if (up.length) steps.push(because(want.stopped ?? "Directed not to recruit: taking our advertisements down.", ...up.map((j) => withdraw(j.id, "Withdrawn: recruiting is stopped by direction."))));
+    }
 
     // Newly signed: start paying wages by standing order, at the wage agreed less what the tax law's charges say to
     // withhold.
@@ -886,6 +919,9 @@ export class Staffing {
     const posts = this.postings(book);
     const apps = book.open("job_application").filter((a) => (a.addressed_to ?? []).includes(me) && !this.handled.has(a.id));
     for (const post of doesHire ? posts : []) {
+      // (An advertisement of ours that we have put on hold: nobody is offered the post while the hold stands; those
+      // who applied are still on file when it is lifted.)
+      if (book.onHold(post.id, [me])) continue;
       const mine = apps.filter((a) => a.data?.posting === post.id).sort((x, y) => (x.id < y.id ? -1 : 1));
       for (const a of mine) this.handled.add(a.id);
       if (!mine.length) continue;

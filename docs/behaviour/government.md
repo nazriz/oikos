@@ -16,14 +16,34 @@ valuation (valuer, outside) ─> rates notice + claim (rates officer) ─> payme
 
 The genesis records that set this up are world content, made by the generator:
 - `signatories-city` tells the bank that only the `finance` seat may instruct payments from `acc-city`;
-- `proc-payments` is the payments procedure: within the adopted budget, and over $50,000 only with the mayor's written approval;
-- `law-rates` sets the rate in the dollar of value, the instalments and the penalty interest (docs/behaviour/public-finance.md). The generated town no longer has the rent tax (`law-tax`), which had no source;
+- `proc-payments` is the payments procedure: wages and bills only within the budget adopted for the year (while a year has none, as the charter allows: below, "The budget year"), and any one payment over the profile's figure only with the mayor's written approval;
+- `budget-year-1` and the four kinds of paper it rests on: the budget the town opens with ("The budget year");
+- `law-rates` sets the rate in the dollar of value, the instalments and the penalty interest (docs/behaviour/public-finance.md). The generated town has no rent tax (`law-tax` had no source, and is gone from the example code since 2026-10-09; a world that wants one writes its law);
+- `law-planning`'s fine and `law-tenancy`'s notices are the profile's (docs/profiles.md, "Sums and figures in a town's laws"): the example code holds no sum and no figure;
 - the law schedules (`schedule-...`, kind `law_schedule`) and a form to amend each one's law (`form-amend-...`): see "Laws made from figures" below.
+
+## The budget year (2026-10-09)
+
+**A town opens with its first year's budget adopted.** A council does not begin a year without a budget: the year's was adopted before the year began (docs/research/references.md, "A council's budget year"). Until 2026-10-09 a generated town began with none and a procedure that forbade paying outside one; the code mayor tabled one on the first day and the council adopted it about a fortnight later, so a code town never noticed, and every model seat did (the live check of 2026-10-09: a finance officer put a hold on all six wage orders, a mayor asked the bank to stop wages).
+
+- **The papers.** The generator writes what the town's own procedure leaves on file, each in the post that makes it and each resting on the one before: the mayor's proposal on the council proposal form (`budget-year-1-proposal`), the clerk's ballot of the council (`budget-year-1-ballot`), a vote for each councillor's post, the result (`budget-year-1-result`) and the budget (`budget-year-1`, kind `budget`, `data.year` 1 and `data.lines`). The budget's `data` is what the clerk's own form for an adopted budget writes. Like the agreements people start with, they were made before the run began: their author is the world's beginning, their time its first moment, and their words say "before the year began".
+- **The lines** are the ones the mayor's office tables every year (`tabledLines`), each from the town's own figures and none set to make a sum come out:
+  - `staff`: the posts on the works crew (the profile's council staff for each 1,000 residents) at a year of the crew's wage. It covers the wage orders the town starts with (tested for every profile);
+  - `environment`: the environment office's posts (the profile's survey staff), likewise;
+  - `services`: the landfill's charge on a year of the town's waste, and a fifth over (no charge: no line);
+  - `roads`: the profile's roads budget for each resident;
+  - `parks`: the profile's parks line (a placeholder in every profile: a stated sum that does not follow the town's size).
+  The budget's words give each line and the sum as the town writes its money, the year in days ("day 0 to day 364"), and what the town expects in rates and grants in the year (the profile's figures for each resident). Nothing checks one against the other: a small town's parks line can be more than it takes in, and that is the profile's placeholder showing.
+- **The year turns over.** A budget is for one year of 365 days from the town's first day. The code mayor tables the next year's `budget_lead_days` before the year ends (the generated town: 73, which is a rejected budget tabled once more after 45 days, the ballot's 14, and a fortnight for the offices' own rounds), the clerk puts it to the council, and the budget adopted says which year it is for. A seat does the same on the council proposal form, which has a `year` field (left out: the year in which the council adopts it). Seen in a 400-day code town: tabled on day 293, adopted on day 307.
+- **While a year has no budget** (the council rejected it, or nobody proposed one), the charter's interim rule holds: the finance office may go on paying what the town is already bound to pay, at no more each month than a twelfth of the budget last adopted; nothing new is undertaken; the year's budget, once adopted, covers the whole year, what was paid in the meantime included. This is what the nine profiles' places have in common, in the form several of them use (a twelfth a month); no place's own rule is stated yet (references, as above: nearly all of it **to confirm**). The works and environment offices keep the staff they have and hire nobody; the code mayor commissions nothing.
+- **`lean-council`** (docs/scenarios.md) changes the town's money and not its budget: the same lines, a hundredth of the opening balance.
+
+**Leaves out:** a revenue side the council votes (the rate is the rating law's, set at the start); a budget revised in the year; lines the finance office holds each payment to (it checks the total); the charter's "already bound to pay" as something the code finance office tests (it applies the twelfth and pays invoices as they come: in a code town nothing new is commissioned without the year's budget, so the two agree; a model mayor who commissions in the interim would be paid within the twelfth).
 
 ## `city.mayor_code`: the all-code control
 
 A rule-following mayor. In AI experiments an LLM takes this seat instead (M2), and this module is the baseline it's compared against.
-- **Budget:** each year without an adopted budget (at the year's start, or on taking office), it proposes one (`data.enact` = a `budget` statement with `lines`: `parks`, and since C4b `staff`, the works crew's wages, and `services`, the landfill's charges; [services.md](services.md)). If the council hasn't adopted one within 45 days, it tables it again.
+- **Budget** (0.12.0; "The budget year" above): it tables the next year's budget `budget_lead_days` before the year ends, and at once for a year that has none adopted (`data.enact` = a `budget` statement with the year and `lines`: `parks`, and since C4b `staff`, the works crew's wages, and `services`, the landfill's charges; [services.md](services.md)). Its words give each line as the town writes its money (until 0.12.0, as a count of the smallest unit). If the council hasn't adopted one within 45 days, it tables it again. It builds by the budget of the year it is in.
 - **A park a year:** when the current year's adopted budget can pay for one and the town's asset register shows a lot of the town's with nothing on it (the first by its number), it sends someone to see the lot (0.11.0: see "What the mayor knows of the town") and, the lot seen free, applies for planning permission. Once that is granted, it proposes and signs a construction agreement with the builder at 1.2× materials cost.
 - **Roads** (0.8.0; daily-round.md): with a `roads` line in the adopted budget, when a building it knows of (0.11.0: the town's own, and those it has had notice of being built) stands more than `road_within` cells (3) from any of the town's roads, it applies for a permit for a road on the town's free lot beside the network that comes nearest that building, and commissions the builder once granted: one road at a time, as many a year as the line pays for.
 - **Approvals:** it writes an `approval` for each invoice for work it commissioned. The payments procedure needs one over $50,000.
@@ -34,7 +54,7 @@ A rule-following mayor. In AI experiments an LLM takes this seat instead (M2), a
   - The citizens' tenancy petition (citizen.md) asks for 90 days' notice to end a tenancy and a 5% cap on rent rises. The notice is a figure of the law on ending a tenancy, so it goes on that law's form. The cap is in no law's figures, so it isn't put: no schedule covers a cap yet.
   - A demand that names no schedule goes to the council in its own words, as before (`data.enact`, with whatever breakdown and rule the demand carries).
 
-Params: `responsiveness_bps` 7000, `petition_threshold_bps` 1500, `population` 200, `park_budget` $80,000, `builder`, `park_type`, `road_budget` (none), `road_type`, `road_within` 3.
+Params: `responsiveness_bps` 7000, `petition_threshold_bps` 1500, `population` 200, `park_budget` (a placeholder; the generated town gives the profile's), `builder`, `park_type`, `road_budget` (none), `road_type`, `road_within` 3, `budget_lead_days` 0 (at the year's start).
 
 **What the mayor knows of the town (0.11.0, generator 0.32.0; docs/design/knowing.md).** Until 0.11.0 the mayor's office was shown a survey of every cell of the town each month, and (because the town issued every title) the whole land register and every elector's enrolment among the town's papers. Nobody is shown a town (docs/no-god-view.md). It now has:
 - **the town's own land, on paper** (`ownLand`: docs/behaviour/ownership.md): the titles the town holds, its asset register, and the notices of building work the town is given. Where each lot is, its plan in the asset register says (a cell's id is its address);
@@ -52,7 +72,8 @@ It wakes daily.
 - It puts each proposal addressed to the town to a council ballot, open for `vote_days` (14).
 - At close, it counts the latest vote of each **councillor seat**, so votes from anyone else don't count. Its council's members are the holders of the town's councillor posts, which it looks up (0.7.0: at its first wake and every `members_every_days`, 30, as a council keeps its own list of members; nobody is shown who's who, and until 0.7.0 the clerk read them off a directory of every entity and post in the town). Only votes made before the closing time count (0.6.1: until then a vote made after the close was counted if it reached the clerk before its daily count).
 - A proposal passes with more yes than no *and* a majority of all councillors (so abstentions count against).
-- It publishes the `ballot_result`. If the proposal passed, it publishes the law or budget itself, with the ballot as its basis.
+- It publishes the `ballot_result`. If the proposal passed, it publishes the law or budget itself, with the ballot as its basis. A budget is for the year its proposal names, if that is this year or one to come; else for the year in which it is adopted.
+- It takes up its office's papers (0.9.0): a proposal a ballot already stands for is not balloted again, and a ballot whose result is on file is not counted again. So the budget a town opens with is left as it is, and so is whatever a clerk before it had done.
 - It drafts: a proposal on a law's amendment form that passes is written into law by the law's schedule (next section).
 - It seats whoever the electoral body declares elected to an office of the town (0.8.0, `electoral`; docs/behaviour/elections.md, "A body of its own"): the commission declares, the town fills its own office.
 - It answers letters with its report: open ballots, recent results, whether a budget is adopted for the year, the council proposal form, and the laws that are amended on their own forms, each with its figures as they stand. It reads its own results, budgets and laws from its records channel. Before pilot 6 that channel held only proposals and ballots, so its report said "no budget is adopted" after the council had adopted one.
@@ -66,6 +87,7 @@ It wakes daily.
 **A schedule** (a record of kind `law_schedule`, the town's; the examples are in `worlds/law/schedules.json`) says how one law is written from its figures:
 - `figures`: each with a `type` (`duration` or `count`, the form field types), a `unit` it's worded in (days, months, percent), and for a count held in another unit, `held_in` and `per_unit` (a share: worded in percent, held in basis points, 100 to one). A duration is held in seconds.
 - `text`, `adico` and, where acts can be checked against the law, `formal`: the law's words, its Institutional Grammar breakdown and its rule, with `{figure}` for the figure as worded ("60 days", "50") and `{figure:unit}` for the number as held (`{notice:seconds}`).
+- A figure may be `optional` (2026-10-09; every figure of the three example schedules is): a place that has no such requirement states none, and the law says nothing of it. The clauses that turn on optional figures are written as a list, `<<separator;;clause;;clause>>`: a clause is kept where every figure it names is given, and the kept ones are joined by the separator (a space between sentences; `, or ` in a breakdown; ` || ` in a rule). An optional figure given as nought is not given: a requirement of nothing is none, so a council takes a requirement out of a law by amending it to nought, and adds one the law lacks by giving it. With none of its figures there is no law to write. No law states a duration in seconds (days, hours or minutes where whole, else the schedule's unit as a decimal).
 - `title` ("the law on rent increases") and `form` (the name of its amendment form).
 
 A law written from a schedule carries its figures openly: `data.schedule`, and `data.figures`, each `{ value, unit }` as held (`notice: { value: 5184000, unit: "seconds" }`). The generator writes the town's opening laws this way from the profile's figures (`rentIncreaseLaw`, `industrialActionLaw`), and a test holds every such law to what its schedule writes.
@@ -73,8 +95,8 @@ A law written from a schedule carries its figures openly: `data.schedule`, and `
 | Schedule | Law at the start | Figures | Rule |
 |---|---|---|---|
 | `schedule-rent-increases` | `law-rent-increases` | `review` (least time between increases), `notice` | on a notice of rent increase; landlords, tenants and the tribunal check against it |
-| `schedule-industrial-action` | `law-industrial-action` | `turnout`, `majority` (percent), `notice` | on a notice of industrial action; the union checks against it |
-| `schedule-tenancy` | `law-tenancy` | `notice` (the landlord's, to end a tenancy), `tenant_notice` | none: nobody's acts are checked against it yet, and the clerk says so |
+| `schedule-industrial-action` | `law-industrial-action` | `turnout`, `majority` (percent), `notice`: whichever the place requires | on a notice of industrial action; the union checks against it |
+| `schedule-tenancy` | `law-tenancy` (written from the profile's notices since 2026-10-09; until then the example code's own words) | `notice` (the landlord's, to end a tenancy), `tenant_notice` | none: nobody's acts are checked against it yet, and the clerk says so |
 
 These laws speak for the town (the first two spoke for the world outside until 2026-10-05): a council amends its own laws, and only the one a law speaks for can withdraw it.
 
@@ -102,7 +124,7 @@ Some offices apply a rule they were given by its id or as a parameter, not by re
 - **The planning officer** (0.8.2) applies the habitat law (`habitat_law`) only while it stands.
 - **The rates officer** (0.2.1) levies under the rating law (`law`) only while it stands, and its report says when it doesn't.
 - **The tax clerk** (0.4.2) assesses and penalises under the tax law only while it stands.
-- **The finance officer** (0.8.3) applies the approval rule only while the payments procedure it's given (`procedure`) stands. Paying within the adopted budget is the charter's, and stays.
+- **The finance officer** (0.8.3) applies the approval rule only while the payments procedure it's given (`procedure`) stands. Paying within the adopted budget, and the interim rule, are the charter's, and stay.
 
 **Still not read from the law in force:**
 - the finance officer's limit (`approval_over`) is a parameter, and the procedure's words say $50,000 without carrying the figure;
@@ -123,15 +145,15 @@ Spatial voting on one axis, from pro-development (−100) to pro-tenant (+100) (
 
 The generator seats five councillors at −80, −40, 0, 40 and 80. That makes tenant-protection proposals a coin-flip-ish affair: the two pro-tenant councillors plus noise. The council's composition is an experimental variable.
 
-## `city.finance_officer` (0.8.0)
+## `city.finance_officer` (0.9.0)
 
 **Payroll (C4b):** the finance officer also runs the town's payroll: wages for the crew the works office hires, net of the income tax withheld, which it pays over monthly ([services.md](services.md), [public-finance.md](public-finance.md)). Wages count against the adopted budget with the invoices it pays.
 
 It wakes every 3 days and, for each invoice addressed to the town, pays through the bank (it is the named signatory) when the payments procedure allows:
-- within the adopted budget's total for the year;
+- within the total of the budget adopted for the year it is in (0.9.0: until then, the latest budget adopted, whatever its year); while the year has none, within a twelfth of the budget last adopted for each month of the year begun ("The budget year"). Spending is reckoned by the year, wages with it, so what is paid in the interim counts against the year's budget once adopted;
 - and, if the invoice is over `approval_over` ($50,000), only with the mayor's written approval.
 
-Otherwise it waits: an approval or next year's budget may come. With probability `1 − compliance_bps` it pays anyway. The approval rule is the payments procedure's (`procedure`, the record's id): once that record is withdrawn, the rule goes with it (0.8.3).
+Otherwise it waits: an approval, the next month's twelfth or the year's budget may come. With probability `1 − compliance_bps` it pays anyway. The approval rule is the payments procedure's (`procedure`, the record's id): once that record is withdrawn, the rule goes with it (0.8.3).
 
 It answers letters with its report: the balance, money in and out, the adopted budget and what's been spent under it, unpaid invoices, and the **budget brief**. The brief lists the budget's lines and what each one pays for (`budget_lines`, from world config), and says that the amounts are for the mayor and the council. The generated town has one line, parks, priced at the builder's rate. Without the brief, a language-model mayor asked for cost estimates day after day and never tabled a budget (pilot 3, docs/real-models.md). It had no way to learn what a budget in this town could fund, and a real finance office would tell it.
 

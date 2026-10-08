@@ -15,7 +15,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ContentBlock, LlmAdapter, LlmMessage, LlmRequest, LlmResponse } from "./adapter";
 import { readAnswerText } from "./answer";
-import { UsageLimitReached } from "./call";
+import { promptTooLong, UsageLimitReached } from "./call";
 
 /** What the Codex CLI says when the subscription's usage limit is reached ("You've hit your usage limit",
  * "usage_limit_reached"), or when its own retries on rate limits give up ("rate limit", "429 Too Many Requests"): either
@@ -162,7 +162,9 @@ export class CodexCliAdapter implements LlmAdapter {
         if (limited) throw new UsageLimitReached(`the Codex subscription's usage limit was reached (${limited.trim().slice(0, 300)}): the run stops here; resume it once the limit resets (oikos resume <log>)`);
         if (r.code === 0 && !r.timedOut) break;
         const why = r.timedOut ? `no answer within ${Math.round(timeoutMs / 1000)} s` : `exit ${r.code}: ${r.stderr.slice(0, 500)}`;
-        if (n >= attempts) throw new Error(`codex exec failed after ${n} attempts (${why})`);
+        // (A prompt too long for the model is the same prompt next time: it is not tried again.)
+        const tooLong = !r.timedOut && promptTooLong(`${r.stderr}\n${r.stdout.split("\n").filter((l) => /"type":"(error|turn\.failed)"/.test(l)).join("\n")}`);
+        if (n >= attempts || tooLong) throw new Error(`codex exec failed after ${n} attempt${n === 1 ? "" : "s"} (${tooLong ? `the prompt is too long: ${why.slice(0, 300)}` : why})`);
         await Bun.sleep(1000 * 2 ** (n - 1));
       }
       let usage = { input_tokens: 0, output_tokens: 0, cache_read_tokens: 0 };

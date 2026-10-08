@@ -1,0 +1,20 @@
+{
+  "form": "works_staffing",
+  "office": [
+    "works"
+  ],
+  "submit_as": "direction",
+  "submit_to": [
+    "city"
+  ],
+  "fields": {
+    "recruit": {
+      "type": "choice",
+      "required": true,
+      "options": [
+        "yes",
+        "no"
+      ]
+    }
+  }
+}

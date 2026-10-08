@@ -4,9 +4,10 @@
 
 import * as C from "../calls";
 import type { Assertion, LookRequest, Observation, Offer, Outcome as ActOutcome, Practice, Reading, Record, ParticipantAction, Registry, StatementRecord, SiteCell } from "../contracts";
-import { channels } from "../contracts";
+import { basesOf, channels } from "../contracts";
 import { cents, moneyNow } from "../money";
 import { evaluate } from "../law";
+import type { ParticipantContext } from "../module";
 
 export const DAY = 86_400;
 export const MONTH = 30 * DAY;
@@ -451,6 +452,18 @@ export class Book {
     return this.withdrawn.has(at) ? undefined : this.records.get(at);
   }
 
+  /**
+   * Is a standing paper on hold (contracts/calls.md, a hold): does a hold that stands name it, made in the name of
+   * whoever the paper speaks for (or, with `by`, of one of those)? Whoever acts on a standing paper asks this before
+   * acting on it: the bank of a payment instruction, an office of a direction given to it, an office's staff of a
+   * standing work order, an employer's own people of its advertisement. A hold by anyone else is nothing to them.
+   */
+  onHold(id: string, by?: string[]): boolean {
+    const r = this.records.get(id);
+    const whose = by ?? (r && "speaks_for" in r && r.speaks_for ? [r.speaks_for] : []);
+    return this.standingOf("hold").some((h) => !!h.speaks_for && whose.includes(h.speaks_for) && Array.isArray(h.data?.holds) && h.data.holds.includes(id));
+  }
+
   /** Seen to be withdrawn, with nothing standing in its place (a law repealed, a procedure revoked). */
   repealed(id: string): boolean {
     return this.withdrawn.has(id) && !this.current(id);
@@ -695,10 +708,15 @@ export function noting<T extends { step(obs: Observation, ...rest: any[]): Parti
 /** A figure of a law. A duration is held in seconds and worded in `unit` (days, months...); a count is held in
  * `held_in` (default: its unit), `per_unit` of them to one `unit` (a share: unit "percent", held in basis points, 100
  * to one). `type` is also the type of the figure's field on the law's amendment form. */
-export type LawFigure = { type: "duration" | "count"; unit: string; label?: string; held_in?: string; per_unit?: number; description?: string };
+export type LawFigure = { type: "duration" | "count"; unit: string; label?: string; held_in?: string; per_unit?: number; description?: string;
+  /** The law may do without it: a place that has no such requirement gives none, and the law then says nothing of it
+   * (given as nought, it is taken as not given: a requirement of nothing is none). */
+  optional?: boolean };
 /** A schedule: in its `text`, each of its `adico` parts and its `formal` (a CEL condition, if acts can be checked
  * against the law), `{name}` stands for the figure as worded ("60 days", "50") and `{name:seconds}` (any word after the
- * colon; by convention the unit it's held in) for the number as held. */
+ * colon; by convention the unit it's held in) for the number as held. Clauses that turn on optional figures are
+ * written as a list, `<<separator;;clause;;clause>>`: a clause is kept where every figure it names is given, and the
+ * kept ones are joined by the separator. */
 export type LawSchedule = { title: string; form?: string; figures: { [name: string]: LawFigure }; text: string; adico?: { [part: string]: string }; formal?: string };
 /** A law's figures as it carries them: each value with the unit it's held in. */
 export type LawFigures = { [name: string]: { value: number; unit: string } };
@@ -711,33 +729,51 @@ export const heldIn = (f: LawFigure): string => (f.type === "duration" ? "second
 /** A figure's value as held, from what its form field gives (a duration arrives in seconds; a count in the figure's unit). */
 export const heldValue = (f: LawFigure, given: number): number => (f.type === "duration" ? given : given * (f.per_unit ?? 1));
 
-/** A figure in words: a duration in the schedule's unit when it's a whole number of them, else in days (or hours...);
- * a count in its unit ("50%", "3 times"; without the unit, "50"). */
-export function figureWords(f: LawFigure, value: number, withUnit = true): string {
+/** A figure in words: a duration in the schedule's unit when it's a whole number of them, else in days, hours or minutes where
+ * it is a whole number of those, else in the schedule's unit as a decimal (a law does not count in
+ * seconds; nought is nought of the schedule's unit); a count in its unit ("50%", "3 times"; without the unit, "50").
+ * A figure that is not there is "none". */
+export function figureWords(f: LawFigure, value: number | undefined, withUnit = true): string {
+  if (!Number.isSafeInteger(value)) return "none";
   if (f.type === "duration") {
-    const own = DURATION_UNITS.find(([plural]) => plural === f.unit);
-    const [plural, singular, size] = [own, ...DURATION_UNITS.slice(3)].find((u) => u && value >= u[2] && value % u[2] === 0) ?? DURATION_UNITS.at(-1)!;
-    return `${value / size} ${value / size === 1 ? singular : plural}`;
+    const own = DURATION_UNITS.find(([plural]) => plural === f.unit) ?? DURATION_UNITS[3]!;
+    const [plural, singular, size] = [own, DURATION_UNITS[3]!, DURATION_UNITS[4]!, DURATION_UNITS[5]!].find((u) => value! >= u[2] && value! % u[2] === 0) ?? own;
+    const n = Math.round((value! * 100) / size) / 100;
+    return `${n} ${n === 1 ? singular : plural}`;
   }
-  const n = String(value / (f.per_unit ?? 1));
+  const n = String(value! / (f.per_unit ?? 1));
   return withUnit ? (f.unit === "percent" ? `${n}%` : `${n} ${f.unit}`) : n;
 }
 
+/** Is a figure given? An optional one given as nought is not: a requirement of nothing is none. */
+export const figureGiven = (f: LawFigure | undefined, value: number | undefined): boolean => !!f && Number.isSafeInteger(value) && !(f.optional && value === 0);
+
 /** A law written from figures by a schedule: its words, its breakdown, its rule, and the figures it carries. Throws if
- * the schedule names a figure it isn't given (a law can't be written with a gap in it). */
-export function draftLaw(scheduleId: string, s: LawSchedule, values: { [name: string]: number }): { text: string; adico?: { [part: string]: string }; formal?: { language: "cel"; condition: string }; data: { schedule: string; figures: LawFigures } } {
-  const fill = (template: string) => template.replace(/\{(\w+)(?::(\w+))?\}/g, (_, name: string, held?: string) => {
-    const f = s.figures[name];
-    const v = values[name];
-    if (!f || !Number.isSafeInteger(v)) throw new Error(`law schedule ${scheduleId}: no figure ${name}`);
-    return held ? String(v) : figureWords(f, v!, false);
+ * the schedule names a figure it isn't given and can't do without (a law can't be written with a gap in it), or if it
+ * is given none of its figures at all (there is then no law to write). */
+export function draftLaw(scheduleId: string, s: LawSchedule, values: { [name: string]: number | undefined }): { text: string; adico?: { [part: string]: string }; formal?: { language: "cel"; condition: string }; data: { schedule: string; figures: LawFigures } } {
+  const given = (name: string) => figureGiven(s.figures[name], values[name]);
+  const named = (part: string) => [...part.matchAll(/\{(\w+)(?::\w+)?\}/g)].map((m) => m[1]!);
+  // The clauses that turn on optional figures: each kept where all it names is given, the kept ones joined.
+  const clauses = (template: string) => template.replace(/<<([\s\S]*?)>>/g, (_, list: string) => {
+    const [separator, ...parts] = list.split(";;");
+    return parts.filter((part) => named(part).every(given)).join(separator!);
   });
+  const fill = (template: string) => clauses(template).replace(/\{(\w+)(?::(\w+))?\}/g, (_, name: string, held?: string) => {
+    if (!given(name)) throw new Error(`law schedule ${scheduleId}: no figure ${name}`);
+    return held ? String(values[name]) : figureWords(s.figures[name]!, values[name], false);
+  }).replace(/ {2,}/g, " ").trim();
   const figures: LawFigures = {};
   for (const [name, f] of Object.entries(s.figures)) {
-    if (!Number.isSafeInteger(values[name])) throw new Error(`law schedule ${scheduleId}: no figure ${name}`);
+    if (!given(name)) {
+      if (f.optional) continue;
+      throw new Error(`law schedule ${scheduleId}: no figure ${name}`);
+    }
     figures[name] = { value: values[name]!, unit: heldIn(f) };
   }
-  return { text: fill(s.text), ...(s.adico ? { adico: Object.fromEntries(Object.entries(s.adico).map(([k, v]) => [k, fill(v)])) } : {}),
+  if (!Object.keys(figures).length) throw new Error(`law schedule ${scheduleId}: none of its figures is given, so there is no law to write`);
+  // (A part of the breakdown that turned wholly on figures not given is left out.)
+  return { text: fill(s.text), ...(s.adico ? { adico: Object.fromEntries(Object.entries(s.adico).map(([k, v]) => [k, fill(v)] as const).filter(([, v]) => v !== "")) } : {}),
     ...(s.formal ? { formal: { language: "cel" as const, condition: fill(s.formal) } } : {}), data: { schedule: scheduleId, figures } };
 }
 
@@ -1021,6 +1057,136 @@ export class Letters {
     const out = this.pending.map((m) => because(why, message([m.from], report({ participant: m.from, as: m.as, entity: m.entity }), m.id)));
     this.pending = [];
     return out;
+  }
+}
+
+/**
+ * The written directions an office takes (docs/behaviour/directions.md). An office works to written procedures and to
+ * directions from whoever it answers to: here, a direction is a statement of kind `direction` filed on the office's
+ * own form for it (the form is its basis), addressed to the office's organisation. Who may direct the office is the
+ * organisation's own rule, a record (`under`: a procedure, say, whose data names the posts: `directions.by`, or for
+ * one office `directions.offices[office]`); a direction made in any other post is not followed, and its writer is
+ * told so in a letter, once, that says nothing but what the rule itself says. The direction that stands is the latest
+ * one not withdrawn; the office follows it, or (below its `compliance_bps`) does not, as it follows any procedure.
+ */
+export class Directions {
+  private readonly answered = new Set<string>();
+  private readonly acknowledged = new Set<string>();
+  constructor(private readonly ctx: ParticipantContext, private readonly o: { under: string; compliance_bps?: number; office_words: string }) {}
+
+  /** The posts that may direct this office, by the organisation's rule as it stands (none: it has no such rule, or the rule is withdrawn). */
+  private may(book: Book): string[] {
+    const rule = this.o.under ? book.current(this.o.under) : undefined;
+    const d = rule?.record === "statement" ? (rule.data?.directions as { by?: unknown; offices?: { [office: string]: unknown } } | undefined) : undefined;
+    const posts = (this.ctx.position && d?.offices?.[this.ctx.position]) ?? d?.by;
+    return Array.isArray(posts) ? posts.filter((x): x is string => typeof x === "string") : [];
+  }
+
+  /** The directions filed on our form `form` that still stand, oldest first. */
+  private filed(book: Book, form?: string): StatementRecord[] {
+    const office = this.ctx.position;
+    return book.standingOf("direction").filter((d) => (d.addressed_to ?? []).includes(this.ctx.entity) && basesOf(d).some((b) => {
+      const f = book.records.get(b);
+      return f?.record === "statement" && f.kind === "form" && f.data?.office === office && (form === undefined || f.data?.form === form);
+    })).sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : 1));
+  }
+
+  /** The direction in force on a form: the latest standing one from a post that may direct us, if we follow it. */
+  standing(book: Book, form: string): StatementRecord | undefined {
+    const may = this.may(book);
+    // (A direction its giver has put on hold is not followed while the hold stands: the one before it is not
+    // revived; the office goes by its own practice.)
+    const d = this.filed(book, form).filter((x) => x.in_position !== undefined && may.includes(x.in_position)).at(-1);
+    if (!d || book.onHold(d.id)) return undefined;
+    return this.ctx.rng(`direction-${d.id}`).below(10_000) < (this.o.compliance_bps ?? 10_000) ? d : undefined;
+  }
+
+  /**
+   * Letters about directions newly received, one to each writer, once: to one who may direct us, that we have it and
+   * what we will do while it stands (`doing`: in the office's words, by form); to anyone else, that it is not
+   * followed, and the rule that says whose directions are.
+   */
+  letters(book: Book, doing: (d: StatementRecord, form: string) => string): Step[] {
+    const may = this.may(book);
+    const steps: Step[] = [];
+    for (const d of this.filed(book)) {
+      if (this.answered.has(d.id) || this.acknowledged.has(d.id) || d.author === this.ctx.participant) continue;
+      const form = basesOf(d).map((b) => book.records.get(b)).find((f) => f?.record === "statement" && f.kind === "form") as StatementRecord | undefined;
+      if (d.in_position !== undefined && may.includes(d.in_position)) {
+        this.acknowledged.add(d.id);
+        steps.push(because(`A direction from ${d.in_position} on our ${String(form?.data?.form ?? "form").replace(/_/g, " ")} form: acknowledging it.`,
+          message([d.author], `From ${this.o.office_words}: your direction ${d.id} is received. ${doing(d, String(form?.data?.form ?? ""))} It stands until you replace or withdraw it.`, d.id)));
+      } else {
+        this.answered.add(d.id);
+        steps.push(because(`A direction (${d.id}) from someone our rules don't say may direct us: not following it, and saying so.`,
+          message([d.author], `From ${this.o.office_words}: your direction ${d.id} is not being followed. ${this.o.under && may.length ? `This office takes directions on its forms only from those ${this.o.under} names.` : "No rule of this organisation's says who may direct this office."}`, d.id)));
+      }
+    }
+    return steps;
+  }
+}
+
+/** A standing work order as the staff read it (contracts/calls.md, a standing work order). */
+export interface WorkOrder { id: string; task: string; at?: string; on?: string[]; by?: string[]; units?: number; every: number; from: number; until?: number }
+
+/**
+ * Standing work (docs/behaviour/standing-work.md). An office's routine work is its staff's: they follow the
+ * organisation's standing work orders (statements of kind `work_order` on its own file: what task, where, how often,
+ * and perhaps on what, by whom, from when and until when), each time one falls due, in their own hours, until it is
+ * replaced, withdrawn or put on hold. Which part of an office a participant does is its `part`:
+ *  - "" (the whole office, as code runs one): it does its routine by its own practice, with no order;
+ *  - "seat" (the office-holder alone, where a model holds the office and its staff are a post of their own): it
+ *    makes the standing orders and does none of the routine;
+ *  - "staff" (the office's staff): they do the routine a standing order in force is for, and nothing else of the
+ *    office's business.
+ */
+export class StandingWork {
+  private readonly made = new Set<string>();
+  constructor(private readonly me: string, readonly part: "" | "seat" | "staff") {}
+
+  /** The standing order in force for a task: our latest one standing for it, begun, not ended, and not on hold. */
+  order(book: Book, task: string, t: number): WorkOrder | undefined {
+    const r = book.standingOf("work_order").filter((x) => x.speaks_for === this.me && x.data?.work?.task === task).reduce<StatementRecord | undefined>((a, b) => (!a || b.at >= a.at ? b : a), undefined);
+    if (!r) return undefined;
+    const d = r.data ?? {};
+    const from = r.at + (Number.isSafeInteger(d.first) ? d.first : 0);
+    if (!Number.isSafeInteger(d.every) || d.every <= 0 || t < from || (Number.isSafeInteger(d.until) && t >= d.until)) return undefined;
+    if (book.onHold(r.id, [this.me])) return undefined;
+    const list = (x: unknown) => (Array.isArray(x) && x.every((y) => typeof y === "string") ? (x as string[]) : undefined);
+    const w = d.work;
+    return { id: r.id, task, every: d.every, from, ...(typeof w.at === "string" ? { at: w.at } : {}), ...(list(w.on) ? { on: list(w.on)! } : {}), ...(list(w.by) ? { by: list(w.by)! } : {}),
+      ...(Number.isSafeInteger(w.units) ? { units: w.units } : {}), ...(Number.isSafeInteger(d.until) ? { until: d.until } : {}) };
+  }
+
+  /**
+   * Whether this participant does a routine task now, and by what: the whole office by its own practice (`own`: how
+   * often); the staff by the order in force (none: they don't); the office-holder never.
+   */
+  does(book: Book, task: string, t: number, own: { every: number }): { every: number; order?: WorkOrder } | undefined {
+    if (this.part === "seat") return undefined;
+    if (this.part === "") return own;
+    const order = this.order(book, task, t);
+    return order ? { every: order.every, order } : undefined;
+  }
+
+  /** For the office-holder: a standing order for each routine that has none on file, made once (what it does after
+   * that, replacing one, holding it, is managing by exception). */
+  set(book: Book, routines: { task: string; at: string; every: number; why: string }[]): Step[] {
+    if (this.part !== "seat") return [];
+    const steps: Step[] = [];
+    for (const r of routines) {
+      if (this.made.has(r.task)) continue;
+      this.made.add(r.task);
+      if (book.all("work_order").some((x) => x.speaks_for === this.me && x.data?.work?.task === r.task)) continue;
+      steps.push(because(r.why, C.call("work", { task: r.task, at: r.at, every: C.secs(r.every) })));
+    }
+    return steps;
+  }
+
+  /** The standing orders of ours that stand, in words, for a report. */
+  words(book: Book, t: number): string {
+    const all = book.standingOf("work_order").filter((x) => x.speaks_for === this.me);
+    return all.length ? all.map((x) => `${x.id} (${x.data?.work?.task} every ${Math.round(Number(x.data?.every) / DAY)} days${this.order(book, String(x.data?.work?.task), t)?.id === x.id ? "" : ", not in force"})`).join(", ") : "none";
   }
 }
 

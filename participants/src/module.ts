@@ -95,7 +95,70 @@ export interface Kept {
   why: string;
 }
 
+/** A field of a form (contracts/outcomes.schema.json, FormData): what whoever fills it in is asked for. */
+export interface FormField {
+  /** amount, duration, date, count, text, choice (one of `options`), list (several ids), or what an id names (lot,
+   * cell, space, structure_type, account, entity, structure, record). */
+  type: string;
+  required?: boolean;
+  options?: string[];
+  description: string;
+}
+
+/**
+ * A written direction an office takes (docs/behaviour/directions.md): the form it publishes for it, and what following
+ * one means. Whoever the office's organisation says may direct it files the direction on the form; the office reads
+ * the direction that stands and follows it at its next plan, until it is replaced or withdrawn. Declared beside the
+ * code that follows it, as `keeps` is beside the code that holds a register.
+ */
+export interface Taken {
+  /** The form's name (a label), as the call language's `form` names it. */
+  form: string;
+  /** What the form is, in a few words ("Staffing direction to the works office"). */
+  title: string;
+  fields: { [name: string]: FormField };
+  /** What following it means, in words: what the office does while it stands. */
+  follows: string;
+}
+
+/**
+ * A paper an office issues, as a form of its own stationery (docs/behaviour/office-papers.md): the form's fields, and
+ * how they are written into the statement the rest of the world reads (`writes`: forms.ts). Where a model holds the
+ * office, the world publishes the form for it, and filling it in makes the same paper the module itself makes. In
+ * `writes`, a string "@name" stands for something of the office's own that the world fills in when it publishes the
+ * form (`issuesWith`: its account, its premises, whom it sends every entry to); one that the office does not have
+ * leaves its key, or its place in a list, out.
+ */
+export interface Issued {
+  form: string;
+  title: string;
+  fields: { [name: string]: FormField };
+  writes: { kind: string; text: string; data?: unknown; to?: unknown[]; visible?: "public" | unknown[]; basis?: string; offer?: unknown; assertion?: unknown };
+}
+
+/**
+ * A routine task an office's staff do by standing work order (docs/behaviour/standing-work.md): the task's name as an
+ * order names it, what doing it is, in words, and which of the module's parameters says where it is done. Where a
+ * model holds the office, the staff are a post of their own that follows the office's standing orders; the office-
+ * holder sets them.
+ */
+export interface Routine {
+  task: string;
+  what: string;
+  /** The parameter that holds the place the work is done at (the depot, the clinic). */
+  at: string;
+}
+
 export interface BehaviourModule {
+  /** The routine tasks its office's staff do by standing work order (docs/behaviour/standing-work.md). */
+  routines?: Routine[];
+  /** The papers it issues, each as a form of the office's own stationery (docs/behaviour/office-papers.md). */
+  issues?: Issued[];
+  /** What of the office's own the forms it issues carry, from its parameters: the values of each "@name" in `issues`. */
+  issuesWith?(params: { [k: string]: any }): { [name: string]: unknown };
+  /** The written directions it takes, each on a form its office publishes (docs/behaviour/directions.md). An office
+   * follows only what is filed on its form by someone its organisation says may direct it. */
+  takes?: Taken[];
   /** Its own registers, held whole because this is the office that keeps them (the land registry its register, a bank
    * its customers' instructions): never a way to know what someone else keeps, which is asked for (`ask` in
    * behaviour/common.ts). */

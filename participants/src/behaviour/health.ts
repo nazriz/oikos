@@ -7,13 +7,17 @@
 import * as C from "../calls";
 import type { SiteStructure } from "../contracts";
 import { need, params, type BehaviourModule, type ParticipantContext } from "../module";
-import { because, Book, DAY, outOfTime, say, type Step } from "./common";
+import { because, Book, DAY, outOfTime, say, StandingWork, type Step } from "./common";
 import { Staffing, stepper } from "./firms";
+import * as P from "./papers";
 
 const HOUR = 3600;
 
 export const practice: BehaviourModule = {
   name: "clinic.practice",
+  routines: [{ task: "treat", at: "building", what: "Each working day, in the hours the clinic is open, its doctors see those who have asked for care and are waiting, in the order they asked, as far as the doctors' hours go, and each patient is told they have been seen." }],
+  issues: [P.JOB_ADVERTISEMENT],
+  issuesWith: (p) => P.staffingOwn({ role: p.role ?? "doctor", industry: p.industry ?? "health_care", workplace: p.workplace, notice_days: p.notice_days ?? 14 }),
   version: "0.2.1",
   doc: "docs/behaviour/health.md",
   // (When it opens each working day, and whenever a patient asks: someone who comes in and asks is seen then, if it's
@@ -32,10 +36,14 @@ export const practice: BehaviourModule = {
       consults: [] as { kind: string; severity?: string; consults: number }[],
       give_up_days: 3, // a patient who asked and isn't here after this long is dropped from the list
       channel: "premises", // its view of the building, who is where in it
+      // Which part of the office this is (docs/behaviour/standing-work.md): "" the whole office, as code runs one;
+      // "seat" the office-holder alone, who sets the standing work orders; "staff" its staff, who follow them.
+      part: "" as "" | "seat" | "staff",
     }, ctx.params);
     need(p, ["building", "workplace", "waiting", "account"], "clinic.practice");
     const me = ctx.entity;
     const book = new Book();
+    const routines = new StandingWork(me, p.part);
     const staffing = new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, workplace: p.workplace, role: p.role, industry: p.industry });
     let view: SiteStructure | undefined;
     const queue: { request: string; patient: string; kind: string; severity: string; at: number }[] = [];
@@ -52,7 +60,9 @@ export const practice: BehaviourModule = {
       (obs) => {
         const t = obs.t;
         const steps: Step[] = [];
-        steps.push(...staffing.routine(obs, book, p.account, { target: p.doctors, wage: p.wage, canPost: staffing.workers(book, t).length < p.doctors,
+        steps.push(...routines.set(book, [{ task: p.treat_task, at: p.building, every: DAY, why: "Setting the doctors' work: those waiting are seen each working day, as a standing work order." }]));
+        // (Taking on and paying the doctors is the office-holder's; its staff, where they are a post of their own, see patients.)
+        if (p.part !== "staff") steps.push(...staffing.routine(obs, book, p.account, { target: p.doctors, wage: p.wage, canPost: staffing.workers(book, t).length < p.doctors,
           why: `The clinic's establishment is ${p.doctors} doctors; we have ${staffing.workers(book, t).length}: posting a job.` }));
 
         // Who's asked for care, in the order they asked.
@@ -69,7 +79,7 @@ export const practice: BehaviourModule = {
         for (let i = queue.length - 1; i >= 0; i--) if (t - queue[i]!.at > p.give_up_days * DAY) queue.splice(i, 1);
         const open = day % 7 < p.work_days && t % DAY >= p.opens && t % DAY < p.closes;
         // (Closed: those who asked are seen when it opens, at its morning look.)
-        if (!open || !queue.length) return steps;
+        if (!open || !queue.length || !routines.does(book, p.treat_task, t, { every: DAY })) return steps;
         const inRoom = (space: string) => [...new Set(view?.spaces.find((sp) => sp.space === space)?.occupants ?? [])];
         const waiting = new Set(inRoom(p.waiting));
         const mine = new Set(staffing.workers(book, t));

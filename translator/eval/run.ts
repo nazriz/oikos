@@ -26,6 +26,8 @@ export function fixture(): Knowledge {
   const rec = (r: any) => ({ author: "genesis", at: 0, visible_to: "public", ...r });
   k.absorb({
     participant: "mayor-system", as: "mayor", t: 30 * 86_400, status: "active", entity: "city", outcomes: [], inbox: [], drafts: [],
+    // (The post it holds: an office's own stationery is known to whoever holds the office.)
+    positions: [{ position: "mayor", entity: "city", role: "mayor" }],
     channels: {
       // (Its own account, and the accounts it has paid before: a town knows where its builder and its staff are paid.
       // Without them every payment came back "which account?", which the test read as a failed translation.)
@@ -39,6 +41,21 @@ export function fixture(): Knowledge {
         // (The town's own standing payments, as it asked the bank for them: what a hold on one is addressed to.)
         ...["rec.90", "rec.91", "rec.92"].map((id, i) => rec({ id, record: "statement", author: "mayor-system", in_position: "mayor", speaks_for: "city", kind: "request", text: "A standing payment.", addressed_to: ["bank"], visible_to: ["city", "bank"],
           data: { outcome: { money: { from: "acc-city", to: ["acc-builder", "acc-greenco", "acc-c0042"][i], amount: "85000" } }, every: 30 * 86_400 } })),
+        // (The forms the works office takes directions on, as the town publishes them: contracts/test/forms.json.)
+        rec({ id: "form-works-staffing", record: "statement", speaks_for: "city", kind: "form", text: "Staffing direction to the works office.",
+          data: { form: "works_staffing", office: "works", submit_as: "direction", submit_to: ["city"], fields: { recruit: { type: "choice", options: ["yes", "no"], required: true }, posts: { type: "count" } } } }),
+        rec({ id: "form-works-collection", record: "statement", speaks_for: "city", kind: "form", text: "Collection direction to the works office.",
+          data: { form: "works_collection", office: "works", submit_as: "direction", submit_to: ["city"], fields: { every: { type: "duration", required: true } } } }),
+        // (Two papers of the mayor's own office, on its stationery: an invoice approved, and a nomination.)
+        rec({ id: "form-mayor-invoice-approval", record: "statement", speaks_for: "city", kind: "form", text: "The mayor's written approval of an invoice.", visible_to: ["city"],
+          data: { form: "invoice_approval", office: "mayor", submit_as: "approval", submit_to: ["city"], fields: { invoice: { type: "record", required: true } },
+            writes: { kind: "approval", text: "Approved for payment: {invoice}.", basis: "=invoice", to: ["=self"], data: { invoice: "=invoice" } } } }),
+        rec({ id: "form-mayor-nomination", record: "statement", speaks_for: "city", kind: "form", text: "Nomination for an office at an election.", visible_to: ["city"],
+          data: { form: "nomination", office: "mayor", submit_as: "nomination", submit_to: ["city"], fields: { office: { type: "entity", required: true }, name: { type: "text", required: true }, platform: { type: "text", required: true }, incumbent: { type: "choice", options: ["yes", "no"] }, values: { type: "list" } },
+            writes: { kind: "nomination", text: "Nomination for {office}: {name}. {platform}", visible: "public", data: { office: "=office", name: "=name", incumbent: "?incumbent", values: "=values" } } } }),
+        // (A standing work order of the town's own, on its own file: what a hold on one is put beside.)
+        rec({ id: "rec.95", record: "statement", author: "works-system", in_position: "works", speaks_for: "city", kind: "work_order", text: "Standing work order: collect at str.7, every 7 days.", addressed_to: ["city"], visible_to: ["city"],
+          data: { work: { task: "collect", at: "str.7" }, every: 7 * 86_400 } }),
       ] },
     },
   } as any);

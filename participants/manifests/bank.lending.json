@@ -130,5 +130,158 @@
       "what": "accounts",
       "why": "The bank's own ledger: it keeps its customers' accounts, and a lending office reads what an applicant holds with it."
     }
+  ],
+  "issues": [
+    {
+      "form": "loan_decision",
+      "title": "Decision on a loan application",
+      "fields": {
+        "application": {
+          "type": "record",
+          "required": true,
+          "description": "The application decided."
+        },
+        "applicant": {
+          "type": "entity",
+          "required": true,
+          "description": "Who applied."
+        },
+        "approved": {
+          "type": "choice",
+          "required": true,
+          "options": [
+            "yes",
+            "no"
+          ],
+          "description": "Whether it is approved."
+        },
+        "reason": {
+          "type": "text",
+          "description": "Why not, where it is declined."
+        },
+        "amount": {
+          "type": "amount",
+          "description": "Where approved: how much is lent."
+        },
+        "months": {
+          "type": "count",
+          "description": "Where approved: over how many months."
+        },
+        "rate_bps": {
+          "type": "count",
+          "description": "Where approved: the yearly rate, in hundredths of a percent."
+        },
+        "payment": {
+          "type": "amount",
+          "description": "Where approved: the monthly repayment."
+        }
+      },
+      "writes": {
+        "kind": "loan_decision",
+        "text": "Loan application {application}: approved {approved}.",
+        "basis": "=application",
+        "to": [
+          "=applicant"
+        ],
+        "visible": [
+          "=applicant",
+          "=self"
+        ],
+        "data": {
+          "application": "=application",
+          "approved": "?approved",
+          "reason": "=reason",
+          "amount": "#amount",
+          "months": "=months",
+          "rate_bps": "=rate_bps",
+          "payment": "#payment"
+        }
+      }
+    },
+    {
+      "form": "loan_payout",
+      "title": "Advice that a loan has been paid out",
+      "fields": {
+        "loan": {
+          "type": "record",
+          "required": true,
+          "description": "The loan agreement."
+        },
+        "borrower": {
+          "type": "entity",
+          "required": true,
+          "description": "The borrower."
+        },
+        "request": {
+          "type": "record",
+          "required": true,
+          "description": "The request for the payout."
+        },
+        "amount": {
+          "type": "amount",
+          "required": true,
+          "description": "How much was paid out."
+        },
+        "account": {
+          "type": "account",
+          "required": true,
+          "description": "The account it was paid into."
+        }
+      },
+      "writes": {
+        "kind": "loan_payout",
+        "text": "Loan {loan}: {amount} paid out into {account}.",
+        "basis": "=request",
+        "to": [
+          "=borrower"
+        ],
+        "visible": [
+          "=borrower",
+          "=self"
+        ],
+        "data": {
+          "loan": "=loan",
+          "amount": "#amount",
+          "account": "=account"
+        }
+      }
+    },
+    {
+      "form": "funding_draw",
+      "title": "A draw on the bank's wholesale funding",
+      "fields": {
+        "amount": {
+          "type": "amount",
+          "required": true,
+          "description": "How much is drawn."
+        },
+        "account": {
+          "type": "account",
+          "required": true,
+          "description": "The account it is to be paid into."
+        },
+        "rate_bps": {
+          "type": "count",
+          "required": true,
+          "description": "The yearly rate, in hundredths of a percent."
+        }
+      },
+      "writes": {
+        "kind": "funding_draw",
+        "text": "Funding drawn: {amount} into {account}.",
+        "to": [
+          "@funder"
+        ],
+        "visible": [
+          "=self",
+          "@funder"
+        ],
+        "data": {
+          "amount": "#amount",
+          "account": "=account",
+          "rate_bps": "=rate_bps"
+        }
+      }
+    }
   ]
 }

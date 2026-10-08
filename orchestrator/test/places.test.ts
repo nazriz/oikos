@@ -126,7 +126,7 @@ test("money in a generated town's laws and papers is written as its currency is,
     const whole = (n: number) => formatMoney(n, cur, cur.minor_units && n % 10 ** cur.minor_units === 0 ? { decimals: false } : {});
     const tax = c.world.records.find((r: any) => r.id === "law-income-tax");
     for (const c of P.values.public_finance.income_tax.charges) {
-      if (c.schedule.length > 1) for (const b of c.schedule) expect(tax.text).toContain(`above ${whole(b.from)}`);
+      if (c.schedule.length > 1) for (const b of c.schedule) if (b.from > 0) expect(tax.text).toContain(`above ${whole(b.from)}`); // (the first band is said by where it ends)
       if (c.base?.from) expect(tax.text).toContain(`from ${whole(c.base.from)}`);
       if (c.base?.up_to !== undefined) expect(tax.text).toContain(`up to ${whole(c.base.up_to)}`);
     }
@@ -189,7 +189,8 @@ test("an institution a place doesn't have is absent from its town: no payment, l
   expect(laws).not.toContain("law-rent-increases");
   expect(laws).not.toContain("law-industrial-action");
   expect(of("firm.landlord").rent_review_months).toBeNull();
-  expect(c.world.records.some((r: any) => r.id === "schedule-industrial-action-notice")).toBe(false);
+  // (The schedules and their forms are there all the same: a council can make the law its town does not have.)
+  expect(c.world.records.some((r: any) => r.id === "form-amend-industrial-action")).toBe(true);
   // No retirement fund.
   expect(c.world.entities.some((e: any) => e.kind === "retirement_fund")).toBe(false);
   expect(() => generateFrom({ ...spec, retirement_fund: true }, P)).toThrow(/retirement fund/);
@@ -210,11 +211,42 @@ test("an institution a place doesn't have is absent from its town: no payment, l
   N.values.industrial_action.notice_days = 14;
   const n = generateFrom(spec, N);
   const law = n.world.records.find((r: any) => r.id === "law-industrial-action");
-  expect(law.data.schedule).toBe("schedule-industrial-action-notice");
-  expect(law.text).toContain("14 days");
-  expect(law.text).not.toContain("ballot");
-  expect(law.formal.condition).toBe(`block.block == 'publish' && block.kind == 'industrial_action' && block.data.from - now < ${14 * DAY}`);
-  expect(n.world.records.some((r: any) => r.id === "form-amend-industrial-action-notice")).toBe(true);
+  expect(law.data).toEqual({ schedule: "schedule-industrial-action", figures: { notice: { value: 14 * DAY, unit: "seconds" } } });
+  expect(law.text).toBe("Industrial action is protected only where each of these holds. The employer has had written notice of it of at least 14 days.");
+  expect(law.formal.condition).toBe(`block.block == 'publish' && block.kind == 'industrial_action' && (block.data.from - now < ${14 * DAY})`);
+
+  // The reverse, a ballot and no notice: the ballot's two requirements, and nothing of notice.
+  const B = copy("au-vic-2026");
+  delete B.values.industrial_action.notice_days;
+  const ballotOnly = generateFrom(spec, B).world.records.find((r: any) => r.id === "law-industrial-action");
+  expect(Object.keys(ballotOnly.data.figures)).toEqual(["turnout", "majority"]);
+  expect(ballotOnly.text).toBe("Industrial action is protected only where each of these holds. At least 50% of the members concerned have voted in a ballot on it. More than 50% of the votes in a ballot of the members concerned are for it.");
+  expect(ballotOnly.formal.condition).toBe("block.block == 'publish' && block.kind == 'industrial_action' && (block.data.voted * 10000 < 5000 * block.data.eligible || block.data.yes * 10000 <= 5000 * block.data.voted)");
+  // A figure still stated as nought is taken as not stated: the law says nothing of it, and with nothing but noughts there is no law.
+  const Z = copy("au-vic-2026");
+  Object.assign(Z.values.industrial_action, { ballot_turnout_bps: 0, notice_days: 0 });
+  const majorityOnly = generateFrom(spec, Z).world.records.find((r: any) => r.id === "law-industrial-action");
+  expect(majorityOnly.text).toBe("Industrial action is protected only where each of these holds. More than 50% of the votes in a ballot of the members concerned are for it.");
+  Object.assign(Z.values.industrial_action, { ballot_pass_bps: 0 });
+  expect(generateFrom(spec, Z).world.records.some((r: any) => r.id === "law-industrial-action")).toBe(false);
+  // No interest on overdue rates: the rating law has no "or else", and carries no rate of interest.
+  const R = copy("au-vic-2026");
+  delete R.values.public_finance.rates_penalty_interest_bps;
+  const rates = generateFrom(spec, R).world.records.find((r: any) => r.id === "law-rates");
+  expect(rates.text).not.toContain("interest");
+  expect(rates.adico.or_else).toBeUndefined();
+  expect("penalty_interest_bps" in rates.data).toBe(false);
+
+  // In the profiles as they stand: no figure of nought stands for a rule a place does not have, and no town's law
+  // states a nought, a duration in seconds or a share in basis points.
+  for (const id of ids) {
+    const V = loadProfile(id).values as any;
+    for (const [what, v] of Object.entries({ levy: V.services.landfill_levy_per_tonne, buffer: V.credit.serviceability_buffer_bps, turnout: V.industrial_action.ballot_turnout_bps, majority: V.industrial_action.ballot_pass_bps,
+      notice: V.industrial_action.notice_days, review: V.tenancy.rent_review_months, rent_notice: V.tenancy.rent_increase_notice_days, interest: V.public_finance.rates_penalty_interest_bps })) expect({ id, what, v }).not.toEqual({ id, what, v: 0 });
+    for (const r of town(id).world.records.filter((x: any) => x.kind === "law")) for (const words of [r.text, ...Object.values(r.adico ?? {})] as string[]) {
+      expect({ id, law: r.id, words }).not.toEqual({ id, law: r.id, words: expect.stringMatching(/\b0 (seconds?|minutes?|hours?|days?|weeks?|months?|years?)\b|(?<![\d.,])0%|\bseconds?\b|basis points|\bbps\b|above [^\d]{0,4}0(?![\d.,])/) });
+    }
+  }
 }, SLOW);
 
 test("wages are paid on the profile's pay period: a month's pay monthly makes the same town as a fortnight's fortnightly", () => {
@@ -332,4 +364,60 @@ test("the occupancy standard and a home's physical room are the profile's where 
     return householdsOf(t).filter((h) => home.has(h.leaseholder) && bedroomsNeeded(h, 0, 365 * DAY, S) > of.get(home.get(h.leaseholder)!)!.bedrooms).length;
   };
   expect(short(c, P.values.households.occupancy)).toBeLessThanOrEqual(short(plain, OCCUPANCY));
+}, SLOW);
+
+test("every town opens with its first year's budget on file: adopted by its council on the papers its own procedure leaves, with the lines its mayor's office tables", () => {
+  const YEAR = 365 * DAY;
+  for (const id of ids) {
+    const c = town(id);
+    const P = loadProfile(id);
+    const rec = (rid: string) => c.world.records.find((r: any) => r.id === rid);
+    const written = (n: number) => formatMoney(n, P.values.currency, n % 10 ** P.values.currency.minor_units === 0 ? { decimals: false } : {});
+    const budget = rec("budget-year-1"), ballot = rec(budget.basis), proposal = rec(ballot.data.proposal), result = c.world.records.find((r: any) => r.kind === "ballot_result" && r.data.ballot === ballot.id);
+    // The papers: a proposal in the mayor's post on the council proposal form, the clerk's ballot of the council, a
+    // vote for each councillor's post, the result, and the budget resting on the ballot, in the town's name.
+    const form = rec("form-council-proposal");
+    expect(proposal).toMatchObject({ kind: "proposal", in_position: "mayor", speaks_for: "city", addressed_to: ["city"], basis: form.id, author: "genesis", at: 0 });
+    for (const k of Object.keys(proposal.data)) expect(Object.keys(form.data.fields)).toContain(k);
+    expect(proposal.data).toMatchObject({ kind: "budget", year: 1 });
+    expect(ballot).toMatchObject({ kind: "ballot", in_position: "council-clerk", basis: proposal.id, data: { proposal: proposal.id, electorate: "council", options: ["yes", "no"], closes_at: 0, tags: ["budget"] } });
+    const councillors = c.positions.filter((x: any) => x.role === "councillor").map((x: any) => x.id).sort();
+    const votes = c.world.records.filter((r: any) => r.record === "vote" && r.ballot === ballot.id);
+    expect(votes.map((v: any) => v.in_position).sort()).toEqual(councillors);
+    expect(result).toMatchObject({ in_position: "council-clerk", basis: ballot.id, data: { ballot: ballot.id, yes: votes.filter((v: any) => v.choice === "yes").length, no: 0, passed: true } });
+    expect(budget).toMatchObject({ kind: "budget", in_position: "council-clerk", speaks_for: "city", visible_to: "public", basis: ballot.id, author: "genesis", at: 0 });
+    // The budget is what the clerk's own form for an adopted budget writes: a year, and the town's lines.
+    expect(Object.keys(budget.data).sort()).toEqual(["lines", "year"]);
+    expect(budget.data.year).toBe(1);
+    const finance = c.participants.find((p: any) => p.controller.impl === "city.finance_officer").controller.params;
+    for (const k of Object.keys(budget.data.lines)) expect(Object.keys(finance.budget_lines)).toContain(k);
+    // Its lines are the ones the mayor's office is given to table each year, and the proposal's amounts are the same.
+    const mayor = c.participants.find((p: any) => p.id === "mayor-system").controller.params;
+    expect(budget.data.lines).toEqual({ parks: mayor.park_budget, ...(mayor.road_budget ? { roads: mayor.road_budget } : {}), ...(mayor.staff_budget ? { staff: mayor.staff_budget } : {}), ...(mayor.services_budget ? { services: mayor.services_budget } : {}), ...(mayor.environment_budget ? { environment: mayor.environment_budget } : {}) });
+    for (const [k, v] of Object.entries(budget.data.lines)) expect(proposal.data[k]).toBe(String(v));
+    // The staff lines cover the wages the town is bound to at the start: every agreement it employs someone under, for a year.
+    const wages = c.world.records.filter((r: any) => r.record === "agreement" && r.terms.template === "employment" && r.terms.parties[0] === "city")
+      .reduce((sum: number, a: any) => sum + Math.floor((Number(a.terms.commitments[0].does.outcome.money.amount) * YEAR) / a.terms.commitments[0].every), 0);
+    expect(wages).toBeGreaterThan(0);
+    expect((budget.data.lines.staff ?? 0) + (budget.data.lines.environment ?? 0)).toBeGreaterThanOrEqual(wages);
+    // Its words say each line and the sum as the town writes its money, the year in days, and that the council adopted it.
+    for (const v of [...Object.values(budget.data.lines), Object.values(budget.data.lines).reduce((a: number, x: any) => a + x, 0)] as number[]) expect(budget.text).toContain(written(v));
+    expect(budget.text).toContain("year 1 (day 0 to day 364)");
+    expect(budget.text).toContain(`Adopted by the council before the year began (ballot ${ballot.id}).`);
+    // The procedure the finance office follows names the budget for the year, and what holds while a year has none.
+    expect(rec("proc-payments").text).toContain("only within the budget the council has adopted for the year");
+    expect(rec("law-charter").text).toContain("at no more each month than a twelfth of the budget last adopted");
+    // The mayor's office tables the next year's before the year ends.
+    expect(mayor.budget_lead_days).toBeGreaterThan(c.participants.find((p: any) => p.controller.impl === "city.council_clerk").controller.params.vote_days);
+  }
+}, SLOW);
+
+test("a council with almost no reserves opens with the same budget and a hundredth of the money: a budget it cannot meet", () => {
+  const plain = generate({ ...spec, profile: ids[0] }), lean = generate({ ...spec, profile: ids[0], scenario: "lean-council" });
+  const lines = (c: any) => c.world.records.find((r: any) => r.id === "budget-year-1").data.lines;
+  const held = (c: any) => Number(c.world.accounts.find((a: any) => a.holder === "city").balance);
+  expect(lines(lean)).toEqual(lines(plain));
+  expect(held(lean) * 100).toBe(held(plain));
+  // What it holds is less than a month of what the budget spends.
+  expect(held(lean) * 12).toBeLessThan(Object.values(lines(lean)).reduce((a: number, v: any) => a + v, 0));
 }, SLOW);

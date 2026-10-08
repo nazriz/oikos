@@ -1,8 +1,16 @@
 {
   "name": "city.mayor_code",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "doc": "docs/behaviour/government.md",
   "params": {
+    "budget_lead_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 0,
+      "source": "placeholder"
+    },
     "builder": {
       "schema": {
         "type": "string"
@@ -122,5 +130,79 @@
     }
   },
   "perceives": [],
-  "state": "none"
+  "state": "none",
+  "issues": [
+    {
+      "form": "invoice_approval",
+      "title": "The mayor's written approval of an invoice",
+      "fields": {
+        "invoice": {
+          "type": "record",
+          "required": true,
+          "description": "The invoice approved for payment."
+        }
+      },
+      "writes": {
+        "kind": "approval",
+        "text": "Approved for payment: {invoice}.",
+        "basis": "=invoice",
+        "to": [
+          "=self"
+        ],
+        "data": {
+          "invoice": "=invoice"
+        }
+      }
+    },
+    {
+      "form": "nomination",
+      "title": "Nomination for an office at an election",
+      "fields": {
+        "office": {
+          "type": "entity",
+          "required": true,
+          "description": "The office stood for (the post, by its id)."
+        },
+        "name": {
+          "type": "text",
+          "required": true,
+          "description": "The name to go on the ballot."
+        },
+        "platform": {
+          "type": "text",
+          "required": true,
+          "description": "What the candidate puts to the electors."
+        },
+        "incumbent": {
+          "type": "choice",
+          "options": [
+            "yes",
+            "no"
+          ],
+          "description": "Whether the candidate holds the office now."
+        },
+        "values": {
+          "type": "list",
+          "description": "What the candidate stands for, in a word or two each."
+        }
+      },
+      "writes": {
+        "kind": "nomination",
+        "text": "Nomination for {office}: {name}. {platform}",
+        "to": [
+          "@electoral"
+        ],
+        "visible": "public",
+        "assertion": {
+          "that": "=platform"
+        },
+        "data": {
+          "office": "=office",
+          "name": "=name",
+          "incumbent": "?incumbent",
+          "values": "=values"
+        }
+      }
+    }
+  ]
 }

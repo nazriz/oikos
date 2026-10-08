@@ -11,9 +11,10 @@ import type { LookRequest, Observation, SiteStructure, StatementRecord } from ".
 import { channels } from "../contracts";
 import { standingClaims } from "../law";
 import { need, params, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
-import { ask, Asked, goSee, ownerLooks, visited, VISIT_MAX, nextLook, because, Book, prohibitions, holdsOf, noting, cellsOf, commitmentOf, DAY, Letters, lotOf, ownAccount, record, say, sign, type Step, usd, withdraw, outOfTime, team } from "./common";
+import { ask, Asked, Directions, goSee, ownerLooks, visited, VISIT_MAX, nextLook, because, Book, prohibitions, holdsOf, noting, cellsOf, commitmentOf, DAY, Letters, lotOf, ownAccount, record, say, sign, type Step, usd, withdraw, outOfTime, team } from "./common";
 import { Deliveries, goodsPrices, held, order } from "./trade";
 import { Bargaining, Staffing, stepper, WindingUp } from "./firms";
+import * as P from "./papers";
 
 /** Who the registry says owns a lot: the latest standing ownership claim, following transfers. */
 export function ownerOf(book: Book, lot: string): string | undefined {
@@ -75,6 +76,7 @@ export function ownLand(book: Book, owner: string): OwnLot[] {
  */
 export const planningOfficer: BehaviourModule = {
   name: "city.planning_officer",
+  issues: P.PLANNING,
   version: "0.9.0", // 0.9.0: the town's land from the town's own papers; no longer shown the land register or a survey of the town
   doc: "docs/behaviour/institutions.md",
   cadence: () => 7 * DAY,
@@ -156,7 +158,15 @@ export const planningOfficer: BehaviourModule = {
  */
 export const inspector: BehaviourModule = {
   name: "city.inspector",
-  version: "0.6.0", // 0.6.0: goes to the sites it is notified of and asks the registry who owns them; no patrol of the town
+  issues: P.INSPECTOR,
+  issuesWith: (p) => ({ valuer: p.valuer }),
+  takes: [{ form: "inspector_enforcement", title: "Enforcement direction to the building inspector",
+    fields: {
+      fines: { type: "choice", options: ["yes", "no"], required: true, description: "Whether a breach the inspector finds is fined and ordered demolished: yes, as the office does of its own accord; no, it is recorded and nothing more." },
+      fine: { type: "amount", description: "The fine for a breach, where it is to be other than the office's usual one." },
+    },
+    follows: "While a direction with fines no stands, the inspector still goes to the sites it is told of and still tells the valuer what was built, but lays no fine and makes no demolition order on a breach: it records the breach in its report. With fines yes, it fines and orders as before, at the amount given if one is." }],
+  version: "0.7.0", // 0.7.0: takes a written direction on enforcement (docs/behaviour/directions.md); 0.6.0: goes to the sites it is notified of and asks the registry who owns them; no patrol of the town
   doc: "docs/behaviour/institutions.md",
   cadence: () => 7 * DAY,
   create(ctx: ParticipantContext) {
@@ -164,8 +174,13 @@ export const inspector: BehaviourModule = {
       sites: "sites", // the channel it goes to a site through (a visit)
       register: { lots: "lots", titles: "titles", dealings: "dealings" }, // the land register, asked about one lot
       valuer: "", // whom it tells of what was built or brought down (none: nobody)
+      // Whose written directions it follows (docs/behaviour/directions.md): the town's own rule, a record the world
+      // names (none: it follows nobody's); and how often it follows one it is given.
+      directed_under: "", direction_compliance_bps: 10_000,
     }, ctx.params);
     const book = new Book();
+    const directions = new Directions(ctx, { under: p.directed_under, compliance_bps: p.direction_compliance_bps, office_words: "the building inspector" });
+    const notFined: string[] = []; // breaches found and, by direction, not acted on
     const asked = new Asked();
     const notices: { id: string; lot?: string; at?: string; structure?: string; type?: string; removes?: string; gone?: boolean }[] = [];
     const taken = new Set<string>();
@@ -174,7 +189,7 @@ export const inspector: BehaviourModule = {
     let inspected = 0;
     const letters = new Letters();
     const report = () =>
-      `Report from the building inspector: ${taken.size} notices of building work received, ${inspected} sites inspected. ${found.length ? `Breaches found and acted on (a fine and a demolition order each): ${found.join(", ")}.` : "No breaches found."} We inspect the work we are told of; work nobody tells the town of we don't see.`;
+      `Report from the building inspector: ${taken.size} notices of building work received, ${inspected} sites inspected. ${found.length ? `Breaches found and acted on (a fine and a demolition order each): ${found.join(", ")}.` : notFined.length ? "No breaches acted on." : "No breaches found."}${notFined.length ? ` Breaches found and, by direction, not fined or ordered demolished: ${notFined.join(", ")}.` : ""} We inspect the work we are told of; work nobody tells the town of we don't see.`;
     return noting(book, stepper(
       (obs) => {
         book.absorb(obs);
@@ -221,12 +236,21 @@ export const inspector: BehaviourModule = {
           if (p.valuer) steps.push(because(`A ${st.type} is being built on ${lot ?? st.at}: asking the valuer for a supplementary valuation.`,
             say("valuation_request", `Supplementary valuation: a ${st.type} (${st.structure}) on ${lot ?? st.at}.`, { to: [p.valuer], basis: n.id, data: { ...(lot ? { lot } : {}), structure: st.structure, structure_type: st.type } })));
           if (!breached || ctx.rng(`act-${st.structure}`).below(10_000) >= p.compliance_bps) continue;
+          // An enforcement direction that stands (from whoever the town says may direct us): whether a breach is
+          // fined and ordered down, and at what amount.
+          const enforcement = directions.standing(book, "inspector_enforcement");
+          if (enforcement?.data?.fines === "no") {
+            notFined.push(`${st.structure} on ${lot ?? st.at} (${breached.id}; direction ${enforcement.id})`);
+            continue;
+          }
+          const fine = typeof enforcement?.data?.fine === "string" ? cents(enforcement.data.fine) : p.fine;
           found.push(`${st.structure} on ${lot ?? st.at} (${breached.id})`);
           steps.push(because(`Inspected: ${st.structure} is being built in breach of ${breached.id}; fining the owner and ordering it demolished.`,
-            record("right", me, { kind: "fine", amount: p.fine, for: `Unpermitted ${st.type} on ${lot ?? st.at} (${st.structure}).` }, { against: owner, basis: breached.id }),
+            record("right", me, { kind: "fine", amount: fine, for: `Unpermitted ${st.type} on ${lot ?? st.at} (${st.structure}).` }, { against: owner, basis: breached.id }),
             say("demolition_order", `Order: demolish ${st.structure} on ${lot ?? st.at}, built in breach of ${breached.id}.`, { to: [owner], basis: breached.id, data: { structure: st.structure, lot, law: breached.id } }),
           ));
         }
+        steps.push(...directions.letters(book, (d) => (d.data?.fines === "no" ? "A breach the inspector finds is recorded in its report, and neither fined nor ordered demolished." : `A breach the inspector finds is fined${typeof d.data?.fine === "string" ? ` ${usd(cents(d.data.fine))}` : ""} and ordered demolished.`)));
         steps.push(...letters.answer(report));
         return steps;
       },
@@ -274,6 +298,8 @@ export const inspector: BehaviourModule = {
  */
 export const builder: BehaviourModule = {
   name: "firm.builder",
+  issues: [P.JOB_ADVERTISEMENT],
+  issuesWith: (p) => P.staffingOwn({ role: "construction worker", industry: p.industry, workplace: p.workplace, notice_days: p.notice_days ?? 14 }),
   version: "0.12.3", // 0.12.3: takes on the share of its hands the world gives by the day, and pays them for the days there is building to do; 0.12.2: registers the share of its jobs the world gives for its kind; 0.12.1: with what 0.11.2 changed; 0.12.0: goes to a lot before building on it, sees its sites as its crew works on them, and gives notice of building work; no longer shown the town
   doc: "docs/behaviour/institutions.md",
   cadence: () => DAY,
@@ -711,6 +737,8 @@ export const landRegistry: BehaviourModule = {
  */
 export const registry: BehaviourModule = {
   name: "city.registry",
+  issues: P.REGISTRY,
+  issuesWith: (p) => ({ feeds: p.feeds ?? [], land_registry: p.land_registry }),
   version: "0.7.0", // 0.7.0: keeps no register of land: it applies to the land registry for a dead owner's titles to pass; 0.6.0: registers births
   doc: "docs/behaviour/institutions.md",
   cadence: () => DAY,
