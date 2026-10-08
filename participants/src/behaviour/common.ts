@@ -959,6 +959,16 @@ export const PAYMENT_FAILED = {
   is: (text: string) => /^Payment of .+ to \S+ \(request \S+\) failed: insufficient funds\.$/.test(text),
 };
 
+/**
+ * What a bank writes, once, to whoever has a standing order paying into the account of someone it has been told has
+ * died (docs/behaviour/deaths.md): how an employer, who is on no register and is told by no registry, comes to know
+ * that the person it pays has died. The words are here, once, so the bank and its readers can't drift apart.
+ */
+export const PAYEE_DIED = {
+  note: (holder: string, to: string, request: string) => `Your payments to ${to} (request ${request}): the account's holder, ${holder}, has died. They go to the estate until you stop them.`,
+  who: (text: string): string | undefined => /^Your payments to \S+ \(request \S+\): the account's holder, (\S+), has died\./.exec(text)?.[1],
+};
+
 /** An amount in words, for reasons and letters, as the world writes its money (money.ts). */
 export const usd = moneyNow;
 

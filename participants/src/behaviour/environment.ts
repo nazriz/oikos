@@ -17,7 +17,7 @@ const YEAR = 365 * DAY;
 
 export const environment: BehaviourModule = {
   name: "city.environment",
-  version: "0.2.0",
+  version: "0.2.1",
   doc: "docs/behaviour/environment.md",
   cadence: () => DAY,
   firstWake: (ctx) => 8 * 3600 + ctx.rng("first-wake").below(3600),

@@ -14,7 +14,7 @@ import { channels } from "../contracts";
 import { DAY, wait, type BehaviourModule, type ParticipantContext } from "../module";
 import { refusalText } from "../llm/words";
 import * as C from "../calls";
-import { because, Book, callAction, Letters, message, pay, PAYMENT_FAILED, type Step, usd } from "./common";
+import { because, Book, callAction, Letters, message, pay, PAYEE_DIED, PAYMENT_FAILED, type Step, usd } from "./common";
 
 interface Payment { instruction: string; from: string; to: string; amount: number; due: number; settles?: string }
 
@@ -62,7 +62,7 @@ export const bankPaymentSystem: BehaviourModule = {
   keeps: [
     { what: "request", why: "A bank keeps its own customers' instructions: every standing order and payment request it is asked to carry out is addressed to it." },
   ],
-  version: "0.10.0",
+  version: "0.11.0",
   doc: "docs/behaviour/bank-payment-system.md",
   cadence: () => DAY,
   firstWake: () => 0,
@@ -200,8 +200,17 @@ export const bankPaymentSystem: BehaviourModule = {
           continue;
         }
         if (Number.isInteger(d.every) && d.every > 0) {
+          // A standing order into the account of someone we've been told has died: the payer is told, once (how an
+          // employer comes to know: docs/behaviour/deaths.md). It is still carried out, into the estate.
           const was = nextDue.get(ins.id);
           let due = was ?? ins.at + (Number.isInteger(d.first) ? d.first : d.every);
+          // (Said when a payment under it next falls due, so that it is said at the same moment however often the
+          // order is gone through.)
+          const payee = due <= obs.t ? custody().get(d.to) : undefined;
+          if (payee && dead.has(payee.holder) && !done.has(`died:${ins.id}`)) {
+            done.add(`died:${ins.id}`);
+            refusals.push(message([ins.author === "genesis" ? ins.speaks_for ?? me : ins.in_position ?? ins.author], PAYEE_DIED.note(payee.holder, d.to, ins.id), ins.id));
+          }
           while (due <= obs.t) {
             out.push({ instruction: ins.id, from: d.from, to: d.to, amount: d.pay, due });
             due += d.every;

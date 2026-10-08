@@ -1,6 +1,6 @@
 {
   "name": "bank.payment_system",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "doc": "docs/behaviour/bank-payment-system.md",
   "params": {
     "amount": {

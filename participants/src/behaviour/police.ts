@@ -17,7 +17,7 @@ import { Staffing, stepper } from "./firms";
 
 export const station: BehaviourModule = {
   name: "police.station",
-  version: "0.2.0",
+  version: "0.2.1",
   doc: "docs/behaviour/crime.md",
   cadence: () => DAY,
   firstWake: (ctx) => 10 * 3600 + ctx.rng("first-wake").below(3600),

@@ -34,7 +34,7 @@ export const principal: BehaviourModule = {
     { what: "school_enrolment", why: "A school keeps its own roll: every pupil's enrolment is made with it." },
     { what: "school_place", why: "The places it has given, each to a pupil on its own roll." },
   ],
-  version: "0.2.0",
+  version: "0.2.1",
   doc: "docs/behaviour/education.md",
   cadence: () => DAY,
   firstWake: (ctx) => 8 * 3600 + ctx.rng("first-wake").below(1800),

@@ -1,15 +1,26 @@
 {
   "name": "city.registry",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "doc": "docs/behaviour/institutions.md",
-  "params": {},
+  "params": {
+    "estate_tells": {
+      "schema": {
+        "type": "array"
+      },
+      "default": [],
+      "source": "placeholder"
+    },
+    "feeds": {
+      "schema": {
+        "type": "array"
+      },
+      "default": [],
+      "source": "placeholder"
+    }
+  },
   "perceives": [],
   "state": "none",
   "keeps": [
-    {
-      "what": "death_registration",
-      "why": "The registrar keeps the register of deaths: it makes every entry in it."
-    },
     {
       "what": "lot",
       "why": "In this town the registrar also keeps the register of land: it passes a dead owner's titles to their heirs. The plans of the lots are that register's."

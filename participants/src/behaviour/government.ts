@@ -634,7 +634,7 @@ export const ratesOfficer: BehaviourModule = {
  */
 export const works: BehaviourModule = {
   name: "city.works",
-  version: "0.2.2",
+  version: "0.2.3",
   doc: "docs/behaviour/services.md",
   cadence: () => DAY,
   firstWake: (ctx) => 7 * 3600 + ctx.rng("first-wake").below(3600),

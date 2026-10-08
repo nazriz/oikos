@@ -38,6 +38,34 @@ how long a dead person goes on being treated as alive.
 `found_after`; `homes_channel`, `registry`, `call_seconds` (3,600) on `police.station`. Without `found_alone_after` in
 the profile the police are given no sight of homes and make no calls.
 
+## Who is told (registry 0.5.0, citizen 0.38.0, bank 0.11.0, the employers' modules; generator 0.28.0)
+
+Nobody is shown the register of deaths (docs/no-god-view.md). Until registry 0.5.0 every entry was published, and
+every employer, the bank, the clinic, the school, the police, the energy retailer, every landlord and the support
+office were shown every death in the town and looked through them for their own people. Now an entry is the
+registry's own record, and it is sent to those concerned:
+
+| Who | How they come to know | Basis |
+|---|---|---|
+| **Whoever reported it** | The entry is addressed to them: the family member, the landlord, the police. | The informant is given the certificate (Births, Deaths and Marriages Registration Act 1996 (Vic) ss 37, 39: the doctor notifies the registrar within 48 hours and the funeral director within 7 days of the disposal; the registry's "Register a death" page; both opened 2026-10-08) |
+| **Those the family names** | Reporting a death, a household member names whom the dead person dealt with, as far as the household knows them (`tell` on the notification): their bank, the energy retailer, the school if they were of school age, and the landlord if the one reporting holds the lease. The registry addresses its entry to each. | The bereaved choose whom to tell, and one notice can reach many: GOV.UK, "Tell Us Once" (opened: it reaches government bodies; "banks, mortgage providers ... utility companies, landlords" are for the bereaved to tell); the Australian Death Notification Service, where the notifier picks the banks, utilities and others to be told once the death is registered (to confirm: its own site would not open; as state registries describe it) |
+| **Those sent every entry as of right** (`feeds`) | The support office; a retirement fund where the town has one. | Registrars-General send lists of deaths to the electoral authority (Commonwealth Electoral Act 1918 s 108, as the Australian Electoral Commission's 2000 submission on tax file numbers sets out; opened, the current section not), and registry data is matched by the payer of pensions (Services Australia: to confirm). The fund is a stand-in: a fund is told by the family, who here are not told which fund |
+| **The town's own offices** | The registry is the town's, so its entries are the town's own papers: the electoral office (the roll) and child protection (children left without an adult) read them as before. | The same s 108 feed; a registrar's referral |
+| **An estate with no family** (`estate_tells`) | Where the report names no family (a landlord's or the police's), the estate passes to the town, and the registry addresses the entry to the bank and the energy retailer as well. | An administrator writes to the institutions a dead person may have dealt with (a public trustee's practice: to confirm, no source opened) |
+| **An employer** | Is on no register and is told by no registry. It learns from its bank: when a wage next falls due into the account of someone the bank has been told has died, the bank writes to whoever pays it, once ("Your payments to ... : the account's holder, ..., has died"). The payment is still made, into the estate; the employer then stops the wages and ends the employment, as it did on seeing the entry. So an employer learns at the next pay day, up to a pay period after the bank does. | A payment to a dead person's account comes back to its sender with the reason (in the United States' clearing rules a return code of its own, "beneficiary or account holder deceased": to confirm, from memory); an employer acts "on receipt of an official death/funeral notice, a registered death certificate or written notification ... from the deceased's legal representative" (Southern Cross University, "Death of an employee", opened: one employer's policy). The household record does not say where each member works, so the family cannot name the employer |
+| **A bank** | By the entry: named by the family, or written to by the town for an estate with no family. It stops the dead person's instructions and settles the estate, as before. | "Once notified ... we will place a stop on accounts held individually in the name of the deceased" (ANZ, "Deceased estates", opened); a bank is told by the family or the estate's representative |
+| **A landlord** | By the entry, when it reported the death itself or the family member reporting held the lease; otherwise it is not told, and the rent stopping is what it sees (its arrears rule). | Consumer Affairs Victoria, "If a renter or rental provider dies" (opened: says what follows once the provider knows, not how it comes to know) |
+| **The police** | Are not told of registrations. They may call at a home already registered; the registry registers a death once. | — |
+| **Someone leaving town** | Tells those they deal with (`tell_on_leaving`: the town where they are enrolled, the energy retailer, whoever pays them support): their departure is addressed to each, and each is shown the departures addressed to it. | — (a change of address is given to those one deals with) |
+
+**Parameters.** `feeds`, `estate_tells` on `city.registry` (the world gives them; none: only the reporter is told);
+`tell_on_leaving` on `citizen.default`. No figure is new.
+
+**What knowing less does.** The bank, the support office, the school and the energy retailer learn at the same moment
+as before. An employer learns up to a pay period later, and pays the estate that wage. A landlord whose tenant's family
+does not hold the lease is not told at all. A firm that is neither named nor paying the dead person (the builder for a
+client, a shop for a customer) never learns.
+
 ## What the police's sight stands for, and why it is the weak point
 
 In a real town the police do not look into homes: somebody calls them. The callers (relatives elsewhere, neighbours,

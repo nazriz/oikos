@@ -5,7 +5,7 @@
 import { expect, test } from "bun:test";
 import type { Observation } from "../src/contracts";
 import { bankPaymentSystem } from "../src/behaviour/bank";
-import { PAYMENT_FAILED } from "../src/behaviour/common";
+import { PAYEE_DIED, PAYMENT_FAILED } from "../src/behaviour/common";
 import { inCurrency } from "../src/money";
 import { Randomness } from "../src/rng";
 import PROFILE from "../../worlds/profiles/au-vic-2026.json";
@@ -80,6 +80,22 @@ test("a payment the world refuses is reported to the holder in other words (it \
   const told = callsOf(m.step(obs({ woke_for: "done", outcomes: [{ action: "a", t: DAY, status: "refused", refusal: { code: "unknown_account" } }], channels: { ...channels, requests: { kind: "records", records: [] } } }), undefined as any) as any);
   expect(told.map((c) => [c.fn, c.args])).toEqual([["message", { to: ["c1"], text: "Payment of 70000 cents to acc-landlord (request pay-1) couldn't be made: there's no such account.", re: "pay-1" }]]);
   expect(PAYMENT_FAILED.is(told[0]!.args.text)).toBe(false);
+});
+
+test("someone who pays by standing order into the account of a person the bank has been told has died is told so, once, when a payment next falls due; it is still paid, into the estate", () => {
+  const m = bank();
+  const wages = statement("r1", 0, "request", { author: "c1-self", speaks_for: "c1", addressed_to: ["bank"], visible_to: ["c1", "bank"],
+    data: { outcome: { money: { from: "acc-c1", to: "acc-c2", amount: "50000", for: "Wages." } }, every: 14 * DAY, first: 14 * DAY } });
+  const death = statement("d1", 20 * DAY, "death_registration", { speaks_for: "city", addressed_to: ["bank"], visible_to: ["city", "bank"], data: { deceased: "c2" } });
+  const paid = (said: any[]) => said.filter((c) => c.fn === "money").length;
+  const told = (said: any[]) => said.filter((c) => c.fn === "message" && PAYEE_DIED.who(c.args.text));
+  const first = at(m, 14 * DAY, [wages], { c1: 500_000, c2: 0 });
+  expect([paid(first), told(first).length]).toEqual([1, 0]);
+  // Told of the death between pay days: nothing is said until a payment falls due.
+  expect(told(at(m, 21 * DAY, [death], { c1: 500_000, c2: 50_000 }))).toEqual([]);
+  const next = at(m, 28 * DAY, [], { c1: 500_000, c2: 50_000 });
+  expect(told(next).map((c) => [c.args.to, c.args.re, PAYEE_DIED.who(c.args.text)])).toEqual([[["c1-self"], "r1", "c2"]]);
+  expect(told(at(m, 42 * DAY, [], { c1: 500_000, c2: 100_000 }))).toEqual([]);
 });
 
 test("going through standing orders only when they're due gives the payments and replies that going through every one at every plan does", () => {

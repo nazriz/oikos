@@ -20,7 +20,10 @@ const household = statement("hh-1", 0, "household", { author: "genesis", speaks_
     { person: "c3", participant: "c3-self", born_at: -30 * YEAR, sex: "male" }, { person: "k1", participant: "k1-self", born_at: -12 * YEAR, sex: "female", parents: ["c1", "c2"] }] } });
 const START = [household, ...signed(employment("J2", 0, "factory-1", "c2", WAGE)), ...signed(employment("J3", 0, "factory-1", "c3", WAGE))];
 const READINGS = { J2: { of: "agreement", status: "in_force" }, J3: { of: "agreement", status: "in_force" } };
-const PARAMS = { registry: "city", child_protection: "city" };
+// (Whom the family names to be told, as far as it knows them: here the bank and the energy retailer. The registry
+// sends its entry to each: nobody is shown its register, docs/no-god-view.md.)
+const PARAMS = { registry: "city", child_protection: "city", bank: "bank", utilities: { energy: "energy-co" } };
+const TELL = ["bank", "energy-co"];
 /** The home, with who is in it and who has left it; and a workplace someone may be at instead. */
 const street = (atHome: string[], left: object[] = [], atWork: string[] = []) => [
   { cell: "cell.0.0", x: 0, y: 0, structure: { structure: "apts-1", type: "apartments", complete: true, spaces: [{ space: HOME, kind: "dwelling", capacity: 6, count: atHome.length, occupants: atHome, left }] } },
@@ -40,7 +43,7 @@ test("of the adults at home, the first in the household's list reports a death t
   // family; the third adult does not.
   const partner = await adult("c2");
   const said = await partner.wake(at, { street: street(["c2", "c3", "k1"], died(at - 4 * HOUR)), in: HOME, woke_for: "cadence" });
-  expect(reports(said)).toEqual([{ deceased: "c1", partner: "c2", children: ["k1"], adult_children: [] }]);
+  expect(reports(said)).toEqual([{ deceased: "c1", tell: TELL, partner: "c2", children: ["k1"], adult_children: [] }]);
   expect(said.some((c) => c.fn === "statement" && c.args.kind === "household" && c.args.data.leaseholder === "c2" && c.args.data.members.length === 3)).toBe(true);
   // Seen again at the next wake: said once.
   expect(reports(await partner.wake(at + DAY, { street: street(["c2", "c3", "k1"], died(at - 4 * HOUR)), in: HOME }))).toEqual([]);
@@ -52,7 +55,7 @@ test("with the first of the survivors out, the adult who is at home reports it",
   const at = 3 * DAY + 11 * HOUR;
   const third = await adult("c3");
   const said = await third.wake(at, { street: street(["c3", "k1"], died(at - HOUR)), in: HOME });
-  expect(reports(said)).toEqual([{ deceased: "c1", partner: "c2", children: ["k1"], adult_children: [] }]);
+  expect(reports(said)).toEqual([{ deceased: "c1", tell: TELL, partner: "c2", children: ["k1"], adult_children: [] }]);
 });
 
 test("a child with no adult of the household at home tells the first of its adults, once; with one at home, nobody", async () => {
@@ -75,7 +78,7 @@ test("an adult told by a child of the household reports it from where they are; 
   const atWork = { street: street([], [], ["c2"]), in: WORK, woke_for: "news" };
   expect(reports(await partner.wake(at, { ...atWork, inbox: [{ id: "m0", from: "c9-self", t: at, text: SAYING.died("c1", HOME) }] }))).toEqual([]);
   const said = await partner.wake(at + HOUR, { ...atWork, inbox: [{ id: "m1", from: "k1-self", t: at, text: SAYING.died("c1", HOME) }] });
-  expect(reports(said)).toEqual([{ deceased: "c1", partner: "c2", children: ["k1"], adult_children: [] }]);
+  expect(reports(said)).toEqual([{ deceased: "c1", tell: TELL, partner: "c2", children: ["k1"], adult_children: [] }]);
   // Home that evening, the death still among the home's departures: nothing more to report.
   expect(reports(await partner.wake(at + 3 * HOUR, { street: street(["c2", "k1"], died(at - 5 * HOUR)), in: HOME }))).toEqual([]);
 });

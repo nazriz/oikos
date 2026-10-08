@@ -30,6 +30,25 @@ test("a deceased's land passes to their partner, else their eldest adult child, 
   expect(calls([lot, title, notice({ deceased: "c0009", partner: "c0002" })])).not.toContain("transfer=");
 });
 
+test("a death's entry is sent to those concerned, never published: whoever reported it, those they named, those sent every entry, and, with no family, those the town writes to for the estate", () => {
+  const entry = (params: object, data: object) => {
+    const m = registry.create({ ...ctx, params });
+    const a: any = m.step(obs([notice(data)]), ctx);
+    return a.call as string;
+  };
+  const world = { feeds: ["outside"], estate_tells: ["bank", "energy-co"] };
+  // Reported by the family (it says who the children are, if none): the reporter, whom they named, and the feed.
+  const family = entry(world, { deceased: "c0001", partner: "c0002", children: [], adult_children: [], tell: ["bank", "school"] });
+  expect(family).toContain('to=["c0002","bank","school","outside"]');
+  expect(family).toContain('visible=["city","c0002","bank","school","outside"]');
+  expect(family).not.toContain("visible=public");
+  // Reported by someone else (a landlord, the police): nobody named, so the town writes to the bank and the utilities.
+  const alone = entry(world, { deceased: "c0001" });
+  expect(alone).toContain('to=["c0002","outside","bank","energy-co"]');
+  // A world that gives the registry nobody to tell: the reporter alone.
+  expect(entry({}, { deceased: "c0001" })).toContain('to=["c0002"]');
+});
+
 test("a title's transfer counts only from its holder, or from whoever issued it", () => {
   const book = new Book();
   const by = (who: string, to: string, id: string) => ({ id, at: 300, author: "x", record: "claim_transfer", speaks_for: who, claim: "title-lot-1", to, visible_to: "public" });

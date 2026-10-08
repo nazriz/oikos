@@ -117,7 +117,7 @@ interface Job { agreement: string; employer: string; wage: number; period: numbe
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.37.0",
+  version: "0.38.0",
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -180,6 +180,8 @@ export const citizen: BehaviourModule = {
       paper: null as string | null, // the local paper, whose news we read (the world says; none: no paper, and nothing is read as news)
       // School (docs/behaviour/education.md): the school children of its ages go to (the world says; none: no school).
       school: null as { entity: string; building: string; ages: [number, number] } | null,
+      // Whom we tell when we leave town for good (the world gives them; none: our leaving is said to nobody in particular).
+      tell_on_leaving: [] as string[],
       // Health (docs/behaviour/health.md): the clinic and its waiting room; the share who go when something's wrong of a
       // kind it sees; and the conditions nobody works with (the world says; none: no clinic).
       care: null as { entity: string; waiting: string; seek_bps: number; severities: string[]; off_work: string[]; wait_days: number } | null,
@@ -713,6 +715,12 @@ export const citizen: BehaviourModule = {
       const street = obs.channels.street;
       const t = obs.t;
       const ourHome = home?.space ?? livingAt;
+      /** Those to be told of a household member's death, as far as we know whom they dealt with. */
+      const tellOfDeath = (dead: Member, at: number): string[] => {
+        const age = ageAt(dead, at, year);
+        const school = p.school && age >= p.school.ages[0] && age <= p.school.ages[1] ? p.school.entity : undefined;
+        return [...new Set([p.bank, p.utilities?.energy, school, home && !home.owned ? home.landlord : undefined].filter((x): x is string => !!x && x !== me))].sort();
+      };
       if (household) {
         let hh: HouseholdData = household;
         const ours = ourHome && street?.kind === "sites" ? street.cells.flatMap((c) => c.structure?.spaces ?? []).filter((sp) => sp.space === ourHome) : [];
@@ -734,7 +742,9 @@ export const citizen: BehaviourModule = {
           if ((d.told || grown.find((m) => atHome.has(m.person))?.person === me) && p.registry) {
             steps.push(because(`${dead.person}, of our household, has died: reporting it to the registry.`, say("death_notification", `${dead.person} has died.`, {
               to: [p.registry],
-              data: { deceased: dead.person, ...(partner && survivors.some((m) => m.person === partner) ? { partner } : {}),
+              // (And whom they had dealings with, as far as we know: their bank, the energy retailer, the school of a
+              // child, the landlord if the lease is ours to know. The registry sends its entry to each.)
+              data: { deceased: dead.person, tell: tellOfDeath(dead, t), ...(partner && survivors.some((m) => m.person === partner) ? { partner } : {}),
                 children: kids.map((k) => k.person), adult_children: kids.filter((k) => ageAt(k, t, year) >= ADULT_YEARS).map((k) => k.person) },
             })));
             if (leaseholder) {
@@ -2253,7 +2263,8 @@ export const citizen: BehaviourModule = {
         for (const o of book.all("request")) if (o.record === "statement" && cites(o, r.id) && o.speaks_for === me && !book.withdrawn.has(o.id)) s.push(withdraw(o.id, "Leaving town."));
         s.push(notice(r.id, "Leaving town."));
       }
-      s.push(say("departure", `${me} has left town.`));
+      // (Told to those we deal with, as the world says who they are: where we're enrolled, who supplies us, who pays us.)
+      s.push(say("departure", `${me} has left town.`, p.tell_on_leaving.length ? { to: [...p.tell_on_leaving].sort() } : {}));
       if (acc && acc.balance > 0 && p.outside_account) s.push(pay(p.outside_account, acc.balance, { from: acc.account, for: "Moving away: send all my savings with me." }));
       // Leaving takes a body out of every space it's in. The children go first, each on its own (one may not be here).
       leaving = true;
