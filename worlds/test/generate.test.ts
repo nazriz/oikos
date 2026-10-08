@@ -131,3 +131,32 @@ test("a firm is held by its owners, from outside, or widely: never by every hous
     expect(config.positions.find((p: any) => p.entity === "fund").role_module.code).toBe("fund.retirement");
   }
 });
+
+// A works' opening money (docs/behaviour/generator.md): its working capital by rule, as a shop's is. Until 2026-10-08 it
+// was one figure for every works, whatever its staff: in the 1,000-person town a works of forty opened with less than
+// half of what a month's inputs cost it, and could not meet a payroll a month in.
+test("a works opens with a month's wages and a month's inputs for its opening staff, never less than the profile's figure", () => {
+  const big = Bun.YAML.parse(readFileSync(join(root, "worlds/town-1000.yaml"), "utf8")) as TownSpec;
+  for (const s of [spec, big]) {
+    const config = generate(s) as any;
+    const floor = JSON.parse(readFileSync(join(root, `worlds/profiles/${s.profile}.json`), "utf8")).values.opening.factory as number;
+    const sells = config.participants.find((p: any) => p.controller?.impl === "world.trade").controller.params.sells as { inputs: number };
+    const factories = config.participants.filter((p: any) => p.controller?.impl === "firm.producer");
+    expect(factories.length).toBeGreaterThan(0);
+    let staffed = 0;
+    for (const f of factories) {
+      const p = f.controller.params, firm = f.owner as string;
+      const staff = config.world.records.filter((r: any) => r.terms?.template === "employment" && r.terms.parties[0] === firm).length;
+      const month = Math.floor((staff * p.working_day * 5 * 30) / 7 / p.labour_per_unit);
+      const inputs = Number(config.world.holdings.find((h: any) => h.holder === firm && h.kind === "inputs").quantity);
+      expect(inputs).toBe(month * p.per_unit.inputs); // (a month's inputs, as before)
+      const capital = Math.floor((p.wage * 30) / 14) * staff + inputs * sells.inputs;
+      const balance = Number(config.world.accounts.find((a: any) => a.holder === firm).balance);
+      expect(balance).toBe(Math.max(floor, capital));
+      if (staff) staffed++;
+      // (Enough for the order that takes its inputs from a month's to a month and a half's, with a pay period's wages kept.)
+      if (staff) expect(balance).toBeGreaterThanOrEqual(Math.ceil((inputs * sells.inputs) / 2) + staff * p.wage);
+    }
+    expect(staffed).toBeGreaterThan(0);
+  }
+});

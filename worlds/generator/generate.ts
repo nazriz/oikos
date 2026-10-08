@@ -815,6 +815,12 @@ export function generate(spec: TownSpec): any {
   for (const f of factories) {
     const month = Math.floor(((staffCount.get(f) ?? 0) * WORKING_DAY * 5 * 30) / 7 / MAKE.labour);
     factoryStock.push({ kind: "inputs", holder: f, at: `${f}-works`, quantity: String(month * MAKE.inputs) }, { kind: "goods", holder: f, at: `${f}-works`, quantity: String(Math.floor(month / 4)) });
+    // A works' opening money: its working capital, as a shop's is (above), by the works' own rule for what it keeps
+    // before paying its owners (docs/behaviour/producer.md): a month's wages and a month's inputs for its opening
+    // staff, both paid ahead of what it sells. Never less than the profile's figure, which is what a works with no
+    // staff yet holds to start on.
+    const account = accounts.find((a) => a.id === `acc-${f}`)!;
+    account.balance = Math.max(account.balance, Math.floor((wages.factory * MONTH) / (14 * DAY)) * (staffCount.get(f) ?? 0) + month * MAKE.inputs * WORLD.inputs);
   }
   for (const s of shops) factoryStock.push({ kind: "goods", holder: s, at: `${s}-premises`, quantity: String(Math.floor(SHOP.demand / 2)) });
   for (const firm of firmIds) {
