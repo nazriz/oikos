@@ -15,7 +15,16 @@
       "minor_words": [
         "paisa",
         "paise"
-      ]
+      ],
+      "decimal_mark": ".",
+      "group_mark": ",",
+      "grouping": [3, 2],
+      "number_words": {
+        "lakh": 100000,
+        "lakhs": 100000,
+        "crore": 10000000,
+        "crores": 10000000
+      }
     },
     "households": {
       "lone_bps": 466,
@@ -1293,7 +1302,7 @@
     }
   },
   "sources": {
-    "currency": "Indian rupees, in paise: written with the rupee sign before the amount (\"₹1,234.56\"), or in words as rupees and paise (paisa singular, paise plural). ISO 4217: INR, two decimal places. Coinage Act 2011 (Government of India): the rupee is divided into 100 paise. The Indian grouping of digits (₹1,23,456, lakhs and crores) is not expressible: amounts are written in the western grouping.",
+    "currency": "Indian rupees, in paise: written with the rupee sign before the amount (\"₹1,234.56\"), or in words as rupees and paise (paisa singular, paise plural). ISO 4217: INR, two decimal places. Coinage Act 2011 (Government of India): the rupee is divided into 100 paise. How its people write money: the rupee sign before the digits with no space, a point before the decimals, commas after the first three digits from the right and then every two (\"₹1,23,456.78\"), and large sums in lakh (100,000) and crore (10,000,000). Unicode CLDR (cldr-json, cldr-numbers-full/main/en-IN/numbers.json, opened 2026-10-08): decimal '.', group ',', decimalFormat '#,##,##0.###', currency pattern '¤#,##,##0.00'. Wikipedia, \"Indian numbering system\" (opened 2026-10-08): lakh = 100,000, crore = 10,000,000, \"150,000 rupees is '1.5 lakh rupees' ... written as '1,50,000 rupees'\". The Reserve Bank of India's own style was not opened. Other words of the system (arab, kharab) are not listed.",
     "households": "Census of India 2011 (the last census; 15 years old), Table HH-01 'Normal households by household size', Tamil Nadu (DDW-HH01-3300-2011.XLS, opened): 18,462,231 households; urban Tamil Nadu 8,954,366 households of 34,493,120 people (mean 3.85); one-person households 4.66% of urban households (5.89% of all). lone_bps 466 is that figure. The Census 2011 tables do not publish households by type (nuclear, joint, couple, one parent): couple_bps, couple_children_bps, one_parent_bps and group_bps (which stands for extended and joint households, the rest of the households after the lone ones) are PLACEHOLDERS shaped by the size table (14% of urban households have 2 members, 19% have 3, 31% have 4). The structure can draw extended households only as 2-3 unrelated adults (a gap), so generated households are smaller than the census's mean of 3.85. children_couple and children_one_parent: placeholders shaped by Tamil Nadu's total fertility rate (1.54 for 2021-25, National Commission on Population, Technical Group, Population Projections for India and States 2011-2036, Table 17A, opened). same_sex_couple_bps 0: the census does not record them (an absence of data). lone_parent_female_bps 85%: placeholder. adult_female_bps: the projected sex ratio of Tamil Nadu in 2026, 1,006 females per 1,000 males (Technical Group projections, Table T-17, opened): 1006/2006. child_male_bps: NFHS-5 Tamil Nadu sex ratio at birth for births in the last five years, 878 females per 1,000 males (IIPS, NFHS-5 State Fact Sheet Compendium Phase II, Tamil Nadu, indicator 4, opened: 1000/1878 = 53.2% male); a small-sample survey figure, probably more skewed than the registered one. mother_age_at_first_birth [20, 28]: placeholder around a median of about 23 (NFHS-5; not read). adult_ages, group_size, child_max_age: structure bounds. Children at home are drawn to 24, a simplification.",
     "households.age_bands_bps": "National Commission on Population (Ministry of Health and Family Welfare), Report of the Technical Group on Population Projections 2011-2036 (July 2020), Table 19, Tamil Nadu, 1 March 2026, person: 0-4 5.6%, 5-9 6.1, 10-14 6.6, 15-19 6.8, 20-24 7.2, 25-29 7.6, 30-34 7.9, 35-39 8.1, 40-44 8.0, 45-49 7.5, 50-54 6.8, 55-59 6.1, 60-64 5.1, 65-69 4.0, 70-74 2.9, 75-79 2.0, 80 and over 1.8 (opened from an archived copy of the PDF, a web.archive.org capture of nhm.gov.in). The report's last group is 80+: it is split 1.3% for 80-84 and 0.5% for 85-99, a placeholder split. 2026 total 77.546 million; 0-14 18.3%, 60+ 15.8%. A projection from the 2011 census, not a count; SRS Statistical Report 2020 (Tamil Nadu: under 15, 19.1%; 60+, 11.7%, opened) is the check.",
     "fertility_per_10000": "Registrar General of India, SRS Statistical Report 2020, Statement 21 (ASFRs, Tamil Nadu, 2020): births per 1,000 women of 5.6, 86.0, 123.7, 54.3, 15.0, 3.5 and 0.5 at 15-19, 20-24, 25-29, 30-34, 35-39, 40-44 and 45-49, times 10 (configs are integers). The total fertility rate these give is 1.4 (the report's figure for Tamil Nadu); NFHS-5 gives 1.8 for 2019-21. (The Technical Group projection, Table 17A, has Tamil Nadu's total fertility rate at 1.54 for 2021-25 and 1.52 for 2026-30.)",

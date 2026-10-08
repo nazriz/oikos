@@ -91,7 +91,10 @@ test("money is read and written in the world's own currency: no smaller unit, th
   expect([said(fine, "FIN 0.00000001"), said(fine, "1.5"), formatMoney("150000001", fine)]).toEqual(["1", "150000000", "FIN 1.50000001"]);
 
   // The town's own, to the limits: 38 digits at most, and its words in the refusals.
-  expect(said(TOWN_MONEY, "$1.234")).toBe("refused: a point with three digits after it can be read two ways: $1.234");
+  // (The town says its decimal mark, so a point once is the decimals; a currency that says nothing of it is told "two ways".)
+  expect(said(TOWN_MONEY, "$1.234")).toBe("refused: more than two decimals: $1.234");
+  const unsaid: Currency = { ...TOWN_MONEY, decimal_mark: undefined, group_mark: undefined };
+  expect(said(unsaid, "$1.234")).toBe("refused: a point with three digits after it can be read two ways: $1.234");
   expect(said(TOWN_MONEY, "aud 500")).toBe("50000");
   expect(said(TOWN_MONEY, `$${"9".repeat(36)}`)).toBe(`${"9".repeat(36)}00`);
   expect(said(TOWN_MONEY, `$${"9".repeat(37)}`)).toBe(`refused: too large: $${"9".repeat(37)}`);

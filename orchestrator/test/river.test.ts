@@ -29,6 +29,10 @@ async function run(compliance: number, name: string) {
   return { riverSite, riverCells: cellsOf(riverSite), ev, recs };
 }
 
+// (Marked as expected to fail on 2026-10-08, for a landlord whose offer the builder declined and who never offered
+// again: in this town the builder republishes its prices the morning the landlord commissions the house. Since
+// firm.landlord 0.13.2 a declined offer is made again at the builder's price, and the test passes for that reason:
+// the house goes up on the river site, the builder gives notice of it, and the inspector goes there.)
 test("a refused permit, a landlord who builds anyway, and an inspector who notices", async () => {
   const { riverSite, riverCells, ev, recs } = await run(0, "defiant");
   const app = recs.find((r) => r.kind === "permit_application" && r.data.lot === riverSite);

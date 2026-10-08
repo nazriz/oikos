@@ -10,13 +10,15 @@
    "symbol": "R$",
    "unit_words": [
     "real",
-    "reais",
-    "conto"
+    "reais"
    ],
    "minor_words": [
     "centavo",
     "centavos"
-   ]
+   ],
+    "decimal_mark": ",",
+    "group_mark": ".",
+    "symbol_spaced": true
   },
   "households": {
    "lone_bps": 1874,
@@ -1283,7 +1285,7 @@
   }
  },
  "sources": {
-  "currency": "Brazilian real, in centavos: written R$ before the amount, or in words as reais (informally contos) and centavos. ISO 4217: BRL, two decimal places. Words \"conto\" for an informal unit (to confirm usage in Minas Gerais). Brazilians write R$1.234,56 (dot for thousands, comma for decimals); the currency block has no field for that (a structural gap, reported with this profile).",
+  "currency": "Brazilian real, in centavos: written R$ before the amount, or in words as reais and centavos. ISO 4217: BRL, two decimal places. How its people write money: a comma before the decimals, points between thousands, R$ before the digits with a space (\"R$ 1.234,56\"). Unicode CLDR (cldr-json, cldr-numbers-full/main/pt/numbers.json, opened 2026-10-08): decimal ',', group '.', currency pattern '¤ #,##0.00' (the data is Portuguese for Brazil by CLDR's default; the page does not say so itself). The Manual de Redação da Presidência da República and ANBIMA's manual were not opened (a web search found them; no text was read). \"Conto\" is removed from the unit words: in every dictionary opened (Priberam, https://dicionario.priberam.org/conto: \"mil escudos\"; Dictionary.com: \"1000 escudos\", \"1000 milreis\", \"an unofficial Brazilian monetary unit worth 1000 cruzeiros\") it is a thousand of the unit, never one real, and none of them says it is used for one real, so \"5 conto\" must not be read as five reais (it is refused).",
   "households.age_bands_bps": "IBGE, SIDRA open API (apisidra.ibge.gov.br), Censo Demografico 2022, table 9514 (resident population by sex and age group), municipality of Aguanil, MG (code 3100807; 4,357 residents; opened 2026-10-08): shares of the population aged 0 to 99; the 85-99 band sums the 85-89, 90-94 and 95-99 groups.",
   "households.lone_bps": "IBGE, SIDRA open API (apisidra.ibge.gov.br), Censo 2022 table 9879 (private households by type of household unit), Aguanil: 304 one-person households of 1,622 (18.7%). Opened 2026-10-08.",
   "households.group_bps": "IBGE, SIDRA open API (apisidra.ibge.gov.br), Censo 2022 table 9882 (household composition), Aguanil: 394 households of \"other composition\" less the 304 one-person households = 90 of 1,622 (5.5%), taken as multi-person households with no spouse/child/step-child.",
