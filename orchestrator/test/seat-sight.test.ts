@@ -70,11 +70,13 @@ test("a mayor's letters all go, whatever it writes as what they are about; none 
   let n = 0;
   const use = (name: string, input: object) => ({ type: "tool_use" as const, id: `t${++n}`, name, input });
   const shown: string[] = [];
+  const everything: string[] = [];
   let sitting = 0;
   const adapter = new MockAdapter("mock", {
     participant: (req: LlmRequest) => {
       shown.push(shownLast(req));
-      if (req.messages.length > 1 || ++sitting > 1) return [use("done_for_now", { days: 7 })];
+      everything.push(`${req.system}\n${JSON.stringify(req.messages)}`);
+      if (req.messages.length > 1 || ++sitting > 1) return [use("done_for_now", { days: 1 })];
       // As the first real mayor wrote: what it is about in words, as an id, and not at all.
       return [use("write", { to: ["bank"], text: "Please confirm the town's account is in order.", as: "mayor", about: "acc-city payments" }),
         use("write", { to: ["finance"], text: "What does the payments procedure allow before a budget is adopted?", as: "mayor", about: "proc-payments" }),
@@ -103,4 +105,8 @@ test("a mayor's letters all go, whatever it writes as what they are about; none 
   // It is told each went, and its own record of the run counts what was sent.
   expect(shown[1]).toContain('Done: your letter to bank (headed "About: acc-city payments": what it is about is not one id, so it heads the letter).');
   expect(debrief).toContain("3 letters of yours were sent, you asked for 0 things to be done");
+  // The offices answer, and their letters are signed by post and organisation; nothing it is ever shown, in a letter, a
+  // paper or its standing instructions, has an id of the platform's own in it (principle 14).
+  expect(shown.join("\n")).toMatch(/- From [^\n]*\((finance|council-clerk|bank-payments)\), [^\n]*\((city|bank)\) \(year 1, day \d+\)/);
+  for (const x of everything) expect(x).not.toMatch(/[a-z]-system\b|[0-9]-self\b/);
 }, 120_000);

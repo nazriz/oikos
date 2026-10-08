@@ -88,6 +88,20 @@ export function readable(x: unknown, how: { fields?: FieldKinds; money?: (a: str
 
 /** Long text is cut short, with a mark, except in what the participant looked up (`whole`); `cuts` counts what a
  * report cut, so that it can say so. (Rendering is synchronous: both are set and read within one report.) */
+/** Who someone is in the world, by any id of theirs: the id a seat names them by, what they are called, and whose post
+ * it is. A participant has an id of the platform's own, which no seat is shown: an office is known by its post, a
+ * person by themselves (principle 14). Set for the report being written. */
+export type WhoIs = (id: string) => { id: string; name?: string; of?: string } | undefined;
+let whoIs: WhoIs | undefined;
+/** Whoever wrote a paper, as the world knows them. */
+const writer = (id: string) => whoIs?.(id)?.id ?? id;
+/** Someone by name and id, and the organisation whose post it is: how a letter is signed. */
+function signed(id: string): string {
+  const w = whoIs?.(id);
+  const me = w?.id ?? id;
+  const org = w?.of ? whoIs?.(w.of) : undefined;
+  return `${w?.name && w.name !== me ? `${w.name} (${me})` : me}${w?.of ? `, ${org?.name && org.name !== w.of ? `${org.name} (${w.of})` : w.of}` : ""}`;
+}
 let inFull = false;
 let cuts = 0;
 const clip = (s: string, max = 400) => (inFull || s.length <= max ? s : (cuts++, s.slice(0, max) + "…"));
@@ -199,7 +213,7 @@ function readingWords(x: Reading | undefined): string {
 
 function describe(r: Record, readings?: { [id: string]: Reading }): string {
   const from = r.author === "genesis" ? "" : ` (${when(r.at)})`;
-  const who = r.speaks_for ?? r.author;
+  const who = r.speaks_for ?? writer(r.author);
   switch (r.record) {
     case "statement": {
       if (r.kind === "request" && r.data?.outcome) return `[${r.id}] ${who} asked ${(r.addressed_to ?? []).join(", ")} to ${outcomeWords(r.data.outcome, r.data.every)}${from}`;
@@ -422,7 +436,7 @@ const says = (x: unknown, asked: string) => {
 
 /** One paper as a line of a list: its id, what it is, its date, from whom, and a line of what it says. */
 function listLine(r: Record, readings?: { [id: string]: Reading }): string {
-  const who = r.speaks_for ?? (r.author === "genesis" ? undefined : r.author);
+  const who = r.speaks_for ?? (r.author === "genesis" ? undefined : writer(r.author));
   const date = r.author === "genesis" && r.at === 0 ? "from the start" : when(r.at);
   const cut = (x: string) => (x.length > GIST_MAX ? `${x.slice(0, GIST_MAX)}…` : x);
   let gist: string;
@@ -452,7 +466,7 @@ function listLines(records: Record[], limit: number, readings?: { [id: string]: 
     if (r.record === "claim") while (j < records.length && alike(r, records[j]!)) j++;
     if (j - i >= 4) {
       const run = records.slice(i, j) as Extract<Record, { record: "claim" }>[];
-      const who = r.speaks_for ?? (r.author === "genesis" ? undefined : r.author);
+      const who = r.speaks_for ?? (r.author === "genesis" ? undefined : writer(r.author));
       lines.push(`${num(run.length)} ${paperKind(r)}s, ${r.author === "genesis" && r.at === 0 ? "from the start" : when(r.at)}${who ? `, from ${who}` : ""}: ${run[0]!.holder} ${POSITION[run[0]!.position] ?? run[0]!.position}: ${run.slice(0, 6).map((x) => `${x.about?.object ?? x.id} [${x.id}]`).join(", ")}${run.length > 6 ? `, and ${num(run.length - 6)} more (to find one, say what it is about)` : ""}`);
       i = j;
     } else lines.push(listLine(records[i++]!, readings));
@@ -485,7 +499,7 @@ function paperInFull(r: Record, asked: Looked, readings?: { [id: string]: Readin
   const lists: [string, unknown[]][] = r.record === "statement" && r.data !== null && typeof r.data === "object" ? Object.entries(r.data as object).filter((e): e is [string, unknown[]] => Array.isArray(e[1]) && e[1].length > 1) : [];
   if (all.length <= PAPER_MAX && !(narrowed && lists.length)) return [`- ${all}`];
   if (r.record !== "statement" || !lists.length) return [`- ${all.slice(0, PAPER_MAX)}…`, `(Cut short at ${num(PAPER_MAX)} of its ${num(all.length)} characters.)`];
-  const out = [`- [${r.id}] ${paperKind(r)} from ${r.speaks_for ?? r.author}${r.author === "genesis" ? "" : ` (${when(r.at)})`}: "${r.text.length > 2000 ? `${r.text.slice(0, 2000)}…` : r.text}"`];
+  const out = [`- [${r.id}] ${paperKind(r)} from ${r.speaks_for ?? writer(r.author)}${r.author === "genesis" ? "" : ` (${when(r.at)})`}: "${r.text.length > 2000 ? `${r.text.slice(0, 2000)}…` : r.text}"`];
   let room = PAPER_MAX - out[0]!.length;
   for (const [k, v] of Object.entries(r.data as object)) {
     if (lists.some(([name]) => name === k)) continue;
@@ -634,6 +648,8 @@ export interface RenderOptions {
   /** Folders that hold papers of some kinds only (by report: the kinds, as a list of papers names them): nothing else
    * is shown under their name, as it comes or looked up. */
   folders?: Map<string, string[]>;
+  /** Who someone is in the world, by any id of theirs (a letter's writer, a paper's author). */
+  whoIs?: WhoIs;
   /** Told of each look cut short at the most one look shows (`LOOK_CHARS_MAX`). */
   onCut?: (cut: { report: string; characters: number; limit: number }) => void;
 }
@@ -645,6 +661,7 @@ export const NOTHING_NEW = "Nothing new there since you last looked.";
 /** What's new since the participant last looked. */
 export function renderObservation(obs: Observation, o: RenderOptions = {}): string {
   inFull = false;
+  whoIs = o.whoIs;
   const max = o.maxRecords ?? 40;
   const postTitle = new Map((obs.positions ?? []).map((p) => [p.position, p.title ?? words(p.role ?? p.position)]));
   // A post's reports are named after the post (`mayor/budget` reads "Mayor: Budget").
@@ -668,7 +685,8 @@ export function renderObservation(obs: Observation, o: RenderOptions = {}): stri
   for (const n of obs.notices ?? []) out.push(n.re ? `A note on your request: ${n.text}` : n.text);
   if (obs.inbox.length) {
     out.push("", "## Letters");
-    for (const m of obs.inbox) out.push(`- From ${m.from} (${when(m.t)})${m.re ? `, about ${m.re}` : ""}: "${m.text}"`);
+    // A letter is signed: by the post it was written in and whose post that is, or by the person or organisation.
+    for (const m of obs.inbox) out.push(`- From ${signed(m.as ?? (whoIs?.(m.from) ? m.from : m.from_entity ?? m.from))} (${when(m.t)})${m.re ? `, about ${m.re}` : ""}: "${m.text}"`);
   }
   // Anything on file (standing documents) isn't repeated in other reports.
   const onFile = new Set(Object.entries(obs.channels).flatMap(([id, ch]) => (o.standing?.has(id) && ch.kind === "records" ? ch.records.map((r) => r.id) : [])));
@@ -805,7 +823,8 @@ export function renderObservation(obs: Observation, o: RenderOptions = {}): stri
  * the same kind, from whoever it speaks for, says it replaces (an amended law names the law it replaces), whether or
  * not the withdrawal is among what's shown. The same reading as a code participant's book (`Book`, behaviour/common.ts).
  */
-export function renderStanding(obs: Observation, standing: Set<string>): string {
+export function renderStanding(obs: Observation, standing: Set<string>, who?: WhoIs): string {
+  whoIs = who;
   const out: string[] = [];
   // An office's own stationery (a form that writes a paper of that office's) is on file for whoever holds the
   // office: another office of the same organisation is not shown it.

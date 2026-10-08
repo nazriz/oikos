@@ -51,6 +51,8 @@ export interface TranslateRequest {
   proposal: string;
   /** What the participant knows (the resolver and the preview use it; the translator sees only its forms). */
   knowledge: Knowledge;
+  /** What someone is called, for the preview, where the seat's own knowledge has no name for them. */
+  called?: (id: string) => string | undefined;
 }
 
 export type Translation = { ok: true; draft: Draft; hash: string } | { ok: false; notices: string[]; call?: string; raw?: unknown; invalid?: string[]; asked_back?: true };
@@ -306,7 +308,7 @@ export function createTranslator(io: LlmIO, check: KernelCheck, typeOf: (type: s
     const warnings = lawWarnings(r.blocks, req.knowledge, typeOf, req.as);
     const draft: Draft = {
       id: req.draftId, participant: req.participant, ...(req.as ? { as: req.as } : {}), proposal: req.proposal.slice(0, 16384), call, resolver: RESOLVER,
-      blocks: r.blocks, summary: new Preview(req.knowledge, req.knowledge.actingFor(req.as)).of(r.blocks).slice(0, 16384),
+      blocks: r.blocks, summary: new Preview(req.knowledge, req.knowledge.actingFor(req.as), req.called).of(r.blocks).slice(0, 16384),
       check: { ok: k.ok, ...(k.refusal ? { refusal: k.refusal } : {}), ...(warnings.length ? { warnings } : {}) },
       translator: tid,
     };

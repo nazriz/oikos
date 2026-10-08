@@ -365,6 +365,22 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     params: sortedKeys(params ?? {}) as any,
   });
   const isLlm = (p: Part) => p.controller?.type === "llm";
+  /** Who someone is in the world, by any id of theirs: a participant's own id is the platform's, and no seat is shown
+   * it (principle 14). An office's system is known by the post it holds, a person's seat by the person; a post by its
+   * title and whose it is; anyone else by what they are called. What a letter's signature and a paper's author say. */
+  const entityNames = new Map<string, string>((cfg.world?.entities ?? []).map((e: any) => [e.id, e.name]));
+  const whoIs = (id: string): { id: string; name?: string; of?: string } | undefined => {
+    const p = parts.get(id);
+    if (p) {
+      const posts = p.kind === "system" ? held(id) : [];
+      if (posts.length === 1) return { id: posts[0]!.id, name: posts[0]!.title ?? p.title, of: posts[0]!.entity };
+      const e = p.person ?? p.owner;
+      return e ? { id: e, ...(entityNames.get(e) ? { name: entityNames.get(e)! } : {}) } : undefined;
+    }
+    const x = positions.get(id);
+    if (x) return { id, ...(x.title ? { name: x.title } : {}), of: x.entity };
+    return entityNames.has(id) ? { id, name: entityNames.get(id)! } : undefined;
+  };
 
   /** A code unit for one capacity of a participant, if there's a module to run it. */
   const codeUnit = async (p: Part, cap: string, controller = p.controller, wakeAt?: number): Promise<Unit | undefined> => {
@@ -428,7 +444,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     const boards = new Set<string>((cfg.knowing?.published ?? []).filter((x: any) => x.board).map((x: any) => x.what));
     const ways = new Map<string, { way: string; by?: string[]; board?: boolean }>(chans.filter((x) => x.ch.way).map((x) => [x.path, { way: x.ch.way, ...(x.ch.by ? { by: x.ch.by } : {}),
       ...(x.ch.way === "published" && !x.ch.from && (x.ch.match?.statement_kinds ?? []).some((k: string) => boards.has(k)) ? { board: true } : {}) }]));
-    const config = { participant: p.id, entity, entityName, onRequest, kinds, ways, title: office?.title ?? p.title, role: office?.role, framing: p.framing, standing: standingIds, titles, cadenceDays: pp.cadence_days ?? 7, draftText,
+    const config = { whoIs, participant: p.id, entity, entityName, onRequest, kinds, ways, title: office?.title ?? p.title, role: office?.role, framing: p.framing, standing: standingIds, titles, cadenceDays: pp.cadence_days ?? 7, draftText,
       ...(pp.sessions ? { sessions: pp.sessions } : {}), ...(pp.max_actions ? { maxActions: pp.max_actions } : {}),
       // Folders that hold some kinds of paper only (by the channel's own id, as `standing` is given), and the most a prompt may be.
       ...(pp.folders ? { folders: new Map<string, string[]>(Object.entries(pp.folders as { [id: string]: string[] }).flatMap(([id, kinds]) => chans.filter((x) => x.path === id || x.path.endsWith(`/${id}`)).map((x) => [x.path, kinds] as [string, string[]]))) } : {}),
@@ -865,7 +881,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     unwritten.push({ key: u.key, notes });
     const tr = await translating.run(notes, async () => {
       try {
-        return await translator.translate({ draftId, participant: u.participant, as, proposal: action.text, knowledge: u.knowledge });
+        return await translator.translate({ draftId, participant: u.participant, as, proposal: action.text, knowledge: u.knowledge, called: (id) => whoIs(id)?.name });
       } catch (e) {
         if (!(e instanceof ModelCallFailed)) throw e;
         if (++unanswered >= MAX_FAILURES_IN_A_ROW) throw new ModelUnreachable(`the model can't be reached (${unanswered} calls in a row failed; the last, the translator's: ${String(e.message).slice(0, 300)}): the run stops here; resume it once it can be (oikos resume <log>)`);

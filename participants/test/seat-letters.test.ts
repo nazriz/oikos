@@ -68,7 +68,7 @@ test("what could not go is told at once, in the seat's terms, and nothing else i
   ]]);
   // The request goes, its reason kept as far as a record holds; so does the answer on a draft, with its note.
   expect(await p.step(obs(9 * HOUR), ctx)).toEqual({ type: "propose", text: "Publish a notice: the hall opens at nine.", as: "mayor", reasoning: long.slice(0, TEXT_MAX) });
-  expect(await p.step(obs(9 * HOUR), ctx)).toEqual({ type: "sign", draft: "draft.mayor.1", decision: "reject", note: long.slice(0, TEXT_MAX) });
+  expect(await p.step(obs(9 * HOUR), ctx)).toEqual({ type: "sign", draft: "draft.mayor-system.1", decision: "reject", note: long.slice(0, TEXT_MAX) });
   await p.step(obs(9 * HOUR), ctx);
   const r = resultsOf(calls[1]!);
   expect(r.a).toBe(`Not done: "Council Clerk" isn't an id: a letter goes to people and organisations by the ids your reports give them (to find one, look them up in who's who).`);

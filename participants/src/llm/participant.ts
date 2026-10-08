@@ -17,9 +17,9 @@ import type { ParticipantContext } from "../module";
 import { inCurrency } from "../money";
 import type { ContentBlock, LlmMessage, ToolSpec } from "./adapter";
 import { callModel, ModelCallFailed, promptTooLong, type LlmIO } from "./call";
-import { kindSaid, LOOK_CHARS_MAX, NOTHING_FOUND, NOTHING_NEW, renderObservation, renderStanding, type Looked } from "./render";
+import { kindSaid, LOOK_CHARS_MAX, NOTHING_FOUND, NOTHING_NEW, renderObservation, renderStanding, type Looked, type WhoIs } from "./render";
 
-export const LLM_PARTICIPANT_VERSION = "0.13.0"; // 0.13.0: figures in the papers it is shown read as a person reads them (money, days, dates, per cent), a letter whose about is not one id goes with it at its head, and nothing a seat sends is lost without a word; a look into papers answers with a list (a paper is read when asked for by its id, a long one a part at a time), one look and one whole prompt have a ceiling, a prompt its model would not take is never sent again unchanged; 0.12.0: told that a paper is named by its id, and one it cannot name is looked up first; 0.11.0: a place it is not at is gone to (someone is sent, and what they found is told when they are back); 0.10.0: who is who is looked up by name, a register someone else keeps is asked about one named thing, a board is searched (docs/design/knowing.md); 0.9.0: an answer read exactly or not at all (told and asked once more when not), a way out of the study not clearly meant is asked about; 0.8.0: looks kept ready for every sitting; no turn when nothing came of looking into whole reports; a notebook added to or changed in part
+export const LLM_PARTICIPANT_VERSION = "0.13.0"; // 0.13.0: offices and people by their names in the world and never a participant's own id, who holds a post, figures in the papers it is shown read as a person reads them (money, days, dates, per cent), a letter whose about is not one id goes with it at its head, and nothing a seat sends is lost without a word; a look into papers answers with a list (a paper is read when asked for by its id, a long one a part at a time), one look and one whole prompt have a ceiling, a prompt its model would not take is never sent again unchanged; 0.12.0: told that a paper is named by its id, and one it cannot name is looked up first; 0.11.0: a place it is not at is gone to (someone is sent, and what they found is told when they are back); 0.10.0: who is who is looked up by name, a register someone else keeps is asked about one named thing, a board is searched (docs/design/knowing.md); 0.9.0: an answer read exactly or not at all (told and asked once more when not), a way out of the study not clearly meant is asked about; 0.8.0: looks kept ready for every sitting; no turn when nothing came of looking into whole reports; a notebook added to or changed in part
 
 export interface LlmParticipantConfig {
   participant: string;
@@ -57,6 +57,9 @@ export interface LlmParticipantConfig {
    * them by, such as "employment agreement"): a folder named for payroll holds payroll papers, whatever else is the
    * organisation's own. Nothing else is shown under its name, as it comes or looked up. */
   folders?: Map<string, string[]>;
+  /** Who someone is in the world, by any id of theirs (render.ts, `WhoIs`): how a letter's writer and a paper's author
+   * are named to the seat, and what a participant's own id (the platform's, which no seat is shown) is put as. */
+  whoIs?: WhoIs;
   /** The most one prompt may come to, in characters (the system prompt and everything shown): `PROMPT_MAX` unless set. */
   promptMax?: number;
 }
@@ -310,6 +313,8 @@ export interface LlmController {
 }
 
 type Use = Extract<ContentBlock, { type: "tool_use" }>;
+/** A participant's own id as worlds are generated (an office's system, a person's own seat): a word of the platform's. */
+const PLATFORM_ID = /(?<![A-Za-z0-9_-])[a-z][a-z0-9_-]{0,56}-(?:system|self)(?![A-Za-z0-9_-])/g;
 /** The most a letter, a request or a note can run to (the contracts' limit on free text), and the most a letter goes to. */
 export const TEXT_MAX = 16_384;
 const TO_MAX = 64;
@@ -524,6 +529,12 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
     }
   };
   const note = (data: object) => io.annotate({ annotation: "note", subject: c.participant, data });
+  /** What it is shown, with no id of the platform's own in it: wherever a participant's id stands (in a letter's
+   * words, a paper's, a reference to something waiting to be confirmed), the id the world knows that party by stands
+   * instead: an office's post, a person themselves. The same party, by the name a seat can write to. */
+  const inWorld = (shown: string) => (c.whoIs ? shown.replace(PLATFORM_ID, (id) => c.whoIs!(id)?.id ?? id) : shown);
+  /** A reference to something waiting to be confirmed, as the seat is shown it, back as it is kept: a seat's drafts are its own. */
+  const draftRef = (ref: string) => { const m = /^\[?draft\.(.+)\.([0-9]+)\]?$/.exec(ref.trim()); return m ? `draft.${c.participant}.${m[2]}` : ref; };
   /** A look, in words: the report, and what of it. */
   const lookWords = (i: any) => {
     const finds: any[] = Array.isArray(i.find) ? i.find : i.find ? [i.find] : [];
@@ -563,7 +574,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
     if (use.name === "confirm") {
       if (!text(i.ref)) return no("it didn't say which one");
       if (i.decision !== "confirm" && i.decision !== "decline") return no('it has to say "confirm" or "decline"');
-      return { what, action: { type: "sign", draft: i.ref, decision: i.decision === "confirm" ? "accept" : "reject", ...(text(i.note) ? { note: i.note.slice(0, TEXT_MAX) } : {}) },
+      return { what, action: { type: "sign", draft: draftRef(i.ref), decision: i.decision === "confirm" ? "accept" : "reject", ...(text(i.note) ? { note: i.note.slice(0, TEXT_MAX) } : {}) },
         ...(i.decision === "confirm" ? { label: "What you confirmed" } : {}), ...(text(i.note) && i.note.length > TEXT_MAX ? { clipped: `note (${i.note.length} characters; ${TEXT_MAX} kept)` } : {}) };
     }
     if (use.name === "write") {
@@ -695,12 +706,13 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
   return {
     async step(obs, ctx) {
       inCurrency(ctx.world.currency);
-      const standing = renderStanding(obs, standingIds);
+      const standing = inWorld(renderStanding(obs, standingIds, c.whoIs));
       // (What stands now, as this report's standing documents show it: nothing, once the last of them is withdrawn. A
       // report that brings none of those documents leaves what's on file as it was.)
       if (standing || Object.entries(obs.channels).some(([id, ch]) => standingIds.has(id) && ch.kind === "records" && ch.records.length)) standingText = standing;
-      let body = renderObservation(obs, { standing: standingIds, titles: c.titles, lastAction, draftText: c.draftText, lookable: canLook, ...(lastLooked ? { looked: lastLooked } : {}), ...(c.folders ? { folders: c.folders } : {}), onCut: (cut) => void cutLooks.push(cut) });
+      let body = renderObservation(obs, { ...(c.whoIs ? { whoIs: c.whoIs } : {}), standing: standingIds, titles: c.titles, lastAction, draftText: c.draftText, lookable: canLook, ...(lastLooked ? { looked: lastLooked } : {}), ...(c.folders ? { folders: c.folders } : {}), onCut: (cut) => void cutLooks.push(cut) });
       for (const cut of cutLooks.splice(0)) await note({ look_cut: cut });
+      body = inWorld(body);
       lastAction = undefined;
       lastLooked = undefined;
       if (obs.inbox.length) mail = true;

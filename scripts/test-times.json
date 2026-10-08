@@ -107,6 +107,7 @@
  "participants/test/rng.test.ts": 0.2,
  "participants/test/seat-finding-out.test.ts": 0.1,
  "participants/test/seat-letters.test.ts": 0.1,
+ "participants/test/seat-names.test.ts": 0,
  "participants/test/seat-papers.test.ts": 0.1,
  "participants/test/standing-work.test.ts": 0.1,
  "participants/test/stepper.test.ts": 0.2,
