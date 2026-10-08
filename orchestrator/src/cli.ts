@@ -1,9 +1,13 @@
 #!/usr/bin/env bun
 // oikos: run worlds, measure them, and report what they cost.
 //
-//   oikos run <world.json|yaml> [--seeds N] [--parallel P] [--out DIR] [--until SECONDS]
+//   oikos run <world.json|yaml> [--seeds N] [--towns T] [--parallel P] [--out DIR] [--until SECONDS]
 //                 [--set path=value]... [--translator-model provider/model] [--no-measure]
 //                 [--model provider/model --budget DOLLARS_PER_RUN [--base-url URL]]
+//     --seeds N runs ONE town N times: the town is generated once, from the spec's `seed`, and only the runs' seeds
+//     differ (what happens, never who lives there). --towns T generates T different towns, from the spec's seed and
+//     the T - 1 after it, and runs each --seeds times (1 if not given): `--towns 3` is three towns run once each,
+//     `--towns 3 --seeds 2` six runs. Their runs are named <world>.town<S>.seed<N>. For a generated world only.
 //     --model runs every language-model participant and the translator on a real model: anthropic/…, openai/…
 //     (keys from ANTHROPIC_API_KEY / OPENAI_API_KEY), or a local open-weight model: ollama/… or local/… --base-url.
 //     A model that costs money needs --budget: the run stops, and says why, rather than spend more. --batch-budget caps
@@ -19,8 +23,10 @@
 //     and never a log that holds a real model's answers.
 //   oikos resume <log.jsonl | log.jsonl.zst | DIR>: go on with a run that stopped (a folder: its one run that did).
 //   oikos measure <DIR> [QUERY...] [--sql "select ..."] [--list]
-//   oikos diff <BASELINE> <CHANGE> [QUERY...]: every measure of two batches compared (beyond seed noise: flagged)
-//   oikos health <DIR> [--profile NAME]: the batch's measures against its profile's calibration targets
+//   oikos diff <BASELINE> <CHANGE> [QUERY...]: every measure of two batches compared (beyond the noise between runs:
+//     flagged). Its first line says what each side is: how many runs, of how many towns.
+//   oikos health <DIR> [--profile NAME]: the batch's measures against its profile's calibration targets (and over how
+//     many runs of how many towns)
 //   oikos cost <DIR> [--translator-model provider/model]
 //   oikos run ... [--no-compress]: logs are compressed once measured (<run>.jsonl.zst, about a seventh the size,
 //     checked to read back whole before the plain log goes); --no-compress keeps them plain.
@@ -113,7 +119,7 @@
 import { existsSync, readFileSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { exportLogs, queries, query, runQuery, table } from "@oikos/measure";
-import { loadWorld, resumeCommand, runBatch, runOne, type StopSignal } from "./batch";
+import { loadWorld, resumeCommand, runBatch, runName, runOne, type StopSignal } from "./batch";
 import { MockAdapter, mockPolicies, PRICES } from "@oikos/participants/llm";
 import { costReport } from "./cost";
 import { currentLogs } from "./logs";
@@ -166,12 +172,12 @@ function stopOnSignal(): StopSignal {
   return stop;
 }
 
-const usage = "usage: oikos run <world> [--seeds N] [--parallel P] [--out DIR] [--until S] [--set k=v] [--scenario NAME[+NAME]] [--modules FILE] [--translator-model m] [--no-measure] [--overwrite] [--model provider/model --budget USD [--base-url URL]] | resume <log.jsonl[.zst]|DIR> [--until S] [--model ... as for run] | measure <DIR> [QUERY...] [--sql SQL] [--list] | diff <BASELINE> <CHANGE> [QUERY...] | health <DIR> [--profile NAME] | cost <DIR> [--translator-model m] | translator-eval --model provider/model [--budget USD] [--out FILE] [--real | --only-real] [--jobs N] | scenarios [--all] | pilot-report <DIR>... [--no-write] | replay <log.jsonl> | story <log.jsonl> [participant]";
+const usage = "usage: oikos run <world> [--seeds N (runs of one town)] [--towns T (different towns, each run --seeds times)] [--parallel P] [--out DIR] [--until S] [--set k=v] [--scenario NAME[+NAME]] [--modules FILE] [--translator-model m] [--no-measure] [--overwrite] [--model provider/model --budget USD [--base-url URL]] | resume <log.jsonl[.zst]|DIR> [--until S] [--model ... as for run] | measure <DIR> [QUERY...] [--sql SQL] [--list] | diff <BASELINE> <CHANGE> [QUERY...] | health <DIR> [--profile NAME] | cost <DIR> [--translator-model m] | translator-eval --model provider/model [--budget USD] [--out FILE] [--real | --only-real] [--jobs N] | scenarios [--all] | pilot-report <DIR>... [--no-write] | replay <log.jsonl> | story <log.jsonl> [participant]";
 
 try {
   if (cmd === "run" && positional()[0]) {
     const r = await runBatch({
-      world: positional()[0]!, seeds: Number(flag("seeds", "1")), out: flag("out") ?? scenarioOut(positional()[0]!), parallel: flag("parallel") ? Number(flag("parallel")) : undefined,
+      world: positional()[0]!, seeds: Number(flag("seeds", "1")), ...(flag("towns") !== undefined ? { towns: Number(flag("towns")) } : {}), out: flag("out") ?? scenarioOut(positional()[0]!), parallel: flag("parallel") ? Number(flag("parallel")) : undefined,
       until: flag("until") ? Number(flag("until")) : undefined, sets: sets(), translatorModel: flag("translator-model"), measure: !has("no-measure"), log: console.log,
       model: flag("model"), budgetUsd: flag("budget") ? Number(flag("budget")) : undefined, baseUrl: flag("base-url"), modules: flag("modules"),
       recordObservations: flag("record-observations"), recordDecisions: flag("record-decisions"), logDetail: flag("log"), compress: !has("no-compress"), keep: flag("keep") as "log" | "measures" | undefined,
@@ -185,7 +191,7 @@ try {
     }
     if (r.stopped.length) {
       console.log(`\n${r.stopped.length} run${r.stopped.length === 1 ? "" : "s"} STOPPED before the end and can be resumed (logs kept plain, measured as far as they got):`);
-      for (const x of r.stopped) console.log(`  seed ${x.seed}, at day ${Math.floor(x.t / 86_400)}: ${x.why}\n    ${x.resume}`);
+      for (const x of r.stopped) console.log(`  ${runName(x)}, at day ${Math.floor(x.t / 86_400)}: ${x.why}\n    ${x.resume}`);
     }
     if (r.problems.length) {
       console.log(`\nAfter the runs, something failed (the runs and batch.json are there):`);
@@ -194,7 +200,7 @@ try {
     }
     if (r.failed.length) {
       console.log(`\n${r.failed.length} run${r.failed.length === 1 ? "" : "s"} didn't finish (diagnosis beside each log, <run>.failure.json):`);
-      for (const f of r.failed) console.log(`  seed ${f.seed}: ${f.reason}`);
+      for (const f of r.failed) console.log(`  ${runName(f)}: ${f.reason}`);
       process.exitCode = 1;
     }
   } else if (cmd === "scenarios") {
@@ -216,7 +222,7 @@ try {
       for (const s of inert) console.log(`  ${s.id}: ${s.inert_because!.trim().replace(/\s+/g, " ")}`);
     }
   } else if (cmd === "run-one" && positional()[0]) {
-    await runOne({ world: positional()[0]!, seed: Number(flag("seed")), out: flag("out", "runs")!, until: flag("until") ? Number(flag("until")) : undefined, sets: sets(),
+    await runOne({ world: positional()[0]!, seed: Number(flag("seed")), ...(flag("town") !== undefined ? { town: Number(flag("town")) } : {}), out: flag("out", "runs")!, until: flag("until") ? Number(flag("until")) : undefined, sets: sets(),
       model: flag("model"), translatorModel: flag("translator-model"), budgetUsd: flag("budget") ? Number(flag("budget")) : undefined, baseUrl: flag("base-url"), modules: flag("modules"),
       recordObservations: flag("record-observations"), recordDecisions: flag("record-decisions"), logDetail: flag("log"), consult: has("consult"), consultAvoid: flag("consult-avoid"), overwrite: has("overwrite"), stop: stopOnSignal() });
   } else if (cmd === "resume" && positional()[0]) {
@@ -240,17 +246,18 @@ try {
     for (const dir of positional()) console.log(renderReport(await pilotReport(dir, !has("no-write"))) + "\n");
   } else if (cmd === "health" && positional()[0]) {
     // The health report (docs/design/rebuild.md 8.4): the batch's measures against its profile's targets.
-    const { health, healthText } = await import("@oikos/measure");
+    const { drawn, health, healthText } = await import("@oikos/measure");
     const { loadProfile } = await import("@oikos/worlds/generator/profile");
     const batch = join(positional()[0]!, "batch.json");
     const profile = flag("profile") ?? (existsSync(batch) ? JSON.parse(readFileSync(batch, "utf8")).spec?.profile : undefined);
     if (!profile) throw new Error("which profile's targets? (--profile NAME; a batch made from a generated world knows its own)");
-    console.log(healthText(await health(await measureDir(positional()[0]!), (loadProfile(profile) as any).targets ?? [])));
+    const dir = await measureDir(positional()[0]!);
+    console.log(healthText(await health(dir, (loadProfile(profile) as any).targets ?? []), await drawn(dir)));
   } else if (cmd === "diff" && positional()[1]) {
     // Before and after (docs/design/rebuild.md 8.4): every measure of two batches of the same world, compared.
-    const { diff, diffText } = await import("@oikos/measure");
+    const { diff, diffText, drawn } = await import("@oikos/measure");
     const [a, b] = [await measureDir(positional()[0]!), await measureDir(positional()[1]!)];
-    console.log(diffText(await diff(a, b, positional().slice(2).length ? positional().slice(2) : undefined)));
+    console.log(diffText(await diff(a, b, positional().slice(2).length ? positional().slice(2) : undefined), [await drawn(a), await drawn(b)]));
   } else if (cmd === "consult-audit" && positional()[0]) {
     // The sparse mind's robustness audit (docs/design/ai-citizens.md 4), on the world's own questions and people.
     const { consultAudit, auditText } = await import("./audit");
