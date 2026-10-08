@@ -192,12 +192,20 @@ export function drawHousehold(H: HouseholdSpec, below: (n: number) => number): D
     return { members, couples: [c], leaseholder: c[0] };
   }
   // Children first (the eldest sets the parents' ages: older by the mother's age at a first birth).
+  // (The years between one child and the next are drawn first, and the eldest is at least as old as they add up to.
+  // Until 2026-10-08 the eldest's age came first and a younger child's stopped at nought: an eldest of one or two had
+  // brothers and sisters all born in the same year as each other, and the town had half as many under-fives again as
+  // the census.)
   const n = 1 + byShare(kind === 3 ? H.children_couple : H.children_one_parent);
-  const eldest = below((H.child_max_age ?? 17) + 1);
+  const oldest = H.child_max_age ?? 17;
+  const gaps: number[] = [];
+  for (let i = 1; i < n; i++) gaps.push(1 + below(4));
+  const span = Math.min(oldest, gaps.reduce((a, b) => a + b, 0));
+  const eldest = span + below(oldest - span + 1);
   let age = eldest;
   for (let i = 0; i < n; i++) {
     person(age, chance(H.child_male_bps) ? "male" : "female");
-    age = Math.max(0, age - 1 - below(4));
+    age = Math.max(0, age - (gaps[i] ?? 0));
   }
   const parentAge = clampAge(eldest + within(H.mother_age_at_first_birth));
   const kids = members.map((_, i) => i);
