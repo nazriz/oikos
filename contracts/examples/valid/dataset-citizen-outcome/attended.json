@@ -1,0 +1,28 @@
+{
+  "run": "town-1000.seed1",
+  "t": 867600,
+  "seq": 40122,
+  "participant": "citizen-17-self",
+  "domain": "practice",
+  "option": "rec.214",
+  "of": 4,
+  "decision_seq": 20410,
+  "decision_t": 604800,
+  "kind": "attended",
+  "way": "here",
+  "facts": {
+    "host": "group-2",
+    "others": 31,
+    "meaning": 1200
+  },
+  "learned": {
+    "payoff": 9864,
+    "before": 7000,
+    "after": 8507
+  },
+  "belief": {
+    "host": "group-2",
+    "before": 6000,
+    "after": 6200
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "run": "town-1000.seed1",
+  "t": 950400,
+  "seq": 44790,
+  "participant": "citizen-17-self",
+  "domain": "job",
+  "option": "shop-9",
+  "kind": "told",
+  "way": "mine",
+  "from": "citizen-88",
+  "facts": {
+    "paid": false
+  },
+  "learned": {
+    "payoff": 0,
+    "before": 5000,
+    "first": true,
+    "after": 3333,
+    "heard": true
+  }
+}

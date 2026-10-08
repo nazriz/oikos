@@ -9,7 +9,7 @@ import { MockAdapter, type LlmRequest } from "@oikos/participants/llm";
 import { generate } from "@oikos/worlds/generator/generate";
 import { unsureText } from "../../translator/src/index";
 import { compressLog } from "../src/logs";
-import { ASK_BACK, endingOf, longestAskBackRun, mattersOf, pilotReport } from "../src/pilot-report";
+import { ASK_BACK, endingOf, longestAskBackRun, mattersOf, pilotReport, renderReport } from "../src/pilot-report";
 import { runWorld } from "../src/run";
 
 const root = join(import.meta.dir, "../..");
@@ -63,6 +63,12 @@ test("the report reads what the script did, from the log alone, plain or compres
   expect(t).toMatchObject({ matters: 2, matters_through_within_two_tries: 1, longest_ask_back_run: { seat: "mayor-system", length: 1 } });
   expect(t.its_own_retries).toBe(1);
   expect(r.stopped.reached_until).toBe(true); // (it ran its 12 days; PILOT.txt says that was its until)
+  // What it recorded for citizen models, in one line: the citizens' decisions and what they learned of how each went.
+  expect(r.citizen_records.decisions).toBeGreaterThan(0);
+  expect(r.citizen_records.outcomes).toBeGreaterThan(0);
+  expect(renderReport(r)).toContain(`citizen records: ${r.citizen_records.decisions} decisions, ${r.citizen_records.outcomes} outcomes`);
+  // (And a pilot that recorded none says so, loudly.)
+  expect(renderReport({ ...r, citizen_records: { decisions: 0, outcomes: 0 } })).toContain("citizen records: NONE");
 
   // The same report from the compressed log (and the summary beside it), whatever order the files are read in.
   await compressLog(s.logPath);

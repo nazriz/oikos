@@ -235,8 +235,8 @@ The cited rules become considerations and priors, so their calibration carries o
 - Statements: optional `offer` and `practice`.
 - Agreements: typed `does` (2c), with a migration.
 - Channels: `match.has`.
-- Log: a `decision` annotation for citizens' recorded decisions (section 7).
-- The dataset format: a `citizen_decisions` file.
+- Log: a `decision` annotation for citizens' recorded decisions, and an `outcome` annotation for what each came to know of how they turned out (section 7).
+- The dataset format: a `citizen_decisions` file, each decision with its outcomes, and a `citizen_outcomes` file.
 
 ## 7. Recording decisions
 
@@ -255,7 +255,42 @@ It's on by default for runs that train citizen models, and off (lean) for quick 
   - `current` (their routine), `circumstances` (income, savings, without a home, bedrooms needed, the cost of essentials), `satisfied_here`, `doubt`;
   - `state` (needs, satisfaction, certainty, feeling, beliefs, goal), and `person` (values, temperament, need weights) with each citizen's first.
 - The dataset row has `seq`, where the decision stands in the log: what the citizen then did, and what came of it, follows there.
-- **Not recorded:** what the citizen made of how a choice turned out (the payoff the mind learns from); decisions the mind doesn't make (leaving town, petitions, a venture: their reasoning is in the act, in words); the citizen's whole view (`--record-observations code`, about four times the log).
+- **Not recorded:** decisions the mind doesn't make (leaving town, claiming support, buying a home: their reasoning is in the act, in words); the citizen's whole view (`--record-observations code`, about four times the log).
+
+**How a choice turned out (2026-10-09; docs/decisions.md, "The outcome signal for citizen models"; docs/design/run-datasets.md has the layout):**
+- Every place the mind evaluates how something went and updates what it has learned is recorded at that moment, as an `outcome` annotation: the facts as the citizen has them, how it came to know (`mine`, `here`, `published`, `ask`), and the mind's own figures (the payoff it computed, the option's attraction before and after, the need, the feeling). It names the decision it follows by the citizen's own count (`n`, now on every decision).
+- The signal is the citizen's, from what the citizen came to know. The platform adds no reward and no judgement, and the record holds nothing the citizen did not have.
+- By area: **shop**, how fully each order was served; **job**, hired, each pay day paid or not, a rise, how it ended and who ended it; **home**, the lease signed, moved in or not yet, a rent increase, a renewal, a notice, the end (facts and feelings only: the mind learns nothing of a home); **gatherings**, who came, or an evening in; **the union**, joined, a rise won, a stoppage; **goals**, met or not; **a business**, founded or refused; **a petition**, its organiser's count. And what friends say of their shop, employer and gatherings.
+- On wherever decisions are recorded, off with them; the same state hash either way (held by `orchestrator/test/outcomes.test.ts` on the 1,000-person town).
+
+**What a trainer gets** (three different 1,000-person towns, 60 days, mock; 83,466 decisions and 106,728 outcomes, 81,311 of them following a decision):
+
+| Area | Decisions (each town) | With at least one outcome | From decision to first outcome | What the outcome is |
+|---|---|---|---|---|
+| gatherings (`practice`) | 72,656 (24,449 / 24,213 / 23,994) | 99.4% (stay 100%, go 90.0%) | stay: the same moment; go: 7 days (the next week's plan) | the payoff the mind learns |
+| shop | 9,530 (3,264 / 3,197 / 3,069) | 93.3% | median 1 day, nine in ten within 4.5 | the share served |
+| petition | 1,134 (369 / 392 / 373) | 0.3% (the 3 started; signing has none) | 7 days | the organiser's count |
+| job | 116 (40 / 49 / 27) | 45.7% (hired) | 7 days | hired, then 2.8 records each on average |
+| union (`membership`) | 30 (15 / 9 / 6) | 16.7% (the 5 who joined) | 7 days | joined, a rise |
+| home | 0 | | | none in 60 days: no household chose among homes (why not was not looked into) |
+
+A decision without an outcome is one whose run ended first (a gathering decided for the last week, an order not yet delivered), or one the citizen is never told about (an application nobody answered), or one that has none (above).
+
+**Does the signal vary with the choice?** Plainly, area by area:
+
+- **Gatherings: between going and staying, yes; between gatherings, by which one and almost nothing else.** Going is worth 9,545 on average (sd 556), staying 6,189 (sd 1,741; seven values, the levels of the social need). Among those who went, 85% to 94% of the payoff's variance is which host: in one town the sports group gives 8,965 (sd 257) every time and the congregation 9,951 (sd 234). The payoff is the logarithm of how many came, capped, and 30 to 55 always come, so most gatherings sit near the cap. Three people in 3,627 were turned away. A model can learn "go beats stay" and a ranking of five hosts; it cannot learn when a gathering is worth going to, because it always is.
+- **Shop: some.** Of 8,894 orders, 94.1% were served in full (payoff 10,000), 5.6% not at all and 24 in part: the payoff is close to two-valued. A quarter of its variance (24% to 25% in each town) is which shop: most shops serve everyone every time, and a few in each town (two to four of the dozen busiest) leave many orders unserved (the worst averages 5,391). So there is something to learn (which shops run short), it is learned from few failures, and what the citizen had learned of a shop when choosing it does not yet predict how it then serves (9,232 for shops rated 8,500 to 9,500 against 9,518 for shops rated under 5,000).
+- **Job: nothing in a calm town.** Every one of 5,414 pay days learned of has the same payoff (10,000); there was no unpaid wage in three towns in 60 days, and the 4,867 things friends said of their employers were all "they pay". Only 81 of those pay days follow a decision made in the run: nearly everyone holds the job they started with. What varies is in the facts, not in the mind's figure: hired or not (46% of applications), the wage, how the job ended (71 ended: 64 on the employer's notice, 7 on the worker's). **That is a finding about today's citizen, not a fault of the record:** its mind learns one bit about an employer.
+- **Home: no data in 60 days,** and the mind computes no payoff for a home at all. A 180-day pilot will have tenancies ending and rents rising; the records will hold their facts and the anger, and no learned value.
+
+**Still missing for a citizen model** (what the planned citizen redesign will change in these records):
+1. **A payoff for the things that matter most.** Home and job, the two biggest choices in a life, teach the mind nothing (home) or one bit (job). The redesign's mind should evaluate a job by what it pays, asks and whether it lasts, and a home by its cost, room and what happened there; each new evaluation is recorded where it is made, by the same helpers (`learn`, `hearOf`, `felt`, `outcome` in `citizen.ts`), and the dataset needs no new shape.
+2. **Decisions the mind does not yet make.** Leaving town, claiming support, borrowing, buying a home, complaining, standing for office and having a child are rules; they have no decision record and no outcome. When they become the mind's, they come into both.
+3. **Negatives the citizen never hears.** An application that fails says nothing to the citizen, so the record has silence, which a learner must read from the empty list and the run's end. If the redesign has employers and landlords answer, the answer is an outcome.
+4. **What the citizen saw.** A decision has its options and their facts, not the citizen's whole view (`--record-observations`, four times the log). A model that is to notice things the code never offered as options needs the view.
+5. **Households.** One person decides for a household and the others follow; the record is of the decider. The redesign's pooling and shared decisions will need the outcome to say whose it was.
+6. **The length of a life.** Sixty days hold eight shopping trips and four pay days a person. What a job or a home came to is known over years: citizen-model data wants the long pilots.
+7. **Outcomes the citizen never learns** (who got the home; what the wage was elsewhere) are deliberately not here. A researcher scoring a citizen model against "what would have been better" reads them from the log, outside.
 
 ## 8. Building it
 
@@ -388,7 +423,7 @@ It's on by default for runs that train citizen models, and off (lean) for quick 
   - Complaints (41–52 over five years) aren't comparable with the earlier run's, which predates the works department's fix.
   - Migration still comes in bursts (0 to 45 arrivals a year).
 
-- **Recorded:** every decision the mind makes, as a `decision` annotation in full logs, exported as `citizen_decisions.jsonl` (section 7).
+- **Recorded:** every decision the mind makes, as a `decision` annotation in full logs, exported as `citizen_decisions.jsonl`; and, since 2026-10-09, how each turned out as the citizen came to know it, as `outcome` annotations (section 7).
 - **The cited priors, now swayed by the person** (3e; 2026-09-29):
   - **Joining the union:** the ABS rate for the industry, shifted by the person's benevolence and universalism, and by what membership has done for them (the `membership` domain: a raise the union won counts for it, pay lost on strike against it).
   - **Strike ballots:** turnout and voting yes, by the same solidarity; security counts against striking.

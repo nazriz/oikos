@@ -40,7 +40,7 @@ test("a run's dataset: a manifest, and every translation, decision, act and reco
   expect(m.seats.models["mayor-system"].adapter).toBe("mock/mock");
   expect(Object.keys(m.versions.modules)).toContain("citizen.default");
   // Every row of every file is valid, and the manifest's counts are right.
-  const kinds: Record<string, string> = { "systems.jsonl": "SystemPrompt", "translations.jsonl": "Translation", "decisions.jsonl": "Decision", "actions.jsonl": "Action", "observations.jsonl": "ObservationRow", "citizen_decisions.jsonl": "CitizenDecision" };
+  const kinds: Record<string, string> = { "systems.jsonl": "SystemPrompt", "translations.jsonl": "Translation", "decisions.jsonl": "Decision", "actions.jsonl": "Action", "observations.jsonl": "ObservationRow", "citizen_decisions.jsonl": "CitizenDecision", "citizen_outcomes.jsonl": "CitizenOutcome" };
   for (const [file, def] of Object.entries(kinds)) {
     const rs = rows(join(dir, file));
     expect(rs.length).toBe(m.files[file].rows);
@@ -67,6 +67,16 @@ test("a run's dataset: a manifest, and every translation, decision, act and reco
   expect(minds.some((d) => d.circumstances && d.options.some((o: any) => o.facts))).toBe(true);
   expect(minds.some((d) => d.person)).toBe(true);
   expect(minds.some((d) => actions.some((a) => a.participant === d.participant && a.seq > d.seq && a.t === d.t))).toBe(true);
+  // And what the citizen came to know of how each turned out: under the decision (none: an empty list, which is
+  // "not known", not a payoff of nought), and as rows of their own that name the decision.
+  expect(minds.every((d) => Number.isInteger(d.n) && Array.isArray(d.outcomes))).toBe(true);
+  expect(minds.some((d) => d.outcomes.length === 0)).toBe(true);
+  const learned = rows(join(dir, "citizen_outcomes.jsonl"));
+  expect(minds.reduce((n, d) => n + d.outcomes.length, 0)).toBe(learned.filter((o) => o.decision_seq !== undefined).length);
+  const served = minds.find((d) => d.domain === "shop" && d.outcomes.some((o: any) => o.kind === "served"))!;
+  expect(served.outcomes.find((o: any) => o.kind === "served")).toMatchObject({ option: served.choice, way: "mine", facts: { ordered: expect.any(Number), delivered: expect.any(Number) }, learned: { payoff: expect.any(Number), before: expect.any(Number), after: expect.any(Number) } });
+  expect(m.citizens).toMatchObject({ decisions: minds.length, outcomes: learned.length });
+  expect(m.citizens.by_domain.shop.with_outcome).toBe(minds.filter((d) => d.domain === "shop" && d.outcomes.length).length);
   // Observations: just the two asked for.
   const seen = new Set(rows(join(dir, "observations.jsonl")).map((x) => x.participant));
   expect([...seen].sort()).toEqual([citizen, "mayor-system"].sort());

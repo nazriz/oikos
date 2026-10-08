@@ -1,0 +1,23 @@
+{
+  "run": "town-1000.seed1",
+  "t": 2419200,
+  "seq": 140031,
+  "participant": "citizen-208-self",
+  "n": 3,
+  "domain": "home",
+  "strategy": "deliberate",
+  "choice": "rec.5120",
+  "options": [
+    {
+      "key": "rec.5120",
+      "score": 2210,
+      "facts": {
+        "money_per_month": -98000,
+        "home": {
+          "bedrooms": 2
+        }
+      }
+    }
+  ],
+  "outcomes": []
+}

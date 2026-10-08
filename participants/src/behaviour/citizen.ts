@@ -27,7 +27,7 @@
 import { cents } from "../money";
 import type { Eligibility, LookRequest, Observation, ParticipantAction, Record, SiteStructure, StatementRecord } from "../contracts";
 import { basesOf, channels, cites } from "../contracts";
-import { DECISIONS, params, wait, type Belief, type BehaviourModule, type ConsultAnswer, type DecisionRecord, type ParticipantContext } from "../module";
+import { DECISIONS, OUTCOMES, params, wait, type Belief, type BehaviourModule, type ConsultAnswer, type DecisionRecord, type OutcomeRecord, type ParticipantContext } from "../module";
 import type { Rng } from "../rng";
 import * as C from "../calls";
 import { ask, Asked, because, Book, breaches, noted, callAction, commitmentOf, DAY, nextLook, usd, jobTerms, record, leaseTerms, message, MONTH, moveIn, moveOut, notice, pay, PAYMENT_FAILED, petitionSignatures, publishedCount, say, sign, stoodEmpty, structureOf, variableToday, vote, withdraw, type Step, ownBanked } from "./common";
@@ -333,6 +333,56 @@ export const citizen: BehaviourModule = {
     const isMember = () => !!p.union && memberOf(p.union);
     let lastServed = 10_000; // how fully the last shop served us (basis points)
     const decided: DecisionRecord[] = []; // the mind's decisions since the last action, carried with the next (7)
+    // How things turned out, as we came to know it, since the last action (7): recording only. Nothing below reads
+    // any of it back: what we do is the same whether or not a run keeps it.
+    const outcomes: OutcomeRecord[] = [];
+    let decisions = 0; // our own count of our recorded decisions: an outcome names the one it follows by it
+    const chose = new Map<string, number>(); // "area:option" -> our latest decision that chose it
+    /** A decision, recorded: numbered, and remembered by what it chose (`as`: other names its outcomes come under). */
+    const decision = (d: DecisionRecord, ...as: string[]): number => {
+      d.n = ++decisions;
+      decided.push(d);
+      for (const key of [d.choice, ...as]) if (key !== undefined) chose.set(`${d.domain}:${key}`, d.n);
+      return d.n;
+    };
+    /** Something we came to know of how a choice went (`own`: of our own choosing, so it follows our decision, if one
+     * is recorded; another's experience told to us follows none). */
+    const outcome = (o: OutcomeRecord, own = true) => {
+      const of = own ? chose.get(`${o.domain}:${o.option}`) : undefined;
+      outcomes.push({ ...o, ...(of !== undefined ? { of } : {}) });
+    };
+    /** What the mind has learned of an option, for the record: before an update (what it expected of one never tried or
+     * heard of, marked `first`), and now. */
+    const was = (domain: string, option: string) => ({ before: Math.round(mind.learned(domain).get(option)), ...(mind.learned(domain).known(option) ? {} : { first: true as const }) });
+    const now = (domain: string, option: string) => Math.round(mind.learned(domain).get(option));
+    /** What the mind learns of an option from how it went for us, with the record of it: the payoff as the mind
+     * computed it, and what it had learned of the option before and has now. */
+    const learn = (domain: string, option: string, payoff: number, o: Omit<OutcomeRecord, "domain" | "option" | "learned">, own = true) => {
+      const before = was(domain, option);
+      mind.learn(domain, option, payoff);
+      outcome({ ...o, domain, option, learned: { payoff: Math.round(payoff), ...before, after: now(domain, option) } }, own);
+    };
+    /** What the mind makes of what someone told us an option gave them, with the record of it. */
+    const hearOf = (domain: string, option: string, payoff: number, o: Omit<OutcomeRecord, "domain" | "option" | "learned">) => {
+      const before = was(domain, option);
+      mind.hear(domain, option, payoff);
+      outcome({ ...o, domain, option, learned: { payoff: Math.round(payoff), ...before, after: now(domain, option), heard: true } }, false);
+    };
+    /** A feeling as the mind appraised it, for the record: `feel` (at least this strongly) or `add` (more, by a share). */
+    const felt = (how: "feel" | "add", emotion: Parameters<Feelings["level"]>[0], about: string, bps: number, t: number): NonNullable<OutcomeRecord["felt"]>[number] => {
+      const before = feelings.level(emotion, about, t);
+      feelings[how](emotion, about, bps, t);
+      return { emotion, about, bps: Math.round(bps), before, after: feelings.level(emotion, about, t) };
+    };
+    /** Holding more strongly to what someone teaches, for the record. */
+    const strengthened = (host: string, bps: number): NonNullable<OutcomeRecord["belief"]> => {
+      const before = holdTo(host);
+      strengthen(host, bps);
+      return { host, before, after: holdTo(host) };
+    };
+    let thanked: NonNullable<OutcomeRecord["felt"]>[number] | undefined; // gratitude for a lead, for the record of what it led to
+    const noticeSeen = new Set<string>(); // (for the record: a landlord's notice on a lease, said once)
+    const petitionSeen = new Set<string>(); // (for the record: a petition we first saw and did not sign, said once)
     let personTold = false; // who we are goes with our first recorded decision, once (it does not change)
     const wholeFacts = (f: Facts): NonNullable<DecisionRecord["options"][number]["facts"]> => ({ money_per_month: Math.round(f.money_per_month),
       ...(f.home ? { home: f.home.bedrooms !== undefined ? { bedrooms: f.home.bedrooms } : {} } : {}),
@@ -393,7 +443,7 @@ export const citizen: BehaviourModule = {
       const c = o.circ;
       const person = personTold ? undefined : { values: { ...mind.person.values }, temperament: { ...mind.person.temperament }, weights: { ...mind.person.weights } };
       personTold = true;
-      decided.push({ t, domain, strategy: d.strategy, ...(d.key !== undefined ? { choice: d.key } : {}), options: seen,
+      decision({ t, domain, strategy: d.strategy, ...(d.key !== undefined ? { choice: d.key } : {}), options: seen,
         ...(o.current !== undefined ? { current: o.current } : {}),
         circumstances: { monthly_income: Math.round(c.monthly_income), savings: Math.round(c.savings), homeless: c.homeless,
           ...(c.homeBedroomsNeeded !== undefined ? { bedrooms_needed: c.homeBedroomsNeeded } : {}), ...(c.essentials !== undefined ? { essentials: Math.round(c.essentials) } : {}) },
@@ -619,18 +669,23 @@ export const citizen: BehaviourModule = {
           // (Read at work some days after it was made: a pay at the new rate that came before we had read of the rise
           // was our wages as agreed, and counts as that now, as it would have had we known.)
           const net = job.wage - withholding(incomeTaxLaw(book), job.wage, job.period);
-          for (const x of inflows) if (x.t >= r.at && (x.amount === job.wage || x.amount === net)) mind.learn("job", job.employer, 10_000);
+          outcome({ t: obs.t, domain: "job", option: job.employer, kind: "rise", way: "published", facts: { rise_bps: Number(r.data?.rise_bps ?? 0), wage: job.wage, made_at: r.at } });
+          for (const x of inflows) if (x.t >= r.at && (x.amount === job.wage || x.amount === net)) learn("job", job.employer, 10_000, { t: obs.t, kind: "paid", way: "mine", facts: { amount: x.amount, agreed: job.wage, paid_at: x.t } });
           if (p.union && isMember()) {
-            mind.learn("membership", "member", Math.min(10_000, 6_000 + Number(r.data?.rise_bps ?? 0) * 10)); // it paid
-            // Grateful to the union, and surer of what it says.
-            feelings.add("gratitude", p.union, 5_000, obs.t);
-            strengthen(p.union, 1_000);
+            // it paid. Grateful to the union, and surer of what it says.
+            const payoff = Math.min(10_000, 6_000 + Number(r.data?.rise_bps ?? 0) * 10);
+            const before = was("membership", "member");
+            mind.learn("membership", "member", payoff);
+            const grateful = felt("add", "gratitude", p.union, 5_000, obs.t);
+            const belief = strengthened(p.union, 1_000);
+            outcome({ t: obs.t, domain: "membership", option: "member", kind: "rise_won", way: "published", facts: { employer: job.employer, rise_bps: Number(r.data?.rise_bps ?? 0) },
+              learned: { payoff: Math.round(payoff), ...before, after: now("membership", "member") }, felt: [grateful], belief });
           }
         }
         if (!(r.addressed_to ?? []).includes(me)) continue;
         if (r.kind === "stop_work" && r.data?.employer === job.employer && !striking) {
           striking = { employer: job.employer, out: false };
-          if (isMember()) mind.learn("membership", "member", 3_000); // pay lost for the time out
+          if (isMember()) learn("membership", "member", 3_000, { t: obs.t, kind: "stoppage_called", way: "mine", facts: { employer: job.employer } }); // pay lost for the time out
         }
         if (r.kind === "return_to_work" && striking && r.data?.employer === striking.employer) {
           backTo = striking.left ? { employer: striking.employer, space: striking.left } : null;
@@ -659,7 +714,9 @@ export const citizen: BehaviourModule = {
         if (id) {
           founded.firm = id;
           pendingFirm = false;
+          outcome({ t: obs.t, domain: "venture", option: "found", kind: "founded", way: "mine", facts: { firm: id, capital: founded.capital } });
         } else if (obs.outcomes.some((o) => o.status === "refused")) {
+          outcome({ t: obs.t, domain: "venture", option: "found", kind: "refused", way: "mine", facts: { why: String(obs.outcomes.find((o) => o.status === "refused")?.refusal?.code ?? "") } });
           founded = null;
           pendingFirm = false;
         }
@@ -684,8 +741,10 @@ export const citizen: BehaviourModule = {
         inflows.push({ t: tx.t, amount: cents(tx.amount) });
         // Our wages, as agreed: the wage, less the income tax the law says our employer withholds.
         if (job && (cents(tx.amount) === job.wage || cents(tx.amount) === job.wage - withholding(incomeTaxLaw(book), job.wage, job.period))) {
+          const since = tx.t - (job.paidAt ?? job.since);
           job.paidAt = tx.t;
-          mind.learn("job", job.employer, 10_000); // an employer that pays, as agreed
+          // an employer that pays, as agreed
+          learn("job", job.employer, 10_000, { t: obs.t, kind: "paid", way: "mine", facts: { amount: cents(tx.amount), agreed: job.wage, paid_at: tx.t, days_since_last: Math.floor(since / DAY), period_days: Math.round(job.period / DAY) } });
         }
       }
       while (inflows.length && inflows[0]!.t < obs.t - p.income_window_days * DAY) inflows.shift();
@@ -737,14 +796,14 @@ export const citizen: BehaviourModule = {
           toldUs.set(person, { ...told, t: obs.t });
           talked.set(person, obs.t);
           ties.add(person, 300, obs.t);
-          if (told.shop && told.served !== undefined) mind.hear("shop", told.shop, told.served);
-          if (told.employer && told.paid !== undefined) mind.hear("job", told.employer, told.paid ? 10_000 : 0);
+          if (told.shop && told.served !== undefined) hearOf("shop", told.shop, told.served, { t: obs.t, kind: "told", way: "mine", from: person, facts: { served_bps: told.served } });
+          if (told.employer && told.paid !== undefined) hearOf("job", told.employer, told.paid ? 10_000 : 0, { t: obs.t, kind: "told", way: "mine", from: person, facts: { paid: told.paid } });
           // Someone who keeps going somewhere finds it worth it (a placeholder for how much).
           // (All the more, if we hold with what it teaches.)
-          for (const host of told.goesTo ?? []) for (const g of book.practices()) if ((g.speaks_for ?? g.author) === host) mind.hear("practice", g.id, Math.min(10_000, 7_000 + Math.round(holdTo(host) * p.belief.meaning)));
+          for (const host of told.goesTo ?? []) for (const g of book.practices()) if ((g.speaks_for ?? g.author) === host) hearOf("practice", g.id, Math.min(10_000, 7_000 + Math.round(holdTo(host) * p.belief.meaning)), { t: obs.t, kind: "told", way: "mine", from: person, facts: { goes: true, host } });
           // Told what someone holds: if we hold it too, surer of it, the more so the more conformist we are. (Words alone
           // don't bring someone to a belief they don't hold; taking part, among those who keep to it, does: Henrich 2009.)
-          for (const host of told.holdsTo ?? []) if (holdTo(host) > 0) strengthen(host, Math.round((p.belief.told_bps * (5_000 + mind.person.temperament.conformity)) / 10_000));
+          for (const host of told.holdsTo ?? []) if (holdTo(host) > 0) outcome({ t: obs.t, domain: "belief", option: host, kind: "told", way: "mine", from: person, belief: strengthened(host, Math.round((p.belief.told_bps * (5_000 + mind.person.temperament.conformity)) / 10_000)) }, false);
           continue;
         }
         const want = (Object.keys(ASKING) as Want[]).find((w) => ASKING[w] === m.text);
@@ -758,6 +817,7 @@ export const citizen: BehaviourModule = {
       // Did the move-in we just attempted work?
       if (moving && lastWasMove && obs.outcomes.length) {
         if (obs.outcomes.at(-1)!.status === "applied" && home) home.movedIn = true;
+        if (home && !home.owned) outcome({ t: obs.t, domain: "home", option: home.space, kind: home.movedIn ? "moved_in" : "not_in_yet", way: "mine", ...(home.movedIn ? {} : { facts: { why: String(obs.outcomes.at(-1)!.refusal?.code ?? "") } }) });
         // (Under water: not a home anyone can live in. We end the lease, as a tenant of uninhabitable premises may.)
         if (obs.outcomes.at(-1)!.refusal?.code === "flooded" && home && !home.owned) uninhabitable = home.agreement;
         moving = false;
@@ -1035,6 +1095,7 @@ export const citizen: BehaviourModule = {
       if (home && t >= endsAt(home)) {
         // Looking for somewhere cheaper (a goal's method): for the first month of the hunt, only homes that beat this rent.
         if (pursuing("cheaper home")) cheaperThan = { rent: Math.floor((home.rent * p.goals.cheaper_bps) / 10_000), until: t + MONTH };
+        if (!home.owned) outcome({ t, domain: "home", option: home.space, kind: "ended", way: "mine", facts: { by: endedBy(home.agreement), rent: home.rent, ...(book.signedAt(home.agreement) !== undefined ? { held_days: Math.floor((t - book.signedAt(home.agreement)!) / DAY) } : {}) } });
         const s: Step = because(`Our tenancy of ${home.space} has ended: moving out and stopping the rent${cheaperThan ? `; we'll look for somewhere cheaper, under ${usd(cheaperThan.rent)} a month` : ""}.`, ...(home.movedIn ? [moveOut(home.structure, me)] : []));
         if (home.order) s.push(withdraw(home.order, "Tenancy ended; stop this standing order."));
         for (const x of home.retiring ?? []) s.push(withdraw(x.order, "Tenancy ended; stop this standing order."));
@@ -1053,9 +1114,12 @@ export const citizen: BehaviourModule = {
         const last = job.paidAt ?? job.since;
         if (t - last > job.period + 5 * DAY) {
           job.claimed = true;
-          mind.learn("job", job.employer, 0); // an employer that didn't pay: remembered
-          feelings.feel("anger", job.employer, 8_000, t);
           const missed = Math.max(1, Math.floor((t - last) / job.period));
+          // an employer that didn't pay: remembered
+          const before = was("job", job.employer);
+          mind.learn("job", job.employer, 0);
+          outcome({ t, domain: "job", option: job.employer, kind: "unpaid", way: "mine", facts: { days_since_last: Math.floor((t - last) / DAY), period_days: Math.round(job.period / DAY), periods_missed: missed, owed: missed * job.wage },
+            learned: { payoff: 0, ...before, after: now("job", job.employer) }, felt: [felt("feel", "anger", job.employer, 8_000, t)] });
           steps.push(because(`Our wages haven't been paid for ${Math.floor((t - last) / DAY)} days: resigning, and claiming the ${usd(missed * job.wage)} we're owed.`,
             notice(job.agreement, "Resigning: our wages haven't been paid."),
             record("right", me, { kind: "debt", amount: missed * job.wage, for: `Unpaid wages (${missed} pay period${missed > 1 ? "s" : ""}).` }, { against: job.employer, basis: job.agreement })));
@@ -1065,6 +1129,7 @@ export const citizen: BehaviourModule = {
       // A job that has ended.
       if (job && t >= jobEnds(job)) {
         if (job.workplace && inside(job.workplace)) steps.push(because("Our job has ended: leaving the workplace.", moveOut(job.workplace, me)));
+        outcome({ t, domain: "job", option: job.employer, kind: "ended", way: "mine", facts: { by: job.leftAt !== undefined ? "self" : endedBy(job.agreement), held_days: Math.floor((t - job.since) / DAY), ...(job.claimed ? { unpaid: true } : {}) } });
         job = null;
         joblessSince = t;
       }
@@ -1079,6 +1144,7 @@ export const citizen: BehaviourModule = {
           steps.push(s);
           job = { agreement: r.id, employer: r.terms.parties.find((x) => x !== me)!, ...terms, since: t };
           joblessSince = null;
+          outcome({ t, domain: "job", option: job.employer, kind: "hired", way: "mine", facts: { wage: terms.wage, period_days: Math.round(terms.period / DAY), after_notice: true } });
         }
       }
       if (!home && homelessSince === null) homelessSince = t;
@@ -1119,12 +1185,13 @@ export const citizen: BehaviourModule = {
           const pur = pursuits.get(goal);
           if (levelsNow[w.need] >= w.below) {
             unmetSince.delete(goal);
+            if (pur?.method) outcome({ t, domain: "goal", option: `${goal}: ${pur.method}`, kind: "met", way: "mine", need: w.need, facts: { level: levelsNow[w.need], wanted: w.below, days: Math.floor((t - pur.since) / DAY) } });
             if (pur) pursuits.delete(goal);
             continue;
           }
           if (!unmetSince.has(goal)) unmetSince.set(goal, t);
           const record = (choice: string | undefined, options: [string, boolean, number][]) =>
-            decided.push({ t, domain: "goal", strategy: "deliberate", ...(choice ? { choice: `${goal}: ${choice}` } : {}), options: options.map(([m, , z]) => ({ key: `${goal}: ${m}`, score: Math.round(z * 1_000) })) });
+            decision({ t, domain: "goal", strategy: "deliberate", ...(choice ? { choice: `${goal}: ${choice}` } : {}), options: options.map(([m, , z]) => ({ key: `${goal}: ${m}`, score: Math.round(z * 1_000) })) });
           if (!pur && t - unmetSince.get(goal)! >= G.unmet_days * DAY && t >= (restUntil.get(goal) ?? 0)) {
             const open = w.methods.filter(([, ok]) => ok).sort((a, b) => b[2] - a[2] || (a[0] < b[0] ? -1 : 1));
             if (open.length) {
@@ -1132,6 +1199,7 @@ export const citizen: BehaviourModule = {
               record(open[0]![0], open);
             }
           } else if (pur && t - pur.since >= G.method_days * DAY) {
+            if (pur.method) outcome({ t, domain: "goal", option: `${goal}: ${pur.method}`, kind: "not_met", way: "mine", need: w.need, facts: { level: levelsNow[w.need], wanted: w.below, days: Math.floor((t - pur.since) / DAY) } });
             const next = pur.next(t);
             record(next, w.methods.filter(([m]) => pur.methods.includes(m)));
             if (!next) {
@@ -1168,6 +1236,7 @@ export const citizen: BehaviourModule = {
             sign(r.id), ["so", pay(rentTo, rent, { from: acc.account, every: MONTH, first: Math.max(0, starts - t), basis: r.id, for: `Rent for ${home.space}, monthly in advance.` })]));
           if (home.order && stopAt <= t) steps.push(because("The old lease's rent is replaced by the new one's.", withdraw(home.order, "Replaced by a new standing order.")));
           else if (home.order) home.retiring = [...(home.retiring ?? []), { order: home.order, at: stopAt }];
+          outcome({ t, domain: "home", option: home.space, kind: "renewed", way: "mine", facts: { rent, was: home.rent } });
           home = { ...home, agreement: r.id, rent, order: undefined };
           pendingRef = { kind: "rent", agreement: r.id };
         } else if (r.terms.template === "lease" && !home) {
@@ -1181,6 +1250,8 @@ export const citizen: BehaviourModule = {
           ));
           home = { agreement: r.id, space, structure, landlord: other, rent, movedIn: false };
           pendingRef = { kind: "rent", agreement: r.id };
+          outcome({ t, domain: "home", option: space, kind: "lease_signed", way: "mine", facts: { rent, ...(homelessSince !== null ? { days_without: Math.floor((t - homelessSince) / DAY) } : {}) }, ...(thanked ? { felt: [thanked] } : {}) });
+          thanked = undefined;
           homelessSince = null;
         } else if (r.terms.template === "employment" && !job) {
           const terms = jobTerms(r, me);
@@ -1188,6 +1259,8 @@ export const citizen: BehaviourModule = {
           if (terms.workplace && !p.round) s.push(moveIn(terms.workplace)); // (with the round, we go when work starts)
           steps.push(s);
           job = { agreement: r.id, employer: other, ...terms, since: t };
+          outcome({ t, domain: "job", option: other, kind: "hired", way: "mine", facts: { wage: terms.wage, period_days: Math.round(terms.period / DAY), ...(joblessSince !== null ? { days_without: Math.floor((t - joblessSince) / DAY) } : {}) }, ...(thanked ? { felt: [thanked] } : {}) });
+          thanked = undefined;
           joblessSince = null;
         } else if (r.terms.template === "employment" && job && !switching && !retired && other !== job.employer) {
           // Offered a better-paid job while in one (we applied for it): we take it, give notice at ours, and start the
@@ -1239,14 +1312,15 @@ export const citizen: BehaviourModule = {
         const chance = shifted(rate, p.sway.union_join * (zValue("benevolence") + zValue("universalism")) / 2 + learnedMember + conform + creed + meant);
         const joins = !member && ctx.rng(`join-${job.agreement}`).below(10_000) < chance;
         // Recorded as the mind's decision (docs/design/ai-citizens.md 7): weighed, from the chance as the person came to it.
-        if (!member) decided.push({ t, domain: "membership", strategy: "deliberate", choice: joins ? "join" : "not",
-          options: [{ key: "join", score: chance }, { key: "not", score: 10_000 - chance }] });
+        if (!member) decision({ t, domain: "membership", strategy: "deliberate", choice: joins ? "join" : "not",
+          options: [{ key: "join", score: chance }, { key: "not", score: 10_000 - chance }] }, ...(joins ? ["member"] : []));
         if (joins)
           steps.push(because(`A new job: joining the union (${rate / 100}% of those working in ${industry.replaceAll("_", " ")} do; for me, ${chance / 100}%${saidJoin ? `, thinking what it would mean to me: ${Math.round((saidJoin.join ?? 0) / 1_000)} of 10 against ${Math.round((saidJoin.not ?? 0) / 1_000)} not to` : ""}).`, say("membership_application", "Application to join.", { to: [p.union], visible: [me, p.union], data: { account: acc.account, employer: job.employer, industry } })));
       }
       for (const r of fresh) {
         if (r.record === "agreement" && r.terms.template === "membership" && r.terms.parties.includes(me) && !book.signedBy(r.id, me)) {
           const dues = commitmentOf(r, me).outcome?.money;
+          outcome({ t, domain: "membership", option: "member", kind: "joined", way: "mine", facts: { with: r.terms.parties.find((x) => x !== me) ?? "", ...(dues ? { dues: cents(dues.amount) } : {}) } });
           steps.push(because(`Joining the union: signing, and paying the dues monthly.`, sign(r.id),
             ...(dues ? [pay(dues.to, cents(dues.amount), { from: acc.account, every: MONTH, first: 0, basis: r.id, for: "Union dues." })] : [])));
           continue;
@@ -1284,7 +1358,7 @@ export const citizen: BehaviourModule = {
         if (p.tribunal && !challenged.has(r.id) && r.speaks_for && breaches(book, { block: "publish", kind: "rent_increase", data: r.data }, r.speaks_for, r.at).length) {
           challenged.add(r.id);
           if (ctx.rng(`challenge-${r.id}`).below(10_000) < p.tribunal.challenge_bps) {
-            feelings.feel("anger", home.landlord, 4_000, t);
+            outcome({ t, domain: "home", option: home.space, kind: "rent_increase", way: "mine", facts: { rent, was: home.rent, from: Number(r.data.from), challenged: true }, felt: [felt("feel", "anger", home.landlord, 4_000, t)] });
             steps.push(because(`A notice of rent increase that breaks the law: taking it to the tribunal, and paying the rent as it was meanwhile.`,
               say("tribunal_application", `Application: the notice of rent increase ${r.id} from ${r.speaks_for} breaks the law; we ask that it be found invalid.`, { to: [p.tribunal.entity], visible: [me, p.tribunal.entity, r.speaks_for], basis: r.id, data: { kind: "rent_increase", against: r.speaks_for, notice: r.id, evidence: evidence(r) } })));
             continue;
@@ -1292,10 +1366,11 @@ export const citizen: BehaviourModule = {
         }
         // Angry with the landlord, the more so the more of our income it takes (a placeholder scale).
         const riseShare = householdIncome() > 0 ? ((rent - home.rent) * 10_000) / householdIncome() : 10_000;
-        if (rent > home.rent) feelings.feel("anger", home.landlord, 2_000 + 20 * riseShare, t);
+        const angry = rent > home.rent ? felt("feel", "anger", home.landlord, 2_000 + 20 * riseShare, t) : undefined;
         const lease = book.records.get(home.agreement);
         const rentTo = lease ? leaseTerms(lease, me).rentTo : undefined;
         const bearable = householdIncome() > 0 ? rent * 10_000 <= householdIncome() * p.rent_bearable_share_bps : affordable(rent, acc.balance);
+        outcome({ t, domain: "home", option: home.space, kind: "rent_increase", way: "mine", facts: { rent, was: home.rent, from: Number(r.data.from), bearable: !!(bearable && rentTo) }, ...(angry ? { felt: [angry] } : {}) });
         if (bearable && rentTo) {
           const s: Step = because(affordable(rent, acc.balance)
             ? `Our rent goes up to ${usd(rent)} a month (from ${usd(home.rent)}): still within our budget, so we'll pay it from when it starts.`
@@ -1411,8 +1486,15 @@ export const citizen: BehaviourModule = {
           // (What it teaches, held, makes it mean more; and others there, keeping to it at a cost of their time, make it
           // more credible: Henrich's credibility-enhancing displays.)
           const meaning = Math.round(holdTo(attending.host) * p.belief.meaning);
-          mind.learn("practice", attending.practice, got ? Math.min(10_000, Math.round(Math.log1p(others.length) * 2_500) + meaning) : 0);
-          if (got) strengthen(attending.host, Math.round((p.belief.display_bps * Math.min(20, others.length)) / 20));
+          {
+            const payoff = got ? Math.min(10_000, Math.round(Math.log1p(others.length) * 2_500) + meaning) : 0;
+            const before = was("practice", attending.practice);
+            mind.learn("practice", attending.practice, payoff);
+            const after = now("practice", attending.practice);
+            const belief = got ? strengthened(attending.host, Math.round((p.belief.display_bps * Math.min(20, others.length)) / 20)) : undefined;
+            outcome({ t, domain: "practice", option: attending.practice, kind: got ? "attended" : "turned_away", way: "here", facts: { host: attending.host, ...(got ? { others: others.length } : {}), ...(meaning ? { meaning } : {}) },
+              learned: { payoff, ...before, after }, ...(belief && belief.after !== belief.before ? { belief } : {}) });
+          }
           if (got) {
             // (Before anything else: it's over now. Acts take time, so a plan's order is the order things get done.)
             if (!attending.gone) steps.unshift(because(`${attending.host}'s gathering is over (${others.length} others were there): going home.`, moveOut(attending.space, me)));
@@ -1451,12 +1533,12 @@ export const citizen: BehaviourModule = {
             // The first time: our routine, as it stands. We go if a membership of ours says we take part (and know it for
             // what it's been); otherwise our evenings are our own.
             if (!decidedFor.has(r.id)) {
-              if (!mind.learned("practice").known("stay")) mind.learn("practice", "stay", 5_000);
+              if (!mind.learned("practice").known("stay")) learn("practice", "stay", 5_000, { t, kind: "expected", way: "mine" }, false);
               const ours = book.ofType("agreement").some((a) => a.record === "agreement" && a.terms.parties.includes(me) && book.inForce(a.id) &&
                 a.terms.commitments.some((c: any) => c.who === me && c.does?.outcome?.attend?.practice === r.id));
               if (ours) {
                 wentLast.add(r.id);
-                if (!mind.learned("practice").known(r.id)) mind.learn("practice", r.id, Math.min(10_000, 7_000 + Math.round(holdTo(host) * p.belief.meaning)));
+                if (!mind.learned("practice").known(r.id)) learn("practice", r.id, Math.min(10_000, 7_000 + Math.round(holdTo(host) * p.belief.meaning)), { t, kind: "expected", way: "mine", facts: { host, member: true } }, false);
               } else stayedLast.add(r.id);
             }
             // Coming up this week: going or not. Its company as we found it, or as many as we know go; its time.
@@ -1480,7 +1562,7 @@ export const citizen: BehaviourModule = {
               wentLast.delete(r.id);
               stayedLast.add(r.id);
               // An evening at home: as good as the company we have there.
-              mind.learn("practice", "stay", levelsNow.social);
+              learn("practice", "stay", levelsNow.social, { t, kind: "stayed", way: "mine", need: "social" });
             }
           }
           const next = going.get(r.id);
@@ -1527,6 +1609,7 @@ export const citizen: BehaviourModule = {
           levels: needLevels(), circ: { ...circumstances(), homeBedroomsNeeded: need }, satisfied_here: 0,
         }) : undefined;
         const best = listings.find((l) => l.id === d?.key);
+        if (best && typeof best.data?.space === "string") chose.set(`home:${best.data.space}`, decisions);
         if (best?.speaks_for) {
           applied.add(best.id);
           const members = household?.members.map((m) => m.person) ?? [me];
@@ -1644,6 +1727,7 @@ export const citizen: BehaviourModule = {
         founded.paid = true;
         const amount = Math.min(acc.balance, Math.floor(Number(r.data?.amount) || 0));
         if (amount > 0) steps.push(because(`Putting the ${usd(amount)} of capital into our new business.`, pay(String(r.data.account), amount, { from: acc.account, for: "Capital." })));
+        outcome({ t, domain: "venture", option: "found", kind: "capital_called", way: "mine", facts: { firm: founded.firm, asked: Math.floor(Number(r.data?.amount) || 0), paid: Math.max(0, amount) } });
       }
       if (!founded && p.ventures.length && p.found_bps > 0 && t >= nextVenture && !retired && p.in_labour_force) {
         nextVenture = t + MONTH;
@@ -1658,7 +1742,12 @@ export const citizen: BehaviourModule = {
         const saidFound = l ? (({ about, thing, options }) => consult(about, thing, options, acc.balance, t))(CONSULT_THINGS.found(String(l.data.type))) : undefined;
         if (saidFound === "pending") nextVenture = t;
         const meantFound = saidFound && saidFound !== "pending" ? (p.sway.consult * ((saidFound.found ?? 0) - (saidFound.not ?? 0))) / 10_000 : 0;
-        if (l && saidFound !== "pending" && ctx.rng(`found-${t}`).below(10_000) < shifted(p.found_bps, enterprise + meantFound)) {
+        // Recorded as a decision (docs/design/ai-citizens.md 7), from the chance as the person came to it.
+        const weighing = !!l && saidFound !== "pending";
+        const chanceFound = weighing ? shifted(p.found_bps, enterprise + meantFound) : 0;
+        const founds = weighing && ctx.rng(`found-${t}`).below(10_000) < chanceFound;
+        if (weighing) decision({ t, domain: "venture", strategy: "deliberate", choice: founds ? "found" : "not", options: [{ key: "found", score: chanceFound }, { key: "not", score: 10_000 - chanceFound }] });
+        if (l && founds) {
           const v = p.ventures.find((x) => x.kind === l.data.type)!;
           const capital = (l.data.price as number) + v.capital;
           const fill = (x: unknown): unknown => typeof x === "string"
@@ -1777,7 +1866,7 @@ export const citizen: BehaviourModule = {
           // What we learn of the shop: how fully it served us (experience-weighted attraction). How our own shop did is
           // what we judge the next trip by (a retry elsewhere doesn't make up for it).
           const served = Math.round((d.delivered * 10_000) / d.ordered);
-          mind.learn("shop", d.seller, served);
+          learn("shop", d.seller, served, { t, kind: "served", way: "mine", facts: { ordered: d.ordered, delivered: d.delivered, ...(d.refund > 0 ? { refund: d.refund } : {}), ...(d.order ? { order: d.order } : {}) } });
           if (d.seller === favourite) lastServed = served;
           if (short <= 0) continue;
           // Tried elsewhere now, if this trip can: another shop we know, by what we've learned of each, weighted, not the
@@ -1786,6 +1875,13 @@ export const citizen: BehaviourModule = {
           const untried = trip && trip.tried.size < p.beta ? shops.filter((x) => !trip!.tried.has(x.shop)) : [];
           // (Chosen once: the draw is this order's own, the same however often it's made, so not once per shop looked at.)
           const chosen = untried.length ? mind.learned("shop").choose(ctx.rng(`retry-${d.order}`), untried.map((u) => ({ key: u.shop, value: 0 })), mind.person.temperament.openness).key : undefined;
+          // (Recorded as a decision that follows the trip's: among the shops not yet tried, by what we've learned of each.)
+          if (chosen !== undefined) {
+            const a = mind.learned("shop");
+            const trips = chose.get(`shop:${d.seller}`);
+            decision({ t, domain: "shop", strategy: "compare", choice: chosen, ...(trips !== undefined ? { follows: trips } : {}),
+              options: [...untried].sort((x, y) => (x.shop < y.shop ? -1 : x.shop > y.shop ? 1 : 0)).map((u) => ({ key: u.shop, score: Math.round(a.get(u.shop)), ...(a.known(u.shop) ? { learned: Math.round(a.get(u.shop)) } : {}) })) });
+          }
           const next = untried.find((x) => x.shop === chosen);
           const retried = !!next && buy(next, Math.min(short, Math.floor((short * (priceAt(d.seller)?.price ?? next.price)) / next.price)), `${d.seller} could serve ${d.delivered} of the ${d.ordered} we wanted: trying ${next.shop} for the rest.`, d.order);
           if (!retried && d.refund > 0) deferred += d.refund;
@@ -1866,7 +1962,7 @@ export const citizen: BehaviourModule = {
       const who = structure ? leadFrom.get(structure) : undefined;
       if (!who) return "";
       leadFrom.delete(structure!);
-      feelings.add("gratitude", who, 6_000, t);
+      thanked = felt("add", "gratitude", who, 6_000, t);
       ties.add(who, 2_000, t);
       return ` (${who} told us to look there: we're grateful)`;
     };
@@ -1954,15 +2050,24 @@ export const citizen: BehaviourModule = {
       const noticed = [...book.notices.entries()].some(([ag, ns]) => ag === home?.agreement && ns.some((n) => n.as !== me));
       // Aggrieved: angry with our landlord (given notice to go, or a rent rise), while it lasts; or while the rent
       // takes too much of our income.
-      if (tenancy && noticed) feelings.feel("anger", tenancy.landlord, 6_000, t);
+      if (tenancy && noticed) {
+        const angry = felt("feel", "anger", tenancy.landlord, 6_000, t);
+        if (!noticeSeen.has(tenancy.agreement)) outcome({ t, domain: "home", option: tenancy.space, kind: "notice_received", way: "mine", facts: { from: tenancy.landlord }, felt: [angry] });
+        noticeSeen.add(tenancy.agreement);
+      }
       const aggrieved = !!tenancy && (burden >= p.rent_burden_grievance_bps || feelings.level("anger", tenancy.landlord, t) >= p.aggrieved_bps);
       const open = found.petitions.filter((x) => (x.data?.demand?.tags ?? []).includes("tenant_protection"));
       // An organiser closes their petition after `petition_days`; a new one can then start.
       for (const pet of open) if (pet.speaks_for === me && t - pet.at >= p.petition_days * DAY && !signed.has(`closed-${pet.id}`)) {
         signed.add(`closed-${pet.id}`);
         steps.push(because(`Closing our petition after ${p.petition_days} days.`, withdraw(pet.id, "Petition closed.")));
+        outcome({ t, domain: "petition", option: "start", kind: "closed", way: "mine", facts: { petition: pet.id, signatures: petitionSignatures(book, pet.id) + 1, days_open: Math.floor((t - pet.at) / DAY) } });
       }
-      if (willing && aggrieved && open.length === 0 && ctx.rng(`petition-${t}`).below(10_000) < p.petition_start_bps) {
+      // (Recorded as a decision, from the chance: docs/design/ai-citizens.md 7.)
+      const weighing = willing && aggrieved && open.length === 0;
+      const starts = weighing && ctx.rng(`petition-${t}`).below(10_000) < p.petition_start_bps;
+      if (weighing) decision({ t, domain: "petition", strategy: "deliberate", choice: starts ? "start" : "not", options: [{ key: "start", score: p.petition_start_bps }, { key: "not", score: 10_000 - p.petition_start_bps }] });
+      if (starts) {
         steps.push(because(`Aggrieved (${noticed ? "our landlord gave us notice" : `rent is ${Math.round(burden / 100)}% of household income`}) and no tenants' petition is open: starting one.`, say("petition", "Petition: landlords must give 90 days' notice, and may not raise rent by more than 5% a year.", { data: { demand: {
           kind: "law", text: "A landlord must give at least 90 days' notice to end a tenancy, and may not raise the rent by more than 5% in any 12 months.",
           adico: { attribute: "landlords", deontic: "must_not", aim: "end a tenancy on less than 90 days' notice, or raise rent by more than 5% a year" }, tags: ["tenant_protection"],
@@ -1979,11 +2084,17 @@ export const citizen: BehaviourModule = {
           if ((!last || last.n !== n) && (!last || t - last.at >= 3 * DAY)) {
             countsPublished.set(pet.id, { n, at: t });
             steps.push(because("Publishing our petition's running count.", say("petition_count", `${n} people have signed.`, { basis: pet.id, data: { petition: pet.id, signatures: n } })));
+            outcome({ t, domain: "petition", option: "start", kind: "signatures", way: "mine", facts: { petition: pet.id, signatures: n, days_open: Math.floor((t - pet.at) / DAY) } });
           }
           continue;
         }
         if (signed.has(pet.id) || !willing) continue;
         const share = (publishedCount(book, pet) * 10_000) / p.population;
+        // (Recorded as a decision when we sign, and once when we first see it and do not: the share of the town that
+        // has signed, as published, against our own threshold.)
+        const signs = aggrieved || ((home || livingAt) && share >= threshold);
+        if (signs || !petitionSeen.has(pet.id)) decision({ t, domain: "petition", strategy: aggrieved ? "deliberate" : "imitate", choice: signs ? "sign" : "not", options: [{ key: "not", score: threshold }, { key: "sign", score: Math.round(share) }] });
+        petitionSeen.add(pet.id);
         if (aggrieved || ((home || livingAt) && share >= threshold)) {
           signed.add(pet.id);
           steps.push(because(aggrieved ? "Signing the tenants' petition: we're aggrieved ourselves." : `Signing the tenants' petition: ${Math.round(share / 100)}% of the town has signed, past our own threshold of ${Math.round(threshold / 100)}%.`, vote(pet.id, "sign")));
@@ -1998,6 +2109,11 @@ export const citizen: BehaviourModule = {
     // When our home or job ends: by the terms' reading (a term run out, or notice given by either side under its clause),
     // or, for a job, when we walked out.
     const endsAt = (x: { agreement: string }) => book.endsAt(x.agreement) ?? Number.MAX_SAFE_INTEGER;
+    /** For the record: who ended an agreement of ours, as far as its notices say (ours, the other side's, or its term). */
+    const endedBy = (agreement: string): string => {
+      const ns = book.notices.get(agreement) ?? [];
+      return ns.some((n) => n.as === me) ? "self" : ns.length ? "other" : "term";
+    };
     const jobEnds = (j: Job) => Math.min(j.leftAt ?? Number.MAX_SAFE_INTEGER, endsAt(j));
     const children = (t: number) => others().filter((m) => ageAt(m, t, year) < ADULT_YEARS);
     const adults = (t: number) => others().filter((m) => ageAt(m, t, year) >= ADULT_YEARS);
@@ -2429,7 +2545,7 @@ export const citizen: BehaviourModule = {
           return { key: c.candidate, number: c.number ?? c.candidate, score };
         }).sort((x, y) => y.score - x.score || (x.key < y.key ? -1 : 1));
         if (!scores.length) continue;
-        decided.push({ t, domain: "vote", strategy: "deliberate", choice: scores[0]!.key, options: scores });
+        decision({ t, domain: "vote", strategy: "deliberate", choice: scores[0]!.key, options: scores.map((x) => ({ key: x.key, score: x.score })) });
         steps.push(because(`Voting: ranking the ${scores.length} candidates (our approval of the town's government: ${approval}).`, vote(b.id, scores.map((x) => x.number).join(">"), [electoral])));
       }
     };
@@ -2489,6 +2605,19 @@ export const citizen: BehaviourModule = {
         ...(home && !home.owned ? [{ of: "agreement" as const, agreement: home.agreement, in_force: true }] : []),
       ],
       step(obs): ParticipantAction | Promise<ParticipantAction> {
+        // What was decided and what was learned since our last action go with this one, whatever it is (a symbol each:
+        // never part of the action).
+        const carry = (action: ParticipantAction): ParticipantAction => {
+          if (decided.length) Object.defineProperty(action, DECISIONS, { value: decided.splice(0), enumerable: false });
+          if (outcomes.length) Object.defineProperty(action, OUTCOMES, { value: outcomes.splice(0), enumerable: false });
+          return action;
+        };
+        const action = wake(obs);
+        return action instanceof Promise ? action.then(carry) : carry(action);
+      },
+    };
+    function wake(obs: Observation): ParticipantAction | Promise<ParticipantAction> {
+      {
         if (leaving && obs.body && !obs.body.present) departed = true; // gone from the world: nothing more is ours to do
         if (departed) return wait(ctx.world.runEnd + DAY);
         absorb(obs);
@@ -2662,18 +2791,15 @@ export const citizen: BehaviourModule = {
         const action = next ? noted(book, callAction(next))
           : p.round ? wait(Math.min(practiceWake ?? Infinity, nextPlanAt, nextChange(obs.t)))
           : wait(practiceWake !== null ? Math.min(practiceWake, obs.t + 7 * DAY) : undefined);
-        if (decided.length) Object.defineProperty(action, DECISIONS, { value: decided.splice(0), enumerable: false });
         // Questions to the sparse mind out this wake: the action, once they're answered (and if waiting, awake again by
         // the next hour, to decide with the answer).
         if (asking.length) {
           const out = Promise.all(asking.splice(0));
           const then = action.type === "wait" ? wait(Math.min(action.until ?? Infinity, obs.t + ctx.world.tickSeconds)) : action;
-          const d = (action as any)[DECISIONS];
-          if (d && then !== action) Object.defineProperty(then, DECISIONS, { value: d, enumerable: false });
           return out.then(() => then);
         }
         return action;
-      },
-    };
+      }
+    }
   },
 };

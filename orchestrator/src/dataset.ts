@@ -7,7 +7,7 @@ import { basename, join } from "node:path";
 import { logLines, runOf } from "./logs";
 import type { CorpusExample } from "./corpus";
 
-export const DATASET_VERSION = "0.2.0";
+export const DATASET_VERSION = "0.3.0";
 
 interface Command { seq: number; command: string; as?: string; blocks?: unknown[]; looks?: unknown[]; provenance?: unknown; reasoning?: string; applied?: boolean; refusal?: unknown }
 interface Decision {
@@ -59,7 +59,20 @@ export async function exportDataset(logPath: string, outDir: string, o: DatasetO
   const actions = o.actions ? lines(join(outDir, "actions.jsonl")) : undefined;
   const actionRows = new Map<number, any>(); // seq -> row, until its outcome is known (the events follow at once)
   const observations = lines(join(outDir, "observations.jsonl"));
-  const citizenDecisions = lines(join(outDir, "citizen_decisions.jsonl"));
+  // Citizens' decisions are written as they are read, without their outcomes (which come later in the log), to a file
+  // that is then written again with each decision's outcomes under it: only the outcomes are held meanwhile.
+  const citizenDecisions = lines(join(outDir, "citizen_decisions.part.jsonl"));
+  const citizenOutcomes = lines(join(outDir, "citizen_outcomes.jsonl"));
+  const decisionSeqs: number[] = []; // each decision row's place in the log, in the order written
+  const decisionOf = new Map<string, Map<number, { seq: number; t: number; domain: string }>>(); // citizen -> its own number -> its latest decision of that number
+  const outcomesOf = new Map<number, string[]>(); // a decision's seq -> its outcomes, as they will be written under it
+  let numbered = false; // the run numbered its citizens' decisions: it recorded outcomes with them
+  const byDomain = new Map<string, { decisions: number; with_outcome: number; outcomes: number }>();
+  const by = (domain: string) => {
+    let x = byDomain.get(domain);
+    if (!x) byDomain.set(domain, (x = { decisions: 0, with_outcome: 0, outcomes: 0 }));
+    return x;
+  };
   const flushActions = (before: number) => {
     for (const [seq, row] of actionRows) if (seq < before) {
       actions!.write(row);
@@ -126,9 +139,39 @@ export async function exportDataset(logPath: string, outDir: string, o: DatasetO
         // (With where it stands in the log: what that citizen did and what came of it is what follows there, in
         // actions.jsonl by `seq`. What it had before it, as the mind was given it, where the record has it.)
         const d = b.data ?? {};
-        citizenDecisions.write({ run: run(), t: d.t ?? e.t, seq: e.seq, participant: b.subject, domain: d.domain, strategy: d.strategy, ...(d.choice !== undefined ? { choice: d.choice } : {}), options: d.options ?? [],
+        const area = by(String(d.domain));
+        area.decisions++;
+        decisionSeqs.push(e.seq);
+        // (Numbered by the citizen: what it later learns of how the choice went names it by that number. A log made
+        // before outcomes were recorded has no numbers, and its rows say nothing of outcomes.)
+        if (Number.isInteger(d.n)) {
+          numbered = true;
+          let mine = decisionOf.get(b.subject);
+          if (!mine) decisionOf.set(b.subject, (mine = new Map()));
+          mine.set(d.n, { seq: e.seq, t: d.t ?? e.t, domain: String(d.domain) });
+        }
+        citizenDecisions.write({ run: run(), t: d.t ?? e.t, seq: e.seq, participant: b.subject, ...(Number.isInteger(d.n) ? { n: d.n } : {}), ...(Number.isInteger(d.follows) ? { follows: d.follows } : {}),
+          domain: d.domain, strategy: d.strategy, ...(d.choice !== undefined ? { choice: d.choice } : {}), options: d.options ?? [],
           ...(d.current !== undefined ? { current: d.current } : {}), ...(d.circumstances ? { circumstances: d.circumstances } : {}), ...(d.satisfied_here !== undefined ? { satisfied_here: d.satisfied_here } : {}),
           ...(d.doubt !== undefined ? { doubt: d.doubt } : {}), ...(d.person ? { person: d.person } : {}), ...(d.state ? { state: d.state } : {}) });
+      } else if (a === "outcome") {
+        // What a citizen came to know of how its choices turned out (one entry holds all it learned since its last
+        // action): a row each, and each kept for the decision it follows, to be written under it.
+        for (const o of (b.data?.outcomes ?? []) as any[]) {
+          const dec = Number.isInteger(o.of) ? decisionOf.get(b.subject)?.get(o.of) : undefined;
+          const said = { ...(o.from !== undefined ? { from: o.from } : {}), ...(o.facts ? { facts: o.facts } : {}), ...(o.learned ? { learned: o.learned } : {}), ...(o.need !== undefined ? { need: o.need } : {}),
+            ...(o.felt ? { felt: o.felt } : {}), ...(o.belief ? { belief: o.belief } : {}) };
+          citizenOutcomes.write({ run: run(), t: o.t ?? e.t, seq: e.seq, participant: b.subject, domain: o.domain, option: o.option, ...(Number.isInteger(o.of) ? { of: o.of } : {}),
+            ...(dec ? { decision_seq: dec.seq, decision_t: dec.t } : {}), kind: o.kind, way: o.way, ...said });
+          by(String(o.domain)).outcomes++;
+          if (!dec) continue;
+          let under = outcomesOf.get(dec.seq);
+          if (!under) {
+            outcomesOf.set(dec.seq, (under = []));
+            by(dec.domain).with_outcome++;
+          }
+          under.push(JSON.stringify({ t: o.t ?? e.t, seq: e.seq, option: o.option, kind: o.kind, way: o.way, ...said }));
+        }
       } else if (a === "observation") {
         observations.write({ run: run(), t: b.data?.t ?? e.t, participant: b.subject, ...(b.data?.as ? { as: b.data.as } : {}), observation: b.data?.observation });
       }
@@ -173,9 +216,25 @@ export async function exportDataset(logPath: string, outDir: string, o: DatasetO
   for (const d of decisions) dw.write(d);
   files["decisions.jsonl"] = await dw.close();
   if (actions) files["actions.jsonl"] = await actions.close();
+  // Citizens' decisions, each with what the citizen came to know of how it turned out (none: an empty list, where
+  // the run recorded outcomes at all; a log from before it did says nothing of them).
   const cd = await citizenDecisions.close();
-  if (cd.rows) files["citizen_decisions.jsonl"] = cd;
-  else await Bun.file(join(outDir, "citizen_decisions.jsonl")).delete();
+  const part = join(outDir, "citizen_decisions.part.jsonl");
+  if (cd.rows) {
+    const w = Bun.file(join(outDir, "citizen_decisions.jsonl")).writer();
+    let i = 0;
+    for await (const row of logLines(part)) {
+      if (!row) continue;
+      const seq = decisionSeqs[i++]!;
+      w.write(numbered ? `${row.slice(0, -1)},"outcomes":[${(outcomesOf.get(seq) ?? []).join(",")}]}\n` : `${row}\n`);
+    }
+    await w.end();
+    files["citizen_decisions.jsonl"] = cd;
+  }
+  await Bun.file(part).delete();
+  const co = await citizenOutcomes.close();
+  if (co.rows) files["citizen_outcomes.jsonl"] = co;
+  else await Bun.file(join(outDir, "citizen_outcomes.jsonl")).delete();
   const obs = await observations.close();
   if (obs.rows) files["observations.jsonl"] = obs;
   else await Bun.file(join(outDir, "observations.jsonl")).delete();
@@ -194,6 +253,9 @@ export async function exportDataset(logPath: string, outDir: string, o: DatasetO
     // How the log itself says it ended: completed, or aborted or error with why (a run cut short, or stopped at a
     // limit); a log with no end entry is a run that was killed, or is still going.
     end: { t: lastT, reason: !end ? "unfinished: the log has no end entry" : end.detail ? `${end.reason}: ${end.detail}` : end.reason },
+    // What the run recorded for citizen models: by area of life, the decisions, those the citizen learned at least one
+    // outcome of, and the outcomes (those that follow no recorded decision among them).
+    ...(cd.rows ? { citizens: { decisions: cd.rows, outcomes: co.rows, by_domain: Object.fromEntries([...byDomain].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) } } : {}),
     files,
   };
   await Bun.write(join(outDir, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);

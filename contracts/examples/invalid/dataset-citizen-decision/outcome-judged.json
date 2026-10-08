@@ -1,0 +1,25 @@
+{
+  "run": "town-1000.seed1",
+  "t": 1209600,
+  "seq": 61200,
+  "participant": "citizen-17-self",
+  "n": 12,
+  "domain": "shop",
+  "strategy": "deliberate",
+  "choice": "shop-3",
+  "options": [
+    {
+      "key": "shop-3",
+      "score": 9120
+    }
+  ],
+  "outcomes": [
+    {
+      "t": 1814400,
+      "option": "shop-3",
+      "kind": "served",
+      "way": "mine",
+      "reward": 6667
+    }
+  ]
+}

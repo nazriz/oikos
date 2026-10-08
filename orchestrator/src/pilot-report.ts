@@ -103,10 +103,15 @@ export async function reportOfLog(dir: string, log: string): Promise<any> {
     return r;
   };
   const askBacks: { draft: string; t: number; sentence: string }[] = [];
+  // What the run recorded for citizen models (docs/design/ai-citizens.md 7): code citizens' decisions, and what each
+  // came to know of how its choices turned out. Counted, so that a pilot recording none is noticed.
+  const citizens = { decisions: 0, outcomes: 0 };
 
   for await (const line of logLines(log)) {
     // (Only the entries a figure is read from are parsed: a pilot's log is mostly the town's own events.)
-    const interesting = line.includes('"kind":"annotation"') ? !line.includes('"annotation":"decision"') && !line.includes('"annotation":"observation"')
+    const annotation = line.includes('"kind":"annotation"');
+    if (annotation && line.includes('"annotation":"decision"')) citizens.decisions++;
+    const interesting = annotation ? !line.includes('"annotation":"decision"') && !line.includes('"annotation":"observation"')
       : line.includes('"command":"opt_out"') || line.includes('"kind":"end"');
     if (!interesting) continue;
     let e: any;
@@ -118,6 +123,7 @@ export async function reportOfLog(dir: string, log: string): Promise<any> {
       // A seat's opt-out: the command the participant's `opt_out` use becomes, with the statement as it was given.
       seat(b.participant).opted_out = { t: e.t, day: Math.floor(e.t / 86_400), statement: b.statement ?? "" };
     } else if (b.annotation === "orchestrator") config ??= b.data;
+    else if (b.annotation === "outcome") citizens.outcomes += b.data?.outcomes?.length ?? 0;
     else if (b.annotation === "usage") {
       // Cost and tokens by who the call was for: the translator ("translator") or a seat.
       const into = b.subject === "translator" || b.purpose === "translator" ? tr : seat(b.subject);
@@ -215,6 +221,7 @@ export async function reportOfLog(dir: string, log: string): Promise<any> {
     confirm: config?.confirm ?? null,
     days_run: Math.round(((end?.t ?? last) / 86_400) * 10) / 10, until_days: until !== undefined ? Math.round((until / 86_400) * 10) / 10 : null,
     stopped,
+    citizen_records: citizens,
     per_seat: Object.fromEntries([...seats].filter(([, s]) => s.model_calls || s.opted_out).map(([k, s]) => { const { model: _m, configured: _c, ...rest } = s; return [k, rest]; })),
     translator_report: {
       model_calls: tr.model_calls, failed_calls: tr.failed_calls, cost_microusd: tr.cost_microusd, its_own_retries: tr.retries,
@@ -250,6 +257,10 @@ export function renderReport(r: any): string {
   L.push(`seats: ${Object.entries(r.seats).map(([k, s]: any) => `${k} on ${s.model}`).join("; ") || "none"}`);
   L.push(`translator: ${r.translator.model ?? "none"}${r.translator.version ? ` ${r.translator.version}` : ""}; confirmation: ${r.confirm}`);
   L.push(`days run: ${r.days_run}${r.until_days !== null ? ` of ${r.until_days}` : ""}; stopped: ${r.stopped.reason}${r.stopped.detail ? ` (${String(r.stopped.detail).slice(0, 160)})` : ""}${r.stopped.reached_until === true ? ", reached its until" : r.stopped.reached_until === false ? ", short of its until" : ""}`);
+  // (One line, so a pilot that recorded nothing for citizen models is seen at once.)
+  const c = r.citizen_records;
+  if (c) L.push(c.decisions || c.outcomes ? `citizen records: ${c.decisions} decisions, ${c.outcomes} outcomes${c.decisions && !c.outcomes ? " (NO OUTCOMES: the run was made before they were recorded, or something is wrong)" : ""}`
+    : "citizen records: NONE (no citizen decision or outcome is in this log: a lean log, or --record-decisions none)");
   if (r.folder_note) L.push(`folder note: ${r.folder_note.slice(0, 400)}`);
   for (const [k, s] of Object.entries<any>(r.per_seat)) {
     L.push(`-- ${k}: ${s.model_calls} calls${s.failed_calls ? ` (${s.failed_calls} failed)` : ""}, ${s.cost_microusd} microusd; tool uses: ${kv(s.tool_uses)}; answers with no tool use: ${s.answers_without_tool_use}`);

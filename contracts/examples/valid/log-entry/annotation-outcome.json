@@ -1,0 +1,54 @@
+{
+  "seq": 90214,
+  "t": 1814400,
+  "kind": "annotation",
+  "body": {
+    "annotation": "outcome",
+    "subject": "citizen-17-self",
+    "data": {
+      "outcomes": [
+        {
+          "t": 1814400,
+          "domain": "shop",
+          "option": "shop-3",
+          "of": 12,
+          "kind": "served",
+          "way": "mine",
+          "facts": {
+            "ordered": 9,
+            "delivered": 6,
+            "refund": 1350,
+            "order": "rec.4411"
+          },
+          "learned": {
+            "payoff": 6667,
+            "before": 8000,
+            "first": true,
+            "after": 7298
+          }
+        },
+        {
+          "t": 1814400,
+          "domain": "job",
+          "option": "works-1",
+          "kind": "paid",
+          "way": "mine",
+          "facts": {
+            "amount": 164000,
+            "agreed": 211356,
+            "paid_at": 1728000,
+            "days_since_last": 14,
+            "period_days": 14
+          },
+          "learned": {
+            "payoff": 10000,
+            "before": 7632,
+            "after": 8878
+          }
+        }
+      ]
+    }
+  },
+  "prev": "abababababababababababababababababababababababababababababababab",
+  "hash": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
+}
