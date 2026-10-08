@@ -1,0 +1,23 @@
+{
+  "form": "works_staffing",
+  "office": "works",
+  "submit_as": "direction",
+  "submit_to": [
+    "city"
+  ],
+  "fields": {
+    "recruit": {
+      "type": "choice",
+      "required": true,
+      "options": [
+        "yes",
+        "no"
+      ],
+      "description": "Whether the works office recruits."
+    },
+    "posts": {
+      "type": "count",
+      "description": "The most works crew it is to have."
+    }
+  }
+}

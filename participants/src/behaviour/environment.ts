@@ -10,14 +10,18 @@ import { cents } from "../money";
 import type { SiteStructure } from "../contracts";
 import { channels } from "../contracts";
 import { need, params, type BehaviourModule, type ParticipantContext } from "../module";
-import { ask, Asked, nextLook, because, Book, DAY, lotOf, MONTH, say, type Step, usd, withdraw, outOfTime, team } from "./common";
-import { Staffing, stepper } from "./firms";
+import { ask, Asked, nextLook, because, Book, DAY, Directions, lotOf, MONTH, say, type Step, usd, withdraw, outOfTime, team } from "./common";
+import { Staffing, staffingForm, staffingUnder, stepper } from "./firms";
+import * as P from "./papers";
 
 const YEAR = 365 * DAY;
 
 export const environment: BehaviourModule = {
   name: "city.environment",
-  version: "0.3.0", // 0.3.0: samples habitat from its own habitat map and asks the land registry which lot a cell is on; no longer shown the district or the register of lots
+  issues: [P.JOB_ADVERTISEMENT, ...P.ENVIRONMENT],
+  issuesWith: (p) => ({ ...P.staffingOwn({ role: p.role ?? "environmental scientist", industry: p.industry, workplace: p.workplace, notice_days: p.notice_days ?? 14 }), planning: p.planning }),
+  takes: [staffingForm("environment_staffing", "the environment office", "environmental scientists")],
+  version: "0.4.0", // 0.4.0: takes a written direction on its staffing (docs/behaviour/directions.md); 0.3.0: samples habitat from its own habitat map and asks the land registry which lot a cell is on; no longer shown the district or the register of lots
   doc: "docs/behaviour/environment.md",
   cadence: () => DAY,
   firstWake: (ctx) => 8 * 3600 + ctx.rng("first-wake").below(3600),
@@ -38,10 +42,14 @@ export const environment: BehaviourModule = {
       depot_channel: "depot",
       // The land register's plans, asked which lot a cell of ground is on (none: its habitat register names no lots).
       lots: "",
+      // Whose written directions it follows (docs/behaviour/directions.md): the town's own rule, a record the world
+      // names (none: it follows nobody's); and how often it follows one it is given.
+      directed_under: "", direction_compliance_bps: 10_000,
     }, ctx.params);
     need(p, ["depot", "workplace", "planning"], "city.environment");
     const me = ctx.entity;
     const book = new Book();
+    const directions = new Directions(ctx, { under: p.directed_under, compliance_bps: p.direction_compliance_bps, office_words: "the environment office" });
     const staffing = new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, workplace: p.workplace, role: p.role, ...(p.industry ? { industry: p.industry } : {}), does: { hire: true, pay: false }, own: "role" });
     // cell -> its cover: by the office's own habitat map (its own paper, made up from where its scientists have been),
     // less what the town has since had notice of being built on.
@@ -95,8 +103,14 @@ export const environment: BehaviourModule = {
         const room = depotView?.spaces.find((sp) => sp.space === p.workplace);
         const target = budget ? Math.min(room?.capacity ?? Infinity, annual > 0 ? Math.floor(line / annual) : 0) : workers.length;
         if (workers.length > target && t % MONTH < DAY) steps.push(...staffing.letGo(book, t, `The adopted budget's ${p.staff_line} line (${usd(line)}) pays for ${target} staff, and we have ${workers.length}: letting one go.`, "Redundancy: the budget doesn't pay for the position."));
-        steps.push(...staffing.routine(obs, book, "", { target, wage: p.wage, canPost: !!budget && target > workers.length,
-          why: `The adopted budget's ${p.staff_line} line (${usd(line)}) pays for ${target} staff; we have ${workers.length}: posting a job.` }));
+        // A staffing direction that stands (from whoever the town says may direct us): whether to recruit, and how many.
+        const staffingDir = directions.standing(book, "environment_staffing");
+        const directed = staffingUnder(staffingDir);
+        const hireTo = Math.min(target, directed.posts ?? Infinity);
+        steps.push(...staffing.routine(obs, book, "", { target: hireTo, wage: p.wage, canPost: !!budget && hireTo > workers.length, recruit: directed.recruit,
+          ...(staffingDir ? { stopped: `Direction ${staffingDir.id} says not to recruit: taking our advertisements down.` } : {}),
+          why: `The adopted budget's ${p.staff_line} line (${usd(line)}) pays for ${target} staff${hireTo < target ? ` (and direction ${staffingDir!.id} says to fill ${hireTo})` : ""}; we have ${workers.length}: posting a job.` }));
+        steps.push(...directions.letters(book, (d) => (staffingUnder(d).recruit ? `The office recruits up to ${Math.min(target, staffingUnder(d).posts ?? Infinity)} staff.` : "The office advertises no post, takes down the advertisements it has out and takes nobody on.")));
 
         // ---- a new round: a sample of each species' habitat, as we've seen the land ----
         if (t >= nextRound && queue.length === 0 && pending === 0) {

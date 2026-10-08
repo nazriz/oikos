@@ -361,7 +361,9 @@ test("generated gold: a few hundred different programs for every function of the
   for (const g of gold) {
     const p = calls.parseProgram(g.program);
     expect(calls.contractErrors(p)).toEqual([]);
-    expect([g.program, whyNot(p)]).toEqual([g.program, undefined]);
+    // (A paper of an office's own has more to say than a sentence or two holds: up to fourteen values. Since 0.12.0.)
+    if (g.tag === "paper" && whyNot(p) !== undefined) expect([g.program, whyNot(p), literals(p).length <= 14]).toEqual([g.program, "more than ten values", true]);
+    else expect([g.program, whyNot(p)]).toEqual([g.program, undefined]);
     expect(g.program).toBe(goldText(p)); // as gold is kept
     expect(g.shape).toBe(shapeOf(p));
     expect(g.origin).toBe("synthetic");
@@ -782,7 +784,11 @@ test("gold from the seen cases: a form filled in carries the form the test's may
   const gold = goldFromCases(CASES);
   const forms = gold.filter((g) => functionOf(g) === "form");
   expect(forms.length).toBeGreaterThan(0);
-  for (const g of forms) expect(g.forms!.map(formLine)).toEqual(["- permit_application, to=planning, id form-permit: fields lot (lot, required), structure_type (structure_type, required), notes (text)"]);
+  // (Each carries its own form and no other: the planning permit, or, since 0.12.0, a form that is one office's own.)
+  for (const g of forms) expect(g.forms!.map((f) => f.form)).toEqual([formOf(g.program)!.form]);
+  const permits = forms.filter((g) => formOf(g.program)!.form === "permit_application");
+  expect(permits.length).toBeGreaterThan(2);
+  for (const g of permits) expect(g.forms!.map(formLine)).toEqual(["- permit_application, to=planning, id form-permit: fields lot (lot, required), structure_type (structure_type, required), notes (text)"]);
   expect(gold.every((g) => g.origin === "case" && g.currency === TEST_CURRENCY)).toBe(true);
 });
 

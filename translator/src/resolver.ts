@@ -9,13 +9,13 @@
 //   - it uses only what the participant knows (P8). Ids the participant states outright
 //     are passed through: if one doesn't exist, physics says so.
 
-import { calls, formatMoney, type Block } from "@oikos/participants";
+import { calls, formatMoney, forms, type Block } from "@oikos/participants";
 import { Knowledge } from "./knowledge";
 
 type Call = calls.Call;
 type Value = calls.Value;
 
-export const RESOLVER = { id: "resolver", version: "0.5.0" };
+export const RESOLVER = { id: "resolver", version: "0.6.0" };
 
 /** What the resolver reads from a structure type in the world's catalogue (which is public): its footprint, the terrains it can stand on, and its spaces. */
 export interface StructureTypeInfo {
@@ -59,6 +59,9 @@ export function asLabel(s: string): string {
   return out.slice(0, 64);
 }
 
+
+/** A length of time in words: whole days where it is whole days ("14 days", "1 day"), seconds otherwise. */
+export const durationWords = forms.durationWords;
 
 /** Resolve a program. `typeOf` gives a structure type from the world's catalogue, for building on a lot. */
 export function resolve(program: calls.Program, k: Knowledge, typeOf: (type: string) => StructureTypeInfo | undefined = () => undefined, as?: string): Resolution {
@@ -254,7 +257,7 @@ class Resolver {
       case "money": return this.money(c, bind);
       case "goods": return this.goods(c);
       case "take": return this.take(c);
-      case "work": return this.work(c);
+      case "work": return this.work(c, bind);
       case "account": return this.account(c, bind);
       case "structure": return this.structure(c, bind);
       case "occupancy": return this.occupancy(c);
@@ -301,8 +304,10 @@ class Resolver {
 
   /** Work (phase B): units of a task at a place, by the people named (`by`: one, or a list). Nobody named: work that
    * takes no one's time (using things up). */
-  private work(c: Call): Block[] {
+  private work(c: Call, bind?: string): Block[] {
     const task = this.need(c, "task", "What work?");
+    if (this.has(c, "every")) return this.standingWork(c, task, bind);
+    if (this.has(c, "first") || this.has(c, "until")) throw new Ask("Work asked for once is done now. When it starts and how long it goes on are said of work done again and again: say how often.");
     // A survey (nature): of a species or a field, in these cells, a unit each.
     const survey = this.id(c, "survey");
     const cells = survey ? this.ids(c, "cells") : undefined;
@@ -321,6 +326,30 @@ class Resolver {
       investigate = { from: this.k.entityOf(from), at: takenAt, kind: this.need(c, "kind", "Taken: what?") };
     }
     return [{ block: "work", task, units: Number(units), at, performers: by, ...(on ? { on } : {}), ...(survey && cells ? { survey: { of: survey, cells } } : {}), ...(investigate ? { investigate } : {}) }];
+  }
+
+  /**
+   * A standing work order (contracts/calls.md): work to be done again and again, by the organisation's own staff, put
+   * on the organisation's own file. What task, where, on what and by whom (if said), how often, from when and for how
+   * long. Nothing is done here and the kernel does nothing with it: the staff whose work it is follow it, each time
+   * it falls due, in their own hours, while it stands. It is changed by withdrawing it and making another, and put
+   * on hold like any standing paper.
+   */
+  private standingWork(c: Call, task: string, bind?: string): Block[] {
+    if (this.has(c, "survey") || this.has(c, "investigate")) throw new Ask("A survey or an investigation is asked for each time, with what it is of: it can't be a standing order.");
+    const at = this.need(c, "at", "Where?");
+    const every = this.seconds(c, "every")!;
+    if (every <= 0) throw new Ask("How often?");
+    const first = this.seconds(c, "first");
+    const until = this.seconds(c, "until");
+    const by = this.has(c, "by") ? [...new Set(this.ids(c, "by")!.map((p) => this.k.entityOf(p)))] : undefined;
+    const on = this.has(c, "on") ? [...new Set(this.ids(c, "on")!)] : undefined;
+    const units = this.quantity(c, "units");
+    const me = this.id(c, "for") ?? this.me;
+    const text = `Standing work order: ${task} at ${at}${on ? `, on ${on.join(", ")}` : ""}${by ? `, by ${by.join(", ")}` : ""}${units ? `, ${units} each time` : ""}, every ${durationWords(every)}${first !== undefined ? `, the first in ${durationWords(first)}` : ""}${until !== undefined ? `, for ${durationWords(until)}` : ""}.`;
+    return [{ block: "publish", kind: "work_order", text, speaks_for: me, addressed_to: [me], visible_to: [...new Set([me, ...(by ?? [])])],
+      data: { work: { task, at, ...(on ? { on } : {}), ...(by ? { by } : {}), ...(units ? { units: Number(units) } : {}) }, every, ...(first !== undefined ? { first } : {}), ...(until !== undefined ? { until: this.k.t + until } : {}) },
+      ...(bind ? { ref: bind } : {}) }];
   }
 
   /** Taking goods another holds, where we are (crime: world-expansion 7.3). */
@@ -637,9 +666,11 @@ class Resolver {
       if (!acts) throw new Ask(`You don't know of a standing paper called ${x} that someone acts on. Look it up and name it by its id, or say who is to hold it.`);
       for (const a of acts) if (a !== me && !to.includes(a)) to.push(a);
     }
-    if (!to.length) throw new Ask(`${held.join(", ")} ${held.length > 1 ? "are" : "is"} yours to act on: nobody else needs telling.`);
+    // (What is addressed to nobody but the organisation itself is acted on by its own people: the hold goes on its
+    // own file, where they read it. A standing work order is such a paper.)
+    const own = !to.length;
     const text = this.str(c, "text") || `Please hold ${held.join(", ")}: nothing is to be done under ${held.length > 1 ? "them" : "it"} until this is withdrawn.`;
-    return [{ block: "publish", kind: "hold", text, addressed_to: to, data: { holds: held }, visible_to: [me, ...to], ...common }];
+    return [{ block: "publish", kind: "hold", text, addressed_to: own ? [me] : to, data: { holds: held }, visible_to: own ? [me] : [me, ...to], ...common }];
   }
 
   private form(c: Call, bind?: string): Block[] {
@@ -655,17 +686,17 @@ class Resolver {
     const known = this.k.forms.filter((x) => spellings.includes(x.data?.form) || x.id === written);
     if (!known.length) throw new Ask(LABEL_TEXT.unknown_form);
     const name: string = known.some((x) => x.id === written) ? written : known[0]!.data.form;
-    const goes = [...new Set(known.map((x) => x.in_position ?? x.speaks_for ?? x.author))].sort();
+    const goes = [...new Set(known.map((x) => Knowledge.formOf(x)))].sort();
     const to = this.has(c, "to") ? this.need(c, "to", "Which office's form?") : goes.length === 1 ? goes[0]! : (() => { throw new Ask("Which office's form?"); })();
     const f = this.k.form(to, name);
     if (!f) {
       // Known by name but not from that office: say where it goes, rather than that it's unknown.
       const elsewhere = this.k.forms.filter((x) => x.data?.form === name || x.id === name);
       if (!elsewhere.length) throw new Ask(LABEL_TEXT.unknown_form);
-      const where = [...new Set(elsewhere.map((x) => x.in_position ?? x.speaks_for ?? x.author))];
+      const where = [...new Set(elsewhere.map((x) => Knowledge.formOf(x)))];
       throw new Ask(`The ${name.replace(/_/g, " ")} form isn't one ${to} takes: it goes to ${where.join(" or ")}.`);
     }
-    const spec = f.data as { form: string; submit_as: string; submit_to: string[]; fields: { [k: string]: { type: string; required?: boolean; options?: string[] } } };
+    const spec = f.data as { form: string; submit_as: string; submit_to: string[]; fields: { [k: string]: { type: string; required?: boolean; options?: string[] } }; writes?: forms.FormWrites };
     const data: { [k: string]: unknown } = {};
     const missing: string[] = [];
     for (const [field, t] of Object.entries(spec.fields)) {
@@ -676,19 +707,52 @@ class Resolver {
       data[field] =
         t.type === "amount" ? this.amount(c, field)
         : t.type === "duration" ? this.seconds(c, field)
-        : t.type === "count" ? calls.parseCount(this.str(c, field)!)
+        // (A count on a form may be nought: a vote with nobody against.)
+        : t.type === "count" ? (/^[0-9]{1,15}$/.test(this.str(c, field)!.trim()) ? Number(this.str(c, field)!.trim()) : calls.parseCount(this.str(c, field)!))
         : t.type === "text" ? this.str(c, field)
         : t.type === "choice" ? this.choice(c, field, t.options ?? [])
         : t.type === "space" ? this.space(this.id(c, field)!)
         // A kind of building names a catalogue entry, not anyone: quoted or not, it's the same word.
         : t.type === "structure_type" ? this.str(c, field)
+        : t.type === "list" ? this.ids(c, field)
+        : t.type === "date" ? this.date(c, field)
         : this.id(c, field);
     }
-    const unknown = Object.keys(c.args).filter((a) => !["to", "form", "for"].includes(a) && !(a in spec.fields));
+    // (A paper of the office's own may be given its words as they are to stand, where the form has no field of that name.)
+    const ownWords = !!spec.writes && !("text" in spec.fields);
+    const unknown = Object.keys(c.args).filter((a) => !["to", "form", "for"].includes(a) && !(a in spec.fields) && !(a === "text" && ownWords));
     if (unknown.length) throw new Ask(`The ${spec.form.replace(/_/g, " ")} form has no ${unknown.join(" or ")} field. Its fields are: ${Object.keys(spec.fields).join(", ")}.`);
     if (missing.length) throw new Ask(`The ${spec.form.replace(/_/g, " ")} needs: ${missing.join(", ")}.`);
-    const summary = Object.entries(data).map(([k, x]) => `${k.replace(/_/g, " ")} ${typeof x === "string" ? x : JSON.stringify(x)}`).join(", ");
+    // A paper of the office's own (contracts: FormWrites): written from the fields as the form says, the statement
+    // the rest of the world reads. It does not cite the form.
+    if (spec.writes) {
+      const me = this.id(c, "for") ?? this.me;
+      const paper = this.written(() => forms.writePaper(spec as forms.FormData, data as forms.Filled, { self: me, now: this.k.t, money: (a) => this.sum(a), ...(ownWords && this.has(c, "text") ? { text: this.str(c, "text")! } : {}) }));
+      return [{ block: "publish", ...paper, text: paper.text.slice(0, 16384), speaks_for: me, ...(bind ? { ref: bind } : {}) }];
+    }
+    // What was filled in, in words: an amount as the world writes its money, a length of time in days.
+    const words = (k: string, x: unknown): string => {
+      const type = spec.fields[k]?.type;
+      if (type === "amount" && typeof x === "string") return this.sum(x);
+      if (type === "duration" && typeof x === "number") return durationWords(x);
+      return typeof x === "string" ? x : JSON.stringify(x);
+    };
+    const summary = Object.entries(data).map(([k, x]) => `${k.replace(/_/g, " ")} ${words(k, x)}`).join(", ");
     return [{ block: "publish", kind: spec.submit_as, speaks_for: this.id(c, "for") ?? this.me, addressed_to: spec.submit_to, basis: f.id, text: `${spec.form.replace(/_/g, " ")}: ${summary}.`.slice(0, 16384), data, ...(bind ? { ref: bind } : {}) }];
+  }
+
+  /** A date as written ("year 1, day 12"), as the moment that day begins. */
+  private date(c: Call, field: string): number {
+    return this.written(() => forms.parseDate(this.str(c, field)!));
+  }
+  /** What a form's own reading says is wrong is a question back. */
+  private written<T>(f: () => T): T {
+    try {
+      return f();
+    } catch (e) {
+      if (e instanceof forms.FormError) throw new Ask(e.message);
+      throw e;
+    }
   }
 
   private choice(c: Call, field: string, options: string[]): string {

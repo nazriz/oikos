@@ -1,0 +1,48 @@
+{
+  "form": "death_registration",
+  "office": "registry",
+  "submit_as": "death_registration",
+  "submit_to": [
+    "city"
+  ],
+  "fields": {
+    "deceased": {
+      "type": "entity",
+      "required": true
+    },
+    "notification": {
+      "type": "record",
+      "required": true
+    },
+    "reported_by": {
+      "type": "entity",
+      "required": true
+    },
+    "children": {
+      "type": "list"
+    },
+    "registered_on": {
+      "type": "date"
+    }
+  },
+  "writes": {
+    "kind": "death_registration",
+    "text": "Death registered: {deceased}.",
+    "basis": "=notification",
+    "to": [
+      "=reported_by",
+      "outside"
+    ],
+    "visible": [
+      "=self",
+      "=reported_by",
+      "outside"
+    ],
+    "data": {
+      "deceased": "=deceased",
+      "reported_by": "=reported_by",
+      "children": "=children",
+      "on": "=registered_on"
+    }
+  }
+}

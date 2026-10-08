@@ -43,5 +43,108 @@
     }
   },
   "perceives": [],
-  "state": "none"
+  "state": "none",
+  "issues": [
+    {
+      "form": "council_ballot",
+      "title": "A ballot of the council on a proposal",
+      "fields": {
+        "proposal": {
+          "type": "record",
+          "required": true,
+          "description": "The proposal put to the vote."
+        },
+        "open_for": {
+          "type": "duration",
+          "required": true,
+          "description": "How long the ballot stays open."
+        },
+        "tags": {
+          "type": "list",
+          "description": "What the proposal is about, a word each (budget, tenant_protection, development)."
+        }
+      },
+      "writes": {
+        "kind": "ballot",
+        "text": "Ballot of the council on {proposal}, open for {open_for}.",
+        "basis": "=proposal",
+        "data": {
+          "proposal": "=proposal",
+          "options": [
+            "yes",
+            "no"
+          ],
+          "closes_at": "+open_for",
+          "electorate": "council",
+          "tags": "=tags"
+        }
+      }
+    },
+    {
+      "form": "council_result",
+      "title": "The result of a ballot of the council",
+      "fields": {
+        "ballot": {
+          "type": "record",
+          "required": true,
+          "description": "The ballot counted."
+        },
+        "yes": {
+          "type": "count",
+          "required": true,
+          "description": "Votes for."
+        },
+        "no": {
+          "type": "count",
+          "required": true,
+          "description": "Votes against."
+        },
+        "passed": {
+          "type": "choice",
+          "required": true,
+          "options": [
+            "yes",
+            "no"
+          ],
+          "description": "Whether it passed."
+        }
+      },
+      "writes": {
+        "kind": "ballot_result",
+        "text": "Result of {ballot}: {yes} for, {no} against.",
+        "basis": "=ballot",
+        "data": {
+          "ballot": "=ballot",
+          "yes": "=yes",
+          "no": "=no",
+          "passed": "?passed"
+        }
+      }
+    },
+    {
+      "form": "adopted_budget",
+      "title": "The budget as the council adopted it",
+      "fields": {
+        "year": {
+          "type": "count",
+          "required": true,
+          "description": "The year the budget is for."
+        },
+        "ballot": {
+          "type": "record",
+          "required": true,
+          "description": "The ballot that adopted it."
+        }
+      },
+      "writes": {
+        "kind": "budget",
+        "text": "The town's budget for year {year}.",
+        "basis": "=ballot",
+        "data": {
+          "year": "=year",
+          "lines": {}
+        }
+      }
+    }
+  ]
 }

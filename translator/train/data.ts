@@ -65,6 +65,14 @@
 //                   as the lifting of a hold. What used to be refused as `no_such_act` (a standing payment to be
 //                   held) is no refusal now. `look_first` has briefs of three kinds: a standing payment named only
 //                   by what it pays, another record named only by describing it, and an act that depends on a look.
+//   an office's own (0.12.0) a form that is one office's own (`FormSpec.office`) is a direction that office takes or a
+//                   paper it issues (contracts/calls.md). A request for one is worded as the thing itself ("Direct the
+//                   works office to stop recruiting", "Register the death of ..."): it need not name the form, a paper
+//                   need not say whose office it is, and a yes-or-no answer is in how it is said, so those are
+//                   looked for and, where the request doesn't have them, recorded as implied (`Needed.optional`).
+//                   The same direction with no such form listed is a letter to the office (synthetic.ts
+//                   `directions`), so that the form listed is what decides. Fields may be lists and dates. Work to
+//                   be done again and again is a standing order (`work(..., every=...)`), held and withdrawn by id.
 //
 // Nothing here reads the held-out cases; the finished data is checked against them for shared wording before it is
 // used (eval/held-out.ts), and any request that shares some is dropped.
@@ -72,7 +80,7 @@
 // The sampling is seeded (a generator of its own: this is tooling, not a world, and takes nothing from a run's
 // randomness), so the same logs and seed give the same programs to write requests for.
 
-import { calls, canonical as canonicalJson, formatMoney, groupDigits, marksOf, type Currency } from "@oikos/participants";
+import { calls, canonical as canonicalJson, formatMoney, forms as formReading, groupDigits, marksOf, type Currency } from "@oikos/participants";
 import type { LlmAdapter, Usage } from "@oikos/participants/llm";
 import { canonical, fixture, TEST_CURRENCY, tidy } from "../eval/run";
 import { sharesWording } from "../eval/held-out";
@@ -83,17 +91,26 @@ import { FLAG_YES, FLAGS, sameMeaning, type MeaningContext } from "./meaning";
 
 export { meaningOf, sameMeaning, type MeaningContext } from "./meaning";
 
-export const DATA_VERSION = "0.11.0";
+export const DATA_VERSION = "0.12.0"; // 0.12.0: a direction on an office's form and a paper of one's own office (and the same direction as a letter where no form is listed), fields that are lists and dates, standing work orders
 
 const sha256 = (s: string) => new Bun.CryptoHasher("sha256").update(s).digest("hex");
 
 /** A form as someone knows of it: its name, the office it goes to, and its fields in the order it lists them. */
-export interface FormField { type: string; required?: boolean; options?: string[] }
-export interface FormSpec { form: string; to: string; fields: { [name: string]: FormField }; /** Its record's id, where the form is a real one (a generated form's is made from its office and name). */ id?: string }
+export interface FormField { type: string; required?: boolean; options?: string[]; /** What the field is for, in the form's own words, where it says (a writer is told; the translator is not shown it). */ description?: string }
+export interface FormSpec {
+  form: string; to: string; fields: { [name: string]: FormField };
+  /** Its record's id, where the form is a real one (a generated form's is made from its office and name). */
+  id?: string;
+  /** The form is one office's own (`to` is that office; contracts/calls.md): a `direction` the office takes, filled
+   * in by whoever directs it, or a `paper` the office issues, on its own stationery, known to whoever holds it. */
+  office?: "direction" | "paper";
+}
 
 /** The types of field a form can have, as the resolver reads them (translator/src/resolver.ts, `form`): the first
  * seven each have a reading of their own; any other type's value is an id, and these are the ones worlds use. */
-export const FIELD_TYPES = ["amount", "duration", "count", "text", "choice", "space", "structure_type", "lot", "cell", "account", "record", "entity", "person", "structure", "position"] as const;
+export const FIELD_TYPES = ["amount", "duration", "count", "text", "choice", "space", "structure_type", "lot", "cell", "account", "record", "entity", "person", "structure", "position", "list", "date"] as const;
+/** (Since 0.12.0: a `list` takes several ids, written as a list, one of them alone bare; a `date` a day as reports
+ * write one, "year 2, day 40" or "day 40", copied as the request has it. Both have a reading of their own.) */
 
 /** A form as the translator is shown it: one line, exactly as `translatorContext()` writes it (translator/src/index.ts;
  * a test holds the two together). */
@@ -113,7 +130,13 @@ export function knowing(forms: FormSpec[], currency: Currency): Knowledge {
   const k = new Knowledge(currency);
   if (forms.length) k.absorb({
     participant: "someone", t: 0, status: "active", entity: "someone", outcomes: [], inbox: [], drafts: [],
-    channels: { known: { kind: "records", records: forms.map((f) => ({ id: formId(f), record: "statement", author: f.to, in_position: f.to, at: 0, visible_to: "public", kind: "form", text: `${f.form.replace(/_/g, " ")}.`, data: { form: f.form, submit_as: f.form, submit_to: [f.to], fields: f.fields } })) } },
+    // (An office's own stationery is known to whoever holds the office: this someone holds each such office.)
+    positions: forms.filter((f) => f.office === "paper").map((f) => ({ position: f.to, entity: "someone" })),
+    channels: { known: { kind: "records", records: forms.map((f) => ({
+      id: formId(f), record: "statement", author: f.to, ...(f.office ? {} : { in_position: f.to }), at: 0, visible_to: "public", kind: "form", text: `${f.form.replace(/_/g, " ")}.`,
+      // One office's own form names its office: a direction is handed in as that; a paper is written from the form.
+      data: { form: f.form, ...(f.office ? { office: f.to } : {}), submit_as: f.office === "direction" ? "direction" : f.form, submit_to: [f.to], fields: f.fields, ...(f.office === "paper" ? { writes: { kind: f.form, text: `${f.form.replace(/_/g, " ")}.` } } : {}) },
+    })) } },
   } as any);
   return k;
 }
@@ -131,8 +154,13 @@ export interface Gold {
   family?: string;
   currency?: Currency;
   forms?: FormSpec[];
-  /** A kind of program a part can be made of by name, beside its function (`inOnly`): `amount_form`. */
+  /** A kind of program a part can be made of by name, beside its function (`inOnly`): `amount_form`; `direction` and
+   * `paper` (a form that is one office's own, filled in); `direction_unlisted` (the same direction where no form for
+   * it is listed: a letter to the office, always asked for indirectly); `standing_work`. */
   tag?: string;
+  /** What else a writer is told of this program, whatever the style, each a line (what a record it names is; what a
+   * direction with no form is to say). */
+  notes?: string[];
 }
 
 /** What kinds of two acts one request can ask for (`pairOf`). */
@@ -469,12 +497,41 @@ const IMPLIED = new Set(["leave", "then", "position", "sex", "visible"]);
 
 /** What a request has to carry of its program, each with how it must appear (`line`: which line it is of, in a
  * program of several). */
-export interface Needed { value: string; arg: string; exact: boolean; line?: number; /** How it comes from the request (see `Span.how`). */ how: "copy" | "choice" }
+export interface Needed {
+  value: string; arg: string; exact: boolean; line?: number; /** How it comes from the request (see `Span.how`). */ how: "copy" | "choice";
+  /** The request may say it or not, and where it doesn't the value is implied: the name of an office's own form (a
+   * request for the direction or the paper needn't name it); whose office a paper is of; a yes-or-no answer on such a
+   * form, which is in how the thing is said ("stop recruiting" is `recruit=no`). */
+  optional?: true;
+}
 /** A value of a program the request implies without saying it (`Span.how`: implied). */
 export interface Implied { value: string; arg: string; line?: number }
 
 /** The types of form field whose value is one of a list, or a word of the world's catalogue: a choice, never a copy. */
 const CHOSEN_FIELDS = new Set(["choice", "structure_type"]);
+
+/** The form a call fills in, as the forms known have it: by its name and, where more than one has the name, by the
+ * office the call says. */
+function specOf(c: calls.Call, forms: FormSpec[]): FormSpec | undefined {
+  if (c.fn !== "form" || !forms.length) return undefined;
+  const f = formOf(calls.callText(c));
+  const named = forms.filter((x) => x.form === f?.form);
+  return named.find((x) => x.to === f?.to) ?? named[0];
+}
+
+/** The form of an office's own that a program fills in (the first such line's), if it fills one: `FormSpec.office`. */
+export function ownForm(program: string | calls.Program, forms: FormSpec[] = []): FormSpec | undefined {
+  const p = typeof program === "string" ? calls.parseProgram(program) : program;
+  if ("none" in p) return undefined;
+  for (const l of p.lines) {
+    const spec = specOf(l.call, forms);
+    if (spec?.office) return spec;
+  }
+  return undefined;
+}
+
+/** Whether a field asks yes or no. */
+const yesOrNo = (f: FormField | undefined): boolean => f?.type === "choice" && [...(f.options ?? [])].sort().join() === "no,yes";
 
 /**
  * What a request has to carry of its program for a model that copies and chooses (design §16.10) to learn from it:
@@ -491,7 +548,13 @@ const CHOSEN_FIELDS = new Set(["choice", "structure_type"]);
  * puts the slots back into the object.
  */
 export function needed(p: calls.Program, forms: FormSpec[] = []): Needed[] {
-  return valuesOf(p, forms).needed;
+  return valuesOf(p, forms).needed.filter((n) => !n.optional);
+}
+
+/** What a request may carry of its program or leave to how it is said (`Needed.optional`): by the forms given, the
+ * name of an office's own form, a paper's office, a yes or no on such a form. Found where it is said; implied where not. */
+export function optionalIn(p: calls.Program, forms: FormSpec[] = []): Needed[] {
+  return valuesOf(p, forms).needed.filter((n) => n.optional);
 }
 
 /** What a program has that its request implies and never says (`Span.how`: implied): a yes-or-no kind of choice, a
@@ -519,12 +582,16 @@ function valuesOf(p: calls.Program, forms: FormSpec[]): { needed: Needed[]; impl
   const value = (arg: string, v: calls.Value, c: calls.Call) => {
     const key = arg.slice(arg.lastIndexOf(".") + 1);
     // Whether this argument's bare word is a word chosen and not an id copied.
-    const spec = c.fn === "form" ? forms.find((f) => f.form === formOf(calls.callText(c))?.form) : undefined;
+    const spec = specOf(c, forms);
     const wordy = c.fn === "form" ? key === "form" || CHOSEN_FIELDS.has(spec?.fields[key]?.type ?? "") : WORD_ARGS.has(key);
     const how = (s: string): Needed["how"] => (wordy && !idLike(s) ? "choice" : "copy");
+    // An office's own form: the request may leave its name unsaid, a paper's office too, and a yes or no.
+    const optional = !!spec?.office && (key === "form" || (key === "to" && spec.office === "paper") || yesOrNo(spec.fields[key]));
     if ("id" in v) {
       if (bound.has(v.id)) return;
-      if (IMPLIED.has(key)) return void imply({ value: v.id, arg });
+      if (optional) return void push({ value: v.id, arg, exact: key !== "form" && idLike(v.id), how: key === "to" ? "copy" : how(v.id), optional: true });
+      // (A field of an office's own form may have any name: only a call's own arguments are implied by their names.)
+      if (IMPLIED.has(key) && !(spec?.office && key in spec.fields)) return void imply({ value: v.id, arg });
       // An entry on one's own file: "note in our books" says both that it is an entry and whose file, in no word of its own.
       if (c.fn === "statement" && key === "kind" && v.id === "entry" && fits("visible=own", c)) return void imply({ value: v.id, arg });
       push({ value: v.id, arg, exact: idLike(v.id), how: how(v.id) });
@@ -610,15 +677,20 @@ export function namesIn(config: unknown): { [id: string]: string } {
   return out;
 }
 
+/** Whether a form's record says it is one office's own, and of which kind: a paper where it says how it is written
+ * (`writes`), a direction otherwise. */
+const officeOwn = (data: any): { office?: "direction" | "paper" } => (typeof data?.office === "string" ? { office: data.writes ? "paper" : "direction" } : {});
+
 /** The forms a world's config holds (records of kind form, with their fields), as someone there knows of them. */
 export function formsIn(config: unknown): FormSpec[] {
   const out: FormSpec[] = [];
   const walk = (v: any) => {
     if (Array.isArray(v)) v.forEach(walk);
     else if (v && typeof v === "object") {
-      const to = v.in_position ?? v.speaks_for ?? v.author;
+      // (Whose form it is, as `Knowledge.formOf` has it: the office it is one office's form of, first.)
+      const to = (typeof v.data?.office === "string" ? v.data.office : undefined) ?? v.in_position ?? v.speaks_for ?? v.author;
       if (typeof v.data?.form === "string" && v.data.fields && typeof v.data.fields === "object" && typeof to === "string") {
-        out.push({ ...(typeof v.id === "string" ? { id: v.id } : {}), form: v.data.form, to, fields: Object.fromEntries(Object.entries(v.data.fields as { [k: string]: any }).map(([k, f]) => [k, { type: String(f.type), ...(f.required ? { required: true } : {}), ...(Array.isArray(f.options) ? { options: f.options.map(String) } : {}) }])) });
+        out.push({ ...(typeof v.id === "string" ? { id: v.id } : {}), form: v.data.form, to, ...officeOwn(v.data), fields: Object.fromEntries(Object.entries(v.data.fields as { [k: string]: any }).map(([k, f]) => [k, { type: String(f.type), ...(f.required ? { required: true } : {}), ...(Array.isArray(f.options) ? { options: f.options.map(String) } : {}) }])) });
       } else Object.values(v).forEach(walk);
     }
   };
@@ -728,7 +800,7 @@ export function shuffled<T>(xs: readonly T[], rand: () => number): T[] {
 }
 
 const AMOUNT_ARGS = new Set(["amount", "price", "carrying"]);
-const DURATION_ARGS = new Set(["every", "term", "our_notice", "their_notice", "first"]);
+const DURATION_ARGS = new Set(["every", "term", "our_notice", "their_notice", "first", "until"]); // (`until`: for how long a standing work order goes on)
 const COUNT_ARGS = new Set(["quantity", "units"]);
 
 /**
@@ -949,21 +1021,38 @@ export function surfaceVariant(g: Gold, rand: () => number, cur: Currency | unde
     // (How often is said as how often: `howOften`. A form's field by that name is a length of time like any other.)
     if ("text" in v && key === "every" && !fields[key]) return rand() < 0.6 ? { text: choose([v.text, ...howOften(v.text)]) } : v;
     if ("text" in v && (DURATION_ARGS.has(key) || fields[key]?.type === "duration") && rand() < 0.6) return { text: choose([v.text, ...durationForms(v.text, false)]) };
+    // (A day of the first year is written with the year or without it.)
+    if ("text" in v && fields[key]?.type === "date" && rand() < 0.5) return { text: choose([v.text, ...dateForms(v.text)]) };
     return v;
   };
   const call = (c: calls.Call): calls.Call => ({ fn: c.fn, args: Object.fromEntries(Object.entries(c.args).map(([k, v]) => [k, value(k, v)])) });
   return { ...g, family: g.family ?? g.program, program: calls.programText({ lines: p.lines.map((l) => ({ ...l, call: call(l.call) })) }) };
 }
 
+/** Other ways of writing the same day ("year 1, day 40" and "day 40"; "year 3, day 9" has no other), each read back
+ * as the same day by the form reader's own parser. */
+export function dateForms(text: string): string[] {
+  let t: number;
+  try {
+    t = formReading.parseDate(text);
+  } catch {
+    return [];
+  }
+  const m = /^\s*(?:year\s*([0-9]+)\s*,?\s*)?day\s*([0-9]+)\s*$/i.exec(text);
+  if (!m) return [];
+  return [`year ${m[1] ?? 1}, day ${m[2]}`, ...(Number(m[1] ?? 1) === 1 ? [`day ${m[2]}`] : [])].filter((f) => f !== text && same(() => formReading.parseDate(f), t));
+}
+
 /** Gold programs from the seen test cases (each case's first accepted answer): the functions a town's own code rarely
  * or never calls (a trust set up, a claim recorded, a post created) are there. Never from held-out cases. Their
  * amounts are in the test town's money, and a form filled in carries the form the test's mayor knows of. */
 export function goldFromCases(cases: Case[]): Gold[] {
-  const known: FormSpec[] = fixture().forms.map((f) => ({ id: f.id, form: String(f.data?.form), to: String((f as any).in_position ?? (f as any).speaks_for ?? f.author), fields: (f.data?.fields ?? {}) as FormSpec["fields"] }));
+  const known: FormSpec[] = fixture().forms.map((f) => ({ id: f.id, form: String(f.data?.form), to: String((typeof f.data?.office === "string" ? f.data.office : undefined) ?? (f as any).in_position ?? (f as any).speaks_for ?? f.author), ...officeOwn(f.data), fields: (f.data?.fields ?? {}) as FormSpec["fields"] }));
   return cases.filter((c) => !c.held_out && !c.expect[0]!.startsWith("none(")).filter((c) => askable(calls.parseProgram(c.expect[0]!))).map((c) => {
     const program = goldText(withOffice(calls.parseProgram(c.expect[0]!), known));
     const own = known.filter((f) => f.form === formOf(program)?.form);
-    return { program, shape: shapeOf(calls.parseProgram(program)), names: {}, source: `case ${c.id}`, origin: "case" as const, currency: TEST_CURRENCY, ...(own.length ? { forms: own } : {}) };
+    const office = ownForm(program, own)?.office;
+    return { program, shape: shapeOf(calls.parseProgram(program)), names: {}, source: `case ${c.id}`, origin: "case" as const, currency: TEST_CURRENCY, ...(own.length ? { forms: own } : {}), ...(office ? { tag: office } : {}) };
   });
 }
 
@@ -1132,6 +1221,8 @@ export function styleBrief(style: string, g: Gold, rand: () => number, o: { indi
     return { riders: ms.map((m) => ({ kind: "mention" as const, text: m.id })), say: ` In ${style === "late" ? "those further sentences" : "what comes after the act"}, name exactly these other things by id, as things the act leaves alone, does not touch or is not about (never as anything to be done): ${listed(ms)}. The quotation marks here only set the ids off: write each ${style === "late" ? "bare" : "in square brackets"}, after a few words for what it is, at least once, and no other id the call doesn't have.` };
   };
   const within = (n: number): { say: string; inside: string[] } => {
+    // (What a direction with no form says is given to the writer: nothing else is named inside it.)
+    if (g.tag === "direction_unlisted") return { inside: [], say: "" };
     const ms = mentions(rand, n, own, ["a place", "a record", "a person", "an account"]);
     const sum = g.currency && rand() < 0.4 ? amountWritings(BigInt((1 + Math.floor(rand() * 400)) * 25) * 10n ** BigInt(g.currency.minor_units), g.currency)[0] : undefined;
     return { inside: ms.map((m) => m.id), say: ` What they are asked to do names exactly these by id, as what the task concerns, all of them between the marks: ${listed(ms)}${sum ? `; and it names this sum where it fits (a limit, an estimate): "${sum}"` : ""}. The quotation marks here only set them off: between the marks there are none${style === "early" ? ", and each id stands in square brackets after a few words for what it is" : ""}.` };
@@ -1220,14 +1311,16 @@ const PARTICULAR: { [fn: string]: [arg: string, said: string][] } = {
   harm: [["", "the speaker attacks someone: hits them, hurts them"]],
   agreement: [["sign", "an agreement that was offered is signed: accepted"], ["notice", "notice is given to end an agreement (the agreement is the one named; any words given are the notice's own)"], ["", "an agreement is offered to someone: what we commit to, what they commit to, for how long, on what notice"]],
   statement: [["withdraw", "something published earlier, or standing on record, is withdrawn: taken down, cancelled (a hold that is withdrawn is lifted: what it held goes on again)"],
-    ["hold", "something standing on record (a standing payment, an instruction someone carries out for the speaker) is put on hold for a time, to be resumed later: it stays on record, and is not ended, cancelled or withdrawn"],
+    ["hold", "something standing on record (a standing payment, a standing work order, an instruction someone carries out for the speaker) is put on hold for a time, to be resumed later: it stays on record, and is not ended, cancelled or withdrawn"],
     ["visible=own", "an entry is made in the speaker's own books, on their own file: it moves nothing, and nobody else is told or shown it (its words are given)"],
     ["", "something is published (a notice, a law, a report: its kind is the call's word, its words are given)"]],
   presence: [["leave,who", "the person named leaves the world: goes away from it altogether"], ["leave", "the speaker leaves the world: goes away from it altogether (nobody else is named: it is their own leaving)"], ["who", "someone who was away comes back into the world from outside: returns, arrives back (never \"is present\" or \"attends\")"], ["", "a newcomer comes into the world from outside: arrives, is let in (their name, their age, what they come as; any money they carry)"]],
   position: [["vacate", "a post is left empty: whoever holds it holds it no longer"], ["appoint", "someone is appointed to a post"], ["", "a new post is created in the organisation (its title; its role, if given)"]],
   system: [["retire", "a system (software, an AI system) is switched off: retired, shut down"], ["", "a system (software, an AI system) is put to work for the organisation: say that it is a system; what kind is the call's word for it; its title, if it has one"]],
   birth: [["", "the speaker is having a child (its name; the other parent, if named). The call's word for the child (child, baby, infant, newborn) is the request's own word for it, said as people say it: \"we're having a baby\""]],
-  work: [["survey", "people survey something (a species, or something measured) in certain cells of a place"], ["investigate", "people look into things of some kind taken from someone, at the place they were taken from"], ["", "people do so many units of a kind of work at a place (who does it; what it is done to, if said)"]],
+  work: [["survey", "people survey something (a species, or something measured) in certain cells of a place"], ["investigate", "people look into things of some kind taken from someone, at the place they were taken from"],
+    ["every", "a standing order is set for the speaker's own staff: a kind of work to be done at a place again and again, as a routine (how often; what it is done to and who does it, if said; how much each time, how long until the first time and for how long it goes on, if said). Nothing is done today because of it, and it is no letter to anyone"],
+    ["","people do so many units of a kind of work at a place (who does it; what it is done to, if said)"]],
   take: [["", "the speaker takes things someone else holds, at the place where they are kept (the owner isn't asked: taking is all that is said)"]],
 };
 
@@ -1268,6 +1361,12 @@ export const SAYINGS: { [fn: string]: [pattern: string, said: string[]][] } = {
     ["survey", ["{task} the {survey} in …", "do a {survey} {task} of …", "carry out a {task} of {survey} over …", "we need a {task} of {survey} in …"]],
     ["investigate,by", ["have {by} {task} the {kind} taken from {investigate} at {taken_at}", "put {by} on it: {task} the {kind} that went from {investigate} at {taken_at}", "{by} is to {task} who took {investigate}'s {kind} at {taken_at}", "get {by} to {task} the {kind} missing from {investigate}, taken at {taken_at}"]],
     ["investigate", ["{task} the {kind} taken from {investigate} at {taken_at}", "{task} what became of {investigate}'s {kind}, taken at {taken_at}", "open a case and {task} the {kind} taken from {investigate} at {taken_at}"]],
+    // A standing order (0.12.0): the routine, and how often in the call's own words; whatever else it says ("…":
+    // what it is done to, how much each time, from when, for how long) is the writer's to add.
+    ["every,by,!until", ["from now on {by} is to {task} at {at} {every} …", "put {by} on a standing roster: {task} at {at}, {every} …", "{by} is to do the {task} round at {at} {every}, until further notice …", "a standing order for {by}: {task} at {at} {every} …", "roster {by} to {task} at {at} {every} from now on …", "make it routine: {by} to {task} at {at}, {every} …"]],
+    ["every,by", ["{by} is to {task} at {at} {every} …", "roster {by} to {task} at {at} {every} …", "put {by} on the {task} round at {at}, {every} …", "a standing order for {by}: {task} at {at} {every} …", "schedule {by} to {task} at {at} {every} …"]],
+    ["every,!until", ["from now on the crew is to {task} at {at} {every} …", "set a standing order: {task} at {at}, {every} …", "the {task} round at {at} is to be done {every}, until further notice …", "make {task} at {at} a routine: {every} …", "our staff are to {task} at {at} {every} from now on …", "put {task} at {at} on the schedule, {every} …", "a standing routine: {task} at {at} {every} …"]],
+    ["every", ["the crew is to {task} at {at} {every} …", "set a standing order: {task} at {at}, {every} …", "schedule {task} at {at} {every} …", "our staff are to {task} at {at} {every} …", "put {task} at {at} on the roster, {every} …"]],
     ["by", ["have {by} do {units} units of {task} at {at}", "put {by} on {units} units of {task} at {at}", "set {by} to {task}: {units} units, at {at}", "{by} is to do {units} units of {task} at {at}", "get {units} units of {task} done at {at} by {by}", "assign {by} {units} units of {task} at {at}", "{units} units of {task} at {at}, for {by} to do"]],
     ["", ["do {units} units of {task} at {at}", "get {units} units of {task} done at {at}", "run {units} units of {task} at {at}", "{units} units of {task} at {at}, please", "carry out {units} units of {task} at {at}", "see to {units} units of {task} at {at}"]],
   ],
@@ -1396,6 +1495,12 @@ export function writerNotes(program: string, rand: () => number): string[] {
     const position = c.fn === "claim" && c.args.position && "id" in c.args.position ? c.args.position.id : undefined;
     if (position && CLAIM_SAID[position]) out.push(`${where}: it is a ${position}; if you don't use that word, say it as people do: ${CLAIM_SAID[position]}.`);
     for (const [k, v] of Object.entries(c.args)) if (k === "every" && c.fn !== "form" && "text" in v) out.push(`${where}: how often is said in exactly these words: "${v.text}".`);
+    // A standing order: what its other values are, and that it is a routine and not a day's work.
+    if (c.fn === "work" && "every" in c.args) {
+      const told = ([["on", "what the work is done to each time"], ["by", "who is to do it each time"], ["units", "how much of it each time (so many units)"], ["first", "how long from now until the first time (\"starting in …\", \"the first in …\")"], ["until", "for how long the routine is to go on (\"for the next …\", \"for … and then no longer\"): a length of time, not a day"]] as const)
+        .flatMap(([k, what]) => (inWords(c.args[k]) !== undefined ? [`${inWords(c.args[k])} is ${what}`] : []));
+      out.push(`${where}: this is a routine for the speaker's own staff, to be done again and again from now on, not one day's work and not a letter to anyone: say so in words of your own (a standing order, a roster, a round, a schedule, "from now on", "each time"${"until" in c.args ? "" : ", \"until further notice\""}).${told.length ? ` ${told.join("; ")}.` : ""} Give no number of units, nobody to do it and no end unless the call has one.`);
+    }
   };
   p.lines.forEach((l, i) => {
     const where = several ? `Line ${i + 1} (${l.call.fn})` : `In this call (${l.call.fn})`;
@@ -1446,6 +1551,62 @@ export function amountNotes(g: Gold, rand: () => number): string[] {
   }
   const empty = Object.keys(spec.fields).filter((k) => spec.fields[k]!.type === "amount" && !(k in c.args));
   if (empty.length) out.push(`The form has other amounts that this call leaves empty (${empty.map(label).join(", ")}): say nothing of them.`);
+  return out;
+}
+
+/** How an office is directed on its own form: each a way a request may put it, of which one is given to the writer. */
+const DIRECTED_BY_FORM = ["direct {to} to …", "direct {to} to …", "direct {to} not to … until I say otherwise", "{to} is to … from now on", "tell {to} to …", "instruct {to}: …", "have {to} …", "from now on {to} is to …", "{to} is not to … until further notice", "a direction to {to}: …"];
+/** How the holder of an office asks for one of its own papers, by the last word of the paper's name (any other: the last). */
+const PAPER_SAID: [ends: string[], said: string[]][] = [
+  [["registration", "register", "entry", "roll"], ["register …", "enter … in the register", "make the entry for …", "put … on the register"]],
+  [["advertisement", "listing", "posting", "vacancy"], ["advertise …", "put out an advertisement for …", "post … as open", "list …"]],
+  [["approval", "consent", "permit", "licence", "certificate"], ["approve …", "issue … for …", "grant …", "sign off …", "certify …"]],
+  [["order", "direction", "summons", "warrant"], ["order …", "issue an order to …", "make an order: …", "draw up the order for …"]],
+  [["decision", "result", "finding", "ruling"], ["record the decision on …", "decide …: …", "enter the result of …", "give the decision on …"]],
+  [["notice", "warning", "reminder", "call"], ["give notice of …", "issue a notice to …", "send out the notice of …", "notify … of …"]],
+  [[], ["issue …", "make out …", "draw up …", "enter …", "record …", "write up …", "prepare and issue …"]],
+];
+
+/**
+ * What a writer is told of a form that is one office's own, filled in (`FormSpec.office`), in place of how a form
+ * handed in is said (`writerNotes`): a direction is worded as directing that office, and a paper as that piece of the
+ * office's own work, one of several ways chosen by seed. The form is named only now and then (a seat says "Direct the
+ * works office to stop recruiting" and "Register the death of …", and the form listed is what makes either a form
+ * filled in); a paper's office is the speaker's own and mostly unsaid; a yes or no is in how it is said. Then what
+ * each answer is (the form's own words for the field, where it has them), since nothing else tells a writer what
+ * `posts` or `tell` means.
+ */
+export function ownFormNotes(g: Gold, spec: FormSpec, rand: () => number): string[] {
+  const p = calls.parseProgram(g.program);
+  const c = "none" in p ? undefined : p.lines.map((l) => l.call).find((x) => x.fn === "form");
+  if (!c) return [];
+  const pick = <T>(xs: T[]): T => xs[Math.floor(rand() * xs.length)]!;
+  const label = (k: string) => k.replace(/_/g, " ");
+  const to = inWords(c.args.to) ?? spec.to;
+  const named = rand() < (spec.office === "direction" ? 0.2 : 0.4);
+  const out: string[] = [];
+  if (spec.office === "direction") {
+    out.push(`This is a direction to an office (${to}), on that office's own form for it. Ask for it as an office-holder directs an office, something like: "${pick(DIRECTED_BY_FORM).replace("{to}", to)}". What the office is to do, or to stop doing, is said in plain words that hold each of the call's answers as written. The office is named by its id, as the one directed.`);
+    out.push(named ? `Name the form too, in passing ("on the ${label(spec.form)} form", "by ${label(spec.form)} direction").` : "Do not name the form, and do not say that a form is filled in or handed in: the office is directed, and that is all the request says. (This stands in place of what you are told elsewhere of naming a form and of giving each answer against its label.)");
+  } else {
+    const end = spec.form.split("_").pop()!;
+    const said = (PAPER_SAID.find(([ends]) => ends.includes(end)) ?? PAPER_SAID[PAPER_SAID.length - 1]!)[1];
+    out.push(`This is a paper of the speaker's own office, on the office's own form for it (${label(spec.form)}). Ask for it as the holder of the office asks for a piece of its own paperwork, something like: "${pick(said)}". Each of the call's answers is said in plain words, exactly as written.`);
+    out.push(named ? `Name the paper by the form's own name (${label(spec.form)}).` : `The form's name need not appear: say what the paper is in your own words, or let the act say it. Do not say that a form is filled in or handed in. (This stands in place of what you are told elsewhere of naming a form and of giving each answer against its label; where an answer would be unclear without its label, give the label.)`);
+    out.push(rand() < 0.3 ? `Say whose office it is, by its id (${to}).` : `The office (${to}) is the speaker's own: leave it unsaid.`);
+  }
+  const answers: string[] = [];
+  for (const [k, v] of Object.entries(c.args)) {
+    const f = spec.fields[k];
+    const value = inWords(v);
+    if (!f || value === undefined) continue;
+    const what = f.description ? ` (${f.description.replace(/[.\s]+$/, "")})` : "";
+    if (yesOrNo(f)) answers.push(`${label(k)} is ${value}${what}: say it as what is or is not to be, in a verb of your own; the word "${value}" itself need not appear`);
+    else if (f.type === "list") answers.push(`${label(k)} is ${value}${what}: each of them named by its id`);
+    else if (f.type === "date") answers.push(`${label(k)} is the day ${value}${what}: written exactly so`);
+    else answers.push(`${label(k)} is ${value}${what}`);
+  }
+  if (answers.length) out.push(`What each answer is: ${answers.join("; ")}.`);
   return out;
 }
 
@@ -1617,6 +1778,8 @@ export function pairOf(g: Gold, rand: () => number): { gold: Gold; pair: Pair; /
   const c = p.lines[0]!.call;
   const withdrawn = c.fn === "statement" && c.args.withdraw && "id" in c.args.withdraw ? c.args.withdraw.id : undefined;
   if (c.fn !== "form" && withdrawn === undefined) return undefined;
+  // (A direction to an office is not handed in for someone to take further. A paper of one's own office may go out with a direction to someone about it, as any act may.)
+  if (ownForm(p, g.forms ?? [])?.office === "direction") return undefined;
   const own = literals(p);
   const made = (second: calls.Call, pair: Pair, names: { [id: string]: string } = {}): { gold: Gold; pair: Pair; letter?: string } => {
     const program = calls.programText({ lines: [...p.lines, { call: second }] });
@@ -1644,10 +1807,10 @@ export function pairOf(g: Gold, rand: () => number): { gold: Gold; pair: Pair; /
 const DIRECTING = ["direct {to} to …", "direct {to} to …", "ask {to} to …", "tell {to} to …", "instruct {to} to …", "have {to} …", "get {to} to …"];
 
 /** What the writer is told of saying a letter indirectly: one of the ways (DIRECTING), with where the marks go. */
-export function indirectNotes(program: string, rand: () => number): string[] {
+export function indirectNotes(program: string, rand: () => number, ways: string[] = DIRECTING): string[] {
   const p = calls.parseProgram(program) as { lines: calls.Line[] };
   const to = inWords(p.lines[0]!.call.args.to) ?? "them";
-  const way = DIRECTING[Math.floor(rand() * DIRECTING.length)]!;
+  const way = ways[Math.floor(rand() * ways.length)]!;
   return [`The act, said something like: "${way.replace("{to}", to).replace("…", `${OPEN}…${CLOSE}`)}".`];
 }
 
@@ -1655,6 +1818,13 @@ export function indirectNotes(program: string, rand: () => number): string[] {
 const INDIRECTLY = [
   "Asked indirectly: this request quotes no letter. It directs, asks, tells or instructs them to do something, or has or gets them to do it, and what they are to do is yours to invent: an ordinary administrative task for whoever they are (arrange, inspect, collect, repair, prepare, review, confirm, report back …), one to three clauses (more where the style says so), in the voice of the style. It is something said to them in words: not so many units of a kind of work at a place, not a payment, not a form.",
   `In your request, put ${OPEN} straight before the first word of what they are to do and ${CLOSE} straight after its last word, so that the words between the marks are precisely what would be said to them: not the "to" before them, not who they are, not the full stop after. Use the marks once, with no quotation marks between them. Who it goes to is said outside the marks, as the call writes it.`,
+].join("\n");
+
+/** What a writer is told when an office is directed and no form for the direction is listed (`direction_unlisted`):
+ * the letter's words are still the writer's, but what they say is given (under "How to say it"). */
+const DIRECTED_UNLISTED = [
+  "Asked indirectly: this request quotes no letter. It directs an office to change something the office does of its own accord, as an office-holder directs one, and there is no form for it: the direction is words said to the office. What the office is to do is given below, under \"How to say it\": put it in your own words, one to three clauses (more where the style says so), in the voice of the style, holding each figure given there as written. It names no form and no record.",
+  INDIRECTLY.split("\n")[1]!,
 ].join("\n");
 
 /**
@@ -1669,7 +1839,9 @@ const PAIRED: { [pair in Pair]: string } = {
   "withdraw+message": "Two things in one request, as office-holders ask them: what line 1 names is withdrawn, said first and whole; and then, in a sentence of its own, someone is directed, asked, told or instructed to do something about that same withdrawal (take it off the agenda, strike it from the register, tell those it concerned, stop work that rested on it), which is line 2. What they are to do is yours to invent: one or two clauses, in the voice of the style, said to them in words.",
   "withdraw+withdraw": "The same thing done twice in one request: both of the things named are withdrawn, each by its id. Say it as one request (\"Withdraw … and …\"), not as two.",
 };
-const PAIRED_ORDER = "Where the style asks for further sentences after the act, they come after line 1's act and before the direction, and are about the act: the direction is the last sentence of the request. What the style says of asking for nothing more and telling nobody else is said of those further sentences: the direction is part of what is asked.";
+/** The same for a paper of the speaker's own office (`FormSpec.office`): it is issued, not handed in to anyone. */
+const PAIRED_PAPER = "Two things in one request, as office-holders ask them: the paper of line 1 is made out, said first and whole, as told below; and then, in a sentence of its own, someone is directed, asked, told or instructed to do something about that same paper (deliver it, file a copy of it, tell those it concerns, act on it), which is line 2. What they are to do is yours to invent: one or two clauses, in the voice of the style, said to them in words.";
+const PAIRED_ORDER ="Where the style asks for further sentences after the act, they come after line 1's act and before the direction, and are about the act: the direction is the last sentence of the request. What the style says of asking for nothing more and telling nobody else is said of those further sentences: the direction is part of what is asked.";
 
 export function requestBrief(gold: Gold, style: string, notes: string[] = [], o: { indirect?: boolean; pair?: Pair } = {}): string {
   const names = Object.entries(gold.names).map(([id, name]) => `${id} is ${name}`);
@@ -1677,7 +1849,7 @@ export function requestBrief(gold: Gold, style: string, notes: string[] = [], o:
   const fields = (gold.forms ?? []).filter((f) => f.form === form?.form).map(formLine);
   return [
     `Call:\n${o.indirect ? withText(gold.program, `${OPEN}…${CLOSE}`) : gold.program}`, `What it brings about (for your understanding: don't reuse this wording):\n${bringsAbout(gold.program).join("\n")}`,
-    ...(o.pair ? [[PAIRED[o.pair], ...(o.indirect ? [INDIRECTLY.split("\n")[1]!, ...((calls.parseProgram(gold.program) as { lines: calls.Line[] }).lines.some((l) => l.call.fn === "message" && "re" in l.call.args) ? ["The call's letter says what it is about (re=): name that id again where they are directed, outside the marks (\"Direct them, regarding rec.412, to …\")."] : []), PAIRED_ORDER] : [])].join("\n")] : o.indirect ? [INDIRECTLY] : []),
+    ...(o.pair ? [[o.pair === "form+message" && ownForm(gold.program, gold.forms ?? []) ? PAIRED_PAPER : PAIRED[o.pair], ...(o.indirect ? [INDIRECTLY.split("\n")[1]!, ...((calls.parseProgram(gold.program) as { lines: calls.Line[] }).lines.some((l) => l.call.fn === "message" && "re" in l.call.args) ? ["The call's letter says what it is about (re=): name that id again where they are directed, outside the marks (\"Direct them, regarding rec.412, to …\")."] : []), PAIRED_ORDER] : [])].join("\n")] : o.indirect ? [gold.tag === "direction_unlisted" ? DIRECTED_UNLISTED : INDIRECTLY] : []),
     ...(notes.length ? [`How to say it:\n${notes.join("\n")}`] : []),
     ...(names.length ? [`For your understanding only (still write the ids): ${names.join("; ")}.`] : []), ...(fields.length ? [`The form, as the person knows of it:\n${fields.join("\n")}`] : []), `Style: ${STYLES[style] ?? style}`,
   ].join("\n\n");
@@ -1857,7 +2029,7 @@ export function spansIn(request: string, program: string, forms: FormSpec[] = []
   const parsed = calls.parseProgram(program);
   const { needed: needs, implied } = valuesOf(parsed, forms);
   // The form each line fills in, as known: its fields' labels say whose an amount is where two fields share one.
-  const specs = "none" in parsed ? [] : parsed.lines.map((l) => (l.call.fn === "form" ? forms.find((f) => f.form === formOf(calls.callText(l.call))?.form) : undefined));
+  const specs = "none" in parsed ? [] : parsed.lines.map((l) => specOf(l.call, forms));
   const group = (n: Needed) => `${n.line ?? 0}:${n.arg.includes(".") && !/^about\.[^.]+$/.test(n.arg) ? n.arg.slice(0, n.arg.lastIndexOf(".")) : ""}`;
   const found = needs.map((n) => occurrences(request, n));
   const settled: ([number, number] | undefined)[] = found.map((f) => (f.length === 1 ? f[0] : undefined));
@@ -1904,7 +2076,8 @@ export function spansIn(request: string, program: string, forms: FormSpec[] = []
   // said with a capital) was chosen for those words, not copied from them.
   const how = (n: Needed, at: [number, number]): Span["how"] => (n.how === "copy" && request.slice(at[0], at[1]) === n.value ? "copy" : "choice");
   const spans = needs.flatMap((n, i): Span[] => {
-    if (!found[i]!.length) return [];
+    // (What the request may leave unsaid, and does, is implied: an office's own form not named, a yes or no.)
+    if (!found[i]!.length) return n.optional ? [{ arg: n.arg, value: n.value, how: "implied", ...(n.line !== undefined ? { line: n.line } : {}) }] : [];
     const all = open(i);
     const at = settled[i] ?? all[0]!;
     const base = { arg: n.arg, value: n.value, how: how(n, at), ...(n.line !== undefined ? { line: n.line } : {}) };
@@ -1915,8 +2088,8 @@ export function spansIn(request: string, program: string, forms: FormSpec[] = []
 }
 
 /** Whether a request carries everything its program takes from it (the translator copies and chooses; it never composes). */
-export function copies(request: string, program: string): boolean {
-  return needed(calls.parseProgram(program)).every((n) => spanOf(request, n) !== undefined);
+export function copies(request: string, program: string, forms: FormSpec[] = []): boolean {
+  return needed(calls.parseProgram(program), forms).every((n) => spanOf(request, n) !== undefined);
 }
 
 /**
@@ -2044,7 +2217,9 @@ export function builtRefusals(positives: Example[], seed = 1, share = 0.05, floo
     if (add([...parts.values()], runTogether([...parts.values()].map(said), rand), "built: several requests run together")) made++;
   }
   if (o.only === "too_much") return out;
-  const forms = positives.filter((e) => e.shape.startsWith("form(") && e.forms.length);
+  // (Only a request that names its form: a direction or a paper asked for without naming the form, shown without the
+  // form, is no request for an unknown form. It is a letter to the office, or a paper nothing here writes.)
+  const forms = positives.filter((e) => e.shape.startsWith("form(") && e.forms.length && !(e.spans ?? []).some((s) => s.arg === "form" && s.how === "implied"));
   const chosen = new Set(forms.filter(() => rand() < Math.max(share * 4, 0.2)));
   for (const e of shuffled(forms, rand)) if (chosen.size < Math.min(floor.unknown_form ?? 0, forms.length)) chosen.add(e);
   for (const e of forms.filter((x) => chosen.has(x))) {
@@ -2252,7 +2427,7 @@ export function refusalBriefs(gold: Gold[], perLabel: number, seed = 1): Refusal
         brief: `The speaker wants to go to ${place} in person, see for themselves how things stand there, and note what they find. It is not a request to read a record or a report, nor to ask or send anyone else: the speaker is to go and look.`, ...withIds(LOOKED_FOR, naming(3 + Math.floor(mrand() * 3), [place], "as the other places to be looked at on the same round and the records or people to be checked there", ["a place", "a record", "a person"])) };
     }
     return { label: "no_such_act", mustCopy: [], source: "brief",
-      brief: `The speaker wants a routine of their own office or organisation changed, stopped or started from now on: ${choose(ROUTINES)}. It is something the office carries on by itself, without anyone asking each time. It is not a request to write to anyone, to publish a rule or a notice, or to undo anything already done, and it names no record.`, seats: STAYS };
+      brief: `The speaker wants a routine of their own office or organisation changed, stopped or started from now on: ${choose(ROUTINES)}. It is something the office carries on by itself, without anyone asking each time. Nobody is addressed: no office, post or person is named as the one to be directed, told or asked (the speaker says "we", "our office", "this office", or says only what is to change), and no form is spoken of. It is not a request to write to anyone, to publish a rule or a notice, or to undo anything already done; it names no record, and it sets no task, place and frequency for staff to work to (that would be a roster, which is another thing).`, seats: STAYS };
   };
   for (let i = 0; i < perLabel; i++) {
     if (payments.length) {
@@ -2506,22 +2681,31 @@ export function planOf(gold: Gold[], o: PlanOptions): PlanItem[] {
     // those that do): the form alone, closing with what becomes of it and nobody named, which is ONE line by the
     // translator's rules ("adds no line, unless the request asks for someone it names to be told"). Without these a
     // model learns that any closing sentence about what happens next is a letter.
-    const after = two?.pair === "form+message" && pairRand() < 0.2 ? whatNext(pairRand) : undefined;
+    // (An office's own form, where the program fills one in: `ownForm`. What becomes of a paper of one's own office
+    // is not for anyone to take in and decide.)
+    const office = ownForm(one.program, one.forms ?? []);
+    const after = two?.pair === "form+message" && !office && pairRand() < 0.2 ? whatNext(pairRand) : undefined;
     if (after) two = undefined;
     if (o.pairsOnly && !two && !after) continue;
     const { writer, styleKey, n } = next();
     const g = two?.gold ?? one;
-    const indirect = two ? two.letter !== undefined : (o.indirect ?? 0) > 0 && isLetter(g.program) && indirectRand() < o.indirect!;
+    // (A direction to an office with no form for it listed is always asked for as seats direct: indirectly.)
+    const unlisted = g.tag === "direction_unlisted" && isLetter(g.program);
+    const indirect = two ? two.letter !== undefined : unlisted || ((o.indirect ?? 0) > 0 && isLetter(g.program) && indirectRand() < o.indirect!);
     // (A pair's further sentences are about its act, as any act's are: the direction comes last, after them.)
     const styled = styleBrief(styleKey, g, styleRand, { indirect: indirect && !two });
     const { style, inside } = styled;
     // (What a form's amounts come to, a third of the time: after the last of them, a sentence that is no field's.)
-    const total = !indirect || two ? (sayRand() < 0.35 ? amountTotal(one, sayRand) : undefined) : undefined;
+    const total = (!indirect || two) && !office ? (sayRand() < 0.35 ? amountTotal(one, sayRand) : undefined) : undefined;
     const riders = [...styled.riders, ...(total ? [total.rider] : []), ...(after ? [after] : [])];
     const instruction = after ? `${styled.instruction} Whatever else the style asks, the request's last sentence is exactly this one, which says what becomes of the form once it is handed in, names nobody and asks nobody for anything: "${after.text}"` : styled.instruction;
-    const notes = two?.letter ? [...writerNotes(one.program, sayRand), ...amountNotes(one, sayRand), ...indirectNotes(two.letter, sayRand).map((x) => x.replace("The act, said", "The direction, said"))]
-      : indirect ? indirectNotes(g.program, sayRand) : [...writerNotes(g.program, sayRand), ...amountNotes(g, sayRand)];
+    const notes = two?.letter ? [...(office ? ownFormNotes(one, office, sayRand) : [...writerNotes(one.program, sayRand), ...amountNotes(one, sayRand)]), ...indirectNotes(two.letter, sayRand).map((x) => x.replace("The act, said", "The direction, said"))]
+      : unlisted ? indirectNotes(g.program, sayRand, ["direct {to} to …", "direct {to} to …", "instruct {to} to …", "tell {to} to …", "{to} is to …"])
+      : indirect ? indirectNotes(g.program, sayRand)
+      // (An office's own form is asked for as the direction or the paper it is, not as a form handed in.)
+      : office ? ownFormNotes(g, office, sayRand) : [...writerNotes(g.program, sayRand), ...amountNotes(g, sayRand)];
     if (total) notes.push(total.note);
+    if (!two) notes.push(...(g.notes ?? []));
     const brief = requestBrief(g, instruction, notes, { indirect, ...(two ? { pair: two.pair } : {}) });
     plan.push({ id: idOf(n, brief), kind: "request", writer, style, brief, gold: g, riders, notes, ...(indirect ? { indirect: true as const } : {}), ...(inside ? { inside } : {}), ...(two ? { pair: two.pair } : {}) });
   }
@@ -2608,7 +2792,7 @@ async function fromPlan(plan: PlanItem[], o: {
         // the program doesn't have (strayIds); only then is a model asked.
         if (m && "marks" in m) (out.why = "marks"), (out.marks = m.marks);
         else if (!t.indirect && (request.includes(OPEN) || request.includes(CLOSE))) (out.why = "marks"), (out.marks = "unasked");
-        else if (!(t.riders.every((r) => request.includes(r.text)) && (t.inside ?? []).every((id) => said?.words.includes(id)) && copies(withoutRiders(request, t.riders), program))) out.why = "not_copied";
+        else if (!(t.riders.every((r) => request.includes(r.text)) && (t.inside ?? []).every((id) => said?.words.includes(id)) && copies(withoutRiders(request, t.riders), program, t.gold.forms ?? []))) out.why = "not_copied";
         // (A form's amount said only inside its long text is under no label: nothing says which field it is.)
         else if (onlyInsideAnother(withoutRiders(request, t.riders), program, t.gold.forms ?? [])) out.why = "not_copied";
         // (Nor is an amount two fields share, unless the request says it for each straight after that field's label.)

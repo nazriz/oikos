@@ -211,6 +211,24 @@ A model call that fails (after its adapter's own time limits and retries) is rec
   - **Removed:** `way: "whole"` (the migration's form for a view not yet replaced). No world may say it.
 - **Unchanged:** blocks, records, the call language, datasets. Going to look is a look, not an act.
 
+## Changes since v0.8 closed (2026-10-09: offices that take directions; docs/behaviour/directions.md; under the owner's standing approval for readiness changes, to look over)
+
+- **`module.schema.json`: `takes`** (optional): the written directions a module's office takes, each a `Taken`: `form` (the form's name), `title`, `fields` (a form's fields, each with a `description`) and `follows` (what following one means, in words, 20 characters or more). A world publishes one form for each from this declaration; who may direct the office is a record of the world's, never the manifest. A manifest without it is valid as before.
+- **`outcomes.schema.json`, `FormData`: `office`** (optional): the office (a position) a form is the form of, where it is one office's and not its whole organisation's. In a call, such a form's `to` is its office (`form(form=works_staffing, to=works, …)`); named by its organisation it is still found, and another office of the same organisation is not where it goes. The call language's schema is unchanged.
+- **No new block, record or kernel rule.** A direction is a statement of kind `direction`, made on the form, and following it is the office's own conduct. Both resolvers are held to `contracts/test/forms.json`.
+- **Forms for an office's own papers** (2026-10-09; docs/behaviour/office-papers.md):
+  - `module.schema.json`: **`issues`** (optional): the papers a module's office issues, each an `Issued`: `form`, `title`, `fields`, and `writes`. In `writes`, a string `"@name"` is something of the office's own that a world fills in when it publishes the form.
+  - `outcomes.schema.json`: **`FormWrites`** and `FormData.writes` (optional): how a form writes a paper from its fields: `kind`, `text` (`{name}`: the field in words), and the templates `data`, `to`, `visible`, `offer`, `assertion` and `basis`, in which `"=name"` is the field as read, `"#name"` as a whole number, `"?name"` a yes or no as true or false, `"+name"` a length of time counted from now, and `"=self"` whoever the paper is made for. Such a form resolves to `publish` of `writes.kind`, written as it says; it does not cite the form and is not addressed to `submit_to`. It may be given `text=`, the paper's own words, where it has no field of that name.
+  - **`FieldType`** gains `list` (several ids) and `date` ("year 1, day 12", or a moment in seconds). A form's `count` may be nought.
+  - A form that has `writes` and an `office` is that office's stationery: both resolvers know it only at a seat that holds the office.
+  - The call language's schema and the blocks are unchanged. `contracts/test/forms.json` now has 29 cases.
+- **Standing work orders** (2026-10-09; docs/behaviour/standing-work.md):
+  - `calls.schema.json`: **`work` takes `every`, `first` and `until`** (`units` was already optional in the schema; the resolver asks for it only of work done now). `work(task=…, at=…, every=…)` resolves to `publish` of kind `work_order` on the organisation's own file (calls.md has its data). No new block; the kernel does nothing with it.
+  - **A hold on a paper addressed to one's own organisation** now resolves to a hold on its own file (addressed to and seen by that organisation), where it was answered "is yours to act on: nobody else needs telling" (`contracts/test/holds.json`, one case changed).
+  - `module.schema.json`: **`routines`** (optional): the routine tasks a module's office's staff do by standing order (`task`, `what`, and `at`: the parameter that says where).
+  - Both resolvers are held to `contracts/test/standing-work.json` (12 cases).
+- **A form's summary in words** (both resolvers): a form-made statement's text says an amount as the world writes its money and a length of time in days ("every 14 days"), where it said the bare integer.
+
 ## Changes from v0.7 (v0.8, closed 2026-10-02; docs/design/world-expansion.md)
 
 - **Nature** (signed 2026-10-01; world-expansion §2.4): `catalogue.land_covers` (with succession), `default_cover`, `cleared_cover`, `fields` (sources by cover and by building, decay, diffusion, flow, bounds) and `species` (growth, capacities by cover, tolerances, dispersal, barriers, detection); structure types' `cover`; a `flow` layer on places; fields and populations on cells in state and log; events `species_extinct` and `nature_census`; tasks that `survey` (the estimate in the actor's outcome, `surveyed`, for it alone); cover and conspicuous species in the sites view. Reserved covers `built` and `open`.

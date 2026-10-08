@@ -6,12 +6,16 @@
 
 import * as C from "../calls";
 import { need, params, type BehaviourModule, type ParticipantContext } from "../module";
-import { because, Book, DAY, goSee, ownAccount, say, type Step, usd, variableToday, visited, VISIT_MAX } from "./common";
+import { because, Book, DAY, goSee, ownAccount, say, StandingWork, type Step, usd, variableToday, visited, VISIT_MAX } from "./common";
 import { stepper } from "./firms";
 import { Deliveries, goodsPrices, held as heldAt, order } from "./trade";
 
 export const water: BehaviourModule = {
   name: "utility.water",
+  routines: [
+    { task: "draw_water", at: "works", what: "Each day the works draws from the river what the town uses, by the published estimate of how many live in it, and says so when the river cannot give it." },
+    { task: "bill", at: "works", what: "Before each round of bills a reader goes round the meters; then each property's owner is sent a bill for the service charge and what its meter shows was used. How often the bills go out is the order's." },
+  ],
   keeps: [
     { what: "property_roll", why: "Its customer roll: the valuer's roll of each property it supplies is given to it, as valuations are given to a rating authority." },
     { what: "acquisition_notice", why: "Its customer roll: each notice that land it supplies has changed hands is given to it." },
@@ -31,10 +35,16 @@ export const water: BehaviourModule = {
       // what it is given), the meter a home's building carries (a measure of the building, in litres), the channel
       // its reader goes to the meters through, and how many days before the bills the round of readings begins.
       roll: "roll", meter: "water_used", meters: "", read_days: 21,
+      // Which part of the office this is (docs/behaviour/standing-work.md): "" the whole office, as code runs one;
+      // "seat" the office-holder alone, who sets the standing work orders; "staff" its staff, who follow them.
+      part: "" as "" | "seat" | "staff",
     }, ctx.params);
     need(p, ["works"], "utility.water");
     const me = ctx.entity;
     const book = new Book();
+    const routines = new StandingWork(me, p.part);
+    let billEvery = p.bill_every_days * DAY;
+    let billingNow = p.part === "";
     // The customer roll: each property we supply, its owner as we were last told, and the buildings on it.
     const lots = new Map<string, { owner?: string; buildings: Set<string> }>();
     const lotOfBuilding = new Map<string, string>();
@@ -101,13 +111,20 @@ export const water: BehaviourModule = {
         // ---- each day: what the town uses, drawn from the river ----
         // (What it uses is what its people use: the statistician's published estimate of how many there are, at the
         // world's figure a head. Nobody counts them at home.)
+        steps.push(...routines.set(book, [
+          { task: p.task, at: p.works, every: DAY, why: "Setting the works' daily draw of what the town uses, as a standing work order." },
+          { task: "bill", at: p.works, every: p.bill_every_days * DAY, why: `Setting the billing round: the meters read and the bills sent every ${p.bill_every_days} days, as a standing work order.` }]));
+        const billing = routines.does(book, "bill", t, { every: p.bill_every_days * DAY });
+        billingNow = !!billing;
+        if (billing) billEvery = billing.every;
         const day = Math.floor(t / DAY);
         if (day !== lastDay) {
           const days = lastDay < 0 ? 1 : day - lastDay;
           lastDay = day;
           const estimate = book.open("population_estimate").sort((a, b) => b.at - a.at)[0];
           const people = Math.max(0, Math.floor(Number(estimate?.data?.residents) || 0));
-          const kl = Math.ceil((people * p.litres_per_person_per_day * days) / 1000);
+          // (Only while the draw is ours to make: a day it was not made is not made up.)
+          const kl = routines.does(book, p.task, t, { every: DAY }) ? Math.ceil((people * p.litres_per_person_per_day * days) / 1000) : 0;
           if (kl > 0) {
             const st = because(`The town of ${people} used about ${kl} kL of water (${days} day${days > 1 ? "s" : ""}): drawing it from the river.`, C.call("work", { task: p.task, units: C.text(String(kl)), at: p.works }));
             st.then = (out) => {
@@ -126,8 +143,8 @@ export const water: BehaviourModule = {
         }
         // ---- the quarter's bills: to each home's owner, the service charge and what its meter shows was used ----
         const acc = ownAccount(obs);
-        if (t >= nextBill && acc) {
-          nextBill = t + p.bill_every_days * DAY;
+        if (t >= nextBill && acc && billing) {
+          nextBill = t + billEvery;
           for (const [h, lot] of [...lotOfBuilding].sort(([a], [b]) => (a < b ? -1 : 1))) {
             if (unmetered.has(h)) continue;
             const owner = lots.get(lot)?.owner;
@@ -148,7 +165,7 @@ export const water: BehaviourModule = {
       // The round of meter readings before each quarter's bills: the reader goes to a visit's worth of meters at a
       // time, and to the next when back.
       (obs) => {
-        if (!p.meters) return [];
+        if (!p.meters || !billingNow) return [];
         if (roundFor !== nextBill && obs.t >= nextBill - p.read_days * DAY) {
           roundFor = nextBill;
           toRead = [...lotOfBuilding.keys()].filter((h) => !unmetered.has(h)).sort();
@@ -166,6 +183,10 @@ export const water: BehaviourModule = {
 
 export const energy: BehaviourModule = {
   name: "utility.energy",
+  routines: [
+    { task: "supply_energy", at: "depot", what: "Each day the network supplies what the customers use from what the retailer holds, and more is bought from the grid when it runs below a fortnight's use. Those who ask to be supplied are taken on, and those gone taken off." },
+    { task: "bill", at: "depot", what: "Each customer is sent a bill for the supply charge and what they used; one who has gone, their last. How often the bills go out is the order's." },
+  ],
   version: "0.1.1",
   doc: "docs/behaviour/utilities.md",
   cadence: () => DAY,
@@ -178,10 +199,14 @@ export const energy: BehaviourModule = {
       units_per_customer_per_day: 0, // what a household uses (the world's figure)
       price_per_unit: 0, supply_per_day: 0, // the tariff (cents)
       bill_every_days: 30,
+      // Which part of the office this is (docs/behaviour/standing-work.md): "" the whole office, as code runs one;
+      // "seat" the office-holder alone, who sets the standing work orders; "staff" its staff, who follow them.
+      part: "" as "" | "seat" | "staff",
     }, ctx.params);
     need(p, ["depot", "grid"], "utility.energy");
     const me = ctx.entity;
     const book = new Book();
+    const routines = new StandingWork(me, p.part);
     const customers = new Map<string, { account: string; since: number; billedTo: number }>(); // person -> their account
     const ended = new Set<string>();
     let lastDay = -1;
@@ -195,6 +220,12 @@ export const energy: BehaviourModule = {
         const t = obs.t;
         const steps: Step[] = [];
         const acc = ownAccount(obs);
+        steps.push(...routines.set(book, [
+          { task: p.task, at: p.depot, every: DAY, why: "Setting the daily supply to our customers, as a standing work order." },
+          { task: "bill", at: p.depot, every: p.bill_every_days * DAY, why: `Setting the billing round: every customer billed every ${p.bill_every_days} days, as a standing work order.` }]));
+        const supplying = routines.does(book, p.task, t, { every: DAY });
+        const billingBy = routines.does(book, "bill", t, { every: p.bill_every_days * DAY });
+        if (!supplying && !billingBy) return steps;
         // ---- customers: who asked to be supplied; those gone (died, left) or who asked to stop, no longer ----
         for (const r of book.open("supply_request").filter((x) => (x.addressed_to ?? []).includes(me) && !customers.has(x.speaks_for!) && !ended.has(x.id))) {
           ended.add(r.id);
@@ -211,7 +242,7 @@ export const energy: BehaviourModule = {
         // What's come (or been refunded) is no longer on order.
         for (const d of deliveries.take(book, me)) if (d.kind === p.kind) onOrder = Math.max(0, onOrder - d.ordered);
         const held = heldAt(obs, p.depot, p.kind);
-        const supply = Math.min(owed, held);
+        const supply = supplying ? Math.min(owed, held) : 0;
         if (supply > 0) {
           owed -= supply;
           steps.push(because(`Supplying the ${supply} units our ${customers.size} customers used.`, C.call("work", { task: p.task, units: C.text(String(supply)), at: p.depot })));
@@ -220,7 +251,7 @@ export const energy: BehaviourModule = {
         const fortnight = customers.size * p.units_per_customer_per_day * 14;
         const grid = goodsPrices(book, p.grid);
         const unit = grid.prices[p.kind];
-        if (acc && unit !== undefined && grid.account && held - supply + onOrder < fortnight + owed) {
+        if (supplying && acc && unit !== undefined && grid.account && held - supply + onOrder < fortnight + owed) {
           const q = Math.max(1, customers.size * p.units_per_customer_per_day * 30 + owed);
           if (acc.balance >= q * unit) {
             onOrder += q;
@@ -232,9 +263,9 @@ export const energy: BehaviourModule = {
           }
         }
         // ---- the month's bills: each customer, the supply charge and their use; a customer gone, their last ----
-        const billing = t >= nextBill;
-        if (billing) nextBill = t + p.bill_every_days * DAY;
-        if (acc) for (const [who, c] of [...customers].sort(([a], [b]) => (a < b ? -1 : 1))) {
+        const billing = !!billingBy && t >= nextBill;
+        if (billing) nextBill = t + billingBy!.every;
+        if (acc && billingBy) for (const [who, c] of [...customers].sort(([a], [b]) => (a < b ? -1 : 1))) {
             if (!billing && !gone.has(who)) continue;
             const days = Math.max(0, Math.round((t - c.billedTo) / DAY));
             c.billedTo = t;

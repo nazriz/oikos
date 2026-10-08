@@ -27,5 +27,55 @@
     }
   },
   "perceives": [],
-  "state": "none"
+  "state": "none",
+  "issues": [
+    {
+      "form": "permit_decision",
+      "title": "Decision on a planning permit application",
+      "fields": {
+        "application": {
+          "type": "record",
+          "required": true,
+          "description": "The application decided."
+        },
+        "applicant": {
+          "type": "entity",
+          "required": true,
+          "description": "Who applied: the decision is sent to them."
+        },
+        "decision": {
+          "type": "choice",
+          "required": true,
+          "options": [
+            "granted",
+            "refused",
+            "incomplete"
+          ],
+          "description": "Granted, refused, or sent back as incomplete."
+        },
+        "law": {
+          "type": "record",
+          "description": "The law the building would breach, if any."
+        },
+        "missing": {
+          "type": "list",
+          "description": "For an incomplete application: what it does not say (lot, structure_type)."
+        }
+      },
+      "writes": {
+        "kind": "permit_decision",
+        "text": "Permit {decision}: application {application}.",
+        "basis": "=application",
+        "to": [
+          "=applicant"
+        ],
+        "data": {
+          "application": "=application",
+          "decision": "=decision",
+          "law": "=law",
+          "missing": "=missing"
+        }
+      }
+    }
+  ]
 }

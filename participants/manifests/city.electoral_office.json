@@ -96,5 +96,48 @@
       "what": "electoral_roll",
       "why": "The roll it publishes at each election is its own."
     }
+  ],
+  "issues": [
+    {
+      "form": "election_notice",
+      "title": "Notice of an election",
+      "fields": {
+        "office": {
+          "type": "entity",
+          "required": true,
+          "description": "The office to be filled (the post, by its id)."
+        },
+        "poll_at": {
+          "type": "date",
+          "required": true,
+          "description": "Polling day."
+        },
+        "nominations_close_at": {
+          "type": "date",
+          "required": true,
+          "description": "When nominations close."
+        },
+        "method": {
+          "type": "choice",
+          "required": true,
+          "options": [
+            "preferential",
+            "plurality"
+          ],
+          "description": "How the votes are counted."
+        }
+      },
+      "writes": {
+        "kind": "election_notice",
+        "text": "Election for {office}: nominations close {nominations_close_at}; polling {poll_at}.",
+        "visible": "public",
+        "data": {
+          "office": "=office",
+          "poll_at": "=poll_at",
+          "nominations_close_at": "=nominations_close_at",
+          "method": "=method"
+        }
+      }
+    }
   ]
 }

@@ -11,6 +11,7 @@ import { Bargaining, Staffing, stepper, WindingUp } from "./firms";
 import { Borrowing } from "./credit";
 import { distribute, LENGNICK, movePrice, moveWage, payOut } from "./lengnick";
 import { Deliveries, fill, goodsPrices, held, order, OrderBook, priceList } from "./trade";
+import * as P from "./papers";
 
 /**
  * A factory. Its workers' hours turn inputs into goods (the task `make`, at its works); it keeps inputs for the next
@@ -22,6 +23,8 @@ import { Deliveries, fill, goodsPrices, held, order, OrderBook, priceList } from
  */
 export const producer: BehaviourModule = {
   name: "firm.producer",
+  issues: [P.JOB_ADVERTISEMENT, ...P.TRADE],
+  issuesWith: (p) => ({ ...P.staffingOwn({ role: p.role ?? "factory worker", industry: p.industry, workplace: p.workplace, notice_days: p.notice_days ?? 14 }) }),
   version: "0.4.2",
   doc: "docs/behaviour/producer.md",
   cadence: () => DAY,

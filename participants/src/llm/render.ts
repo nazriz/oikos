@@ -43,7 +43,13 @@ const details = (x: unknown, max = 400) => {
 };
 /** A statement's details. A form's are always whole: its fields are what it's filled in from, and whoever reads the
  * request made on it sees every one (a long form cut short reads as a form without its last fields). */
-const dataWords = (r: { kind: string; data?: unknown }) => details(r.data, r.kind === "form" ? Infinity : 400);
+const dataWords = (r: { kind: string; data?: unknown }) => details(r.kind === "form" ? formAsShown(r.data) : r.data, r.kind === "form" ? Infinity : 400);
+/** A form's details as whoever fills it in needs them: of a paper of the office's own, its name, whose it is and its
+ * fields (how the paper is put together from them is the form's business, and is shown when it is filled in). */
+function formAsShown(data: unknown): unknown {
+  const d = data as { writes?: { kind?: string }; form?: unknown; office?: unknown; fields?: unknown } | undefined;
+  return d?.writes ? { form: d.form, office: d.office, issues: d.writes.kind, fields: d.fields } : data;
+}
 
 /**
  * What came back from something the participant did, every part of it: what it made, what a survey estimated, what
@@ -722,6 +728,10 @@ export function renderObservation(obs: Observation, o: RenderOptions = {}): stri
  */
 export function renderStanding(obs: Observation, standing: Set<string>): string {
   const out: string[] = [];
+  // An office's own stationery (a form that writes a paper of that office's) is on file for whoever holds the
+  // office: another office of the same organisation is not shown it.
+  const held = new Set((obs.positions ?? []).map((p) => p.position));
+  const othersStationery = (r: { kind?: string; data?: any }) => r.kind === "form" && !!r.data?.writes && typeof r.data?.office === "string" && !held.has(r.data.office);
   const shown = Object.entries(obs.channels).flatMap(([id, ch]) => (standing.has(id) && ch.kind === "records" ? ch.records : []));
   const byId = new Map(shown.map((r) => [r.id, r]));
   const down = new Set<string>();
@@ -733,7 +743,7 @@ export function renderStanding(obs: Observation, standing: Set<string>): string 
   }
   for (const [id, ch] of Object.entries(obs.channels)) {
     if (!standing.has(id) || ch.kind !== "records") continue;
-    for (const r of ch.records) if (r.record === "statement" && !down.has(r.id)) out.push(`- [${r.id}] ${words(r.kind)}${r.speaks_for ? ` of ${r.speaks_for}` : ""}: "${r.text}"${r.data ? ` (${dataWords(r)})` : ""}${ruleWords(r) ? ` ${ruleWords(r)}` : ""}`);
+    for (const r of ch.records) if (r.record === "statement" && !down.has(r.id) && !othersStationery(r)) out.push(`- [${r.id}] ${words(r.kind)}${r.speaks_for ? ` of ${r.speaks_for}` : ""}: "${r.text}"${r.data ? ` (${dataWords(r)})` : ""}${ruleWords(r) ? ` ${ruleWords(r)}` : ""}`);
   }
   return out.join("\n");
 }

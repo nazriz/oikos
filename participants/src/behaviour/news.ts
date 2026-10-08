@@ -6,6 +6,7 @@
 import { need, params, type BehaviourModule, type ParticipantContext } from "../module";
 import { because, Book, DAY, say, type Step } from "./common";
 import { stepper } from "./firms";
+import * as P from "./papers";
 
 /** What makes an item news, by the kind of record (placeholders): its weight, and its tone toward the government. */
 const KINDS: { [kind: string]: { weight: number; tone: (r: any) => number; headline: (r: any) => string } } = {
@@ -26,6 +27,8 @@ const KINDS: { [kind: string]: { weight: number; tone: (r: any) => number; headl
 
 export const newspaper: BehaviourModule = {
   name: "firm.newspaper",
+  issues: P.EDITOR,
+  issuesWith: (p) => ({ town: p.town }),
   version: "0.1.0",
   doc: "docs/behaviour/news.md",
   cadence: () => DAY,
