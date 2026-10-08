@@ -7,7 +7,7 @@ import { expect, test } from "bun:test";
 import PROFILE from "../../worlds/profiles/au-vic-2026.json";
 import type { Observation } from "../src/contracts";
 import type { ContentBlock, LlmRequest } from "../src/llm/adapter";
-import { createLlmParticipant, isId, TEXT_MAX, tools, type LlmParticipantConfig } from "../src/llm/participant";
+import { createLlmParticipant, isId, NOTEBOOK_MAX, notebookRoom, TEXT_MAX, tools, type LlmParticipantConfig } from "../src/llm/participant";
 
 const HOUR = 3_600;
 const ctx = { world: { currency: PROFILE.values.currency } } as any;
@@ -91,4 +91,18 @@ test("the debrief counts the letters that were sent, beside those written; and t
   await p.step(obs(7 * 86_400 + 9 * HOUR), ctx);
   await p.debrief("The run is over. How was it?");
   expect(debriefs[0].prompt).toContain("From day 1 to day 8 1 letter of yours was sent (2 more that you wrote were not: you were told at the time), you asked for 0 things to be done");
+});
+
+test("a notebook has room for a half-year, and a seat is told how to make room before it is full", async () => {
+  // (The live check: 4,000 characters were full by day 5, and seven changes were refused for room before the seat was
+  // told anything but the count.)
+  expect(NOTEBOOK_MAX).toBe(8000);
+  expect(notebookRoom(1200)).toBe("(1,200 of the 8,000 characters it holds are used.)");
+  expect(notebookRoom(6400)).toBe("(6,400 of the 8,000 characters it holds are used: it is nearly full, with 1,600 left. To make room before something won't fit, strike out what is settled (change the passage to nothing), or write the notebook afresh, shorter.)");
+  const nearly = "Day 1: wrote to the bank. ".repeat(250).slice(0, 6400);
+  const { p, calls, c } = harness([[use("n", "notebook", { text: nearly }), use("d", "done_for_now", {})]]);
+  await p.step(obs(9 * HOUR), ctx);
+  await p.step(obs(7 * 86_400 + 9 * HOUR), ctx);
+  expect(calls[1]!.messages[0]!.content as string).toContain(`${nearly}\n(6,400 of the 8,000 characters it holds are used: it is nearly full, with 1,600 left. To make room`);
+  expect(tools(c).find((t) => t.name === "notebook")!.description).toContain("It holds 8,000 characters. Add to it, change or strike out a passage of it, or write it all out afresh; what you don't touch stays as it is. What wouldn't fit isn't put in, and you're told: to make room, strike out what is settled (change the passage to nothing), or write it all afresh, shorter.");
 });

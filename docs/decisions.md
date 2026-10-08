@@ -2899,6 +2899,14 @@ See the design note, §16.
   - **Not verified:** a run in which a post changes hands mid-run; any model's use of the new references.
   - **Revisit if** a hand-written world is piloted (then the sweep wants the cast's ids, not their form), or when people have names (then a person's letter is signed with one).
 
+- **Three smaller things from the live check** (2026-10-09; the model seat 0.13.0; finding 11; tests in `participants/test/seat-letters.test.ts`, `orchestrator/test/pilot-report.test.ts`).
+  - **"From day 1 to day 1"** in a debrief whose notebook ran to day 8: the span was taken from the days the seat acted in the world, so a sitting spent on its notebook did not count. It is the days it sat (fixed with the letters' count, two entries above).
+  - **"stopped: aborted (stopped at 1036800), reached its until"** of a run that finished. A run cut at `until`, short of the world's whole length, ends "aborted" in its log by the log's contract, which has two endings; that is left alone. The pilot report now says "finished: it ran to its until" for such a run (and for one that completed), and carries `finished: true`.
+  - **The notebook's room.** 4,000 characters were full by day 5 for the seats that write most, and seven changes were refused for room; a seat was told only the count used. It holds 8,000 now: a seat that keeps a line a day for a half-year has about 44 characters a line at 4,000 and 88 at 8,000, and the cost is at most 4,000 more characters in an opening prompt of 10,000 to 40,000. From 6,000 used it is told, with its notebook: "it is nearly full, with N left. To make room before something won't fit, strike out what is settled (change the passage to nothing), or write the notebook afresh, shorter." The tool's description says how to make room too.
+  - **Text a seat reads that changed:** the notebook tool's description (8,000; how to make room) and the line under its notebook; the writers' instructions follow.
+  - **Not verified:** that 8,000 is enough for a half-year (no model was called; pilot 7's year-long mayors kept within 4,000, sol's seats did not).
+  - **Revisit if** a wave's reports still show `notebook_not_changed` for room.
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Calibration, measured again after the first-year risk fix** (2026-10-05, at 0251d3a, `runs/calibration-2026-10-05` on the run server; the small town, 3 seeds × 2 years, code only, as below). Health: 4 breaches of 15 (8 measured). Recorded, not chased: Naz decides what to do with the numbers.

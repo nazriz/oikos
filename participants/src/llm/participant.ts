@@ -19,7 +19,7 @@ import type { ContentBlock, LlmMessage, ToolSpec } from "./adapter";
 import { callModel, ModelCallFailed, promptTooLong, type LlmIO } from "./call";
 import { kindSaid, LOOK_CHARS_MAX, NOTHING_FOUND, NOTHING_NEW, renderObservation, renderStanding, type Looked, type WhoIs } from "./render";
 
-export const LLM_PARTICIPANT_VERSION = "0.13.0"; // 0.13.0: offices and people by their names in the world and never a participant's own id, who holds a post, figures in the papers it is shown read as a person reads them (money, days, dates, per cent), a letter whose about is not one id goes with it at its head, and nothing a seat sends is lost without a word; a look into papers answers with a list (a paper is read when asked for by its id, a long one a part at a time), one look and one whole prompt have a ceiling, a prompt its model would not take is never sent again unchanged; 0.12.0: told that a paper is named by its id, and one it cannot name is looked up first; 0.11.0: a place it is not at is gone to (someone is sent, and what they found is told when they are back); 0.10.0: who is who is looked up by name, a register someone else keeps is asked about one named thing, a board is searched (docs/design/knowing.md); 0.9.0: an answer read exactly or not at all (told and asked once more when not), a way out of the study not clearly meant is asked about; 0.8.0: looks kept ready for every sitting; no turn when nothing came of looking into whole reports; a notebook added to or changed in part
+export const LLM_PARTICIPANT_VERSION = "0.13.0"; // 0.13.0: a notebook of 8,000 characters and told how to make room when nearly full, offices and people by their names in the world and never a participant's own id, who holds a post, figures in the papers it is shown read as a person reads them (money, days, dates, per cent), a letter whose about is not one id goes with it at its head, and nothing a seat sends is lost without a word; a look into papers answers with a list (a paper is read when asked for by its id, a long one a part at a time), one look and one whole prompt have a ceiling, a prompt its model would not take is never sent again unchanged; 0.12.0: told that a paper is named by its id, and one it cannot name is looked up first; 0.11.0: a place it is not at is gone to (someone is sent, and what they found is told when they are back); 0.10.0: who is who is looked up by name, a register someone else keeps is asked about one named thing, a board is searched (docs/design/knowing.md); 0.9.0: an answer read exactly or not at all (told and asked once more when not), a way out of the study not clearly meant is asked about; 0.8.0: looks kept ready for every sitting; no turn when nothing came of looking into whole reports; a notebook added to or changed in part
 
 export interface LlmParticipantConfig {
   participant: string;
@@ -263,13 +263,13 @@ export function tools(c: LlmParticipantConfig): ToolSpec[] {
         ? `That's all for now. You're back after the given number of days, at that day's sitting (given none: after ${c.cadenceDays}); sooner, at the next sitting, if someone writes to you. You can use it alongside other actions: they're done, and you'll see how they went when you're back.`
         : "That's all for now. You'll be back after the given number of days, or sooner if someone writes to you. You can use it alongside other actions: they're done, and you're back after the days given, when you'll see how they went.",
       input_schema: { type: "object", properties: { days: { type: "integer", minimum: 1 } } } },
-    { name: "notebook", description: "Your notebook: the only thing you'll remember from one sitting to the next. It holds 4,000 characters. Add to it, change or strike out a passage of it, or write it all out afresh; what you don't touch stays as it is. What wouldn't fit isn't put in, and you're told. Use it alongside your actions.",
+    { name: "notebook", description: `Your notebook: the only thing you'll remember from one sitting to the next. It holds ${NOTEBOOK_MAX.toLocaleString("en")} characters. Add to it, change or strike out a passage of it, or write it all out afresh; what you don't touch stays as it is. What wouldn't fit isn't put in, and you're told: to make room, strike out what is settled (change the passage to nothing), or write it all afresh, shorter. Use it alongside your actions.`,
       input_schema: { type: "object", properties: {
         add: { type: "string", description: "Words to add at the end, on a new line." },
         change: { type: "array", maxItems: 8, description: "Passages to change, each where it stands.", items: { type: "object", required: ["from", "to"], properties: {
           from: { type: "string", description: "The passage as it stands in your notebook, word for word (enough of it to be the only one)." },
           to: { type: "string", description: "What it should say instead; empty to strike it out." } } } },
-        text: { type: "string", maxLength: 4000, description: "The whole notebook, written afresh: it replaces everything there." } } } },
+        text: { type: "string", maxLength: NOTEBOOK_MAX, description: "The whole notebook, written afresh: it replaces everything there." } } } },
     { name: "opt_out", description: leave, input_schema: { type: "object", required: ["statement"], properties: { statement: { type: "string" } } } },
     ...(reports.size
       ? [{ name: "look", description: lookWords,
@@ -329,7 +329,11 @@ const text = (x: unknown): x is string => typeof x === "string" && x.length > 0;
 const quote = (s: string, max = 80) => `"${s.length > max ? `${s.slice(0, max)}…` : s}"`;
 
 /** The most a notebook holds, and the most of what came in between sittings that's set out at the next. */
-export const NOTEBOOK_MAX = 4000;
+export const NOTEBOOK_MAX = 8000;
+/** From this much used, a seat is told its notebook is nearly full, and how to make room, before anything is refused for room. */
+export const NOTEBOOK_NEARLY = 6000;
+/** What a seat is told of its notebook's room, with the notebook: how much is used, and from nearly full how to make room. */
+export const notebookRoom = (used: number) => `(${used.toLocaleString("en")} of the ${NOTEBOOK_MAX.toLocaleString("en")} characters it holds are used${used >= NOTEBOOK_NEARLY ? `: it is nearly full, with ${(NOTEBOOK_MAX - used).toLocaleString("en")} left. To make room before something won't fit, strike out what is settled (change the passage to nothing), or write the notebook afresh, shorter` : ""}.)`;
 export const CARRY_MAX = 40_000;
 
 /** A notebook as one use of it leaves it: written afresh (`text`), passages changed where they stand (`change`), words
@@ -842,7 +846,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
         } else {
           const since = sinceLast(now);
           if (since.left) await note({ carried_not_shown: { reports: since.left, of: since.of, limit_characters: CARRY_MAX } });
-          sending = [{ role: "user", content: `Your notebook: ${notes ? `${notes}\n(${notes.length} of the ${NOTEBOOK_MAX} characters it holds are used.)` : "(empty)"}\n\n${unsaid.length ? `${unsaid.join("\n")}\n\n` : ""}${since.before ? `Since you last looked:\n${since.before}\n\nNow:\n` : ""}${now}` }];
+          sending = [{ role: "user", content: `Your notebook: ${notes ? `${notes}\n${notebookRoom(notes.length)}` : "(empty)"}\n\n${unsaid.length ? `${unsaid.join("\n")}\n\n` : ""}${since.before ? `Since you last looked:\n${since.before}\n\nNow:\n` : ""}${now}` }];
         }
 
         let res: Awaited<ReturnType<typeof callModel>>;
