@@ -538,10 +538,11 @@ const RECIPES: { [fn in Exclude<calls.Fn, "form">]: (d: Draw) => Lines } = {
       if (orders) {
         d.tag = "standing_work_hold";
         d.notes.push(`What is put on hold is ${held.length > 1 ? "standing work orders, each" : "a standing work order:"} a routine set for the office's own staff (a round, a roster, a schedule). Say that that is what ${held.length > 1 ? "they are" : "it is"}, in words of your own, beside the id: it is paused, stays on record and is to be taken up again.`);
-      }
+      } else d.tag = "hold";
       return [call("statement", { hold: held.length === 1 ? id(held[0]!) : list([...new Set(held)]), basis: d.maybe(0.08) ? d.record() : undefined })];
     }
-    if (d.maybe(0.12)) return [call("statement", { kind: id("entry"), visible: id("own"), text: d.entryWords(), basis: d.maybe(0.5) ? d.rec() : undefined })];
+    // (Tagged, like the hold above, so that a part can be made of them by name: nothing about the program changes.)
+    if (d.maybe(0.12)) return (d.tag = "entry"), [call("statement", { kind: id("entry"), visible: id("own"), text: d.entryWords(), basis: d.maybe(0.5) ? d.rec() : undefined })];
     if (d.maybe(0.15)) {
       // (A quarter of what is withdrawn is a standing work order: the routine ended for good, with no words of its own.)
       if (d.maybe(0.25)) {
