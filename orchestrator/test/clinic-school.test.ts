@@ -33,11 +33,39 @@ test("children are taught, the ill stay home and are seen at the clinic", async 
   const pupils = config.world.records.filter((r: any) => r.kind === "school_place").map((r: any) => ({ occupant: r.addressed_to[0], space: r.data.classroom }));
   const ageAt0 = (p: string) => Math.floor(-born.get(p)! / YEAR);
   expect(pupils.length).toBe([...born.keys()].filter((p) => ageAt0(p) >= 5 && ageAt0(p) <= 17).length);
+  // (Until 2026-10-08 this held every class to more than 170 lessons and every pupil to 170 lessons' schooling: true of
+  // the one town it was written against, where both teachers lasted the year. In the town drawn since, a teacher dies
+  // on about day 150, the school posts the job, and that class goes untaught for some forty school days until someone
+  // is hired: the school's rule at work, not a fault. So what is held is the rule: the school teaches on about the
+  // school days there are; a teacher teaches every one of them while they are with the school and well; a school that
+  // loses a teacher posts the job; and a pupil's schooling is the lessons their own class was given.)
   const lessons = ev.filter((e) => e.event === "worked" && e.task === "teach");
-  const classrooms = new Set(lessons.map((e) => e.on)).size;
-  expect(lessons.length / classrooms).toBeGreaterThan(170);
-  expect(lessons.length / classrooms).toBeLessThanOrEqual(205); // (a 365-day year holds a day or so more than 200)
-  // A pupil who stayed the year: about a year's schooling more (a lesson is 50), as the engine keeps it.
+  const dayOf = (e: any) => Math.floor(e.t / DAY);
+  const schoolDays = [...new Set(lessons.map(dayOf))].sort((a, b) => a - b);
+  expect(schoolDays.length).toBeGreaterThan(170);
+  expect(schoolDays.length).toBeLessThanOrEqual(205); // (a 365-day year holds a day or so more than 200)
+  // One lesson a class a day, and a teacher takes one class a day.
+  expect(new Set(lessons.map((e) => `${e.on}|${dayOf(e)}`)).size).toBe(lessons.length);
+  expect(new Set(lessons.map((e) => `${e.performers.join("+")}|${dayOf(e)}`)).size).toBe(lessons.length);
+  // A teacher teaches on every school day from their first lesson to their last, but for days they were unwell.
+  const unwell = (p: string, day: number) => ev.some((e) => e.event === "condition_began" && e.person === p && Math.floor(e.t / DAY) <= day && day <= Math.ceil(e.until / DAY));
+  const teachers = [...new Set(lessons.flatMap((e) => e.performers as string[]))];
+  for (const who of teachers) {
+    const taught = new Set(lessons.filter((e) => e.performers.includes(who)).map(dayOf));
+    const [first, lastDay] = [Math.min(...taught), Math.max(...taught)];
+    const missed = schoolDays.filter((d) => d > first && d < lastDay && !taught.has(d) && !unwell(who, d));
+    expect({ who, missed }).toEqual({ who, missed: [] });
+  }
+  // (So a class with no lesson on a school day is one the school had no teacher for.) When it has lost a teacher, it
+  // posts the job.
+  const lost = ev.filter((e) => e.event === "person_died" && teachers.includes(e.person)).length + recs.filter((r) => r.record === "notice" && teachers.some((w) => r.agreement === `job-${w}`) && r.speaks_for !== "school").length;
+  if (lost) expect(recs.some((r) => r.kind === "job_posting" && r.speaks_for === "school")).toBe(true);
+  // A pupil who stayed the year: the schooling of the lessons their own class was given (a lesson is 50), as the
+  // engine keeps it: never more, and no more than thirty lessons short (the allowance this test has always had for
+  // days a child misses, then against the year's 200).
+  const given = new Map<string, number>();
+  for (const e of lessons) given.set(e.on, (given.get(e.on) ?? 0) + 1);
+  const roomOf = new Map<string, string>(pupils.map((o: any) => [o.occupant, o.space]));
   const last = new Map<string, number>();
   for (const e of ev.filter((e) => e.event === "body_changed" && e.variable === "skill")) last.set(e.person, e.value);
   const gone = new Set(ev.filter((e) => e.event === "person_left" || e.event === "person_died").map((e) => e.person));
@@ -45,10 +73,10 @@ test("children are taught, the ill stay home and are seen at the clinic", async 
   expect(stayed.length).toBeGreaterThan(5);
   for (const p of stayed) {
     const gained = last.get(p)! - skill0.get(p)!;
-    expect(gained).toBeGreaterThan(170 * 50);
-    expect(gained).toBeLessThanOrEqual(205 * 50);
-  }
-  // Those who reached the end of school: out of the classroom, with a certificate of their years.
+    const theirs = given.get(roomOf.get(p)!) ?? 0;
+    expect(gained).toBeGreaterThan((theirs - 30) * 50);
+    expect(gained).toBeLessThanOrEqual(theirs * 50);
+  }  // Those who reached the end of school: out of the classroom, with a certificate of their years.
   const certs = recs.filter((r) => r.kind === "school_certificate");
   const leavers = pupils.map((o: any) => o.occupant).filter((p: string) => ageAt0(p) === 17);
   for (const c of certs) expect(c.data.years).toBeGreaterThanOrEqual(12);
@@ -75,8 +103,10 @@ test("children are taught, the ill stay home and are seen at the clinic", async 
   expect(back.length).toBeGreaterThan(0);
 
   // Nothing refused but the usual races (and a patient who'd gone home before being seen; and a building under water,
-  // in a spring flood: the weather's).
-  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left", "participant_inactive", "flooded"].includes(e.code)).map((e) => e.code)).toEqual([]);
+  // in a spring flood: the weather's; and, as the households and deaths tests allow with the daily round, a partner
+  // gone to work while a conception was under way, "isn't near": which couple and which morning is the town's draw).
+  const partnerGone = (e: any) => e.code === "too_far" && / isn't near /.test(e.detail ?? "");
+  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left", "participant_inactive", "flooded"].includes(e.code) && !partnerGone(e)).map((e) => e.code)).toEqual([]);
 }, 2_400_000);
 
 test("with care in the world, treatable deaths come through severe illness, and with care as usual each age dies at the life table's rate", () => {

@@ -159,9 +159,16 @@ test("Lengnick: with too little demand a factory lets workers go and stops makin
   // at its band's top before its stock passes last month's demand: in this town the staff go for want of the wages,
   // not by the month's-end rule. Either is the factory letting workers go for too little demand.)
   expect(letGo.length + cashLetGo.length).toBeGreaterThanOrEqual(1);
-  // (At least two of its staff go. Four, before the clinic and the school took four of the town's 120 people's jobs
-  // from the factory: generator 0.22.0.)
-  expect(letGo.length + cashLetGo.length + quit.length).toBeGreaterThanOrEqual(2);
+  // (How many go is not held. It was "at least four", then "at least two" counting those who left for other jobs, each
+  // true of the town it was written against; in the town drawn since 2026-10-08 one goes in five months, of thirty-one
+  // with work for a fifth of them. The rule is slow by its own terms: making stops at the band's top, so stock never
+  // passes last month's demand while demand is steady, and staff go only as the money runs down (docs/scenarios.md,
+  // the export slump). A count here would hold the town to an outcome; what is held is that someone goes, that every
+  // redundancy the factories give is for one of the rule's two reasons, and that making stops at the band's top.)
+  const given = e1.filter((e) => e.event === "recorded" && e.record.record === "notice" && factoryJobs.has(e.record.agreement) && String(e.record.text).startsWith("Redundancy"));
+  expect(given.length).toBe(letGo.length + cashLetGo.length);
+  for (const n of given) expect(["Redundancy: we're making more than we sell.", "Redundancy: we can't cover the wage bill."]).toContain(n.record.text);
+  void quit;
   expect(e1.filter((e) => e.event === "recorded" && e.record.record === "notice" && e.record.text?.startsWith("Redundancy: we're making more")).length).toBe(letGo.length);
   // Beyond the top of Lengnick's band (last month's demand: the shops' orders, and its share of the world market's
   // offer) a factory makes nothing, though its staff could make far more: a day's making never takes its stock past
