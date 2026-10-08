@@ -2782,6 +2782,103 @@ See the design note, §16.
   - **Not verified:** `bun run test:all` (the merge's); the year and the timing on the redrawn towns.
   - **Revisit if** either changed test is found to have hidden something: the first, a tenant who never makes a missed rent up; the second, a works that stops seeking hands while short.
 
+- **Informal work: unregistered jobs, work by the day, and people working for themselves** (2026-10-09; track F of docs/design/profile-depth.md, item 1, approved by Naz as recommended: parts a and b, and the opening state of c. docs/behaviour/firms.md, entry.md, citizen.md; docs/measurement.md, "Employment"; docs/profiles.md. firm.retailer 0.9.1, firm.producer 0.4.4, firm.builder 0.12.3, citizen.default 0.43.1, generator 0.36.1, measure 0.6.0).
+  - **Why.** Every job in a town was a registered job on a standing wage, at a shop, a factory, the builder or a public body. That is most work in five of the nine places and little of it in the other four, and the Kenyan and Indian profiles said so in their own `about`. One mechanism for each of three things, as data a profile states or leaves out.
+  - **(a) Jobs an employer does not register.** `employment.registered_bps`, by kind of work. Each employer of a kind registers that share of its own jobs (`Staffing.unregistered`: a draw when the job's wages start; the generator's at the start). An unregistered job is an ordinary employment agreement paid whole: nothing withheld, nothing paid over, on no report. What follows is not coded: the payments office has no record for the worker, so a payment that turns on one is refused. All that says which jobs is the employer's own note (`off_books`, seen by the employer alone). **Decided against** a share of employers ("this firm complies, that one does not"), which is how Naz's acceptance was worded: a town has three to thirty firms of a kind, so a draw by firm gives a place's share only by accident, and the ILO's definition is of the job, at any employer. **No inspector**; firms.md says where one attaches.
+  - **(b) Work by the day.** `employment.casual_bps` and `day_wage`, by kind of work. An employment agreement whose pay is a day's, each side's notice the least an agreement can say: the record's own fields. Paid on each working day the hand is at work, by a payment of its own; the builder pays for the days it has building in hand. What the law takes from a registered one is reckoned over the working week (`dayPayPeriod`). The hand takes a day's pay as pay, and after most of a week without any ends it with nothing to claim.
+  - **(c) A person working for themself: the opening state.** `employment.own_account`: the share of people in work, and the kinds as the survey divides them. The existing shop mechanism run by its owner (`firm.retailer` with `operator`), the owner's own participant in its one position, from a room of their home or a pitch in a market the town keeps. **The town holds the kinds that trade, and only those.** A ride or a repair has no customer (households buy goods), and a business that makes what it sells needs the factory's rules run by one person: both left. **Decided:** people of the kinds not held are drawn in jobs, as everyone was before, rather than left without work or folded into trade; a profile states every kind truly and the town's description says what was not placed. That is the largest thing to know about the result: the town holds 49% of Kenya's own-account workers outside farming, and about a fifth of India's, Brazil's and Mexico's.
+  - **The two points the design had not verified, tried first** (`kernel/tests/cast.rs`): a person performs a task in a business where they hold the only position: yes. A task set in a dwelling or a pitch: a task that names no kind of space is done in a dwelling; one set `in` a pitch is done at a pitch and refused at home; the shop's own task, set in a workplace, is refused in a dwelling. So the town's catalogue gains a task (`sell`) and a kind of building (`market`): world content. **No kernel change.**
+  - **Contract changes: none.** The agreement record already says a day's pay and a notice; `off_books`, `trading_from` and `pitch` are a statement kind, a statement kind and an agreement's label, all free vocabulary. One thing found that a contract change would do better: an agreement made by a call cannot carry `attrs`, so work by the day is known by its pay period alone.
+  - **Not a mechanism but needed for it:** where some work for themselves, the factories open with the staff the smaller employed workforce leaves them, spread evenly (filled one after another, the last stood empty and would close); and the shops are staffed and funded for their share of the custom, every seller's expected custom the same at the start. Both only where a profile states own-account work.
+  - **Faults found on the way, all fixed:** a one-off payment citing a job was read as that job's wage order (only standing requests are now); and four in the first version of (c), found in the Kenyan towns (entry.md lists them: a trader not following their home, an owner gone, weekly restocking on a week's stock, stock money kept to the last unit).
+  - **The measure** (accepted by Naz: employment as work done or a job held). `economy/summary`'s employed is now an hour's work for pay or profit in the run's last seven days, or a job held, or a business of one's own in being (ILO, 19th ICLS). The old series stays as `employed_by_agreement`, `employment_by_agreement_pct`, `unemployment_by_agreement_pct`. For a town with no informal work they differ by those working out a notice (the first profile's 1,000-person month: 427 against 424). New: `economy/work`, `economy/public-money`.
+  - **Figures, and from where** (each profile's note has the detail; opened by a research agent on 2026-10-09 unless said):
+
+    | Profile | registered, of employees' jobs | by the day | own-account, of people in work | of which the town holds |
+    |---|---|---|---|---|
+    | ke-nakuru-2026 | 34.7% (ILOSTAT, informal employment by status, Kenya 2019: 65.3% of employees informal) | not stated (no table opened) | 39.4% (ILOSTAT, status by activity, Kenya 2021, outside agriculture) | trade, 48.9% of them: 19% of people in work |
+    | in-tn-2026 | 53.8% (PLFS 2023-24, table 36, urban Tamil Nadu: 46.2% of regular employees with no social security) | 25.2% of employees (PLFS table 19: casual 17.8%, regular 52.9% of workers), at 617.71 rupees a day (the profile's own figure) | 25.2% (PLFS table 19: own-account workers and employers) | trade, 20.7% (ILOSTAT, India 2025): 5% |
+    | br-mg-2026 | 74.3% (PNAD Contínua, SIDRA 4097, Minas Gerais, 2nd quarter 2026: 25.7% of private employees without a work card) | not stated | 24.9% (the same table: conta própria) | trade, 21.1% (ILOSTAT, Brazil 2025): 5% |
+    | mx-jal-2026 | 56.9% (ILOSTAT, Mexico 2025: 43.1% of employees informal; national) | not stated | 16.9% (ENOE, Jalisco, 2nd quarter 2026) | trade, 36.1% (ILOSTAT, Mexico 2025): 6% |
+
+    The other five profiles state nothing and are unchanged. Rough, and for the authors: one registered share for all three kinds of employer; kinds of own-account work national; the split of traders between a pitch and home a placeholder (half and half); farming and unpaid family workers left out.
+  - **The unchanged-hash check.** The first profile's town, 1,000 people, seed 1, 30 days: f596db724366db04 on main (bea2d7b), measured first, and after each of the commits here. A profile that states none of the new fields generates the same config to the byte (tested for each part).
+  - **Three different towns a side, 180 days** (`worlds/town-1000.yaml --set profile=... --towns 3`, mock seats, lean logs; before: main at bea2d7b; after: this branch). Mean, and lowest to highest. Money in whole units of each currency, over the 180 days.
+
+    *Kenya (ke-nakuru-2026):*
+
+    | Measure | before | after |
+    |---|---|---|
+    | employed, new measure | 470 (448 to 488) | 452 (445 to 463) |
+    | employment to population, new | 69.3% | 70.6% |
+    | unemployment, new | 5.3% (0.6 to 8.1) | 2.2% (1.8 to 2.8) |
+    | employed by agreement (old) | 465 | 361 |
+    | unemployment by agreement (old) | 6.3% | 21.7% |
+    | own-account / unregistered employees / by the day | 0 / 0 / 0 | 85 / 225 / 0 |
+    | informal employment (target 84%) | 0% | 68.7% (66.7 to 70.8) |
+    | wages paid | 39.7 million | 34.4 million |
+    | own-account drawings | 0 | 8.1 million |
+    | withheld and paid over | 4.63 million (tax 0.75, health 1.04, housing levy 0.57, NSSF 2.27) | 2.13 million (tax 0.75, health 0.37, housing levy 0.20, NSSF 0.81) |
+    | support and pensions paid, to how many | 227,000 to 25 | 230,000 to 26 |
+    | household saving | 10.8% | 10.7% |
+    | median rent, of income | 75.1% (70.7 to 81.8) | 85.2% (all three) |
+    | households unhoused | 27 (22 to 34) | 13 (10 to 17) |
+    | demand unmet | 14.8% (3.6 to 35.4) | 9.6% (5.1 to 14.5) |
+
+    *India (in-tn-2026):*
+
+    | Measure | before | after |
+    |---|---|---|
+    | employed, new measure | 408 (394 to 418) | 436 (425 to 449) |
+    | employment to population, new | 53.3% | 55.8% |
+    | unemployment, new | 5.0% | 0% |
+    | employed by agreement (old) | 405 | 409 |
+    | unemployment by agreement (old) | 5.6% | 5.7% |
+    | own-account / unregistered employees / by the day | 0 / 0 / 0 | 23 / 205 / 103 |
+    | informal employment (national 87%, with farming) | 0% | 52.5% (49.4 to 58.1) |
+    | wages paid | 40.6 million | 40.0 million |
+    | own-account drawings | 0 | 3.0 million |
+    | withheld and paid over | 0 | 0 |
+    | support and pensions paid, to how many | 902,000 to 156 | 909,000 to 160 |
+    | household saving | 0.8% (-1.5 to 2.4) | 4.8% (1.3 to 8.5) |
+    | median rent, of income | 31.1% | 31.0% |
+    | households unhoused | 3 | 6 |
+    | demand unmet | 0.4% | 1.8% (0.5 to 4.0) |
+
+    *Brazil (br-mg-2026) and Mexico (mx-jal-2026):*
+
+    | Measure | Brazil before | Brazil after | Mexico before | Mexico after |
+    |---|---|---|---|---|
+    | employed, new measure | 439 | 432 | 423 | 452 |
+    | unemployment, new | 1.6% | 1.9% | 6.1% | 3.5% |
+    | employed by agreement (old) | 430 | 406 | 421 | 422 |
+    | unemployment by agreement (old) | 3.7% | 7.8% | 6.7% | 10.0% |
+    | own-account / unregistered employees | 0 / 0 | 25 / 92 | 0 / 0 | 27 / 176 |
+    | informal employment (targets 36.5% and 46.5%) | 0% | 27.0% (25.8 to 29) | 0% | 44.9% (42.1 to 50.3) |
+    | wages paid | 7.47 million | 6.92 million | 31.6 million | 32.5 million |
+    | own-account drawings | 0 | 1.17 million | 0 | 4.38 million |
+    | withheld and paid over | 598,000 (INSS 581,000) | 431,000 (INSS 414,000) | 2.73 million | 1.57 million |
+    | support and pensions paid, to how many | 1.17 million to 164 | 1.21 million to 187 | 785,000 to 62 | 791,000 to 63 |
+    | household saving | 7.6% | 7.9% | 10.2% | 9.2% |
+    | median rent, of income | 14.9% | 14.1% | 15.1% | 15.3% |
+    | households unhoused | 0 | 0 | 2 | 2 |
+    | demand unmet | 1.8% | 10.4% (3.1 to 15.5) | 1.7% | 3.7% |
+
+  - **Read plainly.**
+    - *Kenya: more like the place, and it still does not hold together.* Seven in ten of the employed are informal (the profile's target is 84%; the gap is the own-account kinds the town cannot hold and farming). The contributory charges collect a third of what they did. Fewer households are unhoused and less demand goes unmet. **Rent is what stops it, and nothing here was going to move it:** the median renting household still pays 85% of its income (it was 75%; the median such household is now one factory wage, 7,121 shillings a fortnight, against a two-bedroom flat at 13,000 a month). That is the profile's own rents and its dwelling mix (three one-bedroom, seven two-bedroom and two three-bedroom flats a block, the first profile's mix at Nakuru's urban rents), its author's to restate; a trader's earnings come to about a wage (about 16,000 shillings a month drawn), so a household with a trader in it is no better placed than one with a job. The town also floods (1,300 to 3,400 acts refused a town for water, before and after alike): the river track's work. And fewer people come: arrivals fell from about 118 to 60 a town, because newcomers come for posted jobs and employers post fewer.
+    - *India: holds together, as it did before* (rent 31% of income). A quarter of employees are by the day, half the jobs unregistered, and 23 traders. **Registering a job changes no payment there:** the profile's law takes nothing from pay at these wages and has no contribution, so 205 unregistered jobs differ from registered ones by a note. The provident fund and the state insurance are what registration brings in India, and are the author's to add. Unemployment by the new measure reads nought: the traders are extra work beside the same employers' jobs.
+    - *Brazil:* demand unmet rose from 1.8% to 10.4%. **Not chased; recorded.** Likely cause: the shops open staffed and funded for a smaller share of the custom than they end up with (25 traders take less than the even share the opening expectation gives each seller), and a shop adds one hand a month. If that is right it is the opening expectation, not the mechanism; it should be looked at before Brazil is piloted. More people draw the payment for those out of work (33 to 55 a town, from 11 to 23): by agreement, fewer are in jobs.
+    - *Mexico:* 45% informal against a target of 46.5%, which is the registered share doing nearly all of it.
+  - **What went to the citizen redesign** (docs/design/ai-citizens.md, Open, 5): taking up own-account work when out of work, and looking from it; giving it up for a job or when custom fails; choosing it; a household deciding who does what, and unpaid family help; services sold to households; a business that makes what it sells, and a plot; weighing a registered job against an unregistered one and a standing wage against work by the day; turning up each morning to be picked. In a run nobody starts such a business and none closes for want of custom.
+  - **Not verified.**
+    - The research agent's reading of each source (the ILOSTAT files, the PLFS report's tables 19, 36 and 39, SIDRA tables 4097 and 8529, the ENOE bulletin): its figures were taken as reported, with the URL, and not re-read. KNBS's own tables could not be opened at all; the Kenyan figures are the ILO's.
+    - A business following its owner's home, and closing when its owner leaves: seen in the Kenyan runs (6 to 10 moves and 1 to 4 closures a town; in the one town looked at, the businesses' refusals fell from about 7,400 to about 130) and held by no test of its own (the test town had no move in ninety days).
+    - Why Brazil's unmet demand rose.
+    - Run time: a Kenyan town of 1,000 with 85 businesses of one took 146 to 170 seconds for 180 days against 134 to 145 on main, on a machine other work was loading.
+    - `bun run test:all` (the merge's). On the branch: the fast tier, 664 pass; the fast tier and what the change reaches, 812 pass, 0 fail, across 124 files.
+  - **Left as it is, and known:** the business of an owner who dies is run by nobody (its prices stay up, an order to it is never answered); a hand by the day reads low on a job board read in order of pay; an unregistered job pays the same wage as a registered one; someone in an unregistered job claims a contributory payment each month and is refused each month; no pitch fee.
+  - **Revisit if** a profile's author needs a registered share that differs between firms of one kind (then it is a draw by firm, for towns large enough); an inspector is built (then the share moves, and `compliance` is the employer's answer to it); households buy services (then the kinds not held can be, and the "drawn in jobs" rule goes); businesses of one make a month's run several times slower (they did not: about a tenth); the opening expectation of custom is shown to be what starves Brazil's shops; or the citizen redesign lands (entry and exit are written once, there).
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Calibration, measured again after the first-year risk fix** (2026-10-05, at 0251d3a, `runs/calibration-2026-10-05` on the run server; the small town, 3 seeds × 2 years, code only, as below). Health: 4 breaches of 15 (8 measured). Recorded, not chased: Naz decides what to do with the numbers.
