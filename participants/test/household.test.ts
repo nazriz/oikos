@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
-import { bedroomsNeeded, hear, SAYING, type HouseholdData, type Member } from "../src/behaviour/household";
+import { adultAgeBands, bedroomsNeeded, drawHousehold, hear, SAYING, type HouseholdData, type HouseholdSpec, type Member } from "../src/behaviour/household";
+import { Randomness } from "../src/rng";
 import { CATCHING_UP, heardNews } from "../src/behaviour/citizen";
 import { inCurrency } from "../src/money";
 import PROFILE from "../../worlds/profiles/au-vic-2026.json";
@@ -50,4 +51,27 @@ test("catching up: a code citizen's news reads back as what it says", () => {
   expect(heardNews(CATCHING_UP.leans("religious-group-1"))).toEqual({ leansTo: ["religious-group-1"] });
   expect(heardNews(CATCHING_UP.nothing)).toBeUndefined();
   expect(heardNews("Lovely weather.")).toBeUndefined();
+});
+
+// Adults' ages follow the census (docs/behaviour/households.md): those whose age no family decides are drawn from the
+// census's adults less the ones families put in each band. Grown children at home are put there by their families as
+// parents are; taken off for parents only (until 2026-10-08), the youngest adults were counted twice (16% of adults
+// under 25 where the census has 9%) and every band from 50 up came out a fifth short (20% of adults at or past 67
+// where the census has 25%).
+test("adults' ages follow the census, grown children at home counted among them", () => {
+  const H = { ...PROFILE.values.households } as unknown as HouseholdSpec;
+  const a = new Randomness(1n).stream(["bands"]), b = new Randomness(1n).stream(["draw"]);
+  H.adult_age_bands = adultAgeBands(H, (n) => a.below(n));
+  const [lo] = H.adult_ages;
+  const share = (from: number, to: number) => H.age_bands_bps!.reduce((x, c) => x + (c.bps * Math.max(0, Math.min(c.to, to) - Math.max(c.from, from) + 1)) / (c.to - c.from + 1), 0);
+  let adults = 0, young = 0, old = 0;
+  for (let i = 0; i < 20_000; i++) for (const m of drawHousehold(H, (n) => b.below(n)).members) {
+    if (m.age < lo) continue;
+    adults++;
+    if (m.age < 25) young++;
+    if (m.age >= 67) old++;
+  }
+  const pct = (n: number) => (100 * n) / adults, census = (from: number, to: number) => (100 * share(from, to)) / share(lo, 200);
+  expect(Math.abs(pct(young) - census(lo, 24))).toBeLessThan(2.5);
+  expect(Math.abs(pct(old) - census(67, 200))).toBeLessThan(2.5);
 });

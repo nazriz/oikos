@@ -213,10 +213,11 @@ export function drawHousehold(H: HouseholdSpec, below: (n: number) => number): D
 }
 
 /**
- * The ages of adults who aren't parents at home (living alone, as couples without children, or in groups), so that all
- * adults together follow the census (`age_bands_bps`): the census's adults in each band, less the parents the family
- * shares put there (estimated by drawing `n` households), as shares (docs/behaviour/households.md). None without the
- * census bands.
+ * The ages of adults whose age no family decides (living alone, as couples without children, or in groups), so that all
+ * adults together follow the census (`age_bands_bps`): the census's adults in each band, less those the family shares
+ * put there, parents and grown children still at home alike (estimated by drawing `n` households), as shares
+ * (docs/behaviour/households.md). None without the census bands. (Until 2026-10-08 only parents were taken off: with
+ * children at home up to their mid-twenties, the youngest bands were filled twice and every older band came up short.)
  */
 export function adultAgeBands(H: HouseholdSpec, below: (n: number) => number, n = 20_000): HouseholdSpec["adult_age_bands"] {
   const census = H.age_bands_bps;
@@ -231,8 +232,9 @@ export function adultAgeBands(H: HouseholdSpec, below: (n: number) => number, n 
     for (const m of d.members) {
       if (m.age < lo) continue;
       adults++;
-      const isParent = d.members.some((k) => k.parents?.includes(d.members.indexOf(m)));
-      if (isParent && band(m.age) >= 0) parents[band(m.age)]!++;
+      // (Placed by a family: a parent, whose age follows the eldest child's, or a grown child at home.)
+      const placed = !!m.parents || d.members.some((k) => k.parents?.includes(d.members.indexOf(m)));
+      if (placed && band(m.age) >= 0) parents[band(m.age)]!++;
     }
   }
   const total = bands.reduce((x, b) => x + b.bps, 0);
