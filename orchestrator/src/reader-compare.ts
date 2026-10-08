@@ -18,12 +18,13 @@
 // pipeline folders whose readers' stored answers are measured the same way, with no call (their time is not known).
 // Everything is written under `out`: `calls.jsonl` (every call's prompt, answer, usage and cost: model runs are kept),
 // `read/<reader>/batch-N.json`, `claude-code.jsonl` (what Claude Code reported for each of its calls), `comparison.json`
-// and `comparison.txt`. Run again, it makes only the calls that are missing.
+// and `comparison.txt`. Run again, it makes only the calls that are missing (a batch's file is its answer whatever the
+// prompt has become since: for a later prompt, a new `out`; `comparison.json` names the prompt it was made under).
 
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { calls } from "@oikos/participants";
-import { translatorSystem } from "@oikos/translator";
+import { TRANSLATOR_VERSION, translatorSystem } from "@oikos/translator";
 import { formOfLine, type BlindAnswer } from "../../translator/train/blind";
 import { sameProgram, type FormSpec } from "../../translator/train/data";
 import { withListsQuoted, type Unlabelled } from "../../translator/train/readers";
@@ -177,7 +178,7 @@ export async function compare(cfg: CompareConfig, log: (line: string) => void = 
   const done = settled.flatMap((s, i) => (s.status === "fulfilled" ? [s.value] : (log(`${cfg.readers[i]}: ${String((s.reason as Error)?.message ?? s.reason).slice(0, 300)}`), [])));
   const fresh = measure(requests, labels, done);
   const stored = Object.fromEntries((cfg.stored ?? []).map((d) => [d, measureStored(resolve(d))]).filter(([, m]) => m));
-  const result = { made: new Date().toISOString(), requests: requests.length, labelled: requests.filter((u) => labels.has(u.id)).length, fresh, stored, failed: settled.flatMap((s, i) => (s.status === "rejected" ? [{ reader: cfg.readers[i], why: String((s.reason as Error)?.message ?? s.reason).slice(0, 500) }] : [])) };
+  const result = { made: new Date().toISOString(), prompt: TRANSLATOR_VERSION, requests: requests.length, labelled: requests.filter((u) => labels.has(u.id)).length, fresh, stored, failed: settled.flatMap((s, i) => (s.status === "rejected" ? [{ reader: cfg.readers[i], why: String((s.reason as Error)?.message ?? s.reason).slice(0, 500) }] : [])) };
   writeFileSync(join(out, "comparison.json"), `${JSON.stringify(result, null, 1)}\n`);
   const text = [tableText(`Fresh: ${requests.length} requests (${result.labelled} with a settled label), each read by every candidate`, fresh), ...Object.entries(stored).map(([d, m]) => tableText(`Stored: ${d}`, m as ReturnType<typeof measure>))].join("\n\n");
   writeFileSync(join(out, "comparison.txt"), `${text}\n`);

@@ -4,8 +4,12 @@
 // tool and parser; one attempt), with the forms its seat knew, and the answer is compared with the label by meaning,
 // as the two readers who settled the label were compared with each other (translator/train/data.ts, `sameProgram`).
 //
-// Reported as the other groups are: right, no draft, wrong draft; and by pilot, seat model, profile, origin and
-// function, each where the file's lines say it.
+// Each case is asked and compared in the money of its own world: a line carries its world's currency (the pipeline's
+// examples do), amounts in the request and in the answer are read as that world writes them, and a count by currency is
+// in the report. A line that names none is read in the test town's and counted (`currency_not_given`).
+//
+// Reported as the other groups are: right, no draft, wrong draft; and by pilot, seat model, profile, currency, origin
+// and function, each where the file's lines say it.
 //
 // These are not the held-out cases (held-out.ts): a pipeline's test sets are made from pilots' logs on this machine and
 // kept in the pipeline's own folder, so their results are reported whole.
@@ -27,6 +31,7 @@ export interface SetCase {
   forms?: string[];
   /** The label: the program two blind readers agreed on. */
   program: string;
+  /** The money of the world the request was made in, as that world's config has it. */
   currency?: Currency;
   /** The situation it was asked or written in (`<pilot>/<run>/<seat>/d<day>/<turn>`). */
   source?: string;
@@ -44,10 +49,13 @@ export function loadSet(file: string): SetCase[] {
 
 const formsOf = (c: Pick<SetCase, "forms">): FormSpec[] => (c.forms ?? []).map(formOfLine).filter((f): f is FormSpec => !!f);
 
+/** The money a case is read in: its own world's, or (a line that names none) the test town's. */
+const currencyOf = (c: Pick<SetCase, "currency">): Currency => c.currency ?? (PROFILE.values.currency as Currency);
+
 /** What the translator and the resolver are given for a case: the forms its seat knew (each a record that is shown
  * exactly as its line in the file), the money of its world, and nothing else of that world. */
 export function setKnowledge(c: Pick<SetCase, "forms" | "currency">): Knowledge {
-  const k = new Knowledge(c.currency ?? (PROFILE.values.currency as Currency));
+  const k = new Knowledge(currencyOf(c));
   const records = formsOf(c).map((f) => ({ id: f.id ?? f.form, record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: f.to, kind: "form", text: `${f.form.replace(/_/g, " ")}.`, data: { form: f.form, submit_as: f.form, submit_to: [f.to], fields: f.fields } }));
   if (records.length) k.absorb({ participant: "seat", t: 0, status: "active", entity: "", outcomes: [], inbox: [], drafts: [], channels: { papers: { kind: "records", records } } } as any);
   return k;
@@ -83,7 +91,7 @@ const parsed = (program: string): calls.Program | undefined => {
  * answers with that refusal's own words (the same thing for whoever asked). */
 export function passesSet(c: SetCase, got: string): boolean {
   const forms = formsOf(c);
-  if (sameProgram(got, c.program, { ...(c.currency ? { currency: c.currency } : {}), ...(forms.length ? { forms } : {}) })) return true;
+  if (sameProgram(got, c.program, { currency: currencyOf(c), ...(forms.length ? { forms } : {}) })) return true;
   const want = parsed(c.program), g = parsed(got);
   return !!want && "none" in want && !!g && !("none" in g) && refusalOf(got, c) === want.none;
 }
@@ -97,11 +105,14 @@ export interface SetReport {
   file?: string;
   results: SetResult[];
   all: Tally;
-  /** The same counts by what the lines say of themselves: `pilot`, `seat_model`, `profile`, `origin`, `function`; a
+  /** The same counts by what the lines say of themselves: `pilot`, `seat_model`, `profile`, `currency` (its code),
+   * `origin`, `function`; a
    * dimension no line speaks of is absent, and lines that don't say are counted under "(not given)". */
   by: { [dimension: string]: { [value: string]: Tally } };
   /** Cases whose forms could not be shown to the translator as the file has them (run all the same). */
   forms_not_as_written: number;
+  /** Cases whose line names no currency: read in the test town's. */
+  currency_not_given: number;
   cost_microusd: number;
 }
 
@@ -114,6 +125,7 @@ export function dimensionsOf(c: SetCase): { [dimension: string]: string | undefi
     pilot: c.pilot ?? (where.includes("/") ? where.split("/")[0] : undefined),
     seat_model: c.seat_model ?? (c.written_by?.endsWith(" (seat)") ? c.written_by.slice(0, -7) : undefined),
     profile: c.profile,
+    currency: c.currency?.code,
     origin: c.origin === undefined ? undefined : c.origin === "pilot" ? "the seat's own" : "written in its situation",
     function: !p ? undefined : "none" in p ? `none(${p.none})` : [...new Set(p.lines.map((l) => l.call.fn))].join("+"),
   };
@@ -158,7 +170,7 @@ export async function evaluateSet(adapter: LlmAdapter, cases: SetCase[], o: { na
   await Promise.all(Array.from({ length: Math.max(1, Math.min(o.jobs ?? 1, 8)) }, worker));
   const by: SetReport["by"] = {};
   const dims = cases.map(dimensionsOf);
-  for (const d of ["pilot", "seat_model", "profile", "origin", "function"]) {
+  for (const d of ["pilot", "seat_model", "profile", "currency", "origin", "function"]) {
     if (!dims.some((x) => x[d] !== undefined)) continue;
     const groups = new Map<string, SetResult[]>();
     results.forEach((r, i) => { if (r) { const v = dims[i]![d] ?? "(not given)"; (groups.get(v) ?? groups.set(v, []).get(v)!).push(r); } });
@@ -167,7 +179,7 @@ export async function evaluateSet(adapter: LlmAdapter, cases: SetCase[], o: { na
   const ran = results.filter(Boolean);
   return {
     model: `${adapter.provider}/${adapter.model}`, name: o.name ?? o.file ?? "a test set", ...(o.file ? { file: o.file } : {}),
-    results: ran, all: tally(ran), by, forms_not_as_written: cases.filter((c) => !shownAsWritten(c)).length, cost_microusd: cost,
+    results: ran, all: tally(ran), by, forms_not_as_written: cases.filter((c) => !shownAsWritten(c)).length, currency_not_given: cases.filter((c) => !c.currency).length, cost_microusd: cost,
   };
 }
 
@@ -178,6 +190,7 @@ export const tallyText = (t: Tally) => `${t.passed}/${t.of} right, ${t.no_draft}
 export function setReportText(r: SetReport, o: { failures?: boolean } = {}): string {
   const out = [`Test set "${r.name}" on ${r.model}: ${tallyText(r.all)}. Cost $${(r.cost_microusd / 1e6).toFixed(4)}.`];
   if (r.forms_not_as_written) out.push(`  ! ${r.forms_not_as_written} of them could not be shown their forms as the file has them.`);
+  if (r.currency_not_given) out.push(`  ! ${r.currency_not_given} of them name no currency and were read in the test town's.`);
   for (const [d, groups] of Object.entries(r.by)) out.push(`  by ${d.replace("_", " ")}: ${Object.entries(groups).map(([v, t]) => `${v} ${t.passed}/${t.of} (${t.no_draft} no draft, ${t.wrong_draft} wrong)`).join("; ")}`);
   if (o.failures !== false) for (const x of r.results.filter((x) => !x.pass))
     out.push(`- [${x.outcome}] ${x.id}: got ${x.got !== undefined ? short(x.got) : x.error ? `(error: ${x.error})` : `(no program: ${x.raw})`}; expected ${short(x.expect, 200)}`);

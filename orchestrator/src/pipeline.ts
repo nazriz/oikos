@@ -387,8 +387,8 @@ export interface Manifest {
   agreement: { [lane: string]: { [fn: string]: { requests: number; agreed: number; disagreed: number; other: number } } };
   tests: { [name: string]: { file: string; examples: number; by_function: { [fn: string]: number } } };
   /** Each trained run on each test set made here: right, no draft, wrong draft; and the same by pilot, seat model,
-   * profile, origin and function (translator/eval/set-run.ts). The answers themselves are in the run's `eval-sets.json`. */
-  test_scores?: { [run: string]: { [test: string]: Pick<SetReport, "all" | "by" | "forms_not_as_written"> } };
+   * profile, currency (each case read in its own world's), origin and function (translator/eval/set-run.ts). The answers themselves are in the run's `eval-sets.json`. */
+  test_scores?: { [run: string]: { [test: string]: Pick<SetReport, "all" | "by" | "forms_not_as_written" | "currency_not_given"> } };
   data?: { joined: string; data: string; counts: any };
   runs: { [name: string]: any };
 }
@@ -837,7 +837,7 @@ export async function runPipeline(cfg: PipelineConfig, hooks: Hooks = {}): Promi
         }
         putJson(file, scored);
       }
-      (m.test_scores ??= {})[r.name] = Object.fromEntries(Object.entries(scored.sets).map(([name, s]) => [name, { all: s.all, by: s.by, forms_not_as_written: s.forms_not_as_written }]));
+      (m.test_scores ??= {})[r.name] = Object.fromEntries(Object.entries(scored.sets).map(([name, s]) => [name, { all: s.all, by: s.by, forms_not_as_written: s.forms_not_as_written, currency_not_given: s.currency_not_given }]));
       for (const [name, s] of Object.entries(scored.sets)) say(`${r.name} on "${name}": ${s.all.passed}/${s.all.of} right, ${s.all.no_draft} no draft, ${s.all.wrong_draft} wrong drafts`);
       save();
     }
@@ -879,7 +879,7 @@ export function plainReport(m: Manifest): string {
   for (const [n, r] of Object.entries(m.runs)) L.push(`  run ${n}: ${r.validation ? `validation ${r.validation[0]}/${r.validation[1]}` : "no report yet"}${r.real_requests ? `; ${r.real_requests.replace(/ on decide[^:]*:/, ":").replace(/Cost.*/, "").trim()}` : ""}`);
   for (const [run, by] of Object.entries(m.test_scores ?? {})) for (const [name, s] of Object.entries(by)) {
     L.push(`  run ${run} on "${name}": ${s.all.passed}/${s.all.of} right, ${s.all.no_draft} no draft, ${s.all.wrong_draft} wrong drafts`);
-    for (const d of ["pilot", "seat_model", "profile"]) if (s.by[d] && Object.keys(s.by[d]!).length > 1) L.push(`    by ${d.replace("_", " ")}: ${Object.entries(s.by[d]!).map(([v, t]) => `${v} ${t.passed}/${t.of}`).join(", ")}`);
+    for (const d of ["pilot", "seat_model", "profile", "currency"]) if (s.by[d] && Object.keys(s.by[d]!).length > 1) L.push(`    by ${d.replace("_", " ")}: ${Object.entries(s.by[d]!).map(([v, t]) => `${v} ${t.passed}/${t.of}`).join(", ")}`);
   }
   L.push(`Cost: ${usd(m.usage.total)} in ${m.usage.total.calls} calls (${m.usage.total.input_tokens} input tokens, ${m.usage.total.output_tokens} output)${Object.keys(m.usage.by_model).length > 1 ? `; ${Object.entries(m.usage.by_model).map(([k, u]) => `${k} ${usd(u)}`).join(", ")}` : ""}`);
   return L.join("\n");

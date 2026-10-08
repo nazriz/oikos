@@ -57,9 +57,11 @@ there and whole is skipped.
     decide/NAME --real`; the held-out test is read by the eval itself, on this machine, and never leaves it). With
     `"train": false` the pipeline stops after the export. See "The pod" below.
 11. **Score on the test sets made here**: each run on each file of step 7 (`translator-eval --model decide/NAME --only-sets
-    --set FILE` does the same by hand, for a trained model or any other): right, no draft, wrong draft, in all and by pilot,
-    seat model, profile, origin and function. The counts go in the manifest (`test_scores`), every answer in the run's
-    `eval-sets.json`.
+    --set FILE` does the same by hand, for a trained model or any other: `--model codex/…`, `claude-code/…`): right, no
+    draft, wrong draft, in all and by pilot, seat model, profile, currency, origin and function. Each case is asked and
+    compared in the money of its own world (its line carries that world's currency, and amounts are read as that world
+    writes them; a line that names none is read in the test town's and counted). The counts go in the manifest
+    (`test_scores`), every answer in the run's `eval-sets.json`.
 
 Writers and readers hand their file in as one object of a given shape (`answers`, a list with an object for each line, every
 field a plain string): a model called through Claude Code or the Codex CLI is asked for exactly that shape as its answer
@@ -87,6 +89,11 @@ adapter cuts those at 4,000 characters). A program whose every quotation mark ca
   torch build is the cu128 one (recent cards); a card under 20 GB takes its steps in parts of 4,096 tokens
   (`--token-budget 4096`: the same loss, in more parts). Dearer than `OIKOS_POD_MAX_PER_HOUR` (1) is not taken.
 - **Scoring is after the pod is ended**, on this machine. Runs that are home and not scored are scored with no pod rented.
+- **Scores are only comparable under the same scoring code.** The script's first whole run (2026-10-08, one seed of the
+  small reader on data-13) scored 141 of 180 real requests where the same setup by hand had scored 147 the day before;
+  the hand-run model scored again that day gave 141 too. The six were the scoring's: two keys that had since been given
+  several bases, and four right answers under the cut-off on sureness that had since become the default. Before reading
+  a difference between runs, score the older one again (`translator-eval --model decide/NAME --real --out <another file>`).
 - Exit codes: 0 all home and scored; 1 a run failed there, the queue stopped, or a run was not scored; 3 the pod stopped
   answering; 4 the time limit; 5 a pod could not be confirmed ended.
 
@@ -130,7 +137,7 @@ Two different models, of different families: the point of reading twice, blind, 
 make the same mistake for the same reason. **The default pair is Sonnet 5.5 (through Claude Code) and gpt-6.1-sol (through
 the Codex CLI).** Measured 2026-10-08 on 40 requests of pilot 11, 34 of them with a label two earlier readers had settled
 (`runs/reader-comparison-2026-10-08/`, made with `bun orchestrator/src/reader-compare.ts <config.json>`, which measures any
-candidates the same way):
+candidates the same way; the translator's prompt was 0.7.6, a line about amounts short of today's):
 
 | Reader | Read whole | With the settled labels | Seconds a request | Cost a request, as reported |
 |---|---|---|---|---|
@@ -165,7 +172,7 @@ The manifest has: the sources (test-only or not, and why; their logs; the seat m
 pilot's `commit.txt`), the translator prompt's version, the models, the counts at every step, agreement by function (of the
 requests both readers answered, how many became examples), what was dropped and why (`by_reason` of the label step; the join's
 counts), the test sets made, the data folder, the model runs with their scores on the fixed tests (`runs`) and on the test sets
-made here (`test_scores`: by run and set, in all and by pilot, seat model, profile, origin and function), and usage and
+made here (`test_scores`: by run and set, in all and by pilot, seat model, profile, currency, origin and function), and usage and
 cost in total and by model.
 The command prints a short plain report from it.
 

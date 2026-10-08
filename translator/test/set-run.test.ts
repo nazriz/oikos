@@ -65,3 +65,21 @@ test("a model is scored on the file: right, no draft, wrong draft, in all and by
   const plain = await evaluateSet(model, cases.slice(2), { prices: { "mock/m": { input: 0, output: 0, cache_read: 0, cache_write: 0 } } });
   expect(plain.by.profile).toBeUndefined();
 });
+
+test("a case is read in its own world's money: an amount as that world writes it is the label's, another world's sign is not, and the report counts by currency", async () => {
+  // (An invented currency with no smaller unit, and a line that names none.)
+  const cur = { code: "ZOL", symbol: "Ƶ", unit_words: ["zol", "zols"], minor_units: 0, minor_words: [] };
+  const zol: SetCase = { id: "pilot-z/town.seed1/draft.clerk-system.1", request: "Pay acc-b 1500 zols from acc-town.", program: 'money(amount="1500 zols", from=acc-town, to=acc-b)', currency: cur };
+  expect(passesSet(zol, 'money(amount="Ƶ1500", from=acc-town, to=acc-b)')).toBe(true);
+  expect(passesSet(zol, 'money(amount="1,500", from=acc-town, to=acc-b)')).toBe(true);
+  expect(passesSet(zol, 'money(amount="150 zols", from=acc-town, to=acc-b)')).toBe(false);
+  expect(passesSet(zol, 'money(amount="$1500", from=acc-town, to=acc-b)')).toBe(false);
+  expect(dimensionsOf(zol).currency).toBe("ZOL");
+  expect(setKnowledge(zol).currency).toEqual(cur);
+  const model = new MockAdapter("m", { translator: () => [{ type: "tool_use", id: "c", name: "call", input: { program: 'money(amount="Ƶ1500", from=acc-town, to=acc-b)' } }] });
+  const r = await evaluateSet(model, [zol, { ...zol, id: "pilot-z/town.seed1/draft.clerk-system.2", currency: undefined }], { prices: { "mock/m": { input: 0, output: 0, cache_read: 0, cache_write: 0 } } });
+  expect(r.results.map((x) => x.pass)).toEqual([true, false]);
+  expect(r.by.currency).toEqual({ "(not given)": { passed: 0, of: 1, no_draft: 0, wrong_draft: 1 }, ZOL: { passed: 1, of: 1, no_draft: 0, wrong_draft: 0 } });
+  expect(r.currency_not_given).toBe(1);
+  expect(setReportText(r)).toContain("1 of them name no currency");
+});

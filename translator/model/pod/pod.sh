@@ -194,14 +194,14 @@ pull() {
   done
 }
 
-# A run that is home, scored here (the tests never leave this machine). The scoring's own process does not end by itself
-# (the model's process stays up for further questions): it is ended once the last line of the report is out, or after 40 minutes.
+# A run that is home, scored here (the tests never leave this machine). The scoring ends by itself (it lets the model's
+# process go when it has its answers); one that has not ended after 40 minutes is ended, by its own process id.
 score() {
   local n=$1 E t=0
   (cd $W && OIKOS_TRANSLATOR_MODELS=$M exec bun orchestrator/src/cli.ts translator-eval --model decide/$n --real --jobs 1 --out $M/$n/eval.json > $M/$n/eval.log 2>&1) &
   E=$!
-  until grep -q "^Real requests" $M/$n/eval.log 2>/dev/null; do sleep 15; t=$((t+15)); kill -0 $E 2>/dev/null || break; [ $t -gt 2400 ] && break; done
-  sleep 5; kill $E 2>/dev/null; pkill -f "predict.py $M/$n" 2>/dev/null
+  while kill -0 $E 2>/dev/null; do sleep 5; t=$((t+5)); [ $t -gt 2400 ] && { say "$n: the scoring did not end in 40 minutes: ending it"; kill $E 2>/dev/null; break; }; done
+  wait $E 2>/dev/null
   [ -f $M/$n/eval.json ] || { say "$n: not scored (see $M/$n/eval.log)"; return 1; }
   say "$n: $(grep -hE '^(Translator test|Real requests)' $M/$n/eval.log | sed -E 's/ on decide[^:]*//; s/Cost.*//' | tr '\n' ' ')"
 }
