@@ -19,24 +19,86 @@ export function when(t: number): string {
   return `year ${Math.floor(t / YEAR) + 1}, day ${Math.floor((t % YEAR) / DAY) + 1}`;
 }
 
+/** A length of time as people say one: whole years, else whole days, else hours and minutes; seconds only where it
+ * comes to nothing rounder. */
 export function duration(s: number): string {
-  if (s % YEAR === 0) return `${s / YEAR} year${s === YEAR ? "" : "s"}`;
-  if (s % DAY === 0) return `${s / DAY} day${s === DAY ? "" : "s"}`;
-  return `${s} seconds`;
+  const n = (x: number, word: string) => `${num(x)} ${word}${x === 1 ? "" : "s"}`;
+  if (s !== 0 && s % YEAR === 0) return n(s / YEAR, "year");
+  if (s !== 0 && s % DAY === 0) return n(s / DAY, "day");
+  if (s !== 0 && s % 3_600 === 0) return n(s / 3_600, "hour");
+  if (s !== 0 && s % 60 === 0) return s > 3_600 ? `${n(Math.floor(s / 3_600), "hour")} ${n((s % 3_600) / 60, "minute")}` : n(s / 60, "minute");
+  return n(s, "second");
+}
+
+// How a paper's details are read: its figures as a person reads them, not as a record holds them. A record holds
+// money in its currency's smallest unit, lengths of time in seconds, moments in seconds since the start and rates in
+// hundredths of a per cent; a detail is known for one of those by the name the world's papers give it (the lists
+// below: names, never a place's figures), by the unit written beside it ({unit, value}), or, on a form, by what the
+// form says the field is. Anything else stands as it is.
+const MONEY_DETAILS = new Set(["amount", "unit_price", "price", "refund", "wage", "rent", "land", "levy_from", "balance", "cost", "fee", "deposit", "bond", "principal", "payment", "carrying"]);
+const MONEY_LISTS = new Set(["prices", "demolition", "goods", "lines", "amounts"]);
+const TIME_SPANS = new Set(["every", "period", "notice", "term"]);
+const MOMENTS = new Set(["at", "until", "first", "closes", "opens", "due"]);
+const whole = (v: unknown): v is number | string => (typeof v === "number" && Number.isSafeInteger(v)) || (typeof v === "string" && /^-?(0|[1-9][0-9]{0,37})$/.test(v));
+const percent = (v: number, per: number) => `${String(Number(((v * 100) / per).toFixed(6)))}%`;
+/** A moment as a date, with the time of day where it is not the day's start (so that two moments never read alike). */
+function moment(t: number): string {
+  const s = ((t % DAY) + DAY) % DAY;
+  const two = (x: number) => String(x).padStart(2, "0");
+  const day = t < 0 ? `${duration(Math.ceil(-t / DAY) * DAY)} before the start` : when(t);
+  return s === 0 ? day : `${day}, ${two(Math.floor(s / 3_600))}:${two(Math.floor((s % 3_600) / 60))}${s % 60 ? `:${two(s % 60)}` : ""}`;
+}
+/** What a form says each of its fields is (`amount`, `duration`, `date`...), for a paper filled in on it. */
+export type FieldKinds = { [field: string]: { type?: string } | undefined };
+
+/** A paper's details with each figure as a person reads it (see above). The shape is kept; a rate's name loses the
+ * unit it carried ("rate_bps": 1600 reads "rate": "16%"). `fields`: the form the details were filled in on. */
+export function readable(x: unknown, how: { fields?: FieldKinds; money?: (a: string | number) => string } = {}, under?: string): unknown {
+  const fields = how.fields;
+  const sum = how.money ?? money;
+  const deeper = { ...(how.money ? { money: how.money } : {}) };
+  if (Array.isArray(x)) return x.map((v) => readable(v, deeper, under));
+  if (x === null || typeof x !== "object") return x;
+  const o = x as { [k: string]: unknown };
+  // A figure with its unit beside it.
+  if (whole(o.value) && typeof o.unit === "string" && Object.keys(o).every((k) => ["unit", "value", "label", "description", "type"].includes(k))) {
+    const v = Number(o.value);
+    const said = o.unit === "seconds" ? duration(v) : o.unit === "bps" ? percent(v, 10_000) : o.unit === "ppm" ? percent(v, 1_000_000) : `${num(v)} ${o.unit}`;
+    return Object.keys(o).length === 2 ? said : { ...Object.fromEntries(Object.entries(o).filter(([k]) => k !== "unit" && k !== "value")), value: said };
+  }
+  const out: { [k: string]: unknown } = {};
+  for (const [k, v] of Object.entries(o)) {
+    const type = fields?.[k]?.type;
+    if (!whole(v) || typeof v === "boolean") {
+      // (A list of prices, a budget's lines: every one of them a sum. Not anything else that happens to have the name.)
+      const sums = MONEY_LISTS.has(k) && v !== null && typeof v === "object" && !Array.isArray(v) && Object.values(v).length > 0 && Object.values(v).every(whole);
+      out[k] = sums ? Object.fromEntries(Object.entries(v as object).map(([n, a]) => [n, sum(a as string)])) : readable(v, deeper, k);
+      continue;
+    }
+    if (type) out[k] = type === "amount" ? sum(v) : type === "duration" ? duration(Number(v)) : type === "date" ? moment(Number(v)) : v;
+    else if (k.endsWith("_bps")) out[k.slice(0, -4)] = percent(Number(v), 10_000);
+    else if (k.endsWith("_ppm")) out[k.slice(0, -4)] = percent(Number(v), 1_000_000);
+    else if (MONEY_DETAILS.has(k) || (k === "from" && under === "brackets")) out[k] = sum(v);
+    else if (TIME_SPANS.has(k) || k.endsWith("_seconds")) out[k.endsWith("_seconds") ? k.slice(0, -8) : k] = duration(Number(v));
+    else if (MOMENTS.has(k) || k.endsWith("_at")) out[k] = moment(Number(v));
+    else out[k] = v;
+  }
+  return out;
 }
 
 /** Long text is cut short, with a mark, except in what the participant looked up (`whole`); `cuts` counts what a
  * report cut, so that it can say so. (Rendering is synchronous: both are set and read within one report.) */
-let whole = false;
+let inFull = false;
 let cuts = 0;
-const clip = (s: string, max = 400) => (whole || s.length <= max ? s : (cuts++, s.slice(0, max) + "…"));
+const clip = (s: string, max = 400) => (inFull || s.length <= max ? s : (cuts++, s.slice(0, max) + "…"));
 const words = (label: string) => label.replace(/_/g, " ");
 const cap = (x: string) => words(x).replace(/^./, (c) => c.toUpperCase());
 const num = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 /** A name as someone might write it, for matching: case, underscores and hyphens don't matter. */
 const plain = (s: string) => s.toLowerCase().replace(/[_-]+/g, " ").trim();
-const details = (x: unknown, max = 400) => {
-  if (x === null || x === undefined || typeof x !== "object") return "";
+const details = (raw: unknown, max = 400) => {
+  if (raw === null || raw === undefined || typeof raw !== "object") return "";
+  const x = readable(raw);
   const entries = Object.entries(x as object);
   const flat = entries.every(([, v]) => v === null || ["string", "number", "boolean"].includes(typeof v));
   return clip(flat ? entries.map(([k, v]) => `${words(k)}: ${v}`).join("; ") : JSON.stringify(x), max);
@@ -400,7 +462,8 @@ function listLines(records: Record[], limit: number, readings?: { [id: string]: 
 const alike = (a: Record, b: Record) => a.record === "claim" && b.record === "claim" && a.at === b.at && a.holder === b.holder && a.position === b.position && a.counterparty === b.counterparty && a.about?.kind === b.about?.kind && a.speaks_for === b.speaks_for;
 
 /** One entry of a list in a paper (a lot of a register, an area of a map), in a line: each thing it says by name. */
-function entryWords(e: unknown): string {
+function entryWords(raw: unknown): string {
+  const e = readable(raw);
   if (e === null || typeof e !== "object" || Array.isArray(e)) return clipTo(typeof e === "object" ? JSON.stringify(e) : String(e), 600);
   const value = (v: unknown): string => (Array.isArray(v) && v.every((x) => x === null || typeof x !== "object") ? v.join(", ") : v !== null && typeof v === "object" ? JSON.stringify(v) : String(v));
   return clipTo(Object.entries(e).map(([k, v]) => `${words(k)}: ${value(v)}`).join("; "), 600);
@@ -411,12 +474,12 @@ const clipTo = (x: string, max: number) => (x.length > max ? `${x.slice(0, max)}
  * details the entries asked for (from `fromEntry` on, or those that include `words`), as many as fit, with how many
  * there are and how to ask for more. Never whole. */
 function paperInFull(r: Record, asked: Looked, readings?: { [id: string]: Reading }): string[] {
-  whole = true;
+  inFull = true;
   let all: string;
   try {
     all = describe(r, readings);
   } finally {
-    whole = false;
+    inFull = false;
   }
   const narrowed = asked.words !== undefined || (asked.fromEntry ?? 1) > 1;
   const lists: [string, unknown[]][] = r.record === "statement" && r.data !== null && typeof r.data === "object" ? Object.entries(r.data as object).filter((e): e is [string, unknown[]] => Array.isArray(e[1]) && e[1].length > 1) : [];
@@ -581,7 +644,7 @@ export const NOTHING_NEW = "Nothing new there since you last looked.";
 
 /** What's new since the participant last looked. */
 export function renderObservation(obs: Observation, o: RenderOptions = {}): string {
-  whole = false;
+  inFull = false;
   const max = o.maxRecords ?? 40;
   const postTitle = new Map((obs.positions ?? []).map((p) => [p.position, p.title ?? words(p.role ?? p.position)]));
   // A post's reports are named after the post (`mayor/budget` reads "Mayor: Budget").

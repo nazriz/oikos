@@ -9,11 +9,11 @@
 // field of every kind of act and expects the preview to change.
 
 import { citedWords, formatMoney, type Block } from "@oikos/participants";
-import { ruleWords } from "@oikos/participants/llm";
+import { duration, readable, ruleWords, type FieldKinds } from "@oikos/participants/llm";
 import type { Knowledge } from "./knowledge";
 
-const DAY = 86_400;
-const span = (s: number) => (s % (365 * DAY) === 0 ? `${s / (365 * DAY)} year${s === 365 * DAY ? "" : "s"}` : s % DAY === 0 ? `${s / DAY} day${s === DAY ? "" : "s"}` : `${s} seconds`);
+/** A length of time as people say one (years, days, hours and minutes: never a count of seconds where it is rounder). */
+const span = duration;
 
 export class Preview {
   /** `me`: the entity it acts for (its person, or the organisation of the position it acts in). */
@@ -30,13 +30,38 @@ export class Preview {
     const e = this.k.entityOf(id);
     return e === this.me || e === this.k.entity ? "you" : this.k.name(id);
   }
+  /**
+   * Whoever something is addressed or sent to, as the seat knows them. Never "you" for the organisation it acts for or
+   * for a post of it: a proposal put to the town, or a letter to its clerk, is not addressed to whoever writes it (the
+   * live check of 2026-10-09: "addressed to you", "You will write to you", and a correct draft declined for it). A
+   * post is named by its title; the organisation acted for by its name, said to be the one acted for.
+   */
+  private whom(id: string | undefined): string {
+    if (!id) return "someone";
+    if (id.startsWith("$")) return `the new ${id.slice(1)}`;
+    if (this.k.positions.has(id)) {
+      const title = this.k.positionWords.get(id)?.title;
+      return title ? `the ${title.charAt(0).toLowerCase()}${title.slice(1)} (${id})` : id;
+    }
+    const e = this.k.entityOf(id);
+    if (e !== this.me) return e === this.k.entity ? "you" : this.k.name(id);
+    // Itself, or the organisation it acts for (which a post of its own is a post of).
+    return [...this.k.positions.values()].includes(e) ? `${this.k.name(id)}, which you act for` : "you";
+  }
+  /** A paper's details as a person reads them: on a form, each field as the form says it is (an amount, a length of time, a date). */
+  private read(data: unknown, form?: string): unknown {
+    const fields = form === undefined ? undefined : (this.k.forms.find((f) => f.id === form)?.data?.fields as FieldKinds | undefined);
+    return readable(data, { money: (a) => this.sum(a), ...(fields ? { fields } : {}) });
+  }
   private acct(id: string): string {
     const holder = this.k.accounts.get(id)?.holder;
     if (holder === this.me) return `your account (${id})`;
     return id;
   }
-  private details(data: unknown): string {
-    if (data === null || typeof data !== "object") return "";
+  private details(raw: unknown, form?: string): string {
+    if (raw === null || typeof raw !== "object") return "";
+    const data = this.read(raw, form);
+    if (data === null || typeof data !== "object") return String(data);
     const entries = Object.entries(data as object);
     const flat = entries.every(([, v]) => v === null || ["string", "number", "boolean"].includes(typeof v));
     return flat ? entries.map(([k, v]) => `${k.replace(/_/g, " ")}: ${v}`).join("; ") : JSON.stringify(data);
@@ -44,7 +69,8 @@ export class Preview {
   /** Whatever of `o` the sentence before didn't say (every key but `said`), by name. */
   private also(o: any, said: string[], lead = " Also: "): string {
     const val = (v: unknown): string => (v === null || typeof v !== "object" ? String(v) : Array.isArray(v) && v.every((x) => x === null || typeof x !== "object") ? v.join(", ") : JSON.stringify(v));
-    const more = Object.entries(o ?? {}).filter(([k, v]) => !said.includes(k) && v !== undefined).map(([k, v]) => `${k.replace(/_/g, " ")}: ${val(v)}`);
+    const left = Object.fromEntries(Object.entries(o ?? {}).filter(([k, v]) => !said.includes(k) && v !== undefined));
+    const more = Object.entries(this.read(left) as object).map(([k, v]) => `${k.replace(/_/g, " ")}: ${val(v)}`);
     return more.length ? `${lead}${more.join("; ")}.` : "";
   }
   private seenBy(v: unknown): string {
@@ -83,10 +109,10 @@ export class Preview {
     const RECORD = ["speaks_for", "visible_to", "basis"]; // said by `named`, `seenBy` and `citing`, on the acts that make a record
     switch (b.block) {
       case "publish": {
-        const to = b.addressed_to?.length ? `, addressed to ${b.addressed_to.map((x: string) => this.who(x)).join(", ")}` : "";
+        const to = b.addressed_to?.length ? `, addressed to ${b.addressed_to.map((x: string) => this.whom(x)).join(", ")}` : "";
         if (b.kind === "request" && b.data?.outcome) {
           const rest = this.also(b.data, ["outcome", "every"], ", with these details: ").replace(/\.$/, "");
-          return [`You will ask ${this.who(b.addressed_to?.[0])} to ${this.outcome(b.data.outcome, b.data.every)}${named(b)}${b.addressed_to?.length > 1 ? to : ""}${this.seenBy(b.visible_to)}${rest}${citing(b)}. Your request will read: "${b.text}".${this.rule(b)}`,
+          return [`You will ask ${this.whom(b.addressed_to?.[0])} to ${this.outcome(b.data.outcome, b.data.every)}${named(b)}${b.addressed_to?.length > 1 ? to : ""}${this.seenBy(b.visible_to)}${rest}${citing(b)}. Your request will read: "${b.text}".${this.rule(b)}`,
             ["kind", "text", "data", "addressed_to", "adico", "formal", ...RECORD]];
         }
         // A hold: an instruction to whoever acts on something standing. What it does is theirs to do, and it settles nothing.
@@ -96,7 +122,7 @@ export class Preview {
             const rest = this.also(b.data, ["holds"], " With these details: ");
             // (On its own file, where what is held is the organisation's own to act on: its own staff read it.)
             const ownFile = b.addressed_to.every((x: string) => this.k.entityOf(x) === this.me);
-            return [`You will ${ownFile ? "tell your own staff, on your own file," : `instruct ${b.addressed_to.map((x: string) => this.who(x)).join(", ")}`} to hold ${held.join(", ")}${named(b)}${this.seenBy(b.visible_to)}${citing(b)}. ${many ? "They stay" : "It stays"} on record. This by itself stops nothing and settles nothing: whoever you instruct acts on it, or doesn't, and whatever ${many ? "they were" : "it was"} for is still owed. To resume ${many ? "them" : "it"}, withdraw this instruction. Your instruction will read: "${b.text}".${rest}${this.rule(b)}`,
+            return [`You will ${ownFile ? "tell your own staff, on your own file," : `instruct ${b.addressed_to.map((x: string) => this.whom(x)).join(", ")}`} to hold ${held.join(", ")}${named(b)}${this.seenBy(b.visible_to)}${citing(b)}. ${many ? "They stay" : "It stays"} on record. This by itself stops nothing and settles nothing: whoever you instruct acts on it, or doesn't, and whatever ${many ? "they were" : "it was"} for is still owed. To resume ${many ? "them" : "it"}, withdraw this instruction. Your instruction will read: "${b.text}".${rest}${this.rule(b)}`,
               ["kind", "text", "data", "addressed_to", "adico", "formal", ...RECORD]];
         }
         // A direction on an office's own form: what is filed, with whom, and that following it is the office's to do.
@@ -113,7 +139,7 @@ export class Preview {
           return [`You will put a standing work order on ${this.k.entityOf(b.speaks_for ?? this.me) === this.me ? "your own file" : `the file of ${this.who(b.speaks_for)}`}${others.length ? `, shown to ${others.map((x: string) => this.who(x)).join(", ")}` : ""}: "${b.text}". Nothing is done now: the staff whose work it is follow it each time it falls due, in their own working hours, while it stands. To change it, withdraw it and make another; to pause it, put it on hold.${citing(b, " It cites ")}${this.rule(b)}`,
             ["kind", "text", "data", "addressed_to", "adico", "formal", ...RECORD]];
         }
-        const d = this.details(b.data);
+        const d = this.details(b.data, typeof b.basis === "string" ? b.basis : undefined);
         // On its own file: seen by nobody but whoever it is made for, and addressed to nobody.
         const own = Array.isArray(b.visible_to) && b.visible_to.length === 1 && b.visible_to[0] === (b.speaks_for ?? this.me) && !b.addressed_to?.length && !b.place;
         if (own) {
@@ -190,7 +216,7 @@ export class Preview {
       case "vote":
         return [`You will vote "${b.choice}" on ${b.ballot}${named(b)}${this.seenBy(b.visible_to)}.`, ["choice", "ballot", "speaks_for", "visible_to"]];
       case "message":
-        return [`You will write to ${b.to.map((x: string) => this.who(x)).join(", ")}${b.re ? `, about ${b.re}` : ""}: "${b.text}".`, ["to", "re", "text"]];
+        return [`You will write to ${b.to.map((x: string) => this.whom(x)).join(", ")}${b.re ? `, about ${b.re}` : ""}: "${b.text}".`, ["to", "re", "text"]];
       default:
         return [`You will do this (${b.block}).`, []];
     }

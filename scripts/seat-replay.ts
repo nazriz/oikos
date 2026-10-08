@@ -33,9 +33,15 @@ const prompts: { seat: string; size: number; text: string; fresh: boolean }[] = 
 const sittings: { [seat: string]: number } = {};
 const previews: string[] = [];
 let written = 0;
-const requests = [
-  "File a council proposal with the council clerk: a budget for year 1, with parks 60,000, staff 270,000, roads 0, services 0 and environment 0. The proposal: the town's budget for year 1.",
-  "Write to the council clerk: please put the budget proposal on the next ballot.",
+// What the mayor asks for, and the call a translator would write for each (the mock translator answers with it: no
+// model reads the request).
+const requests: [string, string][] = [
+  ["File a council proposal: a budget for year 1, with parks 60,000, staff 270,000, roads 0, services 0 and environment 0. The proposal: the town's budget for year 1.",
+    'form(form=council_proposal, to=city, kind=budget, affects=neither, proposal="The town\'s budget for year 1.", parks="60000", staff="270000", roads="0", services="0", environment="0")'],
+  ["Write to the council clerk: please put the budget proposal on the next ballot.", 'message(to=council-clerk, text="Please put the budget proposal on the next ballot.")'],
+  ["File an amendment of the law on ending a tenancy: a landlord's notice of 90 days. It mainly affects tenants.", 'form(form=amend_tenancy, to=city, notice="90 days", affects=tenants)'],
+  ["Advertise one job on the town's crew at 85,000 a year.", 'form(form=job_advertisement, wage="85000", period="1 year", posts="1")'],
+  ["Pay the builder 1,250 from the town's account for the survey.", 'money(amount="1250", from=acc-city, to=builder, for="the survey")'],
 ];
 const adapter = new MockAdapter("mock", {
   participant: (req: LlmRequest) => {
@@ -54,7 +60,7 @@ const adapter = new MockAdapter("mock", {
         return drafts.map((d) => use("confirm", { ref: d.id, decision: "confirm" }));
       }
       if (!fresh) return [use("done_for_now", { days: 1 })];
-      if (s <= requests.length) return [use("do", { what: requests[s - 1]!, as: "mayor" })];
+      if (s <= requests.length) return [use("do", { what: requests[s - 1]![0], as: "mayor" })];
       // Letters: one about something in words, one about a paper by its id, one about nothing.
       written += 3;
       return [use("write", { to: ["bank"], text: `Day ${s}: please confirm the town's account is in order.`, as: "mayor", about: "acc-city payments" }),
@@ -64,6 +70,7 @@ const adapter = new MockAdapter("mock", {
     }
     return [use("done_for_now", { days: 7 })];
   },
+  translator: (req: LlmRequest) => [{ type: "tool_use" as const, id: `x${++n}`, name: "call", input: { program: requests.find(([said]) => said === req.context.proposal)?.[1] ?? "none(unclear)" } }],
   debrief: () => [{ type: "text", text: "Noted." }],
 });
 
@@ -81,7 +88,7 @@ let sent = 0;
 const notes: { [k: string]: number } = {};
 const told: string[] = [];
 for await (const line of logLines(join(out, "replay.seed1.jsonl"))) {
-  if (line.includes('"block":"message"') && line.includes('"kind":"command"') && line.includes('"participant":"mayor')) sent++;
+  if (line.includes('"block":"message"') && line.includes('"kind":"command"') && line.includes('"participant":"mayor') && line.includes('"via":"direct"')) sent++;
   if (!line.includes('"annotation":"note"')) continue;
   const e = JSON.parse(line);
   for (const k of ["not_sent", "rejected_action", "prompt_trimmed", "prompt_too_long", "look_cut", "letter_about_in_words"]) if (e.body?.data?.[k] !== undefined) { notes[k] = (notes[k] ?? 0) + 1; if (k === "not_sent") told.push(JSON.stringify(e.body.data[k])); }
@@ -91,3 +98,6 @@ console.log(`notes in the log: ${JSON.stringify(notes)}`);
 for (const t of told.slice(0, 5)) console.log(`  not sent: ${t}`);
 console.log(`previews (${previews.length}):`);
 for (const p of [...new Set(previews)]) console.log(`  ${p}`);
+const failed: string[] = [];
+for await (const line of logLines(join(out, "replay.seed1.jsonl"))) if (line.includes('"annotation":"translation_failure"')) failed.push(JSON.stringify(JSON.parse(line).body.data).slice(0, 400));
+for (const x of failed) console.log(`  not drafted: ${x}`);
