@@ -115,10 +115,12 @@ const TABLES: { [name: string]: string } = {
     select $run as run_id, seq, t, json_extract_string(body, '$.kind') as kind, (json_extract_string(body, '$.quantity'))::HUGEINT as quantity,
       json_extract_string(body, '$.from') as "from", json_extract_string(body, '$.from_at') as from_at, json_extract_string(body, '$.to') as "to", json_extract_string(body, '$.to_at') as to_at, json_extract_string(body, '$.by') as "by"
     from raw where kind = 'event' and json_extract_string(body, '$.event') = 'goods_moved'`,
-  // Work done (phase B): units of a task at a place, by how many people, taking how many seconds of their time in all.
+  // Work done (phase B): units of a task at a place, by how many people (and who: `who`), taking how many seconds of
+  // their time in all.
   work: `
     select $run as run_id, seq, t, json_extract_string(body, '$.task') as task, (json_extract_string(body, '$.units'))::BIGINT as units, (json_extract_string(body, '$.labour'))::BIGINT as labour,
-      json_extract_string(body, '$.at') as "at", json_extract_string(body, '$.on') as "on", json_array_length(json_extract(body, '$.performers')) as performers, json_extract_string(body, '$.by') as "by"
+      json_extract_string(body, '$.at') as "at", json_extract_string(body, '$.on') as "on", json_array_length(json_extract(body, '$.performers')) as performers, json_extract_string(body, '$.by') as "by",
+      from_json(json_extract(body, '$.performers'), '["VARCHAR"]') as who
     from raw where kind = 'event' and json_extract_string(body, '$.event') = 'worked'`,
   // Bodies going into and out of spaces (a space is <structure>/<kind>.<n>; its structure and kind are split out). Genesis occupancy at 0.
   occupancy: `

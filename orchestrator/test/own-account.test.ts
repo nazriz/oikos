@@ -8,6 +8,7 @@ import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { generate, generateFrom } from "@oikos/worlds/generator/generate";
 import { loadProfile } from "@oikos/worlds/generator/profile";
+import { exportLogs, runQuery } from "@oikos/measure";
 import { runWorld } from "../src/run";
 
 const root = join(import.meta.dir, "../..");
@@ -33,7 +34,7 @@ async function run(name: string, config: any, until: number) {
   const log = readFileSync(s.logPath, "utf8").trim().split("\n").map((l) => JSON.parse(l));
   expect(log.filter((e) => e.kind === "annotation" && (e.body.data?.call_unresolved || e.body.data?.call_unreadable)).map((e) => e.body.data)).toEqual([]);
   const ev = log.filter((e) => e.kind === "event").map((e) => ({ t: e.t, ...e.body }));
-  return { ev, recs: ev.filter((e) => e.event === "recorded").map((e) => e.record) };
+  return { ev, recs: ev.filter((e) => e.event === "recorded").map((e) => e.record), log: s.logPath, out };
 }
 
 test("a profile that states none makes the town it always made; the kinds must add up", () => {
@@ -91,7 +92,7 @@ test("the town starts with the stated share in businesses of one, each run by it
 
 test("they sell to households by their own hours, draw what the business clears, and look for no job", async () => {
   const config = town(5_000);
-  const { ev, recs } = await run("town", config, 90 * DAY);
+  const { ev, recs, log, out } = await run("town", config, 90 * DAY);
   const firms = new Map<string, string>(config.world.entities.filter((e: any) => e.kind === "own_account").map((e: any) => [e.id, e.id.replace("own-", "")]));
   const placeOf = new Map<string, string>(config.positions.filter((x: any) => firms.has(x.entity)).map((x: any) => [x.entity, x.role_module.params.premises]));
   const market = config.world.structures.find((x: any) => x.type === "market").id;
@@ -132,6 +133,20 @@ test("they sell to households by their own hours, draw what the business clears,
   expect(recs.filter((r) => r.kind === "benefit_claim" && owners.has(r.speaks_for) && r.data?.payment === "unemployment")).toEqual([]);
   // Nothing reaches the tax office from them: no report, nothing paid over.
   expect(recs.filter((r) => r.kind === "withholding_report" && firms.has(r.speaks_for))).toEqual([]);
+  // Measured as a labour force survey counts (docs/measurement.md, "Employment"): they are employed, by the work they
+  // did and the business they have, though no employment agreement names them; the old series does not see them.
+  const m = join(out, "measure");
+  await exportLogs([log], m);
+  const [sum] = await runQuery(m, "economy/summary");
+  const [work] = await runQuery(m, "economy/work");
+  const n = (x: unknown) => Number(x);
+  expect(n(work!.own_account)).toBeGreaterThan(firms.size - 4);
+  expect(n(work!.own_account)).toBeLessThanOrEqual(firms.size);
+  expect(n(sum!.employed)).toBe(n(work!.employed));
+  expect(n(sum!.employed)).toBeGreaterThanOrEqual(n(sum!.employed_by_agreement) + n(work!.own_account));
+  expect(n(sum!.employed_by_agreement)).toBe(n(work!.employees));
+  expect(n(work!.informal_employment_pct)).toBeCloseTo((100 * n(work!.own_account)) / n(work!.employed), 0);
+  expect(n(sum!.unemployment_pct)).toBeLessThan(n(sum!.unemployment_by_agreement_pct) - 20);
   const perSeller = sold.reduce((x, w) => x + w.units, 0) / firms.size;
   console.log(`own-account: ${firms.size} businesses, ${sellers.size} sold, ${sold.reduce((x, w) => x + w.units, 0)} items in 90 days (${perSeller.toFixed(0)} each), ${draws.length} drawings; shops served ${ev.filter((e) => e.event === "worked" && e.task === "serve").reduce((x, w) => x + w.units, 0)}`);
 }, 900_000);

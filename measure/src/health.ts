@@ -17,6 +17,10 @@ export const TARGET_MEASURES: { what: string; query: string; column: string; key
   { what: "unemployment_rate_pct", query: "economy/summary", column: "unemployment_pct", tolerance: 1.5 },
   { what: "participation_rate_pct", query: "economy/summary", column: "participation_pct", tolerance: 3 },
   { what: "household_saving_ratio_pct", query: "economy/summary", column: "people_saving_pct", tolerance: 5 },
+  // (Informal employment, as each place's profile names its target: docs/measurement.md, "Employment".)
+  { what: "informal_share_of_employment_pct", query: "economy/work", column: "informal_employment_pct", tolerance: 5 },
+  { what: "informal_employment_pct", query: "economy/work", column: "informal_employment_pct", tolerance: 5 },
+  { what: "own_account_share_of_employment_pct", query: "economy/work", column: "own_account_pct", tolerance: 5 },
   { what: "renters_housing_costs_share_of_income_pct", query: "town/rent-stress", column: "median_rent_pct", tolerance: 3 },
   { what: "social_group_participation_pct", query: "town/gatherings", column: "took_part_pct", tolerance: 5 },
   // (A teacher whose group is of the religious kind: its generated id says so.)
