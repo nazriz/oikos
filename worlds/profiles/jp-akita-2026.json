@@ -1,6 +1,6 @@
 {
   "id": "jp-akita-2026",
-  "place": "A small town of a few thousand people in rural Akita Prefecture, Tohoku region, Japan",
+  "place": "A town of about 4,000 people in rural Akita Prefecture, Tohoku region, Japan (demographics and town finances of Ikawa Town; wages, prices and rules of Akita Prefecture or Japan)",
   "as_of": "2026-10",
   "about": "Every place-specific figure the town generator uses, with its source. A world for another place and time is another profile; the platform's code holds none of these (docs/profiles.md).",
   "values": {
@@ -13,11 +13,11 @@
       ]
     },
     "households": {
-      "lone_bps": 3060,
-      "group_bps": 60,
-      "couple_bps": 2130,
-      "couple_children_bps": 3700,
-      "one_parent_bps": 1050,
+      "lone_bps": 2007,
+      "group_bps": 20,
+      "couple_bps": 2013,
+      "couple_children_bps": 4977,
+      "one_parent_bps": 983,
       "children_couple": [
         4500,
         4300,
@@ -29,8 +29,8 @@
         1000
       ],
       "same_sex_couple_bps": 0,
-      "lone_parent_female_bps": 8900,
-      "adult_female_bps": 5290,
+      "lone_parent_female_bps": 8389,
+      "adult_female_bps": 5335,
       "child_male_bps": 5124,
       "adult_ages": [
         18,
@@ -49,92 +49,92 @@
         {
           "from": 0,
           "to": 4,
-          "bps": 280
+          "bps": 183
         },
         {
           "from": 5,
           "to": 9,
-          "bps": 310
+          "bps": 225
         },
         {
           "from": 10,
           "to": 14,
-          "bps": 380
+          "bps": 324
         },
         {
           "from": 15,
           "to": 19,
-          "bps": 370
+          "bps": 407
         },
         {
           "from": 20,
           "to": 24,
-          "bps": 350
+          "bps": 278
         },
         {
           "from": 25,
           "to": 29,
-          "bps": 380
+          "bps": 308
         },
         {
           "from": 30,
           "to": 34,
-          "bps": 440
+          "bps": 291
         },
         {
           "from": 35,
           "to": 39,
-          "bps": 500
+          "bps": 350
         },
         {
           "from": 40,
           "to": 44,
-          "bps": 570
+          "bps": 577
         },
         {
           "from": 45,
           "to": 49,
-          "bps": 690
+          "bps": 632
         },
         {
           "from": 50,
           "to": 54,
-          "bps": 730
+          "bps": 599
         },
         {
           "from": 55,
           "to": 59,
-          "bps": 670
+          "bps": 725
         },
         {
           "from": 60,
           "to": 64,
-          "bps": 580
+          "bps": 747
         },
         {
           "from": 65,
           "to": 69,
-          "bps": 840
+          "bps": 1006
         },
         {
           "from": 70,
           "to": 74,
-          "bps": 1060
+          "bps": 1000
         },
         {
           "from": 75,
           "to": 79,
-          "bps": 710
+          "bps": 729
         },
         {
           "from": 80,
           "to": 84,
-          "bps": 560
+          "bps": 617
         },
         {
           "from": 85,
           "to": 99,
-          "bps": 580
+          "bps": 1002
         }
       ]
     },
@@ -476,17 +476,17 @@
         {
           "bedrooms": 1,
           "count": 3,
-          "rent": 36000
+          "rent": 40000
         },
         {
           "bedrooms": 2,
           "count": 7,
-          "rent": 44000
+          "rent": 47000
         },
         {
           "bedrooms": 3,
           "count": 2,
-          "rent": 52000
+          "rent": 55000
         }
       ],
       "house_types": [
@@ -494,13 +494,13 @@
           "id": "house",
           "bedrooms": 3,
           "share_bps": 5500,
-          "rent": 48000
+          "rent": 52000
         },
         {
           "id": "large-house",
           "bedrooms": 4,
           "share_bps": 4500,
-          "rent": 56000
+          "rent": 60000
         }
       ]
     },
@@ -575,7 +575,7 @@
         "from_age": 65
       },
       "unemployment": {
-        "amount": 154000,
+        "amount": 132700,
         "every_days": 28,
         "from_age": 18
       }
@@ -645,31 +645,31 @@
     "fertility_per_10000": [
       {
         "from": 15,
-        "rate": 21
+        "rate": 15
       },
       {
         "from": 20,
-        "rate": 214
+        "rate": 138
       },
       {
         "from": 25,
-        "rate": 603
+        "rate": 555
       },
       {
         "from": 30,
-        "rate": 769
+        "rate": 792
       },
       {
         "from": 35,
-        "rate": 389
+        "rate": 465
       },
       {
         "from": 40,
-        "rate": 81
+        "rate": 110
       },
       {
         "from": 45,
-        "rate": 3
+        "rate": 4
       },
       {
         "from": 50,
@@ -745,7 +745,7 @@
       }
     },
     "credit": {
-      "cash_rate_bps": 100,
+      "cash_rate_bps": 125,
       "funding_spread_bps": 100,
       "lending_rate_bps": {
         "person": 600,
@@ -782,31 +782,35 @@
             "rate_bps": 0
           },
           {
-            "from": 1600000,
-            "rate_bps": 825
+            "from": 1380000,
+            "rate_bps": 1168
+          },
+          {
+            "from": 2200000,
+            "rate_bps": 831
           },
           {
             "from": 3600000,
-            "rate_bps": 975
-          },
-          {
-            "from": 4700000,
-            "rate_bps": 1300
+            "rate_bps": 1179
           },
           {
             "from": 6600000,
-            "rate_bps": 2250
+            "rate_bps": 2222
           },
           {
-            "from": 11100000,
-            "rate_bps": 2800
+            "from": 8500000,
+            "rate_bps": 2713
+          },
+          {
+            "from": 13000000,
+            "rate_bps": 3638
           }
         ],
         "levy_bps": 1500,
         "levy_from": 1300000
       },
-      "grants_per_resident_per_year": 300000,
-      "rates_per_resident_per_year": 50000,
+      "grants_per_resident_per_year": 479900,
+      "rates_per_resident_per_year": 55000,
       "rates_instalments": 4,
       "rates_due_days": 30,
       "rates_penalty_interest_bps": 870,
@@ -829,11 +833,11 @@
     },
     "unions": {
       "membership_bps": {
-        "manufacturing": 1500,
-        "retail": 1000,
-        "construction": 700,
-        "public_administration": 2500,
-        "other": 1100
+        "manufacturing": 2640,
+        "retail": 1640,
+        "construction": 2020,
+        "public_administration": 2810,
+        "other": 1590
       },
       "dues_per_month": 4000,
       "resignation_notice_days": 14,
@@ -947,7 +951,7 @@
       }
     },
     "ownership": {
-      "house_owner_bps": 9500,
+      "house_owner_bps": 9267,
       "mortgage_bps_by_age": [
         {
           "from": 18,
@@ -963,7 +967,7 @@
         }
       ],
       "mortgage_payment_per_month": 75000,
-      "mortgage_rate_bps": 100,
+      "mortgage_rate_bps": 150,
       "mortgage_years_left": [
         5,
         35
@@ -1153,9 +1157,9 @@
           "id": "japanese-squirrel",
           "name": "Japanese squirrel",
           "density_per_ha": {
-            "woodland": 0.3
+            "woodland": 0.15
           },
-          "home_range_ha": 5,
+          "home_range_ha": 10,
           "growth_bps_per_year": 3000,
           "mortality_bps_per_year": 2500,
           "dispersal_bps_per_year": 1000,
@@ -1191,7 +1195,7 @@
             }
           },
           "detection_bps": 5000,
-          "listed": true
+          "listed": false
         },
         {
           "id": "japanese-bush-warbler",
@@ -1219,27 +1223,27 @@
   },
   "sources": {
     "currency": "Japanese yen: ISO 4217 JPY, no minor unit (0 decimal places; the sen is not in use, so an amount is a whole number of yen and money is counted in yen). Written with the yen sign before the amount (¥1,234) or in words as yen (the word is the same in singular and plural). Currency Act 1987 (Japan), art. 2: the yen is the unit; amounts are written in whole yen.  (Act and ISO 4217 from memory; to confirm.)",
-    "households": "National Statistics (Statistics Bureau of Japan), Census 2020, Akita Prefecture, as summarised by Akita Prefecture, 'R2 Census summary' (R2_国勢調査_要約.pdf, https://www.pref.akita.lg.jp/uploads/public/archive_0000061425_00/R2_%E5%9B%BD%E5%8B%A2%E8%AA%BF%E6%9F%BB_%E8%A6%81%E7%B4%84.pdf; read 2026-10-08): of general households, one person 30.6%, couple only 21.3%, couple with children 21.2%, one parent with children 10.5%, nuclear households 53.0%, other relatives 15.8%, with non-relatives 0.6% (IPSS table T12-46 as reported in a search summary; the table itself could not be read: to confirm). Mean 2.41 people per general household. STRUCTURAL GAP: the profile has no category for extended or three-generation households (15.8% of Akita's households); they are counted with 'couple_children_bps' (3,700 = 2,120 + 1,580), a placeholder choice. group_bps is the 0.6% with non-relatives. children_couple and children_one_parent (shares with 1, 2, 3+ children): placeholders, to replace from the Census 2020 table of families by number of children. same_sex_couple_bps 0: same-sex couples are not recognised in Japanese law and the Census does not count them (placeholder). lone_parent_female_bps: about 89% of single-parent households are mother-and-child (MHLW, National Survey on Single-Parent Households, FY2021, from memory; to confirm). adult_female_bps: women are 52.9% of Akita's population (Census 2020: 507,063 of 959,502 per the summary above); child_male_bps: 105.4 boys per 100 girls at birth (derived from Japan's sex ratio at birth; MHLW Vital Statistics, to confirm). adult_ages 18-99: adulthood is 18 since the Civil Code amendment effective 1 April 2022 (to confirm). mother_age_at_first_birth: 24 to 38, around the mean age of first birth in Japan, about 31 (MHLW Vital Statistics 2023; to confirm); child_max_age and group_size: placeholders.",
-    "households.age_bands_bps": "PLACEHOLDER shaped by data: Census 2020, Akita Prefecture: total 959,502; under 15 9.7%, 15-64 52.8%, 65 and over 37.5% (the highest of all prefectures; Akita Prefecture, R2 Census summary, as above). Those three totals are the Census's; the split into five-year bands within them is my estimate from the shape of Japan's 2020 age pyramid (the 1947-49 baby-boom cohort at 70-74), because the five-year table could not be opened here (e-Stat, Census 2020, Akita, table of population by five-year age group and sex); to replace from e-Stat. A small town of a few thousand in Akita is likely older than the prefecture. 85 and over taken to 99.",
+    "households": "Ikawa Town (Ikawa-machi), Akita Prefecture, a town of 4,566 people at the 2020 census (4,157 on the resident register on 1 Jan 2025, per the town's financial status collection; 3,977 on the town's home page in Oct 2026). Statistics Bureau of Japan, Census 2020 (Reiwa 2), Basic Complete Tabulation on Population and Households, as published for Akita Prefecture by Akita Prefecture (https://ckan.pref.akita.lg.jp/dataset/ea89bc10-047f-412d-b304-1e2958466993/resource/b9042ad3-5808-4ee4-9740-3f7cf5a4840d/download/050008_r2kokucho_jinkoutoukihon_toukei.xlsx; opened and read 2026-10-08), table 12-3 (households by family type), Ikawa row: 1,523 general households, of which couple only 305, couple with children 342, father with children 24, mother with children 125, other relatives-only households (extended families) 412, with non-relatives 3, one person 304, family type unknown 8. Shares are of the 1,515 households of known type. lone_parent_female_bps: 125 of 149 one-parent households. adult_female_bps: 2,436 of 4,566 people are women (table 2-7). STRUCTURAL GAP: the profile has no category for extended (three-generation) households, 27% of Ikawa's; they are counted with couples with children (couple_children_bps = 2,257 + 2,719). Not sourced from a table, PLACEHOLDERS: children_couple and children_one_parent (shares with 1, 2, 3+ children), group_size, child_max_age. same_sex_couple_bps 0: same-sex couples are not recognised in Japanese law and the Census does not count them. child_male_bps 5,124: 105.4 boys per 100 girls at birth in Japan (derived from MHLW Vital Statistics; not re-opened, to confirm). adult_ages 18-99: adulthood is 18 since 1 April 2022 (Civil Code; to confirm). mother_age_at_first_birth: 24 to 38, around Japan's mean age at first birth of about 31 (MHLW Vital Statistics; to confirm).",
+    "households.age_bands_bps": "Ikawa Town, Census 2020, people by five-year age group (Statistics Bureau of Japan, Census 2020 (Reiwa 2), Basic Complete Tabulation on Population and Households, as published for Akita Prefecture by Akita Prefecture (https://ckan.pref.akita.lg.jp/dataset/ea89bc10-047f-412d-b304-1e2958466993/resource/b9042ad3-5808-4ee4-9740-3f7cf5a4840d/download/050008_r2kokucho_jinkoutoukihon_toukei.xlsx; opened and read 2026-10-08), table 2-7, Ikawa column; 4,540 people of known age; 85 and over, including the 100 and over, taken to 99). Ikawa is older than the prefecture: 43.5% are 65 and over (Akita 37.6%), 49.1% are 15-64 and 7.3% under 15.",
     "life.qx_per_100000": "Ministry of Health, Labour and Welfare, Abridged Life Table for Japan 2024 (Reiwa 6), male and female tables, nqx for single years of age 0 to 100, x 100,000 and rounded: https://www.mhlw.go.jp/toukei/saikin/hw/life/life24/dl/life24-06.pdf (male) and life24-07.pdf (female); read 2026-10-08. National, not Akita: Akita's life expectancy at birth is lower than Japan's (80.48 male and 87.10 female in the 2020 prefectural life tables, MHLW, https://www.mhlw.go.jp/toukei/saikin/hw/life/tdfk20/; Japan 2020: 81.56 and 87.71, to confirm), so this understates Akita's mortality. Rounding at five decimal places makes the young-adult figures coarse. Akita's crude death rate in 2024 was 19.6 per 1,000 (Akita Prefecture, Vital Statistics 2024 final figures), reflecting its age structure.",
     "life.illness": "PLACEHOLDER carried over unchanged from another profile's placeholder (a chance a year of a hospital-level illness by age, 3-14 or 14-60 days; docs/behaviour/life.md); not re-derived for this place. To source from the MHLW Patient Survey 2023 (inpatient rates by age) and Hospital Report.",
     "life.injury": "PLACEHOLDER carried over unchanged from another profile (2.1% a year of a serious injury); not re-derived. To source from the MHLW Patient Survey (inpatients with injuries by age).",
-    "life.birth": "ages 15-49 and gestation_days 266 (38 weeks from conception): biology, the same in any place. female_bps 4,868: Japan's sex ratio at birth is about 105.4 boys to 100 girls (derived; MHLW Vital Statistics, from memory; to confirm). Akita's own births in 2024: 3,282 (Akita Prefecture, Vital Statistics 2024 final figures, https://www.pref.akita.lg.jp/ summary read 2026-10-08).",
+    "life.birth": "ages 15-49 and gestation_days 266 (38 weeks from conception): biology, the same in any place. female_bps 4,868: Japan's sex ratio at birth, about 105.4 boys per 100 girls (derived; MHLW Vital Statistics; not re-opened this pass, to confirm).",
     "life.treatable": "PLACEHOLDER carried over unchanged from another profile (15% of under-75 deaths treatable). To source from the OECD/Eurostat avoidable-mortality list applied to MHLW cause-of-death statistics for Japan.",
     "life.found_alone_after": "How long after dying at home alone a person is found. Japan's own figure, the same one used by another profile that had no local one: National Police Agency of Japan, people who died alone at home in 2025 (76,941): found the same or the next day 28,398; in 2 to 3 days 15,865; in 4 to 7 days 10,456; in 8 days or more 22,222, of them 7,148 after a month or more and 208 after a year or more. Taken from that profile's entry, which read it as reported in the press (a summary of the agency's release), not in the agency's own tables; not re-opened for this profile (to confirm). Rural Akita's neighbourhood ties may differ: a placeholder for a local figure.",
     "life.work_injury_bps": "PLACEHOLDER, order of magnitude only: the Ministry of Health, Labour and Welfare's industrial accident statistics count casualties with four or more days lost (about 135,000 in 2024 across about 60 million employees, roughly 0.2% a year; figures from memory, to confirm). Set at 0.25% a year in manufacturing and 0.22% in retail from that overall rate and the usual ordering of industries; the industry rates were not looked up. To source from the MHLW Survey on Industrial Accident Trends (frequency rates by industry).",
     "wages_per_fortnight": "Ministry of Health, Labour and Welfare, Basic Survey on Wage Structure 2024 (Reiwa 6), Akita results as published by the Akita Labour Bureau, 'Akita Wage Statistics' (Nov 2025), https://jsite.mhlw.go.jp/akita-roudoukyoku/content/contents/002492552.pdf, tables 3-1, 3-3, 3-4 (establishments of 10 or more employees), read 2026-10-08. Monthly scheduled cash earnings (thousand yen) and annual bonus (thousand yen), men / women: manufacturing 270.4 / 194.0 and 801.4 / 432.9; construction 291.0 / 232.4 and 636.2 / 568.1; wholesale and retail 277.6 / 197.4 and 722.7 / 362.8. Fortnightly pay = (12 x monthly scheduled earnings + annual bonus) / 26, weighting men and women by assumed employment shares (manufacturing 70% men, construction 90% men, retail 50%): the weights are my assumptions, not published figures. Overtime is excluded. These are the industries' average full-time-type pay, not minimums; Akita's minimum wage is 1,031 yen an hour from 31 March 2026 (same document, annex 3; about 82,500 yen a fortnight at 80 hours). PAY PERIOD GAP: Japanese employees are paid monthly, not fortnightly; the figure is the monthly pay scaled to a fortnight.",
-    "rents_per_month": "PLACEHOLDERS anchored on: Akita's average rent of rented housing, 39,404 yen a month (Statistics Bureau, Housing and Land Survey 2018, Basic Tabulation table 127-2, via e-Stat/ecitizen.jp StatsData 0003356468; includes public housing; the 2023 table was not found); Japan's average private rented dwelling rent, 65,496 yen in 2023, lowest prefecture (Miyazaki) 46,290 (Housing and Land Survey 2023, as reported by JILI; Akita not found). Akita's private rents are therefore somewhere in the high 30,000s to mid 40,000s a month; the split by bedrooms and the mix of units and house shares are my placeholders around that, to replace from the 2023 survey's Akita table of rent by floor area. Only 20.9% of Akita dwellings are rented (Housing and Land Survey 2023, Akita summary).",
-    "spending.saving_bps": "PLACEHOLDER: Japan's household saving rate has been a few percent of disposable income (about 2-3% in recent years; Cabinet Office, National Accounts, household saving rate; figure from memory, to confirm for FY2025).",
+    "rents_per_month": "PLACEHOLDERS bounded by one opened fact: the mean monthly rent of privately rented dwellings in Japan was 65,496 yen in 2023, with the lowest prefectures Miyazaki (46,290) and Aomori (46,340) (Statistics Bureau, Housing and Land Survey 2023, as reported by the Japan Institute of Life Insurance, https://www.jili.or.jp/lifeplan/houseeconomy/10111.html, opened 2026-10-08), which puts Akita's above 46,340. Akita's own figure was not found (the prefecture's 2023 tables are in e-Stat, not opened) except its 2018 average rent of all rented housing, 39,404 yen (Housing and Land Survey 2018, table 127-2, via ecitizen.jp, including public housing). The split by bedrooms, the unit mix and the house shares are my estimates around 47,000 yen. Ikawa has only 26 privately renting households (Census 2020 table 18-4).",
+    "spending.saving_bps": "PLACEHOLDER: Japan's household saving rate has been a few percent of disposable income (about 2-3%; Cabinet Office, National Accounts, household saving rate; recalled). TRIED: the Cabinet Office FY2024 annual national accounts index (https://www.esri.cao.go.jp/jp/sna/data/data_list/kakuhou/files/2024/2024_kaku_top.html) lists Excel tables but not the saving rate in its text; the tables themselves were not opened.",
     "spending.wealth_effect_bps_per_year": "PLACEHOLDER carried over from another profile (about 3 cents of consumption a year per unit of wealth; Dvornak and Kohler 2003, an Australian estimate). Not a Japanese figure; to replace from Japanese estimates of the wealth effect.",
     "spending.shops_known": "Not a figure of this place: a model's. Lengnick, M. (2013), 'Agent-based macroeconomics: A baseline model', Journal of Economic Behavior & Organization 86, Table 1: n = 7 type A connections (as in the other profile).",
     "spending.shop_search_bps_per_month": "PLACEHOLDER carried over: a household's chance a month of looking for a new seller (25%). To source.",
-    "spending.essentials_per_month": "PLACEHOLDER: what a person spends however little comes in. Set at 45,000 yen a month, near the food spending of a one-person household in Japan (about 40,000 yen a month, Statistics Bureau, Family Income and Expenditure Survey 2024, single-person households; figure from memory, to confirm) plus a little for fuel and clothing.",
+    "spending.essentials_per_month": "PLACEHOLDER: what a person spends however little comes in, 45,000 yen a month, near the food spending of a one-person household in Japan (about 40,000 yen a month; Statistics Bureau, Family Income and Expenditure Survey, single-person households; recalled, not opened: the annual report PDF opened this pass (https://www.stat.go.jp/data/kakei/2025np/pdf/gaiyou.pdf) was the survey's methods overview, with the results tables in e-Stat, not opened).",
     "retirement_age": "Basic old-age pension age 65 (National Pension Act; claiming can be deferred to 75). Employers must secure work to 65 (Act on Stabilization of Employment of Elderly Persons). STRUCTURAL GAP: Japan has no single retirement age; about half of 65-69 year olds work (Labour Force Survey), which a single retirement age cannot show. Statutory facts from memory; to confirm.",
     "savings_by_age": "An adult's cash and deposits, 10th/25th/50th/75th/90th percentiles by age. The 50th percentiles are set from the median financial assets of households of two or more people by age of head, 2024: 20s 840,000 yen, 30s 1.8 million, 40s 2.5 million, 50s 2.5 million (the 55+ band is raised towards the 60s' 6.5 million), 60s 6.5 million, 70s 12.05 million (Financial Services Agency-affiliated J-FLEC, Survey of Household Financial Behaviour, 2024, two-or-more-person households, https://j-flec.go.jp/wpimages/uploads/yoronf24.pdf; figures as reported in a search summary, the PDF not opened: to confirm). They are household, not individual, holdings and include non-holders. The other percentiles and the 18-24 band are PLACEHOLDERS.",
     "retiree_savings": "Median financial assets of two-or-more-person households headed by people in their 60s (6.5 million yen) and 70s (12.05 million yen), J-FLEC, Survey of Household Financial Behaviour 2024 (as for savings_by_age; to confirm); used as the range.",
     "support.pension": "Basic old-age pension (National Pension), full monthly amount FY2026: 70,608 yen (up 1.9% from 69,308), Japan Pension Service notice, https://www.nenkin.go.jp/oshirase/taisetu/kojin/2026/202604/0401.html (read 2026-10-08). Paid every second month for the two preceding months (the 15th of even months), so 141,216 yen every 61 days (365/6 = 60.8). from_age 65. Left out: the earnings-related employees' pension that most Akita retirees with an employment history also receive (average well above the basic pension), contribution-record reductions, means-tested welfare (seikatsu hogo) and the couples' rate. STRUCTURAL GAP: a second, earnings-related tier.",
-    "support.unemployment": "PLACEHOLDER: Employment Insurance basic allowance (Employment Insurance Act). Real shape: 50-80% of the previous wage per day (capped by age), paid for 90-330 days only after 6-12 months of insured work, in 28-day blocks after reporting to Hello Work. The structure expresses a flat amount and age only: set to 154,000 yen every 28 days, an average daily allowance of about 5,500 yen x 28 (the daily average is my recollection of MHLW Employment Insurance Statistics, not looked up; to confirm). from_age 18 (adulthood). STRUCTURAL GAP: contribution requirement, wage-linked amount, limited duration.",
+    "support.unemployment": "Employment Insurance basic allowance (Employment Insurance Act). Opened: Hello Work, Basic allowance (https://www.hellowork.mhlw.go.jp/insurance/insurance_basicbenefit.html, opened 2026-10-08): the daily amount is about 50-80% of the previous daily wage (45-80% at 60-64), the more the lower the wage; upper limits per day from 1 Aug 2024: under 30, 7,450 yen; 30-44, 8,270; 45-59, 9,110; 60-64, 7,830; benefit days run from 90 to 360 by age, insured period and reason for leaving. The page did not give the lower limit or the 28-day cycle (I am recalling that benefits are recognised and paid in four-week cycles; to confirm). The flat figure is DERIVED: 60% (my choice inside the 50-80% range) of a daily wage of about 7,900 yen (the Akita retail monthly scheduled earnings of 237,500 yen, from the wage survey above, over 30 days) = 4,740 yen a day, x 28 days = 132,700 yen. from_age 18. STRUCTURAL GAP: contribution requirement, wage-linked amount, limited duration.",
     "firm_ownership.forms_bps": "PLACEHOLDERS carried over from another profile (factories widely held; shops 80% closely held and 20% from outside; landlords 70% closely held). Roughly right in kind for Japan (small rural shops family-run; private rented housing is mostly owned by individuals, Housing and Land Survey), not sourced for Akita.",
     "firm_ownership.closely_held": "PLACEHOLDERS carried over from another profile (one household 85%, two 12%, three 3%; wealth weights). Not sourced for Japan.",
     "firm_ownership.widely_held": "PLACEHOLDER: the share of a widely held (listed) company's shares held from outside the town: 90%. A town of a few thousand holds almost none of a national listed company; the 80% of the other profile is too low for the same reason. To source from the JPX shareholding distribution survey.",
@@ -1247,14 +1251,14 @@
     "industry": "PLACEHOLDERS, to confirm: manufacturing's compensation of employees (about 18% of output) and intermediate inputs (about 68%), retail trade's purchases of goods (about 72% of sales) and labour (about 15%): shaped by the Japanese 2020 Input-Output Tables (MIC/METI et al.) and the Economic Census for Business Activity; not looked up.",
     "prices": "PLACEHOLDERS: an item of goods worth 10,000 yen at world prices (the unit the town counts in); imports 10% dearer (freight and margins); inputs 200 yen a kg (raw industrial materials); building materials 90 yen a kg (timber at roughly 50-100 yen a kg, steel about 100, concrete well below; ordinary building-material price indices, METI/Construction Research Institute, to source). docs/behaviour/building.md.",
     "ordinary_hours_per_week": "Statutory working hours: 40 a week and 8 a day (Labour Standards Act 1947, art. 32; from memory, to confirm).",
-    "fertility_per_10000": "Akita's total fertility rate in 2024 was 1.04 (Japan 1.15): Akita Prefecture, Vital Statistics 2024 final figures (https://www.pref.akita.lg.jp/ , read 2026-10-08). The age-specific shape is PLACEHOLDER: Japan's recent age-specific birth rates per 1,000 women (about 2.2, 22, 62, 79, 40, 8.3, 0.3 for 15-19 to 45-49; from memory, to confirm against MHLW Vital Statistics 2024), scaled so that five times their sum equals 1.04.",
-    "labour_force_participation_bps": "PLACEHOLDER: the share of working-age adults (18 to the retirement age) in the labour force, about 80%. National Labour Force Survey, August 2026: employment rate 80.3% for ages 15-64 (Statistics Bureau, Labour Force Survey (Basic Tabulation), August 2026, https://www.stat.go.jp/data/roudou/sokuhou/tsuki/pdf/gaiyou.pdf, read 2026-10-08), with unemployment 2.5%; Akita's own is not looked up.",
+    "fertility_per_10000": "Age shape: MHLW, Vital Statistics 2024 final figures, table 7 (total fertility rate by mother's five-year age group, 2024; https://www.mhlw.go.jp/toukei/saikin/hw/jinkou/kakutei24/xls/16_hyoR06.xlsx, opened 2026-10-08): 15-19 0.0082, 20-24 0.0764, 25-29 0.3064, 30-34 0.4369, 35-39 0.2566, 40-44 0.0608, 45-49 0.0022, total 1.1475 (Japan 2024). Level: Akita's total fertility rate in 2024 was 1.04 (Akita Prefecture, Vital Statistics 2024 final figures, https://www.pref.akita.lg.jp/ summary opened 2026-10-08); the national shape is scaled by 1.04/1.1475, an assumption that Akita's age pattern is Japan's (Akita's own age-specific table is in the prefecture table of the same release and was not read). Each band's value is the sum of single-year rates, so per year per 10,000 women it is value x 2,000.",
+    "labour_force_participation_bps": "PLACEHOLDER: the share of working-age adults (18 to the retirement age) in the labour force, about 80%. National Labour Force Survey, August 2026, opened: employment rate 80.3% for ages 15-64 and 62.5% for those 15 and over; unemployment 2.5% (Statistics Bureau of Japan, Labour Force Survey (Basic Tabulation), August 2026, https://www.stat.go.jp/data/roudou/sokuhou/tsuki/pdf/gaiyou.pdf, opened 2026-10-08). Akita's own is not looked up.",
     "tenancy": "Act on Land and House Leases (Shakuchi-shakuya-ho), arts. 26-28, 32: a lease renews unless the landlord gives notice 6 to 12 months ahead and has a justifiable cause; rent is changed by agreement, or by a court if the parties disagree (art. 32); there is no cap or notice period for an increase like some countries' rules. Custom: two-year leases, renewed with a renewal fee (so rent_review_months 24 and 30 days' notice are PLACEHOLDERS from custom). STRUCTURAL GAP: the 'justifiable cause' rule for ending a tenancy. After a fixed term the lease renews as a continuing one ('periodic'). From memory; to confirm.",
     "values": "PLACEHOLDER carried over: Schwartz's ten basic values in the cross-national order found by Schwartz and Bardi (J. Cross-Cultural Psychology 32(3), 2001; to confirm). Japan's own order differs (it is higher on conformity, security and tradition, lower on hedonism and stimulation among 56 nations' averages); to replace from the World Values Survey (wave 7) Schwartz items for Japan.",
     "industrial_action": "Trade Union Act and Labour Relations Adjustment Act: no statutory ballot for a private-sector strike beyond a union's own rules (a vote of the members by direct secret ballot is required by the union's constitution under Trade Union Act art. 5(2)(8)); no notice period except 10 days' notice for public-interest businesses (Labour Relations Adjustment Act art. 37); 'no work, no pay' during a strike. ballot_turnout_bps, ballot_pass_bps and notice_days are PLACEHOLDERS; paid_during_action false follows the no-work-no-pay principle. From memory; to confirm.",
     "world_price_process": "PLACEHOLDER: world prices move each month by a mean-reverting random process (sd of the monthly move in basis points; the share of a gap kept each month). To estimate from the Bank of Japan's Corporate Goods Price Index and Import Price Index.",
-    "credit.cash_rate_bps": "Bank of Japan, uncollateralised overnight call rate target, raised from 0.75% to 1.00% at the Monetary Policy Meeting of 15-16 June 2026 (as reported by the Japan Center for Economic Research, https://www.jcer.or.jp/?p=122929, read 2026-10-08 in a search summary; to confirm on the BoJ's site).",
-    "credit.funding_spread_bps": "PLACEHOLDER carried over: the bank's cost of funds over the policy rate (1.00%).",
+    "credit.cash_rate_bps": "Bank of Japan, Change in the Guideline for Money Market Operations, 18 September 2026: the uncollateralized overnight call rate to remain at around 1.25 percent, effective 24 September 2026, decided 7-2 (https://www.boj.or.jp/en/mopo/mpmdeci/mpr_2026/k260918a.pdf, opened 2026-10-08).",
+    "credit.funding_spread_bps": "PLACEHOLDER carried over: the bank's cost of funds over the policy rate (now 1.25%).",
     "credit.lending_rate_bps": "PLACEHOLDERS: a regional bank's unsecured personal loan about 6% (range roughly 2-15% by product); loans to firms about 2.5% (the short-term prime lending rate follows the policy rate). Not looked up; to source from the Bank of Japan's Loans and Discounts statistics and a regional bank's published rates.",
     "credit.serviceability_buffer_bps": "PLACEHOLDER carried over: a bank tests a borrower's repayment at a rate 3 points above the loan rate (the practice of Japanese banks of screening at a higher rate is common but was not looked up).",
     "credit.max_repayment_share_bps": "PLACEHOLDER: banks screen housing and personal loans by the repayment burden ratio (repayments over annual income), commonly capped at 30-35% (Flat 35 guidance: 30% for incomes under 4 million yen, 35% above; figures from memory, to confirm). Set 35% for a person and 20% for an organisation (placeholder).",
@@ -1265,9 +1269,9 @@
     "opening": "PLACEHOLDERS: what each organisation holds on the first day, set by scaling another profile's openings by the ratio of the two retail fortnightly wages (about 62 yen per unit of that currency): bank 31 million, town 124 million, builder 18 million, each landlord 37 million, a shop 1.8 million, a factory 25 million yen; and the least an adult in the labour force has saved, 60,000 yen. Scaling is not sourcing; to source.",
     "town_finance.parks_per_year": "PLACEHOLDER: the town's yearly parks line, 9 million yen (another profile's figure scaled by wages, about a park a year at what the builder charges).",
     "town_finance.payment_approval_over": "PLACEHOLDER: the town's procedure needs the mayor's written approval over 3 million yen (another profile's threshold scaled by wages). To source from a municipality's financial regulations.",
-    "public_finance.income_tax": "DERIVED APPROXIMATION, not a published schedule. Japan taxes income after deductions: national income tax (Income Tax Act art. 89; 5%, 10%, 20%, 23%, 33%, 40%, 45% of taxable income at 1.95, 3.3, 6.95, 9, 18, 40 million yen) plus a flat 10% resident tax (prefectural 4% and municipal 6%). The structure takes marginal rates on gross pay. Tax on gross pay was derived from: the employment-income deduction (minimum 650,000 yen from 2025; 30% of pay plus 80,000 between 1.8 and 3.6 million yen, 20% plus 440,000 to 6.6 million, 10% plus 1.1 million to 8.5 million, then 1.95 million), the basic deduction (about 580,000-950,000 yen by income, raised in the 2025 reform), social insurance premiums at about 15% of pay (the 'levy' below), then the national and resident rates: nothing up to 1.6 million yen of pay, then marginal rates of 8.25%, 9.75%, 13%, 22.5%, 28% at 1.6, 3.6, 4.7, 6.6, 11.1 million yen. The statutory rates are from memory (National Tax Agency, Income tax rates; to confirm); the deduction schedule changed with the 2025 and 2026 tax reforms (to confirm for 2026); the derivation is mine. STRUCTURAL GAP: deductions that depend on family (dependents, spouse) and the income-linked salary deduction cannot be expressed. The 'levy' stands for employees' social insurance contributions (health insurance about 5%, long-term care 0.9% from 40, employees' pension 9.15%, employment insurance 0.55%: about 15.6% in total; from memory, to confirm), charged on the whole from 1.3 million yen (the 'wall' where an employee's own insurance begins); the pension and health systems it funds are paid from the same pot in this model.",
-    "public_finance.grants_per_resident_per_year": "PLACEHOLDER: local allocation tax (the central government's grant to municipalities) for small towns in Akita is several hundred thousand yen a resident (I recall figures of about 300,000-400,000 for towns of 5,000-10,000 people; Ministry of Internal Affairs and Communications, Local Public Finance Statistics; not looked up, to confirm). Set at 300,000 yen.",
-    "public_finance.rates_per_resident_per_year": "PLACEHOLDER: the fixed asset tax (municipal tax on land and buildings, standard rate 1.4% of assessed value; Local Tax Act art. 350) per resident for a small Akita municipality, estimated at about 50,000 yen (not looked up; to source from MIC, Municipal Settlement Statistics, per capita fixed asset tax by municipality). Sets the town's opening rate in the yen.",
+    "public_finance.income_tax": "STATED AS PUBLISHED, National Tax Agency (opened 2026-10-08): income tax rates on taxable income, https://www.nta.go.jp/taxes/shiraberu/taxanswer/shotoku/2260.htm: up to 1.949 million yen 5%; 1.95-3.299 million 10% less 97,500; 3.3-6.949 million 20% less 427,500; 6.95-8.999 million 23% less 636,000; 9-17.999 million 33% less 1,536,000; 18-39.999 million 40% less 2,796,000; 40 million and over 45% less 4,796,000; plus a reconstruction special income tax of 2.1% of the tax (1.1% from 2027). Employment income deduction for 2026 and 2027, https://www.nta.go.jp/taxes/shiraberu/taxanswer/shotoku/1410.htm: 740,000 yen to 2.2 million of pay; 30% + 80,000 to 3.6 million; 20% + 440,000 to 6.6 million; 10% + 1,100,000 to 8.5 million; 1.95 million above. Basic deduction for 2026, https://www.nta.go.jp/taxes/shiraberu/taxanswer/shotoku/1199.htm (the page says it takes effect on 1 December 2026): 1.04 million yen at total income up to 1.32 million; 620,000 to 3.36 million; 680,000 to 4.89 million; 670,000 to 6.55 million; 620,000 to 23.5 million. Resident tax (prefectural 4% and municipal 6%, flat 10% of taxable income, basic deduction 430,000) and employee social insurance at 15% of pay are from memory (to confirm). THE APPROXIMATION, separately and mine: the structure takes marginal rates on gross annual pay. I computed total tax (national with the reconstruction tax, plus resident tax) on pay G as national tax on max(0, G - employment deduction - basic deduction - 15% of G) plus 10% of max(0, G - employment deduction - 430,000 - 15% of G), and fitted marginal rates between 1.38, 2.2, 3.6, 6.6, 8.5 and 13 million yen of pay: nothing up to 1.38 million, then 11.68%, 8.31%, 11.79%, 22.22%, 27.13% and 36.38% (above 13 million). The fit is within a few thousand yen of the computed tax at the nodes, and within about 7,000 to 20,000 yen between 2 and 5 million. Family deductions (spouse, dependants) and other deductions cannot be expressed. The 'levy' stands for employees' social insurance (health about 5%, long-term care 0.9% from 40, employees' pension 9.15%, employment insurance 0.55%, about 15.6%; from memory, to confirm) charged from 1.3 million yen; the 15% in the derivation above is deducted because insurance premiums are deductible from taxable income.",
+    "public_finance.grants_per_resident_per_year": "Ikawa Town, FY2024 settlement (Financial Status Collection, 2024, https://www.town.ikawa.akita.jp/uploaded/attachment/2729.xlsx, opened 2026-10-08): local allocation tax 1,994,958 thousand yen (47.3% of the town's revenue), over 4,157 residents on the register (1 Jan 2025) = 479,900 yen a resident. The central government's local allocation tax is a general grant to municipalities; the sheet marks the town as not a 'surplus-revenue' municipality (the grant-free-excess flag is ×).",
+    "public_finance.rates_per_resident_per_year": "Ikawa Town, FY2024 settlement (same collection, 'Status of ordinary accounts'): fixed asset tax 228,703 thousand yen (55.5% of local tax of 412,391 thousand), over 4,157 residents = 55,000 yen a resident. The fixed asset tax is the municipal tax on land and buildings (standard rate 1.4% of assessed value, Local Tax Act art. 350; to confirm). Sets the town's opening rate in the yen.",
     "public_finance.rates_instalments": "Fixed asset tax is paid in four instalments (usually June, September, December and February; each municipality sets its own dates), Local Tax Act art. 362 (from memory; to confirm).",
     "public_finance.rates_due_days": "PLACEHOLDER: a month between notice and the due date of an instalment (municipalities send notices in early June, pay by the end of the month).",
     "public_finance.rates_penalty_interest_bps": "Delinquency charge on local tax: 2.4% a year for the first month after the due date and 8.7% afterwards in 2025 (Local Tax Act art. 329 etc.; special base rate); 8.7% used, to confirm for 2026.",
@@ -1280,7 +1284,7 @@
     "services.asset_life_years": "PLACEHOLDER carried over (15 years).",
     "services.upkeep_hours_per_week_per_asset": "PLACEHOLDER carried over (4 hours a week).",
     "services.complain_bps": "PLACEHOLDER carried over (30% complain when a service fails).",
-    "unions.membership_bps": "PLACEHOLDERS shaped by the national rate: Japan's estimated unionisation rate was about 16% (Ministry of Health, Labour and Welfare, Basic Survey on Labour Unions 2024; recalled, not opened, to confirm), highest in public administration, finance and large firms, lowest in small firms and in Akita-like rural areas. The industry rates here (manufacturing 15%, retail 10%, construction 7%, public administration 25%, other 11%) are my estimates for a rural prefecture. STRUCTURAL GAP: Japanese unions are mostly enterprise unions, one per firm, not industry-wide.",
+    "unions.membership_bps": "Ministry of Health, Labour and Welfare, Basic Survey on Labour Unions 2025 (as at 30 June 2025), table 3, unionisation rate by industry (https://www.mhlw.go.jp/toukei/itiran/roudou/roushi/kiso/25/dl/gaikyou.pdf, opened 2026-10-08): manufacturing 26.4%, wholesale and retail 16.4%, construction 20.2%, public administration 28.1%, all industries 15.9% (used for 'other'). National, not Akita: Akita's rates are not published in this survey. STRUCTURAL GAP: Japanese unions are mostly enterprise unions (one per firm), not industry-wide.",
     "unions.resignation_notice_days": "PLACEHOLDER carried over (14 days).",
     "groups.leave_notice_days": "PLACEHOLDER (0: a person may leave a club or association at any time).",
     "unions.dues_per_month": "PLACEHOLDER: about 4,000 yen a month (enterprise union dues are commonly 3,000-6,000 yen; recalled, to source from the MHLW Basic Survey on Labour Unions).",
@@ -1295,16 +1299,16 @@
     "households.child_max_age": "PLACEHOLDER (24): a child lives at home with its parents until at most this age.",
     "health": "The clinic stands for the town's health system (a town clinic and the hospital it refers to; a liberty). doctors_per_1000: 2.7 physicians per 1,000 people, about the level of Akita Prefecture (Akita has about 270 physicians per 100,000, MHLW, Survey of Physicians, Dentists and Pharmacists 2022; recalled, to confirm) and a little above Japan's 2.6; a small town has fewer. doctor_wage_per_fortnight: 461,500 yen (12 million yen a year / 26), roughly a hospital physician's pay (MHLW Basic Survey on Wage Structure; recalled, to confirm). Japan's universal insurance (30% copayment) is why seek_care_bps is high. consult_minutes, seek_care_bps, treats and off_work_severities: PLACEHOLDERS carried over from another profile (conditions here are hospital-level; care shortens them by a fifth; nobody works with a serious or severe condition).",
     "round": "Working hours 9 to 5 (eight hours, five days: the 40-hour week; Japanese offices run 9 to 6 with an hour's break, the shops and factories vary; a liberty); school 8 to 3 (Japanese elementary schools start around 8:15 and finish between 2:30 and 3:45). Travel: a 25 m cell on foot in about 18 seconds (walking about 1.4 m/s, Bohannon 1997; to confirm); on a road, 2 seconds (about 45 km/h; speed limits in Japanese towns are commonly 40-50 km/h and 60 km/h on general roads, Road Traffic Act enforcement order; to confirm); slower across water, wetland and bush (placeholders). Roads: the town builds toward buildings more than 75 m from a road within a budget of 20,000 yen a resident a year (placeholder; municipal road spending per resident, MIC Municipal Settlement Statistics, to source). Most rural Akita residents drive to work (Census 2020 commuting by car; to confirm).",
-    "ownership": "house_owner_bps 9,500: 95.0% of detached houses in Akita are owner-occupied, and Akita's owner-occupancy rate is Japan's highest at 77.1% (Statistics Bureau, Housing and Land Survey 2023, Akita summary 'Reiwa 5 Housing and Land Survey: Akita', Akita Prefecture, https://www.pref.akita.lg.jp/uploads/public/archive_0000090774_00/akitagaiyo2023.pdf, read 2026-10-08). Flats are all rented here (a liberty). mortgage_bps_by_age, mortgage_years_left and market: PLACEHOLDERS, shaped by Japanese practice (35-year terms; almost no down payment is common, 10% used; buying costs 6-8% including brokerage, registration and acquisition taxes; to source from the Housing Finance Agency's Flat 35 user survey). mortgage_payment_per_month: about 75,000 yen (recalled average, to confirm). mortgage_rate_bps: 1.00% a year, a variable-rate housing loan in 2026 (variable rates have followed the Bank of Japan's rises; placeholder, to confirm against the major banks' published rates).",
+    "ownership": "house_owner_bps: of Ikawa's 1,514 households in dwellings (main households), 1,403 own their homes, 82 rent public housing, 26 rent privately and 3 are in company housing (Statistics Bureau of Japan, Census 2020 (Reiwa 2), Basic Complete Tabulation on Population and Households, as published for Akita Prefecture by Akita Prefecture (https://ckan.pref.akita.lg.jp/dataset/ea89bc10-047f-412d-b304-1e2958466993/resource/b9042ad3-5808-4ee4-9740-3f7cf5a4840d/download/050008_r2kokucho_jinkoutoukihon_toukei.xlsx; opened and read 2026-10-08), table 18-4, Ikawa row); 9,270 basis points. Akita as a whole: 77.1% of dwellings owner-occupied and 95.0% of detached houses (Statistics Bureau, Housing and Land Survey 2023, Akita summary, https://www.pref.akita.lg.jp/uploads/public/archive_0000090774_00/akitagaiyo2023.pdf, opened 2026-10-08). Flats are all rented here (a liberty). NOTE: in a town like Ikawa private rental housing is nearly absent (26 households), so the 20 landlords and 30 flats of the spec are a much larger rental market than the town's. mortgage_bps_by_age, mortgage_years_left and market: PLACEHOLDERS, shaped by Japanese practice (35-year terms, 10% down, buying costs 6-8% with brokerage, registration and acquisition taxes; to source from the Housing Finance Agency's Flat 35 user survey). mortgage_payment_per_month about 75,000 yen (recalled, to confirm). mortgage_rate_bps 1.50%: PLACEHOLDER, the Bank of Japan's 1.25% policy rate plus a small spread (variable-rate housing loans follow the short-term prime rate; not looked up).",
     "utilities": "Water: about 214 litres per person per day domestic use in Japan (Ministry of Land, Infrastructure, Transport and Tourism, White Paper on Water Resources, recalled, to confirm); a municipal tariff of about 220 yen a kilolitre (volume charge, water and sewerage together) and a basic charge of about 1,000 yen a month (3,000 a quarter): recalled typical rural tariffs, to confirm against a town's published tariff. Bills go to owners. The river's inflow, flow and losses are placeholders, as in the other profile. Energy: about 15 kWh a household a day (5,500 kWh a year, higher in cold Tohoku than Japan's average of about 4,500; recalled, to confirm: Agency for Natural Resources and Energy, Energy White Paper); about 35 yen a kWh including fuel cost adjustment and renewable levy (Tohoku Electric Power standard tariff, recalled, to confirm) and a basic charge of about 33 yen a day; the grid price to the retailer (20 yen) is a placeholder; grid emissions 450 g CO2 a kWh (placeholder; the retailer-specific adjusted emission factor is published by the Ministry of the Environment). STRUCTURAL GAP: heating by kerosene and snow clearing are a large part of an Akita household's energy and winter costs and are not modelled.",
-    "climate": "Weather drawn for each run (docs/behaviour/weather.md). rain_by_month_bps: Akita's rivers carry the most water in March-May from snowmelt, and the least in winter and late summer (shape recalled from MLIT river data, to confirm; a placeholder). storm_*: heavy-rain disasters in Akita in August 2013, July 2017, July 2023 and July 2024 (Akita Prefecture/JMA records, recalled, to confirm) suggest a damaging event about once in two to four years; 6% a month is a placeholder in that order. Drought: rare in Akita (4% a year, placeholder). Heatwaves: summer months July-September (JMA; record heat in Akita in 2023; recalled), three to five days; frequencies and heat effects carried over from another profile as placeholders. STRUCTURAL GAP: Akita's characteristic hazard is winter snow (annual snowfall of 2 to 3 metres in inland towns, heavy-snow special areas) and cold; the climate block has only rain, drought and heat.",
+    "climate": "Weather drawn for each run (docs/behaviour/weather.md). Opened: Japan Meteorological Agency, 1991-2020 normals for Akita (https://www.data.jma.go.jp/stats/etrn/view/nml_sfc_ym.php?prec_no=32&block_no=47582, opened 2026-10-08): precipitation by month (mm) Jan 118.9, Feb 98.5, Mar 99.5, Apr 109.9, May 125.0, Jun 122.9, Jul 197.0, Aug 184.6, Sep 161.0, Oct 175.5, Nov 189.1, Dec 159.8; snowfall total (cm) Dec 58, Jan 100, Feb 79, Mar 30, Apr 1, Nov 6; maximum snow depth normals (cm) 14-17 in winter (Akita city is on the coast; inland towns get more snow, recalled); mean temperature 0.4 C in January and 25.0 C in August. rain_by_month_bps (the river's inflow by month, 10,000 = the year's usual) is a PLACEHOLDER shaped by these normals: precipitation in December to February falls as snow and is held until the thaw, so inflow peaks in March to May, and the summer and autumn rains (July to November are the wettest months) keep it up; the numbers are my reading of that, not a measured river flow. storm_*: heavy-rain disasters in Akita in August 2013, July 2017, July 2023 and July 2024 (recalled, to confirm), a damaging event about once in two to four years; 6% a month is a placeholder in that order. drought_*, heatwave and heat figures: PLACEHOLDERS carried over; summer_months July-September (JMA normals above show July-September as the warmest). STRUCTURAL GAP: Akita's characteristic hazard is winter snow and cold (inland towns such as Ikawa are snowier than Akita city); the climate block has only rain, drought and heat.",
     "hazards": "Floods, PLACEHOLDERS carried over from another profile, sized against the river as modelled (about 9,000 kL a 25 m cell in the usual flow): it spills over its banks past 12,000, 30% of the excess a day; a building floods with water above 300 kL on its cell; wetland soaks up 500 kL a cell a day. The 2023 and 2024 floods of the Omono, Koyoshi and Mogami basins show the hazard is real in Akita (recalled, to confirm). To source from MLIT flood hazard maps.",
-    "crime": "Crime (world-expansion 7.2), deliberately rare and driven by circumstance only (Becker 1968; Cohen and Felson 1979), never by any group. take_bps_per_month_in_need, caught_bps_reckoned and take_quantity: placeholders carried over (Japan's theft rate is low). detection_bps: about 35%, near the clearance rate of all penal-code offences in Japan (about 37-39% in 2023-24, National Police Agency, White Paper on Police; recalled, to confirm; theft alone is lower, around a third). police_per_1000: about 1.9 police officers per 1,000 in Akita (Akita Prefectural Police authorised strength of about 1,800 officers over 0.9 million people; recalled, to confirm). officer_wage_per_fortnight: about 6 million yen a year / 26 = 230,800 (prefectural police officer, local public servant pay survey; recalled, to confirm). investigation_hours: placeholder.",
+    "crime": "Crime (world-expansion 7.2), deliberately rare and driven by circumstance only (Becker 1968; Cohen and Felson 1979), never by any group. take_bps_per_month_in_need, caught_bps_reckoned, take_quantity and investigation_hours: placeholders carried over (Japan's theft rate is low). detection_bps about 35%, near the clearance rate of all penal-code offences in Japan (about 37-39% in 2023-24; recalled from the National Police Agency's statistics, to confirm; theft alone is lower). police_per_1000 about 1.9 (Akita Prefectural Police authorised strength about 1,800 officers over 0.9 million people; recalled, to confirm). officer_wage_per_fortnight about 6 million yen a year / 26 (recalled, to confirm). TRIED AND NOT READ: the National Police Agency's crime statistics pages (npa.go.jp/publications/statistics/crime/ returned 403 or 404) and the 2025 White Paper on Police (an index page only, https://www.npa.go.jp/hakusyo/r07/index.html).",
     "justice": "Japan's equivalent is the summary court (small claims and civil disputes, up to 1.4 million yen) and district court, with the Labour Tribunal for wage disputes; rent disputes are rare in court. hearing_after_days 30: a first hearing about a month after filing (placeholder; the Supreme Court's civil case statistics give times to judgment, to source). pay_within_days, challenge_bps, apply_bps and apply_after_days are PLACEHOLDERS carried over. Enforcement of an unpaid money judgment by attachment of the debtor's bank account (Civil Execution Act).",
     "elections": "Local Autonomy Act and Public Offices Election Act: mayors and assemblies are elected every four years; the mayor by a plurality in a direct vote, assembly members by a single non-transferable vote (modelled as a plurality); voting is not compulsory. turnout_bps 6,000: turnout in town and village elections in Japan is typically 60% or so, and mayoral elections in small towns higher (MIC, election results; recalled, to confirm). stand_bps and news_readers_bps: PLACEHOLDERS (Akita has high newspaper readership: the Akita Sakigake Shimpo; to source from the Japan Audit Bureau of Circulations or MIC).",
     "education": "school_ages 6-17: nine years of compulsory schooling from age 6 (School Education Act) and about 99% go on to upper secondary school, which ends at 18 (MEXT, School Basic Survey; recalled, to confirm). students_per_teacher 11.0: PLACEHOLDER for a rural Akita public school (Japan's average is about 14-15, MEXT School Basic Survey 2024; Akita lower; not looked up). school_days_per_year 200 (MEXT: about 200-210 school days; recalled), hours_per_day 6 (placeholder). teacher_wage_per_fortnight 250,000 (about 6.5 million yen a year / 26; public school teachers, MIC local public servant pay survey, recalled, to confirm). attainment: PLACEHOLDER shares of adults by highest level of education, shaped by the Census 2020's education table for Akita (lower secondary only about 18%, upper secondary 48%, vocational or junior college 20%, university 14%: my recollection of the pattern, not read from the table; to replace from e-Stat), years of schooling 9, 12, 14, 16. return_per_year_bps: the wage return to a year of schooling, about 10% (the international literature, Psacharopoulos and Patrinos 2018; Japan's estimates are lower, 6-8%; to confirm), applied as productivity (Mincer 1974); max_years placeholder.",
     "nature": "Nature (docs/design/world-expansion.md 2). cell_m: a cell is a 25 m lot. Landscape shares around the town: Akita is about 71% forest (Akita Prefecture forest statistics; recalled, to confirm) and about 10% farmland, but a town on a plain has more paddy around it: woodland 35%, scrub 5%, grassland 5%, farmland (mostly rice paddy) 45%, wetland 10% are PLACEHOLDERS. Covers' succession (cleared land to grassland in a year; scrub to woodland in about 40) and the pollution figures, survey_hours_per_ha, survey_staff and spin_up_years are placeholders carried over.",
-    "nature.species": "Three real species of Akita, with ecology figures that are PLACEHOLDERS (I found no usable density or home-range figure this session; the sources searched were habitat-suitability model sheets for the species by the Ecosystem Conservation Society - Japan (JHEP), https://www.ecosys.or.jp/certification/jhep/img/model/nihonrisu.pdf and uguisu.pdf, which could not be read). Japanese squirrel (Sciurus lis): a forest-dependent tree squirrel of Honshu and Shikoku which needs forest patches of about 20 ha or more to persist (as reported from Japanese studies in a search summary; to confirm) and avoids open farmland and built ground; density 0.3 a hectare and home range 5 ha are my estimates. Black-spotted pond frog (Pelophylax nigromaculatus; tonosama-gaeru): a paddy and pond frog breeding in April to June in paddies and nearby water, males holding territories on the water surface (as reported in a search summary of Honda's species guide, https://www.honda.co.jp/outdoor/adventure/tonosamagaeru.html; to confirm), declining in Japan with the loss of paddies and listed as Near Threatened by the Ministry of the Environment (Red List 2020; recalled, to confirm); densities, range, dispersal and pollution tolerance are placeholders. Japanese bush warbler (Horornis diphone; uguisu): a common and conspicuous songbird of scrub and woodland edge whose male song marks a territory in spring and summer (Canon bird-branch page, https://global.canon/ja/environment/bird-branch/photo-gallery/uguisu/ as reported in a search summary; to confirm); densities by cover and territory size are placeholders. Growth, mortality, dispersal, min_viable and detection: placeholders; family groups sharing a home range are not modelled."
+    "nature.species": "Three real species of Akita; ecology figures are PLACEHOLDERS except where stated. Japanese squirrel (Sciurus lis): males' home ranges 4-30 ha and females' 4-17 ha, litters of 2-6 after a 39-40 day gestation, IUCN Least Concern (Wikipedia, 'Japanese squirrel', https://en.wikipedia.org/wiki/Japanese_squirrel, opened 2026-10-08; a secondary source citing field studies, not checked against them). Home range set at 10 ha (the middle of those ranges); density 0.15 a hectare is DERIVED from it (about one adult per 10 ha, with some overlap between sexes), not an observed density. Black-spotted pond frog (Pelophylax nigromaculatus): clutch 1,800-3,000 eggs (600-5,000 by other estimates), maturity at about two years, maximum longevity about 13 years, IUCN Least Concern (Wikipedia, 'Dark-spotted frog', https://en.wikipedia.org/wiki/Dark-spotted_frog, opened 2026-10-08); breeds April-June in paddies, males holding territories on the water surface (Honda, species guide, https://www.honda.co.jp/outdoor/adventure/tonosamagaeru.html, via a search summary; to confirm). Density, home range, dispersal, mortality and pollution tolerance are placeholders. Japanese bush warbler (Horornis diphone; uguisu): a common songbird of scrub and woodland edge whose male song marks a territory in spring and summer (Canon bird-branch page, https://global.canon/ja/environment/bird-branch/photo-gallery/uguisu/, via a search summary; to confirm). The only research paper the English Wikipedia article cites is Hamao and Hayama 2015 on the Ogasawara Islands population (Ornithological Science 14: 111-115), which is an introduced population, so not used; densities and territory size are placeholders. TRIED AND NOT READ: the Ecosystem Conservation Society - Japan habitat-suitability sheets for the squirrel and warbler (https://www.ecosys.or.jp/certification/jhep/img/model/nihonrisu.pdf, uguisu.pdf): the PDFs' text is garbled, no numbers could be extracted. Listing: the Ministry of the Environment Red List status of the frog and squirrel was not confirmed, so neither is marked listed. Growth, mortality, dispersal, min_viable and detection: placeholders; family groups sharing a home range are not modelled."
   },
   "targets": [
     {
@@ -1379,8 +1383,23 @@
     },
     {
       "what": "union_membership_pct_of_employees",
-      "value": 16.1,
-      "source": "MHLW, Basic Survey on Labour Unions, 2024: estimated unionisation rate about 16% (recalled, not opened this session; to confirm); Akita's own is lower"
+      "value": 16.0,
+      "source": "MHLW, Basic Survey on Labour Unions 2025 (30 June 2025): estimated unionisation rate 16.0%, 9.927 million members; https://www.mhlw.go.jp/toukei/itiran/roudou/roushi/kiso/25/dl/houdou.pdf"
+    },
+    {
+      "what": "policy_rate_pct",
+      "value": 1.25,
+      "source": "Bank of Japan, Change in the Guideline for Money Market Operations, 18 September 2026 (effective 24 September 2026): uncollateralized overnight call rate around 1.25 percent"
+    },
+    {
+      "what": "population_ikawa_town_2020",
+      "value": 4566,
+      "source": "Statistics Bureau of Japan, Census 2020, Ikawa Town (Akita Prefecture table 2-7); 43.5% aged 65 and over"
+    },
+    {
+      "what": "owner_occupied_main_households_pct_ikawa_2020",
+      "value": 92.7,
+      "source": "Statistics Bureau of Japan, Census 2020, Ikawa Town, table 18-4: 1,403 of 1,514 main households own their home"
     }
   ]
 }
