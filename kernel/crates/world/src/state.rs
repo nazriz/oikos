@@ -69,6 +69,14 @@ pub struct State {
     pub record_order: imbl::Vector<Id>,
     pub participants: Map<Id, Arc<Participant>>,
     pub positions: Map<Id, Position>,
+    /// entity -> its positions, and participant -> the positions it holds, each in id order: derived from `positions`
+    /// and kept with it (`add_position`, `set_holder`: the only ways a position is made or changes hands), never
+    /// serialised, so the state and its hash are unchanged. For finding who acts for an organisation, and what a
+    /// participant acts in, without looking through every position (`acting_for`, `held_by`).
+    #[serde(skip)]
+    pub positions_of: Map<Id, BTreeSet<Id>>,
+    #[serde(skip)]
+    pub held: Map<Id, BTreeSet<Id>>,
     /// Future physical effects and acts in progress, sorted by (at, seq).
     pub schedule: Schedule,
     /// Each actor's timeline (docs/design/rebuild.md 6.3): when each of its lanes is next free. A person's is keyed by
@@ -740,7 +748,51 @@ impl State {
         if let Some(b) = self.body(entity) {
             return b.participant.iter().map(|p| (p.clone(), crate::config::SELF.to_string())).collect();
         }
-        self.positions.iter().filter(|(_, x)| x.entity == entity).filter_map(|(id, x)| x.holder.clone().map(|h| (h, id.clone()))).collect()
+        let found: Vec<(Id, Id)> = self.positions_of.get(entity).into_iter().flatten().filter_map(|id| self.positions.get(id)?.holder.clone().map(|h| (h, id.clone()))).collect();
+        debug_assert_eq!(found, self.positions.iter().filter(|(_, x)| x.entity == entity).filter_map(|(id, x)| x.holder.clone().map(|h| (h, id.clone()))).collect::<Vec<_>>(), "positions_of out of step with positions for {entity}");
+        found
+    }
+
+    /// The positions a participant holds now, in id order.
+    pub fn held_by(&self, participant: &str) -> Vec<&Id> {
+        let found: Vec<&Id> = self.held.get(participant).into_iter().flatten().collect();
+        debug_assert_eq!(found, self.held_by_scan(participant), "held out of step with positions for {participant}");
+        found
+    }
+
+    /// The same, by looking through every position: what `held` must always agree with (checked in debug builds).
+    pub fn held_by_scan(&self, participant: &str) -> Vec<&Id> {
+        self.positions.iter().filter(|(_, x)| x.holder.as_deref() == Some(participant)).map(|(id, _)| id).collect()
+    }
+
+    /// A position made (the only way into `positions`, so `positions_of` and `held` keep step).
+    pub fn add_position(&mut self, id: Id, position: Position) {
+        self.positions_of.entry(position.entity.clone()).or_default().insert(id.clone());
+        if let Some(h) = &position.holder {
+            self.held.entry(h.clone()).or_default().insert(id.clone());
+        }
+        self.positions.insert(id, position);
+    }
+
+    /// A position changes hands, or falls vacant, at a change stamp (the only way its holder changes).
+    pub fn set_holder(&mut self, position: &str, holder: Option<Id>, changed: u64) {
+        let Some(x) = self.positions.get_mut(position) else { return };
+        let was = std::mem::replace(&mut x.holder, holder.clone());
+        x.changed = changed;
+        if was == holder {
+            return;
+        }
+        if let Some(w) = was {
+            if let Some(set) = self.held.get_mut(&w) {
+                set.remove(position);
+                if set.is_empty() {
+                    self.held.remove(&w);
+                }
+            }
+        }
+        if let Some(h) = holder {
+            self.held.entry(h).or_default().insert(position.to_string());
+        }
     }
 }
 

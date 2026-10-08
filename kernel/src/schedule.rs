@@ -53,6 +53,9 @@ pub struct Scheduler {
     tick: i64,
     perturb: Option<Perturb>,
     units: BTreeMap<String, Unit>,
+    /// participant -> the keys of its units, in key order (kept with `units`): who news reaches is found without
+    /// going through every unit.
+    by_participant: BTreeMap<String, BTreeSet<String>>,
     /// (next wake, key): the queue.
     queue: BTreeSet<(i64, String)>,
     moment_at: i64,
@@ -123,8 +126,13 @@ impl Scheduler {
                 news_wakes: 0,
                 done_at: None,
             };
+            self.by_participant.entry(unit.participant.clone()).or_default().insert(key.clone());
+            let participant = unit.participant.clone();
             if let Some(old) = self.units.insert(key.clone(), unit) {
                 self.queue.remove(&(old.next_wake, key.clone()));
+                if old.participant != participant {
+                    self.forget(&old.participant, &key);
+                }
             }
             self.queue.insert((next_wake, key));
         }
@@ -135,13 +143,29 @@ impl Scheduler {
         for k in keys {
             if let Some(u) = self.units.remove(k) {
                 self.queue.remove(&(u.next_wake, k.clone()));
+                self.forget(&u.participant, k);
             }
         }
     }
 
+    /// A unit is no longer its participant's.
+    fn forget(&mut self, participant: &str, key: &str) {
+        if let Some(keys) = self.by_participant.get_mut(participant) {
+            keys.remove(key);
+            if keys.is_empty() {
+                self.by_participant.remove(participant);
+            }
+        }
+    }
+
+    /// A participant's units, in key order.
+    fn units_of<'a>(&'a self, participant: &str) -> impl Iterator<Item = (&'a String, &'a Unit)> + 'a {
+        self.by_participant.get(participant).into_iter().flatten().filter_map(|k| self.units.get(k).map(|u| (k, u)))
+    }
+
     /// Every unit of a participant back to its cadence from now (a stand-in taking over, a participant carried on).
     pub fn to_cadence(&mut self, participant: &str, t: i64) {
-        let keys: Vec<(String, i64)> = self.units.iter().filter(|(_, u)| u.participant == participant).map(|(k, u)| (k.clone(), u.cadence)).collect();
+        let keys: Vec<(String, i64)> = self.units_of(participant).map(|(k, u)| (k.clone(), u.cadence)).collect();
         for (k, c) in keys {
             let at = t + self.ceil(c);
             self.set_wake(&k, at, "cadence");
@@ -245,7 +269,7 @@ impl Scheduler {
                 }
                 Some("message_delivered") => {
                     for to in e["to"].as_array().into_iter().flatten().filter_map(Value::as_str) {
-                        let keys = self.units.iter().filter(|(_, u)| u.participant == to && u.next_wake > t && !Self::busy(u, t)).map(|(k, _)| k.clone()).collect();
+                        let keys = self.units_of(to).filter(|(_, u)| u.next_wake > t && !Self::busy(u, t)).map(|(k, _)| k.clone()).collect();
                         self.wake_now(keys, t);
                     }
                 }
@@ -291,15 +315,17 @@ impl Scheduler {
             if pid == author {
                 return vec![];
             }
-            return self.units.iter().filter(|(_, u)| u.participant == pid && u.capacity.as_deref() == Some("self") && wakeable(u)).map(|(k, _)| k.clone()).collect();
+            return self.units_of(pid).filter(|(_, u)| u.capacity.as_deref() == Some("self") && wakeable(u)).map(|(k, _)| k.clone()).collect();
         }
+        // (The organisation's positions in id order, and each holder's units in key order: as going through every
+        // position and every unit gave them.)
         let mut keys = vec![];
-        for (id, x) in st.positions.iter() {
-            let Some(holder) = x.holder.as_deref() else { continue };
-            if x.entity != entity || holder == author {
+        for id in st.positions_of.get(entity).into_iter().flatten() {
+            let Some(holder) = st.positions.get(id).and_then(|x| x.holder.as_deref()) else { continue };
+            if holder == author {
                 continue;
             }
-            keys.extend(self.units.iter().filter(|(_, u)| u.participant == holder && u.capacity.as_deref() == Some(id.as_str()) && wakeable(u)).map(|(k, _)| k.clone()));
+            keys.extend(self.units_of(holder).filter(|(_, u)| u.capacity.as_deref() == Some(id.as_str()) && wakeable(u)).map(|(k, _)| k.clone()));
         }
         keys
     }

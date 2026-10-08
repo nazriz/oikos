@@ -726,10 +726,9 @@ fn capacities<'a>(st: &'a State, participant: &str) -> Vec<Capacity<'a>> {
     if let (ParticipantKind::Person, Some(person)) = (p.kind, &p.person) {
         v.push(Capacity { key: SELF.into(), prefix: String::new(), entity: person.clone(), channels: &p.def.channels });
     }
-    for (id, x) in st.positions.iter() {
-        if x.holder.as_deref() == Some(participant) {
-            v.push(Capacity { key: id.clone(), prefix: format!("{id}/"), entity: x.entity.clone(), channels: &x.channels });
-        }
+    for id in st.held_by(participant) {
+        let x = &st.positions[id];
+        v.push(Capacity { key: id.clone(), prefix: format!("{id}/"), entity: x.entity.clone(), channels: &x.channels });
     }
     v
 }
@@ -937,9 +936,9 @@ fn build(s: &Statics, st: &State, index: &mut RecordIndex, participant: &str, mo
         in_space: st.structures_of(person).into_iter().find_map(|sid| st.occupancy.get(&sid)?.iter().find(|(_, bodies)| bodies.contains(person)).map(|(sp, _)| sp.clone())),
     });
     let positions = st
-        .positions
-        .iter()
-        .filter(|(_, x)| x.holder.as_deref() == Some(participant))
+        .held_by(participant)
+        .into_iter()
+        .map(|id| (id, &st.positions[id]))
         .map(|(id, x)| HeldPosition { position: id.clone(), entity: x.entity.clone(), title: x.title.clone(), role: x.role.clone() })
         .collect();
     // Readings of the agreements the records here bring.

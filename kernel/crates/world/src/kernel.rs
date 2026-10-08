@@ -243,24 +243,9 @@ impl World {
                     )
                 })
                 .collect(),
-            positions: c
-                .positions
-                .iter()
-                .map(|p| {
-                    (
-                        p.id.clone(),
-                        Position {
-                            entity: p.entity.clone(),
-                            title: p.title.clone(),
-                            role: p.role.clone(),
-                            channels: Arc::new(p.channels.clone()),
-                            role_module: p.role_module.clone(),
-                            holder: p.holder.clone(),
-                            changed: 0,
-                        },
-                    )
-                })
-                .collect(),
+            positions: Default::default(),
+            positions_of: Default::default(),
+            held: Default::default(),
             schedule: Default::default(),
             timelines: Default::default(),
             nature: None,
@@ -268,6 +253,10 @@ impl World {
             flooded: Default::default(),
             takings: vec![],
         };
+        for p in &c.positions {
+            let position = Position { entity: p.entity.clone(), title: p.title.clone(), role: p.role.clone(), channels: Arc::new(p.channels.clone()), role_module: p.role_module.clone(), holder: p.holder.clone(), changed: 0 };
+            st.add_position(p.id.clone(), position);
+        }
         for x in &w.structures {
             let f = s.types[&x.structure_type].footprint;
             let cells = crate::config::footprint_cells(&crate::config::detailed_rects(&w.places), &x.at, f).expect("validated");
@@ -540,12 +529,10 @@ impl World {
                 let mut events = vec![Timed::new(t, EventBody::ParticipantOptedOut { participant: participant.clone(), statement: statement.clone() })];
                 // Without a stand-in, nobody is there to act in its positions any more.
                 if vacant {
-                    let held: Vec<Id> = self.state.positions.iter().filter(|(_, x)| x.holder.as_deref() == Some(participant.as_str())).map(|(id, _)| id.clone()).collect();
+                    let held: Vec<Id> = self.state.held_by(participant).into_iter().cloned().collect();
                     for id in held {
                         let c = self.state.stamp();
-                        let x = self.state.positions.get_mut(&id).unwrap();
-                        x.holder = None;
-                        x.changed = c;
+                        self.state.set_holder(&id, None, c);
                         events.push(Timed::new(t, EventBody::Appointed { position: id, holder: None, by: None }));
                     }
                 }
