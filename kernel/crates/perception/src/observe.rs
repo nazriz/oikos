@@ -372,6 +372,8 @@ pub struct RecordIndex {
     standing_record: BTreeMap<&'static str, BTreeSet<u64>>,
     /// cell -> records placed there (and withdrawals of them).
     by_place: BTreeMap<Id, Vec<u64>>,
+    /// The latest record placed anywhere (0: none).
+    placed_last: u64,
     accounts: Option<AccountsByEntity>,
     /// Which accounts, entities and positions have changed, and when (their change stamps): what a channel that
     /// delivers changes reads, where going through every one would cost more.
@@ -379,19 +381,19 @@ pub struct RecordIndex {
     entity_changes: Changes<crate::state::Entity>,
     position_changes: Changes<crate::state::Position>,
     /// The cells areas cover, as worked out so far. (Behind a lock: observations of one moment may be built at once,
-    /// `observe_prepared`, and each answer here is the same whoever works it out first.)
-    scopes: std::sync::Mutex<Scopes>,
+    /// `observe_prepared`, and each answer here is the same whoever works it out first. Read far more than written:
+    /// readers don't wait for each other.)
+    scopes: std::sync::RwLock<Scopes>,
 }
 
-/// The cells areas cover, kept from the first time each is worked out.
+/// The cells areas cover, kept from the first time each is worked out: each the same for the whole run.
 #[derive(Debug, Default)]
 struct Scopes {
-    /// entity -> (its `moved` stamp, the footprints of the buildings it's in then).
-    places: BTreeMap<Id, (u64, Vec<Rect>)>,
-    /// entity -> how near -> (its `moved` stamp, the cells within that of where it is then): worked out from `places`,
-    /// once for each place it's in, not at every look.
-    near: BTreeMap<Id, BTreeMap<i64, (u64, std::sync::Arc<BTreeSet<Id>>)>>,
-    /// place -> its cells, and a channel's list of cells -> the same as a set: the same for the whole run.
+    /// (the footprints of the buildings a body is in, how near) -> the cells within that of them. By where, not by
+    /// whom: everyone in a building has the same surroundings, worked out once, and nothing is redone when a body moves
+    /// to somewhere a body has been before.
+    near: BTreeMap<(Vec<(i64, i64, i64, i64)>, i64), std::sync::Arc<BTreeSet<Id>>>,
+    /// place -> its cells, and a channel's list of cells -> the same as a set.
     place_cells: BTreeMap<Id, std::sync::Arc<BTreeSet<Id>>>,
     listed_cells: BTreeMap<Vec<Id>, std::sync::Arc<BTreeSet<Id>>>,
 }
@@ -504,6 +506,7 @@ impl RecordIndex {
             }
             if let Some(p) = place_of(st, rec) {
                 self.by_place.entry(p.clone()).or_default().push(seq);
+                self.placed_last = self.placed_last.max(seq);
             }
             // Everything stands when made, except a withdrawal: it takes something down.
             if !matches!(rec.body, crate::blocks::RecordBody::Withdrawal { .. }) {
@@ -582,38 +585,56 @@ impl RecordIndex {
 
     /// Records placed within the scope, above `after`, in order.
     fn placed(&self, scope: &Scope, after: u64) -> Vec<u64> {
-        let tail = |v: &Vec<u64>| v[v.partition_point(|&q| q <= after)..].to_vec();
-        let mut seqs: Vec<u64> = match scope {
-            Scope::Everywhere => self.by_place.values().flat_map(tail).collect(),
-            Scope::Cells(ps) => ps.iter().filter_map(|p| self.by_place.get(p)).flat_map(tail).collect(),
+        // (Nothing placed anywhere since: most looks, which ask for what is new. No cell is gone through for it.)
+        if after >= self.placed_last {
+            return vec![];
+        }
+        let mut seqs: Vec<u64> = vec![];
+        let mut tail = |v: &Vec<u64>| {
+            if v.last().is_some_and(|&q| q > after) {
+                seqs.extend_from_slice(&v[v.partition_point(|&q| q <= after)..]);
+            }
         };
+        match scope {
+            Scope::Everywhere => self.by_place.values().for_each(&mut tail),
+            // (Whichever is fewer is gone through: the scope's cells, or the cells anything is placed on.)
+            Scope::Cells(ps) if ps.len() <= self.by_place.len() => ps.iter().filter_map(|p| self.by_place.get(p)).for_each(&mut tail),
+            Scope::Cells(ps) => self.by_place.iter().filter(|(p, _)| ps.contains(*p)).for_each(|(_, v)| tail(v)),
+        }
         seqs.sort_unstable();
+        #[cfg(debug_assertions)]
+        {
+            let plain = |v: &Vec<u64>| v[v.partition_point(|&q| q <= after)..].to_vec();
+            let mut all: Vec<u64> = match scope {
+                Scope::Everywhere => self.by_place.values().flat_map(plain).collect(),
+                Scope::Cells(ps) => ps.iter().filter_map(|p| self.by_place.get(p)).flat_map(plain).collect(),
+            };
+            all.sort_unstable();
+            assert_eq!(seqs, all, "what is placed in a scope, found the short way, isn't what going through every cell finds");
+        }
         seqs
     }
 
     /// The cells an area covers for an entity, now. (Worked out without the lock held, then kept: two at once work
     /// out the same thing.)
     fn scope(&self, s: &Statics, st: &State, area: &Area, me: &str) -> Scope {
-        let scopes = || self.scopes.lock().unwrap_or_else(|e| e.into_inner());
+        let known = || self.scopes.read().unwrap_or_else(|e| e.into_inner());
+        let keep = || self.scopes.write().unwrap_or_else(|e| e.into_inner());
         match area {
             Area::All(_) => Scope::Everywhere,
             Area::Cells(cs) => {
-                if let Some(cells) = scopes().listed_cells.get(cs) {
+                if let Some(cells) = known().listed_cells.get(cs) {
                     return Scope::Cells(cells.clone());
                 }
                 let cells: std::sync::Arc<BTreeSet<Id>> = std::sync::Arc::new(cs.iter().cloned().collect());
-                Scope::Cells(scopes().listed_cells.entry(cs.clone()).or_insert(cells).clone())
+                Scope::Cells(keep().listed_cells.entry(cs.clone()).or_insert(cells).clone())
             }
             Area::Near(n) => {
-                let moved = st.entities.get(me).map_or(0, |e| e.moved);
-                let known = {
-                    let scopes = scopes();
-                    if let Some((_, cells)) = scopes.near.get(me).and_then(|by| by.get(&n.near)).filter(|(m, _)| *m == moved) {
-                        return Scope::Cells(cells.clone());
-                    }
-                    scopes.places.get(me).filter(|(m, _)| *m == moved).map(|(_, rects)| rects.clone())
-                };
-                let rects = known.unwrap_or_else(|| crate::geo::body_rects(s, st, me));
+                let rects = crate::geo::body_rects(s, st, me);
+                let key = (rects.iter().map(|r| (r.x, r.y, r.w, r.h)).collect::<Vec<_>>(), n.near);
+                if let Some(cells) = known().near.get(&key) {
+                    return Scope::Cells(cells.clone());
+                }
                 let g = &s.config.world.ground;
                 let mut cells = BTreeSet::new();
                 for r in &rects {
@@ -625,15 +646,11 @@ impl RecordIndex {
                         }
                     }
                 }
-                let cells = std::sync::Arc::new(cells);
-                let mut scopes = scopes();
-                scopes.places.insert(me.to_string(), (moved, rects));
-                scopes.near.entry(me.to_string()).or_default().insert(n.near, (moved, cells.clone()));
-                Scope::Cells(cells)
+                Scope::Cells(keep().near.entry(key).or_insert(std::sync::Arc::new(cells)).clone())
             }
             // A place's cells: where its area meets a detailed place (never walking a summarised area cell by cell).
             Area::Place(p) => {
-                if let Some(cells) = scopes().place_cells.get(&p.place) {
+                if let Some(cells) = known().place_cells.get(&p.place) {
                     return Scope::Cells(cells.clone());
                 }
                 let mut cells = BTreeSet::new();
@@ -649,7 +666,7 @@ impl RecordIndex {
                     }
                 }
                 let cells = std::sync::Arc::new(cells);
-                Scope::Cells(scopes().place_cells.entry(p.place.clone()).or_insert(cells).clone())
+                Scope::Cells(keep().place_cells.entry(p.place.clone()).or_insert(cells).clone())
             }
         }
     }
