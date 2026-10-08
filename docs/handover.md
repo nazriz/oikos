@@ -146,6 +146,7 @@ For a session starting cold: on a new machine, in the cloud, after a break. Read
   and looked in on, not waited for.
 - A laptop that sleeps looks like a model that's slow. Long runs: detached, with `caffeinate`, on a machine that stays
   awake (what `scripts/mini run` does).
+- **Tax and support are published laws; people stop work at ages of their own (2026-10-09; decisions log, "A payment and a tax are published laws their offices read").** A profile states its tax on pay as a list of charges (`public_finance.income_tax.charges`, with `public_finance.funds`), its support as a list of payments (`support.payments`) and when people stop work as the share in the labour force by age (`labour_force_share_by_age`); the town has two laws of the outside world's (`law-income-tax`, `law-support`) that employers, the payments office and people read. Every town's state hash moved (the 1,000-person town, seed 1, 30 days: eadf8406...; with the curve taken out, de54db6c..., which is main's old run entry for entry). Forms and what is left out: docs/behaviour/public-finance.md, boundary.md (`world.transfers`), citizen.md ("Stopping work").
 - **Running tests on the shared machine (2026-10-08; docs/dev-machine.md).** One full suite per merge: `bun run
   test:all` is run once, on the merge, by whoever merges. On a branch: `bun run test:changed` (the fast tier and the
   tests that import what the branch changed; it says what it chose and why), or `bun scripts/test.ts <filter>...`.

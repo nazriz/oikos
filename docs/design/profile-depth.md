@@ -1,6 +1,6 @@
 # Profile depth: what nine places need that the structure cannot yet say (proposal)
 
-**Status:** a proposal awaiting Naz's sign-off (2026-10-08). No code, contract or profile figure was changed to write
+**Status:** a proposal (2026-10-08). **Sections 3, 4 and 5 (tracks D and E) are built** (2026-10-09; docs/decisions.md, "A payment and a tax are published laws their offices read"): what was built, what differs from the proposal below and what was left to the citizen redesign and to a yearly assessment are there and in docs/behaviour/public-finance.md, boundary.md and citizen.md. The rest awaits Naz's sign-off. No code, contract or profile figure was changed to write
 it, and nothing was run: where it says what a town would do, that is read from the code and the profiles' figures, and
 says so.
 

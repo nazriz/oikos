@@ -24,7 +24,17 @@ A model's parameters from the literature (Lengnick's Table 1, the Bank of Englan
 
 A town spec names its profile (`profile: au-vic-2026`); a spec can override a figure for an experiment (wages, households), and that override is the spec's, not the profile's.
 
-**Adding a place:** copy a profile, replace every figure with that place's, with sources; mark what you can't source as a placeholder. Nothing else changes. If a place needs something a profile can't express (a payment with a means test, say), that's a change to the rule (a module parameter, documented), made generally.
+**Adding a place:** copy a profile, replace every figure with that place's, with sources; mark what you can't source as a placeholder. Nothing else changes. If a place needs something a profile can't express (a payment that falls as income rises, say), that's a change to the rule (a module parameter or a law's form, documented), made generally.
+
+## A place's laws on pay and support, and when people stop work (2026-10-08)
+
+Three things a profile states as its place's own rules, in forms general enough for any place. Each is published in the town as a law that its office reads; none is a module's setting.
+
+- **Tax on pay** (`public_finance.income_tax.charges`): the law's list of charges, each with what it is charged on, its schedule, its reliefs, and whom it is paid to (`paid_to`: one of `public_finance.funds`, the place's named funds and bodies; `"town"` for a local tax; nothing said: the general government). The forms are in docs/behaviour/public-finance.md. Sums are a year's.
+- **Support payments** (`support.payments`): the law's list of payments, each a rule in three parts: who qualifies, how much, for how long; and how often it is paid and from where (`paid_from`: a fund, or the general government). The forms are in docs/behaviour/boundary.md (`world.transfers`). A payment reckoned from a record of contributions needs a charge that is reported worker by worker (`itemised`); the generator refuses a profile that has the one without the other.
+- **Stopping work** (`labour_force_share_by_age`): the share of people in the labour force by age band, from the place's labour force survey; the first band is the reference. Each person in the labour force is given their own age of stopping, drawn so the shares by age come out as the survey's (docs/behaviour/citizen.md, "Stopping work"). Left out, everyone stops at `retirement_age`. With it, `retirement_age` is still the age the profile's other figures by age turn on (the retired's savings, a retirement fund's access) and the top of the working ages the measures use; the pension's age is the payment's own, and so is the last age of a payment for those out of work.
+
+**Moving a figure into these forms, and saying a rule truly.** An author states a rule as the law states it where the source gives it; where the source gives only a typical sum or an approximation, the author keeps that as a stand-in and the source note says what the true rule's form would be. Every note that was changed on 2026-10-08 ends with what was moved, what was said for the first time and from what, and what is still a stand-in.
 
 ## What a profile states, and what the generator derives
 
@@ -46,7 +56,8 @@ A profile states what can be observed in a place: wages, rents, prices of real t
 ## What a place may not have
 
 A place that has no such institution leaves the figure out. Nothing is stated as nought to stand for "none":
-- no payment to the unemployed: leave out `support.unemployment` (nobody claims one, none is paid);
+- no payment to the unemployed: leave it out of `support.payments` (nobody claims one, none is paid or counted); no payments at all: an empty list, and no support law is written;
+- no tax on pay: an empty list of charges (no law is written, nothing is withheld);
 - no landfill charge: leave out `services.landfill_levy_per_tonne` (no budget line for it);
 - no serviceability buffer: leave out `credit.serviceability_buffer_bps`;
 - no rule on rent increases: leave out `tenancy.rent_review_months` and `rent_increase_notice_days` (no such law is written; `tenancy.rent_review_practice_months` says how often landlords review rents anyway, if they do);
@@ -54,7 +65,7 @@ A place that has no such institution leaves the figure out. Nothing is stated as
 - no retirement fund: leave out `retirement_fund` (and a town doesn't ask for one);
 - voting required by law or not: `elections.compulsory_voting` (the town's election law says "must" or "may").
 
-Still required, though some places lack them (to do): an age pension (`support.pension`), a union, income tax, council rates, a clinic and school funded from outside.
+Still required, though some places lack them (to do): a union, council rates, a clinic and school funded from outside.
 
 ## Guardrails
 
@@ -79,11 +90,11 @@ Still required, though some places lack them (to do): an age pension (`support.p
 - **How money is written** is one convention: the sign before the amount, thousands in threes with commas, a full stop before the decimals (`formatMoney`, and the resolver's twin). Not every place's.
 - **The profiles' own notes on `opening`** still mention a shop's and a factory's opening sums (removed from the figures on 2026-10-08; the prose is their authors').
 - **Three profiles state a working week longer than their daily round** (gb-eng-2026: 48 hours over five days of 9 to 5; mx-jal-2026: 48 over five; ke-nakuru-2026: 52 over five days of 8 to 5): each gave the legal ceiling. The town generates and runs (a wage buys the hours stated), but the day is longer than the round shows. For their authors.
-- **Figures of nought still standing for "none" in the profiles as written** (a profile can now leave the thing out; the figures are their authors', so they were left for them): no payment to the unemployed stated as an amount of 0 (in-tn-2026, ke-nakuru-2026, mx-jal-2026); a landfill charge of 0 (de-ni-2026, in-tn-2026, ke-nakuru-2026); a serviceability buffer of 0 (us-oh-2026, de-ni-2026, in-tn-2026, mx-jal-2026); ballot figures of 0 (in-tn-2026: both; de-ni-2026: turnout) and a notice of 0 days (us-oh-2026, de-ni-2026). Until they are left out, those towns have a payment of nothing that people claim, a levy line of nothing, and a ballot law that binds nothing.
+- **Figures of nought still standing for "none" in the profiles as written** (a profile can now leave the thing out; the figures are their authors', so they were left for them): a landfill charge of 0 (de-ni-2026, in-tn-2026, ke-nakuru-2026); a serviceability buffer of 0 (us-oh-2026, de-ni-2026, in-tn-2026, mx-jal-2026); ballot figures of 0 (in-tn-2026: both; de-ni-2026: turnout) and a notice of 0 days (us-oh-2026, de-ni-2026). Until they are left out, those towns have a levy line of nothing and a ballot law that binds nothing. (The payment of nought to the unemployed in three profiles is gone since 2026-10-08, and so is the levy of nought on pay in two.)
 - **Every profile states `pay_period_days` 14**, with wages its author converted to fourteen days: where pay is monthly, the author restates the wages for a month and sets 30.
 - **Stated sums that should follow from wages** and still don't: what the bank, the town, the builder and a landlord hold on the first day, the least a working adult has saved, and the retired's savings (`opening`, `retiree_savings`). Each author scaled the first profile's by a wage ratio.
 - **Some rules were modelled on one country's institutions:**
-  - the Age Pension's age window, as the support payments' eligibility;
+  - the stand-ins that remain in the profiles' support payments and taxes (each note says which): a family transfer paid as a flat payment to those out of work (br-mg-2026), a means-tested pension paid to everyone (in-tn-2026), tariffs approximated by steps (de-ni-2026, jp-akita-2026, br-mg-2026);
   - Victoria's rules in the example legal code.
   - the retirement fund's rules, in a world that has one (`fund.retirement`, off by default: a pension of at least a yearly share of the balance, rising with age; paid from the age people here stop work), after Australia's account-based pensions.
 
