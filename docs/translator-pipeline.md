@@ -18,7 +18,9 @@ For each *lane* (the training pilots; and the test-only pilots, if there are any
 there and whole is skipped.
 
 1. **Situations** (`oikos in-situ`): every time a model seat was asked what to do, read back from the pilots' logs: the seat's
-   prompt as sent, what it was shown, the forms it knew of; and the seats' own requests that are no test case. The real test
+   prompt as sent, what it was shown, the forms it knew of, and the money of its world (the log's header: its first
+   currency), which goes with every request and example made from it, so that amounts are compared, and can be written
+   again, as that world writes them; and the seats' own requests that are no test case. The real test
    cases (`translator/eval/pilot-cases.ts`) and every seat-day they come from are marked and never given out.
 2. **Select**: which situations each writer gets. One seat-day in `every` (3), one turn of it (a turn where the seat itself
    asked for something, if there is one), spread through the run; at most `situations` in all, shared among the seat model

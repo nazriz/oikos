@@ -91,7 +91,7 @@ test("money is read and written in the world's own currency: no smaller unit, th
   expect([said(fine, "FIN 0.00000001"), said(fine, "1.5"), formatMoney("150000001", fine)]).toEqual(["1", "150000000", "FIN 1.50000001"]);
 
   // The town's own, to the limits: 38 digits at most, and its words in the refusals.
-  expect(said(TOWN_MONEY, "$1.234")).toBe("refused: more than two decimals: $1.234");
+  expect(said(TOWN_MONEY, "$1.234")).toBe("refused: a point with three digits after it can be read two ways: $1.234");
   expect(said(TOWN_MONEY, "aud 500")).toBe("50000");
   expect(said(TOWN_MONEY, `$${"9".repeat(36)}`)).toBe(`${"9".repeat(36)}00`);
   expect(said(TOWN_MONEY, `$${"9".repeat(37)}`)).toBe(`refused: too large: $${"9".repeat(37)}`);
@@ -103,7 +103,7 @@ test("amounts and durations convert by table, with no arithmetic beyond the digi
   // Exact beyond JSON's 2^53 (D58): a world's sums can be that large.
   expect(parseAmount("$120 trillion")).toBe("12000000000000000");
   expect(parseAmount("$90,071,992,547,409.93")).toBe("9007199254740993");
-  for (const bad of ["10%", "half", "$1,23", "$1.234", "1.5 cents", "about $500"]) expect(() => parseAmount(bad)).toThrow();
+  for (const bad of ["10%", "half", "$1,2345", "$1.234", "1.5 cents", "about $500"]) expect(() => parseAmount(bad)).toThrow();
   expect(["monthly", "every 3 months", "2 weeks", "a year", "fortnightly", "30 days"].map(calls.parseDuration)).toEqual([2592000, 7776000, 1209600, 31536000, 1209600, 2592000]);
   for (const bad of ["next Friday", "soon", "1.5 days"]) expect(() => calls.parseDuration(bad)).toThrow();
 });

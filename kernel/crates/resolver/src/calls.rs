@@ -390,47 +390,110 @@ impl Currency {
 
 const NUMBER_WORDS: [&str; 9] = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight"];
 
-/// An amount as written, in the currency's smallest unit, exact, as a decimal string: its sign or code, digits (grouped
-/// or not, with decimals), a multiplier (k, m, b, t, thousand ... trillion), then a word for its unit or its smallest
-/// unit, or its code. Bare digits are whole units. Nothing finer than the smallest unit, and no arithmetic on anything
-/// but the digits written. (participants/src/calls.ts `parseAmount` is the same, step for step.)
+/// An amount as written, in the currency's smallest unit, exact, as a decimal string.
+///
+/// What is read, in this order:
+///  - a marker of this world's money, before the digits or after them, with a space or without: the currency's sign,
+///    its code, a word for its unit, or its sign with the first two letters of its code before it (how a sign that
+///    several currencies share is told apart). A marker that ends in a letter may have a full stop and a space after it;
+///  - the digits, with their separators. A comma and a point together: the one written last is the decimal mark and
+///    the other groups the digits. Either of them written more than once groups the digits. A point written once is
+///    a decimal point. A comma written once groups the digits if three follow it, and is a decimal comma if one or two
+///    do. Digits are grouped in threes, or (with commas) the last three and then twos;
+///  - a multiplier (k, m, b, t; thousand, million, billion, trillion; lakh, crore), only where a marker or the end
+///    follows it;
+///  - then a marker again, or a word for the smallest unit (then whole digits and no multiplier).
+/// Bare digits are whole units. Nothing finer than the smallest unit, and no arithmetic on anything but the digits
+/// written.
+///
+/// What is not read, because it could be two numbers and a currency's config doesn't say which: a point written once
+/// with three digits after it, in a currency of fewer than three decimals. Another currency's sign, code or words are
+/// not this world's money, and are not read; nor is a number written out in words.
+/// (participants/src/calls.ts `parseAmount` is the same, step for step; contracts/test/amounts.json holds what both
+/// must read and what both must refuse.)
 pub fn parse_amount(s: &str, cur: &Currency) -> Result<String, UnitError> {
     let err = || UnitError(format!("not an amount: {s}"));
+    let grouping = || UnitError(format!("badly grouped digits: {s}"));
     let t = s.trim().to_lowercase().split_whitespace().collect::<Vec<_>>().join(" ");
     let code = cur.code.to_lowercase();
     let symbol = cur.symbol.as_ref().map(|x| x.to_lowercase());
     let minor = usize::from(cur.minor_units);
+    let minors: Vec<String> = cur.minor_words.iter().map(|u| u.to_lowercase()).collect();
+    // What marks an amount as this world's money. (Tried longest first: a sign may be how its code or a word begins.)
+    let mut markers: Vec<String> = vec![code.clone()];
+    markers.extend(cur.unit_words.iter().map(|u| u.to_lowercase()));
+    if let Some(x) = &symbol {
+        markers.push(x.clone());
+        if !x.chars().any(|c| c.is_ascii_lowercase() || c.is_ascii_digit()) {
+            markers.push(format!("{}{x}", code.chars().take(2).collect::<String>()));
+        }
+    }
+    markers.retain(|m| !m.is_empty());
+    markers.sort_by_key(|m| std::cmp::Reverse(m.chars().count()));
+    let space = |x: &'_ str| -> usize { usize::from(x.starts_with(' ')) };
+    let is_unit = |w: &str| markers.iter().any(|m| m == w);
+    let is_minor = |w: &str| minors.iter().any(|m| m == w);
+    let digit = |c: Option<char>| c.is_some_and(|c| c.is_ascii_digit());
     let mut rest = t.as_str();
-    rest = match symbol.as_deref().and_then(|x| rest.strip_prefix(x)) {
-        Some(r) => r,
-        None => rest.strip_prefix(code.as_str()).unwrap_or(rest),
+    if !digit(rest.chars().next()) {
+        // A marker first: one that has the digits straight after it.
+        let mut found = None;
+        for m in &markers {
+            let Some(mut r) = rest.strip_prefix(m.as_str()) else { continue };
+            if m.ends_with(|c: char| c.is_ascii_lowercase()) && r.starts_with(". ") {
+                r = &r[1..];
+            }
+            r = &r[space(r)..];
+            if digit(r.chars().next()) {
+                found = Some(r);
+                break;
+            }
+        }
+        rest = found.ok_or_else(err)?;
+    }
+    // The digits and their separators (a separator is one only between two digits).
+    let bytes = rest.as_bytes();
+    let mut end = 0;
+    while end < bytes.len() && (bytes[end].is_ascii_digit() || ((bytes[end] == b',' || bytes[end] == b'.') && bytes.get(end + 1).is_some_and(|b| b.is_ascii_digit()))) {
+        end += 1;
+    }
+    let number = &rest[..end];
+    rest = &rest[end..];
+    rest = &rest[space(rest)..];
+    // Which separator is the decimal mark, if either is.
+    let commas = number.matches(',').count();
+    let points = number.matches('.').count();
+    let mark = if commas > 0 && points > 0 {
+        Some(if number.rfind(',') > number.rfind('.') { ',' } else { '.' })
+    } else if points == 1 {
+        Some('.')
+    } else if commas == 1 && number.len() - number.find(',').unwrap_or(0) - 1 < 3 {
+        Some(',')
+    } else {
+        None
     };
-    rest = rest.strip_prefix(' ').unwrap_or(rest);
-    let digits_end = rest.find(|c: char| !(c.is_ascii_digit() || c == ',')).unwrap_or(rest.len());
-    let whole = &rest[..digits_end];
-    if whole.is_empty() || !whole.starts_with(|c: char| c.is_ascii_digit()) {
+    let group = if mark == Some(',') || (mark.is_none() && points > 0) { '.' } else { ',' };
+    let (whole, frac) = match mark.and_then(|m| number.rfind(m)) {
+        Some(cut) => (&number[..cut], &number[cut + 1..]),
+        None => (number, ""),
+    };
+    if mark.is_some_and(|m| whole.contains(m)) {
+        return Err(grouping());
+    }
+    if frac.len() > minor.max(3) {
         return Err(err());
     }
-    rest = &rest[digits_end..];
-    let mut frac = "";
-    if let Some(r) = rest.strip_prefix('.') {
-        let n = r.find(|c: char| !c.is_ascii_digit()).unwrap_or(r.len());
-        if n == 0 || n > minor.max(3) {
-            return Err(err());
-        }
-        frac = &r[..n];
-        rest = &r[n..];
-    }
-    rest = rest.strip_prefix(' ').unwrap_or(rest);
-    let is_unit = |w: &str| w == code || cur.unit_words.iter().any(|u| u.to_lowercase() == w);
-    let is_minor = |w: &str| cur.minor_words.iter().any(|u| u.to_lowercase() == w);
-    let mults: [(&str, u128); 8] = [("thousand", 1_000), ("million", 1_000_000), ("billion", 1_000_000_000), ("trillion", 1_000_000_000_000), ("k", 1_000), ("m", 1_000_000), ("b", 1_000_000_000), ("t", 1_000_000_000_000)];
+    let mults: [(&str, u128); 12] = [
+        ("thousand", 1_000), ("million", 1_000_000), ("billion", 1_000_000_000), ("trillion", 1_000_000_000_000),
+        ("lakh", 100_000), ("lakhs", 100_000), ("crore", 10_000_000), ("crores", 10_000_000),
+        ("k", 1_000), ("m", 1_000_000), ("b", 1_000_000_000), ("t", 1_000_000_000_000),
+    ];
     let mut mult: u128 = 1;
     let mut has_mult = false;
     for (w, m) in mults {
         if let Some(r) = rest.strip_prefix(w) {
-            // (A multiplier only when a unit's word or the end follows.)
-            let r2 = r.strip_prefix(' ').unwrap_or(r);
+            // (A multiplier only when a marker, a word for the smallest unit, or the end follows.)
+            let r2 = &r[space(r)..];
             if r2.is_empty() || is_unit(r2) || is_minor(r2) {
                 mult = m;
                 has_mult = true;
@@ -439,22 +502,29 @@ pub fn parse_amount(s: &str, cur: &Currency) -> Result<String, UnitError> {
             }
         }
     }
-    rest = rest.strip_prefix(' ').unwrap_or(rest);
+    rest = &rest[space(rest)..];
     let in_minor = match rest {
         "" => false,
         w if is_unit(w) => false,
         w if is_minor(w) => true,
         _ => return Err(err()),
     };
-    if whole.contains(',') {
-        let groups: Vec<&str> = whole.split(',').collect();
-        let ok = !groups[0].is_empty() && groups[0].len() <= 3 && groups[1..].iter().all(|g| g.len() == 3);
-        if !ok {
-            return Err(UnitError(format!("badly grouped digits: {s}")));
+    let groups: Vec<&str> = whole.split(group).collect();
+    if groups.len() > 1 {
+        let first = groups[0].len();
+        let last = groups.len() - 1;
+        let threes = first <= 3 && groups[1..].iter().all(|g| g.len() == 3);
+        let twos = group == ',' && groups.len() > 2 && first <= 2 && groups[1..last].iter().all(|g| g.len() == 2) && groups[last].len() == 3;
+        if !threes && !twos {
+            return Err(grouping());
         }
     }
     if in_minor && (!frac.is_empty() || has_mult) {
         return Err(err());
+    }
+    // (The one that could be two numbers is said to be so: one to three digits, a point, three digits.)
+    if frac.len() > minor && mult == 1 && mark == Some('.') && frac.len() == 3 && commas == 0 && whole.len() <= 3 && !whole.starts_with('0') {
+        return Err(UnitError(format!("a point with three digits after it can be read two ways: {s}")));
     }
     if frac.len() > minor && mult == 1 {
         return Err(UnitError(match minor {
@@ -464,7 +534,7 @@ pub fn parse_amount(s: &str, cur: &Currency) -> Result<String, UnitError> {
     }
     let large = || UnitError(format!("too large: {s}"));
     let per_unit: u128 = if in_minor { 1 } else { 10u128.pow(u32::from(cur.minor_units)) };
-    let whole_n: u128 = whole.replace(',', "").parse().map_err(|_| large())?;
+    let whole_n: u128 = groups.concat().parse().map_err(|_| large())?;
     // The decimals, carried exactly: what's written, times the multiplier, must come to whole smallest units.
     let frac_n: u128 = if frac.is_empty() { 0 } else { frac.parse().map_err(|_| err())? };
     let frac_scaled = frac_n * mult * per_unit;
@@ -624,10 +694,12 @@ mod tests {
         assert_eq!(parse_amount("$2m").unwrap(), "200000000");
         assert_eq!(parse_amount("500 dollars").unwrap(), "50000");
         assert_eq!(parse_amount("$3 trillion").unwrap(), "300000000000000");
-        assert!(parse_amount("1,23").is_err());
+        assert_eq!(parse_amount("1,23").unwrap(), "123"); // (a comma with two digits after it can only be a decimal comma)
+        assert!(parse_amount("1,2345").is_err());
         assert!(parse_amount("$1.234").is_err());
         assert!(parse_amount("ten dollars").is_err());
-        assert_eq!(parse_amount("$1.234").unwrap_err().0, "more than two decimals: $1.234");
+        assert_eq!(parse_amount("$1.234").unwrap_err().0, "a point with three digits after it can be read two ways: $1.234");
+        assert_eq!(parse_amount("$0.005").unwrap_err().0, "more than two decimals: $0.005");
         assert_eq!(parse_amount("twn 500").unwrap(), "50000");
         assert_eq!(parse_amount("1.5 cents").unwrap_err().0, "not an amount: 1.5 cents");
         assert_eq!(parse_amount("$90,071,992,547,409.93").unwrap(), "9007199254740993");
@@ -645,6 +717,41 @@ mod tests {
         assert_eq!(format_money("5"), "$0.05");
         assert_eq!(format_money("100000000"), "$1,000,000.00");
         assert_eq!(format_money("-5"), "-$0.05");
+    }
+
+    /// The table both readers of amounts are held to (the TypeScript one: translator/test/amounts.test.ts): every
+    /// amount in it reads as it says in its own currency, or is refused.
+    #[test]
+    fn amounts_read_as_the_shared_table_says() {
+        let table: serde_json::Value = serde_json::from_str(include_str!("../../../../contracts/test/amounts.json")).unwrap();
+        let cases = table["cases"].as_array().unwrap();
+        assert!(cases.len() > 200);
+        let mut wrong = Vec::new();
+        for case in cases {
+            let (name, text) = (case[0].as_str().unwrap(), case[1].as_str().unwrap());
+            let cur = Currency::from_config(&table["currencies"][name]).unwrap();
+            let got = parse_amount(text, &cur).ok();
+            if got.as_deref() != case[2].as_str() {
+                wrong.push(format!("{name}: {text:?} read as {got:?}, wanted {}", case[2]));
+            }
+        }
+        // What a refusal says (the participant is told it): the same words from both readers.
+        for case in table["refusals"].as_array().unwrap() {
+            let (name, text) = (case[0].as_str().unwrap(), case[1].as_str().unwrap());
+            let cur = Currency::from_config(&table["currencies"][name]).unwrap();
+            match parse_amount(text, &cur) {
+                Err(e) if Some(e.0.as_str()) == case[2].as_str() => {}
+                other => wrong.push(format!("{name}: {text:?} answered {other:?}, wanted {}", case[2])),
+            }
+        }
+        assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+        // What a world writes an amount as reads back as that amount.
+        for cur in table["currencies"].as_object().unwrap().values() {
+            let cur = Currency::from_config(cur).unwrap();
+            for n in ["0", "1", "5", "99", "100", "1000", "123456", "100000", "1234567", "50000000", "123456789012", "9007199254740993"] {
+                assert_eq!(parse_amount(&format_money(n, &cur), &cur).unwrap(), n, "{}", cur.code);
+            }
+        }
     }
 
     #[test]
