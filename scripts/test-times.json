@@ -32,6 +32,7 @@
  "orchestrator/test/models.test.ts": 10.5,
  "orchestrator/test/nature.test.ts": 203.2,
  "orchestrator/test/offers.test.ts": 9.2,
+ "orchestrator/test/pipeline.test.ts": 2.1,
  "orchestrator/test/ownership.test.ts": 71.9,
  "orchestrator/test/perception.test.ts": 168,
  "orchestrator/test/prices.test.ts": 158.9,
