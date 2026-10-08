@@ -161,11 +161,11 @@ test("a town is generated from each profile, taking its figures from it", () => 
     const c = generate({ ...spec, citizens: 60, profile: p.id });
     expect(c.world.currencies).toEqual([p.values.currency]);
     const retail = c.participants.find((x: any) => x.controller?.impl === "firm.retailer");
-    expect(retail.controller.params.wage).toBe(p.values.wages_per_fortnight.shop);
+    expect(retail.controller.params.wage).toBe(p.values.wages_per_pay_period.shop);
     const person = c.participants.find((x: any) => x.kind === "person");
     expect(person.controller.params.retirement_age).toBe(p.values.retirement_age);
   }
-});
+}, 120_000); // (nine towns to generate: longer than a test's usual five seconds on a busy machine)
 
 test("platform code names none of a generated world's entities, accounts or buildings: modules are told whom they deal with", () => {
   // Every id the generated town has (its organisations, people, accounts and buildings): none may be written into the

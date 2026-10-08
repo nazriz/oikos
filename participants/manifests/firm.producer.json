@@ -1,6 +1,6 @@
 {
   "name": "firm.producer",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "doc": "docs/behaviour/producer.md",
   "params": {
     "builder": {

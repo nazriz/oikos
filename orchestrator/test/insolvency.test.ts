@@ -22,6 +22,10 @@ test("a factory with no customers and no credit is wound up: everyone let go, wh
   // ... nor the town's shops (with the energy retailer's ordering loop fixed, 2026-10-02, they bought from it, and it
   // didn't fail).
   for (const p of [...config.participants, ...(config.positions ?? [])]) for (const prm of [p.controller?.params, p.role_module?.params]) if (Array.isArray(prm?.suppliers)) prm.suppliers = prm.suppliers.filter((x: string) => x !== "factory-2");
+  // ... who also find wholesalers by their lists, and since 2026-10-08 choose among those at one price each in its own
+  // order, not all the first by name: so its list asks more than anyone pays (three times the imports' price).
+  const own = [...config.participants, ...(config.positions ?? [])].flatMap((p: any) => [p.controller?.params, p.role_module?.params]).find((prm: any) => prm?.works === "factory-2-works");
+  own.price = 3 * own.price;
   // ... and nothing in stock to sell (a firm with goods to sell can still pay).
   config.world.holdings = config.world.holdings.filter((h: any) => h.holder !== "factory-2");
   const out = join(root, "runs", "test-insolvency");

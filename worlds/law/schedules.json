@@ -59,6 +59,33 @@
       }
     },
     {
+      "id": "schedule-industrial-action-notice",
+      "record": "statement",
+      "author": "genesis",
+      "at": 0,
+      "visible_to": ["city"],
+      "speaks_for": "city",
+      "kind": "law_schedule",
+      "basis": "law-charter",
+      "text": "How the law on notice of industrial action is written from its figure, where no ballot is required: the notice an employer must have.",
+      "data": {
+        "title": "the law on notice of industrial action",
+        "form": "amend_industrial_action_notice",
+        "figures": {
+          "notice": { "type": "duration", "unit": "days", "label": "notice to the employer", "description": "The least written notice the employer must have of the action (for example: 14 days)." }
+        },
+        "text": "Industrial action is protected only if the employer has written notice of at least {notice}.",
+        "adico": {
+          "attribute": "unions",
+          "deontic": "must_not",
+          "aim": "take industrial action",
+          "condition": "without written notice to the employer of at least {notice}",
+          "or_else": "the action is unprotected"
+        },
+        "formal": "block.block == 'publish' && block.kind == 'industrial_action' && block.data.from - now < {notice:seconds}"
+      }
+    },
+    {
       "id": "schedule-tenancy",
       "record": "statement",
       "author": "genesis",

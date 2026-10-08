@@ -39,6 +39,12 @@ export interface LlmRequest {
   system: string;
   messages: LlmMessage[];
   tools?: ToolSpec[];
+  /** The answer wanted as one object of a given shape (a JSON Schema: every object closed, every property required),
+   * in place of tools and words. An adapter that asks its model for a shape directly (Claude Code, the Codex CLI) asks
+   * for exactly this one and hands the object back as a tool_use block of this name, its input the object: nothing in
+   * it is a string of JSON for the model to escape by hand. Other adapters leave it and use `tools`, so a caller that
+   * may meet either gives both (a tool of the same name taking the same object). */
+  answer?: { name: string; schema: object };
   maxTokens: number;
   /** Structured facts behind the prompt, for mock policies only. Never sent to a real model. */
   context?: any;

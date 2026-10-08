@@ -13,7 +13,7 @@ import { DuckDBInstance, type DuckDBConnection } from "@duckdb/node-api";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { basename, join } from "node:path";
 
-export const MEASURE_VERSION = "0.4.0";
+export const MEASURE_VERSION = "0.5.0";
 
 const QUERY_DIR = join(import.meta.dir, "../queries");
 
@@ -34,6 +34,10 @@ const TABLES: { [name: string]: string } = {
       json_extract_string(h.body, '$.kernel.version') as kernel_version,
       json_extract_string(h.body, '$.kernel.build') as kernel_build,
       (json_extract_string(h.body, '$.config.clock.run_seconds'))::BIGINT as run_seconds,
+      -- The world's money (its first currency): its code, and the decimal places of its smallest unit, which every
+      -- amount in the log is counted in. A measure that reports money divides by 10 to that power.
+      json_extract_string(h.body, '$.config.world.currencies[0].code') as currency,
+      coalesce((json_extract_string(h.body, '$.config.world.currencies[0].minor_units'))::INTEGER, 0) as minor_units,
       json_extract_string(e.body, '$.reason') as end_reason, e.t as end_t, json_extract_string(e.body, '$.state_hash') as state_hash,
       (select count(*) from raw) as entries,
       (select json_extract_string(a.body, '$.data.version') from raw a where a.kind = 'annotation' and json_extract_string(a.body, '$.annotation') = 'orchestrator' limit 1) as orchestrator_version

@@ -94,7 +94,9 @@ test("a child born here is brought home by the parent who bore them and added to
     if (365 * DAY - b.t < 14 * DAY) continue; // born in the run's last fortnight
     if (ev.some((e) => e.event === "person_left" && e.person === b.parents[0] && e.t < b.t)) continue; // born away (the mother had left town)
     expect(records.some((r) => r.data.members.some((m: any) => m.person === b.person && m.sex === b.sex))).toBe(true);
-    const home = ev.find((e) => e.event === "occupied" && e.occupant === b.person);
+    // (Their first move into a home: a newborn that is hurt may be at the clinic before it is brought home, as one was
+    // in this town from 2026-10-08.)
+    const home = ev.find((e) => e.event === "occupied" && e.occupant === b.person && !String(e.space).startsWith("clinic-"));
     if (home) expect(home.by).toBe(`${b.parents[0]}-self`);
   }
   // Nothing refused but same-moment races (D58; and a new employer naming, on their first day, someone who has
