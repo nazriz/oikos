@@ -33,15 +33,20 @@
 //
 // No structured data but a claim's slots is written (data.ts `JSON_OUT_OF_SCOPE`): the first model copies and chooses.
 
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { calls, type Currency } from "@oikos/participants";
-import { amountWritings, askable, FIELD_TYPES, goldText, howOften, implausible, sampler, shapeOf, shuffled, type FormField, type FormSpec, type Gold } from "./data";
+import { amountWritings, askable, FIELD_TYPES, goldText, howOften, implausible, sampler, shapeOf, shuffled, type FormField, type FormSpec, type Gold, type WrittenCurrency } from "./data";
 
 /**
  * How invented worlds write their money: a sign before the amount or only a code; two decimal places, none, or three;
- * words for the unit and its smallest part, or none. None is any place's: the model is to learn that an amount is
+ * words for the unit and its smallest part, or none; and, in the last few, a way of writing numbers that is not the
+ * first worlds' (data.ts `Writing`): a decimal comma with points between the thousands, the sign after the digits or
+ * spaced from them, digits grouped in twos with the words for those groups, a sign of letters, a sign other
+ * currencies share written with letters of the code. None is any place's: the model is to learn that an amount is
  * whatever span is written as one. (`$` is among them because a real world's may be; nothing depends on it.)
  */
-export const CURRENCIES: Currency[] = [
+export const CURRENCIES: WrittenCurrency[] = [
   { code: "DLR", minor_units: 2, symbol: "$", unit_words: ["dollar", "dollars"], minor_words: ["cent", "cents"] },
   { code: "FLN", minor_units: 2, symbol: "ƒ", unit_words: ["florin", "florins"], minor_words: ["penny", "pence"] },
   { code: "KRN", minor_units: 2, symbol: "kr", unit_words: ["krona", "kronor"], minor_words: ["ore"] },
@@ -53,7 +58,33 @@ export const CURRENCIES: Currency[] = [
   { code: "ORO", minor_units: 0, unit_words: ["oro", "oros"] },
   { code: "DNR", minor_units: 3, unit_words: ["dinar", "dinars"], minor_words: ["fils"] },
   { code: "LRA", minor_units: 3, symbol: "₤", unit_words: ["lira", "lire"] },
+  { code: "GLD", minor_units: 2, symbol: "₲", unit_words: ["gulden", "guldens"], minor_words: ["stiver", "stivers"], written: { decimal_mark: ",", symbol_after: true } },
+  { code: "NVO", minor_units: 2, symbol: "N$", unit_words: ["novo", "novos"], minor_words: ["centimo", "centimos"], written: { decimal_mark: ",", symbol_spaced: true } },
+  { code: "RPA", minor_units: 2, symbol: "₨", unit_words: ["rupa", "rupas"], minor_words: ["pai", "pais"], written: { grouping: "twos", symbol_spaced: true } },
+  { code: "TSH", minor_units: 2, symbol: "TSh", unit_words: ["shilling", "shillings", "bob"], minor_words: ["cent", "cents"], written: { symbol_spaced: true } },
+  { code: "PSO", minor_units: 2, symbol: "$", unit_words: ["peso", "pesos"], minor_words: ["centavo", "centavos"], written: { country_sign: true } },
+  { code: "ZEN", minor_units: 0, symbol: "圓", unit_words: ["zen"], written: { symbol_after: true } },
 ];
+
+/**
+ * The money of the worlds there are: each profile's currency (worlds/profiles/), as its profile gives it. A profile
+ * says nothing of how numbers are written there (it has no field for it), so these are written the ways every world's
+ * money is. In the order of the profiles' file names; one that is an invented world's exactly is not said twice.
+ */
+export function worldsCurrencies(dir = join(import.meta.dir, "../../worlds/profiles")): Currency[] {
+  const out: Currency[] = [];
+  for (const f of readdirSync(dir).filter((x) => x.endsWith(".json")).sort()) {
+    const cur = JSON.parse(readFileSync(join(dir, f), "utf8")).values?.currency as Currency | undefined;
+    if (cur && typeof cur.code === "string" && Number.isInteger(cur.minor_units) && ![...CURRENCIES, ...out].some((x) => JSON.stringify(x) === JSON.stringify(cur))) out.push(cur);
+  }
+  return out;
+}
+
+/** The money generated programs are in, unless told otherwise: the invented worlds', then the worlds' there are
+ * (read once). So what is generated for a seed changes when a profile is added: a set's manifest counts its examples
+ * by currency (`by_currency`). */
+let every: WrittenCurrency[] | undefined;
+export const everyCurrency = (): WrittenCurrency[] => (every ??= [...CURRENCIES, ...worldsCurrencies()]);
 
 // ---------------------------------------------------------------- pools
 
@@ -558,7 +589,7 @@ export interface SyntheticOptions {
   only?: string[];
   /** The share of a function's programs that are several dependent lines, where it has such programs (default 0.12). */
   dependent?: number;
-  /** How the invented worlds write money (default: CURRENCIES). */
+  /** The money the programs are in (default: `everyCurrency()`, the invented worlds' and each profile's). */
   currencies?: Currency[];
   /** Counts, by reason, the programs drawn and dropped as no plausible thing to ask for (data.ts `implausible`). */
   dropped?: { [reason: string]: number };
@@ -585,7 +616,7 @@ export function synthetic(o: SyntheticOptions = {}): Gold[] {
     const seen = new Set<string>();
     const dependent = DEPENDENT[fn] ?? [];
     for (let tries = 0; seen.size < per && tries < per * 40; tries++) {
-      const d = new Draw(rand, o.currencies ?? CURRENCIES);
+      const d = new Draw(rand, o.currencies ?? everyCurrency());
       const lines = dependent.length && rand() < (o.dependent ?? 0.12) ? d.pick(dependent)(d) : RECIPES[fn](d);
       const g = goldOf(lines, d, `synthetic: ${fn}`, undefined, o.dropped);
       if (!g || seen.has(g.program)) continue;
@@ -668,7 +699,7 @@ export interface FormOptions {
 /** The invented forms, in their sets: for a seed, always the same. */
 export function formSets(o: FormOptions = {}): FormSpec[][] {
   const rand = sampler(hash(`${o.seed ?? 1}:form sets`));
-  const d = new Draw(rand, o.currencies ?? CURRENCIES);
+  const d = new Draw(rand, o.currencies ?? everyCurrency());
   const taken = new Set<string>();
   const types: string[] = [];
   const sets: FormSpec[][] = [];
@@ -699,9 +730,9 @@ export function syntheticForms(o: FormOptions = {}): Gold[] {
   formSets(o).forEach((set, si) => set.forEach((spec, fi) => {
     const rand = sampler(hash(`${o.seed ?? 1}:form ${si}.${fi}`));
     for (let n = 0, tries = 0; n < (o.perForm ?? 5) && tries < 60; tries++) {
-      const d = new Draw(rand, o.currencies ?? CURRENCIES);
+      const d = new Draw(rand, o.currencies ?? everyCurrency());
       // (A set of forms is one world's: its amounts are all in that world's money.)
-      d.currency = (o.currencies ?? CURRENCIES)[si % (o.currencies ?? CURRENCIES).length]!;
+      d.currency = (o.currencies ?? everyCurrency())[si % (o.currencies ?? everyCurrency()).length]!;
       const filled = Object.entries(spec.fields).filter(([, f]) => f.required || d.maybe(0.5));
       const fields = filled.length ? filled : Object.entries(spec.fields).slice(0, 1);
       // Shown alone, or beside one or two others of its set (always beside its namesake, if it has one).
@@ -755,7 +786,7 @@ export function amountForms(o: { forms?: number; perForm?: number; seed?: number
   const out: Gold[] = [];
   const seen = new Set<string>();
   const taken = new Set<string>();
-  const currencies = o.currencies ?? CURRENCIES;
+  const currencies = o.currencies ?? everyCurrency();
   const words = (k: string) => k.replace(/_/g, " ");
   for (let si = 0; si * 2 < (o.forms ?? 20); si++) {
     const rand = sampler(hash(`${o.seed ?? 1}:amount forms ${si}`));
@@ -854,7 +885,7 @@ export function piled(o: { groups?: number; seed?: number; currencies?: Currency
   const want = o.groups ?? 20;
   const out: Gold[][] = [];
   for (let tries = 0; out.length < want && tries < want * 20; tries++) {
-    const d = new Draw(rand, o.currencies ?? CURRENCIES);
+    const d = new Draw(rand, o.currencies ?? everyCurrency());
     const person = d.maybe(0.6);
     const who = person ? d.personId() : d.orgId();
     const acts = shuffled(person ? ABOUT_A_PERSON : ABOUT_AN_ORG, rand).slice(0, d.maybe(0.3) ? 3 : 2);

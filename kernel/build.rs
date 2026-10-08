@@ -47,8 +47,11 @@ fn main() {
     let build = if dirty { format!("{rev}+dirty") } else { rev };
     println!("cargo:rustc-env=OIKOS_BUILD={build}");
     println!("cargo:rustc-env=OIKOS_SOURCE={}", fingerprint());
-    println!("cargo:rerun-if-changed=../.git/HEAD");
-    println!("cargo:rerun-if-changed=../.git/index");
+    // (In a worktree `../.git` is a file that names the real git directory; a path that isn't there makes cargo
+    // rebuild the engine on every invocation. So ask git where its directory is.)
+    let git_dir = git(&["rev-parse", "--absolute-git-dir"]).unwrap_or_else(|| "../.git".into());
+    println!("cargo:rerun-if-changed={git_dir}/HEAD");
+    println!("cargo:rerun-if-changed={git_dir}/index");
     for p in ["src", "crates", "Cargo.toml", "Cargo.lock", "../contracts"] {
         println!("cargo:rerun-if-changed={p}");
     }

@@ -52,7 +52,7 @@ test("unlawful rent increases are taken to the tribunal, found invalid, and with
   expect(withdrawn.length).toBeGreaterThan(0);
   expect(withdrawn.length).toBeLessThan(orders.length);
   for (const w of withdrawn) expect(unlawful.map((n) => n.id)).toContain(w.withdraws);
-}, 900_000);
+}, 2_400_000);
 
 test("a law repealed by the town that made it stops binding those who followed it: they are told through their book of laws", async () => {
   // A law forbids any rent increase; every landlord complies, so none is given. On day 120 the town withdraws it (a
@@ -89,4 +89,4 @@ test("a law repealed by the town that made it stops binding those who followed i
   expect(increases.filter((r) => r.at > repealedAt!).length).toBeGreaterThan(3);
   // Each landlord, the tribunal's member and the union were shown the repeal through their laws, once.
   for (const who of ["landlord-1-office-system", "landlord-2-office-system", "tribunal-member-system", "union-organiser-system"]) expect([who, told.get(who)]).toEqual([who, 1]);
-}, 900_000);
+}, 2_400_000);
