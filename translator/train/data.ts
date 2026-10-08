@@ -77,7 +77,7 @@ import { FLAG_YES, FLAGS, sameMeaning, type MeaningContext } from "./meaning";
 
 export { meaningOf, sameMeaning, type MeaningContext } from "./meaning";
 
-export const DATA_VERSION = "0.9.1";
+export const DATA_VERSION = "0.10.0";
 
 const sha256 = (s: string) => new Bun.CryptoHasher("sha256").update(s).digest("hex");
 
@@ -724,13 +724,38 @@ const DURATION_ARGS = new Set(["every", "term", "our_notice", "their_notice", "f
 const COUNT_ARGS = new Set(["quantity", "units"]);
 
 /**
+ * How a world's people write a number of its money, beyond what a world's config says of its currency. The config has
+ * no field for any of this yet (docs/profiles.md, "Known exceptions"), so only an invented world of the training data
+ * says it (synthetic.ts), and it travels with the currency on every program and example made in that world: an example
+ * can be written again, or scored, as its own world writes. The parser needs none of it: it reads every one of these
+ * forms in any currency, or refuses.
+ */
+export interface Writing {
+  /** The decimal mark: a point if absent; a comma, with points between the thousands. */
+  decimal_mark?: "." | ",";
+  /** How digits are grouped: in threes if absent; `twos`: the last three and then twos, with the words that go with
+   * that way of counting for a round sum. */
+  grouping?: "threes" | "twos";
+  /** The sign is also written after the digits. */
+  symbol_after?: boolean;
+  /** The sign is also written with a space before the digits. */
+  symbol_spaced?: boolean;
+  /** The sign is one other currencies use too, so it is also written with the first two letters of the code before it. */
+  country_sign?: boolean;
+}
+export type WrittenCurrency = Currency & { written?: Writing };
+
+/**
  * Every way this pipeline writes an amount (a count of the currency's smallest unit) in a world's money, each checked
  * to read back as the same number: its sign or code before the digits, grouped or not, with its decimals or (a round
  * sum) without; its code or a word for its unit after them; bare digits, which are whole units; a multiplier (k, m,
- * thousand, million) on a sum that is one; and counted out in its smallest unit, where that has a name. Nothing here
- * knows any currency: the sign, the words and the decimal places are the world's (`Currency`).
+ * thousand, million) on a sum that is one; and counted out in its smallest unit, where that has a name. Then, where
+ * the world says how its people write numbers (`Writing`): its own decimal mark and grouping, its sign after the
+ * digits or spaced from them, its sign with letters of its code. Nothing here knows any currency: the sign, the words,
+ * the decimal places and the ways of writing are the world's. The first is always the sign (or the code) and the
+ * digits grouped in threes, with a point before the decimals.
  */
-export function amountWritings(n: bigint, cur: Currency): string[] {
+export function amountWritings(n: bigint, cur: WrittenCurrency): string[] {
   if (n < 0n) return [];
   const per = 10n ** BigInt(cur.minor_units);
   const whole = n / per;
@@ -756,6 +781,32 @@ export function amountWritings(n: bigint, cur: Currency): string[] {
   }
   const minor = cur.minor_words ?? [];
   if (minor.length && n > 0n && n < 100_000n) forms.push(`${n} ${n === 1n ? minor[0] : minor[minor.length - 1]}`);
+  const w = cur.written;
+  if (w) {
+    // The digits in the world's own marks. (What can't be told from another number is dropped below: it isn't read.)
+    const own: string[] = [];
+    if (w.decimal_mark === ",") {
+      const pointed = plain.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+      own.push(...(round ? [pointed] : []), ...(frac ? [`${pointed},${frac}`, `${plain},${frac}`] : []));
+    }
+    if (w.grouping === "twos" && plain.length > 5) {
+      const twos = `${plain.slice(0, -3).replace(/\B(?=(\d{2})+(?!\d))/g, ",")},${plain.slice(-3)}`;
+      own.push(round ? twos : `${twos}.${frac}`);
+    }
+    forms.push(...own.map((d) => `${sign}${d}`), ...own.flatMap((d) => words.map((x) => `${d} ${x}`)), ...own.map((d) => `${d} ${cur.code}`), ...own);
+    const written = [digits[0]!, ...own];
+    if (cur.symbol !== undefined) {
+      if (w.symbol_after) forms.push(...written.flatMap((d) => [`${d} ${cur.symbol}`, `${d}${cur.symbol}`]));
+      if (w.symbol_spaced) forms.push(...written.map((d) => `${cur.symbol} ${d}`));
+      if (w.country_sign) forms.push(...written.map((d) => `${cur.code.slice(0, 2)}${cur.symbol}${d}`));
+    }
+    if (w.grouping === "twos" && round && whole > 0n) {
+      const [lakh, crore] = [100_000n, 10_000_000n];
+      if (whole % lakh === 0n) forms.push(`${sign}${whole / lakh} lakh`, `${whole / lakh} lakh`, ...words.map((x) => `${whole / lakh} lakh ${x}`));
+      else if (whole % (lakh / 10n) === 0n && whole > lakh) forms.push(`${sign}${whole / lakh}.${(whole % lakh) / (lakh / 10n)} lakh`, ...words.map((x) => `${whole / lakh}.${(whole % lakh) / (lakh / 10n)} lakh ${x}`));
+      if (whole % crore === 0n) forms.push(`${sign}${whole / crore} crore`, ...words.map((x) => `${whole / crore} crore ${x}`));
+    }
+  }
   return [...new Set(forms)].filter((f) => same(() => calls.parseAmount(f, cur), n.toString()));
 }
 
@@ -2261,6 +2312,8 @@ export interface Manifest {
   by_function: { [fn: string]: number };
   by_origin: { [origin: string]: number };
   by_style: { [style: string]: number };
+  /** By the currency of the world each example is from (its code; an example of no known world is not counted). */
+  by_currency?: { [code: string]: number };
   /** Requests carrying something that adds nothing to their program, by kind (capacity, citation, do_not). */
   riders: { [kind: string]: number };
   /** Spans whose value is in the request more than once, with nothing to settle which is meant (each records them all). */
@@ -2634,7 +2687,7 @@ async function fromPlan(plan: PlanItem[], o: {
   const short = o.refusalFloor ? Object.fromEntries(labels_.filter((l) => (labels[l] ?? 0) < o.refusalFloor!).map((l) => [l, labels[l] ?? 0])) : {};
   const spanCount = (how: Span["how"]) => examples.reduce((n, e) => n + (e.spans ?? []).filter((x) => x.how === how).length, 0);
   const manifest: Manifest = {
-    version: DATA_VERSION, examples: examples.length, by_kind: count((e) => e.kind), by_shape: count((e) => e.shape), by_function: count((e) => functionOf(e)), by_origin: count((e) => e.origin ?? (e.kind === "refusal" ? "refusal" : "unknown")), by_style: count((e) => e.style),
+    version: DATA_VERSION, examples: examples.length, by_kind: count((e) => e.kind), by_shape: count((e) => e.shape), by_function: count((e) => functionOf(e)), by_origin: count((e) => e.origin ?? (e.kind === "refusal" ? "refusal" : "unknown")), by_style: count((e) => e.style), by_currency: count((e) => e.currency?.code),
     riders, ambiguous_spans: examples.reduce((n, e) => n + (e.spans ?? []).filter((x) => x.ambiguous).length, 0),
     spans: { copy: spanCount("copy"), choice: spanCount("choice"), implied: spanCount("implied") },
     indirect: examples.filter((e) => e.indirect).length,

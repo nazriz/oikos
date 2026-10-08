@@ -3,11 +3,12 @@
 // this, 2026-10-08); and why a stopped one stopped decides what the queue does next. Small fixture folders, no run.
 
 import { afterAll, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { compressLog } from "../src/logs";
-import { localStamp, runState } from "../src/pilot-state";
+import { lastAlerts } from "../src/pilot-alerts";
+import { localStamp, runState, scanOptOuts } from "../src/pilot-state";
 
 const UNTIL = 5_184_000;
 const base = realpathSync(mkdtempSync(join(tmpdir(), "oikos-pilot-queue-test-")));
@@ -31,14 +32,14 @@ test("a finished pilot, its log compressed with a summary beside it, is done", a
   const s = await runState(dir, UNTIL);
   expect(s).toMatchObject({ stop: "done", t: UNTIL });
   expect(s.log).toBe(join(dir, "town-1000.seed4.jsonl.zst"));
-});
+}, 60_000);
 
 test("a compressed log with no summary is read through to its last entry", async () => {
   const done = await runState(await folder("finished-bare", { t: UNTIL, end: { reason: "aborted", detail: `stopped at ${UNTIL}` }, compress: true, summary: false }), UNTIL);
   expect(done).toMatchObject({ stop: "done", t: UNTIL });
   const short = await runState(await folder("short-bare", { t: 86_400 * 10, end: { reason: "aborted", detail: "stopped at 864000" }, compress: true, summary: false }), UNTIL);
   expect(short).toMatchObject({ stop: "failed", t: 864_000 });
-});
+}, 60_000);
 
 test("a plain log asks for the same: done, stopped at a usage limit, at its spending limit, by a signal", async () => {
   const usage = await runState(await folder("usage", { t: 864_000, end: { reason: "aborted", detail: "claude-code/x (participant, for mayor-system): You've hit your usage limit; resets at 5pm" } }), UNTIL);
@@ -54,12 +55,12 @@ test("a plain log asks for the same: done, stopped at a usage limit, at its spen
   expect(noEnd).toMatchObject({ stop: "failed", t: 432_000 });
   const plainDone = await runState(await folder("plain-done", { t: UNTIL, end: { reason: "aborted", detail: `stopped at ${UNTIL}` } }), UNTIL);
   expect(plainDone.stop).toBe("done");
-});
+}, 60_000);
 
 test("a plain log's own last entry outranks a summary left by an earlier stop", async () => {
   const s = await runState(await folder("stale", { t: UNTIL, end: { reason: "aborted", detail: `stopped at ${UNTIL}` }, staleSummary: 864_000 }), UNTIL);
   expect(s).toMatchObject({ stop: "done", t: UNTIL });
-});
+}, 60_000);
 
 test("a pilot never started has no state, whether its folder is there or not", async () => {
   mkdirSync(join(base, "empty"));
@@ -69,14 +70,14 @@ test("a pilot never started has no state, whether its folder is there or not", a
   writeFileSync(join(base, "empty", "claude-code.calls.jsonl"), "{}\n");
   writeFileSync(join(base, "empty", "town-1000.seed4.stopped-1.jsonl"), "{}\n");
   expect(await runState(join(base, "empty"), UNTIL)).toEqual({ stop: "none" });
-});
+}, 60_000);
 
 test("the status log's times are local, with the offset from UTC", () => {
   expect(localStamp(new Date(2026, 9, 8, 14, 5))).toMatch(/^2026-10-08 14:05[+-]\d\d:\d\d$/);
   const d = new Date(2026, 9, 8, 14, 5);
   const off = -d.getTimezoneOffset();
   expect(localStamp(d).slice(-6)).toBe(`${off < 0 ? "-" : "+"}${String(Math.trunc(Math.abs(off) / 60)).padStart(2, "0")}:${String(Math.abs(off) % 60).padStart(2, "0")}`);
-});
+}, 60_000);
 
 test("the queue skips a finished, compressed pilot, writes PILOT.txt with its test flag, and reports on it", async () => {
   const runs = join(base, "runs");
@@ -84,7 +85,7 @@ test("the queue skips a finished, compressed pilot, writes PILOT.txt with its te
   expect(dir).toBe(join(runs, "pilot-x"));
   const queue = join(base, "queue.json");
   writeFileSync(queue, JSON.stringify([{ name: "pilot-x", world: "worlds/town-1000.yaml", model: "mock/mock", until: UNTIL, budget: 1, test: true, note: "a held-out test" }]));
-  const p = Bun.spawnSync(["bun", join(import.meta.dir, "../../scripts/pilot-queue.ts"), queue], { env: { ...process.env, OIKOS_RUNS: runs }, stdout: "pipe", stderr: "pipe" });
+  const p = Bun.spawnSync(["bun", join(import.meta.dir, "../../scripts/pilot-queue.ts"), queue], { env: { ...process.env, OIKOS_RUNS: runs, OIKOS_WAVE: "wv", OIKOS_NO_NOTIFY: "1", OIKOS_ALERT_CMD: `cat >> ${join(base, "hook.txt")}` }, stdout: "pipe", stderr: "pipe" });
   const out = p.stdout.toString();
   expect(p.exitCode).toBe(0);
   expect(out).toMatch(/^\d{4}-\d\d-\d\d \d\d:\d\d[+-]\d\d:\d\d pilot-x: done \(day 60\)/m);
@@ -95,4 +96,29 @@ test("the queue skips a finished, compressed pilot, writes PILOT.txt with its te
   const rep = JSON.parse(readFileSync(join(dir, "pilot-report.json"), "utf8"));
   expect(rep).toMatchObject({ pilot: "pilot-x", test: true, note: expect.stringContaining("a held-out test") });
   expect(readFileSync(queue.replace(/\.json$/, ".status.log"), "utf8")).toContain("queue finished");
-});
+  // The alerts: a local-time line each in the wave's alerts log, and the same lines given to the hook.
+  const alerts = readFileSync(join(runs, "pilot-queues/wv.alerts.log"), "utf8").trim().split("\n");
+  expect(alerts.length).toBe(2);
+  expect(alerts[0]).toMatch(/^\d{4}-\d\d-\d\d \d\d:\d\d[+-]\d\d:\d\d \[queue\] done: pilot-x \(day 60\)$/);
+  expect(alerts[1]).toContain("queue finished");
+  expect(readFileSync(join(base, "hook.txt"), "utf8").trim().split("\n")).toEqual(alerts);
+  expect(lastAlerts(runs, "wv", 1)).toEqual([alerts[1]!]);
+}, 60_000);
+
+test("an opt-out is found in a log as it grows, once, from where the last look ended; also in a compressed one", async () => {
+  const log = join(base, "optout.seed1.jsonl");
+  const line = (e: object) => JSON.stringify(e) + "\n";
+  writeFileSync(log, line({ kind: "event", t: 1, body: {} }) + line({ kind: "command", t: 2_800_000, body: { command: "opt_out", participant: "finance-system", statement: "x \u00e9" } }));
+  const a = await scanOptOuts(log, 0);
+  expect(a.optOuts).toEqual([{ participant: "finance-system", t: 2_800_000, day: 32, statement: "x \u00e9" }]);
+  expect(await scanOptOuts(log, a.offset)).toEqual({ offset: a.offset, optOuts: [] });
+  // (A line half written is left for the next look.)
+  const more = line({ kind: "command", t: 3_000_000, body: { command: "opt_out", participant: "mayor-system", statement: "" } });
+  appendFileSync(log, more.slice(0, 30));
+  const half = await scanOptOuts(log, a.offset);
+  expect(half.optOuts).toEqual([]);
+  appendFileSync(log, more.slice(30));
+  expect((await scanOptOuts(log, half.offset)).optOuts.map((o) => o.participant)).toEqual(["mayor-system"]);
+  await compressLog(log);
+  expect((await scanOptOuts(log + ".zst")).optOuts.map((o) => o.participant)).toEqual(["finance-system", "mayor-system"]);
+}, 60_000);

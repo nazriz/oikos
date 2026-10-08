@@ -11,6 +11,7 @@
 // (measure/, DuckDB over Parquet); and the cost report (cost.txt, cost.json).
 
 import { availableParallelism } from "node:os";
+import { insideSlot, take } from "../../scripts/slots";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import { exportLogs, MEASURE_VERSION } from "@oikos/measure";
@@ -258,8 +259,16 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
     for (const seed of queue.splice(0)) failed.push({ seed, reason: `not started: the batch was asked to stop (${o.stop!.requested ?? "a signal"})` });
     for (const c of children) c.kill("SIGTERM");
   };
+  // A run that asks a model spends its time waiting for answers, not on a core: it takes no slot.
+  const slotted = !o.model;
   const worker = async () => {
-    for (let seed = queue.shift(); seed !== undefined; seed = queue.shift()) {
+    while (queue.length) {
+      // One of the machine's slots for each run under way (scripts/slots.ts): a batch starts with as many of its P as
+      // are free and adds the rest as they free. Waiting changes when a run starts, and nothing in it.
+      const slot = slotted ? await take(1, `oikos run ${o.world} (${seeds.length} seed${seeds.length === 1 ? "" : "s"}) into ${out}`, { cancel: () => !queue.length, say: log }) : undefined;
+      const seed = queue.shift();
+      if (seed === undefined) { slot?.release(); break; }
+      try {
       // This run's spending limit: the per-run limit, or what's left of the batch's, whichever is less.
       let limitUsd = o.budgetUsd;
       let held = 0;
@@ -277,7 +286,7 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
       const args = [process.execPath, CLI, "run-one", o.world, "--seed", String(seed), "--out", out, ...(o.until !== undefined ? ["--until", String(o.until)] : []), ...sets.flatMap((s) => ["--set", s]),
         ...(o.recordObservations ? ["--record-observations", o.recordObservations] : []), ...(o.recordDecisions ? ["--record-decisions", o.recordDecisions] : []), ...(o.logDetail ? ["--log", o.logDetail] : []), ...(o.consult ? ["--consult"] : []), ...(o.consultAvoid ? ["--consult-avoid", o.consultAvoid] : []), ...(o.model ? ["--model", o.model] : []), ...(o.model && o.translatorModel ? ["--translator-model", o.translatorModel] : []), ...(limitUsd !== undefined ? ["--budget", String(limitUsd)] : []), ...(o.baseUrl ? ["--base-url", o.baseUrl] : []),
         ...(o.modules ? ["--modules", resolve(o.modules)] : []), ...(o.overwrite ? ["--overwrite"] : [])];
-      const p = Bun.spawn(args, { stdout: "pipe", stderr: "pipe", env: { ...process.env } }); // (the environment as it is now)
+      const p = Bun.spawn(args, { stdout: "pipe", stderr: "pipe", env: slotted ? insideSlot(1, { ...process.env }) : { ...process.env } }); // (the environment as it is now)
       children.add(p);
       const [code, err] = await Promise.all([p.exited, new Response(p.stderr).text()]);
       children.delete(p);
@@ -315,6 +324,7 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
         log(`    resume it with: ${resume}${rec.stopped.by === "SpendingLimitReached" ? "  (with a higher --budget: it stopped at this one)" : ""}`);
       } else log(`  seed ${seed}: ${(rec.t / (365 * 86_400)).toFixed(2)} years, ${rec.commands.toLocaleString("en-US")} commands, ${rec.refused} refused, ${(rec.wallMs / 1000).toFixed(0)} s; final state ${rec.stateHash.slice(0, 16)}`);
       for (const w of healthWarnings(rec)) log(`    ! ${w}`);
+      } finally { slot?.release(); }
     }
   };
   await Promise.all(Array.from({ length: parallel }, worker));
