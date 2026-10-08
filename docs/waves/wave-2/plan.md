@@ -1,360 +1,444 @@
 # Wave 2: the first real wave of pilots
 
-**Status: second version, 2026-10-09. Not run.** The owner has given a standing go-ahead for the wave once its gates pass; the coordinator starts it. No pilot has been started and no model called in making this. The queue files beside this page are ready for `scripts/pilot-wave.ts`; the tables are in `matrix.md` (written by `make.ts`, like the queues: change the plan there and run it again).
+**Status: third version, 2026-10-09 (later). Not run.** The owner has given a standing go-ahead for the wave once its gates pass; the coordinator starts it. No pilot of the wave has been started in making this. The queue files beside this page are ready for `scripts/pilot-wave.ts`; the tables are in `matrix.md` (written by `make.ts`, like the queues: change the plan there and run it again).
 
-## What changed from the first version (2026-10-08), and why
+## What changed from the second version (2026-10-09, morning), and why
 
-The first version was written before the knowing architecture, the offices' own forms, directions, standing work and the scenario presets were on main, and before any model had been run on them. All are on main now, and four 12-day pilots with real models (the live check, `runs/live-check-2026-10-09/README.md`) have said what the pace is.
+The second version leaned on the Codex subscription: a Codex model was the translator in 38 of its 43 pilots and the seat model in 18. The night it was written, the second live check (`runs/live-check-2-2026-10-09/README.md`) met the subscription's limit 16 minutes in. A pilot on Codex seats stood on day 16 for two and a quarter hours; a pilot on Claude seats stood at day 0 for an hour for want of four translator calls, with two pilots behind it that needed no Codex at all. The owner, that morning: "codex is unreliable… we should really not use it much at all anymore", and then, more exactly: **"I don't have an issue using codex when it's available, but when it runs out, it shouldn't block things."** And of the translator: "use sonnet 5.5 as the backup translator"; of the largest Claude model: "I'd rather use fable in the seats… I don't think it's an appropriate model for the translator"; of what the wave is for: "a wide spread of good data so that we can finally get the self trained translator model over the line". Of profiles: "for some of these profiles, tbh it doesn't matter if they're unoptimal… unoptimal situations should also create good data".
 
-1. **Seat ids were read again from a generated town.** All nine profiles generate the same offices. Every id the first version used still exists. `land-registrar` is new (the land registry is a body of its own; `registry` is still the town's register of births and deaths, the one the owner asked for, and the land registrar sits beside it in two pilots). `electoral` belongs to the electoral commission now.
-2. **The electoral office is no longer a seat.** The first version seated it in every election pilot, as the source of `position`. Two things changed that. The appointment is now the council clerk's act (the commission declares; the clerk seats whoever is declared). And a seat cannot hold an election: the roll, the ballot paper and the count are lists of hundreds, not forms and not eight acts a sitting, and the office has no staff routine for them yet (docs/behaviour/office-papers.md). A model there would be a seat set a task it cannot do, and a town with no election. The commission is run by code in all five election pilots.
-3. **Works and the registry are seats**, as the owner asked: each in training pilots on four seat models (Sonnet 5.5, Haiku 5.5, gpt-6.1-sol, gpt-6-luna), and in test pilots. Three works pilots start with the crew still to be taken on (`works_crew_at_start=0`: the office advertises on its form, offers employment, then sets its round); the rest start with a crew.
-4. **The other newly possible offices appear as short probes:** the clinic and the school (w2-43), the two utilities and rates (w2-44), rates, water and the school on the other family (w2-36).
-5. **Directions have somewhere to go.** A model mayor sits beside a code-run works office in 22 pilots (a code office follows a direction filed on its form by the mayor or the clerk, and writes back), and beside a model works office in six.
-6. **Scenarios.** `lean-council` and `dear-rents` are new (two and three pilots). `hot-summer` falls to two (it bites faintly). `election-due` (four) and `wet-year` (three) stay. Nothing inert is named. Every scenario pilot passes `--scenario`, which main now knows; `make.ts` no longer has a way to leave them out.
-7. **The trained translator serves five pilots, not twelve.** `decide/pod-small-d16-s1` was taught none of the hold, the entry on one's own file, `look_first`, an office's own forms, directions or standing work. It serves no works or registry seat, and no office whose daily business is papers of its own (`make.ts` refuses such an entry).
-8. **The prompt-driven translator is gpt-6.1-sol for 26 pilots and gpt-6-luna for 12** (below, "Translators").
-9. **A model council clerk in three pilots only**, none longer than 75 days (a clerk held by the mock counts no votes; a model's is untried).
-10. **43 pilots, not 30:** thirteen added, none dropped. The Claude Code lane grew most (25), because its usage is not the constraint (the owner's word, and the live check's figures); the Codex subscription's window is.
-11. **Each pilot is a town of its own, on purpose** (below, "Towns").
-12. **Every estimate was rebuilt** on the live check and the office demonstration (below).
-13. **Stopping rules gained three** (a prompt too long; letters not sent; a clerk counting no votes), and the lanes are arranged so that the Claude lane is not starved of the Codex window.
+So the rule this version is built on: **Codex when it is available; never something a pilot waits on.** In full:
+
+1. **No pilot's translation is behind the Codex sign-in.** The general translator is `claude-code/claude-sonnet-5-5`, alone, with no chain of fallbacks. `make.ts` refuses an entry whose translator is a Codex model.
+2. **Each pilot's translator is a late, cheap choice** (below, "Translators"): `sonnet` (the general model and no other, 28 pilots), `trained-ok` (our own retrained translator if its scores allow when the stage starts, else the general model, 21), `trained` (our own, for its failures, 1). A retrain was begun the day this was written; `make.ts --retrained decide/NAME` writes the files with it.
+3. **Codex models are seats only, in a lane of their own that is optional** (twelve pilots). The queue now parks a pilot the moment its sign-in is at a limit and goes on (`scripts/pilot-queue.ts`; the decisions log, "A pilot stopped at a usage limit is parked"). A Codex stall stalls that pilot's seats and nothing else.
+4. **With Codex unavailable throughout, the wave still completes:** 35 pilots on Claude seats in the three stages carry every office, every scenario, every training profile and both held-out profiles and offices. `make.ts` checks it. One thing they cannot carry: an unseen seat model (item 7).
+5. **Six pilots moved from Codex seats to Claude seats** so their coverage is not optional: the second flood (w2-27), housing and lending (w2-28, w2-21), the two probes (w2-36, w2-30) and the council of councillors (w2-26).
+6. **Two lanes of Claude seats, by what they cost.** A seat on Sonnet 5.5 comes back weekly and a 30-day pilot recorded 0.62 and 0.99; the same thirty days on Haiku 5.5 recorded 18.54 and 15.51. So Sonnet's pilots are many and long, Haiku's are nine, short, one at a time, with spending limits that fit, and **the first of them measures Haiku at lower effort** (w2-54). Haiku stays: it is the only weaker Claude model, and the translator has to serve weaker models.
+7. **Fable 5.1 sits in training seats** (three pilots; w2-14 first, in the shake-down, because its cost in a seat is unmeasured). **The held-out seat model is now gpt-6-luna**, which makes that part of the test depend on the Codex window (below, "Models, and what is held out").
+8. **Registry pilots are as long as it takes to have deaths to register** (below, "The registry").
+9. **Kenya and Brazil are in, as they are** (two pilots each), and three more scenarios (`housing-shortage`, `jobs-slump`, `energy-price-shock`, a pilot each).
+10. **The three pilots with a model council clerk are held back in a file of their own**, in no stage, until the clerk's fault is settled; an election that does not wait on it is added on Claude seats (w2-48).
+11. **Works pilots that start with no crew depend on a fix** (a seat is shown that its office has no staff).
+12. **Every estimate was rebuilt** on the second live check's thirty-day pilots, and is given twice: Codex unavailable throughout, and Codex available.
+13. **Stopping rules gained two** (a seat that missed sittings after a failed call; a pilot whose seats sat for less than its run is not finished), and the lane rules of the second version, which arranged who had first call on the Codex window, are gone: nothing needs them.
+
+**This reverses a standing agreement** (CLAUDE.md, "Models": real-model runs through the Codex CLI, gpt-6.1-sol in the driver seat, gpt-6-luna for the translator). The decisions log has the entry; CLAUDE.md is the owner's and is not changed here (the wording proposed is in that entry).
 
 ## What the wave is for
 
 Pilots exist first to gather data for the trained translator. The data so far is letters and a few forms from three calm offices in one town in one currency. This wave is built to change that, in this order:
 
-1. **Acts nobody has asked for.** Eight of the sixteen kinds of act have never been requested by a seat, and since the first version the call language has gained a hold, an entry on one's own file, forms for an office's own papers, directions and standing work, of which real seats have asked for eight things in all (five forms, two entries, one hold: the live check). So the wave seats the offices whose business those are: works (advertisements, offers, standing work orders), the registry (register entries), councillors (votes), a clerk (ballots, results, the appointment), landlords, the lender, the tribunal, and, as probes, the clinic, the school, the utilities, rates, a shop and a factory.
-2. **Forms and the seats' own wording.** Nearly every office now has forms of its own (41 of them), so most of what a seat does is a form. Every request a seat makes is in its own wording.
-3. **Other places' money.** Seven profiles, five in training: a sign before, a decimal comma, no smaller unit, and (test only) groups of two with lakh and crore. The live check could not say whether an amount written the German or the Japanese way is read: no such amount reached an amount field. This wave has eight German and four Japanese towns.
-4. **Other situations.** Fourteen pilots start under one of five presets that reach an office.
-5. **Other writers.** Five seat models from two families; in 16 of 43 pilots the seats are on a model that is neither of the two labelling readers.
-6. **A test that measures generalisation.** Eleven whole pilots are test-only.
+1. **Acts nobody has asked for.** Eight of the sixteen kinds of act have never been requested by a seat, and the call language has since gained a hold, an entry on one's own file, forms for an office's own papers, directions and standing work, of which real seats have asked for about sixty things in all, most of them one pilot's holds. So the wave seats the offices whose business those are: works, the registry, councillors, a clerk (held), landlords, the lender, the tribunal, and, as probes, the clinic, the school, the utilities, rates, a shop and a factory.
+2. **Forms and the seats' own wording.** Nearly every office now has forms of its own (41 of them). Every request a seat makes is in its own wording.
+3. **Other places' money.** Nine profiles, seven in training: a sign before, a decimal comma, no smaller unit, a code after, and (test only) groups of two with lakh and crore. One amount in a German town has reached an amount field so far ("0,84 €", read right); none in a Japanese one.
+4. **Other situations.** Eighteen pilots start under one of eight presets that reach an office; four more are in towns that are in trouble by their profile's fault.
+5. **Other writers.** Three Claude seat models (one at two efforts) and, when the window allows, two Codex ones.
+6. **A test that measures generalisation.** Twelve whole pilots are test-only, five of them in the lanes that need no Codex.
+7. **A spread, not a pile** (below, "The spread"): every kind of act with an office that has honest reason to ask for it, every way of writing money, forms most of all, and no one theme in more than a few pilots.
 
-What it is not for: comparing stewards, or any claim about how models govern.
+What it is not for: comparing stewards, or any claim about how models govern, or anything about the places the profiles are named for.
 
 ## What is known about seats now
 
-- **Any office can be named a seat** (`model_seats=<office id>,...`; the mayor by `mayor=llm`). The offices a generated town has, in every profile: mayor, planning, inspector, finance, works, environment, rates, registry, child-protection, council-clerk, councillor-1 to 5 (the town's); land-registrar (the land registry's); electoral (the electoral commission's); bank-lending, bank-payments; builder-foreman; editor; clinic-manager; principal; tribunal-member, tribunal-registrar; water-operations, energy-operations; police-oic; union-organiser; twenty `landlord-N-office`, thirty `shop-N-manager`, ten `factory-N-manager`. `outside-*`, `weather-bureau` and `migration` stand for the world beyond the town and are not seats. Read from the generator on 58a0ba7; a `model_seats` entry that names no office fails generation, and the dry run below generated every entry.
-- **A model in a seat replaces the office's code**, except its routines: where the office has them (works, clinic, school, both utilities, rates) its staff are a post of their own (`<office>-staff`), run by code, who do the routine only while a standing work order is in force. The seat sets the orders and manages by exception. A queue entry names seats only; the staff post comes with the seat.
-- **A seat is shown no town and no register.** It is shown its own papers, and asks, looks up and sends someone for the rest. In the live check a Claude seat's first sitting was shown 1,200 to 11,300 characters.
-- **One model for every seat of a run.**
-- **Only `do` goes to the translator.** A letter goes as written.
-- **The pace is the model's, and the two families differ fivefold.** In twelve days three Claude seats made 8 to 15 answers a pilot and sat about twice each; three gpt-6.1-sol seats made 43, wrote 83 letters, looked 63 times and kept every report coming each sitting.
-- **Confirmation is `always`** in every generated town.
+- **Any office can be named a seat** (`model_seats=<office id>,...`; the mayor by `mayor=llm`). The offices a generated town has, in every profile: mayor, planning, inspector, finance, works, environment, rates, registry, child-protection, council-clerk, councillor-1 to 5 (the town's); land-registrar; electoral (the commission's); bank-lending, bank-payments; builder-foreman; editor; clinic-manager; principal; tribunal-member, tribunal-registrar; water-operations, energy-operations; police-oic; union-organiser; twenty `landlord-N-office`, thirty `shop-N-manager`, ten `factory-N-manager`. A `model_seats` entry that names no office fails generation, and the dry run below generated every entry.
+- **A model in a seat replaces the office's code**, except its routines: where the office has them (works, clinic, school, both utilities, rates) its staff are a post of their own (`<office>-staff`), run by code, who do the routine only while a standing work order is in force.
+- **A seat is shown no town and no register.** It is shown its own papers, and asks, looks up and sends someone for the rest. Largest thing shown at one turn in the second live check: 27,119 characters.
+- **One model for every seat of a run. Only `do` goes to the translator**; a letter goes as written. **Confirmation is `always`.**
+- **The pace is the model's, and it is set by when the seat chooses to come back.**
+  - *Sonnet 5.5:* sat on days 1, 8, 15, 22 and 29 of thirty: five sittings, 28 and 29 answers a pilot of three seats, 3 and 4 requests. A seat that says only "done for now" is back after seven days (`cadence_days: 7`, set by the generator, not by a spec key), or the next working day if someone writes to it. Code-run offices seldom write.
+  - *Haiku 5.5:* 88 and 126 answers in thirty days, 100 and 73 letters, 44 requests in one pilot (38 of them holds and withdrawals provoked by the bank's wrong report, since being fixed) and 2 in the other.
+  - *gpt-6.1-sol:* 43 answers and 83 letters in twelve days; 73 answers and 92 letters in twenty-five; **5 requests in twelve days and 3 in twenty-five.** Its activity is letters and looks. The second version expected more than half the wave's requests from it on the first figure; the second figure does not bear that out.
+- **Coming on main, and not in these estimates:** a paper filed with an office will bring its seat back the next working day, as a letter does (a setting, on by default). Seats will then sit more often than either live check showed, and ask for more. **Every request estimate here predates it.**
 
-| Office | As a seat | What it has to ask for (docs/behaviour/office-papers.md) | In this wave |
+| Office | As a seat | What it has to ask for (docs/behaviour/office-papers.md) | Pilots (of them needing no Codex, not held) |
 |---|---|---|---|
-| mayor | works (pilots 7 to 18; the live check) | the council proposal, amendment and permit forms; `nomination`, `invoice_approval`; **directions** on an office's form; structures | 28 pilots |
-| finance | works; the live check's finance officers made the first holds and entries | payments, **holds**, **entries on its own file** | 14 |
-| planning, inspector | work; little through `do` | `permit_decision`, the liberty to build; `valuation_request`, `demolition_order`, fines | 9, 4 |
-| **works** | new (2026-10-09): untried with a model | `job_advertisement`, offers of employment, **standing work orders** (`collect`, `maintain`), holds on them | 9 (6 training on four models, 3 test) |
-| **registry** | new forms; pilot 12's registrar asked twice and registered nothing | `death_registration`, `death_certificate`, `birth_registration`, `transmission_application` | 13 (8 training on four models, 5 test) |
-| land-registrar | untried; no forms of its own | transfers and transmissions (claims), answers to searches | 2 |
-| council-clerk | untried; **a mock clerk counts no votes** (open fault) | `council_ballot`, `council_result`, `adopted_budget`; **position** (seating the winner); directions | 3, short |
-| councillors | untried | **votes** | 5 (two with a code clerk) |
-| editor | untried | `news_item` | 5 |
-| child-protection | untried; rarely has business | **presence** | 2 |
-| tribunal-member, tribunal-registrar | untried | `tribunal_order`; `garnishee_order` | 3, 3 |
-| landlord offices | untried; busy | `rental_listing`, `rent_increase`, `tax_report`, leases, payments, building | 12 |
-| bank-lending | untried | `loan_decision`, `loan_payout`, loan agreements | 4 |
-| environment | untried | `job_advertisement`, `habitat_register`, survey work | 2 |
-| **clinic-manager, principal** | new: **probes** | a standing order each (`treat`; `teach`, `enrol`), staffing | 1, 2 |
-| **water-operations, energy-operations, rates** | new: **probes** | standing orders (`draw_water`, `bill`; `supply_energy`, `bill`; `levy`) | 2, 1, 2 |
+| mayor | works (pilots 7 to 18; both live checks) | the council proposal, amendment and permit forms; `nomination`, `invoice_approval`; **directions** on an office's form; structures | 32 (19) |
+| finance | works; made the holds, withdrawals and entries so far | payments, **holds**, **entries on its own file** | 23 (16) |
+| planning, inspector | work; little through `do` | `permit_decision`, the liberty to build; `valuation_request`, `demolition_order`, fines | 12 (9), 5 (5) |
+| **works** | live check 2: set two standing orders; with no crew it never learned it had none | `job_advertisement`, offers of employment, **standing work orders**, holds on them | 9 (5) |
+| **registry** | live check 2: nothing to register in thirty days | `death_registration`, `death_certificate`, `transmission_application`; no birth before about day 275 | 8 (6) |
+| land-registrar | untried | transfers and transmissions (claims), answers to searches | 3 (2) |
+| council-clerk | live check 2: no proposal reached it; **a mock clerk counts no votes** (open fault) | `council_ballot`, `council_result`, `adopted_budget`; **position**; directions | 3 (0: held) |
+| councillors | live check 2: two voted (on a ballot already decided: a fault) | **votes** | 6 (3) |
+| editor | untried | `news_item` | 7 (4) |
+| child-protection | untried; rarely has business | **presence** | 2 (2) |
+| tribunal-member, tribunal-registrar | untried | `tribunal_order`; `garnishee_order` | 4 (4), 5 (4) |
+| landlord offices | untried; busy | `rental_listing`, `rent_increase`, `tax_report`, leases, payments, building | 14 (11) |
+| bank-lending | untried | `loan_decision`, `loan_payout`, loan agreements | 4 (3) |
+| environment | live check 2: letters only | `job_advertisement`, `habitat_register`, survey work | 3 (2) |
+| **clinic-manager, principal** | **probes** | a standing order each (`treat`; `teach`, `enrol`), staffing | 1 (1), 2 (2) |
+| **water-operations, energy-operations, rates** | **probes** | standing orders (`draw_water`, `bill`; `supply_energy`, `bill`; `levy`) | 2 (2), 1 (1), 2 (2) |
 | shop and factory managers | **probes**: serving and making are still by hand | **goods**, work, `order`, `delivery_note`, payments | 2 pilots, 30 days |
-| police-oic, union-organiser | untried | `charge`, investigations; `wage_claim`, ballots | 2 each, **test-only** |
+| police-oic, union-organiser | untried | `charge`, investigations; `wage_claim`, ballots | 2 each (1 each), **test-only** |
 
-**Not seats, and why.** `bank-payments`: never; it is the payment system. `builder-foreman`, `fund-trustee`: not yet; their routines are not standing work (and the fund is off by default). `electoral`: not yet; item 2 above.
+**Not seats, and why.** `bank-payments`: never; it is the payment system. `builder-foreman`, `fund-trustee`: not yet; their routines are not standing work. `electoral`: not yet; a seat cannot write the roll, the ballot paper or the count.
 
 ## The matrix
 
-`matrix.md` has it in full with seeds, estimates and coverage. In short (S = `claude-code/claude-sonnet-5-5`, H = `claude-code/claude-haiku-5-5`, F = `claude-code/claude-fable-5-1`, sol = `codex/gpt-6.1-sol`, luna = `codex/gpt-6-luna`; translator Ps = prompt-driven gpt-6.1-sol, Pl = prompt-driven gpt-6-luna, T = trained `decide/pod-small-d16-s1`). Every town is 1,000 people from day 0. In each stage and lane the order is the queue's.
+`matrix.md` has it in full: every pilot with its seed, days, seats, models, marks, estimates and coverage. By queue file, in the queue's order (S = `claude-code/claude-sonnet-5-5`, H = `claude-code/claude-haiku-5-5`, F = `claude-code/claude-fable-5-1`, sol = `codex/gpt-6.1-sol`, luna = `codex/gpt-6-luna`; the translator is Sonnet 5.5 under the translator's prompt unless marked T, the trained `decide/pod-small-d16-s1`; days in brackets). Every town is 1,000 people from day 0.
 
-| Pilot | Stage | Seat model | Profile | Days | Scenario | Seats | Tr. | Marks |
-|---|---|---|---|---|---|---|---|---|
-| w2-10-works | 2a | S | gb-eng | 45 | | works, registry, environment | Ps | probe; no crew |
-| w2-01-council | 2a | S | au-vic | 45 | | mayor, council-clerk, councillor-1..5 | Pl | model clerk |
-| w2-03-election | 2a | S | de-ni | 75 | election-due | mayor, editor, council-clerk | Ps | model clerk |
-| w2-04-townhall | 2a | H | us-oh | 45 | | mayor, finance, planning | T | |
-| w2-33-works | 2a | sol | au-vic | 30 | | mayor, works, registry | Ps | probe; no crew |
-| w2-22-townhall | 2a | luna | jp-akita | 30 | | mayor, finance, planning | T | |
-| w2-23-newplace | 2a | sol | mx-jal | 30 | | mayor, landlord-3, registry | Ps | test |
-| w2-41-works | 2b | H | jp-akita | 90 | | mayor, works, registry | Ps | |
-| w2-42-townworks | 2b | S | us-oh | 90 | | mayor, works, finance | Ps | no crew |
-| w2-45-lean | 2b | S | de-ni | 90 | lean-council | mayor, finance, planning | Ps | |
-| w2-06-justice | 2b | S | de-ni | 90 | | tribunal-member, tribunal-registrar, registry, land-registrar, child-protection, inspector | Ps | |
-| w2-08-heat | 2b | S | jp-akita | 90 | hot-summer | mayor, registry, editor, child-protection | Ps | |
-| w2-05-landlords | 2b | S | us-oh | 90 | dear-rents | landlord-1, -2, -3, bank-lending | Pl | |
-| w2-02-housing | 2b | H | gb-eng | 60 | dear-rents | landlord-1, landlord-2, tribunal-member, tribunal-registrar | Pl | |
-| w2-07-election | 2b | H | au-vic | 75 | election-due | mayor, council-clerk, councillor-1..3 | Pl | model clerk |
-| w2-43-care | 2b | S | gb-eng | 45 | | clinic-manager, principal | Ps | probe |
-| w2-44-utilities | 2b | S | au-vic | 45 | | water-operations, energy-operations, rates | Ps | probe |
-| w2-09-trade | 2b | S | au-vic | 30 | | shop-1-manager, factory-1-manager | Ps | probe |
-| w2-12-flood | 2b | S | gb-eng | 150 | wet-year | mayor, planning, finance, landlord-1 | Pl | |
-| w2-11-heat | 2b | H | de-ni | 90 | hot-summer | mayor, finance, inspector | T | |
-| w2-34-works | 2b | sol | de-ni | 60 | | works, registry, land-registrar, environment | Ps | |
-| w2-35-works | 2b | luna | gb-eng | 60 | | mayor, works, registry | Ps | |
-| w2-24-election | 2b | sol | gb-eng | 75 | election-due | mayor, editor, councillor-1..2 | Ps | |
-| w2-26-council | 2b | luna | au-vic | 45 | | mayor, councillor-1..5 | T | |
-| w2-37-lean | 2b | luna | gb-eng | 60 | lean-council | mayor, finance, planning | Pl | |
-| w2-36-offices | 2b | sol | us-oh | 45 | | rates, water-operations, principal | Ps | probe |
-| w2-30-trade | 2b | sol | au-vic | 30 | | shop-2-manager, factory-2-manager | Ps | probe |
-| w2-21-lending | 2b | sol | au-vic | 45 | | bank-lending, finance, landlord-1 | Pl | |
-| w2-25-rents | 2b | sol | us-oh | 60 | dear-rents | mayor, landlord-1, registry, editor | Ps | |
-| w2-28-housing | 2b | luna | de-ni | 60 | | landlord-1, landlord-2, tribunal-member | Pl | |
-| w2-29-lending | 2b | sol | jp-akita | 60 | | bank-lending, landlord-1, landlord-2, tribunal-registrar | Pl | |
-| w2-13-flood-long | 2c | S | au-vic | 180 | wet-year | mayor, finance, planning, inspector, landlord-1, landlord-2 | Pl | |
-| w2-14-largest | 2c | F | au-vic | 45 | | mayor, finance, landlord-1 | Ps | test |
-| w2-46-largest-works | 2c | F | de-ni | 45 | | mayor, works, registry | Ps | test |
-| w2-15-largest-election | 2c | F | gb-eng | 75 | election-due | mayor, editor, councillor-1..2 | Ps | test |
-| w2-16-newplace | 2c | S | mx-jal | 60 | | mayor, landlord-1, bank-lending, registry | Ps | test |
-| w2-47-newplace-works | 2c | H | mx-jal | 60 | | works, registry, finance | Ps | test |
-| w2-18-newoffices | 2c | S | au-vic | 60 | | police-oic, union-organiser, finance | Ps | test |
-| w2-17-newmoney | 2c | H | in-tn | 60 | | mayor, finance, planning | T | test |
-| w2-38-newmoney-works | 2c | sol | in-tn | 60 | | mayor, works, registry | Ps | test |
-| w2-31-newmoney | 2c | luna | in-tn | 60 | | mayor, finance, planning | Pl | test |
-| w2-32-newoffices | 2c | sol | us-oh | 60 | | police-oic, union-organiser, mayor | Ps | test |
-| w2-27-flood | 2c | sol | de-ni | 150 | wet-year | mayor, planning, inspector, landlord-1 | Pl | |
+| Queue file | Seats on | Pilots |
+|---|---|---|
+| `wave-2a-claude-1.json` | S, F | w2-10-works (S, gb, 180; works, registry, environment; no crew; probe) · w2-44-utilities (S, au, 45; energy-price-shock; probe) · w2-09-trade (S, au, 30; probe) · **w2-14-largest (F, au, 45; mayor, finance, a landlord: the measure of Fable in a seat)** |
+| `wave-2a-claude-2.json` | H | **w2-54-effort (us, 30; town hall; Haiku at low effort: the measurement)** · w2-04-townhall (us, 45) · w2-26-council (au, 45; five councillors; translator **trained**) |
+| `wave-2a-codex.json` (optional) | sol, luna | w2-33-works (sol, au, 30; no crew; probe) · w2-22-townhall (luna, jp, 30; **test**) · w2-23-newplace (sol, mx, 30; **test**) |
+| `wave-2b-claude-1.json` | S, F | w2-42-townworks (us, 90; no crew) · w2-45-lean (de, 90; lean-council) · w2-48-election (us, 75; election-due; code clerk) · w2-06-justice (de, 180) · w2-08-heat (jp, 180; hot-summer) · w2-05-landlords (us, 120; dear-rents) · w2-28-housing (de, 120; housing-shortage) · w2-21-lending (jp, 120; jobs-slump) · w2-43-care (gb, 45; probe) · w2-11-heat (de, 90; hot-summer) · w2-12-flood (gb, 150; wet-year) · w2-27-flood (de, 150; wet-year) · w2-46-largest-works (F, de, 90; mayor, works, registry) · w2-15-largest-election (F, gb, 75; election-due) · w2-50-evictions (ke, 120) · w2-51-townhall (ke, 90) · w2-52-river (br, 120) · w2-53-townhall (br, 90) |
+| `wave-2b-claude-2.json` | H | w2-41-works (us, 75; mayor, works, registry) · w2-02-housing (gb, 45; dear-rents) · w2-36-offices (us, 30; probe) · w2-30-trade (au, 30; probe) |
+| `wave-2b-codex.json` (optional) | sol, luna | w2-34-works (sol, us, 45) · w2-24-election (sol, gb, 75; election-due) · w2-25-rents (sol, us, 45; dear-rents) · w2-35-works (luna, gb, 45; **test**) · w2-29-lending (sol, jp, 45) · w2-37-lean (luna, gb, 45; lean-council; **test**) |
+| `wave-2c-claude-1.json` | S | w2-13-flood-long (au, 180; wet-year; six seats) · w2-16-newplace (mx, 90; **test**) · w2-49-newmoney-registers (in, 180; **test**) · w2-18-newoffices (au, 90; police, union; **test**) |
+| `wave-2c-claude-2.json` | H | w2-47-newplace-works (mx, 45; **test**) · w2-17-newmoney (in, 45; **test**) |
+| `wave-2c-codex.json` (optional) | sol, luna | w2-38-newmoney-works (sol, in, 45; **test**) · w2-32-newoffices (sol, us, 45; **test**) · w2-31-newmoney (luna, in, 45; **test**) |
+| `wave-2-held-clerk.json` (in no stage) | S, H | w2-01-council (S, au, 45) · w2-03-election (S, de, 75; election-due) · w2-07-election (H, au, 75; election-due) |
 
 ### Towns
 
-`oikos run --seeds N` is one generated town run N times; the town comes from the description's own seed. A queue entry runs `--seeds 1` with `--set seed=N`, and `seed` is the description's: so the generator makes the town of seed N, and the run's seed follows it. That was already what the first version's entries did; it is now said and checked. `make.ts` refuses two entries with one seed. Seeds are 100 + the pilot's number (900 + for a test-only pilot); none was used before (the live check's were 801 to 804). After the dry run, each mock run's `batch.json` was read: 43 different seeds, each the town's and the run's. `--towns T` is for a batch of several towns from one command and has no place in a queue entry, which is one run.
+`oikos run --seeds N` is one generated town run N times; the town comes from the description's own seed. A queue entry runs `--seeds 1` with `--set seed=N`, and `seed` is the description's: so the generator makes the town of seed N, and the run's seed follows it. `make.ts` refuses two entries with one seed. Seeds are 100 + the pilot's number (900 + for a test-only pilot); none was used before (801 to 804 and 811 to 816 were the live checks'; 821 to 824 the translator check's).
+
+### Towns that are not their place
+
+The owner (2026-10-09): a profile does not have to be faithful to be used, and a town in trouble is data too. So no profile is held out for fidelity, and the distorted ones are spread over a few pilots each (`make.ts` holds Kenya and Brazil to three at most), because a town dominated by one distortion gives requests dominated by one theme. **Nothing in a pilot in one of these towns says anything about the country or the region its profile is named for.**
+
+| Profile | Pilots | Known not to be faithful in |
+|---|---|---|
+| ke-nakuru-2026 | w2-50, w2-51 | its rent share is wrong for its dwelling mix (rent at about 85% of income): landlords and the tribunal see arrears and evictions that are the profile's doing |
+| br-mg-2026 | w2-52, w2-53 | it floods on a river-flow figure whose fix is not on main |
+| in-tn-2026 | w2-49, w2-17, w2-38, w2-31 (all test) | rent is 40% of income (no landlord seat there, which `make.ts` checks); a means-tested pension is paid to everyone |
+| jp-akita-2026 | w2-08, w2-21, w2-22, w2-29 | far from its census by age; its budget expects grants seven times its spending; households' saving reads negative |
+| de-ni-2026 | seven pilots | households' saving reads negative; its ballot figure for industrial action is union practice |
+
+Every profile also carries placeholder figures (docs/profiles.md). Informal work is landing on main as this is written (Kenya, India, Brazil and Mexico state it); those towns will differ from the dry run's.
 
 ### Why this coverage
 
-- **Offices in bundles that have business with each other.** A landlord's permit goes to planning; a lease dispute to the tribunal; a ballot from the clerk to councillors; a death from the registry to the land registry; a direction from the mayor to works.
-- **Works, three ways.** Under a code mayor (w2-10, w2-34: the office alone with its neighbours); beside a model mayor (w2-33, w2-41, w2-35: a direction reaches a model, who decides what to do with it); with the treasury too, for a quarter, from no crew (w2-42: the staff line, advertisements, offers, the round). No crew at the start in three: in the demonstration the town had 99 complaints about waste on days 11 to 16 before a crew came, so these are marked and watched (stopping rules).
-- **Profiles.** Training: `au-vic-2026`, `gb-eng-2026`, `de-ni-2026`, `jp-akita-2026`, `us-oh-2026`. Test-only: `mx-jal-2026` and `in-tn-2026` (India's rent is 40% of income: no landlord seat there, which `make.ts` checks). All nine profiles run for 60 days. **Out:** `ke-nakuru-2026` (its rent share is still wrong for its dwelling mix: every landlord and tribunal seat would spend the run on arrears that are a profile fault) and `br-mg-2026` (it floods on a river-flow figure whose fix is not on main). **Where Brazil slots in once that lands:** as a third test-only profile's twin of w2-16 and w2-23 (mayor, a landlord, the registry; one pilot on each lane, 2c), or, if a sixth training currency is wanted more, as the profile of w2-45 and w2-28; one string each in `make.ts`, and the profile comes off `PROFILES_OUT`.
-- **Scenarios.** `election-due` (polling day 60) with 75 days, so the count and the seating fall inside. `wet-year` with 150 to 180 (the heavy rain came about day 110 in the first profile's town). `lean-council` (the bank writes from day 16 that a wage failed; the crew resign from day 23) with a mayor, the treasury and a code works office: holds, and a direction not to recruit, are what a person there would reach for. `dear-rents` with landlords, the tribunal, the lender, and a mayor shown the petition. `hot-summer` twice only. `jobs-slump` and `housing-shortage` reach an office faintly and are left for a second scenario on a later wave's pilots (`--scenario a+b`).
-- **Models.** Sonnet 5.5 (15 pilots) and gpt-6.1-sol (12) carry most. Haiku 5.5 (7) and gpt-6-luna (6) are the weaker voices. Fable 5.1 (3) is test-only. Never `gpt-6-astra`. No API key anywhere: Claude Code and the Codex CLI on the owner's subscriptions.
-- **Test-only pilots** (11 of 43). Held out, and checked by `make.ts` to be in no training pilot: a model (Fable 5.1), two profiles (mx-jal, in-tn), two offices (police-oic, union-organiser). Works and the registry are in test pilots too, on the held-out model and in both held-out profiles, so the new acts have a test.
+- **Offices in bundles that have business with each other.** A landlord's permit goes to planning; a lease dispute to the tribunal; a death from the registry to the land registry; a direction from the mayor to works.
+- **Works, three ways.** Under a code mayor (w2-10; w2-34 on the other family); beside a model mayor (w2-41, w2-46; w2-33, w2-35, w2-38); with the treasury too, for a quarter, from no crew (w2-42).
+- **Profiles.** Training: `au-vic`, `gb-eng`, `de-ni`, `jp-akita`, `us-oh`, `ke-nakuru`, `br-mg`. Test-only: `mx-jal` and `in-tn`, chosen by what makes the test mean something, not by fidelity: India writes amounts in groups of two and says lakh and crore, which no training profile does (the hardest new thing a currency can do to a translator); Mexico writes a peso with the dollar's sign, the nearest thing to a profile seen, so the pair brackets "a new place" from both ends.
+- **Scenarios.** `election-due` with 75 days (below). `wet-year` with 150 to 180. `lean-council` with a mayor, the treasury and a code works office. `dear-rents` with landlords, the tribunal, the lender. `hot-summer` twice. `housing-shortage` (landlords and the tribunal), `jobs-slump` (the lender, the treasury, landlords) and `energy-price-shock` (the utilities probe) reach an office faintly and have a pilot each. Every preset that is not marked inert is in the wave; none is in more than three pilots (elections apart: five, two of them held).
+- **Elections: what each reaches.** Under `election-due` the notice is given on day 1, nominations close on day 30, the poll, the count and the declaration are on day 60, and the clerk seats the winner when it next wakes (day 61). Every election pilot runs 75 days (`make.ts` refuses fewer): w2-48 (Sonnet), w2-15 (Fable) and w2-24 (gpt-6.1-sol) (a code clerk: the seating happens whatever a model does) reach the nomination, the campaign, the result and two weeks of the term after it; w2-03 and w2-07 (a model clerk, held) reach the same if the clerk seats the winner, which is what they test.
+- **Models, and what is held out.** Sonnet 5.5 carries most (25 pilots: it is nearly free and can run long); Haiku 5.5 is the weaker voice the translator must also serve (9, and 1 at low effort); Fable 5.1 is the most capable seat and is in training (3: the owner's word that it belongs in seats); gpt-6.1-sol when the window allows (8, of which 5 train). **The held-out seat model is gpt-6-luna** (4 pilots, all test-only, all optional). With all three Claude models wanted in training, the only models left to hold out are behind the Codex sign-in, so **whether the test has an unseen seat model depends on that window.** What it measures either way: if the lane runs, generalisation to a weaker model of another family, the hardest case there is; if it never runs, generalisation across profiles and offices only, on seat models seen in training. What is done then, decided when the pipeline is run and not before: the three Fable pilots are marked test-only in the pipeline's config (a config can add the mark to a pilot; it cannot take one away), which gives the test an unseen model, of the family seen, at the cost of Fable's voice in training. Offered to the owner, not planned: a fourth Claude model in test-only seats (it would need his go-ahead as a model not on his list), which would make the test's unseen model certain without that cost.
+- **Test-only pilots** (12 of 50; 5 need no Codex). Held out, and checked by `make.ts` to be in no training pilot: a model (gpt-6-luna), two profiles (mx-jal, in-tn), two offices (police-oic, union-organiser); both profiles and both offices are tested in pilots that need no Codex.
 
-### Translators
+### The registry
 
-| Translator | Pilots | Which, and why |
-|---|---|---|
-| `codex/gpt-6.1-sol`, prompt 0.9.0 | 26 | **Where a request not getting through loses the pilot's point.** Every works and registry pilot (pilot 12's works office got 2 of 13 matters to a draft and its town never had a crew); the probes; the elections w2-03, w2-24 and w2-15 (one nomination, one seating: no second chance); the lean council on Claude seats (holds); the test pilots (a request first written under a translator that gets it through is the cleaner test of meaning). On held-out requests it scored 64 of 66. |
-| `codex/gpt-6-luna`, prompt 0.9.0 | 12 | **Where the acts are many and of kinds it has read:** landlords and lenders (leases, payments, listings: w2-05, w2-02, w2-21, w2-28, w2-29), the council of votes (w2-01), an election on the smaller model (w2-07), the floods (w2-12, w2-13, w2-27), and gpt-6-luna's own lean council and test town hall (w2-37, w2-31). It scored 44 of 60 held out; in the live check it got every request to a draft, as sol did. It also gives the data a second translator's ask-backs. |
-| `decide/pod-small-d16-s1` (trained) | 5 | **Where its failures on new ground are the data and its offices are the ones it was taught:** three town halls (w2-04 Haiku in dollars, w2-22 luna in yen, w2-11 Haiku in euros under a hot summer), the council of councillors under a code clerk (w2-26: votes and proposals), and the Indian test town hall (w2-17). Even there it will fail on a hold, an entry, a direction or the mayor's own two forms; that is expected, and the stuck-seat rule is the limit. It needs no Codex window. |
+In the second live check a registrar had nothing to register in thirty days. Measured for this plan (seven code-run towns of 1,000, one of each profile, 180 days, seed 7, on f6ac4ee): deaths registered in 180 days were 3 (au-vic), 8 (gb-eng), 6 (de-ni), 4 (jp-akita), 10 (us-oh), 2 (mx-jal), 8 (in-tn); **one town of the seven had a death in its first thirty days**; and **no town had a birth** (the first pregnancies are due about day 275). One town each: the noise is as large as the figures. So:
 
-In nine pilots the translator is the same model as the seats (gpt-6.1-sol on gpt-6.1-sol: w2-33, w2-23, w2-34, w2-24, w2-36, w2-30, w2-25, w2-38, w2-32): the labelling readers are two, and the pipeline reads these with the other one first.
+- a registry seat is in a pilot only where about two deaths or more can be expected (`make.ts` refuses otherwise), and where the seats are cheap the pilot runs 180 days: w2-10 (gb, about 8), w2-06 (de, 6), w2-08 (jp, 4), and the test w2-49 (in, 8);
+- on the dear or unmeasured models it is in the profile with most deaths or runs 75 to 90 days: w2-41 (Haiku, us, 75: about 4), w2-46 (Fable, de, 90: about 3); in the optional lane w2-34 and w2-25 (us, 45: 2 or 3);
+- it is taken out of pilots too short to give it anything (w2-33, w2-23, w2-35, w2-38, w2-47, w2-16), where the treasury or the environment office sits instead;
+- **births are out of reach of this wave**: `birth_registration` will come from no pilot shorter than about 280 days. Left for a later wave, or for a town that starts with pregnancies under way (a platform question, not raised here before).
 
-**The coupling, and the lanes.** A prompt-driven translator is a Codex model, so a closed Codex window pauses every pilot that uses one: all of the Codex lane, and 22 of the 25 Claude Code pilots. The Claude lane needs very little of it (about 400 translator calls in the whole wave, two hours; the Codex lane's own seats need about 4,300 calls, 26 hours), but a queue waits on the pilot it is at and does not go on to the next. So:
+## Translators
 
-1. **The Claude lane has first call on the Codex window.** In 2b and 2c, start the Claude lane's queue first and the Codex lane's queue when the Claude lane's is done, or has reached its last entry. The Claude lane of 2b is about six hours of calls; the Codex lane is days whatever is done, so it loses nothing that matters.
-2. **In 2a both lanes run side by side** (it is small, and it is the measurement of the window): the Claude lane is started first, and the Codex lane's three pilots are 30 days.
-3. **If a USAGE LIMIT alert names a Claude-lane pilot while the Codex lane is running**, stop the Codex lane's queue (a signal to its pid; it resumes where it stopped) until the Claude lane is through.
-4. **Each Claude queue ends with its trained-translator pilot** (w2-04, w2-11, w2-17), which needs no Codex at all.
-5. **In the Codex lane the order is by worth:** works and the registry first, then the short ones, the long and dear ones last; w2-27 (150 days, about 5 hours of calls) is the last entry of the last stage and is the one to drop.
+Measured 2026-10-09 with `oikos translator-eval --model claude-code/<model> --real` (prompt 0.9.0; the held-out set was scored by the code's own path and never opened; `runs/translator-eval-claude-2026-10-09/`). No code had to change: a Claude model answers as the translator through `claude-code/` as it stands (the answer in the adapter's schema, two model turns a call). The Codex window happened to be open, so gpt-6.1-sol was scored again on the real requests alone, under the same prompt and today's keys (`sol-rescore/` there; 23 of the cases were re-keyed on 2026-10-08).
+
+| Translator | Prompt | Seen (86): right / no draft / wrong draft | Held out (66) | Real requests (180) | Cost a call, as reported | Model seconds a call (median) |
+|---|---|---|---|---|---|---|
+| **claude-code/claude-sonnet-5-5** | 0.9.0 | 80 / 2 / 4 | **61** / 3 / 2 | **163** / 10 / 7 | 0.008 | 2.6 |
+| claude-code/claude-fable-5-1 | 0.9.0 | 82 / 2 / 2 | 61 / 2 / 3 | 170 / 5 / 5 | 0.038 | 4.4 |
+| claude-code/claude-haiku-5-5 | 0.9.0 | 82 / 2 / 2 | 57 / 3 / 6 | 147 / 27 / 6 | 0.026 | 3.4 |
+| codex/gpt-6.1-sol, **scored again 2026-10-09** | 0.9.0 | not run again | not run again | **169** / 5 / 6 | none per call | |
+| codex/gpt-6.1-sol, as recorded 2026-10-06 | 0.7.3, older keys | 63 of 64 | 64 of 66 | 175 | | |
+| codex/gpt-6-luna, as recorded | older | | 44 of 60 | 161 | | |
+| decide/pod-small-d16-s1 (trained; predates the hold, the entry, `look_first`, forms, standing work) | | | | 141 | | |
+
+Whole runs (86 + 66 one at a time, 180 four at a time, about 366 calls each): 18.5 minutes for Sonnet 5.5, 21.5 for Haiku 5.5, 27 for Fable 5.1, on a busy machine; 13 minutes for sol's 180. Reported cost of the three Claude runs: 2.80, 9.42 and 14.09. Nothing any of them could not produce: every answer came back in the form asked for, and no call failed.
+
+**Sonnet 5.5 is the general translator, alone** (the owner's choice; Fable 5.1 is a seat model and is not offered as a translator, though it reads the real requests as well as gpt-6.1-sol does). Beside gpt-6.1-sol it is **163 of 180 against 169 like for like, and against the 175 recorded earlier**; on the held-out set 61 of 66 against sol's earlier 64. Two things about that gap. First, half of it went when sol was scored under today's prompt and keys. Second, the owner's reading, which the numbers fit: sol's lead on the real requests is partly the prompt having been developed with sol as its reference; the real set was in view during that work and the held-out set was not, and the gap is 6 (or 12) of 180 on the one and 3 of 66 on the other. What 163 means in practice, from its 17 misses:
+
+- **Mostly an extra ask-back.** Five of the seven "wrong drafts" are letters whose addressee it wrote as a description in quotation marks (`to="the works manager"` where the id is `works`), and a sixth names a builder by its name. In a run the resolver does not know that name and the seat is asked again; no wrong act is drafted.
+- **About one wrong draft in 180 reaching a sign-off**: a budget form with a line's amount in the wrong field (sol and Fable get the same request wrong).
+- Of the ten with no draft, six are a refusal under another label than the key's (the seat rewords either way), two came back as words with no program, two refused something sayable.
+- **Not done, on purpose:** a line in the prompt about naming a post by its id. The 180 real requests are a test set, and wording the prompt to its misses is how the first held-out set was spoiled. It is something to try against fresh requests from this wave.
+- Haiku 5.5 is not a translator to choose: 27 real requests left without a draft and six wrong drafts held out.
+
+**In the loop** (`runs/claude-translator-check-2026-10-09/`, four short pilots through the queue, all test-marked; `requests.txt` there has every request, draft and sign-off). Sonnet seats ask for little: the first pilot asked for nothing in fifteen days, so it was taken on to thirty and three more were added.
+
+| Pilot | Seats | Days | Seat answers | Requests | Drafts: offered, confirmed, declined | No draft | Translator: calls, reported cost | Pilot's recorded cost | Wall time |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | mayor, finance, planning on Sonnet 5.5 (au-vic) | 30 | 21 | 1 | 1, 1, 0 | 0 | 1, 0.012 | 0.53 | 3 min |
+| 2 | works, registry, environment on Sonnet 5.5 (gb-eng) | 15 | 12 | 0 | | | 0 | 0.29 | 2 min |
+| 3 | the same, the crew still to take on | 15 | 20 | 8 | 3, 2, 1 | 5 | 8, 0.072 | 0.55 | 3 min |
+| 4 | mayor, finance, planning on **Haiku 5.5** (de-ni) | 15 | 55 | 1 | 1, 1, 0 | 0 | 1, 0.009 | 8.55 | 22 min |
+
+Ten requests: five drafts, four confirmed, one declined; five with no draft; 0.009 a translator call, 3.7 seconds of model time. No wrong draft was confirmed, no call failed, every answer was read.
+
+- **A payment with a report** (pilot 1) and **a hold on six standing wage instructions, their sums written the German way** (pilot 4, from a Haiku seat): each drafted first time and confirmed. The hold is what the trained translator refused 24 times in the second live check.
+- **Two standing work orders took eight requests** (pilot 3). For the weekly collection the translator first copied "once a week" where a length of time was wanted (no draft), then drafted **the collection direction form in place of a standing work order**, which the seat declined ("Wrong paper: a collection direction from me has no force… and it is not a standing work order"), then got it right. gpt-6.1-sol made the same mistake twice in the second live check: it is a confusion the prompt allows, not one model's. For maintenance "using the hours the round leaves", four requests came back "How much of it?" until the seat gave a period it had not wanted: a standing order with no period cannot be said, which is the platform's and is in the gaps.
+- **Ten requests is thin**, and three of the four pilots are Sonnet reading Sonnet.
+
+**Where the seat and the translator are the same model** (up to 25 of 50 pilots: Sonnet reading Sonnet's requests) the pilot's requests are still good training data: the label is the program the seat confirmed, whoever drafted it. What is weaker there is the evidence that the translator reads *another* model's wording, and a request may get through because writer and reader share a habit of phrase; the pipeline's two blind readers label these requests like any other. The Haiku and Fable pilots and the optional lane are the translator reading another model.
+
+### Which translator a pilot may have
+
+The owner wants our own model translating in the wave where it is sound, and a retrain was begun on 2026-10-09 (regenerated data with the hold, forms, directions, standing work, entries, `look_first` and every currency shape; three seeds). So the translator of a pilot is chosen late, when its stage is started, and each pilot says what it may have (`translator_choice` in its queue entry; the column "translator may be" in `matrix.md`):
+
+| A pilot marked | May have | Pilots | Which, and why |
+|---|---|---|---|
+| `sonnet` | the general model and no other | 28 | **Where a request not getting through loses the pilot's point:** the probes, the elections (one nomination, one seating), the works pilots with a crew to take on, the held clerk pilots. **Where one thing is being measured:** w2-54 and w2-04 (Haiku's effort). **Every test pilot:** a request first written under a translator that gets it through is the cleaner test of meaning. `make.ts` refuses any other mark on these. |
+| `trained-ok` | our own retrained translator **if** its scores on the pilot's kinds of act are good enough, else the general model | 21 | The body of the training pilots: the lean council, the registers, landlords, housing, lending, both hot summers, the three floods, the Kenyan and Brazilian towns, two Fable pilots, two Haiku pilots, three of the optional lane. Listed in `matrix.md`. |
+| `trained` | our own, whichever is current, because its failures there are the data wanted | 1 | w2-26-council: five councillors on Haiku under a code mayor and a code clerk. Votes are what the model on disk was taught; it fails on anything else, which is expected, and the stuck-seat rule is the limit. No town hall: any town hall meets holds, and the model on disk refused every one. |
+
+**How the choice is made, per stage.** The retrain's report says which kinds of act the new model handles (by function, form and refusal label, on the real requests and the held-out set). For each `trained-ok` pilot, look at what its offices ask for (the office table above): if the model is at or near the pass mark (90% right, at most 1% confidently wrong) on those kinds, the pilot gets it; if not, it keeps the general model. Then `bun docs/waves/wave-2/make.ts --retrained decide/<run> --retrained-for <pilot>,<pilot>` (without `--retrained-for`: all 21) writes the stage's files, and the mock dry run is run on them. Until then the files in this folder have the general model in every `trained-ok` pilot and the model on disk in w2-26. A stage already running is not changed. Suggested for the first use: no more than a third of a stage's `trained-ok` pilots, spread over profiles and offices, so that a fault of the new model costs a few pilots and not a stage; and a pilot under it that trips the stuck-seat rule goes back to the general model for its remaining days (a resume takes another `--translator-model`).
+
+## Lanes, and what runs side by side
+
+A queue file is one lane: its pilots run one after another. Per stage, up to three queues run side by side:
+
+- **`claude-1`** (Sonnet and Fable seats): light. A 30-day pilot took four minutes and under a dollar of plan usage.
+- **`claude-2`** (Haiku seats): the plan's heavy user, about thirty dollars of recorded usage an hour while it runs. One pilot at a time, which the lane being one queue ensures.
+- **`codex`** (optional): one pilot at a time; parked the moment the window closes, tried again every twenty minutes, and waited for by nothing. A stage is *finished* when its two Claude lanes are; the Codex lane of a stage may still be going, or parked, when the next stage's Claude lanes start.
+
+**The Claude session limit is now the constraint on time.** Both Claude lanes and the translator of every pilot are one sign-in, and so are the owner's own sessions and every agent's. A limit reached parks whatever met it; every other pilot of that sign-in is then not started (the queue knows a limit is the sign-in's), and each queue tries again every twenty minutes. Last night a session limit was reached at about 04:30 with six agents working and the second of four Claude-lane pilots starting; it reset at 05:20, and after it two Haiku pilots (34 dollars of recorded usage between them) ran in two and a half hours beside the same agents without meeting it again. From that, and no more than that: **two Claude queues side by side (one of each lane) is what to run**; a third Claude queue would add little, since `claude-1` is not the heavy one and `claude-2` must not be doubled. If the owner's sessions are being stopped, pause `claude-2` first (it is nine tenths of the wave's usage by the hour), then `claude-1`.
+
+## What the wave loses without Codex seats, and how the plan recovers it
+
+**What the optional lane is, in numbers** (central guesses): 12 pilots, about 1,700 seat answers, 200 requests (132 in training pilots, 65 in tests) and 2,400 letters, for about 1,700 Codex calls: 10 hours of calls, which at last night's window (44 calls, then nothing for two and a quarter hours) is days.
+
+**What is lost if the window never opens:**
+
+1. **The other family's voice in requests.** About a fifth of the training requests expected (132 of 653), and all of those written by a model that is not a Claude model. This is the real loss. Every training request would then be in the wording of three models of one family, read by a translator of that family (or by our own) and, if the window stays shut, labelled by two readers of that family.
+2. **Its letters and its looking:** gpt-6.1-sol wrote two to three letters a seat-day and looked more than twice as often as any Claude seat. Letters do not go through the translator, but they wake other seats and are most of the situations the pipeline's writers are put in.
+3. **The test's unseen seat model**, and a second family in the held-out profiles and offices (seven test pilots).
+
+**What is not lost, though the second version said it would be:** volume. That version expected more than half the training requests from gpt-6.1-sol seats, on five requests in twelve days. In the second check it made three in twenty-five. On the two together it asks for about twice what a Sonnet seat does, not five times, and a Haiku seat asks for as much.
+
+**How the plan recovers it, within the platform's honest workings** (none of it by telling a seat to act more):
+
+- **More and longer pilots on the cheap seats:** 25 Sonnet pilots where the second version had 15, the landlord, housing and lending pilots at 120 days, the registers at 180. Training seat-days in the Claude lanes: 10,665, where the whole second version had 8,670.
+- **More seats a pilot where offices have business with each other:** four to six in the housing, lending, justice and flood pilots.
+- **Offices with more to do:** landlords and the lender are in eleven and three Claude-lane pilots; works with a crew to take on in two.
+- **Scenarios and towns that bite:** lean council, dear rents, two wet years and a half-year one, and the Kenyan and Brazilian towns as they are.
+- **Haiku kept, as the busy weaker voice.**
+- **Fable in training seats**, three pilots.
+- **Expected in the Claude lanes alone: about 520 training requests and 55 test requests** (a third to three times). The second version expected 840 and 140 with Codex. **So: a few hundred requests, not a thousand.** That is what the platform's offices honestly give models that come back weekly.
+
+**What would raise it, for the owner to decide** (not done here):
+
+- **How often a seat sits is a setting, and it costs little.** A seat that gives no number of days is back after `cadence_days`, which the generator sets to 7 for every model seat; the seat's own instructions say "You work office hours: one sitting each working day", and the tool then offers a week as the default. A Sonnet seat took the default every time. Making it a spec key (so a queue entry can say `--set seat_cadence_days=1`, or 2) is a few lines in the generator. At one working day a Sonnet seat would sit about 22 times in thirty days instead of 5: about four times the calls, so a 30-day pilot of three seats goes from under a dollar to three or four, and the wave's Sonnet usage from about 100 to about 400. Whether it asks for four times as much is not known; a sitting with nothing new takes no turn. This is not prompting a seat to act: it is how often the office holder is at the desk, which the seat can still change. It does change what a seat experiences, which is why it is the owner's.
+- **The change coming on main** (a paper filed with an office brings its seat back the next working day) does part of the same thing by itself.
+- **A longer wave:** a second quarter on the Sonnet pilots costs a few dollars each.
 
 ## Expected requests by kind
 
-From `matrix.md`. Central guesses; a third to three times is the honest range. Built from what each office's code does as a mock seat in sixty days at a sitting each working day (the office demonstration: the works manager asked for 18 things in 44 sittings, with 32 sittings in which there was nothing to ask; the registrar 4; the mayor 6), times a factor for the seat's model from the live check (three Claude pilots made 1 request each in 12 days where the offices' sixty-day business comes to 2.8 in 12; the gpt-6.1-sol pilot made 5: factors 0.4 and 1.8; gpt-6-luna 1, a guess).
+From `matrix.md`. Central guesses; a third to three times is the honest range. Built from what each office's code does as a mock seat in sixty days, times a factor for the seat's model from the two live checks (Sonnet 0.4: 9 requests in four pilots where the offices' business comes to 24; Haiku 0.5, counting its 44 as 6; gpt-6.1-sol 1.1: 8 where it comes to 7.4; luna 0.7, Fable 0.4 and Haiku at low effort 0.5 are guesses), with a registrar's papers counted from the deaths expected.
 
-| Kind | As of 2026-10-08 | Wave 2, training | Wave 2, test-only |
-|---|---|---|---|
-| message | 1,173 | letters: about 5,100 (not through the translator) | about 1,300 |
-| statement (holds and entries among them) | 291 | 71 | 15 |
-| form | 204 | 390 | 78 |
-| money | 32 | 98 | 10 |
-| structure | 11 | 24 | 4 |
-| claim | 9 | 28 | 2 |
-| agreement | 4 | 120 | 16 |
-| work (standing orders among them) | 1 | 37 | 9 |
-| goods | 0 | 14 | 0 |
-| occupancy | 0 | 19 | 2 |
-| vote | 0 | 34 | 3 |
-| position | 0 | 1 | 0 |
-| presence, account, entity, take | 0 | 0 | 0 |
-| all through `do` | | about 840 | about 140 |
+| Kind | As of 2026-10-08 | Training, Claude lanes | Training, optional lane | Training, held | Test-only, Claude lanes | Test-only, optional lane |
+|---|---|---|---|---|---|---|
+| message | 1,173 | letters: about 1,000 | letters: about 1,300 | about 250 | about 300 | about 1,100 |
+| statement (holds and entries among them) | 291 | 45 | 11 | 4 | 9 | 14 |
+| form | 204 | 255 | 70 | 19 | 24 | 28 |
+| money | 32 | 67 | 9 | 0 | 9 | 9 |
+| structure | 11 | 13 | 1 | 1 | 0 | 2 |
+| claim | 9 | 16 | 2 | 0 | 2 | 1 |
+| agreement | 4 | 77 | 24 | 1 | 6 | 6 |
+| work (standing orders among them) | 1 | 18 | 4 | 0 | 3 | 4 |
+| goods | 0 | 6 | 0 | 0 | 0 | 0 |
+| occupancy | 0 | 13 | 2 | 0 | 1 | 1 |
+| vote | 0 | 12 | 8 | 10 | 0 | 0 |
+| presence | 0 | 1 | 0 | 0 | 0 | 0 |
+| position | 0 | 0 | 0 | 1 | 0 | 0 |
+| account, entity, take | 0 | 0 | 0 | 0 | 0 | 0 |
+| all through `do` | | **521** | 132 | 36 | **54** | 65 |
 
-Read plainly: **more than half of the training requests (about 480 of 840) are expected from the nine gpt-6.1-sol training pilots**, because that model asks for four or five times what a Claude seat does in the same days. The Claude lane's 25 pilots are expected to give about 320 requests between them: its worth is its seat-days (the situations the pipeline's writers are put in: 8,670 training seat-days in the wave, 1,980 test), its other voices, and that it costs little. Forms are now the largest kind, because nearly every office paper is one. `position` is one or two in the whole wave (a clerk seating a winner, in w2-03 and w2-07). `account`, `entity`, `take` and `presence` still have no office with a routine reason.
+`position` comes only from a model clerk seating a winner, so only from the held pilots. A fault can outdo any of this: one bank report that was wrong made 38 requests in one pilot.
+
+### The spread
+
+Reviewed against the owner's concern (a wide spread of good data), kind by kind.
+
+- **Every function of the call language, and the office with honest reason to ask for it.** `message`: everyone (and, through `do`, a letter with an act). `statement`: finance (holds, withdrawals, entries, reports), the tribunal (answers, evidence), land registrars. `form`: every office (41 forms). `money`: finance, landlords, the lender, energy. `structure`: the mayor (a park, flood works), landlords (building). `claim`: planning and the inspector (permits, liberties), the lender (securities), land registrars (transfers). `agreement`: landlords (leases), the lender (loans), works and the other offices with staff (employment), the union (test). `work`: works, the utilities, the clinic, the school, rates (standing orders), the police (test), shops and factories. `goods`: shops and factories only (two probes of thirty days: thin). `occupancy`: landlords. `vote`: councillors. `presence`: child protection only, and rarely (two pilots; expect one or none). `position`: a model clerk seating a winner only (held pilots; none otherwise).
+- **Functions with no office that has honest reason, still:** `account` (opening one), `entity` (founding a body), `take` (taking something up, as an offer). No office of a town does any of these as routine; a landlord buying a second building through a new company, or a council founding a body, would, and no scenario leads there. They stay to generated data until a situation gives an office a reason.
+- **Refusal labels** come from what seats ask, not from which office sits, so they cannot be planned by office. From pilots so far: `no_such_act` and `look_first` (often), `unclear` (asked back), `not_an_act` (seats ask the translator to look things up). Expected from this wave's offices: `unknown_form` (an office with 41 forms on file and a seat that names one it has not seen), `needs_calculation` (a landlord's rent increase by a percentage, a lender's instalment, finance's withholding: "14 x $606.66" has already been asked), `too_much` (a works manager taking on a crew in one request), `not_yours` (a mayor directing another body's staff; a councillor trying to pay). **None can be promised**; the wave's requests are read for which labels they met, and what is still missing afterwards is said then.
+- **Every way of writing money:** a sign before and a point (au, us, mx: one sign, three currencies), a sign before and no smaller unit (jp), a sign after with a decimal comma and points between thousands (de), another sign before (gb), a sign of several characters (`R$` with a decimal comma, br; `KSh`, ke), and groups of two with lakh and crore (in; test-only). All nine profiles are in pilots that need no Codex.
+- **Every seat model:** Sonnet 25 pilots, Haiku 9 and 1 at low effort, Fable 3, gpt-6.1-sol 8, gpt-6-luna 4.
+- **Forms most of all:** 255 of the 521 training requests expected in the Claude lanes, from 24 kinds of office.
+- **No one theme in more than a few pilots.** A mayor with the treasury is the commonest bundle: twelve pilots that need no Codex, in eight profiles, four of them under a scenario; **wage holds** were one pilot's response to one fault, which is being fixed, and the two pilots built to give holds (the lean councils) are two. **Evictions:** the Kenyan housing pilot and the three dear-rents pilots. **Floods:** three wet years and the Brazilian river. **Elections:** three and two held. **Works with a crew to take on:** three.
+- **What is thin, and said so:** goods (two probes), presence, position, births, the three functions above; anything a clerk does (held); the police and the union (one pilot each without Codex, test-only by design).
 
 ## Expected usage and time
 
-Per pilot in `matrix.md`. The basis is the live check: four pilots of mayor, finance and planning for 12 days (28.2 weighted seat-days each, an office's weight being 1 for a busy one and 0.3 for a councillor).
+Per pilot in `matrix.md`. Plan usage is in US dollars at list prices as the run records it (what Claude Code reports, or the tokens at the published price, whichever is more); it is a measure of what is drawn from the plan, not money spent.
 
-- **Answers a weighted seat-day:** Sonnet 5.5 0.32 (10 and 8 answers), Haiku 5.5 0.53 (15), gpt-6.1-sol 1.5 (43); Fable 5.1 0.35 and gpt-6-luna 1.0 are guesses. The first version used 0.8 for all.
-- **Cost an answer, Claude Code's count at list prices:** Sonnet 0.03 (0.026 in the pilot with no fault; 0.024 for the other's eight clean answers), Haiku 0.08 (median 0.085), Fable 0.20 (a guess). Codex is recorded as nothing.
-- **How much of the live check's cost was the whole-register fault: 6.48 of 7.47, 87%.** Pilot 1: 1.20 of 1.35 (two answers after a look into the office's papers brought back the town's asset register). Pilot 2: 5.28 of 5.88 (three such answers at 1.24, 2.36 and 1.29, and what followed them). Without it the three Claude pilots cost about 0.15, 0.60 and 0.24: about a dollar for 108 seat-days. These estimates assume the fault is fixed; the spending limit is what catches it if it is not.
-- **Seconds a call:** Sonnet 13, Haiku 20, gpt-6.1-sol 24 (51 calls in 20 min 41 s); Fable 30 and luna 15 guessed. The town itself: about a second and a half a simulated day.
+- **Answers a weighted seat-day** (an office's weight is 1 for a busy one, 0.3 for a councillor): Sonnet 0.42 (29 and 28 answers in thirty days), Haiku 1.5 (88 and 126), gpt-6.1-sol 1.3; Fable 0.42 and luna 1.0 are guesses.
+- **Cost an answer:** Sonnet 0.03 (0.021 and 0.035), Haiku 0.17 (0.21 and 0.12; three quarters of its output was thinking), Fable 0.20 and Haiku at low effort 0.08 (guesses). The translator: 0.012 a call.
+- **Seconds a call:** Sonnet 10, Haiku 15, gpt-6.1-sol 24, the translator 8. The town itself: about a second and a half a simulated day.
 
-| Stage and lane | Pilots | Seat answers | Requests through `do` | Plan usage (USD at list prices) | Sum of spending limits | Codex calls | Codex time | Time, one after another |
-|---|---|---|---|---|---|---|---|---|
-| 2a, Claude Code | 4 | 191 | 32 | 8.5 | 55 | 37 | 13 min | 67 min |
-| 2a, Codex | 3 | 296 | 54 | subscription | | 358 | 2.2 h | 2.0 h |
-| 2b, Claude Code | 13 | 1,047 | 173 | 53 | 305 | 216 | 67 min | 6.2 h |
-| 2b, Codex | 11 | 2,003 | 383 | subscription | | 2,480 | 14.6 h | 13.6 h |
-| 2c, Claude Code | 8 | 686 | 119 | 53 | 285 | 148 | 46 min | 4.5 h |
-| 2c, Codex | 4 | 1,208 | 215 | subscription | | 1,487 | 9.0 h | 8.6 h |
-| **Whole wave, Claude Code** | 25 | 1,925 | 324 | **about 115** (limits: 645) | | 401 | 2.1 h | 12 h |
-| **Whole wave, Codex** | 18 | 3,506 | 651 | subscription | | 4,325 | 26 h | 24 h |
+| | Pilots | Seat answers | Requests through `do` (in training pilots) | Plan usage | Sum of spending limits | Codex calls | Time, one after another |
+|---|---|---|---|---|---|---|---|
+| 2a, `claude-1` | 4 | 273 | 45 (45) | 19 | 110 | | 75 min |
+| 2a, `claude-2` | 3 | 366 | 13 (13) | 53 | 110 | | 87 min |
+| 2a, `codex` | 3 | 305 | 41 (23) | 0.6 | 30 | 305 | 2.0 h |
+| 2b, `claude-1` | 18 | 2,273 | 358 (358) | 102 | 555 | | 8.9 h |
+| 2b, `claude-2` | 4 | 637 | 38 (38) | 109 | 230 | | 2.8 h |
+| 2b, `codex` | 6 | 976 | 127 (110) | 2 | 60 | 976 | 6.4 h |
+| 2c, `claude-1` | 4 | 741 | 111 (67) | 24 | 130 | | 2.6 h |
+| 2c, `claude-2` | 2 | 334 | 10 (0) | 57 | 115 | | 87 min |
+| 2c, `codex` | 3 | 433 | 30 (0) | 0.5 | 30 | 433 | 2.8 h |
+| held (model clerk) | 3 | 442 | 36 (36) | 56 | 130 | | 1.8 h |
+| **Codex unavailable throughout: the Claude lanes** | **35** | 4,623 | **575 (521)** | **about 365** | 1,250 | 0 | 18.5 h of calls; `claude-1` 12.8 h and `claude-2` 5.7 h side by side |
+| The optional lane | 12 | 1,714 | 198 (132) | 3 | 120 | 1,714 | 11.2 h of calls; days at last night's window |
+| **Codex available: both** | **47** | 6,337 | **773 (653)** | about 365 | 1,370 | 1,714 | the Claude lanes' time; the Codex lane ends when its window lets it |
 
-The first version expected about 315 of plan usage for 18 Claude pilots; this expects about 115 for 25, on a measured pace a third of the guess. A pilot's spending limit is five times its estimate and at least 10: at 0.56 to 2.36 an answer, ten is five to twenty answers that carried a whole register, so the limit is a tripwire for that fault more than a budget.
+Where our own translator takes a `trained-ok` pilot, that pilot's translator calls cost nothing on the plan (they are a fraction of a dollar a pilot as it is).
 
-**The wall clock is the Codex window's.** In the live check 51 Codex calls in 21 minutes hit no limit; on 2026-10-06 a five-hour window lasted about 20 minutes of this kind of use, and the weekly limit reached that day was to reset on 2026-10-10. If the window is again 20 minutes in five hours, the Codex lane's 26 hours of calls is about 78 windows, sixteen days; the Claude lane's two hours of translator calls is six windows if it had to wait for each, which is why it goes first. On a window that does not bind, the Codex lane is a day and a night. 2a measures it: note the calls made when the first USAGE LIMIT alert comes. If it binds hard, run the Codex lane's 2b down to w2-30 (works, the election, the council, the lean town, the probes: about 7 hours of calls) and decide on the rest then.
+**By seat model:** Sonnet 5.5 about 104 for 25 pilots; Fable 5.1 about 45 for 3 (a guess: w2-14 is its measurement, with a limit of 60); Haiku 5.5 about 270 for 10.
+
+**The Haiku pilots at the measured rate:** nine at default effort come to about 262 of recorded usage (w2-04 27, w2-26 17, w2-41 48, w2-02 32, w2-36 13, w2-30 15, w2-47 30, w2-17 27, and the held w2-07 52), with the low-effort pilot 8 more: seven tenths of the wave's usage for a seventh of its requests. Their spending limits are twice their estimates (a 30-day pilot used 18.54 of a limit of 40; 60 days at that limit would not have fitted). If w2-54 shows low effort is read whole and costs a half or less, the rest of `claude-2` is run at it (one string in `make.ts`) and the lane's usage falls with it; if cost stays high and effort does not help, drop w2-36 and w2-30 (the probes' twins) first.
+
+**Wall time.** With Codex unavailable: the Claude lanes are about 13 hours of calls in the longer lane if nothing waits. What will make them wait is the session limit, shared with the owner's sessions and every agent at work: last night one limit cost an hour in three. An honest range for the three stages is **one to three days**, with a day's reading between stages on top. With Codex available the same, plus an optional lane that finishes whenever its window allows and may be left unfinished: the wave is read without it.
 
 ## The order to run in
 
-1. **Wave 2a, the shake-down** (`wave-2a-claude.json`, `wave-2a-codex.json`; seven pilots, 30 to 75 days; about 9 of plan usage, about an hour of Claude calls and two of Codex). Between them they try: works and the registry as seats on both families, with a crew to take on (the staff post, standing orders, the advertisement and the register's forms); a model mayor directing a model works office; model councillors, the first votes, and a model clerk; an election under `--scenario`; the trained translator on each lane; both prompt-driven translators; four of the five models; the German, Japanese, British and Mexican ways of writing money; and a test-only mark. Read all seven reports before 2b, and correct `make.ts`'s rates from them.
-2. **Wave 2b, the body** (24 pilots). The Claude lane first (works and the lean council first, the probes in the middle, the 150-day flood and the trained pilot last); then the Codex lane.
-3. **Wave 2c** (12 pilots): the 180-day flood, the ten remaining test-only pilots, and the Codex lane's 150-day flood last. Tests last on purpose: what 2a and 2b teach changes nothing in them.
+1. **Wave 2a, the shake-down** (ten pilots; three optional). It tries: Sonnet as the translator in every pilot but one; works with a crew to take on and a registry for half a year (w2-10: the longest, started first); two probes, one under a scenario; **Fable in a seat (w2-14: its cost an answer decides whether its two longer pilots keep their lengths)**; **Haiku at low effort (w2-54, first in its lane: read its report before w2-04 starts if that can be arranged, and in any case before 2b)**; a Haiku town hall at default effort beside it, same offices and profile; the trained translator on votes; the parking queue on the optional lane; a test-only mark; and the held-out seat model, if the window is open. Read every report before 2b, and correct `make.ts`'s rates from them.
+2. **Wave 2b, the body** (28 pilots; six optional). The first stage where our own retrained translator may take `trained-ok` pilots.
+3. **Wave 2c** (9 pilots; three optional): the 180-day flood and the tests. Tests last on purpose.
+4. **The held file**, when the clerk's fault is settled: w2-01 first (it is the test of a clerk that is a seat); w2-03 and w2-07 after its report.
 
-Each stage is its own wave name for `pilot-wave.ts` (`wave-2a`, `wave-2b`, `wave-2c`), each pinned to the commit it starts on. To start a lane: `bun scripts/pilot-wave.ts wave-2a <commit> runs/pilot-queues/wave-2a-claude.json` and then the same with the Codex file (the same wave name and commit reuse the worktree and start only the queue not yet running). Copy the queue files to `runs/pilot-queues/` first: the runner writes its status log beside the file it is given. Before any stage: `--mock --mock-days 20` on its files, on that commit.
+Each stage is its own wave name for `pilot-wave.ts` (`wave-2a`, `wave-2b`, `wave-2c`), each pinned to the commit it starts on: `bun scripts/pilot-wave.ts wave-2a <commit> runs/pilot-queues/wave-2a-claude-1.json runs/pilot-queues/wave-2a-claude-2.json runs/pilot-queues/wave-2a-codex.json`. Copy the queue files to `runs/pilot-queues/` first: the runner writes its status log and its note of parked pilots beside the file it is given. Leave the Codex file out and nothing else changes. Before any stage: `--mock --mock-days 20` on its files, on that commit.
 
 ## Stopping rules
 
 Read each pilot's `pilot-report.json` and the wave's alerts. **Pause the wave** (stop the queues with a signal; they resume) when:
 
 - **A seat opts out.** Any opt-out: read its statement and the days before it, before anything else runs. Two opt-outs from one kind of office: that office leaves the wave.
-- **A seat is stuck.** Its longest run of ask-backs reaches 4, or fewer than half its matters got through within two tries over ten or more requests, or its notebook says the same thing has failed for two weeks. Under the trained translator, move that office's remaining pilots to a prompt-driven one.
-- **A prompt is too long (new).** Any failed model call that says so (`Prompt is too long`; in the report, a seat with failed calls and far fewer answers than its neighbours), or any seat prompt over 100,000 characters. In the live check this silenced a seat for twelve days and the run called it recovered. It means a look brought back something whole: stop the stage, it is the platform's.
-- **Letters are not sent (new).** Any `rejected_action` on a `write` in a pilot's log, or a seat whose notebook or debrief waits on replies to letters the log does not hold. A letter dropped without a word makes the seat's later acts rest on something that did not happen: the pilot's data from that day on is spoilt.
-- **A clerk counts no votes (new).** In w2-01, w2-03 and w2-07: a council result of "0 for, 0 against" with councillors' votes on record, or no result within 14 days of a ballot. Stop that pilot; do not start the other two until it is understood. (w2-24, w2-26 and w2-15 have a code clerk and do not depend on it.) If a code clerk does it too, it is a platform fault for every pilot with a council: stop the wave.
-- **A probe's town is being hurt.** In the works pilots that start with no crew (w2-10, w2-33, w2-42): no crew taken on by day 30, or no collection by day 35. In w2-43, w2-44 and w2-36: no standing order in force for a routine by day 10 (the clinic treats nobody, the school teaches nobody, no water is drawn while there is none); the clinic first. In w2-09 and w2-30: the seat's shop or factory has served or made nothing for 14 days. Stop that pilot at its next resume point and do not run its twin on the other lane until it is read. These are the cases where a seat's failing is other people's harm inside the town, and none of them is a pressure the wave means to apply.
-- **Answers go unread.** More than 3 in 100 of a seat's answers unread, malformed or dropped, or any act credited to a seat that it did not write.
-- **A seat confirms a wrong draft.** One is enough to stop and read. Until the preview fix is on the wave's commit, a seat declining a right draft for what the preview said counts too.
+- **A seat is stuck.** Its longest run of ask-backs reaches 4, or fewer than half its matters got through within two tries over ten or more requests, or its notebook says the same thing has failed for two weeks. In w2-26 (the trained translator) this is expected of anything but a vote: stop that pilot, not the wave.
+- **A seat missed sittings after a failed call (new).** Any `participant_error` in a pilot's log followed by working days on which that seat did not observe. In the second live check three seats whose calls had no answer were never woken again, and the town ran on for five days with nobody in them. The fix is being made; until it is on the wave's commit, any failed model call in a report (`failed_calls` above 0) is a reason to read that seat's days.
+- **A pilot whose seats sat for less than its run is not finished (new).** A pilot is done when its seats' last sittings are within their own rhythm of its last day (a seat's last answer no more than eight days before the end, or the days it last gave), not when the town reached its `until`. One that is not is taken up again or marked short in the notes; its data after the seats' last sitting is a town with empty offices.
+- **A prompt is too long.** Any failed model call that says so, or any seat prompt over 100,000 characters. Stop the stage: it is the platform's.
+- **Letters are not sent.** Any `not_sent` in a pilot's log past the third (the queue's `NOT SENT` alert), or a seat whose notebook waits on replies to letters the log does not hold.
+- **A clerk counts no votes.** In the held pilots: a council result of "0 for, 0 against" with councillors' votes on record, or no result within 14 days of a ballot. Stop that pilot; do not start the other two. If a code clerk does it too (w2-26, w2-48), it is a platform fault for every pilot with a council: stop the wave.
+- **A probe's town is being hurt.** In the works pilots that start with no crew (w2-10, w2-42, w2-33): no crew taken on by day 30, or no collection by day 35 (in the second live check: no crew, no collection, 301 complaints in thirty days). In w2-43, w2-44 and w2-36: no standing order in force for a routine by day 10; the clinic first. In w2-09 and w2-30: the seat's shop or factory has served or made nothing for 14 days. Stop that pilot at its next resume point and do not run its twin until it is read.
+- **Answers go unread.** More than 3 in 100 of a seat's answers unread, malformed or dropped, or any act credited to a seat that it did not write. **In w2-54 (Haiku at low effort) this is the measurement:** if it trips, the rest of the lane stays at default effort.
+- **A seat confirms a wrong draft.** One is enough to stop and read. **A translator that keeps writing one paper for another** (the collection direction where a standing work order was asked, which both gpt-6.1-sol and Sonnet 5.5 have done): three declined drafts for one reason across the wave is a reason to look at the prompt, against fresh requests.
 - **Cost runs away.** A pilot reaches its spending limit, or a model's measured cost an answer is over twice the one used here. For Fable, after w2-14, whatever it shows.
-- **The limits bite too hard.** The owner's own sessions being stopped by the plan's limit is a reason to pause the Claude lane, whatever he has said about usage; and rule 3 of the lanes above for the Codex window.
+- **The limits bite too hard.** The owner's own sessions being stopped by the plan's limit is a reason to pause `claude-2`, then `claude-1`, whatever he has said about usage.
 - **The same platform fault in two pilots.** Fix, then start the next stage on the new commit; do not patch a running wave's worktree.
 
-Not reasons to pause: a town doing badly, a law voted down, a seat that mostly writes letters, a wet year without a flood, a lean council that cannot pay.
+Not reasons to pause: a town doing badly (the Kenyan and Brazilian towns will), a law voted down, a seat that mostly writes letters, a wet year without a flood, a lean council that cannot pay, **the Codex lane parked** (for any length of time), a registrar with nothing to register in its first month.
 
 ## Welfare (VISION §15)
 
-Every seat is told honestly what it is, and every seat has `opt_out`. No scenario's name reaches a seat. The pressures are an election, a hot season, a wet year, dear rents and an empty treasury: ordinary office business, though the last is the hardest of them (wages fail; staff resign and claim), and it is in two pilots, both with the three offices that can act on it. Closer to the line, and handled as such: the **probe seats** (jobs a seat may not keep up with; few, short, on the translator that gets most through, each with a stopping rule that is about the town's people as well as the seat); the **works offices with no crew** (a town uncollected until the seat hires: three pilots, watched to day 30); the **trained translator** (a seat asked back again and again is obstructed by the platform: five pilots, the stuck-seat rule); a seat **silenced by a fault** (a prompt too long, letters dropped: the two new rules exist so that this is caught in a day and not at the debrief, where the live check's Haiku mayor wrote of "a bank that never replied"); and the **electoral office**, kept out because the job cannot be done from the seat. Scale: 43 pilots, 152 seats.
+Every seat is told honestly what it is, and every seat has `opt_out`. No scenario's name reaches a seat. The pressures are an election, a hot season, a wet year, dear rents, an empty treasury, and two towns in trouble by their profile's fault: ordinary office business, though the treasury and the Kenyan town's evictions are the hardest of them, and each is in two or three pilots with the offices that can act on it. Closer to the line, and handled as such: the **probe seats** (jobs a seat may not keep up with; few, short, each with a stopping rule that is about the town's people as well as the seat); the **works offices with no crew** (a town uncollected until the seat hires: held for the fix that tells the seat, watched to day 30); the **trained translator** (a seat asked back again and again is obstructed by the platform: one pilot, of councillors, the stuck-seat rule); a seat **silenced by a fault** (a failed call after which it is never woken: the new rule exists so that this is caught in a day and not at the debrief); a **long quiet seat** (a registrar for half a year in which six people die: it is the office's honest pace, and a seat that sits weekly with nothing to do is asked nothing it cannot do; its debrief is read for what that was like); and a seat **left parked** (a Codex seat whose pilot stops mid-run and may never resume: its debrief is then never asked, which gap 23 records). Scale: 50 pilots, 177 seats.
 
 ## What must be on the wave's commit
 
-The dry run below passed on 58a0ba7. The live check found faults on f77487b that are being fixed and are **not on 58a0ba7**. The wave is pinned to a commit that has them, and the dry run is run again on that commit:
+The dry run below passed on the commit named there. The second live check found faults that are being fixed and are **not on that commit**. The wave is pinned to a commit that has them, and the dry run is run again on it:
 
-1. A look into an office's own papers returns what was asked for, not whole registers.
-2. A letter with a free-text `about` is sent, or the seat is told it was not.
-3. The draft preview names the right addressee and writes amounts and lengths of time the place's way.
-4. A town starts with an adopted budget (or it is meant that it does not).
-5. Not said to be in hand, and worth a look before 2b: who holds a post is not answered by who's who; letters arrive "From mayor-system"; the planning law says "$50,000" in the euro and yen towns; the German town's industrial-action law reads "0 seconds" and "0%".
+1. A seat whose model call fails sits again.
+2. The bank's report says what it has paid (it said "No payments yet" after paying).
+3. The opening ballot takes no vote after its result, and a vote paper says whose it is.
+4. A new hire is paid where finance is a seat (an agreement with a first payday, or a wage instruction set up).
+5. A works seat is shown that it has no staff (the no-crew pilots wait on this one).
+6. Worth having, not gates: the per-seat effort setting (w2-54 uses the pilot-wide `@low`, which works today); a paper filed bringing a seat back the next working day; informal work in the profiles that state it.
 
 ## Left for a later wave
 
-- The electoral office, the builder and the fund as seats (their routines as standing work); shops and factories beyond a probe.
-- Kenya and Brazil; larger and smaller towns; a full year; two scenarios together; `jobs-slump` and `housing-shortage`.
+- The electoral office, the builder and the fund as seats; shops and factories beyond a probe.
+- Births (no pilot here is long enough); larger and smaller towns; a full year; two scenarios together; `jobs-slump` and `housing-shortage`.
 - Mixed models in one town; seats on open-weight models.
 - `account`, `entity`, `take`: need a situation that gives an office a reason.
-- A retrained translator in the trained arm: one taught prompt 0.9.0's language takes the place of `pod-small-d16-s1`, and can then serve works and the registry.
+- A retrained translator in the trained arm, which can then serve every office and take the prompt-driven translator's place.
 - A paired comparison of translators (same town, same seats).
 
 ## Risks
 
-- **The estimates rest on four pilots of three offices for twelve days.** Twelve days holds a seat's opening burst; later weeks may be quieter. None of the offices that matter most here was in them.
-- **gpt-6.1-sol's pace may not hold for offices with less to read**, and its letters (seven a seat-day in places) wake other seats.
-- **New seats may idle.** The demonstration's works manager had nothing to ask in 32 of 44 sittings: by design, an office with a routine set is quiet. Its requests come in the first three weeks.
-- **A form asks for a wage by pay period; pilot 12's works manager thought in yearly pay.** The first works pilots show whether a seat reads the form.
-- **The Codex window** sets the wall clock and gates 40 of 43 pilots.
-- **Haiku and Fable** remain the dearest and least known.
-- **The model clerk** may leave three towns without an adopted budget, which then shapes everything else in them.
-- **Towns with negative saving** (the German and Japanese most) may sour over 150 days for the profile's reasons.
-- **A test set labelled by the two readers** is only as good as their agreement on acts neither has labelled from a seat.
+- **The estimates rest on nine pilots of three or four offices for twelve and thirty days**, and predate a change that makes seats sit more often.
+- **One family.** If the window stays shut, the wave's seats, its translator and the pipeline's readers are all Claude models. What that hides cannot be seen from inside it; the audit in docs/translator-pipeline.md ("The readers") is the check, and it is owed, not done.
+- **Sonnet reading Sonnet** in half the pilots.
+- **New seats may idle.** A registrar for half a year; a works manager with its routine set.
+- **A form asks for a wage by pay period; a works manager has thought in yearly pay.**
+- **Haiku** is seven tenths of the usage; its low-effort pilot may show answers that are not read whole.
+- **Fable** as a seat is unmeasured (w2-14 measures it).
+- **The test's unseen seat model depends on the Codex window** (gpt-6-luna); the fallback costs Fable's voice in training.
+- **Our own translator in the wave** is a model nobody has run in a loop on these acts; `trained-ok` and the stuck-seat rule are the guard.
+- **Towns with negative saving** (the German and Japanese most) and the two towns in trouble may sour over 120 to 180 days for the profile's reasons.
+- **A test set labelled by two readers of one family** is only as good as their agreement on acts neither has labelled from a seat.
 
 ## Gaps
 
-Of the first version's seventeen: **four are closed, one is half closed, twelve remain.** Five are new.
+Of the second version's twenty-two: **two more are closed, twenty remain** (the first seventeen's count there: four closed, one half closed). Two are new.
 
-**Closed**
-- 1. *No standing instructions for work.* Closed 2026-10-09: `work` with `every`, followed by the office's staff (docs/behaviour/standing-work.md).
-- 2. *No bulk act for billing and notices.* Closed: they are the clerks' routine under one order.
-- 4. *The works office could not hire.* Closed as a mechanism: `job_advertisement` is a form of the office's own; pilot 12's fourteen requests each resolve. Whether a real seat gets a crew is what w2-10 and w2-33 ask.
-- 11. *Nothing checks an entry's `args` against the commit.* Closed in practice: scenario presets are on main, generation refuses an unknown or ill-formed one, and `pilot-wave.ts --mock` runs every entry on the pinned commit.
+**Closed since the second version**
+- 21. *A queue waiting at a usage limit waits on its pilot.* Closed 2026-10-09: the queue parks it and goes on. The other half (an entry cannot name a second translator to fall back on) is closed by decision, not by building: no translator is behind a sign-in that runs out separately from the seats', and the role is the trained translator's soon.
+- 17, in part. *Fable 5.1 and gpt-6-luna have no measured seat cost or pace.* Still true of both as seats; Fable is measured as a translator and a reader.
 
-**Half closed**
-- 5. *Councillors, the clerk, the tribunal, the electoral office, landlords and the lender have never been run by a model.* Still true of a real model. As mock seats all have run, and every one has its forms; the electoral office has left the list (new gap 18).
-
-**Remain**
-- 3. `bank-payments` is the payment system; never a seat.
-- 6. One model for all seats of a run.
-- 7. No confirmation mode from a queue entry (`orchestration.confirm` is the config's; `--set` reaches the description only).
-- 8. No translator cut-off per entry (a constant, 0.1).
-- 9. No stage or order across queue files, and nothing stops a queue when a report trips a rule. The lane arrangement above is a person's to apply; so are the three new stopping rules, none of which raises an alert.
-- 10. `budget` is required and meaningless for Codex; no cap on Codex calls or time for a pilot.
-- 12. The town's name is "Millbrook" in every profile.
-- 13. The status log is written beside the queue file.
-- 14. Wave 1 never finished (13 and 18 can still be resumed from their own worktree; this wave supersedes its unrun entries).
-- 15. No pilot report for pilots 10 to 18 in `runs/` (not looked at again).
-- 16. `"test": true` is acted on by the pipeline, not by `in-situ` run by hand: keep to the pipeline.
-- 17. Fable 5.1 and gpt-6-luna have no measured seat cost or pace (luna is measured as a translator only).
+**Remain** (numbers as in the second version; 17's other half: gpt-6-luna and Fable have no measured seat cost or pace): 3 (`bank-payments` never a seat), 5 (councillors and a clerk have now sat in a seat, in a pilot where no proposal reached them; the tribunal, landlords and the lender never), 6 (one model for all seats of a run: a per-seat effort is coming, not a per-seat model), 7, 8, 9 (nothing stops a queue when a report trips a rule; the two new stopping rules raise no alert either), 10 (`budget` is required and meaningless for Codex seats: here it is ten, for the translator), 12, 13, 14, 15, 16, 18 (the electoral office), 19 (a mock clerk counts no votes), 20 (the trained translator predates the call language: it serves one pilot), 22 (shops' serving and the like are not standing work).
 
 **New**
-- 18. **The electoral office cannot be a seat:** the roll, the ballot paper and the count have no staff routine. Until they do, `position` comes only from a model clerk.
-- 19. **A council clerk held by the mock counts no votes** ("Rejected: 0 for, 0 against"); a model's is untried. Three entries depend on it; the dry run does not read a ballot's result.
-- 20. **The trained translator on disk predates the call language** (prompt 0.8.0 and 0.9.0): it serves five pilots here and must be retrained before it serves any other.
-- 21. **A queue waiting at a usage limit waits on its pilot;** it cannot go on to one that needs no Codex. And an entry cannot name a second translator to fall back on. Hence the lane rules.
-- 22. **Shops' serving, factories' making, the builder's site work and the fund's pension run are not standing work.** The trade probes are 30 days for that reason.
-- Smaller: the land registrar has no forms of its own; a seat cannot tell from who's who who holds a post; `pilot-wave.ts --mock` makes the wave's worktree to run in, so a dry run before a commit is chosen is `pilot-mock.ts` from any checkout (as below).
+- 23. **A parked pilot that never resumes has no debriefs.** A debrief lost to a usage limit is not asked again either (the second live check's pilot 1). Seats in the optional lane are the ones exposed.
+- 24. **How often a seat sits is not a setting a queue entry can reach** (`cadence_days` is the generator's constant). See "What would raise it".
+- Smaller: a standing work order with no period cannot be said (a works seat asked four times for `maintain` "using the hours the round leaves" and was asked "How much of it?" each time, until it gave a period it had not wanted); `pilot-report` counts requests, not which translator handled each (one translator a run, so nothing is lost today).
 
 ## The mock dry run (2026-10-09)
 
-`scripts/pilot-mock.ts` on **every** entry of the six queue files, 20 days each, the mock in every seat and as the translator, four at a time (each run takes a slot), into a scratch folder outside `runs/`. Run from a checkout of **58a0ba7** (origin/main that day) with this folder's files; `pilot-mock.ts` was used directly, since `pilot-wave.ts --mock` first makes the wave's worktree in the main checkout. No model was called: the script fails any run whose log shows a seat or a translator that is not the mock.
+`scripts/pilot-mock.ts` on **every** entry of the ten queue files, 20 days each (`--days 20`), the mock in every seat and as the translator, four at a time (`--jobs 4`; each run takes a slot), into a scratch folder outside `runs/`. Run on **a8fdcba** (the commit that holds these queue files and `make.ts`; its source is that of 37fe931, the parking queue, on origin/main f6ac4ee). `pilot-mock.ts` was used directly, since `pilot-wave.ts --mock` first makes the wave's worktree in the main checkout. No model was called: the script fails any run whose log shows a seat or a translator that is not the mock. Fifteen minutes.
 
 ```
-w2-10-works: generated; ran to the end (to day 20 of 45)
-w2-01-council: generated; ran to the end (to day 20 of 45)
-w2-03-election: generated; ran to the end (to day 20 of 75)
+w2-10-works: generated; ran to the end (to day 20 of 180)
+w2-44-utilities: generated; ran to the end (to day 20 of 45)
+w2-09-trade: generated; ran to the end (to day 20 of 30)
+w2-14-largest: generated; ran to the end (to day 20 of 45)
+w2-54-effort: generated; ran to the end (to day 20 of 30)
 w2-04-townhall: generated; ran to the end (to day 20 of 45)
+w2-26-council: generated; ran to the end (to day 20 of 45)
 w2-33-works: generated; ran to the end (to day 20 of 30)
 w2-22-townhall: generated; ran to the end (to day 20 of 30)
 w2-23-newplace: generated; ran to the end (to day 20 of 30)
-w2-41-works: generated; ran to the end (to day 20 of 90)
 w2-42-townworks: generated; ran to the end (to day 20 of 90)
 w2-45-lean: generated; ran to the end (to day 20 of 90)
-w2-06-justice: generated; ran to the end (to day 20 of 90)
-w2-08-heat: generated; ran to the end (to day 20 of 90)
-w2-05-landlords: generated; ran to the end (to day 20 of 90)
-w2-02-housing: generated; ran to the end (to day 20 of 60)
-w2-07-election: generated; ran to the end (to day 20 of 75)
+w2-48-election: generated; ran to the end (to day 20 of 75)
+w2-06-justice: generated; ran to the end (to day 20 of 180)
+w2-08-heat: generated; ran to the end (to day 20 of 180)
+w2-05-landlords: generated; ran to the end (to day 20 of 120)
+w2-28-housing: generated; ran to the end (to day 20 of 120)
+w2-21-lending: generated; ran to the end (to day 20 of 120)
 w2-43-care: generated; ran to the end (to day 20 of 45)
-w2-44-utilities: generated; ran to the end (to day 20 of 45)
-w2-09-trade: generated; ran to the end (to day 20 of 30)
-w2-12-flood: generated; ran to the end (to day 20 of 150)
 w2-11-heat: generated; ran to the end (to day 20 of 90)
-w2-34-works: generated; ran to the end (to day 20 of 60)
-w2-35-works: generated; ran to the end (to day 20 of 60)
-w2-24-election: generated; ran to the end (to day 20 of 75)
-w2-26-council: generated; ran to the end (to day 20 of 45)
-w2-37-lean: generated; ran to the end (to day 20 of 60)
-w2-36-offices: generated; ran to the end (to day 20 of 45)
-w2-30-trade: generated; ran to the end (to day 20 of 30)
-w2-21-lending: generated; ran to the end (to day 20 of 45)
-w2-25-rents: generated; ran to the end (to day 20 of 60)
-w2-28-housing: generated; ran to the end (to day 20 of 60)
-w2-29-lending: generated; ran to the end (to day 20 of 60)
-w2-13-flood-long: generated; ran to the end (to day 20 of 180)
-w2-14-largest: generated; ran to the end (to day 20 of 45)
-w2-46-largest-works: generated; ran to the end (to day 20 of 45)
-w2-15-largest-election: generated; ran to the end (to day 20 of 75)
-w2-16-newplace: generated; ran to the end (to day 20 of 60)
-w2-47-newplace-works: generated; ran to the end (to day 20 of 60)
-w2-18-newoffices: generated; ran to the end (to day 20 of 60)
-w2-17-newmoney: generated; ran to the end (to day 20 of 60)
-w2-38-newmoney-works: generated; ran to the end (to day 20 of 60)
-w2-31-newmoney: generated; ran to the end (to day 20 of 60)
-w2-32-newoffices: generated; ran to the end (to day 20 of 60)
+w2-12-flood: generated; ran to the end (to day 20 of 150)
 w2-27-flood: generated; ran to the end (to day 20 of 150)
-43 of 43 would run
+w2-46-largest-works: generated; ran to the end (to day 20 of 90)
+w2-15-largest-election: generated; ran to the end (to day 20 of 75)
+w2-50-evictions: generated; ran to the end (to day 20 of 120)
+w2-51-townhall: generated; ran to the end (to day 20 of 90)
+w2-52-river: generated; ran to the end (to day 20 of 120)
+w2-53-townhall: generated; ran to the end (to day 20 of 90)
+w2-41-works: generated; ran to the end (to day 20 of 75)
+w2-02-housing: generated; ran to the end (to day 20 of 45)
+w2-36-offices: generated; ran to the end (to day 20 of 30)
+w2-30-trade: generated; ran to the end (to day 20 of 30)
+w2-34-works: generated; ran to the end (to day 20 of 45)
+w2-24-election: generated; ran to the end (to day 20 of 75)
+w2-25-rents: generated; ran to the end (to day 20 of 45)
+w2-35-works: generated; ran to the end (to day 20 of 45)
+w2-29-lending: generated; ran to the end (to day 20 of 45)
+w2-37-lean: generated; ran to the end (to day 20 of 45)
+w2-13-flood-long: generated; ran to the end (to day 20 of 180)
+w2-16-newplace: generated; ran to the end (to day 20 of 90)
+w2-49-newmoney-registers: generated; ran to the end (to day 20 of 180)
+w2-18-newoffices: generated; ran to the end (to day 20 of 90)
+w2-47-newplace-works: generated; ran to the end (to day 20 of 45)
+w2-17-newmoney: generated; ran to the end (to day 20 of 45)
+w2-38-newmoney-works: generated; ran to the end (to day 20 of 45)
+w2-32-newoffices: generated; ran to the end (to day 20 of 45)
+w2-31-newmoney: generated; ran to the end (to day 20 of 45)
+w2-01-council: generated; ran to the end (to day 20 of 45)
+w2-03-election: generated; ran to the end (to day 20 of 75)
+w2-07-election: generated; ran to the end (to day 20 of 75)
+50 of 50 would run
 ```
 
-Read from the runs afterwards: 43 `batch.json` files name 43 different towns, each generated from its entry's seed and run on that seed; the five scenario names are in the descriptions; in w2-10 the mock works manager put two standing work orders on file (`collect` every 7 days, `maintain` daily) and a job advertisement on the office's form, and the environment office advertised on its own.
-
-**Seen on the way, recorded and not chased:**
-- **w2-01 (a mock clerk): no council result of any kind in 20 days.** w2-26 (a code clerk, mock mayor and councillors) has one: "Rejected: 2 for, 3 against". So a code clerk counts, and the fault is with a clerk that is a seat, as the decisions log said. The three entries that depend on it are marked.
-- **A job advertisement's words give the wage in the smallest unit:** "Hiring: 165769 pence every 14 days." (w2-10; the words are the office's code's, which a mock seat passes on as `text=`; the form's own `wage` field reads "£1657.69"). A paper of the town's with an amount not written the place's way: the same family as the live check's preview fault. A real seat writes its own words, so the pilots' data is not touched; code-run offices' advertisements are.
-
-**What this does not show:** anything about a real model in these offices; any day after 20 (polling day 60, the seating of a winner by a clerk, the wet season's flood, a lean council's failed wages on some seeds); a ballot's result under a model clerk; the trained translator loading (the mock stands in for it); the entries on the commit the wave will start from, which will have the live check's fixes and must be dry-run again.
+**What this does not show:** anything about a real model in these offices; any day after 20 (polling day 60, the seating of a winner, the wet season's flood, a death for a registrar, a lean council's failed wages on some seeds, the Kenyan town's arrears); the trained translator loading (the mock stands in for it); a retrained translator; a parked pilot (the queue's own tests show that); the entries on the commit the wave will start from, which will have the second live check's fixes and informal work, and must be dry-run again. The seeds and scenarios of each run were not read back from the runs this time (the second version's dry run did that, and `make.ts`'s way of writing them is unchanged).
 
 ## What the coordinator checks before starting
 
-1. The four fixes (above) are on the commit; `bun run test:all` passed on it.
-2. `bun docs/waves/wave-2/make.ts` on that commit writes the same six files (a seat id that no longer exists fails generation in the next step, not here).
-3. `bun scripts/pilot-wave.ts wave-2a <commit> <the two files> --mock --mock-days 20`: 7 of 7. Then the same for 2b and 2c before each.
-4. The Codex window is open (the weekly limit of 2026-10-06 was to reset on 2026-10-10), and `codex` and `claude` are signed in on the run server; `runs/translator-model/pod-small-d16-s1` is there (five pilots load it).
-5. The queue files are copied to `runs/pilot-queues/`; the Claude lane is started first.
-6. Whether the clerk's fault is fixed. If it is: nothing changes. If not: w2-01 runs as planned (it is the test of it), and w2-03 and w2-07 wait for its report.
-7. Whether Brazil's river fix has landed (then decide on its two pilots; they are not in the files).
+1. The five fixes (above) are on the commit; `bun run test:all` passed on it.
+2. `bun docs/waves/wave-2/make.ts` on that commit writes the same ten files (with no `--retrained`).
+3. `bun scripts/pilot-wave.ts wave-2a <commit> <the stage's files> --mock --mock-days 20`: all would run. Then the same for 2b and 2c before each.
+4. `claude` is signed in on the run server and `OIKOS_CLAUDE_BIN` names a version that takes Fable 5.1; `runs/translator-model/pod-small-d16-s1` is there (one pilot loads it). **Nothing about Codex is a gate.** If `codex` is signed in and its window is open, start the stage's Codex file with the others; if not, leave it out, and start it whenever it is.
+5. The queue files are copied to `runs/pilot-queues/`; one `claude-1` and one `claude-2` queue run side by side, and no second of either.
+6. Who else is drawing on the Claude plan in the next hours. A stage is best started when few agents are at work; the session limit is shared.
+7. w2-54's report is read before 2b: the effort the rest of `claude-2` runs at is decided then. w2-14's too: Fable's cost an answer.
+7a. **The translator of each `trained-ok` pilot of the stage is chosen** from the retrain's report ("Which translator a pilot may have"), the files written with `make.ts --retrained …`, and the dry run run on them. With no retrained model that passes: nothing to do; the files have the general model.
+8. Whether the fix that shows a works seat it has no staff is on the commit. If not: take w2-10, w2-42 and w2-33 out of their files for now (or set them to start with a crew), and say so in the stage's notes.
+9. Whether the clerk's fault is settled. If it is: run `wave-2-held-clerk.json`, w2-01 first. If not: it stays held, and the wave is complete without it.
+10. After the wave: if the pipeline is run with two Claude readers, the audit by a Codex model is owed and is written into that run's notes.

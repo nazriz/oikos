@@ -440,3 +440,48 @@ fn those_who_share_a_space_see_who_left_it_and_why() {
     }
 }
 
+
+/// Working for oneself (docs/behaviour/entry.md, "A person working for themself"): a person performs the tasks of a
+/// business in which they hold the only position; a task that names no kind of space is done in a dwelling; a task set
+/// in a kind of space the world's catalogue names (a market's pitch) is done there, and nowhere else.
+#[test]
+fn a_person_works_alone_in_their_own_business_at_home_or_at_a_pitch() {
+    let mut w = world(&default_params());
+    w["catalogue"]["tasks"].as_array_mut().unwrap().push(json!({"id": "sell", "labour": 600}));
+    w["catalogue"]["tasks"].as_array_mut().unwrap().push(json!({"id": "sell_at_pitch", "labour": 600, "in": "pitch"}));
+    w["catalogue"]["structure_types"].as_array_mut().unwrap().push(json!({"id": "market", "category": "commercial", "materials": {"materials": "10"}, "build_time": 86_400,
+        "footprint": {"w": 1, "h": 1}, "spaces": [{"kind": "pitch", "count": 2, "capacity": 1}]}));
+    w["world"]["structures"].as_array_mut().unwrap().push(json!({"id": "s-market", "at": "cell.2.2", "type": "market"}));
+    for o in w["world"]["occupancy"].as_array_mut().unwrap() {
+        if o["occupant"] == "bob" {
+            o["space"] = json!("s-market/pitch.1");
+        }
+    }
+    let mut run = Run::start(w, "own-work", Vec::new(), None).unwrap();
+    let found = |run: &mut Run<Vec<u8>>, who: &str| {
+        let r = act(run, who, None, json!([{"block": "create_entity", "kind": "own_account", "name": "A stall", "first_position": {"title": "Owner", "channels": [{"id": "books", "kind": "accounts"}], "ref": "owner"}, "ref": "firm"}]));
+        assert_eq!(refusal(&r), None);
+        match &r.events[0].body {
+            EventBody::ActionApplied { created: Some(c), .. } => c["owner"].clone(),
+            other => panic!("{other:?}"),
+        }
+    };
+    // Alice, at home (a dwelling), in her own business: the only position, hers; the work, her own hours.
+    let owner = found(&mut run, "alice-self");
+    let r = act(&mut run, "alice-self", Some(&owner), json!([{"block": "work", "task": "sell", "units": 3, "at": "s-house", "performers": ["alice"]}]));
+    assert_eq!(refusal(&r), None);
+    assert!(r.events.iter().any(|e| matches!(&e.body, EventBody::Worked { task, labour: 1800, performers, .. } if task == "sell" && performers == &vec!["alice".to_string()])));
+    // Her hours are hers once: a working day's, and no more.
+    let r = act(&mut run, "alice-self", Some(&owner), json!([{"block": "work", "task": "sell", "units": 46, "at": "s-house", "performers": ["alice"]}]));
+    assert_eq!(refusal(&r), Some(RefusalCode::NoTimeLeft));
+    // A task set in a workplace is not done in a dwelling, and one set in a pitch is not done at home.
+    let r = act(&mut run, "alice-self", Some(&owner), json!([{"block": "work", "task": "make", "units": 1, "at": "s-house", "performers": ["alice"]}]));
+    assert_eq!(refusal(&r), Some(RefusalCode::NotAtWork));
+    let r = act(&mut run, "alice-self", Some(&owner), json!([{"block": "work", "task": "sell_at_pitch", "units": 1, "at": "s-house", "performers": ["alice"]}]));
+    assert_eq!(refusal(&r), Some(RefusalCode::NotAtWork));
+    // Bob, at his pitch in the market, in his own business.
+    let owner = found(&mut run, "bob-self");
+    let r = act(&mut run, "bob-self", Some(&owner), json!([{"block": "work", "task": "sell_at_pitch", "units": 2, "at": "s-market", "performers": ["bob"]}]));
+    assert_eq!(refusal(&r), None);
+    assert!(r.events.iter().any(|e| matches!(&e.body, EventBody::Worked { task, labour: 1200, .. } if task == "sell_at_pitch")));
+}

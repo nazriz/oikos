@@ -8,6 +8,10 @@ It wakes weekly, whenever something names it (an offer, a notice, a message), an
 
 **Households** ([households.md](households.md)): a citizen lives in a household. The rules on homes and leaving town are the **leaseholder's**, for the household: the budget is a third of household income, the search is for the bedrooms the occupancy standard asks for, and the whole household moves and leaves together. Other adults follow the leaseholder and pay a share of the rent. Children act on their own only from 18, when they open a bank account. Voice (petitions) and complaints are the leaseholders'.
 
+**Work by the day** (0.42.1; [firms.md](firms.md), "Work by the day"): a job whose pay is a day's. Its holder takes the day's pay (whole, or less what the law takes from a day's pay) as their wages; counts a month's income as the working days of a month; and, a pay period and five days without pay, ends it without notice and without a claim (nothing is owed for a day not worked), and looks for other work. A job an employer does not register ([firms.md](firms.md)) looks to its holder like any job that pays the whole wage.
+
+**Working for oneself** (0.43.0; [entry.md](entry.md), "A person working for themself"): someone the world starts in a business of their own (`own_work`) runs it in its one position and, as themself, is not out of work: they read no job board, apply for nothing and claim no payment for being out of work. Their income is what the business has paid them over the days income is reckoned on (before that, what it was expected to bring). In working hours they are at their pitch, if they trade from one. Nobody takes such work up or gives it up during a run: that waits for the citizen redesign.
+
 ## Who a citizen is, and how it decides (the mind)
 
 | | What | Source |

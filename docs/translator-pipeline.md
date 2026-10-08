@@ -123,7 +123,8 @@ adapter cuts those at 4,000 characters). A program whose every quotation mark ca
 `out` is a new folder (an existing one is resumed). `pilots`: folders of logs; `test: true` marks one test-only (the pilot's own
 mark cannot be taken away from here). `writers`: the seat's provider (`claude-code`) or its whole model name, to a
 `provider/model`; the longest match wins. `readers`: two different `provider/model`s (checked; `gpt-6-astra` is refused
-anywhere); see "The readers" below for why these two. `budget`: the spending limit in USD for every model call the run makes (required; a Codex call costs nothing per
+anywhere); see "The readers" below for why these two, and for the pair to name when the Codex window is shut
+(`["claude-code/claude-sonnet-5-5", "claude-code/claude-haiku-5-5"]`: nothing waits on Codex). `budget`: the spending limit in USD for every model call the run makes (required; a Codex call costs nothing per
 call, and its subscription limits apply). Optional: `testSituations` (as `situations`), `requestsPerSituation` (8), `realRequests`,
 `writtenRequests` (all), `every` (3), `seed` (1), `repeat` (4), `validationDays` (10), `testsInValidationReal` (false: put the
 test lane's examples into validation-real as well, which makes `real_right` in a run's report count them, and so no longer
@@ -133,32 +134,78 @@ comparable with earlier runs), `waitMinutes` (20) and `maxWaitHours` (12) for us
 
 ## The readers
 
-Two different models, of different families: the point of reading twice, blind, is that two readers who agree did not
-make the same mistake for the same reason. **The default pair is Sonnet 5.5 (through Claude Code) and gpt-6.1-sol (through
-the Codex CLI).** Measured 2026-10-08 on 40 requests of pilot 11, 34 of them with a label two earlier readers had settled
-(`runs/reader-comparison-2026-10-08/`, made with `bun orchestrator/src/reader-compare.ts <config.json>`, which measures any
-candidates the same way; the translator's prompt was 0.7.6, a line about amounts short of today's):
+Two different models: the point of reading twice, blind, is that two readers who agree did not make the same mistake for
+the same reason, and two families are less likely to than one.
 
-| Reader | Read whole | With the settled labels | Seconds a request | Cost a request, as reported |
-|---|---|---|---|---|
-| claude-code/claude-sonnet-5-5 | 40/40 | 34/34 | 1.4 | 0.0115 USD |
-| claude-code/claude-haiku-5-5@low | 40/40 | 24/34 | 1.5 | 0.0162 USD |
-| codex/gpt-6-luna | 39/40 | 29/34 | 0.8 | none per call |
-| codex/gpt-6.1-sol | 40/40 | 34/34 | 2.0 | none per call |
+**The default pair is Sonnet 5.5 (through Claude Code) and gpt-6.1-sol (through the Codex CLI)**, as in the config above.
+**When the Codex window is shut, the second reader is Haiku 5.5 at its default effort**: `"readers":
+["claude-code/claude-sonnet-5-5", "claude-code/claude-haiku-5-5"]`. That is a choice made in the config when the pipeline
+is started (a run never changes reader half way; a reader at a limit is waited for, `waitMinutes` and `maxWaitHours`,
+and the run then stops to be resumed), and the manifest records it (`models.readers`, and usage by model). Codex running
+out blocks nothing: the pipeline is started with the Claude pair and the audit below is owed.
 
-Agreement between two (of 40): Sonnet with sol 36, Sonnet with luna 31, sol with luna 31, Sonnet with Haiku 24, Haiku with
-luna 25, Haiku with sol 24. The labels were settled by Haiku 5.5 and Sonnet 5.5, which flatters those two; sol's 34 of 34
-is the independent one. Haiku at low effort ends a copied text with a full stop the request's words don't have (8 of its 10
-misses) and refuses two requests to hold payments. No answer of the 160 came with quotation marks escaped by hand.
+Measured twice on the same 40 requests of pilot 11, 34 of them with a label two earlier readers had settled (made with
+`bun orchestrator/src/reader-compare.ts <config.json>`, which measures any candidates the same way). First on 2026-10-08
+under prompt 0.7.6 (`runs/reader-comparison-2026-10-08/`), then on 2026-10-09 under prompt 0.9.0 for the Claude models
+alone (`runs/reader-comparison-2026-10-09/`; the Codex models were not asked again):
 
-**The fallback** when one of the pair cannot be had: gpt-6-luna in place of sol (still two families; fewer examples, since
-it agrees with Sonnet on 31 of 40 and not 36); if Claude Code is what cannot be had, sol with luna (one family: the last
-resort, and to be said in the run's notes). Haiku 5.5 at low effort is not a reader to choose: it costs no less as reported
-and agrees least. With the default writers, each reader also reads requests its own model wrote; the other reader never did.
+| Reader | Prompt | Read whole | With the settled labels | Seconds a request | Cost a request, as reported |
+|---|---|---|---|---|---|
+| claude-code/claude-sonnet-5-5 | 0.9.0 | 40/40 | 33/34 | 0.9 | 0.0043 USD |
+| claude-code/claude-haiku-5-5 | 0.9.0 | 40/40 | 34/34 | 2.1 | 0.0171 USD |
+| claude-code/claude-haiku-5-5@low | 0.9.0 | 40/40 | 26/34 | 1.5 | 0.0139 USD |
+| claude-code/claude-fable-5-1 | 0.9.0 | 40/40 | 34/34 | 2.3 | 0.0258 USD |
+| claude-code/claude-sonnet-5-5 | 0.7.6 | 40/40 | 34/34 | 1.4 | 0.0115 USD |
+| claude-code/claude-haiku-5-5@low | 0.7.6 | 40/40 | 24/34 | 1.5 | 0.0162 USD |
+| codex/gpt-6-luna | 0.7.6 | 39/40 | 29/34 | 0.8 | none per call |
+| codex/gpt-6.1-sol | 0.7.6 | 40/40 | 34/34 | 2.0 | none per call |
 
-What "cost as reported" is: Claude Code's own figure for a call on the plan. In the comparison's four Claude calls it is
-exactly the tokens at one rate for both models (per million: 5 input, 25 output, 0.5 cache read, 6.25 cache write), so it
-measures tokens used and not either model's price. Haiku used 1.7 times Sonnet's output tokens for the same answers.
+Agreement between two (of 40):
+
+| Pair | Agree | Of those, sol's stored answer agrees too |
+|---|---|---|
+| Sonnet with sol (both 0.7.6) | 36 | |
+| Sonnet (0.9.0) with sol (0.7.6) | 35 | |
+| **Sonnet with Haiku at default effort (0.9.0)** | **38** | 35 |
+| Haiku at default effort with Fable (0.9.0) | 37 | 36 |
+| Sonnet with Fable (0.9.0) | 36 | 35 |
+| Sonnet with Haiku at low effort (0.9.0; 24 under 0.7.6) | 31 | |
+| Sonnet or sol with luna (0.7.6) | 31 | |
+
+- **Of the Claude pairs, Sonnet with Haiku at default effort**: it agrees most (38 of 40, so most examples), costs least
+  (about 0.021 a request for the pair; with Fable 0.030; Haiku with Fable 0.043), and its two readers are the most unlike
+  of the three in size. Fable reads as well as either and is the dearest; it is the one to bring in if Haiku cannot be had.
+- **Haiku's earlier poor showing was the effort, not the model.** At low effort it still ends a copied text with a full
+  stop the request's words do not have and agrees with the labels on 26 of 34; at default effort it agrees on all 34. It
+  is never a reader at low effort.
+- **The labels flatter the Claude models** (they were settled by Haiku 5.5 and Sonnet 5.5); sol's 34 of 34 was the
+  independent figure. The third column is the check that does not: of what a Claude pair agrees on, sol's stored
+  answers (an older prompt) agree with all but one to three. The one request all three Claude readers answer one way
+  and sol another is refused by both, with different labels (`look_first`, which did not exist when sol read it).
+
+**What is lost when both readers are one family.** Agreement between two Claude models is weaker evidence than agreement
+across families: a reading both were trained toward (how to name an addressee, when to refuse, what counts as one act)
+passes both and becomes a label. On these 40 requests nothing of the kind shows (above), but 40 requests of one pilot's
+three offices cannot show much, and none of them is a hold, a direction, a standing work order or an office's own form.
+The examples a one-family pair makes are also more numerous (38 of 40 against 36), which is the same fact seen from the
+other side: they disagree less, so the label step drops less, including things it should have dropped.
+
+**The audit, which blocks nothing.** When a pipeline run used the Claude pair, read a sample of its *examples* again with
+`codex/gpt-6.1-sol` when its window is next open: 100 requests or one in ten, whichever is less, drawn evenly by function
+(`reader-compare.ts` with `requests` and `labels` pointing at the run's `lanes/train/requests/unlabelled.jsonl` and
+`label/examples.jsonl`, `readers: ["codex/gpt-6.1-sol"]`, `limit: 100`: about four batches, 100 calls' worth of the
+window). Read the disagreements by hand. If sol disagrees with more than about one label in ten, or its disagreements
+gather in one function, that function's examples from the run are read again by sol in full before they train anything.
+Record the audit beside the run (`audit-<date>/`) and in its notes. Until it is done, the run's notes say "readers of one
+family; audit owed".
+
+**Other fallbacks.** gpt-6-luna in place of sol keeps two families and makes fewer examples (31 of 40). With the default
+writers, each reader also reads requests its own model wrote; under the Claude pair Sonnet reads what Sonnet wrote and
+Haiku never wrote any.
+
+What "cost as reported" is: Claude Code's own figure for a call on the plan. On 2026-10-08 it was the tokens at one rate
+for both models; on 2026-10-09 the three models' figures differ (Fable's is at its list price), so it is nearer a price,
+and still a measure of plan usage rather than of money.
 
 ## What is written under `out`
 

@@ -4,37 +4,19 @@
   "world": "worlds/town-1000.yaml",
   "sets": [
    "seed=134",
-   "profile=de-ni-2026",
+   "profile=us-oh-2026",
    "model_seats=works,registry,land-registrar,environment"
   ],
   "model": "codex/gpt-6.1-sol",
-  "translator": "codex/gpt-6.1-sol",
-  "until": 5184000,
-  "budget": 25,
+  "translator": "claude-code/claude-sonnet-5-5",
+  "translator_choice": "trained-ok",
+  "until": 3888000,
+  "budget": 10,
   "env": {
    "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
    "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
   },
-  "note": "Wave 2b (plan of 2026-10-09), for the translator's data. Profile de-ni-2026; a town of its own, generated from seed 134; 1,000 people; 60 days. Seats: works, registry, land-registrar, environment, all on codex/gpt-6.1-sol. Translator: codex/gpt-6.1-sol (under the translator's prompt). Every draft is confirmed or declined by its seat. The works office, both registers and the environment office under a code mayor."
- },
- {
-  "name": "w2-35-works",
-  "world": "worlds/town-1000.yaml",
-  "sets": [
-   "seed=135",
-   "profile=gb-eng-2026",
-   "mayor=llm",
-   "model_seats=works,registry"
-  ],
-  "model": "codex/gpt-6-luna",
-  "translator": "codex/gpt-6.1-sol",
-  "until": 5184000,
-  "budget": 25,
-  "env": {
-   "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
-   "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
-  },
-  "note": "Wave 2b (plan of 2026-10-09), for the translator's data. Profile gb-eng-2026; a town of its own, generated from seed 135; 1,000 people; 60 days. Seats: mayor, works, registry, all on codex/gpt-6-luna. Translator: codex/gpt-6.1-sol (under the translator's prompt). Every draft is confirmed or declined by its seat. The works office and the registry on the weaker model of the other family."
+  "note": "Wave 2b (plan of 2026-10-09, third version), for the translator's data. Profile us-oh-2026; a town of its own, generated from seed 134; 1,000 people; 45 days. Seats: works, registry, land-registrar, environment, all on codex/gpt-6.1-sol. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt); this pilot may have our own retrained translator instead, if its scores allow when the stage starts. Every draft is confirmed or declined by its seat. OPTIONAL: its seats need the Codex window; it is parked when that closes, and nothing waits for it. The works office, both registers and the environment office on the other family, under a code mayor."
  },
  {
   "name": "w2-24-election",
@@ -50,110 +32,15 @@
    "election-due"
   ],
   "model": "codex/gpt-6.1-sol",
-  "translator": "codex/gpt-6.1-sol",
+  "translator": "claude-code/claude-sonnet-5-5",
+  "translator_choice": "sonnet",
   "until": 6480000,
-  "budget": 25,
+  "budget": 10,
   "env": {
    "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
    "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
   },
-  "note": "Wave 2b (plan of 2026-10-09), for the translator's data. Profile gb-eng-2026; a town of its own, generated from seed 124; 1,000 people; 75 days; starting conditions election-due. Seats: mayor, editor, councillor-1, councillor-2, all on codex/gpt-6.1-sol. Translator: codex/gpt-6.1-sol (under the translator's prompt). Every draft is confirmed or declined by its seat. An election with a model mayor standing, the commission and the clerk both run by code: it does not wait on the clerk's fault."
- },
- {
-  "name": "w2-26-council",
-  "world": "worlds/town-1000.yaml",
-  "sets": [
-   "seed=126",
-   "profile=au-vic-2026",
-   "mayor=llm",
-   "model_seats=councillor-1,councillor-2,councillor-3,councillor-4,councillor-5"
-  ],
-  "model": "codex/gpt-6-luna",
-  "translator": "decide/pod-small-d16-s1",
-  "until": 3888000,
-  "budget": 25,
-  "env": {
-   "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
-   "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
-  },
-  "note": "Wave 2b (plan of 2026-10-09), for the translator's data. Profile au-vic-2026; a town of its own, generated from seed 126; 1,000 people; 45 days. Seats: mayor, councillor-1, councillor-2, councillor-3, councillor-4, councillor-5, all on codex/gpt-6-luna. Translator: decide/pod-small-d16-s1 (the trained one: it was taught no hold, entry on one's own file, look_first, office's own form, direction or standing work). Every draft is confirmed or declined by its seat. A mayor and five councillors on the weaker model under a code clerk, with the trained translator: votes and proposals are what it was taught."
- },
- {
-  "name": "w2-37-lean",
-  "world": "worlds/town-1000.yaml",
-  "sets": [
-   "seed=137",
-   "profile=gb-eng-2026",
-   "mayor=llm",
-   "model_seats=finance,planning"
-  ],
-  "args": [
-   "--scenario",
-   "lean-council"
-  ],
-  "model": "codex/gpt-6-luna",
-  "translator": "codex/gpt-6-luna",
-  "until": 5184000,
-  "budget": 25,
-  "env": {
-   "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
-   "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
-  },
-  "note": "Wave 2b (plan of 2026-10-09), for the translator's data. Profile gb-eng-2026; a town of its own, generated from seed 137; 1,000 people; 60 days; starting conditions lean-council. Seats: mayor, finance, planning, all on codex/gpt-6-luna. Translator: codex/gpt-6-luna (under the translator's prompt). Every draft is confirmed or declined by its seat. A town with almost nothing in the bank, on the weaker model."
- },
- {
-  "name": "w2-36-offices",
-  "world": "worlds/town-1000.yaml",
-  "sets": [
-   "seed=136",
-   "profile=us-oh-2026",
-   "model_seats=rates,water-operations,principal"
-  ],
-  "model": "codex/gpt-6.1-sol",
-  "translator": "codex/gpt-6.1-sol",
-  "until": 3888000,
-  "budget": 25,
-  "env": {
-   "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
-   "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
-  },
-  "note": "Wave 2b (plan of 2026-10-09), for the translator's data. Profile us-oh-2026; a town of its own, generated from seed 136; 1,000 people; 45 days. Seats: rates, water-operations, principal, all on codex/gpt-6.1-sol. Translator: codex/gpt-6.1-sol (under the translator's prompt). Every draft is confirmed or declined by its seat. A PROBE: stop it by its own rule (plan.md, the stopping rules). A probe: three offices with routines on the other family."
- },
- {
-  "name": "w2-30-trade",
-  "world": "worlds/town-1000.yaml",
-  "sets": [
-   "seed=130",
-   "profile=au-vic-2026",
-   "model_seats=shop-2-manager,factory-2-manager"
-  ],
-  "model": "codex/gpt-6.1-sol",
-  "translator": "codex/gpt-6.1-sol",
-  "until": 2592000,
-  "budget": 25,
-  "env": {
-   "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
-   "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
-  },
-  "note": "Wave 2b (plan of 2026-10-09), for the translator's data. Profile au-vic-2026; a town of its own, generated from seed 130; 1,000 people; 30 days. Seats: shop-2-manager, factory-2-manager, all on codex/gpt-6.1-sol. Translator: codex/gpt-6.1-sol (under the translator's prompt). Every draft is confirmed or declined by its seat. A PROBE: stop it by its own rule (plan.md, the stopping rules). The trade probe on the other family."
- },
- {
-  "name": "w2-21-lending",
-  "world": "worlds/town-1000.yaml",
-  "sets": [
-   "seed=121",
-   "profile=au-vic-2026",
-   "model_seats=bank-lending,finance,landlord-1-office"
-  ],
-  "model": "codex/gpt-6.1-sol",
-  "translator": "codex/gpt-6-luna",
-  "until": 3888000,
-  "budget": 25,
-  "env": {
-   "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
-   "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
-  },
-  "note": "Wave 2b (plan of 2026-10-09), for the translator's data. Profile au-vic-2026; a town of its own, generated from seed 121; 1,000 people; 45 days. Seats: bank-lending, finance, landlord-1-office, all on codex/gpt-6.1-sol. Translator: codex/gpt-6-luna (under the translator's prompt). Every draft is confirmed or declined by its seat. The lender, the treasury and a landlord: loans, payments, leases."
+  "note": "Wave 2b (plan of 2026-10-09, third version), for the translator's data. Profile gb-eng-2026; a town of its own, generated from seed 124; 1,000 people; 75 days; starting conditions election-due. Seats: mayor, editor, councillor-1, councillor-2, all on codex/gpt-6.1-sol. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt). Every draft is confirmed or declined by its seat. OPTIONAL: its seats need the Codex window; it is parked when that closes, and nothing waits for it. An election with a model mayor standing on the other family, the commission and the clerk both run by code."
  },
  {
   "name": "w2-25-rents",
@@ -169,32 +56,36 @@
    "dear-rents"
   ],
   "model": "codex/gpt-6.1-sol",
-  "translator": "codex/gpt-6.1-sol",
-  "until": 5184000,
-  "budget": 25,
+  "translator": "claude-code/claude-sonnet-5-5",
+  "translator_choice": "trained-ok",
+  "until": 3888000,
+  "budget": 10,
   "env": {
    "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
    "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
   },
-  "note": "Wave 2b (plan of 2026-10-09), for the translator's data. Profile us-oh-2026; a town of its own, generated from seed 125; 1,000 people; 60 days; starting conditions dear-rents. Seats: mayor, landlord-1-office, registry, editor, all on codex/gpt-6.1-sol. Translator: codex/gpt-6.1-sol (under the translator's prompt). Every draft is confirmed or declined by its seat. Dear rents in a fourth currency's town: the petition, the mayor, a landlord, the paper, the registrar."
+  "note": "Wave 2b (plan of 2026-10-09, third version), for the translator's data. Profile us-oh-2026; a town of its own, generated from seed 125; 1,000 people; 45 days; starting conditions dear-rents. Seats: mayor, landlord-1-office, registry, editor, all on codex/gpt-6.1-sol. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt); this pilot may have our own retrained translator instead, if its scores allow when the stage starts. Every draft is confirmed or declined by its seat. OPTIONAL: its seats need the Codex window; it is parked when that closes, and nothing waits for it. Dear rents on the other family: the petition, the mayor, a landlord, the paper, the registrar."
  },
  {
-  "name": "w2-28-housing",
+  "name": "w2-35-works",
   "world": "worlds/town-1000.yaml",
   "sets": [
-   "seed=128",
-   "profile=de-ni-2026",
-   "model_seats=landlord-1-office,landlord-2-office,tribunal-member"
+   "seed=935",
+   "profile=gb-eng-2026",
+   "mayor=llm",
+   "model_seats=works,finance"
   ],
   "model": "codex/gpt-6-luna",
-  "translator": "codex/gpt-6-luna",
-  "until": 5184000,
-  "budget": 25,
+  "translator": "claude-code/claude-sonnet-5-5",
+  "translator_choice": "sonnet",
+  "until": 3888000,
+  "budget": 10,
   "env": {
    "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
    "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
   },
-  "note": "Wave 2b (plan of 2026-10-09), for the translator's data. Profile de-ni-2026; a town of its own, generated from seed 128; 1,000 people; 60 days. Seats: landlord-1-office, landlord-2-office, tribunal-member, all on codex/gpt-6-luna. Translator: codex/gpt-6-luna (under the translator's prompt). Every draft is confirmed or declined by its seat. Landlords and the tribunal on the weaker model."
+  "test": true,
+  "note": "Wave 2b (plan of 2026-10-09, third version), for the translator's data. Profile gb-eng-2026; a town of its own, generated from seed 935; 1,000 people; 45 days. Seats: mayor, works, finance, all on codex/gpt-6-luna. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt). Every draft is confirmed or declined by its seat. TEST ONLY: kept out of training. OPTIONAL: its seats need the Codex window; it is parked when that closes, and nothing waits for it. Test-only (that model): the works office."
  },
  {
   "name": "w2-29-lending",
@@ -205,13 +96,39 @@
    "model_seats=bank-lending,landlord-1-office,landlord-2-office,tribunal-registrar"
   ],
   "model": "codex/gpt-6.1-sol",
-  "translator": "codex/gpt-6-luna",
-  "until": 5184000,
-  "budget": 25,
+  "translator": "claude-code/claude-sonnet-5-5",
+  "translator_choice": "trained-ok",
+  "until": 3888000,
+  "budget": 10,
   "env": {
    "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
    "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
   },
-  "note": "Wave 2b (plan of 2026-10-09), for the translator's data. Profile jp-akita-2026; a town of its own, generated from seed 129; 1,000 people; 60 days. Seats: bank-lending, landlord-1-office, landlord-2-office, tribunal-registrar, all on codex/gpt-6.1-sol. Translator: codex/gpt-6-luna (under the translator's prompt). Every draft is confirmed or declined by its seat. Loans and leases in whole units of money."
+  "note": "Wave 2b (plan of 2026-10-09, third version), for the translator's data. Profile jp-akita-2026; a town of its own, generated from seed 129; 1,000 people; 45 days. Seats: bank-lending, landlord-1-office, landlord-2-office, tribunal-registrar, all on codex/gpt-6.1-sol. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt); this pilot may have our own retrained translator instead, if its scores allow when the stage starts. Every draft is confirmed or declined by its seat. OPTIONAL: its seats need the Codex window; it is parked when that closes, and nothing waits for it. Loans and leases in whole units of money, on the other family."
+ },
+ {
+  "name": "w2-37-lean",
+  "world": "worlds/town-1000.yaml",
+  "sets": [
+   "seed=937",
+   "profile=gb-eng-2026",
+   "mayor=llm",
+   "model_seats=finance,planning"
+  ],
+  "args": [
+   "--scenario",
+   "lean-council"
+  ],
+  "model": "codex/gpt-6-luna",
+  "translator": "claude-code/claude-sonnet-5-5",
+  "translator_choice": "sonnet",
+  "until": 3888000,
+  "budget": 10,
+  "env": {
+   "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
+   "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
+  },
+  "test": true,
+  "note": "Wave 2b (plan of 2026-10-09, third version), for the translator's data. Profile gb-eng-2026; a town of its own, generated from seed 937; 1,000 people; 45 days; starting conditions lean-council. Seats: mayor, finance, planning, all on codex/gpt-6-luna. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt). Every draft is confirmed or declined by its seat. TEST ONLY: kept out of training. OPTIONAL: its seats need the Codex window; it is parked when that closes, and nothing waits for it. Test-only (that model): a town with almost nothing in the bank."
  }
 ]

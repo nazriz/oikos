@@ -38,6 +38,24 @@ export interface Profile {
     pay_period_days: number;
     /** A full-time wage by kind of work, gross, for one pay period. */
     wages_per_pay_period: { shop: number; factory: number; construction: number };
+    /** Work as it is actually arranged here, where that is not a registered job on a standing wage (docs/behaviour/
+     * firms.md, "Informal work"). Each part is left out where the place's survey gives no figure, and the town is
+     * then as it was: every job registered, on a standing wage.
+     * `registered_bps`: of the jobs at employers of a kind (the kinds wages are given for), the share the employer
+     * registers: withholds from, and reports. Left out for a kind: all of them.
+     * `casual_bps`: of the jobs at employers of a kind, the share that is work by the day: taken on and paid by the
+     * day, for the days worked, with no notice and no standing wage; `day_wage`: a day's pay for it, by kind (needed
+     * for each kind that has a share). */
+    employment?: { registered_bps?: { shop?: number; factory?: number; construction?: number };
+      casual_bps?: { shop?: number; factory?: number; construction?: number }; day_wage?: { shop?: number; factory?: number; construction?: number };
+      /** People who work for themselves, alone (docs/behaviour/entry.md, "A person working for themself"): of people
+       * in work, the share who do (`share_bps`), and what they do, as the place's survey divides them (`kinds`, their
+       * shares of own-account workers adding to 10,000). A kind says what it `does`: "trade" (buys goods and sells them
+       * to households: the town can hold it), "make" (makes what it sells) or "service" (sells its work: a ride, a
+       * repair); the last two the town cannot hold yet, and people of those kinds are drawn as they always were, in
+       * jobs. And where it is worked `from`: "home" (the person's own dwelling) or "pitch" (a pitch in a market the
+       * town keeps); and how many days of sales it keeps in stock (`stock_days`; left out: seven). */
+      own_account?: { share_bps: number; kinds: { id: string; name: string; does: "trade" | "make" | "service"; share_bps: number; from?: "home" | "pitch"; stock_days?: number }[] } };
     rents_per_month: {
       apartment_units: { bedrooms: number; count: number; rent: number }[];
       house_types: { id: string; bedrooms: number; share_bps: number; rent: number }[];

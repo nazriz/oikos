@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { compressLog } from "../src/logs";
 import { lastAlerts } from "../src/pilot-alerts";
-import { localStamp, runState, scanOptOuts } from "../src/pilot-state";
+import { limitedProviders, localStamp, nextPilot, parkedPath, providersOf, runState, scanOptOuts } from "../src/pilot-state";
 
 const UNTIL = 5_184_000;
 const base = realpathSync(mkdtempSync(join(tmpdir(), "oikos-pilot-queue-test-")));
@@ -148,3 +148,123 @@ test("a sitting a seat missed is heard of while the pilot runs; a run stopped wi
   expect(await runState(await folder("unreachable", { t: 864_000, end: { reason: "aborted", detail: down }, stoppedBy: "ModelUnreachable" }), UNTIL)).toMatchObject({ stop: "unreachable", t: 864_000 });
   expect(await runState(await folder("unreachable-bare", { t: 864_000, end: { reason: "aborted", detail: down }, summary: false }), UNTIL)).toMatchObject({ stop: "unreachable" });
 }, 60_000);
+
+// ---- A pilot stopped at a usage limit is parked, and the queue goes on (2026-10-09).
+
+test("a limit is a sign-in's: which ones an entry needs, and whose limit a stop names", () => {
+  expect(providersOf({ model: "codex/a", translator: "claude-code/b" })).toEqual(["codex", "claude-code"]);
+  expect(providersOf({ model: "claude-code/a", translator: "claude-code/b" })).toEqual(["claude-code"]);
+  expect(providersOf({ model: "claude-code/a" })).toEqual(["claude-code"]);
+  const both = ["codex", "claude-code"];
+  expect(limitedProviders("the Codex subscription's usage limit was reached (You've hit your usage limit): the run stops here", both)).toEqual(["codex"]);
+  expect(limitedProviders("the Claude plan's limit for claude -p was reached (You've hit your session limit): the run stops here", both)).toEqual(["claude-code"]);
+  expect(limitedProviders("codex/x (translator, for mayor-system): too many requests", both)).toEqual(["codex"]);
+  // (Words that name neither: nothing the entry uses is tried until the wait is over.)
+  expect(limitedProviders("429", both)).toEqual(both);
+});
+
+test("the next entry is the first not settled whose sign-ins are not at a limit; a parked one comes first again when its wait is over", () => {
+  const q = [{ name: "a", model: "codex/x", translator: "claude-code/s" }, { name: "b", model: "claude-code/s", translator: "claude-code/s" }, { name: "c", model: "codex/x", translator: "decide/t" }, { name: "d", model: "claude-code/h", translator: "decide/t" }];
+  const none = new Map<string, number>();
+  expect(nextPilot(q, new Set(), none, 100).pick?.name).toBe("a");
+  const codex = new Map([["codex", 500]]);
+  expect(nextPilot(q, new Set(), codex, 100).pick?.name).toBe("b");
+  expect(nextPilot(q, new Set(["b"]), codex, 100).pick?.name).toBe("d");
+  // Only parked ones left: wait for the time the limit is tried again; then the first of them, in the queue's order.
+  expect(nextPilot(q, new Set(["b", "d"]), codex, 100)).toEqual({ waitUntil: 500 });
+  expect(nextPilot(q, new Set(["b", "d"]), codex, 500).pick?.name).toBe("a");
+  // A wait that ends while later entries are still to run: the parked pilot is taken up before them.
+  expect(nextPilot(q, new Set(["b"]), codex, 500).pick?.name).toBe("a");
+  // Both sign-ins at a limit: the earlier of the two times, for whichever entry it frees.
+  expect(nextPilot(q, new Set(), new Map([["codex", 500], ["claude-code", 300]]), 100)).toEqual({ waitUntil: 300 });
+  expect(nextPilot(q, new Set(["a", "b", "c", "d"]), codex, 100)).toEqual({});
+});
+
+/** A stand-in for the CLI the queue runs: a run on a Codex model stops at a usage limit until the third time one is
+ * tried (counted in a file), and any other run goes to its end. It writes the log a real run would leave. */
+function standIn(dir: string): string {
+  mkdirSync(dir, { recursive: true });
+  const script = join(dir, "cli.ts");
+  writeFileSync(script, `
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+const a = process.argv.slice(2);
+if (a[0] === "pilot-report") process.exit(0);
+const get = (n: string) => a[a.indexOf(n) + 1]!;
+const until = Number(get("--until")), model = get("--model");
+const log = a[0] === "resume" ? a[1]! : join(get("--out"), "town.seed1.jsonl");
+const count = ${JSON.stringify(join(dir, "codex-tries"))};
+let open = true;
+if (model.startsWith("codex/")) {
+  const n = (existsSync(count) ? Number(readFileSync(count, "utf8")) : 0) + 1;
+  writeFileSync(count, String(n));
+  open = n >= 3;
+}
+appendFileSync(${JSON.stringify(join(dir, "ran.txt"))}, a[0] + " " + log.split("/").at(-2) + (open ? " to the end" : " limit") + "\\n");
+const end = open ? { kind: "end", t: until, body: { reason: "aborted", detail: "stopped at " + until } }
+  : { kind: "end", t: 16 * 86400, body: { reason: "aborted", detail: "the Codex subscription's usage limit was reached (You've hit your usage limit. Upgrade to Pro): the run stops here; resume it once the limit resets" } };
+writeFileSync(log, [{ kind: "header", t: 0, body: {} }, { kind: "event", t: 5, body: {} }, end].map((e) => JSON.stringify(e)).join("\\n") + "\\n");
+process.exit(open ? 0 : 1);
+`);
+  return script;
+}
+const QUEUE = join(import.meta.dir, "../../scripts/pilot-queue.ts");
+const entry = (name: string, model: string) => ({ name, world: "worlds/town-1000.yaml", model, translator: "claude-code/s", until: 30 * 86_400, budget: 1 });
+const queueEnv = (runs: string, cli: string) => ({ ...process.env, OIKOS_RUNS: runs, OIKOS_WAVE: "pk", OIKOS_NO_NOTIFY: "1", OIKOS_ALERT_CMD: "", OIKOS_POLL_SECONDS: "0.2", OIKOS_QUEUE_CLI: cli });
+
+test("a pilot at a usage limit is parked and the queue goes on to what needs another sign-in; it is come back to, and nothing is lost", async () => {
+  const here = join(base, "parking"), runs = join(here, "runs");
+  const cli = standIn(here);
+  const queue = join(here, "lane.json");
+  writeFileSync(queue, JSON.stringify([entry("codex-a", "codex/x"), entry("claude-b", "claude-code/s"), entry("codex-c", "codex/x"), entry("claude-d", "claude-code/h")]));
+  const p = Bun.spawn(["bun", QUEUE, queue, "--wait", "0.02"], { env: queueEnv(runs, cli), stdout: "pipe", stderr: "pipe" });
+  const [out, code] = await Promise.all([new Response(p.stdout).text(), p.exited]);
+  expect(code).toBe(0);
+  const at = (re: RegExp) => { const m = re.exec(out); expect(m, String(re)).not.toBeNull(); return m!.index; };
+  // Parked, by the sign-in that said so, on the day it stopped; and the queue went on to the Claude pilot at once.
+  expect(out).toMatch(/codex-a: parked at a usage limit on day 16 \(codex: the Codex subscription's usage limit/);
+  expect(at(/claude-b: starting/)).toBeGreaterThan(at(/codex-a: parked/));
+  expect(at(/claude-b: done \(day 30\)/)).toBeLessThan(at(/codex-a: done \(day 30\)/));
+  // The other Codex pilot was not started while that sign-in was at its limit: only after the parked one got through.
+  expect(at(/codex-c: starting/)).toBeGreaterThan(at(/codex-a: done/));
+  expect(out).toMatch(/codex-a: resuming from day 16/);
+  for (const n of ["codex-a", "claude-b", "codex-c", "claude-d"]) expect(out).toMatch(new RegExp(`${n}: done \\(day 30\\)`));
+  // The stand-in was run for codex-a three times (two limits, then through), and once for each other: nothing was skipped or run twice.
+  const ran = readFileSync(join(here, "ran.txt"), "utf8").trim().split("\n");
+  expect(ran.filter((l) => l.includes("codex-a"))).toEqual(["run codex-a limit", "resume codex-a limit", "resume codex-a to the end"]);
+  expect(ran.filter((l) => !l.includes("codex-a")).sort()).toEqual(["run claude-b to the end", "run claude-d to the end", "run codex-c to the end"]);
+  // The alerts name what was parked and for whom; nothing is parked at the end.
+  const alerts = readFileSync(join(runs, "pilot-queues/pk.alerts.log"), "utf8");
+  expect(alerts).toMatch(/\[lane\] PARKED codex-a: at a usage limit \(codex\) on day 16; the queue goes on to what does not need codex/);
+  expect(alerts).toContain("usage-limit wait over for codex-a: trying again");
+  expect(JSON.parse(readFileSync(parkedPath(queue), "utf8"))).toEqual([]);
+  expect(out.trim().split("\n").at(-1)).toContain("queue finished");
+}, 120_000);
+
+test("with only a parked pilot left the queue waits and says so, and its note names it; --no-park waits on the pilot itself, as before", async () => {
+  const here = join(base, "no-park"), runs = join(here, "runs");
+  const cli = standIn(here);
+  const queue = join(here, "lane.json");
+  writeFileSync(queue, JSON.stringify([entry("codex-a", "codex/x"), entry("claude-b", "claude-code/s")]));
+  const p = Bun.spawn(["bun", QUEUE, queue, "--wait", "0.02", "--no-park"], { env: queueEnv(runs, cli), stdout: "pipe", stderr: "pipe" });
+  const [out, code] = await Promise.all([new Response(p.stdout).text(), p.exited]);
+  expect(code).toBe(0);
+  expect(out).toMatch(/codex-a: stopped at a usage limit on day 16 .*asking again in 0\.02 minutes/);
+  expect(out).not.toContain("parked");
+  expect(out.indexOf("claude-b: starting")).toBeGreaterThan(out.indexOf("codex-a: done (day 30)"));
+  // A queue whose only entry stays at its limit: its note says what is parked, for whom, and when it is next tried.
+  const stuck = join(base, "stuck"), q2 = join(stuck, "lane.json");
+  const cli2 = standIn(stuck);
+  writeFileSync(q2, JSON.stringify([entry("codex-a", "codex/x")]));
+  const p2 = Bun.spawn(["bun", QUEUE, q2, "--wait", "30"], { env: queueEnv(join(stuck, "runs"), cli2), stdout: "ignore", stderr: "ignore" });
+  try {
+    let note: any[] = [];
+    for (let i = 0; i < 600 && !note.length; i++) { await Bun.sleep(100); try { note = JSON.parse(readFileSync(parkedPath(q2), "utf8")); } catch { /* (not written yet) */ } }
+    expect(note).toEqual([{ name: "codex-a", day: 16, providers: ["codex"], since: expect.stringMatching(/^\d{4}-\d\d-\d\d \d\d:\d\d/), next_try: expect.stringMatching(/^\d{4}-\d\d-\d\d \d\d:\d\d/) }]);
+    let said = "";
+    for (let i = 0; i < 100 && !said.includes("nothing else can run"); i++) { await Bun.sleep(100); said = readFileSync(q2.replace(/\.json$/, ".status.log"), "utf8"); }
+    expect(said).toMatch(/nothing else can run: waiting for codex-a \(parked at a usage limit; the next try at \d{4}/);
+  } finally {
+    p2.kill();
+  }
+}, 120_000);
