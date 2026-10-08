@@ -109,7 +109,7 @@ export class ClaudeCodeAdapter implements LlmAdapter {
       const system = join(dir, "system.txt");
       writeFileSync(system, claudeCodeSystem(req));
       const names = (req.tools ?? []).map((t) => t.name);
-      const args = ["-p", "--model", this.model.split("@")[0]!, ...(this.effort ? ["--effort", this.effort] : []), "--system-prompt-file", system, "--tools", "", "--output-format", "json", "--no-session-persistence", "--setting-sources", "",
+      const args = ["-p", "--model", this.model.split("@")[0]!, ...((req.effort ?? this.effort) ? ["--effort", (req.effort ?? this.effort)!] : []), "--system-prompt-file", system, "--tools", "", "--output-format", "json", "--no-session-persistence", "--setting-sources", "",
         "--strict-mcp-config", "--disable-slash-commands", "--exclude-dynamic-system-prompt-sections", ...(req.answer ? ["--json-schema", JSON.stringify(req.answer.schema)] : names.length ? ["--json-schema", JSON.stringify(answerSchema(names))] : [])];
       const timeoutMs = this.o.timeoutMs ?? 180_000;
       const attempts = this.o.attempts ?? 3;
@@ -142,7 +142,7 @@ export class ClaudeCodeAdapter implements LlmAdapter {
       const u = result.usage ?? {};
       const usage = { input_tokens: u.input_tokens ?? 0, output_tokens: u.output_tokens ?? 0, cache_read_tokens: u.cache_read_input_tokens ?? 0, cache_write_tokens: u.cache_creation_input_tokens ?? 0, ...(typeof result.total_cost_usd === "number" ? { reported_cost_microusd: Math.ceil(result.total_cost_usd * 1e6) } : {}) };
       const log = this.o.log ?? process.env.OIKOS_CLAUDE_CODE_LOG;
-      if (log) appendFileSync(log, JSON.stringify({ subject: req.subject, purpose: req.purpose, model: this.model, input_tokens: usage.input_tokens, output_tokens: usage.output_tokens, cache_read_tokens: usage.cache_read_tokens, cache_write_tokens: usage.cache_write_tokens, turns: result.num_turns, reported_usd: result.total_cost_usd, by_model: result.modelUsage, ms: result.duration_ms }) + "\n");
+      if (log) appendFileSync(log, JSON.stringify({ subject: req.subject, purpose: req.purpose, model: this.model, ...((req.effort ?? this.effort) ? { effort: req.effort ?? this.effort } : {}), input_tokens: usage.input_tokens, output_tokens: usage.output_tokens, cache_read_tokens: usage.cache_read_tokens, cache_write_tokens: usage.cache_write_tokens, turns: result.num_turns, reported_usd: result.total_cost_usd, by_model: result.modelUsage, ms: result.duration_ms }) + "\n");
       return { content, usage };
     } finally {
       rmSync(dir, { recursive: true, force: true });

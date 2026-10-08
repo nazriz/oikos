@@ -3222,6 +3222,13 @@ See the design note, §16.
   - **Not verified:** a real model's use of `hold`; how often real towns bring a mayor back (every invoice and complaint to the town is in its in-tray).
   - **Revisit if** a seat is brought back most days by one kind it does nothing with and does not hold it (then the default for that kind is the thing to change), or the daily look-in shows in run time.
 
+- **A seat's effort is a setting of its own** (2026-10-09; live check 2, finding 14; `participants/src/llm/adapter.ts` (`LlmRequest.effort`), `claude-code.ts`, `codex.ts`, `call.ts`, `participant.ts`, `orchestrator/src/run.ts`, `worlds/generator/generate.ts` (`seat_effort`); test `orchestrator/test/seat-settings.test.ts`; docs/real-models.md, "A seat's settings").
+  - **What was there.** Effort was part of the run's model name (`claude-code/claude-haiku-5-5@low`): one for every seat and the translator. The Claude Code adapter takes `CLAUDE_EFFORT` out of the environment it runs `claude -p` in (so that a run started inside a session is the run it would be from a terminal), so with no `@` a seat ran at the model's default. Haiku 5.5 at that default spent about three quarters of its output on thinking.
+  - **Now.** A town's description may give `seat_effort` (one word for every seat, or by office id), which a queue entry sets with `"sets": ["seat_effort.finance=low"]`. It is the seat's own setting, sent with each of its calls (`effort` on the request), used by the two command-line adapters before any effort named with the model, and recorded with each transcript and in the run's account of who sat. Not given, nothing is passed: the default is unchanged.
+  - **Contracts:** none (a controller's parameters and a transcript's data are open).
+  - **Not verified, on purpose:** whether a Haiku seat at low effort is still read whole. No model was called. The reader comparison's finding (Haiku at low effort a poor reader) is about the translator's job.
+  - **Revisit if** the measurement shows answers unread or acts dropped at the lower effort: then the cost is the price of a Haiku seat.
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Calibration, measured again after the first-year risk fix** (2026-10-05, at 0251d3a, `runs/calibration-2026-10-05` on the run server; the small town, 3 seeds × 2 years, code only, as below). Health: 4 breaches of 15 (8 measured). Recorded, not chased: Naz decides what to do with the numbers.

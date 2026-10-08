@@ -64,6 +64,9 @@ export interface LlmParticipantConfig {
    * stands at a time, in words (behaviour/roster.ts, from the office's own papers). Set out at its first sitting and
    * at any sitting where it has changed since it was last set out. */
   staff?: { text(t: number): string };
+  /** How hard its model reasons, where its way in takes an effort (docs/real-models.md, "Effort"): the seat's own
+   * setting, sent with each of its calls. Not given: the adapter's (the model's default, or what was named with it). */
+  effort?: string;
   /** Whether a paper filed with its office brings it back before the day it gave, as a letter does (true unless set):
    * at the next working day's sitting after the paper came, never at once, so that a day's papers are one sitting.
    * A real office opens its in-tray every working day. The seat can say which kinds may wait (`done_for_now`, hold). */
@@ -957,7 +960,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
             sentCharacters = fit.characters;
             fitted = fit.messages;
             return callModel(io, {
-              purpose: "participant", subject: c.participant, system: fit.system, messages: fit.messages, tools: toolset, maxTokens: c.maxTokens ?? 4000,
+              purpose: "participant", subject: c.participant, system: fit.system, messages: fit.messages, tools: toolset, maxTokens: c.maxTokens ?? 4000, ...(c.effort ? { effort: c.effort } : {}),
               context: { observation: obs, notes, participant: c.participant, ...(missed.length ? { missed } : {}) },
             }, seenSystems);
           };
@@ -1204,7 +1207,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
         `From day ${day(tally.first)} to day ${day(tally.last)} ${tally.letters} letter${tally.letters === 1 ? "" : "s"} of yours ${tally.letters === 1 ? "was" : "were"} sent${tally.written > tally.letters ? ` (${tally.written - tally.letters} more that you wrote ${tally.written - tally.letters === 1 ? "was" : "were"} not: you were told at the time)` : ""}, you asked for ${tally.requests} thing${tally.requests === 1 ? "" : "s"} to be done (confirming ${tally.confirmed}, declining ${tally.declined}), and looked something up ${tally.looks} time${tally.looks === 1 ? "" : "s"}.`;
       const content = `${text}\n\nFor reference, your own record of the run. Your notebook, as you left it: ${notes || "(empty)"}\n${did}`;
       const res = await callModel(io, {
-        purpose: "debrief", subject: c.participant, system: c.framing.system ?? "", maxTokens: c.maxTokens ?? 2000,
+        purpose: "debrief", subject: c.participant, system: c.framing.system ?? "", maxTokens: c.maxTokens ?? 2000, ...(c.effort ? { effort: c.effort } : {}),
         messages: [{ role: "user", content }], context: { participant: c.participant, notes },
       }, seenSystems);
       const reply = res.content.filter((b) => b.type === "text").map((b: any) => b.text).join("\n");

@@ -151,7 +151,7 @@ export class CodexCliAdapter implements LlmAdapter {
       const last = join(dir, "answer.json");
       writeFileSync(schema, JSON.stringify(req.answer ? req.answer.schema : answerSchema((req.tools ?? []).map((t) => t.name))));
       const args = ["exec", "--json", "--ephemeral", "--skip-git-repo-check", "--ignore-user-config", "--ignore-rules", "--sandbox", "read-only",
-        ...(this.model !== "default" ? ["-m", this.model.split("@")[0]!] : []), ...(this.effort ? ["-c", `model_reasoning_effort="${this.effort}"`] : []), "--output-schema", schema, "--output-last-message", last, "-"];
+        ...(this.model !== "default" ? ["-m", this.model.split("@")[0]!] : []), ...((req.effort ?? this.effort) ? ["-c", `model_reasoning_effort="${req.effort ?? this.effort}"`] : []), "--output-schema", schema, "--output-last-message", last, "-"];
       const timeoutMs = this.o.timeoutMs ?? 180_000;
       const attempts = this.o.attempts ?? 3;
       let r!: Awaited<ReturnType<CodexRunner>>;

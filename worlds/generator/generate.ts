@@ -154,6 +154,9 @@ export interface TownSpec {
   /** Whether a paper filed with a seat's office brings the seat back before the day it gave, at the next working day's
    * sitting, as a letter does (docs/real-models.md, "A seat's settings"). On unless set false: then only a letter does. */
   wake_on_papers?: boolean;
+  /** How hard a seat's model reasons, where its way in takes that (docs/real-models.md, "A seat's settings"): one word
+   * for every seat ("low"), or by office id ({ finance: "low" }). Not given: the model's own default. */
+  seat_effort?: string | { [seat: string]: string };
   /** The units in each apartment block, by bedrooms, each with its rent (cents a month). Default: the profile's. */
   apartment_units?: { bedrooms: number; count: number; rent: number }[];
   /** Kinds of house (a catalogue type each), their bedrooms, share of the houses and rent. Default: the profile's. */
@@ -1861,10 +1864,13 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       part.controller.params.standing = [...part.controller.params.standing, "standing"];
     }
   }
-  // Settings of every seat a model holds, as the town's description gives them: whether papers bring it back.
+  // Settings of every seat a model holds, as the town's description gives them: whether papers bring it back, and how
+  // hard its model reasons (by office, or one word for all).
   for (const part of participants) {
     if (part.controller?.type !== "llm") continue;
-    part.controller.params = { ...part.controller.params, ...(spec.wake_on_papers === false ? { wake_on_papers: false } : {}) };
+    const office = positions.find((x) => x.holder === part.id)?.id;
+    const effort = typeof spec.seat_effort === "string" ? spec.seat_effort : office ? spec.seat_effort?.[office] : undefined;
+    part.controller.params = { ...part.controller.params, ...(spec.wake_on_papers === false ? { wake_on_papers: false } : {}), ...(effort ? { effort: String(effort) } : {}) };
   }
   // An office a model holds has its own stationery (docs/behaviour/office-papers.md): a form for each paper the
   // office issues, as its module says (`issues`), with what is the office's own filled in. Seen by its organisation
