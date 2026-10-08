@@ -623,6 +623,24 @@ pub struct CurrencyCfg {
     /// The words for its smallest unit, where that has a name; the first is the singular.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub minor_words: Vec<String>,
+    /// The mark written before the decimals: "." or ","; absent: a point, unless the group mark is a point.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub decimal_mark: Option<String>,
+    /// The mark written between groups of digits; absent: a comma, or a point where the decimal mark is a comma.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group_mark: Option<String>,
+    /// [3] or [3, 2]; absent: threes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub grouping: Option<Vec<u8>>,
+    /// The sign (or code) is written after the digits.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub symbol_after: Option<bool>,
+    /// A space stands between the sign and the digits.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub symbol_spaced: Option<bool>,
+    /// Words this place writes for large numbers, with their values (read, never written).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub number_words: BTreeMap<String, u64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -1411,6 +1429,21 @@ pub fn validate(c: &Config) -> Result<(), String> {
         }
         if c.minor_units == 0 && !c.minor_words.is_empty() {
             return Err(format!("currency {}: it has no smaller unit to name", c.code));
+        }
+        if c.decimal_mark.as_deref().is_some_and(|m| m != "." && m != ",") {
+            return Err(format!("currency {}: its decimal mark is a point or a comma", c.code));
+        }
+        if c.group_mark.as_deref().is_some_and(|m| ![",", ".", " ", "\u{a0}", "\u{202f}", "'", "\u{2019}"].contains(&m)) {
+            return Err(format!("currency {}: its group mark is a comma, a point, a space or an apostrophe", c.code));
+        }
+        if c.decimal_mark.is_some() && c.decimal_mark == c.group_mark {
+            return Err(format!("currency {}: its decimal mark and its group mark can't be the same", c.code));
+        }
+        if c.grouping.as_ref().is_some_and(|g| g != &[3] && g != &[3, 2]) {
+            return Err(format!("currency {}: its grouping is [3] or [3, 2]", c.code));
+        }
+        if !c.number_words.iter().all(|(w, v)| plain(w) && (10..=1_000_000_000_000).contains(v)) {
+            return Err(format!("currency {}: its number words can't be empty or hold spaces, digits, '.' or ',', and stand for 10 to a million million", c.code));
         }
     }
     let mut totals: BTreeMap<&str, oikos_core::money::Money> = BTreeMap::new();

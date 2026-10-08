@@ -16,7 +16,9 @@
       "minor_words": [
         "cent",
         "cents"
-      ]
+      ],
+      "decimal_mark": ".",
+      "group_mark": ","
     },
     "households": {
       "lone_bps": 2856,
@@ -1280,7 +1282,7 @@
     }
   },
   "sources": {
-    "currency": "United States dollars, in cents: written with a dollar sign before the amount (\"$1,234.56\"), or in words as dollars (informally bucks) and cents. ISO 4217: USD, two decimal places.",
+    "currency": "United States dollars, in cents: written with a dollar sign before the amount (\"$1,234.56\"), or in words as dollars (informally bucks) and cents. ISO 4217: USD, two decimal places. How its people write money: the dollar sign before the digits with no space, a point before the decimals, commas between thousands. Unicode CLDR (cldr-json, cldr-numbers-full/main/en/numbers.json, opened 2026-10-08): decimal '.', group ',', currency pattern '¤#,##0.00'. A national style guide (the GPO Style Manual) was not opened. Both marks are stated so that \"$1.234\" is read as a decimal with a digit too many.",
     "households": "U.S. Census Bureau, American Community Survey 2020-2024 5-year estimates, Wyandot County, Ohio (county seat Upper Sandusky; a rural county of 21,598 people), table B11001, B11003, B09019 and B01001, read through the Census Reporter API (https://api.censusreporter.org/1.0/data/show/latest?table_ids=B11001, B11003, B09019 and B01001&geo_ids=05000US39175, opened). Of 8999 households: lone person 2570 (28.6%), not-living-alone nonfamily (group) 400 (4.4%), other family (one parent or relatives, any age of child) 1285 (14.3%), married couple with own children under 18 1546 (17.2%); the remaining married couples (no own child under 18, so couples whose children are grown or at home aged 18-24, which the table cannot separate) take the rest, 35.5%. same_sex_couple_bps: same-sex spouses 78 of 5,411 couples (B09019). lone_parent_female_bps: female householders with own children under 18, 334 of 597 lone-parent families (B11003). adult_female_bps and child_male_bps: from B01001 (adults 18+, children under 18). children_couple, children_one_parent, adult_ages, mother_age_at_first_birth, group_size: rule parameters carried over unchanged from the other profile (the number of children per family was not sought; placeholders). Mean household size is 21,334 people in households over 8,999 households = 2.37.",
     "households.age_bands_bps": "U.S. Census Bureau, American Community Survey 2020-2024 5-year estimates, Wyandot County, Ohio (county seat Upper Sandusky; a rural county of 21,598 people), table B01001, read through the Census Reporter API (https://api.censusreporter.org/1.0/data/show/latest?table_ids=B01001&geo_ids=05000US39175, opened). Five-year age shares of all 21,598 residents (sexes added; 15-19, 20-24, 60-64 and 65-69 are made from the table's finer groups); 85 and over taken to 99.",
     "households.child_max_age": "A rule parameter carried over: children at home are drawn up to age 24 (a simplification: the census counts a household's own children of any age living with their parents). No place-specific figure.",

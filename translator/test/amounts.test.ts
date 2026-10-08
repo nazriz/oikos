@@ -13,11 +13,11 @@ import TABLE from "../../contracts/test/amounts.json";
 import { translatorSystem } from "../src/index";
 import { decode, encode } from "../model/encode";
 import { pieces, row, stepsOf } from "../model/export";
-import { amountWritings, sameProgram, spansIn, surfaceVariant, sampler, type Gold, type Writing, type WrittenCurrency } from "../train/data";
+import { amountWritings, sameProgram, spansIn, surfaceVariant, sampler, type Gold, type WrittenCurrency } from "../train/data";
 import { labelled } from "../train/readers";
 import { amountForms, CURRENCIES as INVENTED, everyCurrency, synthetic, worldsCurrencies } from "../train/synthetic";
 
-const CURRENCIES = TABLE.currencies as { [name: string]: Currency };
+const CURRENCIES = TABLE.currencies as unknown as { [name: string]: Currency };
 const read = (s: string, cur: Currency): string | null => {
   try {
     return calls.parseAmount(s, cur);
@@ -45,6 +45,18 @@ test("every amount in the table reads as it says, in its own currency, or is ref
     const mine = (TABLE.cases as [string, string, string | null][]).filter(([c]) => c === name);
     expect(mine.some(([, , want]) => want !== null) && mine.some(([, , want]) => want === null)).toBe(true);
   }
+});
+
+test("each currency writes an amount as its place does (the table's \"writes\", which the kernel's writer is held to as well)", () => {
+  const wrong: unknown[] = [];
+  for (const [name, n, want] of (TABLE as unknown as { writes: [string, string, string][] }).writes) {
+    const got = formatMoney(n, CURRENCIES[name]!);
+    if (got !== want) wrong.push({ currency: name, n, got, want });
+  }
+  expect(wrong).toEqual([]);
+  // Whole units only, for a round figure in a law's words.
+  expect(formatMoney(150_000_00, CURRENCIES.inr!, { decimals: false })).toBe("₹1,50,000");
+  expect(formatMoney(123_400, CURRENCIES.de!, { decimals: false })).toBe("1.234 €");
 });
 
 test("what a world writes an amount as reads back as that amount: every currency, every size", () => {
@@ -120,7 +132,16 @@ test("the translator's instructions are one text for every world, and say of amo
 // ---------------------------------------------------------------- the training data's writings
 
 /** Every way of writing numbers at once: what a test asks of a currency whose own way isn't on record. */
-const EVERY_WAY: Writing[] = [{}, { decimal_mark: ",", symbol_after: true }, { decimal_mark: ",", symbol_spaced: true }, { grouping: "twos", symbol_spaced: true }, { country_sign: true, symbol_after: true }];
+type Writing = Pick<WrittenCurrency, "decimal_mark" | "group_mark" | "grouping" | "symbol_after" | "symbol_spaced" | "number_words" | "country_sign">;
+const LAKH = { lakh: 100_000, lakhs: 100_000, crore: 10_000_000, crores: 10_000_000 };
+const EVERY_WAY: Writing[] = [{}, { decimal_mark: ",", symbol_after: true }, { decimal_mark: ",", symbol_spaced: true }, { grouping: [3, 2], number_words: LAKH, symbol_spaced: true }, { country_sign: true, symbol_after: true },
+  { decimal_mark: ",", group_mark: "\u202f", symbol_after: true, symbol_spaced: true }, { group_mark: "'" }, { decimal_mark: ",", group_mark: ".", grouping: [3, 2], number_words: LAKH }];
+/** A currency with how its place writes numbers replaced by `way` (the fields it has of its own set aside). */
+const writtenAs = (base: WrittenCurrency, way: Writing): WrittenCurrency => {
+  const { decimal_mark, group_mark, grouping, symbol_after, symbol_spaced, number_words, country_sign, ...rest } = base;
+  void [decimal_mark, group_mark, grouping, symbol_after, symbol_spaced, number_words, country_sign];
+  return { ...rest, ...way };
+};
 const SUMS = (cur: Currency): bigint[] => {
   const per = 10n ** BigInt(cur.minor_units);
   return [1n * per, 500n * per, 9_000n * per, 1_234n * per + (per > 1n ? 56n % per : 0n), 150_000n * per, 1_234_567n * per + (per > 1n ? 5n : 0n), 2_500_000n * per, 30_000_000n * per, 7n];
@@ -128,12 +149,12 @@ const SUMS = (cur: Currency): bigint[] => {
 
 test("the training data writes an amount as its world does, every writing reads back as the same number, and the first is the plain one", () => {
   const seen = new Set<string>();
-  for (const base of [...Object.values(CURRENCIES), ...everyCurrency()]) for (const written of [(base as WrittenCurrency).written, ...EVERY_WAY]) {
-    const cur: WrittenCurrency = { ...base, ...(written ? { written } : {}) };
+  for (const base of [...Object.values(CURRENCIES), ...everyCurrency()]) for (const way of [undefined, ...EVERY_WAY]) {
+    const cur: WrittenCurrency = way ? writtenAs(base as WrittenCurrency, way) : (base as WrittenCurrency);
     for (const n of SUMS(cur)) {
       const forms = amountWritings(n, cur);
       expect(forms.length).toBeGreaterThanOrEqual(3);
-      expect(forms[0]).toBe(formatMoney(n, cur).replace(n % 10n ** BigInt(cur.minor_units) === 0n && cur.minor_units > 0 ? new RegExp(`\\.0{${cur.minor_units}}$`) : /$^/, ""));
+      expect(forms[0]).toBe(formatMoney(n, cur, n % 10n ** BigInt(cur.minor_units) === 0n ? { decimals: false } : {}));
       for (const f of forms) {
         expect([cur.code, f, read(f, cur)]).toEqual([cur.code, f, n.toString()]);
         seen.add(f.replace(/[0-9]+/g, "9"));
@@ -144,7 +165,8 @@ test("the training data writes an amount as its world does, every writing reads 
   const of = (code: string) => INVENTED.find((c) => c.code === code)!;
   const comma = of("GLD"), spaced = of("NVO"), twos = of("RPA"), letters = of("TSH"), shared = of("PSO"), plain = of("DLR"), after = of("ZEN");
   expect(amountWritings(123_456n, comma)).toEqual(expect.arrayContaining(["₲1,234.56", "₲1.234,56", "1.234,56 ₲", "1234,56₲", "1.234,56 guldens", "1.234,56 GLD", "1.234,56"]));
-  expect(amountWritings(123_400n, comma)).not.toContain("₲1.234"); // (it could be two numbers: nothing writes what isn't read)
+  expect(amountWritings(123_400n, comma)).toContain("₲1.234"); // (its decimal mark is stated, so a point can only group)
+  expect(amountWritings(123_400n, plain)).not.toContain("$1.234"); // (it could be two numbers: nothing writes what isn't read)
   expect(amountWritings(123_456_700n, comma)).toContain("₲1.234.567");
   expect(amountWritings(123_456n, spaced)).toEqual(expect.arrayContaining(["N$1,234.56", "N$ 1.234,56", "N$ 1,234.56", "NVO 1,234.56"]));
   expect(amountWritings(15_000_000n, twos)).toEqual(expect.arrayContaining(["₨150,000", "₨1,50,000", "₨ 1,50,000", "1,50,000 rupas", "₨1.5 lakh", "1.5 lakh rupas"]));
@@ -165,8 +187,8 @@ test("generated programs are in the invented worlds' money and each profile's, a
   expect(worldsCurrencies().length).toBeGreaterThanOrEqual(1);
   // The invented worlds differ in what a real world's may: decimals, a sign or none, where the sign goes, the marks.
   const has = (f: (c: WrittenCurrency) => unknown) => expect(INVENTED.some(f)).toBe(true);
-  for (const f of [(c: WrittenCurrency) => c.minor_units === 0, (c: WrittenCurrency) => c.minor_units === 3, (c: WrittenCurrency) => !c.symbol, (c: WrittenCurrency) => c.written?.decimal_mark === ",", (c: WrittenCurrency) => c.written?.grouping === "twos",
-    (c: WrittenCurrency) => c.written?.symbol_after, (c: WrittenCurrency) => c.written?.symbol_spaced, (c: WrittenCurrency) => c.written?.country_sign, (c: WrittenCurrency) => INVENTED.filter((x) => x.symbol === c.symbol).length > 1]) has(f);
+  for (const f of [(c: WrittenCurrency) => c.minor_units === 0, (c: WrittenCurrency) => c.minor_units === 3, (c: WrittenCurrency) => !c.symbol, (c: WrittenCurrency) => c.decimal_mark === ",", (c: WrittenCurrency) => c.grouping?.length === 2,
+    (c: WrittenCurrency) => c.symbol_after, (c: WrittenCurrency) => c.symbol_spaced, (c: WrittenCurrency) => c.country_sign, (c: WrittenCurrency) => INVENTED.filter((x) => x.symbol === c.symbol).length > 1]) has(f);
   const gold = [...synthetic({ perFunction: 150, only: ["money", "structure", "presence"], seed: 4 }), ...amountForms({ forms: 40, seed: 4 })];
   const used = new Set<string>();
   const shapes = new Set<string>();
@@ -186,7 +208,7 @@ test("generated programs are in the invented worlds' money and each profile's, a
   expect(shapes.size).toBeGreaterThan(120);
   // Its world's way of writing goes with a program, so another surface of it is written as that world writes.
   const g = gold.find((x) => x.currency!.code === "GLD" && x.shape.startsWith("money("))!;
-  expect((g.currency as WrittenCurrency).written).toEqual({ decimal_mark: ",", symbol_after: true });
+  expect([(g.currency as WrittenCurrency).decimal_mark, (g.currency as WrittenCurrency).symbol_after]).toEqual([",", true]);
   const rand = sampler(3);
   const surfaces = new Set<string>();
   for (let i = 0; i < 80; i++) for (const a of amountsOf(surfaceVariant(g, rand))) {
@@ -200,8 +222,8 @@ test("generated programs are in the invented worlds' money and each profile's, a
 
 test("a trained model's answer copies an amount exactly, however its world writes it: every writing of the nine currencies comes back as it was said", () => {
   let checked = 0;
-  for (const name of ["aud", "usd", "mxn", "jpy", "eur", "gbp", "brl", "inr", "kes"]) for (const written of EVERY_WAY) {
-    const cur: WrittenCurrency = { ...CURRENCIES[name]!, written };
+  for (const name of ["aud", "usd", "mxn", "jpy", "eur", "gbp", "brl", "inr", "kes"]) for (const way of EVERY_WAY) {
+    const cur: WrittenCurrency = writtenAs(CURRENCIES[name]!, way);
     for (const n of SUMS(cur).filter((_, i) => i % 2 === 0)) for (const amount of amountWritings(n, cur)) {
       for (const [request, program] of [
         [`Pay acc-works ${amount} from acc-town for the fence.`, `money(amount="${amount}", for="the fence", from=acc-town, to=acc-works)`],

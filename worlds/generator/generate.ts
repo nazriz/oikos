@@ -245,7 +245,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   // Money in words, as the town writes it (its currency's sign, grouping and decimal places; whole units without their
   // decimals, as a rule or a round figure is written).
   const perUnit = 10 ** V.currency.minor_units;
-  const asWritten = (n: number) => (V.currency.minor_units && n % perUnit === 0 ? formatMoney(n, V.currency).slice(0, -(V.currency.minor_units + 1)) : formatMoney(n, V.currency));
+  const asWritten = (n: number) => formatMoney(n, V.currency, n % perUnit === 0 ? { decimals: false } : {});
   const toWholeUnit = (n: number) => Math.round(n / perUnit) * perUnit;
   const R = new Randomness(BigInt(spec.seed));
   const rng = (k: string) => R.stream(["generator", k]);
