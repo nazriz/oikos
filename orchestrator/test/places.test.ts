@@ -399,7 +399,9 @@ test("every town opens with its first year's budget on file: adopted by its coun
     // Its lines are the ones the mayor's office is given to table each year, and the proposal's amounts are the same.
     const mayor = c.participants.find((p: any) => p.id === "mayor-system").controller.params;
     expect(budget.data.lines).toEqual({ parks: mayor.park_budget, ...(mayor.road_budget ? { roads: mayor.road_budget } : {}), ...(mayor.staff_budget ? { staff: mayor.staff_budget } : {}), ...(mayor.services_budget ? { services: mayor.services_budget } : {}), ...(mayor.environment_budget ? { environment: mayor.environment_budget } : {}) });
-    for (const [k, v] of Object.entries(budget.data.lines)) expect(proposal.data[k]).toBe(String(v));
+    // (Written as the town writes its money, on a paper people read: no sum is a bare count of the smallest unit.)
+    for (const [k, v] of Object.entries(budget.data.lines)) expect(proposal.data[k]).toBe(written(v as number));
+    for (const v of Object.values(proposal.data)) expect(String(v)).not.toMatch(/^[0-9]{4,}$/);
     // The staff lines cover the wages the town is bound to at the start: every agreement it employs someone under, for a year.
     const wages = c.world.records.filter((r: any) => r.record === "agreement" && r.terms.template === "employment" && r.terms.parties[0] === "city")
       .reduce((sum: number, a: any) => sum + Math.floor((Number(a.terms.commitments[0].does.outcome.money.amount) * YEAR) / a.terms.commitments[0].every), 0);

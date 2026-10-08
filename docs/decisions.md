@@ -3278,6 +3278,14 @@ See the design note, §16.
   - **Hash.** `worlds/town-1000.yaml`, seed 1, 30 days: 8a2ca8c818146838, twice (unchanged: notes and a test). The ratios were measured again on the tree after main's informal-work changes were merged: the same.
   - **Test.** `orchestrator/test/places.test.ts`, "a town's opening budget against the grant it expects" (a town of a thousand for each profile).
 
+- **The opening budget proposal's sums are written as the town writes money** (2026-10-09; generator 0.43.0; live check 2, finding 12).
+  - **The fault.** The proposal a town opens with held each line in its content as a bare count of the smallest unit ("environment: 4321834; parks: 15000000"), beside words that gave the same sums properly. A seat is shown both.
+  - **Done.** At generation the content's sums are written as the proposal's words write them ("£43,218.34"). The paper was made before the run and no office's code reads it: the clerk does not ballot a proposal a ballot stands for, and the budget itself (`budget-year-1`) holds the lines as numbers, which is what offices read.
+  - **A difference to know of.** A proposal a seat files on the council proposal form in the run still holds its amounts as the form reads them (a count of the smallest unit), because the clerk's code reads them to write the budget. What a seat is shown of those is the seat renderer's to word.
+  - **Contracts:** none. **Test:** `orchestrator/test/places.test.ts` (every profile; fails on main).
+  - **Revisit if** anything comes to read the opening proposal's content as numbers (then it reads the budget's).
+  - **Hash.** `worlds/town-1000.yaml`, seed 1, 30 days: 5098693b1c379072, twice (before: 8a2ca8c818146838; the same 166,910 commands and 166 refusals: one paper's content).
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Calibration, measured again after the first-year risk fix** (2026-10-05, at 0251d3a, `runs/calibration-2026-10-05` on the run server; the small town, 3 seeds × 2 years, code only, as below). Health: 4 breaches of 15 (8 measured). Recorded, not chased: Naz decides what to do with the numbers.

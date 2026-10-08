@@ -70,7 +70,7 @@ const ACT_TIME = {
   },
 };
 
-export const GENERATOR_VERSION = "0.42.0";
+export const GENERATOR_VERSION = "0.43.0";
 const DAY = 86_400;
 const MONTH = 30 * DAY;
 const YEAR = 365 * DAY;
@@ -1647,7 +1647,9 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     const [proposal, ballot, result, budget] = ["budget-year-1-proposal", "budget-year-1-ballot", "budget-year-1-result", "budget-year-1"];
     const paper = (id: string, kind: string, position: string, x: object) => ({ id, record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", in_position: position, kind, ...x });
     records.push(paper(proposal, "proposal", "mayor", { visible_to: ["city"], addressed_to: ["city"], basis: "form-council-proposal", text: `Council proposal (a budget, put before the year began): ${words}`,
-      data: { proposal: words, kind: "budget", affects: "neither", year: 1, ...Object.fromEntries(Object.entries(lines).map(([k, v]) => [k, String(v)])) } }));
+      // (Each line's sum as the town writes its money, as the proposal's words have it: this paper was made before
+      // the run and is read by people, never by an office's code; the budget itself holds the figures as numbers.)
+      data: { proposal: words, kind: "budget", affects: "neither", year: 1, ...Object.fromEntries(Object.entries(lines).map(([k, v]) => [k, asWritten(v)])) } }));
     // (The ballot was held and closed before the year began, and says so: in its words, and as `closed` with its
     // result beside the closing time a record must have. A vote on it now is too late, and the clerk says so.)
     const councillorPosts = COUNCIL_LEANINGS.map((_, i) => `councillor-${i + 1}`);
