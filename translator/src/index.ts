@@ -20,7 +20,7 @@ import type { Knowledge } from "./knowledge";
 import { Preview } from "./preview";
 import { LABEL_TEXT, RESOLVER, resolve, type Resolution, type StructureTypeInfo } from "./resolver";
 
-export const TRANSLATOR_VERSION = "0.7.6";
+export const TRANSLATOR_VERSION = "0.7.7";
 
 export interface TranslatorId {
   id: string;
@@ -86,13 +86,17 @@ const GLOSS: { [fn: string]: string } = {
   take: "things someone else holds are taken from where they are, without their agreement",
 };
 
-/** What the translator is told of amounts, in place of the contract's line (which shows how three currencies are
- * written): true to what the parser accepts in any world, and naming no world's money. */
-const AMOUNTS = "  - amounts: whatever the request wrote as one, copied whole: the digits (with their commas and decimals, and a multiplier such as k or m, or thousand to trillion, if written) together with the sign or code before them or the word or code after them, if any. The parser reads it in the world's own money, to an integer in its smallest unit; digits written with no sign or word are whole units.";
+/** What the translator is told of amounts, in place of the contract's line (which shows how some currencies are
+ * written): true to what the parser accepts in any world, and naming no world's money. The translator is not told
+ * which world it is in, on purpose: it copies what was written, and the parser, which has the world's currency, reads
+ * it. So the instructions are the same text for every world, and a model trained on them is one model for all. */
+const AMOUNTS = "  - amounts: whatever the request wrote as one, copied whole: the digits (with their commas, points and decimals, and a multiplier such as k or m, or a word such as thousand or million, if written) together with the sign, code or word of money before or after them, if any. The parser reads it in the world's own money, to an integer in its smallest unit; digits written with no sign or word are whole units.";
 
-/** The translator's instructions: the call language itself, generated from the contract (P12), and nothing about any world. */
+/** The translator's instructions: the call language itself, generated from the contract (P12), and nothing about any
+ * world: no currency's sign, code or words in the rules, the syntax or the examples (orchestrator/test/generality.test.ts
+ * and translator/test/train.test.ts hold it to that). */
 export function translatorSystem(): string {
-  // The contract's syntax, with its line on amounts said for any world: the contract lists how three example
+  // The contract's syntax, with its line on amounts said for any world: the contract lists how some example
   // currencies are written, and the translator is to learn none of them (it copies; the parser, which has the world's
   // currency, reads). The contract's examples likewise lose their sign: bare digits are an amount in any world.
   const syntax = CALLS_MD.slice(CALLS_MD.indexOf("## Syntax"), CALLS_MD.indexOf("## Functions")).trim()

@@ -8,7 +8,7 @@ import { resolve } from "../src/resolver";
 import {
   amountForms, amountWritings, askable, badlyWritten, bringsAbout, builtRefusals, checkerFor, copies, durationForms, FIELD_TYPES, formLine, formOf, functionOf, generate, goldFromCases, goldFromLog, goldText, implausible, JSON_OUT_OF_SCOPE, knowing, literals, meaningOf, mustAppear,
   needed, piledBriefs, plausible, refusalBriefs, everyIn, howOften, runTogether, sayingFor, SAYINGS, withHowOften, writerNotes, spansIn, sameMeaning, sameProgram, sampler, shapeOf, split, STYLES, styleBrief, surfaceVariant, whyNot, withOffice, withoutRiders, writerSystem, type Example, type Gold, unwrapped, quotesBalanced } from "../train/data";
-import { CURRENCIES, formSets, piled, synthetic, syntheticForms } from "../train/synthetic";
+import { CURRENCIES, everyCurrency, formSets, piled, synthetic, syntheticForms } from "../train/synthetic";
 
 const act = (call: string) => JSON.stringify({ kind: "command", body: { command: "act", provenance: { via: "call", call } } });
 const header = JSON.stringify({ kind: "header", body: { config: { world: { entities: [{ id: "builder", name: "Millbrook Builders" }, { id: "city", name: "Millbrook" }] }, positions: [{ id: "works", title: "Works Manager" }] } } });
@@ -415,7 +415,7 @@ test("generated gold: programs of several lines are dependent ones, values vary 
     expect(() => calls.parseAmount(v.text, g.currency!)).not.toThrow();
     currencies.add(g.currency!.code);
   }
-  expect(currencies.size).toBe(CURRENCIES.length);
+  expect(currencies.size).toBe(everyCurrency().length); // (the invented worlds' and each profile's)
   expect(CURRENCIES.some((c) => c.symbol && c.minor_units === 2) && CURRENCIES.some((c) => !c.symbol) && CURRENCIES.some((c) => c.minor_units === 0) && CURRENCIES.some((c) => c.minor_units === 3)).toBe(true);
   const written = money.map((g) => (linesOf(g.program)[0]!.call.args.amount as { text: string }).text);
   expect(written.some((a) => /^[0-9][0-9,.]*$/.test(a)) && written.some((a) => /^[A-Z]{3} /.test(a)) && written.some((a) => / [a-z]+$/.test(a)) && written.some((a) => /^[^A-Za-z0-9]/.test(a)) && written.some((a) => /\.\d{3}$/.test(a))).toBe(true);

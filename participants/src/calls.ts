@@ -257,49 +257,95 @@ export const PARSED = Symbol.for("oikos.call-program");
 
 export class UnitError extends Error {}
 
-const MULTIPLIERS: [string, bigint][] = [["thousand", 1_000n], ["million", 1_000_000n], ["billion", 1_000_000_000n], ["trillion", 1_000_000_000_000n], ["k", 1_000n], ["m", 1_000_000n], ["b", 1_000_000_000n], ["t", 1_000_000_000_000n]];
+/** The words and letters that multiply the digits before them. (Words for numbers, as people who count in them
+ * write them: no currency's.) */
+const MULTIPLIERS: [string, bigint][] = [["thousand", 1_000n], ["million", 1_000_000n], ["billion", 1_000_000_000n], ["trillion", 1_000_000_000_000n], ["lakh", 100_000n], ["lakhs", 100_000n], ["crore", 10_000_000n], ["crores", 10_000_000n], ["k", 1_000n], ["m", 1_000_000n], ["b", 1_000_000_000n], ["t", 1_000_000_000_000n]];
 const NUMBER_WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight"];
 const isDigit = (c: string | undefined) => c !== undefined && c >= "0" && c <= "9";
+const isPlainLetter = (c: string | undefined) => c !== undefined && c >= "a" && c <= "z";
 
 /**
- * An amount as written, in the currency's smallest unit, exact, as the contracts write it (a decimal string, D58): its
- * sign or code, digits (grouped or not, with decimals), a multiplier (k, m, b, t, thousand ... trillion), then a word
- * for its unit or its smallest unit, or its code. Bare digits are whole units. Nothing finer than the smallest unit,
- * and no arithmetic on anything but the digits written. (The kernel's resolver reads the same, step for step:
- * `parse_amount`.)
+ * An amount as written, in the currency's smallest unit, exact, as the contracts write it (a decimal string, D58).
+ *
+ * What is read, in this order:
+ *  - a marker of this world's money, before the digits or after them, with a space or without: the currency's sign,
+ *    its code, a word for its unit, or its sign with the first two letters of its code before it (how a sign that
+ *    several currencies share is told apart). A marker that ends in a letter may have a full stop and a space after it;
+ *  - the digits, with their separators. A comma and a point together: the one written last is the decimal mark and
+ *    the other groups the digits. Either of them written more than once groups the digits. A point written once is
+ *    a decimal point. A comma written once groups the digits if three follow it, and is a decimal comma if one or two
+ *    do. Digits are grouped in threes, or (with commas) the last three and then twos;
+ *  - a multiplier (k, m, b, t; thousand, million, billion, trillion; lakh, crore), only where a marker or the end
+ *    follows it;
+ *  - then a marker again, or a word for the smallest unit (then whole digits and no multiplier).
+ * Bare digits are whole units. Nothing finer than the smallest unit, and no arithmetic on anything but the digits
+ * written.
+ *
+ * What is not read, because it could be two numbers and a currency's config doesn't say which (it has no field for
+ * how digits are grouped): a point written once with three digits after it, in a currency of fewer than three
+ * decimals (a decimal point with a decimal too many, or thousands grouped by a point). Another currency's sign, code
+ * or words are not this world's money, and are not read; nor is a number written out in words.
+ * (The kernel's resolver reads the same, step for step: `parse_amount`. contracts/test/amounts.json holds what both
+ * must read and what both must refuse.)
  */
 export function parseAmount(s: string, cur: Currency): string {
   const err = () => new UnitError(`not an amount: ${s}`);
+  const grouping = () => new UnitError(`badly grouped digits: ${s}`);
   const t = s.trim().toLowerCase().split(/\s+/).filter(Boolean).join(" ");
   const code = cur.code.toLowerCase();
   const symbol = cur.symbol?.toLowerCase();
   const minor = cur.minor_units;
-  const after = (x: string, prefix: string) => (x.startsWith(prefix) ? x.slice(prefix.length) : undefined);
+  const minors = (cur.minor_words ?? []).map((u) => u.toLowerCase());
+  // What marks an amount as this world's money. (Tried longest first: a sign may be how its code or a word begins.)
+  const markers = [code, ...(cur.unit_words ?? []).map((u) => u.toLowerCase())];
+  if (symbol !== undefined) markers.push(symbol);
+  if (symbol !== undefined && ![...symbol].some((c) => isPlainLetter(c) || isDigit(c))) markers.push(code.slice(0, 2) + symbol);
+  markers.sort((a, b) => b.length - a.length);
+  const after = (x: string, prefix: string) => (prefix !== "" && x.startsWith(prefix) ? x.slice(prefix.length) : undefined);
   const space = (x: string) => after(x, " ") ?? x;
-  let rest = (symbol !== undefined ? after(t, symbol) : undefined) ?? after(t, code) ?? t;
-  rest = space(rest);
-  let end = 0;
-  while (end < rest.length && (isDigit(rest[end]) || rest[end] === ",")) end++;
-  const whole = rest.slice(0, end);
-  if (!isDigit(whole[0])) throw err();
-  rest = rest.slice(end);
-  let frac = "";
-  if (rest.startsWith(".")) {
-    let n = 0;
-    while (isDigit(rest[1 + n])) n++;
-    if (n === 0 || n > Math.max(minor, 3)) throw err();
-    frac = rest.slice(1, 1 + n);
-    rest = rest.slice(1 + n);
+  const isUnit = (w: string) => w !== "" && markers.includes(w);
+  const isMinor = (w: string) => minors.includes(w);
+  let rest = t;
+  if (!isDigit(rest[0])) {
+    // A marker first: one that has the digits straight after it.
+    let found: string | undefined;
+    for (const m of markers) {
+      let r = after(rest, m);
+      if (r === undefined) continue;
+      if (isPlainLetter(m[m.length - 1]) && r.startsWith(". ")) r = r.slice(1);
+      r = space(r);
+      if (isDigit(r[0])) {
+        found = r;
+        break;
+      }
+    }
+    if (found === undefined) throw err();
+    rest = found;
   }
-  rest = space(rest);
-  const isUnit = (w: string) => w === code || (cur.unit_words ?? []).some((u) => u.toLowerCase() === w);
-  const isMinor = (w: string) => (cur.minor_words ?? []).some((u) => u.toLowerCase() === w);
+  // The digits and their separators (a separator is one only between two digits).
+  let end = 0;
+  while (end < rest.length && (isDigit(rest[end]) || ((rest[end] === "," || rest[end] === ".") && isDigit(rest[end + 1])))) end++;
+  const number = rest.slice(0, end);
+  rest = space(rest.slice(end));
+  // Which separator is the decimal mark, if either is.
+  const commas = number.split(",").length - 1;
+  const points = number.split(".").length - 1;
+  let mark = "";
+  if (commas > 0 && points > 0) mark = number.lastIndexOf(",") > number.lastIndexOf(".") ? "," : ".";
+  else if (points === 1) mark = ".";
+  else if (commas === 1 && number.length - number.indexOf(",") - 1 < 3) mark = ",";
+  const group = mark === "," || (mark === "" && points > 0) ? "." : ",";
+  const cut = mark === "" ? number.length : number.lastIndexOf(mark);
+  const whole = number.slice(0, cut);
+  const frac = number.slice(cut + 1);
+  if (mark !== "" && whole.includes(mark)) throw grouping();
+  if (frac.length > Math.max(minor, 3)) throw err();
   let mult = 1n;
   let hasMult = false;
   for (const [w, m] of MULTIPLIERS) {
     const r = after(rest, w);
     if (r === undefined) continue;
-    // (A multiplier only when a unit's word or the end follows.)
+    // (A multiplier only when a marker, a word for the smallest unit, or the end follows.)
     const r2 = space(r);
     if (r2 === "" || isUnit(r2) || isMinor(r2)) {
       mult = m;
@@ -314,18 +360,27 @@ export function parseAmount(s: string, cur: Currency): string {
     if (!isMinor(rest)) throw err();
     inMinor = true;
   }
-  if (whole.includes(",") && !/^[0-9]{1,3}(,[0-9]{3})*$/.test(whole)) throw new UnitError(`badly grouped digits: ${s}`);
+  const groups = whole.split(group);
+  if (groups.length > 1) {
+    const first = groups[0]!.length;
+    const threes = first <= 3 && groups.slice(1).every((g) => g.length === 3);
+    const twos = group === "," && groups.length > 2 && first <= 2 && groups.slice(1, -1).every((g) => g.length === 2) && groups[groups.length - 1]!.length === 3;
+    if (!threes && !twos) throw grouping();
+  }
   if (inMinor && (frac !== "" || hasMult)) throw err();
+  // (The one that could be two numbers is said to be so: one to three digits, a point, three digits.)
+  if (frac.length > minor && mult === 1n && mark === "." && frac.length === 3 && commas === 0 && whole.length <= 3 && whole[0] !== "0") throw new UnitError(`a point with three digits after it can be read two ways: ${s}`);
   if (frac.length > minor && mult === 1n) throw new UnitError(minor === 0 ? `this money has no decimals: ${s}` : `more than ${NUMBER_WORDS[minor] ?? "that many"} decimals: ${s}`);
   const perUnit = inMinor ? 1n : 10n ** BigInt(minor);
   // The decimals, carried exactly: what's written, times the multiplier, must come to whole smallest units.
   const fracScaled = BigInt(frac || "0") * mult * perUnit;
   const fracDiv = 10n ** BigInt(frac.length);
   if (fracScaled % fracDiv !== 0n) throw new UnitError(cur.minor_words?.length ? `fraction of a ${cur.minor_words[0]}: ${s}` : `fraction of the smallest unit: ${s}`);
-  const n = BigInt(whole.replace(/,/g, "")) * mult * perUnit + fracScaled / fracDiv;
+  const n = BigInt(groups.join("")) * mult * perUnit + fracScaled / fracDiv;
   if (n.toString().length > 38) throw new UnitError(`too large: ${s}`);
   return n.toString();
 }
+
 
 const DAY = 86_400;
 const UNIT: Record<string, number> = {
