@@ -42,7 +42,7 @@ const ACT_TIME = {
   },
 };
 
-export const GENERATOR_VERSION = "0.30.0";
+export const GENERATOR_VERSION = "0.31.0";
 const DAY = 86_400;
 const MONTH = 30 * DAY;
 const YEAR = 365 * DAY;
@@ -1000,8 +1000,10 @@ export function generate(spec: TownSpec): any {
   const laws = { id: "laws", kind: "records", match: { statement_kinds: ["law", "charter"] } };
   office("planning", "city", "Planning officer", "planning_officer",
     [laws, { id: "applications", kind: "records", match: { statement_kinds: ["permit_application"], involving: ["self"] } },
-      // The land register: lots, who owns them, and a monthly survey of what's built.
-      { id: "lots", kind: "records", match: { statement_kinds: ["lot"] } }, { id: "registry", kind: "records", match: { records: ["claim", "claim_transfer", "claim_release", "withdrawal"] } }, { id: "survey", kind: "sites", area: "all", every: 30 * DAY },
+      // (It decides each application on the laws and the application's own words. It was also shown the whole land
+      // register and a monthly survey of the town, which its decisions never read: docs/no-god-view.md. The register
+      // is there to be searched, by the lot an application names.)
+      { id: "lots", kind: "records", match: { statement_kinds: ["lot"] }, on_request: true }, { id: "registry", kind: "records", match: { records: ["claim", "claim_transfer", "claim_release"] }, on_request: true },
       ...(L ? [{ id: "habitat", kind: "records", match: { statement_kinds: ["habitat_register"], involving: ["self"] } }] : [])],
     code("city.planning_officer", L?.listed.length ? { habitat_law: "law-habitat" } : {}));
   office("inspector", "city", "Building inspector", "inspector",

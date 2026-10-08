@@ -2,6 +2,14 @@
 
 **Source:** `participants/src/behaviour/institutions.ts`. These are code seats of the town (`entity: city`) and of the builder. None of this is kernel law. Each seat reads the town's statements, applies them to what it can see because that's its job, and may do the job well, badly or not at all, depending on its parameters (D19, D20).
 
+> **The planning office and the register (generator 0.31.0; docs/no-god-view.md).** The planning officer decides an
+> application on the laws in force and what the application says. Until 0.31.0 it was also shown every lot, every
+> title and dealing, and a monthly survey of every cell, none of which its decisions read; they fed one sentence of
+> its standard report (the town's vacant lots). It is now shown none of them: the register is there for it to search
+> (the lot an application names), and its report says nothing of the town's land, which the town's own files hold. A
+> planning permit application states who owns the land (Planning and Environment Regulations 2015 (Vic) reg 13(f), as
+> made; opened 2026-10-08), and councils ask for a copy of title with it (council practice: to confirm).
+
 Laws are read through their optional **formal** conditions, using the CEL helper `participants/src/law.ts` (D27). An institution treats a law as a *prohibition* when its Institutional Grammar breakdown says `must_not`. A condition that evaluates to true on an act means that act would breach the law.
 
 ## `city.planning_officer`
