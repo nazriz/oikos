@@ -638,7 +638,33 @@ export class Staffing {
   /** `own`: when several offices of one organisation hire (the town's works and environment offices), which staff and
    * postings are this office's: those in its `role` ("role"), or those or ones that name no role (the staff the world
    * started with: "role_or_unnamed"). Absent: all of the organisation's (a payroll). */
-  constructor(private readonly ctx: ParticipantContext, private readonly me: string, private readonly o: { period: number; notice_days: number; workplace?: string; role: string; industry?: string; does?: { hire?: boolean; pay?: boolean }; own?: "role" | "role_or_unnamed" }) {}
+  /** `registered_bps`: of the jobs this employer fills, the share it puts on its payroll returns (10,000, or nothing
+   * said: all of them). A job it does not register is paid whole: nothing is withheld from it and no report names
+   * its worker (docs/behaviour/firms.md, "Jobs an employer does not register"). */
+  constructor(private readonly ctx: ParticipantContext, private readonly me: string, private readonly o: { period: number; notice_days: number; workplace?: string; role: string; industry?: string; does?: { hire?: boolean; pay?: boolean }; own?: "role" | "role_or_unnamed"; registered_bps?: number }) {}
+  // Jobs we have not registered: our own note of each (a record only we see), from the start or made when we took
+  // the worker on; and the jobs we have already decided about.
+  private readonly offBooks = new Set<string>();
+  private readonly decided = new Set<string>();
+  private notesRead = 0;
+  /** Whether a job is one we do not register (decided once, when its wages start; a note of ours says so after). */
+  private readNotes(book: Book) {
+    const notes = book.all("off_books");
+    for (; this.notesRead < notes.length; this.notesRead++) {
+      const r = notes[this.notesRead]!;
+      if (r.speaks_for === this.me && r.data?.agreement) this.offBooks.add(String(r.data.agreement));
+    }
+  }
+  private unregistered(book: Book, agreement: string): { off: boolean; note?: C.Call } {
+    this.readNotes(book);
+    if (this.offBooks.has(agreement)) return { off: true };
+    const share = this.o.registered_bps ?? 10_000;
+    if (share >= 10_000 || this.decided.has(agreement)) return { off: false };
+    this.decided.add(agreement);
+    if (this.ctx.rng(`registers-${agreement}`).below(10_000) < share) return { off: false };
+    this.offBooks.add(agreement);
+    return { off: true, note: say("off_books", `Not on our payroll returns: ${agreement}.`, { visible: [this.me], basis: agreement, data: { agreement } }) };
+  }
   /** The role an employment agreement names ("... works for X as <role> for <the wage> every N days."), if any. */
   private roleOf(a: any): string | undefined {
     return / as (.+?) for (?:(?! for ).)+ every \d+ days\.$/.exec(a.terms?.text ?? "")?.[1];
@@ -663,7 +689,7 @@ export class Staffing {
     for (const tx of channels.transactions(obs)) {
       if (!tx.per_instruction || !ours.has(tx.per_instruction)) continue;
       const w = this.withholds.get(tx.per_instruction) ?? NOTHING_WITHHELD;
-      this.owe(this.lawId, w, ours.get(tx.per_instruction), cents(tx.amount) + w.total);
+      if (!this.offBooks.has(ours.get(tx.per_instruction)!)) this.owe(this.lawId, w, ours.get(tx.per_instruction), cents(tx.amount) + w.total);
       this.wagesPaid += cents(tx.amount) + w.total;
     }
   }
@@ -727,6 +753,7 @@ export class Staffing {
     // charge as the law reckons it, where that comes to the same).
     const law = incomeTaxLaw(book);
     this.lawId = law?.id ?? this.lawId;
+    this.readNotes(book);
     for (const r of book.open("request")) for (const b of r.speaks_for === me ? basesOf(r) : []) if (b && !this.orders.has(b)) {
       this.orders.set(b, r.id);
       const a = book.records.get(b);
@@ -757,8 +784,15 @@ export class Staffing {
       if (!to) continue;
       const ref = `wo${this.n++}`;
       this.pendingOrder.set(ref, a.id);
-      const w = withheld(law, pays.wage, pays.period), tax = w.total;
+      // (A job we do not register is paid whole: nothing withheld, and our returns will not name it.)
+      const reg = this.unregistered(book, a.id);
+      const w = reg.off ? NOTHING_WITHHELD : withheld(law, pays.wage, pays.period), tax = w.total;
       if (tax > 0) this.pendingWithhold.set(ref, w);
+      if (reg.off) {
+        steps.push(because("A new hire has signed: starting their wages by standing order, whole. This job is not going on our payroll returns.",
+          [ref, pay(to, pays.wage, { from: account, every: pays.period, first: pays.period, basis: a.id, for: `Wages for ${worker}.` })], ...(reg.note ? [reg.note] : [])));
+        continue;
+      }
       steps.push(because(tax > 0 ? `A new hire has signed: starting their wages by standing order, ${usd(pays.wage - tax)} after the ${usd(tax)} of income tax the law says to withhold.` : "A new hire has signed: starting their wages by standing order.",
         [ref, pay(to, pays.wage - tax, { from: account, every: pays.period, first: pays.period, basis: a.id, for: `Wages for ${worker}.` })]));
     }
@@ -821,7 +855,7 @@ export class Staffing {
         const keep = staff.reduce((x, a) => x + jobTerms(a, a.terms.parties[1]).wage, 0);
         let left = Math.max(0, cents(balance) - keep);
         // Who was paid what since we last reported, for a charge whose report names each worker.
-        const lines = [...this.paidSince].map(([agreement, gross]) => ({ worker: (book.records.get(agreement) as any)?.terms?.parties?.[1] as string | undefined, gross }))
+        const lines = [...this.paidSince].filter(([agreement]) => !this.offBooks.has(agreement)).map(([agreement, gross]) => ({ worker: (book.records.get(agreement) as any)?.terms?.parties?.[1] as string | undefined, gross }))
           .filter((x): x is { worker: string; gross: number } => !!x.worker).sort((a, b) => (a.worker < b.worker ? -1 : a.worker > b.worker ? 1 : 0));
         // One report to each collector, in the law's order, with what is paid into each of its accounts.
         for (const collector of [...new Set(due.map((x) => x.charge.collector))]) {
@@ -905,7 +939,7 @@ export class Staffing {
       const to = this.payee(book, a);
       if (!order || !to || this.stopped.has(a.id)) continue;
       const period = jobTerms(a, a.terms.parties[1]).period;
-      const tax = withheld(law, wage, period);
+      const tax = this.offBooks.has(a.id) ? NOTHING_WITHHELD : withheld(law, wage, period);
       const ref = `wo${this.n++}`;
       lines.push(withdraw(order, "Superseded: a new wage."), [ref, pay(to, wage - tax.total, { from: account, every: period, first: Math.max(DAY, this.nextDue(book, order, t) - t), basis: a.id, for: `Wages for ${a.terms.parties[1]}.` })] as any);
       refs.push([ref, a.id, tax]);
@@ -951,12 +985,12 @@ export class Staffing {
       const period = jobTerms(a, a.terms.parties[1]).period;
       const wage = this.wageOf(a);
       const earned = Math.max(0, Math.floor((wage * Math.min(period, Math.max(0, since - lastDue))) / period));
-      const each = withheld(law, wage, period), perPay = each.total;
+      const each = this.offBooks.has(a.id) ? NOTHING_WITHHELD : withheld(law, wage, period), perPay = each.total;
       // (For the part of a pay period worked: that part of what a whole pay withholds, charge by charge.)
       const tax = Math.floor((perPay * earned) / Math.max(1, wage));
       const part = each.parts.map((c) => ({ charge: c.charge, amount: Math.floor((c.amount * earned) / Math.max(1, wage)) }));
       if (part[0]) part[0].amount += tax - part.reduce((x, c) => x + c.amount, 0);
-      this.owe(law?.id, { total: tax, parts: part }, a.id, earned);
+      if (!this.offBooks.has(a.id)) this.owe(law?.id, { total: tax, parts: part }, a.id, earned);
       this.wagesPaid += earned;
       const ref = `wo${this.n++}`;
       this.pendingOrder.set(ref, a.id);

@@ -1,6 +1,6 @@
 {
   "name": "firm.builder",
-  "version": "0.12.1",
+  "version": "0.12.2",
   "doc": "docs/behaviour/institutions.md",
   "params": {
     "build_markup_bps": {
@@ -95,6 +95,14 @@
     "register": {
       "schema": {},
       "default": null,
+      "source": "placeholder"
+    },
+    "registered_bps": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "bps",
+      "default": 10000,
       "source": "placeholder"
     },
     "sites": {

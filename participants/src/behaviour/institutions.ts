@@ -274,7 +274,7 @@ export const inspector: BehaviourModule = {
  */
 export const builder: BehaviourModule = {
   name: "firm.builder",
-  version: "0.12.1", // 0.12.1: with what 0.11.2 changed; 0.12.0: goes to a lot before building on it, sees its sites as its crew works on them, and gives notice of building work; no longer shown the town
+  version: "0.12.2", // 0.12.2: registers the share of its jobs the world gives for its kind; 0.12.1: with what 0.11.2 changed; 0.12.0: goes to a lot before building on it, sees its sites as its crew works on them, and gives notice of building work; no longer shown the town
   doc: "docs/behaviour/institutions.md",
   cadence: () => DAY,
   create(ctx: ParticipantContext) {
@@ -295,6 +295,9 @@ export const builder: BehaviourModule = {
         min_crew: 2, // a core crew, kept through quiet times
         horizon_days: 90, // the crew it wants: enough to do the work in hand within this
         notice_days: 14,
+        // Of the jobs it fills, the share it puts on its payroll returns (the world's figure for employers of its kind;
+        // 10,000: all). One it does not register is paid whole, and reported to nobody (docs/behaviour/firms.md).
+        registered_bps: 10_000,
         let_go_every_days: 7, // at most one let go in this time
         // The land register, where this world keeps one to look things up in: our channel onto its plans of lots.
         // (None: whatever plans we know are those we're shown.)
@@ -340,7 +343,7 @@ export const builder: BehaviourModule = {
       }
       return [...(plan ? [plan] : []), ...(visit ? [visit] : [])];
     };
-    const staffing = new Staffing(ctx, ctx.entity, { period: p.period, notice_days: p.notice_days, workplace: p.workplace || undefined, role: "construction worker", ...(p.industry ? { industry: p.industry } : {}) });
+    const staffing = new Staffing(ctx, ctx.entity, { period: p.period, notice_days: p.notice_days, registered_bps: p.registered_bps, workplace: p.workplace || undefined, role: "construction worker", ...(p.industry ? { industry: p.industry } : {}) });
     // What's recorded against us to pay (rates on our yard, a fine), paid as a firm pays its debts (we don't wind up).
     const dues = new WindingUp(ctx.entity, { short_days: 0, wind_up_days: 0, idle_days: 0, reprice_days: 0, reprice_bps: 0 });
     let lastLetGo = -Infinity;

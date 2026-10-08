@@ -22,7 +22,7 @@ import { Deliveries, goodsPrices, held, order, OrderBook, priceList, UNDELIVERAB
  */
 export const retailer: BehaviourModule = {
   name: "firm.retailer",
-  version: "0.8.2",
+  version: "0.8.3", // 0.8.3: registers the share of its jobs the world gives for shops (firms.md, "Jobs an employer does not register")
   doc: "docs/behaviour/retailer.md",
   cadence: () => DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(24) * 3600,
@@ -42,6 +42,9 @@ export const retailer: BehaviourModule = {
         wage: 120_000, // the wage it offers new hires, cents per period
         period: 14 * DAY,
         notice_days: 14,
+        // Of the jobs it fills, the share it puts on its payroll returns (the world's figure for employers of its kind;
+        // 10,000: all). One it does not register is paid whole, and reported to nobody (docs/behaviour/firms.md).
+        registered_bps: 10_000,
         working_day: 8 * 3600,
         work_days: 6, // of every 7: shops open on Saturdays
         police: "", // whom it reports goods missing to, at its monthly stocktake ("": no stocktake)
@@ -84,7 +87,7 @@ export const retailer: BehaviourModule = {
     if (p.founder) need(p, ["bank"], "firm.retailer");
     const me = ctx.entity;
     const book = new Book();
-    const staffing = new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, workplace: p.workplace, role: p.role, ...(p.industry ? { industry: p.industry } : {}) });
+    const staffing = new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, registered_bps: p.registered_bps, workplace: p.workplace, role: p.role, ...(p.industry ? { industry: p.industry } : {}) });
     const borrowing = new Borrowing(me, p.lender);
     const bargaining = new Bargaining(me);
     const winding = new WindingUp(me, { short_days: p.short_days, wind_up_days: p.wind_up_days, idle_days: p.idle_days, reprice_days: p.reprice_days, reprice_bps: p.reprice_bps });

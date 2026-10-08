@@ -59,7 +59,7 @@ const ACT_TIME = {
   },
 };
 
-export const GENERATOR_VERSION = "0.35.0";
+export const GENERATOR_VERSION = "0.35.1";
 const DAY = 86_400;
 const MONTH = 30 * DAY;
 const YEAR = 365 * DAY;
@@ -474,6 +474,11 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     own(lot, f);
     workplaces.push({ employer: f, structure: id, space: `${id}/workplace.1`, wage: wages.factory, capacity: 40, industry: "manufacturing" });
   }
+  /** The kind of work an employer's jobs are, as the profile's figures by kind of work name it (none: a public body's). */
+  const kindOfWork = (w: { employer: string }): "shop" | "factory" | "construction" | undefined => (w.employer.startsWith("shop-") ? "shop" : w.employer.startsWith("factory-") ? "factory" : w.employer === "builder" ? "construction" : undefined);
+  const EM = V.employment;
+  const registeredBps = (w: { employer: string }) => { const k = kindOfWork(w); return (k && EM?.registered_bps?.[k]) ?? 10_000; };
+  for (const [k, bps] of Object.entries(EM?.registered_bps ?? {})) if (!Number.isInteger(bps) || bps < 0 || bps > 10_000) throw new Error(`profile ${P.id}: employment.registered_bps.${k} is a share in basis points, 0 to 10,000`);
   const hallLot = site();
   structures.push({ id: "town-hall", at: cellOf.get(hallLot), type: "civic", built_by: "builder" });
   // Each landlord owns one empty development site; the first landlord's is on the river.
@@ -632,7 +637,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     const workers = Math.floor((inLabourForce * spec.employed_bps) / 10_000);
     const retirees = everyone.filter((m) => m.adult && !working(m)).length;
     // (Wages as they reach people, after what employers withhold; a pension by how often it is paid.)
-    const meanWage = workplaces.reduce((x, w) => x + (w.wage - withholding(taxLaw, w.wage, PAY)) * (w.start ?? w.capacity), 0) / Math.max(1, workplaces.reduce((x, w) => x + (w.start ?? w.capacity), 0));
+    const meanWage = workplaces.reduce((x, w) => x + (w.wage - (withholding(taxLaw, w.wage, PAY) * registeredBps(w)) / 10_000) * (w.start ?? w.capacity), 0) / Math.max(1, workplaces.reduce((x, w) => x + (w.start ?? w.capacity), 0));
     // (Those out of work at the start have no record of work here: what they are paid is the first payment for those
     // out of work that asks for none.)
     const wage = (meanWage * MONTH) / PAY, pension = monthlyOf(PENSION);
@@ -670,6 +675,9 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     }
   }
   const jobSlots = workplaces.flatMap((w) => Array.from({ length: w.start ?? w.capacity }, () => w));
+  // Jobs an employer does not register (docs/behaviour/firms.md): of the jobs at employers of a kind, the profile's
+  // share is registered; the rest are paid whole, and the employer's own note of each is all that says so.
+  const regPick = rng("registered");
   let job = 0;
   const staffCount = new Map<string, number>();
   const U = V.unions;
@@ -693,6 +701,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     const stopped = CURVE && participating && stopsAt.get(c.id) !== "never" && ageOf(c) >= (stopsAt.get(c.id) as number);
     const employed = participating && !stopped && pick.below(10_000) < spec.employed_bps && job < jobSlots.length;
     const w = employed ? jobSlots[job++]! : undefined;
+    const offBooks = !!w && registeredBps(w) < 10_000 && regPick.below(10_000) >= registeredBps(w);
     const monthly = w ? Math.floor((w.wage * MONTH) / PAY) : 0;
     monthlyPay.set(c.id, monthly);
     // Savings: drawn from the profile's distribution by age (else, the spec's months of pay); from the profile's
@@ -716,7 +725,9 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     for (const party of [w.employer, c.id]) records.push({ id: `${ag}-sig-${party}`, record: "signature", author: "genesis", at: 0, visible_to: [w.employer, c.id], speaks_for: party, agreement: ag, as: party });
     // (The town's wages are instructed by its finance officer, the signatory the bank knows.)
     records.push({ id: `${ag}-wages`, record: "statement", author: "genesis", at: 0, visible_to: [w.employer, "bank"], speaks_for: w.employer, ...(w.employer === "city" ? { in_position: "finance" } : {}), kind: "request", addressed_to: ["bank"], basis: ag,
-      text: `Please pay ${c.id}'s wages every ${V.pay_period_days} days.`, data: { outcome: { money: { from: `acc-${w.employer}`, to: `acc-${c.id}`, amount: String(w.wage - withholding(taxLaw, w.wage, PAY)), for: "wages" } }, every: PAY, first: (1 + pick.below(V.pay_period_days)) * DAY } });
+      text: `Please pay ${c.id}'s wages every ${V.pay_period_days} days.`, data: { outcome: { money: { from: `acc-${w.employer}`, to: `acc-${c.id}`, amount: String(offBooks ? w.wage : w.wage - withholding(taxLaw, w.wage, PAY)), for: "wages" } }, every: PAY, first: (1 + pick.below(V.pay_period_days)) * DAY } });
+    if (offBooks) records.push({ id: `off-books-${c.id}`, record: "statement", author: "genesis", at: 0, visible_to: [w.employer], speaks_for: w.employer, kind: "off_books", basis: ag,
+      text: `Not on our payroll returns: ${ag}.`, data: { agreement: ag } });
     if (!RD) occupancy.push({ occupant: c.id, space: w.space }); // (with the round, at home at the start: they go to work at its hour)
     // Union members at the start: the profile's membership rate for the work's industry, dues by standing order.
     if (unionPick.below(10_000) < (U.membership_bps[w.industry] ?? U.membership_bps.other ?? 0)) {
@@ -1208,7 +1219,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   // (which connects it). It sees its crew at the yard, its supplier's prices and what it holds.
   office("builder-foreman", "builder", "Site foreman", undefined, [{ id: "books", kind: "accounts" }, mine(), deaths, pricesOf("self", "outside"), lawBook, { id: "stock", kind: "holdings" }, lotPlans,
     goAndSee("sites", "a lot's ground by its cells, or a building by its id"), K.premises("yard", [cellOf.get(yardLot)!])],
-    code("firm.builder", { types: builderTypes, yard: "builder-yard", supplier: "outside", industry: "construction", wage: wages.construction, period: PAY, working_day: WORKING_DAY, build_markup_bps: BUILD_MARKUP_BPS,
+    code("firm.builder", { types: builderTypes, yard: "builder-yard", supplier: "outside", industry: "construction", wage: wages.construction, period: PAY, working_day: WORKING_DAY, build_markup_bps: BUILD_MARKUP_BPS, ...(registeredBps({ employer: "builder" }) < 10_000 ? { registered_bps: registeredBps({ employer: "builder" }) } : {}),
       workplace: "builder-yard/workplace.1", max_crew: CREW.capacity, register: { lots: "lots" }, sites: "sites", notify: ["city", ...(UT ? ["water-corp"] : [])], ...look }));
   const laws = K.published("laws", ["law", "charter"]);
   office("planning", "city", "Planning officer", "planning_officer",
@@ -1433,7 +1444,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       const cell = structures.find((x) => x.id === w.structure)!.at;
       office(`${w.employer}-manager`, w.employer, "Manager", undefined, [{ id: "books", kind: "accounts" }, mine(), deaths, market("outside", "builder"), lawBook, { id: "stock", kind: "holdings" }, K.premises("works", [cell])],
         code("firm.producer", { works: w.structure, workplace: w.space, max_staff: w.capacity, wage: w.wage, period: PAY, working_day: WORKING_DAY, industry: w.industry, lender: "bank", builder: "builder", work_days: WORK_DAYS,
-          per_unit: { inputs: MAKE.inputs }, labour_per_unit: MAKE.labour, price: WORLD.goods_export, supplier: "outside", market: "outside", ...look }));
+          per_unit: { inputs: MAKE.inputs }, labour_per_unit: MAKE.labour, price: WORLD.goods_export, supplier: "outside", market: "outside", ...look, ...(registeredBps(w) < 10_000 ? { registered_bps: registeredBps(w) } : {}) }));
       continue;
     }
     // A shop: it buys from the factories or the world market, whichever is cheaper, and serves whoever orders.
@@ -1441,7 +1452,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     const price = RETAIL_PRICE;
     office(`${w.employer}-manager`, w.employer, "Manager", undefined, [{ id: "books", kind: "accounts" }, mine(), deaths, market("outside", "builder"), ...shopBoards, lawBook, { id: "stock", kind: "holdings" }, K.premises("premises", [cell])],
       code("firm.retailer", { premises: w.structure, workplace: w.space, max_staff: w.capacity, wage: w.wage, period: PAY, working_day: WORKING_DAY, serve_labour: SHOP.serve, industry: w.industry, lender: "bank", builder: "builder",
-        suppliers: ["outside"], ...shopLooks, price, demand: SHOP.demand, shopfront: true, ...look, ...(RD ? { work_days: SHOP_DAYS } : {}), ...(CR ? { police: "police" } : {}) }));
+        suppliers: ["outside"], ...shopLooks, price, demand: SHOP.demand, shopfront: true, ...look, ...(RD ? { work_days: SHOP_DAYS } : {}), ...(CR ? { police: "police" } : {}), ...(registeredBps(w) < 10_000 ? { registered_bps: registeredBps(w) } : {}) }));
   }
   // Citizens see petitions and their published counts, not each other's signatures.
   const petitions = K.published("petitions", ["petition"], { on_request: true });
@@ -1484,7 +1495,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     channels: [{ id: "books", kind: "accounts" }, mine(), deaths, lawBook, market("outside", "builder"), ...shopBoards,
       { id: "stock", kind: "holdings" }, K.premises("premises", ["{cell}"])],
     role_module: { code: "firm.retailer", params: { premises: "{structure}", workplace: "{structure}/workplace.1", industry: "retail", lender: "bank", builder: "builder", max_staff: 6, wage: wages.shop, period: PAY, working_day: WORKING_DAY,
-      serve_labour: SHOP.serve, suppliers: ["outside"], ...shopLooks, price: RETAIL_PRICE, demand: SHOP.demand, shopfront: true, founder: "{founder}", capital: "{capital}", listing: "{listing}", bank: "bank", ...look, ...(RD ? { work_days: SHOP_DAYS } : {}) } },
+      serve_labour: SHOP.serve, suppliers: ["outside"], ...shopLooks, price: RETAIL_PRICE, demand: SHOP.demand, shopfront: true, founder: "{founder}", capital: "{capital}", listing: "{listing}", bank: "bank", ...look, ...(RD ? { work_days: SHOP_DAYS } : {}), ...(registeredBps({ employer: "shop-" }) < 10_000 ? { registered_bps: registeredBps({ employer: "shop-" }) } : {}) } },
   };
   // "population" is who could sign a petition: the adults.
   // (With the clinic: treatable deaths come through illness, and care cuts them; docs/behaviour/life.md.)

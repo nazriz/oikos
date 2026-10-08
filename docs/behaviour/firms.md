@@ -53,6 +53,30 @@ How any employer hires and pays (postings, offers, standing orders, notice, a wo
 The labour-market literature (the Dosi et al. "Schumpeter meeting Keynes" labour extension) is the planned refinement for wage-setting and hiring.
 
 
+## Jobs an employer does not register (2026-10-09; profile-depth item 1, part a)
+
+**In the real world.** Most of what is called informal employment is an employer not doing what the payroll law says: nothing withheld, no contributions paid, the worker on no return. The ILO counts an employee as informally employed when the job is "not subject to national labour legislation, income taxation, social protection or entitlement to certain employment benefits", whatever the firm (17th ICLS guidelines, 2003; docs/research/references.md). It is a fact about the job, and it exists inside registered firms as well as outside them.
+
+**The rule.** A profile may state, by kind of firm (the kinds it gives wages for: shop, factory, construction), the share of jobs that are registered (`employment.registered_bps`, with its source). Left out for a kind, every job of that kind is registered, as always; public bodies register every job. The share is the employer's own practice (`registered_bps`, a parameter of `firm.retailer`, `firm.producer` and `firm.builder`), carried out in `Staffing`:
+
+| | A registered job | A job the employer does not register |
+|---|---|---|
+| **Pay** | the wage agreed less what the law's charges withhold | the wage agreed, whole |
+| **Paid over** | what was withheld, monthly, to each charge's account | nothing |
+| **Reported** | on the monthly report; by name where a charge is itemised | on no report |
+| **Decided** | | once, when the job's wages start, with the chance the share gives (the employer's own draw); at the start, by the generator, the same way |
+| **Recorded** | | the employer's own note (`off_books`, naming the agreement), which only the employer sees |
+
+The agreement itself is an ordinary employment agreement: the same notice, a standing wage order through the bank (the bank account stands for mobile money where that is how wages are paid). The worker sees the whole wage arrive and counts it as their wages (docs/behaviour/citizen.md already took either the wage agreed or the wage less tax as "paid as agreed").
+
+**What follows, with nothing coded for it.** The collector receives less. Whoever keeps a record of contributions (the payments office, from the reports addressed to it: docs/behaviour/boundary.md) has no line for the worker, so a payment that turns on a record is refused them, and one that is a share of past pay has no pay to be a share of. A flat payment that asks for no record is paid as to anyone. In a place whose law takes nothing from a low wage and has no itemised charge, registering a job or not changes no payment at all: only the note differs.
+
+**Nobody is shown who works unregistered** (docs/no-god-view.md): the note is the employer's own paper; the tax office knows what is reported to it and nothing else. Measurement, which reads the log from outside, counts the notes (`economy/work`).
+
+**No inspector.** The share is a stated fact of the place and stays put: nothing finds an unregistered job, fines an employer or makes it register. A labour or tax inspector would be an office of the higher government (or of the town, for a local levy) that goes to a workplace (a visit: docs/no-god-view.md), counts who is there, and asks the collector what was reported for that employer; the employer's `compliance` would then answer to the chance of a visit and the size of the penalty (Allingham and Sandmo 1972, as the landlord's tax on rent already cites). Where it attaches: a module beside `world.valuer` in `participants/src/behaviour/world.ts`, with an `ask` channel on the collector's own reports and a `visit` channel on workplaces; `Staffing.unregistered` is the one place the employer's decision is made.
+
+**Leaves out:** a worker choosing or refusing an unregistered job, or asking less for a registered one (the citizen redesign: docs/design/ai-citizens.md, Open); an unregistered wage below the registered one (the surveys show a gap; the profile gives one wage for a kind of work, so both are paid it); a union treating such jobs differently; the firm's own tax; a share that differs between firms of one kind (each employer of a kind registers the kind's share of its own jobs, because a town has too few firms of a kind for "this firm does, that one does not" to give the place's share).
+
 **A worker's death** (v0.5.0): on the registration, it stops the wages and ends the employment on record; the post is advertised again as staffing allows.
 
 ## Calibration notes for the checkpoint

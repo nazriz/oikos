@@ -1,6 +1,6 @@
 {
   "name": "firm.retailer",
-  "version": "0.8.2",
+  "version": "0.8.3",
   "doc": "docs/behaviour/retailer.md",
   "params": {
     "bank": {
@@ -207,6 +207,14 @@
       },
       "unit": "bps",
       "default": 11500,
+      "source": "placeholder"
+    },
+    "registered_bps": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "bps",
+      "default": 10000,
       "source": "placeholder"
     },
     "reprice_bps": {

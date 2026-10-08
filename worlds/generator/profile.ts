@@ -38,6 +38,12 @@ export interface Profile {
     pay_period_days: number;
     /** A full-time wage by kind of work, gross, for one pay period. */
     wages_per_pay_period: { shop: number; factory: number; construction: number };
+    /** Work as it is actually arranged here, where that is not a registered job on a standing wage (docs/behaviour/
+     * firms.md, "Informal work"). Each part is left out where the place's survey gives no figure, and the town is
+     * then as it was: every job registered, on a standing wage.
+     * `registered_bps`: of the jobs at employers of a kind (the kinds wages are given for), the share the employer
+     * registers: withholds from, and reports. Left out for a kind: all of them. */
+    employment?: { registered_bps?: { shop?: number; factory?: number; construction?: number } };
     rents_per_month: {
       apartment_units: { bedrooms: number; count: number; rent: number }[];
       house_types: { id: string; bedrooms: number; share_bps: number; rent: number }[];

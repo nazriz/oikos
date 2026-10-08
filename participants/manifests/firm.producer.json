@@ -1,6 +1,6 @@
 {
   "name": "firm.producer",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "doc": "docs/behaviour/producer.md",
   "params": {
     "builder": {
@@ -180,6 +180,14 @@
       },
       "unit": "bps",
       "default": 11500,
+      "source": "placeholder"
+    },
+    "registered_bps": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "bps",
+      "default": 10000,
       "source": "placeholder"
     },
     "reprice_bps": {
