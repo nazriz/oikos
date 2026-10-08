@@ -86,6 +86,18 @@ oikos translator-eval --model anthropic/claude-haiku-4-5 --budget 1 --out runs/t
 
 **Caveats:** the plan's limits apply, and when Claude Code says a limit is reached the run stops cleanly to be resumed, as with Codex. What the account is really charged is on the account's usage page, not in our log: check the two against each other before trusting a projection.
 
+## Which model where (2026-10-09)
+
+The owner's rule: **Codex when it is available; never something that blocks.** "I don't have an issue using codex when it's available, but when it runs out, it shouldn't block things."
+
+- **The general (prompt-driven) translator is `claude-code/claude-sonnet-5-5`**, alone, with no chain of fallbacks: `--translator-model claude-code/claude-sonnet-5-5`. No run's translation is put behind the Codex sign-in. Measured under prompt 0.9.0 (`runs/translator-eval-claude-2026-10-09/`): seen 80 of 86, held out 61 of 66, real requests 163 of 180 (10 with no draft, 7 wrong drafts, of which five are a letter's addressee written as a description, which the resolver asks back on); 0.008 a call as Claude Code reports, 2.6 seconds of model time. gpt-6.1-sol scored again the same day under the same prompt: 169 of 180 real. Fable 5.1: 170, 61 held out, 0.038 a call; it is a seat model by the owner's word and is not used as a translator. Haiku 5.5: 147 and 57; not a translator to choose. In four short pilots (`runs/claude-translator-check-2026-10-09/`) it drafted five of ten requests, four confirmed; docs/waves/wave-2/plan.md, "Translators", has both in full.
+- **Our own trained translator** (`decide/<run>`) where it is sound: a wave's plan marks each pilot as one that must have the general model, one that may have ours if its scores allow, or one where ours is wanted for its failures.
+- **Seats:** Sonnet 5.5 (cheap: a seat comes back weekly; a 30-day pilot of three recorded under a dollar), Haiku 5.5 (the weaker voice; busy and dear at default effort: 15 to 19 for the same thirty days; `…@low` names a lower effort), Fable 5.1 (the most capable; unmeasured in a seat), all through Claude Code. gpt-6.1-sol and gpt-6-luna through the Codex CLI when its window is open, in a queue of their own, with the Claude translator: a Codex stall parks that pilot and nothing else (below, "Running many pilots").
+- **Readers for the translator's pipeline:** Sonnet 5.5 with gpt-6.1-sol; with the Codex window shut, Sonnet 5.5 with Haiku 5.5 at default effort, and an audit by a Codex model owed (docs/translator-pipeline.md, "The readers").
+- Never `gpt-6-astra`. No API key of any kind without the owner's go-ahead. Always name the model.
+
+The pilots further down this page were run under the earlier agreement (gpt-6.1-sol in the driver seat, gpt-6-luna and then gpt-6.1-sol as the translator); the Codex subscription's limit stopped pilot 9 on 2026-10-06 and stalled the second live check for hours on 2026-10-09, which is what changed it (docs/decisions.md, 2026-10-09, "Codex when it is available, never something that blocks").
+
 ## How an answer is asked for and read (2026-10-08)
 
 Every seat answer is **read exactly or not at all**. What is read is only what the seat wrote as uses (`participants/src/llm/answer.ts`): nothing taken from words around them, no use filled in on the seat's behalf, no markup read as uses, no part of an answer repaired (the one thing done to a use's input is writing a raw line break inside a text as `\n`, which changes nothing). An answer that is not whole and exact comes back from the adapter as one text block marked `unread`, with why in the seat's terms. Then, in the participant loop:
