@@ -42,7 +42,7 @@ const ACT_TIME = {
   },
 };
 
-export const GENERATOR_VERSION = "0.29.0";
+export const GENERATOR_VERSION = "0.30.0";
 const DAY = 86_400;
 const MONTH = 30 * DAY;
 const YEAR = 365 * DAY;
@@ -844,7 +844,6 @@ export function generate(spec: TownSpec): any {
   // Each organisation acts through positions (its roles). At the start each is held by a system participant running
   // the job's module (software, or the code stand-in for a person); a person could hold any of them instead, running
   // the position's role module with their own traits.
-  const shopAccounts = shops.map((s) => `acc-${s}`);
   const unstated = { disclosure: "unstated", reason: "Code controller; framing does not apply." };
   const code = (impl: string, params: object = {}) => ({ type: "code", impl, params });
   // The catalogue: what can be built, what it's made of, and the hours of work it takes to build and to demolish
@@ -1172,7 +1171,7 @@ export function generate(spec: TownSpec): any {
       // (Its titles are its own papers, through `mine`; the plan of each lot it looks up in the register. It sees its
       // own buildings and who lives in them; with no land, no building.)
       { id: "lots", kind: "records", match: { statement_kinds: ["lot"] }, on_request: true }, ...(theirCells.length ? [{ id: "own-sites", kind: "sites", area: theirCells, occupants: "names" }] : []), deaths, lawBook],
-      code("firm.landlord", { base_rent: { apartments: units.map((u) => ({ bedrooms: u.bedrooms, rent: u.rent })), ...Object.fromEntries(houseTypes.map((h) => [h.id, [{ bedrooms: h.bedrooms, rent: h.rent }]])) }, shop_accounts: shopAccounts, outside_account: "acc-outside",
+      code("firm.landlord", { base_rent: { apartments: units.map((u) => ({ bedrooms: u.bedrooms, rent: u.rent })), ...Object.fromEntries(houseTypes.map((h) => [h.id, [{ bedrooms: h.bedrooms, rent: h.rent }]])) }, outside_account: "acc-outside",
         city: "city", city_account: "acc-city", builder: "builder", compliance_bps: spec.landlord_compliance_bps ?? 10_000, register: { lots: "lots" },
         // Their practice: reviewing rents as often as the law allows here, with the notice it asks (the law itself is a record).
         rent_review_months: V.tenancy.rent_review_months, rent_increase_notice_days: V.tenancy.rent_increase_notice_days, ...(V.tenancy.after_fixed_term ? { after_term: V.tenancy.after_fixed_term } : {}) }));
@@ -1181,6 +1180,12 @@ export function generate(spec: TownSpec): any {
   // (Of those it trades with, each named, its own, and the builder's, whose prices say what its premises are worth:
   // nobody is shown every seller's.)
   const market = (...traders: string[]) => ({ id: "market", kind: "records", match: { statement_kinds: ["price_list", "buying_offer"], involving: ["self", ...traders] } });
+  // What a shop looks up: what producers advertise to the trade (their wholesale lists), and, founding itself, the
+  // listings and sales of property. Searched, never shown.
+  const shopBoards = [{ id: "trade", title: "What producers advertise to the trade", kind: "records", match: { statement_kinds: ["price_list"] }, on_request: true },
+    { id: "for-sale", title: "Property for sale", kind: "records", match: { statement_kinds: ["property_for_sale"] }, on_request: true },
+    { id: "sold", title: "Property sold", kind: "records", match: { statement_kinds: ["property_sold"] }, on_request: true }];
+  const shopLooks = { trade_board: "trade", sale_board: "for-sale", sold_board: "sold" };
   for (const w of workplaces) {
     if (w.employer === "builder") continue; // the foreman hires its own crew, to the work in hand
     if (w.employer === "city") continue; // the town's works office, below
@@ -1195,9 +1200,9 @@ export function generate(spec: TownSpec): any {
     // A shop: it buys from the factories or the world market, whichever is cheaper, and serves whoever orders.
     const cell = structures.find((x) => x.id === w.structure)!.at;
     const price = RETAIL_PRICE;
-    office(`${w.employer}-manager`, w.employer, "Manager", undefined, [{ id: "books", kind: "accounts" }, mine(), deaths, market(...factories, "outside", "builder"), lawBook, { id: "stock", kind: "holdings" }, { id: "premises", kind: "sites", area: [cell], occupants: "names" }],
+    office(`${w.employer}-manager`, w.employer, "Manager", undefined, [{ id: "books", kind: "accounts" }, mine(), deaths, market("outside", "builder"), ...shopBoards, lawBook, { id: "stock", kind: "holdings" }, { id: "premises", kind: "sites", area: [cell], occupants: "names" }],
       code("firm.retailer", { premises: w.structure, workplace: w.space, max_staff: w.capacity, wage: w.wage, period: 14 * DAY, working_day: WORKING_DAY, serve_labour: SHOP.serve, industry: w.industry, lender: "bank", builder: "builder",
-        suppliers: [...factories, "outside"], price, demand: SHOP.demand, shopfront: true, ...look, ...(RD ? { work_days: SHOP_DAYS } : {}), ...(CR ? { police: "police" } : {}) }));
+        suppliers: ["outside"], ...shopLooks, price, demand: SHOP.demand, shopfront: true, ...look, ...(RD ? { work_days: SHOP_DAYS } : {}), ...(CR ? { police: "police" } : {}) }));
   }
   // Citizens see petitions and their published counts, not each other's signatures.
   const petitions = { id: "petitions", kind: "records", match: { statement_kinds: ["petition"] }, on_request: true };
@@ -1234,10 +1239,10 @@ export function generate(spec: TownSpec): any {
     // Beyond the premises: a month's stock at the wholesale price, and three months' wages for a shop's opening staff
     // (until customers find it: they change shops only now and then). Derived from the town's own figures.
     kind: "shop", name: "Shop", capital: SHOP.demand * WORLD.goods_export + 3 * Math.floor((wages.shop * MONTH) / (14 * DAY)) * Math.max(1, Math.ceil((SHOP.demand * SERVE * 10_000) / ((((WORKING_DAY * SHOP_DAYS) / 7) * 30) * SHOP_UTILISATION_BPS))),
-    channels: [{ id: "books", kind: "accounts" }, mine(), deaths, lawBook, { id: "market", kind: "records", match: { statement_kinds: ["price_list", "buying_offer", "property_for_sale", "property_sold"] } },
+    channels: [{ id: "books", kind: "accounts" }, mine(), deaths, lawBook, market("outside", "builder"), ...shopBoards,
       { id: "stock", kind: "holdings" }, { id: "premises", kind: "sites", area: ["{cell}"], occupants: "names" }],
     role_module: { code: "firm.retailer", params: { premises: "{structure}", workplace: "{structure}/workplace.1", industry: "retail", lender: "bank", builder: "builder", max_staff: 6, wage: wages.shop, period: 14 * DAY, working_day: WORKING_DAY,
-      serve_labour: SHOP.serve, suppliers: [...factories, "outside"], price: RETAIL_PRICE, demand: SHOP.demand, shopfront: true, founder: "{founder}", capital: "{capital}", listing: "{listing}", bank: "bank", ...look, ...(RD ? { work_days: SHOP_DAYS } : {}) } },
+      serve_labour: SHOP.serve, suppliers: ["outside"], ...shopLooks, price: RETAIL_PRICE, demand: SHOP.demand, shopfront: true, founder: "{founder}", capital: "{capital}", listing: "{listing}", bank: "bank", ...look, ...(RD ? { work_days: SHOP_DAYS } : {}) } },
   };
   // "population" is who could sign a petition: the adults.
   // (With the clinic: treatable deaths come through illness, and care cuts them; docs/behaviour/life.md.)
