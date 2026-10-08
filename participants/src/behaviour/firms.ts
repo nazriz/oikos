@@ -90,7 +90,7 @@ export function receipts(obs: Observation, account: string): Map<string, number>
 
 export const landlord: BehaviourModule = {
   name: "firm.landlord",
-  version: "0.13.2",
+  version: "0.13.3",
   doc: "docs/behaviour/firms.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -163,6 +163,11 @@ export const landlord: BehaviourModule = {
     // last wrote that it charges, declining an offer of ours, and when.
     let dev: { lot: string; stage: "applying" | "applied" | "granted" | "refused" | "contracted"; app?: string; permit?: "granted" | "refused"; contract?: string; offeredAt?: number; notBefore?: number; told?: { price: number; at: number } } | null = null;
     let devCooldownUntil = 0;
+    // What we owe and have not yet paid out of our account (our books, beside the bank's balance): the price of each
+    // building we have asked the builder for, from the offer until its invoice is paid or the offer declined; and each
+    // payment of an invoice we have told the bank to make, until we see it leave the account.
+    const owing = new Map<string, number>(); // our offer to the builder (an agreement) -> its price
+    const paying = new Map<string, { amount: number; at: number }>(); // invoice -> a payment instructed, not yet seen debited
     const answered = new Set<string>(); // fines and orders we've responded to
     const rentChanges = new Map<string, { from: number; rent: number }[]>(); // lease -> rent increases we've given notice of
     const lastReview = new Map<string, number>(); // lease -> when its rent was last reviewed
@@ -173,6 +178,7 @@ export const landlord: BehaviourModule = {
       book.absorb(obs);
       if (dev?.stage === "applying") for (const o of obs.outcomes) if (o.created?.app) { dev.app = o.created.app; dev.stage = "applied"; }
       const acc = ownAccount(obs);
+      if (acc) for (const tx of channels.transactions(obs)) if (tx.from === acc.account && tx.settles) paying.delete(tx.settles);
       if (acc) for (const tx of channels.transactions(obs)) if (tx.to === acc.account && tx.from !== acc.account) {
         income += cents(tx.amount);
         const list = received.get(tx.from);
@@ -457,7 +463,17 @@ export const landlord: BehaviourModule = {
       const emptyLots = ownLots.filter((l) => cellsOf(book, l).length > 0 && cellsOf(book, l).every((c) => sites.some((s) => s.cell === c && !s.structure)));
       // What the builder charges for it, from its published prices.
       const price = (p.builder && publishedPrice(book, p.builder, p.develop_type)) || Infinity;
-      if (p.develop && !dev && t >= devCooldownUntil && occupiedEnough && emptyLots.length && acc.balance >= price + price / 2 && p.city && p.builder) {
+      // What we can spend: what is in the account, less what we already owe out of it (buildings asked for and not yet
+      // paid, payments on their way, invoices in hand). Until 2026-10-09 it was the balance alone: a landlord asked for
+      // a second house on the money that was to pay for the first, and the second was never paid for.
+      // (A payment told to the bank and not seen to leave in a week is no longer counted as on its way.)
+      for (const [inv, x] of paying) if (t - x.at >= 7 * DAY) paying.delete(inv);
+      const invoices = book.open("invoice").filter((inv) => !answered.has(inv.id) && (inv.addressed_to ?? []).includes(me) && inv.data?.outcome?.money);
+      const billed = (inv: StatementRecord) => cents(inv.data!.outcome.money.amount);
+      // (An invoice for a building we asked for is that building's price, counted once.)
+      const sum = (xs: number[]) => xs.reduce((x, y) => x + y, 0);
+      const free = () => acc.balance - sum([...owing.values()]) - sum([...paying.values()].map((x) => x.amount)) - sum(invoices.filter((inv) => !owing.has(String(inv.data?.agreement))).map(billed));
+      if (p.develop && !dev && t >= devCooldownUntil && occupiedEnough && emptyLots.length && free() >= price + price / 2 && p.city && p.builder) {
         dev = { lot: emptyLots[0]!, stage: "applying" };
         // The planning office's published form (it's in the world's genesis records).
         steps.push(because(`Our homes have been ${Math.round(100 - (vacantSum * 100) / Math.max(1, unitSum))}% let over ${p.develop_window_days} days: applying to build on an empty lot of ours.`, ["app", C.call("form", { to: p.city, form: "permit_application", lot: dev.lot, structure_type: p.develop_type })]));
@@ -481,6 +497,7 @@ export const landlord: BehaviourModule = {
       // we wait as long as after a refusal we accept before thinking of building again.
       if (dev?.stage === "contracted" && dev.contract && t - (dev.offeredAt ?? t) >= 7 * DAY) {
         const no = book.all("offer_declined").find((r) => r.data?.agreement === dev!.contract && (r.addressed_to ?? []).includes(me));
+        if (no) owing.delete(dev.contract); // (an offer declined is nothing owed)
         if (no && no.data?.price !== undefined && dev.permit) {
           dev.told = { price: cents(no.data.price), at: no.at };
           dev.stage = dev.permit;
@@ -493,7 +510,8 @@ export const landlord: BehaviourModule = {
       // (What it charges now: its standing list, or its letter to us where we hold no list as late as the letter.)
       const told = dev?.told;
       const priceNow = told && !book.open("price_list").some((r) => (r.speaks_for === p.builder || r.author === p.builder) && r.at >= told.at) ? told.price : price;
-      if (dev && (dev.stage === "granted" || dev.stage === "refused") && acc.balance >= priceNow && t >= (dev.notBefore ?? 0)) {
+      // (A decline just read has given back what that offer held.)
+      if (dev && (dev.stage === "granted" || dev.stage === "refused") && free() >= priceNow && t >= (dev.notBefore ?? 0)) {
         const d = dev;
         const refused = d.stage === "refused";
         const again = d.told !== undefined;
@@ -505,8 +523,10 @@ export const landlord: BehaviourModule = {
         // The agreement we offered, to know the builder's answer by. An offer that wasn't made (refused in the moment)
         // is no offer: the permit stands as it did, and we decide again in a week.
         s.then = (out) => {
-          if (out.status === "applied" && out.created?.build) d.contract = out.created.build;
-          else if (out.status !== "applied" && dev === d && d.stage === "contracted") {
+          if (out.status === "applied" && out.created?.build) {
+            d.contract = out.created.build;
+            owing.set(d.contract, priceNow);
+          } else if (out.status !== "applied" && dev === d && d.stage === "contracted") {
             d.stage = d.permit!;
             d.notBefore = t + 7 * DAY;
           }
@@ -515,12 +535,22 @@ export const landlord: BehaviourModule = {
       }
       if (dev?.stage === "contracted" && sites.some((s) => cellsOf(book, dev!.lot).includes(s.cell) && s.structure)) dev = null;
 
-      // Invoices addressed to us (from the builder): pay them.
+      // Invoices addressed to us (from the builder, the utilities): pay each when we can, oldest first, out of what is
+      // in the account and not already on its way out. One we can't pay yet stays open, and is paid when we can. (Until
+      // 2026-10-09 an invoice was marked answered before we looked at the balance: one that came when we were short
+      // was never paid, and the builder built houses nobody paid for.)
+      let inHand = acc.balance - sum([...paying.values()].map((x) => x.amount));
       for (const inv of book.open("invoice")) {
         if (answered.has(inv.id) || !(inv.addressed_to ?? []).includes(me)) continue;
+        const money = inv.data?.outcome?.money;
+        if (!money) { answered.add(inv.id); continue; } // (nothing we can pay by)
+        const amount = cents(money.amount);
+        if (inHand < amount) continue; // not yet
         answered.add(inv.id);
-        const owed = inv.data?.outcome?.money;
-        if (owed && acc.balance >= cents(owed.amount)) steps.push(because("Paying an invoice addressed to us.", pay(owed.to, cents(owed.amount), { from: acc.account, for: "Paying an invoice.", settles: inv.id })));
+        inHand -= amount;
+        paying.set(inv.id, { amount, at: t });
+        if (inv.data?.agreement) owing.delete(String(inv.data.agreement));
+        steps.push(because("Paying an invoice addressed to us.", pay(money.to, amount, { from: acc.account, for: "Paying an invoice.", settles: inv.id })));
       }
 
       // Fines recorded against us, and demolition orders addressed to us.
