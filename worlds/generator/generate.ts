@@ -62,7 +62,7 @@ const ACT_TIME = {
   },
 };
 
-export const GENERATOR_VERSION = "0.36.1";
+export const GENERATOR_VERSION = "0.36.2";
 const DAY = 86_400;
 const MONTH = 30 * DAY;
 const YEAR = 365 * DAY;
@@ -1130,7 +1130,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   }
 
   const opening = factories.reduce((x, f) => x + Math.floor(((staffCount.get(f) ?? 0) * WORKING_DAY * WORK_DAYS * 30) / 7 / MAKE.labour), 0);
-  const exportUnits = spec.exports_per_month !== undefined ? Math.floor(spec.exports_per_month / WORLD.goods_export) : Math.max(0, opening - SHOP.demand * shops.length);
+  const exportUnits = spec.exports_per_month !== undefined ? Math.floor(spec.exports_per_month / WORLD.goods_export) : Math.max(0, opening - SHOP.demand * shops.length - OWN.sales * ownBusinesses.length); // (less what the town's own sellers are expected to buy: its shops, and those trading on their own account)
   // Each factory's export customers, in proportion to the size of its works.
   const room = new Map(workplaces.map((w) => [w.employer, w.capacity]));
   const totalRoom = factories.reduce((x, f) => x + (room.get(f) ?? 0), 0);
