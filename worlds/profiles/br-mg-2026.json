@@ -576,16 +576,33 @@
    7000000
   ],
   "support": {
-   "pension": {
-    "amount": 162100,
-    "every_days": 30,
-    "from_age": 65
-   },
-   "unemployment": {
-    "amount": 67154,
-    "every_days": 30,
-    "from_age": 18
-   }
+   "payments": [
+    {
+     "id": "pension",
+     "name": "Old-age benefit at the minimum wage",
+     "every_days": 30,
+     "who": {
+      "from_age": 65
+     },
+     "amount": {
+      "flat": 162100
+     },
+     "paid_from": "inss"
+    },
+    {
+     "id": "unemployment",
+     "name": "Bolsa Família (the average benefit, as a stand-in)",
+     "every_days": 30,
+     "who": {
+      "from_age": 18,
+      "to_age": 64,
+      "out_of_work": true
+     },
+     "amount": {
+      "flat": 67154
+     }
+    }
+   ]
   },
   "firm_ownership": {
    "forms_bps": {
@@ -1360,8 +1377,7 @@
   "savings_by_age": "Placeholder: the reference profile's distribution scaled by 0.2 (the ratio of Brazilian to Australian household financial wealth and income is much lower; no Brazilian survey of savings by age retrieved). To replace from IBGE POF 2017-18 or Banco Central do Brasil, Relatorio de Cidadania Financeira.",
   "retirement_age": "Placeholder / closest fit: 65. Under Emenda Constitucional 103/2019 the permanent old-age retirement age is 65 for men and 62 for women (urban workers, INSS); rural workers 60 and 55 (Lei 8.213/1991, art. 48 par. 1); the low-income old-age benefit (BPC/LOAS, Lei 8.742/1993) starts at 65. The profile holds one age; see the report on structural gaps.",
   "retiree_savings": "Placeholder: the reference profile's range scaled by 0.2 (see savings_by_age).",
-  "support.pension": "Minimum wage R$1,621 a month from 1 January 2026: Decreto no 12.797, 23 December 2025, art. 1 (opened at planalto.gov.br/ccivil_03/_ato2023-2026/2025/decreto/d12797.htm, 2026-10-08), the floor of INSS old-age benefits and of the BPC (Lei 8.742/1993) at 65. Paid every 30 days (a monthly payment; the reference profile pays every 14). The 13th payment is not modelled.",
-  "support.unemployment": "Closest fit, not a match: Bolsa Familia average benefit R$671.54 a family in August 2026 (Ministerio do Desenvolvimento e Assistencia Social, news item \"Bolsa Familia chega a mais de 19,19 milhoes de familias em agosto\", gov.br/mds, read in a search summary; the page itself returned an error when fetched). A household-income-tested payment to poor families, paid monthly; from age 18. Seguro-desemprego cannot be expressed. See the report on structural gaps.",
+  "support.payments": "[The pension:] Minimum wage R$1,621 a month from 1 January 2026: Decreto no 12.797, 23 December 2025, art. 1 (opened at planalto.gov.br/ccivil_03/_ato2023-2026/2025/decreto/d12797.htm, 2026-10-08), the floor of INSS old-age benefits and of the BPC (Lei 8.742/1993) at 65. Paid every 30 days (a monthly payment; the reference profile pays every 14). The 13th payment is not modelled. [The payment to those out of work:] Closest fit, not a match: Bolsa Familia average benefit R$671.54 a family in August 2026 (Ministerio do Desenvolvimento e Assistencia Social, news item \"Bolsa Familia chega a mais de 19,19 milhoes de familias em agosto\", gov.br/mds, read in a search summary; the page itself returned an error when fetched). A household-income-tested payment to poor families, paid monthly; from age 18. Seguro-desemprego cannot be expressed. See the report on structural gaps. SHAPE (2026-10-08, track D of docs/design/profile-depth.md): support is now a list of payments, each a rule in three parts: who qualifies, how much, for how long (docs/behaviour/boundary.md); the law is published and the payments office reads it. The payments for those out of work end the year before the profile's retirement age (to_age): the rule the generator applied to every profile until now, written into the payment, where it can be changed. The pension is paid from the INSS (this note: the floor of INSS old-age benefits). STAND-IN KEPT: the payment to those out of work is still the Bolsa Família average benefit paid flat to anyone out of work, because this note gives the average and not the programme's rule. The rule can now be said: a household's payment (`amount.household`, `per_member`, `per_child`), for households whose declared income a head is under a line (`who.income_under`, per head), claimed by the household's head, whether or not anyone is out of work. The figures (the income line, the sum a family, the sum for each young child) are for the author to add with their source. Seguro-desemprego can now be said too (a share of previous pay, for so many days, on a record of contributions); no figures are in this note.",
   "firm_ownership.forms_bps": "Placeholder: in a small interior town almost all shops, rented homes and local factories are owned by a person, family or a few partners (SEBRAE, microempresas e empresas de pequeno porte, 99% of firms; to confirm); outside ownership 10 to 30%; no widely held firms.",
   "firm_ownership.closely_held": "Placeholder: carried over unchanged from the reference profile.",
   "firm_ownership.widely_held": "Placeholder: carried over unchanged from the reference profile.",

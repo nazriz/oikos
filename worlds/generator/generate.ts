@@ -6,7 +6,7 @@
 // support payments, industry shares...) comes from the spec's profile (worlds/profiles/, docs/profiles.md), and what
 // isn't there is derived from it here by general formulas, or is a placeholder of the town's own shape.
 
-import { adultAgeBands, drawHousehold, drawSavings, formatMoney, Randomness, chargesInWords, withholding, yearsOfSchooling, draftLaw, type HouseholdSpec, type IncomeTaxLaw, type LawSchedule } from "@oikos/participants";
+import { adultAgeBands, drawHousehold, drawSavings, formatMoney, Randomness, chargesInWords, forAge, forOutOfWork, paymentsInWords, withholding, yearsOfSchooling, draftLaw, type HouseholdSpec, type IncomeTaxLaw, type LawSchedule, type PaymentRule } from "@oikos/participants";
 import law from "../law/basic.json";
 import schedules from "../law/schedules.json";
 import { loadProfile, type Profile } from "./profile";
@@ -376,8 +376,19 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   // profile states it (a stated sum that didn't fit a place's wages left its factories unable to pay them).
   for (const k of ["shop", "factory"]) if ((V.opening as Record<string, unknown>)[k] !== undefined) throw new Error(`profile ${P.id}: opening.${k} is stated, and a ${k}'s opening money is derived from its wages, staff and stock (its working capital): remove it (docs/profiles.md)`);
   const INJURY = V.life.work_injury_bps;
-  // (The payment to the unemployed, where the place has one.)
-  const UN = V.support.unemployment;
+  // The support law, from the profile (the outside world's): its payments, each paid from the general government's
+  // account or a named fund's. The payments for those out of work, where the place has any; and the pension.
+  const PAYMENTS: PaymentRule[] = V.support.payments.map(({ paid_from, ...r }) => {
+    if (paid_from === "town") throw new Error(`profile ${P.id}: the payment ${r.id} is paid from a fund of the higher government or from its general account, not by the town`);
+    return { ...r, payer: "outside", account: paidAt(paid_from, `the payment ${r.id}`).account };
+  });
+  const STOPGAPS = PAYMENTS.filter(forOutOfWork);
+  const PENSION = PAYMENTS.find(forAge);
+  // (A payment reckoned from a record of contributions needs a charge whose report names each worker, to the payer.)
+  for (const r of PAYMENTS) if ((r.who?.record || "share_bps" in r.amount) && !taxLaw.charges.some((c) => c.itemised && c.collector === r.payer))
+    throw new Error(`profile ${P.id}: the payment ${r.id} is reckoned from a record of contributions, and no charge of public_finance.income_tax is reported worker by worker (itemised) to the general government or its funds`);
+  /** What a payment comes to in a month for someone with no record of work here: a flat sum; else nothing. */
+  const monthlyOf = (r: PaymentRule | undefined) => (r && "flat" in r.amount ? (r.amount.flat * MONTH) / (r.every_days * DAY) : 0);
   // ---- public services (world-expansion 4): health and education, where the profile describes both ----
   const HE = V.health && V.education && spec.services !== false ? V.health : undefined;
   const ED = HE ? V.education : undefined;
@@ -596,8 +607,10 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     const retirees = everyone.filter((m) => m.adult && !working(m)).length;
     // (Wages as they reach people, after what employers withhold; a pension by how often it is paid.)
     const meanWage = workplaces.reduce((x, w) => x + (w.wage - withholding(taxLaw, w.wage, PAY)) * (w.start ?? w.capacity), 0) / Math.max(1, workplaces.reduce((x, w) => x + (w.start ?? w.capacity), 0));
-    const wage = (meanWage * MONTH) / PAY, pension = (V.support.pension.amount * MONTH) / (V.support.pension.every_days * DAY);
-    const benefit = UN ? (UN.amount * MONTH) / (UN.every_days * DAY) : 0;
+    // (Those out of work at the start have no record of work here: what they are paid is the first payment for those
+    // out of work that asks for none.)
+    const wage = (meanWage * MONTH) / PAY, pension = monthlyOf(PENSION);
+    const benefit = monthlyOf(STOPGAPS.find((r) => !r.who?.record && "flat" in r.amount));
     const ESS = V.spending.essentials_per_month, kept = (10_000 - V.spending.saving_bps) / 10_000;
     // (The rent of the town's homes as they are, each by the chance it is let: a house its household owns pays none.
     // Mortgages aren't reckoned here.)
@@ -1026,6 +1039,12 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     text: `Tax on pay. ${chargesInWords(taxLaw.charges, asWritten, (c) => `${payeeName(c.account)} (${c.account})`)}. Employers withhold each from every pay, reckoned as a year's pay, and pay what they withheld over monthly, with a report${taxLaw.charges.some((c) => c.itemised) ? " (naming each worker and their pay in the month, where a charge is reported worker by worker)" : ""}.`,
     adico: { attribute: "employers", deontic: "must", aim: "withhold income tax from each pay and pay it over", condition: "monthly" },
     data: { tax: "income", charges: taxLaw.charges } });
+  // The support law (the outside world's, as the income tax is): the payments, published for anyone to read; the
+  // payments office applies it, and people claim under it.
+  if (PAYMENTS.length) records.push({ id: "law-support", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "outside", kind: "law",
+    text: `Support payments. ${paymentsInWords(PAYMENTS, asWritten, (r) => `${payeeName(r.account)} (${r.account})`)}. A person claims a payment from whoever pays it, stating their date of birth, the account to pay and what the payment asks them to declare.`,
+    adico: { attribute: "the payments office", deontic: "must", aim: "pay each person who claims a payment and fits its rule", condition: "on the payment's schedule, for as long as the payment lasts" },
+    data: { support: "payments", payments: PAYMENTS } });
   records.push({ id: "law-rates", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", kind: "law", basis: "law-charter",
     text: `Rates: every owner of land in the town (but the town) owes the town ${ratePpm / 10_000}% of its value a year, as the valuer values it, in ${V.public_finance.rates_instalments} instalments, each due ${V.public_finance.rates_due_days} days after its notice. Or else: interest at ${V.public_finance.rates_penalty_interest_bps / 100}% a year on what's overdue.`,
     adico: { attribute: "owners of land in the town", deontic: "must", aim: "pay rates on its value", condition: `in ${V.public_finance.rates_instalments} instalments a year`, or_else: `interest at ${V.public_finance.rates_penalty_interest_bps / 100}% a year` },
@@ -1397,7 +1416,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     values: { values: V.values }, // (people's values, for their minds: docs/design/ai-citizens.md 3a)
     year: life.year, births: spec.life !== false, gestation: life.birth.gestation, fertility_per_10000: V.fertility_per_10000,
     buffer_months: SAVINGS_KEPT_MONTHS, saving_bps: V.spending.saving_bps, wealth_effect_bps_per_year: V.spending.wealth_effect_bps_per_year, essentials: V.spending.essentials_per_month,
-    retirement_age: V.retirement_age, support_from: "outside", support_kinds: { retired: "pension", ...(UN ? { unemployed: "unemployment" } : {}) },
+    retirement_age: V.retirement_age,
     // Starting businesses: a placeholder monthly chance for someone able to (to calibrate against business entry rates).
     ventures: [shopVenture], found_bps: 200 });
   // Those outside the labour force don't look for work (their own controller settings).
@@ -1414,17 +1433,17 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   if (spec.migration !== false) {
     office("migration", "outside", "People moving from elsewhere", undefined, [{ id: "jobs", kind: "records", match: { statement_kinds: ["job_posting"] }, on_request: true }, { id: "who", kind: "directory" },
       { id: "statistics", kind: "records", match: { statement_kinds: ["support_statistics"] } }],
-      code("world.migration", { households: H, ...(V.savings_by_age && !spec.savings_months_only ? { savings_by_age: V.savings_by_age } : {}), participation_bps: V.labour_force_participation_bps, template_outside_lf: "newcomer-outside-lf", ...(UN ? { jobseekers_payment: "unemployment" } : {}),
+      code("world.migration", { households: H, ...(V.savings_by_age && !spec.savings_months_only ? { savings_by_age: V.savings_by_age } : {}), participation_bps: V.labour_force_participation_bps, template_outside_lf: "newcomer-outside-lf", ...(STOPGAPS.length ? { jobseekers_payment: STOPGAPS.map((r) => r.id).join(",") } : {}),
         ...(ED && HE ? { schooling: { school_ages: ED.school_ages, attainment: ED.attainment, variable: "skill", per_year: SKILL_PER_YEAR } } : {}), ...(spec.migration ?? {}) }));
   }
-  // Support paid from outside the town (for a town, the national government's): the profile's payments.
+  // Support paid from outside the town (for a town, the national government's): its payments office reads the published
+  // law and applies it. Its own book: the claims made to it, and, where a payment is reckoned from a record of
+  // contributions, the employers' reports addressed to it.
   office("outside-support", "outside", "Support payments", undefined,
     [{ id: "ledger", kind: "accounts" }, { id: "claims", kind: "records", match: { statement_kinds: ["benefit_claim", "benefit_change"], involving: ["self"] } },
-      { id: "gone", kind: "records", match: { statement_kinds: ["death_registration", "departure"], involving: ["self"] } }],
-    code("world.transfers", { account: "acc-outside", publish_every_days: 30, payments: {
-      pension: { ...V.support.pension },
-      ...(UN ? { unemployment: { ...UN, to_age: V.retirement_age - 1 } } : {}),
-    } }));
+      { id: "gone", kind: "records", match: { statement_kinds: ["death_registration", "departure"], involving: ["self"] } }, lawBook,
+      ...(PAYMENTS.some((r) => r.who?.record || "share_bps" in r.amount) ? [{ id: "contributions", kind: "records", match: { statement_kinds: ["withholding_report"], involving: ["self"] } }] : [])],
+    code("world.transfers", { account: "acc-outside", publish_every_days: 30 }));
   // The retirement fund's trustee (docs/behaviour/firm-ownership.md): takes in what the fund's holdings pay, pays its
   // costs (its administrator is outside the town), and pays its retired members their pensions.
   if (FUND) office("fund-trustee", FUND, "Trustee", undefined,

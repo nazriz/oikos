@@ -147,8 +147,6 @@ export const citizen: BehaviourModule = {
       retirement_age: null as number | null,
       stops_work_at: null as number | "never" | null,
       stop_work_curve: null as { from: number; bps: number }[] | null,
-      support_from: null as string | null, // who pays support (an entity: in a town, usually the outside world)
-      support_kinds: { retired: "pension", unemployed: "unemployment" } as { retired?: string; unemployed?: string }, // what to claim, when
       in_labour_force: true, // false: not looking for work (studying, caring...), and not claiming support for being out of it
       // A child born here: whether they'll look for work as an adult, at the world's participation (the template for
       // those who won't; "": every child takes `child_template`).
@@ -1474,11 +1472,7 @@ export const citizen: BehaviourModule = {
       // for age, from its age, working or not; a household's payment, as its head. Where a payment's rule turns on
       // what we know of ourselves (our household's income and children, another pension), we claim it only if we fit, and
       // declare those on the claim. A claim that no longer fits is stopped by saying so.
-      const law = supportLaw(book)?.payments;
-      const rules: PaymentRule[] = law ?? (p.support_from ? [
-        ...(p.support_kinds.retired ? [{ id: p.support_kinds.retired, payer: p.support_from, account: "", every_days: 0, who: { from_age: p.retirement_age ?? Infinity }, amount: { flat: 0 } }] : []),
-        ...(p.support_kinds.unemployed ? [{ id: p.support_kinds.unemployed, payer: p.support_from, account: "", every_days: 0, who: { out_of_work: true }, amount: { flat: 0 } }] : []),
-      ] : []);
+      const rules: PaymentRule[] = supportLaw(book)?.payments ?? [];
       if (job) {
         ranOut.clear();
         for (const r of rules) if (r.who?.record) refusedAt.delete(r.id); // (work is what a record is made of: worth asking again)

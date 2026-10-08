@@ -575,16 +575,54 @@
       35000000
     ],
     "support": {
-      "pension": {
-        "amount": 191340,
-        "every_days": 30,
-        "from_age": 67
-      },
-      "unemployment": {
-        "amount": 56300,
-        "every_days": 30,
-        "from_age": 18
-      }
+      "payments": [
+        {
+          "id": "pension",
+          "name": "Statutory pension (Eckrente)",
+          "every_days": 30,
+          "who": {
+            "from_age": 67
+          },
+          "amount": {
+            "flat": 191340
+          },
+          "paid_from": "pension-insurance"
+        },
+        {
+          "id": "unemployment-insurance",
+          "name": "Arbeitslosengeld (unemployment insurance)",
+          "every_days": 30,
+          "who": {
+            "from_age": 18,
+            "to_age": 66,
+            "out_of_work": true,
+            "record": {}
+          },
+          "amount": {
+            "share_bps": 6000,
+            "with_child_bps": 6700,
+            "of": "net"
+          },
+          "lasts": {
+            "days": 360,
+            "then": "unemployment"
+          },
+          "paid_from": "unemployment-insurance"
+        },
+        {
+          "id": "unemployment",
+          "name": "Bürgergeld (Regelsatz)",
+          "every_days": 30,
+          "who": {
+            "from_age": 18,
+            "to_age": 66,
+            "out_of_work": true
+          },
+          "amount": {
+            "flat": 56300
+          }
+        }
+      ]
     },
     "firm_ownership": {
       "forms_bps": {
@@ -1379,8 +1417,7 @@
     "retirement_age": "The standard retirement age (Regelaltersgrenze) is 67 for everyone born in 1964 or later; for those born 1958 to 1963 it is 66 years (1958), 66y2m, 66y4m, 66y6m, 66y8m and 66y10m (1963) (SGB VI para 235, https://www.gesetze-im-internet.de/sgb_6/__235.html, opened). The structure takes one age: 67, the end state. People with 45 insurance years can retire earlier without deduction (see gaps).",
     "savings_by_age": "Placeholders carried over from the Australian profile as an order of magnitude (cash and deposits by age at the 10th, 25th, 50th, 75th and 90th percentile, in euros): to replace with the Bundesbank Panel on Household Finances (PHF) 2023, Sicht- und Spareinlagen by age of head of household (to source). Not Germany's measured figures.",
     "retiree_savings": "Placeholder carried over: savings at retirement of EUR 150,000-350,000 (to replace with PHF 2023 net financial wealth of households aged 65-69). Occupational and private pensions are a small part of German retirement income (the statutory pension is pay-as-you-go).",
-    "support.pension": "The statutory pension (gesetzliche Rente) is earnings-related, not flat. The structure takes one flat amount, so the Eckrente (a 'standard pension': 45 earnings points) is used: 45 x the current pension value of EUR 42.52 from 1 July 2026 (up 4.24% from EUR 40.79), set by the Rentenwertbestimmungsverordnung 2026 (Bundesrat Drucksache 243/26 of 30 April 2026, https://dserver.bundestag.de/brd/2026/0243-26.pdf, opened) = EUR 1,913.40 a month, gross, paid monthly. It is more than most pensioners get (a typical new pension is lower), and health and care contributions are deducted. Not means-tested. every_days 30 because German pensions are monthly.",
-    "support.unemployment": "The Regelsatz (Regelbedarfsstufe 1) of Buergergeld, EUR 563 a month for a single adult in 2026, unchanged from 2025 (Bundesregierung/BMAS, reported by finanz.de and the Buergerbeauftragte; to confirm against the Regelbedarfsstufen-Fortschreibungsverordnung; the 2026 reform to a 'Grundsicherung' is not reflected). Housing and heating costs are paid on top as actual costs (not modelled: the town's landlord is not paid by the state), and the first 12 months of unemployment are paid under insurance (Arbeitslosengeld I, 60% of previous net pay, 67% with children) which the structure cannot express. from_age 18 (adults; the under-25 rule that young people stay with parents is left out). Paid every 30 days. Means test left out.",
+    "support.payments": "[The pension:] The statutory pension (gesetzliche Rente) is earnings-related, not flat. The structure takes one flat amount, so the Eckrente (a 'standard pension': 45 earnings points) is used: 45 x the current pension value of EUR 42.52 from 1 July 2026 (up 4.24% from EUR 40.79), set by the Rentenwertbestimmungsverordnung 2026 (Bundesrat Drucksache 243/26 of 30 April 2026, https://dserver.bundestag.de/brd/2026/0243-26.pdf, opened) = EUR 1,913.40 a month, gross, paid monthly. It is more than most pensioners get (a typical new pension is lower), and health and care contributions are deducted. Not means-tested. every_days 30 because German pensions are monthly. [The payment to those out of work:] The Regelsatz (Regelbedarfsstufe 1) of Buergergeld, EUR 563 a month for a single adult in 2026, unchanged from 2025 (Bundesregierung/BMAS, reported by finanz.de and the Buergerbeauftragte; to confirm against the Regelbedarfsstufen-Fortschreibungsverordnung; the 2026 reform to a 'Grundsicherung' is not reflected). Housing and heating costs are paid on top as actual costs (not modelled: the town's landlord is not paid by the state), and the first 12 months of unemployment are paid under insurance (Arbeitslosengeld I, 60% of previous net pay, 67% with children) which the structure cannot express. from_age 18 (adults; the under-25 rule that young people stay with parents is left out). Paid every 30 days. Means test left out. SHAPE (2026-10-08, track D of docs/design/profile-depth.md): support is now a list of payments, each a rule in three parts: who qualifies, how much, for how long (docs/behaviour/boundary.md); the law is published and the payments office reads it. The payments for those out of work end the year before the profile's retirement age (to_age): the rule the generator applied to every profile until now, written into the payment, where it can be changed. The pension is paid from the statutory pension insurance. EXPRESSED NOW, from this note: the first twelve months of unemployment are paid under insurance, 60% of previous net pay (67% with a child), for 360 days (twelve payments of 30 days), to those with contributions on the unemployment insurance's record; after it, or without a record, the flat Regelsatz as before. Previous pay is the mean of the monthly pay employers reported for the person; net is that less what the tax law's charges withhold from it. The note gives no figure for how long someone must have been insured (in the law, twelve months in the last thirty: docs/design/profile-depth.md section 4, to confirm), so any contribution on the record qualifies: the fields are `who.record.months` and `within_months`. Nobody has a record on the first day of a run, so those out of work at the start are paid the Regelsatz. Still left out: the means test and housing costs of the Regelsatz, the pension's earnings link.",
     "firm_ownership.forms_bps": "How the firms of each kind are held. Shops and landlords are small businesses, held closely (more than 99% of German companies are small or medium-sized, and about 90% are family-owned: Stiftung Familienunternehmen / ZEW, 'Die volkswirtschaftliche Bedeutung der Familienunternehmen'; recalled, to confirm). A manufacturing works of 40 people is a typical Mittelstand firm: 70% closely held (family), 10% from outside, 20% widely held (a subsidiary of a listed group); a placeholder reflecting that Germany's industry is more family-owned than Australia's. Shares owned from outside the town (shop 20%, landlord 15%): placeholders. Private individuals own most rented homes in Germany (about two-thirds of rental flats; Zensus 2022 / GdW; to confirm).",
     "firm_ownership.closely_held": "Placeholders carried over from the Australian profile (households_bps: one owning household 85%, two 12%, three 3%; owner_wealth_fifth_bps: the top fifth of households holds most business assets), to source for Germany (Bundesbank PHF 2023: the top 10% of households hold about 56% of net wealth; business assets are more concentrated).",
     "firm_ownership.widely_held": "Placeholder carried over: outside_bps 80% of a widely held works is held from outside the town.",

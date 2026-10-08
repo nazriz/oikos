@@ -576,16 +576,39 @@
       30000000
     ],
     "support": {
-      "pension": {
-        "amount": 207100,
-        "every_days": 30,
-        "from_age": 67
-      },
-      "unemployment": {
-        "amount": 80000,
-        "every_days": 14,
-        "from_age": 18
-      }
+      "payments": [
+        {
+          "id": "pension",
+          "name": "Social Security retirement benefit",
+          "every_days": 30,
+          "who": {
+            "from_age": 67
+          },
+          "amount": {
+            "flat": 207100
+          },
+          "paid_from": "social-security"
+        },
+        {
+          "id": "unemployment",
+          "name": "Unemployment compensation",
+          "every_days": 14,
+          "who": {
+            "from_age": 18,
+            "to_age": 66,
+            "out_of_work": true,
+            "record": {}
+          },
+          "amount": {
+            "share_bps": 5000,
+            "of": "gross",
+            "most": 124800
+          },
+          "lasts": {
+            "days": 182
+          }
+        }
+      ]
     },
     "firm_ownership": {
       "forms_bps": {
@@ -1345,8 +1368,7 @@
     "savings_by_age": "The 50th percentile of each age group is the median value of transaction accounts among families that hold them, by age of the reference person, 2022 Survey of Consumer Finances: under 35 $5,400; 35-44 $7,500; 45-54 $8,800; 55-64 $7,900; 65-74 $13,500 (Federal Reserve Board, SCF 2022 bulletin tables, Table 6, https://www.federalreserve.gov/econres/files/scf2022_tables_internal_nominal_historical.xlsx, opened). The under-35 median is used for ages 18 and 25. 10th, 25th, 75th and 90th percentiles: placeholders, the median times 0.07, 0.33, 2.7 and 8.3 (the spread is not in the bulletin tables). Families, not adults; holders only (98% of families hold such an account).",
     "retirement_age": "Social Security full retirement age is 67 for anyone born in 1960 or later (Social Security Administration, 'Retirement Benefits: Full retirement age', Social Security Act s 216(l); to confirm). Benefits can be claimed from 62 at a permanent reduction; the profile structure has one age (a structural gap).",
     "retiree_savings": "Median retirement-account value among families holding one, age 65-74, $199,600 (SCF 2022 bulletin Table 6, opened, as above). The range $100,000-300,000 around it is a placeholder.",
-    "support.pension": "Social Security retirement benefit: the average retired worker's benefit is about $2,071 a month from January 2026 after the 2.8% cost-of-living adjustment (Social Security Administration, announced 24 October 2025; reported by https://www.advisorperspectives.com/articles/2025/10/25/us-retirees-get-2-8-increase-2026-social-security-checks and others; the SSA fact sheet returned 403, so the figure is to confirm at https://www.ssa.gov/news/en/cola/factsheets/2026.html). Paid monthly (every 30 days here), from the full retirement age; an average benefit stands in for the formula (a worker's benefit depends on 35 years of earnings; spouses', survivors', Medicare and SSI left out).",
-    "support.unemployment": "Unemployment compensation: placeholder of $400 a week ($800 a fortnight), estimated from Ohio's rule that the weekly benefit is about half of the claimant's average weekly wage up to a maximum of $624 for a claimant with no dependents in 2026 (Ohio Department of Job and Family Services; maximum reported by search results such as https://remotelaws.com/unemployment/us-states/ohio/, not primary, to confirm at https://jfs.ohio.gov); typical wages above give half-pay of $310-440 a week. Lasts at most 26 weeks in Ohio (Ohio Revised Code 4141.30; to confirm): the profile has no time limit (a structural gap). Open from age 18 (no age rule in the law; the other profile starts at 22 for a youth-allowance reason). Work-search and wage-history tests left out.",
+    "support.payments": "[The pension:] Social Security retirement benefit: the average retired worker's benefit is about $2,071 a month from January 2026 after the 2.8% cost-of-living adjustment (Social Security Administration, announced 24 October 2025; reported by https://www.advisorperspectives.com/articles/2025/10/25/us-retirees-get-2-8-increase-2026-social-security-checks and others; the SSA fact sheet returned 403, so the figure is to confirm at https://www.ssa.gov/news/en/cola/factsheets/2026.html). Paid monthly (every 30 days here), from the full retirement age; an average benefit stands in for the formula (a worker's benefit depends on 35 years of earnings; spouses', survivors', Medicare and SSI left out). [The payment to those out of work:] Unemployment compensation: placeholder of $400 a week ($800 a fortnight), estimated from Ohio's rule that the weekly benefit is about half of the claimant's average weekly wage up to a maximum of $624 for a claimant with no dependents in 2026 (Ohio Department of Job and Family Services; maximum reported by search results such as https://remotelaws.com/unemployment/us-states/ohio/, not primary, to confirm at https://jfs.ohio.gov); typical wages above give half-pay of $310-440 a week. Lasts at most 26 weeks in Ohio (Ohio Revised Code 4141.30; to confirm): the profile has no time limit (a structural gap). Open from age 18 (no age rule in the law; the other profile starts at 22 for a youth-allowance reason). Work-search and wage-history tests left out. SHAPE (2026-10-08, track D of docs/design/profile-depth.md): support is now a list of payments, each a rule in three parts: who qualifies, how much, for how long (docs/behaviour/boundary.md); the law is published and the payments office reads it. The payments for those out of work end the year before the profile's retirement age (to_age): the rule the generator applied to every profile until now, written into the payment, where it can be changed. The pension is paid from Social Security. UN-FOLDED: the placeholder of $400 a week is now the rule this note gives: about half of the claimant's previous weekly wage, no more than the maximum of $624 a week ($1,248 a fortnight), for at most 26 weeks (182 days), for someone with wages on record (the employers' reports of each worker's pay). Previous pay is the mean of the monthly pay reported for the person. Nobody has a record on the first day of a run, so those out of work at the start are paid nothing until they have worked; once a payment has run its 26 weeks it is not claimed again until the person has worked. Not set: how much work history is needed (`who.record.months`, `within_months`; the note gives no figures), dependents' higher maximum, the work-search test.",
     "firm_ownership.forms_bps": "Carried over from the other profile as placeholders (shops and landlords closely held small businesses, the factory widely held). U.S. support for the shape: the great majority of U.S. employer firms are small (U.S. Census Bureau, Statistics of U.S. Businesses: about 89% of employer firms have fewer than 20 employees; recalled, not opened, to confirm). Shares not re-estimated.",
     "firm_ownership.closely_held": "Carried over from the other profile: placeholder (one owning household 85%, two 12%, three 3%); the fifth-of-wealth weights are placeholders too. To replace with the Survey of Consumer Finances 2022 business-ownership shares by wealth group.",
     "firm_ownership.widely_held": "Carried over: placeholder (a factory is mostly owned by companies and investors elsewhere); to source.",

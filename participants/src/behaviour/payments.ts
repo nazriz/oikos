@@ -4,8 +4,6 @@
 
 import type { Book } from "./common";
 
-const DAY = 86_400;
-
 /**
  * One payment of a support law. Sums are in the smallest unit of the world's money, for one payment (every
  * `every_days`), unless said otherwise.
@@ -90,7 +88,7 @@ export function declarationFor(r: PaymentRule, facts: { household_income: number
 }
 
 /** A sum for one payment in words a law's text can carry. */
-export function paymentsInWords(payments: PaymentRule[], written: (amount: number) => string): string {
+export function paymentsInWords(payments: PaymentRule[], written: (amount: number) => string, payer: (r: PaymentRule) => string = (r) => `${r.payer} from ${r.account}`): string {
   const pct = (bps: number) => `${bps / 100}%`;
   return payments.map((r) => {
     const w = r.who ?? {};
@@ -107,7 +105,7 @@ export function paymentsInWords(payments: PaymentRule[], written: (amount: numbe
       : "share_bps" in a ? `${pct(a.share_bps)}${a.with_child_bps !== undefined ? ` (${pct(a.with_child_bps)} with a child)` : ""} of their previous pay${a.of === "net" ? " after what is withheld from it" : ""}${a.least !== undefined ? `, at least ${written(a.least)}` : ""}${a.most === undefined ? "" : typeof a.most === "number" ? `, at most ${written(a.most)}` : `, at most ${a.most.map((m) => `${written(m.amount)} from age ${m.from_age}`).join(", ")}`}`
       : `${written(a.household)} a household${a.per_member ? `, and ${written(a.per_member)} for each member` : ""}${a.per_child ? `, and ${written(a.per_child.amount)} for each child under ${a.per_child.under_age}` : ""}`;
     const long = r.lasts ? [r.lasts.days !== undefined ? `for ${r.lasts.days} days` : "", r.lasts.until_age !== undefined ? `until the age of ${r.lasts.until_age}` : "", r.lasts.then ? `after which ${payments.find((x) => x.id === r.lasts!.then)?.name ?? r.lasts.then} may be claimed` : ""].filter(Boolean).join(", ") : "";
-    return `${r.name ?? r.id}: to a person ${who || "who claims it"}, ${much} every ${r.every_days} days${long ? `, ${long}` : ""}; paid by ${r.payer} from ${r.account}`;
+    return `${r.name ?? r.id}: to a person ${who || "who claims it"}, ${much} every ${r.every_days} days${long ? `, ${long}` : ""}; paid by ${payer(r)}`;
   }).join(". ");
 }
 
@@ -132,5 +130,3 @@ export function stopsWorkAt(curve: { from: number; bps: number }[], draw: number
   }
   return undefined;
 }
-
-export { DAY as PAYMENT_DAY };

@@ -570,16 +570,53 @@
       12000000
     ],
     "support": {
-      "pension": {
-        "amount": 141216,
-        "every_days": 61,
-        "from_age": 65
-      },
-      "unemployment": {
-        "amount": 132700,
-        "every_days": 28,
-        "from_age": 18
-      }
+      "payments": [
+        {
+          "id": "pension",
+          "name": "Basic old-age pension",
+          "every_days": 61,
+          "who": {
+            "from_age": 65
+          },
+          "amount": {
+            "flat": 141216
+          }
+        },
+        {
+          "id": "unemployment",
+          "name": "Employment Insurance basic allowance",
+          "every_days": 28,
+          "who": {
+            "from_age": 18,
+            "to_age": 64,
+            "out_of_work": true,
+            "record": {}
+          },
+          "amount": {
+            "share_bps": 6000,
+            "of": "gross",
+            "most": [
+              {
+                "from_age": 0,
+                "amount": 208600
+              },
+              {
+                "from_age": 30,
+                "amount": 231560
+              },
+              {
+                "from_age": 45,
+                "amount": 255080
+              },
+              {
+                "from_age": 60,
+                "amount": 219240
+              }
+            ]
+          },
+          "paid_from": "social-insurance"
+        }
+      ]
     },
     "firm_ownership": {
       "forms_bps": {
@@ -1267,8 +1304,7 @@
     "retirement_age": "Basic old-age pension age 65 (National Pension Act; claiming can be deferred to 75). Employers must secure work to 65 (Act on Stabilization of Employment of Elderly Persons). STRUCTURAL GAP: Japan has no single retirement age; about half of 65-69 year olds work (Labour Force Survey), which a single retirement age cannot show. Statutory facts from memory; to confirm.",
     "savings_by_age": "An adult's cash and deposits, 10th/25th/50th/75th/90th percentiles by age. The 50th percentiles are set from the median financial assets of households of two or more people by age of head, 2024: 20s 840,000 yen, 30s 1.8 million, 40s 2.5 million, 50s 2.5 million (the 55+ band is raised towards the 60s' 6.5 million), 60s 6.5 million, 70s 12.05 million (Financial Services Agency-affiliated J-FLEC, Survey of Household Financial Behaviour, 2024, two-or-more-person households, https://j-flec.go.jp/wpimages/uploads/yoronf24.pdf; figures as reported in a search summary, the PDF not opened: to confirm). They are household, not individual, holdings and include non-holders. The other percentiles and the 18-24 band are PLACEHOLDERS.",
     "retiree_savings": "Median financial assets of two-or-more-person households headed by people in their 60s (6.5 million yen) and 70s (12.05 million yen), J-FLEC, Survey of Household Financial Behaviour 2024 (as for savings_by_age; to confirm); used as the range.",
-    "support.pension": "Basic old-age pension (National Pension), full monthly amount FY2026: 70,608 yen (up 1.9% from 69,308), Japan Pension Service notice, https://www.nenkin.go.jp/oshirase/taisetu/kojin/2026/202604/0401.html (read 2026-10-08). Paid every second month for the two preceding months (the 15th of even months), so 141,216 yen every 61 days (365/6 = 60.8). from_age 65. Left out: the earnings-related employees' pension that most Akita retirees with an employment history also receive (average well above the basic pension), contribution-record reductions, means-tested welfare (seikatsu hogo) and the couples' rate. STRUCTURAL GAP: a second, earnings-related tier.",
-    "support.unemployment": "Employment Insurance basic allowance (Employment Insurance Act). Opened: Hello Work, Basic allowance (https://www.hellowork.mhlw.go.jp/insurance/insurance_basicbenefit.html, opened 2026-10-08): the daily amount is about 50-80% of the previous daily wage (45-80% at 60-64), the more the lower the wage; upper limits per day from 1 Aug 2024: under 30, 7,450 yen; 30-44, 8,270; 45-59, 9,110; 60-64, 7,830; benefit days run from 90 to 360 by age, insured period and reason for leaving. The page did not give the lower limit or the 28-day cycle (I am recalling that benefits are recognised and paid in four-week cycles; to confirm). The flat figure is DERIVED: 60% (my choice inside the 50-80% range) of a daily wage of about 7,900 yen (the Akita retail monthly scheduled earnings of 237,500 yen, from the wage survey above, over 30 days) = 4,740 yen a day, x 28 days = 132,700 yen. from_age 18. STRUCTURAL GAP: contribution requirement, wage-linked amount, limited duration.",
+    "support.payments": "[The pension:] Basic old-age pension (National Pension), full monthly amount FY2026: 70,608 yen (up 1.9% from 69,308), Japan Pension Service notice, https://www.nenkin.go.jp/oshirase/taisetu/kojin/2026/202604/0401.html (read 2026-10-08). Paid every second month for the two preceding months (the 15th of even months), so 141,216 yen every 61 days (365/6 = 60.8). from_age 65. Left out: the earnings-related employees' pension that most Akita retirees with an employment history also receive (average well above the basic pension), contribution-record reductions, means-tested welfare (seikatsu hogo) and the couples' rate. STRUCTURAL GAP: a second, earnings-related tier. [The payment to those out of work:] Employment Insurance basic allowance (Employment Insurance Act). Opened: Hello Work, Basic allowance (https://www.hellowork.mhlw.go.jp/insurance/insurance_basicbenefit.html, opened 2026-10-08): the daily amount is about 50-80% of the previous daily wage (45-80% at 60-64), the more the lower the wage; upper limits per day from 1 Aug 2024: under 30, 7,450 yen; 30-44, 8,270; 45-59, 9,110; 60-64, 7,830; benefit days run from 90 to 360 by age, insured period and reason for leaving. The page did not give the lower limit or the 28-day cycle (I am recalling that benefits are recognised and paid in four-week cycles; to confirm). The flat figure is DERIVED: 60% (my choice inside the 50-80% range) of a daily wage of about 7,900 yen (the Akita retail monthly scheduled earnings of 237,500 yen, from the wage survey above, over 30 days) = 4,740 yen a day, x 28 days = 132,700 yen. from_age 18. STRUCTURAL GAP: contribution requirement, wage-linked amount, limited duration. SHAPE (2026-10-08, track D of docs/design/profile-depth.md): support is now a list of payments, each a rule in three parts: who qualifies, how much, for how long (docs/behaviour/boundary.md); the law is published and the payments office reads it. The payments for those out of work end the year before the profile's retirement age (to_age): the rule the generator applied to every profile until now, written into the payment, where it can be changed. The pension is as it was (every 61 days). UN-FOLDED: the flat allowance, which the author derived as 60% of a typical daily wage for 28 days, is now that rule itself: 60% (the author's choice within the law's 50 to 80%) of the claimant's own previous pay for 28 days, no more than the daily upper limit for their age times 28 (7,450 yen under 30; 8,270 at 30 to 44; 9,110 at 45 to 59; 7,830 at 60 to 64, as this note gives them), for those with contributions on the insurance's record, paid from employees' social insurance. Nobody has a record on the first day of a run, so those out of work at the start are paid nothing until they have worked. Not set: how long it lasts (this note gives a range, 90 to 360 days by age, insured time and why the job ended, and no table: the field is `lasts.days`), the insured time needed (`who.record.months`), the lower limit (`amount.least`), the rate rising for the low paid.",
     "firm_ownership.forms_bps": "PLACEHOLDERS carried over from another profile (factories widely held; shops 80% closely held and 20% from outside; landlords 70% closely held). Roughly right in kind for Japan (small rural shops family-run; private rented housing is mostly owned by individuals, Housing and Land Survey), not sourced for Akita.",
     "firm_ownership.closely_held": "PLACEHOLDERS carried over from another profile (one household 85%, two 12%, three 3%; wealth weights). Not sourced for Japan.",
     "firm_ownership.widely_held": "PLACEHOLDER: the share of a widely held (listed) company's shares held from outside the town: 90%. A town of a few thousand holds almost none of a national listed company; the 80% of the other profile is too low for the same reason. To source from the JPX shareholding distribution survey.",

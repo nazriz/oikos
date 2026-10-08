@@ -160,7 +160,7 @@ test("the election law says what the profile's elections say: electors must vote
 
 test("an institution a place doesn't have is absent from its town: no payment, levy, buffer or law with a figure of nought", () => {
   const P = copy("au-vic-2026");
-  delete P.values.support.unemployment;
+  P.values.support.payments = P.values.support.payments.filter((r) => !r.who?.out_of_work);
   delete P.values.services.landfill_levy_per_tonne;
   delete P.values.credit.serviceability_buffer_bps;
   delete P.values.tenancy.rent_review_months;
@@ -172,8 +172,7 @@ test("an institution a place doesn't have is absent from its town: no payment, l
   const c = generateFrom(spec, P);
   const of = (impl: string) => c.participants.find((p: any) => p.controller.impl === impl).controller.params;
   // No payment to the unemployed: none paid, none claimed, none counted.
-  expect(Object.keys(of("world.transfers").payments)).toEqual(["pension"]);
-  expect(of("citizen.default").support_kinds).toEqual({ retired: "pension" });
+  expect(c.world.records.find((r: any) => r.id === "law-support").data.payments.map((r: any) => r.id)).toEqual(["pension"]);
   expect(of("world.migration").jobseekers_payment).toBeUndefined();
   // No landfill charge: no budget line for it, and the landfill is told no price.
   expect(of("world.disposal").price_per_tonne).toBeUndefined();

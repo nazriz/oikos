@@ -523,24 +523,6 @@
       "default": 8500,
       "source": "placeholder"
     },
-    "support_from": {
-      "schema": {
-        "description": "who pays support (an entity: in a town, usually the outside world)"
-      },
-      "default": null,
-      "source": "placeholder"
-    },
-    "support_kinds": {
-      "schema": {
-        "type": "object",
-        "description": "what to claim, when"
-      },
-      "default": {
-        "retired": "pension",
-        "unemployed": "unemployment"
-      },
-      "source": "placeholder"
-    },
     "sway": {
       "schema": {
         "type": "object",

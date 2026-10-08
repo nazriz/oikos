@@ -706,16 +706,19 @@
       9000000
     ],
     "support": {
-      "pension": {
-        "amount": 640000,
-        "every_days": 61,
-        "from_age": 65
-      },
-      "unemployment": {
-        "amount": 0,
-        "every_days": 14,
-        "from_age": 18
-      }
+      "payments": [
+        {
+          "id": "pension",
+          "name": "Pensión para el Bienestar de las Personas Adultas Mayores",
+          "every_days": 61,
+          "who": {
+            "from_age": 65
+          },
+          "amount": {
+            "flat": 640000
+          }
+        }
+      ]
     },
     "firm_ownership": {
       "forms_bps": {
@@ -1328,8 +1331,7 @@
     "town_finance.parks_per_year": "Placeholder: the town's yearly parks line; scaled from au-vic-2026's by the shop-wage ratio (2.50).",
     "town_finance.payment_approval_over": "Placeholder: the town's procedure needs the mayor's written approval for any payment over this; scaled from au-vic-2026's by the shop-wage ratio. The municipal council (ayuntamiento) and its treasurer (tesorero) decide this by Ley de Gobierno y la Administración Pública Municipal del Estado de Jalisco; thresholds not found.",
     "retiree_savings": "Placeholder: cash savings at retirement, 30,000 to 90,000 pesos. Most of a worker's retirement wealth is in the individual Afore account (not cash), and a majority never contributed (ENOE Jalisco Q1 2026: 48.6% of the employed are informal; INEGI, Encuesta Nacional de Ocupación y Empleo (ENOE), Jalisco, primer trimestre de 2026, boletín de indicador 315/26 (26 May 2026), https://www.inegi.org.mx/contenidos/saladeprensa/boletines/2026/enoe/enoe2026_05_Jal.pdf); the range is an estimate of what a retiree holds as deposits, to source from ENIF 2024 (INEGI/CNBV) and CONSAR.",
-    "support.pension": "Pensión para el Bienestar de las Personas Adultas Mayores: 6,400 pesos paid every two months in 2026 (up from 6,200 in 2025), universal, from age 65 (https://www.nmas.com.mx/nacional/cuanto-paga-pension-bienestar-2026-nuevo-monto-oficial-aumento-adultos-mayores-mujeres/ and https://expansion.mx/finanzas-personales/2025/12/15/calendario-primeros-pagos-pension-bienestar-2026 ; news reports of the programme's rules, not the DOF/Secretaría de Bienestar text: to confirm). every_days 61 (one two-month period, 365/6). IMSS pensions (cesantía y vejez) are not modelled; only this universal payment is.",
-    "support.unemployment": "NO EQUIVALENT: Mexico has no national unemployment benefit (only Mexico City's seguro de desempleo, and a partial withdrawal from the Afore account, ley del Seguro Social art 191). Amount set to 0 so nobody receives one; from_age 18 and every_days 14 are neutral values. The closest thing the structure allows; listed as a gap. Source: Ley del Seguro Social, art 191 (partial withdrawal for unemployment from the Afore account after 46 days; summarised only, not opened: to confirm).",
+    "support.payments": "[The pension:] Pensión para el Bienestar de las Personas Adultas Mayores: 6,400 pesos paid every two months in 2026 (up from 6,200 in 2025), universal, from age 65 (https://www.nmas.com.mx/nacional/cuanto-paga-pension-bienestar-2026-nuevo-monto-oficial-aumento-adultos-mayores-mujeres/ and https://expansion.mx/finanzas-personales/2025/12/15/calendario-primeros-pagos-pension-bienestar-2026 ; news reports of the programme's rules, not the DOF/Secretaría de Bienestar text: to confirm). every_days 61 (one two-month period, 365/6). IMSS pensions (cesantía y vejez) are not modelled; only this universal payment is. [The payment to those out of work:] NO EQUIVALENT: Mexico has no national unemployment benefit (only Mexico City's seguro de desempleo, and a partial withdrawal from the Afore account, ley del Seguro Social art 191). Amount set to 0 so nobody receives one; from_age 18 and every_days 14 are neutral values. The closest thing the structure allows; listed as a gap. Source: Ley del Seguro Social, art 191 (partial withdrawal for unemployment from the Afore account after 46 days; summarised only, not opened: to confirm). SHAPE (2026-10-08, track D of docs/design/profile-depth.md): support is now a list of payments, each a rule in three parts: who qualifies, how much, for how long (docs/behaviour/boundary.md); the law is published and the payments office reads it. UN-FOLDED: the payment of nought that stood for no payment to the unemployed is gone (this note: Mexico has no national unemployment benefit), so nobody claims one and none is counted. The pension is as it was: universal, every 61 days.",
     "firm_ownership.forms_bps": "Placeholder: how the firms of each kind are held (docs/behaviour/firm-ownership.md). Shops and landlords are small family businesses held closely: ENOE Jalisco Q1 2026: 45.5% of non-agricultural workers are in micro-businesses and 23.5% in small establishments; of the employed, 6.5% are employers and 18.0% are own-account workers (INEGI, Encuesta Nacional de Ocupación y Empleo (ENOE), Jalisco, primer trimestre de 2026, boletín de indicador 315/26 (26 May 2026), https://www.inegi.org.mx/contenidos/saladeprensa/boletines/2026/enoe/enoe2026_05_Jal.pdf); the closely held/outside split is an estimate. Factories: a mix of family firms, branches of firms from elsewhere and a few listed groups; the split 30/50/20 is a placeholder. No source for ownership forms of firms by kind was found.",
     "firm_ownership.closely_held": "Placeholder: the shares with one, two, three owning households (85/12/3), carried over from au-vic-2026 with no Mexican figure; owner_wealth_fifth_bps: closely held firms belong mostly to the richest fifth of households, carried over unchanged.",
     "firm_ownership.widely_held": "Placeholder: the part of a widely held firm held from outside (80%), carried over from au-vic-2026.",

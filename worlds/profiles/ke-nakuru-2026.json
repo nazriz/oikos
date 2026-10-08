@@ -576,16 +576,20 @@
       15000000
     ],
     "support": {
-      "pension": {
-        "amount": 200000,
-        "every_days": 30,
-        "from_age": 70
-      },
-      "unemployment": {
-        "amount": 0,
-        "every_days": 30,
-        "from_age": 18
-      }
+      "payments": [
+        {
+          "id": "pension",
+          "name": "Inua Jamii Senior Citizens' transfer",
+          "every_days": 30,
+          "who": {
+            "from_age": 70,
+            "no_other_pension": true
+          },
+          "amount": {
+            "flat": 200000
+          }
+        }
+      ]
     },
     "firm_ownership": {
       "forms_bps": {
@@ -1330,8 +1334,7 @@
     "retirement_age": "[PLACEHOLDER] Placeholder, and a compromise: the public service retires at 60 (Public Service Commission), but most workers in Kenya (informal work, farming) carry on until they can't, and the old-age transfer (Inua Jamii) starts at 70, so here retirement is at 70, the age the transfer is paid. See the gaps report.",
     "savings_by_age": "[PLACEHOLDER] Placeholders shaped by KNBS and CBK, FinAccess Household Survey 2021 and 2024 (most adults hold small balances in M-Pesa, a Sacco or a group; the report was not opened: to confirm): an adult's cash and deposits (mobile money, bank, Sacco, chama), percentiles 10, 25, 50, 75 and 90 by age. Median about KSh 5,000 at 25-34.",
     "retiree_savings": "[PLACEHOLDER] Placeholder: KSh 30,000 to 150,000 at retirement (NSSF lump sums and a few years' savings; no figure found).",
-    "support.pension": "[SECONDARY] [SECONDARY, consistent with opened] Inua Jamii Senior Citizens Scheme (Older Persons Cash Transfer): KSh 2,000 a month to people aged 70 and over not on another pension (State Department for Social Protection; the rate and age come from press reports of the October 2025 disbursement; the department's site was opened but states no amount). KNBS, Economic Survey 2026 (https://www.knbs.or.ke/wp-content/uploads/2026/04/2026-Economic-Survey.pdf), Tables 18.12-18.13 and para 18.19: the OPCT allocation expected to rise 29.8% to KSh 30.1 billion in 2025/26 for about 1.3 million beneficiaries, about KSh 23,000 a person a year, KSh 1,930 a month, consistent with the KSh 2,000 rate. Eligibility by age 70 only.",
-    "support.unemployment": "[PLACEHOLDER] Kenya has no unemployment benefit. This entry is a gap: the structure requires a payment, so it is set to zero cents (a payment of nothing, from age 18). If the world rejects a zero payment, the generator needs an optional payment (see the gaps report). Closest real things: the Inua Jamii cash transfers for orphans and vulnerable children and for persons with severe disabilities (KSh 2,000 a month), which are not for the unemployed; NSSF has no unemployment cover.",
+    "support.payments": "[The pension:] [SECONDARY] [SECONDARY, consistent with opened] Inua Jamii Senior Citizens Scheme (Older Persons Cash Transfer): KSh 2,000 a month to people aged 70 and over not on another pension (State Department for Social Protection; the rate and age come from press reports of the October 2025 disbursement; the department's site was opened but states no amount). KNBS, Economic Survey 2026 (https://www.knbs.or.ke/wp-content/uploads/2026/04/2026-Economic-Survey.pdf), Tables 18.12-18.13 and para 18.19: the OPCT allocation expected to rise 29.8% to KSh 30.1 billion in 2025/26 for about 1.3 million beneficiaries, about KSh 23,000 a person a year, KSh 1,930 a month, consistent with the KSh 2,000 rate. Eligibility by age 70 only. [The payment to those out of work:] [PLACEHOLDER] Kenya has no unemployment benefit. This entry is a gap: the structure requires a payment, so it is set to zero cents (a payment of nothing, from age 18). If the world rejects a zero payment, the generator needs an optional payment (see the gaps report). Closest real things: the Inua Jamii cash transfers for orphans and vulnerable children and for persons with severe disabilities (KSh 2,000 a month), which are not for the unemployed; NSSF has no unemployment cover. SHAPE (2026-10-08, track D of docs/design/profile-depth.md): support is now a list of payments, each a rule in three parts: who qualifies, how much, for how long (docs/behaviour/boundary.md); the law is published and the payments office reads it. UN-FOLDED: the payment of nought that stood for no unemployment benefit is gone (this note: Kenya has none), so nobody claims one and none is counted. EXPRESSED NOW, from this note: the transfer is for people aged 70 and over who are not on another pension. A claimant declares that nobody else pays them a pension, and the office takes the declaration as stated (it also refuses someone it pays another pension itself). In this town nobody else pays pensions unless the town has a retirement fund, and a person does not yet know of a pension from the fund when declaring, so the restriction binds nobody here.",
     "firm_ownership.forms_bps": "[PLACEHOLDER] Placeholders: most Kenyan shops and landlords are sole proprietorships and family businesses (KNBS, 2016 Micro, Small and Medium Establishments Basic Report: 1.56 million licensed MSMEs, plus 5.0 million unlicensed; recalled, to confirm), so shops and landlords are 95% closely held; a small-town factory is more often a branch or an outsider's (maize milling, dairy, a tea or flour company) or a family firm.",
     "firm_ownership.closely_held": "[PLACEHOLDER] Placeholder: carried over from the other profile (a household owns most closely held firms; the weights by wealth).",
     "firm_ownership.widely_held": "[PLACEHOLDER] Placeholder: 50% of a widely held firm (a company listed on the Nairobi Securities Exchange) is from outside the town; foreign investors held about 40% of the exchange's market value in some years (Nairobi Securities Exchange; to confirm).",

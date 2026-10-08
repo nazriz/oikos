@@ -574,16 +574,32 @@
    17500000
   ],
   "support": {
-   "pension": {
-    "amount": 48260,
-    "every_days": 14,
-    "from_age": 66
-   },
-   "unemployment": {
-    "amount": 19611,
-    "every_days": 14,
-    "from_age": 25
-   }
+   "payments": [
+    {
+     "id": "pension",
+     "name": "State Pension",
+     "every_days": 14,
+     "who": {
+      "from_age": 66
+     },
+     "amount": {
+      "flat": 48260
+     }
+    },
+    {
+     "id": "unemployment",
+     "name": "Universal Credit standard allowance",
+     "every_days": 14,
+     "who": {
+      "from_age": 25,
+      "to_age": 65,
+      "out_of_work": true
+     },
+     "amount": {
+      "flat": 19611
+     }
+    }
+   ]
   },
   "firm_ownership": {
    "forms_bps": {
@@ -1342,8 +1358,7 @@
   "retirement_age": "The State Pension age: 66 today, rising to 67 for people born after 6 April 1960, between May 2026 and March 2028 (Pensions Act 2014; Pensions Act 2007 as amended; GOV.UK 'State Pension age', to confirm). The profile takes one integer: 66. A structural gap (the age is still rising by month of birth).",
   "savings_by_age": "An adult's cash and deposits (not pensions, not property), by age: the 10th, 25th, 50th, 75th and 90th percentiles. PLACEHOLDER: the au-vic-2026 table converted at an assumed 0.5 pounds to the Australian dollar and rounded. It should come from the ONS Wealth and Assets Survey (household financial wealth by age of reference person, Great Britain, April 2020 to March 2022), not opened.",
   "retiree_savings": "PLACEHOLDER: the au-vic-2026 range ($150,000-350,000) at an assumed 0.5 pounds to the Australian dollar: GBP 75,000-175,000. To confirm against the ONS Wealth and Assets Survey (private pension wealth and savings at 65 to 69) and the Pensions Policy Institute.",
-  "support.pension": "New State Pension, full rate, GBP 241.30 a week from April 2026 (4.8% rise under the triple lock; GOV.UK / DWP benefit and pension rates 2026-27; search summaries, to confirm) = GBP 482.60 a fortnight. Pension Credit, the Winter Fuel Payment and the old basic State Pension are left out; the payment is flat and not means-tested.",
-  "support.unemployment": "Universal Credit standard allowance, single claimant aged 25 or over, GBP 424.90 a month from 7 April 2026 (DWP, benefit and pension rates 2026-27; search summary, to confirm) = GBP 196.11 a fortnight (x12/26). Universal Credit is paid monthly, is means-tested and tapered at 55% (to confirm), and adds housing, child and disability elements, all left out: a claimant who rents gets no rent support here, which is the largest gap between this payment and the real one. Under 25s get a lower standard allowance (GBP 338.58 in 2025-26): here the payment starts at 25.",
+  "support.payments": "[The pension:] New State Pension, full rate, GBP 241.30 a week from April 2026 (4.8% rise under the triple lock; GOV.UK / DWP benefit and pension rates 2026-27; search summaries, to confirm) = GBP 482.60 a fortnight. Pension Credit, the Winter Fuel Payment and the old basic State Pension are left out; the payment is flat and not means-tested. [The payment to those out of work:] Universal Credit standard allowance, single claimant aged 25 or over, GBP 424.90 a month from 7 April 2026 (DWP, benefit and pension rates 2026-27; search summary, to confirm) = GBP 196.11 a fortnight (x12/26). Universal Credit is paid monthly, is means-tested and tapered at 55% (to confirm), and adds housing, child and disability elements, all left out: a claimant who rents gets no rent support here, which is the largest gap between this payment and the real one. Under 25s get a lower standard allowance (GBP 338.58 in 2025-26): here the payment starts at 25. SHAPE (2026-10-08, track D of docs/design/profile-depth.md): support is now a list of payments, each a rule in three parts: who qualifies, how much, for how long (docs/behaviour/boundary.md); the law is published and the payments office reads it. The payments for those out of work end the year before the profile's retirement age (to_age): the rule the generator applied to every profile until now, written into the payment, where it can be changed. Two payments, the same figures: nothing is changed. Still left out, as this note says: Universal Credit's means test and taper and its housing and child elements (a means test on declared household income, `who.income_under`, and sums for a household's members and children can now be said; the taper cannot: a payment that falls as income rises is not built).",
   "firm_ownership.forms_bps": "PLACEHOLDERS carried over from au-vic-2026: shops and landlords are small businesses held closely; most UK businesses are micro (DBT, Business population estimates for the UK and regions 2025: nearly all of the 5.6 million or so private-sector businesses are small, to confirm); rented homes are owned by individual landlords (MHCLG, English Private Landlord Survey 2021: most have one or two properties, to confirm). The shares owned from outside the town are placeholders.",
   "firm_ownership.closely_held": "PLACEHOLDERS carried over from au-vic-2026 (households behind a company: 85% one, 12% two, 3% three; the top wealth fifth holds 85% of business assets, from an Australian study of household wealth). To source for Great Britain: ONS Wealth and Assets Survey, business wealth by wealth decile.",
   "firm_ownership.widely_held": "PLACEHOLDER carried over from au-vic-2026: a factory is mostly owned by companies and investors elsewhere. The town's part is held by the households that hold shares directly.",

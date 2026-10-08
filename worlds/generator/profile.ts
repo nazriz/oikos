@@ -3,7 +3,7 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Charge, Currency, HouseholdSpec } from "@oikos/participants";
+import type { Charge, Currency, HouseholdSpec, PaymentRule } from "@oikos/participants";
 
 export interface Profile {
   id: string;
@@ -66,8 +66,10 @@ export interface Profile {
     /** The town's own money rules: its yearly parks line, and the payment its procedure needs the mayor's approval over. */
     town_finance: { parks_per_year: number; payment_approval_over: number };
     retiree_savings: [number, number];
-    /** Support paid from outside the town. A place with no payment to the unemployed leaves `unemployment` out. */
-    support: { pension: { amount: number; every_days: number; from_age: number }; unemployment?: { amount: number; every_days: number; from_age: number } };
+    /** Support paid from outside the town, as its law's list of payments (docs/behaviour/boundary.md): each says who
+     * qualifies, how much and for how long, and where it is paid from (`paid_from`: one of `public_finance.funds`; left
+     * out: the general government). A place that has no such payment leaves it out of the list. */
+    support: { payments: (Omit<PaymentRule, "payer" | "account"> & { paid_from?: string })[] };
     /** Who owns firms (docs/behaviour/firm-ownership.md). Fifths are of households by wealth, lowest first. */
     firm_ownership: {
       /** Of the firms of each kind, the share held each way: by one household or a few; from outside; widely. */

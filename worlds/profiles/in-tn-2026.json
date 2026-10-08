@@ -575,16 +575,19 @@
       52500000
     ],
     "support": {
-      "pension": {
-        "amount": 120000,
-        "every_days": 30,
-        "from_age": 60
-      },
-      "unemployment": {
-        "amount": 0,
-        "every_days": 30,
-        "from_age": 22
-      }
+      "payments": [
+        {
+          "id": "pension",
+          "name": "Old age pension",
+          "every_days": 30,
+          "who": {
+            "from_age": 60
+          },
+          "amount": {
+            "flat": 120000
+          }
+        }
+      ]
     },
     "firm_ownership": {
       "forms_bps": {
@@ -1339,8 +1342,7 @@
     "savings_by_age": "PLACEHOLDER percentiles: an adult's cash and deposits (not gold, chit funds, provident fund, or property), by age. The other profile's placeholders scaled by half the ratio of the two shop wages. Check against the survey mean: MoSPI, All India Debt and Investment Survey (NSS 77th round, assets as on 30 June 2018), urban Tamil Nadu: average value of deposits etc. ₹115,228 a household (and ₹1,642,964 of all assets, loans outstanding ₹103,239; opened via MoSPI eSankhyiki data server (mcp.mospi.gov.in), opened 2026-10-08). The survey gives household means, not adults' percentiles by age.",
     "retiree_savings": "PLACEHOLDER: savings at retirement, about 2.25 to 5.25 lakh rupees, the other profile's placeholder scaled by 1.5. Most workers in India have no provident fund or pension (informal work); the EPFO and National Pension System are to be used to source this.",
     "retirement_age": "60: the age at which Tamil Nadu's government servants retire (Government of Tamil Nadu order of 2021 raising it from 59; to confirm) and at which the Indira Gandhi National Old Age Pension starts (National Social Assistance Programme guidelines). Self-employed and informal workers carry on working past it (gap).",
-    "support.pension": "Eligibility and the Centre's part: Ministry of Rural Development, National Social Assistance Programme (nsap.nic.in, archived copy of 2025, opened): under the Indira Gandhi National Old Age Pension Scheme, BPL persons aged 60 or above are entitled to a monthly pension of ₹200 up to 79 years of age and ₹500 thereafter. Tamil Nadu's total: ₹1,200 a month under all its social-security pensions from August 2023 (Deccan Herald, 22 July 2023, 'Tamil Nadu enhances monthly pension for elders to Rs 1,200', opened; the Revenue/Social Welfare Department's order could not be reached: tn.gov.in times out). It is means-tested to the poor; the structure pays every person from the age, so this overstates coverage (gap). Paid monthly, so every_days is 30.",
-    "support.unemployment": "None: India has no general unemployment benefit (the Employees' State Insurance scheme's Atal Beemit Vyakti Kalyan Yojana pays only some insured workers, and the rural employment guarantee gives up to 100 days of paid work a household, ₹319 a day in Tamil Nadu in 2024-25, which is work, not a transfer: Ministry of Rural Development, as reported; to confirm). The amount is 0, the closest the structure allows. Women heads of household in Tamil Nadu receive ₹1,000 a month (Kalaignar Magalir Urimai Thogai, from September 2023; to confirm): not expressible (gap).",
+    "support.payments": "[The pension:] Eligibility and the Centre's part: Ministry of Rural Development, National Social Assistance Programme (nsap.nic.in, archived copy of 2025, opened): under the Indira Gandhi National Old Age Pension Scheme, BPL persons aged 60 or above are entitled to a monthly pension of ₹200 up to 79 years of age and ₹500 thereafter. Tamil Nadu's total: ₹1,200 a month under all its social-security pensions from August 2023 (Deccan Herald, 22 July 2023, 'Tamil Nadu enhances monthly pension for elders to Rs 1,200', opened; the Revenue/Social Welfare Department's order could not be reached: tn.gov.in times out). It is means-tested to the poor; the structure pays every person from the age, so this overstates coverage (gap). Paid monthly, so every_days is 30. [The payment to those out of work:] None: India has no general unemployment benefit (the Employees' State Insurance scheme's Atal Beemit Vyakti Kalyan Yojana pays only some insured workers, and the rural employment guarantee gives up to 100 days of paid work a household, ₹319 a day in Tamil Nadu in 2024-25, which is work, not a transfer: Ministry of Rural Development, as reported; to confirm). The amount is 0, the closest the structure allows. Women heads of household in Tamil Nadu receive ₹1,000 a month (Kalaignar Magalir Urimai Thogai, from September 2023; to confirm): not expressible (gap). SHAPE (2026-10-08, track D of docs/design/profile-depth.md): support is now a list of payments, each a rule in three parts: who qualifies, how much, for how long (docs/behaviour/boundary.md); the law is published and the payments office reads it. UN-FOLDED: the payment of nought that stood for no payment to the unemployed is gone (this note: India has no general unemployment benefit), so nobody claims one and none is counted. STAND-IN KEPT: the pension is still paid to everyone from 60. It is means-tested to the poor; that can now be said (`who.income_under`: the household's income as the claimant declares it), but this note gives no income line, so none is set. The payment to women heads of household could be said as a household's payment; a rule by sex is not built.",
     "firm_ownership": "PLACEHOLDERS throughout, to source. Shops and landlords are held closely, as proprietorships and family firms: the National Sample Survey Office's survey of unincorporated non-agricultural enterprises (NSS 73rd round, 2015-16) found proprietary and partnership enterprises to be nearly all of them (to confirm). Factories in a small town are mostly family-owned small firms, with some branches of larger companies. Households holding shares directly: a small share of Indians hold equities (SEBI investor survey 2015: about 2% of households invest in the securities market; NSE Market Pulse; neither opened, to confirm); the shares by wealth fifth are guesses summing to a small total. The number of owners and owner wealth weights: guesses. Evidence for closely held shops: MoSPI, ASUSE 2023-24, urban Tamil Nadu, trade (opened via MoSPI eSankhyiki data server (mcp.mospi.gov.in), opened 2026-10-08): of 1,000 unincorporated establishments, 985 are proprietary and 14 partnerships; it does not count companies, so the shares here are not read from it.",
     "retirement_fund": "PLACEHOLDERS; used only by a world that asks for a retirement fund. The Employees' Provident Fund Organisation (EPFO) and National Pension System stand for it. member_bps 12%: EPFO's active contributors are about 7 crore against a workforce of some 60 crore (EPFO annual report; PLFS; to confirm). cost_bps_of_income 0.5%: EPFO's administrative charge of 0.5% of wages (Employees' Provident Funds Scheme 1952, para 38; to confirm). share_bps_of_local: a guess. drawdown_bps_by_age: carried over from the other profile (account-based pensions are an Australian design); EPF pays most members a lump sum, not a pension (gap).",
     "industry": "Factory: MoSPI, Annual Survey of Industries 2023-24, Tamil Nadu, all factories (sum over 2-digit NIC groups, opened via MoSPI eSankhyiki data server (mcp.mospi.gov.in), opened 2026-10-08): wages and salaries including employer's contribution ₹2.17 lakh crore are 7.0% of total output of ₹30.99 lakh crore; total inputs ₹25.94 lakh crore are 83.7% of output (materials 67.4%, fuels the rest). Retail: PLACEHOLDERS, purchases about 80% of sales and wages about 6% for small shops (no source found: the ASUSE gives GVA per worker for trade, not a wage share of sales; to compute).",

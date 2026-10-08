@@ -12,13 +12,6 @@
       "required": true,
       "source": "the account it pays from where a payment names none (the world must say)"
     },
-    "payments": {
-      "schema": {
-        "type": "object"
-      },
-      "default": {},
-      "source": "placeholder"
-    },
     "publish_every_days": {
       "schema": {
         "type": "integer"

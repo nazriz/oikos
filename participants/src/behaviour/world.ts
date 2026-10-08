@@ -241,8 +241,6 @@ export const transfers: BehaviourModule = {
       {
         account: "", // the account it pays from where a payment names none (the world must say)
         year: 365 * DAY,
-        // Payments given to the office outright, where the world publishes no support law: each flat, by age alone.
-        payments: {} as { [kind: string]: { amount: number; every_days: number; from_age: number; to_age?: number } },
         publish_every_days: 0,
       },
       ctx.params,
@@ -254,9 +252,8 @@ export const transfers: BehaviourModule = {
     const decided = new Set<string>();
     type Paying = { person: string; account: string; payment: string; from: string; amount: number; every: number; next: number; until?: number; then?: string };
     const paying = new Map<string, Paying>(); // claim -> what we pay under it
-    const given: PaymentRule[] = Object.entries(p.payments).map(([id, x]) => ({ id, payer: me, account: p.account, every_days: x.every_days, who: { from_age: x.from_age, ...(x.to_age !== undefined ? { to_age: x.to_age } : {}) }, amount: { flat: x.amount } }));
-    /** The payments we pay: the published law's, where we are the payer; else those we were given. */
-    const rules = (): PaymentRule[] => supportLaw(book)?.payments.filter((r) => r.payer === me) ?? given;
+    /** The payments we pay: the published law's, where we are the payer (no law: none). */
+    const rules = (): PaymentRule[] => supportLaw(book)?.payments.filter((r) => r.payer === me) ?? [];
     /** Our book of contributions for one person: the monthly pay employers reported for them, newest first. */
     const reported = (who: string, since: number) => book.all("withholding_report").filter((r) => (r.addressed_to ?? []).includes(me) && r.at >= since && Array.isArray(r.data?.staff))
       .sort((a, b) => b.at - a.at || (a.id < b.id ? 1 : -1))
@@ -298,6 +295,7 @@ export const transfers: BehaviourModule = {
         const most = a.most === undefined ? Infinity : typeof a.most === "number" ? a.most : [...a.most].sort((x, y) => y.from_age - x.from_age).find((b) => b.from_age <= age)?.amount ?? Infinity;
         amount = Math.min(most, Math.max(a.least ?? 0, Math.floor((pay * (a.with_child_bps !== undefined && children(18) > 0 ? a.with_child_bps : a.share_bps)) / 10_000)));
       } else amount = a.household + (a.per_member ?? 0) * members + (a.per_child ? a.per_child.amount * children(a.per_child.under_age) : 0);
+      if (!(amount > 0)) return { ok: false, why: "the payment comes to nothing" };
       const ends = [rule.lasts?.days !== undefined ? t + rule.lasts.days * DAY : Infinity, rule.lasts?.until_age !== undefined ? born + rule.lasts.until_age * p.year : Infinity];
       const until = Math.min(...ends);
       return { ok: true, amount, ...(until < Infinity ? { until } : {}) };
@@ -622,7 +620,7 @@ export const idle: BehaviourModule = {
  *
  * Monthly, it looks at the town's standing job postings (as someone thinking of moving would). A newcomer expects the
  * mean posted wage times the chance of a job: postings / (postings + those competing for them: the town's jobseekers,
- * as the latest published count of recipients of `jobseekers_payment` says, and the adults it has brought in the last
+ * as the latest published counts of recipients of the payments for those out of work (`jobseekers_payment`) say, and the adults it has brought in the last
  * `memory_days`). In Harris & Todaro the chance is the destination's employment rate: a town's own unemployed make it
  * less. The one who came for the job looks for work; other adults do at `participation_bps` (`template_outside_lf`
  * for those who don't). For each posting, a household comes with probability
@@ -648,7 +646,7 @@ export const migration: BehaviourModule = {
         template: "newcomer",
         households: null as HouseholdSpec | null, // who comes, as the world's profile describes households (required)
         search_limit: 200,
-        jobseekers_payment: "", // the support payment whose published recipients count as jobseekers ("": none published)
+        jobseekers_payment: "", // the support payments whose published recipients count as jobseekers (several: with commas between; "": none published)
         participation_bps: 10_000, // of adults other than the one who came for the job, those looking for work
         template_outside_lf: "", // the template for those who aren't ("": everyone takes `template`)
         // Where bodies have a skill (schooling): the years each newcomer has had, as the world's people have, and how much
@@ -710,7 +708,7 @@ export const migration: BehaviourModule = {
           const mean = monthly.reduce((a, b) => a + b, 0) / monthly.length;
           const recent = brought.filter((b) => obs.t - b.t < p.memory_days * DAY).reduce((a, b) => a + b.adults, 0);
           const stats = book.open("support_statistics").sort((a, b) => b.at - a.at || (a.id < b.id ? 1 : -1))[0];
-          const jobseekers = p.jobseekers_payment ? Number(stats?.data?.recipients?.[p.jobseekers_payment] ?? 0) : 0;
+          const jobseekers = p.jobseekers_payment.split(",").filter(Boolean).reduce((x, k) => x + Number(stats?.data?.recipients?.[k] ?? 0), 0);
           const chance = postings.length / (postings.length + recent + jobseekers);
           const gapBps = Math.floor(((mean * chance - p.outside_monthly_income) * 10_000) / p.outside_monthly_income);
           const perPosting = Math.min(10_000, Math.max(0, Math.floor((gapBps * p.response_bps) / 10_000)));
