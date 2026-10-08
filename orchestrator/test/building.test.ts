@@ -27,7 +27,10 @@ async function run(name: string, config: any, until: number) {
   // Every call the modules wrote was one they could make.
   expect(log.filter((e) => e.kind === "annotation" && (e.body.data?.call_unresolved || e.body.data?.call_unreadable)).map((e) => e.body.data)).toEqual([]);
   const ev = log.filter((e) => e.kind === "event").map((e) => ({ t: e.t, ...e.body }));
-  return { ev, recs: ev.filter((e) => e.event === "recorded").map((e) => e.record) };
+  // Why an act was sent: the reasoning on the command that began it.
+  const reasoning = new Map<number, string>(log.filter((e) => e.kind === "command" && e.body.command === "act").map((e) => [e.seq, e.body.reasoning ?? ""]));
+  const began = new Map<string, number>(ev.filter((e) => e.event === "action_started").map((e) => [e.action, e.cause]));
+  return { ev, recs: ev.filter((e) => e.event === "recorded").map((e) => e.record), why: (action: string) => reasoning.get(began.get(action) ?? -1) ?? "" };
 }
 
 test("the builder buys materials from outside, and its crew's hours finish each building", async () => {
@@ -82,10 +85,21 @@ test("a demolition order is carried out by the builder's crew, commissioned by t
   const house = config.world.structures.find((s: any) => s.type.includes("house") && config.world.records.some((r: any) => r.id === `title-${lotOf(s.at)}` && r.holder === "landlord-1"));
   config.world.records.push({ id: "order-1", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", kind: "demolition_order", addressed_to: ["landlord-1"],
     text: `Order: demolish ${house.id}.`, data: { structure: house.id, lot: lotOf(house.at) } });
-  const { ev, recs } = await run("demolition", config, 60 * DAY);
-  // (Its tenants, out at work when it came down, try going home once each: they couldn't see it from there.)
+  const { ev, recs, why } = await run("demolition", config, 60 * DAY);
+  // Its household, put out when it began to come down, try going home: they couldn't see it from where they were. Who
+  // lives there is the town's draw (people out at work, or a retired couple at home), so what is held is the rule, not
+  // a count: only that household is turned away, and nobody tries the same way twice. There are two ways home: one's
+  // own daily round ("a place pulled down, or coming down: not again"), and, for the others of a household, the
+  // leaseholder's word that the home is theirs, which the round then tries once more (docs/behaviour/households.md).
+  // (Until 2026-10-08 this was "once each", true of the one town it was written against, whose tenants were all at
+  // work and none of whom was told to come by a leaseholder.)
   const gone = ev.filter((e) => e.event === "action_refused" && ["coming_down", "unknown_structure"].includes(e.code));
-  expect(new Set(gone.map((e) => e.participant)).size).toBe(gone.length);
+  const livedThere = new Set<string>(config.world.occupancy.filter((o: any) => o.space.startsWith(`${house.id}/`)).map((o: any) => `${o.occupant}-self`));
+  for (const e of gone) expect(livedThere.has(e.participant)).toBe(true);
+  // (A way home is known by why the act was sent: the same words are the same way.)
+  const tries = gone.map((e) => `${e.participant}: ${why(e.action)}`);
+  expect(tries.every((x) => !x.endsWith(": "))).toBe(true);
+  expect(new Set(tries).size).toBe(tries.length);
   expect(ev.filter((e) => e.event === "action_refused" && !RACES.includes(e.code) && !["coming_down", "unknown_structure"].includes(e.code))).toEqual([]);
   // The landlord commissions the builder at its published demolition price; the builder starts, and invoices.
   const contract = recs.find((r) => r.record === "agreement" && r.terms.template === "construction" && r.basis === "order-1");

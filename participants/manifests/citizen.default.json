@@ -1,6 +1,6 @@
 {
   "name": "citizen.default",
-  "version": "0.40.0",
+  "version": "0.41.1",
   "doc": "docs/behaviour/citizen.md",
   "params": {
     "accept_fewer_bedrooms_after_days": {
@@ -332,6 +332,11 @@
       },
       "unit": "days",
       "default": 90,
+      "source": "placeholder"
+    },
+    "occupancy": {
+      "schema": {},
+      "default": null,
       "source": "placeholder"
     },
     "outside_account": {

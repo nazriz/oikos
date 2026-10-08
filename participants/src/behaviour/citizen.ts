@@ -31,10 +31,10 @@ import { DECISIONS, params, wait, type Belief, type BehaviourModule, type Consul
 import type { Rng } from "../rng";
 import * as C from "../calls";
 import { ask, Asked, because, Book, breaches, noted, callAction, commitmentOf, DAY, nextLook, usd, jobTerms, record, leaseTerms, message, MONTH, moveIn, moveOut, notice, pay, PAYMENT_FAILED, petitionSignatures, publishedCount, say, sign, stoodEmpty, structureOf, variableToday, vote, withdraw, type Step, ownBanked } from "./common";
-import { ADULT_YEARS, ageAt, bedroomsNeeded, hear, householdOf, SAYING, type Heard, type HouseholdData, type Member } from "./household";
+import { ADULT_YEARS, ageAt, bedroomsNeeded, hear, householdOf, SAYING, type Heard, type HouseholdData, type Member, type OccupancyStandard } from "./household";
 import { Deliveries, goodsPrices, offerOf as shopOffer, order } from "./trade";
 import { incomeTaxLaw, withholding } from "./tax";
-import { Borrowing } from "./credit";
+import { Borrowing, loanFor } from "./credit";
 import { factsOf, Feelings, Mind, MIND_DEFAULTS, MIND_VERSION, Pursuit, satisfaction, Ties, type Circumstances, type Facts, type MindParams, type NeedLevels, type PopulationValues, type Value } from "./mind";
 
 /** How belief changes (docs/behaviour/citizen.md "Belief"; placeholders): a month's fading; how much of the way to
@@ -117,7 +117,7 @@ interface Job { agreement: string; employer: string; wage: number; period: numbe
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.40.0", // 0.40.0: asks the police to call at a silent home next door; registers a birth
+  version: "0.41.1", // 0.41.1: main's 0.40.1 (a buyer rounds the deposit up) with 0.41.0
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -252,6 +252,8 @@ export const citizen: BehaviourModule = {
       news_days: 90,
       // Households (docs/behaviour/households.md).
       accept_fewer_bedrooms_after_days: 60, // still hunting after this long: accept one bedroom fewer than the standard asks, and so on (placeholder)
+      // The occupancy standard a home is judged by, where the world states its own (none: the module's, household.ts).
+      occupancy: null as OccupancyStandard | null,
       // Fertility (docs/behaviour/households.md): births per 10,000 women a year by age (the world's profile); a month's chance is a twelfth.
       fertility_per_10000: [] as { from: number; rate: number }[],
       // Complaining about a service (docs/behaviour/services.md): whom to (none: nobody), about which of our home's
@@ -1505,7 +1507,7 @@ export const citizen: BehaviourModule = {
         // Which one: the mind's (docs/design/ai-citizens.md 3). Each home's offer (its rent) and its bedrooms appraised
         // against needs; where friends told us to look counts as others having gone there. (A home we can't afford, or
         // without the bedrooms we must have, isn't considered.)
-        const need = household ? bedroomsNeeded(household, t, year) : 1;
+        const need = household ? bedroomsNeeded(household, t, year, p.occupancy) : 1;
         const toldBy = new Set(told.map((l) => l.id));
         const d = listings.length ? decide("home", t, ctx.rng(`home-${t}`), {
           options: listings.map((l) => {
@@ -1521,7 +1523,7 @@ export const citizen: BehaviourModule = {
           const how = d!.strategy === "imitate" ? "where someone told us to look" : "weighing each home's rent and room";
           steps.push(because(`Applying for ${best.data.space}: within a third of household income, with at least ${minBedrooms(t)} bedrooms, ${how}.`,
             say("rental_application", `Application for ${best.data.space ?? best.data.structure}, for a household of ${members.length}.`, { to: [best.speaks_for], visible: [me, best.speaks_for],
-            data: { listing: best.id, account: acc.account, members, household: { people: members.length, bedrooms_needed: household ? bedroomsNeeded(household, t, year) : 0 } }, basis: best.id })));
+            data: { listing: best.id, account: acc.account, members, household: { people: members.length, bedrooms_needed: household ? bedroomsNeeded(household, t, year, p.occupancy) : 0 } }, basis: best.id })));
         }
       }
       // Retiring at the world's retirement age: we stop working (giving our employer notice) and claim support.
@@ -1949,7 +1951,7 @@ export const citizen: BehaviourModule = {
     const minBedrooms = (t: number) => {
       if (!household) return 0;
       const relax = homelessSince === null ? 0 : Math.floor((t - homelessSince) / (p.accept_fewer_bedrooms_after_days * DAY));
-      return Math.max(0, bedroomsNeeded(household, t, year) - relax);
+      return Math.max(0, bedroomsNeeded(household, t, year, p.occupancy) - relax);
     };
     /** At the start, the share of the rent another adult already pays us (a standing order in the world's genesis records). */
     const genesisShare = (a: Member) => {
@@ -2192,7 +2194,8 @@ export const citizen: BehaviourModule = {
             .sort((a, b) => Number(a.data?.price) - Number(b.data?.price) || (a.id < b.id ? -1 : 1))[0];
           if (l) {
             const price = Number(l.data!.price);
-            const loan = price - Math.floor((price * m.deposit_bps) / 10_000);
+            // (The deposit rounded up to a whole unit, the loan the rest: what a lender's share of the price admits.)
+            const loan = loanFor(price, m.deposit_bps);
             buying = { listing: l.id, seller: l.speaks_for!, account: String(l.data!.account), price, lot: String(l.data!.lot), space: String(l.data!.space), structure: String(l.data!.structure), stage: "applied", since: t };
             steps.push(borrowing.apply(t, acc.account, loan, m.mortgage_months, "a home",
               `${l.data!.structure} is for sale at ${usd(price)}, and we have the deposit and costs: asking the bank for a mortgage of ${usd(loan)}.`, { price, home: l.data!.space }));

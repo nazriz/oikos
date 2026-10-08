@@ -13,7 +13,7 @@ export { drawPerson, NEEDS, VALUES, type PopulationValues } from "./behaviour/mi
 export { repayment } from "./behaviour/credit";
 export { draftLaw, figureWords, heldIn, heldValue, type LawFigure, type LawFigures, type LawSchedule } from "./behaviour/common";
 export { annualTax, withholding, type IncomeTaxLaw } from "./behaviour/tax";
-export { adultAgeBands, drawHousehold, drawSavings, bedroomsNeeded, type DrawnHousehold, type HouseholdSpec } from "./behaviour/household";
+export { adultAgeBands, drawHousehold, drawSavings, bedroomsNeeded, OCCUPANCY, type DrawnHousehold, type Extension, type HouseholdSpec, type OccupancyStandard } from "./behaviour/household";
 export { yearsOfSchooling, type SchoolingSpec } from "./behaviour/school";
 import type { BehaviourModule } from "./module";
 import { bankPaymentSystem } from "./behaviour/bank";

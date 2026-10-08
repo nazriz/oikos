@@ -135,6 +135,14 @@ describe("world-config mutations are rejected", () => {
     ["a currency's sign that could be read as digits", (c) => (c.world.currencies[0].symbol = "1$")],
     ["a currency's word with a space in it", (c) => (c.world.currencies[0].unit_words = ["new dollars"])],
     ["a currency with an unknown field", (c) => (c.world.currencies[0].name = "Dollar")],
+    ["a decimal mark that is neither a point nor a comma", (c) => (c.world.currencies[0].decimal_mark = ";")],
+    ["a group mark that is a letter", (c) => (c.world.currencies[0].group_mark = "x")],
+    ["a comma for both marks", (c) => Object.assign(c.world.currencies[0], { decimal_mark: ",", group_mark: "," })],
+    ["a point for both marks", (c) => Object.assign(c.world.currencies[0], { decimal_mark: ".", group_mark: "." })],
+    ["a grouping in twos only", (c) => (c.world.currencies[0].grouping = [2])],
+    ["a sign-after flag that is not a boolean", (c) => (c.world.currencies[0].symbol_after = "yes")],
+    ["a number word worth less than ten", (c) => (c.world.currencies[0].number_words = { few: 5 })],
+    ["a number word with a space in it", (c) => (c.world.currencies[0].number_words = { "ten thousand": 10000 })],
     ["zero tick length", (c) => (c.clock.tick_seconds = 0)],
     ["wrong contracts version", (c) => (c.contracts = "0.1")],
     ["a negative distance", (c) => c.positions[0].channels.push({ id: "street", kind: "sites", area: { near: -1 } })],
@@ -149,6 +157,14 @@ describe("world-config mutations are rejected", () => {
       expect(v(c)).toBe(false);
     });
   }
+});
+
+test("a currency may say how its place writes money, with every field at once", () => {
+  const c = readJson(join(root, "examples/valid/world-config/riverbend-mini.json"));
+  Object.assign(c.world.currencies[0], {
+    decimal_mark: ",", group_mark: " ", grouping: [3, 2], symbol_after: true, symbol_spaced: true, number_words: { lakh: 100000, crore: 10000000 },
+  });
+  expect(validator(TARGETS["world-config"]!)(c)).toBe(true);
 });
 
 // The behaviour modules' manifests (participants/manifests, written from the modules) are what the contract says.

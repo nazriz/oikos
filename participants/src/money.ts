@@ -27,9 +27,10 @@ export function amount(n: number | bigint): Amount {
 }
 
 /**
- * How a world's money is written (its config's `world.currencies` entry): the sign or code before an amount, the
- * words after it, and how many decimal places its smallest unit is. The platform has none of its own: every amount in
- * words is read and written in a currency the world declares.
+ * How a world's money is written (its config's `world.currencies` entry): the sign or code before an amount (or after
+ * it), the words after it, how many decimal places its smallest unit is, and how its place writes numbers: the
+ * decimal mark, the mark and size of groups of digits, a space beside the sign, the words for large numbers. The
+ * platform has none of its own: every amount in words is read and written in a currency the world declares.
  */
 export interface Currency {
   code: string;
@@ -41,16 +42,57 @@ export interface Currency {
   unit_words?: string[];
   /** The words for its smallest unit; the first is the singular. */
   minor_words?: string[];
+  /** The mark written before the decimals. Absent: a point, unless the group mark is a point (then a comma). */
+  decimal_mark?: string;
+  /** The mark written between groups of digits (a space may be a no-break one; an apostrophe straight or curly).
+   * Absent: a comma, or a point where the decimal mark is a comma. */
+  group_mark?: string;
+  /** Digits in threes ([3]) or the last three and then twos ([3, 2]). Absent: threes written; threes read, and twos
+   * too where the group mark is a comma. */
+  grouping?: number[];
+  /** The sign (or code) is written after the digits. */
+  symbol_after?: boolean;
+  /** A space stands between the sign and the digits (a code is always set off by one). */
+  symbol_spaced?: boolean;
+  /** The words its place writes for large numbers, in lower case, with their values: read, never written. */
+  number_words?: { [word: string]: number };
 }
 
-/** An amount in the currency's smallest unit as people write it: its sign (or its code and a space), the whole units
- * grouped in threes, and its decimals. Exact at any size. (The kernel's resolver writes the same: `format_money`.) */
-export function formatMoney(a: Amount | number | bigint, cur: Currency): string {
+/** The decimal mark and group mark a currency writes with. */
+export function marksOf(cur: Currency): { decimal: string; group: string } {
+  const decimal = cur.decimal_mark ?? (cur.group_mark === "." ? "," : ".");
+  return { decimal, group: cur.group_mark ?? (decimal === "," ? "." : ",") };
+}
+
+/** Whole digits grouped as the currency groups them (in threes unless it says [3, 2]), with its group mark. */
+export function groupDigits(whole: string, cur: Currency): string {
+  const { group } = marksOf(cur);
+  const second = cur.grouping?.[1] ?? 3;
+  let out = "";
+  for (let i = 0; i < whole.length; i++) {
+    const fromRight = whole.length - i;
+    if (i > 0 && (fromRight === 3 || (fromRight > 3 && (fromRight - 3) % second === 0))) out += group;
+    out += whole[i];
+  }
+  return out;
+}
+
+/** An amount in the currency's smallest unit as people write it: its sign (or its code and a space) before the digits
+ * or, where the currency says so, after them; the whole units grouped as the currency groups them (in threes unless it
+ * says [3, 2]) with its group mark; its decimals after its decimal mark (left off with `decimals: false`: whole units,
+ * for a round figure). Exact at any size. (The kernel's resolver writes the same: `format_money`.) */
+export function formatMoney(a: Amount | number | bigint, cur: Currency, o: { decimals?: boolean } = {}): string {
   const v = BigInt(a);
   const c = v < 0n ? -v : v;
   const per = 10n ** BigInt(cur.minor_units);
-  const whole = (c / per).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-  return `${v < 0n ? "-" : ""}${cur.symbol ?? `${cur.code} `}${whole}${cur.minor_units > 0 ? `.${(c % per).toString().padStart(cur.minor_units, "0")}` : ""}`;
+  const { decimal } = marksOf(cur);
+  const whole = groupDigits((c / per).toString(), cur);
+  let number = whole;
+  if (cur.minor_units > 0 && o.decimals !== false) number += `${decimal}${(c % per).toString().padStart(cur.minor_units, "0")}`;
+  // (A code, being letters, is always set off from the digits.)
+  const sign = cur.symbol ?? cur.code;
+  const gap = cur.symbol === undefined || cur.symbol_spaced ? " " : "";
+  return `${v < 0n ? "-" : ""}${cur.symbol_after ? `${number}${gap}${sign}` : `${sign}${gap}${number}`}`;
 }
 
 // The money of the world a participant is in, while it takes its step. A code participant's rules write amounts in

@@ -80,7 +80,7 @@
 // The sampling is seeded (a generator of its own: this is tooling, not a world, and takes nothing from a run's
 // randomness), so the same logs and seed give the same programs to write requests for.
 
-import { calls, canonical as canonicalJson, forms as formReading, type Currency } from "@oikos/participants";
+import { calls, canonical as canonicalJson, formatMoney, forms as formReading, groupDigits, marksOf, type Currency } from "@oikos/participants";
 import type { LlmAdapter, Usage } from "@oikos/participants/llm";
 import { canonical, fixture, TEST_CURRENCY, tidy } from "../eval/run";
 import { sharesWording } from "../eval/held-out";
@@ -804,89 +804,94 @@ const DURATION_ARGS = new Set(["every", "term", "our_notice", "their_notice", "f
 const COUNT_ARGS = new Set(["quantity", "units"]);
 
 /**
- * How a world's people write a number of its money, beyond what a world's config says of its currency. The config has
- * no field for any of this yet (docs/profiles.md, "Known exceptions"), so only an invented world of the training data
- * says it (synthetic.ts), and it travels with the currency on every program and example made in that world: an example
- * can be written again, or scored, as its own world writes. The parser needs none of it: it reads every one of these
- * forms in any currency, or refuses.
+ * A world's money as the training data writes it: a currency of the config (which says how its place writes numbers:
+ * `decimal_mark`, `group_mark`, `grouping`, `symbol_after`, `symbol_spaced`, `number_words`), and, for the invented
+ * worlds only, one more way of writing a sign that the config has no field for: it is also written with the first two
+ * letters of the code before it (how a sign several currencies share is told apart). It travels with the currency on
+ * every program and example made in that world, so an example can be written again, or scored, as its own world
+ * writes. (Sets made before 2026-10-08 carried these in a `written` block; `withWritten` lifts it.)
  */
-export interface Writing {
-  /** The decimal mark: a point if absent; a comma, with points between the thousands. */
+export type WrittenCurrency = Currency & { country_sign?: boolean; written?: LegacyWriting };
+/** The block an invented currency carried before the config had fields for it. */
+export interface LegacyWriting {
   decimal_mark?: "." | ",";
-  /** How digits are grouped: in threes if absent; `twos`: the last three and then twos, with the words that go with
-   * that way of counting for a round sum. */
   grouping?: "threes" | "twos";
-  /** The sign is also written after the digits. */
   symbol_after?: boolean;
-  /** The sign is also written with a space before the digits. */
   symbol_spaced?: boolean;
-  /** The sign is one other currencies use too, so it is also written with the first two letters of the code before it. */
   country_sign?: boolean;
 }
-export type WrittenCurrency = Currency & { written?: Writing };
+/** A currency with an old `written` block lifted into the config's own fields. */
+export function withWritten(cur: WrittenCurrency): WrittenCurrency {
+  const { written: w, ...rest } = cur;
+  if (!w) return cur;
+  return {
+    ...rest,
+    ...(w.decimal_mark ? { decimal_mark: w.decimal_mark } : {}),
+    ...(w.grouping === "twos" ? { grouping: [3, 2] as [3, 2], number_words: { lakh: 100_000, lakhs: 100_000, crore: 10_000_000, crores: 10_000_000 } } : {}),
+    ...(w.symbol_after ? { symbol_after: true } : {}),
+    ...(w.symbol_spaced ? { symbol_spaced: true } : {}),
+    ...(w.country_sign ? { country_sign: true } : {}),
+  };
+}
 
 /**
  * Every way this pipeline writes an amount (a count of the currency's smallest unit) in a world's money, each checked
- * to read back as the same number: its sign or code before the digits, grouped or not, with its decimals or (a round
- * sum) without; its code or a word for its unit after them; bare digits, which are whole units; a multiplier (k, m,
- * thousand, million) on a sum that is one; and counted out in its smallest unit, where that has a name. Then, where
- * the world says how its people write numbers (`Writing`): its own decimal mark and grouping, its sign after the
- * digits or spaced from them, its sign with letters of its code. Nothing here knows any currency: the sign, the words,
- * the decimal places and the ways of writing are the world's. The first is always the sign (or the code) and the
- * digits grouped in threes, with a point before the decimals.
+ * to read back as the same number: first the world's own plain writing (`formatMoney`: its sign or code, its grouping
+ * and marks, with its decimals or, a round sum, without); then the same digits with the sign or code in the other
+ * places it is written (spaced from them, after them where the config says so), and in the conventional marks (commas
+ * between thousands, a point before decimals) where those read back the same; its code or a word for its unit after
+ * the digits; bare digits, which are whole units; a multiplier (k, m, thousand, million, and the world's own
+ * `number_words`) on a sum that is one; and counted out in its smallest unit, where that has a name. Nothing here
+ * knows any currency: the sign, the words, the decimal places and the ways of writing are the world's.
  */
-export function amountWritings(n: bigint, cur: WrittenCurrency): string[] {
+export function amountWritings(n: bigint, cur0: WrittenCurrency): string[] {
   if (n < 0n) return [];
+  const cur = withWritten(cur0);
   const per = 10n ** BigInt(cur.minor_units);
   const whole = n / per;
   const round = n % per === 0n;
   const frac = cur.minor_units > 0 ? (n % per).toString().padStart(cur.minor_units, "0") : "";
   const plain = whole.toString();
-  const grouped = plain.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-  const digits = [...new Set(round ? [grouped, plain, ...(frac ? [`${grouped}.${frac}`] : [])] : [`${grouped}.${frac}`, `${plain}.${frac}`])];
+  const { decimal } = marksOf(cur);
+  const own = groupDigits(plain, cur);
+  const conventional = plain.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const digitsOf = (g: string, mark: string) => (round ? [g, plain, ...(frac ? [`${g}${mark}${frac}`] : [])] : [`${g}${mark}${frac}`, `${plain}${mark}${frac}`]);
+  const digits = [...new Set(digitsOf(own, decimal))];
+  const others = [...new Set([...digitsOf(conventional, "."), ...(cur.decimal_mark || cur.group_mark ? digitsOf(own, decimal === "." ? "," : ".") : [])])].filter((d) => !digits.includes(d));
   const sign = cur.symbol ?? `${cur.code} `;
   const units = cur.unit_words ?? [];
   const words = whole === 1n && round ? units.slice(0, 1) : units.length > 1 ? units.slice(1) : units;
   const forms = [
+    formatMoney(n, cur, round ? { decimals: false } : {}),
     ...digits.map((d) => `${sign}${d}`),
+    ...others.map((d) => `${sign}${d}`),
     ...words.map((w) => `${digits[0]} ${w}`),
+    ...others.flatMap((d) => words.map((w) => `${d} ${w}`)),
     `${digits[0]} ${cur.code}`,
-    ...(cur.symbol !== undefined ? [`${cur.code} ${digits[0]}`] : []),
+    ...(cur.symbol !== undefined ? [digits[0]!, ...others].map((d) => `${cur.code} ${d}`) : []),
+    ...others.map((d) => `${d} ${cur.code}`),
     digits[0]!,
+    ...others,
   ];
+  if (cur.symbol !== undefined) {
+    const written = [...digits, ...others];
+    if (cur.symbol_after) forms.push(...written.flatMap((d) => [`${d} ${cur.symbol}`, `${d}${cur.symbol}`]));
+    if (cur.symbol_spaced) forms.push(...written.map((d) => `${cur.symbol} ${d}`));
+    if (cur.country_sign) forms.push(...written.map((d) => `${cur.code.slice(0, 2)}${cur.symbol}${d}`));
+  }
   if (round && whole > 0n) {
     if (whole % 1_000n === 0n) forms.push(`${sign}${whole / 1_000n}k`, `${whole / 1_000n}k`, ...words.map((w) => `${whole / 1_000n} thousand ${w}`));
     else if (whole % 100n === 0n && whole > 1_000n) forms.push(`${sign}${whole / 1_000n}.${(whole % 1_000n) / 100n}k`);
     if (whole % 1_000_000n === 0n) forms.push(`${sign}${whole / 1_000_000n}m`, `${sign}${whole / 1_000_000n} million`, ...words.map((w) => `${whole / 1_000_000n} million ${w}`));
+    // The world's own words for large numbers.
+    for (const [word, value] of Object.entries(cur.number_words ?? {})) {
+      const v = BigInt(value);
+      if (whole % v === 0n) forms.push(`${sign}${whole / v} ${word}`, `${whole / v} ${word}`, ...words.map((x) => `${whole / v} ${word} ${x}`));
+      else if (whole % (v / 10n) === 0n && whole > v) forms.push(`${sign}${whole / v}.${(whole % v) / (v / 10n)} ${word}`, ...words.map((x) => `${whole / v}.${(whole % v) / (v / 10n)} ${word} ${x}`));
+    }
   }
   const minor = cur.minor_words ?? [];
   if (minor.length && n > 0n && n < 100_000n) forms.push(`${n} ${n === 1n ? minor[0] : minor[minor.length - 1]}`);
-  const w = cur.written;
-  if (w) {
-    // The digits in the world's own marks. (What can't be told from another number is dropped below: it isn't read.)
-    const own: string[] = [];
-    if (w.decimal_mark === ",") {
-      const pointed = plain.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-      own.push(...(round ? [pointed] : []), ...(frac ? [`${pointed},${frac}`, `${plain},${frac}`] : []));
-    }
-    if (w.grouping === "twos" && plain.length > 5) {
-      const twos = `${plain.slice(0, -3).replace(/\B(?=(\d{2})+(?!\d))/g, ",")},${plain.slice(-3)}`;
-      own.push(round ? twos : `${twos}.${frac}`);
-    }
-    forms.push(...own.map((d) => `${sign}${d}`), ...own.flatMap((d) => words.map((x) => `${d} ${x}`)), ...own.map((d) => `${d} ${cur.code}`), ...own);
-    const written = [digits[0]!, ...own];
-    if (cur.symbol !== undefined) {
-      if (w.symbol_after) forms.push(...written.flatMap((d) => [`${d} ${cur.symbol}`, `${d}${cur.symbol}`]));
-      if (w.symbol_spaced) forms.push(...written.map((d) => `${cur.symbol} ${d}`));
-      if (w.country_sign) forms.push(...written.map((d) => `${cur.code.slice(0, 2)}${cur.symbol}${d}`));
-    }
-    if (w.grouping === "twos" && round && whole > 0n) {
-      const [lakh, crore] = [100_000n, 10_000_000n];
-      if (whole % lakh === 0n) forms.push(`${sign}${whole / lakh} lakh`, `${whole / lakh} lakh`, ...words.map((x) => `${whole / lakh} lakh ${x}`));
-      else if (whole % (lakh / 10n) === 0n && whole > lakh) forms.push(`${sign}${whole / lakh}.${(whole % lakh) / (lakh / 10n)} lakh`, ...words.map((x) => `${whole / lakh}.${(whole % lakh) / (lakh / 10n)} lakh ${x}`));
-      if (whole % crore === 0n) forms.push(`${sign}${whole / crore} crore`, ...words.map((x) => `${whole / crore} crore ${x}`));
-    }
-  }
   return [...new Set(forms)].filter((f) => same(() => calls.parseAmount(f, cur), n.toString()));
 }
 
