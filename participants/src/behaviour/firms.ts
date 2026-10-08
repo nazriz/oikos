@@ -610,6 +610,11 @@ export class Staffing {
   workers(book: Book, t: number): string[] {
     return this.staff(book, t).map((a) => a.terms.parties[1] as string);
   }
+  /** How many of our staff we're keeping: those we haven't given notice. (Someone let go is still staff, and paid, until
+   * their notice runs out; a rule that lets people go until the rest can be paid counts these, or it never stops.) */
+  keeping(book: Book, t: number): number {
+    return this.staff(book, t).filter((a) => !this.noticed.has(a.id)).length;
+  }
 
   /**
    * The routine: start wages for new hires and stop them for the dead and the departed; offer each posting's job to
@@ -1175,9 +1180,11 @@ export const employer: BehaviourModule = {
         target: p.target_staff, wage: p.wage, canPost: acc.balance >= p.buffer_periods * bill,
         why: `Short-staffed (${staff.length + staffing.offered(book, t).length} of ${p.target_staff}) with ${p.buffer_periods} pay periods of the wage bill in hand: posting a job.`,
       });
-      // Can't cover the next pay period: lay off the most recent hire.
-      if (staff.length && acc.balance < staff.length * p.wage) {
-        steps.push(...staffing.letGo(book, t, `Can't cover the next pay period (${usd(acc.balance)} for ${staff.length} staff): laying off the most recent hire.`, "Redundancy: we can't cover the wage bill."));
+      // Can't cover the next pay period: lay off the most recent hire (and the next, at our next look, until those we're
+      // keeping can be paid: not everyone, one after another, because the ones already given notice are still counted).
+      const keeping = staffing.keeping(book, t);
+      if (keeping && acc.balance < keeping * p.wage) {
+        steps.push(...staffing.letGo(book, t, `Can't cover the next pay period (${usd(acc.balance)} for ${keeping} staff): laying off the most recent hire.`, "Redundancy: we can't cover the wage bill."));
       }
 
       // Monthly: pay suppliers (the outside world) for goods sold.

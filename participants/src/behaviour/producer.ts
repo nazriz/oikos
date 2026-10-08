@@ -212,16 +212,20 @@ export const producer: BehaviourModule = {
           const owed = winding.debts(book).reduce((x, d) => x + cents(d.about.amount), 0);
           if (owed > acc.balance && winding.state === "trading" && borrowing.canApply(t)) steps.push(borrowing.apply(t, acc.account, Math.ceil((owed - acc.balance) / 100_000) * 100_000, 12, "paying our debts", `We owe ${usd(owed)} in debts recorded against us and have ${usd(acc.balance)}: asking our bank for the difference.`));
         }
-        if (winding.state === "trading" && workers.length && acc.balance < workers.length * wage) {
+        // (Those we're keeping: someone already given notice is still staff until it runs out, and counting them made
+        // this let everyone go, one after another within the moment, where the rule lets the most recent hire go.)
+        const keeping = staffing.keeping(book, t);
+        if (winding.state === "trading" && keeping && acc.balance < keeping * wage) {
           // Short of the next pay period: first, working capital from our bank (two months' wages); while we wait to hear,
-          // nobody is let go. Refused (or in default): the most recent hire goes, and this month's headcount with them.
+          // nobody is let go. Refused (or in default): the most recent hire goes, and this month's headcount with them
+          // (and the next, until those we keep can be paid).
           const bill = Math.floor((workers.length * wage * MONTH) / p.period);
           if (borrowing.canApply(t)) {
             const amount = Math.ceil((2 * bill) / 100_000) * 100_000;
             steps.push(borrowing.apply(t, acc.account, amount, 12, "working capital", `We have ${usd(acc.balance)}, not enough for the next pay period (${workers.length} staff): asking our bank for ${usd(amount)} of working capital before letting anyone go.`));
           } else if (!borrowing.waiting(t)) {
-            const s = staffing.letGo(book, t, `Can't cover the next pay period (${usd(acc.balance)} for ${workers.length} staff), and no loan to be had: letting the most recent hire go.`, "Redundancy: we can't cover the wage bill.");
-            if (s.length) headcount = Math.min(headcount, workers.length - 1);
+            const s = staffing.letGo(book, t, `Can't cover the next pay period (${usd(acc.balance)} for ${keeping} staff), and no loan to be had: letting the most recent hire go.`, "Redundancy: we can't cover the wage bill.");
+            if (s.length) headcount = Math.min(headcount, keeping - 1);
             steps.push(...s);
           }
         }

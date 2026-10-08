@@ -48,7 +48,7 @@ The same helper (`Borrowing`) for households and firms:
 
 **When they apply:**
 - **A household** (citizen 0.11.0): when its money is less than next month's housing and essentials, and it has income coming in. It asks for three months' worth, less what it has, over a year. It's a loan to tide it over.
-- **A factory or shop** (producer, retailer): when it can't cover the next pay period, it asks for two months' wage bill over a year before letting anyone go, and lets no one go while it waits to hear. Refused, it lets the most recent hire go.
+- **A factory or shop** (producer, retailer): when it can't cover the next pay period, it asks for two months' wage bill over a year before letting anyone go, and lets no one go while it waits to hear, or for a day after a loan is granted or signed for (the bank pays it out at its next look, not in the moment of signing). Refused, it lets the most recent hire go, and the next, until it can pay those it keeps.
 
 **Leaves out:**
 - borrowing to buy things (there's one good, bought as it's used);

@@ -459,9 +459,12 @@ export const builder: BehaviourModule = {
           target: want, wage: wage, canPost: acc.balance >= bill + wage,
           why: `${Math.round(inHand / 3600)} hours of work in hand need ${want} hands to do within ${p.horizon_days} days; we have ${crewNow.length}: posting a job.`,
         }));
-        if ((crewNow.length > want && t - lastLetGo >= p.let_go_every_days * DAY) || (crewNow.length && acc.balance < crewNow.length * wage)) {
-          const broke = acc.balance < crewNow.length * wage;
-          const s = staffing.letGo(book, t, broke ? `Can't cover the next pay period (${usd(acc.balance)} for ${crewNow.length}): letting the most recent hire go.` : `${Math.round(inHand / 3600)} hours of work in hand need ${want} hands; we have ${crewNow.length}: letting the most recent hire go.`,
+        // (Short of the next pay period for those we're keeping: someone already given notice is still crew until it runs
+        // out, and counting them let the whole crew go, one after another within the moment.)
+        const keeping = staffing.keeping(book, t);
+        const broke = keeping > 0 && acc.balance < keeping * wage;
+        if ((crewNow.length > want && t - lastLetGo >= p.let_go_every_days * DAY) || broke) {
+          const s = staffing.letGo(book, t, broke ? `Can't cover the next pay period (${usd(acc.balance)} for ${keeping}): letting the most recent hire go.` : `${Math.round(inHand / 3600)} hours of work in hand need ${want} hands; we have ${crewNow.length}: letting the most recent hire go.`,
             broke ? "Redundancy: we can't cover the wage bill." : "Redundancy: there isn't the work.");
           if (s.length) lastLetGo = t;
           steps.push(...s);
