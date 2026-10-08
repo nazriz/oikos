@@ -41,7 +41,8 @@ export type ClaudeCodeRunner = (args: string[], stdin: string, cwd: string, time
  * counted as its own.) */
 export const spawnClaudeCode: ClaudeCodeRunner = (args, stdin, cwd, timeoutMs) => {
   const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => k !== "ANTHROPIC_API_KEY" && !/^CLAUDE(CODE$|_CODE_|_PID$|_EFFORT$)/.test(k)));
-  return runBounded(["claude", ...args], stdin, cwd, timeoutMs, undefined, undefined, env);
+  // (OIKOS_CLAUDE_BIN: which Claude Code to run, where the first on the path is too old for a model: Fable 5.1 wants 2.1.251 or newer.)
+  return runBounded([process.env.OIKOS_CLAUDE_BIN || "claude", ...args], stdin, cwd, timeoutMs, undefined, undefined, env);
 };
 
 /** What is the same call after call for one seat: its instructions, then the tools and how an answer is given. */
