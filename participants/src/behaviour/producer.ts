@@ -212,17 +212,20 @@ export const producer: BehaviourModule = {
           const owed = winding.debts(book).reduce((x, d) => x + cents(d.about.amount), 0);
           if (owed > acc.balance && winding.state === "trading" && borrowing.canApply(t)) steps.push(borrowing.apply(t, acc.account, Math.ceil((owed - acc.balance) / 100_000) * 100_000, 12, "paying our debts", `We owe ${usd(owed)} in debts recorded against us and have ${usd(acc.balance)}: asking our bank for the difference.`));
         }
-        if (winding.state === "trading" && workers.length && acc.balance < workers.length * wage) {
+        // (Those we're keeping: someone already given notice is still staff until it runs out, and counting them made
+        // this let everyone go, one after another within the moment, where the rule lets the most recent hire go.)
+        const keeping = staffing.staying(book, t);
+        if (winding.state === "trading" && keeping && acc.balance < keeping * wage) {
           // Short of the next pay period: first, working capital from our bank (two months' wages); while we wait to hear,
-          // nobody is let go. Refused (or in default): the most recent hire goes, and this month's headcount with them.
+          // nobody is let go. Refused (or in default): the most recent hire goes, and this month's headcount with them
+          // (and the next, until those we keep can be paid).
           const bill = Math.floor((workers.length * wage * MONTH) / p.period);
           if (borrowing.canApply(t)) {
             const amount = Math.ceil((2 * bill) / 100_000) * 100_000;
             steps.push(borrowing.apply(t, acc.account, amount, 12, "working capital", `We have ${usd(acc.balance)}, not enough for the next pay period (${workers.length} staff): asking our bank for ${usd(amount)} of working capital before letting anyone go.`));
-          } else if (!borrowing.waiting(t) && acc.balance < staffing.staying(book, t) * wage) {
-            // (Until those who stay can be paid: the ones already given notice are going.)
-            const s = staffing.letGo(book, t, `Can't cover the next pay period (${usd(acc.balance)} for ${workers.length} staff), and no loan to be had: letting the most recent hire go.`, "Redundancy: we can't cover the wage bill.");
-            if (s.length) headcount = Math.min(headcount, workers.length - 1);
+          } else if (!borrowing.waiting(t)) {
+            const s = staffing.letGo(book, t, `Can't cover the next pay period (${usd(acc.balance)} for ${keeping} staff), and no loan to be had: letting the most recent hire go.`, "Redundancy: we can't cover the wage bill.");
+            if (s.length) headcount = Math.min(headcount, keeping - 1);
             steps.push(...s);
           }
         }
@@ -236,7 +239,12 @@ export const producer: BehaviourModule = {
         }
 
         // ---- inputs: (s, S): below a month's use (with what's on order), order up to a month and a half's ----
+        // As much as we can pay for, keeping the next pay period's wages aside for the staff we have or are hiring to, as a
+        // shop does when it restocks (docs/behaviour/retailer.md): inputs are bought a month ahead of their use, and
+        // wages fall due within the fortnight. (Until 2026-10-08 the whole balance went on an order: a works holding a
+        // month's inputs spent its payroll on the next half month's, and gave its staff notice for want of the payroll.)
         const plan = monthlyUnits(workers.length);
+        let spare = acc.balance - Math.max(workers.length, headcount) * wage;
         for (const [kind, per] of Object.entries(p.per_unit).sort(([a], [b]) => (a < b ? -1 : 1))) {
           if (winding.state !== "trading") break; // winding up: no more buying
           const have = held(obs, p.works, kind) + (onOrder.get(kind) ?? 0);
@@ -244,11 +252,14 @@ export const producer: BehaviourModule = {
           const up = Math.floor((plan * per * 3) / 2);
           const unit = supply.prices[kind];
           if (have >= s || unit === undefined || !supply.account) continue;
-          const q = Math.max(up - have, supply.min_order ?? 1); // at least what the supplier sells in one order
-          if (acc.balance < q * unit) continue;
+          const least = supply.min_order ?? 1; // at least what the supplier sells in one order
+          const want = Math.max(up - have, least);
+          const q = Math.min(want, Math.floor(spare / unit));
+          if (q < least || q <= 0) continue;
+          spare -= q * unit;
           onOrder.set(kind, (onOrder.get(kind) ?? 0) + q);
           const st = order({ me, seller: p.supplier, sellerAccount: supply.account, kind, quantity: q, unitPrice: unit, at: p.works, from: acc.account,
-            why: `Our ${kind} (${have} with what's on order) are below a month's production (${s}): ordering ${q}, up to a month and a half's.` });
+            why: `Our ${kind} (${have} with what's on order) are below a month's production (${s}): ordering ${q}, ${q < want ? `as many as we can pay for with the next pay period's wages kept aside (${want} would take us up to a month and a half's)` : "up to a month and a half's"}.` });
           st.then = (out) => {
             const id = out.created?.order;
             if (id) orderQty.set(id, { kind, quantity: q });

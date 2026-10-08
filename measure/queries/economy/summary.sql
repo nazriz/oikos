@@ -18,13 +18,14 @@ emp as (select a.run_id, a.id, json_extract_string(a.body, '$.terms.parties[0]')
 jobs as (select e.run_id, count(distinct e.worker) as employed from emp e join r on r.run_id = e.run_id
     left join people p on p.run_id = e.run_id and p.entity = e.worker
   where e.signed_t <= r.end_t and (e.notice_t is null or e.notice_t > r.end_t) and (p.gone_t is null or p.gone_t > r.end_t) group by all),
-person_accounts as (select distinct a.run_id, a.account, a.holder, l.t as left_t, ar.t as arrived_t from accounts a join entities e on e.run_id = a.run_id and e.entity = a.holder and e.kind = 'person'
+person_accounts as (select distinct a.run_id, a.account, a.holder, l.t as left_t, ar.t as arrived_t, d.t as died_t from accounts a join entities e on e.run_id = a.run_id and e.entity = a.holder and e.kind = 'person'
   left join (select run_id, person, min(t) as t from life where event = 'person_left' group by all) l on l.run_id = a.run_id and l.person = a.holder
-  left join (select run_id, person, max(t) as t from life where event = 'person_arrived' group by all) ar on ar.run_id = a.run_id and ar.person = a.holder),
--- (Not income or spending but wealth moving, as the national accounts treat it: what a leaver's account pays out once they've gone, and what comes in with a newcomer on the day they arrive.)
+  left join (select run_id, person, max(t) as t from life where event = 'person_arrived' group by all) ar on ar.run_id = a.run_id and ar.person = a.holder
+  left join (select run_id, person, min(t) as t from life where event = 'person_died' group by all) d on d.run_id = a.run_id and d.person = a.holder),
+-- (Not income or spending but wealth moving, as the national accounts treat it: what a leaver's account pays out once they've gone, what comes in with a newcomer on the day they arrive, and what a dead person's account pays out: their estate, to the town where there is no heir. Counted as spending, one estate was ten points of a town's saving over two months.)
 flows as (select t.run_id,
     sum(t.amount) filter (where ti.account is not null and fi.account is null and not (ti.arrived_t is not null and t.t between ti.arrived_t and ti.arrived_t + 86400)) as came_in,
-    sum(t.amount) filter (where fi.account is not null and ti.account is null and not (fi.left_t is not null and t.t >= fi.left_t)) as went_out
+    sum(t.amount) filter (where fi.account is not null and ti.account is null and not (fi.left_t is not null and t.t >= fi.left_t) and not (fi.died_t is not null and t.t >= fi.died_t)) as went_out
   from transfers t join r on r.run_id = t.run_id left join person_accounts ti on ti.run_id = t.run_id and ti.account = t."to" left join person_accounts fi on fi.run_id = t.run_id and fi.account = t."from"
   where t.t >= r.from_t group by all)
 select r.run_id, r.seed, e.adults, e.working_age, e.labour_force, j.employed,

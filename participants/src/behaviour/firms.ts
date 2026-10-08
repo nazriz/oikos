@@ -1190,9 +1190,11 @@ export const employer: BehaviourModule = {
         target: p.target_staff, wage: p.wage, canPost: acc.balance >= p.buffer_periods * bill,
         why: `Short-staffed (${staff.length + staffing.offered(book, t).length} of ${p.target_staff}) with ${p.buffer_periods} pay periods of the wage bill in hand: posting a job.`,
       });
-      // Can't cover the next pay period: lay off the most recent hire.
-      if (staff.length && acc.balance < staffing.staying(book, t) * p.wage) {
-        steps.push(...staffing.letGo(book, t, `Can't cover the next pay period (${usd(acc.balance)} for ${staff.length} staff): laying off the most recent hire.`, "Redundancy: we can't cover the wage bill."));
+      // Can't cover the next pay period: lay off the most recent hire (and the next, at our next look, until those we're
+      // keeping can be paid: not everyone, one after another, because the ones already given notice are still counted).
+      const keeping = staffing.staying(book, t);
+      if (keeping && acc.balance < keeping * p.wage) {
+        steps.push(...staffing.letGo(book, t, `Can't cover the next pay period (${usd(acc.balance)} for ${keeping} staff): laying off the most recent hire.`, "Redundancy: we can't cover the wage bill."));
       }
 
       // Monthly: pay suppliers (the outside world) for goods sold.

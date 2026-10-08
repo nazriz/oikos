@@ -234,3 +234,10 @@ Sources opened on 2026-10-08 unless marked.
 |---|---|---|
 | A pool of tokens that every job on a machine draws from before it starts heavy work, however deep in a tree of processes it is, with a job's children counted as inside its token | GNU Make's jobserver: Smith, P. D., "Jobserver Implementation", in the GNU Make manual, "Sharing Job Slots with GNU make" (Free Software Foundation) **(to confirm: section title and author as cited)** | `scripts/slots.ts`: the tokens are files in one directory rather than bytes in a pipe, so that jobs in unrelated process trees share them and a dead holder's can be reclaimed |
 | A lock taken by making a hard link to a file already written (atomic on a local file system; the lock is never seen half written) | The `open(2)` manual's note on lock files over NFS (`link(2)` to a unique file, in place of `O_EXCL`) **(to confirm)** | `scripts/slots.ts`, `claim` |
+
+## A works' money (docs/behaviour/producer.md, generator.md; docs/decisions.md, 2026-10-08)
+
+| Idea | Citation | Used in |
+|---|---|---|
+| A firm keeps a buffer of money in proportion to its wage bill before it pays its owners | Lengnick, M. (2013), "Agent-based macroeconomics: A baseline model", *Journal of Economic Behavior & Organization* 86, 102-120 (the liquidity buffer, chi) | `firm.producer`: inputs are bought with the next pay period's wages kept aside |
+| Working capital is what carries a firm from paying for inputs and wages to being paid for what it sells | Richards, V. D. and Laughlin, E. J. (1980), "A cash conversion cycle approach to liquidity analysis", *Financial Management* 9(1), 32-38 **(to confirm: not opened; cited for the idea only, no figure taken from it)** | `worlds/generator/generate.ts`: a works' opening money (a month's wages and a month's inputs for its opening staff), as the reason it is derived |
