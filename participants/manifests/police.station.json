@@ -1,6 +1,6 @@
 {
   "name": "police.station",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "doc": "docs/behaviour/crime.md",
   "params": {
     "account": {
@@ -21,12 +21,11 @@
       "required": true,
       "source": "the station, and where its officers work (the world must say)"
     },
-    "call_seconds": {
+    "calls_channel": {
       "schema": {
-        "type": "integer"
+        "type": "string"
       },
-      "unit": "seconds",
-      "default": 3600,
+      "default": "",
       "source": "placeholder"
     },
     "channel": {
@@ -34,20 +33,6 @@
         "type": "string"
       },
       "default": "premises",
-      "source": "placeholder"
-    },
-    "found_after": {
-      "schema": {
-        "type": "array"
-      },
-      "default": [],
-      "source": "placeholder"
-    },
-    "homes_channel": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "",
       "source": "placeholder"
     },
     "industry": {

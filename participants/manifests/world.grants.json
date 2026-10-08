@@ -1,6 +1,6 @@
 {
   "name": "world.grants",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "doc": "docs/behaviour/public-finance.md",
   "params": {
     "account": {
@@ -8,21 +8,6 @@
         "type": "string"
       },
       "default": "",
-      "source": "placeholder"
-    },
-    "count_at": {
-      "schema": {
-        "type": "integer",
-        "description": "when it looks (a time of night: residents are counted where they sleep, as a census counts them)"
-      },
-      "default": 10800,
-      "source": "when it looks (a time of night: residents are counted where they sleep, as a census counts them)"
-    },
-    "dwelling": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "dwelling",
       "source": "placeholder"
     },
     "every_days": {

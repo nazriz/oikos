@@ -1,6 +1,6 @@
 {
   "name": "city.environment",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "doc": "docs/behaviour/environment.md",
   "params": {
     "decline_flag_bps": {
@@ -36,13 +36,6 @@
       "default": "",
       "source": "placeholder"
     },
-    "land_channel": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "land",
-      "source": "placeholder"
-    },
     "look_at": {
       "schema": {
         "type": "integer"
@@ -56,6 +49,13 @@
       },
       "unit": "days",
       "default": 5,
+      "source": "placeholder"
+    },
+    "lots": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
       "source": "placeholder"
     },
     "notice_days": {

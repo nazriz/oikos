@@ -28,6 +28,7 @@ export function callsOf(action: { type: string; call?: string; reasoning?: strin
 export const context = (participant: string, entity: string, params: object, o: { position?: string; seed?: bigint; currency?: object } = {}): any => ({
   participant, entity, position: o.position, params,
   rng: (purpose: string) => new Randomness(o.seed ?? 1n).stream([participant, purpose]),
+  chance: (purpose: string) => new Randomness(o.seed ?? 1n).stream(["chance", purpose]),
   world: { tickSeconds: 3600, runEnd: 4000 * DAY, currency: o.currency },
 });
 
@@ -40,11 +41,13 @@ export const context = (participant: string, entity: string, params: object, o: 
 export function wake(m: { step: (o: Observation, ctx: any) => any }, t: number, channels: { [id: string]: any }, o: { entity: string; inbox?: any[]; as?: { participant: string; position?: string }; ids?: { n: number }; woke_for?: string; more?: object } = { entity: "city" }) {
   const said: Said[] = [];
   const made: any[] = [];
+  const looks: any[] = [];
   const ids = o.ids ?? { n: 0 };
   let obs = { t, entity: o.entity, participant: o.as?.participant ?? "x", channels, inbox: o.inbox ?? [], outcomes: [], woke_for: o.woke_for ?? "cadence", ...(o.more ?? {}) } as unknown as Observation;
   for (let i = 0; i < 2000; i++) {
     const a: any = m.step(obs, undefined as any);
     if (a.type === "wait") break;
+    if (a.type === "look") looks.push(...a.looks);
     const calls = callsOf(a, t);
     said.push(...calls);
     const created: { [name: string]: string } = {};
@@ -58,7 +61,7 @@ export function wake(m: { step: (o: Observation, ctx: any) => any }, t: number, 
     obs = { ...obs, woke_for: "done", outcomes: [{ action: `act.${i}`, t, status: "applied", ...(Object.keys(created).length ? { created } : {}) }], inbox: [],
       channels: Object.fromEntries(Object.entries(obs.channels).map(([k, c]: [string, any]) => [k, c.kind === "records" ? { ...c, records: [] } : c.kind === "accounts" ? { ...c, transactions: [] } : c])) } as unknown as Observation;
   }
-  return { said, made, of: (fn: string, kind?: string) => said.filter((c) => c.fn === fn && (kind === undefined || c.args.kind === kind)) };
+  return { said, made, looks, of: (fn: string, kind?: string) => said.filter((c) => c.fn === fn && (kind === undefined || c.args.kind === kind)) };
 }
 
 /** A statement record, as a world's genesis or another participant would have made it. */

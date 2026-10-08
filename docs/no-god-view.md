@@ -58,7 +58,7 @@ the contract cannot see:
 | Way in | Whole when |
 |---|---|
 | A `kept` channel | always: it must be a declared keeper's, and the test lists every one |
-| A seat's own files (`mine`, shown as they come) | they hold, at the start, at least 25 records of a collection and nine tenths of all there are (everything a registry issues names the registry) |
+| A seat's own files (`mine`, shown as they come) | they hold, at the start, at least 25 records of a collection and nine tenths of all there are (everything a registry issues names the registry: which is why the land registry and the electoral commission are bodies of their own, and why a notice of acquisition is addressed to nobody) |
 | Premises | they are half the ground or more |
 | A parameter the module is handed | it names every entity of a kind there are five or more of, or every such entity's account (`every:shop`); or it holds a list of things dated after the start (`future`) |
 
@@ -79,6 +79,9 @@ What nothing can see: what a keeper does with its register; a view built up by a
 - `ask.board(channel, { most, where, by })`: a reader's few of a board.
 - `lookUp.entity / participant / position / name / holders(channel, ...)`: who someone is, or who holds an office.
 - `goSee(channel, places)`, then `visited(obs, channel)`: going to look.
+- `ownerLooks(book, asked, register, lot)`, then `ownerOf(book, lot)`: who owns one lot, by the register.
+- `ownLand(book, owner)` (`behaviour/institutions.ts`): an organisation's own land, by its own papers.
+- `ctx.chance(purpose)`: a draw that is the same for whoever makes it (how long a silent house goes unremarked).
 - `Asked`: remembers what has been asked, so each thing is asked once.
 
 Return them from a stepper's `looks` (`behaviour/firms.ts`) or as a `look` action. An ask, a board and a look-up are

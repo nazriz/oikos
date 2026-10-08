@@ -594,6 +594,10 @@ fn holds(r: &Record, c: &crate::config::Condition) -> bool {
         return b.cites(want) == (c.op == CmpOp::Eq);
     }
     let Some(v) = field(r, &c.field) else { return false };
+    // A list: it equals a value it holds, and differs from one it does not (a plan's cells: which lot is this cell on).
+    if let (Value::Array(items), CmpOp::Eq | CmpOp::Ne) = (&v, c.op) {
+        return items.iter().any(|x| compare(x, &c.value) == Some(Equal)) == (c.op == CmpOp::Eq);
+    }
     let Some(o) = compare(&v, &c.value) else { return false };
     match c.op {
         CmpOp::Eq => o == Equal,

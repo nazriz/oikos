@@ -53,14 +53,15 @@ to whom, how many at once). The generator takes each declaration from the behavi
 
 | Keeper | Keeps | Why | Answers |
 |---|---|---|---|
-| The land registry (its own body, stage d) | lots (plans); titles; dealings (transfers, releases, what is struck out) | It makes the register: title is by registration | A lot by its number; a title by its number or by the lot it is to; the dealings in one title. By holder: only to the holder itself and to the bodies a statute supplies (the rating authority, the water corporation, the valuer), section 6 |
+| The land registry (its own body) | lots (plans); titles; dealings (transfers, releases, what is struck out) | It makes the register: title is by registration | A lot by its number, or by a cell of its ground (an address); a title by its number or by the lot it is to; the dealings in one title. By holder: to nobody, as built (the bodies a statute supplies are told instead: section 6; the field and the `to` list are in the contract for a world that wants it) |
 | The registry of births, deaths and marriages | death notifications sent to it; its entries | Every notification is addressed to it; it makes the entries | Nothing by search: it sends each entry to those concerned (docs/behaviour/deaths.md) |
-| The electoral office (its own body, stage d) | enrolments; its roll | Every enrolment is addressed to it; it makes the roll | An elector their own enrolment (it is theirs already); nothing else |
+| The electoral office (its own body: the electoral commission) | enrolments; its roll | Every enrolment is addressed to it; it makes the roll | An elector their own enrolment (it is theirs already); nothing else |
 | A bank (both offices) | its customers' instructions | Each is addressed to it | Nothing: an account's holder sees their own account |
 | The school | its enrolments and places | Each is addressed to it or made by it | Nothing |
 | The rating authority (the town's rates office) | valuations sent to it: the rate book | Each valuation is addressed to it as rating authority | An owner their own (it is theirs already) |
-| The valuer | its valuation roll | It makes each valuation | Nothing by search: each valuation goes to the owner and the rating authority |
-| The water corporation | its customer roll | Each customer is one it supplies and bills | Nothing |
+| The valuer | its valuation roll (the properties, and the notices of acquisition given to it) | It makes the roll; each notice is given to it | Nothing by search: each valuation goes to the owner and the rating authority |
+| The water corporation | its customer roll (the same roll as given to it, and the notices) | Each is given to it as the supplier of the land | Nothing |
+| The works office | its round (the addresses it collects from) | It makes each entry | Nothing |
 
 Nobody keeps **the directory** (who exists, and who holds which office): it has no whole view at all, for anyone
 (section 7). Nobody keeps **the map**: the ground is seen by being there or by going.
@@ -127,11 +128,17 @@ corporation, the valuer. In the profile's place they do not search the register 
 acquires land lodges a notice of acquisition, which goes to the revenue office, the council and the water authority;
 valuations go to the owner and the rating authority. So here:
 
-- The land registry addresses each dealing it registers (a transfer, a new title) to the bodies its module is told
-  to notify (a parameter of the registry's module: behaviour, not contract), and each of them keeps a **roll of its
-  own** from what it is sent: its own records, `mine`.
-- At the start of a run each such body already holds its roll as its own papers (a roll made before the run began,
-  one record for each property, addressed to it by the registry at genesis).
+- The land registry tells the bodies its module is told to notify (a parameter of the registry's module: behaviour,
+  not contract) each time land changes hands: a notice of acquisition, **seen by them alone and addressed to nobody**
+  (as built: a notice addressed to a body would arrive among the papers of every office of that body, and a body
+  with many offices would be shown a register in its in-tray). Each of them keeps a **roll of its own** from what it
+  is given, as its declared keeper (`keeps` on its module): the valuer and the water corporation.
+- At the start each such body already holds its roll: the valuer's roll as it stood when the run began (one record
+  for each property that is not the town's: the lot, its ground, its owner, what stands on it), given to the water
+  corporation too.
+- As built, the town's rating authority is not sent the notices: it rates on the valuer's valuations, each of which
+  names the owner. The town's other offices need the town's own land only: the titles the town holds (its own
+  papers) and its asset register (its own document), kept up by the notices of building work the town is given.
 - What a roll does not say, the office finds out by asking for the one thing (a lot's plan) or going to look (what is
   built there now).
 
@@ -180,17 +187,17 @@ A `sites` channel with `way: "visit"` shows nothing until its seat goes. A look 
 
 **Who goes where, replacing the maps** (each documented with its real-world basis in docs/behaviour/):
 
-| Seat | Was shown | Now |
+| Seat | Was shown | Now (as built) |
 |---|---|---|
-| The police | Every home, by name, when they asked | They go to the one home they are asked to check on (a welfare check): asked by a landlord whose rent has stopped, an employer whose worker has not come, or a neighbour who has seen nobody in or out. `life.found_alone_after` stays as how long it takes a neighbour to notice and ask, with its source |
-| The builder | Every cell, weekly | Its own yard (`here`); it goes to a lot before building on it, and sees its sites as it works on them |
-| The building inspector | Every cell, fortnightly (a patrol) | The builder notifies the council when it starts a building; the inspector goes to that site |
-| The valuer | Every cell, monthly | Its own valuation roll; it goes to a property when told something was built there |
-| The funders (health, school, police, grants to the town) | Every cell, monthly (a head count) | A published population estimate (the statistician's, made from registrations and movements) |
-| The planning office, the mayor | Every cell, monthly | The town's own asset register (its lots and what stands on each: the town's own paper), kept up from the town's own contracts; they go to look at a lot before relying on it |
-| The works office | The whole town, always | Its round: the addresses it serves (its own roll), each seen when the crew is there; its own assets, inspected |
-| The water corporation | The whole town, always | Its customer roll, and the residents each customer declares |
-| The environment office | The whole district, monthly | Its scientists' surveys (as now) say what they found where they went; the cover of each cell surveyed comes with the survey |
+| The police | Every home, by name, when they asked | They go to the one home they are asked to check on (a welfare check). A neighbour asks: from outside a home shows how many are in it and when anyone was last seen going in or coming out, never who, and one that someone went into and has not come out of, with nobody there, is remarked on after the time `life.found_alone_after` gives. A landlord still looks into its own buildings itself; an employer does not ask (docs/behaviour/deaths.md) |
+| The builder | Every cell, weekly | Its own yard (`here`); its foreman goes to a lot before the job is taken on, and to a building before bringing it down; its crew sees its sites as they work on them (the outcome of work: `seen`). It gives notice of building work as it begins |
+| The building inspector | Every cell, fortnightly (a patrol) | The builder gives the town notice when it starts a building; the inspector goes to that site, and asks the land registry who owns the lot |
+| The valuer | Every cell, monthly | Its own valuation roll, kept up by the notices of acquisition and by what the town's inspector asks it to value as built or brought down. It goes to no property (a mass valuation does not: docs/behaviour/knowing.md, section 2). The design had it go when told of a building; the source says a supplementary valuation is made on the council's request |
+| The funders (health, school, police, grants to the town) | Every cell, monthly (a head count) | A published population estimate (the statistician's, made from the census count, registered births and deaths, arrivals and departures) |
+| The planning office, the mayor | Every cell, monthly | The town's own asset register (its lots and what stands on each: the town's own paper), kept up from the notices of building work the town is given; the mayor sends someone to look at a lot before applying to build on it |
+| The works office | The whole town, always | Its round: the addresses it serves (its own register), each seen by the crew that collects there; the town's own assets, each inspected once (a visit) and then seen by the crew that keeps it up |
+| The water corporation | The whole town, always | Its customer roll; a meter on each home (a measure of the building, in the world's catalogue), read by going round before each quarter's bills; the published population estimate for what it draws. The design had each customer declare its residents; nobody does that, and a meter is what a water corporation reads |
+| The environment office | The whole district, monthly | Its own habitat map (its own document, as old as the day it was made), less what the town has had notice of being built on; which lot a cell is on, asked of the land registry. The design had the cover of each cell come with the survey; the office has to choose where to survey before it goes |
 
 ## 9. What a model seat's tools become
 
@@ -211,6 +218,10 @@ only what its office can do, in the world's terms.
   of every building. It can still find out everything a real office-holder could: by asking the keeper, by sending
   someone, by reading what is published, or by writing to the office that knows (the planning office's report, the
   finance office's).
+
+- **Places** it is not at: `look` at "Go and see (takes time)", naming buildings by id or ground by its cell (as
+  built; a lot is not a place: its cells are on its plan). The report after its staff are back sets out what was found
+  there, once; what earlier goings found is the seat's to keep in its notebook.
 
 ## 10. The weather bureau
 
@@ -233,8 +244,8 @@ not found, the bureau stays a declared boundary module with that reason.
   - sites: `"here" | "visit"`. `area` is `{near}` (at most 2) or `{premises: [cells]}` (`here`), absent (`visit`);
     `"all"`, lists and `{place}` removed.
   - directory: `way: "ask"` only.
-  - During the migration only: `way: "whole"` (the old unscoped forms), each one listed in the guard's `OWED`.
-    Removed from the schema when `OWED` is empty.
+  - During the migration only, there was `way: "whole"` (the old unscoped forms), each one listed in the guard's
+    `OWED`. Both are gone (2026-10-08).
 - **`knowing`** (new, top level, optional): `published` (list of `{ what, why, board?, most? }`), `keepers` (list of
   `{ entity, what, why, answers?: [{ by, to?, most? }] }`), `visit_seconds`.
 - Load-time validation (the kernel refuses the config): a channel whose way does not allow its scope; a published
@@ -249,6 +260,20 @@ not found, the bureau stays a declared boundary module with that reason.
   `who`, or a visit look without `visit`, is rejected.
 - **`QueryField`**: new `holder` (a claim's holder).
 - **`ChannelData`** (sites): new optional `visited` (true: what a visit found, as of `as_of`).
+
+As built (stages c and d), further:
+
+- **`Outcome.seen`** (new): the buildings worked on by people sent to them, each as they left it, for the one whose
+  work it was. Work nobody is named as doing shows nothing.
+- **`SiteSpace.seen_leaving`, `seen_entering`** (new, from outside only): when anyone was last seen leaving a space
+  or going into it. Never who.
+- **A sites channel of way `visit`: `look_seconds`** (new, optional): how long looking at one place takes through
+  this channel, where it is not the world's `knowing.visit_seconds`.
+- **`Query`**: where the place a condition names holds a list, `=` holds if the list has the value and `!=` if it
+  does not (a lot's plan by a cell of its ground).
+- **`way: "whole"`** is gone from the schema and the kernel.
+- In the participants' module API (not a schema): `ParticipantContext.chance(purpose)`, a deterministic stream keyed
+  by the purpose alone, for a draw that is a fact about a thing and not about who meets it.
 
 `contracts/log.schema.json`: new events `visit_started` (participant, position, channel, places, starts, done) and
 `visited` (participant, position, channel, places).
@@ -273,6 +298,11 @@ work is in flight on them): the README carries a dated change note, and the renu
 - **A look-up by name is exact.** There is no "someone called something like".
 - **A view built from many asks.** Each ask is capped; nothing counts how many a seat makes. The log has every look.
 
+- **As built:** an employer does not ask the police after a worker who has not come; work nobody gives the town
+  notice of is never inspected or valued; an asset or a meter is seen only when someone goes; a habitat map goes out
+  of date; the population the funders pay by is an estimate that misses whoever leaves or dies unrecorded; someone
+  with no neighbour is found by nobody. Each is said in its module's page.
+
 ## 13. Migration, in stages (each leaves the suite green)
 
 - **(a) The contract and the kernel.** `way` on every channel; `knowing` in the config; validation; `Position.premises`;
@@ -286,3 +316,8 @@ work is in flight on them): the README carries a dated change note, and the renu
   own for the valuer, water and rates. `OWED` loses the register lines and the town's-own-files lines.
 - **(e) The bureau's forecast**, if sourced.
 - **At zero:** `OWED` and `way: "whole"` are deleted; the guard stays as a backstop that should never fire.
+
+**Done 2026-10-08:** (a) and (b) each in a commit of their own; (c) and (d) together (the maps could not be taken
+from the town's offices before the town's own papers were theirs alone, which needed the registry to be its own
+body); (e) not built: no hit or false-alarm rates were found for the bureau's warnings in the profile's place
+(docs/behaviour/knowing.md, section 5), so the bureau stays a declared boundary module. `OWED` is empty and gone.

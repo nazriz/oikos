@@ -203,7 +203,13 @@ A model call that fails (after its adapter's own time limits and retries) is rec
 - **`LookRequest`:** `who` (a directory look-up) and `visit` (`{ places }`). **`QueryField`:** `holder`. **`ChannelData` (sites):** `visited`.
 - **Log:** events `visit_started` and `visited`.
 - **Load-time validation** as listed above; the same when a position is made during a run (`create_position`, `create_entity`'s first position).
-- **Unchanged:** blocks, records, the call language, outcomes, datasets. Going to look is a look, not an act.
+- **Added with the last whole views gone (2026-10-08; docs/decisions.md, "Knowing, stages c and d"):**
+  - `Outcome.seen`: the buildings worked on by people sent to them, each as they left it (a list of `SiteStructure`), for the one whose work it was. Work nobody is named as doing shows nothing.
+  - `SiteSpace.seen_leaving` and `seen_entering` (from outside only, where who is there cannot be told): when anyone was last seen leaving a space, or going into it. Never who.
+  - A sites channel of way `visit` may say `look_seconds`: how long looking at one place takes through it, where that is not the world's `knowing.visit_seconds`.
+  - `Query`: where the place a condition names holds a list, `=` holds if the list has the value and `!=` if it does not.
+  - **Removed:** `way: "whole"` (the migration's form for a view not yet replaced). No world may say it.
+- **Unchanged:** blocks, records, the call language, datasets. Going to look is a look, not an act.
 
 ## Changes from v0.7 (v0.8, closed 2026-10-02; docs/design/world-expansion.md)
 

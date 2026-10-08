@@ -46,13 +46,18 @@ const KEEPERS = [
   "city.electoral_office: electoral_roll",
   "city.electoral_office: enrolment",
   "city.rates_officer: valuation",
-  "city.registry: lot",
-  "city.registry: records:claim",
-  "city.registry: records:claim_release",
-  "city.registry: records:claim_transfer",
-  "city.registry: records:withdrawal",
+  "city.works: service_address",
+  "land.registry: lot",
+  "land.registry: records:claim",
+  "land.registry: records:claim_release",
+  "land.registry: records:claim_transfer",
+  "land.registry: records:withdrawal",
   "school.principal: school_enrolment",
   "school.principal: school_place",
+  "utility.water: acquisition_notice",
+  "utility.water: property_roll",
+  "world.valuer: acquisition_notice",
+  "world.valuer: property_roll",
 ];
 
 /** Every boundary module: one that stands for the simulation's own edge and is handed its conditions. */
@@ -60,59 +65,6 @@ const BOUNDARY = [
   "world.trade: every:factory",
   "world.trade: future",
   "world.weather: future",
-];
-
-/**
- * Whole views still to be removed (docs/decisions.md, "Nobody has a god's view"): each was found by this test, none is
- * a keeper's, and none may be added to. The list only shrinks: a view here that is no longer found fails the test
- * until its line is taken out.
- */
-const OWED: string[] = [
-  "city.environment: enrolment",
-  "city.environment: lot",
-  "city.environment: map",
-  "city.environment: records:claim",
-  "city.finance_officer: enrolment",
-  "city.finance_officer: lot",
-  "city.finance_officer: records:claim",
-  "city.inspector: lot",
-  "city.inspector: map",
-  "city.inspector: records:claim",
-  "city.inspector: records:claim_release",
-  "city.inspector: records:claim_transfer",
-  "city.inspector: records:withdrawal",
-  "city.mayor_code: enrolment",
-  "city.mayor_code: lot",
-  "city.mayor_code: map",
-  "city.mayor_code: records:claim",
-  "city.planning_officer: lot",
-  "city.planning_officer: map",
-  "city.planning_officer: records:claim",
-  "city.planning_officer: records:claim_release",
-  "city.planning_officer: records:claim_transfer",
-  "city.planning_officer: records:withdrawal",
-  "city.rates_officer: enrolment",
-  "city.rates_officer: lot",
-  "city.rates_officer: records:claim",
-  "city.works: enrolment",
-  "city.works: lot",
-  "city.works: map",
-  "city.works: records:claim",
-  "firm.builder: map",
-  "police.station: map",
-  "utility.water: lot",
-  "utility.water: map",
-  "utility.water: records:claim",
-  "utility.water: records:claim_release",
-  "utility.water: records:claim_transfer",
-  "utility.water: records:withdrawal",
-  "world.grants: map",
-  "world.valuer: lot",
-  "world.valuer: map",
-  "world.valuer: records:claim",
-  "world.valuer: records:claim_release",
-  "world.valuer: records:claim_transfer",
-  "world.valuer: records:withdrawal",
 ];
 
 test("every keeper and every boundary module is listed here, and each says why", () => {
@@ -134,12 +86,9 @@ test("no kind of participant is shown a whole register, population or map, or th
   const allowed = new Set([...KEEPERS, ...BOUNDARY]);
   const undeclared = found().filter((v) => !allowed.has(line(v.module, v.what)))
     .map((v) => `${line(v.module, v.what)} (${v.through}, at ${v.seat}${v.seats > 1 ? ` and ${v.seats - 1} more` : ""})`).sort();
-  const owed = new Set(OWED);
-  // Nothing new: every whole view is a keeper's, a boundary module's, a publication, or one already owed.
-  expect(undeclared.filter((u) => !owed.has(u.replace(/ \(.*$/, "")))).toEqual([]);
-  // And what is owed is still there (take a line out of OWED when its view is gone).
-  const still = new Set(undeclared.map((u) => u.replace(/ \(.*$/, "")));
-  expect(OWED.filter((o) => !still.has(o))).toEqual([]);
+  // Every whole view is a keeper's or a boundary module's. (Until 2026-10-08 a list here held the 81 views still owed;
+  // the last went with the land registry and the electoral commission becoming bodies of their own.)
+  expect(undeclared).toEqual([]);
 });
 
 test("a declaration nobody needs is not kept: each keeper and boundary module is shown what it says", () => {

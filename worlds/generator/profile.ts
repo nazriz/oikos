@@ -30,7 +30,7 @@ export interface Profile {
     };
     /** Who knows what (docs/behaviour/knowing.md): how long looking at one place gone to takes; what a search of the
      * land register costs (recorded; nobody is charged yet). */
-    knowing?: { visit_seconds: number; title_search_fee?: number; index_search_fee?: number };
+    knowing?: { visit_seconds: number; /** How long reading one meter takes someone who has gone to it. */ meter_read_seconds?: number; title_search_fee?: number; index_search_fee?: number };
     ordinary_hours_per_week: number;
     wages_per_fortnight: { shop: number; factory: number; construction: number };
     rents_per_month: {

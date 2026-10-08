@@ -42,6 +42,11 @@ test("every capacity's view equals the kernel's full picture, after every look",
         const strip = (c: any) => (c.kind === "accounts" ? { ...c, transactions: [] } : c.kind === "sites" ? { ...c, as_of: 0 } : c);
         // A channel not looked through this time (its `every`) shows what it last saw, by design.
         if (ch.kind === "sites" && !raw?.channels[id]) continue;
+        // What a visit found is the looker's memory of the places as they were then, not a sight of them now, and
+        // whom it has looked up is its own address book (the kernel's full picture has nothing of a place nobody is
+        // at, and no directory: docs/design/knowing.md, sections 7 and 8).
+        if ((ch.kind === "sites" && ch.visited) || (ch.kind === "directory" && !want)) continue;
+        if (!want) throw new Error(`${participant} sees ${id} (${ch.kind}), which the kernel's full picture of it doesn't have`);
         expect(canonical(strip(ch))).toBe(canonical(strip(want)));
         kinds.add(ch.kind);
         checked++;
@@ -50,5 +55,5 @@ test("every capacity's view equals the kernel's full picture, after every look",
   });
   expect(checked).toBeGreaterThan(500);
   expect(moves).toBeGreaterThan(0); // someone moved, and their view followed
-  expect(kinds).toEqual(new Set(["accounts", "sites", "directory", "holdings"]));
+  expect(kinds).toEqual(new Set(["accounts", "sites", "holdings"]));
 }, 300_000);

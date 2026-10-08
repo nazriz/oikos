@@ -30,6 +30,8 @@ Taxes are laws (records), and the institutions that levy, collect and pay are pa
   - **buildings:** what the builder would charge to build each one now (its published prices).
 
   This is capital improved value, estimated without sales evidence: the town has almost no property sales. Each `valuation` goes to the owner and the town.
+
+  **Who knows what (world.valuer 0.2.0).** Until 0.2.0 the valuer was shown the whole land register and a survey of every cell each month. It now values from its own roll (`roll`, a register it keeps): each property not the town's own as it stood at the start (the lot, its owner, its buildings), each notice of acquisition the land registry sends it when land changes hands, and each `valuation_request` the town's building inspector sends it for something built or brought down. It goes to no property: "Municipal property valuations are undertaken every year under a mass valuation", and a new building is valued "if so requested by the council" (docs/behaviour/knowing.md, section 2). Land the town sells joins the roll by the notice of its acquisition. **Leaves out:** the inspection of sales and of outlying properties, and the five-year rolling look from outside, which a real valuer makes; a building nobody told the council of is never valued.
 - **The rating law** (`law-rates`, the town's) gives:
   - a rate in the dollar of value a year (`rate_ppm`, millionths);
   - the instalments (4);
@@ -54,7 +56,7 @@ Taxes are laws (records), and the institutions that levy, collect and pay are pa
 
 ## Grants
 
-`world.grants` (an office of the outside world) pays the town every quarter: a yearly amount per resident, for the people it sees living in the town's homes, with a `grant_payment` statement. The generated town's figure is the profile's: general purpose grants per resident.
+`world.grants` (an office of the outside world; v0.3.0) pays the town every quarter: a yearly amount per resident, for the residents the statistician's latest published estimate gives (`population_estimate`: docs/behaviour/boundary.md), with a `grant_payment` statement that cites the estimate. Until 0.3.0 it was shown every cell of the town each month and counted who was in the homes at three in the morning; a funder counts nobody, and pays by the published count (in the profile's place, grants to councils are distributed on the statistician's estimated resident population: Local Government (Financial Assistance) Act 1995 (Cth), to confirm; not opened). With no estimate published it pays nothing and looks again the next day. The same module pays the clinic's, the school's and the police's funding. The generated town's figure is the profile's: general purpose grants per resident.
 
 **Leaves out:** grants tied to purposes (roads, capital works), and equalisation between councils.
 

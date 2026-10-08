@@ -7,17 +7,17 @@
 
 import * as C from "../calls";
 import { cents } from "../money";
-import type { SiteStructure } from "../contracts";
+import type { LookRequest, SiteStructure } from "../contracts";
 import { channels } from "../contracts";
 import { need, params, type BehaviourModule, type ParticipantContext } from "../module";
-import { nextLook, because, Book, DAY, lotOf, MONTH, say, type Step, usd, withdraw, outOfTime, team } from "./common";
+import { ask, Asked, nextLook, because, Book, DAY, lotOf, MONTH, say, type Step, usd, withdraw, outOfTime, team } from "./common";
 import { Staffing, stepper } from "./firms";
 
 const YEAR = 365 * DAY;
 
 export const environment: BehaviourModule = {
   name: "city.environment",
-  version: "0.2.1",
+  version: "0.3.0", // 0.3.0: samples habitat from its own habitat map and asks the land registry which lot a cell is on; no longer shown the district or the register of lots
   doc: "docs/behaviour/environment.md",
   cadence: () => DAY,
   firstWake: (ctx) => 8 * 3600 + ctx.rng("first-wake").below(3600),
@@ -35,13 +35,19 @@ export const environment: BehaviourModule = {
       sample_cells: 60, // at most this many of a species' habitat cells a round (placeholder; hours permitting)
       planning: "", // whom the habitat register is for (the planning office's entity)
       decline_flag_bps: 2000, // a fall this large since the last round is flagged in the report (placeholder)
-      depot_channel: "depot", land_channel: "land",
+      depot_channel: "depot",
+      // The land register's plans, asked which lot a cell of ground is on (none: its habitat register names no lots).
+      lots: "",
     }, ctx.params);
     need(p, ["depot", "workplace", "planning"], "city.environment");
     const me = ctx.entity;
     const book = new Book();
     const staffing = new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, workplace: p.workplace, role: p.role, ...(p.industry ? { industry: p.industry } : {}), does: { hire: true, pay: false }, own: "role" });
-    const cover = new Map<string, string>(); // cell -> its cover, as last seen
+    // cell -> its cover: by the office's own habitat map (its own paper, made up from where its scientists have been),
+    // less what the town has since had notice of being built on.
+    const cover = new Map<string, string>();
+    const mapped = new Set<string>();
+    const asked = new Asked();
     let depotView: SiteStructure | undefined;
     const used = new Map<string, number>(); // staff -> seconds worked today
     let usedDay = -1;
@@ -59,8 +65,14 @@ export const environment: BehaviourModule = {
       (obs) => {
         book.absorb(obs);
         staffing.absorb(obs);
-        const land = obs.channels[p.land_channel];
-        if (land?.kind === "sites") for (const c of land.cells) cover.set(c.cell, c.structure ? "built" : (c.terrain ?? ""));
+        for (const r of book.open("habitat_map")) {
+          if (mapped.has(r.id) || r.speaks_for !== me) continue;
+          mapped.add(r.id);
+          // (Area by area, a later area over an earlier one, as a map is drawn; then what was built on when it was made.)
+          for (const a of (r.data?.areas ?? []) as { cover: string; x: number; y: number; w: number; h: number }[]) for (let y = a.y; y < a.y + a.h; y++) for (let x = a.x; x < a.x + a.w; x++) cover.set(`cell.${x}.${y}`, a.cover);
+          for (const c of (r.data?.built ?? []) as string[]) cover.set(c, "built");
+        }
+        for (const n of book.open("building_notice")) if (!mapped.has(n.id) && typeof n.data?.at === "string") { mapped.add(n.id); cover.set(n.data.at, "built"); }
         const depot = obs.channels[p.depot_channel];
         if (depot?.kind === "sites") for (const c of depot.cells) if (c.structure?.structure === p.depot) depotView = c.structure;
         // What our surveys found (only we see it).
@@ -137,6 +149,17 @@ export const environment: BehaviourModule = {
         return steps;
       },
       p.look_at ? (obs) => nextLook(obs.t, p.look_at, p.look_days) : undefined,
+      // Which lot each cell is on where we found a listed species: the land registry's to say, asked about the one
+      // cell (once each), before the round's report names the lots.
+      () => {
+        if (!p.lots) return [];
+        const looks: LookRequest[] = [];
+        for (const s of p.species) {
+          if (!s.listed) continue;
+          for (const [cell, k] of found.get(s.id) ?? []) if (k > 0 && !lotOf(book, cell) && looks.length < 16 && asked.first(`ground:${cell}`)) looks.push(ask.about(p.lots, "data.cells", cell, { most: 1 }));
+        }
+        return looks;
+      },
     );
 
     function nameOf(species: string): string {

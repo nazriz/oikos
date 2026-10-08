@@ -1,6 +1,6 @@
 {
   "name": "citizen.default",
-  "version": "0.39.1",
+  "version": "0.40.0",
   "doc": "docs/behaviour/citizen.md",
   "params": {
     "accept_fewer_bedrooms_after_days": {
@@ -198,9 +198,16 @@
       "default": null,
       "source": "placeholder"
     },
+    "electoral_body": {
+      "schema": {
+        "description": "with whom we enrol, nominate and vote, where that is not the town itself (the world says)"
+      },
+      "default": null,
+      "source": "placeholder"
+    },
     "electoral_town": {
       "schema": {
-        "description": "where we enrol and vote (the world says; none: no elections)"
+        "description": "the town whose government we elect (the world says; none: no elections)"
       },
       "default": null,
       "source": "placeholder"
@@ -627,6 +634,11 @@
         "description": "consumption a year per unit of wealth"
       },
       "default": 300,
+      "source": "placeholder"
+    },
+    "welfare": {
+      "schema": {},
+      "default": null,
       "source": "placeholder"
     },
     "work_board": {

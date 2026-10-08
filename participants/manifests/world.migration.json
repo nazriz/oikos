@@ -1,6 +1,6 @@
 {
   "name": "world.migration",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "doc": "docs/behaviour/boundary.md",
   "params": {
     "households": {

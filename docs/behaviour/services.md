@@ -29,6 +29,21 @@ The crew works from the depot (the town hall) on the homes and parks. They don't
 - **The landfill** (`world.disposal`, the outside world's) invoices the town monthly for what its dockets say it brought, at the profile's price a tonne (the landfill levy; the gate fee is left out). The finance officer pays the invoice within the budget.
 - **Citizens complain.** A leaseholder whose home's waste has gone two weeks' worth uncollected writes to the town (a `complaint`), with a chance each week (the profile's, a placeholder), once until it's collected. The works office collects that home first. The mayor sees complaints.
 
+## Who knows what (city.works 0.3.0, generator 0.32.0; docs/design/knowing.md)
+
+Until 0.3.0 the works office was shown the whole town, always: every building, how much waste was at each and how
+worn each asset was, as it changed. Nobody is shown a town (docs/no-god-view.md). What it has now:
+
+| What | How it comes to know | Basis |
+|---|---|---|
+| **Where to collect** | Its round: a register of its own (`round`, which it keeps: `service_address`, an entry for each building people lived in at the start). A building it has had notice of being built since (the builder's `building_notice` to the town) joins the round, unless it is the town's own; one the crew calls at and finds nothing kept of waste at is taken off. | A council's waste service runs on a list of the properties it serves (to confirm: no source opened) |
+| **How much is at each address** | Nobody sees a bin between collections. The crew that collects sees the building as it leaves it (the outcome of its own work: `seen`), so the office knows what was left and, from what the loads it sent took, about how much had gathered since the last call. It sends for that much next time (at least a load's call at every address due). A bin left empty held no more than was sent for: next time a load less is sent, and a call that falls short is measured by what it leaves. An address never called at gets a first load, and the rest the day after. | — |
+| **The town's assets** | The town's own asset register and the notices of building work since (`ownLand`: docs/behaviour/ownership.md). Each asset it has never seen it sends someone to inspect (a visit: up to 16 at a time, taking the office's time; the crew goes on working meanwhile, the office doing two things at once). Wear runs at a steady rate, so one sight and the crew's sight after each upkeep is enough. | "The Property Department maintains an asset register of Council land and building assets" (docs/behaviour/knowing.md, section 2) |
+
+**What changed in the town** (the 1,000-person town, 90 days): about a tenth more loads' worth of the crew's time on
+collection (4,090 a month against 3,711), from the first calls and the loads sent for a little more than was there;
+no complaints; upkeep as before.
+
 ## The budget
 
 The budget has three lines, each on the council proposal form:

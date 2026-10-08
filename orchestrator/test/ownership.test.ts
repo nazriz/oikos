@@ -51,14 +51,15 @@ test("owners own their houses, repay their mortgages, pay rates, and pass their 
   // Owners never apply to rent.
   const applied = recs.filter((r) => r.kind === "rental_application" && owners.has(r.speaks_for) && !recs.some((x) => x.record === "claim_transfer" && x.claim && titles.find((t: any) => t.id === x.claim)?.holder === r.speaks_for));
   expect(applied).toEqual([]);
-  // A dead owner's title passes to their heir, recorded by the land registry (the town).
+  // A dead owner's title passes to their heir, entered by the land registry (a body of its own, which keeps the
+  // register: the registrar of deaths applies to it; until 2026-10-08 the town's registrar entered it itself).
   // (Only deaths someone sees get registered: an owner who dies while the household is out, never, until people come
   // home each day: world-expansion 6.3. The registry's part is tested on its own: participants/test/registry.test.ts.)
   const regs = recs.filter((r) => r.kind === "death_registration" && owners.has(r.data.deceased));
   for (const r of regs) {
     const title = titles.find((x: any) => x.holder === r.data.deceased);
     const passed = recs.find((x) => x.record === "claim_transfer" && x.claim === title.id);
-    expect(passed?.speaks_for).toBe("city");
+    expect(passed?.speaks_for).toBe("land-registry");
     expect(passed?.to).toBe(r.data.partner ?? passed?.to);
   }
 }, 2_400_000);

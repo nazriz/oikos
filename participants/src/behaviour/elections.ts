@@ -40,7 +40,7 @@ export const electoralOffice: BehaviourModule = {
     { what: "enrolment", why: "The electoral office keeps the roll: every elector's enrolment is lodged with it." },
     { what: "electoral_roll", why: "The roll it publishes at each election is its own." },
   ],
-  version: "0.4.0",
+  version: "0.5.0", // 0.5.0: declares a result without seating the winner where the office is another body's (`seats`)
   doc: "docs/behaviour/elections.md",
   cadence: () => DAY,
   firstWake: (ctx) => 9 * 3600 + ctx.rng("first-wake").below(3600),
@@ -54,7 +54,10 @@ export const electoralOffice: BehaviourModule = {
       nominations_close_days: 30,
       voting_days: 14, // the ballot is open this long, ending on polling day
       method: "preferential" as "preferential" | "plurality",
-      town: ctx.entity,
+      town: ctx.entity, // with whom electors enrol and candidates nominate: the electoral body itself
+      // Whether it seats the winner itself (the office is its own organisation's), or only declares the result and
+      // leaves the office's own organisation to seat whoever was elected (the world says which).
+      seats: true,
     }, ctx.params);
     need(p, ["office"], "city.electoral_office");
     const book = new Book();
@@ -94,7 +97,7 @@ export const electoralOffice: BehaviourModule = {
             steps.push(because(who ? `Nominations closed: one candidate, ${who.name}, elected unopposed.` : "Nominations closed: no candidates; no one is elected.",
               say("ballot_result", `Election result, ${p.office_title || p.office}: ${who ? `${who.name} elected unopposed` : "no one nominated; no one elected"}.`,
                 { visible: "public", data: { office: p.office, winner: who?.candidate, unopposed: !!who, candidates: names.length } }),
-              ...(who ? [C.call("position", { appoint: p.office, to: who.candidate })] : [])));
+              ...(who && p.seats ? [C.call("position", { appoint: p.office, to: who.candidate })] : [])));
             stage = "waiting";
             poll += p.term_days * DAY;
             return steps;
@@ -133,7 +136,7 @@ export const electoralOffice: BehaviourModule = {
           steps.push(because(`Polling day: counting ${last.size} formal votes of ${electors.size} electors${winner ? `; ${who?.name ?? winner} is elected` : ": nobody is elected"}.`,
             say("ballot_result", `Election result, ${p.office_title || p.office}: ${winner ? `${who?.name ?? winner} elected` : "no one elected"}; ${last.size} formal votes of ${electors.size} on the roll (turnout ${turnout / 100}%).`,
               { visible: "public", basis: ballot, data: { ballot, office: p.office, winner, rounds, formal: last.size, electors: electors.size, turnout_bps: turnout } }),
-            ...(winner ? [C.call("position", { appoint: p.office, to: winner })] : [])));
+            ...(winner && p.seats ? [C.call("position", { appoint: p.office, to: winner })] : [])));
           stage = "waiting";
           ballot = undefined;
           poll += p.term_days * DAY;

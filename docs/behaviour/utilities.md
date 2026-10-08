@@ -17,9 +17,28 @@ docs/design/world-expansion.md §6.1, contract §6.4 (signed 2026-10-01). Figure
 
 | | Rule | Source |
 |---|---|---|
-| **Supply** | Each day it draws from the river what the town used: the residents it sees in each home at `litres_per_person_per_day` (160). | ESC water performance reports (to confirm) |
+| **Supply** | Each day it draws from the river what the town uses: the statistician's latest published estimate of how many live in the town (docs/behaviour/boundary.md), at `litres_per_person_per_day` (160). With no estimate published it draws nothing. | ESC water performance reports (to confirm) |
 | **Restrictions** | When the river can't give it (refused), it announces water restrictions, and lifts them when it can again. | — |
-| **Bills** | Quarterly, to each home's owner (its lot's title): the service charge ($90) and what was used ($3 a kilolitre). Owners pay (landlords pay invoices addressed to them). | A regional corporation's tariff (to confirm); Victorian water bills go to owners |
+| **Bills** | Quarterly, to each home's owner as its customer roll has them: the service charge ($90) and what the home's meter shows was used since it was last billed ($3 a kilolitre). A meter not read this quarter is billed the service charge alone, and what it shows when next read. Owners pay (landlords pay invoices addressed to them). | A regional corporation's tariff (to confirm); Victorian water bills go to owners |
+
+### Who knows what (utility.water 0.2.0, generator 0.32.0; docs/design/knowing.md)
+
+Until 0.2.0 the corporation was shown the whole town, always (who was in every home, each morning), and the whole
+land register. Nobody is shown a town (docs/no-god-view.md). What it has now:
+
+| What | How it comes to know | Basis |
+|---|---|---|
+| **Its customers** | A roll of its own (`roll`, a register it keeps): the valuer's roll of each property as it stood at the start (the lot, its owner, the buildings on it and which hold dwellings), and each notice of acquisition the land registry sends when land changes hands. | Whoever disposes of land must give notice to the water authority (Water Act 1989 (Vic) s 159); valuations are returned to rating authorities, of which a water corporation is one (docs/behaviour/knowing.md, section 2; who is prescribed: to confirm) |
+| **New buildings** | The builder gives it notice of building work as it begins (`building_notice`), and of a demolition; the building joins the roll, or leaves it. Whether it is a home, its meter says when first read. | A connection is applied for by whoever builds (to confirm: no source opened) |
+| **What each home used** | A meter: each building that holds dwellings carries a measure, `water_used`, in litres, that rises with those in it (the world's catalogue, as waste does; `litres_per_person_per_day` a head). Before each quarter's bills (`read_days`, 21) its reader goes round the meters: a visit to up to 16 buildings at a time, which takes the corporation's time (the way there and back, and `knowing.meter_read_seconds` at each: 120, a placeholder), and the next when back. | Meters are read on a round before billing (common practice: to confirm, no source opened) |
+| **How many the town is** | The published population estimate. | — |
+
+**What changed in the town.** The daily draw follows the estimate (everyone counted as resident) and not who was
+seen at home at six in the morning: about 8% more water drawn in the first month of the 1,000-person town. A home's
+bill follows who was in it, hour by hour (the meter), not who was there at one look a day.
+
+**Leaves out:** a meter reader is nobody's working day (the corporation has no staff in the world: its draw of water
+takes none either); estimated readings; the tenant as the customer.
 
 ## The energy retailer
 

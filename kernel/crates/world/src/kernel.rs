@@ -209,6 +209,7 @@ impl World {
             occupancy: crate::state::Map::new(),
             whereabouts: Default::default(),
             departures: crate::state::Map::new(),
+            entered: crate::state::Map::new(),
             records: crate::state::Map::new(),
             marks: Default::default(),
             agreements_of: Default::default(),
@@ -505,8 +506,10 @@ impl World {
                             if v.places.is_empty() || v.places.len() > 16 {
                                 return perr("a visit goes to 1..=16 places");
                             }
-                            if let Some(p) = v.places.iter().find(|p| crate::sites::place_cells(&self.state, p).is_none()) {
-                                return perr(format!("no building or cell {p} to go to"));
+                            // (Somewhere to go: a place named that is not there, a building since brought down, is passed
+                            // by, and found missing by whoever went. Nowhere to go at all is no visit.)
+                            if v.places.iter().all(|p| crate::sites::place_cells(&self.state, p).is_none()) {
+                                return perr(format!("no building or cell to go to among {}", v.places.join(", ")));
                             }
                         }
                         (K::Sites { way: Way::Visit, .. }, None) => return perr(format!("channel {}: say where to go (`visit`): it shows nothing until someone goes", l.channel)),
@@ -673,7 +676,7 @@ impl World {
                     t,
                     EventBody::ActionRefused { action: action.clone(), participant: participant.into(), position: pos.clone(), block: r.block, code: r.code, detail: r.detail.clone() },
                 )],
-                Outcome { action, t, status: OutcomeStatus::Refused, created: None, refusal: Some(refusal_info(&r)), surveyed: None, investigated: None, seen: None },
+                Outcome { action, t, status: OutcomeStatus::Refused, created: None, refusal: Some(refusal_info(&r)), surveyed: None, investigated: None, seen: vec![] },
             ),
         };
         let key = pos.unwrap_or_else(|| SELF.into());
@@ -739,9 +742,9 @@ impl World {
                 },
             };
             let id = l.channel.rsplit('/').next().unwrap_or(&l.channel);
-            let Some(crate::config::ChannelKind::Sites { occupants, .. }) = channels.iter().find(|c| c.id == id).map(|c| c.kind.clone()) else { continue };
+            let Some(crate::config::ChannelKind::Sites { occupants, look_seconds, .. }) = channels.iter().find(|c| c.id == id).map(|c| c.kind.clone()) else { continue };
             let names = occupants == Some(crate::config::Occupants::Names);
-            events.extend(crate::sites::begin(&self.s, &mut self.state, participant, &key, &l.channel, &channels, &v.places, names));
+            events.extend(crate::sites::begin(&self.s, &mut self.state, participant, &key, &l.channel, &channels, &v.places, names, look_seconds));
         }
         events
     }

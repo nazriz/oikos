@@ -357,6 +357,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     entity,
     ...(cap === "self" ? {} : { position: cap }),
     rng: (purpose) => randomness.stream(["participant", pid, cap, String(Math.floor(t / tick) * tick), purpose]),
+    chance: (purpose) => randomness.stream(["chance", purpose]),
     world: { tickSeconds: tick, runEnd, currency },
     ...(consult ? { consult } : {}),
     // Keys sorted: the log keeps the config in canonical form, so a resumed run must see its parameters exactly as the

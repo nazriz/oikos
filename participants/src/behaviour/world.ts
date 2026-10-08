@@ -3,11 +3,10 @@
 // params.purchases = [{ to: account, amount: cents, every: seconds, memo? }].
 
 import * as C from "../calls";
-import { channels, type LookRequest, type ParticipantAction, type SiteStructure, type StatementRecord } from "../contracts";
+import { channels, type LookRequest, type ParticipantAction, type StatementRecord } from "../contracts";
 import { DAY, need, params, wait, type BehaviourModule } from "../module";
 import { cents } from "../money";
 import { ask, because, Book, callAction, MONTH, pay, publishedPrice, say, usd, withdraw, type Step, Asked, lookUp, LOOKS_MAX } from "./common";
-import { ownerOf } from "./institutions";
 import { stepper } from "./firms";
 import { fill, held, OrderBook, priceList } from "./trade";
 import { drawHousehold, drawSavings, type HouseholdSpec } from "./household";
@@ -368,11 +367,14 @@ export const weather: BehaviourModule = {
  * world.statistics: the statistician the world's government keeps (for a town, an office of a higher government: the
  * outside world). Once a month its collectors read the prices of a sample of outlets (a search of what sellers
  * advertise, the first `sample` standing lists that sell to anyone) and it publishes the mean for each kind of goods:
- * a price index, which is what anyone who needs "prices" reads (a union's claim). Documented in docs/behaviour/boundary.md.
+ * a price index, which is what anyone who needs "prices" reads (a union's claim). And it publishes how many live in
+ * the town: the count at the last census (a number it is given), plus the births registered and the people who have
+ * moved in since, less the deaths registered and those who said they were leaving: an estimate, which is what anyone
+ * who needs "the population" reads (a funder paying by the head). Documented in docs/behaviour/boundary.md.
  */
 export const statistics: BehaviourModule = {
   name: "world.statistics",
-  version: "0.1.0",
+  version: "0.2.0", // 0.2.0: the population estimate
   doc: "docs/behaviour/boundary.md",
   cadence: () => DAY,
   firstWake: () => 0,
@@ -381,29 +383,43 @@ export const statistics: BehaviourModule = {
       adverts: "", // its channel onto what sellers advertise, searched (the world must say)
       sample: 200, // outlets priced a month, at most (placeholder: what one search reads)
       every_days: 30,
+      population: 0, // how many lived in the town at the last census (a count; none: no estimate is published)
     }, ctx.params);
     need(p, ["adverts"], "world.statistics");
     let next = 0;
+    let nextEstimate = 0;
     let read: StatementRecord[] | undefined;
+    // Registrations and movements, as they reach us (each counted once).
+    const book = new Book();
     return stepper(
       (obs) => {
+        book.absorb(obs);
         const ch = obs.channels[p.adverts];
         if (ch?.kind === "records" && ch.search) read = ch.records as StatementRecord[];
       },
       (obs) => {
-        if (!read) return [];
+        const steps: Step[] = [];
+        if (p.population > 0 && obs.t >= nextEstimate) {
+          nextEstimate = obs.t + p.every_days * DAY;
+          const births = book.all("birth_registration").length, deaths = book.all("death_registration").length;
+          const arrived = book.all("arrival").reduce((n, r) => n + (Number(r.data?.people) || 0), 0), left = book.all("departure").length;
+          const residents = Math.max(0, p.population + births + arrived - deaths - left);
+          steps.push(because(`The month's estimate of the town's population: ${p.population} at the census, ${births} births and ${arrived} arrivals since, less ${deaths} deaths and ${left} departures.`,
+            say("population_estimate", `Estimated resident population: ${residents}.`, { visible: "public", data: { residents, census: p.population, births, arrivals: arrived, deaths, departures: left } })));
+        }
+        if (!read) return steps;
         const lists = read.filter((r) => r.data?.goods && !r.data?.min_order);
         read = undefined;
         next = obs.t + p.every_days * DAY;
         const by = new Map<string, number[]>();
         for (const r of lists) for (const [kind, price] of Object.entries(r.data!.goods as { [k: string]: unknown })) if (typeof price === "number") by.set(kind, [...(by.get(kind) ?? []), price]);
-        return [...by].sort(([a], [b]) => (a < b ? -1 : 1)).map(([kind, prices]) => {
+        return [...steps, ...[...by].sort(([a], [b]) => (a < b ? -1 : 1)).map(([kind, prices]) => {
           const mean = Math.round(prices.reduce((x, y) => x + y, 0) / prices.length);
           return because(`This month's prices of ${kind}, read at ${prices.length} outlets: publishing the mean.`,
             say("price_index", `Price index, ${kind}: ${usd(mean)} on average at ${prices.length} outlets.`, { visible: "public", data: { kind, mean, outlets: prices.length } }));
-        });
+        })];
       },
-      () => next,
+      () => Math.min(next, p.population > 0 ? nextEstimate : Infinity),
       (obs) => (obs.t >= next && !read ? [ask.board(p.adverts, { most: p.sample })] : []),
     );
   },
@@ -411,27 +427,51 @@ export const statistics: BehaviourModule = {
 
 /**
  * world.valuer: the valuer the world's government keeps (for a town, an office of a higher government: the outside
- * world, D31). Once a year it values every property that someone other than the exempt owns: the lot's land, at the
- * world's land value, plus each building on it at what the builder would charge to build it now (its published
- * prices). It publishes each valuation to the owner and to the town that rates it. Documented in
- * docs/behaviour/public-finance.md.
+ * world, D31). Once a year it values every property on its roll that someone other than the exempt owns: the lot's
+ * land, at the world's land value, plus each building on it at what the builder would charge to build it now (its
+ * published prices). It sends each valuation to the owner and to the town that rates it. The roll is its own: each
+ * property as it stood when the roll was last made up, the notices of land changing hands it is given since, and
+ * what the council has asked it to value since as built or brought down. It values from the roll, as a mass
+ * valuation does, and goes to no property. Documented in docs/behaviour/public-finance.md.
  */
 export const valuer: BehaviourModule = {
   name: "world.valuer",
-  version: "0.1.0",
+  keeps: [
+    { what: "property_roll", why: "The valuation roll is the valuer's own: it makes an entry for each property it values." },
+    { what: "acquisition_notice", why: "Each notice that land has changed hands is given to it, to keep its roll's owners by." },
+  ],
+  version: "0.2.0", // 0.2.0: values from its own roll, kept up by the notices and requests it is given; no longer shown the town or the land register
   doc: "docs/behaviour/public-finance.md",
   cadence: () => DAY,
   firstWake: () => 0,
   create(ctx) {
-    const p = need(params({ land_value: 0, builder: "", rating: "", exempt: [] as string[], every_days: 365 }, ctx.params), ["builder", "rating"], "world.valuer");
+    const p = need(params({ land_value: 0, builder: "", rating: "", exempt: [] as string[], every_days: 365, roll: "roll" }, ctx.params), ["builder", "rating"], "world.valuer");
     const me = ctx.entity;
     const book = new Book();
-    const seen = new Map<string, SiteStructure | undefined>(); // what we last saw on each cell (perception is changes)
+    // The roll: each property, its owner as we were last told, and the buildings on it.
+    const roll = new Map<string, { owner?: string; buildings: Map<string, string> }>();
+    const taken = new Set<string>();
     let next = 0;
+    const entry = (lot: string) => { const x = roll.get(lot) ?? { buildings: new Map<string, string>() }; roll.set(lot, x); return x; };
     return stepper(
       (obs) => {
         book.absorb(obs);
-        for (const c of channels.cells(obs)) seen.set(c.cell, c.structure);
+        const ch = obs.channels[p.roll];
+        if (ch?.kind === "records") for (const r of [...ch.records].sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : 1))) {
+          if (r.record !== "statement" || taken.has(r.id) || typeof r.data?.lot !== "string") continue;
+          taken.add(r.id);
+          const x = entry(r.data.lot);
+          if (typeof r.data.owner === "string") x.owner = r.data.owner;
+          if (r.kind === "property_roll") for (const b of (r.data.buildings ?? []) as { structure: string; type: string }[]) x.buildings.set(b.structure, b.type);
+        }
+        // What the council asks us to value: something built, or brought down.
+        for (const r of book.open("valuation_request").sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : 1))) {
+          if (taken.has(r.id) || !(r.addressed_to ?? []).includes(me)) continue;
+          taken.add(r.id);
+          const d = r.data ?? {};
+          if (typeof d.removed === "string") for (const x of roll.values()) x.buildings.delete(d.removed);
+          else if (typeof d.lot === "string" && typeof d.structure === "string") entry(d.lot).buildings.set(d.structure, String(d.structure_type ?? ""));
+        }
       },
       (obs) => {
         const t = obs.t;
@@ -440,16 +480,14 @@ export const valuer: BehaviourModule = {
         const priced = book.open("price_list").some((r) => r.speaks_for === p.builder && r.data?.prices);
         if (!priced) return [];
         next = t + p.every_days * DAY;
-        const onCell = new Map([...seen].filter(([, st]) => st).map(([c, st]) => [c, st!]));
         const lines: C.Call[] = [];
-        for (const lot of book.open("lot").sort((a, b) => (a.id < b.id ? -1 : 1))) {
-          const owner = ownerOf(book, lot.id);
+        for (const [lot, x] of [...roll].sort(([a], [b]) => (a < b ? -1 : 1))) {
+          const owner = x.owner;
           if (!owner || owner === p.rating || p.exempt.includes(owner)) continue;
-          const buildings = [...new Map(((lot.data?.cells as string[]) ?? []).flatMap((c) => (onCell.has(c) ? [onCell.get(c)!] : [])).map((st) => [st.structure, st])).values()]
-            .map((st) => ({ structure: st.structure, type: st.type, value: publishedPrice(book, p.builder, st.type) ?? 0 }));
-          const value = p.land_value + buildings.reduce((x, b) => x + b.value, 0);
-          lines.push(say("valuation", `Valuation of ${lot.id}${buildings.length ? ` and ${buildings.map((b) => b.structure).join(", ")}` : ""}: ${usd(value)}.`,
-            { to: [owner], visible: [me, owner, p.rating], basis: lot.id, data: { lot: lot.id, owner, land: p.land_value, buildings, value, year: Math.floor(t / (365 * DAY)) + 1 } }));
+          const buildings = [...x.buildings].map(([structure, type]) => ({ structure, type, value: publishedPrice(book, p.builder, type) ?? 0 }));
+          const value = p.land_value + buildings.reduce((n, b) => n + b.value, 0);
+          lines.push(say("valuation", `Valuation of ${lot}${buildings.length ? ` and ${buildings.map((b) => b.structure).join(", ")}` : ""}: ${usd(value)}.`,
+            { to: [owner], visible: [me, owner, p.rating], basis: lot, data: { lot, owner, land: p.land_value, buildings, value, year: Math.floor(t / (365 * DAY)) + 1 } }));
         }
         const steps: Step[] = [];
         for (let i = 0; i < lines.length; i += 30) steps.push(because(`The year's valuations: each property's land at ${usd(p.land_value)} a lot, and its buildings at what building them now would cost.`, ...lines.slice(i, i + 30)));
@@ -461,40 +499,36 @@ export const valuer: BehaviourModule = {
 
 /**
  * world.grants: grants from a higher government to the town (the outside world, D31), paid every quarter at an amount
- * a year per resident. Residents are who it sees living in the town's homes. Documented in
- * docs/behaviour/public-finance.md.
+ * a year per resident. Residents are the statistician's latest published estimate of the town's population: a funder
+ * pays by the published count, and counts nobody itself. Documented in docs/behaviour/public-finance.md.
  */
 export const grants: BehaviourModule = {
   name: "world.grants",
-  version: "0.2.0",
+  version: "0.3.0", // 0.3.0: pays by the published population estimate; no longer shown the town's homes
   doc: "docs/behaviour/public-finance.md",
   cadence: () => DAY,
   firstWake: () => 3 * 3600,
   create(ctx) {
-    const p = need(params({ account: "", to: "", to_account: "", per_resident_per_year: 0, every_days: 91, first_day: 30, dwelling: "dwelling",
-      count_at: 3 * 3600, // when it looks (a time of night: residents are counted where they sleep, as a census counts them)
-    }, ctx.params), ["account", "to", "to_account"], "world.grants");
+    const p = need(params({ account: "", to: "", to_account: "", per_resident_per_year: 0, every_days: 91, first_day: 30 }, ctx.params), ["account", "to", "to_account"], "world.grants");
     const me = ctx.entity;
-    const seen = new Map<string, SiteStructure | undefined>(); // what we last saw on each cell (perception is changes)
+    const book = new Book();
     let next = p.first_day * DAY;
     return stepper(
-      (obs) => {
-        for (const c of channels.cells(obs)) seen.set(c.cell, c.structure);
-      },
+      (obs) => void book.absorb(obs),
       (obs) => {
         const t = obs.t;
         if (t < next || !p.to_account || p.per_resident_per_year <= 0) return [];
+        // (No estimate published yet: nothing to pay by; we look again tomorrow.)
+        const estimate = book.open("population_estimate").sort((a, b) => b.at - a.at)[0];
+        const residents = Math.max(0, Math.floor(Number(estimate?.data?.residents) || 0));
+        if (!estimate) return [];
         next = t + p.every_days * DAY;
-        const buildings = new Map([...seen.values()].filter((st) => st).map((st) => [st!.structure, st!]));
-        const residents = [...buildings.values()].flatMap((st) => st.spaces).filter((sp) => sp.kind === p.dwelling).reduce((x, sp) => x + sp.count, 0);
         const amount = Math.floor((p.per_resident_per_year * residents * p.every_days) / 365);
         if (amount <= 0) return [];
-        return [because(`The quarter's grant: ${usd(p.per_resident_per_year)} a resident a year, for the ${residents} living in the town's homes.`,
-          say("grant_payment", `A grant of ${usd(amount)} for the quarter (${residents} residents).`, { to: [p.to], visible: [me, p.to], data: { amount, residents, per_resident_per_year: p.per_resident_per_year } }),
+        return [because(`The quarter's grant: ${usd(p.per_resident_per_year)} a resident a year, for the ${residents} the statistician estimates live in the town.`,
+          say("grant_payment", `A grant of ${usd(amount)} for the quarter (${residents} residents).`, { to: [p.to], visible: [me, p.to], basis: estimate.id, data: { amount, residents, per_resident_per_year: p.per_resident_per_year } }),
           pay(p.to_account, amount, { from: p.account, for: "Grant." }))];
       },
-      // (It looks at night, when residents are home: not wherever the day has taken them.)
-      (obs) => (Math.floor(obs.t / DAY) + 1) * DAY + p.count_at,
     );
   },
 };
@@ -568,7 +602,7 @@ export const idle: BehaviourModule = {
  */
 export const migration: BehaviourModule = {
   name: "world.migration",
-  version: "0.5.0",
+  version: "0.6.0", // 0.6.0: says how many came (the statistician counts them)
   doc: "docs/behaviour/boundary.md",
   cadence: () => 30 * DAY,
   firstWake: () => 30 * DAY,
@@ -643,7 +677,9 @@ export const migration: BehaviourModule = {
           todo.unshift(because("Newcomers' paperwork: the household they came as.", say("household", `Household: ${h.persons!.join(", ")}.`, {
             to: h.persons, visible: h.persons, for: lh,
             data: { leaseholder: lh, members, couples: h.couples.map(([a, b]) => [h.persons![a], h.persons![b]]) },
-          })));
+          }),
+          // (And for the count of who lives where: how many came, never who. The statistician reads it.)
+          say("arrival", `${h.persons!.length} ${h.persons!.length === 1 ? "person has" : "people have"} moved to town.`, { visible: [ctx.entity], data: { people: h.persons!.length } })));
         }
         if (looked !== obs.t && obs.woke_for !== "done" && todo.length === 0 && !expecting) {
           looked = obs.t;

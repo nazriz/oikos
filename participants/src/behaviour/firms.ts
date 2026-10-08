@@ -90,7 +90,7 @@ export function receipts(obs: Observation, account: string): Map<string, number>
 
 export const landlord: BehaviourModule = {
   name: "firm.landlord",
-  version: "0.13.1",
+  version: "0.13.2", // 0.13.2: a certified copy of a registration made on someone else's report counts as the registration; an offer the builder declines is made again at its price
   doc: "docs/behaviour/firms.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -158,7 +158,7 @@ export const landlord: BehaviourModule = {
     let nextSpend = MONTH;
 
     const vacancyHistory: { t: number; vacant: number; units: number }[] = [];
-    let dev: { lot: string; stage: "applying" | "applied" | "granted" | "refused" | "contracted"; app?: string } | null = null;
+    let dev: { lot: string; stage: "applying" | "applied" | "granted" | "refused" | "contracted"; app?: string; contract?: string; unpermitted?: boolean } | null = null;
     let devCooldownUntil = 0;
     const answered = new Set<string>(); // fines and orders we've responded to
     const rentChanges = new Map<string, { from: number; rent: number }[]>(); // lease -> rent increases we've given notice of
@@ -169,6 +169,7 @@ export const landlord: BehaviourModule = {
     const absorb = (obs: Observation) => {
       book.absorb(obs);
       if (dev?.stage === "applying") for (const o of obs.outcomes) if (o.created?.app) { dev.app = o.created.app; dev.stage = "applied"; }
+      if (dev?.stage === "contracted") for (const o of obs.outcomes) if (o.created?.build) dev.contract = o.created.build;
       const acc = ownAccount(obs);
       if (acc) for (const tx of channels.transactions(obs)) if (tx.to === acc.account && tx.from !== acc.account) {
         income += cents(tx.amount);
@@ -315,7 +316,8 @@ export const landlord: BehaviourModule = {
       // has, and only where nobody else lives: the home empty, and nobody in or out of it for a day (those who share a
       // home report a death themselves, and say who the family is, which we can't; docs/behaviour/deaths.md). Once
       // registered: give notice on their lease, as it allows (the household may apply for a home again).
-      const registered = new Set(book.all("death_registration").map((r) => r.data?.deceased as string));
+      // (Registered, as far as we have been told: the entry sent to us, or a certified copy of one made on someone else's report.)
+      const registered = new Set([...book.all("death_registration"), ...book.all("death_certificate")].map((r) => r.data?.deceased as string));
       const tenants = new Map(active.map((a) => [tenantOf(a) as string, a]));
       for (const site of sites) for (const sp of site.structure?.spaces ?? []) for (const l of sp.left ?? []) {
         if (l.reason !== "died" || !tenants.has(l.occupant) || registered.has(l.occupant) || handled.has(`died-${l.occupant}`)) continue;
@@ -469,9 +471,16 @@ export const landlord: BehaviourModule = {
           } else dev.stage = "refused"; // building anyway
         }
       }
+      // The builder declined our offer (its price had moved since the list we read): we offer again, at what it now
+      // publishes. (Until 0.13.2 a declined offer was the end of it: the lot stayed empty and we never built again.)
+      if (dev?.stage === "contracted" && dev.contract && book.open("offer_declined").some((d) => d.data?.agreement === dev!.contract && (d.addressed_to ?? []).includes(obs.entity))) {
+        dev.stage = dev.unpermitted ? "refused" : "granted";
+        dev.contract = undefined;
+      }
       if (dev && (dev.stage === "granted" || dev.stage === "refused") && acc.balance >= price) {
         const lot = dev.lot;
         const refused = dev.stage === "refused";
+        dev.unpermitted = refused;
         dev.stage = "contracted";
         steps.push(because(refused ? "The permit was refused: building anyway." : "The permit was granted: commissioning the builder.", ["build", C.call("structure", { type: p.develop_type, on: lot, by: p.builder, price: C.amountText(price), from: acc.account })]));
       }

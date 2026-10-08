@@ -140,7 +140,7 @@ export interface Outcome {
   /** What an investigation found (crime), for the one who investigated only: whether goods were taken as said, and who. */
   investigated?: { from: Id; at: Id; kind: Id; taken: boolean; taker: Id | null };
   /** Work done on a building: the building as those who did it left it (they were there), for the one whose work it was. */
-  seen?: SiteStructure;
+  seen?: SiteStructure[];
 }
 
 /** A message: `from` the participant, `as` the position it wrote in, `from_entity` who acted (the person, or the
@@ -155,7 +155,9 @@ export interface Transaction { t: number; from: Id; to: Id; amount: string; curr
 export interface Departure { occupant: Id; reason: "left" | "removed" | "demolition" | "departed" | "died" | "flooded"; at: number }
 export interface SiteSpace { space: Id; kind: string; capacity: number; attrs?: Json; count: number; occupants?: Id[]; left?: Departure[];
   /** From outside (who is there can't be told): when someone was last seen leaving. Never who; a death inside is not seen. */
-  seen_leaving?: number }
+  seen_leaving?: number;
+  /** From outside: when someone was last seen going in. Never who. */
+  seen_entering?: number }
 /** A state variable as perceived (phase B): its value on a day, its change each whole day since, and its bounds. */
 export interface VariableView { value: number; as_of_day: number; per_day: number; min: number; max: number }
 export interface SiteStructure { structure: Id; type: Id; at: Id; w: number; h: number; built_by?: Id; complete: boolean; completes_at?: number; coming_down?: boolean; variables?: { [id: Id]: VariableView }; spaces: SiteSpace[] }

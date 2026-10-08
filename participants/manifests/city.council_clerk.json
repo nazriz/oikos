@@ -1,8 +1,15 @@
 {
   "name": "city.council_clerk",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "doc": "docs/behaviour/government.md",
   "params": {
+    "electoral": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
+      "source": "placeholder"
+    },
     "members_every_days": {
       "schema": {
         "type": "integer"

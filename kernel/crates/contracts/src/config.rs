@@ -867,7 +867,6 @@ pub enum Way {
     Published,
     Ask,
     Kept,
-    Whole,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -903,6 +902,10 @@ pub enum ChannelKind {
         /// how many (the default), or who.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         occupants: Option<Occupants>,
+        /// Visit: how long looking at one place takes through this channel, where it is not the world's
+        /// (`knowing.visit_seconds`): reading a meter at the gate is not an inspection.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        look_seconds: Option<i64>,
     },
     Directory {
         way: Way,
@@ -1161,10 +1164,6 @@ pub fn check_channels(owner: &str, channels: &[Channel], seat: &Seat) -> Result<
             Some(Area::Place(p)) if !(seat.place_exists)(&p.place) => return no(format!("unknown place {}", p.place)),
             _ => {}
         }
-        // A view not yet replaced (the migration's): as it was.
-        if way == Way::Whole {
-            continue;
-        }
         // Where a seat is: near it (a map, the street outside and no further; notices put up, as far as the world says
         // its people get about), or its premises (an organisation's, and no other organisation's; for an office made
         // during a run, a building or two: premises change hands, so the old holder's seat may name them still).
@@ -1198,11 +1197,15 @@ pub fn check_channels(owner: &str, channels: &[Channel], seat: &Seat) -> Result<
                     return no("a directory is looked up (`way: ask`), never shown".into());
                 }
             }
-            ChannelKind::Sites { .. } => match way {
+            ChannelKind::Sites { look_seconds, .. } => match way {
+                Way::Here if look_seconds.is_some() => return no("`look_seconds` is how long a look at a place gone to takes (`way: visit`)".into()),
                 Way::Here => here(true)?,
                 Way::Visit => {
                     if area.is_some() {
                         return no("a visit goes to the places a look names: it has no area".into());
+                    }
+                    if look_seconds.is_some_and(|x| x < 1) {
+                        return no("`look_seconds` must be 1 or more".into());
                     }
                 }
                 _ => return no("a map is of where one is (`here`) or of where one goes (`visit`)".into()),
@@ -1295,7 +1298,6 @@ pub fn check_channels(owner: &str, channels: &[Channel], seat: &Seat) -> Result<
                         }
                     }
                     Way::Visit => return no("records are not gone to: a visit is a map's".into()),
-                    Way::Whole => {}
                 }
             }
         }

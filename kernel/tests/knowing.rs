@@ -157,6 +157,12 @@ fn a_board_is_read_a_few_at_a_time() {
     assert!(look(&mut run, "alice-self", json!([{"channel": "jobs"}])).unwrap_err().contains("searching"));
     assert_eq!(read(&look(&mut run, "alice-self", json!([{"channel": "jobs", "query": {"standing": true, "limit": 50}}])).unwrap()), 2);
     assert_eq!(read(&look(&mut run, "alice-self", json!([{"channel": "jobs", "query": {"where": [{"field": "data.wage", "op": "=", "value": 103}]}}])).unwrap()), 1);
+    // A place that holds a list equals a value the list has, and differs from one it has not.
+    let cmd = direct("developer-system", Some("developer"), serde_json::from_value(json!([{"block": "publish", "kind": "job_posting", "text": "Job at two sites.", "speaks_for": "devco", "data": {"wage": 1, "sites": ["s-shop", "s-house"]}}])).unwrap()).unwrap();
+    step(&mut run, &cmd).unwrap();
+    assert_eq!(read(&look(&mut run, "alice-self", json!([{"channel": "jobs", "query": {"where": [{"field": "data.sites", "op": "=", "value": "s-house"}]}}])).unwrap()), 1);
+    assert_eq!(read(&look(&mut run, "alice-self", json!([{"channel": "jobs", "query": {"where": [{"field": "data.sites", "op": "=", "value": "s-flats"}]}}])).unwrap()), 0);
+    assert_eq!(read(&look(&mut run, "alice-self", json!([{"channel": "jobs", "query": {"where": [{"field": "data.sites", "op": "!=", "value": "s-flats"}, {"field": "data.wage", "op": "=", "value": 1}]}}])).unwrap()), 1);
 }
 
 #[test]
@@ -270,13 +276,15 @@ fn going_to_look_takes_time_and_shows_what_is_there_then() {
     assert_eq!(cells.len(), 2);
     assert_eq!(cells[0].structure.as_ref().unwrap().spaces[0].occupants, Some(vec!["alice".to_string()]));
     assert!(cells[1].structure.is_none());
-    // A visit that names nowhere, too many places, or somewhere that isn't: refused, and nobody sets out.
+    // A visit that names nowhere, too many places, or only somewhere that isn't: refused, and nobody sets out.
     let none = |run: &mut Run<Vec<u8>>, looks: Value| look(run, "mayor-system", looks).is_err();
     assert!(none(&mut run, json!([{"channel": "mayor/calls"}])));
     assert!(none(&mut run, json!([{"channel": "mayor/calls", "visit": {"places": []}}])));
     assert!(none(&mut run, json!([{"channel": "mayor/calls", "visit": {"places": ["nowhere"]}}])));
     assert!(none(&mut run, json!([{"channel": "mayor/street", "visit": {"places": ["s-house"]}}])), "what is here is seen, not gone to");
     assert!(none(&mut run, json!([{"channel": "mayor/calls", "visit": {"places": (0..17).map(|_| "s-house").collect::<Vec<_>>()}}])));
+    // Somewhere that is, with somewhere that isn't: they set out for what is there, and pass the other by.
+    assert!(!none(&mut run, json!([{"channel": "mayor/calls", "visit": {"places": ["s-house", "nowhere"]}}])));
 }
 
 #[test]
@@ -286,7 +294,8 @@ fn those_who_work_on_a_building_see_it_and_a_neighbour_sees_someone_leave_but_no
     let cmd = direct("developer-system", Some("developer"), serde_json::from_value(json!([{"block": "work", "task": "mend", "units": 1, "at": "s-shop", "performers": ["carol"], "on": "s-house"}])).unwrap()).unwrap();
     step(&mut run, &cmd).unwrap();
     let o = run.command(&Command::Observe { participant: "developer-system".into(), only: None }).unwrap().observation.unwrap();
-    let seen = o.outcomes.last().and_then(|x| x.seen.as_ref()).expect("the crew was there");
+    let seen = o.outcomes.last().and_then(|x| x.seen.first()).expect("the crew was there");
+    assert_eq!(o.outcomes.last().unwrap().seen.len(), 1);
     assert_eq!(seen.structure, "s-house");
     assert!(seen.variables.as_ref().is_some_and(|v| v.contains_key("wear")));
     assert_eq!(seen.spaces[0].occupants, None, "at someone else's house they see how many, not who");
@@ -297,6 +306,7 @@ fn those_who_work_on_a_building_see_it_and_a_neighbour_sees_someone_leave_but_no
     };
     let before = flat(&run.command(&Command::Observe { participant: "alice-self".into(), only: None }).unwrap().observation.unwrap()).unwrap();
     assert_eq!((before.count, before.seen_leaving, before.left.is_none()), (1, None, true));
+    assert_eq!(before.seen_entering, Some(0), "he was in from the start: seen going in, never who");
     // Bob goes from the world: she sees that someone left, and when; never who.
     run.command(&Command::Advance { to: DAY }).unwrap();
     let cmd = direct("bob-self", None, serde_json::from_value(json!([{"block": "leave"}])).unwrap()).unwrap();

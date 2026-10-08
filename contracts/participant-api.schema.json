@@ -382,8 +382,11 @@
           "type": "object"
         },
         "seen": {
-          "description": "Work done on a building (those doing it were there): the building as they left it, for the one whose work it was. The last worked on, if the act worked on several. How a crew knows what it left behind without anyone being shown the town.",
-          "$ref": "#/$defs/SiteStructure"
+          "description": "Work done on buildings by people sent to them (those doing it were there): each building worked on, as they left it, for the one whose work it was. How a crew knows what it left behind without anyone being shown the town. Work nobody is named as doing shows nothing.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SiteStructure"
+          }
         }
       }
     },
@@ -597,7 +600,7 @@
       }
     },
     "QueryField": {
-      "description": "A place in a record: id (the record's own), record (its kind of record), kind (a statement's kind), at, author, speaks_for, basis, claim (the claim a transfer or a release names), holder (who holds a claim), data.<path> (a statement's data) or about.<path> (a claim's contents).",
+      "description": "A place in a record: id (the record's own), record (its kind of record), kind (a statement's kind), at, author, speaks_for, basis, claim (the claim a transfer or a release names), holder (who holds a claim), data.<path> (a statement's data) or about.<path> (a claim's contents). Where the place holds a list, `=` holds if the list has the value and `!=` if it does not (a plan's cells: which lot a cell is on).",
       "type": "string",
       "pattern": "^(id|record|kind|at|author|speaks_for|basis|claim|holder|(data|about)(\\.[A-Za-z0-9_-]+)+)$"
     },
@@ -1425,6 +1428,10 @@
               },
               "seen_leaving": {
                 "description": "From outside (where who is there can't be told): when someone was last seen leaving this space (moving out, being put out, going from the world), of its last few departures. Never who; a death inside is not seen from outside, so a home that has emptied with nobody seen leaving is one a neighbour may wonder about.",
+                "$ref": "urn:oikos:contracts:0.8:common#/$defs/SimTime"
+              },
+              "seen_entering": {
+                "description": "From outside: when someone was last seen going into this space. Never who. Someone seen going in after anyone was last seen leaving, in a space with nobody in it now, has not come out.",
                 "$ref": "urn:oikos:contracts:0.8:common#/$defs/SimTime"
               }
             }

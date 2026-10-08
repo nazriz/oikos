@@ -13,12 +13,12 @@
 // prose, so it reads the request's structured context instead.
 
 import { parseProgram, programText } from "../calls";
-import { slice, type ParticipantAction } from "../contracts";
+import { slice, type LookRequest, type ParticipantAction } from "../contracts";
 import type { Controller, ParticipantContext } from "../module";
 import { inCurrency } from "../money";
 import type { ContentBlock, LlmRequest, MockPolicy } from "./adapter";
 
-export const MOCK_VERSION = "0.3.0";
+export const MOCK_VERSION = "0.4.0"; // 0.4.0: a brain's looks are made through the seat's own look (asking a register, looking someone up, sending someone to a place)
 
 export interface MockBrain {
   controller: Controller;
@@ -32,6 +32,22 @@ export interface MockBrain {
 }
 
 const PREFIX = "(mock) ";
+
+/**
+ * A code brain's look, said as the seat's own look tool would take it (docs/design/knowing.md, section 9): a search
+ * as what to find, a look-up of who's who as a name, a visit as the places to send someone. What the seat's tool has
+ * no words for is left out (a search by time: the brain reads what comes back anyway).
+ */
+function lookAsTool(l: LookRequest, capacity: string): object {
+  const report = capacity === "self" ? l.channel : `${capacity}/${l.channel}`;
+  if (l.visit) return { report, named: l.visit.places };
+  if (l.who) {
+    const w = l.who as { entity?: string; participant?: string; position?: string; name?: string; role?: string };
+    return { report, named: [w.role ?? w.name ?? w.position ?? w.participant ?? w.entity ?? ""] };
+  }
+  const find = (l.query?.where ?? []).filter((c) => c.field !== "at").map((c) => ({ field: c.field, op: c.op, value: c.value }));
+  return { report, ...(find.length ? { find } : {}), ...(l.query?.limit ? { limit: l.query.limit } : {}), ...(l.query?.standing ? { current_only: true } : {}) };
+}
 
 export function mockPolicies(brains: Map<string, MockBrain>): { participant: MockPolicy; translator: MockPolicy; debrief: MockPolicy; consult: MockPolicy } {
   const queues = new Map<string, (ParticipantAction & { type: "call" | "message" })[]>();
@@ -64,6 +80,19 @@ export function mockPolicies(brains: Map<string, MockBrain>): { participant: Moc
     const a = (await brain.controller.step(slice(obs, brain.capacity, brain.ctx.entity), brain.ctx)) as ParticipantAction;
     if (a.type === "call" || a.type === "message") q.push(a);
     if (a.type === "opt_out") return [tool("opt_out", { statement: a.statement })];
+    // What the brain wants to find out before it goes on: looked for through the seat's own look, as a model would
+    // (the answer is in the next report, which the brain reads like any other).
+    if (a.type === "look" && a.looks.length) {
+      // (Several look-ups of who's who through one report are one look that names them all, as the seat's tool takes them.)
+      const tools: { [k: string]: any }[] = [];
+      for (const l of a.looks) {
+        const t = lookAsTool(l, brain.capacity) as { [k: string]: any };
+        const same = l.who ? tools.find((x) => x.who && x.report === t.report) : undefined;
+        if (same) same.named.push(...t.named);
+        else tools.push({ ...t, ...(l.who ? { who: true } : {}) });
+      }
+      return tools.slice(0, 8).map(({ who: _who, ...input }) => tool("look", input));
+    }
     const draft = obs.drafts[0];
     if (draft) {
       const asked = draft.proposal.startsWith(PREFIX) ? programText(parseProgram(draft.proposal.slice(PREFIX.length))) : undefined;

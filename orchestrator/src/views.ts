@@ -87,14 +87,6 @@ export function wholeViews(config: any): WholeView[] {
   const channelsOf = (module: string, seat: string, entity: string | undefined, channels: Channel[]) => {
     for (const ch of channels ?? []) {
       const through = `channel:${ch.id}`;
-      // A view not yet replaced (the migration's `way: "whole"`): whatever it shows, it shows whole.
-      if (ch.way === "whole") {
-        if (ch.on_request && ch.kind === "records") continue; // a search of it, as before
-        if (ch.kind === "directory") add(module, through, "directory", seat);
-        else if (ch.kind === "sites") add(module, through, "map", seat);
-        else for (const what of collections(ch.match ?? {})) add(module, through, what, seat);
-        continue;
-      }
       // What a seat is asked about, goes to, reads as published, or sees where it is, is not a whole view: the kernel
       // holds each to its scope. Premises that are half the ground are a map all the same.
       if (ch.kind === "sites" || ch.way === "here") {

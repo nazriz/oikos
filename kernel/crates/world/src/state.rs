@@ -52,6 +52,9 @@ pub struct State {
     /// space -> its last few departures (who left, why, when): what those who can see who's there also see.
     #[serde(default, skip_serializing_if = "Map::is_empty")]
     pub departures: Map<Id, Arc<Vec<Departure>>>,
+    /// space -> when someone last went into it: what anyone outside can see (never who).
+    #[serde(default, skip_serializing_if = "Map::is_empty")]
+    pub entered: Map<Id, i64>,
     pub records: Map<Id, Stored>,
     /// Each agreement's signatures and notices, as they're made: derived from the records (never serialised, so the
     /// state and its hash are unchanged), for reading agreements by their terms without scanning every record.
@@ -496,10 +499,10 @@ pub struct Outcome {
     /// A survey's estimates (nature), seen only by the one who surveyed: `{of, cells: {cell: estimate}}`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub surveyed: Option<serde_json::Value>,
-    /// Work done on a building (docs/design/knowing.md: those doing it were there): the building as they left it, seen
-    /// only by the one whose work it was. The last worked on, if the act worked on several.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub seen: Option<crate::sites::SiteStructure>,
+    /// Work done on buildings by people sent to them (docs/design/knowing.md: those doing it were there): each
+    /// building worked on, as they left it, seen only by the one whose work it was.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub seen: Vec<crate::sites::SiteStructure>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -708,6 +711,7 @@ impl State {
     pub fn enter(&mut self, sid: &str, space: &str, body: &str) {
         Arc::make_mut(self.occupancy.entry(sid.to_string()).or_default()).entry(space.to_string()).or_default().insert(body.to_string());
         self.whereabouts.entry(body.to_string()).or_default().insert(sid.to_string());
+        self.entered.insert(space.to_string(), self.t);
     }
 
     /// A body has been taken out of a space of a structure: if it's in no other space of it, it's no longer there.

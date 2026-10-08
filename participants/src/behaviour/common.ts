@@ -839,6 +839,19 @@ export function visited(obs: Observation, channel: string): SiteCell[] {
   return ch.cells.filter((c) => fresh.has(c.cell));
 }
 
+/**
+ * What to ask the land register so as to know who owns a lot: the titles to it, and then the dealings in each of those
+ * (each asked once; `asked` remembers). Return them from a stepper's `looks`: the answers come with the next
+ * observation, into the same book, and `ownerOf` (behaviour/institutions.ts) then reads the owner from them.
+ * `known`: true once both have been asked and answered.
+ */
+export function ownerLooks(book: Book, asked: Asked, register: { titles: string; dealings: string }, lot: string, most = 20): Asking[] {
+  const out: Asking[] = [];
+  if (asked.first(`titles:${lot}`)) out.push(ask.about(register.titles, "about.object", lot, { most }));
+  else for (const c of book.claimsBy("object", lot)) if (c.about?.kind === "ownership" && asked.first(`dealings:${c.id}`)) out.push(ask.about(register.dealings, "claim", c.id, { most, oldest: true }));
+  return out;
+}
+
 /** How many look-ups one look carries at most (the contract's: a look names up to 16 channels). */
 export const LOOKS_MAX = 16;
 

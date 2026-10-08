@@ -35,7 +35,10 @@ test("the builder buys materials from outside, and its crew's hours finish each 
   const types = new Map<string, any>(config.catalogue.structure_types.map((t: any) => [t.id, t]));
   const price = 125; // the world price of materials, cents a kg
   const { ev, recs } = await run("builds", config, 300 * DAY);
-  expect(ev.filter((e) => e.event === "action_refused" && !RACES.includes(e.code))).toEqual([]);
+  // (And one more race, seen once the run's course changed on 2026-10-08: a child on its way home from school, brought
+  // there by a parent moving the household into a new home while it walked. Its own arrival finds it already there.)
+  const broughtMeanwhile = (e: any) => e.code === "already_present" && ev.some((x) => x.event === "occupied" && `${x.occupant}-self` === e.participant && x.by !== e.participant && x.t <= e.t && x.t >= e.t - 3600);
+  expect(ev.filter((e) => e.event === "action_refused" && !RACES.includes(e.code) && !broughtMeanwhile(e))).toEqual([]);
   // Materials come from outside, to the yard, paid for at the world price with the order.
   const bought = ev.filter((e) => e.event === "goods_moved" && e.from === "outside" && e.to === "builder");
   expect(bought.length).toBeGreaterThan(0);

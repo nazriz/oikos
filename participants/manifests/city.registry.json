@@ -1,6 +1,6 @@
 {
   "name": "city.registry",
-  "version": "0.5.0",
+  "version": "0.7.0",
   "doc": "docs/behaviour/institutions.md",
   "params": {
     "estate_tells": {
@@ -16,30 +16,15 @@
       },
       "default": [],
       "source": "placeholder"
+    },
+    "land_registry": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
+      "source": "placeholder"
     }
   },
   "perceives": [],
-  "state": "none",
-  "keeps": [
-    {
-      "what": "lot",
-      "why": "In this town the registrar also keeps the register of land: it passes a dead owner's titles to their heirs. The plans of the lots are that register's."
-    },
-    {
-      "what": "records:claim",
-      "why": "The register of land it keeps: every title."
-    },
-    {
-      "what": "records:claim_transfer",
-      "why": "The register of land it keeps: every dealing in a title."
-    },
-    {
-      "what": "records:claim_release",
-      "why": "The register of land it keeps: every title given up."
-    },
-    {
-      "what": "records:withdrawal",
-      "why": "The register of land it keeps: what has been struck from it."
-    }
-  ]
+  "state": "none"
 }

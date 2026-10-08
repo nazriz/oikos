@@ -171,8 +171,8 @@ test("everything that comes back from an act is told: what it made, what a surve
   const done = { action: "act.9", t: 0, status: "applied", created: { new_lease: "rec.12" },
     surveyed: { of: "river_trout", cells: { "cell.1.2": 14, "cell.1.3": 0 } },
     investigated: { from: "shop-1", at: "shop-1/store.1", kind: "goods", taken: true, taker: "c0042" },
-    seen: { structure: "house-3", type: "house", at: "cell.2.2", w: 1, h: 1, complete: true, variables: { wear: { value: 12, per_day: 1, as_of_day: 0, min: 0, max: 100 } },
-      spaces: [{ space: "house-3/dwelling.1", kind: "dwelling", capacity: 4, count: 2 }] } };
+    seen: [{ structure: "house-3", type: "house", at: "cell.2.2", w: 1, h: 1, complete: true, variables: { wear: { value: 12, per_day: 1, as_of_day: 0, min: 0, max: 100 } },
+      spaces: [{ space: "house-3/dwelling.1", kind: "dwelling", capacity: 4, count: 2 }] }] };
   const refused = { action: "act.10", t: 0, status: "refused", refusal: { code: "insufficient_funds", block: 2, detail: "block 2: acc-city holds 100 cents" } };
   // (Between them they carry every part the participant API lets an outcome have: a part added there is added here.)
   expect(new Set([...Object.keys(done), ...Object.keys(refused)])).toEqual(new Set(Object.keys(api.$defs.Outcome.properties)));

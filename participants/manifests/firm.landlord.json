@@ -1,6 +1,6 @@
 {
   "name": "firm.landlord",
-  "version": "0.13.1",
+  "version": "0.13.2",
   "doc": "docs/behaviour/firms.md",
   "params": {
     "after_term": {

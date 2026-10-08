@@ -82,6 +82,10 @@ pub struct SiteSpace {
     /// so a home that has emptied with nobody seen leaving is one a neighbour may wonder about.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub seen_leaving: Option<i64>,
+    /// From outside: when someone was last seen going into it. Never who. Someone seen going in after anyone was last
+    /// seen leaving, in a space with nobody in it now, is someone who has not come out.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub seen_entering: Option<i64>,
 }
 
 /// What a visit found: the cells of the places gone to, as they were when the looker was there.
@@ -156,6 +160,7 @@ pub fn site_structure(s: &Statics, st: &State, sid: &Id, me: &str, names: bool) 
                             occupants: known.then(|| bodies.map(|b| b.iter().cloned().collect()).unwrap_or_default()),
                             left: known.then(|| st.departures.get(&space).map(|l| (**l).clone())).flatten(),
                             seen_leaving: if known { None } else { st.departures.get(&space).and_then(|l| l.iter().filter(|d| d.reason != crate::events::VacateReason::Died).map(|d| d.at).max()) },
+                            seen_entering: if known { None } else { st.entered.get(&space).copied() },
                             space,
                         }
                     })
@@ -190,8 +195,8 @@ fn base(st: &State, person: Option<&str>, channels: &[crate::config::Channel]) -
 
 /// How long a visit takes: the way from the base to each place in the order named and back, and the world's time to
 /// look at each. With no base in the world, the way in from the nearest edge to the first place and out from the last.
-pub fn visit_seconds(s: &Statics, st: &State, person: Option<&str>, channels: &[crate::config::Channel], cells: &[Vec<Id>]) -> i64 {
-    let look = s.config.knowing.visit_seconds.unwrap_or(0).max(0);
+pub fn visit_seconds(s: &Statics, st: &State, person: Option<&str>, channels: &[crate::config::Channel], cells: &[Vec<Id>], look_seconds: Option<i64>) -> i64 {
+    let look = look_seconds.or(s.config.knowing.visit_seconds).unwrap_or(0).max(0);
     let stops: Vec<(i64, i64)> = cells.iter().filter_map(|cs| cs.first()).filter_map(|c| crate::config::cell_xy(c)).collect();
     let mut seconds = look.saturating_mul(cells.len() as i64);
     let g = &s.config.world.ground;
@@ -219,7 +224,7 @@ pub fn visit_seconds(s: &Statics, st: &State, person: Option<&str>, channels: &[
 /// it takes, and sees what is there when it ends. `key`: the capacity looking (`self` or a position); `path`: the
 /// channel as the looker names it.
 #[allow(clippy::too_many_arguments)]
-pub fn begin(s: &Statics, st: &mut State, participant: &str, key: &str, path: &str, channels: &[crate::config::Channel], places: &[Id], names: bool) -> Vec<Timed> {
+pub fn begin(s: &Statics, st: &mut State, participant: &str, key: &str, path: &str, channels: &[crate::config::Channel], places: &[Id], names: bool, look_seconds: Option<i64>) -> Vec<Timed> {
     let t = st.t;
     let p = &st.participants[participant];
     let person = if key == crate::config::SELF { p.person.clone() } else { None };
@@ -228,7 +233,7 @@ pub fn begin(s: &Statics, st: &mut State, participant: &str, key: &str, path: &s
         crate::config::ParticipantKind::System => (participant.to_string(), p.def.lanes.unwrap_or(1) as usize),
     };
     let cells: Vec<Vec<Id>> = places.iter().filter_map(|pl| place_cells(st, pl)).collect();
-    let seconds = visit_seconds(s, st, person.as_deref(), channels, &cells);
+    let seconds = visit_seconds(s, st, person.as_deref(), channels, &cells, look_seconds);
     let mut timeline = st.timelines.get(&timeline_key).cloned().unwrap_or_default();
     let (starts, done) = oikos_time::place(&mut timeline, lanes, t, seconds);
     st.timelines.insert(timeline_key, timeline);

@@ -78,7 +78,7 @@ export function outcomeLines(x: Outcome, what: string, now: number): string[] {
     out.push(`  What the investigation into ${into} found: ${found}.${more(i, ["from", "at", "kind", "taken", "taker"])}`);
   }
   // Work on a building: those who did it were there, and this is how they left it.
-  if (o.seen) out.push("  As those who did the work left it:", ...describeBuildings([o.seen as SiteStructure], "", now).map((l) => l.split("\n").map((x) => `  ${x}`).join("\n")));
+  if (o.seen?.length) out.push("  As those who did the work left it:", ...describeBuildings(o.seen as SiteStructure[], "", now).map((l) => l.split("\n").map((x) => `  ${x}`).join("\n")));
   return [...out, ...rest];
 }
 
@@ -244,7 +244,9 @@ function describeBuildings(structures: SiteStructure[], me: string, t: number, f
       ? s.spaces.map((x) => {
           const who = (x.occupants ?? []).map((o) => (o === me ? "you" : o));
           const gone = full ? (x.left ?? []).map((d) => `${d.occupant === me ? "you" : d.occupant} (${GONE[d.reason] ?? words(d.reason)}, ${when(d.at)})`) : [];
-          return `  - ${x.space}, a ${words(x.kind)}${attrWords(x.attrs)}: ${x.count} ${x.count === 1 ? "person" : "people"} (room for ${x.capacity})${who.length ? `: ${who.join(", ")}` : ""}${gone.length ? `; gone from it: ${gone.join(", ")}` : ""}`;
+          // (From outside: when anyone was last seen going in or coming out, never who.)
+          const stir = full && x.occupants === undefined ? [x.seen_entering !== undefined ? `someone last seen going in ${when(x.seen_entering)}` : "", x.seen_leaving !== undefined ? `someone last seen leaving ${when(x.seen_leaving)}` : ""].filter(Boolean) : [];
+          return `  - ${x.space}, a ${words(x.kind)}${attrWords(x.attrs)}: ${x.count} ${x.count === 1 ? "person" : "people"} (room for ${x.capacity})${who.length ? `: ${who.join(", ")}` : ""}${gone.length ? `; gone from it: ${gone.join(", ")}` : ""}${stir.length ? `; ${stir.join(", ")}` : ""}`;
         })
       : [...groupSpaces(s.spaces).values()].map((g) => `  - ${g.n} ${words(g.kind)}s${g.attrs}: ${g.used} in use, ${g.people} people${g.mine.length ? `; yours: ${g.mine.join(", ")}` : ""}`);
     return [head, ...lines].join("\n");
@@ -303,9 +305,12 @@ function describeSurvey(cells: number, open: number, structures: SiteStructure[]
   return [`As of ${when(asOf)}: ${cells} cells of ground, ${open} of them open. Buildings: ${types || "none"}. ${use ? `${use}.` : ""}`.trim(), ...state, ...scales(structures)];
 }
 
+/** What a seat is told when it has sent someone to look at a place it is not at. */
+const SET_OUT = "Someone has set out. What they find comes with the report after they are back.";
+
 /** What a participant asked to see when it looked at a report: places or people by name, the buildings a measure is
  * above zero or rising at, and how many at most. */
-export interface Looked { named?: string[]; measure?: string; limit?: number }
+export interface Looked { named?: string[]; measure?: string; limit?: number; /** Someone was sent to the places named: what they find comes later. */ sent?: true }
 
 /** The places a participant asked to see, in full as they are today: buildings by id, by kind, by a room in them or
  * the ground they stand on; open ground by its cell; or every building a measure is above zero or rising at, worst
@@ -435,7 +440,9 @@ export function renderObservation(obs: Observation, o: RenderOptions = {}): stri
     // Having looked at one thing, it isn't shown the standing picture of the others again (the town's survey, who's
     // who: it has just read them, and they come again with its next report). What's new always is: letters, papers,
     // money in and out.
-    if (o.looked?.size && !asked && (ch.kind === "sites" || ch.kind === "directory")) continue;
+    // (What someone sent has just come back with is always told: it comes once.)
+    const back = ch.kind === "sites" && ch.visited && (ch.fresh?.length ?? 0) > 0;
+    if (o.looked?.size && !asked && !back && (ch.kind === "sites" || ch.kind === "directory")) continue;
     if (ch.kind === "accounts") {
       out.push("", `## ${title(id)}`);
       for (const a of ch.accounts) out.push(`- ${a.account}${a.holder === obs.entity ? "" : ` (${a.holder}'s)`}, kept by ${a.custodian === obs.entity ? "you" : a.custodian}: ${money(a.balance)}`);
@@ -457,6 +464,19 @@ export function renderObservation(obs: Observation, o: RenderOptions = {}): stri
       if (lines.length > max) out.push(`(${lines.length - max} earlier ${lines.length - max === 1 ? "item" : "items"} not listed.)`);
       for (const l of lines.slice(-max)) out.push(`- ${l}`);
       if (lines.length > max || cuts > before) out.push(...look(id, "Not everything here is set out in full. To see the rest, say what to find"));
+    } else if (ch.kind === "sites" && ch.visited) {
+      // Places gone to (nobody is shown where they are not): what the latest going found, as it was then, in full,
+      // said once, with the report that brings it; someone just sent is said to be on the way. What earlier goings
+      // found is the seat's to remember (its notebook): it is not said again.
+      const back = new Set(ch.fresh ?? []);
+      const found = ch.cells.filter((c) => back.has(c.cell));
+      if (found.length) {
+        const seen = [...new Map(found.filter((c) => c.structure).map((c) => [c.structure!.structure, c.structure!])).values()];
+        const open = found.filter((c) => !c.structure);
+        out.push("", `## ${title(id)}: what was found there (${when(ch.as_of)})`, ...describeBuildings(seen, obs.entity, ch.as_of, true),
+          ...open.map((c) => `- open ground ${c.cell}${c.terrain ? `, ${words(c.terrain)}` : ""}${c.seen?.length ? `; seen living there: ${c.seen.map(words).join(", ")}` : ""}`), ...scales(seen));
+      } else if (asked) out.push("", `## ${title(id)}`, SET_OUT);
+      continue;
     } else if (ch.kind === "sites") {
       const structures = channels.structures({ ...obs, channels: { [id]: ch } });
       // What it asked to see there, in full.
@@ -502,7 +522,7 @@ export function renderObservation(obs: Observation, o: RenderOptions = {}): stri
     }
   }
   // Somewhere it looked that isn't there to be seen (a report it no longer has): said.
-  for (const id of o.looked?.keys() ?? []) if (!(id in obs.channels)) out.push("", `## ${title(id)}`, "Nothing could be seen there.");
+  for (const [id, asked] of o.looked ?? []) if (!(id in obs.channels)) out.push("", `## ${title(id)}`, asked.sent ? SET_OUT : "Nothing could be seen there.");
   if (obs.drafts.length) {
     out.push("", "## Waiting for you to confirm");
     for (const d of obs.drafts) out.push(o.draftText ? o.draftText(d) : `(${d.id}) ${d.summary}`);

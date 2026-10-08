@@ -1,8 +1,8 @@
 # How a death comes to be known (D54; revised 2026-10-08)
 
-**Source:** `citizen.ts` (`citizen.default` v0.39.1: `seeDeathAtHome`, and the child's word), `household.ts`
+**Source:** `citizen.ts` (`citizen.default` v0.40.0: `seeDeathAtHome`, the child's word, and `wonderNextDoor`), `household.ts`
 (`SAYING.died`), `firms.ts` (`firm.landlord` v0.12.3),
-`police.ts` (`police.station` v0.2.0), `common.ts` (`stoodEmpty`), `institutions.ts` (`city.registry`). Figures: the
+`police.ts` (`police.station` v0.3.0), `common.ts` (`stoodEmpty`), `institutions.ts` (`city.registry`). Figures: the
 profile's `life.found_alone_after`, with its source. What follows a registration (the estate, wages, the lease, children
 in care) is in [households.md](households.md) and [institutions.md](institutions.md).
 
@@ -32,12 +32,14 @@ how long a dead person goes on being treated as alive.
 | **Someone else lives there, not of the household** | An adult who lives in a home and sees someone not of their household die there (a home let again while they still live in it; a lodger) reports it to the registry at their next wake at home, naming no family (they do not know it). Found 2026-10-08 in the deaths test's town once people shopped differently: a leaseholder new to town died within a week of taking a home, before the rest of the family, still at their work, had ever been there, and the earlier tenant was still living in it; so the home never stood empty, nobody of the household was there, and nobody reported it. | Anyone present at a death, and the occupier of the house, may give the registrar the information (for England and Wales, Births and Deaths Registration Act 1953 s 16: to confirm, from memory; Victoria's Act puts the duty on the doctor and the funeral director) |
 | **Nobody else at home: how anyone can tell** | From outside, a home nobody lives in any more is one that is empty and that nobody has gone into or out of for a day (`stoodEmpty`). Where people share a home, one of them comes or goes within a day (the daily round), and it is theirs to report: only they can say who the family is, and an estate reported by anyone else passes to the town. So the landlord and the police report only a death in a home that has stood empty for a day since. | — (a day: the round's own rhythm, not a place's figure) |
 | **A tenant, by the landlord** | A landlord sees who is in the homes it owns (its office's sight of its own buildings). At its weekly look, and whenever else it is woken, a tenant who left by dying, in a home that has stood empty, and not yet registered: reported to the registry. | An owner's inspection. Kept from before; it now waits for the home to stand empty |
-| **Anyone, by the police** | Each day they work, the police look at the town's homes (a channel they see only when they ask to). A death in a home that has stood empty is theirs to call at: when is drawn once for each such person from `found_alone_after` (the share found within 1, 3, 7, 30 and 365 days; any moment within the band drawn), counted from the death. When that time has come, at the next day's work, an officer with an hour free (`call_seconds`) calls, and the death is reported to the registry as found there, unless it has been registered since. A world with no police has nobody to do this. | Japan's National Police Agency, 2025 (to confirm); the hour is a placeholder |
+| **A neighbour, who asks the police** | Once a day a person sees the buildings beside the one they are in, as anyone sees them from outside: how many are in each home, and when anyone was last seen going in or coming out; never who (the kernel shows nothing else of a home one is not in). A home that someone went into after anyone last left, with nobody in it now, holds someone who has not come out. In their own building a person knows their neighbours by name, and sees that one has died and their home stood empty since. How long such a silence goes before anybody remarks on it is drawn once for the home and the silence from `found_alone_after` (the share within 1, 3, 7, 30 and 365 days; any moment within the band drawn), counted from when someone was last seen going in, and never less than a day. When that time has come, an adult who sees it asks the police to call there (a `welfare_check_request` naming the home). Every adult beside the home draws the same time, so several may ask; the police go once. A home with nobody living beside it is remarked on by nobody. | "Reports of uncollected mail or when neighbors or relatives ... raised concerns"; the times are Japan's National Police Agency's (docs/behaviour/knowing.md, section 3, with what was and was not opened) |
+| **The police, when asked** | The police are shown nobody's home. Asked to call at one, they send an officer the same day: a visit, which takes the station's time (the way there and back, and the world's time at a place, `knowing.visit_seconds`) and during which the office does nothing else. The officer goes in, and sees who is there and who last left and why; whoever died there is reported to the registry as found there, unless the police have been told it is registered. A world with no police has nobody to ask. | The police go to a home when someone asks them to check on a person (Western Australia Police Force, "Police welfare checks"; none found for the profile's place: docs/behaviour/knowing.md, section 3) |
 | **The registry** | Registers a death the first time it is reported, with what the report says of the family. | [institutions.md](institutions.md) |
 
-**Parameters.** `life.found_alone_after` in the profile (a list of `{ within_days, bps }`, shares adding to 10,000), handed to the police as
-`found_after`; `homes_channel`, `registry`, `call_seconds` (3,600) on `police.station`. Without `found_alone_after` in
-the profile the police are given no sight of homes and make no calls.
+**Parameters.** `life.found_alone_after` in the profile (a list of `{ within_days, bps }`, shares adding to 10,000), handed to
+every person as `welfare.found_after`, with whom to ask (`welfare.police`) and the channel that shows the buildings
+beside them (`welfare.channel`); `calls_channel` and `registry` on `police.station`. Without `found_alone_after` in the
+profile, or without police, nobody is given the sight of next door and no calls are made.
 
 ## Who is told (registry 0.5.0, citizen 0.38.0, bank 0.11.0, the employers' modules; generator 0.28.0)
 
@@ -67,14 +69,23 @@ as before. An employer learns up to a pay period later, and pays the estate that
 does not hold the lease is not told at all. A firm that is neither named nor paying the dead person (the builder for a
 client, a shop for a customer) never learns.
 
-## What the police's sight stands for, and why it is the weak point
+## What changed on 2026-10-08, and what it leaves weak
 
-In a real town the police do not look into homes: somebody calls them. The callers (relatives elsewhere, neighbours,
-the post) are not in the world, so the time until somebody calls is taken from the figures, and the police are given
-the sight that lets them act when that time comes: who is in each of the town's homes and who last left, by name, when
-they ask. That is more than a police station knows. It is asked for, never shown unasked, and the code office uses it
-for this alone; a model holding the office could ask for it at any time. See "Revisit if" in the decisions log
-(2026-10-08).
+Until police.station 0.3.0 the police were given the sight of every home in the town, by name, whenever they asked,
+and drew the time to come themselves: a stand-in for callers the world did not have. Nobody is shown a town
+(docs/no-god-view.md). The caller is now in the world: a neighbour, who sees only what anyone sees from the street.
+
+- **The time is the home's, not the neighbour's.** Whoever lives beside a silent home draws the same time for it
+  (a draw keyed by the home and the silence, not by who draws: `chance` in a module's context). Drawn by each
+  neighbour separately, a home with eight neighbours would be found at the soonest of eight draws, and the figure
+  would mean nothing. What the figure counts is how long until the police are told by anyone.
+- **Someone with no neighbour is not found** by this rule: a house with nobody living in the cells around it. Their
+  landlord still finds a tenant; an owner living alone beside empty lots is found by nobody. In a real town a relative
+  elsewhere or the post would raise it; neither is in the world.
+- **What a neighbour infers is certain here** (someone went in, nobody came out, nobody is there: only a death does
+  that), where a real neighbour only suspects. The wait drawn from the figures stands for the suspicion growing.
+- **An officer's hour is not used:** the call takes the station's time (its one lane), not a named officer's working
+  day (docs/design/knowing.md, section 12).
 
 ## Observed
 
@@ -97,7 +108,10 @@ for this alone; a model holding the office could ask for it at any time. See "Re
   of 26 deaths in town in the year above. In a real town such a death is found at once. It needs the physics to show
   it to someone (a kernel change), so it is left for a decision.
 - **A death at work** is seen by nobody who acts on it (the employer is shown who is at work, and acts only on a
-  registration). The police's calls are at homes only.
+  registration). The police's calls are at the homes they are asked to call at only.
+- **An employer whose worker has not come, and a landlord whose rent has stopped, do not ask the police.** The
+  landlord still looks into its own buildings itself (a landlord's real right of entry is on notice, on a ground:
+  docs/behaviour/knowing.md, section 3). An employer learns from its bank, as above.
 - **Who really calls:** relatives, friends and neighbours missing someone (people's ties are in the world; nobody
   acts on not having seen someone). With them, the police would be called rather than look.
 - **A home with only children too young for school in it** and the household's adults away: nobody tells anyone, and

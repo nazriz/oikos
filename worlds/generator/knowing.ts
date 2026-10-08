@@ -7,7 +7,7 @@
 import { modules } from "@oikos/participants";
 
 type Match = { records?: string[]; statement_kinds?: string[]; has?: string[] };
-type Extra = { title?: string; every?: number; on_request?: boolean };
+type Extra = { title?: string; every?: number; on_request?: boolean; look_seconds?: number };
 const kinds = (k: string[] | Match): Match => (Array.isArray(k) ? { statement_kinds: k } : k);
 
 /** Its own papers: records that name the seat's entity (it is a party, or they are addressed to it). */
@@ -85,8 +85,8 @@ export const PUBLISHED: { what: string; why: string; board?: true; most?: number
  */
 export function answersOf(what: string, town: { holderSearch: string[]; dealings: number }): { by: string; to?: string[]; most?: number }[] {
   switch (what) {
-    // A lot's plan, by its number.
-    case "lot": return [{ by: "id", most: 1 }];
+    // A lot's plan, by its number, or by a cell of its ground (an address).
+    case "lot": return [{ by: "id", most: 1 }, { by: "data.cells", most: 1 }];
     // A title by its number, or the titles to one lot; by holder only to the bodies a statute supplies.
     case "records:claim": return [{ by: "id", most: 1 }, { by: "about.object", most: town.dealings }, ...(town.holderSearch.length ? [{ by: "holder", to: town.holderSearch }] : [])];
     // The dealings in one title.
