@@ -5,6 +5,15 @@ current; it's what we cite from. Entries marked **(to confirm)** are cited from 
 checking against the original before publication. Behaviour rules' own sources stay in docs/behaviour/ (each doc's
 sources); this list is for the architecture and design ideas.
 
+## Households and homes (docs/behaviour/households.md; docs/design/profile-depth.md, item 2)
+
+| Idea | Citation | Used in |
+|---|---|---|
+| A household as a family nucleus with or without other relatives: one-person, nuclear, extended, composite | United Nations, *Principles and Recommendations for Population and Housing Censuses*, Revision 3 (2017), the classification of households by type; United Nations (2017), *Household Size and Composition Around the World 2017*, ST/ESA/SER.A/405 **(both to confirm: from memory and from the design's list, not opened)** | `drawHousehold` (`participants/src/behaviour/household.ts`): an extended household is a family plus relatives, stated as a share of all households beside the other kinds, as a census table has it |
+| An occupancy standard: bedrooms needed by who lives together (two to a bedroom; couples share; a room of one's own from 18; children share by sex, the youngest of either sex under 5) | The Canadian National Occupancy Standard, as the Australian Bureau of Statistics applies it (Census 2021 dictionary, "Housing suitability (HOSD)") | `bedroomsNeeded` with the figures of `OCCUPANCY`: the standard where a profile states none. The rule's form is general; a profile states its place's own figures (`households.occupancy`) |
+| Crowding by one yardstick for every place: more than three people to a habitable room | UN-Habitat, the "sufficient living area" criterion of its definition of a slum household (not more than three people sharing the same room) **(to confirm: from memory, not opened; and whether a living room counts as a room there)** | `town/households`, the column `over_three_a_room` (a home's rooms taken as its bedrooms and one more) |
+| Who pools income inside a household, and who decides | Chiappori, P.-A. (1992), "Collective Labor Supply and Welfare", *Journal of Political Economy* 100(3) **(to confirm)** | Not used: named in docs/behaviour/households.md among what is left to the citizen redesign. Today each adult's money is their own and only the rent is shared |
+
 ## Citizens' minds (docs/design/ai-citizens.md; research: docs/research/citizen-minds-2026-09.md)
 
 ### How a citizen decides
