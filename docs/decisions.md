@@ -2359,6 +2359,8 @@ See the design note, §16.
 
 - **Profile depth: a proposal awaiting Naz's sign-off** (2026-10-08; `docs/design/profile-depth.md`). What the nine profiles' authors could not say in the structure (informal and own-account work, extended households, a pension age apart from stopping work, unemployment support shapes, tax shapes, seasonal hazards, a river's own flow, how money is written, and ten smaller ones): for each, the smallest general change, what it touches, its basis, its size and its tests; then an order, what can be built side by side, and eleven decisions for Naz. Nothing was built or run. **Revisit if** the citizen redesign lands first (several behaviour rules then belong in it, as the document says).
 
+- **Wave 2 of pilots is planned and awaits Naz's go-ahead** (2026-10-08; `docs/waves/wave-2/plan.md`, its queue files and `make.ts`): thirty pilots in three stages (a six-pilot shake-down first), seven profiles, five seat models, offices no model has held, eight test-only pilots; nothing was run but a ten-day mock of the shake-down. **Revisit if** the shake-down's reports contradict its estimates of requests or usage, or the knowing architecture changes the seat ids it names.
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Calibration, measured again after the first-year risk fix** (2026-10-05, at 0251d3a, `runs/calibration-2026-10-05` on the run server; the small town, 3 seeds × 2 years, code only, as below). Health: 4 breaches of 15 (8 measured). Recorded, not chased: Naz decides what to do with the numbers.

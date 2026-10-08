@@ -1,0 +1,143 @@
+[
+ {
+  "name": "w2-24-election",
+  "world": "worlds/town-1000.yaml",
+  "sets": [
+   "seed=124",
+   "profile=gb-eng-2026",
+   "mayor=llm",
+   "model_seats=electoral,council-clerk,councillor-1,councillor-2"
+  ],
+  "args": [
+   "--scenario",
+   "election-due"
+  ],
+  "model": "codex/gpt-6.1-sol",
+  "translator": "decide/pod-small-d16-s1",
+  "until": 7776000,
+  "budget": 25,
+  "env": {
+   "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
+   "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
+  },
+  "note": "Wave 2b (planned 2026-10-08), for the translator's data. Profile gb-eng-2026, seed 124, 1,000 people, 90 days, starting conditions election-due. Seats: mayor, electoral, council-clerk, councillor-1, councillor-2, all on codex/gpt-6.1-sol. Translator: decide/pod-small-d16-s1 (the trained one). Every draft is confirmed or declined by its seat. An election with a model mayor standing, with the trained translator."
+ },
+ {
+  "name": "w2-25-heat",
+  "world": "worlds/town-1000.yaml",
+  "sets": [
+   "seed=125",
+   "profile=us-oh-2026",
+   "mayor=llm",
+   "model_seats=finance,registry,editor"
+  ],
+  "args": [
+   "--scenario",
+   "hot-summer"
+  ],
+  "model": "codex/gpt-6.1-sol",
+  "translator": "codex/gpt-6-luna",
+  "until": 7776000,
+  "budget": 25,
+  "env": {
+   "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
+   "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
+  },
+  "note": "Wave 2b (planned 2026-10-08), for the translator's data. Profile us-oh-2026, seed 125, 1,000 people, 90 days, starting conditions hot-summer. Seats: mayor, finance, registry, editor, all on codex/gpt-6.1-sol. Translator: codex/gpt-6-luna (under the translator's prompt). Every draft is confirmed or declined by its seat. A hot summer in a fourth currency's town."
+ },
+ {
+  "name": "w2-26-council",
+  "world": "worlds/town-1000.yaml",
+  "sets": [
+   "seed=126",
+   "profile=au-vic-2026",
+   "model_seats=council-clerk,councillor-1,councillor-2,councillor-3,councillor-4,councillor-5"
+  ],
+  "model": "codex/gpt-6-luna",
+  "translator": "codex/gpt-6-luna",
+  "until": 5184000,
+  "budget": 25,
+  "env": {
+   "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
+   "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
+  },
+  "note": "Wave 2b (planned 2026-10-08), for the translator's data. Profile au-vic-2026, seed 126, 1,000 people, 60 days. Seats: council-clerk, councillor-1, councillor-2, councillor-3, councillor-4, councillor-5, all on codex/gpt-6-luna. Translator: codex/gpt-6-luna (under the translator's prompt). Every draft is confirmed or declined by its seat. A council on the weaker model under a code mayor."
+ },
+ {
+  "name": "w2-27-flood",
+  "world": "worlds/town-1000.yaml",
+  "sets": [
+   "seed=127",
+   "profile=de-ni-2026",
+   "mayor=llm",
+   "model_seats=planning,inspector,landlord-1-office"
+  ],
+  "args": [
+   "--scenario",
+   "wet-year"
+  ],
+  "model": "codex/gpt-6.1-sol",
+  "translator": "codex/gpt-6-luna",
+  "until": 12960000,
+  "budget": 25,
+  "env": {
+   "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
+   "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
+  },
+  "note": "Wave 2b (planned 2026-10-08), for the translator's data. Profile de-ni-2026, seed 127, 1,000 people, 150 days, starting conditions wet-year. Seats: mayor, planning, inspector, landlord-1-office, all on codex/gpt-6.1-sol. Translator: codex/gpt-6-luna (under the translator's prompt). Every draft is confirmed or declined by its seat. A wet year where amounts are written with a comma."
+ },
+ {
+  "name": "w2-28-housing",
+  "world": "worlds/town-1000.yaml",
+  "sets": [
+   "seed=128",
+   "profile=gb-eng-2026",
+   "model_seats=landlord-1-office,landlord-2-office,tribunal-member"
+  ],
+  "model": "codex/gpt-6-luna",
+  "translator": "codex/gpt-6-luna",
+  "until": 5184000,
+  "budget": 25,
+  "env": {
+   "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
+   "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
+  },
+  "note": "Wave 2b (planned 2026-10-08), for the translator's data. Profile gb-eng-2026, seed 128, 1,000 people, 60 days. Seats: landlord-1-office, landlord-2-office, tribunal-member, all on codex/gpt-6-luna. Translator: codex/gpt-6-luna (under the translator's prompt). Every draft is confirmed or declined by its seat. Landlords and the tribunal on the weaker model."
+ },
+ {
+  "name": "w2-29-lending",
+  "world": "worlds/town-1000.yaml",
+  "sets": [
+   "seed=129",
+   "profile=jp-akita-2026",
+   "model_seats=bank-lending,landlord-1-office,landlord-2-office,tribunal-registrar"
+  ],
+  "model": "codex/gpt-6.1-sol",
+  "translator": "decide/pod-small-d16-s1",
+  "until": 7776000,
+  "budget": 25,
+  "env": {
+   "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
+   "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
+  },
+  "note": "Wave 2b (planned 2026-10-08), for the translator's data. Profile jp-akita-2026, seed 129, 1,000 people, 90 days. Seats: bank-lending, landlord-1-office, landlord-2-office, tribunal-registrar, all on codex/gpt-6.1-sol. Translator: decide/pod-small-d16-s1 (the trained one). Every draft is confirmed or declined by its seat. Loans and leases in whole units of money, with the trained translator."
+ },
+ {
+  "name": "w2-30-trade",
+  "world": "worlds/town-1000.yaml",
+  "sets": [
+   "seed=130",
+   "profile=au-vic-2026",
+   "model_seats=shop-2-manager,factory-2-manager"
+  ],
+  "model": "codex/gpt-6.1-sol",
+  "translator": "decide/pod-small-d16-s1",
+  "until": 5184000,
+  "budget": 25,
+  "env": {
+   "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
+   "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
+  },
+  "note": "Wave 2b (planned 2026-10-08), for the translator's data. Profile au-vic-2026, seed 130, 1,000 people, 60 days. Seats: shop-2-manager, factory-2-manager, all on codex/gpt-6.1-sol. Translator: decide/pod-small-d16-s1 (the trained one). Every draft is confirmed or declined by its seat. The trade probe again, on the other family and translator."
+ }
+]
