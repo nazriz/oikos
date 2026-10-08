@@ -1,0 +1,1419 @@
+{
+  "id": "us-oh-2026",
+  "place": "A town of a few thousand people in rural Ohio, United States (modelled on Wyandot County, Ohio)",
+  "as_of": "2026-10",
+  "about": "Every place-specific figure the town generator uses for a small town in rural Ohio, with its source. County-level figures are for Wyandot County (county seat Upper Sandusky, 21,598 people, ACS 2020-2024), wages for the BLS West Northwestern Ohio nonmetropolitan area, life tables and birth rates national (NCHS), river and climate for the Sandusky River gauge and Upper Sandusky station. Where a source says 'placeholder' the figure is an estimate or carried over from the other profile; 'opened' means the primary table or page was read. Where the profile structure cannot say what this place's rule is, the source says so. A world for another place and time is another profile; the platform's code holds none of these (docs/profiles.md).",
+  "values": {
+    "currency": {
+      "code": "USD",
+      "minor_units": 2,
+      "symbol": "$",
+      "unit_words": [
+        "dollar",
+        "dollars",
+        "bucks"
+      ],
+      "minor_words": [
+        "cent",
+        "cents"
+      ]
+    },
+    "households": {
+      "lone_bps": 2856,
+      "group_bps": 444,
+      "couple_bps": 3554,
+      "couple_children_bps": 1718,
+      "one_parent_bps": 1428,
+      "children_couple": [
+        3550,
+        4350,
+        2100
+      ],
+      "children_one_parent": [
+        5150,
+        3300,
+        1550
+      ],
+      "same_sex_couple_bps": 144,
+      "lone_parent_female_bps": 5595,
+      "adult_female_bps": 5121,
+      "child_male_bps": 4922,
+      "adult_ages": [
+        18,
+        99
+      ],
+      "mother_age_at_first_birth": [
+        22,
+        36
+      ],
+      "child_max_age": 24,
+      "group_size": [
+        2,
+        3
+      ],
+      "age_bands_bps": [
+        {
+          "from": 0,
+          "to": 4,
+          "bps": 550
+        },
+        {
+          "from": 5,
+          "to": 9,
+          "bps": 715
+        },
+        {
+          "from": 10,
+          "to": 14,
+          "bps": 567
+        },
+        {
+          "from": 15,
+          "to": 19,
+          "bps": 620
+        },
+        {
+          "from": 20,
+          "to": 24,
+          "bps": 499
+        },
+        {
+          "from": 25,
+          "to": 29,
+          "bps": 534
+        },
+        {
+          "from": 30,
+          "to": 34,
+          "bps": 596
+        },
+        {
+          "from": 35,
+          "to": 39,
+          "bps": 763
+        },
+        {
+          "from": 40,
+          "to": 44,
+          "bps": 480
+        },
+        {
+          "from": 45,
+          "to": 49,
+          "bps": 585
+        },
+        {
+          "from": 50,
+          "to": 54,
+          "bps": 625
+        },
+        {
+          "from": 55,
+          "to": 59,
+          "bps": 810
+        },
+        {
+          "from": 60,
+          "to": 64,
+          "bps": 576
+        },
+        {
+          "from": 65,
+          "to": 69,
+          "bps": 687
+        },
+        {
+          "from": 70,
+          "to": 74,
+          "bps": 492
+        },
+        {
+          "from": 75,
+          "to": 79,
+          "bps": 303
+        },
+        {
+          "from": 80,
+          "to": 84,
+          "bps": 293
+        },
+        {
+          "from": 85,
+          "to": 99,
+          "bps": 305
+        }
+      ]
+    },
+    "life": {
+      "qx_per_100000": {
+        "male": [
+          3600,
+          450,
+          300,
+          200,
+          150,
+          100,
+          100,
+          100,
+          100,
+          100,
+          120,
+          120,
+          120,
+          120,
+          120,
+          189,
+          193,
+          199,
+          204,
+          211,
+          217,
+          225,
+          233,
+          241,
+          250,
+          260,
+          271,
+          283,
+          296,
+          310,
+          324,
+          341,
+          358,
+          377,
+          398,
+          420,
+          444,
+          470,
+          499,
+          529,
+          562,
+          598,
+          637,
+          679,
+          725,
+          774,
+          828,
+          886,
+          948,
+          1016,
+          1090,
+          1169,
+          1255,
+          1349,
+          1449,
+          1558,
+          1677,
+          1804,
+          1942,
+          2092,
+          2254,
+          2428,
+          2617,
+          2822,
+          3043,
+          3281,
+          3539,
+          3818,
+          4119,
+          4444,
+          4795,
+          5173,
+          5582,
+          6022,
+          6497,
+          7008,
+          7559,
+          8153,
+          8791,
+          9478,
+          10216,
+          11008,
+          11859,
+          12771,
+          13749,
+          14796,
+          15915,
+          17112,
+          18388,
+          19749,
+          21198,
+          22737,
+          24372,
+          26103,
+          27933,
+          29865,
+          31900,
+          34037,
+          36277,
+          38618,
+          41110
+        ],
+        "female": [
+          3600,
+          450,
+          300,
+          200,
+          150,
+          100,
+          100,
+          100,
+          100,
+          100,
+          120,
+          120,
+          120,
+          120,
+          120,
+          190,
+          195,
+          199,
+          204,
+          210,
+          216,
+          222,
+          229,
+          236,
+          243,
+          252,
+          260,
+          270,
+          280,
+          291,
+          302,
+          315,
+          328,
+          343,
+          358,
+          375,
+          392,
+          411,
+          432,
+          454,
+          477,
+          502,
+          529,
+          558,
+          589,
+          622,
+          658,
+          696,
+          737,
+          781,
+          828,
+          878,
+          932,
+          990,
+          1052,
+          1119,
+          1190,
+          1267,
+          1349,
+          1436,
+          1530,
+          1631,
+          1739,
+          1855,
+          1979,
+          2111,
+          2254,
+          2406,
+          2569,
+          2743,
+          2930,
+          3130,
+          3344,
+          3573,
+          3818,
+          4080,
+          4360,
+          4660,
+          4980,
+          5323,
+          5689,
+          6079,
+          6497,
+          6942,
+          7418,
+          7925,
+          8466,
+          9043,
+          9657,
+          10312,
+          11008,
+          11749,
+          12537,
+          13374,
+          14263,
+          15207,
+          16207,
+          17267,
+          18388,
+          19574,
+          20836
+        ]
+      },
+      "illness": {
+        "by_age": [
+          {
+            "from": 0,
+            "bps": 600
+          },
+          {
+            "from": 5,
+            "bps": 350
+          },
+          {
+            "from": 15,
+            "bps": 600
+          },
+          {
+            "from": 45,
+            "bps": 900
+          },
+          {
+            "from": 65,
+            "bps": 1800
+          },
+          {
+            "from": 85,
+            "bps": 4500
+          }
+        ],
+        "severity": [
+          {
+            "label": "serious",
+            "share_bps": 8000,
+            "days": [
+              3,
+              14
+            ],
+            "fatal_bps": 0
+          },
+          {
+            "label": "severe",
+            "share_bps": 2000,
+            "days": [
+              14,
+              60
+            ],
+            "fatal_bps": 0
+          }
+        ]
+      },
+      "injury": {
+        "bps": 65,
+        "severity": [
+          {
+            "label": "minor",
+            "share_bps": 6000,
+            "days": [
+              3,
+              14
+            ],
+            "fatal_bps": 0
+          },
+          {
+            "label": "serious",
+            "share_bps": 4000,
+            "days": [
+              14,
+              90
+            ],
+            "fatal_bps": 0
+          }
+        ]
+      },
+      "birth": {
+        "ages": [
+          15,
+          49
+        ],
+        "gestation_days": 266,
+        "female_bps": 4878
+      },
+      "treatable": {
+        "share_bps_by_age": [
+          {
+            "from": 0,
+            "bps": 1500
+          },
+          {
+            "from": 75,
+            "bps": 0
+          }
+        ],
+        "band": "severe"
+      },
+      "work_injury_bps": {
+        "factory": 100,
+        "shop": 90
+      },
+      "found_alone_after": [
+        {
+          "within_days": 1,
+          "bps": 3691
+        },
+        {
+          "within_days": 3,
+          "bps": 2062
+        },
+        {
+          "within_days": 7,
+          "bps": 1359
+        },
+        {
+          "within_days": 30,
+          "bps": 1959
+        },
+        {
+          "within_days": 365,
+          "bps": 929
+        }
+      ]
+    },
+    "wages_per_fortnight": {
+      "shop": 130960,
+      "factory": 199520,
+      "construction": 236000
+    },
+    "rents_per_month": {
+      "apartment_units": [
+        {
+          "bedrooms": 1,
+          "count": 3,
+          "rent": 61400
+        },
+        {
+          "bedrooms": 2,
+          "count": 7,
+          "rent": 82400
+        },
+        {
+          "bedrooms": 3,
+          "count": 2,
+          "rent": 96800
+        }
+      ],
+      "house_types": [
+        {
+          "id": "house",
+          "bedrooms": 3,
+          "share_bps": 5500,
+          "rent": 96800
+        },
+        {
+          "id": "large-house",
+          "bedrooms": 4,
+          "share_bps": 4500,
+          "rent": 96700
+        }
+      ]
+    },
+    "spending": {
+      "saving_bps": 410,
+      "wealth_effect_bps_per_year": 300,
+      "essentials_per_month": 35942,
+      "shops_known": 7,
+      "shop_search_bps_per_month": 2500
+    },
+    "savings_by_age": [
+      {
+        "from": 18,
+        "pct": [
+          36180,
+          179820,
+          540000,
+          1441800,
+          4498200
+        ]
+      },
+      {
+        "from": 25,
+        "pct": [
+          36180,
+          179820,
+          540000,
+          1441800,
+          4498200
+        ]
+      },
+      {
+        "from": 35,
+        "pct": [
+          50250,
+          249750,
+          750000,
+          2002500,
+          6247500
+        ]
+      },
+      {
+        "from": 45,
+        "pct": [
+          58960,
+          293040,
+          880000,
+          2349600,
+          7330400
+        ]
+      },
+      {
+        "from": 55,
+        "pct": [
+          52930,
+          263070,
+          790000,
+          2109300,
+          6580700
+        ]
+      }
+    ],
+    "retirement_age": 67,
+    "retiree_savings": [
+      10000000,
+      30000000
+    ],
+    "support": {
+      "pension": {
+        "amount": 207100,
+        "every_days": 30,
+        "from_age": 67
+      },
+      "unemployment": {
+        "amount": 80000,
+        "every_days": 14,
+        "from_age": 18
+      }
+    },
+    "firm_ownership": {
+      "forms_bps": {
+        "factory": {
+          "closely_held": 0,
+          "outside": 0,
+          "widely_held": 10000
+        },
+        "shop": {
+          "closely_held": 8000,
+          "outside": 2000,
+          "widely_held": 0
+        },
+        "landlord": {
+          "closely_held": 7000,
+          "outside": 3000,
+          "widely_held": 0
+        }
+      },
+      "closely_held": {
+        "households_bps": [
+          8500,
+          1200,
+          300
+        ],
+        "owner_wealth_fifth_bps": [
+          100,
+          200,
+          400,
+          800,
+          8500
+        ]
+      },
+      "widely_held": {
+        "outside_bps": 8000
+      },
+      "direct_holders": {
+        "by_wealth_fifth_bps": [
+          800,
+          2500,
+          3500,
+          5000,
+          7200
+        ],
+        "firms_held": [
+          1,
+          4
+        ]
+      }
+    },
+    "retirement_fund": {
+      "share_bps_of_local": 7200,
+      "member_bps": 5300,
+      "pension_every_days": 30,
+      "drawdown_bps_by_age": [
+        {
+          "from": 0,
+          "bps": 400
+        },
+        {
+          "from": 73,
+          "bps": 377
+        },
+        {
+          "from": 75,
+          "bps": 407
+        },
+        {
+          "from": 80,
+          "bps": 495
+        },
+        {
+          "from": 85,
+          "bps": 625
+        },
+        {
+          "from": 90,
+          "bps": 820
+        },
+        {
+          "from": 95,
+          "bps": 1120
+        }
+      ],
+      "cost_bps_of_income": 1500
+    },
+    "industry": {
+      "factory_labour_share_bps": 1700,
+      "factory_input_share_bps": 7200,
+      "retail_purchases_share_bps": 7000,
+      "retail_labour_share_bps": 1400
+    },
+    "prices": {
+      "goods_world": 10000,
+      "goods_import_markup_bps": 1000,
+      "inputs_per_kg": 250,
+      "materials_per_kg": 125
+    },
+    "ordinary_hours_per_week": 40,
+    "fertility_per_10000": [
+      {
+        "from": 15,
+        "rate": 126
+      },
+      {
+        "from": 20,
+        "rate": 558
+      },
+      {
+        "from": 25,
+        "rate": 895
+      },
+      {
+        "from": 30,
+        "rate": 937
+      },
+      {
+        "from": 35,
+        "rate": 543
+      },
+      {
+        "from": 40,
+        "rate": 127
+      },
+      {
+        "from": 45,
+        "rate": 12
+      },
+      {
+        "from": 50,
+        "rate": 0
+      }
+    ],
+    "labour_force_participation_bps": 8171,
+    "tenancy": {
+      "rent_review_months": 12,
+      "rent_increase_notice_days": 30,
+      "after_fixed_term": "periodic"
+    },
+    "values": {
+      "benevolence": {
+        "mean_bps": 7000,
+        "sd_bps": 1500
+      },
+      "universalism": {
+        "mean_bps": 6600,
+        "sd_bps": 1500
+      },
+      "self_direction": {
+        "mean_bps": 6200,
+        "sd_bps": 1500
+      },
+      "security": {
+        "mean_bps": 5800,
+        "sd_bps": 1500
+      },
+      "conformity": {
+        "mean_bps": 5400,
+        "sd_bps": 1500
+      },
+      "hedonism": {
+        "mean_bps": 5000,
+        "sd_bps": 1500
+      },
+      "achievement": {
+        "mean_bps": 4600,
+        "sd_bps": 1500
+      },
+      "tradition": {
+        "mean_bps": 4200,
+        "sd_bps": 1500
+      },
+      "stimulation": {
+        "mean_bps": 3800,
+        "sd_bps": 1500
+      },
+      "power": {
+        "mean_bps": 3400,
+        "sd_bps": 1500
+      }
+    },
+    "industrial_action": {
+      "ballot_turnout_bps": 5000,
+      "ballot_pass_bps": 5000,
+      "notice_days": 0,
+      "paid_during_action": false
+    },
+    "world_price_process": {
+      "goods": {
+        "sd_bps": 150,
+        "persistence_bps": 9000
+      },
+      "inputs": {
+        "sd_bps": 400,
+        "persistence_bps": 9000
+      },
+      "materials": {
+        "sd_bps": 300,
+        "persistence_bps": 9000
+      }
+    },
+    "credit": {
+      "cash_rate_bps": 388,
+      "funding_spread_bps": 100,
+      "lending_rate_bps": {
+        "person": 1230,
+        "organisation": 850
+      },
+      "serviceability_buffer_bps": 0,
+      "max_repayment_share_bps": {
+        "person": 2800,
+        "organisation": 2000
+      },
+      "arrears_days": 30,
+      "default_days": 90,
+      "max_months": 60,
+      "reserve": 10000000
+    },
+    "opening": {
+      "bank": 50000000,
+      "town": 200000000,
+      "builder": 30000000,
+      "landlord": 60000000,
+      "shop": 3000000,
+      "factory": 40000000,
+      "person_min_savings": 100000
+    },
+    "town_finance": {
+      "parks_per_year": 15000000,
+      "payment_approval_over": 5000000
+    },
+    "public_finance": {
+      "income_tax": {
+        "brackets": [
+          {
+            "from": 0,
+            "rate_bps": 0
+          },
+          {
+            "from": 1610000,
+            "rate_bps": 1000
+          },
+          {
+            "from": 2605000,
+            "rate_bps": 1275
+          },
+          {
+            "from": 2850000,
+            "rate_bps": 1475
+          },
+          {
+            "from": 6650000,
+            "rate_bps": 2475
+          },
+          {
+            "from": 12180000,
+            "rate_bps": 2675
+          },
+          {
+            "from": 21787500,
+            "rate_bps": 3475
+          },
+          {
+            "from": 27232500,
+            "rate_bps": 3775
+          },
+          {
+            "from": 65670000,
+            "rate_bps": 3975
+          }
+        ],
+        "levy_bps": 765,
+        "levy_from": 0
+      },
+      "grants_per_resident_per_year": 3600,
+      "rates_per_resident_per_year": 70000,
+      "rates_instalments": 2,
+      "rates_due_days": 30,
+      "rates_penalty_interest_bps": 800,
+      "median_house_price": 16340000,
+      "rates_exempt_kinds": [
+        "health_service",
+        "school",
+        "utility",
+        "police"
+      ]
+    },
+    "services": {
+      "waste_per_person_per_day_g": 2223,
+      "landfill_levy_per_tonne": 475,
+      "council_staff_per_1000": 8,
+      "collect_seconds_per_10kg": 12,
+      "asset_life_years": 15,
+      "upkeep_hours_per_week_per_asset": 4,
+      "complain_bps": 3000
+    },
+    "unions": {
+      "membership_bps": {
+        "manufacturing": 770,
+        "retail": 400,
+        "construction": 1110,
+        "public_administration": 3290,
+        "other": 1000
+      },
+      "dues_per_month": 5500,
+      "resignation_notice_days": 14,
+      "claim_margin_bps": 200,
+      "meeting_every_days": 30,
+      "teaching": "Together, workers win better pay and conditions than each alone."
+    },
+    "groups": {
+      "kinds": [
+        {
+          "kind": "sport",
+          "name": "recreation league",
+          "every_days": 7,
+          "lasts_minutes": 120
+        },
+        {
+          "kind": "religious",
+          "name": "congregation",
+          "every_days": 7,
+          "lasts_minutes": 90,
+          "teaching": "There is a God who made the world and cares how we live.",
+          "held_at_start_bps": 6900
+        },
+        {
+          "kind": "arts",
+          "name": "arts council",
+          "every_days": 14,
+          "lasts_minutes": 120
+        },
+        {
+          "kind": "hobby",
+          "name": "hobby group",
+          "every_days": 14,
+          "lasts_minutes": 120
+        },
+        {
+          "kind": "interest",
+          "name": "civic club",
+          "every_days": 30,
+          "lasts_minutes": 120
+        }
+      ],
+      "per_kind_per_1000_people": 1,
+      "taking_part_bps": 4000,
+      "leave_notice_days": 0
+    },
+    "elections": {
+      "term_years": 4,
+      "method": "plurality",
+      "turnout_bps": 3500,
+      "stand_bps": 200,
+      "news_readers_bps": 3000
+    },
+    "health": {
+      "doctors_per_1000": 0.4,
+      "doctor_wage_per_fortnight": 872300,
+      "consult_minutes": 30,
+      "seek_care_bps": 9000,
+      "treats": [
+        {
+          "kind": "illness",
+          "severity": "serious",
+          "consults": 1,
+          "days_kept_bps": 8000,
+          "fatal_kept_bps": 5000
+        },
+        {
+          "kind": "illness",
+          "severity": "severe",
+          "consults": 2,
+          "days_kept_bps": 8000,
+          "fatal_kept_bps": 5000
+        },
+        {
+          "kind": "injury",
+          "severity": "minor",
+          "consults": 1,
+          "days_kept_bps": 8000,
+          "fatal_kept_bps": 5000
+        },
+        {
+          "kind": "injury",
+          "severity": "serious",
+          "consults": 2,
+          "days_kept_bps": 8000,
+          "fatal_kept_bps": 5000
+        }
+      ],
+      "off_work_severities": [
+        "serious",
+        "severe"
+      ]
+    },
+    "round": {
+      "work_start_hour": 8,
+      "work_end_hour": 16,
+      "work_days": 5,
+      "school_start_hour": 8,
+      "school_end_hour": 15,
+      "travel_seconds_per_cell": 18,
+      "travel_by_cover": {
+        "water": 120,
+        "wetland": 30,
+        "woodland": 25,
+        "scrub": 25
+      },
+      "roads": {
+        "seconds_per_cell": 2,
+        "within_cells": 3,
+        "budget_per_resident": 30000
+      }
+    },
+    "ownership": {
+      "house_owner_bps": 8422,
+      "mortgage_bps_by_age": [
+        {
+          "from": 18,
+          "bps": 8500
+        },
+        {
+          "from": 45,
+          "bps": 5500
+        },
+        {
+          "from": 65,
+          "bps": 1500
+        }
+      ],
+      "mortgage_payment_per_month": 128100,
+      "mortgage_rate_bps": 728,
+      "mortgage_years_left": [
+        5,
+        30
+      ],
+      "market": {
+        "buy_bps_per_month": 100,
+        "deposit_bps": 1000,
+        "costs_bps": 600,
+        "mortgage_months": 360,
+        "relist_days": 30,
+        "cut_bps": 500,
+        "floor_bps": 8000
+      }
+    },
+    "utilities": {
+      "water": {
+        "litres_per_person_per_day": 310,
+        "price_per_kl": 277,
+        "service_per_quarter": 6300,
+        "river_inflow_kl_per_cell_per_day": 1000,
+        "river_decay_bps_per_day": 1000,
+        "river_flow_bps_per_day": 5000
+      },
+      "energy": {
+        "kwh_per_household_per_day": 29,
+        "price_per_kwh": 19,
+        "supply_per_day": 30,
+        "grid_price_per_kwh": 9,
+        "grid_emissions_g_per_kwh": 450
+      }
+    },
+    "climate": {
+      "rain_by_month_bps": [
+        15918,
+        16569,
+        21200,
+        16714,
+        11215,
+        8646,
+        5173,
+        2569,
+        2279,
+        2822,
+        5825,
+        11070
+      ],
+      "storm_bps_per_month": 1000,
+      "storm_days": [
+        1,
+        3
+      ],
+      "storm_bps": 25000,
+      "drought_bps_per_year": 1000,
+      "drought_months": [
+        3,
+        12
+      ],
+      "drought_bps": 4000,
+      "summer_months": [
+        6,
+        7,
+        8
+      ],
+      "heatwave_bps_per_week": 600,
+      "heatwave_days": [
+        3,
+        5
+      ],
+      "heat_units": 10,
+      "built_heat_units": 12,
+      "heat_illness_bps_per_unit": 100,
+      "warning_lead_days": 2
+    },
+    "hazards": {
+      "river_bank_kl": 12000,
+      "spill_bps_per_day": 3000,
+      "flood_above_kl": 300,
+      "wetland_soak_kl_per_day": 500
+    },
+    "crime": {
+      "take_bps_per_month_in_need": 200,
+      "caught_bps_reckoned": 3000,
+      "take_quantity": 5,
+      "detection_bps": 1300,
+      "investigation_hours": 4,
+      "police_per_1000": 2.4,
+      "officer_wage_per_fortnight": 240000
+    },
+    "justice": {
+      "hearing_after_days": 21,
+      "pay_within_days": 28,
+      "challenge_bps": 2000,
+      "apply_bps": 3000,
+      "apply_after_days": 30
+    },
+    "education": {
+      "school_ages": [
+        5,
+        17
+      ],
+      "students_per_teacher": 16.4,
+      "school_days_per_year": 180,
+      "hours_per_day": 6.5,
+      "teacher_wage_per_fortnight": 268000,
+      "attainment": [
+        {
+          "label": "Less than high school",
+          "share_bps": 516,
+          "years": 10
+        },
+        {
+          "label": "High school graduate (or equivalent)",
+          "share_bps": 4774,
+          "years": 12
+        },
+        {
+          "label": "Some college, no degree",
+          "share_bps": 1751,
+          "years": 13
+        },
+        {
+          "label": "Associate degree",
+          "share_bps": 1000,
+          "years": 14
+        },
+        {
+          "label": "Bachelor's degree or above",
+          "share_bps": 1959,
+          "years": 16
+        }
+      ],
+      "return_per_year_bps": 900,
+      "max_years": 20
+    },
+    "nature": {
+      "cell_m": 25,
+      "landscape": {
+        "margin_cells": 100,
+        "block_cells": 16,
+        "shares_bps": {
+          "woodland": 1900,
+          "scrub": 800,
+          "grassland": 1200,
+          "farmland": 5800,
+          "wetland": 300
+        },
+        "woodland_patches": 3
+      },
+      "covers": [
+        {
+          "id": "woodland"
+        },
+        {
+          "id": "scrub",
+          "succeeds_to": {
+            "cover": "woodland",
+            "after_years": 40
+          }
+        },
+        {
+          "id": "grassland"
+        },
+        {
+          "id": "cleared",
+          "succeeds_to": {
+            "cover": "grassland",
+            "after_years": 1
+          }
+        },
+        {
+          "id": "farmland"
+        },
+        {
+          "id": "wetland"
+        },
+        {
+          "id": "riverbank"
+        }
+      ],
+      "default_cover": "grassland",
+      "cleared_cover": "cleared",
+      "river_cover": "riverbank",
+      "pollution": {
+        "decay_bps_per_day": 300,
+        "diffusion_bps_per_day": 800,
+        "flow_bps_per_day": 5000,
+        "per_factory_per_day": 40,
+        "per_farmland_cell_per_day": 1
+      },
+      "species": [
+        {
+          "id": "eastern-box-turtle",
+          "name": "eastern box turtle",
+          "density_per_ha": {
+            "woodland": 1.5,
+            "scrub": 1.0,
+            "grassland": 0.5,
+            "riverbank": 0.5
+          },
+          "home_range_ha": 2.5,
+          "growth_bps_per_year": 600,
+          "mortality_bps_per_year": 800,
+          "dispersal_bps_per_year": 300,
+          "dispersal_m": 100,
+          "barriers": [
+            "built",
+            "farmland"
+          ],
+          "min_viable": 2,
+          "detection_bps": 2000,
+          "listed": true
+        },
+        {
+          "id": "blanchards-cricket-frog",
+          "name": "Blanchard's cricket frog",
+          "density_per_ha": {
+            "wetland": 60,
+            "riverbank": 15
+          },
+          "home_range_ha": 0.1,
+          "growth_bps_per_year": 12000,
+          "mortality_bps_per_year": 5000,
+          "dispersal_bps_per_year": 1500,
+          "dispersal_m": 150,
+          "barriers": [
+            "built"
+          ],
+          "min_viable": 4,
+          "tolerance": {
+            "pollution": {
+              "above": 400,
+              "mortality_bps_per_day": 50
+            }
+          },
+          "detection_bps": 5000,
+          "listed": true
+        },
+        {
+          "id": "northern-cardinal",
+          "name": "northern cardinal",
+          "density_per_ha": {
+            "scrub": 2.0,
+            "woodland": 1.0,
+            "riverbank": 1.5,
+            "grassland": 0.3
+          },
+          "home_range_ha": 1.5,
+          "growth_bps_per_year": 5000,
+          "mortality_bps_per_year": 4000,
+          "dispersal_bps_per_year": 1000,
+          "dispersal_m": 500,
+          "min_viable": 1,
+          "detection_bps": 8000,
+          "conspicuous": true
+        }
+      ],
+      "survey_hours_per_ha": 1,
+      "survey_staff": 1,
+      "spin_up_years": 10
+    }
+  },
+  "sources": {
+    "currency": "United States dollars, in cents: written with a dollar sign before the amount (\"$1,234.56\"), or in words as dollars (informally bucks) and cents. ISO 4217: USD, two decimal places.",
+    "households": "U.S. Census Bureau, American Community Survey 2020-2024 5-year estimates, Wyandot County, Ohio (county seat Upper Sandusky; a rural county of 21,598 people), table B11001, B11003, B09019 and B01001, read through the Census Reporter API (https://api.censusreporter.org/1.0/data/show/latest?table_ids=B11001, B11003, B09019 and B01001&geo_ids=05000US39175, opened). Of 8999 households: lone person 2570 (28.6%), not-living-alone nonfamily (group) 400 (4.4%), other family (one parent or relatives, any age of child) 1285 (14.3%), married couple with own children under 18 1546 (17.2%); the remaining married couples (no own child under 18, so couples whose children are grown or at home aged 18-24, which the table cannot separate) take the rest, 35.5%. same_sex_couple_bps: same-sex spouses 78 of 5,411 couples (B09019). lone_parent_female_bps: female householders with own children under 18, 334 of 597 lone-parent families (B11003). adult_female_bps and child_male_bps: from B01001 (adults 18+, children under 18). children_couple, children_one_parent, adult_ages, mother_age_at_first_birth, group_size: rule parameters carried over unchanged from the other profile (the number of children per family was not sought; placeholders). Mean household size is 21,334 people in households over 8,999 households = 2.37.",
+    "households.age_bands_bps": "U.S. Census Bureau, American Community Survey 2020-2024 5-year estimates, Wyandot County, Ohio (county seat Upper Sandusky; a rural county of 21,598 people), table B01001, read through the Census Reporter API (https://api.censusreporter.org/1.0/data/show/latest?table_ids=B01001&geo_ids=05000US39175, opened). Five-year age shares of all 21,598 residents (sexes added; 15-19, 20-24, 60-64 and 65-69 are made from the table's finer groups); 85 and over taken to 99.",
+    "households.child_max_age": "A rule parameter carried over: children at home are drawn up to age 24 (a simplification: the census counts a household's own children of any age living with their parents). No place-specific figure.",
+    "life.qx_per_100000": "NCHS (CDC), National Vital Statistics Reports vol. 74 no. 6, United States Life Tables, 2023, Table 2 (males) and Table 3 (females), the probability of dying between exact ages x and x+1, ages 0-99, times 100,000 and rounded (opened: https://ftp.cdc.gov/pub/Health_Statistics/NCHS/Publications/NVSR/74-06/Table02.xlsx and Table03.xlsx). Age 100: the table's last row is an open interval (100 and older, qx = 1), so the age-100 entry is a placeholder extrapolated from the ratio of the age-99 to the age-98 value. National, not Ohio's: Ohio's life expectancy is a little below the national one (to confirm against NCHS state life tables).",
+    "life.illness": "Placeholder carried over from the other profile, which shaped it by the age gradient of hospitalisations; to replace with U.S. age-specific rates (AHRQ HCUP National Inpatient Sample; not sought).",
+    "life.injury": "Placeholder: about 650 nonfatal injury hospitalisations per 100,000 people a year in the United States (estimated from memory of CDC WISQARS nonfatal injury reports; not opened, to confirm). Severity split: placeholder.",
+    "life.birth": "Bearing a child from 15 to 49 (NCHS age-specific birth rates cover 15-49, Births in the United States, 2024, https://www.cdc.gov/nchs/products/databriefs/db535.htm, opened); 38 weeks from conception (266 days, a physiological constant, as in the other profile); female_bps from about 105 boys per 100 girls at birth (4878 of 10,000; the U.S. ratio is about 105, to confirm in NCHS Births: Final Data).",
+    "life.treatable": "Carried over from the other profile (about 15% of deaths under 75 treatable, from an Australian source) because no U.S. figure was sought: placeholder. To replace with the OECD/Eurostat treatable-mortality list applied to CDC WONDER deaths under 75.",
+    "life.work_injury_bps": "Placeholders: injuries and illnesses with days away from work, per 100 full-time workers, are about 1.0 in manufacturing and a little under 1.0 in retail trade (BLS, Survey of Occupational Injuries and Illnesses, Employer-Reported Workplace Injuries and Illnesses 2023, Table 1; recalled, not opened; to confirm). Days-away cases are used for 'a week or more off' as closely as the table allows.",
+    "life.found_alone_after": "Carried over from the other profile: no U.S. figure was found, so Japan's is used, the one country found to count it (National Police Agency of Japan, people who died alone at home). Placeholder for this place; to replace if a U.S. medical-examiner study of time to discovery is found.",
+    "fertility_per_10000": "NCHS (CDC), Births in the United States, 2024, Data Brief 535 (https://www.cdc.gov/nchs/products/databriefs/db535.htm, opened): births per 1,000 women by age 15-19 12.6, 20-24 55.8, 25-29 89.5, 30-34 93.7, 35-39 54.3, 40-44 12.7 (times 10: configs are integers). Ages 45-49: 1.2 per 1,000 is a placeholder from memory of NCHS 2023 (the brief did not give it; to confirm). National rates, not Ohio's.",
+    "ordinary_hours_per_week": "Fair Labor Standards Act (29 U.S.C. 207): overtime at one and a half times after 40 hours a week; 40 is the standard full-time week (U.S. Department of Labor). There is no statutory maximum of ordinary hours as there is in some countries: the overtime threshold is used (a structural gap).",
+    "wages_per_fortnight": "BLS, Occupational Employment and Wage Statistics, May 2025, West Northwestern Ohio nonmetropolitan area (area code 3900001; the page https://www.bls.gov/oes/2023/may/oes_3900001.htm names it; its county list was not opened, but the area is the one Ohio nonmetropolitan area covering the north-west, which includes Wyandot County to the best of my knowledge, to confirm), read through the BLS Public Data API (https://api.bls.gov/publicAPI/v2/timeseries/data/, opened), series OEUM3900001000000412031 03 (retail salespersons, mean hourly wage $16.37 x 80 hours = $1,309.60), OEUM3900001000000510000 03 (production occupations, $24.94 x 80 = $1,995.20), OEUM3900001000000470000 03 (construction and extraction occupations, $29.50 x 80 = $2,360.00; spaces in the series ids removed). US pay is commonly biweekly: 80 hours. (The Ohio minimum wage is $11.00 an hour from 1 January 2026, per the Ohio Department of Commerce's announcement https://com.ohio.gov/about-us/media-center/news/ohio+minimum+wage+set+to+increase+in+2026, as returned by search; the page itself and the 2026 poster PDF could not be read for the figure.)",
+    "rents_per_month": "U.S. Census Bureau, American Community Survey 2020-2024 5-year estimates, Wyandot County, Ohio (county seat Upper Sandusky; a rural county of 21,598 people), table B25031 (median gross rent by bedrooms) and B25064, read through the Census Reporter API (https://api.censusreporter.org/1.0/data/show/latest?table_ids=B25031 (median gross rent by bedrooms) and B25064&geo_ids=05000US39175, opened). Median gross rent: 1 bedroom $614, 2 bedrooms $824, 3 bedrooms $968, 4 bedrooms $967 a month (all $827). The 4-bedroom median is no higher than the 3-bedroom one because few such rentals are sampled; used as published. Gross rent includes utilities paid by the tenant. HUD Fair Market Rents (https://www.huduser.gov/portal/datasets/fmr.html) were not opened.",
+    "spending.saving_bps": "The personal saving rate, 4.1% in August 2026 (BEA, Personal Income and Outlays, August 2026, https://www.bea.gov/news/2026/personal-income-and-outlays-august-2026, opened: 'personal saving as a percentage of DPI was 4.1 percent').",
+    "spending.wealth_effect_bps_per_year": "About 3 cents of consumption a year per dollar of wealth: carried over from the other profile, which took it from an Australian study. U.S. estimates of the housing wealth effect are similar in size (Case, Quigley and Shiller 2005, 'Comparing Wealth Effects: The Stock Market versus the Housing Market', Advances in Macroeconomics 5(1); the figure used is to confirm). Placeholder for this place.",
+    "spending.essentials_per_month": "BLS, Consumer Expenditure Surveys 2024, Midwest region (series CXUFOODHOMELB1103M $5,846 and CXUUTILSLB1103M $4,376 a year per consumer unit, via https://api.bls.gov/publicAPI/v2/timeseries/data/, opened): food at home plus utilities, fuels and public services, per consumer unit, divided by 2.37 persons per household (ACS, Wyandot County) and 12 months = $359 a person a month. Other Midwest annual means for reference: total expenditures $74,707, shelter $13,657, transportation $12,901, health care $6,246.",
+    "spending.shops_known": "How many sellers a household deals with and knows the prices of: 7 (Lengnick 2013, 'Agent-based macroeconomics: A baseline model', Journal of Economic Behavior & Organization 86, Table 1: n = 7 type A connections). A model's figure, not a place's.",
+    "spending.shop_search_bps_per_month": "The monthly chance that a household looks at the price of a seller it does not deal with: 25% (Lengnick 2013, Table 1). A model's figure, not a place's.",
+    "savings_by_age": "The 50th percentile of each age group is the median value of transaction accounts among families that hold them, by age of the reference person, 2022 Survey of Consumer Finances: under 35 $5,400; 35-44 $7,500; 45-54 $8,800; 55-64 $7,900; 65-74 $13,500 (Federal Reserve Board, SCF 2022 bulletin tables, Table 6, https://www.federalreserve.gov/econres/files/scf2022_tables_internal_nominal_historical.xlsx, opened). The under-35 median is used for ages 18 and 25. 10th, 25th, 75th and 90th percentiles: placeholders, the median times 0.07, 0.33, 2.7 and 8.3 (the spread is not in the bulletin tables). Families, not adults; holders only (98% of families hold such an account).",
+    "retirement_age": "Social Security full retirement age is 67 for anyone born in 1960 or later (Social Security Administration, 'Retirement Benefits: Full retirement age', Social Security Act s 216(l); to confirm). Benefits can be claimed from 62 at a permanent reduction; the profile structure has one age (a structural gap).",
+    "retiree_savings": "Median retirement-account value among families holding one, age 65-74, $199,600 (SCF 2022 bulletin Table 6, opened, as above). The range $100,000-300,000 around it is a placeholder.",
+    "support.pension": "Social Security retirement benefit: the average retired worker's benefit is about $2,071 a month from January 2026 after the 2.8% cost-of-living adjustment (Social Security Administration, announced 24 October 2025; reported by https://www.advisorperspectives.com/articles/2025/10/25/us-retirees-get-2-8-increase-2026-social-security-checks and others; the SSA fact sheet returned 403, so the figure is to confirm at https://www.ssa.gov/news/en/cola/factsheets/2026.html). Paid monthly (every 30 days here), from the full retirement age; an average benefit stands in for the formula (a worker's benefit depends on 35 years of earnings; spouses', survivors', Medicare and SSI left out).",
+    "support.unemployment": "Unemployment compensation: placeholder of $400 a week ($800 a fortnight), estimated from Ohio's rule that the weekly benefit is about half of the claimant's average weekly wage up to a maximum of $624 for a claimant with no dependents in 2026 (Ohio Department of Job and Family Services; maximum reported by search results such as https://remotelaws.com/unemployment/us-states/ohio/, not primary, to confirm at https://jfs.ohio.gov); typical wages above give half-pay of $310-440 a week. Lasts at most 26 weeks in Ohio (Ohio Revised Code 4141.30; to confirm): the profile has no time limit (a structural gap). Open from age 18 (no age rule in the law; the other profile starts at 22 for a youth-allowance reason). Work-search and wage-history tests left out.",
+    "firm_ownership.forms_bps": "Carried over from the other profile as placeholders (shops and landlords closely held small businesses, the factory widely held). U.S. support for the shape: the great majority of U.S. employer firms are small (U.S. Census Bureau, Statistics of U.S. Businesses: about 89% of employer firms have fewer than 20 employees; recalled, not opened, to confirm). Shares not re-estimated.",
+    "firm_ownership.closely_held": "Carried over from the other profile: placeholder (one owning household 85%, two 12%, three 3%); the fifth-of-wealth weights are placeholders too. To replace with the Survey of Consumer Finances 2022 business-ownership shares by wealth group.",
+    "firm_ownership.widely_held": "Carried over: placeholder (a factory is mostly owned by companies and investors elsewhere); to source.",
+    "firm_ownership.direct_holders": "Carried over from the other profile (an Australian source): placeholder here. To replace with the Survey of Consumer Finances 2022, share of families holding stock directly (about one in five) by wealth percentile group (not opened).",
+    "retirement_fund": "For a world that asks for one (off unless asked for). member_bps: about 53% of private-industry workers participate in an employer retirement plan (BLS, National Compensation Survey: Employee Benefits in the United States, March 2024: 70% have access, 53% participate; recalled, not opened; to confirm). drawdown_bps_by_age: the least a tax-deferred account must pay out a year from age 73, 1 / the IRS Uniform Lifetime Table divisor (26.5 at 73, 24.6 at 75, 20.2 at 80, 16.0 at 85, 12.2 at 90, 8.9 at 95; IRS Publication 590-B, Table III; recalled, to confirm); before 73 the 4% is a placeholder. share_bps_of_local, pension_every_days and cost_bps_of_income: carried over from the other profile, placeholders (a U.S. 401(k) is an account with no required pension: a structural gap, modelled as the nearest thing the profile has).",
+    "industry": "Placeholders to confirm: manufacturing's compensation of employees (about 17%) and intermediate inputs (about 72%) as shares of gross output (recalled from Bureau of Economic Analysis, Industry Economic Accounts, GDP by Industry / Input-Output Accounts; not opened); retail trade's purchases of goods (70%) and wages (14%) as shares of sales, carried over from the other profile and not re-estimated.",
+    "prices": "Unit conventions carried over from the other profile, not place figures: an item of goods worth $100 at world prices (the unit the town counts in); imports 10% dearer (freight and margins); inputs $2.50 a kg; building materials $1.25 a kg (docs/behaviour/building.md). Placeholders: not checked against U.S. price indexes.",
+    "labour_force_participation_bps": "U.S. Census Bureau, American Community Survey 2020-2024 5-year estimates, Wyandot County, Ohio (county seat Upper Sandusky; a rural county of 21,598 people), table B23001, read through the Census Reporter API (https://api.censusreporter.org/1.0/data/show/latest?table_ids=B23001&geo_ids=05000US39175, opened). Share of people aged 20 to 64 in the labour force: 9651 of 11811 (81.7%). (The profile's definition is adults 18 to the retirement age; the table's age groups start at 20 for this range, so 18-19 are left out.)",
+    "tenancy": "Ohio Revised Code chapter 5321 (Landlord-Tenant Act) has no rent control and no limit on how often rent may be raised; the usual notice to change a periodic tenancy is 30 days (to confirm). The 12 months is a practice (a standard lease runs a year, rent changes at renewal), not a legal limit; after a fixed term a tenancy that continues is month-to-month (periodic). Structural gap: the profile cannot say 'no statutory limit'.",
+    "values": "Placeholder, carried over unchanged from the other profile: Schwartz's ten basic values, in the pan-cultural order of importance Schwartz and Bardi found across 56 nations (benevolence, universalism, self-direction, security, conformity, hedonism, achievement, tradition, stimulation, power; Schwartz and Bardi 2001, Journal of Cross-Cultural Psychology 32(3)); means and spreads are not a place's. To replace with a U.S. sample's (World Values Survey; European Social Survey does not cover the U.S.).",
+    "industrial_action": "The National Labor Relations Act (29 U.S.C. 151-169) requires no strike ballot and no notice before a strike in a private workplace, except 10 days' notice before a strike at a health-care institution (s 8(g)) and 60 days' notice to the other side before a contract ends (s 8(d)); unions' own constitutions usually require a strike-authorisation vote by a majority (some two-thirds) of those voting. turnout and pass shares (50% each) are placeholders carried over from the other profile's legal quorum; notice_days 0. Strike pay is small (paid_during_action false). Structural gap: no legal ballot, so the rule's thresholds describe union practice.",
+    "world_price_process": "Placeholder, carried over from the other profile: world prices move each month by a mean-reverting random process (sd of the monthly move, in basis points of the base price; the share of a gap from the base kept each month). To estimate from BLS import/export price indexes (not done).",
+    "credit.cash_rate_bps": "The Federal Reserve's federal funds target range, 3.75% to 4.00% (FOMC, 17 September 2026, https://www.federalreserve.gov/monetarypolicy/openmarket.htm, opened); 3.88% is its midpoint.",
+    "credit.funding_spread_bps": "Placeholder: what a small bank pays over the policy rate for its funding.",
+    "credit.lending_rate_bps": "Placeholders: people 12.3% (around the average interest rate on 24-month personal loans at commercial banks, Federal Reserve G.19, recalled from 2025, not opened); organisations 8.5%, the bank prime rate (federal funds upper bound 4.00% plus 3 points = 7.00%, by convention) plus about 1.5 points for a small-business loan (estimated).",
+    "credit.serviceability_buffer_bps": "The United States has no stress-test buffer for retail lending: the Ability-to-Repay rule (12 CFR 1026.43, CFPB) asks a lender to assess repayment ability at the note's rate (to confirm), so 0.",
+    "credit.max_repayment_share_bps": "Placeholders: people 28% (the 'front-end' housing-ratio guideline of conventional lenders; the 43% debt-to-income limit of the CFPB's former qualified mortgage standard covered all debts; to confirm); organisations 20% of what comes in.",
+    "credit.arrears_days": "Placeholder: a month behind is arrears (a lender's first notice).",
+    "credit.default_days": "Non-accrual at 90 days past due (FFIEC, Instructions for Consolidated Reports of Condition and Income (Call Report), Schedule RC-N; to confirm). Charge-off of consumer loans comes later (120-180 days), not modelled.",
+    "credit.max_months": "Placeholder: the longest term for these loans (five years).",
+    "credit.reserve": "Placeholder: the cash the bank's lending office keeps back and doesn't lend, $100,000. To source.",
+    "opening": "Carried over from the other profile, placeholders to source: what each organisation holds on the first day (the bank's own funds $500,000; the town $2,000,000; the builder $300,000; each landlord $600,000; a shop $30,000; a factory $400,000), and the least an adult in the labour force has saved ($1,000). Not re-estimated for this place.",
+    "town_finance.parks_per_year": "Placeholder, carried over: the town's yearly parks line, $150,000.",
+    "town_finance.payment_approval_over": "Placeholder, carried over: the town's payments procedure needs the mayor's written approval for any payment over $50,000. (An Ohio village's council authorises expenditures by ordinance, Ohio Revised Code ch. 731 and 5705; to confirm. Not modelled.)",
+    "public_finance.income_tax": "A combined schedule on gross income for a single resident, 2026. Federal: IRS Revenue Procedure 2025-32 (tax year 2026 inflation adjustments; https://www.irs.gov/pub/irs-drop/rp-25-32.pdf, opened): standard deduction $16,100; single brackets 10% to $12,400, 12% to $50,400, 22% to $105,700, 24% to $201,775, 32% to $256,225, 35% to $640,600, 37% above; each band starts $16,100 higher in gross income. Ohio: a flat 2.75% above $26,050 for tax year 2026 (Ohio Legislative Service Commission / Department of Taxation material on HB 96 of 2025, as returned by search; not opened; the quoted '$332 plus 2.75% of income above $26,050' suggests a small base amount that is not modelled; to confirm), added from $26,050. levy_bps 765: the employee's FICA, Social Security 6.2% and Medicare 1.45% (IRS; the 2026 wage cap of $184,500 per the SSA fact sheet, not modelled). Left out: Ohio's municipal income tax (1-3% of wages, the main revenue of Ohio municipalities), school-district income taxes, credits (earned income, child), itemised deductions. Structural gaps: no credits, no wage cap, no separate local tax.",
+    "public_finance.grants_per_resident_per_year": "Placeholder: Ohio's Local Government Fund is about 1.7% of state general revenue fund tax revenues (Ohio Legislative Service Commission, as returned by search; the LSC pdf could not be fetched), about $36 a resident (estimated from a recalled total of about $430 million over 11.8 million residents).",
+    "public_finance.rates_per_resident_per_year": "Placeholder (not found at a primary source): estimated at about $700 a resident a year of property-tax revenue for a village or township, outside the school district. Tried: the Wyandot County auditor's Tax-Rates.pdf (403 to this client) and Ohio Department of Taxation's pages (404). A third-party estimate gives an effective property-tax rate of 1.28% for Upper Sandusky (Ownwell, https://www.ownwell.com/trends/ohio/wyandot-county/upper-sandusky, search snippet; not primary). Left out: the municipal income tax.",
+    "public_finance.rates_instalments": "Ohio Revised Code 323.12: real property taxes are payable in two half-year instalments (January and July; to confirm). Two.",
+    "public_finance.rates_due_days": "Placeholder: an instalment falls due 30 days after its notice.",
+    "public_finance.rates_penalty_interest_bps": "Placeholder of 8% a year: Ohio charges a penalty of 5% then 10% of delinquent real property tax (ORC 323.121) and interest on delinquent taxes at the federal short-term rate plus 3 points (ORC 5703.47; both recalled, to confirm the current rate). The profile has only an annual interest rate.",
+    "public_finance.rates_exempt_kinds": "Public property used for a public purpose, and charitable, educational and public health property, are exempt from Ohio real property tax (Ohio Revised Code chapter 5709; to confirm): here, the clinic's, the school's, the police station's and the utilities'.",
+    "public_finance.median_house_price": "U.S. Census Bureau, American Community Survey 2020-2024 5-year estimates, Wyandot County, Ohio (county seat Upper Sandusky; a rural county of 21,598 people), table B25077, read through the Census Reporter API (https://api.censusreporter.org/1.0/data/show/latest?table_ids=B25077&geo_ids=05000US39175, opened). Median value of owner-occupied housing units, $163,400 (an owner's estimate of value, not a sale price).",
+    "services.waste_per_person_per_day_g": "Municipal solid waste generated, 4.9 pounds per person per day in the United States (U.S. EPA, Advancing Sustainable Materials Management: 2018 Fact Sheet, recalled; to confirm and update to the latest edition), 2,223 grams.",
+    "services.landfill_levy_per_tonne": "Placeholder: Ohio's state solid-waste disposal fees total on the order of $5 a ton (Ohio Revised Code 3734.57; recalled, to confirm), with county and district fees on top. Left out: what the landfill charges on top (its gate fee).",
+    "services.council_staff_per_1000": "Placeholder: local government employment other than schools in the United States is on the order of 10-12 per 1,000 residents (U.S. Census Bureau, Annual Survey of Public Employment and Payroll; recalled, not opened; to confirm); a small village runs lower, so 8. In the town, all of them are the town's.",
+    "services.collect_seconds_per_10kg": "Carried over from the other profile: placeholder. A one-driver side-loader lifts up to 6 bins a minute; a household's week of waste is taken as about 24 kg (not re-estimated for U.S. waste, which is higher).",
+    "services.asset_life_years": "Placeholder, carried over: a park or civic building wears out in 15 years without upkeep.",
+    "services.upkeep_hours_per_week_per_asset": "Placeholder, carried over: a crew member's half a day a week keeps a park or the hall up.",
+    "services.complain_bps": "Placeholder, carried over: the chance a week that a household whose waste has gone two weeks uncollected writes to the town.",
+    "unions.membership_bps": "BLS, Union Members 2025 (released 18 February 2026), Table 3, 2025 annual averages, percent of employed wage and salary workers who are union members: manufacturing 7.7, retail trade 4.0, construction 11.1, all 10.0 (used for 'other'); the public sector 32.9% (used for public administration: the release's public-administration row was not found, and this includes teachers). https://www.bls.gov/news.release/union2.t03.htm and https://www.bls.gov/news.release/union2.nr0.htm, opened. Ohio's overall rate was 11.6% in 2025 (Table 5).",
+    "unions.dues_per_month": "Placeholder: about $55 a month, around 1.3% of a full-time worker's earnings; not sourced (union constitutions and DOL OLMS LM-2 reports would give it).",
+    "unions.resignation_notice_days": "Placeholder: in the United States a member of a union can resign at any time, subject to the union's constitution and any dues-checkoff revocation window (National Labor Relations Act s 8(b)(1)(A); to confirm). 14 days carried over from the other profile as the closest.",
+    "unions.claim_margin_bps": "Placeholder, carried over: a union claims the year's rise in prices and 2% more.",
+    "unions.meeting_every_days": "Placeholder: a members' meeting a month.",
+    "unions.teaching": "The union movement's claim, in words (content for belief): carried over from the other profile; its members hold it at the start.",
+    "groups.kinds": "The kinds of social group a general social survey counts (sport or physical recreation; religious; arts; hobby; other civic or special interest), carried over from the other profile with U.S. names (a church, a civic club such as Rotary, Kiwanis or Lions, a recreation league). Meeting rhythms are placeholders.",
+    "groups.kinds.held_at_start_bps": "Pew Research Center, Religious Landscape Study 2023-24, Ohio: about 69% of adults identify as Christian (recalled, not opened; to confirm at https://www.pewresearch.org/religious-landscape-study/state/ohio/). At the start, the congregation's members hold its teaching. Other religions and the unaffiliated aren't represented.",
+    "groups.kinds.teaching": "What a group asks people to hold, in its words: content, for belief to attach to (docs/design/ai-citizens.md 5). The congregation's stands for the Christian denominations together (one congregation per town is a simplification).",
+    "groups.taking_part_bps": "Placeholder, carried over (calibrated for the other place): the share of adults who belong to a group at the start and go to its gatherings; after that, whether anyone goes is theirs. To replace with a U.S. measure (AmeriCorps/Census Civic Engagement and Volunteering Supplement; Pew).",
+    "groups.leave_notice_days": "Placeholder: a member may leave a club or congregation at once.",
+    "groups.per_kind_per_1000_people": "Placeholder: one group of each kind for every 1,000 people.",
+    "elections": "Ohio villages elect a mayor and a council at municipal elections held in odd-numbered years (Ohio Revised Code ch. 731 and 3501.01; village mayors serve four-year terms, to confirm; voting is voluntary, by plurality (first past the post) and often non-partisan). This town elects its mayor directly. turnout_bps: 35% is a placeholder (turnout in Ohio's odd-year municipal elections is far below presidential years; to replace with the Ohio Secretary of State's election results for a village). stand_bps and news_readers_bps: placeholders. Structural gap: the generator's text says every adult must enrol and vote (compulsory), which is false here.",
+    "health": "The clinic stands for the town's health system (a primary-care practice and the hospital it refers to; a liberty). doctors_per_1000: about 40 primary care physicians per 100,000 in rural U.S. counties (HRSA / National Rural Health Association; recalled, not opened; to confirm). doctor_wage_per_fortnight: $240,000 a year, around the mean wage of family medicine physicians (BLS OEWS; recalled, to confirm). consult_minutes, seek_care_bps, treats, off_work_severities: placeholders carried over (hospital-level conditions, so nearly everyone with one is treated; care shortens them by a fifth). Left out: health insurance, which pays for care in the United States, and who has none.",
+    "round": "Working hours 8 to 4, Monday to Friday, for everyone, shops included (a liberty: retail and hospitality work weekends and evenings, not modelled); school 8 to 3 on school days (Ohio schools run about 7:30-8:00 to 2:45-3:30; recalled). Travel: off the roads, a 25 m cell on foot in about 18 seconds (walking about 1.4 m/s: Bohannon 1997; to confirm); on a road, about 2 seconds (about 25 mph, Ohio's speed limit in municipal residence and business districts, Ohio Revised Code 4511.21, to confirm; about 90% of Ohio workers drive to work, ACS commuting tables, recalled); slower across water, wetland and bush (placeholders). Roads: the town builds toward buildings more than three cells (75 m) from one (placeholder), within a roads budget of about $300 a resident a year (placeholder, carried over).",
+    "ownership": "U.S. Census Bureau, American Community Survey 2020-2024 5-year estimates, Wyandot County, Ohio (county seat Upper Sandusky; a rural county of 21,598 people), table B25032 and B25088, read through the Census Reporter API (https://api.censusreporter.org/1.0/data/show/latest?table_ids=B25032 and B25088&geo_ids=05000US39175, opened). house_owner_bps: of one-unit houses (detached and attached), 6362 owner-occupied and 1192 renter-occupied: 84.2% owned (flats here are all rented: a liberty). mortgage_payment_per_month: median selected monthly owner costs with a mortgage, $1,281 (B25088). mortgage_rate_bps: 7.28%, the 30-year fixed-rate average of Freddie Mac's Primary Mortgage Market Survey as of 1 October 2026 (https://www.freddiemac.com/pmms, opened; 6.34% a year earlier; an older stock of mortgages is at lower rates). mortgage_bps_by_age: placeholder (most under 45 have one, few over 65). mortgage_years_left: placeholder. market: deposit 10% (placeholder near the first-time buyer's median down payment, National Association of Realtors, not opened; conventional loans ask 20%); costs 6% (buyer's closing costs plus seller's agent fees; estimated; Ohio has no state transfer tax); a 30-year term; buy_bps_per_month, relist_days, cut_bps and floor_bps: placeholders carried over.",
+    "utilities": "Water: City of Upper Sandusky, Ohio (Wyandot County seat) water tariff, $10.50 per 1,000 gallons ($2.77 a kilolitre) with a $21.00 monthly minimum ($63 a quarter, used as the service charge) (https://www.uppersanduskyoh.com/department/public_works/water_sewer/index.php, opened; no effective date on the page; a search snippet gave $10.25 and $20.50, so the rate may have changed). The sewer charge of $14.50 per 1,000 gallons with a $29.00 monthly minimum on the same page has no place in the profile's water block and is left out (a structural gap: the town's real bill is more than double). litres_per_person_per_day 310: about 82 gallons a person a day (Water Research Foundation / AWWA, Residential End Uses of Water, 2016; recalled, to confirm). The river's inflow, flow and losses are placeholders, carried over. Energy: Ohio residential sales 52,552,770 MWh over 5,014,959 customers in 2020 (EIA, State Electricity Profiles / Electric Power Annual sales_annual.xlsx and customers_annual.xlsx, https://www.eia.gov/electricity/data/state/, opened; the files held no later year) = 10.5 MWh a customer a year, 29 kWh a day. price_per_kwh: Ohio residential average price 19.45 cents per kWh in July 2026 (EIA, Electric Power Monthly, Table 5.6.A, released 24 September 2026, opened), rounded to 19. supply_per_day (30 cents), grid_price_per_kwh (9) and grid_emissions_g_per_kwh (450): placeholders from memory of utility fixed charges, wholesale prices and EPA eGRID's RFC West emissions; not opened, to confirm.",
+    "climate": "Weather drawn for each run (docs/behaviour/weather.md). rain_by_month_bps: the Sandusky River near Upper Sandusky, Ohio (USGS gauge 04196500; the river runs through Wyandot County), mean flow by calendar month over the water years 1921-2026 in cubic feet per second (Jan 440, Feb 458, Mar 586, Apr 462, May 310, Jun 239, Jul 143, Aug 71, Sep 63, Oct 78, Nov 161, Dec 306) as basis points of the twelve-month mean of 276 (USGS National Water Information System, monthly mean statistics, https://waterservices.usgs.gov/nwis/stat/?format=rdb&sites=04196500&statReportType=monthly&statTypeCd=mean&parameterCd=00060, opened). Climate normals 1991-2020 at Upper Sandusky (NOAA NCEI, station USC00338534, https://www.ncei.noaa.gov/data/normals-monthly/1991-2020/access/USC00338534.csv, opened): annual precipitation 40.2 inches, mean temperature 25.2 F in January and 72.9 F in July, an average 15.7 days a year at or above 90 F (June 3.9, July 5.7, August 3.9). The storm, drought and heatwave rates (storm_*, drought_*, heatwave_*) and the heat-island units are placeholders: not derived from the gauge record or the Drought Monitor; the heatwave week chance was not checked against the 15.7 hot days; warning_lead_days placeholder. Left out: winter (snow, ice), tornadoes.",
+    "hazards": "Floods (world-expansion 7.3), placeholders sized against the river as modelled (about 9,000 kL a 25 m cell in the usual flow): it spills over its banks past 12,000, 30% of the excess a day; a building floods with water above 300 kL on its cell; wetland soaks up 500 kL a cell a day. Flooding is among Ohio's most frequent disaster types (FEMA disaster declarations; recalled, not opened, to confirm), and county and village emergency management run relief (Ohio Revised Code ch. 5502; to confirm): here the town hall.",
+    "crime": "Crime (world-expansion 7.2), deliberately rare and driven by circumstance only (need and opportunity, and the chance of being caught: Becker 1968; Cohen and Felson 1979), never by any group. take_bps_per_month_in_need, caught_bps_reckoned and take_quantity: placeholders carried over. detection_bps: about 13% of larceny-theft offences known to police are cleared (FBI, Uniform Crime Reporting clearance rates; recalled, not opened; to confirm). police_per_1000: about 2.4 sworn officers per 1,000 residents in the United States (FBI, Law Enforcement Employees; recalled, to confirm; small Ohio villages often have fewer). officer_wage_per_fortnight: $65,000 a year for a patrol officer in a small Ohio department (BLS OEWS for Ohio police and sheriff's patrol officers; estimated, to confirm). investigation_hours: placeholder.",
+    "justice": "The tribunal is the local court of first instance (an Ohio municipal or county court: small claims, civil and eviction ('forcible entry and detainer') dockets; Ohio Revised Code ch. 1923 and 1925; hearing dates 5-15 days after service for an eviction and 15-40 days for small claims; recalled and to confirm). hearing_after_days: three weeks, a placeholder carried over. pay_within_days, apply_after_days: placeholders. challenge_bps: the share of tenants given an unlawful rent increase who go to court, and apply_bps: the share of workers owed wages who pursue a claim (placeholders: few do; Ohio wage claims go to the Ohio Department of Commerce, Wage and Hour Bureau, or to court; to source). Enforcement of an unpaid money judgment by garnishing a bank account or wages (ORC ch. 2716; to confirm).",
+    "education": "U.S. Census Bureau, American Community Survey 2020-2024 5-year estimates, Wyandot County, Ohio (county seat Upper Sandusky; a rural county of 21,598 people), table B15003, read through the Census Reporter API (https://api.censusreporter.org/1.0/data/show/latest?table_ids=B15003&geo_ids=05000US39175, opened). attainment: people 25 and over (15227): no high school diploma 5.2%, high school or GED 47.7%, some college 17.5%, associate 10.0%, bachelor's or above 19.6%, as years of schooling 10, 12, 13, 14, 16 (the years are a placeholder mapping). students_per_teacher: 16.4 pupils per teacher in Ohio's public schools, fall 2022 (NCES, Digest of Education Statistics 2023, Table 208.40, https://nces.ed.gov/programs/digest/d23/tables/dt23_208.40.asp, opened). teacher_wage_per_fortnight: $69,680 a year, mean wage of elementary school teachers (except special education) in the West Northwestern Ohio nonmetropolitan area, May 2025 (BLS OEWS series OEUM390000100000025202104, https://api.bls.gov/publicAPI/v2/timeseries/data/, opened), over 26 fortnights. school_ages 5 to 17 (compulsory 6 to 18 in Ohio Revised Code 3321.01; kindergarten from 5), school_days_per_year 180 (minimum hours, ORC 3313.48): tried https://codes.ohio.gov, which did not connect from here, so these remain recalled, to confirm. hours_per_day 6.5: placeholder. return_per_year_bps: about 9% (Card 1999, 'The Causal Effect of Education on Earnings', Handbook of Labor Economics 3A; estimates run 6-15%; recalled, to confirm), applied linearly in the time a task takes (docs/behaviour/education.md). max_years: the skill scale's top (placeholder).",
+    "nature": "Nature (docs/design/world-expansion.md 2). cell_m: a cell is a 25 m lot (carried over). The landscape around the town (margin_cells, block_cells, shares_bps, woodland_patches): placeholders for a farming township in glaciated western or north-western Ohio, mostly cropland (corn and soybeans) with woodlots and stream corridors; shaped by the NLCD land-cover mix of rural Ohio counties (recalled, not opened; to confirm at https://www.mrlc.gov). The covers' succession (cleared land to grassland in a year; old-field scrub to woodland in about 40 years; to confirm for Ohio), the pollution figures (agricultural runoff, per farmland cell, carried over), survey_hours_per_ha, survey_staff and spin_up_years are placeholders carried over.",
+    "nature.species": "Real species of the region, with figures mostly placeholders and each to confirm. Eastern box turtle (Terrapene carolina carolina): a species of conservation concern in Ohio (Ohio Division of Wildlife, state-listed species, pub 5356, https://dam.assets.ohio.gov/image/upload/ohiodnr.gov/documents/wildlife/state-listed-species/Pub%205356%20Ohio%20Listed%20Species_R0722.pdf, found in a search, not opened), long-lived (adult survival of about 92-95% a year, so mortality 800), home range of 1-5 ha (recalled, to confirm), slow reproduction, killed on roads (barriers: built, farmland); densities by cover are placeholders. Blanchard's cricket frog (Acris blanchardi): a small frog of pond and stream edges in the Midwest, in decline (Indiana lists it as a species of special concern per an Indiana DNR search result; the Ohio status is to confirm), a short-lived breeder with high turnover (growth and mortality as the other profile's frog, a placeholder); density, range and dispersal are placeholders. Northern cardinal (Cardinalis cardinalis): the common conspicuous control; territories of about 1-2 ha held by a pair (Cornell Lab, Birds of the World; recalled, to confirm); densities by cover placeholders. Growth, mortality, dispersal, min_viable and detection are placeholders, as in the other profile. The Indiana bat (Myotis sodalis), endangered in Ohio, with a summer home range of about 210 ha in a Big Darby Creek (Pickaway County) study (seen in a search snippet only), was considered and left out: its home range is far larger than the modelled landscape."
+  },
+  "targets": [
+    {
+      "what": "employment_to_population_pct",
+      "value": 59.2,
+      "source": "BLS, The Employment Situation, September 2026 (national; https://www.bls.gov/news.release/empsit.nr0.htm, opened)"
+    },
+    {
+      "what": "unemployment_rate_pct",
+      "value": 4.2,
+      "source": "BLS, The Employment Situation, September 2026 (national; https://www.bls.gov/news.release/empsit.nr0.htm, opened). A small Ohio town's rate may differ."
+    },
+    {
+      "what": "participation_rate_pct",
+      "value": 61.8,
+      "source": "BLS, The Employment Situation, September 2026 (national, 16 and over; https://www.bls.gov/news.release/empsit.nr0.htm, opened)"
+    },
+    {
+      "what": "household_saving_ratio_pct",
+      "value": 4.1,
+      "source": "BEA, Personal Income and Outlays, August 2026 (personal saving rate; https://bea.gov/news/2026/personal-income-and-outlays-august-2026, search result; to confirm)"
+    },
+    {
+      "what": "union_membership_pct",
+      "value": 10.0,
+      "source": "BLS, Union Members 2025, released 18 February 2026 (https://www.bls.gov/news.release/archives/union2_02182026.htm; search summary)"
+    },
+    {
+      "what": "union_membership_pct_of_employees",
+      "value": 10.0,
+      "source": "BLS, Union Members 2025, released 18 February 2026 (wage and salary workers; https://www.bls.gov/news.release/archives/union2_02182026.htm; search summary)"
+    },
+    {
+      "what": "union_membership_pct_ohio",
+      "value": 11.6,
+      "source": "BLS, Union Members 2025, Table 5 (Ohio; https://www.bls.gov/news.release/union2.t05.htm, opened)"
+    },
+    {
+      "what": "median_gross_rent_usd_county",
+      "value": 827,
+      "source": "ACS 2020-2024 5-year, Wyandot County, Ohio, table B25064 (via Census Reporter, opened)"
+    },
+    {
+      "what": "median_house_value_usd_county",
+      "value": 163400,
+      "source": "ACS 2020-2024 5-year, Wyandot County, Ohio, table B25077 (via Census Reporter, opened)"
+    }
+  ]
+}

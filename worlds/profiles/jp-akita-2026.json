@@ -1,0 +1,1405 @@
+{
+  "id": "jp-akita-2026",
+  "place": "A town of about 4,000 people in rural Akita Prefecture, Tohoku region, Japan (demographics and town finances of Ikawa Town; wages, prices and rules of Akita Prefecture or Japan)",
+  "as_of": "2026-10",
+  "about": "Every place-specific figure the town generator uses, with its source. A world for another place and time is another profile; the platform's code holds none of these (docs/profiles.md).",
+  "values": {
+    "currency": {
+      "code": "JPY",
+      "minor_units": 0,
+      "symbol": "¥",
+      "unit_words": [
+        "yen"
+      ]
+    },
+    "households": {
+      "lone_bps": 2007,
+      "group_bps": 20,
+      "couple_bps": 2013,
+      "couple_children_bps": 4977,
+      "one_parent_bps": 983,
+      "children_couple": [
+        4500,
+        4300,
+        1200
+      ],
+      "children_one_parent": [
+        5800,
+        3200,
+        1000
+      ],
+      "same_sex_couple_bps": 0,
+      "lone_parent_female_bps": 8389,
+      "adult_female_bps": 5335,
+      "child_male_bps": 5124,
+      "adult_ages": [
+        18,
+        99
+      ],
+      "mother_age_at_first_birth": [
+        24,
+        38
+      ],
+      "child_max_age": 24,
+      "group_size": [
+        2,
+        3
+      ],
+      "age_bands_bps": [
+        {
+          "from": 0,
+          "to": 4,
+          "bps": 183
+        },
+        {
+          "from": 5,
+          "to": 9,
+          "bps": 225
+        },
+        {
+          "from": 10,
+          "to": 14,
+          "bps": 324
+        },
+        {
+          "from": 15,
+          "to": 19,
+          "bps": 407
+        },
+        {
+          "from": 20,
+          "to": 24,
+          "bps": 278
+        },
+        {
+          "from": 25,
+          "to": 29,
+          "bps": 308
+        },
+        {
+          "from": 30,
+          "to": 34,
+          "bps": 291
+        },
+        {
+          "from": 35,
+          "to": 39,
+          "bps": 350
+        },
+        {
+          "from": 40,
+          "to": 44,
+          "bps": 577
+        },
+        {
+          "from": 45,
+          "to": 49,
+          "bps": 632
+        },
+        {
+          "from": 50,
+          "to": 54,
+          "bps": 599
+        },
+        {
+          "from": 55,
+          "to": 59,
+          "bps": 725
+        },
+        {
+          "from": 60,
+          "to": 64,
+          "bps": 747
+        },
+        {
+          "from": 65,
+          "to": 69,
+          "bps": 1006
+        },
+        {
+          "from": 70,
+          "to": 74,
+          "bps": 1000
+        },
+        {
+          "from": 75,
+          "to": 79,
+          "bps": 729
+        },
+        {
+          "from": 80,
+          "to": 84,
+          "bps": 617
+        },
+        {
+          "from": 85,
+          "to": 99,
+          "bps": 1002
+        }
+      ]
+    },
+    "life": {
+      "qx_per_100000": {
+        "male": [
+          182,
+          25,
+          18,
+          13,
+          10,
+          9,
+          8,
+          8,
+          8,
+          8,
+          8,
+          9,
+          10,
+          12,
+          14,
+          18,
+          22,
+          26,
+          31,
+          36,
+          42,
+          47,
+          49,
+          49,
+          47,
+          47,
+          47,
+          47,
+          48,
+          50,
+          53,
+          56,
+          59,
+          62,
+          66,
+          71,
+          75,
+          80,
+          84,
+          90,
+          97,
+          107,
+          117,
+          125,
+          134,
+          144,
+          157,
+          174,
+          194,
+          216,
+          238,
+          263,
+          289,
+          321,
+          355,
+          394,
+          437,
+          482,
+          531,
+          583,
+          639,
+          700,
+          771,
+          854,
+          948,
+          1051,
+          1161,
+          1277,
+          1407,
+          1555,
+          1724,
+          1917,
+          2130,
+          2369,
+          2630,
+          2894,
+          3171,
+          3498,
+          3893,
+          4350,
+          4861,
+          5417,
+          6002,
+          6687,
+          7513,
+          8467,
+          9544,
+          10740,
+          12076,
+          13561,
+          15175,
+          16524,
+          18235,
+          20147,
+          22276,
+          24640,
+          27252,
+          30126,
+          33271,
+          36691,
+          40384
+        ],
+        "female": [
+          182,
+          25,
+          19,
+          14,
+          11,
+          8,
+          7,
+          7,
+          6,
+          6,
+          6,
+          7,
+          9,
+          11,
+          14,
+          17,
+          20,
+          22,
+          25,
+          26,
+          28,
+          29,
+          30,
+          30,
+          29,
+          29,
+          30,
+          30,
+          30,
+          30,
+          30,
+          31,
+          32,
+          34,
+          37,
+          41,
+          45,
+          48,
+          50,
+          53,
+          57,
+          61,
+          66,
+          72,
+          79,
+          87,
+          96,
+          106,
+          116,
+          128,
+          141,
+          155,
+          169,
+          182,
+          196,
+          209,
+          224,
+          240,
+          256,
+          276,
+          297,
+          318,
+          343,
+          374,
+          409,
+          446,
+          484,
+          524,
+          571,
+          631,
+          704,
+          785,
+          874,
+          975,
+          1094,
+          1224,
+          1366,
+          1536,
+          1743,
+          1994,
+          2294,
+          2633,
+          3007,
+          3448,
+          3973,
+          4602,
+          5330,
+          6158,
+          7120,
+          8239,
+          9520,
+          10915,
+          12444,
+          14014,
+          15761,
+          18355,
+          20866,
+          23588,
+          26528,
+          29688,
+          33068
+        ]
+      },
+      "illness": {
+        "by_age": [
+          {
+            "from": 0,
+            "bps": 600
+          },
+          {
+            "from": 5,
+            "bps": 350
+          },
+          {
+            "from": 15,
+            "bps": 600
+          },
+          {
+            "from": 45,
+            "bps": 900
+          },
+          {
+            "from": 65,
+            "bps": 1800
+          },
+          {
+            "from": 85,
+            "bps": 4500
+          }
+        ],
+        "severity": [
+          {
+            "label": "serious",
+            "share_bps": 8000,
+            "days": [
+              3,
+              14
+            ],
+            "fatal_bps": 0
+          },
+          {
+            "label": "severe",
+            "share_bps": 2000,
+            "days": [
+              14,
+              60
+            ],
+            "fatal_bps": 0
+          }
+        ]
+      },
+      "injury": {
+        "bps": 210,
+        "severity": [
+          {
+            "label": "minor",
+            "share_bps": 6000,
+            "days": [
+              3,
+              14
+            ],
+            "fatal_bps": 0
+          },
+          {
+            "label": "serious",
+            "share_bps": 4000,
+            "days": [
+              14,
+              90
+            ],
+            "fatal_bps": 0
+          }
+        ]
+      },
+      "birth": {
+        "ages": [
+          15,
+          49
+        ],
+        "gestation_days": 266,
+        "female_bps": 4868
+      },
+      "treatable": {
+        "share_bps_by_age": [
+          {
+            "from": 0,
+            "bps": 1500
+          },
+          {
+            "from": 75,
+            "bps": 0
+          }
+        ],
+        "band": "severe"
+      },
+      "work_injury_bps": {
+        "factory": 25,
+        "shop": 22
+      },
+      "found_alone_after": [
+        {
+          "within_days": 1,
+          "bps": 3691
+        },
+        {
+          "within_days": 3,
+          "bps": 2062
+        },
+        {
+          "within_days": 7,
+          "bps": 1359
+        },
+        {
+          "within_days": 30,
+          "bps": 1959
+        },
+        {
+          "within_days": 365,
+          "bps": 929
+        }
+      ]
+    },
+    "wages_per_fortnight": {
+      "shop": 130500,
+      "factory": 140800,
+      "construction": 155800
+    },
+    "rents_per_month": {
+      "apartment_units": [
+        {
+          "bedrooms": 1,
+          "count": 3,
+          "rent": 40000
+        },
+        {
+          "bedrooms": 2,
+          "count": 7,
+          "rent": 47000
+        },
+        {
+          "bedrooms": 3,
+          "count": 2,
+          "rent": 55000
+        }
+      ],
+      "house_types": [
+        {
+          "id": "house",
+          "bedrooms": 3,
+          "share_bps": 5500,
+          "rent": 52000
+        },
+        {
+          "id": "large-house",
+          "bedrooms": 4,
+          "share_bps": 4500,
+          "rent": 60000
+        }
+      ]
+    },
+    "spending": {
+      "saving_bps": 250,
+      "wealth_effect_bps_per_year": 300,
+      "essentials_per_month": 45000,
+      "shops_known": 7,
+      "shop_search_bps_per_month": 2500
+    },
+    "savings_by_age": [
+      {
+        "from": 18,
+        "pct": [
+          10000,
+          50000,
+          300000,
+          900000,
+          2500000
+        ]
+      },
+      {
+        "from": 25,
+        "pct": [
+          20000,
+          200000,
+          840000,
+          2500000,
+          6000000
+        ]
+      },
+      {
+        "from": 35,
+        "pct": [
+          50000,
+          500000,
+          1800000,
+          5500000,
+          12000000
+        ]
+      },
+      {
+        "from": 45,
+        "pct": [
+          100000,
+          700000,
+          2500000,
+          7000000,
+          16000000
+        ]
+      },
+      {
+        "from": 55,
+        "pct": [
+          200000,
+          1000000,
+          4500000,
+          12000000,
+          28000000
+        ]
+      }
+    ],
+    "retirement_age": 65,
+    "retiree_savings": [
+      6500000,
+      12000000
+    ],
+    "support": {
+      "pension": {
+        "amount": 141216,
+        "every_days": 61,
+        "from_age": 65
+      },
+      "unemployment": {
+        "amount": 132700,
+        "every_days": 28,
+        "from_age": 18
+      }
+    },
+    "firm_ownership": {
+      "forms_bps": {
+        "factory": {
+          "closely_held": 0,
+          "outside": 0,
+          "widely_held": 10000
+        },
+        "shop": {
+          "closely_held": 8000,
+          "outside": 2000,
+          "widely_held": 0
+        },
+        "landlord": {
+          "closely_held": 7000,
+          "outside": 3000,
+          "widely_held": 0
+        }
+      },
+      "closely_held": {
+        "households_bps": [
+          8500,
+          1200,
+          300
+        ],
+        "owner_wealth_fifth_bps": [
+          100,
+          200,
+          400,
+          800,
+          8500
+        ]
+      },
+      "widely_held": {
+        "outside_bps": 9000
+      },
+      "direct_holders": {
+        "by_wealth_fifth_bps": [
+          200,
+          600,
+          1200,
+          2000,
+          3500
+        ],
+        "firms_held": [
+          1,
+          4
+        ]
+      }
+    },
+    "industry": {
+      "factory_labour_share_bps": 1800,
+      "factory_input_share_bps": 6800,
+      "retail_purchases_share_bps": 7200,
+      "retail_labour_share_bps": 1500
+    },
+    "prices": {
+      "goods_world": 10000,
+      "goods_import_markup_bps": 1000,
+      "inputs_per_kg": 200,
+      "materials_per_kg": 90
+    },
+    "ordinary_hours_per_week": 40,
+    "fertility_per_10000": [
+      {
+        "from": 15,
+        "rate": 15
+      },
+      {
+        "from": 20,
+        "rate": 138
+      },
+      {
+        "from": 25,
+        "rate": 555
+      },
+      {
+        "from": 30,
+        "rate": 792
+      },
+      {
+        "from": 35,
+        "rate": 465
+      },
+      {
+        "from": 40,
+        "rate": 110
+      },
+      {
+        "from": 45,
+        "rate": 4
+      },
+      {
+        "from": 50,
+        "rate": 0
+      }
+    ],
+    "labour_force_participation_bps": 8000,
+    "tenancy": {
+      "rent_review_months": 24,
+      "rent_increase_notice_days": 30,
+      "after_fixed_term": "periodic"
+    },
+    "values": {
+      "benevolence": {
+        "mean_bps": 7000,
+        "sd_bps": 1500
+      },
+      "universalism": {
+        "mean_bps": 6600,
+        "sd_bps": 1500
+      },
+      "self_direction": {
+        "mean_bps": 6200,
+        "sd_bps": 1500
+      },
+      "security": {
+        "mean_bps": 5800,
+        "sd_bps": 1500
+      },
+      "conformity": {
+        "mean_bps": 5400,
+        "sd_bps": 1500
+      },
+      "hedonism": {
+        "mean_bps": 5000,
+        "sd_bps": 1500
+      },
+      "achievement": {
+        "mean_bps": 4600,
+        "sd_bps": 1500
+      },
+      "tradition": {
+        "mean_bps": 4200,
+        "sd_bps": 1500
+      },
+      "stimulation": {
+        "mean_bps": 3800,
+        "sd_bps": 1500
+      },
+      "power": {
+        "mean_bps": 3400,
+        "sd_bps": 1500
+      }
+    },
+    "industrial_action": {
+      "ballot_turnout_bps": 5000,
+      "ballot_pass_bps": 5000,
+      "notice_days": 3,
+      "paid_during_action": false
+    },
+    "world_price_process": {
+      "goods": {
+        "sd_bps": 150,
+        "persistence_bps": 9000
+      },
+      "inputs": {
+        "sd_bps": 400,
+        "persistence_bps": 9000
+      },
+      "materials": {
+        "sd_bps": 300,
+        "persistence_bps": 9000
+      }
+    },
+    "credit": {
+      "cash_rate_bps": 125,
+      "funding_spread_bps": 100,
+      "lending_rate_bps": {
+        "person": 600,
+        "organisation": 250
+      },
+      "serviceability_buffer_bps": 300,
+      "max_repayment_share_bps": {
+        "person": 3500,
+        "organisation": 2000
+      },
+      "arrears_days": 30,
+      "default_days": 90,
+      "max_months": 60,
+      "reserve": 6000000
+    },
+    "opening": {
+      "bank": 31000000,
+      "town": 124000000,
+      "builder": 18000000,
+      "landlord": 37000000,
+      "shop": 1800000,
+      "factory": 25000000,
+      "person_min_savings": 60000
+    },
+    "town_finance": {
+      "parks_per_year": 9000000,
+      "payment_approval_over": 3000000
+    },
+    "public_finance": {
+      "income_tax": {
+        "brackets": [
+          {
+            "from": 0,
+            "rate_bps": 0
+          },
+          {
+            "from": 1380000,
+            "rate_bps": 1168
+          },
+          {
+            "from": 2200000,
+            "rate_bps": 831
+          },
+          {
+            "from": 3600000,
+            "rate_bps": 1179
+          },
+          {
+            "from": 6600000,
+            "rate_bps": 2222
+          },
+          {
+            "from": 8500000,
+            "rate_bps": 2713
+          },
+          {
+            "from": 13000000,
+            "rate_bps": 3638
+          }
+        ],
+        "levy_bps": 1500,
+        "levy_from": 1300000
+      },
+      "grants_per_resident_per_year": 479900,
+      "rates_per_resident_per_year": 55000,
+      "rates_instalments": 4,
+      "rates_due_days": 30,
+      "rates_penalty_interest_bps": 870,
+      "median_house_price": 25000000,
+      "rates_exempt_kinds": [
+        "health_service",
+        "school",
+        "utility",
+        "police"
+      ]
+    },
+    "services": {
+      "waste_per_person_per_day_g": 851,
+      "landfill_levy_per_tonne": 20000,
+      "council_staff_per_1000": 6,
+      "collect_seconds_per_10kg": 12,
+      "asset_life_years": 15,
+      "upkeep_hours_per_week_per_asset": 4,
+      "complain_bps": 3000
+    },
+    "unions": {
+      "membership_bps": {
+        "manufacturing": 2640,
+        "retail": 1640,
+        "construction": 2020,
+        "public_administration": 2810,
+        "other": 1590
+      },
+      "dues_per_month": 4000,
+      "resignation_notice_days": 14,
+      "claim_margin_bps": 200,
+      "meeting_every_days": 30,
+      "teaching": "Together, workers can win better pay and conditions than each can alone."
+    },
+    "groups": {
+      "kinds": [
+        {
+          "kind": "sport",
+          "name": "sports club",
+          "every_days": 7,
+          "lasts_minutes": 120
+        },
+        {
+          "kind": "religious",
+          "name": "shrine and temple association",
+          "every_days": 30,
+          "lasts_minutes": 90,
+          "teaching": "The ancestors and the spirits of the place watch over the family and the village, and are honoured at the shrine, the temple and the household altar.",
+          "held_at_start_bps": 3100
+        },
+        {
+          "kind": "arts",
+          "name": "calligraphy and crafts circle",
+          "every_days": 14,
+          "lasts_minutes": 120
+        },
+        {
+          "kind": "hobby",
+          "name": "senior citizens' club",
+          "every_days": 14,
+          "lasts_minutes": 120
+        },
+        {
+          "kind": "interest",
+          "name": "neighbourhood association",
+          "every_days": 30,
+          "lasts_minutes": 120
+        }
+      ],
+      "per_kind_per_1000_people": 1,
+      "taking_part_bps": 4000,
+      "leave_notice_days": 0
+    },
+    "elections": {
+      "term_years": 4,
+      "method": "plurality",
+      "turnout_bps": 6000,
+      "stand_bps": 200,
+      "news_readers_bps": 5500
+    },
+    "health": {
+      "doctors_per_1000": 2.7,
+      "doctor_wage_per_fortnight": 461500,
+      "consult_minutes": 30,
+      "seek_care_bps": 9000,
+      "treats": [
+        {
+          "kind": "illness",
+          "severity": "serious",
+          "consults": 1,
+          "days_kept_bps": 8000,
+          "fatal_kept_bps": 5000
+        },
+        {
+          "kind": "illness",
+          "severity": "severe",
+          "consults": 2,
+          "days_kept_bps": 8000,
+          "fatal_kept_bps": 5000
+        },
+        {
+          "kind": "injury",
+          "severity": "minor",
+          "consults": 1,
+          "days_kept_bps": 8000,
+          "fatal_kept_bps": 5000
+        },
+        {
+          "kind": "injury",
+          "severity": "serious",
+          "consults": 2,
+          "days_kept_bps": 8000,
+          "fatal_kept_bps": 5000
+        }
+      ],
+      "off_work_severities": [
+        "serious",
+        "severe"
+      ]
+    },
+    "round": {
+      "work_start_hour": 9,
+      "work_end_hour": 17,
+      "work_days": 5,
+      "school_start_hour": 8,
+      "school_end_hour": 15,
+      "travel_seconds_per_cell": 18,
+      "travel_by_cover": {
+        "water": 120,
+        "wetland": 30,
+        "woodland": 25,
+        "scrub": 25
+      },
+      "roads": {
+        "seconds_per_cell": 2,
+        "within_cells": 3,
+        "budget_per_resident": 20000
+      }
+    },
+    "ownership": {
+      "house_owner_bps": 9267,
+      "mortgage_bps_by_age": [
+        {
+          "from": 18,
+          "bps": 6000
+        },
+        {
+          "from": 45,
+          "bps": 3500
+        },
+        {
+          "from": 65,
+          "bps": 500
+        }
+      ],
+      "mortgage_payment_per_month": 75000,
+      "mortgage_rate_bps": 150,
+      "mortgage_years_left": [
+        5,
+        35
+      ],
+      "market": {
+        "buy_bps_per_month": 50,
+        "deposit_bps": 1000,
+        "costs_bps": 700,
+        "mortgage_months": 420,
+        "relist_days": 30,
+        "cut_bps": 500,
+        "floor_bps": 8000
+      }
+    },
+    "utilities": {
+      "water": {
+        "litres_per_person_per_day": 214,
+        "price_per_kl": 220,
+        "service_per_quarter": 3000,
+        "river_inflow_kl_per_cell_per_day": 1000,
+        "river_decay_bps_per_day": 1000,
+        "river_flow_bps_per_day": 5000
+      },
+      "energy": {
+        "kwh_per_household_per_day": 15,
+        "price_per_kwh": 35,
+        "supply_per_day": 33,
+        "grid_price_per_kwh": 20,
+        "grid_emissions_g_per_kwh": 450
+      }
+    },
+    "climate": {
+      "rain_by_month_bps": [
+        8500,
+        8500,
+        12000,
+        15000,
+        14000,
+        10000,
+        9500,
+        9000,
+        9500,
+        9000,
+        8000,
+        7000
+      ],
+      "storm_bps_per_month": 600,
+      "storm_days": [
+        2,
+        4
+      ],
+      "storm_bps": 25000,
+      "drought_bps_per_year": 400,
+      "drought_months": [
+        6,
+        18
+      ],
+      "drought_bps": 4000,
+      "summer_months": [
+        7,
+        8,
+        9
+      ],
+      "heatwave_bps_per_week": 1200,
+      "heatwave_days": [
+        3,
+        5
+      ],
+      "heat_units": 10,
+      "built_heat_units": 12,
+      "heat_illness_bps_per_unit": 100,
+      "warning_lead_days": 2
+    },
+    "hazards": {
+      "river_bank_kl": 12000,
+      "spill_bps_per_day": 3000,
+      "flood_above_kl": 300,
+      "wetland_soak_kl_per_day": 500
+    },
+    "crime": {
+      "take_bps_per_month_in_need": 200,
+      "caught_bps_reckoned": 3000,
+      "take_quantity": 5,
+      "detection_bps": 3500,
+      "investigation_hours": 4,
+      "police_per_1000": 1.9,
+      "officer_wage_per_fortnight": 230800
+    },
+    "justice": {
+      "hearing_after_days": 30,
+      "pay_within_days": 28,
+      "challenge_bps": 2000,
+      "apply_bps": 3000,
+      "apply_after_days": 30
+    },
+    "education": {
+      "school_ages": [
+        6,
+        17
+      ],
+      "students_per_teacher": 11.0,
+      "school_days_per_year": 200,
+      "hours_per_day": 6,
+      "teacher_wage_per_fortnight": 250000,
+      "attainment": [
+        {
+          "label": "Lower secondary school (junior high) only",
+          "share_bps": 1800,
+          "years": 9
+        },
+        {
+          "label": "Upper secondary school (high school)",
+          "share_bps": 4800,
+          "years": 12
+        },
+        {
+          "label": "Vocational college or junior college",
+          "share_bps": 2000,
+          "years": 14
+        },
+        {
+          "label": "University or graduate school",
+          "share_bps": 1400,
+          "years": 16
+        }
+      ],
+      "return_per_year_bps": 1000,
+      "max_years": 20
+    },
+    "nature": {
+      "cell_m": 25,
+      "landscape": {
+        "margin_cells": 100,
+        "block_cells": 16,
+        "shares_bps": {
+          "woodland": 3500,
+          "scrub": 500,
+          "grassland": 500,
+          "farmland": 4500,
+          "wetland": 1000
+        },
+        "woodland_patches": 2
+      },
+      "covers": [
+        {
+          "id": "woodland"
+        },
+        {
+          "id": "scrub",
+          "succeeds_to": {
+            "cover": "woodland",
+            "after_years": 40
+          }
+        },
+        {
+          "id": "grassland"
+        },
+        {
+          "id": "cleared",
+          "succeeds_to": {
+            "cover": "grassland",
+            "after_years": 1
+          }
+        },
+        {
+          "id": "farmland"
+        },
+        {
+          "id": "wetland"
+        },
+        {
+          "id": "riverbank"
+        }
+      ],
+      "default_cover": "grassland",
+      "cleared_cover": "cleared",
+      "river_cover": "riverbank",
+      "pollution": {
+        "decay_bps_per_day": 300,
+        "diffusion_bps_per_day": 800,
+        "flow_bps_per_day": 5000,
+        "per_factory_per_day": 40,
+        "per_farmland_cell_per_day": 1
+      },
+      "species": [
+        {
+          "id": "japanese-squirrel",
+          "name": "Japanese squirrel",
+          "density_per_ha": {
+            "woodland": 0.15
+          },
+          "home_range_ha": 10,
+          "growth_bps_per_year": 3000,
+          "mortality_bps_per_year": 2500,
+          "dispersal_bps_per_year": 1000,
+          "dispersal_m": 50,
+          "barriers": [
+            "built",
+            "farmland"
+          ],
+          "min_viable": 1,
+          "detection_bps": 2000,
+          "listed": false
+        },
+        {
+          "id": "black-spotted-pond-frog",
+          "name": "black-spotted pond frog",
+          "density_per_ha": {
+            "wetland": 60,
+            "riverbank": 8
+          },
+          "home_range_ha": 0.3,
+          "growth_bps_per_year": 12000,
+          "mortality_bps_per_year": 4000,
+          "dispersal_bps_per_year": 1500,
+          "dispersal_m": 300,
+          "barriers": [
+            "built"
+          ],
+          "min_viable": 4,
+          "tolerance": {
+            "pollution": {
+              "above": 400,
+              "mortality_bps_per_day": 50
+            }
+          },
+          "detection_bps": 5000,
+          "listed": false
+        },
+        {
+          "id": "japanese-bush-warbler",
+          "name": "Japanese bush warbler",
+          "density_per_ha": {
+            "scrub": 0.7,
+            "woodland": 0.3,
+            "riverbank": 0.5,
+            "grassland": 0.1
+          },
+          "home_range_ha": 1,
+          "growth_bps_per_year": 5000,
+          "mortality_bps_per_year": 3500,
+          "dispersal_bps_per_year": 1000,
+          "dispersal_m": 500,
+          "min_viable": 1,
+          "detection_bps": 8000,
+          "conspicuous": true
+        }
+      ],
+      "survey_hours_per_ha": 1,
+      "survey_staff": 1,
+      "spin_up_years": 10
+    }
+  },
+  "sources": {
+    "currency": "Japanese yen: ISO 4217 JPY, no minor unit (0 decimal places; the sen is not in use, so an amount is a whole number of yen and money is counted in yen). Written with the yen sign before the amount (¥1,234) or in words as yen (the word is the same in singular and plural). Currency Act 1987 (Japan), art. 2: the yen is the unit; amounts are written in whole yen.  (Act and ISO 4217 from memory; to confirm.)",
+    "households": "Ikawa Town (Ikawa-machi), Akita Prefecture, a town of 4,566 people at the 2020 census (4,157 on the resident register on 1 Jan 2025, per the town's financial status collection; 3,977 on the town's home page in Oct 2026). Statistics Bureau of Japan, Census 2020 (Reiwa 2), Basic Complete Tabulation on Population and Households, as published for Akita Prefecture by Akita Prefecture (https://ckan.pref.akita.lg.jp/dataset/ea89bc10-047f-412d-b304-1e2958466993/resource/b9042ad3-5808-4ee4-9740-3f7cf5a4840d/download/050008_r2kokucho_jinkoutoukihon_toukei.xlsx; opened and read 2026-10-08), table 12-3 (households by family type), Ikawa row: 1,523 general households, of which couple only 305, couple with children 342, father with children 24, mother with children 125, other relatives-only households (extended families) 412, with non-relatives 3, one person 304, family type unknown 8. Shares are of the 1,515 households of known type. lone_parent_female_bps: 125 of 149 one-parent households. adult_female_bps: 2,436 of 4,566 people are women (table 2-7). STRUCTURAL GAP: the profile has no category for extended (three-generation) households, 27% of Ikawa's; they are counted with couples with children (couple_children_bps = 2,257 + 2,719). Not sourced from a table, PLACEHOLDERS: children_couple and children_one_parent (shares with 1, 2, 3+ children), group_size, child_max_age. same_sex_couple_bps 0: same-sex couples are not recognised in Japanese law and the Census does not count them. child_male_bps 5,124: 105.4 boys per 100 girls at birth in Japan (derived from MHLW Vital Statistics; not re-opened, to confirm). adult_ages 18-99: adulthood is 18 since 1 April 2022 (Civil Code; to confirm). mother_age_at_first_birth: 24 to 38, around Japan's mean age at first birth of about 31 (MHLW Vital Statistics; to confirm).",
+    "households.age_bands_bps": "Ikawa Town, Census 2020, people by five-year age group (Statistics Bureau of Japan, Census 2020 (Reiwa 2), Basic Complete Tabulation on Population and Households, as published for Akita Prefecture by Akita Prefecture (https://ckan.pref.akita.lg.jp/dataset/ea89bc10-047f-412d-b304-1e2958466993/resource/b9042ad3-5808-4ee4-9740-3f7cf5a4840d/download/050008_r2kokucho_jinkoutoukihon_toukei.xlsx; opened and read 2026-10-08), table 2-7, Ikawa column; 4,540 people of known age; 85 and over, including the 100 and over, taken to 99). Ikawa is older than the prefecture: 43.5% are 65 and over (Akita 37.6%), 49.1% are 15-64 and 7.3% under 15.",
+    "life.qx_per_100000": "Ministry of Health, Labour and Welfare, Abridged Life Table for Japan 2024 (Reiwa 6), male and female tables, nqx for single years of age 0 to 100, x 100,000 and rounded: https://www.mhlw.go.jp/toukei/saikin/hw/life/life24/dl/life24-06.pdf (male) and life24-07.pdf (female); read 2026-10-08. National, not Akita: Akita's life expectancy at birth is lower than Japan's (80.48 male and 87.10 female in the 2020 prefectural life tables, MHLW, https://www.mhlw.go.jp/toukei/saikin/hw/life/tdfk20/; Japan 2020: 81.56 and 87.71, to confirm), so this understates Akita's mortality. Rounding at five decimal places makes the young-adult figures coarse. Akita's crude death rate in 2024 was 19.6 per 1,000 (Akita Prefecture, Vital Statistics 2024 final figures), reflecting its age structure.",
+    "life.illness": "PLACEHOLDER carried over unchanged from another profile's placeholder (a chance a year of a hospital-level illness by age, 3-14 or 14-60 days; docs/behaviour/life.md); not re-derived for this place. To source from the MHLW Patient Survey 2023 (inpatient rates by age) and Hospital Report.",
+    "life.injury": "PLACEHOLDER carried over unchanged from another profile (2.1% a year of a serious injury); not re-derived. To source from the MHLW Patient Survey (inpatients with injuries by age).",
+    "life.birth": "ages 15-49 and gestation_days 266 (38 weeks from conception): biology, the same in any place. female_bps 4,868: Japan's sex ratio at birth, about 105.4 boys per 100 girls (derived; MHLW Vital Statistics; not re-opened this pass, to confirm).",
+    "life.treatable": "PLACEHOLDER carried over unchanged from another profile (15% of under-75 deaths treatable). To source from the OECD/Eurostat avoidable-mortality list applied to MHLW cause-of-death statistics for Japan.",
+    "life.found_alone_after": "How long after dying at home alone a person is found. Japan's own figure, the same one used by another profile that had no local one: National Police Agency of Japan, people who died alone at home in 2025 (76,941): found the same or the next day 28,398; in 2 to 3 days 15,865; in 4 to 7 days 10,456; in 8 days or more 22,222, of them 7,148 after a month or more and 208 after a year or more. Taken from that profile's entry, which read it as reported in the press (a summary of the agency's release), not in the agency's own tables; not re-opened for this profile (to confirm). Rural Akita's neighbourhood ties may differ: a placeholder for a local figure.",
+    "life.work_injury_bps": "PLACEHOLDER, order of magnitude only: the Ministry of Health, Labour and Welfare's industrial accident statistics count casualties with four or more days lost (about 135,000 in 2024 across about 60 million employees, roughly 0.2% a year; figures from memory, to confirm). Set at 0.25% a year in manufacturing and 0.22% in retail from that overall rate and the usual ordering of industries; the industry rates were not looked up. To source from the MHLW Survey on Industrial Accident Trends (frequency rates by industry).",
+    "wages_per_fortnight": "Ministry of Health, Labour and Welfare, Basic Survey on Wage Structure 2024 (Reiwa 6), Akita results as published by the Akita Labour Bureau, 'Akita Wage Statistics' (Nov 2025), https://jsite.mhlw.go.jp/akita-roudoukyoku/content/contents/002492552.pdf, tables 3-1, 3-3, 3-4 (establishments of 10 or more employees), read 2026-10-08. Monthly scheduled cash earnings (thousand yen) and annual bonus (thousand yen), men / women: manufacturing 270.4 / 194.0 and 801.4 / 432.9; construction 291.0 / 232.4 and 636.2 / 568.1; wholesale and retail 277.6 / 197.4 and 722.7 / 362.8. Fortnightly pay = (12 x monthly scheduled earnings + annual bonus) / 26, weighting men and women by assumed employment shares (manufacturing 70% men, construction 90% men, retail 50%): the weights are my assumptions, not published figures. Overtime is excluded. These are the industries' average full-time-type pay, not minimums; Akita's minimum wage is 1,031 yen an hour from 31 March 2026 (same document, annex 3; about 82,500 yen a fortnight at 80 hours). PAY PERIOD GAP: Japanese employees are paid monthly, not fortnightly; the figure is the monthly pay scaled to a fortnight.",
+    "rents_per_month": "PLACEHOLDERS bounded by one opened fact: the mean monthly rent of privately rented dwellings in Japan was 65,496 yen in 2023, with the lowest prefectures Miyazaki (46,290) and Aomori (46,340) (Statistics Bureau, Housing and Land Survey 2023, as reported by the Japan Institute of Life Insurance, https://www.jili.or.jp/lifeplan/houseeconomy/10111.html, opened 2026-10-08), which puts Akita's above 46,340. Akita's own figure was not found (the prefecture's 2023 tables are in e-Stat, not opened) except its 2018 average rent of all rented housing, 39,404 yen (Housing and Land Survey 2018, table 127-2, via ecitizen.jp, including public housing). The split by bedrooms, the unit mix and the house shares are my estimates around 47,000 yen. Ikawa has only 26 privately renting households (Census 2020 table 18-4).",
+    "spending.saving_bps": "PLACEHOLDER: Japan's household saving rate has been a few percent of disposable income (about 2-3%; Cabinet Office, National Accounts, household saving rate; recalled). TRIED: the Cabinet Office FY2024 annual national accounts index (https://www.esri.cao.go.jp/jp/sna/data/data_list/kakuhou/files/2024/2024_kaku_top.html) lists Excel tables but not the saving rate in its text; the tables themselves were not opened.",
+    "spending.wealth_effect_bps_per_year": "PLACEHOLDER carried over from another profile (about 3 cents of consumption a year per unit of wealth; Dvornak and Kohler 2003, an Australian estimate). Not a Japanese figure; to replace from Japanese estimates of the wealth effect.",
+    "spending.shops_known": "Not a figure of this place: a model's. Lengnick, M. (2013), 'Agent-based macroeconomics: A baseline model', Journal of Economic Behavior & Organization 86, Table 1: n = 7 type A connections (as in the other profile).",
+    "spending.shop_search_bps_per_month": "PLACEHOLDER carried over: a household's chance a month of looking for a new seller (25%). To source.",
+    "spending.essentials_per_month": "PLACEHOLDER: what a person spends however little comes in, 45,000 yen a month, near the food spending of a one-person household in Japan (about 40,000 yen a month; Statistics Bureau, Family Income and Expenditure Survey, single-person households; recalled, not opened: the annual report PDF opened this pass (https://www.stat.go.jp/data/kakei/2025np/pdf/gaiyou.pdf) was the survey's methods overview, with the results tables in e-Stat, not opened).",
+    "retirement_age": "Basic old-age pension age 65 (National Pension Act; claiming can be deferred to 75). Employers must secure work to 65 (Act on Stabilization of Employment of Elderly Persons). STRUCTURAL GAP: Japan has no single retirement age; about half of 65-69 year olds work (Labour Force Survey), which a single retirement age cannot show. Statutory facts from memory; to confirm.",
+    "savings_by_age": "An adult's cash and deposits, 10th/25th/50th/75th/90th percentiles by age. The 50th percentiles are set from the median financial assets of households of two or more people by age of head, 2024: 20s 840,000 yen, 30s 1.8 million, 40s 2.5 million, 50s 2.5 million (the 55+ band is raised towards the 60s' 6.5 million), 60s 6.5 million, 70s 12.05 million (Financial Services Agency-affiliated J-FLEC, Survey of Household Financial Behaviour, 2024, two-or-more-person households, https://j-flec.go.jp/wpimages/uploads/yoronf24.pdf; figures as reported in a search summary, the PDF not opened: to confirm). They are household, not individual, holdings and include non-holders. The other percentiles and the 18-24 band are PLACEHOLDERS.",
+    "retiree_savings": "Median financial assets of two-or-more-person households headed by people in their 60s (6.5 million yen) and 70s (12.05 million yen), J-FLEC, Survey of Household Financial Behaviour 2024 (as for savings_by_age; to confirm); used as the range.",
+    "support.pension": "Basic old-age pension (National Pension), full monthly amount FY2026: 70,608 yen (up 1.9% from 69,308), Japan Pension Service notice, https://www.nenkin.go.jp/oshirase/taisetu/kojin/2026/202604/0401.html (read 2026-10-08). Paid every second month for the two preceding months (the 15th of even months), so 141,216 yen every 61 days (365/6 = 60.8). from_age 65. Left out: the earnings-related employees' pension that most Akita retirees with an employment history also receive (average well above the basic pension), contribution-record reductions, means-tested welfare (seikatsu hogo) and the couples' rate. STRUCTURAL GAP: a second, earnings-related tier.",
+    "support.unemployment": "Employment Insurance basic allowance (Employment Insurance Act). Opened: Hello Work, Basic allowance (https://www.hellowork.mhlw.go.jp/insurance/insurance_basicbenefit.html, opened 2026-10-08): the daily amount is about 50-80% of the previous daily wage (45-80% at 60-64), the more the lower the wage; upper limits per day from 1 Aug 2024: under 30, 7,450 yen; 30-44, 8,270; 45-59, 9,110; 60-64, 7,830; benefit days run from 90 to 360 by age, insured period and reason for leaving. The page did not give the lower limit or the 28-day cycle (I am recalling that benefits are recognised and paid in four-week cycles; to confirm). The flat figure is DERIVED: 60% (my choice inside the 50-80% range) of a daily wage of about 7,900 yen (the Akita retail monthly scheduled earnings of 237,500 yen, from the wage survey above, over 30 days) = 4,740 yen a day, x 28 days = 132,700 yen. from_age 18. STRUCTURAL GAP: contribution requirement, wage-linked amount, limited duration.",
+    "firm_ownership.forms_bps": "PLACEHOLDERS carried over from another profile (factories widely held; shops 80% closely held and 20% from outside; landlords 70% closely held). Roughly right in kind for Japan (small rural shops family-run; private rented housing is mostly owned by individuals, Housing and Land Survey), not sourced for Akita.",
+    "firm_ownership.closely_held": "PLACEHOLDERS carried over from another profile (one household 85%, two 12%, three 3%; wealth weights). Not sourced for Japan.",
+    "firm_ownership.widely_held": "PLACEHOLDER: the share of a widely held (listed) company's shares held from outside the town: 90%. A town of a few thousand holds almost none of a national listed company; the 80% of the other profile is too low for the same reason. To source from the JPX shareholding distribution survey.",
+    "firm_ownership.direct_holders": "PLACEHOLDER shaped by data: about one household in five holds shares in Japan (J-FLEC Survey of Household Financial Behaviour 2024, two-or-more-person households; figure not opened, to confirm); Akita lower. By wealth fifth 2%, 6%, 12%, 20%, 35% (mean 15%) is my estimate; firms_held 1 to 4 carried over.",
+    "industry": "PLACEHOLDERS, to confirm: manufacturing's compensation of employees (about 18% of output) and intermediate inputs (about 68%), retail trade's purchases of goods (about 72% of sales) and labour (about 15%): shaped by the Japanese 2020 Input-Output Tables (MIC/METI et al.) and the Economic Census for Business Activity; not looked up.",
+    "prices": "PLACEHOLDERS: an item of goods worth 10,000 yen at world prices (the unit the town counts in); imports 10% dearer (freight and margins); inputs 200 yen a kg (raw industrial materials); building materials 90 yen a kg (timber at roughly 50-100 yen a kg, steel about 100, concrete well below; ordinary building-material price indices, METI/Construction Research Institute, to source). docs/behaviour/building.md.",
+    "ordinary_hours_per_week": "Statutory working hours: 40 a week and 8 a day (Labour Standards Act 1947, art. 32; from memory, to confirm).",
+    "fertility_per_10000": "Age shape: MHLW, Vital Statistics 2024 final figures, table 7 (total fertility rate by mother's five-year age group, 2024; https://www.mhlw.go.jp/toukei/saikin/hw/jinkou/kakutei24/xls/16_hyoR06.xlsx, opened 2026-10-08): 15-19 0.0082, 20-24 0.0764, 25-29 0.3064, 30-34 0.4369, 35-39 0.2566, 40-44 0.0608, 45-49 0.0022, total 1.1475 (Japan 2024). Level: Akita's total fertility rate in 2024 was 1.04 (Akita Prefecture, Vital Statistics 2024 final figures, https://www.pref.akita.lg.jp/ summary opened 2026-10-08); the national shape is scaled by 1.04/1.1475, an assumption that Akita's age pattern is Japan's (Akita's own age-specific table is in the prefecture table of the same release and was not read). Each band's value is the sum of single-year rates, so per year per 10,000 women it is value x 2,000.",
+    "labour_force_participation_bps": "PLACEHOLDER: the share of working-age adults (18 to the retirement age) in the labour force, about 80%. National Labour Force Survey, August 2026, opened: employment rate 80.3% for ages 15-64 and 62.5% for those 15 and over; unemployment 2.5% (Statistics Bureau of Japan, Labour Force Survey (Basic Tabulation), August 2026, https://www.stat.go.jp/data/roudou/sokuhou/tsuki/pdf/gaiyou.pdf, opened 2026-10-08). Akita's own is not looked up.",
+    "tenancy": "Act on Land and House Leases (Shakuchi-shakuya-ho), arts. 26-28, 32: a lease renews unless the landlord gives notice 6 to 12 months ahead and has a justifiable cause; rent is changed by agreement, or by a court if the parties disagree (art. 32); there is no cap or notice period for an increase like some countries' rules. Custom: two-year leases, renewed with a renewal fee (so rent_review_months 24 and 30 days' notice are PLACEHOLDERS from custom). STRUCTURAL GAP: the 'justifiable cause' rule for ending a tenancy. After a fixed term the lease renews as a continuing one ('periodic'). From memory; to confirm.",
+    "values": "PLACEHOLDER carried over: Schwartz's ten basic values in the cross-national order found by Schwartz and Bardi (J. Cross-Cultural Psychology 32(3), 2001; to confirm). Japan's own order differs (it is higher on conformity, security and tradition, lower on hedonism and stimulation among 56 nations' averages); to replace from the World Values Survey (wave 7) Schwartz items for Japan.",
+    "industrial_action": "Trade Union Act and Labour Relations Adjustment Act: no statutory ballot for a private-sector strike beyond a union's own rules (a vote of the members by direct secret ballot is required by the union's constitution under Trade Union Act art. 5(2)(8)); no notice period except 10 days' notice for public-interest businesses (Labour Relations Adjustment Act art. 37); 'no work, no pay' during a strike. ballot_turnout_bps, ballot_pass_bps and notice_days are PLACEHOLDERS; paid_during_action false follows the no-work-no-pay principle. From memory; to confirm.",
+    "world_price_process": "PLACEHOLDER: world prices move each month by a mean-reverting random process (sd of the monthly move in basis points; the share of a gap kept each month). To estimate from the Bank of Japan's Corporate Goods Price Index and Import Price Index.",
+    "credit.cash_rate_bps": "Bank of Japan, Change in the Guideline for Money Market Operations, 18 September 2026: the uncollateralized overnight call rate to remain at around 1.25 percent, effective 24 September 2026, decided 7-2 (https://www.boj.or.jp/en/mopo/mpmdeci/mpr_2026/k260918a.pdf, opened 2026-10-08).",
+    "credit.funding_spread_bps": "PLACEHOLDER carried over: the bank's cost of funds over the policy rate (now 1.25%).",
+    "credit.lending_rate_bps": "PLACEHOLDERS: a regional bank's unsecured personal loan about 6% (range roughly 2-15% by product); loans to firms about 2.5% (the short-term prime lending rate follows the policy rate). Not looked up; to source from the Bank of Japan's Loans and Discounts statistics and a regional bank's published rates.",
+    "credit.serviceability_buffer_bps": "PLACEHOLDER carried over: a bank tests a borrower's repayment at a rate 3 points above the loan rate (the practice of Japanese banks of screening at a higher rate is common but was not looked up).",
+    "credit.max_repayment_share_bps": "PLACEHOLDER: banks screen housing and personal loans by the repayment burden ratio (repayments over annual income), commonly capped at 30-35% (Flat 35 guidance: 30% for incomes under 4 million yen, 35% above; figures from memory, to confirm). Set 35% for a person and 20% for an organisation (placeholder).",
+    "credit.arrears_days": "PLACEHOLDER carried over (30 days).",
+    "credit.default_days": "PLACEHOLDER (90 days, a customary three-month rule for treating a loan as in default).",
+    "credit.max_months": "PLACEHOLDER (5 years for an unsecured loan).",
+    "credit.reserve": "PLACEHOLDER: the cash the bank's lending office keeps back and doesn't lend, 6 million yen: another profile's reserve ($100,000) scaled by the ratio of the two retail wages in each currency (about 62). Scaling is not sourcing.",
+    "opening": "PLACEHOLDERS: what each organisation holds on the first day, set by scaling another profile's openings by the ratio of the two retail fortnightly wages (about 62 yen per unit of that currency): bank 31 million, town 124 million, builder 18 million, each landlord 37 million, a shop 1.8 million, a factory 25 million yen; and the least an adult in the labour force has saved, 60,000 yen. Scaling is not sourcing; to source.",
+    "town_finance.parks_per_year": "PLACEHOLDER: the town's yearly parks line, 9 million yen (another profile's figure scaled by wages, about a park a year at what the builder charges).",
+    "town_finance.payment_approval_over": "PLACEHOLDER: the town's procedure needs the mayor's written approval over 3 million yen (another profile's threshold scaled by wages). To source from a municipality's financial regulations.",
+    "public_finance.income_tax": "STATED AS PUBLISHED, National Tax Agency (opened 2026-10-08): income tax rates on taxable income, https://www.nta.go.jp/taxes/shiraberu/taxanswer/shotoku/2260.htm: up to 1.949 million yen 5%; 1.95-3.299 million 10% less 97,500; 3.3-6.949 million 20% less 427,500; 6.95-8.999 million 23% less 636,000; 9-17.999 million 33% less 1,536,000; 18-39.999 million 40% less 2,796,000; 40 million and over 45% less 4,796,000; plus a reconstruction special income tax of 2.1% of the tax (1.1% from 2027). Employment income deduction for 2026 and 2027, https://www.nta.go.jp/taxes/shiraberu/taxanswer/shotoku/1410.htm: 740,000 yen to 2.2 million of pay; 30% + 80,000 to 3.6 million; 20% + 440,000 to 6.6 million; 10% + 1,100,000 to 8.5 million; 1.95 million above. Basic deduction for 2026, https://www.nta.go.jp/taxes/shiraberu/taxanswer/shotoku/1199.htm (the page says it takes effect on 1 December 2026): 1.04 million yen at total income up to 1.32 million; 620,000 to 3.36 million; 680,000 to 4.89 million; 670,000 to 6.55 million; 620,000 to 23.5 million. Resident tax (prefectural 4% and municipal 6%, flat 10% of taxable income, basic deduction 430,000) and employee social insurance at 15% of pay are from memory (to confirm). THE APPROXIMATION, separately and mine: the structure takes marginal rates on gross annual pay. I computed total tax (national with the reconstruction tax, plus resident tax) on pay G as national tax on max(0, G - employment deduction - basic deduction - 15% of G) plus 10% of max(0, G - employment deduction - 430,000 - 15% of G), and fitted marginal rates between 1.38, 2.2, 3.6, 6.6, 8.5 and 13 million yen of pay: nothing up to 1.38 million, then 11.68%, 8.31%, 11.79%, 22.22%, 27.13% and 36.38% (above 13 million). The fit is within a few thousand yen of the computed tax at the nodes, and within about 7,000 to 20,000 yen between 2 and 5 million. Family deductions (spouse, dependants) and other deductions cannot be expressed. The 'levy' stands for employees' social insurance (health about 5%, long-term care 0.9% from 40, employees' pension 9.15%, employment insurance 0.55%, about 15.6%; from memory, to confirm) charged from 1.3 million yen; the 15% in the derivation above is deducted because insurance premiums are deductible from taxable income.",
+    "public_finance.grants_per_resident_per_year": "Ikawa Town, FY2024 settlement (Financial Status Collection, 2024, https://www.town.ikawa.akita.jp/uploaded/attachment/2729.xlsx, opened 2026-10-08): local allocation tax 1,994,958 thousand yen (47.3% of the town's revenue), over 4,157 residents on the register (1 Jan 2025) = 479,900 yen a resident. The central government's local allocation tax is a general grant to municipalities; the sheet marks the town as not a 'surplus-revenue' municipality (the grant-free-excess flag is ×).",
+    "public_finance.rates_per_resident_per_year": "Ikawa Town, FY2024 settlement (same collection, 'Status of ordinary accounts'): fixed asset tax 228,703 thousand yen (55.5% of local tax of 412,391 thousand), over 4,157 residents = 55,000 yen a resident. The fixed asset tax is the municipal tax on land and buildings (standard rate 1.4% of assessed value, Local Tax Act art. 350; to confirm). Sets the town's opening rate in the yen.",
+    "public_finance.rates_instalments": "Fixed asset tax is paid in four instalments (usually June, September, December and February; each municipality sets its own dates), Local Tax Act art. 362 (from memory; to confirm).",
+    "public_finance.rates_due_days": "PLACEHOLDER: a month between notice and the due date of an instalment (municipalities send notices in early June, pay by the end of the month).",
+    "public_finance.rates_penalty_interest_bps": "Delinquency charge on local tax: 2.4% a year for the first month after the due date and 8.7% afterwards in 2025 (Local Tax Act art. 329 etc.; special base rate); 8.7% used, to confirm for 2026.",
+    "public_finance.median_house_price": "PLACEHOLDER, 25 million yen: a plausible price of a new detached house with its lot in a rural Akita town (not looked up; Akita land prices are among Japan's lowest, with residential land about 20,000 yen per square metre in the prefectural capital, Akita Prefecture land price survey, to confirm). The lot's land value is this less what the builder charges.",
+    "public_finance.rates_exempt_kinds": "Land and buildings owned by the state, prefectures and municipalities and used for public purposes, and by schools and public hospitals, are exempt from fixed asset tax (Local Tax Act arts. 348, 351; from memory, to confirm); the same kinds here.",
+    "services.waste_per_person_per_day_g": "Ministry of the Environment, Survey of General Waste Treatment, FY2023: 851 grams of household and business municipal waste per person a day, national (https://www.env.go.jp/press/ , read 2026-10-08 as a search summary; Akita's own figure was not found and is likely higher).",
+    "services.landfill_levy_per_tonne": "PLACEHOLDER. STRUCTURAL GAP: Japan has no landfill levy; municipalities charge a disposal fee (businesses pay by weight at municipal incinerators, roughly 10-30 yen a kg; households pay for designated bags). 20,000 yen a tonne stands for that gate fee (from memory, to source from a municipality's waste fee schedule).",
+    "services.council_staff_per_1000": "PLACEHOLDER carried over (6 per 1,000 residents on the works crew).",
+    "services.collect_seconds_per_10kg": "PLACEHOLDER carried over (12 seconds per 10 kg collected).",
+    "services.asset_life_years": "PLACEHOLDER carried over (15 years).",
+    "services.upkeep_hours_per_week_per_asset": "PLACEHOLDER carried over (4 hours a week).",
+    "services.complain_bps": "PLACEHOLDER carried over (30% complain when a service fails).",
+    "unions.membership_bps": "Ministry of Health, Labour and Welfare, Basic Survey on Labour Unions 2025 (as at 30 June 2025), table 3, unionisation rate by industry (https://www.mhlw.go.jp/toukei/itiran/roudou/roushi/kiso/25/dl/gaikyou.pdf, opened 2026-10-08): manufacturing 26.4%, wholesale and retail 16.4%, construction 20.2%, public administration 28.1%, all industries 15.9% (used for 'other'). National, not Akita: Akita's rates are not published in this survey. STRUCTURAL GAP: Japanese unions are mostly enterprise unions (one per firm), not industry-wide.",
+    "unions.resignation_notice_days": "PLACEHOLDER carried over (14 days).",
+    "groups.leave_notice_days": "PLACEHOLDER (0: a person may leave a club or association at any time).",
+    "unions.dues_per_month": "PLACEHOLDER: about 4,000 yen a month (enterprise union dues are commonly 3,000-6,000 yen; recalled, to source from the MHLW Basic Survey on Labour Unions).",
+    "unions.claim_margin_bps": "PLACEHOLDER carried over (a union asks for 2 points more than the going rise).",
+    "unions.meeting_every_days": "PLACEHOLDER carried over (a meeting a month).",
+    "groups.kinds": "Kinds of social group. In rural Japan the main ones are neighbourhood associations (chonaikai or jichikai, to which most households belong; Cabinet Office/MIC surveys, to source), senior citizens' clubs (rojin clubs), sports clubs, hobby circles and shrine and temple associations (ujiko or danka groups). Kinds, meeting times and lengths are PLACEHOLDERS shaped by that, not sourced figures. STRUCTURAL GAP: religious belonging in Japan is by household and event (festivals, funerals, New Year) and rarely weekly attendance; 'every_days' 30 is a compromise.",
+    "groups.taking_part_bps": "PLACEHOLDER carried over (40% take part in a group).",
+    "groups.kinds.teaching": "The religious group's teaching is worded as the folk practice of ancestor veneration and local spirits that Shinto-Buddhist household religion in rural Japan shares; my wording, not a quotation.",
+    "groups.kinds.held_at_start_bps": "PLACEHOLDER, 31%: about three in ten Japanese say they hold a religion (NHK Broadcasting Culture Research Institute, Japanese National Character Survey 2018, from memory, to confirm; the survey's question counts organised belonging, not folk practice).",
+    "unions.teaching": "My wording of the same idea as the other profile's: workers together can win better pay and conditions than each alone.",
+    "groups.per_kind_per_1000_people": "PLACEHOLDER carried over (one group of each kind per 1,000 people).",
+    "households.child_max_age": "PLACEHOLDER (24): a child lives at home with its parents until at most this age.",
+    "health": "The clinic stands for the town's health system (a town clinic and the hospital it refers to; a liberty). doctors_per_1000: 2.7 physicians per 1,000 people, about the level of Akita Prefecture (Akita has about 270 physicians per 100,000, MHLW, Survey of Physicians, Dentists and Pharmacists 2022; recalled, to confirm) and a little above Japan's 2.6; a small town has fewer. doctor_wage_per_fortnight: 461,500 yen (12 million yen a year / 26), roughly a hospital physician's pay (MHLW Basic Survey on Wage Structure; recalled, to confirm). Japan's universal insurance (30% copayment) is why seek_care_bps is high. consult_minutes, seek_care_bps, treats and off_work_severities: PLACEHOLDERS carried over from another profile (conditions here are hospital-level; care shortens them by a fifth; nobody works with a serious or severe condition).",
+    "round": "Working hours 9 to 5 (eight hours, five days: the 40-hour week; Japanese offices run 9 to 6 with an hour's break, the shops and factories vary; a liberty); school 8 to 3 (Japanese elementary schools start around 8:15 and finish between 2:30 and 3:45). Travel: a 25 m cell on foot in about 18 seconds (walking about 1.4 m/s, Bohannon 1997; to confirm); on a road, 2 seconds (about 45 km/h; speed limits in Japanese towns are commonly 40-50 km/h and 60 km/h on general roads, Road Traffic Act enforcement order; to confirm); slower across water, wetland and bush (placeholders). Roads: the town builds toward buildings more than 75 m from a road within a budget of 20,000 yen a resident a year (placeholder; municipal road spending per resident, MIC Municipal Settlement Statistics, to source). Most rural Akita residents drive to work (Census 2020 commuting by car; to confirm).",
+    "ownership": "house_owner_bps: of Ikawa's 1,514 households in dwellings (main households), 1,403 own their homes, 82 rent public housing, 26 rent privately and 3 are in company housing (Statistics Bureau of Japan, Census 2020 (Reiwa 2), Basic Complete Tabulation on Population and Households, as published for Akita Prefecture by Akita Prefecture (https://ckan.pref.akita.lg.jp/dataset/ea89bc10-047f-412d-b304-1e2958466993/resource/b9042ad3-5808-4ee4-9740-3f7cf5a4840d/download/050008_r2kokucho_jinkoutoukihon_toukei.xlsx; opened and read 2026-10-08), table 18-4, Ikawa row); 9,270 basis points. Akita as a whole: 77.1% of dwellings owner-occupied and 95.0% of detached houses (Statistics Bureau, Housing and Land Survey 2023, Akita summary, https://www.pref.akita.lg.jp/uploads/public/archive_0000090774_00/akitagaiyo2023.pdf, opened 2026-10-08). Flats are all rented here (a liberty). NOTE: in a town like Ikawa private rental housing is nearly absent (26 households), so the 20 landlords and 30 flats of the spec are a much larger rental market than the town's. mortgage_bps_by_age, mortgage_years_left and market: PLACEHOLDERS, shaped by Japanese practice (35-year terms, 10% down, buying costs 6-8% with brokerage, registration and acquisition taxes; to source from the Housing Finance Agency's Flat 35 user survey). mortgage_payment_per_month about 75,000 yen (recalled, to confirm). mortgage_rate_bps 1.50%: PLACEHOLDER, the Bank of Japan's 1.25% policy rate plus a small spread (variable-rate housing loans follow the short-term prime rate; not looked up).",
+    "utilities": "Water: about 214 litres per person per day domestic use in Japan (Ministry of Land, Infrastructure, Transport and Tourism, White Paper on Water Resources, recalled, to confirm); a municipal tariff of about 220 yen a kilolitre (volume charge, water and sewerage together) and a basic charge of about 1,000 yen a month (3,000 a quarter): recalled typical rural tariffs, to confirm against a town's published tariff. Bills go to owners. The river's inflow, flow and losses are placeholders, as in the other profile. Energy: about 15 kWh a household a day (5,500 kWh a year, higher in cold Tohoku than Japan's average of about 4,500; recalled, to confirm: Agency for Natural Resources and Energy, Energy White Paper); about 35 yen a kWh including fuel cost adjustment and renewable levy (Tohoku Electric Power standard tariff, recalled, to confirm) and a basic charge of about 33 yen a day; the grid price to the retailer (20 yen) is a placeholder; grid emissions 450 g CO2 a kWh (placeholder; the retailer-specific adjusted emission factor is published by the Ministry of the Environment). STRUCTURAL GAP: heating by kerosene and snow clearing are a large part of an Akita household's energy and winter costs and are not modelled.",
+    "climate": "Weather drawn for each run (docs/behaviour/weather.md). Opened: Japan Meteorological Agency, 1991-2020 normals for Akita (https://www.data.jma.go.jp/stats/etrn/view/nml_sfc_ym.php?prec_no=32&block_no=47582, opened 2026-10-08): precipitation by month (mm) Jan 118.9, Feb 98.5, Mar 99.5, Apr 109.9, May 125.0, Jun 122.9, Jul 197.0, Aug 184.6, Sep 161.0, Oct 175.5, Nov 189.1, Dec 159.8; snowfall total (cm) Dec 58, Jan 100, Feb 79, Mar 30, Apr 1, Nov 6; maximum snow depth normals (cm) 14-17 in winter (Akita city is on the coast; inland towns get more snow, recalled); mean temperature 0.4 C in January and 25.0 C in August. rain_by_month_bps (the river's inflow by month, 10,000 = the year's usual) is a PLACEHOLDER shaped by these normals: precipitation in December to February falls as snow and is held until the thaw, so inflow peaks in March to May, and the summer and autumn rains (July to November are the wettest months) keep it up; the numbers are my reading of that, not a measured river flow. storm_*: heavy-rain disasters in Akita in August 2013, July 2017, July 2023 and July 2024 (recalled, to confirm), a damaging event about once in two to four years; 6% a month is a placeholder in that order. drought_*, heatwave and heat figures: PLACEHOLDERS carried over; summer_months July-September (JMA normals above show July-September as the warmest). STRUCTURAL GAP: Akita's characteristic hazard is winter snow and cold (inland towns such as Ikawa are snowier than Akita city); the climate block has only rain, drought and heat.",
+    "hazards": "Floods, PLACEHOLDERS carried over from another profile, sized against the river as modelled (about 9,000 kL a 25 m cell in the usual flow): it spills over its banks past 12,000, 30% of the excess a day; a building floods with water above 300 kL on its cell; wetland soaks up 500 kL a cell a day. The 2023 and 2024 floods of the Omono, Koyoshi and Mogami basins show the hazard is real in Akita (recalled, to confirm). To source from MLIT flood hazard maps.",
+    "crime": "Crime (world-expansion 7.2), deliberately rare and driven by circumstance only (Becker 1968; Cohen and Felson 1979), never by any group. take_bps_per_month_in_need, caught_bps_reckoned, take_quantity and investigation_hours: placeholders carried over (Japan's theft rate is low). detection_bps about 35%, near the clearance rate of all penal-code offences in Japan (about 37-39% in 2023-24; recalled from the National Police Agency's statistics, to confirm; theft alone is lower). police_per_1000 about 1.9 (Akita Prefectural Police authorised strength about 1,800 officers over 0.9 million people; recalled, to confirm). officer_wage_per_fortnight about 6 million yen a year / 26 (recalled, to confirm). TRIED AND NOT READ: the National Police Agency's crime statistics pages (npa.go.jp/publications/statistics/crime/ returned 403 or 404) and the 2025 White Paper on Police (an index page only, https://www.npa.go.jp/hakusyo/r07/index.html).",
+    "justice": "Japan's equivalent is the summary court (small claims and civil disputes, up to 1.4 million yen) and district court, with the Labour Tribunal for wage disputes; rent disputes are rare in court. hearing_after_days 30: a first hearing about a month after filing (placeholder; the Supreme Court's civil case statistics give times to judgment, to source). pay_within_days, challenge_bps, apply_bps and apply_after_days are PLACEHOLDERS carried over. Enforcement of an unpaid money judgment by attachment of the debtor's bank account (Civil Execution Act).",
+    "elections": "Local Autonomy Act and Public Offices Election Act: mayors and assemblies are elected every four years; the mayor by a plurality in a direct vote, assembly members by a single non-transferable vote (modelled as a plurality); voting is not compulsory. turnout_bps 6,000: turnout in town and village elections in Japan is typically 60% or so, and mayoral elections in small towns higher (MIC, election results; recalled, to confirm). stand_bps and news_readers_bps: PLACEHOLDERS (Akita has high newspaper readership: the Akita Sakigake Shimpo; to source from the Japan Audit Bureau of Circulations or MIC).",
+    "education": "school_ages 6-17: nine years of compulsory schooling from age 6 (School Education Act) and about 99% go on to upper secondary school, which ends at 18 (MEXT, School Basic Survey; recalled, to confirm). students_per_teacher 11.0: PLACEHOLDER for a rural Akita public school (Japan's average is about 14-15, MEXT School Basic Survey 2024; Akita lower; not looked up). school_days_per_year 200 (MEXT: about 200-210 school days; recalled), hours_per_day 6 (placeholder). teacher_wage_per_fortnight 250,000 (about 6.5 million yen a year / 26; public school teachers, MIC local public servant pay survey, recalled, to confirm). attainment: PLACEHOLDER shares of adults by highest level of education, shaped by the Census 2020's education table for Akita (lower secondary only about 18%, upper secondary 48%, vocational or junior college 20%, university 14%: my recollection of the pattern, not read from the table; to replace from e-Stat), years of schooling 9, 12, 14, 16. return_per_year_bps: the wage return to a year of schooling, about 10% (the international literature, Psacharopoulos and Patrinos 2018; Japan's estimates are lower, 6-8%; to confirm), applied as productivity (Mincer 1974); max_years placeholder.",
+    "nature": "Nature (docs/design/world-expansion.md 2). cell_m: a cell is a 25 m lot. Landscape shares around the town: Akita is about 71% forest (Akita Prefecture forest statistics; recalled, to confirm) and about 10% farmland, but a town on a plain has more paddy around it: woodland 35%, scrub 5%, grassland 5%, farmland (mostly rice paddy) 45%, wetland 10% are PLACEHOLDERS. Covers' succession (cleared land to grassland in a year; scrub to woodland in about 40) and the pollution figures, survey_hours_per_ha, survey_staff and spin_up_years are placeholders carried over.",
+    "nature.species": "Three real species of Akita; ecology figures are PLACEHOLDERS except where stated. Japanese squirrel (Sciurus lis): males' home ranges 4-30 ha and females' 4-17 ha, litters of 2-6 after a 39-40 day gestation, IUCN Least Concern (Wikipedia, 'Japanese squirrel', https://en.wikipedia.org/wiki/Japanese_squirrel, opened 2026-10-08; a secondary source citing field studies, not checked against them). Home range set at 10 ha (the middle of those ranges); density 0.15 a hectare is DERIVED from it (about one adult per 10 ha, with some overlap between sexes), not an observed density. Black-spotted pond frog (Pelophylax nigromaculatus): clutch 1,800-3,000 eggs (600-5,000 by other estimates), maturity at about two years, maximum longevity about 13 years, IUCN Least Concern (Wikipedia, 'Dark-spotted frog', https://en.wikipedia.org/wiki/Dark-spotted_frog, opened 2026-10-08); breeds April-June in paddies, males holding territories on the water surface (Honda, species guide, https://www.honda.co.jp/outdoor/adventure/tonosamagaeru.html, via a search summary; to confirm). Density, home range, dispersal, mortality and pollution tolerance are placeholders. Japanese bush warbler (Horornis diphone; uguisu): a common songbird of scrub and woodland edge whose male song marks a territory in spring and summer (Canon bird-branch page, https://global.canon/ja/environment/bird-branch/photo-gallery/uguisu/, via a search summary; to confirm). The only research paper the English Wikipedia article cites is Hamao and Hayama 2015 on the Ogasawara Islands population (Ornithological Science 14: 111-115), which is an introduced population, so not used; densities and territory size are placeholders. TRIED AND NOT READ: the Ecosystem Conservation Society - Japan habitat-suitability sheets for the squirrel and warbler (https://www.ecosys.or.jp/certification/jhep/img/model/nihonrisu.pdf, uguisu.pdf): the PDFs' text is garbled, no numbers could be extracted. Listing: the Ministry of the Environment Red List status of the frog and squirrel was not confirmed, so neither is marked listed. Growth, mortality, dispersal, min_viable and detection: placeholders; family groups sharing a home range are not modelled."
+  },
+  "targets": [
+    {
+      "what": "unemployment_rate_pct",
+      "value": 2.5,
+      "source": "Statistics Bureau of Japan, Labour Force Survey (Basic Tabulation), August 2026 (seasonally adjusted, Japan): https://www.stat.go.jp/data/roudou/sokuhou/tsuki/pdf/gaiyou.pdf"
+    },
+    {
+      "what": "employment_to_population_pct",
+      "value": 62.5,
+      "source": "Statistics Bureau of Japan, Labour Force Survey, August 2026: employment rate (employed / population 15 and over) 62.5%; for ages 15-64, 80.3%"
+    },
+    {
+      "what": "participation_rate_pct",
+      "value": 64.2,
+      "source": "Derived from Statistics Bureau of Japan, Labour Force Survey, August 2026: employed 68.49 million + unemployed 1.80 million = 70.29 million in the labour force, with 39.15 million outside it: 64.2% of those 15 and over"
+    },
+    {
+      "what": "total_fertility_rate_akita_2024",
+      "value": 1.04,
+      "source": "Akita Prefecture, Vital Statistics 2024 final figures (final count, 16 September 2025): total fertility rate 1.04 (Japan 1.15), 3,282 births"
+    },
+    {
+      "what": "crude_birth_rate_per_1000_akita_2024",
+      "value": 3.7,
+      "source": "Akita Prefecture, Vital Statistics 2024 final figures: 3.7 births per 1,000 (Japan 5.7)"
+    },
+    {
+      "what": "crude_death_rate_per_1000_akita_2024",
+      "value": 19.6,
+      "source": "Akita Prefecture, Vital Statistics 2024 final figures: 17,421 deaths, 19.6 per 1,000 (Japan 13.3)"
+    },
+    {
+      "what": "natural_increase_per_1000_akita_2024",
+      "value": -15.9,
+      "source": "Akita Prefecture, Vital Statistics 2024 final figures: natural change -14,139, -15.9 per 1,000 (Japan -7.6)"
+    },
+    {
+      "what": "share_aged_65_plus_pct_akita_2020",
+      "value": 37.5,
+      "source": "Statistics Bureau of Japan, Census 2020, Akita Prefecture (Akita Prefecture, R2 Census summary): 359,687 of 959,502 people; the highest of any prefecture"
+    },
+    {
+      "what": "persons_per_household_akita_2020",
+      "value": 2.41,
+      "source": "Statistics Bureau of Japan, Census 2020, Akita Prefecture (R2 Census summary): 2.41 people per general household"
+    },
+    {
+      "what": "lone_person_households_pct_akita_2020",
+      "value": 30.6,
+      "source": "Statistics Bureau of Japan, Census 2020, Akita Prefecture (R2 Census summary): 117,169 of 383,531 general households"
+    },
+    {
+      "what": "owner_occupied_dwellings_pct_akita_2023",
+      "value": 77.1,
+      "source": "Statistics Bureau of Japan, Housing and Land Survey 2023, Akita summary (Akita Prefecture, akitagaiyo2023.pdf): owner-occupied 77.1% of dwellings, the highest in Japan"
+    },
+    {
+      "what": "life_expectancy_at_birth_akita_2020_male",
+      "value": 80.48,
+      "source": "MHLW, Prefectural Life Tables 2020: Akita male 80.48 (as reported in a search summary; to confirm)"
+    },
+    {
+      "what": "life_expectancy_at_birth_akita_2020_female",
+      "value": 87.1,
+      "source": "MHLW, Prefectural Life Tables 2020: Akita female 87.10 (as reported in a search summary; to confirm)"
+    },
+    {
+      "what": "minimum_wage_yen_per_hour_akita",
+      "value": 1031,
+      "source": "MHLW, regional minimum wages: Akita 1,031 yen an hour effective 31 March 2026 (Akita Labour Bureau, Akita Wage Statistics, annex 3: https://jsite.mhlw.go.jp/akita-roudoukyoku/content/contents/002492552.pdf)"
+    },
+    {
+      "what": "union_membership_pct_of_employees",
+      "value": 16.0,
+      "source": "MHLW, Basic Survey on Labour Unions 2025 (30 June 2025): estimated unionisation rate 16.0%, 9.927 million members; https://www.mhlw.go.jp/toukei/itiran/roudou/roushi/kiso/25/dl/houdou.pdf"
+    },
+    {
+      "what": "policy_rate_pct",
+      "value": 1.25,
+      "source": "Bank of Japan, Change in the Guideline for Money Market Operations, 18 September 2026 (effective 24 September 2026): uncollateralized overnight call rate around 1.25 percent"
+    },
+    {
+      "what": "population_ikawa_town_2020",
+      "value": 4566,
+      "source": "Statistics Bureau of Japan, Census 2020, Ikawa Town (Akita Prefecture table 2-7); 43.5% aged 65 and over"
+    },
+    {
+      "what": "owner_occupied_main_households_pct_ikawa_2020",
+      "value": 92.7,
+      "source": "Statistics Bureau of Japan, Census 2020, Ikawa Town, table 18-4: 1,403 of 1,514 main households own their home"
+    }
+  ]
+}
