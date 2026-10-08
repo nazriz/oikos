@@ -448,7 +448,16 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     // in each and which are vacant, from the office's own papers (behaviour/roster.ts). Kept from what the seat is shown.
     const staffedBy = office ? mods[office.role_module?.code ?? ""]?.staffed?.(office.role_module?.params ?? {}) : undefined;
     const roster = office && staffedBy ? new Roster(ctxFor(p.id, office.id, entity, {}), entity, office.id, staffedBy) : undefined;
-    const config = { ...(roster ? { staff: { text: (at: number) => roster.text(at, office!.title ?? office!.id, (id: string) => whoIs(id)?.name) } } : {}), whoIs, participant: p.id, entity, entityName, onRequest, kinds, ways, title: office?.title ?? p.title, role: office?.role, framing: p.framing, standing: standingIds, titles, cadenceDays: pp.cadence_days ?? 7, draftText,
+    // Its in-trays (what a paper filed with its office comes into): its own papers of some kinds only, or a folder of
+    // some kinds; and the folders that hold every paper of its organisation's. And whose papers are its office's own
+    // doing: its own, and its staff's where they are a post of their own.
+    const folderKinds = new Map<string, string[]>(Object.entries((pp.folders ?? {}) as { [id: string]: string[] }).flatMap(([id, kinds]) => chans.filter((x) => x.path === id || x.path.endsWith(`/${id}`)).map((x) => [x.path, kinds] as [string, string[]])));
+    const own = chans.filter((x) => x.ch.kind === "records" && x.ch.way === "mine" && !x.ch.on_request && !standingIds.includes(x.path));
+    const narrow = (m: any) => !!(m?.statement_kinds?.length || m?.records?.length || m?.has?.length);
+    const trays = { kinds: new Map<string, string[] | true>(own.flatMap((x): [string, string[] | true][] => (folderKinds.has(x.path) ? [[x.path, folderKinds.get(x.path)!]] : narrow(x.ch.match) ? [[x.path, true]] : []))),
+      all: new Set(own.filter((x) => !folderKinds.has(x.path) && !narrow(x.ch.match)).map((x) => x.path)) };
+    const ownAuthors = mine.flatMap((x) => { const staff = positions.get(`${x.id}-staff`)?.holder; return staff ? [staff] : []; });
+    const config = { trays, ownAuthors, ...(pp.wake_on_papers === false ? { wakeOnPapers: false } : {}), ...(roster ? { staff: { text: (at: number) => roster.text(at, office!.title ?? office!.id, (id: string) => whoIs(id)?.name) } } : {}), whoIs, participant: p.id, entity, entityName, onRequest, kinds, ways, title: office?.title ?? p.title, role: office?.role, framing: p.framing, standing: standingIds, titles, cadenceDays: pp.cadence_days ?? 7, draftText,
       ...(pp.sessions ? { sessions: pp.sessions } : {}), ...(pp.max_actions ? { maxActions: pp.max_actions } : {}),
       // Folders that hold some kinds of paper only (by the channel's own id, as `standing` is given), and the most a prompt may be.
       ...(pp.folders ? { folders: new Map<string, string[]>(Object.entries(pp.folders as { [id: string]: string[] }).flatMap(([id, kinds]) => chans.filter((x) => x.path === id || x.path.endsWith(`/${id}`)).map((x) => [x.path, kinds] as [string, string[]]))) } : {}),
@@ -457,7 +466,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     const module: BehaviourModule = { name: "llm.participant", version: LLM_PARTICIPANT_VERSION, doc: "docs/design/m2-llm-participants.md", cadence: () => cadence, create: () => controller as unknown as Controller };
     const ctx = ctxFor(p.id, office?.id ?? "self", entity, {});
     debriefs.set(p.id, { part: p, controller });
-    bindings[p.id] = { configured: `${c.impl ?? "?"}/${c.model ?? "?"}`, adapter: `${io.adapter.provider}/${io.adapter.model}` };
+    bindings[p.id] = { configured: `${c.impl ?? "?"}/${c.model ?? "?"}`, adapter: `${io.adapter.provider}/${io.adapter.model}`, ...(pp.wake_on_papers === false ? { wake_on_papers: false } : {}) };
     if (!o.adapter) {
       // The mock's code brain: the module the world names for it, run in its one capacity (or none: it just waits).
       const b = pp.mock?.brain;
@@ -466,7 +475,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       if (brainModule) {
         await hashSource(brainModule);
         const bctx = { ...ctx, params: sortedKeys(pp.mock?.params ?? {}) as any };
-        brains.set(p.id, { controller: brainModule.create(bctx), ctx: bctx, capacity: office?.id ?? "self", cadence: brainModule.cadence(bctx), rejectBps: pp.mock?.reject_bps, optOutAt: pp.mock?.opt_out_at });
+        brains.set(p.id, { controller: brainModule.create(bctx), ctx: bctx, capacity: office?.id ?? "self", cadence: brainModule.cadence(bctx), rejectBps: pp.mock?.reject_bps, optOutAt: pp.mock?.opt_out_at, ...(pp.mock?.back_days ? { backDays: pp.mock.back_days } : {}) });
         bindings[p.id] = { ...bindings[p.id], mock_brain: b };
       }
     }

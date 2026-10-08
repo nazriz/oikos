@@ -17,9 +17,9 @@ import type { ParticipantContext } from "../module";
 import { inCurrency } from "../money";
 import type { ContentBlock, LlmMessage, ToolSpec } from "./adapter";
 import { callModel, ModelCallFailed, promptTooLong, type LlmIO } from "./call";
-import { kindSaid, LOOK_CHARS_MAX, NOTHING_FOUND, NOTHING_NEW, renderObservation, renderStanding, when, type Looked, type WhoIs } from "./render";
+import { kindSaid, LOOK_CHARS_MAX, ofKind, paperKind, NOTHING_FOUND, NOTHING_NEW, renderObservation, renderStanding, when, type Looked, type WhoIs } from "./render";
 
-export const LLM_PARTICIPANT_VERSION = "0.13.0"; // 0.13.0: a request that came to nothing is put to it at once and by its own words, a notebook of 8,000 characters and told how to make room when nearly full, offices and people by their names in the world and never a participant's own id, who holds a post, figures in the papers it is shown read as a person reads them (money, days, dates, per cent), a letter whose about is not one id goes with it at its head, and nothing a seat sends is lost without a word; a look into papers answers with a list (a paper is read when asked for by its id, a long one a part at a time), one look and one whole prompt have a ceiling, a prompt its model would not take is never sent again unchanged; 0.12.0: told that a paper is named by its id, and one it cannot name is looked up first; 0.11.0: a place it is not at is gone to (someone is sent, and what they found is told when they are back); 0.10.0: who is who is looked up by name, a register someone else keeps is asked about one named thing, a board is searched (docs/design/knowing.md); 0.9.0: an answer read exactly or not at all (told and asked once more when not), a way out of the study not clearly meant is asked about; 0.8.0: looks kept ready for every sitting; no turn when nothing came of looking into whole reports; a notebook added to or changed in part
+export const LLM_PARTICIPANT_VERSION = "0.14.0"; // 0.14.0: a sitting missed because its model did not answer is made up the next working day and said; its office's staff set out (posts, who is in each, vacancies) at its first sitting and when they change; a paper filed with its office brings it back at the next working day's sitting, a day's papers together, unless it holds that kind or is set not to be; a list is gone through a part at a time (from_entry) and every look says what was searched; a paper under one heading only, and what came by kind; an unread answer is asked for whole; a seat's own effort; 0.13.0: a request that came to nothing is put to it at once and by its own words, a notebook of 8,000 characters and told how to make room when nearly full, offices and people by their names in the world and never a participant's own id, who holds a post, figures in the papers it is shown read as a person reads them (money, days, dates, per cent), a letter whose about is not one id goes with it at its head, and nothing a seat sends is lost without a word; a look into papers answers with a list (a paper is read when asked for by its id, a long one a part at a time), one look and one whole prompt have a ceiling, a prompt its model would not take is never sent again unchanged; 0.12.0: told that a paper is named by its id, and one it cannot name is looked up first; 0.11.0: a place it is not at is gone to (someone is sent, and what they found is told when they are back); 0.10.0: who is who is looked up by name, a register someone else keeps is asked about one named thing, a board is searched (docs/design/knowing.md); 0.9.0: an answer read exactly or not at all (told and asked once more when not), a way out of the study not clearly meant is asked about; 0.8.0: looks kept ready for every sitting; no turn when nothing came of looking into whole reports; a notebook added to or changed in part
 
 export interface LlmParticipantConfig {
   participant: string;
@@ -64,6 +64,16 @@ export interface LlmParticipantConfig {
    * stands at a time, in words (behaviour/roster.ts, from the office's own papers). Set out at its first sitting and
    * at any sitting where it has changed since it was last set out. */
   staff?: { text(t: number): string };
+  /** Whether a paper filed with its office brings it back before the day it gave, as a letter does (true unless set):
+   * at the next working day's sitting after the paper came, never at once, so that a day's papers are one sitting.
+   * A real office opens its in-tray every working day. The seat can say which kinds may wait (`done_for_now`, hold). */
+  wakeOnPapers?: boolean;
+  /** Its office's in-trays (by channel path): its own papers of some kinds only (`true`: whatever comes there; a list:
+   * those kinds, as a folder holds them), and the folders that hold every paper of its organisation's (`all`), where
+   * only what is addressed to its own post, or comes from outside an organisation with no in-tray, is its to open. */
+  trays?: { kinds: Map<string, string[] | true>; all: Set<string> };
+  /** Whose papers are its office's own doing (itself; its staff's post): never what brings it back. */
+  ownAuthors?: string[];
   /** The most one prompt may come to, in characters (the system prompt and everything shown): `PROMPT_MAX` unless set. */
   promptMax?: number;
 }
@@ -263,10 +273,12 @@ export function tools(c: LlmParticipantConfig): ToolSpec[] {
       input_schema: { type: "object", required: ["ref", "decision"], properties: { ref: { type: "string" }, decision: { enum: ["confirm", "decline"] }, note: { type: "string" } } } },
     { name: "write", description: "Write to people or organisations, by id. The words go exactly as you write them. If the letter is about one thing that has an id (a paper, an account, a lot), give that id as about, and the letter is filed as about it. If what it is about is anything else (some words, or several things), say so in about all the same: it is put at the head of the letter as its subject line, and the letter is sent.",
       input_schema: { type: "object", required: ["to", "text"], properties: { to: { type: "array", items: { type: "string" } }, text: { type: "string" }, as: AS, about: { type: "string", description: "What it's about (optional): one id, or a subject line in words." } } } },
-    { name: "done_for_now", description: c.sessions
+    { name: "done_for_now", description: c.sessions && c.wakeOnPapers !== false && c.trays
+        ? `That's all for now. You're back after the given number of days, at that day's sitting (given none: after ${c.cadenceDays}); sooner if someone writes to you (the next sitting), or if a paper is filed with your office (an application, a proposal, a complaint, a notice: whatever comes into its in-tray), which brings you back at the next working day's sitting after it comes, a day's papers together. If a kind of paper can wait for the sitting you've set, name it in hold, as your reports name it (complaint, say): those kinds then wait, from now on, until you give hold again (an empty list: nothing waits). You can use it alongside other actions: they're done, and you'll see how they went when you're back.`
+        : c.sessions
         ? `That's all for now. You're back after the given number of days, at that day's sitting (given none: after ${c.cadenceDays}); sooner, at the next sitting, if someone writes to you (a letter: a paper filed with your office, a vote or a notice does not bring you back sooner, so give fewer days when you are waiting on one). You can use it alongside other actions: they're done, and you'll see how they went when you're back.`
         : "That's all for now. You'll be back after the given number of days, or sooner if someone writes to you. You can use it alongside other actions: they're done, and you're back after the days given, when you'll see how they went.",
-      input_schema: { type: "object", properties: { days: { type: "integer", minimum: 1 } } } },
+      input_schema: { type: "object", properties: { days: { type: "integer", minimum: 1 }, ...(c.sessions && c.wakeOnPapers !== false && c.trays ? { hold: { type: "array", maxItems: 32, items: { type: "string" }, description: "Kinds of paper that need not bring you back early: they wait for the sitting you have set. It stands until you give it again; an empty list: nothing waits." } } : {}) } } },
     { name: "notebook", description: `Your notebook: the only thing you'll remember from one sitting to the next. It holds ${NOTEBOOK_MAX.toLocaleString("en")} characters. Add to it, change or strike out a passage of it, or write it all out afresh; what you don't touch stays as it is. What wouldn't fit isn't put in, and you're told: to make room, strike out what is settled (change the passage to nothing), or write it all afresh, shorter. Use it alongside your actions.`,
       input_schema: { type: "object", properties: {
         add: { type: "string", description: "Words to add at the end, on a new line." },
@@ -480,9 +492,6 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
   let mail = false; // someone wrote, in something it hasn't been shown yet
   const seenSystems = new Set<string>();
   let standingText = "";
-  // Its office's staff as last set out for it, and as they stand at the sitting under way.
-  let staffShown: string | undefined;
-  let staffNow: string | undefined;
   const DAYS = 86_400;
   const S = c.sessions;
   const sittingStart = (day: number) => day * DAYS + (S?.start ?? 0);
@@ -494,6 +503,42 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
     for (day = day + (t >= sittingStart(day) ? 1 : 0); !workday(day) || day === sittingDay; day++);
     return sittingStart(day);
   };
+  // Papers filed with its office while it was away (docs/real-models.md, "What brings a seat back"): how many of each
+  // kind since it last sat, the earliest sitting they bring it back to, the kinds it has said may wait, and those seen.
+  const papersBack = !!S && c.wakeOnPapers !== false && !!c.trays;
+  const papersIn = new Map<string, number>();
+  let papersAt: number | undefined;
+  let hold = new Set<string>();
+  const own = new Set([c.participant, ...(c.ownAuthors ?? [])]);
+  const posts = new Set<string>();
+  const counted = new Set<string>();
+  /** Take in what an observation brings of papers filed with the office: each once, by the kind a list names it by. */
+  const filed = (obs: Observation) => {
+    if (!papersBack) return;
+    for (const p of obs.positions ?? []) posts.add(p.position);
+    const anyTray = c.trays!.kinds.size > 0;
+    for (const [id, ch] of Object.entries(obs.channels)) {
+      if (ch.kind !== "records" || ch.search || standingIds.has(id)) continue;
+      const tray = c.trays!.kinds.get(id);
+      if (tray === undefined && !c.trays!.all.has(id)) continue;
+      for (const r of ch.records) {
+        if (own.has(r.author) || counted.has(r.id)) continue;
+        const toPost = r.record === "statement" && (r.addressed_to ?? []).some((x) => posts.has(x));
+        const mine = tray !== undefined ? tray === true || ofKind(r, tray) : toPost || (!anyTray && r.speaks_for !== c.entity);
+        if (!mine) continue;
+        counted.add(r.id);
+        const kind = paperKind(r);
+        if (hold.has(kindSaid(kind))) continue;
+        papersIn.set(kind, (papersIn.get(kind) ?? 0) + 1);
+        // (The next working day's sitting after the day it came: never at once.)
+        const due = nextSitting((Math.floor(r.at / DAYS) + 1) * DAYS);
+        papersAt = papersAt === undefined ? due : Math.min(papersAt, due);
+      }
+    }
+  };
+  // Its office's staff as last set out for it, and as they stand at the sitting under way.
+  let staffShown: string | undefined;
+  let staffNow: string | undefined;
 
   /** Carry out the next queued action. */
   const next = (obs: Observation): ParticipantAction => {
@@ -745,6 +790,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
       lastAction = undefined;
       lastLooked = undefined;
       if (obs.inbox.length) mail = true;
+      filed(obs);
       // This report is the result of the action just carried out, if one was.
       const wasResult = current !== undefined;
       if (current && sending && obs.outcomes.some((x) => x.status === "applied")) tally.letters++;
@@ -815,10 +861,21 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
       if (S && !open) {
         const day = Math.floor(obs.t / DAYS);
         const inHours = workday(day) && obs.t >= sittingStart(day) && obs.t < day * DAYS + S.end && day !== sittingDay;
-        if (!inHours || (obs.t < backAt && !mail)) {
+        // (A paper filed with its office brings it back as a letter does, at the next working day's sitting after the
+        // paper came. So that it knows what has come, it looks in at each working day's sitting: no call is made.)
+        const papers = papersAt !== undefined && obs.t >= papersAt;
+        const notYet = obs.t < backAt && !mail && !papers;
+        if (!inHours || notYet) {
           carried.push(body);
           missed.push(obs);
-          return { type: "wait", until: obs.t < backAt && !mail ? Math.max(backAt, nextSitting(obs.t)) : nextSitting(obs.t) };
+          const tomorrow = nextSitting((day + 1) * DAYS);
+          return { type: "wait", until: notYet ? (papersBack ? Math.min(Math.max(backAt, tomorrow), inHours ? tomorrow : nextSitting(obs.t)) : Math.max(backAt, nextSitting(obs.t))) : nextSitting(obs.t) };
+        }
+        if (obs.t < backAt && !mail && papers) {
+          const what = [...papersIn].sort(([x], [y]) => (x < y ? -1 : 1)).map(([k, n]) => `${n} ${k}${n === 1 ? "" : "s"}`).join(", ");
+          const told = `You are back before the day you gave: papers were filed with your office (${what}). They are set out below.`;
+          if (!unsaid.includes(told)) unsaid.push(told);
+          await note({ back_for_papers: { papers: [...papersIn].map(([kind, n]) => ({ kind, n })), days_early: Math.ceil((backAt - obs.t) / DAYS) } });
         }
         open = true;
         sittingDay = day;
@@ -1016,6 +1073,8 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
         said.clear();
         quiet.clear();
         mail = false;
+        papersAt = undefined;
+        papersIn.clear();
         backEarly = false;
         stayOn = false;
 
@@ -1116,6 +1175,11 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
         const done = uses.find((x) => x.name === "done_for_now");
         const days = Number.isInteger(done?.input?.days) && done!.input.days > 0 ? { days: done!.input.days as number } : {};
         if (done) lastDays = days.days;
+        // Kinds of paper that may wait for the sitting it sets: as it says, until it says again.
+        if (done && papersBack && Array.isArray(done.input?.hold)) {
+          hold = new Set((done.input.hold as unknown[]).filter(text).map((k) => kindSaid(k)));
+          await note({ papers_held: [...hold] });
+        }
         if (queue.length) {
           if (done) doneAfter = days;
           return next(obs);

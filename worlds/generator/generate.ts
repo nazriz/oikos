@@ -151,6 +151,9 @@ export interface TownSpec {
   /** Other offices handed to a language model (the mock, until a real one is named): position ids, a list or a
    * comma-separated text ("planning,finance"). Each keeps its code module as the mock's brain and as its role's module. */
   model_seats?: string[] | string;
+  /** Whether a paper filed with a seat's office brings the seat back before the day it gave, at the next working day's
+   * sitting, as a letter does (docs/real-models.md, "A seat's settings"). On unless set false: then only a letter does. */
+  wake_on_papers?: boolean;
   /** The units in each apartment block, by bedrooms, each with its rent (cents a month). Default: the profile's. */
   apartment_units?: { bedrooms: number; count: number; rent: number }[];
   /** Kinds of house (a catalogue type each), their bedrooms, share of the houses and rent. Default: the profile's. */
@@ -1857,6 +1860,11 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       pos.channels.push(K.mine("standing", ["procedure", "work_order", "hold"], { title: "The office's procedures and standing orders" }));
       part.controller.params.standing = [...part.controller.params.standing, "standing"];
     }
+  }
+  // Settings of every seat a model holds, as the town's description gives them: whether papers bring it back.
+  for (const part of participants) {
+    if (part.controller?.type !== "llm") continue;
+    part.controller.params = { ...part.controller.params, ...(spec.wake_on_papers === false ? { wake_on_papers: false } : {}) };
   }
   // An office a model holds has its own stationery (docs/behaviour/office-papers.md): a form for each paper the
   // office issues, as its module says (`issues`), with what is the office's own filled in. Seen by its organisation
