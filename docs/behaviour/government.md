@@ -18,7 +18,8 @@ The genesis records that set this up are world content, made by the generator:
 - `signatories-city` tells the bank that only the `finance` seat may instruct payments from `acc-city`;
 - `proc-payments` is the payments procedure: wages and bills only within the budget adopted for the year (while a year has none, as the charter allows: below, "The budget year"), and any one payment over the profile's figure only with the mayor's written approval;
 - `budget-year-1` and the four kinds of paper it rests on: the budget the town opens with ("The budget year");
-- `law-rates` sets the rate in the dollar of value, the instalments and the penalty interest (docs/behaviour/public-finance.md). The generated town no longer has the rent tax (`law-tax`), which had no source;
+- `law-rates` sets the rate in the dollar of value, the instalments and the penalty interest (docs/behaviour/public-finance.md). The generated town has no rent tax (`law-tax` had no source, and is gone from the example code since 2026-10-09; a world that wants one writes its law);
+- `law-planning`'s fine and `law-tenancy`'s notices are the profile's (docs/profiles.md, "Sums and figures in a town's laws"): the example code holds no sum and no figure;
 - the law schedules (`schedule-...`, kind `law_schedule`) and a form to amend each one's law (`form-amend-...`): see "Laws made from figures" below.
 
 ## The budget year (2026-10-09)
@@ -86,6 +87,7 @@ It wakes daily.
 **A schedule** (a record of kind `law_schedule`, the town's; the examples are in `worlds/law/schedules.json`) says how one law is written from its figures:
 - `figures`: each with a `type` (`duration` or `count`, the form field types), a `unit` it's worded in (days, months, percent), and for a count held in another unit, `held_in` and `per_unit` (a share: worded in percent, held in basis points, 100 to one). A duration is held in seconds.
 - `text`, `adico` and, where acts can be checked against the law, `formal`: the law's words, its Institutional Grammar breakdown and its rule, with `{figure}` for the figure as worded ("60 days", "50") and `{figure:unit}` for the number as held (`{notice:seconds}`).
+- A figure may be `optional` (2026-10-09; every figure of the three example schedules is): a place that has no such requirement states none, and the law says nothing of it. The clauses that turn on optional figures are written as a list, `<<separator;;clause;;clause>>`: a clause is kept where every figure it names is given, and the kept ones are joined by the separator (a space between sentences; `, or ` in a breakdown; ` || ` in a rule). An optional figure given as nought is not given: a requirement of nothing is none, so a council takes a requirement out of a law by amending it to nought, and adds one the law lacks by giving it. With none of its figures there is no law to write. No law states a duration in seconds (days, hours or minutes where whole, else the schedule's unit as a decimal).
 - `title` ("the law on rent increases") and `form` (the name of its amendment form).
 
 A law written from a schedule carries its figures openly: `data.schedule`, and `data.figures`, each `{ value, unit }` as held (`notice: { value: 5184000, unit: "seconds" }`). The generator writes the town's opening laws this way from the profile's figures (`rentIncreaseLaw`, `industrialActionLaw`), and a test holds every such law to what its schedule writes.
@@ -93,8 +95,8 @@ A law written from a schedule carries its figures openly: `data.schedule`, and `
 | Schedule | Law at the start | Figures | Rule |
 |---|---|---|---|
 | `schedule-rent-increases` | `law-rent-increases` | `review` (least time between increases), `notice` | on a notice of rent increase; landlords, tenants and the tribunal check against it |
-| `schedule-industrial-action` | `law-industrial-action` | `turnout`, `majority` (percent), `notice` | on a notice of industrial action; the union checks against it |
-| `schedule-tenancy` | `law-tenancy` | `notice` (the landlord's, to end a tenancy), `tenant_notice` | none: nobody's acts are checked against it yet, and the clerk says so |
+| `schedule-industrial-action` | `law-industrial-action` | `turnout`, `majority` (percent), `notice`: whichever the place requires | on a notice of industrial action; the union checks against it |
+| `schedule-tenancy` | `law-tenancy` (written from the profile's notices since 2026-10-09; until then the example code's own words) | `notice` (the landlord's, to end a tenancy), `tenant_notice` | none: nobody's acts are checked against it yet, and the clerk says so |
 
 These laws speak for the town (the first two spoke for the world outside until 2026-10-05): a council amends its own laws, and only the one a law speaks for can withdraw it.
 

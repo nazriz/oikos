@@ -126,7 +126,7 @@ test("money in a generated town's laws and papers is written as its currency is,
     const whole = (n: number) => formatMoney(n, cur, cur.minor_units && n % 10 ** cur.minor_units === 0 ? { decimals: false } : {});
     const tax = c.world.records.find((r: any) => r.id === "law-income-tax");
     for (const c of P.values.public_finance.income_tax.charges) {
-      if (c.schedule.length > 1) for (const b of c.schedule) expect(tax.text).toContain(`above ${whole(b.from)}`);
+      if (c.schedule.length > 1) for (const b of c.schedule) if (b.from > 0) expect(tax.text).toContain(`above ${whole(b.from)}`); // (the first band is said by where it ends)
       if (c.base?.from) expect(tax.text).toContain(`from ${whole(c.base.from)}`);
       if (c.base?.up_to !== undefined) expect(tax.text).toContain(`up to ${whole(c.base.up_to)}`);
     }
@@ -189,7 +189,8 @@ test("an institution a place doesn't have is absent from its town: no payment, l
   expect(laws).not.toContain("law-rent-increases");
   expect(laws).not.toContain("law-industrial-action");
   expect(of("firm.landlord").rent_review_months).toBeNull();
-  expect(c.world.records.some((r: any) => r.id === "schedule-industrial-action-notice")).toBe(false);
+  // (The schedules and their forms are there all the same: a council can make the law its town does not have.)
+  expect(c.world.records.some((r: any) => r.id === "form-amend-industrial-action")).toBe(true);
   // No retirement fund.
   expect(c.world.entities.some((e: any) => e.kind === "retirement_fund")).toBe(false);
   expect(() => generateFrom({ ...spec, retirement_fund: true }, P)).toThrow(/retirement fund/);
@@ -210,11 +211,42 @@ test("an institution a place doesn't have is absent from its town: no payment, l
   N.values.industrial_action.notice_days = 14;
   const n = generateFrom(spec, N);
   const law = n.world.records.find((r: any) => r.id === "law-industrial-action");
-  expect(law.data.schedule).toBe("schedule-industrial-action-notice");
-  expect(law.text).toContain("14 days");
-  expect(law.text).not.toContain("ballot");
-  expect(law.formal.condition).toBe(`block.block == 'publish' && block.kind == 'industrial_action' && block.data.from - now < ${14 * DAY}`);
-  expect(n.world.records.some((r: any) => r.id === "form-amend-industrial-action-notice")).toBe(true);
+  expect(law.data).toEqual({ schedule: "schedule-industrial-action", figures: { notice: { value: 14 * DAY, unit: "seconds" } } });
+  expect(law.text).toBe("Industrial action is protected only where each of these holds. The employer has had written notice of it of at least 14 days.");
+  expect(law.formal.condition).toBe(`block.block == 'publish' && block.kind == 'industrial_action' && (block.data.from - now < ${14 * DAY})`);
+
+  // The reverse, a ballot and no notice: the ballot's two requirements, and nothing of notice.
+  const B = copy("au-vic-2026");
+  delete B.values.industrial_action.notice_days;
+  const ballotOnly = generateFrom(spec, B).world.records.find((r: any) => r.id === "law-industrial-action");
+  expect(Object.keys(ballotOnly.data.figures)).toEqual(["turnout", "majority"]);
+  expect(ballotOnly.text).toBe("Industrial action is protected only where each of these holds. At least 50% of the members concerned have voted in a ballot on it. More than 50% of the votes in a ballot of the members concerned are for it.");
+  expect(ballotOnly.formal.condition).toBe("block.block == 'publish' && block.kind == 'industrial_action' && (block.data.voted * 10000 < 5000 * block.data.eligible || block.data.yes * 10000 <= 5000 * block.data.voted)");
+  // A figure still stated as nought is taken as not stated: the law says nothing of it, and with nothing but noughts there is no law.
+  const Z = copy("au-vic-2026");
+  Object.assign(Z.values.industrial_action, { ballot_turnout_bps: 0, notice_days: 0 });
+  const majorityOnly = generateFrom(spec, Z).world.records.find((r: any) => r.id === "law-industrial-action");
+  expect(majorityOnly.text).toBe("Industrial action is protected only where each of these holds. More than 50% of the votes in a ballot of the members concerned are for it.");
+  Object.assign(Z.values.industrial_action, { ballot_pass_bps: 0 });
+  expect(generateFrom(spec, Z).world.records.some((r: any) => r.id === "law-industrial-action")).toBe(false);
+  // No interest on overdue rates: the rating law has no "or else", and carries no rate of interest.
+  const R = copy("au-vic-2026");
+  delete R.values.public_finance.rates_penalty_interest_bps;
+  const rates = generateFrom(spec, R).world.records.find((r: any) => r.id === "law-rates");
+  expect(rates.text).not.toContain("interest");
+  expect(rates.adico.or_else).toBeUndefined();
+  expect("penalty_interest_bps" in rates.data).toBe(false);
+
+  // In the profiles as they stand: no figure of nought stands for a rule a place does not have, and no town's law
+  // states a nought, a duration in seconds or a share in basis points.
+  for (const id of ids) {
+    const V = loadProfile(id).values as any;
+    for (const [what, v] of Object.entries({ levy: V.services.landfill_levy_per_tonne, buffer: V.credit.serviceability_buffer_bps, turnout: V.industrial_action.ballot_turnout_bps, majority: V.industrial_action.ballot_pass_bps,
+      notice: V.industrial_action.notice_days, review: V.tenancy.rent_review_months, rent_notice: V.tenancy.rent_increase_notice_days, interest: V.public_finance.rates_penalty_interest_bps })) expect({ id, what, v }).not.toEqual({ id, what, v: 0 });
+    for (const r of town(id).world.records.filter((x: any) => x.kind === "law")) for (const words of [r.text, ...Object.values(r.adico ?? {})] as string[]) {
+      expect({ id, law: r.id, words }).not.toEqual({ id, law: r.id, words: expect.stringMatching(/\b0 (seconds?|minutes?|hours?|days?|weeks?|months?|years?)\b|(?<![\d.,])0%|\bseconds?\b|basis points|\bbps\b|above [^\d]{0,4}0(?![\d.,])/) });
+    }
+  }
 }, SLOW);
 
 test("wages are paid on the profile's pay period: a month's pay monthly makes the same town as a fortnight's fortnightly", () => {

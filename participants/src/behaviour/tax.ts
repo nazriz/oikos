@@ -160,7 +160,13 @@ export function chargesInWords(charges: Charge[], written: (amount: number) => s
       : `less ${written(d.amount)}${d.tapers ? ` (reduced by ${pct(d.tapers.bps)} of pay above ${written(d.tapers.above)})` : ""}`));
     const bands = [...c.schedule].sort((x, y) => x.from - y.from);
     const rates = bands.length === 1 && bands[0]!.from === 0 && bands[0]!.rising_to_bps === undefined ? pct(bands[0]!.rate_bps)
-      : bands.map((s) => `${pct(s.rate_bps)}${s.rising_to_bps !== undefined ? ` rising to ${pct(s.rising_to_bps)}` : ""} above ${written(s.from)}`).join(", ");
+      // (The first band is said by where it ends, "nothing up to" or "so much up to": no law says "above nought".)
+      : bands.map((s, i) => {
+          const rate = `${pct(s.rate_bps)}${s.rising_to_bps !== undefined ? ` rising to ${pct(s.rising_to_bps)}` : ""}`;
+          if (s.from > 0) return `${rate} above ${written(s.from)}`;
+          const next = bands[i + 1];
+          return next ? `${s.rate_bps === 0 && s.rising_to_bps === undefined ? "nothing" : rate} up to ${written(next.from)}` : rate;
+        }).join(", ");
     const reliefs = (c.reliefs ?? []).map((r) => ("none_due_up_to" in r ? `none due where that is ${written(r.none_due_up_to)} or less` : `less ${written(r.amount)} of the charge${r.tapers ? ` (reduced by ${pct(r.tapers.bps)} of pay above ${written(r.tapers.above)})` : ""}`));
     return `${c.name ?? c.id}: ${[on, ...(b.from ? [`from ${written(b.from)}`] : []), ...(b.up_to !== undefined ? [`up to ${written(b.up_to)}`] : []), ...less].join(", ")}: ${rates}${reliefs.length ? `; ${reliefs.join("; ")}` : ""}; paid to ${payee(c)}${c.itemised ? ", reported worker by worker" : ""}`;
   }).join(". ");
