@@ -32,6 +32,7 @@ import { callModel, ModelCallFailed, ModelUnreachable, SpendingLimitReached, Usa
 import { TRANSLATOR_VERSION, translatorSystem } from "@oikos/translator";
 import { formOfLine, type BlindAnswer } from "../../translator/train/blind";
 import { functionOf, sameProgram, type Example, type FormSpec } from "../../translator/train/data";
+import { sameButForFreeText } from "../../translator/train/meaning";
 import { withListsQuoted, type LabelManifest, type Unlabelled } from "../../translator/train/readers";
 import { V2_ANSWER } from "../../translator/train/v2";
 import { CHOICE_ANSWER } from "../../translator/train/choices";
@@ -362,9 +363,10 @@ export function unionBasis(request: string, a: string, b: string, ctx: Parameter
     pb = calls.parseProgram(withListsQuoted(b));
   } catch { return undefined; }
   if ("none" in pa || "none" in pb || pa.lines.length !== pb.lines.length) return undefined;
-  if (sameProgram(calls.programText(pa), calls.programText(pb), ctx)) return undefined;
+  const same = (x: string, y: string) => sameProgram(x, y, ctx) || sameButForFreeText(x, y, ctx); // (free text is not compared: meaning.ts)
+  if (same(calls.programText(pa), calls.programText(pb))) return undefined;
   const without = (p: { lines: calls.Line[] }) => ({ lines: p.lines.map((l) => { const { basis: _, ...args } = l.call.args; return { ...l, call: { fn: l.call.fn, args } }; }) });
-  if (!sameProgram(calls.programText(without(pa)), calls.programText(without(pb)), ctx)) return undefined;
+  if (!same(calls.programText(without(pa)), calls.programText(without(pb)))) return undefined;
   const lines = pa.lines.map((la, i) => {
     const lb = pb.lines[i]!;
     const x = basisIds(la.call.args.basis), y = basisIds(lb.call.args.basis);

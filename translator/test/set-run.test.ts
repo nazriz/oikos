@@ -50,10 +50,10 @@ test("a model is scored on the file: right, no draft, wrong draft, in all and by
   expect(shown[0]).toBe(`Request: Pay acc-b 500 from acc-town.\n\nForms this person knows of:\n${FORM}`);
   expect(shown.length).toBe(4); // one attempt each
   expect(r.results.map((x) => x.outcome)).toEqual(["right", "wrong_draft", "no_draft", "right"]);
-  expect(r.all).toEqual({ passed: 2, of: 4, no_draft: 1, wrong_draft: 1 });
-  expect(r.by.pilot).toEqual({ "pilot-x": { passed: 1, of: 2, no_draft: 0, wrong_draft: 1 }, "pilot-y": { passed: 1, of: 2, no_draft: 1, wrong_draft: 0 } });
-  expect(r.by.seat_model).toEqual({ "claude-code/another": { passed: 1, of: 2, no_draft: 1, wrong_draft: 0 }, "codex/some-model": { passed: 1, of: 2, no_draft: 0, wrong_draft: 1 } });
-  expect(r.by.profile).toEqual({ "(not given)": { passed: 1, of: 2, no_draft: 1, wrong_draft: 0 }, "some-profile": { passed: 1, of: 2, no_draft: 0, wrong_draft: 1 } });
+  expect(r.all).toEqual({ passed: 2, text_exact: 2, of: 4, no_draft: 1, wrong_draft: 1 });
+  expect(r.by.pilot).toEqual({ "pilot-x": { passed: 1, text_exact: 1, of: 2, no_draft: 0, wrong_draft: 1 }, "pilot-y": { passed: 1, text_exact: 1, of: 2, no_draft: 1, wrong_draft: 0 } });
+  expect(r.by.seat_model).toEqual({ "claude-code/another": { passed: 1, text_exact: 1, of: 2, no_draft: 1, wrong_draft: 0 }, "codex/some-model": { passed: 1, text_exact: 1, of: 2, no_draft: 0, wrong_draft: 1 } });
+  expect(r.by.profile).toEqual({ "(not given)": { passed: 1, text_exact: 1, of: 2, no_draft: 1, wrong_draft: 0 }, "some-profile": { passed: 1, text_exact: 1, of: 2, no_draft: 0, wrong_draft: 1 } });
   expect(Object.keys(r.by.origin!)).toEqual(["the seat's own", "written in its situation"]);
   expect(Object.keys(r.by.function!)).toEqual(["form", "money", "none(not_an_act)", "none(unknown_form)"]);
   expect(r.forms_not_as_written).toBe(0);
@@ -79,7 +79,7 @@ test("a case is read in its own world's money: an amount as that world writes it
   const model = new MockAdapter("m", { translator: () => [{ type: "tool_use", id: "c", name: "call", input: { program: 'money(amount="Ƶ1500", from=acc-town, to=acc-b)' } }] });
   const r = await evaluateSet(model, [zol, { ...zol, id: "pilot-z/town.seed1/draft.clerk-system.2", currency: undefined }], { prices: { "mock/m": { input: 0, output: 0, cache_read: 0, cache_write: 0 } } });
   expect(r.results.map((x) => x.pass)).toEqual([true, false]);
-  expect(r.by.currency).toEqual({ "(not given)": { passed: 0, of: 1, no_draft: 0, wrong_draft: 1 }, ZOL: { passed: 1, of: 1, no_draft: 0, wrong_draft: 0 } });
+  expect(r.by.currency).toEqual({ "(not given)": { passed: 0, text_exact: 0, of: 1, no_draft: 0, wrong_draft: 1 }, ZOL: { passed: 1, text_exact: 1, of: 1, no_draft: 0, wrong_draft: 0 } });
   expect(r.currency_not_given).toBe(1);
   expect(setReportText(r)).toContain("1 of them name no currency");
 });

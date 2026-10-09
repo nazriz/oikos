@@ -39,7 +39,9 @@ there and whole is skipped.
    are never made by a script: the instruction says so, and a batch or a whole reader file of implausibly uniform answers
    (more than 40% the same program, under 30% different programs; and, for a whole file, over 90% refusals, or over 95%
    one function in 20 or more) is set aside and the run stops.
-6. **Label**: where the two readers' programs differ in `basis` alone, the basis becomes every record either gave, in the
+6. **Label**: two readers agree when their programs are the same act; copied free text is not compared (since 2026-10-10:
+   a letter's text and `re=`, a payment's `for=`, a statement's text, a form's text fields, a closing full stop; docs/decisions.md,
+   ruling A), and the example is one reader's own program, every word of it found in the request. Where the two readers' programs differ in `basis` alone, the basis becomes every record either gave, in the
    request's order (ids only); then `oikos in-situ-label`: what they agree on is an example (with spans), the rest is a reject
    with its reason. Agreement by function is in the manifest.
 7. **Tests.** A pilot is *test-only* if its `PILOT.txt` (the queue entry's JSON after the note) or `pilot-report.json` says
@@ -60,7 +62,8 @@ there and whole is skipped.
 11. **Score on the test sets made here**: each run on each file of step 7 (`translator-eval --model decide/NAME --only-sets
     --set FILE` does the same by hand, for a trained model or any other: `--model codex/…`, `claude-code/…`): right, no
     draft, wrong draft, in all and by pilot, seat model, profile, currency, origin and function. Each case is asked and
-    compared in the money of its own world (its line carries that world's currency, and amounts are read as that world
+    scored as the 180 real requests are, free text not compared, with `text_exact` beside `passed` (how many of the right answers
+    have the label's free text too); compared in the money of its own world (its line carries that world's currency, and amounts are read as that world
     writes them; a line that names none is read in the test town's and counted). The counts go in the manifest
     (`test_scores`), every answer in the run's `eval-sets.json`.
 

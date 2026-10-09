@@ -147,7 +147,7 @@ test("a call that fills per_request with words is the call's fault: tried again,
 test("prompt 0.9.3: a figure named with something to be taken off it is an amount to be worked out; a direction with no form is a message; what per_request is", () => {
   const { translatorSystem, TRANSLATOR_VERSION } = require("../src/index");
   const s: string = translatorSystem();
-  expect(TRANSLATOR_VERSION).toBe("0.9.3");
+  expect(TRANSLATOR_VERSION).toBe("0.9.4");
   for (const said of [
     "So is an amount given only as a figure with something to be taken off it or added to it that the request doesn't state as a figure",
     "the figure named is what the amount is worked out from, and is never written as the amount.",
@@ -170,4 +170,37 @@ test("the seen cases have the ruling both ways: told to an office it is a messag
   expect(by("own-routine-nobody-told").expect).toEqual(["none(no_such_act)"]);
   expect(by("wage-less-tax-not-stated").expect).toEqual(["none(needs_calculation)"]);
   expect(by("wage-net-stated").expect[0]).toContain('amount="$1,640"');
+});
+
+// --- the translator's instructions, 0.9.4 (the rulings of 2026-10-10 on what readers disagreed over)
+
+test("prompt 0.9.4: the rulings are there in general words, each with a worked example that is a program, and the seen cases have them both ways", () => {
+  const { translatorSystem, TRANSLATOR_VERSION } = require("../src/index");
+  const { CASES } = require("../eval/cases");
+  const s: string = translatorSystem();
+  expect(TRANSLATOR_VERSION).toBe("0.9.4");
+  for (const said of [
+    "What the payment settles, named by its record",
+    "The text ends where what they are told ends",
+    "re= is the record the request says the letter is about or answers",
+    "A single payment made now, today or at once has no first=.",
+    "Offering is one's own side signed",
+    "An amount that is so much for each of a number still to be counted",
+    "never the act alone and never too_much",
+    "Only where a form is named",
+    "sending someone unnamed to",
+    "nothing is done on a condition",
+    "Nor is telling or asking someone else to act on things described",
+    "Nor is a decision or a notice the person's own office gives where no form is listed for it",
+  ]) expect(s).toContain(said);
+  // The second line of the one worked example of two lines is a program too.
+  const second = s.split("\n").find((l) => l.includes("and on the line after it, in the same program:"))!;
+  expect(calls.contractErrors(calls.parseProgram(second.split(":  ")[1]!))).toEqual([]);
+  // Every new seen case's accepted answers are programs the contract allows, and each ruling has a case each way.
+  const added = (CASES as { id: string; expect: string[] }[]).filter((c) => c.id.startsWith("r94-"));
+  expect(added.length).toBe(17);
+  for (const c of added) for (const e of c.expect) expect(calls.contractErrors(calls.parseProgram(e))).toEqual([]);
+  const refused = added.filter((c) => c.expect[0]!.startsWith("none(")).length;
+  expect(refused).toBeGreaterThanOrEqual(5);
+  expect(added.length - refused).toBeGreaterThanOrEqual(9);
 });

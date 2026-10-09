@@ -27,6 +27,7 @@ import { calls } from "@oikos/participants";
 import { TRANSLATOR_VERSION, translatorSystem } from "@oikos/translator";
 import { formOfLine, type BlindAnswer } from "../../translator/train/blind";
 import { sameProgram, type FormSpec } from "../../translator/train/data";
+import { sameButForFreeText } from "../../translator/train/meaning";
 import { withListsQuoted, type Unlabelled } from "../../translator/train/readers";
 import { askReader, Caller, undoubled, unionBasis, type Used } from "./pipeline";
 
@@ -53,7 +54,7 @@ const ctxOf = (u: Unlabelled) => {
 /** Two answers to a request that the pipeline's label step would take as agreeing: the same by meaning, or differing in `basis` alone. */
 export const agree = (u: Unlabelled, a: string, b: string): boolean => {
   try {
-    return sameProgram(withListsQuoted(a), withListsQuoted(b), ctxOf(u)) || unionBasis(u.request, a, b, ctxOf(u)) !== undefined;
+    return sameProgram(withListsQuoted(a), withListsQuoted(b), ctxOf(u)) || sameButForFreeText(withListsQuoted(a), withListsQuoted(b), ctxOf(u)) || unionBasis(u.request, a, b, ctxOf(u)) !== undefined;
   } catch {
     return false;
   }

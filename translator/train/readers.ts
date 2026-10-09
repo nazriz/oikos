@@ -25,6 +25,7 @@ import { canonical } from "../eval/run";
 import { decode, encode } from "../model/encode";
 import { row, stepsOf } from "../model/export";
 import { formOfLine, type BlindAnswer } from "./blind";
+import { sameButForFreeText } from "./meaning";
 import { DATA_VERSION, formOf, functionOf, goldText, needed, sameProgram, shapeOf, spanOf, spansIn, type Example, type FormSpec, type Needed } from "./data";
 
 /** A request waiting for its program: what a reader is given of it (`id`, `request`, `forms`), and where it came from. */
@@ -268,11 +269,12 @@ export function labelled(requests: Unlabelled[], answers: [{ reader: string; ans
       drop(...bad);
       continue;
     }
-    // 2. They mean the same.
+    // 2. They mean the same act: copied free text is not compared (ruling A, 2026-10-10: meaning.ts), and what is kept
+    // below is still one reader's own program, every word of it found in the request.
     const forms = u.forms.map(formOfLine).filter((f): f is FormSpec => !!f);
     const ctx = { ...(u.currency ? { currency: u.currency } : {}), ...(forms.length ? { forms } : {}) };
     const compared = parsed.map((p) => calls.programText(withoutBrackets(p)));
-    if (!sameProgram(compared[0]!, compared[1]!, ctx)) {
+    if (!sameProgram(compared[0]!, compared[1]!, ctx) && !sameButForFreeText(compared[0]!, compared[1]!, ctx)) {
       drop("disagreed");
       continue;
     }

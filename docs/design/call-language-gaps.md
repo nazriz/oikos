@@ -396,6 +396,10 @@ Three requests, one pilot, one model, and a substitute that worked (writing the 
 mechanically from what the seat itself can see, so it is possible within the rules; it is not worth a change to the
 language on this evidence. Revisit if it appears in two more pilots or with another model.
 
+### B.9 A single payment on a later day (added 2026-10-10): not decided; set aside
+
+Seats ask for one payment to be made on a day to come ("On day 29, pay … once", "pay the wage due on year 1, day 22: one payment, not a standing one"). `first=` is when something done again and again starts, and the prompt (0.9.4, ruling H) gives a single payment none; a payment with no `every=` is made when it is confirmed. So such a request cannot be written as asked: written without the date it pays at once, and written with `first=` it borrows an argument whose meaning on a single payment nothing defines. Nothing was invented for it. Counted in the round's data (2026-10-10, `runs/translator-round-2-2026-10-10/`): 16 requests of 2,753 from the wave's training pilots (3 had trained with `first=` on a single payment, 13 were among the readers' disagreements). They are set aside from training and from scoring (`set-aside-single-dated-payment.jsonl` beside the joined set). What would settle it: whether the bank module keeps a single dated instruction (then `first=` alone, with no `every=`, could mean "once, on that day", and the contract would say so), or whether the asker is to come back on the day (then it is `look_first`'s neighbour and needs its own answer).
+
 ## C. Order
 
 1. **Now, with no contract change and no retraining.** The bank's letter lists the customer's standing instructions

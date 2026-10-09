@@ -15,7 +15,9 @@ test("an answer is read whole when it is a program; two answers agree by meaning
   expect(isProgram("none(not_an_act)")).toBe(true);
   expect(isProgram('message(to=clerk, text=\\"yes\\")')).toBe(false);
   expect(agree(requests[0], 'message(to=clerk, text="yes")', 'message(text="yes", to=clerk)')).toBe(true);
-  expect(agree(requests[0], 'message(to=clerk, text="yes")', 'message(to=clerk, text="no")')).toBe(false);
+  expect(agree(requests[0], 'message(to=clerk, text="yes")', 'message(to=mayor, text="yes")')).toBe(false);
+  // (Copied free text is not compared, since 2026-10-10: translator/test/free-text.test.ts.)
+  expect(agree(requests[0], 'message(to=clerk, text="yes")', 'message(to=clerk, text="yes, by Friday")')).toBe(true);
 });
 
 test("each reader's count of answers read whole, repaired, agreeing with the settled labels and with each other, and its cost and time a request", () => {

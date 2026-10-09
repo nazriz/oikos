@@ -275,9 +275,13 @@ test("writers' files taken in, made blind, and labelled by two readers: the comm
     expect(decode(enc.input, enc.steps).replace(/="([a-z0-9][a-z0-9._\/-]*)"/g, "=$1")).toBe(e.program.replace(/="([a-z0-9][a-z0-9._\/-]*)"/g, "=$1"));
   }
   expect(JSON.parse(readFileSync(join(done, "manifest.json"), "utf8"))).toMatchObject({ examples: 4, rejected: 1, by_reason: { unanswered: 1 }, readers: ["reader a", "reader b"], by_function: { form: 1, message: 1, money: 1, "none(not_an_act)": 1 }, by_refusal_label: { not_an_act: 1 }, office_left_out: 1 });
-  // A reader who rewords the letter: dropped, with why. And two readers are needed.
+  // A reader who rewords the letter is no disagreement (free text is not compared, since 2026-10-10), and the label is the
+  // other reader's, who copied it; where both reword it, it is dropped, with why. And two readers are needed.
   writeFileSync(b, JSON.stringify(answers("Please sweep lot three")));
-  expect(label(unlabelled, [{ file: a, reader: "a" }, { file: b, reader: "b" }], done).by_reason).toMatchObject({ disagreed: 1 });
+  expect(label(unlabelled, [{ file: a, reader: "a" }, { file: b, reader: "b" }], done)).toMatchObject({ examples: 4, by_reason: { disagreed: 0 }, kept_from: { a: 4, b: 0 } });
+  writeFileSync(a, answers("Kindly sweep the third lot").map((x) => JSON.stringify(x)).join("\n") + "\n");
+  expect(label(unlabelled, [{ file: a, reader: "a" }, { file: b, reader: "b" }], done)).toMatchObject({ examples: 3, by_reason: { disagreed: 0, reworded_text: 1 } });
+  writeFileSync(a, answers("sweep lot-3").map((x) => JSON.stringify(x)).join("\n") + "\n");
   writeFileSync(a, JSON.stringify(answers("Please sweep lot three")));
   expect(label(unlabelled, [{ file: a, reader: "a" }, { file: b, reader: "b" }], done)).toMatchObject({ examples: 3, by_reason: { reworded_text: 1 } });
   expect(rows(join(done, "rejects.jsonl")).filter((x) => x.why !== "unanswered")).toMatchObject([{ id: letter, why: "reworded_text", answers: { a: 'message(to=warden, text="Please sweep lot three")' } }]);

@@ -327,7 +327,7 @@ test("after training, each run is scored on the test sets made here, by pilot, s
   expect(s.forms_not_as_written).toBe(0);
   // Right, no draft and wrong draft add up; the request to be shown something was drafted, which is a wrong draft.
   expect(s.all.passed + s.all.no_draft + s.all.wrong_draft).toBe(s.all.of);
-  expect(s.by.function!["none(not_an_act)"]).toEqual({ passed: 0, of: 1, no_draft: 0, wrong_draft: 1 });
+  expect(s.by.function!["none(not_an_act)"]).toEqual({ passed: 0, text_exact: 0, of: 1, no_draft: 0, wrong_draft: 1 });
   expect(s.all.passed).toBe(s.all.of - 1);
   // The held-back third of the training pilot's real requests is a set too, of that pilot (whose folder names no profile).
   const held = scores[Object.keys(scores).find((n) => n.startsWith("held back"))!]!;

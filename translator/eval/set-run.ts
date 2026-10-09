@@ -20,6 +20,7 @@ import { PRICES, type Budget, type LlmAdapter, type LlmIO, type Price } from "@o
 import { createTranslator, formShown, Knowledge, LABEL_TEXT, resolve } from "../src/index";
 import { formOfLine } from "../train/blind";
 import { sameProgram, type FormSpec } from "../train/data";
+import { sameButForFreeText } from "../train/meaning";
 import PROFILE from "../../worlds/profiles/au-vic-2026.json";
 
 /** A line of a test-set file: an example as the pipeline's label step writes it, with what the pipeline adds for its
@@ -91,13 +92,21 @@ const parsed = (program: string): calls.Program | undefined => {
  * answers with that refusal's own words (the same thing for whoever asked). */
 export function passesSet(c: SetCase, got: string): boolean {
   const forms = formsOf(c);
-  if (sameProgram(got, c.program, { currency: currencyOf(c), ...(forms.length ? { forms } : {}) })) return true;
+  const ctx = { currency: currencyOf(c), ...(forms.length ? { forms } : {}) };
+  if (sameProgram(got, c.program, ctx) || sameButForFreeText(got, c.program, ctx)) return true;
   const want = parsed(c.program), g = parsed(got);
   return !!want && "none" in want && !!g && !("none" in g) && refusalOf(got, c) === want.none;
 }
 
-export interface Tally { passed: number; of: number; no_draft: number; wrong_draft: number }
-export interface SetResult { id: string; pass: boolean; outcome: "right" | "no_draft" | "wrong_draft"; got?: string; expect: string; error?: string; raw?: string }
+/** Whether an answer is the label word for word in its free text too (the comparison before 2026-10-10): reported beside
+ * `passed` so that exactness of copied text stays in sight now that passing does not ask for it. */
+export function textExact(c: SetCase, got: string): boolean {
+  const forms = formsOf(c);
+  return sameProgram(got, c.program, { currency: currencyOf(c), ...(forms.length ? { forms } : {}) });
+}
+
+export interface Tally { passed: number; of: number; no_draft: number; wrong_draft: number; /** Of those passed, the answers whose free text is the label's too. */ text_exact: number }
+export interface SetResult { id: string; pass: boolean; text_exact?: boolean; outcome: "right" | "no_draft" | "wrong_draft"; got?: string; expect: string; error?: string; raw?: string }
 export interface SetReport {
   model: string;
   /** What the set is called, and the file it is. */
@@ -131,7 +140,7 @@ export function dimensionsOf(c: SetCase): { [dimension: string]: string | undefi
   };
 }
 
-const tally = (rs: SetResult[]): Tally => ({ passed: rs.filter((r) => r.pass).length, of: rs.length, no_draft: rs.filter((r) => r.outcome === "no_draft").length, wrong_draft: rs.filter((r) => r.outcome === "wrong_draft").length });
+const tally = (rs: SetResult[]): Tally => ({ text_exact: rs.filter((r) => r.pass && r.text_exact).length, passed: rs.filter((r) => r.pass).length, of: rs.length, no_draft: rs.filter((r) => r.outcome === "no_draft").length, wrong_draft: rs.filter((r) => r.outcome === "wrong_draft").length });
 
 /** Run the cases through the translator on `adapter`, `jobs` at a time. */
 export async function evaluateSet(adapter: LlmAdapter, cases: SetCase[], o: { name?: string; file?: string; prices?: Record<string, Price>; budget?: Budget; jobs?: number; log?: (line: string) => void } = {}): Promise<SetReport> {
@@ -154,7 +163,7 @@ export async function evaluateSet(adapter: LlmAdapter, cases: SetCase[], o: { na
       const pass = got !== undefined && passesSet(c, got);
       const p = got !== undefined ? parsed(got) : undefined;
       const raw = got === undefined ? JSON.stringify((r as any).raw ?? (r as any).notices).slice(0, 500) : undefined;
-      return { ...base, pass, outcome: pass ? "right" : p && !("none" in p) ? "wrong_draft" : "no_draft", ...(got !== undefined ? { got } : {}), ...(raw ? { raw } : {}) };
+      return { ...base, pass, ...(pass ? { text_exact: textExact(c, got!) } : {}), outcome: pass ? "right" : p && !("none" in p) ? "wrong_draft" : "no_draft", ...(got !== undefined ? { got } : {}), ...(raw ? { raw } : {}) };
     } catch (e) {
       if ((e as Error).constructor?.name === "SpendingLimitReached") stop = true; // out of budget: report what ran
       return { ...base, pass: false, outcome: "no_draft", error: String((e as Error).message).slice(0, 300) };

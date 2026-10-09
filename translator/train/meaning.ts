@@ -21,6 +21,13 @@
 //   a hold      `statement(kind=hold, hold=x)` is `statement(hold=x)`
 //   names       what a line calls the thing it makes is the writer's choice; one that nothing uses is no part of it
 //
+// With `freeText: false` (0.9.4's ruling A, 2026-10-10: `sameButForFreeText`), what is copied free text is left out of
+// the comparison, as the scorer of the real requests has always left it (translator/eval/pilot-run.ts): three good
+// readers give three extents of the same letter, and none is wrong. Then a letter's text and its re= (there or not), a
+// statement's text, an agreement's text and terms, a payment's for= (there or not) and a form's fields of type text
+// are not compared; no copied text is compared in its closing full stop; and an empty list is the field left out.
+// Functions, lines, ids, amounts, durations, counts, lists and labels are compared as ever.
+//
 // This file depends on the call language and the resolver's label rule only, so the translator's test set can use it
 // too (translator/eval/run.ts compares in canonical form today).
 
@@ -31,7 +38,15 @@ import { asLabel } from "../src/resolver";
 export interface MeaningContext {
   currency?: Currency;
   forms?: { form: string; to: string; id?: string; fields: { [name: string]: { type: string } } }[];
+  /** `false`: copied free text is not compared (see the top of this file). Absent: everything is. */
+  freeText?: boolean;
 }
+
+/** Free text by function: not compared when `freeText` is false. */
+const FREE_TEXT: { [fn: string]: string[] } = { message: ["text"], statement: ["text"], agreement: ["text", "terms"] };
+/** Arguments that are free text and may be there or not, by function: left out when `freeText` is false. */
+const FREE_OPTIONAL: { [fn: string]: string[] } = { money: ["for"], message: ["re"] };
+const ANY_TEXT = "\u2026";
 
 const AMOUNT_ARGS = new Set(["amount", "price", "carrying"]);
 const DURATION_ARGS = new Set(["every", "term", "our_notice", "their_notice", "first", "age"]);
@@ -117,14 +132,21 @@ function call(c: calls.Call, ctx: MeaningContext, names: Map<string, string>): {
     }
   }
   const out: { [k: string]: Norm } = {};
+  const loose = ctx.freeText === false;
   for (const [key, v] of Object.entries(c.args)) {
     const kind = kindOf(c.fn, key, fields);
     let n: Norm | undefined;
+    if (loose && FREE_OPTIONAL[c.fn]?.includes(key)) continue;
+    if (loose && (FREE_TEXT[c.fn]?.includes(key) || (c.fn === "form" && fields?.[key]?.type === "text"))) {
+      out[key] = ANY_TEXT;
+      continue;
+    }
+    if (loose && "json" in v && Array.isArray(v.json) && v.json.length === 0) continue;
     if (c.fn === "form" && key === "form" && form !== undefined) n = form;
     else if ("call" in v) n = call(v.call, ctx, names);
     else if ("var" in v) n = { made: names.get(v.var) ?? v.var };
     else if ("id" in v) n = names.has(v.id) ? { made: names.get(v.id)! } : scalar(kind, v.id, ctx);
-    else if ("text" in v) n = scalar(kind, v.text, ctx);
+    else if ("text" in v) n = scalar(kind, loose && kind === undefined ? v.text.replace(/[.\s]+$/, "") : v.text, ctx);
     else if (Array.isArray(v.json) && v.json.every((x) => typeof x === "string")) {
       // A list of names or ids: a set; one of them alone is that one.
       const xs = [...new Set((v.json as string[]).map((x) => scalar(kind, x, ctx)).filter((x): x is Norm => x !== undefined).map((x) => JSON.stringify(x)))].sort().map((x) => JSON.parse(x) as Norm);
@@ -188,4 +210,9 @@ export function meaningOf(program: string | calls.Program, ctx: MeaningContext =
 export function sameMeaning(a: string, b: string, ctx: MeaningContext = {}): boolean {
   const x = meaningOf(a, ctx), y = meaningOf(b, ctx);
   return x === undefined || y === undefined ? a.trim() === b.trim() : x === y;
+}
+
+/** Whether two programs are the same act once copied free text is left out of the comparison (see the top of this file). */
+export function sameButForFreeText(a: string, b: string, ctx: MeaningContext = {}): boolean {
+  return sameMeaning(a, b, ctx) || sameMeaning(a, b, { ...ctx, freeText: false });
 }
