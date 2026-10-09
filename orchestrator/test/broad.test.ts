@@ -336,3 +336,13 @@ test("citizens' decisions and a seat's replies are planned from a pilot's log, w
   await runBroad(config(), [cdir], h);
   expect(reads).toBe(before);
 });
+
+test("a writer changed part way: what the first model wrote is kept as its own, and each request says who wrote it", async () => {
+  const c: Counts = { writes: {}, reads: {}, turns: 0 };
+  const r = await runBroad(config({ writers: { w1: "mock/writer-b", w2: "mock/writer-b" }, keepWritten: true }), [part], hooks(c, { wrong }), { only: "write" });
+  expect(c.writes).toEqual({});
+  expect(Object.keys(r.parts[0]!.written).sort()).toEqual(["mock/writer-a", "mock/writer-b"]);
+  expect(existsSync(join(part, "requests-w1--mock-writer-a.jsonl"))).toBe(true);
+  const by = new Set(jsonl<Example>(join(part, "examples.jsonl")).map((e) => e.written_by));
+  expect(by.has("mock/writer-a")).toBe(true);
+});

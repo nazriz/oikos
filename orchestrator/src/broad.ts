@@ -76,6 +76,10 @@ export interface BroadConfig {
    * the writers' own, and each brief without its way of saying the act and without a style. For writers that really
    * are simple ones (a small model, a model at low effort), so that what they hand in is their own voice. */
   plain?: string[];
+  /** A writer's model was changed while a part was being written: a batch another model already wrote for the same
+   * briefs is kept as that model's (each request says who wrote it), and only what is not yet written goes to the
+   * model now named. Without it such a batch is stale and is written again. */
+  keepWritten?: boolean;
 }
 
 export function checkBroadConfig(c: BroadConfig): BroadConfig {
@@ -192,16 +196,18 @@ interface Unit<T> { fp: string; model: string; ids: string[]; answers: T[]; miss
  * A writer's briefs written, a batch at a call: `dir/written/<name>/NNNN.json` each. Returns every `{id, request}` it
  * has. A brief the call left unanswered is asked for once more, by itself with the others so left.
  */
-async function writeBriefs(caller: Caller, cfg: BroadConfig, dir: string, name: string, model: string, briefs: Brief[], o: { system: string; task: string; subject: string; say: (s: string) => void; part: string }): Promise<{ id: string; request: string }[]> {
+async function writeBriefs(caller: Caller, cfg: BroadConfig, dir: string, name: string, model: string, briefs: Brief[], o: { system: string; task: string; subject: string; say: (s: string) => void; part: string }): Promise<{ id: string; request: string; model: string }[]> {
   const cut = batches(briefs, cfg.writeBatch ?? 16, cfg.writeBatchChars ?? 60_000, (b) => b.brief.length);
-  const out: { id: string; request: string }[][] = new Array(cut.length);
+  const out: { id: string; request: string; model: string }[][] = new Array(cut.length);
   let done = 0;
   await pool(cut, cfg.jobs ?? 4, async (batch, k) => {
     const file = join(dir, "written", safe(name), `${pad(k)}.json`);
     const user = (bs: Brief[]) => `${o.task}\n\n=== BRIEFS ===\n${bs.map((b) => JSON.stringify(b)).join("\n")}\n`;
     const mark = fp(model, o.system, user(batch));
     const had = read<Unit<{ id: string; request: string }>>(file);
-    if (had?.fp === mark) return void (out[k] = had.answers);
+    if (had?.fp === mark) return void (out[k] = had.answers.map((a) => ({ ...a, model })));
+    // (Written by another model before the writer was changed: kept as that model's.)
+    if (had && cfg.keepWritten && had.model !== model && had.ids.join() === batch.map((b) => b.id).join()) return void (out[k] = had.answers.map((a) => ({ ...a, model: had.model })));
     if (had) setAside(file, "stale");
     const ids = new Set(batch.map((b) => b.id));
     const take = (text: string, into: Map<string, string>) => { for (const a of objectsIn(text)) if (typeof a.id === "string" && ids.has(a.id) && typeof a.request === "string" && a.request.trim() && !into.has(a.id)) into.set(a.id, a.request); };
@@ -219,7 +225,7 @@ async function writeBriefs(caller: Caller, cfg: BroadConfig, dir: string, name: 
     }
     const answers = batch.filter((b) => got.has(b.id)).map((b) => ({ id: b.id, request: got.get(b.id)! }));
     putJson(file, { fp: mark, model, ids: batch.map((b) => b.id), answers, missing: batch.filter((b) => !got.has(b.id)).map((b) => b.id), used, ms } satisfies Unit<{ id: string; request: string }>);
-    out[k] = answers;
+    out[k] = answers.map((a) => ({ ...a, model }));
     if (++done % 5 === 0 || done === cut.length) o.say(`${o.part}: ${name} (${model}) ${done} of ${cut.length} batches written this sitting`);
   });
   return out.flat();
@@ -263,10 +269,14 @@ export async function runPart(cfg: BroadConfig, dir: string, caller: Caller, say
     const briefs = jsonl<Brief & { spare?: boolean }>(join(dir, `briefs-${safe(name)}.jsonl`)).map(({ id, kind, brief }) => ({ id, kind, brief: plain ? plainBrief(brief) : brief }));
     briefsN += briefs.length;
     const answers = await writeBriefs(caller, cfg, dir, name, model, briefs, { system: plain ? PLAIN_SYSTEM : system, task: plain ? PLAIN_CALL : WRITER_CALL, subject: "translator-data-batch/writer", say, part });
-    const file = join(dir, `requests-${safe(name)}.jsonl`);
-    put(file, lines(answers));
-    files.push({ file, writer: model });
-    written[model] = (written[model] ?? 0) + answers.length;
+    // (A file for each model that wrote under this name: one, unless the writer was changed part way.)
+    for (const m of [...new Set(answers.map((a) => a.model))]) {
+      const own = answers.filter((a) => a.model === m).map(({ id, request }) => ({ id, request }));
+      const file = join(dir, m === model ? `requests-${safe(name)}.jsonl` : `requests-${safe(name)}--${safe(m)}.jsonl`);
+      put(file, lines(own));
+      files.push({ file, writer: m });
+      written[m] = (written[m] ?? 0) + own.length;
+    }
   }
   // ---- take in
   const taken = await writtenData(dir, files);
@@ -506,8 +516,7 @@ export async function runV2(cfg: BroadConfig, dir: string, caller: Caller, say: 
     const plain = !!cfg.plain?.includes(name);
     const briefs = plan.items.filter((t) => t.writer === name).map((t) => ({ id: t.id, brief: plain ? plainBrief(t.brief) : t.brief }));
     const answers = await writeBriefs(caller, cfg, dir, name, model, briefs, { system: plain ? PLAIN_SYSTEM_V2 : system, task: V2_WRITER_CALL, subject: "translator-v2-data/writer", say, part });
-    for (const a of answers) if (!texts.has(a.id)) texts.set(a.id, { text: a.request.trim(), by: model });
-    written[model] = (written[model] ?? 0) + answers.length;
+    for (const a of answers) { if (!texts.has(a.id)) texts.set(a.id, { text: a.request.trim(), by: a.model }); written[a.model] = (written[a.model] ?? 0) + 1; }
   }
   // ---- take in: what a turn must carry, said once only
   const heldOut = o.heldOut === false ? undefined : (o.heldOut as ReturnType<typeof loadHeldOut>) ?? loadHeldOut();
@@ -685,8 +694,7 @@ export async function runChoices(cfg: BroadConfig, dir: string, caller: Caller, 
     const plain = !!cfg.plain?.includes(name);
     const briefs = plan.items.filter((t) => t.writer === name).map((t) => ({ id: t.id, brief: plain ? plainBrief(t.brief) : t.brief }));
     const answers = await writeBriefs(caller, cfg, dir, name, model, briefs, { system: choiceWriterSystem(), task: CHOICE_WRITER_CALL, subject: "translator-choices-data/writer", say, part });
-    for (const a of answers) if (!texts.has(a.id)) texts.set(a.id, { text: a.request.trim(), by: model });
-    written[model] = (written[model] ?? 0) + answers.length;
+    for (const a of answers) { if (!texts.has(a.id)) texts.set(a.id, { text: a.request.trim(), by: a.model }); written[a.model] = (written[a.model] ?? 0) + 1; }
   }
   const heldOut = o.heldOut === false ? undefined : (o.heldOut as ReturnType<typeof loadHeldOut>) ?? loadHeldOut();
   const shares = heldOut?.length ? sharesWording(heldOut) : () => false;
@@ -734,7 +742,9 @@ export async function runChoices(cfg: BroadConfig, dir: string, caller: Caller, 
   const by: PartReport["agreement"] = { kind: {}, label: {}, style: {}, writer: {}, reader: {} };
   const count = (kind: string, key: string, what: "agreed" | "disagreed" | "unanswered") => void ((by[kind]![key] ??= { agreed: 0, disagreed: 0, unanswered: 0 })[what]++);
   for (const e of examples) {
-    const answer = got.get(e.id);
+    // (A reader may hand a value back as it was given it, the key with its few words: the key is what it picked.)
+    const raw = got.get(e.id);
+    const answer = raw === undefined ? undefined : e.options.find((x) => raw === x.key || raw.startsWith(`${x.key}: `))?.key ?? raw;
     const what = answer === undefined ? "unanswered" : answer === e.label ? "agreed" : "disagreed";
     count("kind", e.kind === "citizen" ? `citizen ${e.from.domain}` : `reply ${e.label}`, what); count("label", e.kind === "citizen" ? (["stay", "not", "none"].includes(e.label) ? `citizen: ${e.label}` : "citizen: an option chosen") : e.label, what); count("style", e.style, what); count("writer", e.written_by, what); count("reader", readerOf(e), what);
     if (what === "agreed") checked.push({ ...e, verified_by: readerOf(e) });
