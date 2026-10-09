@@ -18,7 +18,7 @@
    "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
    "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
   },
-  "note": "Wave 2b (plan of 2026-10-09, third version), for the translator's data. Profile us-oh-2026; a town of its own, generated from seed 142; 1,000 people; 90 days; the works crew still to be taken on. Seats: mayor, works, finance, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt). Every draft is confirmed or declined by its seat. The mayor, the works manager and the treasury for a quarter, the crew still to be taken on: the budget's staff line, advertisements, offers, a round set going."
+  "note": "Wave 2b (plan of 2026-10-09, after the shake-down), for the translator's data. Profile us-oh-2026; a town of its own, generated from seed 142; 1,000 people; 90 days; the works crew still to be taken on. Seats: mayor, works, finance, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt). Every draft is confirmed or declined by its seat. The mayor, the works manager and the treasury for a quarter, the crew still to be taken on: the budget's staff line, advertisements, offers, a round set going."
  },
  {
   "name": "w2-45-lean",
@@ -42,7 +42,7 @@
    "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
    "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
   },
-  "note": "Wave 2b (plan of 2026-10-09, third version), for the translator's data. Profile de-ni-2026; a town of its own, generated from seed 145; 1,000 people; 90 days; starting conditions lean-council. Seats: mayor, finance, planning, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt); this pilot may have our own retrained translator instead, if its scores allow when the stage starts. Every draft is confirmed or declined by its seat. A town with almost nothing in the bank and a code-run works office: holds on standing payments, and directions on whether to recruit."
+  "note": "Wave 2b (plan of 2026-10-09, after the shake-down), for the translator's data. Profile de-ni-2026; a town of its own, generated from seed 145; 1,000 people; 90 days; starting conditions lean-council. Seats: mayor, finance, planning, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt); this pilot may have our own retrained translator instead, if its scores allow when the stage starts. Every draft is confirmed or declined by its seat. A town with almost nothing in the bank and a code-run works office: holds on standing payments, and directions on whether to recruit."
  },
  {
   "name": "w2-48-election",
@@ -55,7 +55,7 @@
   ],
   "args": [
    "--scenario",
-   "election-due"
+   "election-due+dear-rents"
   ],
   "model": "claude-code/claude-sonnet-5-5",
   "translator": "claude-code/claude-sonnet-5-5",
@@ -66,7 +66,7 @@
    "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
    "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
   },
-  "note": "Wave 2b (plan of 2026-10-09, third version), for the translator's data. Profile us-oh-2026; a town of its own, generated from seed 148; 1,000 people; 75 days; starting conditions election-due. Seats: mayor, editor, councillor-1, councillor-2, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt). Every draft is confirmed or declined by its seat. An election with a model mayor standing, the commission and the clerk both run by code (it does not wait on the clerk's fault): the nomination by day 30, the poll and the count on day 60, the winner seated the day after."
+  "note": "Wave 2b (plan of 2026-10-09, after the shake-down), for the translator's data. Profile us-oh-2026; a town of its own, generated from seed 148; 1,000 people; 75 days; starting conditions election-due+dear-rents. Seats: mayor, editor, councillor-1, councillor-2, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt). Every draft is confirmed or declined by its seat. An election with a model mayor standing, the commission and the clerk both run by code (it does not wait on the clerk's fault): the nomination by day 30, the poll and the count on day 60, the winner seated the day after."
  },
  {
   "name": "w2-03-election",
@@ -79,7 +79,7 @@
   ],
   "args": [
    "--scenario",
-   "election-due"
+   "election-due+lean-council"
   ],
   "model": "claude-code/claude-sonnet-5-5",
   "translator": "claude-code/claude-sonnet-5-5",
@@ -90,7 +90,54 @@
    "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
    "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
   },
-  "note": "Wave 2b (plan of 2026-10-09, third version), for the translator's data. Profile de-ni-2026; a town of its own, generated from seed 103; 1,000 people; 75 days; starting conditions election-due. Seats: mayor, editor, council-clerk, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt). Every draft is confirmed or declined by its seat. A MODEL CLERK: stop it if no result is declared within three weeks of a ballot opening (plan.md, the stopping rules). An election due on day 60, run by the code electoral commission, in a place that writes a decimal comma: a nomination, the paper's items, and a clerk who seats whoever is declared elected."
+  "note": "Wave 2b (plan of 2026-10-09, after the shake-down), for the translator's data. Profile de-ni-2026; a town of its own, generated from seed 103; 1,000 people; 75 days; starting conditions election-due+lean-council. Seats: mayor, editor, council-clerk, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt). Every draft is confirmed or declined by its seat. A MODEL CLERK: stop it if no result is declared within three weeks of a ballot opening (plan.md, the stopping rules). An election due on day 60, run by the code electoral commission, in a place that writes a decimal comma: a nomination, the paper's items, and a clerk who seats whoever is declared elected."
+ },
+ {
+  "name": "w2-55-council",
+  "world": "worlds/town-1000.yaml",
+  "sets": [
+   "seed=155",
+   "profile=gb-eng-2026",
+   "mayor=llm",
+   "model_seats=council-clerk,councillor-1,councillor-2,councillor-3,councillor-4,councillor-5"
+  ],
+  "args": [
+   "--scenario",
+   "dear-rents+lean-council"
+  ],
+  "model": "claude-code/claude-sonnet-5-5",
+  "translator": "claude-code/claude-sonnet-5-5",
+  "translator_choice": "sonnet",
+  "until": 5184000,
+  "budget": 15,
+  "env": {
+   "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
+   "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
+  },
+  "note": "Wave 2b (plan of 2026-10-09, after the shake-down), for the translator's data. Profile gb-eng-2026; a town of its own, generated from seed 155; 1,000 people; 60 days; starting conditions dear-rents+lean-council. Seats: mayor, council-clerk, councillor-1, councillor-2, councillor-3, councillor-4, councillor-5, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt). Every draft is confirmed or declined by its seat. A MODEL CLERK: stop it if no result is declared within three weeks of a ballot opening (plan.md, the stopping rules). A council of models with something before it: rents that are dear (a petition of dozens of signatures) and almost nothing in the bank (a budget it cannot meet). A mayor who may propose, councillors now shown the charter, the standing orders and the proposal form, and a clerk who puts the ballot and declares the result: the first ballot a clerk seat can count."
+ },
+ {
+  "name": "w2-56-council-votes",
+  "world": "worlds/town-1000.yaml",
+  "sets": [
+   "seed=156",
+   "profile=us-oh-2026",
+   "model_seats=councillor-1,councillor-2,councillor-3,councillor-4,councillor-5"
+  ],
+  "args": [
+   "--scenario",
+   "dear-rents"
+  ],
+  "model": "claude-code/claude-sonnet-5-5",
+  "translator": "decide/pod-small-d16-s1",
+  "translator_choice": "trained",
+  "until": 3888000,
+  "budget": 10,
+  "env": {
+   "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
+   "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
+  },
+  "note": "Wave 2b (plan of 2026-10-09, after the shake-down), for the translator's data. Profile us-oh-2026; a town of its own, generated from seed 156; 1,000 people; 45 days; starting conditions dear-rents. Seats: councillor-1, councillor-2, councillor-3, councillor-4, councillor-5, all on claude-code/claude-sonnet-5-5. Translator: decide/pod-small-d16-s1 (the trained one: it was taught no hold, entry on one's own file, look_first, office's own form, direction or standing work). Every draft is confirmed or declined by its seat. Five councillors under a code mayor and a code clerk where rents are dear, with our own trained translator: whether a councillor shown the proposal form proposes, and what the trained model makes of a vote and of a proposal. It costs about a dollar; its failures are the data."
  },
  {
   "name": "w2-06-justice",
@@ -109,7 +156,7 @@
    "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
    "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
   },
-  "note": "Wave 2b (plan of 2026-10-09, third version), for the translator's data. Profile de-ni-2026; a town of its own, generated from seed 106; 1,000 people; 180 days. Seats: tribunal-member, tribunal-registrar, registry, land-registrar, child-protection, inspector, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt); this pilot may have our own retrained translator instead, if its scores allow when the stage starts. Every draft is confirmed or declined by its seat. Offices that decide and record: the tribunal, the two registers, child protection, the inspector. Half a year, for the registers' sake."
+  "note": "Wave 2b (plan of 2026-10-09, after the shake-down), for the translator's data. Profile de-ni-2026; a town of its own, generated from seed 106; 1,000 people; 180 days. Seats: tribunal-member, tribunal-registrar, registry, land-registrar, child-protection, inspector, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt); this pilot may have our own retrained translator instead, if its scores allow when the stage starts. Every draft is confirmed or declined by its seat. Offices that decide and record: the tribunal, the two registers, child protection, the inspector. Half a year, for the registers' sake."
  },
  {
   "name": "w2-08-heat",
@@ -133,7 +180,7 @@
    "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
    "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
   },
-  "note": "Wave 2b (plan of 2026-10-09, third version), for the translator's data. Profile jp-akita-2026; a town of its own, generated from seed 108; 1,000 people; 180 days; starting conditions hot-summer. Seats: mayor, registry, editor, child-protection, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt); this pilot may have our own retrained translator instead, if its scores allow when the stage starts. Every draft is confirmed or declined by its seat. A hot summer in the oldest town: what the mayor, the registrar and the paper ask for when the bureau warns."
+  "note": "Wave 2b (plan of 2026-10-09, after the shake-down), for the translator's data. Profile jp-akita-2026; a town of its own, generated from seed 108; 1,000 people; 180 days; starting conditions hot-summer. Seats: mayor, registry, editor, child-protection, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt); this pilot may have our own retrained translator instead, if its scores allow when the stage starts. Every draft is confirmed or declined by its seat. A hot summer in the oldest town: what the mayor, the registrar and the paper ask for when the bureau warns."
  },
  {
   "name": "w2-05-landlords",
@@ -156,7 +203,7 @@
    "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
    "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
   },
-  "note": "Wave 2b (plan of 2026-10-09, third version), for the translator's data. Profile us-oh-2026; a town of its own, generated from seed 105; 1,000 people; 120 days; starting conditions dear-rents. Seats: landlord-1-office, landlord-2-office, landlord-3-office, bank-lending, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt); this pilot may have our own retrained translator instead, if its scores allow when the stage starts. Every draft is confirmed or declined by its seat. Three letting offices and the lender where rents are dear: listings, leases, increases, loans."
+  "note": "Wave 2b (plan of 2026-10-09, after the shake-down), for the translator's data. Profile us-oh-2026; a town of its own, generated from seed 105; 1,000 people; 120 days; starting conditions dear-rents. Seats: landlord-1-office, landlord-2-office, landlord-3-office, bank-lending, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt); this pilot may have our own retrained translator instead, if its scores allow when the stage starts. Every draft is confirmed or declined by its seat. Three letting offices and the lender where rents are dear: listings, leases, increases, loans."
  },
  {
   "name": "w2-28-housing",
@@ -179,7 +226,7 @@
    "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
    "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
   },
-  "note": "Wave 2b (plan of 2026-10-09, third version), for the translator's data. Profile de-ni-2026; a town of its own, generated from seed 128; 1,000 people; 120 days; starting conditions housing-shortage. Seats: landlord-1-office, landlord-2-office, tribunal-member, tribunal-registrar, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt); this pilot may have our own retrained translator instead, if its scores allow when the stage starts. Every draft is confirmed or declined by its seat. Landlords and the tribunal where amounts are written with a comma: leases, notices, orders."
+  "note": "Wave 2b (plan of 2026-10-09, after the shake-down), for the translator's data. Profile de-ni-2026; a town of its own, generated from seed 128; 1,000 people; 120 days; starting conditions housing-shortage. Seats: landlord-1-office, landlord-2-office, tribunal-member, tribunal-registrar, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt); this pilot may have our own retrained translator instead, if its scores allow when the stage starts. Every draft is confirmed or declined by its seat. Landlords and the tribunal where amounts are written with a comma: leases, notices, orders."
  },
  {
   "name": "w2-21-lending",
@@ -202,7 +249,7 @@
    "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
    "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
   },
-  "note": "Wave 2b (plan of 2026-10-09, third version), for the translator's data. Profile jp-akita-2026; a town of its own, generated from seed 121; 1,000 people; 120 days; starting conditions jobs-slump. Seats: bank-lending, finance, landlord-1-office, landlord-2-office, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt); this pilot may have our own retrained translator instead, if its scores allow when the stage starts. Every draft is confirmed or declined by its seat. The lender, the treasury and two landlords in whole units of money: loans, payments, leases."
+  "note": "Wave 2b (plan of 2026-10-09, after the shake-down), for the translator's data. Profile jp-akita-2026; a town of its own, generated from seed 121; 1,000 people; 120 days; starting conditions jobs-slump. Seats: bank-lending, finance, landlord-1-office, landlord-2-office, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt); this pilot may have our own retrained translator instead, if its scores allow when the stage starts. Every draft is confirmed or declined by its seat. The lender, the treasury and two landlords in whole units of money: loans, payments, leases."
  },
  {
   "name": "w2-43-care",
@@ -221,7 +268,26 @@
    "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
    "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
   },
-  "note": "Wave 2b (plan of 2026-10-09, third version), for the translator's data. Profile gb-eng-2026; a town of its own, generated from seed 143; 1,000 people; 45 days. Seats: clinic-manager, principal, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt). Every draft is confirmed or declined by its seat. A PROBE: stop it by its own rule (plan.md, the stopping rules). A probe: the clinic and the school, each a routine set once for its staff and then managed by exception."
+  "note": "Wave 2b (plan of 2026-10-09, after the shake-down), for the translator's data. Profile gb-eng-2026; a town of its own, generated from seed 143; 1,000 people; 45 days. Seats: clinic-manager, principal, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt). Every draft is confirmed or declined by its seat. A PROBE: stop it by its own rule (plan.md, the stopping rules). A probe: the clinic and the school, each a routine set once for its staff and then managed by exception."
+ },
+ {
+  "name": "w2-57-utilities",
+  "world": "worlds/town-1000.yaml",
+  "sets": [
+   "seed=157",
+   "profile=de-ni-2026",
+   "model_seats=water-operations,energy-operations,rates"
+  ],
+  "model": "claude-code/claude-sonnet-5-5",
+  "translator": "claude-code/claude-sonnet-5-5",
+  "translator_choice": "sonnet",
+  "until": 5184000,
+  "budget": 10,
+  "env": {
+   "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
+   "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
+  },
+  "note": "Wave 2b (plan of 2026-10-09, after the shake-down), for the translator's data. Profile de-ni-2026; a town of its own, generated from seed 157; 1,000 people; 60 days. Seats: water-operations, energy-operations, rates, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt). Every draft is confirmed or declined by its seat. A PROBE: stop it by its own rule (plan.md, the stopping rules). The two utilities and the rates office again, now that the energy office has an order form and the water round bills, where amounts are written with a comma: orders from outside, supply, billing, the levy."
  },
  {
   "name": "w2-11-heat",
@@ -245,7 +311,7 @@
    "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
    "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
   },
-  "note": "Wave 2b (plan of 2026-10-09, third version), for the translator's data. Profile de-ni-2026; a town of its own, generated from seed 111; 1,000 people; 90 days; starting conditions hot-summer. Seats: mayor, finance, inspector, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt); this pilot may have our own retrained translator instead, if its scores allow when the stage starts. Every draft is confirmed or declined by its seat. A hot summer where amounts are written with a comma."
+  "note": "Wave 2b (plan of 2026-10-09, after the shake-down), for the translator's data. Profile de-ni-2026; a town of its own, generated from seed 111; 1,000 people; 90 days; starting conditions hot-summer. Seats: mayor, finance, inspector, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt); this pilot may have our own retrained translator instead, if its scores allow when the stage starts. Every draft is confirmed or declined by its seat. A hot summer where amounts are written with a comma."
  },
  {
   "name": "w2-12-flood",
@@ -269,7 +335,7 @@
    "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
    "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
   },
-  "note": "Wave 2b (plan of 2026-10-09, third version), for the translator's data. Profile gb-eng-2026; a town of its own, generated from seed 112; 1,000 people; 150 days; starting conditions wet-year. Seats: mayor, planning, finance, landlord-1-office, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt); this pilot may have our own retrained translator instead, if its scores allow when the stage starts. Every draft is confirmed or declined by its seat. A wet year, long enough to hold the river's high month: permits, repairs, payments."
+  "note": "Wave 2b (plan of 2026-10-09, after the shake-down), for the translator's data. Profile gb-eng-2026; a town of its own, generated from seed 112; 1,000 people; 150 days; starting conditions wet-year. Seats: mayor, planning, finance, landlord-1-office, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt); this pilot may have our own retrained translator instead, if its scores allow when the stage starts. Every draft is confirmed or declined by its seat. A wet year, long enough to hold the river's high month: permits, repairs, payments."
  },
  {
   "name": "w2-27-flood",
@@ -293,7 +359,7 @@
    "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
    "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
   },
-  "note": "Wave 2b (plan of 2026-10-09, third version), for the translator's data. Profile de-ni-2026; a town of its own, generated from seed 127; 1,000 people; 150 days; starting conditions wet-year. Seats: mayor, planning, inspector, landlord-1-office, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt); this pilot may have our own retrained translator instead, if its scores allow when the stage starts. Every draft is confirmed or declined by its seat. A wet year where amounts are written with a comma."
+  "note": "Wave 2b (plan of 2026-10-09, after the shake-down), for the translator's data. Profile de-ni-2026; a town of its own, generated from seed 127; 1,000 people; 150 days; starting conditions wet-year. Seats: mayor, planning, inspector, landlord-1-office, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt); this pilot may have our own retrained translator instead, if its scores allow when the stage starts. Every draft is confirmed or declined by its seat. A wet year where amounts are written with a comma."
  },
  {
   "name": "w2-46-largest-works",
@@ -308,12 +374,12 @@
   "translator": "claude-code/claude-sonnet-5-5",
   "translator_choice": "trained-ok",
   "until": 7776000,
-  "budget": 100,
+  "budget": 80,
   "env": {
    "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
    "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
   },
-  "note": "Wave 2b (plan of 2026-10-09, third version), for the translator's data. Profile de-ni-2026; a town of its own, generated from seed 146; 1,000 people; 90 days. Seats: mayor, works, registry, all on claude-code/claude-fable-5-1. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt); this pilot may have our own retrained translator instead, if its scores allow when the stage starts. Every draft is confirmed or declined by its seat. The largest model as mayor, works manager and registrar."
+  "note": "Wave 2b (plan of 2026-10-09, after the shake-down), for the translator's data. Profile de-ni-2026; a town of its own, generated from seed 146; 1,000 people; 90 days. Seats: mayor, works, registry, all on claude-code/claude-fable-5-1. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt); this pilot may have our own retrained translator instead, if its scores allow when the stage starts. Every draft is confirmed or declined by its seat. The largest model as mayor, works manager and registrar."
  },
  {
   "name": "w2-15-largest-election",
@@ -326,18 +392,18 @@
   ],
   "args": [
    "--scenario",
-   "election-due"
+   "election-due+lean-council"
   ],
   "model": "claude-code/claude-fable-5-1",
   "translator": "claude-code/claude-sonnet-5-5",
   "translator_choice": "sonnet",
   "until": 6480000,
-  "budget": 75,
+  "budget": 60,
   "env": {
    "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
    "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
   },
-  "note": "Wave 2b (plan of 2026-10-09, third version), for the translator's data. Profile gb-eng-2026; a town of its own, generated from seed 115; 1,000 people; 75 days; starting conditions election-due. Seats: mayor, editor, councillor-1, councillor-2, all on claude-code/claude-fable-5-1. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt). Every draft is confirmed or declined by its seat. The largest model through an election, under a code clerk."
+  "note": "Wave 2b (plan of 2026-10-09, after the shake-down), for the translator's data. Profile gb-eng-2026; a town of its own, generated from seed 115; 1,000 people; 75 days; starting conditions election-due+lean-council. Seats: mayor, editor, councillor-1, councillor-2, all on claude-code/claude-fable-5-1. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt). Every draft is confirmed or declined by its seat. The largest model through an election, under a code clerk."
  },
  {
   "name": "w2-50-evictions",
@@ -356,7 +422,7 @@
    "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
    "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
   },
-  "note": "Wave 2b (plan of 2026-10-09, third version), for the translator's data. Profile ke-nakuru-2026; a town of its own, generated from seed 150; 1,000 people; 120 days. Seats: landlord-1-office, landlord-2-office, tribunal-member, tribunal-registrar, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt); this pilot may have our own retrained translator instead, if its scores allow when the stage starts. Every draft is confirmed or declined by its seat. Landlords and the tribunal in a town whose rents are most of its tenants' income (a profile fault, used as it is): arrears, notices, orders."
+  "note": "Wave 2b (plan of 2026-10-09, after the shake-down), for the translator's data. Profile ke-nakuru-2026; a town of its own, generated from seed 150; 1,000 people; 120 days. Seats: landlord-1-office, landlord-2-office, tribunal-member, tribunal-registrar, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt); this pilot may have our own retrained translator instead, if its scores allow when the stage starts. Every draft is confirmed or declined by its seat. Landlords and the tribunal in a town whose rents are most of its tenants' income (a profile fault, used as it is): arrears, notices, orders."
  },
  {
   "name": "w2-51-townhall",
@@ -376,7 +442,7 @@
    "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
    "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
   },
-  "note": "Wave 2b (plan of 2026-10-09, third version), for the translator's data. Profile ke-nakuru-2026; a town of its own, generated from seed 151; 1,000 people; 90 days. Seats: mayor, finance, planning, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt); this pilot may have our own retrained translator instead, if its scores allow when the stage starts. Every draft is confirmed or declined by its seat. The town hall of that town: a sixth currency, and a council that hears of the arrears."
+  "note": "Wave 2b (plan of 2026-10-09, after the shake-down), for the translator's data. Profile ke-nakuru-2026; a town of its own, generated from seed 151; 1,000 people; 90 days. Seats: mayor, finance, planning, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt); this pilot may have our own retrained translator instead, if its scores allow when the stage starts. Every draft is confirmed or declined by its seat. The town hall of that town: a sixth currency, and a council that hears of the arrears."
  },
  {
   "name": "w2-52-river",
@@ -396,7 +462,7 @@
    "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
    "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
   },
-  "note": "Wave 2b (plan of 2026-10-09, third version), for the translator's data. Profile br-mg-2026; a town of its own, generated from seed 152; 1,000 people; 120 days. Seats: mayor, planning, inspector, landlord-1-office, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt); this pilot may have our own retrained translator instead, if its scores allow when the stage starts. Every draft is confirmed or declined by its seat. A town that floods without a wet year (its river figure is wrong, and used as it is): permits, repairs, payments in a seventh currency."
+  "note": "Wave 2b (plan of 2026-10-09, after the shake-down), for the translator's data. Profile br-mg-2026; a town of its own, generated from seed 152; 1,000 people; 120 days. Seats: mayor, planning, inspector, landlord-1-office, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt); this pilot may have our own retrained translator instead, if its scores allow when the stage starts. Every draft is confirmed or declined by its seat. A town that floods without a wet year (its river figure is wrong, and used as it is): permits, repairs, payments in a seventh currency."
  },
  {
   "name": "w2-53-townhall",
@@ -416,6 +482,6 @@
    "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
    "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
   },
-  "note": "Wave 2b (plan of 2026-10-09, third version), for the translator's data. Profile br-mg-2026; a town of its own, generated from seed 153; 1,000 people; 90 days. Seats: mayor, finance, editor, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt); this pilot may have our own retrained translator instead, if its scores allow when the stage starts. Every draft is confirmed or declined by its seat. The town hall and the paper of that town."
+  "note": "Wave 2b (plan of 2026-10-09, after the shake-down), for the translator's data. Profile br-mg-2026; a town of its own, generated from seed 153; 1,000 people; 90 days. Seats: mayor, finance, editor, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt); this pilot may have our own retrained translator instead, if its scores allow when the stage starts. Every draft is confirmed or declined by its seat. The town hall and the paper of that town."
  }
 ]

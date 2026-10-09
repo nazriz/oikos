@@ -21,7 +21,27 @@
    "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
    "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
   },
-  "note": "Wave 2c (plan of 2026-10-09, third version), for the translator's data. Profile au-vic-2026; a town of its own, generated from seed 113; 1,000 people; 180 days; starting conditions wet-year. Seats: mayor, finance, planning, inspector, landlord-1-office, landlord-2-office, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt); this pilot may have our own retrained translator instead, if its scores allow when the stage starts. Every draft is confirmed or declined by its seat. The longest: half a year of a wet year with six seats."
+  "note": "Wave 2c (plan of 2026-10-09, after the shake-down), for the translator's data. Profile au-vic-2026; a town of its own, generated from seed 113; 1,000 people; 180 days; starting conditions wet-year. Seats: mayor, finance, planning, inspector, landlord-1-office, landlord-2-office, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt); this pilot may have our own retrained translator instead, if its scores allow when the stage starts. Every draft is confirmed or declined by its seat. The longest: half a year of a wet year with six seats."
+ },
+ {
+  "name": "w2-58-year",
+  "world": "worlds/town-1000.yaml",
+  "sets": [
+   "seed=158",
+   "profile=gb-eng-2026",
+   "mayor=llm",
+   "model_seats=finance,council-clerk,councillor-1,councillor-2,councillor-3,registry"
+  ],
+  "model": "claude-code/claude-sonnet-5-5",
+  "translator": "claude-code/claude-sonnet-5-5",
+  "translator_choice": "sonnet",
+  "until": 34560000,
+  "budget": 115,
+  "env": {
+   "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
+   "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
+  },
+  "note": "Wave 2c (plan of 2026-10-09, after the shake-down), for the translator's data. Profile gb-eng-2026; a town of its own, generated from seed 158; 1,000 people; 400 days. Seats: mayor, finance, council-clerk, councillor-1, councillor-2, councillor-3, registry, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt). Every draft is confirmed or declined by its seat. A MODEL CLERK: stop it if no result is declared within three weeks of a ballot opening (plan.md, the stopping rules). The one pilot past a budget year's end (day 365): the next year's budget proposed, put to a ballot by a model clerk, voted by councillors and adopted, or not; and the first births (due from about day 275) for a registrar. Last in its lane and the one to drop: it turns on a clerk seat counting a ballot, which w2-55 shows first."
  },
  {
   "name": "w2-16-newplace",
@@ -42,7 +62,7 @@
    "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
   },
   "test": true,
-  "note": "Wave 2c (plan of 2026-10-09, third version), for the translator's data. Profile mx-jal-2026; a town of its own, generated from seed 916; 1,000 people; 90 days. Seats: mayor, landlord-1-office, bank-lending, finance, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt). Every draft is confirmed or declined by its seat. TEST ONLY: kept out of training. Test-only: a profile no training pilot uses."
+  "note": "Wave 2c (plan of 2026-10-09, after the shake-down), for the translator's data. Profile mx-jal-2026; a town of its own, generated from seed 916; 1,000 people; 90 days. Seats: mayor, landlord-1-office, bank-lending, finance, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt). Every draft is confirmed or declined by its seat. TEST ONLY: kept out of training. Test-only: a profile no training pilot uses."
  },
  {
   "name": "w2-49-newmoney-registers",
@@ -62,7 +82,7 @@
    "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
   },
   "test": true,
-  "note": "Wave 2c (plan of 2026-10-09, third version), for the translator's data. Profile in-tn-2026; a town of its own, generated from seed 949; 1,000 people; 180 days. Seats: registry, land-registrar, finance, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt). Every draft is confirmed or declined by its seat. TEST ONLY: kept out of training. Test-only: the registers and the treasury in a profile whose amounts are grouped in twos and said in lakh and crore; half a year, for the registers' sake."
+  "note": "Wave 2c (plan of 2026-10-09, after the shake-down), for the translator's data. Profile in-tn-2026; a town of its own, generated from seed 949; 1,000 people; 180 days. Seats: registry, land-registrar, finance, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt). Every draft is confirmed or declined by its seat. TEST ONLY: kept out of training. Test-only: the registers and the treasury in a profile whose amounts are grouped in twos and said in lakh and crore; half a year, for the registers' sake."
  },
  {
   "name": "w2-18-newoffices",
@@ -82,6 +102,6 @@
    "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
   },
   "test": true,
-  "note": "Wave 2c (plan of 2026-10-09, third version), for the translator's data. Profile au-vic-2026; a town of its own, generated from seed 918; 1,000 people; 90 days. Seats: police-oic, union-organiser, finance, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt). Every draft is confirmed or declined by its seat. TEST ONLY: kept out of training. Test-only: two offices no training pilot has as a seat (the police and the union)."
+  "note": "Wave 2c (plan of 2026-10-09, after the shake-down), for the translator's data. Profile au-vic-2026; a town of its own, generated from seed 918; 1,000 people; 90 days. Seats: police-oic, union-organiser, finance, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt). Every draft is confirmed or declined by its seat. TEST ONLY: kept out of training. Test-only: two offices no training pilot has as a seat (the police and the union)."
  }
 ]
