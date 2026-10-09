@@ -91,7 +91,7 @@ import { FLAG_YES, FLAGS, sameMeaning, type MeaningContext } from "./meaning";
 
 export { meaningOf, sameMeaning, type MeaningContext } from "./meaning";
 
-export const DATA_VERSION = "0.13.1"; // 0.13.1: a wide part's programs have, now and then, a large count written with the place's digit grouping and a start or an end given as a day (contracts 2026-10-09: a count is grouped as an amount is; first and until take a date); 0.13.0: a wide part (`broad`): registers beside the styles (rambling, flat, slips), who is asking (`ASKERS`), every paper the worlds' offices issue with every field filled (synthetic.ts `worldForms`), look_first for any act on a record named by description, no_such_act for attending; 0.12.0: a direction on an office's form and a paper of one's own office (and the same direction as a letter where no form is listed), fields that are lists and dates, standing work orders
+export const DATA_VERSION = "0.13.2"; // 0.13.2: a direction to an office with no form listed is always said to the office (never "X is to …"); 0.13.1: a wide part's programs have, now and then, a large count written with the place's digit grouping and a start or an end given as a day (contracts 2026-10-09: a count is grouped as an amount is; first and until take a date); 0.13.0: a wide part (`broad`): registers beside the styles (rambling, flat, slips), who is asking (`ASKERS`), every paper the worlds' offices issue with every field filled (synthetic.ts `worldForms`), look_first for any act on a record named by description, no_such_act for attending; 0.12.0: a direction on an office's form and a paper of one's own office (and the same direction as a letter where no form is listed), fields that are lists and dates, standing work orders
 
 const sha256 = (s: string) => new Bun.CryptoHasher("sha256").update(s).digest("hex");
 
@@ -2869,7 +2869,7 @@ export function planOf(gold: Gold[], o: PlanOptions): PlanItem[] {
     const asker = o.broad ? askerFor(style, g, askRand) : undefined;
     const instruction = (after ? `${styled.instruction} Whatever else the style asks, the request's last sentence is exactly this one, which says what becomes of the form once it is handed in, names nobody and asks nobody for anything: "${after.text}"` : styled.instruction) + (asker ? `\n\n${askerLine(asker)}` : "");
     const notes = two?.letter ? [...(office ? ownFormNotes(one, office, sayRand) : [...writerNotes(one.program, sayRand), ...amountNotes(one, sayRand)]), ...indirectNotes(two.letter, sayRand).map((x) => x.replace("The act, said", "The direction, said"))]
-      : unlisted ? indirectNotes(g.program, sayRand, ["direct {to} to …", "direct {to} to …", "instruct {to} to …", "tell {to} to …", "{to} is to …"])
+      : unlisted ? indirectNotes(g.program, sayRand, ["direct {to} to …", "direct {to} to …", "instruct {to} to …", "tell {to} to …"]) // (not "{to} is to …", since 0.13.2: it addresses nobody, and was read as an order for work)
       : indirect ? indirectNotes(g.program, sayRand)
       // (An office's own form is asked for as the direction or the paper it is, not as a form handed in.)
       : office ? ownFormNotes(g, office, sayRand) : [...writerNotes(g.program, sayRand), ...amountNotes(g, sayRand)];

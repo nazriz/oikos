@@ -9,7 +9,7 @@ import { synthetic, worldForms } from "../train/synthetic";
 const gold = synthetic({ perFunction: 12, seed: 3 });
 
 test("the pipeline's version says there is a wide part", () => {
-  expect(DATA_VERSION).toBe("0.13.1");
+  expect(DATA_VERSION).toBe("0.13.2");
 });
 
 test("the wide deal is made of the styles and the three registers, and the older deal has none of the registers", () => {

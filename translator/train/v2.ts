@@ -407,7 +407,14 @@ export function sameUse(a: Use, b: Use): boolean {
     case "done_for_now": return num("days") && Array.isArray(x.hold) === Array.isArray(y.hold) && sameSet(x.hold, y.hold);
     case "confirm": return id("ref") && x.decision === y.decision && near(x.note, y.note);
     case "opt_out": return near(x.statement, y.statement);
-    case "do": return near(x.what, y.what) && id("as") && near(x.why, y.why);
+    // (An act's words are a stretch of the turn, and where it begins is a matter of a word or two ("I want to seize
+    // 7 apples …" or "seize 7 apples …"): one reading inside the other, and most of it, is the same part. The first
+    // whole turns read, 2026-10-09, differed in this alone in 349 of 475 disagreements.)
+    case "do": {
+      const [a, b] = [squeeze(String(x.what ?? "")), squeeze(String(y.what ?? ""))].map((s) => s.replace(/[.]$/, "").toLowerCase());
+      const [short, long] = a!.length <= b!.length ? [a!, b!] : [b!, a!];
+      return (near(x.what, y.what) || (short.length >= 12 && short.length >= long.length * 0.6 && long.includes(short))) && id("as") && near(x.why, y.why);
+    }
   }
 }
 

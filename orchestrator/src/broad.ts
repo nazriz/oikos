@@ -817,6 +817,11 @@ export function collect(out: string, parts: string[], o: { share?: number; floor
   const heldOut = o.heldOut === false ? undefined : (o.heldOut as ReturnType<typeof loadHeldOut>) ?? loadHeldOut();
   const named = heldOut?.length ? new Set(leaks(heldOut, [{ name: "collected", text: all.map((e) => e.request).join("\n\n") }]).map((l) => l.id)).size : 0;
   mkdirSync(out, { recursive: true });
+  // Set aside under its own name, each with its gold program: a direction to an office with no form listed for it,
+  // read otherwise by the blind reader. By the rule it is a letter to the office (docs/decisions.md, 2026-10-09); the
+  // prompt it was read under left that open. To be read again under a prompt that says so, and to join where it agrees.
+  const unlisted = parts.flatMap((p) => jsonl<Example>(join(resolve(p), "disagreed.jsonl")).filter((e) => e.source.startsWith("synthetic: direction with no form")).map((e) => ({ ...e, groups: groupsOf(e, resolve(p).split("/").pop()!), set_aside: "direction_unlisted" })));
+  put(join(out, "set-aside-direction-unlisted.jsonl"), lines(unlisted));
   put(join(out, "train.jsonl"), lines(train));
   put(join(out, "parity-test.jsonl"), lines(parity));
   const r: Collected = { examples: all.length, train: train.length, parity: parity.length, by, cells, parity_cells, leak_check: { held_out_cases_here: heldOut?.length ?? 0, cases_named: named } };
