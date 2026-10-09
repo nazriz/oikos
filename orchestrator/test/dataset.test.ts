@@ -40,7 +40,7 @@ test("a run's dataset: a manifest, and every translation, decision, act and reco
   expect(m.seats.models["mayor-system"].adapter).toBe("mock/mock");
   expect(Object.keys(m.versions.modules)).toContain("citizen.default");
   // Every row of every file is valid, and the manifest's counts are right.
-  const kinds: Record<string, string> = { "systems.jsonl": "SystemPrompt", "translations.jsonl": "Translation", "decisions.jsonl": "Decision", "actions.jsonl": "Action", "observations.jsonl": "ObservationRow", "citizen_decisions.jsonl": "CitizenDecision" };
+  const kinds: Record<string, string> = { "systems.jsonl": "SystemPrompt", "translations.jsonl": "Translation", "decisions.jsonl": "Decision", "actions.jsonl": "Action", "observations.jsonl": "ObservationRow", "citizen_decisions.jsonl": "CitizenDecision", "citizen_outcomes.jsonl": "CitizenOutcome" };
   for (const [file, def] of Object.entries(kinds)) {
     const rs = rows(join(dir, file));
     expect(rs.length).toBe(m.files[file].rows);
@@ -56,10 +56,30 @@ test("a run's dataset: a manifest, and every translation, decision, act and reco
   // Every draft a decision names is a translation.
   const drafts = new Set(rows(join(dir, "translations.jsonl")).map((x) => x.draft));
   for (const d of decisions) for (const id of d.drafts) expect(drafts.has(id)).toBe(true);
+  // What came of a seat's acts can be followed by reference: each act says what it made, and a later call says what
+  // the seat had been shown that names it (here, the council's ballot on the mayor's proposal).
+  const commandOf = new Map<number, any>(decisions.flatMap((d) => d.commands.map((c: any) => [c.seq, c] as [number, any])));
+  expect([...commandOf.values()].some((c) => c.created?.length)).toBe(true);
+  const back = decisions.flatMap((d) => (d.came_back ?? []).map((x: any) => ({ ...x, t: d.t })));
+  expect(back.length).toBeGreaterThan(0);
+  for (const x of back) {
+    expect(commandOf.get(x.seq)?.created).toContain(x.of);
+    expect(x.in).not.toBe(x.of);
+  }
+  const shown = new Set(JSON.stringify(rows(join(dir, "observations.jsonl")).filter((o) => o.participant === "mayor-system")).match(/"id":"[^"]+"/g));
+  for (const x of back) expect(shown.has(`"id":"${x.in}"`)).toBe(true);
   // Actions: code participants only, each with whether it was applied.
   const actions = rows(join(dir, "actions.jsonl"));
   expect(actions.some((a) => a.participant.endsWith("-self") && a.reasoning && a.call)).toBe(true);
   expect(actions.some((a) => a.participant === "mayor-system")).toBe(false);
+  // An act refused is written as refused, with why: every refusal in the log is on its act's row (an act takes time,
+  // and its refusal is logged when it ends, under the step that ended it).
+  const refusedInLog = readFileSync(s.logPath, "utf8").split("\n").filter((l) => l.includes('"event":"action_refused"')).length;
+  expect(refusedInLog).toBeGreaterThan(0);
+  const refusedRows = [...actions, ...commandOf.values()].filter((a) => a.applied === false);
+  expect(refusedRows.length).toBe(refusedInLog);
+  expect(refusedRows.every((a) => typeof a.refusal?.code === "string")).toBe(true);
+  expect(actions.some((a) => a.created?.length)).toBe(true);
   // Citizens' decisions: where each stands in the log (what followed is that citizen's acts after it), and what the
   // citizen had before it.
   const minds = rows(join(dir, "citizen_decisions.jsonl"));
@@ -67,6 +87,16 @@ test("a run's dataset: a manifest, and every translation, decision, act and reco
   expect(minds.some((d) => d.circumstances && d.options.some((o: any) => o.facts))).toBe(true);
   expect(minds.some((d) => d.person)).toBe(true);
   expect(minds.some((d) => actions.some((a) => a.participant === d.participant && a.seq > d.seq && a.t === d.t))).toBe(true);
+  // And what the citizen came to know of how each turned out: under the decision (none: an empty list, which is
+  // "not known", not a payoff of nought), and as rows of their own that name the decision.
+  expect(minds.every((d) => Number.isInteger(d.n) && Array.isArray(d.outcomes))).toBe(true);
+  expect(minds.some((d) => d.outcomes.length === 0)).toBe(true);
+  const learned = rows(join(dir, "citizen_outcomes.jsonl"));
+  expect(minds.reduce((n, d) => n + d.outcomes.length, 0)).toBe(learned.filter((o) => o.decision_seq !== undefined).length);
+  const served = minds.find((d) => d.domain === "shop" && d.outcomes.some((o: any) => o.kind === "served"))!;
+  expect(served.outcomes.find((o: any) => o.kind === "served")).toMatchObject({ option: served.choice, way: "mine", facts: { ordered: expect.any(Number), delivered: expect.any(Number) }, learned: { payoff: expect.any(Number), before: expect.any(Number), after: expect.any(Number) } });
+  expect(m.citizens).toMatchObject({ decisions: minds.length, outcomes: learned.length });
+  expect(m.citizens.by_domain.shop.with_outcome).toBe(minds.filter((d) => d.domain === "shop" && d.outcomes.length).length);
   // Observations: just the two asked for.
   const seen = new Set(rows(join(dir, "observations.jsonl")).map((x) => x.participant));
   expect([...seen].sort()).toEqual([citizen, "mayor-system"].sort());

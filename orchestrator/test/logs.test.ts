@@ -50,12 +50,17 @@ test("a lean log: no observation hashes, no code participants' reasoning (a mode
   for (const e of f) if (e.kind === "annotation" && e.body.annotation === "decision" && e.body.data.state && !firstOf.has(e.body.subject)) firstOf.set(e.body.subject, e.body.data);
   expect([...firstOf.values()].every((d) => d.person?.values && d.person.temperament && d.person.weights)).toBe(true);
   expect(minded.filter((d) => d.person).length).toBe(firstOf.size);
+  // And what each came to know of how its choices turned out, beside them: in the full log only.
+  const outcomes = (es: any[]) => es.filter((e) => e.kind === "annotation" && e.body.annotation === "outcome").flatMap((e) => e.body.data.outcomes);
+  expect(outcomes(f).some((o) => o.domain === "shop" && o.kind === "served" && Number.isInteger(o.of) && Number.isInteger(o.learned?.payoff))).toBe(true);
+  expect(outcomes(l)).toEqual([]);
   // Asked not to record them: the same world, none in the log, and the log says so for a run that resumes it.
   const config = generate({ ...spec, citizens: 80, mayor: "llm" });
   const quiet = await runWorld({ config, runId: "quiet", outDir: out, until: 30 * DAY, recordDecisions: "none", recordObservations: "none" });
   expect(quiet.stateHash).toBe(full.stateHash);
   const q = entries(quiet.logPath);
   expect(decisions(q)).toEqual([]);
+  expect(outcomes(q)).toEqual([]);
   expect(q.some((e) => e.kind === "annotation" && e.body.annotation === "observation")).toBe(false);
   expect(acts(q).length).toBe(acts(f).length);
   // A language model's observations are recorded without being asked (training data), and no one else's.

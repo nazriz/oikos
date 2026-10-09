@@ -39,6 +39,7 @@
  "orchestrator/test/offers.test.ts": 9.8,
  "orchestrator/test/office-papers-run.test.ts": 10.1,
  "orchestrator/test/office-papers.test.ts": 0.2,
+ "orchestrator/test/outcomes.test.ts": 105,
  "orchestrator/test/own-account.test.ts": 27.9,
  "orchestrator/test/ownership.test.ts": 72.7,
  "orchestrator/test/perception.test.ts": 162.1,

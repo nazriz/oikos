@@ -215,6 +215,10 @@ export const DECISIONS = Symbol.for("oikos.decisions");
  * `circumstances`; `satisfied_here` and `doubt` as the decision was given them; `person` (values, temperament, need
  * weights), with a citizen's first recorded decision only. Whole numbers throughout. */
 export interface DecisionRecord {
+  /** The citizen's own count of its recorded decisions, from 1: what an outcome names as the decision it follows (`of`). */
+  n?: number;
+  /** A decision that follows up an earlier one of the citizen's (its `n`): trying elsewhere for what a shop could not serve. */
+  follows?: number;
   t: number; domain: string; strategy: string; choice?: string;
   options: { key: string; score: number; facts?: { money_per_month: number; home?: { bedrooms?: number }; work_hours_per_month?: number; goods_per_month?: number; company?: number; time_hours_per_month?: number }; others?: number; meaning?: number; learned?: number }[];
   current?: string;
@@ -222,6 +226,39 @@ export interface DecisionRecord {
   satisfied_here?: number; doubt?: number;
   person?: { values: { [value: string]: number }; temperament: { [facet: string]: number }; weights: { [need: string]: number } };
   state?: { mind: string; needs: { [need: string]: number }; satisfaction: number; certainty: number; emotion?: { kind: string; about: string; bps: number }; beliefs?: { [assertion: string]: number }; goal?: { goal: string; method: string } };
+}
+
+/**
+ * What a code participant came to know of how its choices turned out, since its last action (docs/design/ai-citizens.md
+ * 7), carried with the action as decisions are. The orchestrator records them as one `outcome` annotation, for full
+ * logs, wherever it records decisions.
+ */
+export const OUTCOMES = Symbol.for("oikos.outcomes");
+/**
+ * One thing a citizen learned of how something went, when and as it came to know it: never more than it knew. Facts,
+ * and the mind's own figures; nothing here says whether it was good. Whole numbers throughout.
+ * - `t`: when the citizen came to know it. `domain`, `option`: the area of life and what it is about, as decisions name
+ *   them (the shop, the employer, the home, the gathering).
+ * - `of`: the decision it follows from (that decision's `n`), the citizen's latest that chose this option. Absent: no
+ *   recorded decision began it (held from the start; another's experience told to us; what was expected before trying).
+ * - `kind`: what happened, in a word (served, paid, unpaid, hired, ended, attended, told ...).
+ * - `way`: how the citizen came to know (docs/design/knowing.md): `mine` (its own money, papers and letters, and what
+ *   its own acts came to), `here` (it was there), `published`, `ask`.
+ * - `from`: who told it (`told`). `facts`: what happened, as the citizen has it.
+ * - `learned`: the mind's update of what it has learned of the option (experience-weighted attraction, basis points):
+ *   the payoff the mind computed, the attraction before (`first`: never tried nor heard of, so what was expected of
+ *   it) and after; `heard`: another's payoff, weighed as such.
+ * - `need`: the need the mind read the payoff from, where it did. `felt`: feelings the mind appraised from it (the
+ *   strength of the cause, and the feeling's level before and after). `belief`: how strongly it holds what `host`
+ *   teaches, before and after.
+ */
+export interface OutcomeRecord {
+  t: number; domain: string; option: string; of?: number; kind: string; way: "mine" | "here" | "published" | "ask"; from?: string;
+  facts?: { [fact: string]: number | string | boolean };
+  learned?: { payoff: number; before: number; first?: true; after: number; heard?: true };
+  need?: string;
+  felt?: { emotion: string; about: string; bps: number; before: number; after: number }[];
+  belief?: { host: string; before: number; after: number };
 }
 
 export const wait = (until?: number): ParticipantAction => (until === undefined ? { type: "wait" } : { type: "wait", until });

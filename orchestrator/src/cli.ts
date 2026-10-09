@@ -42,11 +42,14 @@
 //   oikos run ... [--log lean|full]: how much the log keeps (full, the default; lean for quick test runs: no
 //     observation hashes, no written reasoning from code participants; replay still checks the state).
 //   oikos run ... [--record-decisions full|none]: code citizens' decisions as their minds made them (what each had
-//     before it, how it decided, what it chose: docs/design/ai-citizens.md 7), training data for citizen models.
-//     full is the default (about a twentieth of a log); never in a lean log. A resumed run records as it began.
+//     before it, how it decided, what it chose: docs/design/ai-citizens.md 7), and what each then came to know of how
+//     its choices turned out (served, paid or not, who came: facts and the mind's own figures, no judgement), training
+//     data for citizen models. full is the default (about a tenth of a log); none leaves both out; never in a lean
+//     log. A resumed run records as it began.
 //   oikos dataset <DIR|log.jsonl> [--out DIR] [--actions]
 //     Run datasets: each log's data as training examples, in <run>.dataset/ (docs/design/run-datasets.md): the manifest,
-//     system prompts, translations, model participants' decisions; code participants' acts with --actions; and
+//     system prompts, translations, model participants' decisions; code participants' acts with --actions; code
+//     citizens' decisions, each with its outcomes under it, and the outcomes as a list of their own; and
 //     observations, as the run recorded them (language-model participants' by default; --record-observations
 //     models|code|all|none|<ids>).
 //   oikos corpus <DIR|log.jsonl> [--out FILE]

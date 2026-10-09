@@ -25,7 +25,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { calls, canonical, DECISIONS, inCurrency, paramErrors, modules as builtin, Randomness, Roster, slice, View, type BehaviourModule, type Controller, type Currency, type DecisionRecord, type LookRequest, type Observation, type ParticipantAction, type ParticipantContext } from "@oikos/participants";
+import { calls, canonical, DECISIONS, OUTCOMES, inCurrency, paramErrors, modules as builtin, Randomness, Roster, slice, View, type BehaviourModule, type Controller, type Currency, type DecisionRecord, type OutcomeRecord, type LookRequest, type Observation, type ParticipantAction, type ParticipantContext } from "@oikos/participants";
 import { CONSULT_VERSION, createConsult, createLlmParticipant, LLM_PARTICIPANT_VERSION, MOCK_VERSION, MockAdapter, mockPolicies, PRICES, ModelCallFailed, ModelUnreachable, SpendingLimitReached, type Budget, type LlmAdapter, type LlmController, type LlmIO, type MockBrain, type Price } from "@oikos/participants/llm";
 import { createTranslator, draftText, Knowledge, RESOLVER, resolve, TRANSLATOR_VERSION, type Draft, type Resolution, NOT_CHECKED } from "@oikos/translator";
 import { Kernel } from "./kernel";
@@ -1040,6 +1040,10 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
           // A code citizen's decisions on the way to this action (docs/design/ai-citizens.md 7): training data, in full logs.
           const decisions = (r.value as any)?.[DECISIONS] as DecisionRecord[] | undefined;
           if (decisions?.length && !lean && o.recordDecisions !== "none") for (const d of decisions) await k.request({ op: "annotate", annotation: { annotation: "decision", subject: x.u.participant, data: d } });
+          // And what it came to know, since its last action, of how its choices turned out: one entry for them all
+          // (wages every pay day for every worker are many, and small). Wherever decisions are recorded, and only there.
+          const outcomes = (r.value as any)?.[OUTCOMES] as OutcomeRecord[] | undefined;
+          if (outcomes?.length && !lean && o.recordDecisions !== "none") await k.request({ op: "annotate", annotation: { annotation: "outcome", subject: x.u.participant, data: { outcomes } } });
           if (thinkingCosts) {
             // Its thinking: a model's by the tokens it just used (logged, so a replay is exact), code's a fixed time.
             const used = (notes.get(x.u.participant) ?? []).filter((a: any) => a.annotation === "usage" && a.purpose === "participant") as any[];

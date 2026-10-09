@@ -1,0 +1,9 @@
+{
+  "run": "town-1000.seed1",
+  "t": 867600,
+  "participant": "citizen-17-self",
+  "domain": "shop",
+  "option": "shop-3",
+  "kind": "served",
+  "way": "kept"
+}

@@ -1,0 +1,30 @@
+{
+  "run": "town-1000.seed1",
+  "t": 3628800,
+  "seq": 201877,
+  "participant": "citizen-40-self",
+  "domain": "job",
+  "option": "works-2",
+  "kind": "unpaid",
+  "way": "mine",
+  "facts": {
+    "days_since_last": 20,
+    "period_days": 14,
+    "periods_missed": 1,
+    "owed": 211356
+  },
+  "learned": {
+    "payoff": 0,
+    "before": 9120,
+    "after": 4800
+  },
+  "felt": [
+    {
+      "emotion": "anger",
+      "about": "works-2",
+      "bps": 8000,
+      "before": 0,
+      "after": 8000
+    }
+  ]
+}

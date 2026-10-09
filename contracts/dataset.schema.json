@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:oikos:contracts:0.8:dataset",
-  "title": "Run dataset (0.2.0)",
-  "description": "A run's data, derived deterministically from its log, joined and flattened into examples a training run can use (docs/design/run-datasets.md). A folder per run: manifest.json (Manifest), systems.jsonl (SystemPrompt), translations.jsonl (Translation), decisions.jsonl (Decision), and optionally actions.jsonl (Action), observations.jsonl (ObservationRow) and citizen_decisions.jsonl (CitizenDecision). The log stays the record; a dataset can always be made again from it.",
+  "title": "Run dataset (0.3.0)",
+  "description": "A run's data, derived deterministically from its log, joined and flattened into examples a training run can use (docs/design/run-datasets.md). A folder per run: manifest.json (Manifest), systems.jsonl (SystemPrompt), translations.jsonl (Translation), decisions.jsonl (Decision), and optionally actions.jsonl (Action), observations.jsonl (ObservationRow), citizen_decisions.jsonl (CitizenDecision) and citizen_outcomes.jsonl (CitizenOutcome). The log stays the record; a dataset can always be made again from it.",
   "$defs": {
     "Version": {
       "type": "string",
@@ -167,6 +167,47 @@
               },
               "synthetic": {
                 "$ref": "urn:oikos:contracts:0.8:common#/$defs/Count"
+              }
+            }
+          }
+        },
+        "citizens": {
+          "description": "What the run recorded for citizen models (docs/design/ai-citizens.md 7): decisions and outcomes in all, and by area of life how many decisions were recorded, how many of them the citizen learned at least one outcome of, and how many outcomes (those following no recorded decision included). Absent: the log holds no citizen's decision.",
+          "type": "object",
+          "required": [
+            "decisions",
+            "outcomes",
+            "by_domain"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "decisions": {
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/Count"
+            },
+            "outcomes": {
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/Count"
+            },
+            "by_domain": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "required": [
+                  "decisions",
+                  "with_outcome",
+                  "outcomes"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "decisions": {
+                    "$ref": "urn:oikos:contracts:0.8:common#/$defs/Count"
+                  },
+                  "with_outcome": {
+                    "$ref": "urn:oikos:contracts:0.8:common#/$defs/Count"
+                  },
+                  "outcomes": {
+                    "$ref": "urn:oikos:contracts:0.8:common#/$defs/Count"
+                  }
+                }
               }
             }
           }
@@ -383,15 +424,23 @@
           "type": "string"
         },
         "applied": {
+          "description": "For an act: whether it was applied, or refused (`refusal`: why), joined by the act's action (an act takes time, and how it ended is logged when it ends). Absent: not an act, or still under way when the log ended.",
           "type": "boolean"
         },
         "refusal": {
           "$ref": "urn:oikos:contracts:0.8:common#/$defs/Opaque"
+        },
+        "created": {
+          "description": "The ids of what the act made, as the log's events for it say: records (a notice, a decision, an order, an agreement) and letters. What is later written in answer names one of them.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       }
     },
     "Decision": {
-      "description": "A language-model participant's model call: what it was shown, what it answered, and what followed in the world.",
+      "description": "A language-model participant's model call: what it was shown, what it answered, what followed in the world, and what had come back of its earlier acts.",
       "type": "object",
       "required": [
         "run",
@@ -466,6 +515,33 @@
           "items": {
             "type": "string"
           }
+        },
+        "came_back": {
+          "description": "What the seat had been shown, since its last model call, that names something an earlier act of its own made: a reply to its letter, a decision on its form, a paper made on its direction, a vote on its proposal. `of`: the id of what the seat made; `seq`: the command that made it (a row of some earlier call's `commands`); `in`: the id of the record or letter that names it (in observations.jsonl); `from`: who wrote it, for a letter. A join by reference and nothing more: it does not say whether what came back was what the seat wanted.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "of",
+              "seq",
+              "in"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "of": {
+                "type": "string"
+              },
+              "seq": {
+                "$ref": "urn:oikos:contracts:0.8:common#/$defs/Count"
+              },
+              "in": {
+                "type": "string"
+              },
+              "from": {
+                "type": "string"
+              }
+            }
+          }
         }
       }
     },
@@ -476,8 +552,7 @@
         "run",
         "t",
         "seq",
-        "participant",
-        "applied"
+        "participant"
       ],
       "additionalProperties": false,
       "properties": {
@@ -506,10 +581,18 @@
           "type": "array"
         },
         "applied": {
+          "description": "Whether the act was applied, or refused (`refusal`: why). Joined by the act's action: an act takes time, and how it ended is logged when it ends. Absent: still under way when the log ended.",
           "type": "boolean"
         },
         "refusal": {
           "$ref": "urn:oikos:contracts:0.8:common#/$defs/Opaque"
+        },
+        "created": {
+          "description": "The ids of what the act made, as the log's events for it say: records (a notice, a decision, an order, an agreement) and letters. What is later written in answer names one of them.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       }
     },
@@ -542,7 +625,7 @@
       }
     },
     "CitizenDecision": {
-      "description": "A code citizen's decision, as its mind made it (docs/design/ai-citizens.md 7): what it had before it (each option's facts, how many it knows took it, what it means to them, what they have learned of it; their routine; their circumstances), how it decided (repeat, imitate, compare, deliberate), each option's score (basis points), and what it chose. Facts as the citizen had them, and the mind's own figures: nothing here says whether a choice was good. Training data for citizen models, and the baseline they're compared with. What followed is in the log after `seq`, by the same participant (actions.jsonl rows carry `seq`).",
+      "description": "A code citizen's decision, as its mind made it (docs/design/ai-citizens.md 7): what it had before it (each option's facts, how many it knows took it, what it means to them, what they have learned of it; their routine; their circumstances), how it decided (repeat, imitate, compare, deliberate), each option's score (basis points), what it chose, and what the citizen then came to know of how the choice turned out (`outcomes`). Facts as the citizen had them, and the mind's own figures: nothing here says whether a choice was good. Training data for citizen models, and the baseline they're compared with. What the citizen did next is in the log after `seq`, by the same participant (actions.jsonl rows carry `seq`).",
       "type": "object",
       "required": [
         "run",
@@ -567,6 +650,16 @@
         },
         "participant": {
           "type": "string"
+        },
+        "n": {
+          "description": "The citizen's own count of its recorded decisions, from 1 (it starts again if the citizen's controller does): what an outcome names as the decision it follows.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "follows": {
+          "description": "The earlier decision of the citizen's (its `n`) that this one follows up: trying another shop for what the trip's shop could not serve.",
+          "type": "integer",
+          "minimum": 1
         },
         "domain": {
           "type": "string"
@@ -814,6 +907,354 @@
                   "maxLength": 64
                 }
               }
+            }
+          }
+        },
+        "outcomes": {
+          "description": "What the citizen came to know of how this choice turned out, in the order it learned it: each time it was served, paid or not, each gathering gone to, and how it ended (the job, the tenancy). Each is an outcome of the citizen's latest decision that chose the option. Present wherever the run recorded outcomes. Empty: the citizen learned nothing of it before the run ended (manifest `end.t`): it is not known, which is not a payoff of nought. Absent: the log was made before outcomes were recorded.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "t",
+              "option",
+              "kind",
+              "way"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "t": {
+                "description": "When the citizen came to know it (not when it happened: a wage is known when the citizen next looks at its account).",
+                "$ref": "urn:oikos:contracts:0.8:common#/$defs/SimTime"
+              },
+              "seq": {
+                "description": "Where the record stands in the run's log (the annotation's sequence number; one annotation holds all a citizen learned since its last action).",
+                "type": "integer",
+                "minimum": 0
+              },
+              "option": {
+                "description": "What it is about, as the citizen's decisions name their options: the shop, the employer, the home (its space), the gathering, `stay`, `member`, a goal and its method.",
+                "type": "string"
+              },
+              "kind": {
+                "description": "What happened, in a word. shop: served. job: hired, paid, unpaid, no_work (work by the day that brought no pay), rise, ended. own_work: drawn (what the citizen's own business paid them). home: lease_signed, moved_in, not_in_yet, rent_increase, renewed, notice_received, ended. practice: attended, turned_away, stayed, expected. membership: joined, rise_won, stoppage_called. goal: met, not_met. venture: founded, refused, capital_called. petition: signatures, closed. Any area: told (another's experience, as they told it). belief: told. A reader should take a kind it does not know as a fact of that name.",
+                "type": "string",
+                "maxLength": 64
+              },
+              "way": {
+                "description": "How the citizen came to know (docs/design/knowing.md): mine (its own money, papers and letters, and what its own acts came to), here (it was there), published, ask.",
+                "enum": [
+                  "mine",
+                  "here",
+                  "published",
+                  "ask"
+                ]
+              },
+              "from": {
+                "description": "Who told the citizen (kind told).",
+                "type": "string"
+              },
+              "facts": {
+                "description": "What happened, as the citizen has it: counts, sums in minor units, days, ids, yes or no. By kind: served: ordered, delivered, refund, order. paid: amount, agreed, paid_at, days_since_last, period_days. unpaid: days_since_last, period_days, periods_missed, owed. hired: wage, period_days, days_without, after_notice. ended: by (self, other, term), held_days, rent, unpaid. rise: rise_bps, wage, made_at. lease_signed: rent, days_without. rent_increase: rent, was, from, bearable, challenged. renewed: rent, was. not_in_yet: why. attended: host, others, meaning. met, not_met: level, wanted, days. told: served_bps, paid, goes, host. Nothing here is a judgement.",
+                "type": "object",
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "learned": {
+                "description": "The mind's update of what it has learned of the option (experience-weighted attraction; basis points on the payoff scale): the payoff the mind computed from what happened, and the option's attraction before and after. `first`: never tried nor heard of before, so `before` is what the citizen expected of it. `heard`: another's payoff, weighed as such (below one's own experience). An update also fades what the citizen has learned of the area's other options; the next decision's options carry them.",
+                "type": "object",
+                "required": [
+                  "payoff",
+                  "before",
+                  "after"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "payoff": {
+                    "type": "integer"
+                  },
+                  "before": {
+                    "type": "integer"
+                  },
+                  "after": {
+                    "type": "integer"
+                  },
+                  "first": {
+                    "const": true
+                  },
+                  "heard": {
+                    "const": true
+                  }
+                }
+              },
+              "need": {
+                "description": "The need the mind read the payoff from, or that the outcome is a level of (an evening at home is worth the company one has there: social; a goal is met when its need recovers).",
+                "type": "string",
+                "maxLength": 32
+              },
+              "felt": {
+                "description": "Feelings the mind appraised from it: the emotion, about whom, the strength of the cause (basis points), and the feeling's level before and after.",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "emotion",
+                    "about",
+                    "bps",
+                    "before",
+                    "after"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "emotion": {
+                      "type": "string",
+                      "maxLength": 32
+                    },
+                    "about": {
+                      "type": "string",
+                      "maxLength": 128
+                    },
+                    "bps": {
+                      "type": "integer"
+                    },
+                    "before": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 10000
+                    },
+                    "after": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 10000
+                    }
+                  }
+                }
+              },
+              "belief": {
+                "description": "How strongly the citizen holds what `host` teaches (the strongest of its teachings; basis points), before and after.",
+                "type": "object",
+                "required": [
+                  "host",
+                  "before",
+                  "after"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "host": {
+                    "type": "string"
+                  },
+                  "before": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10000
+                  },
+                  "after": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10000
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "CitizenOutcome": {
+      "description": "One thing a code citizen came to know of how something went, when and as it came to know it (docs/design/ai-citizens.md 7): the flat list of what is nested under decisions in citizen_decisions.jsonl, with what follows no recorded decision (a job or home held from the start; what someone told them of a shop, an employer or a gathering; what they expected of something before trying it). Facts as the citizen had them and the mind's own figures. Nothing here says whether an outcome was good, and nothing is here that the citizen did not know.",
+      "type": "object",
+      "required": [
+        "run",
+        "t",
+        "participant",
+        "domain",
+        "option",
+        "kind",
+        "way"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "run": {
+          "type": "string"
+        },
+        "t": {
+          "description": "When the citizen came to know it (not when it happened: a wage is known when the citizen next looks at its account).",
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/SimTime"
+        },
+        "seq": {
+          "description": "Where the record stands in the run's log (the annotation's sequence number; one annotation holds all a citizen learned since its last action).",
+          "type": "integer",
+          "minimum": 0
+        },
+        "participant": {
+          "type": "string"
+        },
+        "domain": {
+          "description": "The area of life, as decisions name it (shop, job, home, practice, membership, goal, venture, petition); `belief` for what the citizen holds.",
+          "type": "string"
+        },
+        "option": {
+          "description": "What it is about, as the citizen's decisions name their options: the shop, the employer, the home (its space), the gathering, `stay`, `member`, a goal and its method.",
+          "type": "string"
+        },
+        "of": {
+          "description": "The decision it follows from: that decision's `n` (the citizen's latest that chose this option). Absent: no recorded decision began it.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "decision_seq": {
+          "description": "That decision's `seq` in citizen_decisions.jsonl.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "decision_t": {
+          "description": "When that decision was made: `t` less this is how long the citizen waited to know.",
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/SimTime"
+        },
+        "kind": {
+          "description": "What happened, in a word. shop: served. job: hired, paid, unpaid, no_work (work by the day that brought no pay), rise, ended. own_work: drawn (what the citizen's own business paid them). home: lease_signed, moved_in, not_in_yet, rent_increase, renewed, notice_received, ended. practice: attended, turned_away, stayed, expected. membership: joined, rise_won, stoppage_called. goal: met, not_met. venture: founded, refused, capital_called. petition: signatures, closed. Any area: told (another's experience, as they told it). belief: told. A reader should take a kind it does not know as a fact of that name.",
+          "type": "string",
+          "maxLength": 64
+        },
+        "way": {
+          "description": "How the citizen came to know (docs/design/knowing.md): mine (its own money, papers and letters, and what its own acts came to), here (it was there), published, ask.",
+          "enum": [
+            "mine",
+            "here",
+            "published",
+            "ask"
+          ]
+        },
+        "from": {
+          "description": "Who told the citizen (kind told).",
+          "type": "string"
+        },
+        "facts": {
+          "description": "What happened, as the citizen has it: counts, sums in minor units, days, ids, yes or no. By kind: served: ordered, delivered, refund, order. paid: amount, agreed, paid_at, days_since_last, period_days. unpaid: days_since_last, period_days, periods_missed, owed. hired: wage, period_days, days_without, after_notice. ended: by (self, other, term), held_days, rent, unpaid. rise: rise_bps, wage, made_at. lease_signed: rent, days_without. rent_increase: rent, was, from, bearable, challenged. renewed: rent, was. not_in_yet: why. attended: host, others, meaning. met, not_met: level, wanted, days. told: served_bps, paid, goes, host. Nothing here is a judgement.",
+          "type": "object",
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "learned": {
+          "description": "The mind's update of what it has learned of the option (experience-weighted attraction; basis points on the payoff scale): the payoff the mind computed from what happened, and the option's attraction before and after. `first`: never tried nor heard of before, so `before` is what the citizen expected of it. `heard`: another's payoff, weighed as such (below one's own experience). An update also fades what the citizen has learned of the area's other options; the next decision's options carry them.",
+          "type": "object",
+          "required": [
+            "payoff",
+            "before",
+            "after"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "payoff": {
+              "type": "integer"
+            },
+            "before": {
+              "type": "integer"
+            },
+            "after": {
+              "type": "integer"
+            },
+            "first": {
+              "const": true
+            },
+            "heard": {
+              "const": true
+            }
+          }
+        },
+        "need": {
+          "description": "The need the mind read the payoff from, or that the outcome is a level of (an evening at home is worth the company one has there: social; a goal is met when its need recovers).",
+          "type": "string",
+          "maxLength": 32
+        },
+        "felt": {
+          "description": "Feelings the mind appraised from it: the emotion, about whom, the strength of the cause (basis points), and the feeling's level before and after.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "emotion",
+              "about",
+              "bps",
+              "before",
+              "after"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "emotion": {
+                "type": "string",
+                "maxLength": 32
+              },
+              "about": {
+                "type": "string",
+                "maxLength": 128
+              },
+              "bps": {
+                "type": "integer"
+              },
+              "before": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
+              },
+              "after": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
+              }
+            }
+          }
+        },
+        "belief": {
+          "description": "How strongly the citizen holds what `host` teaches (the strongest of its teachings; basis points), before and after.",
+          "type": "object",
+          "required": [
+            "host",
+            "before",
+            "after"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "host": {
+              "type": "string"
+            },
+            "before": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            "after": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
             }
           }
         }

@@ -1,0 +1,70 @@
+{
+  "run": "town-1000.seed1",
+  "t": 1209600,
+  "seq": 61200,
+  "participant": "citizen-17-self",
+  "n": 12,
+  "domain": "shop",
+  "strategy": "deliberate",
+  "choice": "shop-3",
+  "options": [
+    {
+      "key": "shop-3",
+      "score": 9120,
+      "facts": {
+        "money_per_month": -12150,
+        "goods_per_month": 9
+      }
+    },
+    {
+      "key": "shop-5",
+      "score": 8870,
+      "facts": {
+        "money_per_month": -12600,
+        "goods_per_month": 9
+      },
+      "others": 1,
+      "learned": 8200
+    }
+  ],
+  "circumstances": {
+    "monthly_income": 452000,
+    "savings": 310000,
+    "homeless": false,
+    "essentials": 40000
+  },
+  "satisfied_here": 10000,
+  "state": {
+    "mind": "mind-0.2.0",
+    "needs": {
+      "subsistence": 4000,
+      "shelter": 10000,
+      "security": 10000,
+      "social": 6000,
+      "status": 7000
+    },
+    "satisfaction": 7480,
+    "certainty": 5000
+  },
+  "outcomes": [
+    {
+      "t": 1814400,
+      "seq": 90214,
+      "option": "shop-3",
+      "kind": "served",
+      "way": "mine",
+      "facts": {
+        "ordered": 9,
+        "delivered": 6,
+        "refund": 1350,
+        "order": "rec.4411"
+      },
+      "learned": {
+        "payoff": 6667,
+        "before": 8000,
+        "first": true,
+        "after": 7298
+      }
+    }
+  ]
+}

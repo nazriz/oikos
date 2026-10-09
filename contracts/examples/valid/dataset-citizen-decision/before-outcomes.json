@@ -1,0 +1,19 @@
+{
+  "run": "town-1000.seed1",
+  "t": 2419200,
+  "seq": 140031,
+  "participant": "citizen-208-self",
+  "domain": "vote",
+  "strategy": "deliberate",
+  "choice": "citizen-3-self",
+  "options": [
+    {
+      "key": "citizen-3-self",
+      "score": 1200
+    },
+    {
+      "key": "mayor",
+      "score": -300
+    }
+  ]
+}

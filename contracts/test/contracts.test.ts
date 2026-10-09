@@ -37,6 +37,8 @@ const TARGETS: Record<string, string> = {
   form: `${NS}:outcomes#/$defs/FormData`,
   "dataset-manifest": `${NS}:dataset#/$defs/Manifest`,
   "dataset-decision": `${NS}:dataset#/$defs/Decision`,
+  "dataset-citizen-decision": `${NS}:dataset#/$defs/CitizenDecision`,
+  "dataset-citizen-outcome": `${NS}:dataset#/$defs/CitizenOutcome`,
 };
 
 const readJson = (path: string) => JSON.parse(readFileSync(path, "utf8"));
