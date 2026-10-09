@@ -131,7 +131,10 @@ call, and its subscription limits apply). Optional: `testSituations` (as `situat
 test lane's examples into validation-real as well, which makes `real_right` in a run's report count them, and so no longer
 comparable with earlier runs), `waitMinutes` (20) and `maxWaitHours` (12) for usage limits, `writerCallChars`, `readerBatch`,
 `readerBatchChars`, `callMinutes` (15: how long one call to a writer or reader may take), `trainExtra` (flags for
-`train.py`), `deadlineHours`, `name` (for the runs: `<name>-s<seed>`).
+`train.py`), `deadlineHours`, `name` (for the runs: `<name>-s<seed>`). `uniformity` (the limits of the guard on a reader's answers, step 5: `{"topShare": 0.65}` where the
+requests are known to be lopsided; the wave's writers, put in a seat, ask to be shown things about one time in three, which
+is `none(not_an_act)`, and a batch of 30 then passes 40% of one program by chance: read the batch that stopped the run
+before raising it).
 
 ## The readers
 
