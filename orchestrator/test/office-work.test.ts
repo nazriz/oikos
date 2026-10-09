@@ -14,6 +14,7 @@ import { expect, test } from "bun:test";
 import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { modules } from "@oikos/participants";
 import { generate } from "@oikos/worlds/generator/generate";
 import { runWorld } from "../src/run";
 import { applicantsTo, offeredTo, postingFor, scriptedSeats, type Sitting } from "../../scripts/scripted-seats";
@@ -98,3 +99,100 @@ test("offers that cite no advertisement: the preview says there is no place of w
   expect(last).toMatch(/under rec\.\d+, has not come in to work: no place of work in the employment agreement or in an advertisement it cites/);
   expect(last).toMatch(/- rec\.\d+, collect every 7 days: not carried out: none of the \d in post was at the depot/);
 }, 600_000);
+
+// An office that buys from outside can place the order (the shake-down review, fault 3). In the first utilities pilot
+// the energy seat's stock ran low and it had no paper to order with: its payments to the world market, with no order
+// waiting for them, were sent back, and the market's letters never said what an order is. Here the seat has the
+// office's order form, which says how buying is done; an order on it, paid in full, is delivered; a payment alone is
+// sent back, as before.
+test("an energy seat orders from the grid on its own order form and is delivered; a payment with no order is sent back; its stationery says how", async () => {
+  const config = generate({ ...spec, model_seats: ["energy-operations"] });
+  const market = config.participants.find((p: any) => p.id === "outside-trade-system").controller.params;
+  const own = config.participants.find((p: any) => p.id === "energy-operations-staff-system").controller.params;
+  const price = (market.sells.energy / 100).toFixed(2), least = Math.max(market.min_order ?? 100, 500);
+  const sum = (n: number) => ((n * market.sells.energy) / 100).toFixed(2);
+  const energy: Sitting[] = [
+    { day: 0, asks: () => [
+      { what: "The staff supply the customers each day.", program: `work(at=${own.depot}, every="every day", task=supply_energy)` },
+      { what: "The staff bill the customers each month.", program: `work(at=${own.depot}, every="every 30 days", task=bill)` }] },
+    { day: 3, asks: () => [{ what: `Order ${least} energy from outside, paying with the order.`,
+      program: `form(account=acc-energy-co, at=${own.depot}, deliver_to=energy-co, form=order, kind="energy", quantity="${least}", seller=outside, to=energy-operations, unit_price="${price}")\nmoney(amount="${sum(least)}", for="Order: ${least} energy.", from=acc-energy-co, to=acc-outside)` }] },
+    { day: 6, asks: () => [{ what: "Pay the outside world for 700 energy.", program: `money(amount="${sum(700)}", for="700 energy", from=acc-energy-co, to=acc-outside)` }] },
+    { day: 9, asks: () => [] },
+  ];
+  const seats = scriptedSeats({ "energy-operations": energy });
+  const s = await runWorld({ config, runId: "office-order", outDir: mkdtempSync(join(tmpdir(), "oikos-office-order-")), until: 11 * DAY, adapter: seats.adapter, recordObservations: "none", recordDecisions: "none" });
+  expect(s.participantErrors).toBe(0);
+  const events = readFileSync(s.logPath, "utf8").trim().split("\n").map((l) => JSON.parse(l)).filter((e) => e.kind === "event").map((e) => ({ t: e.t, ...e.body }));
+  const records = events.filter((e) => e.event === "recorded").map((e) => e.record);
+  // The order: the paper the staff's own orders to the grid are, made by the seat; delivered once paid.
+  const order = records.find((r) => r.kind === "order" && r.in_position === "energy-operations")!;
+  expect(order).toMatchObject({ speaks_for: "energy-co", addressed_to: ["outside"], data: { kind: "energy", quantity: least, unit_price: market.sells.energy, deliver_to: "energy-co", at: own.depot, account: "acc-energy-co" } });
+  expect(events.some((e) => e.event === "goods_moved" && e.from === "outside" && e.to === "energy-co" && e.kind === "energy" && Number(e.quantity) === least && e.t >= order.at)).toBe(true);
+  expect(records.some((r) => r.kind === "delivery_note" && r.data?.order === order.id && r.data.delivered === least)).toBe(true);
+  // The payment with no order: the market sends it back, and delivers nothing for it.
+  const bare = String(700 * market.sells.energy);
+  const out = events.find((e) => e.event === "transfer" && e.from === "acc-energy-co" && e.to === "acc-outside" && e.amount === bare)!;
+  expect(out).toBeDefined();
+  expect(events.some((e) => e.event === "transfer" && e.from === "acc-outside" && e.to === "acc-energy-co" && e.amount === bare && e.t >= out.t)).toBe(true);
+  expect(events.filter((e) => e.event === "goods_moved" && e.from === "outside" && e.to === "energy-co" && Number(e.quantity) === 700)).toEqual([]);
+  // What the seat is told: its order form among its stationery, with what it is for and how the order is paid.
+  const form = seats.shown[0]!.system.split("\n").find((l) => l.startsWith("- [form-energy-operations-order]"))!;
+  expect(form).toContain("How the office buys from a supplier, the outside world's market among them");
+  expect(form).toContain("The form pays nothing by itself: pay the whole sum");
+  expect(form).toContain("sends back money that comes with no order waiting for it");
+  // And its staff's report says what was supplied and what is held.
+  expect(records.some((r) => r.kind === "staff_report" && r.data.office === "energy-operations" && /supply_energy \(rec\.\d+, every 1 day\): carried out: \d+ days' supply, \d+ units; \d+ energy held/.test(r.text))).toBe(true);
+}, 600_000);
+
+// A billing order is followed from when it is made (the shake-down review, fault 7). In the first utilities pilot the
+// water seat ordered bills every 30 days and none went out in 43: the billing staff kept the office's own first date
+// (a quarter in) whatever the order said, and nothing told the seat when bills were due. Here the first round goes
+// out one period after the order, and each office's staff report how its orders stand.
+test("bills go out one period after a standing billing order is made; the staff of the water, rates, clinic and school offices each report how their orders stand", async () => {
+  const config = generate({ ...spec, model_seats: ["water-operations", "rates", "clinic-manager", "principal"] });
+  const params = (id: string) => config.participants.find((p: any) => p.id === `${id}-staff-system`).controller.params;
+  const at = { water: params("water-operations").works, clinic: params("clinic-manager").building, school: params("principal").building };
+  const idle = [4, 8, 11, 14].map((day) => ({ day, asks: () => [] }));
+  const seats = scriptedSeats({
+    "water-operations": [{ day: 0, asks: () => [
+      { what: "The works draws what the town uses each day.", program: `work(at=${at.water}, every="every 1 day", task=draw_water)` },
+      { what: "Bills every 10 days.", program: `work(at=${at.water}, every="every 10 days", task=bill)` }] }, ...idle],
+    rates: [{ day: 0, asks: () => [{ what: "The clerks send the notices at each instalment.", program: 'work(at=rates, every="every 91 days", task=levy)' }] }, ...idle],
+    "clinic-manager": [{ day: 0, asks: () => [{ what: "The doctors see those waiting each working day.", program: `work(at=${at.clinic}, every="every day", task=treat)` }] }, ...idle],
+    principal: [{ day: 0, asks: () => [
+      { what: "Every classroom is taught each school day.", program: `work(at=${at.school}, every="every day", task=teach)` },
+      { what: "Enrolments are answered.", program: `work(at=${at.school}, every="every day", task=enrol)` }] }, ...idle],
+  });
+  const s = await runWorld({ config, runId: "office-bills", outDir: mkdtempSync(join(tmpdir(), "oikos-office-bills-")), until: 16 * DAY, adapter: seats.adapter, recordObservations: "none", recordDecisions: "none" });
+  expect(s.participantErrors).toBe(0);
+  const records = readFileSync(s.logPath, "utf8").trim().split("\n").map((l) => JSON.parse(l)).filter((e) => e.kind === "event" && e.body.event === "recorded").map((e) => e.body.record);
+  // The water bills: the first round ten days after the order, and not before.
+  const order = records.find((r) => r.kind === "work_order" && r.data.work.task === "bill")!;
+  const bills = records.filter((r) => r.kind === "invoice" && r.data?.service === "water" && r.in_position === "water-operations-staff");
+  expect(bills.length).toBeGreaterThan(10);
+  expect(Math.min(...bills.map((b) => b.at))).toBeGreaterThanOrEqual(order.at + 10 * DAY);
+  expect(Math.min(...bills.map((b) => b.at))).toBeLessThan(order.at + 11 * DAY);
+  // Before them, the staff's report said when they were due; after, that they went.
+  const of = (office: string) => records.filter((r) => r.kind === "staff_report" && r.data.office === office);
+  expect(of("water-operations")[0]!.text).toMatch(/draw_water \(rec\.\d+, every 1 day\): carried out: 1 days' draw, \d+ kL\. bill \(rec\.\d+, every 10 days\): in force; nothing fell due; the meters are read from year 1, day 1 and the next bills go out on year 1, day 11\./);
+  expect(of("water-operations").some((r) => r.data.orders.some((o: any) => o.task === "bill" && o.state === "followed" && o.times === bills.length))).toBe(true);
+  // The rates clerks, the doctors and the teachers report too, each to their own office.
+  expect(of("rates")[0]!.text).toMatch(/^Report of the rates clerks, year 1, day \d+, on the work under the office's standing work orders\. levy \(rec\.\d+, every 91 days\): in force; nothing fell due; (no property has been valued yet|the next notices go out on year 1, day \d+)/);
+  expect(of("clinic-manager")[0]!.text).toMatch(/^Report of the clinic's doctors, .*treat \(rec\.\d+, every 1 day\): (carried out: \d+ patients seen|in force; nothing fell due).* In post \d+: c\d+ /);
+  expect(of("principal")[0]!.text).toMatch(/^Report of the school's teachers, .*teach \(rec\.\d+, every 1 day\): carried out: \d+ lessons.* In post \d+: c\d+ last worked year 1, day \d+ \(teach\)/);
+  // And the seats that have a roster see it there: when each last worked, and each order as reported.
+  const roster = seats.shown.filter((x) => x.seat === "principal" && x.text.includes("Staff of your office")).at(-1)!.text;
+  expect(roster).toMatch(/last at work year 1, day \d+ \(teach\)/);
+  expect(roster).toMatch(/- rec\.\d+, teach every 1 day: carried out: \d+ lessons/);
+}, 600_000);
+
+test("every office that buys in has an order form that says how buying is done; the world market's answer to a letter says what an order is", () => {
+  for (const name of ["utility.energy", "firm.retailer", "firm.producer", "firm.builder"]) {
+    const order = (modules[name]!.issues ?? []).find((f) => f.form === "order");
+    expect(`${name}: ${order?.does ?? ""}`).toMatch(/: How the office buys from a supplier.*pay the whole sum.*delivers once an order is paid in full/);
+    expect(order!.writes.kind).toBe("order");
+  }
+  expect(modules["world.trade"]!.answers!.acts).toContain("a paper on the buyer's own order form, addressed to it, with the whole sum paid into the account its price list names");
+  expect(modules["world.trade"]!.answers!.acts).toContain("sends back money that comes with no order waiting for it");
+});

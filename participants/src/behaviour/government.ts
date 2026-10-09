@@ -725,7 +725,7 @@ export const ratesOfficer: BehaviourModule = {
   takes: [{ form: "rates_recovery", title: "Recovery direction to the rates officer",
     fields: { interest: { type: "choice", options: ["yes", "no"], required: true, description: "Whether rates left unpaid after their due date are charged the law's penalty interest: yes, as the office does of its own accord; no, none is added." } },
     follows: "While a direction with interest no stands, the rates officer adds no penalty interest to overdue rates and writes to nobody about them. The rates themselves are still levied and still owed, and interest already recorded stays on record." }],
-  version: "0.3.0", // 0.3.0: takes a written direction on penalty interest (docs/behaviour/directions.md)
+  version: "0.4.0", // 0.4.0: its clerks report to the rates officer the notices sent under the standing order and when the next go out; 0.3.0: takes a written direction on penalty interest (docs/behaviour/directions.md)
   doc: "docs/behaviour/public-finance.md",
   cadence: () => DAY,
   create(ctx: ParticipantContext) {
@@ -745,6 +745,8 @@ export const ratesOfficer: BehaviourModule = {
     const settled = new Set<string>(); // claims a payment into our account has named
     const lastInterest = new Map<string, number>(); // overdue claim -> when interest was last charged
     let next = p.first_day * DAY;
+    let reportDay = -1;
+    const dated = (x: number) => `year ${Math.floor(x / (365 * DAY)) + 1}, day ${Math.floor((x % (365 * DAY)) / DAY) + 1}`;
     let levied = 0;
     let received = 0;
     return stepper(
@@ -794,7 +796,14 @@ export const ratesOfficer: BehaviourModule = {
             lines.push(say("rates_notice", `Rates notice: ${usd(o.amount)} on ${o.lots.join(", ")}, due in ${dueDays} days, into ${acc.account}.`, { to: [owner], visible: [me, owner], basis: law.id, data: { amount: o.amount, lots: o.lots, due, account: acc.account } }),
               record("right", me, { kind: "rates", amount: o.amount, account: acc.account, due, lots: o.lots }, { against: owner, basis: law.id }));
           }
+          routines.did("levy", t, { units: lines.length / 2 });
           for (let i = 0; i < lines.length; i += 30) steps.push(because(`The rates instalment: a ${instalments === 1 ? "year" : `${instalments}th of a year`}'s rates at the law's ${ratePpm / 10_000}% of each property's value.`, ...lines.slice(i, i + 30)));
+        }
+        // The clerks' report to the rates officer, once a day (docs/behaviour/standing-work.md, "The staff's report").
+        if (levying) routines.note("levy", !law || ratePpm <= 0 ? "the rating law on file sets no rate, so no notice is sent" : !book.open("valuation").length ? "no property has been valued yet: the first notices go out once the valuer has valued" : `the next notices go out on ${dated(next)}, as the rating law's instalments fall`);
+        if (p.part === "staff" && reportDay !== Math.floor(t / DAY)) {
+          reportDay = Math.floor(t / DAY);
+          steps.push(...routines.report(book, t, { office: (ctx.position ?? "").replace(/-staff$/, ""), from: "the rates clerks", tasks: { levy: ["instalments", "notices"] } }));
         }
         // Overdue: penalty interest, monthly, on what's still unpaid after its due date (unless a recovery direction
         // that stands, from whoever the town says may direct us, says to add none).
