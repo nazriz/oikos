@@ -141,3 +141,33 @@ test("a call that fills per_request with words is the call's fault: tried again,
     .translate({ draftId: "d2", participant: "finance-system", as: "finance", proposal: "Pay over 280.00 from acc-city to acc-c0003, with report.", knowledge: seat("finance") });
   expect(twice).toMatchObject({ ok: false, notices: [NOT_PUT] });
 });
+
+// --- the translator's instructions, 0.9.3
+
+test("prompt 0.9.3: a figure named with something to be taken off it is an amount to be worked out; a direction with no form is a message; what per_request is", () => {
+  const { translatorSystem, TRANSLATOR_VERSION } = require("../src/index");
+  const s: string = translatorSystem();
+  expect(TRANSLATOR_VERSION).toBe("0.9.3");
+  for (const said of [
+    "So is an amount given only as a figure with something to be taken off it or added to it that the request doesn't state as a figure",
+    "the figure named is what the amount is worked out from, and is never written as the amount.",
+    '(Where the request states the result itself, "1,640, being 2,000 less 360", the result is the amount.)',
+    "Pay c0042 their wage of 2,000 from acc-1 every 14 days, less what the tax law says to withhold.  ->  none(needs_calculation)",
+    'Pay c0042 1,640 from acc-1 every 14 days for wages (2,000 less 360 withheld).  ->  money(to=c0042, amount="1,640", from=acc-1, every="every 14 days", for="wages")',
+    "one that addresses an office, a post or a person and tells them to do, stop or change something is a message to them where no form is listed for that direction, never no_such_act.",
+    '(Where no form is listed for it.) Direct the depot to take in no new applications from now on.  ->  message(to="the depot", text="take in no new applications from now on")',
+    "per_request only where the person keeps the account the money leaves and is carrying out a request to pay: that request's id",
+  ]) expect(s).toContain(said);
+  // Every worked example in the instructions is a program the contract takes, and the new ones read as they say.
+  for (const line of s.split("\n").filter((l) => l.includes("  ->  "))) expect(calls.contractErrors(calls.parseProgram(line.split("  ->  ")[1]!))).toEqual([]);
+});
+
+test("the seen cases have the ruling both ways: told to an office it is a message, told to nobody it is no act; and a wage with and without its result", () => {
+  const { CASES } = require("../eval/cases");
+  const by = (id: string) => CASES.find((c: any) => c.id === id);
+  expect(by("direct-office-no-form").expect[0]).toStartWith('message(to="the water office"');
+  expect(by("have-office-stop-no-form").expect[0]).toStartWith('message(to="the registry"');
+  expect(by("own-routine-nobody-told").expect).toEqual(["none(no_such_act)"]);
+  expect(by("wage-less-tax-not-stated").expect).toEqual(["none(needs_calculation)"]);
+  expect(by("wage-net-stated").expect[0]).toContain('amount="$1,640"');
+});

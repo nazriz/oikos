@@ -23,7 +23,7 @@ const acts = (g: Gold) => resolve(calls.parseProgram(g.program), g.forms?.length
 
 test("the versions, and the three rules in the translator's instructions", () => {
   expect(DATA_VERSION).toBe("0.13.2");
-  expect(TRANSLATOR_VERSION).toBe("0.9.2");
+  expect(TRANSLATOR_VERSION).toBe("0.9.3");
   const s = translatorSystem();
   for (const rule of [
     "the direction is that form filled in, not a message.",
