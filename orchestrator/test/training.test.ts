@@ -466,6 +466,23 @@ test("requests written by file: a briefs-only run and the writers' requests take
   expect(asked.every((t: any) => named.includes(t.gold.tag))).toBe(true);
   const of = (re: RegExp) => asked.filter((t: any) => re.test(t.gold.program)).length;
   expect([of(/^statement\(hold=/) > 40, of(/^statement\(.*visible=own/) > 40, of(/^form\(/) > 200, of(/^work\(.*every=/) > 100]).toEqual([true, true, true, true]);
+  // Payments of a bank's and a finance office's kinds, by name; a part weighted toward an asker and toward some worlds' money.
+  const pay = { ...options, shard: undefined, refusalFloor: undefined, perGold: 1, floor: 20, generated: 20, broad: true, briefsOnly: true as const };
+  await trainingData({ ...pay, only: ["per_request", "finance_payment"], bankPayments: 60, financePayments: 40, money: { ORO: 9 }, out: join(d, "payments") });
+  const payPlan = json(join(d, "payments"), "plan.json");
+  expect(payPlan.options).toMatchObject({ only: ["per_request", "finance_payment"], bankPayments: 60, financePayments: 40, money: { ORO: 9 } });
+  const paid = payPlan.items.filter((t: any) => t.kind === "request");
+  expect(payPlan.items.length).toBe(100);
+  expect([paid.filter((t: any) => t.gold.tag === "per_request" && t.asker === "banker" && /per_request=rec\.\d+/.test(t.gold.program)).length, paid.filter((t: any) => t.gold.tag === "finance_payment").length]).toEqual([60, 40]);
+  // (One currency of the worlds' twenty-odd, nine times over: about a quarter of the programs, where its even share is under a twentieth.)
+  expect(paid.filter((t: any) => t.gold.currency.code === "ORO").length).toBeGreaterThan(15);
+  await trainingData({ ...pay, only: ["statement"], askers: { banker: 0.6 }, out: join(d, "askers") });
+  const ap = json(join(d, "askers"), "plan.json");
+  expect(ap.options).toMatchObject({ askers: { banker: 0.6 } });
+  expect(ap.items.filter((t: any) => t.asker === "banker").length).toBeGreaterThan(ap.items.length / 4);
+  await expect(trainingData({ ...pay, askers: { teller: 0.5 }, out: join(d, "bad") })).rejects.toThrow("askers: teller=0.5 is not an asker");
+  await expect(trainingData({ ...pay, broad: false, askers: { banker: 0.5 }, out: join(d, "bad") })).rejects.toThrow("askers: only a wide part");
+  await expect(trainingData({ ...pay, money: { NOPE: 2 }, out: join(d, "bad") })).rejects.toThrow("money: NOPE=2 is not the code");
   // A function or a label the call language doesn't have, or a share that is none, is refused before anything is written.
   await expect(trainingData({ ...options, only: ["letters"], briefsOnly: true, out: join(d, "bad") })).rejects.toThrow("only: no function letters");
   await expect(trainingData({ ...options, refusalLabels: ["reading"], briefsOnly: true, out: join(d, "bad") })).rejects.toThrow("refusal labels: no label reading");

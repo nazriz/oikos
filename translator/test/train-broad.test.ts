@@ -3,13 +3,13 @@
 import { expect, test } from "bun:test";
 import { calls } from "@oikos/participants";
 import * as PAPERS from "../../participants/src/behaviour/papers";
-import { ASKERS, askerFor, BROAD_DEAL, DATA_VERSION, DEAL, fromWritten, PAPER_ASKERS, planOf, refusalBriefs, REGISTERS, STYLES, sampler, type PlanItem } from "../train/data";
-import { synthetic, worldForms } from "../train/synthetic";
+import { ASKERS, askerFor, BROAD_DEAL, DATA_VERSION, DEAL, fromWritten, PAPER_ASKERS, planOf, refusalBriefs, REGISTERS, STYLES, sampler, whyNot, type PlanItem } from "../train/data";
+import { payments, synthetic, worldForms } from "../train/synthetic";
 
 const gold = synthetic({ perFunction: 12, seed: 3 });
 
 test("the pipeline's version says there is a wide part", () => {
-  expect(DATA_VERSION).toBe("0.13.2");
+  expect(DATA_VERSION).toBe("0.14.0");
 });
 
 test("the wide deal is made of the styles and the three registers, and the older deal has none of the registers", () => {
@@ -117,4 +117,82 @@ test("a wide part's programs have grouped counts and starts given as days, each 
   expect(wide.filter(dated).length).toBeGreaterThan(5);
   expect(plain.some(grouped) || plain.some(dated)).toBe(false);
   for (const g of wide.filter((x) => grouped(x) || dated(x))) expect(calls.contractErrors(calls.parseProgram(g.program))).toEqual([]);
+});
+
+test("payments of a bank's kind: a keeper carries out a request to pay, asked by someone at a bank's counter; a log's own stay out", () => {
+  const made = payments({ kind: "per_request", n: 120, seed: 21 });
+  expect(payments({ kind: "per_request", n: 120, seed: 21 })).toEqual(made);
+  expect(made.length).toBe(120);
+  expect(new Set(made.map((g) => g.program)).size).toBe(120);
+  for (const g of made) {
+    const p = calls.parseProgram(g.program) as { lines: calls.Line[] };
+    expect(calls.contractErrors(p)).toEqual([]);
+    expect(p.lines.length).toBe(1);
+    const a = p.lines[0]!.call.args;
+    expect(p.lines[0]!.call.fn).toBe("money");
+    // (The request carried out is a record's id, bare; the account the money leaves is always said.)
+    expect((a.per_request as { id: string }).id).toMatch(/^rec\.\d+$/);
+    expect("id" in a.from!).toBe(true);
+    expect([g.tag, g.asker, g.origin]).toEqual(["per_request", "banker", "synthetic"]);
+    expect(g.notes!.join(" ")).toContain((a.per_request as { id: string }).id);
+    // (What keeps a code keeper's own such payments out of a gold set made from logs is unchanged.)
+    expect(whyNot(p)).toContain("per_request");
+  }
+  // Some name the account's holder inside the purpose, as tellers write it; some settle something.
+  expect(made.filter((g) => /for="c\d{4}'s /.test(g.program)).length).toBeGreaterThan(8);
+  expect(made.filter((g) => g.program.includes("settles=")).length).toBeGreaterThan(3);
+  // Whoever asks is the bank, in every style, an office-holder's too.
+  const plan = planOf(made.slice(0, 52), { writers: ["a"], perGold: 1, broad: true, styles: BROAD_DEAL, seed: 2 });
+  expect(plan.every((t) => t.asker === "banker" && t.brief.includes(ASKERS.banker!) && t.brief.includes("carrying out a request to pay"))).toBe(true);
+});
+
+test("payments of a finance office's kinds: a net wage with its gross and what was withheld, a remittance, several records cited, a first day", () => {
+  const made = payments({ kind: "finance", n: 120, seed: 22 });
+  expect(payments({ kind: "finance", n: 120, seed: 22 })).toEqual(made);
+  expect(made.length).toBe(120);
+  const args = (g: (typeof made)[number]) => (calls.parseProgram(g.program) as { lines: calls.Line[] }).lines[0]!.call.args;
+  for (const g of made) {
+    expect(calls.contractErrors(calls.parseProgram(g.program))).toEqual([]);
+    expect([g.tag, g.asker]).toEqual(["finance_payment", undefined]);
+    expect(g.program).not.toContain("per_request");
+  }
+  // A wage: the note gives the gross and what was withheld, and the call's amount is what is left of the one after the other.
+  const wages = made.filter((g) => g.notes!.some((n) => n.includes("the gross wage")));
+  expect(wages.length).toBe(30);
+  for (const g of wages) {
+    const m = /the gross wage, (.+?), and what was withheld from it, (.+?)\. What is to be paid is (.+?), and the request/.exec(g.notes!.join(" "))!;
+    const [gross, withheld, net] = [m[1]!, m[2]!, m[3]!].map((x) => BigInt(calls.parseAmount(x, g.currency!)));
+    expect(gross! - withheld!).toBe(net!);
+    expect((args(g).amount as { text: string }).text).toBe(m[3]!);
+    expect(g.program).not.toContain(m[1]!);
+  }
+  // What was withheld, remitted to an outside account; a payment resting on several records, mostly settling something; a standing payment with its first day or wait.
+  expect(made.filter((g) => g.notes!.some((n) => n.includes("withheld")) && !wages.includes(g)).length).toBe(30);
+  const several = made.filter((g) => { const b = args(g).basis; return !!b && "json" in b && Array.isArray(b.json) && b.json.length >= 2; });
+  expect(several.length).toBe(30);
+  expect(several.filter((g) => "settles" in args(g)).length).toBeGreaterThan(8);
+  const standing = made.filter((g) => "every" in args(g));
+  expect(standing.length).toBe(30);
+  expect(standing.every((g) => "first" in args(g))).toBe(true);
+  expect(standing.filter((g) => /first="(year \d+, )?day \d+"/.test(g.program)).length).toBeGreaterThan(5);
+});
+
+test("a wide part weighted toward an asker: that share of the requests is theirs, an office-holder's style is an office-holder's still, and with no weight who asks is who it was", () => {
+  const money = gold.filter((g) => g.shape.startsWith("money(") || g.shape.startsWith("statement(") || g.shape.startsWith("agreement("));
+  const o = { writers: ["a"], perGold: 4, broad: true, styles: BROAD_DEAL, seed: 6 };
+  const plain = planOf(money, o), weighted = planOf(money, { ...o, askers: { banker: 0.5 } });
+  expect(planOf(money, { ...o, askers: {} }).map((t) => t.asker)).toEqual(plain.map((t) => t.asker));
+  expect(weighted.length).toBe(plain.length);
+  const official = ["early", "late", "capacity", "cited", "stacked", "do_not"];
+  const free = weighted.filter((t) => !official.includes(t.style));
+  expect(weighted.filter((t) => official.includes(t.style)).every((t) => t.asker === "officer")).toBe(true);
+  const share = free.filter((t) => t.asker === "banker").length / free.length;
+  expect(share).toBeGreaterThan(0.4);
+  expect(share).toBeLessThan(0.7);
+  // (The others are still there, drawn among those who would ask for such an act.)
+  expect(new Set(free.map((t) => t.asker)).size).toBeGreaterThan(4);
+  expect(plain.filter((t) => t.asker === "banker").length).toBeLessThan(free.filter((t) => t.asker === "banker").length / 3);
+  // A program that says who asks is theirs whatever the weight; the whole draw to one asker is that asker.
+  expect(askerFor("chatty", { shape: "form(form,to)", asker: "landlord" }, sampler(1), { banker: 1 })).toBe("landlord");
+  for (let i = 0; i < 10; i++) expect(askerFor("flat", { shape: "statement(kind,text)" }, sampler(i), { banker: 1 })).toBe("banker");
 });

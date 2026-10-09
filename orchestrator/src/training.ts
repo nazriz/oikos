@@ -23,14 +23,14 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { calls } from "@oikos/participants";
+import { calls, type Currency } from "@oikos/participants";
 import { callModel, PRICES, type Budget, type LlmAdapter, type LlmIO, type Price, type Usage } from "@oikos/participants/llm";
 import { createTranslator, Knowledge } from "@oikos/translator";
 import { loadHeldOut, TEST_CURRENCY } from "@oikos/translator/eval";
 import { CASES } from "../../translator/eval/cases";
 import { blindRequests, checkAnswers, type BlindAnswer, type BlindReport } from "../../translator/train/blind";
-import { BROAD_DEAL, PAPER_ASKERS, CLOSE, DATA_VERSION, OPEN, inOnly, fromWritten, functionOf, generate, goldFromCases, goldFromLog, knowing, planOf, refusalWriterSystem, sampler, shuffled, split, surfaceVariant, writerSystem, type Back, type Example, type Gold, type Manifest, type PlanItem, type Reject, type WrittenRequest } from "../../translator/train/data";
-import { amountForms, piled, synthetic, worldForms } from "../../translator/train/synthetic";
+import { ASKERS, BROAD_DEAL, PAPER_ASKERS, CLOSE, DATA_VERSION, OPEN, inOnly, fromWritten, functionOf, generate, goldFromCases, goldFromLog, knowing, planOf, refusalWriterSystem, sampler, shuffled, split, surfaceVariant, writerSystem, type Back, type Example, type Gold, type Manifest, type PlanItem, type Reject, type WrittenRequest } from "../../translator/train/data";
+import { amountForms, everyCurrency, payments, piled, synthetic, worldForms } from "../../translator/train/synthetic";
 import { logsIn } from "./corpus";
 import { logLines, runOf } from "./logs";
 
@@ -39,6 +39,10 @@ import { logLines, runOf } from "./logs";
  * with the function whose generated programs it is drawn among: so `only: ["hold", "entry"]` with `generated: 3000`
  * draws 3,000 statements and writes requests for the holds and the entries among them (about one in ten each).
  */
+/** Kinds of program by name that are added to the gold set by an option of their own (`bankPayments`,
+ * `financePayments`), as the forms of several amounts are: `only` takes them. */
+const ADDED = ["per_request", "finance_payment"];
+
 export const TAGS: { [tag: string]: string } = {
   hold: "statement", entry: "statement", standing_work_hold: "statement", standing_work_withdraw: "statement",
   standing_work: "work", direction: "form", paper: "form", direction_unlisted: "message", world_form: "form",
@@ -112,6 +116,18 @@ export interface TrainingDataOptions {
   /** Every paper the worlds' own offices issue is added to the gold set, each filled in so many ways, every field of
    * it in the first two (synthetic.ts `worldForms`; none if absent). `only: ["world_form"]` writes requests for them alone. */
   worldForms?: number;
+  /** So many payments that carry out a request to pay (a bank's, out of an account it keeps: `per_request`), and so
+   * many of a finance office's kinds (a net wage with the gross and what was withheld said, what was withheld
+   * remitted, a payment resting on several records, a standing payment with its first day), are added to the gold
+   * set (synthetic.ts `payments`; none if absent). `only: ["per_request"]`, `only: ["finance_payment"]` write
+   * requests for them alone. */
+  bankPayments?: number;
+  financePayments?: number;
+  /** A wide part weighted toward some askers: the share of its requests each makes (data.ts `PlanOptions.askers`). */
+  askers?: { [asker: string]: number };
+  /** A part weighted toward some worlds' money: how many times over each of these currencies, by its code, stands
+   * among those the generated programs' money is drawn from (1 if not named; synthetic.ts `everyCurrency`). */
+  money?: { [code: string]: number };
   /** The share of gold programs whose examples are set aside for validation (default 0.15; 0: no split written). */
   validation?: number;
   seed?: number;
@@ -166,7 +182,7 @@ export interface GoldReport {
  * The floor under each refusal label (`refusalFloor`) is kept when requests are written (generate): refusals aren't
  * programs, so it's only carried in the report here.
  */
-export async function balancedGold(sources: string[], o: { perShape?: number; seed?: number; floor?: number; generated?: number; ceiling?: number; refusalFloor?: number; /** `generated` is for these functions only (the others get what they get without it). */ only?: string[]; /** A wide part's draws (synthetic.ts `wide`). */ broad?: boolean } = {}): Promise<{ gold: Gold[]; report: GoldReport }> {
+export async function balancedGold(sources: string[], o: { perShape?: number; seed?: number; floor?: number; generated?: number; ceiling?: number; refusalFloor?: number; /** `generated` is for these functions only (the others get what they get without it). */ only?: string[]; /** A wide part's draws (synthetic.ts `wide`). */ broad?: boolean; /** The money generated programs are drawn in (all the worlds', if absent). */ currencies?: Currency[] } = {}): Promise<{ gold: Gold[]; report: GoldReport }> {
   const seed = o.seed ?? 1;
   const floor = o.floor ?? 300;
   const rand = sampler(seed + 1);
@@ -205,7 +221,7 @@ export async function balancedGold(sources: string[], o: { perShape?: number; se
   for (const g of gold) have[functionOf(g)] = (have[functionOf(g)] ?? 0) + 1;
   for (const fn of Object.keys(calls.ARGS)) {
     const need = Math.max(floor - (have[fn] ?? 0), (!o.only || o.only.includes(fn) || o.only.some((k) => TAGS[k] === fn) ? o.generated : undefined) ?? 100, 0);
-    if (floor > 0 && need > 0) for (const g of synthetic({ only: [fn], perFunction: need, seed, dropped, ...(o.broad ? { wide: true } : {}) })) add(g);
+    if (floor > 0 && need > 0) for (const g of synthetic({ only: [fn], perFunction: need, seed, dropped, ...(o.broad ? { wide: true } : {}), ...(o.currencies ? { currencies: o.currencies } : {}) })) add(g);
   }
   const report: GoldReport = { gold: gold.length, by_function: {}, by_source: {}, by_shape: {}, excluded: Object.fromEntries(Object.entries(excluded).sort()), capped, implausible: Object.fromEntries(Object.entries(dropped).sort()), floor, ...(o.refusalFloor ? { refusal_floor: o.refusalFloor } : {}) };
   for (const g of gold) {
@@ -268,17 +284,26 @@ export async function trainingData(o: TrainingDataOptions): Promise<{ examples: 
     const key = `${m.adapter.provider}/${m.adapter.model}`;
     if (!(m.prices ?? PRICES)[key]) throw new Error(`no price recorded for ${key}: add it to the price table before using this model`);
   }
-  for (const fn of o.only ?? []) if (fn !== "none" && fn !== "amount_form" && fn !== "world_form" && !TAGS[fn] && !calls.ARGS[fn as calls.Fn]) throw new Error(`only: no function ${fn} in the call language (or "none", for refusals alone; "amount_form", for the forms of several amounts; or a kind of program by name: ${Object.keys(TAGS).join(", ")})`);
+  for (const fn of o.only ?? []) if (fn !== "none" && fn !== "amount_form" && fn !== "world_form" && !ADDED.includes(fn) && !TAGS[fn] && !calls.ARGS[fn as calls.Fn]) throw new Error(`only: no function ${fn} in the call language (or "none", for refusals alone; "amount_form", for the forms of several amounts; or a kind of program by name: ${[...Object.keys(TAGS), ...ADDED].join(", ")})`);
+  for (const [asker, share] of Object.entries(o.askers ?? {})) if (!ASKERS[asker] || !(share > 0 && share <= 1)) throw new Error(`askers: ${asker}=${share} is not an asker (${Object.keys(ASKERS).join(", ")}) with a share above 0 and at most 1`);
+  if (Object.values(o.askers ?? {}).reduce((a, b) => a + b, 0) > 1) throw new Error("askers: the shares come to more than 1");
+  if (o.askers && !o.broad) throw new Error("askers: only a wide part says who is asking (broad)");
+  // (Money weighted by code: a currency named N times over is drawn N times as often; one not named, as ever.)
+  for (const [code, times] of Object.entries(o.money ?? {})) if (!everyCurrency().some((c) => c.code === code) || !(Number.isInteger(times) && times >= 1)) throw new Error(`money: ${code}=${times} is not the code of a currency the generated programs are drawn in (${[...new Set(everyCurrency().map((c) => c.code))].join(", ")}) with a whole number of times`);
+  const currencies = o.money ? everyCurrency().flatMap((c) => Array.from({ length: o.money![c.code] ?? 1 }, () => c)) : undefined;
+  const drawn = currencies ? { currencies } : {};
   if (o.pairs !== undefined && !(o.pairs >= 0 && o.pairs <= 1)) throw new Error(`pairs: a share from 0 to 1, got ${o.pairs}`);
   for (const l of o.refusalLabels ?? []) if (!(calls.LABELS as readonly string[]).includes(l)) throw new Error(`refusal labels: no label ${l} (they are: ${calls.LABELS.join(", ")})`);
   if (o.indirect !== undefined && !(o.indirect >= 0 && o.indirect <= 1)) throw new Error(`indirect: a share from 0 to 1, got ${o.indirect}`);
   const wanted = (g: Gold) => inOnly(g, o.only);
-  const balanced = (o.floor ?? 300) > 0 ? await balancedGold(o.sources, o) : undefined;
+  const balanced = (o.floor ?? 300) > 0 ? await balancedGold(o.sources, { ...o, ...drawn }) : undefined;
   let gold = balanced?.gold ?? (await goldOf(o.sources, o));
   // Forms of several amounts, where asked for: beside the gold set's own forms (they are forms like any other to a
   // part of the set, a split and a refusal built from one).
-  if (o.amountForms) gold = [...gold, ...amountForms({ forms: o.amountForms, seed: o.seed ?? 1 })];
-  if (o.worldForms) gold = [...gold, ...worldForms({ perForm: o.worldForms, seed: o.seed ?? 1, askers: PAPER_ASKERS })];
+  if (o.amountForms) gold = [...gold, ...amountForms({ forms: o.amountForms, seed: o.seed ?? 1, ...drawn })];
+  if (o.worldForms) gold = [...gold, ...worldForms({ perForm: o.worldForms, seed: o.seed ?? 1, askers: PAPER_ASKERS, ...drawn })];
+  if (o.bankPayments) gold = [...gold, ...payments({ kind: "per_request", n: o.bankPayments, seed: o.seed ?? 1, ...drawn })];
+  if (o.financePayments) gold = [...gold, ...payments({ kind: "finance", n: o.financePayments, seed: o.seed ?? 1, ...drawn })];
   log(`${gold.length} gold programs of ${new Set(gold.map((g) => g.shape)).size} shapes`);
   if (o.shard) {
     // One part of several: the same gold set is cut the same way every time (every `of`-th program, counted function
@@ -317,7 +342,7 @@ export async function trainingData(o: TrainingDataOptions): Promise<{ examples: 
   const asked = {
     ...(o.perGold ? { perGold: o.perGold } : {}), ...(o.refusalsPerLabel ? { refusalsPerLabel: o.refusalsPerLabel } : {}),
     ...(o.refusalFloor ? { refusalFloor: o.refusalFloor, piled: piled({ groups: o.refusalLabels?.includes("too_much") ? o.refusalFloor : Math.ceil(o.refusalFloor / 3), seed: o.seed ?? 1 }) } : {}),
-    indirect: o.indirect ?? 0.5, ...(o.only ? { only: o.only } : {}), ...(o.refusalLabels ? { refusalLabels: o.refusalLabels } : {}), ...(o.pairs ? { pairs: o.pairs, ...(o.pairsOnly ? { pairsOnly: true } : {}) } : {}), ...(o.broad ? { broad: true, styles: BROAD_DEAL } : {}), ...(o.styles?.length ? { styles: o.styles } : {}), seed: o.seed ?? 1,
+    indirect: o.indirect ?? 0.5, ...(o.only ? { only: o.only } : {}), ...(o.refusalLabels ? { refusalLabels: o.refusalLabels } : {}), ...(o.pairs ? { pairs: o.pairs, ...(o.pairsOnly ? { pairsOnly: true } : {}) } : {}), ...(o.broad ? { broad: true, styles: BROAD_DEAL } : {}), ...(o.styles?.length ? { styles: o.styles } : {}), ...(o.askers ? { askers: o.askers } : {}), seed: o.seed ?? 1,
   };
   // What a part was weighted toward, for whoever reads its manifest.
   const weighted = { indirect_share: asked.indirect, ...(o.broad ? { broad: true } : {}), ...(o.worldForms ? { world_forms: o.worldForms } : {}), ...(o.only ? { only: o.only } : {}), ...(o.refusalLabels ? { refusal_labels: o.refusalLabels } : {}), ...(o.amountForms ? { amount_forms: o.amountForms } : {}), ...(o.pairs ? { pairs_share: o.pairs, ...(o.pairsOnly ? { pairs_only: true } : {}) } : {}) };
@@ -327,7 +352,7 @@ export async function trainingData(o: TrainingDataOptions): Promise<{ examples: 
     const items = planOf(gold, { ...asked, writers: names });
     const plan: Plan = {
       version: DATA_VERSION, seed: o.seed ?? 1, sources: o.sources, ...(o.shard ? { shard: o.shard } : {}),
-      options: { ...(o.perShape ? { perShape: o.perShape } : {}), ...(o.perGold ? { perGold: o.perGold } : {}), ...(o.refusalsPerLabel ? { refusalsPerLabel: o.refusalsPerLabel } : {}), ...(o.refusalFloor ? { refusalFloor: o.refusalFloor } : {}), ...(o.limit ? { limit: o.limit } : {}), floor: o.floor ?? 300, ...(o.generated !== undefined ? { generated: o.generated } : {}), ...(o.ceiling !== undefined ? { ceiling: o.ceiling } : {}), indirect: asked.indirect, ...(o.only ? { only: o.only } : {}), ...(o.refusalLabels ? { refusalLabels: o.refusalLabels } : {}), ...(o.amountForms ? { amountForms: o.amountForms } : {}), ...(o.pairs ? { pairs: o.pairs, ...(o.pairsOnly ? { pairsOnly: true } : {}) } : {}), ...(o.broad ? { broad: true } : {}), ...(o.styles?.length ? { styles: o.styles } : {}), ...(o.worldForms ? { worldForms: o.worldForms } : {}), validation: o.validation ?? 0.15 },
+      options: { ...(o.perShape ? { perShape: o.perShape } : {}), ...(o.perGold ? { perGold: o.perGold } : {}), ...(o.refusalsPerLabel ? { refusalsPerLabel: o.refusalsPerLabel } : {}), ...(o.refusalFloor ? { refusalFloor: o.refusalFloor } : {}), ...(o.limit ? { limit: o.limit } : {}), floor: o.floor ?? 300, ...(o.generated !== undefined ? { generated: o.generated } : {}), ...(o.ceiling !== undefined ? { ceiling: o.ceiling } : {}), indirect: asked.indirect, ...(o.only ? { only: o.only } : {}), ...(o.refusalLabels ? { refusalLabels: o.refusalLabels } : {}), ...(o.amountForms ? { amountForms: o.amountForms } : {}), ...(o.pairs ? { pairs: o.pairs, ...(o.pairsOnly ? { pairsOnly: true } : {}) } : {}), ...(o.broad ? { broad: true } : {}), ...(o.styles?.length ? { styles: o.styles } : {}), ...(o.worldForms ? { worldForms: o.worldForms } : {}), ...(o.bankPayments ? { bankPayments: o.bankPayments } : {}), ...(o.financePayments ? { financePayments: o.financePayments } : {}), ...(o.askers ? { askers: o.askers } : {}), ...(o.money ? { money: o.money } : {}), validation: o.validation ?? 0.15 },
       writers: names, gold_programs: gold.length, ...(balanced ? { gold: balanced.report } : {}), items,
     };
     mkdirSync(o.out, { recursive: true });
@@ -412,7 +437,7 @@ export interface Plan {
   seed: number;
   sources: string[];
   shard?: { index: number; of: number };
-  options: { perShape?: number; perGold?: number; refusalsPerLabel?: number; refusalFloor?: number; limit?: number; floor: number; generated?: number; ceiling?: number; /** The share of the letters asked for indirectly (which ones is in the items). */ indirect?: number; /** The functions requests were planned for, and the refusal labels (all, where absent). */ only?: string[]; refusalLabels?: string[]; /** Forms of several amounts added to the gold set; the share of requests with a second act, and whether those alone. */ amountForms?: number; pairs?: number; pairsOnly?: boolean; /** A wide part; the worlds' own papers added, each filled so many ways. */ broad?: boolean; styles?: string[]; worldForms?: number; validation: number };
+  options: { perShape?: number; perGold?: number; refusalsPerLabel?: number; refusalFloor?: number; limit?: number; floor: number; generated?: number; ceiling?: number; /** The share of the letters asked for indirectly (which ones is in the items). */ indirect?: number; /** The functions requests were planned for, and the refusal labels (all, where absent). */ only?: string[]; refusalLabels?: string[]; /** Forms of several amounts added to the gold set; the share of requests with a second act, and whether those alone. */ amountForms?: number; pairs?: number; pairsOnly?: boolean; /** A wide part; the worlds' own papers added, each filled so many ways. */ broad?: boolean; styles?: string[]; worldForms?: number; /** Payments of a bank's and a finance office's kinds added; askers and money the part was weighted toward. */ bankPayments?: number; financePayments?: number; askers?: { [asker: string]: number }; money?: { [code: string]: number }; validation: number };
   /** Who was asked, in the order the items were dealt (item k to writer k mod n). */
   writers: string[];
   gold_programs: number;

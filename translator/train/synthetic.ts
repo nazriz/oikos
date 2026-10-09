@@ -625,7 +625,7 @@ const DEPENDENT: { [fn: string]: ((d: Draw) => Lines)[] } = {
 
 /** A program worth keeping, as gold: it parses back, passes the contract, is askable and is a plausible thing to ask
  * for (`dropped` counts, by reason, the ones that aren't plausible); otherwise undefined. */
-function goldOf(lines: Lines, d: Draw, source: string, forms?: FormSpec[], dropped?: { [reason: string]: number }, o: { /** As many values as this, where a sentence or two's ten is too few (an office's paper has more). */ most?: number; /** Fields whose lists are of plain words. */ wordLists?: string[] } = {}): Gold | undefined {
+function goldOf(lines: Lines, d: Draw, source: string, forms?: FormSpec[], dropped?: { [reason: string]: number }, o: { /** As many values as this, where a sentence or two's ten is too few (an office's paper has more). */ most?: number; /** Fields whose lists are of plain words. */ wordLists?: string[]; /** A payment that carries out a request to pay (`payments`): kept, where a log's own is a keeper's bookkeeping. */ carriesOut?: boolean } = {}): Gold | undefined {
   let p: calls.Program;
   try {
     p = calls.parseProgram(calls.programText(calls.programOf(...lines)));
@@ -633,7 +633,7 @@ function goldOf(lines: Lines, d: Draw, source: string, forms?: FormSpec[], dropp
     return undefined;
   }
   const not = whyNot(p);
-  if (calls.contractErrors(p).length || (not !== undefined && !(not === "more than ten values" && literals(p).length <= (o.most ?? 10)))) return undefined;
+  if (calls.contractErrors(p).length || (not !== undefined && !(not === "more than ten values" && literals(p).length <= (o.most ?? 10)) && !(o.carriesOut && not.startsWith("carries out")))) return undefined;
   const why = implausible(p, { invented: true, ...(forms ? { forms } : {}), ...(o.wordLists ? { wordLists: o.wordLists } : {}) });
   if (why) {
     if (dropped) dropped[why] = (dropped[why] ?? 0) + 1;
@@ -1184,6 +1184,88 @@ export function amountForms(o: { forms?: number; perForm?: number; seed?: number
       out.push({ program, shape: shapeOf(calls.parseProgram(program)), names: Object.fromEntries(Object.entries(d.names).filter(([k]) => k === spec.to)), source: `synthetic: amount form ${spec.form}`, origin: "synthetic", currency: d.currency, forms: shown, tag: "amount_form" });
       n++;
     }
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------- payments of a bank's and of a finance office's kinds
+
+/** What a wage is for, and what a remittance of what was withheld from wages is for: no place's words. */
+const WAGES_FOR = ["wages", "this fortnight's wages", "wages for the month", "net wages", "pay for the week", "salary", "wages for the last pay period", "net pay"];
+const WITHHELD_FOR = ["tax withheld from wages", "withheld tax for the month", "wage tax withheld this quarter", "amounts withheld from pay", "payroll tax withheld", "tax deducted from wages", "withholding for the period"];
+const OUTSIDE = ["revenue", "tax-office", "treasury", "state-revenue", "national-revenue", "exchequer", "pension-fund", "insurance-fund"];
+const ORDERED = ["goods", "bread", "timber", "flour", "tools", "cloth", "fuel", "medicine", "seed", "bricks"];
+
+/**
+ * Payments of the kinds a bank's and a finance office's seats ask for, which the function's own recipe makes few or
+ * none of (0.14.0; the retrain of 2026-10-10 found two examples of `per_request` in all the data, and the model weak
+ * on a finance office's payments). `kind`:
+ *  - `per_request` (tag `per_request`): a keeper of accounts pays out of an account it keeps, carrying out a request
+ *    to pay that is on record: `money(to, amount, from, per_request=<that record's id>)`, with a purpose most of the
+ *    time (now and then one that names the account's holder, as tellers write it: "c0585's order of 9 goods") and
+ *    now and then what it settles. Whoever asks is someone at a bank's counter (`asker`). A log's own such payments
+ *    are a code keeper's bookkeeping and stay out of the gold set (data.ts `whyNot`): these are the same act as a
+ *    seat that keeps accounts asks for it in words.
+ *  - `finance` (tag `finance_payment`), four in turn: a wage paid net, the request also stating the gross and what was
+ *    withheld (figures the call does not have: the writer is given them, `notes`, and what is paid is the amount
+ *    stated as paid); what was withheld remitted to an outside account, on a law or a record; a payment resting on
+ *    several records and laws (`basis` a list) that mostly settles something; a standing payment with its first day
+ *    or wait said (`first`).
+ * For a seed, always the same.
+ */
+export function payments(o: { kind: "per_request" | "finance"; n?: number; seed?: number; currencies?: Currency[]; dropped?: { [reason: string]: number } }): Gold[] {
+  const rand = sampler(hash(`${o.seed ?? 1}:payments ${o.kind}`));
+  const want = o.n ?? 100;
+  const out: Gold[] = [];
+  const seen = new Set<string>();
+  for (let tries = 0; out.length < want && tries < want * 40; tries++) {
+    const d = new Draw(rand, o.currencies ?? everyCurrency());
+    const per = 10 ** d.currency.minor_units;
+    const write = (n: number) => d.pick(amountWritings(BigInt(n), d.currency));
+    let c: calls.Call;
+    if (o.kind === "per_request") {
+      const holder = `c${pad(d.int(1, 9999), 4)}`;
+      const own = d.maybe(0.65);
+      const from = own ? id(`acc-${holder}`) : d.account();
+      const r = d.rand();
+      const what = r < 0.3 ? d.purpose() : r < 0.5 ? tx(`${d.int(2, 40)} ${d.pick(ORDERED)}`) : r < 0.7 && own ? tx(`${holder}'s ${d.pick(["order of", "purchase of"])} ${d.int(2, 40)} ${d.pick(ORDERED)}`) : r < 0.8 && own ? tx(`${holder}'s ${d.pick(["rent", "dues", "school fees", "water bill", "loan repayment"])}`) : undefined;
+      const request = d.rec() as { id: string };
+      c = call("money", { to: d.maybe(0.7) ? d.account() : d.party(["org", "person"]), amount: d.amount(), from, per_request: request, for: what, settles: d.maybe(0.1) ? d.rec() : undefined });
+      d.tag = "per_request";
+      d.notes.push(`The speaker keeps the account the money leaves (a bank, at its counter) and is carrying out a request to pay that is on record as ${request.id}: say that this payment is made under that request, in words of your own and with its id ("as asked in ${request.id}", "carrying out ${request.id}", "on the instruction ${request.id}", "per ${request.id}"). It is neither what the payment settles nor a record it rests on, and nobody is named as having asked unless the call's own words name them.`);
+    } else {
+      const sub = out.length % 4;
+      d.tag = "finance_payment";
+      if (sub === 0) {
+        // A wage paid net: the gross and what was withheld are said beside it, and are no part of the call.
+        const gross = d.int(40, 900) * d.pick([10, 50, 100]) * per * (d.currency.minor_units === 0 ? d.pick([1, 10, 100]) : 1) + (per > 1 && d.maybe(0.3) ? d.int(1, per - 1) : 0);
+        const unit = per > 1 && d.maybe(0.5) ? 1 : per; // (to the smallest unit, or in whole units)
+        const withheld = Math.max(unit, Math.round((gross * d.int(5, 35)) / 100 / unit) * unit);
+        const net = gross - withheld;
+        // (The three figures written one way where each can be: the k-th of its writings, the first where it has fewer.)
+        const k = d.int(0, 5);
+        const [g, w, n] = [gross, withheld, net].map((x) => { const ways = amountWritings(BigInt(x), d.currency); return ways[k] ?? ways[0]!; }) as [string, string, string];
+        if (new Set([g, w, n]).size < 3) continue;
+        c = call("money", { to: d.maybe(0.5) ? id(`acc-c${pad(d.int(1, 9999), 4)}`) : id(d.personId()), amount: tx(n), from: d.maybe(0.8) ? id(`acc-${d.pick(["payroll", "wages", "city", "town", "works", "finance", "treasury"])}${d.maybe(0.3) ? `-${d.int(1, 40)}` : ""}`) : undefined, for: tx(d.pick(WAGES_FOR)), basis: d.maybe(0.3) ? d.rec() : undefined });
+        d.notes.push(`Beside what is paid, the request states two more figures, each exactly as written here and each said for what it is: the gross wage, ${g}, and what was withheld from it, ${w}. What is to be paid is ${n}, and the request says that figure as the sum to pay (the net wage, what is left after what was withheld): it is given, never left to be worked out. Neither of the other two figures is paid to anyone by this request. (Whatever the instructions or the style say of amounts the call doesn't have: these two are given to you to state, and no other.)`);
+      } else if (sub === 1) {
+        c = call("money", { to: id(`acc-${d.pick(OUTSIDE)}${d.maybe(0.4) ? `-${d.int(1, 40)}` : ""}`), amount: d.amount(), from: d.maybe(0.85) ? d.account() : undefined, for: tx(d.pick(WITHHELD_FOR)), basis: d.maybe(0.6) ? d.record() : undefined, settles: d.maybe(0.2) ? d.rec() : undefined });
+        d.notes.push("What is paid over is money that was withheld (from wages, from payments) and is now passed on to the outside body whose account that is: say so in words of your own (remit, pass on, pay over).");
+      } else if (sub === 2) {
+        const cited = [...new Set(Array.from({ length: d.int(2, 3) }, () => (d.record() as { id: string }).id))];
+        if (cited.length < 2) continue;
+        c = call("money", { to: d.maybe(0.6) ? d.account() : d.party(), amount: d.amount(), from: d.maybe(0.7) ? d.account() : undefined, for: d.maybe(0.7) ? d.purpose() : undefined, basis: list(cited), settles: d.maybe(0.55) ? d.rec() : undefined });
+        d.notes.push(`The payment rests on ${cited.length} things on record (${cited.join(", ")}): each is cited as what the payment is made under, in the order the call lists them.${"settles" in c.args ? ` What it settles (${(c.args.settles as { id: string }).id}) is said apart from them, as the bill, claim or debt this pays off.` : ""}`);
+      } else {
+        const first = d.maybe(0.5) ? d.date() : tx(d.pick(["1 day", "2 days", "3 days", "7 days", "a week", "10 days", "14 days", "a fortnight", "a month", "30 days"]));
+        c = call("money", { to: d.maybe(0.6) ? d.account() : d.party(), amount: d.amount(), from: d.maybe(0.7) ? d.account() : undefined, every: d.every(), first, for: d.maybe(0.7) ? d.purpose() : undefined, basis: d.maybe(0.3) ? d.record() : undefined });
+        d.notes.push(`When the first of the payments is made is said beside how often: ${"text" in first && /^(year|day) /.test(first.text) ? `on ${first.text}, a day ("the first on ${first.text}", "starting ${first.text}")` : `${(first as { text: string }).text} from now, a wait ("the first in ${(first as { text: string }).text}", "starting in ${(first as { text: string }).text}")`}.`);
+      }
+    }
+    const g = goldOf([c], d, `synthetic: ${o.kind === "per_request" ? "payment carrying out a request" : "finance payment"}`, undefined, o.dropped, { carriesOut: o.kind === "per_request" });
+    if (!g || seen.has(g.program)) continue;
+    seen.add(g.program);
+    out.push(o.kind === "per_request" ? { ...g, asker: "banker" } : g);
   }
   return out;
 }

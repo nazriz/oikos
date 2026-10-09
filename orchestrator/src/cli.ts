@@ -73,6 +73,7 @@
 //         [--ceiling N] [--validation SHARE] [--limit N] [--seed N]
 //         [--only FN,FN,...] [--indirect SHARE] [--refusal-labels L,L,...]
 //         [--amount-forms N] [--pairs SHARE [--pairs-only]] [--broad] [--world-forms N] [--styles S,S]   (these options on a run with models too)
+//         [--bank-payments N] [--finance-payments N] [--askers ASKER=SHARE,...] [--money CODE=TIMES,...]
 //     No model: the plan of what is to be written (DIR/plan.json), what each writer is asked, item by item
 //     (DIR/briefs.jsonl: {id, kind, brief}; with --writers, DIR/briefs-NAME.jsonl each, the items dealt in turn), and
 //     the writers' instructions (DIR/writer-instructions.txt), for writers who work on files. --shard I/N: part I of
@@ -91,6 +92,12 @@
 //     every brief; look_first for any act on a record named by description, no_such_act for attending).
 //     --world-forms N adds every paper the worlds' own offices issue, each filled in N ways, every field of it in
 //     the first two (--only world_form: requests for those alone).
+//     --bank-payments N adds N payments a keeper of accounts makes carrying out a request to pay (per_request; asked
+//     by someone at a bank's counter; --only per_request: those alone); --finance-payments N adds N of a finance
+//     office's kinds (a net wage with the gross and what was withheld said, what was withheld remitted, a payment
+//     resting on several records, a standing payment with its first day; --only finance_payment: those alone).
+//     --askers banker=0.4: with --broad, that share of the requests (of those not in an office-holder's style) is
+//     asked by that asker. --money CODE=3,...: those currencies are drawn that many times as often as the others.
 //   oikos translator-data-write <DIR> --requests FILE --writer NAME [--requests FILE --writer NAME ...]
 //     The requests such writers handed in ({id, request}, a line each), checked as a model's are and made into DIR's
 //     examples.jsonl, rejects.jsonl, blind.jsonl and manifest.json, for translator-data-check.
@@ -340,6 +347,7 @@ try {
     const pick = (name: string) => chooseModel(name, { budgetUsd: flag("budget") ? Number(flag("budget")) : undefined, baseUrl: flag("base-url") });
     const num = (name: string) => (flag(name) ? Number(flag(name)) : undefined);
     const list = (name: string) => flag(name)!.split(",").map((x) => x.trim()).filter(Boolean);
+    const weights = (name: string) => Object.fromEntries(list(name).map((x) => { const [k, v] = x.split("="); return [k!, Number(v)]; }));
     // (A part is given as people count them, from 1: `--shard 13/24` is the thirteenth of 24.)
     const part = flag("shard") ? /^(\d+)\/(\d+)$/.exec(flag("shard")!) : undefined;
     if (flag("shard") && !part) throw new Error(`--shard: expected I/N (part I of N, from 1), got ${flag("shard")}`);
@@ -351,6 +359,7 @@ try {
       limit: num("limit"), seed: num("seed"), log: console.log,
       ...(flag("indirect") !== undefined ? { indirect: Number(flag("indirect")) } : {}), ...(flag("only") ? { only: list("only") } : {}), ...(flag("refusal-labels") ? { refusalLabels: list("refusal-labels") } : {}),
       amountForms: num("amount-forms"), pairs: num("pairs"), pairsOnly: has("pairs-only"), broad: has("broad"), worldForms: num("world-forms"), ...(flag("styles") ? { styles: list("styles") } : {}),
+      bankPayments: num("bank-payments"), financePayments: num("finance-payments"), ...(flag("askers") ? { askers: weights("askers") } : {}), ...(flag("money") ? { money: weights("money") } : {}),
     });
     if (has("briefs")) console.log(`${r.briefs} briefs written to ${r.out} (plan.json, briefs.jsonl${flag("writers") ? ", a briefs file for each writer" : ""}, writer-instructions.txt)`);
     else console.log(`${r.examples} examples written to ${r.out} (examples.jsonl, manifest.json)${r.stopped ? `; writing stopped early: ${r.stopped}` : ""}`);

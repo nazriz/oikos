@@ -91,7 +91,7 @@ import { FLAG_YES, FLAGS, sameMeaning, type MeaningContext } from "./meaning";
 
 export { meaningOf, sameMeaning, type MeaningContext } from "./meaning";
 
-export const DATA_VERSION = "0.13.2"; // 0.13.2: a direction to an office with no form listed is always said to the office (never "X is to …"); 0.13.1: a wide part's programs have, now and then, a large count written with the place's digit grouping and a start or an end given as a day (contracts 2026-10-09: a count is grouped as an amount is; first and until take a date); 0.13.0: a wide part (`broad`): registers beside the styles (rambling, flat, slips), who is asking (`ASKERS`), every paper the worlds' offices issue with every field filled (synthetic.ts `worldForms`), look_first for any act on a record named by description, no_such_act for attending; 0.12.0: a direction on an office's form and a paper of one's own office (and the same direction as a letter where no form is listed), fields that are lists and dates, standing work orders
+export const DATA_VERSION = "0.14.0"; // 0.14.0: payments of a bank's and a finance office's kinds by name (synthetic.ts `payments`: `per_request`, `finance_payment`), a wide part weighted toward some askers (`PlanOptions.askers`) and toward some worlds' money (training.ts `money`); a plan made without them is what it was; 0.13.2: a direction to an office with no form listed is always said to the office (never "X is to …"); 0.13.1: a wide part's programs have, now and then, a large count written with the place's digit grouping and a start or an end given as a day (contracts 2026-10-09: a count is grouped as an amount is; first and until take a date); 0.13.0: a wide part (`broad`): registers beside the styles (rambling, flat, slips), who is asking (`ASKERS`), every paper the worlds' offices issue with every field filled (synthetic.ts `worldForms`), look_first for any act on a record named by description, no_such_act for attending; 0.12.0: a direction on an office's form and a paper of one's own office (and the same direction as a letter where no form is listed), fields that are lists and dates, standing work orders
 
 const sha256 = (s: string) => new Bun.CryptoHasher("sha256").update(s).digest("hex");
 
@@ -1188,12 +1188,19 @@ export const PAPER_ASKERS: { [office: string]: string } = { LANDLORD: "landlord"
  * honestly ask for an act of its kind (`ASKS_FOR`, or by its tag; a paper of a world's own office by that office:
  * `Gold.asker`), by seed.
  */
-export function askerFor(style: string, g: Pick<Gold, "shape" | "tag" | "asker">, rand: () => number): string {
+export function askerFor(style: string, g: Pick<Gold, "shape" | "tag" | "asker">, rand: () => number, shares: { [asker: string]: number } = {}): string {
   const r = rand(); // (drawn whatever is returned, so who asks for one program changes nobody else's)
   if (g.asker) return g.asker;
   if (OFFICIAL.has(style)) return "officer";
+  // (A part weighted toward some askers, `PlanOptions.askers`: each has its share of the draw, in the order given,
+  // and the rest of the draw is the pool's as ever. With none, who asks is who it was.)
+  let at = 0;
+  for (const [asker, share] of Object.entries(shares)) {
+    if (r < at + share) return asker;
+    at += share;
+  }
   const pool = (g.tag && ASKS_FOR_TAG[g.tag]) || ASKS_FOR[functionOf(g)] || ["officer"];
-  return pool[Math.floor(r * pool.length)]!;
+  return pool[Math.min(pool.length - 1, Math.floor(((r - at) / (1 - at)) * pool.length))]!;
 }
 /** The line a writer is given for who is asking. */
 export const askerLine = (asker: string): string =>
@@ -2804,6 +2811,11 @@ export interface PlanOptions {
    * otherwise one of those who would honestly ask for such an act), and the refusal briefs have the wide kinds
    * (`refusalBriefs`). With `styles: BROAD_DEAL` the registers are dealt too. Absent: the plan is what it was. */
   broad?: boolean;
+  /** A wide part weighted toward some askers (0.14.0): the share of the requests, of those not in an office-holder's
+   * style and not of a program that says who asks, that each of these askers makes (`ASKERS`; `{ banker: 0.4 }`),
+   * whatever the act: the part's `only` is what keeps it to acts such an asker would honestly ask for. The rest are
+   * drawn as ever. Absent: who asks is who it was. */
+  askers?: { [asker: string]: number };
   seed?: number;
 }
 
@@ -2866,7 +2878,7 @@ export function planOf(gold: Gold[], o: PlanOptions): PlanItem[] {
     // (What a form's amounts come to, a third of the time: after the last of them, a sentence that is no field's.)
     const total = (!indirect || two) && !office ? (sayRand() < 0.35 ? amountTotal(one, sayRand) : undefined) : undefined;
     const riders = [...styled.riders, ...(total ? [total.rider] : []), ...(after ? [after] : [])];
-    const asker = o.broad ? askerFor(style, g, askRand) : undefined;
+    const asker = o.broad ? askerFor(style, g, askRand, o.askers) : undefined;
     const instruction = (after ? `${styled.instruction} Whatever else the style asks, the request's last sentence is exactly this one, which says what becomes of the form once it is handed in, names nobody and asks nobody for anything: "${after.text}"` : styled.instruction) + (asker ? `\n\n${askerLine(asker)}` : "");
     const notes = two?.letter ? [...(office ? ownFormNotes(one, office, sayRand) : [...writerNotes(one.program, sayRand), ...amountNotes(one, sayRand)]), ...indirectNotes(two.letter, sayRand).map((x) => x.replace("The act, said", "The direction, said"))]
       : unlisted ? indirectNotes(g.program, sayRand, ["direct {to} to …", "direct {to} to …", "instruct {to} to …", "tell {to} to …"]) // (not "{to} is to …", since 0.13.2: it addresses nobody, and was read as an order for work)
