@@ -16,7 +16,7 @@
 import { expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { bedroomsNeeded, calls, formatMoney, OCCUPANCY, type OccupancyStandard } from "@oikos/participants";
+import { bedroomsNeeded, calls, chargesOn, formatMoney, OCCUPANCY, type OccupancyStandard } from "@oikos/participants";
 import { generate, generateFrom } from "@oikos/worlds/generator/generate";
 import { loadProfile, PROFILE_DIR, type Profile } from "@oikos/worlds/generator/profile";
 
@@ -506,4 +506,44 @@ test("a council with almost no reserves opens with the same budget and a hundred
   expect(held(lean) * 100).toBe(held(plain));
   // What it holds is less than a month of what the budget spends.
   expect(held(lean) * 12).toBeLessThan(Object.values(lines(lean)).reduce((a: number, v: any) => a + v, 0));
+}, SLOW);
+
+// One rule for what is withheld from a pay, in the law's own words (wave 2a's review of 2026-10-09, fault 4): in
+// every profile's town the opening wage instruction is the agreed wage less what the tax law's three steps give,
+// worked here step by step from the law's own data, and the law says those steps. (A finance seat that took a year
+// as 26 pays came to another figure than the instruction's, and withdrew eight workers' wages.)
+test("in every profile's town the opening wage instructions are what the tax law's own steps give, and the law says the steps", () => {
+  const differing: string[] = [];
+  for (const id of ids) {
+    const c = town(id), V = loadProfile(id).values as any, days = V.pay_period_days as number;
+    const records = c.world.records as any[];
+    const law = records.find((r) => r.id === "law-income-tax");
+    const orders = records.filter((r) => /^job-.*-wages$/.test(r.id));
+    expect(orders.length).toBeGreaterThan(10);
+    const offBooks = new Set(records.filter((r) => r.kind === "off_books").map((r) => r.data.agreement));
+    if (law) {
+      expect(law.text).toContain("What is withheld from a pay is reckoned in three steps, and in no other way. One: the pay is taken as a year's pay, by multiplying it by 365 and dividing by the number of days the pay is for, rounded down to the smallest unit of money.");
+      expect(law.text).toContain(`a pay for ${days} days is ${days}/365 of a year's pay, and a year is not taken as a whole number of pays.`);
+      expect(law.text).toContain("Three: the year's charges are added together, and that sum, multiplied by the number of days the pay is for and divided by 365, rounded down, is what is withheld from the pay.");
+      expect(law.text).not.toContain("reckoned as a year's pay,");
+    }
+    const year = (pay: number) => (law ? chargesOn({ id: law.id, charges: law.data.charges }, pay).reduce((x, k) => x + k.amount, 0) : 0);
+    let differ = 0;
+    for (const o of orders) {
+      const job = records.find((r) => r.id === o.basis);
+      const gross = Number(job.terms.commitments[0].does.outcome.money.amount);
+      expect(job.terms.commitments[0].every).toBe(days * DAY);
+      // One, two, three.
+      const yearly = Math.floor((gross * 365) / days);
+      const byHand = offBooks.has(job.id) ? 0 : Math.floor((year(yearly) * days) / 365);
+      expect({ id, order: o.id, net: Number(o.data.outcome.money.amount) }).toEqual({ id, order: o.id, net: gross - byHand });
+      if (byHand > 0) expect(o.text).toContain(`less ${formatMoney(byHand, V.currency, byHand % 10 ** V.currency.minor_units === 0 ? { decimals: false } : {})} withheld under law-income-tax`);
+      // (The calendar's route, a year of whole pays, for the record of where it differs.)
+      const pays = Math.round(365 / days);
+      if (!offBooks.has(job.id) && Math.floor(year(gross * pays) / pays) !== byHand) differ++;
+    }
+    if (differ) differing.push(id);
+  }
+  // Wherever a law's rates step, the calendar's route gives another figure: seven of the nine towns as the profiles stand.
+  expect(differing.length).toBeGreaterThanOrEqual(5);
 }, SLOW);

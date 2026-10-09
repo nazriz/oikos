@@ -6,7 +6,7 @@
 // support payments, industry shares...) comes from the spec's profile (worlds/profiles/, docs/profiles.md), and what
 // isn't there is derived from it here by general formulas, or is a placeholder of the town's own shape.
 
-import { adultAgeBands, bedroomsNeeded, drawHousehold, drawSavings, formatMoney, forms as formWords, modules, votedWords, Randomness, chargesInWords, dayPayPeriod, forAge, forOutOfWork, linesInWords, paymentsInWords, tabledLines, yearInDays, stopsWorkAt, withholding, yearsOfSchooling, draftLaw, type HouseholdSpec, type IncomeTaxLaw, type Issued, type LawSchedule, type PaymentRule, type Taken } from "@oikos/participants";
+import { adultAgeBands, bedroomsNeeded, drawHousehold, drawSavings, formatMoney, forms as formWords, modules, votedWords, Randomness, chargesInWords, dayPayPeriod, forAge, forOutOfWork, linesInWords, paymentsInWords, tabledLines, yearInDays, stopsWorkAt, withholding, withholdingInWords, yearsOfSchooling, draftLaw, type HouseholdSpec, type IncomeTaxLaw, type Issued, type LawSchedule, type PaymentRule, type Taken } from "@oikos/participants";
 import law from "../law/basic.json";
 import schedules from "../law/schedules.json";
 import { loadProfile, type Profile } from "./profile";
@@ -70,7 +70,7 @@ const ACT_TIME = {
   },
 };
 
-export const GENERATOR_VERSION = "0.44.0"; // 0.44.0: main's 0.39.1 (an office's own form says what issuing it does) with the institutions' opening papers (0.43.0)
+export const GENERATOR_VERSION = "0.44.1"; // 0.44.1: the tax law says, step by step and with each rounding, how what is withheld from a pay is reckoned (the one function every payroll uses), where it said "reckoned as a year's pay"; 0.44.0: main's 0.39.1 (an office's own form says what issuing it does) with the institutions' opening papers (0.43.0)
 const DAY = 86_400;
 const MONTH = 30 * DAY;
 const YEAR = 365 * DAY;
@@ -1315,7 +1315,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   const ratePpm = rateable > 0 ? Math.round((V.public_finance.rates_per_resident_per_year * everyone.length * 1_000_000) / rateable) : 0;
   // (A place with no charge on pay has no such law, and nothing is withheld.)
   if (taxLaw.charges.length) records.push({ id: taxLaw.id, record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "outside", kind: "law",
-    text: `Tax on pay. ${chargesInWords(taxLaw.charges, asWritten, (c) => `${payeeName(c.account)} (${c.account})`)}. Employers withhold each from every pay, reckoned as a year's pay, and pay what they withheld over monthly, with a report${taxLaw.charges.some((c) => c.itemised) ? " (naming each worker and their pay in the month, where a charge is reported worker by worker)" : ""}.`,
+    text: `Tax on pay. ${chargesInWords(taxLaw.charges, asWritten, (c) => `${payeeName(c.account)} (${c.account})`)}. ${withholdingInWords({ period_days: V.pay_period_days, work_days: WORK_DAYS })} Employers pay what they withheld over monthly, with a report${taxLaw.charges.some((c) => c.itemised) ? " (naming each worker and their pay in the month, where a charge is reported worker by worker)" : ""}.`,
     adico: { attribute: "employers", deontic: "must", aim: "withhold income tax from each pay and pay it over", condition: "monthly" },
     data: { tax: "income", charges: taxLaw.charges } });
   // The support law (the outside world's, as the income tax is): the payments, published for anyone to read; the
