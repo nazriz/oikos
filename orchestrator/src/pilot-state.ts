@@ -26,7 +26,8 @@ export interface RunState {
 
 const USAGE_LIMIT = /limit|429|too many requests|credit/i;
 const SPENDING_LIMIT = /spending limit/i;
-const UNREACHABLE = /the model can.t be reached/i;
+const UNREACHABLE = /the model can.t be reached|a debrief could not be asked/i;
+const DEBRIEF_OWED = /a debrief could not be asked/i;
 const ASKED_TO_STOP = /asked to stop|TERM signal|SIGTERM|SIGINT/i;
 
 /** The last non-empty line of a plain log, read from its end (a log can be gigabytes). */
@@ -79,7 +80,9 @@ export async function runState(dir: string, until: number): Promise<RunState> {
     by = summary.stopped?.by;
   }
   const text = String(detail ?? "");
-  const stop: Stop = t !== undefined && t >= until ? "done"
+  // (A run that got to its end and could not ask a debrief has not finished: it stopped there to be resumed, and is
+  // waited for like any run the model could not answer.)
+  const stop: Stop = t !== undefined && t >= until && !DEBRIEF_OWED.test(text) ? "done"
     : SPENDING_LIMIT.test(text) ? "spending_limit" // (before the usage limit: its words are in this one's)
     : by === "StopRequested" || ASKED_TO_STOP.test(text) ? "signal"
     : USAGE_LIMIT.test(text) ? "usage_limit"
@@ -185,4 +188,39 @@ export async function scanOptOuts(log: string, from = 0): Promise<{ offset: numb
   } finally {
     closeSync(fd);
   }
+}
+
+/**
+ * When a provider's limit lifts, where its own message says: "try again at 6:58 AM", "resets at 5pm", "try again in
+ * 2 hours", "in 20 minutes". A time of day is the next such time on the machine's clock (the messages give local
+ * time). Undefined where the message says nothing that can be read, or something more than a day off.
+ */
+export function limitLifts(message: string, now = new Date()): Date | undefined {
+  const within = /\bin\s+(?:about\s+)?(\d+(?:\.\d+)?)\s*(hours?|hrs?|h|minutes?|mins?|m|seconds?|secs?|s)\b/i.exec(message);
+  if (within) {
+    const unit = within[2]!.toLowerCase();
+    const ms = Number(within[1]) * (unit.startsWith("h") ? 3_600_000 : unit.startsWith("m") ? 60_000 : 1000);
+    return ms > 0 && ms <= 24 * 3_600_000 ? new Date(now.getTime() + ms) : undefined;
+  }
+  const at = /\b(?:at|until|resets?)\s+(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*([ap])\.?m\b\.?/i.exec(message) ?? /\b(?:at|until)\s+(\d{1,2}):(\d{2})()(?!\s*[ap]\.?m)/i.exec(message);
+  if (!at) return undefined;
+  let hour = Number(at[1]);
+  const minute = Number(at[2] ?? 0);
+  const half = at[3]?.toLowerCase();
+  if (half ? hour < 1 || hour > 12 : hour > 23) return undefined;
+  if (minute > 59) return undefined;
+  if (half === "p" && hour < 12) hour += 12;
+  if (half === "a" && hour === 12) hour = 0;
+  const when = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, minute, 0, 0);
+  if (when.getTime() <= now.getTime()) when.setDate(when.getDate() + 1);
+  return when;
+}
+
+/** How long a queue waits at a limit, in milliseconds: until the time the limit's own message gives, and a minute more
+ * (never less than a minute, never more than twelve hours); or the usual wait where the message gives none. */
+export function limitWaitMs(message: string, usualMs: number, now = new Date()): { ms: number; until?: Date } {
+  const lifts = limitLifts(message, now);
+  if (!lifts) return { ms: usualMs };
+  const ms = Math.min(12 * 3_600_000, Math.max(60_000, lifts.getTime() - now.getTime() + 60_000));
+  return { ms, until: new Date(now.getTime() + ms) };
 }

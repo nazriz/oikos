@@ -46,6 +46,10 @@ export interface LlmRequest {
    * may meet either gives both (a tool of the same name taking the same object). */
   answer?: { name: string; schema: object };
   maxTokens: number;
+  /** How hard the model is to reason for this call, where whoever makes it has a say (a seat's setting): the word its
+   * way in takes ("low", "medium", "high"). An adapter that takes an effort uses this one before its own; one that
+   * takes none leaves it. Recorded with the call's transcript. */
+  effort?: string;
   /** Structured facts behind the prompt, for mock policies only. Never sent to a real model. */
   context?: any;
 }

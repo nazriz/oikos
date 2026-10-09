@@ -17,7 +17,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } fr
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { alert } from "../orchestrator/src/pilot-alerts";
-import { limitedProviders, localStamp, nextPilot, parkedPath, providersOf, runState, scanOptOuts, type Parked } from "../orchestrator/src/pilot-state";
+import { limitedProviders, limitWaitMs, localStamp, nextPilot, parkedPath, providersOf, runState, scanOptOuts, type Parked } from "../orchestrator/src/pilot-state";
 
 interface Pilot { name: string; world: string; sets?: string[]; model: string; translator?: string; until: number; budget: number; env?: { [k: string]: string }; note?: string; test?: boolean; args?: string[] }
 
@@ -45,7 +45,7 @@ const CLI = process.env.OIKOS_QUEUE_CLI ?? "orchestrator/src/cli.ts";
 const report = (dir: string) => Bun.spawnSync(["bun", CLI, "pilot-report", dir], { cwd: root, stdout: "ignore", stderr: "ignore" });
 
 /** What the queue keeps of a pilot between the times it is taken up. */
-interface Kept { failures: number; offsets: Map<string, number>; optedOut: Set<string>; notSent: number }
+interface Kept { failures: number; offsets: Map<string, number>; optedOut: Set<string>; notSent: number; unanswered: number; unansweredAt: number }
 const kept = new Map<string, Kept>();
 /** Entries the queue has finished with: done, at their spending limit, or left after two failures. */
 const settled = new Set<string>();
@@ -75,7 +75,7 @@ for (;;) {
   // PILOT.txt: the queue's entry, as it was when the pilot was first started ("test": true is read from it by the pilot
   // report, so that later steps keep a held-out test's requests out of training).
   if (!existsSync(join(dir, "PILOT.txt"))) writeFileSync(join(dir, "PILOT.txt"), `${p.test ? "TEST PILOT: its requests are kept out of training (a held-out test).\n\n" : ""}${p.note ? p.note + "\n\n" : ""}${JSON.stringify(p, null, 1)}\n`);
-  if (!kept.has(p.name)) kept.set(p.name, { failures: 0, offsets: new Map(), optedOut: new Set(), notSent: 0 });
+  if (!kept.has(p.name)) kept.set(p.name, { failures: 0, offsets: new Map(), optedOut: new Set(), notSent: 0, unanswered: 0, unansweredAt: -1 });
   const k = kept.get(p.name)!;
   const s = await runState(dir, p.until);
   if (s.stop === "done") { say(`${p.name}: done (day ${day(s.t)})`); tell(`done: ${p.name} (day ${day(s.t)})`); report(dir); settled.add(p.name); continue; }
@@ -116,21 +116,30 @@ for (;;) {
   if (after.stop === "usage_limit" || after.stop === "unreachable") {
     const silent = after.stop === "unreachable";
     const what = silent ? "with its model not answering" : "at a usage limit";
+    // (Where a limit's own message says when it lifts, that is when it is tried again, and a minute more; else the usual wait.)
+    const wait = silent ? { ms: waitMs } : limitWaitMs(String(after.detail ?? ""), waitMs);
+    const when = "until" in wait && wait.until ? `at ${localStamp(wait.until).slice(11)} (when the limit says it lifts)` : `in ${minutes}`;
+    // (A model not answering, six times with the run no further on: left, with why. It is not waited for for ever.)
+    if (silent) {
+      k.unanswered = after.t === k.unansweredAt ? k.unanswered + 1 : 1;
+      k.unansweredAt = after.t ?? -1;
+      if (k.unanswered > 6) { say(`${p.name}: left on day ${day(after.t)}: its model has not answered through six waits (${why})`); tell(`FAILED ${p.name}: left on day ${day(after.t)}, its model not answering through six waits (${why.slice(0, 120)})`); report(dir); settled.add(p.name); continue; }
+    }
     if (!park) {
-      say(`${p.name}: stopped ${what} on day ${day(after.t)} (${why.slice(0, 120)}); asking again in ${minutes}`);
-      tell(`${silent ? "MODEL NOT ANSWERING" : "USAGE LIMIT"} ${p.name}: waiting ${minutes} from day ${day(after.t)}`);
-      await Bun.sleep(waitMs);
+      say(`${p.name}: stopped ${what} on day ${day(after.t)} (${why.slice(0, 120)}); asking again ${when}`);
+      tell(`${silent ? "MODEL NOT ANSWERING" : "USAGE LIMIT"} ${p.name}: waiting, to ask again ${when}, from day ${day(after.t)}`);
+      await Bun.sleep(wait.ms);
       tell(`usage-limit wait over for ${p.name}: trying again`);
       continue;
     }
     // Parked: the sign-in that said so is left alone until the wait is over, and the queue goes on to what needs none of it.
     const who = limitedProviders(String(after.detail ?? ""), providersOf(p));
-    const again = Date.now() + waitMs;
+    const again = Date.now() + wait.ms;
     for (const x of who) limitedUntil.set(x, again);
     parked.set(p.name, { name: p.name, day: day(after.t), providers: who, since: localStamp(), next_try: localStamp(new Date(again)) });
     writeParked();
-    say(`${p.name}: parked ${what} on day ${day(after.t)} (${who.join(", ")}: ${why.slice(0, 120)}); the queue goes on, and it is tried again in ${minutes}`);
-    tell(`PARKED ${p.name}: ${what} (${who.join(", ")}) on day ${day(after.t)}; the queue goes on to what does not need ${who.join(" or ")}, and tries it again in ${minutes}`);
+    say(`${p.name}: parked ${what} on day ${day(after.t)} (${who.join(", ")}: ${why.slice(0, 120)}); the queue goes on, and it is tried again ${when}`);
+    tell(`PARKED ${p.name}: ${what} (${who.join(", ")}) on day ${day(after.t)}; the queue goes on to what does not need ${who.join(" or ")}, and tries it again ${when}`);
     continue;
   }
   // A spending limit is the pilot's own: it is over, as far as it got.

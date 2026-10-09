@@ -34,6 +34,8 @@ export interface MockBrain {
   cadence?: number;
   /** Opt out at the first wake at or after this time (seconds), to exercise opting out. */
   optOutAt?: number;
+  /** Days it says it is back after, whatever its brain would: a seat that chooses to come back in a week, as real ones have. */
+  backDays?: number;
 }
 
 const PREFIX = "(mock) ";
@@ -196,7 +198,7 @@ export function mockPolicies(brains: Map<string, MockBrain>): { participant: Moc
       return [tool("notebook", { text: `Last request on day ${Math.floor(obs.t / 86_400)}.` }), tool("do", { what: PREFIX + said.program, ...as })];
     }
     // Done for now: back when the brain itself would next look in (the time it gave, or its module's own rhythm).
-    const until = a.type === "wait" && a.until !== undefined && a.until > obs.t ? a.until - obs.t : brain.cadence;
+    const until = brain.backDays ? brain.backDays * 86_400 : a.type === "wait" && a.until !== undefined && a.until > obs.t ? a.until - obs.t : brain.cadence;
     return [tool("done_for_now", until ? { days: Math.max(1, Math.ceil(until / 86_400)) } : {})];
   };
 

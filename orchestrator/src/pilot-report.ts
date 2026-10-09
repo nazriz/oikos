@@ -96,6 +96,10 @@ export async function reportOfLog(dir: string, log: string): Promise<any> {
     return s;
   };
   const tr = { model_calls: 0, failed_calls: 0, cost_microusd: 0, retries: 0 };
+  // The whole run's recorded cost (every model call in the log, whoever it was for: a resumed run's log holds the
+  // calls of every part of the run), and the debriefs given and not given.
+  let totalMicroUsd = 0, totalCalls = 0;
+  const debriefed = new Set<string>(), notDebriefed = new Map<string, string>();
   const reqs = new Map<string, Request>();
   const req = (id: string, t: number): Request | undefined => {
     const m = DRAFT_ID.exec(id);
@@ -130,6 +134,8 @@ export async function reportOfLog(dir: string, log: string): Promise<any> {
       // Cost and tokens by who the call was for: the translator ("translator") or a seat.
       const into = b.subject === "translator" || b.purpose === "translator" ? tr : seat(b.subject);
       into.cost_microusd += b.cost_microusd ?? 0;
+      totalMicroUsd += b.cost_microusd ?? 0;
+      totalCalls++;
       if ("input_tokens" in into) { into.input_tokens += b.input_tokens ?? 0; into.output_tokens += b.output_tokens ?? 0; into.model ??= `${b.provider}/${b.model}`; }
     } else if (b.annotation === "model_call_failed") {
       if (b.data?.purpose === "translator") tr.failed_calls++;
@@ -163,6 +169,7 @@ export async function reportOfLog(dir: string, log: string): Promise<any> {
       if (d.prompt_too_long) s.prompts_too_long++;
       // (A sitting missed: the participant notes each. A log from before it did has the run's own note of a seat whose
       // model call failed, which was the same thing: the larger of the two counts is the sittings missed.)
+      if (d.debrief_skipped !== undefined) notDebriefed.set(b.subject, String(d.debrief_skipped).slice(0, 200));
       if (d.sitting_missed) { s.sittings_missed++; s.missed_days.push(Math.floor(e.t / 86_400) + 1); }
       if (d.participant_error && /^ModelCallFailed/.test(String(d.participant_error.error ?? ""))) { s.failed_to_decide++; if (!s.missed_days.includes(Math.floor(e.t / 86_400) + 1)) s.missed_days.push(Math.floor(e.t / 86_400) + 1); }
       if (d.prompt_trimmed) s.prompts_trimmed++;
@@ -172,6 +179,8 @@ export async function reportOfLog(dir: string, log: string): Promise<any> {
         s.notes.notebook_not_changed++;
         for (const why of d.notebook_not_changed.reasons ?? []) count(s.notebook_not_changed_reasons, String(why).slice(0, 120));
       }
+    } else if (b.annotation === "debrief") {
+      debriefed.add(b.subject);
     } else if (b.annotation === "draft") {
       const r = req(b.draft?.id ?? "", e.t);
       if (r) r.ending = "draft_offered";
@@ -230,8 +239,10 @@ export async function reportOfLog(dir: string, log: string): Promise<any> {
     delete s.failed_to_decide;
     if (s.sittings_missed) short.push({ seat: name, sittings_missed: s.sittings_missed, days: s.missed_days, last_sat_day: s.last_sat_day });
   }
+  // (A debrief lost and never given: the pilot is not finished for that seat either.)
+  const owed = [...notDebriefed].filter(([seat]) => !debriefed.has(seat)).map(([seat, why]) => ({ seat, why })).sort((a, b) => (a.seat < b.seat ? -1 : 1));
   return {
-    ...(short.length ? { not_whole: { why: "a seat sat for less than its run: it missed sittings because its model did not answer", seats: short } } : {}),
+    ...(short.length || owed.length ? { not_whole: { ...(short.length ? { why: "a seat sat for less than its run: it missed sittings because its model did not answer", seats: short } : { seats: [] }), ...(owed.length ? { debriefs_not_given: owed } : {}) } } : {}),
     pilot: basename(resolve(dir)), run, log: basename(log),
     ...(pilot.queue?.test ? { test: true } : {}),
     ...(pilot.note ? { note: pilot.note } : {}),
@@ -242,6 +253,10 @@ export async function reportOfLog(dir: string, log: string): Promise<any> {
     days_run: Math.round(((end?.t ?? last) / 86_400) * 10) / 10, until_days: until !== undefined ? Math.round((until / 86_400) * 10) / 10 : null,
     stopped,
     citizen_records: citizens,
+
+    // (The whole run's, as its log records it: every part of a run that was stopped and resumed.)
+    cost: { recorded_microusd: totalMicroUsd, recorded_usd: (totalMicroUsd / 1e6).toFixed(2), model_calls: totalCalls },
+    debriefs: { given: [...debriefed].sort(), not_given: owed },
     per_seat: Object.fromEntries([...seats].filter(([, s]) => s.model_calls || s.opted_out || s.sittings_missed).map(([k, s]) => { const { model: _m, configured: _c, ...rest } = s; return [k, rest]; })),
     translator_report: {
       model_calls: tr.model_calls, failed_calls: tr.failed_calls, cost_microusd: tr.cost_microusd, its_own_retries: tr.retries,
@@ -273,7 +288,11 @@ export function renderReport(r: any): string {
   if (r.runs) return r.runs.map(renderReport).join("\n\n");
   const L: string[] = [];
   const kv = (o: any) => Object.entries(o ?? {}).map(([k, v]) => `${k} ${v}`).join(", ") || "none";
-  if (r.not_whole) L.push(`NOT A FINISHED PILOT: a seat sat for less than its run. ${r.not_whole.seats.map((s: any) => `${s.seat} missed ${s.sittings_missed} sitting${s.sittings_missed === 1 ? "" : "s"} (day ${s.days.join(", ")}; its model did not answer) and last sat on day ${s.last_sat_day ?? "none"}${r.until_days !== null ? ` of ${r.until_days}` : ""}`).join("; ")}`);
+  if (r.not_whole) {
+    const short = r.not_whole.seats.length ? `a seat sat for less than its run. ${r.not_whole.seats.map((s: any) => `${s.seat} missed ${s.sittings_missed} sitting${s.sittings_missed === 1 ? "" : "s"} (day ${s.days.join(", ")}; its model did not answer) and last sat on day ${s.last_sat_day ?? "none"}${r.until_days !== null ? ` of ${r.until_days}` : ""}`).join("; ")}` : "";
+    const owed = r.not_whole.debriefs_not_given?.length ? `${short ? ". And a" : "a"} debrief was not given: ${r.not_whole.debriefs_not_given.map((d: any) => d.seat).join(", ")}` : "";
+    L.push(`NOT A FINISHED PILOT: ${short}${owed}`);
+  }
   L.push(`== ${r.pilot} (${r.run})${r.test ? "  [TEST: kept out of training]" : ""}`);
   L.push(`seats: ${Object.entries(r.seats).map(([k, s]: any) => `${k} on ${s.model}`).join("; ") || "none"}`);
   L.push(`translator: ${r.translator.model ?? "none"}${r.translator.version ? ` ${r.translator.version}` : ""}; confirmation: ${r.confirm}`);
@@ -282,6 +301,8 @@ export function renderReport(r: any): string {
   const c = r.citizen_records;
   if (c) L.push(c.decisions || c.outcomes ? `citizen records: ${c.decisions} decisions, ${c.outcomes} outcomes${c.decisions && !c.outcomes ? " (NO OUTCOMES: the run was made before they were recorded, or something is wrong)" : ""}`
     : "citizen records: NONE (no citizen decision or outcome is in this log: a lean log, or --record-decisions none)");
+
+  if (r.cost) L.push(`recorded cost of the whole run: ${r.cost.recorded_usd} over ${r.cost.model_calls} model calls (as the log records it, in the money the models are priced in)${r.debriefs ? `; debriefs given: ${r.debriefs.given.length}${r.debriefs.not_given.length ? `, NOT given: ${r.debriefs.not_given.map((d: any) => d.seat).join(", ")}` : ""}` : ""}`);
   if (r.folder_note) L.push(`folder note: ${r.folder_note.slice(0, 400)}`);
   for (const [k, s] of Object.entries<any>(r.per_seat)) {
     L.push(`-- ${k}: ${s.model_calls} calls${s.failed_calls ? ` (${s.failed_calls} failed)` : ""}, ${s.cost_microusd} microusd; tool uses: ${kv(s.tool_uses)}; answers with no tool use: ${s.answers_without_tool_use}`);
