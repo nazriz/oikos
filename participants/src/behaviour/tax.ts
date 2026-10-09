@@ -130,6 +130,8 @@ export function annualTax(law: IncomeTaxLaw, income: number): number {
  * What's withheld from a pay of `gross` every `period` seconds, charge by charge: the pay reckoned as a year's, the
  * law's charges on that, and a pay period's part. The whole is rounded down once; each charge has its part rounded
  * down, and what that leaves over goes to the first that takes anything. No law: nothing.
+ * The one reckoning of it: the opening wage instructions, every employer's payroll, a worker's own check of their pay
+ * and a payment reckoned on net pay all call this, and the law's text says the same steps (`withholdingInWords`).
  */
 export function withheld(law: IncomeTaxLaw | undefined, gross: number, period: number): { total: number; parts: { charge: Charge; amount: number }[] } {
   if (!law || gross <= 0 || period <= 0) return { total: 0, parts: [] };
@@ -140,6 +142,30 @@ export function withheld(law: IncomeTaxLaw | undefined, gross: number, period: n
   const taking = parts.filter((c, i) => year[i]!.amount > 0);
   if (taking[0]) taking[0].amount += total - taking.reduce((x, c) => x + c.amount, 0);
   return { total, parts: taking.filter((c) => c.amount > 0) };
+}
+
+/**
+ * The rule `withheld` reckons by, in the words a tax law gives it, so that whoever works a pay's withholding out by
+ * hand from the law comes to the figure every payroll comes to. It is said step by step, with each rounding, because
+ * the step people take from habit is another one: a year as a whole number of pays (26 pays of 14 days), where the
+ * world's year is 365 days and a pay is its days' share of it. The two differ by a little on every pay under any
+ * schedule with more than one rate (wave 2a, 2026-10-09: an opening wage instruction and a finance seat's own sum
+ * stood thirty hundredths apart, and the seat withdrew eight workers' wages for it).
+ * `period_days`: the pay period the words give as their example; `work_days`: the working days of a week, where pay by
+ * the day is reckoned (see `dayPayPeriod`).
+ */
+export function withholdingInWords(o: { period_days: number; work_days?: number }): string {
+  const d = o.period_days;
+  const days = (n: number) => `${n} day${n === 1 ? "" : "s"}`;
+  const perDay = o.work_days === undefined ? undefined : dayPayPeriod(o.work_days) / DAY;
+  return [
+    "Employers withhold each from every pay. What is withheld from a pay is reckoned in three steps, and in no other way.",
+    `One: the pay is taken as a year's pay, by multiplying it by 365 and dividing by the number of days the pay is for, rounded down to the smallest unit of money. (A year is 365 days: a pay for ${days(d)} is ${d}/365 of a year's pay, and a year is not taken as a whole number of pays.)`,
+    "Two: each charge is reckoned on that year's pay as set out above, each band's part rounded down.",
+    "Three: the year's charges are added together, and that sum, multiplied by the number of days the pay is for and divided by 365, rounded down, is what is withheld from the pay.",
+    "Of what is withheld, each charge's part is its own year's amount multiplied and divided the same way, rounded down, and what that leaves over goes with the first charge that takes anything.",
+    ...(perDay === undefined ? [] : [`Pay for a day's work is taken as pay for ${Number(perDay.toFixed(4))} days: a week over its ${o.work_days} working days.`]),
+  ].join(" ");
 }
 
 /** The span a day's pay is reckoned over, for what the law takes from it: a day's pay is pay for a working day, so a

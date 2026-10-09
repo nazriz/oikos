@@ -8,8 +8,8 @@
 // confirmed (the 2026-10-05 audit: the preview left a statement's `adico` and `formal` out). The test changes every
 // field of every kind of act and expects the preview to change.
 
-import { citedWords, formatMoney, type Block } from "@oikos/participants";
-import { duration, readable, ruleWords, type FieldKinds } from "@oikos/participants/llm";
+import { citedWords, formatMoney, forms, type Block } from "@oikos/participants";
+import { duration, moment, readable, ruleWords, type FieldKinds } from "@oikos/participants/llm";
 import type { Knowledge } from "./knowledge";
 
 /** A length of time as people say one (years, days, hours and minutes: never a count of seconds where it is rounder). */
@@ -91,6 +91,34 @@ export class Preview {
     return words ? ` ${words}` : "";
   }
 
+  /**
+   * When a standing paper's first time falls, said as whoever acts on it will count it (participants: `firstDue`), so
+   * that what is confirmed is what happens. A date given is that date. A length of time is counted from the moment
+   * the paper is lodged, and is said so, with the day it comes to if it is lodged today. With neither, the keeper's
+   * own rule is said: a standing payment's first falls one whole period after it is lodged (`otherwise`: that
+   * period), a standing work order is in force at once (`otherwise`: none; of an order only when it comes into force
+   * is said, which is all its staff read of it). (Until 2026-10-09 the length of time was shown as a date counted
+   * from the world's start: "first: year 1, day 15" for 14 days asked on day 8.)
+   */
+  private firstFalls(d: { every: number; first?: number; first_at?: number }, what: string, otherwise: number): string {
+    const now = this.k.t;
+    const today = forms.dateWords(now);
+    const then = `, and then every ${span(d.every)}`;
+    if (what === "order") {
+      if (Number.isSafeInteger(d.first_at)) return ` It is in force from ${forms.dateWords(d.first_at!)}${forms.dateWords(d.first_at!) === today ? ", which is today" : ""}.`;
+      const wait = Number.isSafeInteger(d.first) ? d.first! : 0;
+      return wait === 0 ? " It is in force as soon as it is on file." : ` It comes into force ${span(wait)} after it is put on file: on ${forms.dateWords(now + wait)} if that is today (${today}).`;
+    }
+    if (Number.isSafeInteger(d.first_at)) {
+      const on = forms.dateWords(d.first_at!);
+      return ` The first ${what} falls due on ${on}${on === today ? ", which is today" : ""}${then} from that date.`;
+    }
+    const wait = Number.isSafeInteger(d.first) ? d.first! : otherwise;
+    const lead = Number.isSafeInteger(d.first) ? "" : otherwise > 0 ? "No first date is given: " : "";
+    if (wait === 0) return ` ${lead}${lead ? "t" : "T"}he first ${what} falls due as soon as this is lodged${then}.`;
+    return ` ${lead}${lead ? "t" : "T"}he first ${what} falls due ${span(wait)} after this is lodged${lead ? ", one whole period" : ""}: on ${forms.dateWords(now + wait)} if it is lodged today (${today})${then}.`;
+  }
+
   outcome(o: any, every?: number): string {
     const rep = every ? ` every ${span(every)}` : "";
     // (Whatever a sentence leaves out of its outcome follows it in brackets, by name.)
@@ -120,8 +148,10 @@ export class Preview {
       case "publish": {
         const to = b.addressed_to?.length ? `, addressed to ${b.addressed_to.map((x: string) => this.whom(x)).join(", ")}` : "";
         if (b.kind === "request" && b.data?.outcome) {
-          const rest = this.also(b.data, ["outcome", "every"], ", with these details: ").replace(/\.$/, "");
-          return [`You will ask ${this.whom(b.addressed_to?.[0])} to ${this.outcome(b.data.outcome, b.data.every)}${named(b)}${b.addressed_to?.length > 1 ? to : ""}${this.seenBy(b.visible_to)}${rest}${citing(b)}. Your request will read: "${b.text}".${this.rule(b)}`,
+          // (Of a standing instruction, when its first time falls is said in a sentence of its own, as it will be counted.)
+          const standing = Number.isSafeInteger(b.data.every) && b.data.every > 0;
+          const rest = this.also(b.data, ["outcome", "every", ...(standing ? ["first", "first_at"] : [])], ", with these details: ").replace(/\.$/, "");
+          return [`You will ask ${this.whom(b.addressed_to?.[0])} to ${this.outcome(b.data.outcome, b.data.every)}${named(b)}${b.addressed_to?.length > 1 ? to : ""}${this.seenBy(b.visible_to)}${rest}${citing(b)}. Your request will read: "${b.text}".${standing ? this.firstFalls(b.data, b.data.outcome?.money ? "payment" : "time", b.data.every) : ""}${this.rule(b)}`,
             ["kind", "text", "data", "addressed_to", "adico", "formal", ...RECORD]];
         }
         // A hold: an instruction to whoever acts on something standing. What it does is theirs to do, and it settles nothing.
@@ -155,7 +185,7 @@ export class Preview {
         // A standing work order: on the organisation's own file, for its staff to follow. Nothing is done now.
         if (b.kind === "work_order" && b.data?.work && b.data?.every) {
           const others = (Array.isArray(b.visible_to) ? b.visible_to : []).filter((x: string) => this.k.entityOf(x) !== (b.speaks_for ?? this.me));
-          return [`You will put a standing work order on ${this.k.entityOf(b.speaks_for ?? this.me) === this.me ? "your own file" : `the file of ${this.who(b.speaks_for)}`}${others.length ? `, shown to ${others.map((x: string) => this.who(x)).join(", ")}` : ""}: "${b.text}". Nothing is done now: the staff whose work it is follow it each time it falls due, in their own working hours, while it stands.${this.k.ownStaff?.inPost === 0 && this.k.entityOf(b.speaks_for ?? this.me) === this.me ? ` There is nobody in the post whose work this is: your office has no ${this.k.ownStaff.role} in post, so nothing is done under it until someone is taken on.` : ""} To change it, withdraw it and make another; to pause it, put it on hold.${citing(b, " It cites ")}${this.rule(b)}`,
+          return [`You will put a standing work order on ${this.k.entityOf(b.speaks_for ?? this.me) === this.me ? "your own file" : `the file of ${this.who(b.speaks_for)}`}${others.length ? `, shown to ${others.map((x: string) => this.who(x)).join(", ")}` : ""}: "${b.text}". Nothing is done now: the staff whose work it is follow it each time it falls due, in their own working hours, while it stands.${this.firstFalls(b.data, "order", 0)}${Number.isSafeInteger(b.data.until) ? (b.data.until % 86_400 === 0 ? ` It stands to the end of ${forms.dateWords(b.data.until - 86_400)}.` : ` It stands until ${moment(b.data.until)}.`) : ""}${this.k.ownStaff?.inPost === 0 && this.k.entityOf(b.speaks_for ?? this.me) === this.me ? ` There is nobody in the post whose work this is: your office has no ${this.k.ownStaff.role} in post, so nothing is done under it until someone is taken on.` : ""} To change it, withdraw it and make another; to pause it, put it on hold.${citing(b, " It cites ")}${this.rule(b)}`,
             ["kind", "text", "data", "addressed_to", "adico", "formal", ...RECORD]];
         }
         const d = this.details(b.data, typeof b.basis === "string" ? b.basis : undefined);

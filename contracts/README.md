@@ -227,6 +227,10 @@ A model call that fails (after its adapter's own time limits and retries) is rec
   - **A hold on a paper addressed to one's own organisation** now resolves to a hold on its own file (addressed to and seen by that organisation), where it was answered "is yours to act on: nobody else needs telling" (`contracts/test/holds.json`, one case changed).
   - `module.schema.json`: **`routines`** (optional): the routine tasks a module's office's staff do by standing order (`task`, `what`, and `at`: the parameter that says where).
   - Both resolvers are held to `contracts/test/standing-work.json` (12 cases).
+- **When a standing paper starts, and counts with grouped digits** (2026-10-09; wave 2a's review, faults 2 and 5):
+  - `outcomes.schema.json`, **`RequestData.first_at`** (optional): the date a standing instruction's first time falls on, as a moment (the day's start), where it was asked for by date. `first` (seconds after the request) is as it was; a request carries one or neither. A standing work order's data takes `first_at` the same way. Whoever acts on either reads them by one rule (`firstDue` in participants/src/contracts.ts): `first_at` (never before the day the paper was lodged), else `first` after it, else the keeper's own default (a payment: one period; a work order: at once).
+  - **The call language** (calls.md): `first` and `until` take a date ("year 1, day 22") or a length of time; a count takes the place's digit grouping as an amount does (`parseCount` with the world's currency). A date already past, and `first` on a payment made once, are questions back. `calls.schema.json` is unchanged.
+  - Both resolvers are held to `contracts/test/when.json` (36 readings, 13 refusals, 15 counts, 16 that are not counts, 13 programs).
 - **A form's summary in words** (both resolvers): a form-made statement's text says an amount as the world writes its money and a length of time in days ("every 14 days"), where it said the bare integer.
 
 ## Changes from v0.7 (v0.8, closed 2026-10-02; docs/design/world-expansion.md)

@@ -437,10 +437,71 @@ export function parseDuration(s: string): number {
   return n * UNIT[m[2]!]!;
 }
 
-/** "1", "one", "3" → a count. */
-export function parseCount(s: string): number {
+/** When something is to happen, as written: a date (`at`: the moment that day begins) or a length of time from when
+ * the paper is lodged (`in`: seconds). */
+export type When = { at: number } | { in: number };
+
+/**
+ * A "when" as written (`first`, `until`): a date as the world's papers write one ("year 1, day 22", "year 1 day 22",
+ * "day 22" of the year it now is, "year 2"; "tomorrow"), or a length of time ("14 days", "a fortnight", "today" and
+ * "now": none at all). The words people put round either are read past: "from year 1, day 22", "on day 22",
+ * "starting today", "until day 90", "in 14 days", "after 21 days", "14 days from now". Bare digits are neither, and are refused.
+ * `now` is the moment it is read at (for "tomorrow" and for a day with no year). (The kernel's resolver reads the
+ * same, step for step: `parse_when`. contracts/test/when.json holds what both must read and what both must refuse.)
+ */
+export function parseWhen(s: string, now: number): When {
+  const YEAR = 365 * DAY;
+  const err = () => new UnitError(`not a date or a duration: ${s}`);
+  let t = s.trim().toLowerCase().split(/\s+/).filter(Boolean).join(" ");
+  if (t === "at once") return { in: 0 };
+  for (const lead of [["starting ", "beginning ", "commencing ", "effective "], ["from ", "on ", "in ", "after ", "at ", "until ", "till "], ["the "]]) {
+    const p = lead.find((x) => t.startsWith(x));
+    if (p) t = t.slice(p.length);
+  }
+  for (const tail of [" from now", " from today", "'s time", " in time", " later", " hence"]) {
+    if (t.endsWith(tail)) {
+      t = t.slice(0, -tail.length);
+      break;
+    }
+  }
+  if (["today", "now", "immediately", "at once", "straight away"].includes(t)) return { in: 0 };
+  if (t === "tomorrow") return { at: (Math.floor(now / DAY) + 1) * DAY };
+  const m = /^(?:year ?([0-9]{1,6}))? ?,? ?(?:day ?([0-9]{1,3}))?$/.exec(t);
+  if (m && (m[1] !== undefined || m[2] !== undefined)) {
+    const year = m[1] === undefined ? Math.floor(now / YEAR) + 1 : Number(m[1]);
+    const day = Number(m[2] ?? 1);
+    if (year < 1 || day < 1 || day > 365) throw err();
+    return { at: ((year - 1) * 365 + (day - 1)) * DAY };
+  }
+  try {
+    return { in: parseDuration(t) };
+  } catch {
+    throw err();
+  }
+}
+
+/**
+ * "1", "one", "3" → a count. With the world's currency, digits grouped as the place groups them are read exactly as
+ * an amount's are (parseAmount: "60,000", or "60.000" where a point groups digits, or "1,50,000" where the place
+ * groups in twos), and so is a multiplier ("60k", "2 thousand"); what an amount's digits could not be (a decimal, a
+ * mark that could be read two ways) is not a count. Never nought, unless `zero` says it may be.
+ */
+export function parseCount(s: string, cur?: Currency, zero = false): number {
   const t = s.trim().toLowerCase();
-  const n = /^[0-9]+$/.test(t) ? Number(t) : WORDS[t];
-  if (!n || !Number.isSafeInteger(n)) throw new UnitError(`not a count: ${s}`);
+  const err = () => new UnitError(`not a count: ${s}`);
+  let n: number | undefined = /^[0-9]{1,15}$/.test(t) ? Number(t) : WORDS[t];
+  if (n === undefined && cur && isDigit(t[0])) {
+    // (The place's way of writing numbers, and nothing of its money: no sign, code or word, and no decimals.)
+    const plain: Currency = { code: "", minor_units: 0, ...(cur.decimal_mark !== undefined ? { decimal_mark: cur.decimal_mark } : {}), ...(cur.group_mark !== undefined ? { group_mark: cur.group_mark } : {}), ...(cur.grouping ? { grouping: cur.grouping } : {}), ...(cur.number_words ? { number_words: cur.number_words } : {}) };
+    let read: string;
+    try {
+      read = parseAmount(t, plain);
+    } catch {
+      throw err();
+    }
+    if (read.length > 15) throw err();
+    n = Number(read);
+  }
+  if (n === undefined || !Number.isSafeInteger(n) || n < 0 || (n === 0 && !zero)) throw err();
   return n;
 }

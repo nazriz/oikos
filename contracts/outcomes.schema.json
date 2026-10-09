@@ -70,14 +70,15 @@
       }
     },
     "RequestData": {
-      "description": "The data of a statement of kind 'request': whoever it is addressed to is asked to bring the outcome about, once, or every 'every' seconds starting 'first' seconds after the request. They decide.",
+      "description": "The data of a statement of kind 'request': whoever it is addressed to is asked to bring the outcome about, once, or every 'every' seconds. When the first of them falls: on the date 'first_at' (the moment that day begins; never before the day of the request), else 'first' seconds after the request, else one 'every' after it. A request carries 'first_at' or 'first', not both. They decide.",
       "type": "object",
       "required": ["outcome"],
       "additionalProperties": false,
       "properties": {
         "outcome": { "$ref": "#/$defs/Outcome" },
         "every": { "$ref": "#/$defs/Seconds" },
-        "first": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+        "first": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+        "first_at": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
       }
     },
     "Commitment": {

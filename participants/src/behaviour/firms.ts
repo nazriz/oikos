@@ -21,7 +21,7 @@ import { params, wait, type Belief, type BehaviourModule, type ParticipantContex
 import { distribute } from "./lengnick";
 import { dayPayPeriod, incomeTaxLaw, withheld, type Charge } from "./tax";
 import { message } from "./common";
-import { advertisedJob, ask, Asked, because, between, Book, PAYEE_DIED, breaches, noting, callAction, usd, cellsOf, commitmentOf, DAY, jobTerms, leaseTerms, MONTH, notice, offer, ownAccount, pay, publishedPrice, say, stoodEmpty, structureOf, withdraw, type Step } from "./common";
+import { advertisedJob, ask, Asked, because, between, Book, firstDue, PAYEE_DIED, breaches, noting, callAction, usd, cellsOf, commitmentOf, DAY, jobTerms, leaseTerms, MONTH, notice, offer, ownAccount, pay, publishedPrice, say, stoodEmpty, structureOf, withdraw, type Step } from "./common";
 import * as P from "./papers";
 
 /**
@@ -1090,7 +1090,7 @@ export class Staffing {
   private nextDue(book: Book, order: string, t: number): number {
     const r = book.records.get(order);
     const every = r?.record === "statement" ? Number(r.data?.every) || this.o.period : this.o.period;
-    const start = (r?.at ?? 0) + (r?.record === "statement" && Number.isInteger(r.data?.first) ? r.data!.first : every);
+    const start = r?.record === "statement" ? firstDue(r, every) : (r?.at ?? 0) + every;
     return start > t ? start : start + Math.ceil((t - start + 1) / every) * every;
   }
 

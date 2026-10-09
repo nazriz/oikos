@@ -4,12 +4,14 @@
 
 import * as C from "../calls";
 import type { Assertion, LookRequest, Observation, Offer, Outcome as ActOutcome, Practice, Reading, Record, ParticipantAction, Registry, StatementRecord, SiteCell } from "../contracts";
-import { basesOf, channels } from "../contracts";
+import { basesOf, channels, firstDue } from "../contracts";
 import { cents, moneyNow } from "../money";
 import { evaluate } from "../law";
 import type { Answers, BehaviourModule, ParticipantContext } from "../module";
 
 export const DAY = 86_400;
+
+export { firstDue };
 export const MONTH = 30 * DAY;
 
 type Claim = Extract<Record, { record: "claim" }>;
@@ -1205,7 +1207,7 @@ export class StandingWork {
     const r = book.standingOf("work_order").filter((x) => x.speaks_for === this.me && x.data?.work?.task === task).reduce<StatementRecord | undefined>((a, b) => (!a || b.at >= a.at ? b : a), undefined);
     if (!r) return undefined;
     const d = r.data ?? {};
-    const from = r.at + (Number.isSafeInteger(d.first) ? d.first : 0);
+    const from = firstDue(r, 0);
     if (!Number.isSafeInteger(d.every) || d.every <= 0 || t < from || (Number.isSafeInteger(d.until) && t >= d.until)) return undefined;
     if (book.onHold(r.id, [this.me])) return undefined;
     const list = (x: unknown) => (Array.isArray(x) && x.every((y) => typeof y === "string") ? (x as string[]) : undefined);

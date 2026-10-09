@@ -15,7 +15,7 @@ import { DAY, wait, type BehaviourModule, type ParticipantContext } from "../mod
 import { refusalText } from "../llm/words";
 import * as C from "../calls";
 import { dateWords } from "../forms";
-import { because, Book, callAction, Letters, message, pay, PAYEE_DIED, PAYMENT_FAILED, type Step, usd, Asked, whoWrote } from "./common";
+import { because, Book, callAction, firstDue, Letters, message, pay, PAYEE_DIED, PAYMENT_FAILED, type Step, usd, Asked, whoWrote } from "./common";
 
 interface Payment { instruction: string; from: string; to: string; amount: number; due: number; settles?: string }
 
@@ -231,7 +231,7 @@ export const bankPaymentSystem: BehaviourModule = {
         const r = standing.get(id);
         if (!r) continue;
         const until = ended.get(id) ?? obs.t;
-        const next = nextDue.get(id) ?? r.at + (Number.isInteger(r.data?.first) ? (r.data!.first as number) : (r.data!.every as number));
+        const next = nextDue.get(id) ?? firstDue(r, r.data!.every as number);
         if (next <= until) lastCall.set(id, { order: r, until });
         standing.delete(id);
         undated.delete(id);
@@ -258,7 +258,7 @@ export const bankPaymentSystem: BehaviourModule = {
           holdsOn.set(id, [...(holdsOn.get(id) ?? []), { hold: h.id, from }]);
           // (The first payment it stops: the first due at or after the time it counts from.)
           const every = order.data!.every as number;
-          const next = nextDue.get(id) ?? order.at + (Number.isInteger(order.data?.first) ? (order.data!.first as number) : every);
+          const next = nextDue.get(id) ?? firstDue(order, every);
           const first = next >= from ? next : next + Math.ceil((from - next) / every) * every;
           taken.push(`${id}, from the payment due on day ${Math.floor(first / DAY) + 1}`);
         }
@@ -341,7 +341,7 @@ export const bankPaymentSystem: BehaviourModule = {
           cannot("a payment in it doesn't say a valid amount and account to pay.");
           continue;
         }
-        const d = { from: m.from, to: m.to, pay: cents(m.amount), settles: m.settles, every: bulk ? undefined : ins.data.every, first: ins.data.first };
+        const d = { from: m.from, to: m.to, pay: cents(m.amount), settles: m.settles, every: bulk ? undefined : ins.data.every };
         const acc = custody().get(d.from);
         if (acc && dead.has(acc.holder)) continue; // the account holder has died: it pays out only to settle the estate
         if (!acc) {
@@ -366,7 +366,7 @@ export const bankPaymentSystem: BehaviourModule = {
           // A standing order into the account of someone we've been told has died: the payer is told, once (how an
           // employer comes to know: docs/behaviour/deaths.md). It is still carried out, into the estate.
           const was = nextDue.get(ins.id);
-          let due = was ?? ins.at + (Number.isInteger(d.first) ? d.first : d.every);
+          let due = was ?? firstDue(ins, d.every);
           // (Said when a payment under it next falls due, so that it is said at the same moment however often the
           // order is gone through.)
           const payee = due <= obs.t ? custody().get(d.to) : undefined;

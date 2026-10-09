@@ -269,10 +269,24 @@ impl Resolver<'_> {
     fn speaks_for(&self, c: &Call) -> R<String> {
         Ok(self.id(c, "for")?.unwrap_or_else(|| self.me.clone()))
     }
-    fn quantity(c: &Call, key: &str) -> R<Option<String>> {
+    fn quantity(&self, c: &Call, key: &str) -> R<Option<String>> {
         match Self::str_(c, key)? {
             None => Ok(None),
-            Some(s) => unit(calls::parse_count(&s)).map(|n| Some(n.to_string())),
+            Some(s) => unit(calls::parse_count(&s, self.k.currency.as_ref(), false)).map(|n| Some(n.to_string())),
+        }
+    }
+    /// When (a date, or a length of time from when the paper is lodged), as written. A date already past is a question.
+    fn when(&self, c: &Call, key: &str) -> R<Option<calls::When>> {
+        match Self::str_(c, key)? {
+            None => Ok(None),
+            Some(s) => match unit(calls::parse_when(&s, self.k.t))? {
+                calls::When::At(at) if at + 86_400 <= self.k.t => ask(format!(
+                    "{} is already past: today is {}. Give today's date or a later one, or a length of time from now.",
+                    forms::date_words(at),
+                    forms::date_words(self.k.t)
+                )),
+                w => Ok(Some(w)),
+            },
         }
     }
 
@@ -362,7 +376,7 @@ impl Resolver<'_> {
     /// Moving your own goods: from where you hold them to someone (yourself by default) at a place.
     fn goods(&self, c: &Call) -> R<Vec<Json>> {
         let kind = self.need(c, "kind", "Of what?")?;
-        let quantity = Self::quantity(c, "quantity")?;
+        let quantity = self.quantity(c, "quantity")?;
         let Some(quantity) = quantity.filter(|q| q != "0") else { return ask("How much?") };
         let to = self.k.entity_of(&self.id(c, "to")?.unwrap_or_else(|| self.me.clone()));
         let Some(to_at) = self.id(c, "at")? else {
@@ -397,7 +411,7 @@ impl Resolver<'_> {
         if survey.is_some() && cells.is_none() {
             return ask("Survey which cells?");
         }
-        let units = match (&cells, Self::quantity(c, "units")?) {
+        let units = match (&cells, self.quantity(c, "units")?) {
             (Some(l), None) => Some(l.len().to_string()),
             (_, u) => u,
         };
@@ -442,8 +456,8 @@ impl Resolver<'_> {
         if every <= 0 {
             return ask("How often?");
         }
-        let first = Self::seconds(c, "first")?;
-        let until = Self::seconds(c, "until")?;
+        let first = self.when(c, "first")?;
+        let until = self.when(c, "until")?;
         let by: Option<Vec<String>> = if Self::has(c, "by") {
             let mut v: Vec<String> = vec![];
             for p in self.ids(c, "by")?.unwrap_or_default() {
@@ -467,7 +481,7 @@ impl Resolver<'_> {
         } else {
             None
         };
-        let units = Self::quantity(c, "units")?;
+        let units = self.quantity(c, "units")?;
         let me = self.speaks_for(c)?;
         let mut text = format!("Standing work order: {task} at {at}");
         if let Some(o) = &on {
@@ -480,11 +494,15 @@ impl Resolver<'_> {
             text.push_str(&format!(", {u} each time"));
         }
         text.push_str(&format!(", every {}", duration_words(every)));
-        if let Some(f) = first {
-            text.push_str(&format!(", the first in {}", duration_words(f)));
+        match first {
+            Some(calls::When::At(at)) => text.push_str(&format!(", the first on {}", forms::date_words(at))),
+            Some(calls::When::In(f)) => text.push_str(&format!(", the first in {}", duration_words(f))),
+            None => {}
         }
-        if let Some(u) = until {
-            text.push_str(&format!(", for {}", duration_words(u)));
+        match until {
+            Some(calls::When::At(at)) => text.push_str(&format!(", until the end of {}", forms::date_words(at))),
+            Some(calls::When::In(u)) => text.push_str(&format!(", for {}", duration_words(u))),
+            None => {}
         }
         text.push('.');
         let mut seen = vec![me.clone()];
@@ -508,11 +526,24 @@ impl Resolver<'_> {
         let mut data = serde_json::Map::new();
         data.insert("work".into(), Json::Object(work));
         data.insert("every".into(), json!(every));
-        if let Some(f) = first {
-            data.insert("first".into(), json!(f));
+        match first {
+            Some(calls::When::At(at)) => {
+                data.insert("first_at".into(), json!(at));
+            }
+            Some(calls::When::In(f)) => {
+                data.insert("first".into(), json!(f));
+            }
+            None => {}
         }
-        if let Some(u) = until {
-            data.insert("until".into(), json!(self.k.t + u));
+        // (An end given as a date is the end of that day; as a length of time, so long from now.)
+        match until {
+            Some(calls::When::At(at)) => {
+                data.insert("until".into(), json!(at + 86_400));
+            }
+            Some(calls::When::In(u)) => {
+                data.insert("until".into(), json!(self.k.t + u));
+            }
+            None => {}
         }
         Ok(vec![obj(vec![("block", some("publish")), ("kind", some("work_order")), ("text", some(text)), ("speaks_for", some(me.clone())), ("addressed_to", some(json!([me]))), ("visible_to", some(json!(seen))), ("data", some(Json::Object(data))), ("ref", bind.map(|b| json!(b)))])])
     }
@@ -520,7 +551,7 @@ impl Resolver<'_> {
     /// Taking goods another holds, where we are (crime: world-expansion 7.3).
     fn take(&self, c: &Call) -> R<Vec<Json>> {
         let kind = self.need(c, "kind", "Take what?")?;
-        let Some(quantity) = Self::quantity(c, "quantity")?.filter(|q| q != "0") else { return ask("How much?") };
+        let Some(quantity) = self.quantity(c, "quantity")?.filter(|q| q != "0") else { return ask("How much?") };
         let from = self.k.entity_of(&self.need(c, "from", "Whose?")?);
         let at = self.need(c, "at", "Where?")?;
         Ok(vec![json!({ "block": "take", "kind": kind, "quantity": quantity, "from": from, "at": at })])
@@ -539,7 +570,12 @@ impl Resolver<'_> {
         let from = self.payer(c, "the payment")?;
         let out = self.money_outcome(c, Some(from.clone()), false)?;
         let every = Self::seconds(c, "every")?.filter(|e| *e != 0);
-        let first = Self::seconds(c, "first")?;
+        let first = self.when(c, "first")?;
+        // (When it starts is said of a payment made again and again: one asked for once is made when it is asked.
+        // The words are the other resolver's, `ONCE_IS_NOW`.)
+        if first.is_some() && every.is_none() {
+            return ask("A payment asked for once is made when it is asked: it can't be given a day to start. For a payment made again and again, say how often; for one payment on a later day, ask for it on that day.");
+        }
         let Some(keeper) = self.keeper(&from) else {
             return ask(format!("You don't know who keeps account {from}, so you can't ask them to pay from it."));
         };
@@ -562,15 +598,21 @@ impl Resolver<'_> {
             ])]);
         }
         // Someone else keeps it: the only physical option is to ask them. They decide.
+        let (first_in, first_at) = match first {
+            Some(calls::When::In(f)) => (Some(f), None),
+            Some(calls::When::At(at)) => (None, Some(at)),
+            None => (None, None),
+        };
         let text = format!(
-            "Please pay {} from {from} to {to}{}{}.",
+            "Please pay {} from {from} to {to}{}{}{}.",
             calls::format_money(&amount, self.currency()?),
             every.map(|e| format!(" every {} days", nearest_days(e))).unwrap_or_default(),
+            first_at.map(|at| format!(", the first on {}", forms::date_words(at))).unwrap_or_default(),
             purpose.as_ref().map(|p| format!(", for {p}")).unwrap_or_default()
         );
         let mut money = out.clone();
         money.as_object_mut().unwrap().insert("from".into(), json!(from));
-        let data = obj(vec![("outcome", some(json!({ "money": money }))), ("every", every.map(Json::from)), ("first", first.map(Json::from))]);
+        let data = obj(vec![("outcome", some(json!({ "money": money }))), ("every", every.map(Json::from)), ("first_at", first_at.map(Json::from)), ("first", first_in.map(Json::from))]);
         let basis = self.basis(c)?;
         Ok(vec![obj(vec![
             ("block", some("publish")),
@@ -860,7 +902,7 @@ impl Resolver<'_> {
             "money" => json!({ "money": self.money_outcome(c, self.id(c, "from")?, true)? }),
             "goods" => {
                 let kind = self.need(c, "kind", "Of what?")?;
-                let quantity = Self::quantity(c, "quantity")?.unwrap_or_else(|| "0".into());
+                let quantity = self.quantity(c, "quantity")?.unwrap_or_else(|| "0".into());
                 let to = self.k.entity_of(&self.need(c, "to", "Delivered to whom?")?);
                 let at = self.need(c, "at", "Delivered where?")?;
                 let from = self.id(c, "from_at")?;
@@ -1130,12 +1172,7 @@ impl Resolver<'_> {
                 // (A count on a form may be nought: a vote with nobody against.)
                 "count" => {
                     let s = Self::str_(c, field)?.unwrap_or_default();
-                    let t = s.trim();
-                    if (1..=15).contains(&t.len()) && t.bytes().all(|b| b.is_ascii_digit()) {
-                        Some(json!(t.parse::<i64>().unwrap_or_default()))
-                    } else {
-                        Some(json!(unit(calls::parse_count(&s))?))
-                    }
+                    Some(json!(unit(calls::parse_count(&s, self.k.currency.as_ref(), true))?))
                 }
                 "list" => self.ids(c, field)?.map(|v| json!(v)),
                 "date" => match Self::str_(c, field)? {
@@ -1395,6 +1432,53 @@ mod tests {
         k.absorb(&table["observation"]);
         let cases = table["cases"].as_array().unwrap();
         assert!(cases.len() >= 12);
+        for c in cases {
+            let name = c["name"].as_str().unwrap();
+            let program = parse_program(c["program"].as_str().unwrap()).unwrap_or_else(|e| panic!("{name}: {e:?}"));
+            match resolve(&program, &k, &|_| None, c["as"].as_str()) {
+                Resolution::Blocks(b) => assert_eq!(json!(b), c["blocks"], "{name}"),
+                Resolution::Questions { questions, .. } => assert_eq!(json!(questions), c["asks"], "{name}"),
+            }
+        }
+    }
+
+    /// When and how many: the table this resolver and the repository's TypeScript one are both held to
+    /// (contracts/test/when.json; translator/test/when.test.ts reads the same file).
+    #[test]
+    fn when_and_counts_as_the_shared_table_says() {
+        use crate::calls::{parse_count, parse_when, When};
+        let table: Json = serde_json::from_str(include_str!("../../../../contracts/test/when.json")).unwrap();
+        let now = table["now"].as_i64().unwrap();
+        let reads = table["reads"].as_array().unwrap();
+        assert!(reads.len() >= 30);
+        for r in reads {
+            let text = r["text"].as_str().unwrap();
+            let want = match (r["at"].as_i64(), r["in"].as_i64()) {
+                (Some(at), None) => When::At(at),
+                (None, Some(i)) => When::In(i),
+                _ => panic!("{text}: a date or a length of time"),
+            };
+            assert_eq!(parse_when(text, now).unwrap_or_else(|e| panic!("{text}: {}", e.0)), want, "{text}");
+        }
+        for text in table["refused"].as_array().unwrap() {
+            let text = text.as_str().unwrap();
+            assert_eq!(parse_when(text, now).unwrap_err().0, format!("not a date or a duration: {text}"), "{text}");
+        }
+        let currency = |name: &str| Currency::from_config(&table["currencies"][name]).unwrap();
+        for c in table["counts"].as_array().unwrap() {
+            let text = c["text"].as_str().unwrap();
+            let cur = currency(c["currency"].as_str().unwrap());
+            assert_eq!(parse_count(text, Some(&cur), c["zero"].as_bool() == Some(true)).unwrap_or_else(|e| panic!("{text}: {}", e.0)), c["count"].as_i64().unwrap(), "{text}");
+        }
+        for c in table["not_counts"].as_array().unwrap() {
+            let text = c["text"].as_str().unwrap();
+            let cur = currency(c["currency"].as_str().unwrap());
+            assert_eq!(parse_count(text, Some(&cur), false).unwrap_err().0, format!("not a count: {text}"), "{text}");
+        }
+        let mut k = Knowledge::new(Currency::from_config(&table["currency"]));
+        k.absorb(&table["observation"]);
+        let cases = table["cases"].as_array().unwrap();
+        assert!(cases.len() >= 13);
         for c in cases {
             let name = c["name"].as_str().unwrap();
             let program = parse_program(c["program"].as_str().unwrap()).unwrap_or_else(|e| panic!("{name}: {e:?}"));

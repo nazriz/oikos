@@ -45,6 +45,9 @@ class Ask extends Error {}
  * that wanted a standing order to maintain was asked "How much of it?" four times, 2026-10-09). */
 export const ONCE_OR_ROUTINE = "Is this work to be done once, or as a standing routine of your staff? Done once: say how much of it. As a routine: say how often (every day, every week), and it is a standing work order.";
 
+/** Asked of a payment made once that is given a start. */
+export const ONCE_IS_NOW = "A payment asked for once is made when it is asked: it can't be given a day to start. For a payment made again and again, say how often; for one payment on a later day, ask for it on that day.";
+
 /** Words as a label (a statement's kind, an organisation's, a post's role, an agreement's template): lower case,
  * letters and digits kept, anything else one underscore between them, starting with a letter, at most 64 characters.
  * A label already written as one comes back unchanged. What a model writes as "supplementary evidence statement" is
@@ -282,7 +285,15 @@ class Resolver {
   /** A quantity of goods, as written ("40", "40 items"): a count, exact. */
   private quantity(c: Call, key: string): string | undefined {
     const s = this.str(c, key);
-    return s === undefined ? undefined : String(calls.parseCount(s));
+    return s === undefined ? undefined : String(calls.parseCount(s, this.k.currency));
+  }
+  /** When (a date, or a length of time from when the paper is lodged), as written. A date already past is a question. */
+  private when(c: Call, key: string): calls.When | undefined {
+    const s = this.str(c, key);
+    if (s === undefined) return undefined;
+    const w = calls.parseWhen(s, this.k.t);
+    if ("at" in w && w.at + 86_400 <= this.k.t) throw new Ask(`${forms.dateWords(w.at)} is already past: today is ${forms.dateWords(this.k.t)}. Give today's date or a later one, or a length of time from now.`);
+    return w;
   }
 
   /** Moving your own goods (phase B): from where you hold them (said, or the one place you hold that kind), to
@@ -343,15 +354,17 @@ class Resolver {
     const at = this.need(c, "at", "Where?");
     const every = this.seconds(c, "every")!;
     if (every <= 0) throw new Ask("How often?");
-    const first = this.seconds(c, "first");
-    const until = this.seconds(c, "until");
+    const first = this.when(c, "first");
+    const until = this.when(c, "until");
+    // (An end given as a date is the end of that day; as a length of time, so long from now.)
+    const ends = until === undefined ? undefined : "at" in until ? until.at + 86_400 : this.k.t + until.in;
     const by = this.has(c, "by") ? [...new Set(this.ids(c, "by")!.map((p) => this.k.entityOf(p)))] : undefined;
     const on = this.has(c, "on") ? [...new Set(this.ids(c, "on")!)] : undefined;
     const units = this.quantity(c, "units");
     const me = this.id(c, "for") ?? this.me;
-    const text = `Standing work order: ${task} at ${at}${on ? `, on ${on.join(", ")}` : ""}${by ? `, by ${by.join(", ")}` : ""}${units ? `, ${units} each time` : ""}, every ${durationWords(every)}${first !== undefined ? `, the first in ${durationWords(first)}` : ""}${until !== undefined ? `, for ${durationWords(until)}` : ""}.`;
+    const text = `Standing work order: ${task} at ${at}${on ? `, on ${on.join(", ")}` : ""}${by ? `, by ${by.join(", ")}` : ""}${units ? `, ${units} each time` : ""}, every ${durationWords(every)}${first === undefined ? "" : "at" in first ? `, the first on ${forms.dateWords(first.at)}` : `, the first in ${durationWords(first.in)}`}${until === undefined ? "" : "at" in until ? `, until the end of ${forms.dateWords(until.at)}` : `, for ${durationWords(until.in)}`}.`;
     return [{ block: "publish", kind: "work_order", text, speaks_for: me, addressed_to: [me], visible_to: [...new Set([me, ...(by ?? [])])],
-      data: { work: { task, at, ...(on ? { on } : {}), ...(by ? { by } : {}), ...(units ? { units: Number(units) } : {}) }, every, ...(first !== undefined ? { first } : {}), ...(until !== undefined ? { until: this.k.t + until } : {}) },
+      data: { work: { task, at, ...(on ? { on } : {}), ...(by ? { by } : {}), ...(units ? { units: Number(units) } : {}) }, every, ...(first === undefined ? {} : "at" in first ? { first_at: first.at } : { first: first.in }), ...(ends !== undefined ? { until: ends } : {}) },
       ...(bind ? { ref: bind } : {}) }];
   }
 
@@ -377,7 +390,9 @@ class Resolver {
     const from = this.payer(c, "the payment");
     const out = this.moneyOutcome(c, from).money as { to: string; amount: string; for?: string; settles?: string };
     const every = this.seconds(c, "every");
-    const first = this.seconds(c, "first");
+    const first = this.when(c, "first");
+    // (When it starts is said of a payment made again and again: one asked for once is made when it is asked.)
+    if (first !== undefined && !every) throw new Ask(ONCE_IS_NOW);
     const keeper = this.keeper(from);
     if (keeper === undefined) throw new Ask(`You don't know who keeps account ${from}, so you can't ask them to pay from it.`);
     if (keeper === this.me) {
@@ -389,8 +404,8 @@ class Resolver {
     // Someone else keeps it: the only physical option is to ask them. They decide.
     return [{
       block: "publish", kind: "request", speaks_for: this.me, addressed_to: [keeper], visible_to: [this.me, keeper],
-      text: `Please pay ${this.sum(out.amount)} from ${from} to ${out.to}${every ? ` every ${Math.round(every / 86_400)} days` : ""}${out.for ? `, for ${out.for}` : ""}.`,
-      data: { outcome: { money: { from, ...out } }, ...(every ? { every } : {}), ...(first !== undefined ? { first } : {}) },
+      text: `Please pay ${this.sum(out.amount)} from ${from} to ${out.to}${every ? ` every ${Math.round(every / 86_400)} days` : ""}${first !== undefined && "at" in first ? `, the first on ${forms.dateWords(first.at)}` : ""}${out.for ? `, for ${out.for}` : ""}.`,
+      data: { outcome: { money: { from, ...out } }, ...(every ? { every } : {}), ...(first === undefined ? {} : "at" in first ? { first_at: first.at } : { first: first.in }) },
       ...this.basis(c), ...(bind ? { ref: bind } : {}),
     }];
   }
@@ -711,7 +726,7 @@ class Resolver {
         t.type === "amount" ? this.amount(c, field)
         : t.type === "duration" ? this.seconds(c, field)
         // (A count on a form may be nought: a vote with nobody against.)
-        : t.type === "count" ? (/^[0-9]{1,15}$/.test(this.str(c, field)!.trim()) ? Number(this.str(c, field)!.trim()) : calls.parseCount(this.str(c, field)!))
+        : t.type === "count" ? calls.parseCount(this.str(c, field)!, this.k.currency, true)
         : t.type === "text" ? this.str(c, field)
         : t.type === "choice" ? this.choice(c, field, t.options ?? [])
         : t.type === "space" ? this.space(this.id(c, field)!)

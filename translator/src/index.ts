@@ -20,7 +20,7 @@ import { Knowledge } from "./knowledge";
 import { Preview } from "./preview";
 import { LABEL_TEXT, RESOLVER, resolve, type Resolution, type StructureTypeInfo } from "./resolver";
 
-export const TRANSLATOR_VERSION = "0.9.1"; // 0.9.1: a form listed as a direction to the person's own office is marked so in the list, and the standing-work rule says the office's own order to its staff is never that form; a worked example each of a direction on a form and of an own paper on a form; 0.9.0: a direction to an office and a paper of one's own office go on the form listed for them; work done again and again is a standing order (work with every=)
+export const TRANSLATOR_VERSION = "0.9.2"; // 0.9.2: when a payment or a job done again and again starts (first=) is a date or a length of time, copied as the request wrote it (one rule, one line of the syntax, one worked example; the standing-work rule's words for first= and until= say the same); 0.9.1: a form listed as a direction to the person's own office is marked so in the list, and the standing-work rule says the office's own order to its staff is never that form; a worked example each of a direction on a form and of an own paper on a form; 0.9.0: a direction to an office and a paper of one's own office go on the form listed for them; work done again and again is a standing order (work with every=)
 
 export interface TranslatorId {
   id: string;
@@ -120,11 +120,12 @@ export function translatorSystem(): string {
     "- Recording something in one's own books or on one's own file, which moves nothing and tells nobody, is statement(kind=entry, visible=own, text=\"<what is recorded>\"), with the record it concerns, if one is named, as basis=. The text is copied from the request: its own words for what is recorded, as they stand.",
     "- \"Prepare … for my review\" or \"show me before it takes effect\" still asks for the act: everything is shown to the person before it is confirmed. What a request says is to stay as it is (\"keep the records\", \"cancel nothing else\") or to be shown with the draft asks for nothing more: it adds no line and is no reason to refuse.",
     "- Telling, asking, directing or instructing someone to see to something is a message to them: message(to=<them>, text=\"<what's asked of them>\"). The text is copied from the request: its own words for what they are to do, as they stand, from the first of them to the last, with nothing added (no \"Please\"), nothing reworded and nothing left out. Words the request quotes for them are the text, without the quotation marks. Having or getting someone to do something that is theirs to decide (\"get them to drop the complaint\", \"have the board sign it\") is asking them: a message too. work(...) for a job done once is for when the request itself gives the task, how much of it and where (\"have c0042 do 3 units of make at str.7\"): then it's work(task=make, units=\"3\", at=str.7, by=c0042), whoever is to do it. And where a form listed below the request is that office's own form for what it is being directed to do (its to= is the office, and its fields say what the office is to do), the direction is that form filled in, not a message.",
-    "- Work one's own staff are to do again and again as a standing routine (a round, a roster, a schedule: \"every week\", \"daily\", \"from now on\") is one line: work(task=..., at=..., every=\"<how often, as written>\"), with on= and by= only if the request names what it is done to or who is to do it (several as a list), units= only if it says how much each time, first= only if it says how long until it starts, and until= only if it says for how long it is to go on. Changing such a routine is withdrawing it and making another; pausing it is statement(hold=<it>). A form listed below as a direction to this person's own office is never how that is written, whatever the form's fields: that form is for whoever directs the office, and the office's own order to its staff is work(...).",
+    "- Work one's own staff are to do again and again as a standing routine (a round, a roster, a schedule: \"every week\", \"daily\", \"from now on\") is one line: work(task=..., at=..., every=\"<how often, as written>\"), with on= and by= only if the request names what it is done to or who is to do it (several as a list), units= only if it says how much each time, first= only if it says when it starts (a date, or how long from now), and until= only if it says when it ends (a date) or for how long it is to go on. Changing such a routine is withdrawing it and making another; pausing it is statement(hold=<it>). A form listed below as a direction to this person's own office is never how that is written, whatever the form's fields: that form is for whoever directs the office, and the office's own order to its staff is work(...).",
     "- Things moved or delivered: to= is who receives them (a person or an organisation), at= is the place they are delivered to (a building or a place) and from_at= the place they come from; a place named as where they go is at=, never to=, and with no one named to receive them they are your own (no to=).",
     "- Work done by several people is one work(...) with by= as a list of them (by=[\"c0042\",\"c0043\"]), never a line for each of them: units= is the whole job.",
     "- template= is the request's own word for the kind of newcomer, of child or of system (\"arrives as an apprentice\" is template=apprentice, \"we are having a baby\" is template=baby): the noun the request uses and never a word it didn't say, and left out if it uses none.",
     "- every= is the request's own words for how often, copied whole (\"every 28 days\", \"monthly\", \"a month\").",
+    "- first= is when a payment or a job done again and again is to start, only where the request says when: the request's own words for the date (\"year 1, day 22\") or for how long from now (\"14 days\", \"today\"), copied whole and by themselves, never joined with how often.",
     "- Seen by everyone is visible=public.",
     "- Having someone build something for you is structure(type=..., on=..., by=<them>, price=..., from=...), on its own line: never wrapped in an agreement, and with no money(...) line for the price (price= and from= are its payment). Having something demolished is structure(remove=<the building>, by=...).",
     "- Ending an agreement by notice is agreement(notice=<the agreement>); accepting one offered to you is agreement(sign=<the agreement>).",
@@ -155,6 +156,7 @@ export function translatorSystem(): string {
     "  Put a hold on every standing payment out of acc-1 to acc-9.  ->  none(look_first)",
     "  Note on our own file that the deposit under rec.52 is held for the tenant.  ->  statement(kind=entry, visible=own, text=\"the deposit under rec.52 is held for the tenant\", basis=rec.52)",
     "  Go to str.9 and see whether the roof has been mended.  ->  none(no_such_act)",
+    "  Pay acc-9 1,900 from acc-1 every 14 days for wages, the first payment on year 2, day 22.  ->  money(to=acc-9, amount=\"1,900\", from=acc-1, every=\"every 14 days\", first=\"year 2, day 22\", for=\"wages\")",
     "  From now on the crew at str.3 is to do the mend round every week.  ->  work(task=mend, at=str.3, every=\"every week\")",
     "  (Where a form is listed as: mend_round, to=depot, fields every.) Direct the depot to do the mend round every fortnight.  ->  form(form=mend_round, to=depot, every=\"every fortnight\")",
     "  (Where that form is listed as a direction to this person's own office.) Our crew at str.3 is to do the mend round every fortnight from now on.  ->  work(task=mend, at=str.3, every=\"every fortnight\")",
@@ -286,11 +288,23 @@ const RETRYABLE = /^You don't know of anyone or anything called|^It isn't clear 
 
 /** A resolver's answer that a value in the call could not be read as what its place takes (an amount, a length of
  * time, a count): which value, and what it should have been. */
-const UNIT_FAULT = /^(not an amount|badly grouped digits|a point with three digits after it can be read two ways|this money has no decimals|more than \S+(?: \S+)? decimals|fraction of [^:]*|too large|not a duration|not a count): (.*)\. Please say it another way\.$/s;
+const UNIT_FAULT = /^(not an amount|badly grouped digits|a point with three digits after it can be read two ways|this money has no decimals|more than \S+(?: \S+)? decimals|fraction of [^:]*|too large|not a duration|not a date or a duration|not a count): (.*)\. Please say it another way\.$/s;
 const unitFault = (q: string): { value: string; what: string } | undefined => {
   const m = UNIT_FAULT.exec(q);
-  return m ? { value: m[2]!, what: m[1] === "not a duration" ? "a length of time" : m[1] === "not a count" ? "a number" : "an amount" } : undefined;
+  return m ? { value: m[2]!, what: m[1] === "not a duration" ? "a length of time" : m[1] === "not a date or a duration" ? "a date or a length of time" : m[1] === "not a count" ? "a number" : "an amount" } : undefined;
 };
+/** How each of those is to be said again, in the terms a seat's own papers use. */
+const SAY_AGAIN: { [what: string]: string } = {
+  "an amount": "Please say it again with that amount written in figures.",
+  "a number": "Please say it again with that number written in figures.",
+  "a length of time": 'Please say it again with that written as a number of days, weeks or months, like "14 days".',
+  "a date or a length of time": 'Please say it again with a date, written like "year 1, day 12", or a length of time from now, like "14 days".',
+};
+/** What a seat is asked about words of its own that could not be read as what their place takes. */
+export const ownWords = (value: string, what: string): string => `"${value}", in what you asked, could not be read as ${what}. ${SAY_AGAIN[what] ?? SAY_AGAIN["an amount"]!}`;
+/** What the translator is told of such a value, before it is asked once more. */
+const unreadValue = (value: string, what: string): string =>
+  `"${value}" can't be read as ${what}. Write there only what the request gives for that argument, as the request wrote it (a date like "year 1, day 12", a length of time like "14 days", a number or an amount in its figures); if the request gives nothing for it, leave the argument out; if what the request gives for it can't be written so, answer none(unclear)`;
 /** The form a call fills in, as the seat has it (its name, and what each of its fields takes), if it fills one in. */
 function formOf(program: calls.Program, k: Knowledge): { name: string; fields: { [field: string]: { type?: string } } } | undefined {
   if (!("lines" in program)) return undefined;
@@ -315,7 +329,7 @@ export function askAgain(what: string, form?: { name: string; fields: { [field: 
   const takes = form ? Object.entries(form.fields).filter(([, f]) => f?.type === type).map(([k]) => k.replace(/_/g, " ")) : [];
   return form
     ? `It could not be set out on the ${form.name} form from what you said${takes.length ? `: the form takes these ${plural}: ${takes.join(", ")}` : ""}. Please say it again, giving each one you mean as a figure and leaving out any you don't.`
-    : `It could not be drawn up from what you said: ${what} in it could not be made out. Please say it again, with each figure written out.`;
+    : `It could not be drawn up from what you said: ${what} in it could not be made out. ${what === "a date or a length of time" || what === "a length of time" ? SAY_AGAIN[what]! : "Please say it again, with each figure written out."}`;
 }
 
 export function createTranslator(io: LlmIO, check: KernelCheck, typeOf: (type: string) => StructureTypeInfo | undefined, id = "translator", attempts = 2, resolver?: ResolveFn) {
@@ -323,7 +337,7 @@ export function createTranslator(io: LlmIO, check: KernelCheck, typeOf: (type: s
   const seen = new Set<string>();
   type Failure = Extract<Translation, { ok: false }>;
   /** One answer, resolved and checked. `final`: a failure that another attempt can't help (the world, not the call). */
-  async function attempt(req: TranslateRequest, out: { input?: any } | undefined, raw: unknown): Promise<{ ok: true; draft: Draft; hash: string } | (Failure & { final?: boolean })> {
+  async function attempt(req: TranslateRequest, out: { input?: any } | undefined, raw: unknown): Promise<{ ok: true; draft: Draft; hash: string } | (Failure & { final?: boolean; unit?: true; none?: true })> {
     const text = typeof out?.input?.program === "string" ? out.input.program : undefined;
     if (!text) return { ok: false, notices: [NOT_PUT], raw, invalid: ["no call came back"] };
     let program: calls.Program;
@@ -339,21 +353,23 @@ export function createTranslator(io: LlmIO, check: KernelCheck, typeOf: (type: s
     if (said) return { ok: false, notices: [said], call, final: true, asked_back: true };
     const r = resolver ? await resolver(req, program) : resolve(program, req.knowledge, typeOf, req.as);
     if (!r.ok && r.questions.some((q) => MALFORMED.test(q))) return { ok: false, notices: [NOT_PUT], call, invalid: [...(r.invalid ?? []), ...r.questions] };
-    // A figure the draft could not be read at. If the seat wrote it, it is asked about its own words. If it did not (the
-    // call put something there that the request never said), the call is at fault: it is tried again, and if that
-    // fails too the seat is asked for its request again in terms of the form it can see, never shown the draft's fault.
+    // A figure, a date or a length of time the draft could not be read at. Whether the words are the seat's own or
+    // not, it is the call that put them where they can't be read (a date and a period joined in one argument, a
+    // clause copied where a figure goes: wave 2a, six requests ended so with no second attempt), so the call is tried
+    // once more. If that fails too, the seat is asked: about its own words where they are its own, and otherwise for
+    // its request again in terms of the form it can see, never shown the draft's fault.
     const fault = r.ok ? undefined : r.questions.map(unitFault).find((x) => x !== undefined);
     if (!r.ok && fault) {
       const wrote = fault.value.trim() !== "" && req.proposal.toLowerCase().includes(fault.value.trim().toLowerCase());
-      if (wrote) return { ok: false, notices: [`"${fault.value}", as you wrote it, could not be read as ${fault.what}. Please say it again with that written as a plain figure.`], call, final: true, asked_back: true };
-      return { ok: false, notices: [askAgain(fault.what, formOf(program, req.knowledge))], call, invalid: [...(r.invalid ?? []), ...r.questions.map((q) => `the call gave something the request did not: ${q}`)], asked_back: true };
+      if (wrote) return { ok: false, notices: [ownWords(fault.value, fault.what)], call, invalid: [...(r.invalid ?? []), unreadValue(fault.value, fault.what)], asked_back: true, unit: true };
+      return { ok: false, notices: [askAgain(fault.what, formOf(program, req.knowledge))], call, invalid: [...(r.invalid ?? []), ...r.questions.map((q) => `the call gave something the request did not: ${q}`)], asked_back: true, unit: true };
     }
     // A question another attempt can't answer (which account? which cell?) goes to the participant as it is: the call
     // was right, and something isn't known. Another attempt helps only where the call itself is the trouble: it's
     // invalid, a refusal, or names something by a name nobody has (2026-10-03: asked again after "which account?",
     // models gave up a correct call for none(unclear)).
     const retryable = !!r.ok || !!(r as any).invalid || "none" in program || (r as any).questions.some((q: string) => RETRYABLE.test(q));
-    if (!r.ok) return { ok: false, notices: r.questions, call, ...(r.invalid ? { invalid: r.invalid } : {}), ...(retryable ? {} : { final: true }) };
+    if (!r.ok) return { ok: false, notices: r.questions, call, ...(r.invalid ? { invalid: r.invalid } : {}), ...(retryable ? {} : { final: true }), ...("none" in program ? { none: true as const } : {}) };
     const k = await check(req.participant, req.as, r.blocks);
     if (k.error) return { ok: false, notices: [NOT_CHECKED], call, invalid: [`the check failed: ${String(k.error).slice(0, 500)}`], final: true };
     const warnings = lawWarnings(r.blocks, req.knowledge, typeOf, req.as);
@@ -370,6 +386,9 @@ export function createTranslator(io: LlmIO, check: KernelCheck, typeOf: (type: s
     async translate(req: TranslateRequest): Promise<Translation & { retries?: { call?: string; reason: string }[] }> {
       const messages: LlmMessage[] = [{ role: "user", content: translatorContext(req) }];
       const retries: { call?: string; reason: string }[] = [];
+      // (An attempt that failed on a value it could not read: what the seat is asked if the next attempt does no
+      // better, since that says which of its words was the trouble.)
+      let unread: Failure | undefined;
       for (let n = 1; ; n++) {
         const res = await callModel(io, {
           purpose: "translator", subject: id, ref: req.draftId, system: translatorSystem(), maxTokens: 2000, tools: TOOLS, messages,
@@ -378,8 +397,14 @@ export function createTranslator(io: LlmIO, check: KernelCheck, typeOf: (type: s
         const out = res.content.find((b): b is Extract<typeof b, { type: "tool_use" }> => b.type === "tool_use" && b.name === "call");
         const r = await attempt(req, out, res.content);
         if (r.ok || n >= attempts || r.final) {
-          const { final: _, ...t } = r as Failure & { final?: boolean };
+          const { final: _, unit: _u, none: _n, ...t } = r as Failure & { final?: boolean; unit?: true; none?: true };
+          // (Asked again after a value it could not read, and it gave the request up: the seat is asked about the value.)
+          if (!r.ok && unread && r.none && !r.unit) return { ...unread, ...(t.call ? { call: t.call } : {}), retries };
           return { ...(r.ok ? r : t), ...(retries.length ? { retries } : {}) };
+        }
+        if (r.unit) {
+          const { final: _, unit: _u, none: _n, ...t } = r;
+          unread = t;
         }
         // What went wrong, for the record and for the next attempt: the call's own fault where there is one.
         const reason = (r.invalid?.length ? r.invalid : r.notices).join(" ");

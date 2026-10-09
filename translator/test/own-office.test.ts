@@ -57,7 +57,7 @@ test("the translator is shown that a direction form is to the asker's own office
   expect(prompt).toContain("A form listed below as a direction to this person's own office is never how that is written, whatever the form's fields: that form is for whoever directs the office, and the office's own order to its staff is work(...).");
   expect(prompt).toContain('Direct the depot to do the mend round every fortnight.  ->  form(form=mend_round, to=depot, every="every fortnight")');
   expect(prompt).toContain('Advertise 2 posts at 1,900 a fortnight.  ->  form(form=job_advertisement, to=depot, wage="1,900", period="a fortnight", posts="2")');
-  expect(TRANSLATOR_VERSION).toBe("0.9.1");
+  expect(TRANSLATOR_VERSION).toBe("0.9.2");
 });
 
 test("the works office's own order, both ways: its own seat's is a standing work order; the mayor's is the direction form", () => {
