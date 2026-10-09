@@ -712,13 +712,126 @@ pub fn parse_duration(s: &str) -> Result<i64, UnitError> {
     Ok(n * secs)
 }
 
-/// "1", "one", "3" -> a count.
-pub fn parse_count(s: &str) -> Result<i64, UnitError> {
+/// When something is to happen, as written: a date (the moment that day begins) or a length of time from when the
+/// paper is lodged (seconds).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum When {
+    At(i64),
+    In(i64),
+}
+
+/// A "when" as written (`first`, `until`): a date as the world's papers write one ("year 1, day 22", "year 1 day 22",
+/// "day 22" of the year it now is, "year 2"; "tomorrow"), or a length of time ("14 days", "a fortnight", "today" and
+/// "now": none at all). The words people put round either are read past ("from year 1, day 22", "in 14 days", "14
+/// days from now"). Bare digits are neither. (participants/src/calls.ts `parseWhen` is the same, step for step;
+/// contracts/test/when.json holds what both must read and refuse.)
+pub fn parse_when(s: &str, now: i64) -> Result<When, UnitError> {
+    const YEAR: i64 = 365 * DAY;
+    let err = || UnitError(format!("not a date or a duration: {s}"));
+    let mut t = s.trim().to_lowercase().split_whitespace().collect::<Vec<_>>().join(" ");
+    if t == "at once" {
+        return Ok(When::In(0));
+    }
+    for lead in [&["starting ", "beginning ", "commencing ", "effective "][..], &["from ", "on ", "in ", "after ", "at ", "until ", "till "][..], &["the "][..]] {
+        if let Some(r) = lead.iter().find_map(|p| t.strip_prefix(p)) {
+            t = r.to_string();
+        }
+    }
+    for tail in [" from now", " from today", "'s time", " in time", " later", " hence"] {
+        if let Some(r) = t.strip_suffix(tail) {
+            t = r.to_string();
+            break;
+        }
+    }
+    if ["today", "now", "immediately", "at once", "straight away"].contains(&t.as_str()) {
+        return Ok(When::In(0));
+    }
+    if t == "tomorrow" {
+        return Ok(When::At((now.div_euclid(DAY) + 1) * DAY));
+    }
+    // A date: "year N", "day D", or both, with a comma or a space between (or neither).
+    let digits = |rest: &str, max: usize| -> Option<(i64, usize)> {
+        let n = rest.bytes().take_while(u8::is_ascii_digit).count();
+        if n == 0 || n > max {
+            None
+        } else {
+            Some((rest[..n].parse().ok()?, n))
+        }
+    };
+    let gap = |rest: &'_ str| -> usize { usize::from(rest.starts_with(' ')) };
+    let date = (|| -> Option<(Option<i64>, Option<i64>)> {
+        let mut rest = t.as_str();
+        let (mut year, mut day) = (None, None);
+        if let Some(r) = rest.strip_prefix("year") {
+            let r = &r[gap(r)..];
+            if let Some((n, len)) = digits(r, 6) {
+                year = Some(n);
+                rest = &r[len..];
+            }
+        }
+        rest = &rest[gap(rest)..];
+        if let Some(x) = rest.strip_prefix(',') {
+            rest = x;
+        }
+        rest = &rest[gap(rest)..];
+        if let Some(r) = rest.strip_prefix("day") {
+            let r = &r[gap(r)..];
+            if let Some((n, len)) = digits(r, 3) {
+                day = Some(n);
+                rest = &r[len..];
+            }
+        }
+        if rest.is_empty() && (year.is_some() || day.is_some()) {
+            Some((year, day))
+        } else {
+            None
+        }
+    })();
+    if let Some((year, day)) = date {
+        let year = year.unwrap_or(now.div_euclid(YEAR) + 1);
+        let day = day.unwrap_or(1);
+        if year < 1 || !(1..=365).contains(&day) {
+            return Err(err());
+        }
+        return Ok(When::At(((year - 1) * 365 + (day - 1)) * DAY));
+    }
+    parse_duration(&t).map(When::In).map_err(|_| err())
+}
+
+/// "1", "one", "3" -> a count. With the world's currency, digits grouped as the place groups them are read exactly
+/// as an amount's are (`parse_amount`: "60,000", or "60.000" where a point groups digits), and so is a multiplier;
+/// what an amount's digits could not be (a decimal, a mark that could be read two ways) is not a count. Never
+/// nought, unless `zero` says it may be. (participants/src/calls.ts `parseCount` is the same.)
+pub fn parse_count(s: &str, cur: Option<&Currency>, zero: bool) -> Result<i64, UnitError> {
     let t = s.trim().to_lowercase();
-    let n = if !t.is_empty() && t.chars().all(|c| c.is_ascii_digit()) { t.parse::<i64>().ok() } else { word(&t) };
+    let err = || UnitError(format!("not a count: {s}"));
+    let mut n = if (1..=15).contains(&t.len()) && t.bytes().all(|c| c.is_ascii_digit()) { t.parse::<i64>().ok() } else { word(&t) };
+    if let (None, Some(cur)) = (n, cur) {
+        if t.starts_with(|c: char| c.is_ascii_digit()) {
+            // (The place's way of writing numbers, and nothing of its money: no sign, code or word, and no decimals.)
+            let plain = Currency {
+                code: String::new(),
+                minor_units: 0,
+                symbol: None,
+                unit_words: vec![],
+                minor_words: vec![],
+                decimal_mark: cur.decimal_mark,
+                group_mark: cur.group_mark,
+                grouping: cur.grouping.clone(),
+                symbol_after: false,
+                symbol_spaced: false,
+                number_words: cur.number_words.clone(),
+            };
+            let read = parse_amount(&t, &plain).map_err(|_| err())?;
+            if read.len() > 15 {
+                return Err(err());
+            }
+            n = read.parse::<i64>().ok();
+        }
+    }
     match n {
-        Some(n) if n > 0 && n <= 9_007_199_254_740_991 => Ok(n),
-        _ => Err(UnitError(format!("not a count: {s}"))),
+        Some(n) if (n > 0 || (zero && n == 0)) && n <= 9_007_199_254_740_991 => Ok(n),
+        _ => Err(err()),
     }
 }
 
@@ -799,8 +912,9 @@ mod tests {
         assert_eq!(parse_duration("a year").unwrap(), 365 * DAY);
         assert_eq!(parse_duration("12-month").unwrap(), 360 * DAY);
         assert_eq!(parse_duration("week").unwrap(), 7 * DAY);
-        assert_eq!(parse_count("one").unwrap(), 1);
-        assert!(parse_count("0").is_err());
+        assert_eq!(parse_count("one", None, false).unwrap(), 1);
+        assert!(parse_count("0", None, false).is_err());
+        assert_eq!(parse_count("0", None, true).unwrap(), 0);
         assert_eq!(format_money("123456"), "$1,234.56");
         assert_eq!(format_money("5"), "$0.05");
         assert_eq!(format_money("100000000"), "$1,000,000.00");

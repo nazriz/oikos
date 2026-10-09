@@ -30,7 +30,7 @@ import { basesOf, channels, cites } from "../contracts";
 import { DECISIONS, OUTCOMES, params, wait, type Belief, type BehaviourModule, type ConsultAnswer, type DecisionRecord, type OutcomeRecord, type ParticipantContext } from "../module";
 import type { Rng } from "../rng";
 import * as C from "../calls";
-import { ask, Asked, because, Book, breaches, noted, callAction, commitmentOf, DAY, nextLook, usd, jobTerms, record, leaseTerms, message, MONTH, moveIn, moveOut, notice, pay, PAYMENT_FAILED, petitionSignatures, publishedCount, say, sign, stoodEmpty, structureOf, variableToday, vote, withdraw, type Step, ownBanked } from "./common";
+import { ask, Asked, because, Book, firstDue, breaches, noted, callAction, commitmentOf, DAY, nextLook, usd, jobTerms, record, leaseTerms, message, MONTH, moveIn, moveOut, notice, pay, PAYMENT_FAILED, petitionSignatures, publishedCount, say, sign, stoodEmpty, structureOf, variableToday, vote, withdraw, type Step, ownBanked } from "./common";
 import { ADULT_YEARS, ageAt, bedroomsNeeded, hear, householdOf, SAYING, type Heard, type HouseholdData, type Member, type OccupancyStandard } from "./household";
 import { Deliveries, goodsPrices, offerOf as shopOffer, order } from "./trade";
 import { dayPayPeriod, incomeTaxLaw, withholding } from "./tax";
@@ -1265,7 +1265,7 @@ export const citizen: BehaviourModule = {
           const old = home.order ? (book.records.get(home.order) as any) : undefined;
           if (old && Number.isInteger(old.data?.every) && old.data.every > 0) {
             const every = old.data.every as number;
-            const due0 = old.at + (Number.isInteger(old.data.first) ? old.data.first : every);
+            const due0 = firstDue(old, every);
             starts = due0 >= starts ? due0 : due0 + Math.ceil((starts - due0) / every) * every;
             stopAt = starts - every + DAY;
           }
@@ -1419,7 +1419,7 @@ export const citizen: BehaviourModule = {
           const old = home.order ? (book.records.get(home.order) as any) : undefined;
           if (old && Number.isInteger(old.data?.every) && old.data.every > 0) {
             const every = old.data.every as number;
-            const due0 = old.at + (Number.isInteger(old.data.first) ? old.data.first : every);
+            const due0 = firstDue(old, every);
             starts = due0 >= starts ? due0 : due0 + Math.ceil((starts - due0) / every) * every;
             stopAt = starts - every + DAY;
           }

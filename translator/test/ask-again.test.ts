@@ -52,9 +52,10 @@ test("a figure the seat did write, and that cannot be read, is put to it in its 
   const mine = "File the year 1 budget proposal with staff at about three hundred or so.";
   const t = scripted(['form(form=council_proposal, to=city, kind=budget, staff="about three hundred or so", proposal="Year 1 budget.")']);
   const r = await createTranslator(t.io, ok, () => undefined).translate({ draftId: "draft.mayor-system.1", participant: "mayor-system", as: "mayor", proposal: mine, knowledge: knows() });
-  expect(r).toMatchObject({ ok: false, asked_back: true, notices: ['"about three hundred or so", as you wrote it, could not be read as an amount. Please say it again with that written as a plain figure.'] });
-  // (Its own words: the translator is not asked again for what only the seat can say.)
-  expect(t.calls()).toBe(1);
+  expect(r).toMatchObject({ ok: false, asked_back: true, notices: ['"about three hundred or so", in what you asked, could not be read as an amount. Please say it again with that amount written in figures.'] });
+  // (The call is tried once more first: it is the call that put those words where a figure goes, and a second reading
+  // may set them right. Only then is the seat asked, about its own words: translator/test/when.test.ts.)
+  expect(t.calls()).toBe(2);
 });
 
 test("the words for asking again: by what the form takes, or without a form", () => {

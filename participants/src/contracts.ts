@@ -266,3 +266,16 @@ export function slice(obs: Observation, capacity: Id, entity: Id): Observation {
   }
   return { ...obs, entity, ...(self ? {} : { as: capacity }), channels };
 }
+
+/**
+ * When a standing paper (a standing payment instruction, a standing work order) first falls due: on the date it names
+ * (`first_at`: the moment that day begins; never before the day the paper was lodged, so a date given late is that
+ * day), else so long after it was lodged (`first`), else `otherwise` after it. One reading, for whoever acts on such
+ * a paper, whoever wrote it, and what either is shown of it (contracts: RequestData;
+ * docs/behaviour/bank-payment-system.md).
+ */
+export function firstDue(r: { at: number; data?: any }, otherwise: number): number {
+  const d = r.data ?? {};
+  if (Number.isSafeInteger(d.first_at)) return Math.max(d.first_at, r.at - (r.at % 86_400));
+  return r.at + (Number.isSafeInteger(d.first) ? d.first : otherwise);
+}
