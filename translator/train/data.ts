@@ -91,7 +91,7 @@ import { FLAG_YES, FLAGS, sameMeaning, type MeaningContext } from "./meaning";
 
 export { meaningOf, sameMeaning, type MeaningContext } from "./meaning";
 
-export const DATA_VERSION = "0.12.0"; // 0.12.0: a direction on an office's form and a paper of one's own office (and the same direction as a letter where no form is listed), fields that are lists and dates, standing work orders
+export const DATA_VERSION = "0.13.2"; // 0.13.2: a direction to an office with no form listed is always said to the office (never "X is to …"); 0.13.1: a wide part's programs have, now and then, a large count written with the place's digit grouping and a start or an end given as a day (contracts 2026-10-09: a count is grouped as an amount is; first and until take a date); 0.13.0: a wide part (`broad`): registers beside the styles (rambling, flat, slips), who is asking (`ASKERS`), every paper the worlds' offices issue with every field filled (synthetic.ts `worldForms`), look_first for any act on a record named by description, no_such_act for attending; 0.12.0: a direction on an office's form and a paper of one's own office (and the same direction as a letter where no form is listed), fields that are lists and dates, standing work orders
 
 const sha256 = (s: string) => new Bun.CryptoHasher("sha256").update(s).digest("hex");
 
@@ -161,6 +161,9 @@ export interface Gold {
   /** What else a writer is told of this program, whatever the style, each a line (what a record it names is; what a
    * direction with no form is to say). */
   notes?: string[];
+  /** Who asks for it, where the program itself says (a paper of a world's own office is that office's holder's:
+   * `ASKERS`); otherwise who asks is drawn when a wide part is planned (`askerFor`). */
+  asker?: string;
 }
 
 /** What kinds of two acts one request can ask for (`pairOf`). */
@@ -219,6 +222,8 @@ export interface Example {
   /** Two acts in one request, by the translator's rules one thing: an act and a direction to someone about it, or
    * the same thing done twice (`pairOf`). Its program has two lines. */
   pair?: Pair;
+  /** Who the writer was told is asking (`ASKERS`), in a wide part. */
+  asker?: string;
 }
 
 /**
@@ -352,7 +357,7 @@ const YEAR = 365 * 86_400;
  * into words, and the check that ids are copied can't tell), and a word with an underscore. A real world's ids are
  * what they are (`builder`, `works`), so a log's programs aren't held to this.
  */
-export function implausible(program: calls.Program | string, o: { invented?: boolean; forms?: FormSpec[] } = {}): string | undefined {
+export function implausible(program: calls.Program | string, o: { invented?: boolean; forms?: FormSpec[]; /** Fields of a form whose lists are of plain words (a ballot's tags), not of ids. */ wordLists?: string[] } = {}): string | undefined {
   const p = typeof program === "string" ? calls.parseProgram(program) : program;
   if ("none" in p) return undefined;
   const said = (v: calls.Value | undefined): string | undefined => (v === undefined ? undefined : "id" in v ? v.id : "text" in v ? v.text : undefined);
@@ -412,7 +417,7 @@ export function implausible(program: calls.Program | string, o: { invented?: boo
       const spec = c.fn === "form" ? (o.forms ?? []).find((f) => f.form === said(a.form) && (!("to" in a) || f.to === said(a.to))) : undefined;
       for (const [k, v] of Object.entries(a)) {
         const type = spec?.fields[k]?.type;
-        const word = c.fn === "form" ? k === "form" || type === "choice" || type === "structure_type" || (k !== "to" && !spec) : WORD_ARGS.has(k);
+        const word = c.fn === "form" ? k === "form" || type === "choice" || type === "structure_type" || (type === "list" && !!o.wordLists?.includes(k)) || (k !== "to" && !spec) : WORD_ARGS.has(k);
         const ids = "id" in v ? [v.id] : "json" in v && Array.isArray(v.json) ? v.json.filter((x): x is string => typeof x === "string") : [];
         for (const x of ids) {
           if (word && k !== "form" && x.includes("_")) return "a word with an underscore, which a sentence writes as two";
@@ -1086,8 +1091,113 @@ export const STYLES: { [style: string]: string } = {
   late: "As an office-holder writing a careful, defensive instruction: formal and exact, complete sentences, no \"please\", no question, and no capacity stated. It opens with an imperative verb (Submit, Withdraw, Direct, Pay, Place, Record, Appoint …). Ids are written bare, never in brackets (from acc-city to acc-c0003, budget rec.4754), with a short description before one where it helps. The first sentence says the act, all of it, with every particular the call has said as a seat says them: what, for whom, from what, on what terms, each in a clause of its own, and a few words before an id for what it is (where the call quotes words or fills in a form, they follow at once). Then come further sentences that qualify it, as listed below: each a full sentence of its own, twelve to thirty words, never a tag of five. They ask for nothing more: no second act, nobody else to be written to or told, nothing to be sent to anyone. They speak of what the act itself names in plain words (the payment, that account, the notice), not by repeating its ids, and name no amount or person the call doesn't have, and no other id but the ones given below to be named. The whole request comes to 300 to 700 characters, or up to 1,000 where it has many ids to name: the length is from saying each thing in full, never from adding anything to what is asked.",
 };
 
+/**
+ * Registers (0.13.0): ways of writing that are nobody's office style. Every request until now was written by a capable
+ * model in one careful register, and nearly all as an office-holder; the translator is also to serve a simple model, a
+ * shopkeeper and a tenant. Each is a whole way of writing, like the seats' voices, and none changes what is asked:
+ * what a request must copy is copied exactly in every one of them.
+ *  - `rambling`: the request buried in talk round it;
+ *  - `flat`: the short, literal sentences of a simple writer (a weak model, a form letter);
+ *  - `slips`: typed fast, with slips of the keyboard and an odd order of words, never inside what is copied.
+ * They are dealt by `BROAD_DEAL` and by no other deal, so a plan made without it is what it was.
+ */
+export const REGISTERS: { [style: string]: string } = {
+  rambling: "As someone who talks round the point before and after getting to it: three to six sentences, of which ONE is the request, in the middle or near the end, said whole in that one sentence (or two that run on). The rest is talk: how the day has gone, how they came to need this, a grumble, an aside. The talk asks for nothing and settles nothing: no second thing to be done, nobody else to be told or asked, and no id, amount, number, date, record or person the call doesn't have. It is spoken, not official: no capacity stated, no \"Do not …\".",
+  flat: "As a very simple writer puts things: two to five short, flat sentences, one fact to a sentence, the subject first, plain common words, no courtesy, no reasons, no linking words, nothing ornamental (\"I want to pay acc-c0031. It is 500. The money is for rent.\": the kind of sentence, never these words). Every particular the call has is there, each in a sentence of its own or two to a sentence; nothing is explained and nothing is added.",
+  slips: "As someone typing fast on a small keyboard, or writing in a language that is not their first: one to three slips in ordinary words (a letter dropped or doubled, two letters swapped, a missing \"the\", a word out of its usual order, no capital at the start, a full stop forgotten), in a request that is otherwise short and plain. The slips are never in an id, a name, an amount, a number, a length of time, a date, a form's name or labels, or words the call quotes: every one of those is exact, character for character. It must still be plain what is asked.",
+};
+
+/**
+ * No style at all (0.13.1): what a writer that really is a simple one is told (a small model, or one at low effort:
+ * orchestrator/src/broad.ts `plain`), where the registers above are a capable model writing as if it were. It is
+ * given no way of saying the act and no voice to keep: what comes back is its own. Dealt only where a part asks
+ * for it by name (`--styles own`).
+ */
+export const OWN: { [style: string]: string } = { own: "In your own words, however you would put it yourself. Short is fine." };
+
 /** The seats' two voices (pilot-style.md), each a whole way of writing and not one habit. */
 export const SEATS = ["early", "late"];
+
+/**
+ * The deal of a wide part (0.13.0; `PlanOptions.styles`, `--deal broad`): the three registers and the terse line most
+ * often (two turns in five between them), every older style once, and the seats' voices one turn in five (the standing
+ * set is half in them already, and the pilots' own requests are all in them). In an order that runs through all of
+ * them before any repeats its neighbour.
+ */
+export const BROAD_DEAL: string[] = ["rambling", "late", "flat", "terse", "slips", "chatty", "rambling", "formal", "flat", "late", "slips", "polite", "terse", "reasoned", "rambling", "early", "flat", "bracketed", "slips", "named", "terse", "late", "capacity", "cited", "do_not", "stacked"];
+
+/** The styles that are an office-holder's way of writing: whoever asks in one of them is an office-holder (`askerFor`). */
+const OFFICIAL = new Set(["early", "late", "capacity", "cited", "stacked", "do_not"]);
+
+/**
+ * Who is asking (0.13.0): the kinds of asker a world has, each a line for the writer. The translator is to serve all of
+ * them, and until now every request was an office-holder's. It shows in how they speak of things (my shop, our
+ * members, my landlord), and changes nothing of what is asked.
+ */
+export const ASKERS: { [asker: string]: string } = {
+  officer: "an office-holder (a mayor, a clerk, a finance or works officer), about the business of their office",
+  shopkeeper: "someone who keeps a shop or a small business, about their own stock, takings, staff and suppliers",
+  landlord: "a landlord, about the homes or premises they let, their tenants and the rent",
+  tenant: "a tenant, about their own home, their rent and their landlord",
+  worker: "someone who works for a wage, about their own job, pay, hours and employer",
+  organiser: "a union organiser, about the members, their employer and what the members have decided",
+  clinic: "the manager of a clinic or a school, about its staff, its rooms, its supplies and the people it serves",
+  citizen: "an ordinary resident with no office and no business, about their own household, money, home, job or vote",
+  farmer: "someone who farms or makes things (a grower, a miller, a builder), about their own land, goods, crew and customers",
+  banker: "someone at the counter of a bank or a lender, about the accounts it keeps and the payments it is told to make",
+  newcomer: "someone newly arrived in the town, or about to leave it, about settling in or winding up their own affairs",
+  member: "a member of a council, a board or a committee, about what is before it and how they vote",
+};
+
+/** Who would honestly ask for an act of each function (beside an office-holder): drawn among these, by seed. */
+const ASKS_FOR: { [fn: string]: string[] } = {
+  money: ["tenant", "landlord", "shopkeeper", "citizen", "worker", "farmer", "banker", "clinic", "organiser", "officer"],
+  goods: ["shopkeeper", "farmer", "clinic", "shopkeeper", "farmer", "officer"],
+  work: ["shopkeeper", "farmer", "clinic", "officer", "farmer"],
+  account: ["citizen", "shopkeeper", "banker", "newcomer", "organiser", "landlord", "officer"],
+  structure: ["farmer", "landlord", "shopkeeper", "clinic", "citizen", "officer"],
+  occupancy: ["tenant", "citizen", "newcomer", "landlord", "worker"],
+  entity: ["shopkeeper", "organiser", "citizen", "farmer", "newcomer", "officer"],
+  claim: ["landlord", "farmer", "citizen", "tenant", "officer", "member"],
+  agreement: ["landlord", "tenant", "shopkeeper", "worker", "farmer", "clinic", "organiser", "banker", "officer"],
+  statement: ["shopkeeper", "landlord", "organiser", "clinic", "citizen", "member", "officer", "tenant"],
+  vote: ["citizen", "member", "worker", "organiser", "tenant", "shopkeeper"],
+  message: ["tenant", "citizen", "worker", "shopkeeper", "landlord", "organiser", "clinic", "farmer", "member", "officer", "newcomer"],
+  form: ["citizen", "shopkeeper", "landlord", "farmer", "tenant", "organiser", "clinic", "officer"],
+  presence: ["newcomer", "citizen", "officer", "worker"],
+  birth: ["citizen", "tenant", "worker", "newcomer"],
+  harm: ["citizen", "worker", "tenant"],
+  position: ["shopkeeper", "clinic", "organiser", "farmer", "officer", "member"],
+  system: ["shopkeeper", "clinic", "banker", "officer", "farmer"],
+  take: ["citizen", "worker", "tenant", "newcomer"],
+};
+/** The same for a kind of program by its tag, where the tag says more than the function does: a paper of one's own
+ * office is its office-holder's, whoever that is; a hold is anyone's who has something standing. */
+const ASKS_FOR_TAG: { [tag: string]: string[] } = {
+  hold: ["tenant", "shopkeeper", "citizen", "landlord", "worker", "officer", "banker"],
+  entry: ["shopkeeper", "landlord", "banker", "officer", "clinic", "organiser", "farmer"],
+  standing_work: ["shopkeeper", "farmer", "clinic", "officer", "landlord"], standing_work_hold: ["shopkeeper", "farmer", "clinic", "officer"], standing_work_withdraw: ["shopkeeper", "farmer", "clinic", "officer"],
+  direction: ["officer", "member", "clinic", "officer"], direction_unlisted: ["officer", "member", "clinic", "officer"], paper: ["officer"],
+};
+/** Whose papers the worlds' own offices' are, by the office that issues them (synthetic.ts `worldForms`; a paper of
+ * an office not listed here is an office-holder's). */
+export const PAPER_ASKERS: { [office: string]: string } = { LANDLORD: "landlord", UNION: "organiser", TRADE: "shopkeeper", LENDING: "banker", JOB_ADVERTISEMENT: "shopkeeper", PAYROLL: "shopkeeper", TRIBUNAL_MEMBER: "member" };
+
+/**
+ * Who asks for a program in a style: an office-holder in an office-holder's style; otherwise one of those who would
+ * honestly ask for an act of its kind (`ASKS_FOR`, or by its tag; a paper of a world's own office by that office:
+ * `Gold.asker`), by seed.
+ */
+export function askerFor(style: string, g: Pick<Gold, "shape" | "tag" | "asker">, rand: () => number): string {
+  const r = rand(); // (drawn whatever is returned, so who asks for one program changes nobody else's)
+  if (g.asker) return g.asker;
+  if (OFFICIAL.has(style)) return "officer";
+  const pool = (g.tag && ASKS_FOR_TAG[g.tag]) || ASKS_FOR[functionOf(g)] || ["officer"];
+  return pool[Math.floor(r * pool.length)]!;
+}
+/** The line a writer is given for who is asking. */
+export const askerLine = (asker: string): string =>
+  `Who is asking: ${ASKERS[asker] ?? asker}. It shows in how they speak of things and of themselves ("my shop", "our members", "my landlord"), where that comes naturally, and in nothing else. It never says in whose name or on whose behalf the thing is done, unless the call does (no "on behalf of our members", "for my office", "as the members directed": each would be read as part of what is asked). It adds no id, amount, number, record or person, changes nothing of what is asked, and states no office or capacity unless the style gives one to state.`;
 
 /**
  * The order the styles are dealt in when the caller names none (`planOf`): every other request in one of the seats'
@@ -1210,7 +1320,7 @@ const ABSORBS_A_RECORD = ["basis", "re", "settles"];
  * a request to it: the manifest counts lengths by style (`request_length`), which is where to look.
  */
 export function styleBrief(style: string, g: Gold, rand: () => number, o: { indirect?: boolean } = {}): { style: string; instruction: string; riders: Rider[]; /** Ids a letter asked for indirectly is to name inside its marked words. */ inside?: string[] } {
-  const base = STYLES[style] ?? style;
+  const base = STYLES[style] ?? REGISTERS[style] ?? OWN[style] ?? style;
   const choose = <T>(xs: T[]): T => xs[Math.floor(rand() * xs.length)]!;
   // The seats' voices name other things by id (0.7.0). In a request for an act: things the act leaves alone, in what
   // follows it, each a rider. In a letter asked for indirectly: what the task concerns, inside the marked words
@@ -2324,8 +2434,24 @@ const ROUTINES = [
   "putting every purchase above a set sum out to tender", "rounding what it charges to the nearest whole unit", "keeping a waiting list in the order people applied", "closing its books on the last day of the month",
   "chasing arrears after a set number of days", "giving its own staff first refusal on vacancies", "setting aside a share of what it takes in each month", "sending a collector round on a fixed day",
 ];
+/** What a speaker may mean to attend in person (a wide part's `no_such_act`). */
+const ATTENDED = [
+  "the council's next meeting", "a hearing of the tribunal", "a funeral", "the opening of the new hall", "the count after the ballot closes", "the members' meeting", "the inspection of the works", "market day",
+  "the school's open evening", "the reading of the accounts", "a neighbour's wedding", "the public consultation on the road", "the union's meeting", "the auction of the stores", "the handing over of the keys", "the harvest fair",
+];
+/** What a seat says with a request to attend: what it is, why being there matters, what they will take note of. */
+const ATTENDS = "In this voice the request says what the speaker means to attend, why their being there in person matters and what they will take note of while there, each in plain words, all of it the speaker's own going and seeing.";
+/** The arguments that name, by its id, something on record that an act is done to, each with what that thing is in a
+ * brief's words (a wide part's `look_first`: the same act with that id unknown to the speaker). */
+const ACTED_ON: { [fn: string]: [arg: string, what: string][] } = {
+  vote: [["ballot", "the ballot voted on"]],
+  agreement: [["sign", "the agreement to be signed"], ["notice", "the agreement notice is given on"]],
+  statement: [["withdraw", "the thing on record that is withdrawn"], ["hold", "the standing thing that is put on hold"]],
+  claim: [["release", "the right on record that is given up"], ["transfer", "the right on record that is passed on"]],
+  money: [["settles", "the invoice or bill the payment settles"]],
+};
 /** The arguments that say where: a place a body could go to. */
-const WHERE = ["at", "on", "in", "from_at", "taken_at", "materials_at"];
+const WHERE =["at", "on", "in", "from_at", "taken_at", "materials_at"];
 const ID = /^[a-z0-9][a-z0-9._\/-]*$/;
 
 /** The places a program names (by id), in its calls and the calls inside them. */
@@ -2349,6 +2475,8 @@ const withIds = (seats: string, n: { mention: string[]; say: string }): { seats:
 /** What a refusal's writer is told: the situation, and what the request must and mustn't do. */
 export interface RefusalBrief {
   label: calls.Label; brief: string; mustCopy: string[]; source: string; gold?: string;
+  /** What the request must not hold: the id of the thing a wide part's `look_first` is to name only by describing it. */
+  mustNot?: string[];
   /** What else the writer is told where the request is in one of the seats' voices (`refusalRequestBrief`): the
    * particulars a seat gives with a request of this kind (pilot-style.md), which a short request doesn't have. */
   seats?: string;
@@ -2387,8 +2515,30 @@ const STAYS = "In this voice the request says from when the change holds and wha
  *    to which, how much: its amount as its world writes it), with no id for the instruction; a record of another kind
  *    named only by describing it; a look and an act that depends on what the look finds.
  */
-export function refusalBriefs(gold: Gold[], perLabel: number, seed = 1): RefusalBrief[] {
+export function refusalBriefs(gold: Gold[], perLabel: number, seed = 1, o: { /** A wide part (0.13.0): beside the kinds above, `look_first` for any act on something on record whose id the speaker lacks (a ballot voted on, an agreement signed or given notice on, something withdrawn, held, released, passed on or settled: `ACTED_ON`), and `no_such_act` for attending something in person. */ wide?: boolean } = {}): RefusalBrief[] {
   const rand = sampler(seed);
+  // (A wide part's own kinds draw from a generator of their own: the briefs of the other kinds are as they were.)
+  const wrand = sampler(seed + 53);
+  const wchoose = <T>(xs: T[]): T => xs[Math.floor(wrand() * xs.length)]!;
+  const acted = !o.wide ? [] : gold.flatMap((g) => {
+    if (g.program.includes("\n")) return [];
+    const p = calls.parseProgram(g.program);
+    if ("none" in p) return [];
+    const c = p.lines[0]!.call;
+    const hit = (ACTED_ON[c.fn] ?? []).find(([k]) => { const v = c.args[k]; return !!v && "id" in v; });
+    return hit ? [{ g, c, arg: hit[0], what: hit[1] }] : [];
+  });
+  /** An act on something on record, with the id of that thing unknown to the speaker. */
+  const describedAct = (): RefusalBrief | undefined => {
+    if (!acted.length) return undefined;
+    const { g, c, arg, what } = wchoose(acted);
+    const id = (c.args[arg] as { id: string }).id;
+    const { [arg]: _, ...rest } = c.args;
+    const without = calls.programText({ lines: [{ call: { fn: c.fn, args: rest } }] });
+    const others = mustAppear(calls.parseProgram(without)).filter((x) => x !== id);
+    return { label: "look_first", mustCopy: others, mustNot: [id], source: g.source, gold: g.family ?? g.program,
+      brief: `What is wanted is what this call does, to ${what}: ${g.program}\n(${bringsAbout(g.program).map((b) => b.trim()).join("; ")})\nBut the speaker has no reference for ${what}: its id (${id}) is NOT in the request, and no other id stands in its place. They name it only by describing it, with particulars of your own (what it is about, who made or sent it, roughly when), put something like "${wchoose(BY_DESCRIPTION)}", in your own words.${others.length ? ` Everything else the call has is said, each exactly as written: ${others.join(", ")}.` : ""} Say the act as a person would, never by the call's own names for its parts. It is not a request to be shown or to find anything, nor to write to or ask anyone: the speaker wants the thing done. Don't say that the reference is missing or ask for it to be found.`, seats: DESCRIBED_AT_LENGTH };
+  };
   const choose = <T>(xs: T[]): T => xs[Math.floor(rand() * xs.length)]!;
   const out: RefusalBrief[] = [];
   const payments = gold.filter((g) => /^money\(/.test(g.shape) && !g.program.includes("\n"));
@@ -2403,7 +2553,11 @@ export function refusalBriefs(gold: Gold[], perLabel: number, seed = 1): Refusal
     return { mention: ms.map((m) => m.id), say: ` It also names these by id, ${as}, every one of them and written as given (the quotation marks here only set them off): ${listed(ms)}.` };
   };
   /** It needs something found out first: the three kinds in turn, the first falling back on the second (which needs nothing of the gold). */
-  const lookFirst = (i: number): RefusalBrief => {
+  const lookFirst = (n: number): RefusalBrief => {
+    // (A wide part: every fourth is an act of any kind on something on record whose id the speaker lacks.)
+    const wide = o.wide && n % 4 === 3 ? describedAct() : undefined;
+    if (wide) return wide;
+    const i = o.wide ? n % 4 : n;
     if (i % 3 === 0 && standing.length) {
       const g = choose(standing);
       // What the request must carry: the accounts that say which payments are meant, and the amount as its world
@@ -2420,7 +2574,14 @@ export function refusalBriefs(gold: Gold[], perLabel: number, seed = 1): Refusal
     return { label: "look_first", mustCopy: [], source: "brief",
       brief: `The speaker wants something looked up or found out and then something done that depends on what is found, in one request: ${choose(LOOK_THEN)}. What is to be done can't be said in full until the look has been made (who, which, how much or whether at all is what the look is for), and the request leaves it that way. Give it particulars of your own. It is one instruction to whoever carries things out, not a letter to anyone else asking them to look.`, seats: FOUND_THEN_DONE };
   };
-  const noSuchAct = (i: number): RefusalBrief => {
+  const noSuchAct = (n: number): RefusalBrief => {
+    // (A wide part: every third is something to be attended in person, which no function does either.)
+    if (o.wide && n % 3 === 2 && places.length) {
+      const place = wchoose(places);
+      return { label: "no_such_act", mustCopy: [place], source: "brief",
+        brief: `The speaker means to be at ${place} in person for something that happens there: ${wchoose(ATTENDED)}. They want it arranged that they attend: to be there themselves, for the whole of it. It is not a request to write to anyone, to vote on anything, to hand in a form or to be shown a record, and nobody else is sent in their place.`, seats: ATTENDS };
+    }
+    const i = o.wide ? n % 3 : n;
     if (i % 2 === 0 && places.length) {
       const place = choose(places);
       return { label: "no_such_act", mustCopy: [place], source: "brief",
@@ -2508,7 +2669,7 @@ export const refusalStyle = (b: RefusalBrief, style: string): string => (style =
  * first part written came out with one-line requests to read and to pause, where a seat's run to several sentences.) */
 export const refusalRequestBrief = (b: RefusalBrief, style: string): string => {
   const s = refusalStyle(b, style);
-  return `Situation:\n${b.brief}${b.seats && SEATS.includes(s) ? `\n${b.seats}` : ""}\n\nStyle: ${REFUSAL_STYLES[s] ?? STYLES[s] ?? s}`;
+  return `Situation:\n${b.brief}${b.seats && SEATS.includes(s) ? `\n${b.seats}` : ""}\n\nStyle: ${REFUSAL_STYLES[s] ?? STYLES[s] ?? REGISTERS[s]?.replaceAll("the call", "the situation") ?? OWN[s] ?? s}`;
 };
 
 /** A request for a refusal brief, from a model. */
@@ -2543,6 +2704,8 @@ export interface Manifest {
   by_style: { [style: string]: number };
   /** By the currency of the world each example is from (its code; an example of no known world is not counted). */
   by_currency?: { [code: string]: number };
+  /** By who the writer was told is asking, in a wide part (`ASKERS`; built refusals have nobody). */
+  by_asker?: { [asker: string]: number };
   /** Requests carrying something that adds nothing to their program, by kind (capacity, citation, do_not). */
   riders: { [kind: string]: number };
   /** Spans whose value is in the request more than once, with nothing to settle which is meant (each records them all). */
@@ -2605,7 +2768,7 @@ function doNots(request: string, taken: [number, number][]): { text: string; at:
 /** One thing a writer is asked for: a request for a gold program (`request`), or one that fits a situation and is to
  * be refused (`refusal`). `brief`: exactly what the writer is sent, a model or one working from a file. `writer`: who
  * is asked. A refusal's `round`: 0, or a later one, asked for only where its label came out short of the floor. */
-interface Asked { id: string; writer: string; style: string; brief: string }
+interface Asked { id: string; writer: string; style: string; brief: string; /** Who the writer was told is asking (a wide part: `ASKERS`). */ asker?: string }
 export type PlanItem =
   | (Asked & { kind: "request"; /** The program, with its world's money and forms. */ gold: Gold; riders: Rider[]; /** The way of saying it chosen for this request (`writerNotes`). */ notes: string[]; /** A letter to be asked for indirectly: the request comes back with the words asked of them marked, and they are the example's text (`marked`). */ indirect?: true; /** Ids such a letter was given to name inside its marked words. */ inside?: string[]; /** Two acts in one request (`pairOf`): `gold` is the program of two lines. */ pair?: Pair })
   | (Asked & { kind: "refusal"; /** Its label, and what the request must carry. */ refusal: RefusalBrief; round: number });
@@ -2637,6 +2800,10 @@ export interface PlanOptions {
   pairs?: number;
   /** Requests are planned for those pairs only. */
   pairsOnly?: boolean;
+  /** A wide part (0.13.0): each brief says who is asking (`askerFor`: an office-holder in an office-holder's style,
+   * otherwise one of those who would honestly ask for such an act), and the refusal briefs have the wide kinds
+   * (`refusalBriefs`). With `styles: BROAD_DEAL` the registers are dealt too. Absent: the plan is what it was. */
+  broad?: boolean;
   seed?: number;
 }
 
@@ -2667,6 +2834,7 @@ export function planOf(gold: Gold[], o: PlanOptions): PlanItem[] {
   const sayRand = sampler(seed + 17);
   const indirectRand = sampler(seed + 19);
   const pairRand = sampler(seed + 41);
+  const askRand = sampler(seed + 43);
   const plan: PlanItem[] = [];
   let turn = 0;
   const next = () => ({ writer: o.writers[turn % o.writers.length]!, styleKey: styles[turn % styles.length]!, n: turn++ });
@@ -2698,20 +2866,21 @@ export function planOf(gold: Gold[], o: PlanOptions): PlanItem[] {
     // (What a form's amounts come to, a third of the time: after the last of them, a sentence that is no field's.)
     const total = (!indirect || two) && !office ? (sayRand() < 0.35 ? amountTotal(one, sayRand) : undefined) : undefined;
     const riders = [...styled.riders, ...(total ? [total.rider] : []), ...(after ? [after] : [])];
-    const instruction = after ? `${styled.instruction} Whatever else the style asks, the request's last sentence is exactly this one, which says what becomes of the form once it is handed in, names nobody and asks nobody for anything: "${after.text}"` : styled.instruction;
+    const asker = o.broad ? askerFor(style, g, askRand) : undefined;
+    const instruction = (after ? `${styled.instruction} Whatever else the style asks, the request's last sentence is exactly this one, which says what becomes of the form once it is handed in, names nobody and asks nobody for anything: "${after.text}"` : styled.instruction) + (asker ? `\n\n${askerLine(asker)}` : "");
     const notes = two?.letter ? [...(office ? ownFormNotes(one, office, sayRand) : [...writerNotes(one.program, sayRand), ...amountNotes(one, sayRand)]), ...indirectNotes(two.letter, sayRand).map((x) => x.replace("The act, said", "The direction, said"))]
-      : unlisted ? indirectNotes(g.program, sayRand, ["direct {to} to …", "direct {to} to …", "instruct {to} to …", "tell {to} to …", "{to} is to …"])
+      : unlisted ? indirectNotes(g.program, sayRand, ["direct {to} to …", "direct {to} to …", "instruct {to} to …", "tell {to} to …"]) // (not "{to} is to …", since 0.13.2: it addresses nobody, and was read as an order for work)
       : indirect ? indirectNotes(g.program, sayRand)
       // (An office's own form is asked for as the direction or the paper it is, not as a form handed in.)
       : office ? ownFormNotes(g, office, sayRand) : [...writerNotes(g.program, sayRand), ...amountNotes(g, sayRand)];
     if (total) notes.push(total.note);
     if (!two) notes.push(...(g.notes ?? []));
     const brief = requestBrief(g, instruction, notes, { indirect, ...(two ? { pair: two.pair } : {}) });
-    plan.push({ id: idOf(n, brief), kind: "request", writer, style, brief, gold: g, riders, notes, ...(indirect ? { indirect: true as const } : {}), ...(inside ? { inside } : {}), ...(two ? { pair: two.pair } : {}) });
+    plan.push({ id: idOf(n, brief), kind: "request", writer, style, brief, gold: g, riders, notes, ...(indirect ? { indirect: true as const } : {}), ...(inside ? { inside } : {}), ...(two ? { pair: two.pair } : {}), ...(asker ? { asker } : {}) });
   }
   const perLabel = Math.max(o.refusalsPerLabel ?? 0, o.refusalFloor ?? 0);
   for (let round = 0; round < (o.refusalFloor ? 3 : 1); round++) {
-    const briefs = round === 0 ? [...(perLabel ? refusalBriefs(gold, perLabel, seed) : []), ...piledBriefs(o.piled ?? [], seed)] : refusalBriefs(gold, perLabel, seed + round * 7919);
+    const briefs = round === 0 ? [...(perLabel ? refusalBriefs(gold, perLabel, seed, { wide: !!o.broad }) : []), ...piledBriefs(o.piled ?? [], seed)] : refusalBriefs(gold, perLabel, seed + round * 7919, { wide: !!o.broad });
     // (Some labels only: their briefs come label by label in turn, and so do the styles and the writers, so with two
     // labels one would get every seat's voice and the other none, and with two writers each would get one label. They
     // are dealt in a seeded order instead. So are they with every label asked for, since 0.11.0: the briefs worded by
@@ -2719,10 +2888,13 @@ export function planOf(gold: Gold[], o: PlanOptions): PlanItem[] {
     // label three of them would get every seat's voice and three none.)
     for (const b of shuffled(briefs.filter(labelled), sampler(seed + 29 + round))) {
       const { writer, styleKey, n } = next();
-      const brief = refusalRequestBrief(b, styleKey);
       // (In a seat's voice the request is to carry the ids it was given to name, with what it must carry anyway.)
       const style = refusalStyle(b, styleKey);
-      plan.push({ id: idOf(n, brief), kind: "refusal", writer, style, brief, refusal: SEATS.includes(style) && b.mention?.length ? { ...b, mustCopy: [...b.mustCopy, ...b.mention] } : b, round });
+      // (A wide part: anyone may ask for what is to be refused; an office-holder's style is an office-holder's.)
+      const askers = Object.keys(ASKERS);
+      const asker = !o.broad ? undefined : OFFICIAL.has(style) ? (askRand(), "officer") : askers[Math.floor(askRand() * askers.length)]!;
+      const brief = refusalRequestBrief(b, styleKey) + (asker ? `\n\n${askerLine(asker)}` : "");
+      plan.push({ id: idOf(n, brief), kind: "refusal", writer, style, brief, ...(asker ? { asker } : {}), refusal: SEATS.includes(style) && b.mention?.length ? { ...b, mustCopy: [...b.mustCopy, ...b.mention] } : b, round });
     }
   }
   return plan;
@@ -2797,7 +2969,7 @@ async function fromPlan(plan: PlanItem[], o: {
         else if (onlyInsideAnother(withoutRiders(request, t.riders), program, t.gold.forms ?? [])) out.why = "not_copied";
         // (Nor is an amount two fields share, unless the request says it for each straight after that field's label.)
         else if (!sharedAmountsPlaced(withoutRiders(request, t.riders), program, t.gold.forms ?? [])) out.why = "not_copied";
-        else out.why = badlyWritten(request, program, t.riders) ?? (SEATS.includes(t.style) && strayIds(request, program, { riders: t.riders, ...(t.gold.forms ? { forms: t.gold.forms } : {}) }).length ? "stray_id" : undefined);
+        else out.why = badlyWritten(request, program, t.riders) ?? ((SEATS.includes(t.style) || t.style in REGISTERS || t.style in OWN) && strayIds(request, program, { riders: t.riders, ...(t.gold.forms ? { forms: t.gold.forms } : {}) }).length ? "stray_id" : undefined);
         if (!out.why && out.check) {
           const failed = dropped.failed;
           const got = await attempt(() => out.check!.back.translate(request, formsOf(t.gold), said ? { ...t.gold, program } : t.gold));
@@ -2856,6 +3028,7 @@ async function fromPlan(plan: PlanItem[], o: {
       ...(all.length ? { riders: all } : {}),
       ...(c.said ? { indirect: true as const } : {}),
       ...(t.pair ? { pair: t.pair } : {}),
+      ...(t.asker ? { asker: t.asker } : {}),
     });
   }
   // Refusals that have to be worded: each brief's request kept if it carries what it must and (with a checker) comes
@@ -2877,7 +3050,7 @@ async function fromPlan(plan: PlanItem[], o: {
     const { request, by: model } = w;
     const style = t.style;
     const program = `none(${b.label})`;
-    const why: Reject["why"] | undefined = !b.mustCopy.every((l) => request.includes(l)) ? "not_copied" : !quotesBalanced(request) && !b.mustCopy.some((l) => /["“”]/.test(l)) ? "quotes" : undefined;
+    const why: Reject["why"] | undefined = !b.mustCopy.every((l) => request.includes(l)) || (b.mustNot ?? []).some((l) => occurrences(request, { value: l, arg: "", exact: true, how: "copy" }).length > 0) ? "not_copied" : !quotesBalanced(request) && !b.mustCopy.some((l) => /["“”]/.test(l)) ? "quotes" : undefined;
     if (why) {
       dropped[why]++;
       rejects.push({ request, program, why, written_by: model, style });
@@ -2901,7 +3074,7 @@ async function fromPlan(plan: PlanItem[], o: {
       }
     }
     have[b.label] = (have[b.label] ?? 0) + 1;
-    written.push({ id: exampleId(request, program), request, forms: [], program, kind: "refusal", shape: program, style, written_by: model, ...(check ? { verified_by: check.back.model, ...(check.own ? { verified_by_writer: true as const } : {}) } : {}), source: `written: ${b.source}`, ...(b.gold ? { gold: b.gold } : {}) });
+    written.push({ id: exampleId(request, program), request, forms: [], program, kind: "refusal", shape: program, style, written_by: model, ...(check ? { verified_by: check.back.model, ...(check.own ? { verified_by_writer: true as const } : {}) } : {}), source: `written: ${b.source}`, ...(b.gold ? { gold: b.gold } : {}), ...(t.asker ? { asker: t.asker } : {}) });
   }
   // Nothing that shares wording with a held-out case is kept: each such request is dropped (and counted), so the
   // test stays a test of requests the model hasn't seen the like of.
@@ -2927,7 +3100,7 @@ async function fromPlan(plan: PlanItem[], o: {
   const short = o.refusalFloor ? Object.fromEntries(labels_.filter((l) => (labels[l] ?? 0) < o.refusalFloor!).map((l) => [l, labels[l] ?? 0])) : {};
   const spanCount = (how: Span["how"]) => examples.reduce((n, e) => n + (e.spans ?? []).filter((x) => x.how === how).length, 0);
   const manifest: Manifest = {
-    version: DATA_VERSION, examples: examples.length, by_kind: count((e) => e.kind), by_shape: count((e) => e.shape), by_function: count((e) => functionOf(e)), by_origin: count((e) => e.origin ?? (e.kind === "refusal" ? "refusal" : "unknown")), by_style: count((e) => e.style), by_currency: count((e) => e.currency?.code),
+    version: DATA_VERSION, examples: examples.length, by_kind: count((e) => e.kind), by_shape: count((e) => e.shape), by_function: count((e) => functionOf(e)), by_origin: count((e) => e.origin ?? (e.kind === "refusal" ? "refusal" : "unknown")), by_style: count((e) => e.style), by_currency: count((e) => e.currency?.code), ...(examples.some((e) => e.asker) ? { by_asker: count((e) => e.asker) } : {}),
     riders, ambiguous_spans: examples.reduce((n, e) => n + (e.spans ?? []).filter((x) => x.ambiguous).length, 0),
     spans: { copy: spanCount("copy"), choice: spanCount("choice"), implied: spanCount("implied") },
     indirect: examples.filter((e) => e.indirect).length,

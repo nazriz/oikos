@@ -29,8 +29,8 @@ import { createTranslator, Knowledge } from "@oikos/translator";
 import { loadHeldOut, TEST_CURRENCY } from "@oikos/translator/eval";
 import { CASES } from "../../translator/eval/cases";
 import { blindRequests, checkAnswers, type BlindAnswer, type BlindReport } from "../../translator/train/blind";
-import { CLOSE, DATA_VERSION, OPEN, inOnly, fromWritten, functionOf, generate, goldFromCases, goldFromLog, knowing, planOf, refusalWriterSystem, sampler, shuffled, split, surfaceVariant, writerSystem, type Back, type Example, type Gold, type Manifest, type PlanItem, type Reject, type WrittenRequest } from "../../translator/train/data";
-import { amountForms, piled, synthetic } from "../../translator/train/synthetic";
+import { BROAD_DEAL, PAPER_ASKERS, CLOSE, DATA_VERSION, OPEN, inOnly, fromWritten, functionOf, generate, goldFromCases, goldFromLog, knowing, planOf, refusalWriterSystem, sampler, shuffled, split, surfaceVariant, writerSystem, type Back, type Example, type Gold, type Manifest, type PlanItem, type Reject, type WrittenRequest } from "../../translator/train/data";
+import { amountForms, piled, synthetic, worldForms } from "../../translator/train/synthetic";
 import { logsIn } from "./corpus";
 import { logLines, runOf } from "./logs";
 
@@ -41,7 +41,7 @@ import { logLines, runOf } from "./logs";
  */
 export const TAGS: { [tag: string]: string } = {
   hold: "statement", entry: "statement", standing_work_hold: "statement", standing_work_withdraw: "statement",
-  standing_work: "work", direction: "form", paper: "form", direction_unlisted: "message",
+  standing_work: "work", direction: "form", paper: "form", direction_unlisted: "message", world_form: "form",
 };
 
 /** A model to use, with its price and spending limit (models.ts, chooseModel). */
@@ -103,6 +103,15 @@ export interface TrainingDataOptions {
    * for those alone. */
   pairs?: number;
   pairsOnly?: boolean;
+  /** A wide part (data.ts `PlanOptions.broad`, `BROAD_DEAL`): the registers dealt beside the styles, who is asking
+   * said in every brief, and the wide kinds of refusal brief. */
+  broad?: boolean;
+  /** The styles dealt, in turn, in place of the deal (data.ts `STYLES`, `REGISTERS`, `OWN`): `["own"]` for a part
+   * written by simple writers in no style at all. */
+  styles?: string[];
+  /** Every paper the worlds' own offices issue is added to the gold set, each filled in so many ways, every field of
+   * it in the first two (synthetic.ts `worldForms`; none if absent). `only: ["world_form"]` writes requests for them alone. */
+  worldForms?: number;
   /** The share of gold programs whose examples are set aside for validation (default 0.15; 0: no split written). */
   validation?: number;
   seed?: number;
@@ -157,7 +166,7 @@ export interface GoldReport {
  * The floor under each refusal label (`refusalFloor`) is kept when requests are written (generate): refusals aren't
  * programs, so it's only carried in the report here.
  */
-export async function balancedGold(sources: string[], o: { perShape?: number; seed?: number; floor?: number; generated?: number; ceiling?: number; refusalFloor?: number; /** `generated` is for these functions only (the others get what they get without it). */ only?: string[] } = {}): Promise<{ gold: Gold[]; report: GoldReport }> {
+export async function balancedGold(sources: string[], o: { perShape?: number; seed?: number; floor?: number; generated?: number; ceiling?: number; refusalFloor?: number; /** `generated` is for these functions only (the others get what they get without it). */ only?: string[]; /** A wide part's draws (synthetic.ts `wide`). */ broad?: boolean } = {}): Promise<{ gold: Gold[]; report: GoldReport }> {
   const seed = o.seed ?? 1;
   const floor = o.floor ?? 300;
   const rand = sampler(seed + 1);
@@ -196,7 +205,7 @@ export async function balancedGold(sources: string[], o: { perShape?: number; se
   for (const g of gold) have[functionOf(g)] = (have[functionOf(g)] ?? 0) + 1;
   for (const fn of Object.keys(calls.ARGS)) {
     const need = Math.max(floor - (have[fn] ?? 0), (!o.only || o.only.includes(fn) || o.only.some((k) => TAGS[k] === fn) ? o.generated : undefined) ?? 100, 0);
-    if (floor > 0 && need > 0) for (const g of synthetic({ only: [fn], perFunction: need, seed, dropped })) add(g);
+    if (floor > 0 && need > 0) for (const g of synthetic({ only: [fn], perFunction: need, seed, dropped, ...(o.broad ? { wide: true } : {}) })) add(g);
   }
   const report: GoldReport = { gold: gold.length, by_function: {}, by_source: {}, by_shape: {}, excluded: Object.fromEntries(Object.entries(excluded).sort()), capped, implausible: Object.fromEntries(Object.entries(dropped).sort()), floor, ...(o.refusalFloor ? { refusal_floor: o.refusalFloor } : {}) };
   for (const g of gold) {
@@ -259,7 +268,7 @@ export async function trainingData(o: TrainingDataOptions): Promise<{ examples: 
     const key = `${m.adapter.provider}/${m.adapter.model}`;
     if (!(m.prices ?? PRICES)[key]) throw new Error(`no price recorded for ${key}: add it to the price table before using this model`);
   }
-  for (const fn of o.only ?? []) if (fn !== "none" && fn !== "amount_form" && !TAGS[fn] && !calls.ARGS[fn as calls.Fn]) throw new Error(`only: no function ${fn} in the call language (or "none", for refusals alone; "amount_form", for the forms of several amounts; or a kind of program by name: ${Object.keys(TAGS).join(", ")})`);
+  for (const fn of o.only ?? []) if (fn !== "none" && fn !== "amount_form" && fn !== "world_form" && !TAGS[fn] && !calls.ARGS[fn as calls.Fn]) throw new Error(`only: no function ${fn} in the call language (or "none", for refusals alone; "amount_form", for the forms of several amounts; or a kind of program by name: ${Object.keys(TAGS).join(", ")})`);
   if (o.pairs !== undefined && !(o.pairs >= 0 && o.pairs <= 1)) throw new Error(`pairs: a share from 0 to 1, got ${o.pairs}`);
   for (const l of o.refusalLabels ?? []) if (!(calls.LABELS as readonly string[]).includes(l)) throw new Error(`refusal labels: no label ${l} (they are: ${calls.LABELS.join(", ")})`);
   if (o.indirect !== undefined && !(o.indirect >= 0 && o.indirect <= 1)) throw new Error(`indirect: a share from 0 to 1, got ${o.indirect}`);
@@ -269,6 +278,7 @@ export async function trainingData(o: TrainingDataOptions): Promise<{ examples: 
   // Forms of several amounts, where asked for: beside the gold set's own forms (they are forms like any other to a
   // part of the set, a split and a refusal built from one).
   if (o.amountForms) gold = [...gold, ...amountForms({ forms: o.amountForms, seed: o.seed ?? 1 })];
+  if (o.worldForms) gold = [...gold, ...worldForms({ perForm: o.worldForms, seed: o.seed ?? 1, askers: PAPER_ASKERS })];
   log(`${gold.length} gold programs of ${new Set(gold.map((g) => g.shape)).size} shapes`);
   if (o.shard) {
     // One part of several: the same gold set is cut the same way every time (every `of`-th program, counted function
@@ -307,17 +317,17 @@ export async function trainingData(o: TrainingDataOptions): Promise<{ examples: 
   const asked = {
     ...(o.perGold ? { perGold: o.perGold } : {}), ...(o.refusalsPerLabel ? { refusalsPerLabel: o.refusalsPerLabel } : {}),
     ...(o.refusalFloor ? { refusalFloor: o.refusalFloor, piled: piled({ groups: o.refusalLabels?.includes("too_much") ? o.refusalFloor : Math.ceil(o.refusalFloor / 3), seed: o.seed ?? 1 }) } : {}),
-    indirect: o.indirect ?? 0.5, ...(o.only ? { only: o.only } : {}), ...(o.refusalLabels ? { refusalLabels: o.refusalLabels } : {}), ...(o.pairs ? { pairs: o.pairs, ...(o.pairsOnly ? { pairsOnly: true } : {}) } : {}), seed: o.seed ?? 1,
+    indirect: o.indirect ?? 0.5, ...(o.only ? { only: o.only } : {}), ...(o.refusalLabels ? { refusalLabels: o.refusalLabels } : {}), ...(o.pairs ? { pairs: o.pairs, ...(o.pairsOnly ? { pairsOnly: true } : {}) } : {}), ...(o.broad ? { broad: true, styles: BROAD_DEAL } : {}), ...(o.styles?.length ? { styles: o.styles } : {}), seed: o.seed ?? 1,
   };
   // What a part was weighted toward, for whoever reads its manifest.
-  const weighted = { indirect_share: asked.indirect, ...(o.only ? { only: o.only } : {}), ...(o.refusalLabels ? { refusal_labels: o.refusalLabels } : {}), ...(o.amountForms ? { amount_forms: o.amountForms } : {}), ...(o.pairs ? { pairs_share: o.pairs, ...(o.pairsOnly ? { pairs_only: true } : {}) } : {}) };
+  const weighted = { indirect_share: asked.indirect, ...(o.broad ? { broad: true } : {}), ...(o.worldForms ? { world_forms: o.worldForms } : {}), ...(o.only ? { only: o.only } : {}), ...(o.refusalLabels ? { refusal_labels: o.refusalLabels } : {}), ...(o.amountForms ? { amount_forms: o.amountForms } : {}), ...(o.pairs ? { pairs_share: o.pairs, ...(o.pairsOnly ? { pairs_only: true } : {}) } : {}) };
   if (o.briefsOnly) {
     const names = o.briefsFor?.length ? o.briefsFor : ["writer"];
     if (new Set(names.map(fileName)).size !== names.length) throw new Error(`writers' names must differ: ${names.join(", ")}`);
     const items = planOf(gold, { ...asked, writers: names });
     const plan: Plan = {
       version: DATA_VERSION, seed: o.seed ?? 1, sources: o.sources, ...(o.shard ? { shard: o.shard } : {}),
-      options: { ...(o.perShape ? { perShape: o.perShape } : {}), ...(o.perGold ? { perGold: o.perGold } : {}), ...(o.refusalsPerLabel ? { refusalsPerLabel: o.refusalsPerLabel } : {}), ...(o.refusalFloor ? { refusalFloor: o.refusalFloor } : {}), ...(o.limit ? { limit: o.limit } : {}), floor: o.floor ?? 300, ...(o.generated !== undefined ? { generated: o.generated } : {}), ...(o.ceiling !== undefined ? { ceiling: o.ceiling } : {}), indirect: asked.indirect, ...(o.only ? { only: o.only } : {}), ...(o.refusalLabels ? { refusalLabels: o.refusalLabels } : {}), ...(o.amountForms ? { amountForms: o.amountForms } : {}), ...(o.pairs ? { pairs: o.pairs, ...(o.pairsOnly ? { pairsOnly: true } : {}) } : {}), validation: o.validation ?? 0.15 },
+      options: { ...(o.perShape ? { perShape: o.perShape } : {}), ...(o.perGold ? { perGold: o.perGold } : {}), ...(o.refusalsPerLabel ? { refusalsPerLabel: o.refusalsPerLabel } : {}), ...(o.refusalFloor ? { refusalFloor: o.refusalFloor } : {}), ...(o.limit ? { limit: o.limit } : {}), floor: o.floor ?? 300, ...(o.generated !== undefined ? { generated: o.generated } : {}), ...(o.ceiling !== undefined ? { ceiling: o.ceiling } : {}), indirect: asked.indirect, ...(o.only ? { only: o.only } : {}), ...(o.refusalLabels ? { refusalLabels: o.refusalLabels } : {}), ...(o.amountForms ? { amountForms: o.amountForms } : {}), ...(o.pairs ? { pairs: o.pairs, ...(o.pairsOnly ? { pairsOnly: true } : {}) } : {}), ...(o.broad ? { broad: true } : {}), ...(o.styles?.length ? { styles: o.styles } : {}), ...(o.worldForms ? { worldForms: o.worldForms } : {}), validation: o.validation ?? 0.15 },
       writers: names, gold_programs: gold.length, ...(balanced ? { gold: balanced.report } : {}), items,
     };
     mkdirSync(o.out, { recursive: true });
@@ -402,7 +412,7 @@ export interface Plan {
   seed: number;
   sources: string[];
   shard?: { index: number; of: number };
-  options: { perShape?: number; perGold?: number; refusalsPerLabel?: number; refusalFloor?: number; limit?: number; floor: number; generated?: number; ceiling?: number; /** The share of the letters asked for indirectly (which ones is in the items). */ indirect?: number; /** The functions requests were planned for, and the refusal labels (all, where absent). */ only?: string[]; refusalLabels?: string[]; /** Forms of several amounts added to the gold set; the share of requests with a second act, and whether those alone. */ amountForms?: number; pairs?: number; pairsOnly?: boolean; validation: number };
+  options: { perShape?: number; perGold?: number; refusalsPerLabel?: number; refusalFloor?: number; limit?: number; floor: number; generated?: number; ceiling?: number; /** The share of the letters asked for indirectly (which ones is in the items). */ indirect?: number; /** The functions requests were planned for, and the refusal labels (all, where absent). */ only?: string[]; refusalLabels?: string[]; /** Forms of several amounts added to the gold set; the share of requests with a second act, and whether those alone. */ amountForms?: number; pairs?: number; pairsOnly?: boolean; /** A wide part; the worlds' own papers added, each filled so many ways. */ broad?: boolean; styles?: string[]; worldForms?: number; validation: number };
   /** Who was asked, in the order the items were dealt (item k to writer k mod n). */
   writers: string[];
   gold_programs: number;
@@ -448,7 +458,7 @@ export async function writtenData(dir: string, files: { file: string; writer: st
     ...(plan.options.refusalLabels ? { refusalLabels: plan.options.refusalLabels } : {}),
     ...(heldOut ? { heldOut } : {}), seed: plan.seed,
   });
-  const weighted = { ...(plan.options.indirect !== undefined ? { indirect_share: plan.options.indirect } : {}), ...(plan.options.only ? { only: plan.options.only } : {}), ...(plan.options.refusalLabels ? { refusal_labels: plan.options.refusalLabels } : {}), ...(plan.options.amountForms ? { amount_forms: plan.options.amountForms } : {}), ...(plan.options.pairs ? { pairs_share: plan.options.pairs, ...(plan.options.pairsOnly ? { pairs_only: true } : {}) } : {}) };
+  const weighted = { ...(plan.options.indirect !== undefined ? { indirect_share: plan.options.indirect } : {}), ...(plan.options.broad ? { broad: true } : {}), ...(plan.options.worldForms ? { world_forms: plan.options.worldForms } : {}), ...(plan.options.only ? { only: plan.options.only } : {}), ...(plan.options.refusalLabels ? { refusal_labels: plan.options.refusalLabels } : {}), ...(plan.options.amountForms ? { amount_forms: plan.options.amountForms } : {}), ...(plan.options.pairs ? { pairs_share: plan.options.pairs, ...(plan.options.pairsOnly ? { pairs_only: true } : {}) } : {}) };
   writeData(dir, r, { validation: plan.options.validation, seed: plan.seed }, { sources: plan.sources, gold_programs: plan.gold_programs, ...weighted, ...(plan.gold ? { gold: plan.gold } : {}) },
     { ...(plan.shard ? { shard: plan.shard } : {}), plan_version: plan.version, requests_from: files.map((f) => ({ writer: f.writer, file: f.file })), checked_against_held_out: !!heldOut, cost_microusd: 0 });
   const from = r.manifest.from_files!;

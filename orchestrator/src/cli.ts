@@ -72,7 +72,7 @@
 //         [--shard I/N] [--per-shape N] [--per-gold N] [--refusals N] [--refusal-floor N] [--floor N] [--generated N]
 //         [--ceiling N] [--validation SHARE] [--limit N] [--seed N]
 //         [--only FN,FN,...] [--indirect SHARE] [--refusal-labels L,L,...]
-//         [--amount-forms N] [--pairs SHARE [--pairs-only]]                  (these options on a run with models too)
+//         [--amount-forms N] [--pairs SHARE [--pairs-only]] [--broad] [--world-forms N] [--styles S,S]   (these options on a run with models too)
 //     No model: the plan of what is to be written (DIR/plan.json), what each writer is asked, item by item
 //     (DIR/briefs.jsonl: {id, kind, brief}; with --writers, DIR/briefs-NAME.jsonl each, the items dealt in turn), and
 //     the writers' instructions (DIR/writer-instructions.txt), for writers who work on files. --shard I/N: part I of
@@ -87,6 +87,10 @@
 //     ways (--only amount_form: requests for those alone). --pairs SHARE asks for that share of the forms filled in
 //     and of the withdrawals with a second act in the same request (a direction to someone about it, or a second
 //     withdrawal: one request of two lines, never too_much); --pairs-only writes requests for those alone.
+//     --broad: a wide part (the registers rambling, flat and slips dealt beside the styles; who is asking said in
+//     every brief; look_first for any act on a record named by description, no_such_act for attending).
+//     --world-forms N adds every paper the worlds' own offices issue, each filled in N ways, every field of it in
+//     the first two (--only world_form: requests for those alone).
 //   oikos translator-data-write <DIR> --requests FILE --writer NAME [--requests FILE --writer NAME ...]
 //     The requests such writers handed in ({id, request}, a line each), checked as a model's are and made into DIR's
 //     examples.jsonl, rejects.jsonl, blind.jsonl and manifest.json, for translator-data-check.
@@ -111,6 +115,23 @@
 //   oikos in-situ-label <FILE> --answers FILE --reader NAME --answers FILE --reader NAME --out DIR
 //     Two readers' answers ({id, program}) to a file of such requests, made into DIR's examples.jsonl (a request both
 //     read as the same program, which the request carries whole), rejects.jsonl (the rest, each with why) and manifest.json.
+//   oikos translator-data-batch <config.json> <PART>... [--write-only]
+//     Generated parts (folders made by translator-data --briefs --writers …) written and blind-checked through the
+//     adapters, a batch at a call (broad.ts): each writer's briefs to its model, the mechanical checks, each request
+//     read blind by a model that did not write it, the gold programs compared by meaning, the leak check. The config:
+//     {out, writers: {name: provider/model}, readers: {writer's provider/model: reader, "*": reader}, budget, …}.
+//     Resumable: the same command goes on where it stopped. A folder with a v2-plan.json is the banked part.
+//   oikos translator-data-collect <OUT> <PART>... [--share S] [--floor N]
+//     Every part's checked examples as one set, each with its groups (writer, register, asker, currency, writing,
+//     source), cut by gold program into train.jsonl and parity-test.jsonl (never trained on); the cells of each
+//     group by function, and which are under the floor.
+//   oikos translator-choices-data <PILOT_DIR>... --out DIR [--citizens N] [--replies N] [--writers NAME,…]
+//     The plan of citizens' turns (a code citizen's decision told in plain words; the label is what it chose) and
+//     of plain replies to real draft previews (translator/train/choices.ts). No model is called.
+//   oikos translator-v2-data [PILOT_DIR...] --out DIR [--from-pilots N] [--generated N] [--turns N --acts FILE...] [--writers NAME,…] [--seed N]
+//     The plan of the cases banked for a later translator (translator/train/v2.ts, docs/design/translator-v2.md):
+//     plain-text turns whose right reading is a look, a letter, a note, being done or a yes or no, from what real
+//     seats did (never a test-only pilot's) and generated. No model is called.
 //   oikos translator-pipeline <config.json>
 //     The translator's training pipeline in one unattended command (pipeline.ts, docs/translator-pipeline.md): pilots'
 //     situations, writers, two readers, the labelled examples, test sets, the join, the export and (if the config says
@@ -142,7 +163,7 @@ const sets = () => [...flags("set"), ...(flag("scenario") ? [`scenario=${flag("s
 /** Where a batch under named starting conditions goes, unless told: a folder of its own beside the plain world's. */
 const scenarioOut = (world: string) => (flag("scenario") ? join("runs", `${world.split("/").at(-1)!.replace(/\.(json|ya?ml)$/, "")}.${flag("scenario")!.replace(/[^A-Za-z0-9+-]+/g, "+")}`) : undefined);
 /** Positional arguments: everything that isn't a flag or a flag's value. */
-const positional = () => rest.filter((x, i) => !x.startsWith("--") && !(i > 0 && rest[i - 1]!.startsWith("--") && !["--no-measure", "--list", "--compress", "--no-compress", "--actions", "--consult", "--overwrite", "--force", "--real", "--only-real", "--blind", "--briefs", "--no-spares", "--no-write"].includes(rest[i - 1]!)));
+const positional = () => rest.filter((x, i) => !x.startsWith("--") && !(i > 0 && rest[i - 1]!.startsWith("--") && !["--no-measure", "--list", "--compress", "--no-compress", "--actions", "--consult", "--overwrite", "--force", "--real", "--only-real", "--blind", "--briefs", "--no-spares", "--no-write", "--broad", "--write-only"].includes(rest[i - 1]!)));
 
 /** The measurement folder for a DIR: its measure/, exported from its logs if there isn't one yet. */
 async function measureDir(dir: string): Promise<string> {
@@ -329,7 +350,7 @@ try {
       perShape: num("per-shape"), perGold: num("per-gold"), refusalsPerLabel: num("refusals"), refusalFloor: num("refusal-floor"), floor: num("floor"), generated: num("generated"), ceiling: num("ceiling"), validation: num("validation"),
       limit: num("limit"), seed: num("seed"), log: console.log,
       ...(flag("indirect") !== undefined ? { indirect: Number(flag("indirect")) } : {}), ...(flag("only") ? { only: list("only") } : {}), ...(flag("refusal-labels") ? { refusalLabels: list("refusal-labels") } : {}),
-      amountForms: num("amount-forms"), pairs: num("pairs"), pairsOnly: has("pairs-only"),
+      amountForms: num("amount-forms"), pairs: num("pairs"), pairsOnly: has("pairs-only"), broad: has("broad"), worldForms: num("world-forms"), ...(flag("styles") ? { styles: list("styles") } : {}),
     });
     if (has("briefs")) console.log(`${r.briefs} briefs written to ${r.out} (plan.json, briefs.jsonl${flag("writers") ? ", a briefs file for each writer" : ""}, writer-instructions.txt)`);
     else console.log(`${r.examples} examples written to ${r.out} (examples.jsonl, manifest.json)${r.stopped ? `; writing stopped early: ${r.stopped}` : ""}`);
@@ -383,6 +404,35 @@ try {
     const m = label(positional()[0]!, files.map((file, i) => ({ file, reader: names[i]! })), flag("out")!);
     console.log(`${m.examples} examples of ${m.requests} requests written to ${flag("out")} (examples.jsonl, rejects.jsonl, manifest.json); dropped: ${Object.entries(m.by_reason).filter(([, n]) => n).map(([why, n]) => `${why} ${n}`).join(", ") || "none"}`);
     console.log(`  by function: ${Object.entries(m.by_function).map(([fn, n]) => `${fn} ${n}`).join(", ")}`);
+  } else if (cmd === "translator-data-batch" && positional()[1]) {
+    // Generated parts written and blind-checked through the adapters, and the banked part (broad.ts).
+    const { runBroad } = await import("./broad");
+    const r = await runBroad(JSON.parse(readFileSync(positional()[0]!, "utf8")), positional().slice(1), {}, has("write-only") ? { only: "write" } : {});
+    for (const p of r.parts) console.log(`${p.part}: ${p.briefs} briefs, ${p.examples} passed the mechanical checks, ${p.agreed} of ${p.read} read alike by the blind reader, ${p.leaked} taken out by the leak check, ${p.kept} kept`);
+    for (const [m, u] of Object.entries(r.usage)) console.log(`  ${m}: ${u.calls} calls, ${u.input_tokens + u.cache_read_tokens} tokens in, ${u.output_tokens} out, ${(u.cost_microusd / 1e6).toFixed(2)} USD as reckoned`);
+    console.log(r.status);
+    if (r.status !== "complete") process.exit(3);
+  } else if (cmd === "translator-choices-data" && flag("out") && positional()[0]) {
+    // The plan of citizens' turns and of plain replies to previews (translator/train/choices.ts): no model is called.
+    const { choiceCases } = await import("./broad");
+    const num = (name: string) => (flag(name) ? Number(flag(name)) : undefined);
+    const p = await choiceCases({ out: flag("out")!, pilots: positional(), ...(num("citizens") !== undefined ? { citizens: num("citizens")! } : {}), ...(num("replies") !== undefined ? { replies: num("replies")! } : {}), writers: (flag("writers") ?? "writer").split(",").map((x) => x.trim()).filter(Boolean), ...(num("seed") !== undefined ? { seed: num("seed")! } : {}) });
+    console.log(`${p.items.length} cases planned in ${flag("out")} (choices-plan.json): ${Object.entries(p.by_kind).map(([k, n]) => `${k} ${n}`).join(", ")}`);
+    console.log(`  read: ${JSON.stringify(p.counts)}`);
+  } else if (cmd === "translator-data-collect" && positional()[1]) {
+    // Every part's checked examples as one set with its groups, cut into what may train and a parity test (broad.ts).
+    const { collect } = await import("./broad");
+    const num = (name: string) => (flag(name) ? Number(flag(name)) : undefined);
+    const r = collect(positional()[0]!, positional().slice(1), { ...(num("share") !== undefined ? { share: num("share")! } : {}), ...(num("floor") !== undefined ? { floor: num("floor")! } : {}), ...(num("seed") !== undefined ? { seed: num("seed")! } : {}) });
+    console.log(`${r.examples} examples: ${r.train} may train, ${r.parity} are the parity test (never trained on); the leak check names ${r.leak_check.cases_named} held-out cases`);
+    for (const [d, c] of Object.entries(r.cells)) console.log(`  ${d} × function: smallest cell ${c.min}; ${Object.keys(c.under).length} cells under the floor`);
+  } else if (cmd === "translator-v2-data" && flag("out")) {
+    // The plan of the cases banked for a later translator (translator/train/v2.ts): no model is called.
+    const { v2Cases } = await import("./broad");
+    const num = (name: string) => (flag(name) ? Number(flag(name)) : undefined);
+    const p = await v2Cases({ out: flag("out")!, pilots: positional(), ...(num("from-pilots") !== undefined ? { fromPilots: num("from-pilots")! } : {}), ...(num("generated") !== undefined ? { generated: num("generated")! } : {}), ...(num("max-carried") !== undefined ? { maxCarried: num("max-carried")! } : {}), ...(num("turns") !== undefined ? { turns: num("turns")!, acts: flags("acts") } : {}), writers: (flag("writers") ?? "writer").split(",").map((x) => x.trim()).filter(Boolean), ...(num("seed") !== undefined ? { seed: num("seed")! } : {}) });
+    console.log(`${p.items.length} cases planned in ${flag("out")} (v2-plan.json): ${Object.entries(p.by_kind).map(([k, n]) => `${k} ${n}`).join(", ")}`);
+    console.log(`  from pilots: ${JSON.stringify(p.counts)}`);
   } else if (cmd === "translator-pipeline" && positional()[0]) {
     const { loadConfig, plainReport, runPipeline } = await import("./pipeline");
     const m = await runPipeline(loadConfig(positional()[0]!));

@@ -349,6 +349,59 @@ split by gold program as `runs/translator-data-2026-10-06b/split.ts` does, the p
 - Sureness: `OIKOS_DECIDE_LOG=<file>` logs each answer's sureness; report its spread and what the cut-off of 0.1 asks
   back. `DecideAdapter.cannot` must report nothing lacking for the new runs.
 
+## A wide part
+
+Written 2026-10-09 (data pipeline 0.13.0), for the owner's concern that the data is too narrow: the pilots' requests
+are few, of a few kinds, in one careful register, all from office seats. Breadth is generated. The first run is
+`runs/translator-data-broad-2026-10-09/` (its README has what was made and the agreement rates).
+
+**The plan of a part** is `translator-data --briefs` as ever, with three things more:
+
+- `--broad`: the styles are dealt by `BROAD_DEAL` (data.ts): three registers beside the older styles, `rambling` (the
+  request buried in talk), `flat` (a simple writer's short literal sentences) and `slips` (typed fast, slips and odd
+  word order, never inside what is copied), with the terse line two turns in five between them, and the seats' voices
+  one turn in five. Every brief says **who is asking** (`ASKERS`: an office-holder in an office-holder's style;
+  otherwise a shopkeeper, landlord, tenant, worker, union organiser, clinic manager, resident, farmer, bank clerk,
+  newcomer or board member, among those who would honestly ask for such an act). The refusal briefs gain
+  `look_first` for any act on something on record whose id the speaker lacks (a ballot, an agreement, something
+  withdrawn, held, released or settled: the request must not hold the id), and `no_such_act` for attending something.
+- `--world-forms N`: every paper the worlds' own offices issue (41 over 20 modules, `participants/src/behaviour/papers.ts`),
+  each filled in N ways, every field of it in the first two; `--only world_form` for those alone. Whose paper it is
+  decides who asks (a landlord for a rental listing).
+- A plan made without them is what it was.
+
+**Writing and checking through the adapters** (`orchestrator/src/broad.ts`), one resumable command:
+
+```
+oikos translator-data-batch <config.json> <PART>...
+```
+
+```json
+{
+  "out": "/Users/clawd/oikos/runs/translator-data-broad-2026-10-09",
+  "writers": { "fable-a": "claude-code/claude-fable-5-1", "sonnet": "claude-code/claude-sonnet-5-5" },
+  "readers": { "claude-code/claude-fable-5-1": "claude-code/claude-sonnet-5-5",
+               "claude-code/claude-sonnet-5-5": "claude-code/claude-fable-5-1", "*": "claude-code/claude-sonnet-5-5" },
+  "budget": 400, "writeBatch": 16, "readBatch": 30, "jobs": 4
+}
+```
+
+`writers`: the model for each name the part's briefs were dealt to (`--writers fable-a,fable-b,sonnet,…`: several
+names for one model give it that share). `readers`: who reads each writer's requests blind; a config in which a model
+would read its own writing is refused. For each part: each writer's briefs to its model, a batch at a call; the
+mechanical checks (`translator-data-write`'s); each request read blind under the translator's prompt; the gold
+programs compared by meaning; `checked.jsonl` is what agrees, `disagreed.jsonl` is set aside and never trains;
+agreement is counted by function, style, asker, writer, reader, currency shape and kind; then the leak check
+(`leaks`, five words running with a held-out case: taken out as `leaked.jsonl`, named by case id only). Every call is
+in `calls.jsonl`. A usage limit is waited out and then the run stops with exit code 3: the same command goes on.
+
+**The banked part** (docs/design/translator-v2.md): `oikos translator-v2-data <pilots…> --out DIR --from-pilots N
+--generated N --writers …` plans plain-text turns whose right reading is one of a seat's other tools, and the same
+`translator-data-batch` writes, checks and reads them (`v2-checked.jsonl`). It is in no v1 training set.
+
+**Joining a wide part** to the standing set is step 2 of the retrain above: each part's `checked.jsonl`, split by gold
+program. The join's own leak check runs again there.
+
 ## Not built
 
 - The retrain's first two steps as one command: generated parts are written and checked by their own commands, and
