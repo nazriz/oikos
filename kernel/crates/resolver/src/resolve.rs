@@ -401,7 +401,11 @@ impl Resolver<'_> {
             (Some(l), None) => Some(l.len().to_string()),
             (_, u) => u,
         };
-        let Some(units) = units.filter(|u| u != "0") else { return ask("How much of it?") };
+        // (Neither how much nor how often: which of the two is asked, in the asker's terms. The words are the other
+        // resolver's, `ONCE_OR_ROUTINE` in translator/src/resolver.ts.)
+        let Some(units) = units.filter(|u| u != "0") else {
+            return ask("Is this work to be done once, or as a standing routine of your staff? Done once: say how much of it. As a routine: say how often (every day, every week), and it is a standing work order.");
+        };
         let at = self.need(c, "at", "Where?")?;
         let by: Vec<String> = if Self::has(c, "by") {
             let list = match self.ids(c, "by")? {

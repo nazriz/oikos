@@ -176,6 +176,19 @@ test("Codex CLI: only the subscription's usage limit and rate limits stop the ru
   expect(tries).toBe(1);
   const limited = async () => ({ code: 1, stdout: "", stderr: "Rate limit reached for gpt-6.1-sol." });
   await expect(new CodexCliAdapter("gpt-5", limited).complete(req)).rejects.toBeInstanceOf(UsageLimitReached);
+  // A limit the CLI reported before it stopped answering (the call ran out of time): the run stops as at a limit, at
+  // the first attempt, and is not taken for a model that was only slow and tried again (2026-10-09).
+  let waits = 0;
+  const hung = async () => (waits++, { code: 143, timedOut: true, stderr: "", stdout: '{"type":"error","message":"You’ve hit your usage limit. Upgrade to Pro or try again at 6:58 AM."}\n' });
+  const lim = await new CodexCliAdapter("gpt-5", hung, { attempts: 3 }).complete(req).catch((x) => x);
+  expect(lim).toBeInstanceOf(UsageLimitReached);
+  expect(String(lim.message)).toContain("try again at 6:58 AM");
+  expect(waits).toBe(1);
+  // One that ran out of time saying nothing of a limit is an ordinary failure, and what the CLI last said goes with it.
+  const slow = async () => ({ code: 143, timedOut: true, stdout: "", stderr: "stream disconnected, retrying 4/5\n" });
+  const late = await new CodexCliAdapter("gpt-5", slow, { attempts: 1, timeoutMs: 180_000 }).complete(req).catch((x) => x);
+  expect(late).not.toBeInstanceOf(UsageLimitReached);
+  expect(String(late.message)).toContain("no answer within 180 s; the last it said: stream disconnected, retrying 4/5");
 });
 
 test("a command that won't end can't hang a call: asked to end at the time limit, killed after a grace period, and its pipes not waited on", async () => {

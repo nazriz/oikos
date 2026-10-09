@@ -12,6 +12,8 @@ export interface Case {
   request: string;
   /** Acceptable answers, in the call language (compared in canonical form). */
   expect: string[];
+  /** The post the asker holds, where it is not the mayor's: the forms they are shown are that post's. */
+  as?: string;
   /** Only on cases loaded from outside the repository (eval/held-out.ts): never set in this file. */
   held_out?: boolean;
   /** Held out until 2026-10-05; seen since. */
@@ -92,6 +94,14 @@ export const CASES: Case[] = [
   { id: "standing-work-hold", request: "Pause the standing work order rec.95 until I say to resume it; the round is not cancelled.", expect: ["statement(hold=rec.95)"], note: "a standing order is paused like any standing paper" },
   { id: "direction-staffing", request: "Direct the works office to stop recruiting until I say otherwise.", expect: ["form(form=works_staffing, to=works, recruit=no)"], note: "the works office's own form for it is listed: the direction is that form, not a letter" },
   { id: "direction-collection", request: "The works office is to collect from each address fortnightly from now on.", expect: ['form(form=works_collection, to=works, every="fortnightly")'] },
+  // The same matter asked by the works office of its own staff (2026-10-09: two models wrote the direction form, which
+  // the office does not follow from itself): a standing work order, whatever the form's fields.
+  { id: "own-collection-order", as: "works", request: "Make a standing work order for the works office: task collect, at str.7, every 1 week (a week), in force from now, no end date.",
+    expect: ['work(task=collect, at=str.7, every="every 1 week")', 'work(task=collect, at=str.7, every="1 week")'], note: "the collection form is listed as a direction to the asker's own office: not that form" },
+  { id: "own-collection-routine", as: "works", request: "From now on the crew at str.7 is to collect from each address on the round once a fortnight.",
+    expect: ['work(task=collect, at=str.7, every="once a fortnight")', 'work(task=collect, at=str.7, every="a fortnight")', 'work(task=collect, at=str.7, every="fortnight")'], note: "its own staff's routine, in plain words" },
+  { id: "own-maintain-routine", as: "works", request: "Make a standing work order of the works office: task maintain, at str.7, every day, from now with no end date.",
+    expect: ['work(task=maintain, at=str.7, every="every day")', 'work(task=maintain, at=str.7, every="day")'] },
   { id: "paper-invoice-approval", request: "Approve invoice rec.640 for payment, in writing.", expect: ["form(form=invoice_approval, to=mayor, invoice=rec.640)", "form(form=invoice_approval, invoice=rec.640)"], note: "a paper of the mayor's own office, on its own form" },
   { id: "paper-nomination", request: 'Enter my nomination for the office of mayor [mayor]: the name on the ballot is "Dana Reyes", the platform "Mend the roads before anything else.", I hold the office now, and what I stand for is roads and thrift.',
     expect: ['form(form=nomination, to=mayor, office=mayor, name="Dana Reyes", platform="Mend the roads before anything else.", incumbent=yes, values=["roads","thrift"])'], note: "a yes the wording implies; a field that takes several is a list" },

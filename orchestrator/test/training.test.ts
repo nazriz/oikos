@@ -456,6 +456,16 @@ test("requests written by file: a briefs-only run and the writers' requests take
   expect(Object.keys(wm.by_function)).toEqual(["message"]);
   expect(wm.indirect).toBeGreaterThan(0);
   expect(Object.keys(wm.request_length).length).toBeGreaterThan(3);
+  // A part made of kinds of program by name: holds and entries drawn among the generated statements, an office's own
+  // forms among the forms, standing work among the work; `generated` counts their functions' programs.
+  const named = ["hold", "entry", "direction", "paper", "standing_work"];
+  await trainingData({ ...options, shard: undefined, refusalFloor: undefined, only: named, generated: 400, briefsOnly: true, out: join(d, "kinds") });
+  const kp = json(join(d, "kinds"), "plan.json");
+  const asked = kp.items.filter((t: any) => t.kind === "request");
+  expect(kp.options).toMatchObject({ only: named, generated: 400 });
+  expect(asked.every((t: any) => named.includes(t.gold.tag))).toBe(true);
+  const of = (re: RegExp) => asked.filter((t: any) => re.test(t.gold.program)).length;
+  expect([of(/^statement\(hold=/) > 40, of(/^statement\(.*visible=own/) > 40, of(/^form\(/) > 200, of(/^work\(.*every=/) > 100]).toEqual([true, true, true, true]);
   // A function or a label the call language doesn't have, or a share that is none, is refused before anything is written.
   await expect(trainingData({ ...options, only: ["letters"], briefsOnly: true, out: join(d, "bad") })).rejects.toThrow("only: no function letters");
   await expect(trainingData({ ...options, refusalLabels: ["reading"], briefsOnly: true, out: join(d, "bad") })).rejects.toThrow("refusal labels: no label reading");

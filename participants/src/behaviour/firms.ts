@@ -20,6 +20,7 @@ import { basesOf, channels } from "../contracts";
 import { params, wait, type Belief, type BehaviourModule, type ParticipantContext, type Taken } from "../module";
 import { distribute } from "./lengnick";
 import { dayPayPeriod, incomeTaxLaw, withheld, type Charge } from "./tax";
+import { message } from "./common";
 import { ask, Asked, because, between, Book, PAYEE_DIED, breaches, noting, callAction, usd, cellsOf, commitmentOf, DAY, jobTerms, leaseTerms, MONTH, notice, offer, ownAccount, pay, publishedPrice, say, stoodEmpty, structureOf, withdraw, type Step } from "./common";
 import * as P from "./papers";
 
@@ -632,6 +633,9 @@ export const byTheDay = (a: any): boolean => a?.record === "agreement" && a.term
 /** The notice such an agreement gives: none (the least a term can say). */
 export const NO_NOTICE = 1;
 
+/** How a hiring office's letter to the payroll office begins (an office's note: `officeNote`). */
+export const PAYROLL_NOTE = "Payroll notice from the hiring office, ";
+
 export class Staffing {
   private readonly orders = new Map<string, string>(); // agreement -> wage standing order
   private readonly pendingOrder = new Map<string, string>(); // step marker -> agreement
@@ -901,7 +905,10 @@ export class Staffing {
         const firstPay = signed + pays.period;
         steps.push(because(`${worker} has signed and started: sending the ${this.o.payroll} office a payroll notice (who, the post, the pay, the first pay day, the agreement), for it to set the wage up.`,
           say("payroll_notice", `Payroll notice, new starter: ${worker}, ${post(a)}, under employment agreement ${a.id}. Pay: ${usd(pays.wage)} every ${durationWords(pays.period)} before tax, into ${to}; first pay day ${dateWords(firstPay)}, then every ${durationWords(pays.period)}. For the ${this.o.payroll} office: the wage payment is to be set up from that day.`,
-            { to: [me], visible: [me], basis: a.id, data: { notice: "starter", office: this.o.payroll, employee: worker, post: post(a), agreement: a.id, wage: String(pays.wage), period: pays.period, first_pay: firstPay, account: to } })));
+            { to: [me], visible: [me], basis: a.id, data: { notice: "starter", office: this.o.payroll, employee: worker, post: post(a), agreement: a.id, wage: String(pays.wage), period: pays.period, first_pay: firstPay, account: to } }),
+          // (And put in front of the payroll office: a paper on the organisation's own file is not news to anyone in
+          // it, so the notice goes to the office's post as a letter, in its own words, naming the agreement.)
+          message([this.o.payroll], `${PAYROLL_NOTE}new starter: ${worker}, ${post(a)}, under employment agreement ${a.id}. Pay: ${usd(pays.wage)} every ${durationWords(pays.period)} before tax, into ${to}; first pay day ${dateWords(firstPay)}, then every ${durationWords(pays.period)}. The notice is on the organisation's file. The wage payment is to be set up from that day: a payment from the organisation's account to ${to} every ${durationWords(pays.period)}, first on ${dateWords(firstPay)}, citing ${a.id}, of the pay less what the tax law says to withhold.`, a.id)));
       }
       const deaths = new Set(book.all("death_registration").map((r) => r.data?.deceased as string));
       for (const a of contracts) {
@@ -919,7 +926,8 @@ export class Staffing {
         steps.push(because(died ? `${worker}, who worked for us, has died: ending the employment on record and telling the ${this.o.payroll} office.` : `${worker}'s employment ends on ${dateWords(end)}: telling the ${this.o.payroll} office.`,
           ...ends,
           say("payroll_notice", `Payroll notice, leaver: ${worker}, ${post(a)}, employment agreement ${a.id} ends on ${dateWords(end)} (${reason}). For the ${this.o.payroll} office: pay is due to that day, and the wage payment under the agreement is to end then.`,
-            { to: [me], visible: [me], basis: a.id, data: { notice: "leaver", office: this.o.payroll, employee: worker, post: post(a), agreement: a.id, last_day: end, reason } })));
+            { to: [me], visible: [me], basis: a.id, data: { notice: "leaver", office: this.o.payroll, employee: worker, post: post(a), agreement: a.id, last_day: end, reason } }),
+          message([this.o.payroll], `${PAYROLL_NOTE}leaver: ${worker}, ${post(a)}, employment agreement ${a.id} ends on ${dateWords(end)} (${reason}). The notice is on the organisation's file. Pay is due to that day, and the standing payment of their wage is to be withdrawn then.`, a.id)));
       }
     }
     // A worker who has died: stop the wages, and end the employment on record. We know of it when we are told: by the

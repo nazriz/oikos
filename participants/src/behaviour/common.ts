@@ -1069,7 +1069,7 @@ export class Letters {
  * else.
  */
 export const officeNote = (text: string): boolean =>
-  /^(Report from |From [^:]{1,80}: your )/.test(text) || PAYMENT_FAILED.is(text) || PAYEE_DIED.who(text) !== undefined ||
+  /^(Report from |From [^:]{1,80}: your |Payroll notice from the hiring office, )/.test(text) || PAYMENT_FAILED.is(text) || PAYEE_DIED.who(text) !== undefined ||
   /^(Request \S+ not carried out: |Payment of .+ couldn't be made: |Hold \S+ (is in place|does not apply|is not in place)|Withdrawal \S+ (is not acted on|does not apply))/.test(text);
 
 /** What an office with a standing report says after it. */

@@ -49,8 +49,24 @@ export class Knowledge {
   readonly laws = new Map<string, StatementRecord>();
   readonly claims: Record[] = [];
   private readonly claimIds = new Set<string>();
+  private readonly directionRules = new Map<string, StatementRecord>();
+  /** The posts whose written directions an office follows, by its organisation's rule as the participant has seen it
+   * (the rule's id with them); undefined where it has seen no such rule, or the rule is withdrawn. */
+  mayDirect(office: string): { rule: string; posts: string[] } | undefined {
+    const entity = this.positions.get(office);
+    for (const r of [...this.directionRules.values()].reverse()) {
+      if (this.withdrawn.has(r.id) || r.speaks_for !== entity) continue;
+      const d = r.data!.directions as { by?: unknown; offices?: { [office: string]: unknown } };
+      const posts = d.offices?.[office] ?? d.by;
+      if (Array.isArray(posts)) return { rule: r.id, posts: posts.filter((x): x is string => typeof x === "string") };
+    }
+    return undefined;
+  }
   entity = "";
   t = 0;
+  /** The staff of the office the participant holds, where the office employs any (the run keeps it from the office's
+   * own papers): what they are called and how many are in post. A draft's preview says when work is ordered of nobody. */
+  ownStaff?: { role: string; inPost: number };
 
   absorb(obs: Observation): void {
     this.entity = obs.entity;
@@ -104,6 +120,8 @@ export class Knowledge {
     if (r.record === "statement") {
       if (r.addressed_to?.length) this.addressed.set(r.id, r.addressed_to);
       if (r.kind === "form") this.formsById.set(r.id, r);
+      // An organisation's rule on who may direct its offices (a paper it has put out: its data names the posts).
+      if (r.data?.directions && typeof r.data.directions === "object" && r.speaks_for) this.directionRules.set(r.id, r);
       if (r.kind === "law" && r.formal?.condition) this.laws.set(r.id, r);
       if (r.kind === "lot" && Array.isArray(r.data?.cells)) this.lots.set(r.id, r.data.cells as string[]);
       // Someone asking to be paid names where the money should go: that's where they receive money.

@@ -18,6 +18,7 @@
     {
       "form": "garnishee_order",
       "title": "Order to a debtor's bank to pay an unpaid order of the tribunal",
+      "does": "Has the banks pay an order of the tribunal left unpaid, from what the debtor holds with them.",
       "fields": {
         "order": {
           "type": "record",

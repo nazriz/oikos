@@ -132,6 +132,8 @@ export interface Taken {
 export interface Issued {
   form: string;
   title: string;
+  /** What issuing the paper does, in a sentence, for whoever holds the office: said on the form with its name. */
+  does?: string;
   fields: { [name: string]: FormField };
   writes: { kind: string; text: string; data?: unknown; to?: unknown[]; visible?: "public" | unknown[]; basis?: string; offer?: unknown; assertion?: unknown };
 }
@@ -171,6 +173,12 @@ export interface BehaviourModule {
   issues?: Issued[];
   /** What of the office's own the forms it issues carry, from its parameters: the values of each "@name" in `issues`. */
   issuesWith?(params: { [k: string]: any }): { [name: string]: unknown };
+  /** The office's own staff, where it employs any, from its parameters: what one of them is called (the role its
+   * employment agreements name), which of its organisation's employees are this office's (`own`, as `Staffing` reads
+   * it: several offices of one organisation may each employ), and how many posts it has: an establishment its funder
+   * sets, or what a line of its organisation's adopted budget pays for at the office's rate of pay. Whoever holds the
+   * office knows this of it, as its own papers (the roster: participants/src/behaviour/roster.ts). */
+  staffed?(params: { [k: string]: any }): { role: string; own?: "role" | "role_or_unnamed"; posts: { establishment: number } | { budget_line: string; wage: number; period: number } };
   /** The written directions it takes, each on a form its office publishes (docs/behaviour/directions.md). An office
    * follows only what is filed on its form by someone its organisation says may direct it. */
   takes?: Taken[];

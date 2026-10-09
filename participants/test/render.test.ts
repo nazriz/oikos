@@ -242,7 +242,7 @@ test("a town too big to list building by building: for each measure, how many it
   expect(byMeasure.match(/^- large house/gm)!.length).toBe(30);
   expect(byMeasure).not.toContain("house-35"); // (nothing there, and none coming)
   // More than asked for at once: counted, never dropped without a word.
-  expect(renderObservation(obs({ "mayor/town": town }), { ...o, looked: new Map([["mayor/town", { measure: "waste", limit: 20 }]]) })).toContain("(10 more not listed: ask for more at once, or name the ones you want.)");
+  expect(renderObservation(obs({ "mayor/town": town }), { ...o, looked: new Map([["mayor/town", { measure: "waste", limit: 20 }]]) })).toContain("(Entries 1 to 20 of 30. For the next: look again the same way with from_entry: 21; or name the ones you want.)");
   // By name: a building, a room in one, the ground one stands on, a kind of building, open ground; and what isn't there.
   const open = [{ cell: "cell.0.9", x: 0, y: 9, terrain: "wetland", seen: ["grey_heron"] }];
   const named = renderObservation(obs({ "mayor/town": sites(town.cells.map((c: any) => c.structure), open) }), { ...o, looked: new Map([["mayor/town", { named: ["house-3", "house-5/dwelling.1", "cell.7.0", "Park", "cell.0.9", "the moon"] }]]) });
@@ -270,7 +270,7 @@ test("where a list of papers is cut, the seat is told how to see the rest; what 
   const claims = Array.from({ length: 30 }, (_, i) => ({ id: `t${i}`, record: "claim", author: "genesis", at: 0, visible_to: "public", position: "right", holder: "city", about: { kind: "ownership", object: `p${i}` } }));
   const long = { id: "m1", record: "statement", kind: "minutes", author: "clerk", at: 0, visible_to: "public", text: "x".repeat(1500), data: { note: "y".repeat(600) } };
   const o = { titles: new Map([["mine", "Filings"]]), lookable: new Set(["mine"]) };
-  const hint = '(Not everything here is set out in full. To see the rest, say what to find: look at "Filings" (mine).)';
+  const hint = '(Not everything here is set out in full. To see the rest, say what to find, or go through it a part at a time (from_entry: 1, then as each answer says): look at "Filings" (mine).)';
   expect(renderObservation(obs({ mine: { kind: "records", records: claims } }), o)).toContain(`and 18 more\n${hint}`);
   expect(renderObservation(obs({ mine: { kind: "records", records: [long] } }), o)).toContain(`…)\n${hint}`);
   const many = Array.from({ length: 45 }, (_, i) => ({ ...long, id: `n${i}`, text: "Short.", data: undefined }));
@@ -295,7 +295,7 @@ test("where a list of papers is cut, the seat is told how to see the rest; what 
   expect(one).toContain("x".repeat(1500));
   expect(one).toContain("y".repeat(600));
   expect(one).not.toContain("…");
-  expect(renderObservation(obs({ mine: { kind: "records", search: true, records: claims.slice(0, 20) } }), { ...o, looked: new Map([["mine", { limit: 20 }]]) })).toContain("(There may be more: at most 20 were asked for. Ask for more at once, or say more closely what to find.)");
+  expect(renderObservation(obs({ mine: { kind: "records", search: true, records: claims.slice(0, 20) } }), { ...o, looked: new Map([["mine", { limit: 20 }]]) })).toContain("(There may be more: at most 20 were asked for. For the next: look again the same way with from_entry: 21.)");
   expect(renderObservation(obs({ mine: { kind: "records", search: true, records: [] } }), o)).toContain("## Filings: what you looked up (0 found)\nNothing found.");
   // A look that brought nothing new, or at a report that's no longer its own: said.
   expect(renderObservation(obs({ mine: { kind: "records", records: [] } }), { ...o, looked: new Map([["mine", {}]]) })).toContain("## Filings\nNothing new there since you last looked.");

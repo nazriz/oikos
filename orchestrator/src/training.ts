@@ -34,6 +34,16 @@ import { amountForms, piled, synthetic } from "../../translator/train/synthetic"
 import { logsIn } from "./corpus";
 import { logLines, runOf } from "./logs";
 
+/**
+ * The kinds of program a part can be made of by name beside a function (`only`; data.ts `Gold.tag`, synthetic.ts), each
+ * with the function whose generated programs it is drawn among: so `only: ["hold", "entry"]` with `generated: 3000`
+ * draws 3,000 statements and writes requests for the holds and the entries among them (about one in ten each).
+ */
+export const TAGS: { [tag: string]: string } = {
+  hold: "statement", entry: "statement", standing_work_hold: "statement", standing_work_withdraw: "statement",
+  standing_work: "work", direction: "form", paper: "form", direction_unlisted: "message",
+};
+
 /** A model to use, with its price and spending limit (models.ts, chooseModel). */
 export interface Model { adapter: LlmAdapter; prices?: Record<string, Price>; budget?: Budget }
 
@@ -185,7 +195,7 @@ export async function balancedGold(sources: string[], o: { perShape?: number; se
   const have: { [fn: string]: number } = {};
   for (const g of gold) have[functionOf(g)] = (have[functionOf(g)] ?? 0) + 1;
   for (const fn of Object.keys(calls.ARGS)) {
-    const need = Math.max(floor - (have[fn] ?? 0), (!o.only || o.only.includes(fn) ? o.generated : undefined) ?? 100, 0);
+    const need = Math.max(floor - (have[fn] ?? 0), (!o.only || o.only.includes(fn) || o.only.some((k) => TAGS[k] === fn) ? o.generated : undefined) ?? 100, 0);
     if (floor > 0 && need > 0) for (const g of synthetic({ only: [fn], perFunction: need, seed, dropped })) add(g);
   }
   const report: GoldReport = { gold: gold.length, by_function: {}, by_source: {}, by_shape: {}, excluded: Object.fromEntries(Object.entries(excluded).sort()), capped, implausible: Object.fromEntries(Object.entries(dropped).sort()), floor, ...(o.refusalFloor ? { refusal_floor: o.refusalFloor } : {}) };
@@ -249,7 +259,7 @@ export async function trainingData(o: TrainingDataOptions): Promise<{ examples: 
     const key = `${m.adapter.provider}/${m.adapter.model}`;
     if (!(m.prices ?? PRICES)[key]) throw new Error(`no price recorded for ${key}: add it to the price table before using this model`);
   }
-  for (const fn of o.only ?? []) if (fn !== "none" && fn !== "amount_form" && !calls.ARGS[fn as calls.Fn]) throw new Error(`only: no function ${fn} in the call language (or "none", for refusals alone; or "amount_form", for the forms of several amounts)`);
+  for (const fn of o.only ?? []) if (fn !== "none" && fn !== "amount_form" && !TAGS[fn] && !calls.ARGS[fn as calls.Fn]) throw new Error(`only: no function ${fn} in the call language (or "none", for refusals alone; "amount_form", for the forms of several amounts; or a kind of program by name: ${Object.keys(TAGS).join(", ")})`);
   if (o.pairs !== undefined && !(o.pairs >= 0 && o.pairs <= 1)) throw new Error(`pairs: a share from 0 to 1, got ${o.pairs}`);
   for (const l of o.refusalLabels ?? []) if (!(calls.LABELS as readonly string[]).includes(l)) throw new Error(`refusal labels: no label ${l} (they are: ${calls.LABELS.join(", ")})`);
   if (o.indirect !== undefined && !(o.indirect >= 0 && o.indirect <= 1)) throw new Error(`indirect: a share from 0 to 1, got ${o.indirect}`);

@@ -44,6 +44,11 @@ test("the hiring office sends the payroll office a notice of a new starter once 
     data: { notice: "starter", office: "finance", employee: "c9", post: "environmental scientist", agreement: "job-9", wage: "300000", period: PERIOD, first_pay: 18 * DAY, account: "acc-c9" } });
   expect(notices[0]!.args.text).toBe("Payroll notice, new starter: c9, environmental scientist, under employment agreement job-9. Pay: $3,000.00 every 14 days before tax, into acc-c9; first pay day year 1, day 19, then every 14 days. For the finance office: the wage payment is to be set up from that day.");
   expect(notices[0]!.why).toContain("sending the finance office a payroll notice");
+  // The notice is put in front of the finance office too: a letter to its post, with what it needs to act.
+  const sent = step(hiring(), new Book(), 4 * DAY + 3600, signed(a, 4 * DAY)).filter((c) => c.fn === "message");
+  expect(sent.map((c) => [c.args.to, c.args.re])).toEqual([[["finance"], "job-9"]]);
+  expect(sent[0]!.args.text).toBe("Payroll notice from the hiring office, new starter: c9, environmental scientist, under employment agreement job-9. Pay: $3,000.00 every 14 days before tax, into acc-c9; first pay day year 1, day 19, then every 14 days. The notice is on the organisation's file. " +
+    "The wage payment is to be set up from that day: a payment from the organisation's account to acc-c9 every 14 days, first on year 1, day 19, citing job-9, of the pay less what the tax law says to withhold.");
   // Not again the next day; and not by whoever next holds the office, which reads the notice on its file.
   expect(step(office, book, 5 * DAY, []).filter((c) => c.args.kind === "payroll_notice")).toEqual([]);
   const next = hiring(), theirs = new Book();

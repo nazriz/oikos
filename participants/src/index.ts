@@ -17,6 +17,7 @@ export { forAge, forHousehold, forOutOfWork, paymentsInWords, stopsWorkAt, suppo
 export { adultAgeBands, drawHousehold, drawSavings, bedroomsNeeded, OCCUPANCY, type DrawnHousehold, type Extension, type HouseholdSpec, type OccupancyStandard } from "./behaviour/household";
 export { yearsOfSchooling, type SchoolingSpec } from "./behaviour/school";
 export { linesInWords, tabledLines, votedWords, yearInDays } from "./behaviour/government";
+export { Roster, type RosterNow } from "./behaviour/roster";
 import type { BehaviourModule } from "./module";
 import { answering } from "./behaviour/common";
 import { bankPaymentSystem } from "./behaviour/bank";

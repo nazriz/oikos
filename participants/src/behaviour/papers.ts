@@ -17,6 +17,7 @@ const YES_NO = ["yes", "no"];
 /** A job advertisement, as any employer here places one (firms.ts, `Staffing`). */
 export const JOB_ADVERTISEMENT: Issued = {
   form: "job_advertisement", title: "Job advertisement",
+  does: "How the office takes on staff of its own: it puts the posts on the jobs board at the wage given, for people to apply, and the office then offers employment to those it takes on. It commits no money until someone is taken on.",
   fields: {
     wage: f("amount", "The wage for each pay period.", req),
     period: f("duration", "The pay period: how often the wage is paid.", req),
@@ -38,7 +39,7 @@ export const JOB_ADVERTISEMENT: Issued = {
  * marked with the payroll office (`data.office`); the hiring office's words say who it is for.
  */
 export const PAYROLL: Issued[] = [
-  { form: "payroll_starter", title: "Payroll notice of a new starter, to the office that pays the organisation's staff",
+  { form: "payroll_starter", title: "Payroll notice of a new starter, to the office that pays the organisation's staff", does: "Tells the office that pays the organisation's staff that someone has been taken on, with what it needs to set their wage up. It pays nobody by itself: the paying office sets the payment up. Write to that office too, naming the notice: a paper on the organisation's own file is not put in front of it.",
     fields: {
       employee: f("entity", "Who has been taken on.", req), post: f("text", "The post they hold.", req), agreement: f("record", "The employment agreement, signed by both.", req),
       wage: f("amount", "The wage for each pay period, before tax.", req), period: f("duration", "The pay period.", req),
@@ -47,7 +48,7 @@ export const PAYROLL: Issued[] = [
     writes: { kind: "payroll_notice", text: "Payroll notice, new starter: {employee}, {post}, under employment agreement {agreement}. Pay: {wage} every {period} before tax, into {account}; first pay day {first_pay}, then every {period}. For the {@payroll_office} office: the wage payment is to be set up from that day.",
       basis: "=agreement", to: ["=self"], visible: ["=self"],
       data: { notice: "starter", office: "@payroll_office", employee: "=employee", post: "=post", agreement: "=agreement", wage: "=wage", period: "=period", first_pay: "=first_pay", account: "=account" } } },
-  { form: "payroll_leaver", title: "Payroll notice of a leaver, to the office that pays the organisation's staff",
+  { form: "payroll_leaver", title: "Payroll notice of a leaver, to the office that pays the organisation's staff", does: "Tells the office that pays the organisation's staff that someone's employment is ending and when, so that their wage payment ends then. It ends no employment and stops no payment by itself. Write to that office too, naming the notice.",
     fields: {
       employee: f("entity", "Who is leaving.", req), post: f("text", "The post they held.", req), agreement: f("record", "The employment agreement that is ending.", req),
       last_day: f("date", "The last day of the employment.", req), reason: f("choice", "Why it ends.", { ...req, options: ["notice", "died"] }),
@@ -70,7 +71,7 @@ export function staffingOwn(o: { role?: string; industry?: string; workplace?: s
 // ------------------------------------------------------------------ the registrar of births and deaths
 
 export const REGISTRY: Issued[] = [
-  { form: "death_registration", title: "Entry in the register of deaths",
+  { form: "death_registration", title: "Entry in the register of deaths", does: "Registers a death on the notification of it: the entry is what a bank, the land registry and the family act on, and it is sent to whoever reported the death.",
     fields: {
       deceased: f("entity", "Who has died.", req),
       notification: f("record", "The notification of the death that the entry is made on.", req),
@@ -84,14 +85,14 @@ export const REGISTRY: Issued[] = [
     writes: { kind: "death_registration", text: "Death registered: {deceased}.", basis: "=notification",
       to: ["=reported_by", "=tell", "@feeds", "=estate"], visible: ["=self", "=reported_by", "=tell", "@feeds", "=estate"],
       data: { deceased: "=deceased", reported_by: "=reported_by", partner: "=partner", children: "=children", without_adult: "=without_adult" } } },
-  { form: "death_certificate", title: "Certified copy of an entry of death",
+  { form: "death_certificate", title: "Certified copy of an entry of death", does: "Gives whoever asks a certified copy of a death already registered.",
     fields: { deceased: f("entity", "Who has died.", req), registration: f("record", "The entry in the register.", req), informant: f("entity", "Whom the copy is for.", req) },
     writes: { kind: "death_certificate", text: "Death of {deceased}: registered (entry {registration}).", basis: "=registration", to: ["=informant"], data: { deceased: "=deceased", registration: "=registration" } } },
-  { form: "birth_registration", title: "Entry in the register of births",
+  { form: "birth_registration", title: "Entry in the register of births", does: "Registers a birth on the notification of it, and sends the entry to whoever reported it.",
     fields: { child: f("entity", "The child.", req), notification: f("record", "The notification of the birth.", req), reported_by: f("entity", "Who reported the birth: they are sent the entry.", req),
       born_at: f("date", "When the child was born, as the notification gives it."), mother: f("entity", "The child's mother.") },
     writes: { kind: "birth_registration", text: "Birth registered: {child}.", basis: "=notification", to: ["=reported_by", "@feeds"], visible: ["=self", "=reported_by", "@feeds"], data: { child: "=child", born_at: "=born_at", mother: "=mother" } } },
-  { form: "transmission_application", title: "Application to the land registry for a dead owner's land to pass",
+  { form: "transmission_application", title: "Application to the land registry for a dead owner's land to pass", does: "Asks the land registry to pass a dead owner's land to the heir the law of succession names.",
     fields: { deceased: f("entity", "The owner who has died.", req), heir: f("entity", "Whom the land passes to, as the law of succession says.", req), notification: f("record", "The notification of the death.", req) },
     writes: { kind: "transmission_application", text: "Transmission on death: whatever land {deceased} held passes to {heir}.", basis: "=notification", to: ["@land_registry"], data: { deceased: "=deceased", heir: "=heir" } } },
 ];
@@ -123,7 +124,7 @@ export const COUNCIL_CLERK: Issued[] = [
 ];
 
 export const PLANNING: Issued[] = [
-  { form: "permit_decision", title: "Decision on a planning permit application",
+  { form: "permit_decision", title: "Decision on a planning permit application", does: "Decides a permit application (granted, refused, or sent back as incomplete) and tells the applicant.",
     fields: { application: f("record", "The application decided.", req), applicant: f("entity", "Who applied: the decision is sent to them.", req),
       decision: f("choice", "Granted, refused, or sent back as incomplete.", { ...req, options: ["granted", "refused", "incomplete"] }),
       law: f("record", "The law the building would breach, if any."), missing: f("list", "For an incomplete application: what it does not say (lot, structure_type).") },
@@ -131,22 +132,22 @@ export const PLANNING: Issued[] = [
 ];
 
 export const INSPECTOR: Issued[] = [
-  { form: "valuation_request", title: "Request to the valuer for a supplementary valuation",
+  { form: "valuation_request", title: "Request to the valuer for a supplementary valuation", does: "Asks the valuer to value a lot again after building work, so that its rates follow what now stands on it.",
     fields: { notice: f("record", "The notice of building work it follows from.", req), lot: f("lot", "The lot."), structure: f("structure", "What was built."), structure_type: f("structure_type", "The kind of building."), removed: f("structure", "What was demolished.") },
     writes: { kind: "valuation_request", text: "Supplementary valuation asked for, on notice {notice}.", basis: "=notice", to: ["@valuer"], data: { lot: "=lot", structure: "=structure", structure_type: "=structure_type", removed: "=removed" } } },
-  { form: "demolition_order", title: "Order to demolish a building",
+  { form: "demolition_order", title: "Order to demolish a building", does: "Orders an owner to take down a building put up in breach of a law.",
     fields: { owner: f("entity", "The owner ordered to demolish it.", req), structure: f("structure", "The building.", req), law: f("record", "The law it was built in breach of.", req), lot: f("lot", "The lot it stands on.") },
     writes: { kind: "demolition_order", text: "Order: demolish {structure}, built in breach of {law}.", basis: "=law", to: ["=owner"], data: { structure: "=structure", lot: "=lot", law: "=law" } } },
 ];
 
 export const WORKS: Issued[] = [
-  { form: "disposal_docket", title: "Docket for waste delivered to the landfill",
+  { form: "disposal_docket", title: "Docket for waste delivered to the landfill", does: "Goes with a load of waste taken to the landfill: what was delivered and how much, which the landfill charges by.",
     fields: { kind: f("text", "What was delivered.", req), quantity: f("count", "How much of it.", req) },
     writes: { kind: "disposal_docket", text: "Delivered: {quantity} of {kind}.", to: ["@landfill"], visible: ["=self", "@landfill"], data: { kind: "=kind", quantity: "=quantity" } } },
 ];
 
 export const ENVIRONMENT: Issued[] = [
-  { form: "habitat_register", title: "Register of the lots where a listed species was found",
+  { form: "habitat_register", title: "Register of the lots where a listed species was found", does: "Publishes the lots where a survey found a listed species: the planning office refuses permits on them.",
     fields: { round: f("count", "The survey round it is from.", req), lots: f("list", "The lots.", req) },
     writes: { kind: "habitat_register", text: "Habitat register, round {round}: {lots}.", to: ["@planning"], visible: "public", data: { round: "=round", lots: "=lots" } } },
 ];
@@ -161,7 +162,7 @@ export const ELECTORAL: Issued[] = [
 // ------------------------------------------------------------------ the tribunal
 
 export const TRIBUNAL_MEMBER: Issued[] = [
-  { form: "tribunal_order", title: "Order of the tribunal on an application",
+  { form: "tribunal_order", title: "Order of the tribunal on an application", does: "Decides an application before the tribunal and tells both sides: what is found, and for an order to pay, how much, into which account and by when.",
     fields: {
       application: f("record", "The application decided.", req), kind: f("choice", "What the application was.", { ...req, options: ["rent_increase", "debt", "charge"] }),
       applicant: f("entity", "Who applied.", req), against: f("entity", "Whom it was against.", req),
@@ -175,7 +176,7 @@ export const TRIBUNAL_MEMBER: Issued[] = [
 ];
 
 export const TRIBUNAL_REGISTRAR: Issued[] = [
-  { form: "garnishee_order", title: "Order to a debtor's bank to pay an unpaid order of the tribunal",
+  { form: "garnishee_order", title: "Order to a debtor's bank to pay an unpaid order of the tribunal", does: "Has the banks pay an order of the tribunal left unpaid, from what the debtor holds with them.",
     fields: { order: f("record", "The tribunal's order left unpaid.", req), debtor: f("entity", "Who owes.", req), creditor: f("entity", "Who is owed.", req), amount: f("amount", "How much.", req), pay_into: f("account", "The account it is to be paid into.", req), claim: f("record", "The claim it settles, if the order names one.") },
     writes: { kind: "garnishee_order", text: "Order to pay {amount} from what {debtor} holds, into {pay_into}, under {order}.", basis: "=order", to: ["@banks"], visible: ["@banks", "=self", "=debtor", "=creditor"],
       data: { order: "=order", debtor: "=debtor", amount: "#amount", to: "=pay_into", claim: "=claim" } } },
@@ -220,12 +221,12 @@ export const LENDING: Issued[] = [
 // ------------------------------------------------------------------ the police
 
 export const POLICE: Issued[] = [
-  { form: "charge", title: "A charge laid before the tribunal",
+  { form: "charge", title: "A charge laid before the tribunal", does: "Lays a charge before the tribunal against someone, on a report of a crime and the evidence found.",
     fields: { against: f("entity", "Who is charged.", req), victim: f("entity", "Who was wronged.", req), report: f("record", "The report it comes from.", req), amount: f("amount", "The value of what was taken.", req), account: f("account", "The account the victim is to be paid into.", req),
       found: f("entity", "The evidence: who was found with the goods."), found_at: f("structure", "The evidence: where."), goods: f("text", "The evidence: what goods.") },
     writes: { kind: "tribunal_application", text: "Charge against {against}, on report {report}.", basis: "=report", to: ["@tribunal"], visible: ["=self", "@tribunal", "=against"],
       data: { kind: "charge", against: "=against", victim: "=victim", report: "=report", amount: "#amount", account: "=account", evidence: { found: "=found", at: "=found_at", goods: "=goods" } } } },
-  { form: "death_notification", title: "Notification of a death, to the registrar",
+  { form: "death_notification", title: "Notification of a death, to the registrar", does: "Tells the registrar of a death the police have found, so that it can be registered.",
     fields: { deceased: f("entity", "Who has died.", req), found_at: f("space", "Where they were found.") },
     writes: { kind: "death_notification", text: "Notification of a death: {deceased}.", to: ["@registry"], data: { deceased: "=deceased", found_at: "=found_at" } } },
 ];

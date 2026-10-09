@@ -38,6 +38,7 @@ export const principal: BehaviourModule = {
     { task: "enrol", at: "building", what: "The school office answers each enrolment: a place in the least full classroom for a child of school age, or a letter saying why not; and gives each leaver a certificate of their years." },
   ],
   issues: [P.JOB_ADVERTISEMENT],
+  staffed: (p) => ({ role: p.role ?? "teacher", posts: { establishment: p.teachers ?? 0 } }),
   issuesWith: (p) => P.staffingOwn({ role: p.role ?? "teacher", industry: p.industry ?? "education", workplace: p.workplace, notice_days: p.notice_days ?? 14 }),
   keeps: [
     { what: "school_enrolment", why: "A school keeps its own roll: every pupil's enrolment is made with it." },

@@ -219,6 +219,7 @@
     {
       "form": "job_advertisement",
       "title": "Job advertisement",
+      "does": "How the office takes on staff of its own: it puts the posts on the jobs board at the wage given, for people to apply, and the office then offers employment to those it takes on. It commits no money until someone is taken on.",
       "fields": {
         "wage": {
           "type": "amount",
@@ -284,6 +285,7 @@
     {
       "form": "payroll_starter",
       "title": "Payroll notice of a new starter, to the office that pays the organisation's staff",
+      "does": "Tells the office that pays the organisation's staff that someone has been taken on, with what it needs to set their wage up. It pays nobody by itself: the paying office sets the payment up. Write to that office too, naming the notice: a paper on the organisation's own file is not put in front of it.",
       "fields": {
         "employee": {
           "type": "entity",
@@ -347,6 +349,7 @@
     {
       "form": "payroll_leaver",
       "title": "Payroll notice of a leaver, to the office that pays the organisation's staff",
+      "does": "Tells the office that pays the organisation's staff that someone's employment is ending and when, so that their wage payment ends then. It ends no employment and stops no payment by itself. Write to that office too, naming the notice.",
       "fields": {
         "employee": {
           "type": "entity",
@@ -402,6 +405,7 @@
     {
       "form": "habitat_register",
       "title": "Register of the lots where a listed species was found",
+      "does": "Publishes the lots where a survey found a listed species: the planning office refuses permits on them.",
       "fields": {
         "round": {
           "type": "count",

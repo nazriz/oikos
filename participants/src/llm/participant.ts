@@ -17,7 +17,7 @@ import type { ParticipantContext } from "../module";
 import { inCurrency } from "../money";
 import type { ContentBlock, LlmMessage, ToolSpec } from "./adapter";
 import { callModel, ModelCallFailed, promptTooLong, type LlmIO } from "./call";
-import { kindSaid, LOOK_CHARS_MAX, NOTHING_FOUND, NOTHING_NEW, renderObservation, renderStanding, type Looked, type WhoIs } from "./render";
+import { kindSaid, LOOK_CHARS_MAX, NOTHING_FOUND, NOTHING_NEW, renderObservation, renderStanding, when, type Looked, type WhoIs } from "./render";
 
 export const LLM_PARTICIPANT_VERSION = "0.13.0"; // 0.13.0: a request that came to nothing is put to it at once and by its own words, a notebook of 8,000 characters and told how to make room when nearly full, offices and people by their names in the world and never a participant's own id, who holds a post, figures in the papers it is shown read as a person reads them (money, days, dates, per cent), a letter whose about is not one id goes with it at its head, and nothing a seat sends is lost without a word; a look into papers answers with a list (a paper is read when asked for by its id, a long one a part at a time), one look and one whole prompt have a ceiling, a prompt its model would not take is never sent again unchanged; 0.12.0: told that a paper is named by its id, and one it cannot name is looked up first; 0.11.0: a place it is not at is gone to (someone is sent, and what they found is told when they are back); 0.10.0: who is who is looked up by name, a register someone else keeps is asked about one named thing, a board is searched (docs/design/knowing.md); 0.9.0: an answer read exactly or not at all (told and asked once more when not), a way out of the study not clearly meant is asked about; 0.8.0: looks kept ready for every sitting; no turn when nothing came of looking into whole reports; a notebook added to or changed in part
 
@@ -60,6 +60,10 @@ export interface LlmParticipantConfig {
   /** Who someone is in the world, by any id of theirs (render.ts, `WhoIs`): how a letter's writer and a paper's author
    * are named to the seat, and what a participant's own id (the platform's, which no seat is shown) is put as. */
   whoIs?: WhoIs;
+  /** The staff of its own office, where the office employs any: its posts, who is in each, which are vacant, as it
+   * stands at a time, in words (behaviour/roster.ts, from the office's own papers). Set out at its first sitting and
+   * at any sitting where it has changed since it was last set out. */
+  staff?: { text(t: number): string };
   /** The most one prompt may come to, in characters (the system prompt and everything shown): `PROMPT_MAX` unless set. */
   promptMax?: number;
 }
@@ -282,7 +286,7 @@ export function tools(c: LlmParticipantConfig): ToolSpec[] {
                 op: { enum: OPS, description: "= if not given" },
                 value: { anyOf: [{ type: "string" }, { type: "integer" }, { type: "boolean" }] } } } },
               paper: { type: "string", description: "Papers: one paper's id, to read that paper in full." },
-              from_entry: { type: "integer", minimum: 1, description: "Papers, with paper: for a very long paper, the entry to start from." },
+              from_entry: { type: "integer", minimum: 1, description: "A list (papers found, buildings): the entry to start from, to go on from where the last look stopped, as its answer says. With paper: for a very long paper, the entry to start from." },
               about: { type: "string", description: "Papers: only those that name this id (a person, an organisation, an account, a lot, another paper)." },
               since: { type: "string", description: 'Papers: only those from this date on, as "year 1, day 12".' },
               words: { type: "string", description: "Papers: only those with these words in them; with paper, only that paper's entries with them." } } : {}),
@@ -476,6 +480,9 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
   let mail = false; // someone wrote, in something it hasn't been shown yet
   const seenSystems = new Set<string>();
   let standingText = "";
+  // Its office's staff as last set out for it, and as they stand at the sitting under way.
+  let staffShown: string | undefined;
+  let staffNow: string | undefined;
   const DAYS = 86_400;
   const S = c.sessions;
   const sittingStart = (day: number) => day * DAYS + (S?.start ?? 0);
@@ -553,11 +560,18 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
     const names: string[] = Array.isArray(i.named) ? i.named : text(i.named) ? [i.named] : [];
     return `"${c.titles.get(i.report) ?? i.report}" (${i.report})${i.current_only ? ", what's current" : ""}${finds.length ? `, where ${finds.map((f) => `${f?.field} ${f?.op ?? "="} ${f?.value}`).join(" and ")}` : ""}${names.length ? `: ${names.join(", ")}` : ""}${text(i.measure) ? `, by ${i.measure}` : ""}${text(i.paper) ? `, the paper ${i.paper}${Number.isInteger(i.from_entry) ? ` from entry ${i.from_entry}` : ""}` : ""}${text(i.about) ? `, about ${i.about}` : ""}${text(i.since) ? `, since ${i.since}` : ""}${text(i.words) ? `, with the words "${i.words}"` : ""}`;
   };
+  /** What a look into papers asked for, the report aside, in words: said back with its answer, so that what was
+   * searched is on the page with what was found. Nothing, for a look that named nothing to find. */
+  const criteria = (i: any): string => {
+    const all = lookWords({ ...i, paper: undefined, from_entry: undefined });
+    const head = `"${c.titles.get(i.report) ?? i.report}" (${i.report})`;
+    return all.slice(head.length).replace(/^[,:]\s*/, "").trim();
+  };
   /** Whether a look's result holds nothing it hasn't been shown this sitting, but that there's nothing there. */
   const nothingNew = (obs: Observation, body: string) => {
     if (obs.outcomes.length || obs.inbox.length || obs.notices?.length || obs.drafts.length) return false;
     const shown = messages.flatMap((m) => (m.role !== "user" ? [] : typeof m.content === "string" ? [m.content] : m.content.map((b) => (b.type === "tool_result" ? b.content : b.type === "text" ? b.text : "")))).join("\n\n");
-    const empty = (x: string) => x.split("\n").length === 2 && (x.endsWith(`\n${NOTHING_FOUND}`) || x.endsWith(`\n${NOTHING_NEW}`));
+    const empty = (x: string) => { const l = x.split("\n"); return l.length >= 2 && (l[1] === NOTHING_FOUND || l[1] === NOTHING_NEW) && l.slice(2).every((y) => y.startsWith("(")); };
     const [, ...rest] = sections(body);
     return rest.some(empty) && rest.every((x) => empty(x) || shown.includes(x));
   };
@@ -624,7 +638,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
         // Places, or who's who: the report as it is now, and of it what was named (or the buildings a measure marks).
         if (finds.length || i.current_only) return no(`that report isn't one of papers to search: name ${kind === "sites" ? "the places to see, or a measure" : "who you're looking for"}`);
         if (i.measure !== undefined && (!text(i.measure) || kind !== "sites")) return no(kind === "sites" ? "the measure couldn't be read" : "a measure is something buildings have: name who you're looking for");
-        const looked: Looked = { ...(names.length ? { named: names.slice(0, 40) } : {}), ...(text(i.measure) ? { measure: i.measure } : {}), limit };
+        const looked: Looked = { ...(names.length ? { named: names.slice(0, 40) } : {}), ...(text(i.measure) ? { measure: i.measure } : {}), limit, ...(Number.isInteger(i.from_entry) ? { fromEntry: i.from_entry as number } : {}) };
         // A place it is not at is gone to: nobody is shown it. The places are named, and what was there comes later.
         if (kind === "sites" && way?.way === "visit") {
           if (i.measure !== undefined) return no("nobody is shown places they are not at: say where to send someone (a building by its id, or a piece of ground by its cell)");
@@ -685,13 +699,16 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
       // What a search cannot be asked (what a paper names, the words in it, what an agreement is for) is told from
       // what it gives: then the latest papers that match the rest are looked through, as many as one search gives.
       here ||= text(i.about) || text(i.words);
-      const fetched = here ? SEARCH_MAX : limit;
-      const looked: Looked = { limit, ...(text(i.about) ? { about: i.about.trim() } : {}), ...(text(i.words) ? { words: i.words } : {}), ...(kinds.length ? { kinds } : {}), ...(here ? { fetched } : {}) };
+      // (A list gone on with from an entry: as many as one search gives are asked for, and the part wanted is taken here.)
+      const fromEntry = Number.isInteger(i.from_entry) ? (i.from_entry as number) : undefined;
+      const fetched = here || fromEntry !== undefined ? SEARCH_MAX : limit;
+      const asked = criteria(i);
+      const looked: Looked = { limit, ...(text(i.about) ? { about: i.about.trim() } : {}), ...(text(i.words) ? { words: i.words } : {}), ...(kinds.length ? { kinds } : {}), ...(here || fromEntry !== undefined ? { fetched } : {}), ...(fromEntry !== undefined ? { fromEntry } : {}), ...(asked ? { said: asked } : {}) };
       // Papers it's shown as they come can still be looked through: with nothing to find, the latest of them. Papers it
       // only reads when it chooses, looked into with nothing to find: what has come since it last looked (so that a look
       // into the same folder, sitting after sitting, reaches what is new, and says so when nothing is). A board is never
       // read through: with nothing to find, its latest few.
-      const whole = !where.length && !here && !i.current_only && c.onRequest?.includes(i.report) && !way?.board;
+      const whole = !where.length && !here && fromEntry === undefined && !i.current_only && c.onRequest?.includes(i.report) && !way?.board;
       const query = whole ? {} : { query: { ...(i.current_only ? { standing: true } : {}), ...(where.length ? { where } : {}), order: { field: "at", desc: true }, limit: fetched } };
       return { what, action: { type: "look", looks: [{ channel: i.report, ...query }] }, looked: [i.report, looked],
         // (A kind that finds nothing: the folder's latest papers are looked through for kinds like it.)
@@ -864,7 +881,10 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
         } else {
           const since = sinceLast(now);
           if (since.left) await note({ carried_not_shown: { reports: since.left, of: since.of, limit_characters: CARRY_MAX } });
-          sending = [{ role: "user", content: `Your notebook: ${notes ? `${notes}\n${notebookRoom(notes.length)}` : "(empty)"}\n\n${unsaid.length ? `${unsaid.join("\n")}\n\n` : ""}${since.before ? `Since you last looked:\n${since.before}\n\nNow:\n` : ""}${now}` }];
+          // Its own office's staff, at its first sitting and whenever the list has changed since it was last set out.
+          staffNow = c.staff ? inWorld(c.staff.text(obs.t)) : undefined;
+          const staffPart = staffNow !== undefined && staffNow !== staffShown ? `\n\n${staffNow}` : "";
+          sending = [{ role: "user", content: `Your notebook: ${notes ? `${notes}\n${notebookRoom(notes.length)}` : "(empty)"}\n\n${unsaid.length ? `${unsaid.join("\n")}\n\n` : ""}${since.before ? `Since you last looked:\n${since.before}\n\nNow:\n` : ""}${now}${staffPart}` }];
         }
 
         let res: Awaited<ReturnType<typeof callModel>>;
@@ -940,8 +960,38 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
             const told = "When you were last to sit, more was set out for you than could be read at once, so that sitting was not held. Less is set out now: the oldest of what you had looked up is left out, and says so where it stood. Look again for what you need, a little at a time.";
             if (!unsaid.includes(told)) unsaid.push(told);
           }
-          // No answer (the call failed, or the run is stopping): nothing it was to be shown is dropped. What was kept
-          // for it stays kept, and this report joins it, so the next call shows everything this one would have.
+          // No answer, and the run goes on (the call failed after its adapter's own retries): the seat was not at its
+          // desk for this sitting. Nothing it was to be shown is dropped: this report, what was kept for it, and what
+          // its last answer's actions showed all wait for its next sitting, which is its next working day's (a day on,
+          // without office hours), whatever it had last arranged; and it is told then, first thing, that it missed one
+          // and that nothing was done. (2026-10-09: three seats whose calls failed were not woken again for the last
+          // five days of a run: nothing said when they were due, so each waited out its usual rhythm of a week.)
+          if (e instanceof ModelCallFailed) {
+            const midway = !fresh;
+            if (fresh) carried.push(now); // (with what was looked up for its opening, if anything was)
+            else {
+              keepForNext();
+              carried.push(...extra, ...(turn === 1 && !wasResult ? [body] : []));
+            }
+            if (turn === 1) missed.push(obs);
+            const tooLong = promptTooLong(e.message);
+            const told = midway
+              ? `Your sitting on ${when(obs.t)} was cut short: you were away from your desk after your last answer there, and nothing more was done that day. How what you had asked for went is set out below, with what has come in since.`
+              : `You missed your sitting on ${when(obs.t)}: you were not at your desk, and nothing was read or done that day. What had come in for it is set out below, with what has come in since.`;
+            if (!tooLong && !unsaid.includes(told)) unsaid.push(told);
+            const keptMail = restore.mail || mail;
+            away();
+            queue = [];
+            doneAfter = undefined;
+            mail = keptMail;
+            if (S) sittingDay = Math.floor(obs.t / DAYS); // (that day's sitting is the one missed)
+            backAt = 0;
+            e.backAt = S ? nextSitting(obs.t + 1) : obs.t + DAYS;
+            await note({ sitting_missed: { day: Math.floor(obs.t / DAYS), midway, back_at: e.backAt, why: tooLong ? "prompt_too_long" : "model_call_failed", error: String(e.message).slice(0, 300) } });
+            throw e;
+          }
+          // No answer because the run is stopping (a limit): nothing it was to be shown is dropped. What was kept for it
+          // stays kept, and this report joins it, so the call made again when the run is resumed shows the same.
           if (turn === 1) {
             if (fresh) {
               carried.push(now); // (with what was looked up for its opening, if anything was)
@@ -954,6 +1004,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
         // Answered: it has now seen all of it. (A day it sat, whatever it did: its record of the run says from when to when.)
         [tally.first, tally.last] = [tally.first < 0 ? obs.t : tally.first, obs.t];
         messages = [...sending, { role: "assistant", content: res.content }];
+        if (fresh && staffNow !== undefined) staffShown = staffNow;
         carried = [];
         missed = [];
         unsaid = unreadTwice ? [`When you were last here, ${unreadTwice}.`] : [];
@@ -1061,7 +1112,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
         // nothing said about being done: if there's nothing in any of them, nothing came of the answer.
         const lookUses = uses.filter((u) => u.name === "look");
         trays = lookUses.length > 0 && queue.length === lookUses.length && !notDone.size && uses.every((u) => u.name === "notebook" || u.name === "look")
-          && lookUses.every((u) => (u.input.find === undefined || (Array.isArray(u.input.find) && !u.input.find.length)) && u.input.named === undefined && u.input.measure === undefined && u.input.paper === undefined && u.input.about === undefined && u.input.since === undefined && u.input.words === undefined);
+          && lookUses.every((u) => (u.input.find === undefined || (Array.isArray(u.input.find) && !u.input.find.length)) && u.input.named === undefined && u.input.measure === undefined && u.input.paper === undefined && u.input.about === undefined && u.input.since === undefined && u.input.words === undefined && u.input.from_entry === undefined);
         const done = uses.find((x) => x.name === "done_for_now");
         const days = Number.isInteger(done?.input?.days) && done!.input.days > 0 ? { days: done!.input.days as number } : {};
         if (done) lastDays = days.days;

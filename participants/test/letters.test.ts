@@ -68,7 +68,7 @@ test("every office a generated town has says how it answers a letter; a firm's m
 });
 
 test("what counts as another office's note: its report, its acknowledgement, and the bank's fixed notes; a person's letter never", () => {
-  for (const text of ["Report from bank: Statement of acc-city ...", "From the council clerk: your vote on b1 is not counted.", "From the finance office: your written approval is needed for invoice rec.1 ...",
+  for (const text of ["Report from bank: Statement of acc-city ...", "From the council clerk: your vote on b1 is not counted.", "From the finance office: your written approval is needed for invoice rec.1 ...", "Payroll notice from the hiring office, new starter: c9, works crew ...",
     PAYMENT_FAILED.note("$1.00", "acc-c1", "rec.4"), "Request rec.9 not carried out: mayor is not an authorised signatory for acc-city.", "Hold rec.3 is in place. Not paid while it stands: ...", "Withdrawal rec.5 is not acted on, and rec.2 stands: ..."])
     expect({ text, note: officeNote(text) }).toEqual({ text, note: true });
   for (const text of ["Who authorised rec.2256, and under what authority?", "From what budget line are the crew paid?", "Report on the staffing position, please."])

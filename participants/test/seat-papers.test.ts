@@ -164,7 +164,7 @@ test("a folder read only when chosen, looked into with nothing to find, shows wh
   await p.step(found(9 * HOUR, "finance/files", papers, false), ctx);
   const shown = resultsOf(calls[1]!).a!;
   expect(shown).toContain("## The office's files: new since you last looked (22)\n- [rec.900] construction agreement, year 1, day 4, from city");
-  expect(shown).toContain("(17 earlier ones not listed: say what to find (a kind, who from, since when, what about), or ask for more at once.)");
+  expect(shown).toContain("(17 earlier ones not listed: say what to find (a kind, who from, since when, what about), or, for the next, look again with from_entry: 6.)");
   expect(shown.length).toBeLessThan(2_000);
 });
 

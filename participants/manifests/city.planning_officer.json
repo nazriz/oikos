@@ -32,6 +32,7 @@
     {
       "form": "permit_decision",
       "title": "Decision on a planning permit application",
+      "does": "Decides a permit application (granted, refused, or sent back as incomplete) and tells the applicant.",
       "fields": {
         "application": {
           "type": "record",

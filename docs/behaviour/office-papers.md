@@ -44,6 +44,44 @@ births, deaths and marriages enters a death from the notification and the partic
 (docs/behaviour/deaths.md has the sources for who reports and what is registered); an employer's advertisement
 states the post, the pay and where the work is. **(to confirm: no source opened for the forms themselves.)**
 
+## An office's own staff
+
+**Source:** `participants/src/behaviour/roster.ts`; `staffed` on each module that employs (`city.works`,
+`city.environment`, `clinic.practice`, `school.principal`, `police.station`); `orchestrator/src/run.ts` (the roster
+kept for a seat); the standing work order's preview in `translator/src/preview.ts`.
+
+An office knows who works for it. Where a model holds an office that employs staff, it is shown, at its first sitting
+and at any sitting where the list has changed:
+
+```
+## Works manager: Staff of your office
+Posts (works crew): 6 (the staff line of the budget for year 1 (budget-year-1), ..., pays for that many at ... a year each).
+In post: nobody.
+Vacant: 6.
+There is nobody in post, so the work that is the staff's is done by nobody. The office takes on its own staff,
+beginning with an advertisement on its job advertisement form (form-works-job-advertisement).
+```
+
+- It is read from the office's own papers and nothing else (`mine`, docs/no-god-view.md): the employment agreements
+  its organisation is party to, in the office's role, in force; and, where the posts are what a budget line pays for,
+  the adopted budget. The code that runs the office reads the same papers the same way (`Staffing`). Nothing is asked
+  of the engine, and no one else's staff are shown.
+- Posts are the office's establishment (clinic, school, police: its funder's figure, a parameter) or what its budget
+  line pays for at its rate of pay (works, environment). The code office also keeps within its room at the depot; the
+  roster does not say that.
+- A standing work order drafted while nobody is in post says so in its preview ("There is nobody in the post whose
+  work this is: your office has no works crew in post, so nothing is done under it until someone is taken on.") and
+  again with its result once confirmed.
+- Each form of the office's own says in one line what issuing it does and whose it is to fill in ("Filled in by the
+  works manager, of the office's own accord (nobody's direction or leave is needed)"): `does` on the module's
+  `issues` (contracts/module.schema.json).
+- Offices with no staff of their own (registry, inspector, planning, tribunal) are shown no roster. The rates office
+  and the utilities have routine work and a staff post run by code, with no employees in the world: an order of theirs
+  always has someone to follow it.
+
+**Real-world basis.** An employer keeps a record of its employees and their terms, and a manager knows the
+establishment of their unit. **(to confirm: no source opened.)**
+
 ## Office by office: what a seat does with what
 
 From `papers.ts`, and from a 90-day mock run of a 300-person town with twenty offices as seats (what each office's
