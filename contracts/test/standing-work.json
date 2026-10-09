@@ -602,6 +602,112 @@
    "asks": [
     "Is this work to be done once, or as a standing routine of your staff? Done once: say how much of it. As a routine: say how often (every day, every week), and it is a standing work order."
    ]
+  },
+  {
+   "name": "an offer of employment may say the work the other side commits to, and where: a commitment like any other",
+   "as": "works",
+   "program": "agreement(with=c0061, template=employment, we_do=money(amount=\"XYZ 5127.38\", every=\"every 30 days\", to=acc-c0061), they_do=work(at=town-hall/workplace.1, task=\"works crew\"))",
+   "blocks": [
+    {
+     "block": "propose_agreement",
+     "ref": "offer1",
+     "speaks_for": "city",
+     "terms": {
+      "template": "employment",
+      "parties": [
+       "city",
+       "c0061"
+      ],
+      "commitments": [
+       {
+        "who": "city",
+        "does": {
+         "outcome": {
+          "money": {
+           "to": "acc-c0061",
+           "amount": "512738"
+          }
+         }
+        },
+        "every": 2592000
+       },
+       {
+        "who": "c0061",
+        "does": {
+         "outcome": {
+          "work": {
+           "task": "works_crew",
+           "at": "town-hall/workplace.1"
+          }
+         }
+        }
+       }
+      ]
+     }
+    },
+    {
+     "block": "sign_agreement",
+     "agreement": "$offer1",
+     "as": "city"
+    }
+   ]
+  },
+  {
+   "name": "named for the worker themself, it is the same",
+   "as": "works",
+   "program": "agreement(with=c0061, template=employment, we_do=money(amount=\"XYZ 5127.38\", every=\"every 30 days\", to=acc-c0061), they_do=work(at=town-hall/workplace.1, by=c0061, task=\"works crew\"))",
+   "blocks": [
+    {
+     "block": "propose_agreement",
+     "ref": "offer1",
+     "speaks_for": "city",
+     "terms": {
+      "template": "employment",
+      "parties": [
+       "city",
+       "c0061"
+      ],
+      "commitments": [
+       {
+        "who": "city",
+        "does": {
+         "outcome": {
+          "money": {
+           "to": "acc-c0061",
+           "amount": "512738"
+          }
+         }
+        },
+        "every": 2592000
+       },
+       {
+        "who": "c0061",
+        "does": {
+         "outcome": {
+          "work": {
+           "task": "works_crew",
+           "at": "town-hall/workplace.1"
+          }
+         }
+        }
+       }
+      ]
+     }
+    },
+    {
+     "block": "sign_agreement",
+     "agreement": "$offer1",
+     "as": "city"
+    }
+   ]
+  },
+  {
+   "name": "named for someone else, it is the call that is at fault",
+   "as": "works",
+   "program": "agreement(with=c0061, template=employment, we_do=money(amount=\"XYZ 5127.38\", every=\"every 30 days\", to=acc-c0061), they_do=work(at=town-hall/workplace.1, by=c0062, task=\"works crew\"))",
+   "asks": [
+    "In an agreement each side commits itself: the work a side commits to is its own to do, and nobody else is named for it."
+   ]
   }
  ]
 }

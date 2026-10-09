@@ -1118,6 +1118,11 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   // resumed run ends. (At the spending limit the run is over unless someone raises it: they're debriefed, as designed.)
   const toBeResumed = stoppedBy !== undefined && stoppedBy !== "SpendingLimitReached";
   if (toBeResumed && [...debriefs.values()].some((d) => d.part.framing?.debrief)) await k.request({ op: "annotate", annotation: { annotation: "note", subject: "orchestrator", data: { debriefs_deferred: "the run stopped to be resumed: its participants are debriefed when it ends" } } });
+  // A draft a seat was shown and had not answered when the run ended (it had no sitting left): on record as
+  // unanswered, so that nobody reading the log takes it for declined or for confirmed. (A run stopped to be resumed
+  // keeps its drafts open: they are answered when it goes on.)
+  if (!toBeResumed) for (const u of [...units.values()].sort((a, b) => (a.key < b.key ? -1 : 1))) for (const d of u.llm?.drafts ?? [])
+    await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { draft_unanswered: { draft: d.draft.id, why: "the run ended before the seat sat again" } } } });
   if (!toBeResumed) for (const d of debriefs.values()) if (d.part.framing?.debrief) {
     try {
       await d.controller.debrief(debriefText(d.part));

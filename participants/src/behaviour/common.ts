@@ -1447,7 +1447,9 @@ export function jobTerms(a: Record | undefined, worker: string, book?: Book): { 
   if (a?.record !== "agreement") return { wage: 0, period: 14 * DAY };
   const employer = a.terms.parties.find((x) => x !== worker)!;
   const pays = commitmentOf(a, employer);
-  const stated = commitmentOf(a, worker).outcome?.occupancy?.in;
+  // (Where the worker is to work: the place they commit to come to, or the place the work they commit to is done at.)
+  const theirs = a.terms.commitments.filter((c) => c.who === worker).map((c) => c.does?.outcome);
+  const stated: string | undefined = theirs.map((o) => o?.occupancy?.in).find((x) => typeof x === "string" && x) ?? theirs.map((o) => o?.work?.at).find((x) => typeof x === "string" && x);
   const advertised = stated || !book ? undefined : advertisedJob(book, a)?.data?.space;
   return { wage: cents(pays.outcome?.money?.amount), period: pays.every ?? 14 * DAY, workplace: stated ?? (typeof advertised === "string" && advertised ? advertised : undefined) };
 }

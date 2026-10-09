@@ -976,7 +976,10 @@ impl Resolver<'_> {
             Value::Id(i) => return Ok(Some(json!({ "does": { "text": json!({ "id": i }).to_string() } }))),
             Value::Var(x) => return Ok(Some(json!({ "does": { "text": json!({ "var": x }).to_string() } }))),
         };
-        let every = if c.fn_ == "money" || c.fn_ == "goods" { Self::seconds(c, "every")? } else { None };
+        let every = if c.fn_ == "money" || c.fn_ == "goods" || c.fn_ == "work" { Self::seconds(c, "every")? } else { None };
+        if c.fn_ == "work" && Self::has(c, "by") && self.ids(c, "by")?.unwrap_or_default().iter().any(|p| self.k.entity_of(p) != self.k.entity_of(who)) {
+            return ask("In an agreement each side commits itself: the work a side commits to is its own to do, and nobody else is named for it.");
+        }
         let outcome = match c.fn_.as_str() {
             "money" => json!({ "money": self.money_outcome(c, self.id(c, "from")?, true)? }),
             "goods" => {
@@ -997,7 +1000,14 @@ impl Resolver<'_> {
                 let close = self.id(c, "close")?;
                 json!({ "account": obj(vec![("holder", some(holder)), ("close", close.map(Json::from))]) })
             }
-            other => return ask(format!("A commitment can be money, goods, a building, occupancy or an account, not {other}.")),
+            // Work a side commits to: the kind of work, as a label, where, and how much each time if said.
+            "work" => {
+                let task = Some(as_label(&Self::str_(c, "task")?.unwrap_or_default())).filter(|t| !t.is_empty()).unwrap_or_else(|| "work".into());
+                let at = self.id(c, "at")?;
+                let units = self.quantity(c, "units")?;
+                json!({ "work": obj(vec![("task", some(task)), ("at", at.map(Json::from)), ("units", units.map(Json::from))]) })
+            }
+            other => return ask(format!("A commitment can be money, goods, a building, occupancy, an account or work, not {other}.")),
         };
         Ok(Some(obj(vec![("does", some(json!({ "outcome": outcome }))), ("every", every.filter(|e| *e != 0).map(Json::from))])))
     }
@@ -1027,7 +1037,7 @@ impl Resolver<'_> {
             }
         }
         if commitments.is_empty() {
-            return ask("An agreement says what each side is to do or pay, and this one says nothing either side commits to. Say what you will do or pay, and what they will: money, goods, a building, occupancy or an account.");
+            return ask("An agreement says what each side is to do or pay, and this one says nothing either side commits to. Say what you will do or pay, and what they will: money, goods, a building, occupancy, an account or work.");
         }
         let term = Self::seconds(c, "term")?.filter(|t| *t != 0);
         // After the term: it may continue, periodically, until ended by notice.
@@ -1590,7 +1600,7 @@ mod tests {
         let mut k = Knowledge::new(Currency::from_config(&table["currency"]));
         k.absorb(&table["observation"]);
         let cases = table["cases"].as_array().unwrap();
-        assert!(cases.len() >= 23);
+        assert!(cases.len() >= 26);
         for c in cases {
             let name = c["name"].as_str().unwrap();
             let program = parse_program(c["program"].as_str().unwrap()).unwrap_or_else(|e| panic!("{name}: {e:?}"));

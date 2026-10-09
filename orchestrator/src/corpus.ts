@@ -87,6 +87,9 @@ export function corpusReader(run: string): { take(e: any): void; rows(): CorpusE
         } else if (b.annotation === "note" && b.data?.translation_retry) {
           const r = b.data.translation_retry;
           get(r.draft, e.t, b.subject).retries.push({ attempt: r.attempt, reason: r.reason, ...(r.call ? { call: r.call } : {}) });
+        } else if (b.annotation === "note" && b.data?.draft_unanswered) {
+          // (Shown to its seat and never answered: the run ended first. Neither declined nor confirmed.)
+          get(b.data.draft_unanswered.draft, e.t, b.subject).signoff = { decision: "unanswered", note: b.data.draft_unanswered.why };
         } else if (b.annotation === "signoff") {
           get(b.draft, e.t, b.participant).signoff = { decision: b.decision, ...(b.note ? { note: b.note } : {}) };
         }

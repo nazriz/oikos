@@ -48,8 +48,10 @@ const BOUND_NAME = /^[a-z][a-z0-9_]{0,31}$/;
 const ID_SHAPE = { test: (x: string): boolean => (x.startsWith("$") ? BOUND_NAME.test(x.slice(1)) : WRITTEN_ID.test(x)) };
 /** What is said of something written where an id goes that is no id (a draft's name; a made-up id). */
 export const notAnId = (x: string, what: string): string => (x.startsWith("draft.") ? `${x} is the name a draft went by before it was confirmed, not a paper on record. Once confirmed it is on record under an id of its own (rec. and a number): look it up in your papers and name that.` : `"${x}" (for ${what}) is not the id of anything on record: an id is written exactly as your papers show it, like rec.412. Look it up and name it so.`);
+/** Said of work in an agreement that names someone other than the side committing to it (the call's fault). */
+export const WORK_IS_ITS_OWN = "In an agreement each side commits itself: the work a side commits to is its own to do, and nobody else is named for it.";
 /** Said of an agreement with nothing on either side. */
-export const NO_COMMITMENTS = "An agreement says what each side is to do or pay, and this one says nothing either side commits to. Say what you will do or pay, and what they will: money, goods, a building, occupancy or an account.";
+export const NO_COMMITMENTS = "An agreement says what each side is to do or pay, and this one says nothing either side commits to. Say what you will do or pay, and what they will: money, goods, a building, occupancy, an account or work.";
 /** Asked of work with neither how much nor how often: which of the two it is, in the words of whoever asked (a seat
  * that wanted a standing order to maintain was asked "How much of it?" four times, 2026-10-09). */
 export const ONCE_OR_ROUTINE = "Is this work to be done once, or as a standing routine of your staff? Done once: say how much of it. As a routine: say how often (every day, every week), and it is a standing work order.";
@@ -656,15 +658,20 @@ class Resolver {
     if (v === undefined) return undefined;
     if (!("call" in v)) return { does: { text: "text" in v ? v.text : JSON.stringify("json" in v ? v.json : v) } };
     const c = v.call;
-    const every = c.fn === "money" || c.fn === "goods" ? this.seconds(c, "every") : undefined;
+    const every = c.fn === "money" || c.fn === "goods" || c.fn === "work" ? this.seconds(c, "every") : undefined;
+    if (c.fn === "work" && this.has(c, "by") && this.ids(c, "by")!.some((p) => this.k.entityOf(p) !== this.k.entityOf(who))) throw new Ask(WORK_IS_ITS_OWN);
     const outcome =
       c.fn === "money" ? this.moneyOutcome(c, this.id(c, "from"), true)
       : c.fn === "goods" ? { goods: { kind: this.need(c, "kind", "Of what?"), quantity: this.quantity(c, "quantity") ?? "0", to: this.k.entityOf(this.need(c, "to", "Delivered to whom?")), at: this.need(c, "at", "Delivered where?"), ...(this.id(c, "from_at") ? { from: this.id(c, "from_at") } : {}) } }
       : c.fn === "occupancy" ? this.occupancyOutcome(c)
       : c.fn === "structure" ? { structure: this.id(c, "remove") ? { remove: this.id(c, "remove") } : { type: this.id(c, "type"), on: this.id(c, "on") } }
       : c.fn === "account" ? { account: { holder: this.id(c, "holder") ?? who, ...(this.id(c, "close") ? { close: this.id(c, "close") } : {}) } }
+      // Work a side commits to (an employment agreement's "works as crew at the depot"): the kind of work, as a
+      // label, where it is done, and how much each time if said. The contract's commitments have had it all along;
+      // refused here, every offer of employment a translator wrote this way cost a second call (wave 2b: 8 of 8).
+      : c.fn === "work" ? { work: { task: asLabel(this.str(c, "task") ?? "") || "work", ...(this.id(c, "at") ? { at: this.id(c, "at") } : {}), ...(this.quantity(c, "units") ? { units: this.quantity(c, "units") } : {}) } }
       : undefined;
-    if (!outcome) throw new Ask(`A commitment can be money, goods, a building, occupancy or an account, not ${c.fn}.`);
+    if (!outcome) throw new Ask(`A commitment can be money, goods, a building, occupancy, an account or work, not ${c.fn}.`);
     return { does: { outcome }, ...(every ? { every } : {}) };
   }
 

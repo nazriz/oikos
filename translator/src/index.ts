@@ -284,7 +284,7 @@ export const NOT_CHECKED = "The draft could not be drawn up, and the fault is no
 
 /** Resolver answers that are about how the call was put together (an argument of the wrong shape), not about anything
  * the participant said or knows: the call is at fault, so it's tried again, and the participant never reads these. */
-const MALFORMED = /should name something, not (data|a call)\.$|should name a record by its id\.$|^per_request is written only by|should be written out\.$|should be data or text\.$|should be a list of names or ids\.$|^A commitment can be money, goods|^A hold says only what it holds|\(then=periodic\)/;
+const MALFORMED = /should name something, not (data|a call)\.$|should name a record by its id\.$|^per_request is written only by|should be written out\.$|should be data or text\.$|should be a list of names or ids\.$|^A commitment can be money, goods|^In an agreement each side commits itself|^A hold says only what it holds|\(then=periodic\)/;
 
 /** Resolver questions another attempt at the call could fix (a name it didn't recognise, a refusal's own text). */
 const RETRYABLE = /^You don't know of anyone or anything called|^It isn't clear what should happen|^That's for someone else to decide|^Please state the amount itself|^Please take this one step at a time|^You haven't seen a form by that name|^That's something to look up or read|^Nothing here does that as such|^That needs something found out first/;

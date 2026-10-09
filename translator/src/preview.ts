@@ -248,6 +248,26 @@ export class Preview {
     return `: "${(end < 0 ? rest : rest.slice(0, end)).trim().slice(0, 600)}"`;
   }
 
+  /**
+   * What a withdrawal withdraws, and what stops with it, from the seat's own paper (an earlier check found "You will
+   * withdraw job-c0008-wages." and nothing more, when six people's wages stopped; a pilot's seat was offered the
+   * withdrawal of an employment agreement in place of the wage under it, read as "You will withdraw job-c0004.").
+   */
+  private withdrawn(id: string): string {
+    if (id.startsWith("$")) return "";
+    const p = this.k.papers.get(id);
+    if (!p) return " No paper by that id is among your own papers as you have been shown them: check that it is the one you mean.";
+    if (this.k.withdrawn.has(id)) return " It has been withdrawn already.";
+    if (p.agreement) return ` It is the ${p.agreement.template ? `${p.agreement.template.replace(/_/g, " ")} ` : ""}agreement itself, between ${p.agreement.parties.map((x) => this.who(x)).join(" and ")}: not a payment or an order made under it. Anything standing under it is a paper of its own, and goes on until that paper is withdrawn.`;
+    const to = p.to?.length ? ` to ${p.to.map((x) => this.whom(x)).join(", ")}` : "";
+    const words = `: "${p.text}"`;
+    if (p.kind === "request") return p.standing ? ` It is your standing request${to}${words}. Once it is withdrawn nothing more is to be done under it: what it pays or has done stops.` : ` It is your request${to}${words}.`;
+    if (p.kind === "work_order") return ` It is your standing work order${words}. Once it is withdrawn your staff no longer do that work under it.`;
+    if (p.kind === "hold") return ` It is your hold${to}${words}. Withdrawing it lifts the hold: what it held is acted on again.`;
+    if (p.kind === "direction") return ` It is your written direction${to}${words}. Once it is withdrawn the office goes back to what it does of its own accord.`;
+    return ` It is your ${p.kind.replace(/_/g, " ")}${to}${words}. Once it is withdrawn it no longer stands.`;
+  }
+
   outcome(o: any, every?: number): string {
     const rep = every ? ` every ${span(every)}` : "";
     // (Whatever a sentence leaves out of its outcome follows it in brackets, by name.)
@@ -347,7 +367,7 @@ export class Preview {
         // advertisement's terms; made on none, whoever signs it has nowhere to come to work (2026-10-09: a crew of
         // five was taken on by offers of the pay alone, and none of them ever came to the depot).
         let place = "";
-        if (t.template === "employment" && this.k.entityOf(b.speaks_for ?? this.me) === this.me && !t.commitments.some((c: any) => c.does?.outcome?.occupancy)) {
+        if (t.template === "employment" && this.k.entityOf(b.speaks_for ?? this.me) === this.me && !t.commitments.some((c: any) => c.does?.outcome?.occupancy || c.does?.outcome?.work?.at)) {
           const ad = this.k.advertisedJob(Array.isArray(b.basis) ? b.basis : typeof b.basis === "string" ? [b.basis] : []);
           place = ad ? ` It names no place of work: it is made on the job advertisement ${ad.advertisement}, so the work is where that advertisement says${ad.space ? ` (${ad.space})` : ""}.`
             : " It names no place of work and cites no job advertisement that does: whoever signs it is paid and has nowhere to come to work. Cite the advertisement or the application it answers, or say where they are to work.";
@@ -408,7 +428,7 @@ export class Preview {
       case "release_claim":
         return [`You will release claim ${b.claim}${named(b)}${this.seenBy(b.visible_to)}${citing(b)}.`, ["claim", ...RECORD]];
       case "withdraw":
-        return [`You will withdraw ${b.record}${named(b)}${b.text ? `: "${b.text}"` : ""}${this.seenBy(b.visible_to)}${citing(b)}.`, ["record", "text", ...RECORD]];
+        return [`You will withdraw ${b.record}${named(b)}${b.text ? `: "${b.text}"` : ""}${this.seenBy(b.visible_to)}${citing(b)}.${this.withdrawn(b.record)}`, ["record", "text", ...RECORD]];
       case "vote":
         return [`You will vote "${b.choice}" on ${b.ballot}${named(b)}${this.seenBy(b.visible_to)}.`, ["choice", "ballot", "speaks_for", "visible_to"]];
       case "message":
