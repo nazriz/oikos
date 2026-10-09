@@ -48,6 +48,10 @@ export const ONCE_OR_ROUTINE = "Is this work to be done once, or as a standing r
 /** Asked of a payment made once that is given a start. */
 export const ONCE_IS_NOW = "A payment asked for once is made when it is asked: it can't be given a day to start. For a payment made again and again, say how often; for one payment on a later day, ask for it on that day.";
 
+/** Said of a call that gives `per_request` on a payment its maker does not itself move (the call's fault: it is tried
+ * again, and the seat never reads this). */
+export const PER_REQUEST_IS_THE_KEEPERS = "per_request is written only by whoever keeps the account the money is paid from, and names the request to pay that they are carrying out: leave it out.";
+
 /** Words as a label (a statement's kind, an organisation's, a post's role, an agreement's template): lower case,
  * letters and digits kept, anything else one underscore between them, starting with a letter, at most 64 characters.
  * A label already written as one comes back unchanged. What a model writes as "supplementary evidence statement" is
@@ -167,6 +171,17 @@ class Resolver {
     if (out.length === 0) throw new Ask("basis should name at least one record.");
     if (out.length > 64) throw new Ask("That cites more records than one act can: 64 at most.");
     return { basis: out.length === 1 ? out[0]! : out };
+  }
+  /** A record named by its id, where nothing but a record can stand (the request a keeper's payment carries out):
+   * bare, as every id is written, or a name bound on an earlier line. Words in quotes are not an id, whoever or
+   * whatever they might name, and data is not one (wave 2b: per_request="report", "the bank" and a table of pays
+   * each went through unread). The call is at fault, so the seat never reads this. */
+  private record(c: Call, key: string): string | undefined {
+    const v = this.raw(c, key);
+    if (v === undefined) return undefined;
+    if ("var" in v) return `$${v.var}`;
+    if ("id" in v && !/[A-Z]/.test(v.id)) return v.id;
+    throw new Ask(`${key} should name a record by its id.`);
   }
   private need(c: Call, key: string, question: string): string {
     const x = this.id(c, key);
@@ -395,10 +410,13 @@ class Resolver {
     if (first !== undefined && !every) throw new Ask(ONCE_IS_NOW);
     const keeper = this.keeper(from);
     if (keeper === undefined) throw new Ask(`You don't know who keeps account ${from}, so you can't ask them to pay from it.`);
+    // The request a payment carries out is a record, and only whoever keeps the account carries one out: said of a
+    // payment that is itself a request to the keeper it means nothing, and is refused, never passed over.
+    const per = this.record(c, "per_request");
+    if (per !== undefined && keeper !== this.me) throw new Ask(PER_REQUEST_IS_THE_KEEPERS);
     if (keeper === this.me) {
       // The participant's own entity keeps the money (a bank, or someone keeping their own): it moves it itself.
       if (every) throw new Ask("You keep this money yourself, so a repeating payment means paying each time. Say when to pay this one.");
-      const per = this.id(c, "per_request");
       return [{ block: "transfer", from, to: out.to, amount: out.amount, ...(out.settles ? { settles: out.settles } : {}), ...(per ? { per_instruction: per } : {}), ...(out.for ? { memo: out.for.slice(0, 500) } : {}) }];
     }
     // Someone else keeps it: the only physical option is to ask them. They decide.

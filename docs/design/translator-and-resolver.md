@@ -447,6 +447,7 @@ A form is a statement an institution publishes, of kind `form`, saying what inpu
   The world may change before confirmation; the kernel re-checks on submission.
 - **Legal notes:** laws the seat knows of whose formal conditions the acts match (the existing law-warning mechanism), worded as "this appears to go against *[law's title]*". Informational only (D19).
 - **No translator prose.** A summary would be a second, softer description that could misdescribe the acts. The Draft's `summary` becomes this mechanical preview (§15).
+- **A payment set against the agreement it cites** (2026-10-09, `againstAgreed`): where a payment cites an agreement the seat has seen, under which the payer pays one sum, the preview says what the figure is against it, from the two papers alone: "This is the whole of the pay agreed in rec.1225 (1.944,46 € every 14 days), with nothing withheld from it." / "This is 863,65 € less than the pay agreed in rec.1225 (...)." / at another rhythm, both figures and no difference; paid once, "one period's pay". "With nothing withheld" is said of an employment agreement only. Nothing is said where the seat has not seen the agreement, the agreement is withdrawn, or the money goes to an account the agreement does not name.
 
 **Confirmation modes**, set per experiment and recorded in the config:
 - `always`, the default;
@@ -472,6 +473,8 @@ Feedback reaches the seat as `notices` (the Observation field added on 2026-09-2
 | `too_much` | More than the allowed independent outcomes, or steps that depend on others acting first | "Please take this one step at a time." |
 | `unclear` | No recognisable outcome | "It isn't clear what should happen. Could you say it more plainly?" |
 | `unknown_form` | Names a form the seat hasn't seen | "You haven't seen a form by that name." |
+
+**Which refusals are asked again** (2026-10-09). A translator's refusal is tried once more with what went wrong, since a model sometimes gives up a request a call can say; `needs_calculation` and `look_first` are not. Both send the seat for something only it can bring (a figure, an id), and a second answer has only a guess to offer: of seven such second answers in wave 2, none was a right draft and four were wrong ones (the figure a wage was to be worked out from, twice, once confirmed; an agreement withdrawn in place of the payment under it; a second standing wage beside the one to be changed). The seat reads the refusal's sentence at once.
 
 ### 11.2 Resolver notices
 

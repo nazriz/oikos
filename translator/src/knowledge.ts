@@ -118,7 +118,18 @@ export class Knowledge {
     }
   }
 
+  /** Agreements the participant has seen under which someone pays money: who pays what, to whom and how often. What
+   * a payment that cites one is set against in its draft's preview (a wage against the pay agreed). */
+  readonly agreements = new Map<string, { template?: string; parties: string[]; pays: { who: string; to?: string; amount: string; every?: number }[] }>();
+
   private add(r: Record): void {
+    if (r.record === "agreement") {
+      const pays = (r.terms?.commitments ?? []).flatMap((c) => {
+        const m = c.does?.outcome?.money;
+        return m && typeof m.amount === "string" && /^[0-9]+$/.test(m.amount) ? [{ who: c.who, ...(typeof m.to === "string" ? { to: m.to } : {}), amount: m.amount as string, ...(Number.isSafeInteger(c.every) && c.every! > 0 ? { every: c.every! } : {}) }] : [];
+      });
+      if (pays.length) this.agreements.set(r.id, { ...(r.terms.template ? { template: r.terms.template } : {}), parties: r.terms.parties ?? [], pays });
+    }
     if (r.record === "withdrawal") {
       this.withdrawn.add(r.withdraws);
       this.lots.delete(r.withdraws);

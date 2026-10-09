@@ -1,0 +1,280 @@
+{
+ "about": "Payments and the request a keeper's payment carries out (per_request): what both resolvers (translator/src/resolver.ts and kernel/crates/resolver) must make of each program, from what the case's seat knows (`seats`: an office that asks its bank to pay, and the bank's own teller, who moves the money). Each case has `blocks` (the acts) or `asks` (the questions back, whole).",
+ "currency": {
+  "code": "XYZ",
+  "minor_units": 2
+ },
+ "seats": {
+  "finance": {
+   "channels": {
+    "treasury": {
+     "accounts": [
+      {
+       "account": "acc-city",
+       "balance": "10000000",
+       "custodian": "bank",
+       "holder": "city"
+      }
+     ],
+     "kind": "accounts",
+     "transactions": []
+    },
+    "who": {
+     "entities": [
+      {
+       "entity": "city",
+       "kind": "town",
+       "name": "Millbrook"
+      },
+      {
+       "entity": "bank",
+       "kind": "bank",
+       "name": "Millbrook Bank"
+      },
+      {
+       "entity": "c0007",
+       "kind": "person",
+       "name": "Dana Reyes",
+       "participant": "finance-system"
+      },
+      {
+       "entity": "c0100",
+       "kind": "person",
+       "name": "Sam Okoye",
+       "participant": "teller-system"
+      }
+     ],
+     "kind": "directory",
+     "positions": [
+      {
+       "entity": "city",
+       "holder": "finance-system",
+       "position": "finance",
+       "role": "finance_officer",
+       "title": "Finance Officer"
+      },
+      {
+       "entity": "bank",
+       "holder": "teller-system",
+       "position": "teller",
+       "role": "teller",
+       "title": "Teller"
+      }
+     ]
+    }
+   },
+   "drafts": [],
+   "entity": "c0007",
+   "inbox": [],
+   "outcomes": [],
+   "participant": "finance-system",
+   "positions": [
+    {
+     "entity": "city",
+     "position": "finance",
+     "role": "finance_officer",
+     "title": "Finance Officer"
+    }
+   ],
+   "status": "active",
+   "t": 2592000
+  },
+  "teller": {
+   "channels": {
+    "ledger": {
+     "accounts": [
+      {
+       "account": "acc-city",
+       "balance": "10000000",
+       "custodian": "bank",
+       "holder": "city"
+      },
+      {
+       "account": "acc-c0003",
+       "balance": "0",
+       "custodian": "bank",
+       "holder": "c0003"
+      }
+     ],
+     "kind": "accounts",
+     "transactions": []
+    },
+    "who": {
+     "entities": [
+      {
+       "entity": "city",
+       "kind": "town",
+       "name": "Millbrook"
+      },
+      {
+       "entity": "bank",
+       "kind": "bank",
+       "name": "Millbrook Bank"
+      },
+      {
+       "entity": "c0007",
+       "kind": "person",
+       "name": "Dana Reyes",
+       "participant": "finance-system"
+      },
+      {
+       "entity": "c0100",
+       "kind": "person",
+       "name": "Sam Okoye",
+       "participant": "teller-system"
+      }
+     ],
+     "kind": "directory",
+     "positions": [
+      {
+       "entity": "city",
+       "holder": "finance-system",
+       "position": "finance",
+       "role": "finance_officer",
+       "title": "Finance Officer"
+      },
+      {
+       "entity": "bank",
+       "holder": "teller-system",
+       "position": "teller",
+       "role": "teller",
+       "title": "Teller"
+      }
+     ]
+    }
+   },
+   "drafts": [],
+   "entity": "c0100",
+   "inbox": [],
+   "outcomes": [],
+   "participant": "teller-system",
+   "positions": [
+    {
+     "entity": "bank",
+     "position": "teller",
+     "role": "teller",
+     "title": "Teller"
+    }
+   ],
+   "status": "active",
+   "t": 2592000
+  }
+ },
+ "cases": [
+  {
+   "name": "whoever keeps the account moves the money, and says which request it carries out by that request's id",
+   "seat": "teller",
+   "as": "teller",
+   "program": "money(to=acc-c0003, amount=\"XYZ 2393.34\", from=acc-city, per_request=rec.44, for=\"Wages.\")",
+   "blocks": [
+    {
+     "block": "transfer",
+     "from": "acc-city",
+     "to": "acc-c0003",
+     "amount": "239334",
+     "per_instruction": "rec.44",
+     "memo": "Wages."
+    }
+   ]
+  },
+  {
+   "name": "a keeper's payment that carries out no request names none",
+   "seat": "teller",
+   "as": "teller",
+   "program": "money(to=acc-c0003, amount=\"XYZ 10\", from=acc-city)",
+   "blocks": [
+    {
+     "block": "transfer",
+     "from": "acc-city",
+     "to": "acc-c0003",
+     "amount": "1000"
+    }
+   ]
+  },
+  {
+   "name": "words in quotes are not a record, whatever they say",
+   "seat": "teller",
+   "as": "teller",
+   "program": "money(to=acc-c0003, amount=\"XYZ 10\", from=acc-city, per_request=\"report\")",
+   "asks": [
+    "per_request should name a record by its id."
+   ]
+  },
+  {
+   "name": "nor is a name the seat knows: the request carried out is never a person or an organisation",
+   "seat": "teller",
+   "as": "teller",
+   "program": "money(to=acc-c0003, amount=\"XYZ 10\", from=acc-city, per_request=\"Millbrook Bank\")",
+   "asks": [
+    "per_request should name a record by its id."
+   ]
+  },
+  {
+   "name": "nor is data",
+   "seat": "teller",
+   "as": "teller",
+   "program": "money(to=acc-c0003, amount=\"XYZ 10\", from=acc-city, per_request={\"c0003\":2,\"c0004\":1})",
+   "asks": [
+    "per_request should name a record by its id."
+   ]
+  },
+  {
+   "name": "nor is a bare word with a capital, which is a name",
+   "seat": "teller",
+   "as": "teller",
+   "program": "money(to=acc-c0003, amount=\"XYZ 10\", from=acc-city, per_request=Report)",
+   "asks": [
+    "per_request should name a record by its id."
+   ]
+  },
+  {
+   "name": "a payment asked of the account's keeper carries out no request: the keeper does",
+   "seat": "finance",
+   "as": "finance",
+   "program": "money(to=acc-c0003, amount=\"XYZ 10\", from=acc-city, per_request=rec.44)",
+   "asks": [
+    "per_request is written only by whoever keeps the account the money is paid from, and names the request to pay that they are carrying out: leave it out."
+   ]
+  },
+  {
+   "name": "asked of the keeper with words there, it is the words that are said first",
+   "seat": "finance",
+   "as": "finance",
+   "program": "money(to=acc-c0003, amount=\"XYZ 10\", from=acc-city, per_request=\"the bank\")",
+   "asks": [
+    "per_request should name a record by its id."
+   ]
+  },
+  {
+   "name": "asked of the keeper with nothing there, it is a request to the keeper",
+   "seat": "finance",
+   "as": "finance",
+   "program": "money(to=acc-c0003, amount=\"XYZ 10\", from=acc-city, for=\"wages\")",
+   "blocks": [
+    {
+     "block": "publish",
+     "kind": "request",
+     "speaks_for": "city",
+     "addressed_to": [
+      "bank"
+     ],
+     "visible_to": [
+      "city",
+      "bank"
+     ],
+     "text": "Please pay XYZ 10.00 from acc-city to acc-c0003, for wages.",
+     "data": {
+      "outcome": {
+       "money": {
+        "from": "acc-city",
+        "to": "acc-c0003",
+        "amount": "1000",
+        "for": "wages"
+       }
+      }
+     }
+    }
+   ]
+  }
+ ]
+}

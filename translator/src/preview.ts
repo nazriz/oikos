@@ -8,7 +8,7 @@
 // confirmed (the 2026-10-05 audit: the preview left a statement's `adico` and `formal` out). The test changes every
 // field of every kind of act and expects the preview to change.
 
-import { citedWords, formatMoney, forms, type Block } from "@oikos/participants";
+import { basesOf, citedWords, formatMoney, forms, type Block } from "@oikos/participants";
 import { duration, moment, readable, ruleWords, type FieldKinds } from "@oikos/participants/llm";
 import type { Knowledge } from "./knowledge";
 
@@ -119,6 +119,43 @@ export class Preview {
     return ` ${lead}${lead ? "t" : "T"}he first ${what} falls due ${span(wait)} after this is lodged${lead ? ", one whole period" : ""}: on ${forms.dateWords(now + wait)} if it is lodged today (${today})${then}.`;
   }
 
+  /**
+   * A payment that cites an agreement the seat has seen, set against what that agreement has it pay: the whole sum
+   * agreed, or how much less or more, and for an employment agreement that the whole agreed pay has nothing withheld
+   * from it. Only where the agreement cited has the payer pay one sum, and the payee is not known to be someone outside
+   * it. Both papers are the seat's own to read; this says them side by side (wave 2b: a wage asked as "gross pay less
+   * what the law says to withhold" was drafted at the gross figure, read as "pay 1.944,46 every 14 days, citing the
+   * agreement and the tax law", and confirmed: nothing on the page said it was the whole agreed pay).
+   */
+  private againstAgreed(b: any): string {
+    const m = b.data?.outcome?.money;
+    if (!m || typeof m.amount !== "string" || !/^[0-9]+$/.test(m.amount)) return "";
+    const payer = this.k.entityOf(b.speaks_for ?? this.me);
+    const every: number | undefined = Number.isSafeInteger(b.data.every) && b.data.every > 0 ? b.data.every : undefined;
+    for (const id of basesOf(b)) {
+      const a = this.k.agreements.get(id);
+      if (!a || this.k.withdrawn.has(id)) continue;
+      const holder = this.k.accounts.get(m.to)?.holder;
+      if (holder !== undefined && !a.parties.includes(holder)) continue;
+      // (Paid where the agreement says: into the account it names; or, where it names a party and not an account, to
+      // an account not known to be someone else's; or, where it names nowhere, anywhere.)
+      const samePayee = (to?: string) => to === undefined || to === m.to || (a.parties.includes(this.k.entityOf(to)) && (holder === undefined || this.k.entityOf(to) === holder));
+      const pays = a.pays.filter((p) => this.k.entityOf(p.who) === payer && samePayee(p.to));
+      if (pays.length !== 1) continue;
+      const agreed = pays[0]!;
+      const job = a.template === "employment";
+      const what = job ? "pay" : "sum";
+      const terms = `${this.sum(agreed.amount)}${agreed.every ? ` every ${span(agreed.every)}` : ""}`;
+      // (Paid at another rhythm than the agreement's, the two figures are not one period's: both are said, and no difference.)
+      if (every !== undefined && agreed.every !== undefined && every !== agreed.every) return ` The ${what} agreed in ${id} is ${terms}; this pays ${this.sum(m.amount)} every ${span(every)}.`;
+      const one = every === undefined && agreed.every !== undefined ? `one period's ${what}` : `the ${what}`;
+      const diff = BigInt(m.amount) - BigInt(agreed.amount);
+      if (diff === 0n) return ` This is the whole of ${one} agreed in ${id} (${terms})${job ? ", with nothing withheld from it" : ""}.`;
+      return ` This is ${this.sum((diff < 0n ? -diff : diff).toString())} ${diff < 0n ? "less" : "more"} than ${one} agreed in ${id} (${terms}).`;
+    }
+    return "";
+  }
+
   outcome(o: any, every?: number): string {
     const rep = every ? ` every ${span(every)}` : "";
     // (Whatever a sentence leaves out of its outcome follows it in brackets, by name.)
@@ -151,7 +188,7 @@ export class Preview {
           // (Of a standing instruction, when its first time falls is said in a sentence of its own, as it will be counted.)
           const standing = Number.isSafeInteger(b.data.every) && b.data.every > 0;
           const rest = this.also(b.data, ["outcome", "every", ...(standing ? ["first", "first_at"] : [])], ", with these details: ").replace(/\.$/, "");
-          return [`You will ask ${this.whom(b.addressed_to?.[0])} to ${this.outcome(b.data.outcome, b.data.every)}${named(b)}${b.addressed_to?.length > 1 ? to : ""}${this.seenBy(b.visible_to)}${rest}${citing(b)}. Your request will read: "${b.text}".${standing ? this.firstFalls(b.data, b.data.outcome?.money ? "payment" : "time", b.data.every) : ""}${this.rule(b)}`,
+          return [`You will ask ${this.whom(b.addressed_to?.[0])} to ${this.outcome(b.data.outcome, b.data.every)}${named(b)}${b.addressed_to?.length > 1 ? to : ""}${this.seenBy(b.visible_to)}${rest}${citing(b)}. Your request will read: "${b.text}".${standing ? this.firstFalls(b.data, b.data.outcome?.money ? "payment" : "time", b.data.every) : ""}${this.againstAgreed(b)}${this.rule(b)}`,
             ["kind", "text", "data", "addressed_to", "adico", "formal", ...RECORD]];
         }
         // A hold: an instruction to whoever acts on something standing. What it does is theirs to do, and it settles nothing.

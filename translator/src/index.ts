@@ -281,7 +281,7 @@ export const NOT_CHECKED = "That couldn't be put into effect, and nothing was do
 
 /** Resolver answers that are about how the call was put together (an argument of the wrong shape), not about anything
  * the participant said or knows: the call is at fault, so it's tried again, and the participant never reads these. */
-const MALFORMED = /should name something, not (data|a call)\.$|should be written out\.$|should be data or text\.$|should be a list of names or ids\.$|^A commitment can be money, goods|^A hold says only what it holds|\(then=periodic\)/;
+const MALFORMED = /should name something, not (data|a call)\.$|should name a record by its id\.$|^per_request is written only by|should be written out\.$|should be data or text\.$|should be a list of names or ids\.$|^A commitment can be money, goods|^A hold says only what it holds|\(then=periodic\)/;
 
 /** Resolver questions another attempt at the call could fix (a name it didn't recognise, a refusal's own text). */
 const RETRYABLE = /^You don't know of anyone or anything called|^It isn't clear what should happen|^That's for someone else to decide|^Please state the amount itself|^Please take this one step at a time|^You haven't seen a form by that name|^That's something to look up or read|^Nothing here does that as such|^That needs something found out first/;
@@ -368,7 +368,15 @@ export function createTranslator(io: LlmIO, check: KernelCheck, typeOf: (type: s
     // was right, and something isn't known. Another attempt helps only where the call itself is the trouble: it's
     // invalid, a refusal, or names something by a name nobody has (2026-10-03: asked again after "which account?",
     // models gave up a correct call for none(unclear)).
-    const retryable = !!r.ok || !!(r as any).invalid || "none" in program || (r as any).questions.some((q: string) => RETRYABLE.test(q));
+    // Two refusals are never asked again: an amount that has to be worked out, and something that has to be found out
+    // first. Both send the seat for something only it can bring (a figure; an id), and asked again "write it as a call
+    // if any call can say it" a translator has only a guess to write. In the wave's 424 requests, seven first answers
+    // were one of these two and were asked again: none became a right draft, and four became a wrong one (twice
+    // the figure a wage was to be worked out from, written as the wage, one of them confirmed, 2026-10-09; an
+    // agreement withdrawn in place of the payment under it; a second standing wage beside the one that was to be
+    // changed). The seat is told what the refusal says, at once.
+    const settled = "none" in program && (program.none === "needs_calculation" || program.none === "look_first");
+    const retryable = !settled && (!!r.ok || !!(r as any).invalid || "none" in program || (r as any).questions.some((q: string) => RETRYABLE.test(q)));
     if (!r.ok) return { ok: false, notices: r.questions, call, ...(r.invalid ? { invalid: r.invalid } : {}), ...(retryable ? {} : { final: true }), ...("none" in program ? { none: true as const } : {}) };
     const k = await check(req.participant, req.as, r.blocks);
     if (k.error) return { ok: false, notices: [NOT_CHECKED], call, invalid: [`the check failed: ${String(k.error).slice(0, 500)}`], final: true };

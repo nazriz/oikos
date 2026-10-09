@@ -167,6 +167,17 @@ impl Resolver<'_> {
             _ => ask(format!("{what} should name something, not a call.")),
         }
     }
+    /// A record named by its id, where nothing but a record can stand (the request a keeper's payment carries out):
+    /// bare, as every id is written, or a name bound on an earlier line. Words in quotes are not an id, and data is
+    /// not one. (The other resolver's `record`, word for word.)
+    fn record(c: &Call, key: &str) -> R<Option<String>> {
+        match c.get(key) {
+            None => Ok(None),
+            Some(Value::Var(x)) => Ok(Some(format!("${x}"))),
+            Some(Value::Id(i)) if !i.chars().any(|ch| ch.is_ascii_uppercase()) => Ok(Some(i.clone())),
+            Some(_) => ask(format!("{key} should name a record by its id.")),
+        }
+    }
     fn id(&self, c: &Call, key: &str) -> R<Option<String>> {
         self.id_as(c, key, key)
     }
@@ -581,12 +592,18 @@ impl Resolver<'_> {
         };
         let (to, amount) = (out["to"].as_str().unwrap_or_default().to_string(), out["amount"].as_str().unwrap_or_default().to_string());
         let purpose = out["for"].as_str().map(String::from);
+        // The request a payment carries out is a record, and only whoever keeps the account carries one out: said of a
+        // payment that is itself a request to the keeper it means nothing, and is refused, never passed over. (The
+        // words are the other resolver's, `PER_REQUEST_IS_THE_KEEPERS`.)
+        let per = Self::record(c, "per_request")?;
+        if per.is_some() && keeper != self.me {
+            return ask("per_request is written only by whoever keeps the account the money is paid from, and names the request to pay that they are carrying out: leave it out.");
+        }
         if keeper == self.me {
             // The seat's own entity keeps the money: it moves it itself.
             if every.is_some() {
                 return ask("You keep this money yourself, so a repeating payment means paying each time. Say when to pay this one.");
             }
-            let per = self.id(c, "per_request")?;
             return Ok(vec![obj(vec![
                 ("block", some("transfer")),
                 ("from", some(from)),
@@ -1396,6 +1413,26 @@ mod tests {
         assert!(cases.len() > 15);
         for c in cases {
             let name = c["name"].as_str().unwrap();
+            let program = parse_program(c["program"].as_str().unwrap()).unwrap_or_else(|e| panic!("{name}: {e:?}"));
+            match resolve(&program, &k, &|_| None, c["as"].as_str()) {
+                Resolution::Blocks(b) => assert_eq!(json!(b), c["blocks"], "{name}"),
+                Resolution::Questions { questions, .. } => assert_eq!(json!(questions), c["asks"], "{name}"),
+            }
+        }
+    }
+
+    /// Payments and the request a keeper's payment carries out: the table this resolver and the repository's
+    /// TypeScript one are both held to (contracts/test/payments.json; translator/test/payments.test.ts reads the same
+    /// file). Each case names the seat it is asked of.
+    #[test]
+    fn payments_as_the_shared_table_says() {
+        let table: Json = serde_json::from_str(include_str!("../../../../contracts/test/payments.json")).unwrap();
+        let cases = table["cases"].as_array().unwrap();
+        assert!(cases.len() >= 9);
+        for c in cases {
+            let name = c["name"].as_str().unwrap();
+            let mut k = Knowledge::new(Currency::from_config(&table["currency"]));
+            k.absorb(&table["seats"][c["seat"].as_str().unwrap()]);
             let program = parse_program(c["program"].as_str().unwrap()).unwrap_or_else(|e| panic!("{name}: {e:?}"));
             match resolve(&program, &k, &|_| None, c["as"].as_str()) {
                 Resolution::Blocks(b) => assert_eq!(json!(b), c["blocks"], "{name}"),
