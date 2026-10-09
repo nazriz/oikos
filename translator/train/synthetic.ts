@@ -186,7 +186,7 @@ const pad = (n: number, w: number) => String(n).padStart(w, "0");
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
 /** One program's draws: a world's money, and the names of whatever it mentions by id. */
-class Draw {
+export class Draw {
   names: { [id: string]: string } = {};
   /** What kind of program a recipe made, where it is one a part can be asked for by name (`Gold.tag`), and what
    * else its writer is to be told (`Gold.notes`). */
@@ -621,7 +621,7 @@ const DEPENDENT: { [fn: string]: ((d: Draw) => Lines)[] } = {
 
 /** A program worth keeping, as gold: it parses back, passes the contract, is askable and is a plausible thing to ask
  * for (`dropped` counts, by reason, the ones that aren't plausible); otherwise undefined. */
-function goldOf(lines: Lines, d: Draw, source: string, forms?: FormSpec[], dropped?: { [reason: string]: number }, o: { /** As many values as this, where a sentence or two's ten is too few (an office's paper has more). */ most?: number } = {}): Gold | undefined {
+function goldOf(lines: Lines, d: Draw, source: string, forms?: FormSpec[], dropped?: { [reason: string]: number }, o: { /** As many values as this, where a sentence or two's ten is too few (an office's paper has more). */ most?: number; /** Fields whose lists are of plain words. */ wordLists?: string[] } = {}): Gold | undefined {
   let p: calls.Program;
   try {
     p = calls.parseProgram(calls.programText(calls.programOf(...lines)));
@@ -630,7 +630,7 @@ function goldOf(lines: Lines, d: Draw, source: string, forms?: FormSpec[], dropp
   }
   const not = whyNot(p);
   if (calls.contractErrors(p).length || (not !== undefined && !(not === "more than ten values" && literals(p).length <= (o.most ?? 10)))) return undefined;
-  const why = implausible(p, { invented: true, ...(forms ? { forms } : {}) });
+  const why = implausible(p, { invented: true, ...(forms ? { forms } : {}), ...(o.wordLists ? { wordLists: o.wordLists } : {}) });
   if (why) {
     if (dropped) dropped[why] = (dropped[why] ?? 0) + 1;
     return undefined;
@@ -1005,6 +1005,72 @@ export function papers(o: OwnFormOptions & { declared?: boolean } = {}): Gold[] 
       seen.add(g.program);
       out.push(g);
       n++;
+    }
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------- every paper the worlds' own offices issue
+
+/** What a text field of a declared paper says, by the field's name (a `kind` of goods is a word for goods, a `post` a
+ * title): ordinary words from the pools, none any place's. A name not listed here is a purpose or a short letter. */
+const TEXT_FIELDS: { [name: string]: (d: Draw) => string } = {
+  kind: (d) => d.pick(GOODS), goods: (d) => `${d.int(2, 40)} ${d.pick(GOODS)}`, post: (d) => d.pick(TITLES), name: (d) => d.personName(),
+  headline: (d) => `The ${d.pick(SITES)} ${d.pick(EVENTS)} ${d.pick(WHEN)}`, platform: (d) => d.pick(PURPOSE_LINES),
+  reason: (d) => d.pick(["the income shown does not cover the repayments", "the application is complete and in order", "the security offered is not enough", "the figures could not be confirmed"]),
+  why: (d) => d.pick(["takings are down on last year", "prices have risen since the last settlement", "the order book is full until the spring", "it is what the business can bear this year"]),
+  memo: (d) => d.pick(PURPOSES),
+};
+
+/** The list fields of declared papers that hold plain words (what a ballot is about, what a candidate stands for,
+ * what an application lacks), and words for them. */
+const LIST_WORDS = ["tags", "values", "missing"];
+const TAG_WORDS = ["budget", "roads", "housing", "parks", "rates", "water", "schools", "markets", "harbour", "waste", "safety", "jobs", "rents", "drainage", "lighting"];
+
+/**
+ * Every paper the worlds' own offices issue (participants: papers.ts; 41 over its offices, a name two offices share
+ * once for each), filled in `perForm` ways, as gold programs (`tag: "world_form"`). `papers` reaches a declared paper
+ * only in every third set and may never fill a field that is not required; here none is left out and no field is:
+ * the first two ways of filling a paper have, between them, every field it has (the required ones in both), and the
+ * rest draw the others by chance. Whose office it is, is invented (`to`); who would ask for it is the office's holder
+ * (`Gold.asker`: a landlord for a rental listing, a union's organiser for a wage claim). Each way is in another
+ * world's money. A paper may have more to say than a sentence or two holds: up to twenty values. For a seed, always the same.
+ */
+export function worldForms(o: { perForm?: number; seed?: number; currencies?: Currency[]; dropped?: { [reason: string]: number }; /** Who asks for an office's papers (data.ts `PAPER_ASKERS`). */ askers?: { [office: string]: string } } = {}): Gold[] {
+  const out: Gold[] = [];
+  const seen = new Set<string>();
+  const currencies = o.currencies ?? everyCurrency();
+  const offices = Object.entries(PAPERS).flatMap(([office, x]) => (Array.isArray(x) ? [{ office, papers: x as PAPERS_Issued[] }] : typeof x === "object" && x && "form" in x && "fields" in x ? [{ office, papers: [x as PAPERS_Issued] }] : []));
+  let fi = 0;
+  for (const { office, papers } of offices) {
+    const srand = sampler(hash(`${o.seed ?? 1}:world forms ${office}`));
+    const sd = new Draw(srand, currencies);
+    const to = sd.officeId();
+    const specs: FormSpec[] = papers.map((p) => ({ form: p.form, to, office: "paper" as const, fields: Object.fromEntries(Object.entries(p.fields).map(([k, f]) => [k, { type: f.type, ...(f.required ? { required: true } : {}), ...(f.options ? { options: [...f.options] } : {}), ...(f.description ? { description: f.description } : {}) }])) }));
+    for (const spec of specs) {
+      const rand = sampler(hash(`${o.seed ?? 1}:world form ${office}.${spec.form}`));
+      const optional = Object.entries(spec.fields).filter(([, f]) => !f.required).map(([k]) => k);
+      for (let n = 0, tries = 0; n < (o.perForm ?? 6) && tries < 80; tries++) {
+        const d = new Draw(rand, currencies);
+        d.currency = currencies[(fi * 7 + n * 3 + (o.seed ?? 1)) % currencies.length]!;
+        d.names[to] = sd.names[to]!;
+        d.tag = "world_form";
+        const filled = Object.entries(spec.fields).filter(([k, f]) => f.required || (n < 2 ? optional.indexOf(k) % 2 === n : d.maybe(0.5)));
+        const value = (k: string, f: FormField): V =>
+          f.type === "text" ? tx(spec.form === "news_item" && k === "kind" ? d.pick(NEWS_KINDS) : (TEXT_FIELDS[k] ?? ((x: Draw) => (x.maybe(0.5) ? x.pick(PURPOSES) : (x.letter() as { text: string }).text)))(d))
+          // (A list is of what its field's name says: lots, people, records, or plain words such as a ballot's tags.)
+          : f.type === "list" ? (LIST_WORDS.includes(k) ? list(shuffled(TAG_WORDS, d.rand).slice(0, d.pick([1, 2, 2, 3]))) : d.several(k === "lots" ? "lot" : k === "laws" || k === "estate" ? "record" : "person"))
+          : f.type === "entity" && d.maybe(0.6) ? id(d.personId())
+          : f.type === "count" ? (/_bps$/.test(k) ? tx(String(d.pick([50, 100, 150, 200, 250, 300, 400, 500, 650, 800]))) : k === "year" || k === "edition" || k === "round" ? tx(String(d.int(1, 12))) : d.count(60))
+          : fieldValue(d, f);
+        const shown = shuffled([spec, ...shuffled(specs.filter((x) => x !== spec), rand).slice(0, d.pick([0, 1, 1]))], rand);
+        const g = goldOf([call("form", { form: id(spec.form), to: id(to), ...Object.fromEntries(filled.map(([k, f]) => [k, value(k, f)])) })], d, `synthetic: world form ${office}.${spec.form}`, shown, o.dropped, { most: 20, wordLists: LIST_WORDS });
+        if (!g || seen.has(g.program)) continue;
+        seen.add(g.program);
+        out.push({ ...g, asker: o.askers?.[office] ?? "officer" });
+        n++;
+      }
+      fi++;
     }
   }
   return out;

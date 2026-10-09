@@ -33,6 +33,7 @@ import { TRANSLATOR_VERSION, translatorSystem } from "@oikos/translator";
 import { formOfLine, type BlindAnswer } from "../../translator/train/blind";
 import { functionOf, sameProgram, type Example, type FormSpec } from "../../translator/train/data";
 import { withListsQuoted, type LabelManifest, type Unlabelled } from "../../translator/train/readers";
+import { V2_ANSWER } from "../../translator/train/v2";
 import { evaluateSet, loadHeldOut, loadSet, type SetReport } from "@oikos/translator/eval";
 import { sharesWording } from "../../translator/eval/held-out";
 import { DecideAdapter } from "../../translator/model/adapter";
@@ -196,6 +197,10 @@ const handIn = (item: { [field: string]: object }) => {
 export const HAND_IN = {
   reader: handIn({ id: { type: "string", description: "the request's id, copied exactly" }, program: { type: "string", description: "the program, as it is written" } }),
   writer: handIn({ id: { type: "string", description: "the situation's id, copied exactly" }, requests: { type: "array", items: { type: "string" }, description: "the requests, each as it is said" } }),
+  /** A writer of generated parts (broad.ts): one request, or one turn, for each brief. */
+  request: handIn({ id: { type: "string", description: "the brief's id, copied exactly" }, request: { type: "string", description: "what you wrote for it, as it is said" } }),
+  /** A reader of plain-text turns (translator/train/v2.ts): the uses of a seat's tools each turn is. */
+  turns: { answer: { name: "hand_in", schema: V2_ANSWER }, tools: [{ name: "hand_in", description: "Hand in the answer file: `answers` is the file's lines, in order, one object for each turn.", input_schema: V2_ANSWER }] },
 };
 
 export class Caller {

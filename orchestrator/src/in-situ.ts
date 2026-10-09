@@ -76,6 +76,9 @@ export interface Situation {
   currency?: Currency;
   /** What the seat really asked for in this turn, through `do`. */
   requests: Asked[];
+  /** Everything the seat did in this turn, in order: each tool it used, with its input as it gave it (its `do`s among
+   * them). What a later translator would have to read out of a plain-text turn (translator/train/v2.ts). */
+  uses?: { name: string; input: unknown }[];
   /** Never to be given to a writer: a test case (or a request that begins as one does) was asked here or earlier in this sitting, or one is quoted in `shown`. */
   test: boolean;
   /** Earlier turns of the sitting are not in the log before it (`shown` is this turn's part alone). */
@@ -241,6 +244,7 @@ export async function situationsOf(logPath: string, o: { run?: string; tests?: T
         id: `${short}/${b.subject}/d${day}/${n}`, run, seat: b.subject, day, n, turn: d.turn, model: `${d.provider}/${d.model}`, system, shown: sitting.parts.join("\n\n"),
         ...(s.observed ? { forms: [...s.forms.values()].filter((f) => !s.withdrawn.has(f.id)).map((f) => formShown(f)) } : {}), ...(currency ? { currency } : {}),
         requests: output.filter((u) => u.type === "tool_use" && u.name === "do" && typeof u.input?.what === "string" && u.input.what).map((u) => ({ request: u.input.what as string, test: false })),
+        uses: output.filter((u) => u.type === "tool_use" && typeof u.name === "string").map((u) => ({ name: u.name!, input: u.input ?? {} })),
         test: false, ...(first || carried ? {} : { partial: true as const }),
       };
       // (The sitting it belongs to is remembered on it, so a test case asked in this turn marks the turns after it.)

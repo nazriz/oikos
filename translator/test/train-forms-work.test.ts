@@ -22,7 +22,7 @@ const argsOf = (g: Gold) => parsed(g.program).lines[0]!.call.args as { [k: strin
 const acts = (g: Gold) => resolve(calls.parseProgram(g.program), g.forms?.length ? knowing(g.forms, g.currency!) : new Knowledge(g.currency!), () => undefined);
 
 test("the versions, and the three rules in the translator's instructions", () => {
-  expect(DATA_VERSION).toBe("0.12.0");
+  expect(DATA_VERSION).toBe("0.13.0");
   expect(TRANSLATOR_VERSION).toBe("0.9.1");
   const s = translatorSystem();
   for (const rule of [
@@ -346,7 +346,7 @@ test("through the pipeline: each kind becomes examples with their spans, none is
   const letters = of((e) => e.shape.startsWith("message("));
   const orders = of((e) => e.shape.startsWith("work("));
   expect([forms.length >= 50, letters.length >= 18, orders.length >= 25]).toEqual([true, true, true]);
-  expect(r.manifest.version).toBe("0.12.0");
+  expect(r.manifest.version).toBe("0.13.0");
   expect(r.manifest.dropped.not_copied).toBeLessThan(8);
   for (const e of forms) {
     // The form is shown, its name is nowhere in the request, and the span says so.

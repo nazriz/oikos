@@ -45,7 +45,7 @@ test("the translator's instructions say the three things, and nothing of any wor
 });
 
 test("generated gold: holds of one record or a few, and entries on one's own file, in the money of every world drawn", () => {
-  expect(DATA_VERSION).toBe("0.12.0");
+  expect(DATA_VERSION).toBe("0.13.0");
   const gold = statements();
   const holds = gold.filter(isHold), entries = gold.filter(isEntry);
   expect(holds.length).toBeGreaterThan(60);
