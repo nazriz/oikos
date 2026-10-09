@@ -1232,7 +1232,7 @@ export function payments(o: { kind: "per_request" | "finance"; n?: number; seed?
       const request = d.rec() as { id: string };
       c = call("money", { to: d.maybe(0.7) ? d.account() : d.party(["org", "person"]), amount: d.amount(), from, per_request: request, for: what, settles: d.maybe(0.1) ? d.rec() : undefined });
       d.tag = "per_request";
-      d.notes.push(`The speaker keeps the account the money leaves (a bank, at its counter) and is carrying out a request to pay that is on record as ${request.id}: say that this payment is made under that request, in words of your own and with its id ("as asked in ${request.id}", "carrying out ${request.id}", "on the instruction ${request.id}", "per ${request.id}"). It is neither what the payment settles nor a record it rests on, and nobody is named as having asked unless the call's own words name them.`);
+      d.notes.push(`The speaker keeps the account the money leaves (a bank, at its counter) and is carrying out a request to pay that is on record as ${request.id}: say that this payment is made under that request, in words of your own and with its id ("as asked in ${request.id}", "carrying out the request to pay ${request.id}", "as the account's holder requested in ${request.id}", "Carry out ${request.id}: pay …", "on the holder's instruction ${request.id}"; never a bare "per ${request.id}" or "under ${request.id}", which is how a record a payment rests on is cited). It is neither what the payment settles nor a record it rests on, and nobody is named as having asked unless the call's own words name them.`);
     } else {
       const sub = out.length % 4;
       d.tag = "finance_payment";
