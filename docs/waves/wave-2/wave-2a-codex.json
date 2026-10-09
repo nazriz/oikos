@@ -18,7 +18,7 @@
    "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
    "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
   },
-  "note": "Wave 2a (plan of 2026-10-09, third version), for the translator's data. Profile au-vic-2026; a town of its own, generated from seed 133; 1,000 people; 30 days; the works crew still to be taken on. Seats: mayor, works, finance, all on codex/gpt-6.1-sol. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt). Every draft is confirmed or declined by its seat. A PROBE: stop it by its own rule (plan.md, the stopping rules). Depends on a seat being shown that its office has no staff (a fault being fixed). OPTIONAL: its seats need the Codex window; it is parked when that closes, and nothing waits for it. The works office on the other family, with a model mayor and the treasury beside it: directions to an office a model holds."
+  "note": "Wave 2a (plan of 2026-10-09, third version), for the translator's data. Profile au-vic-2026; a town of its own, generated from seed 133; 1,000 people; 30 days; the works crew still to be taken on. Seats: mayor, works, finance, all on codex/gpt-6.1-sol. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt). Every draft is confirmed or declined by its seat. A PROBE: stop it by its own rule (plan.md, the stopping rules). OPTIONAL: its seats need the Codex window; it is parked when that closes, and nothing waits for it. The works office on the other family, with a model mayor and the treasury beside it: directions to an office a model holds."
  },
  {
   "name": "w2-22-townhall",

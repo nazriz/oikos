@@ -18,7 +18,7 @@
    "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
    "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
   },
-  "note": "Wave 2b (plan of 2026-10-09, third version), for the translator's data. Profile us-oh-2026; a town of its own, generated from seed 142; 1,000 people; 90 days; the works crew still to be taken on. Seats: mayor, works, finance, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt). Every draft is confirmed or declined by its seat. Depends on a seat being shown that its office has no staff (a fault being fixed). The mayor, the works manager and the treasury for a quarter, the crew still to be taken on: the budget's staff line, advertisements, offers, a round set going."
+  "note": "Wave 2b (plan of 2026-10-09, third version), for the translator's data. Profile us-oh-2026; a town of its own, generated from seed 142; 1,000 people; 90 days; the works crew still to be taken on. Seats: mayor, works, finance, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt). Every draft is confirmed or declined by its seat. The mayor, the works manager and the treasury for a quarter, the crew still to be taken on: the budget's staff line, advertisements, offers, a round set going."
  },
  {
   "name": "w2-45-lean",
@@ -67,6 +67,30 @@
    "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
   },
   "note": "Wave 2b (plan of 2026-10-09, third version), for the translator's data. Profile us-oh-2026; a town of its own, generated from seed 148; 1,000 people; 75 days; starting conditions election-due. Seats: mayor, editor, councillor-1, councillor-2, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt). Every draft is confirmed or declined by its seat. An election with a model mayor standing, the commission and the clerk both run by code (it does not wait on the clerk's fault): the nomination by day 30, the poll and the count on day 60, the winner seated the day after."
+ },
+ {
+  "name": "w2-03-election",
+  "world": "worlds/town-1000.yaml",
+  "sets": [
+   "seed=103",
+   "profile=de-ni-2026",
+   "mayor=llm",
+   "model_seats=editor,council-clerk"
+  ],
+  "args": [
+   "--scenario",
+   "election-due"
+  ],
+  "model": "claude-code/claude-sonnet-5-5",
+  "translator": "claude-code/claude-sonnet-5-5",
+  "translator_choice": "sonnet",
+  "until": 6480000,
+  "budget": 15,
+  "env": {
+   "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
+   "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
+  },
+  "note": "Wave 2b (plan of 2026-10-09, third version), for the translator's data. Profile de-ni-2026; a town of its own, generated from seed 103; 1,000 people; 75 days; starting conditions election-due. Seats: mayor, editor, council-clerk, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt). Every draft is confirmed or declined by its seat. A MODEL CLERK: stop it if no result is declared within three weeks of a ballot opening (plan.md, the stopping rules). An election due on day 60, run by the code electoral commission, in a place that writes a decimal comma: a nomination, the paper's items, and a clerk who seats whoever is declared elected."
  },
  {
   "name": "w2-06-justice",

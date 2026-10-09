@@ -2,12 +2,13 @@
 // Writes wave 2's queue files and its tables: `bun docs/waves/wave-2/make.ts [--out DIR] [--retrained decide/NAME [--retrained-for PILOT,...]]`.
 // --retrained names a retrained translator: it then serves the pilot marked `trained` and every pilot marked `trained-ok`
 // (or, with --retrained-for, those of them named), and the tables say so. Without it, as the files in this folder are.
-// Ten queues and matrix.md, into this folder or --out: for each of three stages, two lanes of pilots whose seats are
+// Nine queues and matrix.md, into this folder or --out: for each of three stages, two lanes of pilots whose seats are
 // Claude models (`claude-1`: the light ones; `claude-2`: the dear ones) and one optional lane of pilots whose seats are
-// Codex models (`codex`), and one file of pilots held back (`wave-2-held-clerk.json`).
+// Codex models (`codex`).
 // Nothing here starts a pilot or calls a model: the files are read by scripts/pilot-queue.ts when the wave is started.
 // The reasoning is in plan.md; the figures the estimates rest on are named where they are used.
-// Third version (2026-10-09, later): what changed from the second, and why, is the CHANGES list below (it heads matrix.md).
+// Third version (2026-10-09, later), with its final pass on origin/main 923d139: what changed from the second, and why,
+// is the CHANGES list below (it heads matrix.md).
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -21,15 +22,16 @@ const WORLD = "worlds/town-1000.yaml";
 const MODELS = {
   sonnet: "claude-code/claude-sonnet-5-5",
   haiku: "claude-code/claude-haiku-5-5",
-  // (The same model asked to reason less: the effort is part of the model's name, so every log records it.)
-  haikuLow: "claude-code/claude-haiku-5-5@low",
+  // (The same model with its seats asked to reason less: `seat_effort=low` in the entry's sets, which the run records for
+  // each seat and which leaves the translator's effort alone.)
+  haikuLow: "claude-code/claude-haiku-5-5",
   fable: "claude-code/claude-fable-5-1",
   sol: "codex/gpt-6.1-sol",
   luna: "codex/gpt-6-luna",
 } as const;
 type ModelKey = keyof typeof MODELS;
 /** The translator of a pilot is a late, cheap choice, so each pilot says which it may have:
- *  - `sonnet`: the general model under the translator's prompt (0.9.0), and no other: where a request not getting through
+ *  - `sonnet`: the general model under the translator's prompt (0.9.1), and no other: where a request not getting through
  *    loses the pilot's point (probes, elections, a crew to take on), where one thing is being measured, and every test pilot;
  *  - `trained-ok`: our own trained translator if the retrained one's scores on the pilot's kinds of act are good enough when
  *    the stage is started (--retrained), else the general model, which is what the files have until then;
@@ -56,8 +58,6 @@ interface Plan {
   probe?: boolean;
   /** The town starts with its works crew still to be taken on (`works_crew_at_start=0`), so the works office recruits. */
   noCrew?: boolean;
-  /** Held back, in a queue file of its own that belongs to no stage, until the fault named is settled. */
-  held?: "clerk";
 }
 
 // ---- the offices that can be seats now, how much of a seat's pace each is (1 = a busy office such as the mayor's), and
@@ -122,7 +122,9 @@ const REGISTRY_NEEDS_DEATHS = 2;
 const FOR_TRAINED = ["councillor"];
 /** Offices with no model in them, ever or yet (plan.md says why for each). */
 const NEVER_A_SEAT = ["bank-payments", "builder-foreman", "fund-trustee", "electoral"];
-/** A council clerk held by a model: the known open fault (a mock clerk counts no votes) makes these entries depend on its fix. */
+/** A council clerk held by a model. (A clerk held by the mock counted no votes when it sat weekly: a ballot closing is
+ * not a paper that brings a seat back. A real seat is brought back by the proposal and by each vote, and has to come
+ * back for the count by its own arrangement: untried, and watched by a stopping rule of its own.) */
 const dependsOnClerk = (p: Plan) => p.seats.includes("council-clerk");
 
 // ---- pace and cost, per weighted seat-day, from the two live checks of 2026-10-09 (runs/live-check-2026-10-09 and
@@ -147,7 +149,7 @@ const TRANSLATOR_CALLS_A_REQUEST = 1.3; // (a request asked back is asked again)
 const TRANSLATOR_USD_A_CALL = 0.012; // (the prompt-driven translator: 0.007 a call over 264 calls of the test sets; 0.012 for the one call in a pilot)
 const TRANSLATOR_SECONDS_A_CALL = 8;
 
-const P = (n: number, tag: string, stage: Plan["stage"], model: ModelKey, profile: string, days: number, seats: string[], translator: TranslatorKey, why: string, o: { scenario?: string; test?: boolean; probe?: boolean; noCrew?: boolean; held?: "clerk" } = {}): Plan =>
+const P = (n: number, tag: string, stage: Plan["stage"], model: ModelKey, profile: string, days: number, seats: string[], translator: TranslatorKey, why: string, o: { scenario?: string; test?: boolean; probe?: boolean; noCrew?: boolean } = {}): Plan =>
   ({ n, tag, stage, model, profile, seed: (o.test ? 900 : 100) + n, days, seats, translator, why, ...o });
 
 const C3 = ["councillor-1", "councillor-2", "councillor-3"];
@@ -159,6 +161,7 @@ const plans: Plan[] = [
   P(10, "works", "2a", "sonnet", "gb-eng-2026", 180, ["works", "registry", "environment"], "sonnet", "The works office and the registry held by a model, under a code mayor: standing work orders set once, a crew advertised for and taken on, deaths entered on the register's form. Half a year, because that is what gives a registrar a handful of deaths.", { probe: true, noCrew: true }),
   P(44, "utilities", "2a", "sonnet", "au-vic-2026", 45, ["water-operations", "energy-operations", "rates"], "sonnet", "A probe: the two utilities and the rates office: supply, billing and the levy as standing orders.", { probe: true, scenario: "energy-price-shock" }),
   P(9, "trade", "2a", "sonnet", "au-vic-2026", 30, ["shop-1-manager", "factory-1-manager"], "sonnet", "A probe: one shop and one factory of many, for goods and work; serving and making are still by hand (plan.md, the gaps).", { probe: true }),
+  P(1, "council", "2a", "sonnet", "au-vic-2026", 45, ["mayor", "council-clerk", ...C5], "sonnet", "A council of models: a clerk who puts ballots and declares results, councillors who vote, and a mayor who may direct the code-run works office. The first of the three with a clerk that is a seat, and the test of it: a ballot closing is no paper, so the clerk has to come back for the count by its own arrangement."),
   P(14, "largest", "2a", "fable", "au-vic-2026", 45, ["mayor", "finance", "landlord-1-office"], "trained-ok", "The largest model in the familiar offices with a landlord beside them: the measure of what it costs and how it works a seat, before its two longer pilots."),
   // ---- wave 2a: lane claude-2 (seats on the smaller Claude model).
   P(54, "effort", "2a", "haikuLow", "us-oh-2026", 30, ["mayor", "finance", "planning"], "sonnet", "The measurement of the smaller model at lower effort, first in its lane: whether its answers are read whole, what a call costs, and what it asks for, beside w2-04 (the same offices and profile at default effort). The rest of the lane is set by what it shows."),
@@ -173,6 +176,7 @@ const plans: Plan[] = [
   P(42, "townworks", "2b", "sonnet", "us-oh-2026", 90, ["mayor", "works", "finance"], "sonnet", "The mayor, the works manager and the treasury for a quarter, the crew still to be taken on: the budget's staff line, advertisements, offers, a round set going.", { noCrew: true }),
   P(45, "lean", "2b", "sonnet", "de-ni-2026", 90, ["mayor", "finance", "planning"], "trained-ok", "A town with almost nothing in the bank and a code-run works office: holds on standing payments, and directions on whether to recruit.", { scenario: "lean-council" }),
   P(48, "election", "2b", "sonnet", "us-oh-2026", 75, ["mayor", "editor", "councillor-1", "councillor-2"], "sonnet", "An election with a model mayor standing, the commission and the clerk both run by code (it does not wait on the clerk's fault): the nomination by day 30, the poll and the count on day 60, the winner seated the day after.", { scenario: "election-due" }),
+  P(3, "election", "2b", "sonnet", "de-ni-2026", 75, ["mayor", "editor", "council-clerk"], "sonnet", "An election due on day 60, run by the code electoral commission, in a place that writes a decimal comma: a nomination, the paper's items, and a clerk who seats whoever is declared elected.", { scenario: "election-due" }),
   P(6, "justice", "2b", "sonnet", "de-ni-2026", 180, ["tribunal-member", "tribunal-registrar", "registry", "land-registrar", "child-protection", "inspector"], "trained-ok", "Offices that decide and record: the tribunal, the two registers, child protection, the inspector. Half a year, for the registers' sake."),
   P(8, "heat", "2b", "sonnet", "jp-akita-2026", 180, ["mayor", "registry", "editor", "child-protection"], "trained-ok", "A hot summer in the oldest town: what the mayor, the registrar and the paper ask for when the bureau warns.", { scenario: "hot-summer" }),
   P(5, "landlords", "2b", "sonnet", "us-oh-2026", 120, ["landlord-1-office", "landlord-2-office", "landlord-3-office", "bank-lending"], "trained-ok", "Three letting offices and the lender where rents are dear: listings, leases, increases, loans.", { scenario: "dear-rents" }),
@@ -194,6 +198,7 @@ const plans: Plan[] = [
   P(2, "housing", "2b", "haiku", "gb-eng-2026", 45, ["landlord-1-office", "landlord-2-office", "tribunal-member", "tribunal-registrar"], "trained-ok", "Landlords and the tribunal on the smaller model where rents are dear: leases, notices, orders.", { scenario: "dear-rents" }),
   P(36, "offices", "2b", "haiku", "us-oh-2026", 30, ["rates", "water-operations", "principal"], "sonnet", "A probe: three offices with routines on the smaller model.", { probe: true }),
   P(30, "trade", "2b", "haiku", "au-vic-2026", 30, ["shop-2-manager", "factory-2-manager"], "sonnet", "The trade probe on the smaller model.", { probe: true }),
+  P(7, "election", "2b", "haiku", "au-vic-2026", 75, ["mayor", "council-clerk", ...C3], "sonnet", "An election with a model mayor standing and a model clerk to seat the winner, on the smaller model. Last in its lane: it is the dearest of them, and w2-01's report is read first.", { scenario: "election-due" }),
   // ---- wave 2b: the optional lane. Works first, then by worth; each is parked the moment the window closes.
   P(34, "works", "2b", "sol", "us-oh-2026", 45, ["works", "registry", "land-registrar", "environment"], "trained-ok", "The works office, both registers and the environment office on the other family, under a code mayor."),
   P(24, "election", "2b", "sol", "gb-eng-2026", 75, ["mayor", "editor", "councillor-1", "councillor-2"], "sonnet", "An election with a model mayor standing on the other family, the commission and the clerk both run by code.", { scenario: "election-due" }),
@@ -214,12 +219,6 @@ const plans: Plan[] = [
   P(38, "newmoney-works", "2c", "sol", "in-tn-2026", 45, ["mayor", "works", "finance"], "sonnet", "Test-only: that profile's works office on the other family.", { test: true }),
   P(32, "newoffices", "2c", "sol", "us-oh-2026", 45, ["police-oic", "union-organiser", "mayor"], "sonnet", "Test-only: the held-out offices on the other family.", { test: true }),
   P(31, "newmoney", "2c", "luna", "in-tn-2026", 45, ["mayor", "finance", "planning"], "sonnet", "Test-only: that profile's amounts from the other family's weaker model.", { test: true }),
-
-  // ---- held back until the council clerk's fault is settled (a clerk that is a seat counted no votes as the mock; a
-  // model's is untried): a file of their own, in no stage. None longer than its purpose needs.
-  P(1, "council", "2b", "sonnet", "au-vic-2026", 45, ["mayor", "council-clerk", ...C5], "sonnet", "A council of models: a clerk who puts ballots and declares results, councillors who vote, and a mayor who may direct the code-run works office. The first of the three: the test of a clerk that is a seat.", { held: "clerk" }),
-  P(3, "election", "2b", "sonnet", "de-ni-2026", 75, ["mayor", "editor", "council-clerk"], "sonnet", "An election due on day 60, run by the code electoral commission, in a place that writes a decimal comma: a nomination, the paper's items, and a clerk who seats whoever is declared elected.", { scenario: "election-due", held: "clerk" }),
-  P(7, "election", "2b", "haiku", "au-vic-2026", 75, ["mayor", "council-clerk", ...C3], "sonnet", "An election with a model mayor standing and a model clerk to seat the winner, on the smaller model.", { scenario: "election-due", held: "clerk" }),
 ];
 
 /** What changed from the second version (2026-10-09, morning), and why. Heads matrix.md; plan.md says more. */
@@ -233,11 +232,12 @@ const CHANGES: string[] = [
   "**Longer where a seat on the first Claude model costs almost nothing and comes back weekly:** landlords, housing and lending 120 days (were 60 to 90), the registers 180, the test pilots of that model 90.",
   "**Kenya and Brazil are in, as they are** (the owner, 2026-10-09: a profile does not have to be faithful to be used, and a town in trouble is data too): two pilots each, on the cheap seats, in training (a sixth and a seventh currency). The table below marks every town known not to be its place, and why.",
   "**Three more scenarios that reach an office**, one pilot each: `housing-shortage` (w2-28, landlords and the tribunal), `jobs-slump` (w2-21, the lender, the treasury, landlords), `energy-price-shock` (w2-44, the utilities probe). Eight presets in all, none in more than three pilots.",
-  "**The three pilots with a model council clerk are held back in a file of their own** (`wave-2-held-clerk.json`), in no stage, until the clerk's fault is settled. An election that does not wait on it is added on Claude seats (w2-48, a code clerk), so the wave has an election whatever happens to the clerk or the window.",
+  "**The three pilots with a model council clerk run in their lanes** (final pass: they were held in a file of their own). The fault was the mock's rhythm, not the clerk's code: a clerk held by the mock counts votes when it sits daily, and counted none sitting weekly, because a ballot closing is not a paper that brings a seat back. A real clerk is brought back by the proposal and by each vote, and has to arrange to be back for the count: untried, so w2-01 (45 days) is in the shake-down as the test of it, w2-03 and w2-07 are in the body after its report, and each is stopped if no result is declared within three weeks of a ballot opening. An election that does not turn on it stays (w2-48, a code clerk).",
   "**Every election pilot runs 75 days:** notice on day 1, nominations close on day 30, the poll, the count and the declaration on day 60, the winner seated by the clerk the day after, and two weeks of the new term.",
-  "**Works pilots that start with no crew (w2-10, w2-42, w2-33) depend on a fix** that tells a seat its office has no staff: in the second live check such a seat never learned it, hired nobody, and the town had 301 complaints.",
-  "**Estimates are rebuilt on the second live check's thirty-day pilots:** a seat on the first Claude model sits weekly (0.42 answers a weighted seat-day, 3 or 4 requests a pilot-month); the smaller one is busy and dear (1.5 answers, 0.17 an answer); gpt-6.1-sol asked for 3 things in 25 days, not the five in twelve the second version was built on. They predate a change coming on main (a paper filed with an office brings its seat back the next working day), after which seats will sit more often.",
-  "**50 pilots** (were 43): 35 on Claude seats in the three stages, 3 held, 12 optional on Codex seats; 12 test-only.",
+  "**Works pilots that start with no crew (w2-10, w2-42, w2-33) wait for nothing now** (final pass): a seat is told its office's staff and what each of its own forms is for. In the second live check such a seat never learned it had none, hired nobody, and the town had 301 complaints; the stopping rule for these pilots stays.",
+  "**Final pass on origin/main 923d139** (everything the wave waited for is there): the low-effort measurement (w2-54) sets `seat_effort=low` for its seats and names the model plainly, so the translator's effort is untouched; `wake_on_papers` is left on everywhere (a paper filed with an office brings its seat back the next working day), which every estimate here predates; the translator's prompt is 0.9.1; five towns are marked as flooding through their wet seasons until the river's change lands.",
+  "**Estimates are rebuilt on the second live check's thirty-day pilots:** a seat on the first Claude model sits weekly (0.42 answers a weighted seat-day, 3 or 4 requests a pilot-month); the smaller one is busy and dear (1.5 answers, 0.17 an answer); gpt-6.1-sol asked for 3 things in 25 days, not the five in twelve the second version was built on. They predate a change now on main (a paper filed with an office brings its seat back the next working day), with which seats sit more often.",
+  "**50 pilots** (were 43): 38 on Claude seats in the three stages, 12 optional on Codex seats; 12 test-only.",
 ];
 
 // ---- checks on the plan itself.
@@ -248,9 +248,11 @@ const TEST_ONLY = { profiles: ["mx-jal-2026", "in-tn-2026"], offices: ["police-o
 /** Towns known not to be faithful to their place, and why (the owner, 2026-10-09: a profile does not have to be faithful
  * to be used; such a town is spread over a few pilots, and nothing in a pilot there says anything of the place). */
 const NOT_FAITHFUL: { [profile: string]: string } = {
-  "ke-nakuru-2026": "its rent share is wrong for its dwelling mix (rent at about 85% of income): landlords and the tribunal see arrears and evictions that are the profile's doing",
-  "br-mg-2026": "it floods on a river-flow figure whose fix is not on main: the flood is the profile's, not a wet year's",
-  "in-tn-2026": "rent is 40% of income (no landlord seat there); a means-tested pension is paid to everyone",
+  "ke-nakuru-2026": "its rent share is wrong for its dwelling mix (rent at about 85% of income): landlords and the tribunal see arrears and evictions that are the profile's doing; it floods through its wet season (the river's flow: a change not on main)",
+  "br-mg-2026": "it floods through its wet season on a river-flow figure whose change is not on main: the flood is the profile's, not a wet year's",
+  "in-tn-2026": "rent is 40% of income (no landlord seat there); a means-tested pension is paid to everyone; it floods through its wet season (the river's flow)",
+  "mx-jal-2026": "it floods through its wet season (the river's flow: a change not on main)",
+  "us-oh-2026": "it floods through its wet season (the river's flow: a change not on main)",
   "jp-akita-2026": "far from its census by age (its children-at-home figures are placeholders); its budget expects grants seven times its spending; households' saving reads negative",
   "de-ni-2026": "households' saving reads negative; its ballot figure for industrial action is union practice, not law",
 };
@@ -273,7 +275,6 @@ for (const p of plans) {
   if (p.scenario && !SCENARIOS_OFFERED.includes(p.scenario)) throw new Error(`pilot ${p.n}: ${p.scenario} is not a scenario that reaches an office`);
   if (p.profile === "in-tn-2026" && p.seats.some((s) => officeOf(s) === "landlord")) throw new Error(`pilot ${p.n}: no landlord seat in that profile (its rent share)`);
   if (p.noCrew && !p.seats.includes("works")) throw new Error(`pilot ${p.n}: a crew to take on, and nobody in the works office to do it`);
-  if (dependsOnClerk(p) !== (p.held === "clerk")) throw new Error(`pilot ${p.n}: a model clerk and not held back, or held back with none`);
   if (dependsOnClerk(p) && p.days > 75) throw new Error(`pilot ${p.n}: a model clerk for more than 75 days`);
   if (p.scenario === "election-due" && p.days < 75) throw new Error(`pilot ${p.n}: an election pilot that ends before the winner has sat a fortnight (polling day 60)`);
   if (p.seats.includes("registry") && deathsOf(p) < REGISTRY_NEEDS_DEATHS) throw new Error(`pilot ${p.n}: a registry seat with about ${deathsOf(p).toFixed(1)} deaths to register in ${p.days} days in ${p.profile}`);
@@ -282,8 +283,8 @@ for (const p of plans) {
 for (const [profile, most] of Object.entries(MOST_PILOTS_UNFAITHFUL)) { const n = plans.filter((p) => p.profile === profile).length; if (n < 1 || n > most) throw new Error(`${profile} is in ${n} pilots: one to ${most} is the plan`); }
 if (new Set(plans.map((p) => p.n)).size !== plans.length || new Set(plans.map((p) => p.seed)).size !== plans.length) throw new Error("a number or a seed is used twice");
 const training = plans.filter((p) => !p.test);
-/** The pilots that need nothing but the Claude sign-in and are held for nothing: what the wave is whatever the Codex window does. */
-const assured = (p: Plan) => laneOf(p.model) !== "codex" && !p.held;
+/** The pilots that need nothing but the Claude sign-in: what the wave is whatever the Codex window does. */
+const assured = (p: Plan) => laneOf(p.model) !== "codex";
 for (const office of ["works", "registry"]) {
   const models = new Set(training.filter((p) => assured(p) && p.seats.includes(office)).map((p) => p.model));
   if (models.size < 2) throw new Error(`${office} is a seat on fewer than two models in the training pilots that need no Codex`);
@@ -334,12 +335,12 @@ const entry = (p: Plan) => {
   const others = p.seats.filter((s) => s !== "mayor");
   return {
     name: name(p), world: WORLD,
-    sets: [`seed=${p.seed}`, `profile=${p.profile}`, ...(p.seats.includes("mayor") ? ["mayor=llm"] : []), ...(others.length ? [`model_seats=${others.join(",")}`] : []), ...(p.noCrew ? ["works_crew_at_start=0"] : [])],
+    sets: [`seed=${p.seed}`, `profile=${p.profile}`, ...(p.seats.includes("mayor") ? ["mayor=llm"] : []), ...(others.length ? [`model_seats=${others.join(",")}`] : []), ...(p.noCrew ? ["works_crew_at_start=0"] : []), ...(p.model === "haikuLow" ? ["seat_effort=low"] : [])],
     ...(p.scenario ? { args: ["--scenario", p.scenario] } : {}),
     model: MODELS[p.model], translator: translatorOf(p), translator_choice: p.translator, until: p.days * DAY, budget: budgetOf(p),
     env: { OIKOS_CLAUDE_BIN: `${HOME}/.local/bin/claude`, OIKOS_TRANSLATOR_MODELS: `${HOME}/oikos/runs/translator-model` },
     ...(p.test ? { test: true } : {}),
-    note: `Wave ${p.stage} (plan of 2026-10-09, third version), for the translator's data. Profile ${p.profile}; a town of its own, generated from seed ${p.seed}; 1,000 people; ${p.days} days${p.scenario ? `; starting conditions ${p.scenario}` : ""}${p.noCrew ? "; the works crew still to be taken on" : ""}. Seats: ${p.seats.join(", ")}, all on ${MODELS[p.model]}. Translator: ${translatorOf(p)}${translatorSays(p)}. Every draft is confirmed or declined by its seat.${p.test ? " TEST ONLY: kept out of training." : ""}${p.probe ? " A PROBE: stop it by its own rule (plan.md, the stopping rules)." : ""}${p.noCrew ? " Depends on a seat being shown that its office has no staff (a fault being fixed)." : ""}${p.held ? " HELD BACK until the council clerk's fault is settled: it depends on a clerk that is a seat counting votes." : ""}${laneOf(p.model) === "codex" ? " OPTIONAL: its seats need the Codex window; it is parked when that closes, and nothing waits for it." : ""} ${p.why}`,
+    note: `Wave ${p.stage} (plan of 2026-10-09, third version), for the translator's data. Profile ${p.profile}; a town of its own, generated from seed ${p.seed}; 1,000 people; ${p.days} days${p.scenario ? `; starting conditions ${p.scenario}` : ""}${p.noCrew ? "; the works crew still to be taken on" : ""}. Seats: ${p.seats.join(", ")}, all on ${MODELS[p.model]}${p.model === "haikuLow" ? " at low effort (seat_effort=low)" : ""}. Translator: ${translatorOf(p)}${translatorSays(p)}. Every draft is confirmed or declined by its seat.${p.test ? " TEST ONLY: kept out of training." : ""}${p.probe ? " A PROBE: stop it by its own rule (plan.md, the stopping rules)." : ""}${dependsOnClerk(p) ? " A MODEL CLERK: stop it if no result is declared within three weeks of a ballot opening (plan.md, the stopping rules)." : ""}${laneOf(p.model) === "codex" ? " OPTIONAL: its seats need the Codex window; it is parked when that closes, and nothing waits for it." : ""} ${p.why}`,
   };
 };
 const HELD_FILE = "wave-2-held-clerk.json";
@@ -349,27 +350,26 @@ function translatorOf(p: Plan): string {
   if (p.translator === "trained-ok" && RETRAINED && (!RETRAINED_FOR || RETRAINED_FOR.includes(name(p)))) return RETRAINED;
   return GENERAL;
 }
-const fileOf = (p: Plan) => (p.held ? HELD_FILE : `wave-${p.stage}-${laneOf(p.model)}.json`);
+const fileOf = (p: Plan) => `wave-${p.stage}-${laneOf(p.model)}.json`;
 const lanes: { [file: string]: Plan[] } = {};
 for (const stage of ["2a", "2b", "2c"] as const) for (const lane of ["claude-1", "claude-2", "codex"] as const) lanes[`wave-${stage}-${lane}.json`] = [];
-lanes[HELD_FILE] = [];
 for (const p of plans) lanes[fileOf(p)]!.push(p);
 mkdirSync(outDir, { recursive: true });
 for (const [file, ps] of Object.entries(lanes)) writeFileSync(join(outDir, file), JSON.stringify(ps.map(entry), null, 1) + "\n");
 // (The second version's files, where they are still about: the lanes have other names now.)
-for (const stage of ["2a", "2b", "2c"]) { const old = join(outDir, `wave-${stage}-claude.json`); if (existsSync(old)) rmSync(old); }
+for (const old of [...["2a", "2b", "2c"].map((stage) => `wave-${stage}-claude.json`), HELD_FILE]) if (existsSync(join(outDir, old))) rmSync(join(outDir, old));
 
 // ---- the tables.
 const f1 = (x: number) => x.toFixed(x < 10 ? 1 : 0);
 const hours = (m: number) => (m < 90 ? `${Math.round(m)} min` : `${(m / 60).toFixed(1)} h`);
 const total = (ps: Plan[], of: (p: Plan) => number) => ps.reduce((a, p) => a + of(p), 0);
-const laneName = (p: Plan) => (p.held ? "held" : laneOf(p.model));
-const marks = (p: Plan) => [p.test ? "test only" : "", p.probe ? "probe" : "", p.noCrew ? "no crew at the start (depends on a fix)" : "", p.held ? "held: model clerk" : "", laneOf(p.model) === "codex" ? "optional" : ""].filter(Boolean).join("; ");
+const laneName = (p: Plan) => laneOf(p.model);
+const marks = (p: Plan) => [p.test ? "test only" : "", p.probe ? "probe" : "", p.noCrew ? "no crew at the start" : "", dependsOnClerk(p) ? "model clerk" : "", p.model === "haikuLow" ? "seats at low effort" : "", laneOf(p.model) === "codex" ? "optional" : ""].filter(Boolean).join("; ");
 const L: string[] = ["# Wave 2: the tables", "", "Written by `make.ts`; do not edit by hand. The reasoning is in `plan.md`.", ""];
 L.push("## What changed from the second version (2026-10-09, morning), and why", "", ...CHANGES.map((c) => `- ${c}`), "");
-L.push("## The matrix", "", "Every town is 1,000 people and a town of its own (generated from its seed); every pilot's confirmation mode is `always` (the only one a generated town has). The order is the order in the queue files. Lanes: `claude-1` and `claude-2` need the Claude sign-in alone; `codex` is the optional lane (Codex seats, a Claude translator); `held` is `wave-2-held-clerk.json`, in no stage.", "",
+L.push("## The matrix", "", "Every town is 1,000 people and a town of its own (generated from its seed); every pilot's confirmation mode is `always` (the only one a generated town has). The order is the order in the queue files. Lanes: `claude-1` and `claude-2` need the Claude sign-in alone; `codex` is the optional lane (Codex seats, a Claude translator).", "",
   "| pilot | stage | lane | profile | seed | days | scenario | seats (all on the pilot's model) | seat model | translator may be | translator in the file | marks |", "|---|---|---|---|---|---|---|---|---|---|---|---|");
-for (const p of plans) L.push(`| ${name(p)} | ${p.held ? "none" : p.stage} | ${laneName(p)} | ${p.profile} | ${p.seed} | ${p.days} | ${p.scenario ?? "none"} | ${p.seats.join(", ")} | ${MODELS[p.model]} | ${p.translator} | ${translatorOf(p)} | ${marks(p)} |`);
+for (const p of plans) L.push(`| ${name(p)} | ${p.stage} | ${laneName(p)} | ${p.profile} | ${p.seed} | ${p.days} | ${p.scenario ?? "none"} | ${p.seats.join(", ")} | ${MODELS[p.model]} | ${p.translator} | ${translatorOf(p)} | ${marks(p)} |`);
 L.push("", "## Towns that are not their place", "", "Used as they are: a town in trouble gives requests too. **Nothing in a pilot in one of these towns says anything about the country or the region its profile is named for.** Every profile also carries placeholder figures (docs/profiles.md).", "", "| profile | pilots | known not to be faithful in |", "|---|---|---|");
 for (const [profile, why] of Object.entries(NOT_FAITHFUL)) L.push(`| ${profile} | ${plans.filter((p) => p.profile === profile).map(name).join(", ")} | ${why} |`);
 L.push("", "## Expected usage and time", "", "Plan usage is in US dollars at published prices, as the run records it: the seats' answers where they are Claude models, and the translator's calls (a Codex call is recorded as nothing). Time is the pilot's own, without waits at a usage limit. Codex calls are the seats' answers of the optional lane. Deaths are what a registry seat can expect to have to register (one code-run town of each profile; noisy).", "",
@@ -378,14 +378,13 @@ for (const p of plans) L.push(`| ${name(p)} | ${p.seats.length} | ${Math.round(w
 const sumRow = (label: string, ps: Plan[]) => `| ${label} | ${ps.length} | ${Math.round(total(ps, answersOf))} | ${Math.round(total(ps, requestsOf))} | ${Math.round(total(ps.filter((p) => !p.test), requestsOf))} | ${f1(total(ps, usdOf))} | ${total(ps, budgetOf)} | ${Math.round(total(ps, codexCallsOf))} | ${hours(total(ps, codexMinutesOf))} | ${hours(total(ps, minutesOf))} |`;
 L.push("", "| stage and lane | pilots | seat answers | requests through `do` | of them in training pilots | plan usage | sum of spending limits | Codex calls | Codex time | time, one after another |", "|---|---|---|---|---|---|---|---|---|---|");
 for (const stage of ["2a", "2b", "2c"] as const) for (const lane of ["claude-1", "claude-2", "codex"] as const) L.push(sumRow(`${stage}, ${lane}`, lanes[`wave-${stage}-${lane}.json`]!));
-L.push(sumRow("held (model clerk)", lanes[HELD_FILE]!));
-const sure = plans.filter(assured), optional = plans.filter((p) => laneOf(p.model) === "codex"), heldBack = plans.filter((p) => p.held);
-L.push(sumRow("**Codex unavailable throughout: the Claude lanes**", sure), sumRow("**the optional lane (Codex seats)**", optional), sumRow("**Codex available: both, without the held pilots**", [...sure, ...optional]), sumRow("everything, the held pilots too", plans));
+const sure = plans.filter(assured), optional = plans.filter((p) => laneOf(p.model) === "codex");
+L.push(sumRow("**Codex unavailable throughout: the Claude lanes**", sure), sumRow("**the optional lane (Codex seats)**", optional), sumRow("**Codex available: both**", plans));
 L.push("", "By seat model: " + (Object.keys(MODELS) as ModelKey[]).map((m) => { const ps = plans.filter((p) => p.model === m); return `${MODELS[m]} ${ps.length} pilots, ${Math.round(total(ps, answersOf))} answers, ${Math.round(total(ps, requestsOf))} requests${RATE[m].usdPerAnswer ? `, ${f1(total(ps, usdOf))} of plan usage` : ""} (basis: ${RATE[m].measured})`; }).join("; ") + ".");
 
 const TODAY: Mix = { message: 1173, statement: 291, form: 204, money: 32, structure: 11, claim: 9, agreement: 4, work: 1, goods: 0, account: 0, occupancy: 0, entity: 0, vote: 0, presence: 0, position: 0, take: 0 };
 const sum = (ps: Plan[]) => { const out: Mix = {}; for (const p of ps) for (const [k, v] of Object.entries(kindsOf(p))) out[k] = (out[k] ?? 0) + v; return out; };
-const cols: [string, Plan[]][] = [["training, Claude lanes", sure.filter((p) => !p.test)], ["training, optional lane", optional.filter((p) => !p.test)], ["training, held", heldBack.filter((p) => !p.test)], ["test-only, Claude lanes", sure.filter((p) => p.test)], ["test-only, optional lane", optional.filter((p) => p.test)]];
+const cols: [string, Plan[]][] = [["training, Claude lanes", sure.filter((p) => !p.test)], ["training, optional lane", optional.filter((p) => !p.test)], ["test-only, Claude lanes", sure.filter((p) => p.test)], ["test-only, optional lane", optional.filter((p) => p.test)]];
 const sums = cols.map(([, ps]) => sum(ps));
 L.push("", "## Expected requests through `do`, by kind", "", "Central guesses (a seat's requests, drafted or not); the range that is honest is a third of each to three times it. A form is a paper on a form: a council proposal, a direction to an office, or one of the office's own (an advertisement, a register entry, a decision). A standing work order counts under work; a hold and an entry on one's own file under statement. Letters are written with `write`, which no translator reads: they are counted apart.", "",
   `| kind | as of 2026-10-08 (real and in-situ) | ${cols.map(([c]) => c).join(" | ")} |`, `|---|---|${cols.map(() => "---").join("|")}|`);
@@ -399,14 +398,14 @@ const by = (key: (p: Plan) => string[], ps = plans) => { const m = new Map<strin
 const seatedOn = (office: string) => `${office}: ${by((p) => [MODELS[p.model]], training.filter((p) => p.seats.includes(office)))}`;
 L.push(`- Pilots by lane: ${by((p) => [laneName(p)])}.`, `- Pilots by profile: ${by((p) => [p.profile])}; without the optional lane: ${by((p) => [p.profile], plans.filter((p) => laneOf(p.model) !== "codex"))}.`, `- Pilots by seat model: ${by((p) => [MODELS[p.model]])}.`, `- Pilots by translator: ${by((p) => [translatorOf(p)])}.`, `- Pilots by scenario: ${by((p) => [p.scenario ?? "none"])}.`,
   `- Pilots an office is a seat in: ${by((p) => [...new Set(p.seats.map(officeOf))])}.`,
-  `- The same, in the pilots that need no Codex and are not held: ${by((p) => [...new Set(p.seats.map(officeOf))], sure)}.`,
+  `- The same, in the pilots that need no Codex: ${by((p) => [...new Set(p.seats.map(officeOf))], sure)}.`,
   `- Training pilots by seat model, for the offices asked for: ${["works", "registry", "clinic-manager", "principal", "water-operations", "energy-operations", "rates"].map(seatedOn).join("; ")}.`,
   `- A model mayor beside a code-run works office: ${plans.filter((p) => p.seats.includes("mayor") && !p.seats.includes("works")).map(name).join(", ")}.`,
   `- A model mayor beside a model works office: ${plans.filter((p) => p.seats.includes("mayor") && p.seats.includes("works")).map(name).join(", ")}.`,
   `- Elections (75 days: nominations close day 30, poll and count day 60, the winner seated day 61): ${plans.filter((p) => p.scenario === "election-due").map((p) => `${name(p)} (${laneName(p)})`).join(", ")}.`,
   `- Registry seats, with the deaths each can expect: ${plans.filter((p) => p.seats.includes("registry")).map((p) => `${name(p)} ${f1(deathsOf(p))} in ${p.days} days`).join(", ")}.`,
-  `- Held back for the council clerk's fault: ${plans.filter(dependsOnClerk).map(name).join(", ")}.`,
-  `- Depend on a seat being shown its office has no staff: ${plans.filter((p) => p.noCrew).map(name).join(", ")}.`,
+  `- A model council clerk (stopped if no result is declared within three weeks of a ballot opening): ${plans.filter(dependsOnClerk).map(name).join(", ")}.`,
+  `- Works with its crew still to take on: ${plans.filter((p) => p.noCrew).map(name).join(", ")}.`,
   `- Probes: ${plans.filter((p) => p.probe).map(name).join(", ")}.`,
   `- Test-only: ${plans.filter((p) => p.test).map((p) => `${name(p)} (${laneName(p)})`).join(", ")}.`,
   `- Pilots whose translator is behind the Codex sign-in: none. Pilots whose seats are: ${optional.length}, all in the optional lane, about ${Math.round(total(optional, codexCallsOf))} Codex calls in all.`,

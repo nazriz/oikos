@@ -17,7 +17,7 @@
    "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
    "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
   },
-  "note": "Wave 2a (plan of 2026-10-09, third version), for the translator's data. Profile gb-eng-2026; a town of its own, generated from seed 110; 1,000 people; 180 days; the works crew still to be taken on. Seats: works, registry, environment, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt). Every draft is confirmed or declined by its seat. A PROBE: stop it by its own rule (plan.md, the stopping rules). Depends on a seat being shown that its office has no staff (a fault being fixed). The works office and the registry held by a model, under a code mayor: standing work orders set once, a crew advertised for and taken on, deaths entered on the register's form. Half a year, because that is what gives a registrar a handful of deaths."
+  "note": "Wave 2a (plan of 2026-10-09, third version), for the translator's data. Profile gb-eng-2026; a town of its own, generated from seed 110; 1,000 people; 180 days; the works crew still to be taken on. Seats: works, registry, environment, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt). Every draft is confirmed or declined by its seat. A PROBE: stop it by its own rule (plan.md, the stopping rules). The works office and the registry held by a model, under a code mayor: standing work orders set once, a crew advertised for and taken on, deaths entered on the register's form. Half a year, because that is what gives a registrar a handful of deaths."
  },
  {
   "name": "w2-44-utilities",
@@ -60,6 +60,26 @@
    "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
   },
   "note": "Wave 2a (plan of 2026-10-09, third version), for the translator's data. Profile au-vic-2026; a town of its own, generated from seed 109; 1,000 people; 30 days. Seats: shop-1-manager, factory-1-manager, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt). Every draft is confirmed or declined by its seat. A PROBE: stop it by its own rule (plan.md, the stopping rules). A probe: one shop and one factory of many, for goods and work; serving and making are still by hand (plan.md, the gaps)."
+ },
+ {
+  "name": "w2-01-council",
+  "world": "worlds/town-1000.yaml",
+  "sets": [
+   "seed=101",
+   "profile=au-vic-2026",
+   "mayor=llm",
+   "model_seats=council-clerk,councillor-1,councillor-2,councillor-3,councillor-4,councillor-5"
+  ],
+  "model": "claude-code/claude-sonnet-5-5",
+  "translator": "claude-code/claude-sonnet-5-5",
+  "translator_choice": "sonnet",
+  "until": 3888000,
+  "budget": 10,
+  "env": {
+   "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
+   "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
+  },
+  "note": "Wave 2a (plan of 2026-10-09, third version), for the translator's data. Profile au-vic-2026; a town of its own, generated from seed 101; 1,000 people; 45 days. Seats: mayor, council-clerk, councillor-1, councillor-2, councillor-3, councillor-4, councillor-5, all on claude-code/claude-sonnet-5-5. Translator: claude-code/claude-sonnet-5-5 (under the translator's prompt). Every draft is confirmed or declined by its seat. A MODEL CLERK: stop it if no result is declared within three weeks of a ballot opening (plan.md, the stopping rules). A council of models: a clerk who puts ballots and declares results, councillors who vote, and a mayor who may direct the code-run works office. The first of the three with a clerk that is a seat, and the test of it: a ballot closing is no paper, so the clerk has to come back for the count by its own arrangement."
  },
  {
   "name": "w2-14-largest",
