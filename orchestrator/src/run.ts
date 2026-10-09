@@ -851,8 +851,12 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     }
     if (action.type === "propose") {
       // (Translated already, with the round's others, or now.)
-      const pre = translated.get(u.key) ?? (await translateFor(u, action, as));
+      let pre = translated.get(u.key) ?? (await translateFor(u, action, as));
       translated.delete(u.key);
+      // (A draft the log will not take is drawn up once more: `again`.)
+      let again = false;
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
       const { draftId, tr } = pre;
       // (Emptied as they're written, so that a run stopping later doesn't write them again.)
       for (const annotation of pre.notes.splice(0)) await k.request({ op: "annotate", annotation });
@@ -867,12 +871,25 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       // A draft the log won't take (something in it breaks the contract: a kind that isn't a label, an id that isn't
       // one) is a failed translation, told to the participant as one, and never the end of the run. Pilot 9 stopped on
       // day 63 on such a draft (2026-10-06): what a model wrote reached the log unchecked, and the refusal was fatal.
-      const drafted = await k.tryRequest({ op: "annotate", annotation: { annotation: "draft", draft: tr.draft } });
+      // (Since 2026-10-09 what did this in the wave is asked about by the resolver, with its cause: a draft's name or a
+      // made-up id where an id goes, a paper put up on what is no place, an agreement with nothing on either side.
+      // What still gets here is the platform's own fault: it is on record as one, with the engine's words for the
+      // log, the request is drawn up once more, and the seat is told that nothing was done and to ask again.)
+      const [drafted] = await k.tryRequestMany([{ op: "annotate", annotation: { annotation: "draft", draft: tr.draft } }]);
       if (drafted === null) {
-        await k.request({ op: "annotate", annotation: { annotation: "translation_failure", subject: u.participant, data: { draft: draftId, proposal: action.text, reason: NOT_CHECKED, call: tr.draft.call, invalid: ["the draft breaks the contract and couldn't be recorded"] } } });
+        const why = k.lastError.slice(0, 500);
+        await k.request({ op: "annotate", annotation: { annotation: "translation_failure", subject: u.participant, data: { draft: draftId, proposal: action.text, reason: NOT_CHECKED, call: tr.draft.call, invalid: [`platform fault: the draft breaks the contract and couldn't be recorded: ${why}`], platform_fault: true, ...(again ? {} : { drawn_up_again: true }) } } });
+        if (!again) {
+          again = true;
+          pre = await translateFor(u, action, as);
+          continue;
+        }
         u.notices.push({ t, text: aboutRequest(action.text, NOT_CHECKED), re: draftId });
         return true;
       }
+      break;
+      }
+      const draftId = pre.draftId, tr = pre.tr as Extract<typeof pre.tr, { ok: true }>;
       const pending = { draft: tr.draft, hash: tr.hash, ...(action.reasoning ? { reasoning: action.reasoning } : {}) };
       const onlyWords = tr.draft.blocks.every((b) => b.block === "message");
       if (confirm === "never" || (confirm === "consequential" && onlyWords)) await submit(u, pending, "accept", `confirmation: ${confirm}`);

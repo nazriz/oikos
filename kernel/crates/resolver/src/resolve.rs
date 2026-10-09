@@ -153,7 +153,12 @@ impl Resolver<'_> {
             _ => None,
         };
         match (v, named) {
-            (Value::Id(i), None) => Ok(Some(i.clone())),
+            (Value::Id(i), None) => {
+                if !id_shape(i) {
+                    return ask(not_an_id(i, what));
+                }
+                Ok(Some(i.clone()))
+            }
             (Value::Var(x), _) => Ok(Some(format!("${x}"))),
             (_, Some(n)) => {
                 let found = self.k.by_name(n);
@@ -193,6 +198,9 @@ impl Resolver<'_> {
             let id = if self.bound.contains(x) {
                 format!("${x}")
             } else if written_as_id {
+                if !id_shape(x) {
+                    return ask(not_an_id(x, "basis"));
+                }
                 x.to_string()
             } else {
                 let found = self.k.by_name(x);
@@ -1018,6 +1026,9 @@ impl Resolver<'_> {
                 commitments.push(Json::Object(ordered));
             }
         }
+        if commitments.is_empty() {
+            return ask("An agreement says what each side is to do or pay, and this one says nothing either side commits to. Say what you will do or pay, and what they will: money, goods, a building, occupancy or an account.");
+        }
         let term = Self::seconds(c, "term")?.filter(|t| *t != 0);
         // After the term: it may continue, periodically, until ended by notice.
         let then = match Self::str_(c, "then")?.filter(|t| !t.is_empty()) {
@@ -1075,7 +1086,18 @@ impl Resolver<'_> {
         let data = Self::json_(c, "data")?;
         let adico = Self::json_(c, "adico")?;
         let formal = Self::str_(c, "formal")?.filter(|f| !f.is_empty());
-        let on = self.id(c, "on")?;
+        // Where it is put up: a cell of ground. A lot of one cell is that cell; of several, which is asked; anything
+        // else is no place. (The other resolver's, word for word.)
+        let mut on = self.id(c, "on")?;
+        if let Some(p) = on.clone().filter(|p| !p.starts_with('$') && !is_cell(p)) {
+            match self.k.lots.get(p.as_str()) {
+                Some(cells) if cells.len() == 1 => on = Some(cells[0].clone()),
+                Some(cells) if cells.len() > 1 => {
+                    return ask(format!("Which cell of {p} should it be put up on: {}{}?", cells.iter().take(12).map(|s| s.as_str()).collect::<Vec<_>>().join(", "), if cells.len() > 12 { ", …" } else { "" }));
+                }
+                _ => return ask(format!("A paper is put up at a place on the ground: a lot, or a cell of one. {p} is neither, as far as you know. To publish it and put it up nowhere, leave the place out; to put one paper in another's place, withdraw the other and publish this.")),
+            }
+        }
         let offer = Self::json_(c, "offer")?;
         let practice = Self::json_(c, "practice")?;
         let assertion = Self::json_(c, "assertion")?;
@@ -1323,6 +1345,52 @@ impl Resolver<'_> {
     }
 }
 
+fn digits(s: &str, most: usize) -> bool {
+    !s.is_empty() && s.len() <= most && s.bytes().all(|b| b.is_ascii_digit())
+}
+/// A chosen id (common.schema.json, ConfigId): a lowercase letter, then letters, digits, `_` and `-`, 64 at most.
+fn config_id(s: &str) -> bool {
+    let b = s.as_bytes();
+    !b.is_empty() && b.len() <= 64 && b[0].is_ascii_lowercase() && b.iter().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || *c == b'_' || *c == b'-')
+}
+/// A cell of ground: `cell.<x>.<y>`.
+fn is_cell(s: &str) -> bool {
+    let mut p = s.split('.');
+    p.next() == Some("cell") && p.next().is_some_and(|x| digits(x, 6)) && p.next().is_some_and(|y| digits(y, 6)) && p.next().is_none()
+}
+/// An id as the contract writes one (a chosen id, a minted one, a cell, a space), or a name bound in the same act.
+/// (The other resolver's `ID_SHAPE`.)
+fn id_shape(s: &str) -> bool {
+    if let Some(v) = s.strip_prefix('$') {
+        let b = v.as_bytes();
+        return !b.is_empty() && b.len() <= 32 && b[0].is_ascii_lowercase() && b.iter().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || *c == b'_');
+    }
+    if config_id(s) || is_cell(s) {
+        return true;
+    }
+    if let Some((prefix, n)) = s.split_once('.') {
+        if ["ent", "acc", "str", "rec", "act", "msg", "par", "pos", "cnd"].contains(&prefix) && digits(n, 15) {
+            return true;
+        }
+    }
+    // A space: a structure (chosen, or minted `str.<n>`), a slash, a kind, a dot and a number.
+    if let Some((structure, space)) = s.split_once('/') {
+        let minted = structure.strip_prefix("str.").is_some_and(|n| digits(n, 15));
+        if let Some((kind, n)) = space.rsplit_once('.') {
+            return (config_id(structure) || minted) && config_id(kind) && digits(n, 6);
+        }
+    }
+    false
+}
+/// What is said of something written where an id goes that is no id. (The other resolver's `notAnId`.)
+fn not_an_id(x: &str, what: &str) -> String {
+    if x.starts_with("draft.") {
+        format!("{x} is the name a draft went by before it was confirmed, not a paper on record. Once confirmed it is on record under an id of its own (rec. and a number): look it up in your papers and name that.")
+    } else {
+        format!("\"{x}\" (for {what}) is not the id of anything on record: an id is written exactly as your papers show it, like rec.412. Look it up and name it so.")
+    }
+}
+
 /// A length of time in words, as people say one: whole days where it is whole days ("14 days", "1 day"); else whole
 /// hours ("8 hours"); else hours and minutes ("1 hour 30 minutes", "45 minutes"); seconds only where nothing rounder
 /// fits. (The participants' forms write the same: `durationWords`.)
@@ -1408,7 +1476,7 @@ mod tests {
         // Passed on in the order given, on every act that takes a basis.
         assert_eq!(blocks(r#"money(to=acc-greenco, amount="2,150", from=acc-city, settles=rec.640, basis=["rec.611","rec.627","rec.305"])"#)[0]["basis"], json!(["rec.611", "rec.627", "rec.305"]));
         assert_eq!(blocks(r#"structure(type=park, on=lot-00, by=greenco, price="60,000", from=acc-city, basis=["rec.512","rec.498"])"#)[0]["basis"], json!(["rec.512", "rec.498"]));
-        assert_eq!(blocks(r#"agreement(with=greenco, terms="Mowing, weekly.", basis=["rec.9","rec.3"])"#)[0]["basis"], json!(["rec.9", "rec.3"]));
+        assert_eq!(blocks(r#"agreement(with=greenco, terms="Mowing, weekly.", we_do=account(holder=greenco), basis=["rec.9","rec.3"])"#)[0]["basis"], json!(["rec.9", "rec.3"]));
         assert_eq!(
             blocks(r#"claim(position=liberty, holder=greenco, about={"action":"build","object":"lot-00"}, basis=["law-planning","rec.861"])"#),
             vec![json!({ "block": "record_claim", "position": "liberty", "holder": "greenco", "about": { "action": "build", "object": "lot-00" }, "speaks_for": "city", "basis": ["law-planning", "rec.861"] })]
