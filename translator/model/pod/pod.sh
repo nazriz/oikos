@@ -177,7 +177,8 @@ pull() {
     fi
     lost=0
     # (A pod that answers with nothing going on it and nothing finished would be paid for until the time limit.)
-    [[ $state != *ALL_DONE* && $state != *going* ]] && { say "the queue is not going on the pod and did not finish"; return 1; }
+    # (Why, where it can be told: the end of each run's log is brought home before the pod is ended.)
+    [[ $state != *ALL_DONE* && $state != *going* ]] && { ${=SSH} root@$H 'for f in /work/runs/*/train.log; do echo "== $f"; tail -c 3000 $f; done; echo "== uptime"; uptime; ls -la /work /work/runs' < /dev/null > $S/queue-stopped-$(date +%s).log 2>&1; say "the queue is not going on the pod and did not finish (the runs' last lines are in $S/queue-stopped-*.log)"; return 1; }
     for n in $names; do
       if [ ! -f $M/$n/report.json ] && ${=SSH} root@$H "[ -f /work/runs/$n/report.json ]" < /dev/null; then
         rsync -az --exclude checkpoint.pt -e "$SSH" root@$H:/work/runs/$n/ $M/$n/ && say "home: $n"

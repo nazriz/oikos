@@ -352,6 +352,129 @@ split by gold program as `runs/translator-data-2026-10-06b/split.ts` does, the p
 - Sureness: `OIKOS_DECIDE_LOG=<file>` logs each answer's sureness; report its spread and what the cut-off of 0.1 asks
   back. `DecideAdapter.cannot` must report nothing lacking for the new runs.
 
+### The retrain's results (2026-10-10)
+
+Run folder: `runs/translator-retrain-2026-10-10/` (its README and STATUS; `scores/groups-all.txt` has every table).
+Models: `pod-small-w2-s1`, `-s2`, `-s3` in its `models/` (`microsoft/deberta-v3-small`, arguments by name,
+`--forms-most 18`, four epochs, `--token-budget 4096`), trained on `runs/translator-model/data-18`, the export of
+`runs/translator-data-in-situ/joined-12`. **It does not pass**: 81 to 83% right on the 180 real requests against a
+floor of 90%, wrong drafts 7 to 9% against 1%.
+
+**What trained** (49,496 rows; 35,148 distinct requests; `joined-12.manifest.json` counts it every way):
+
+| Source | Rows | Distinct requests |
+|---|---|---|
+| The older generated set (joined-11) | 19,236 | 18,361 |
+| The wide generated set (less 442 rows sharing a source with the parity test) | 12,862 | 12,357 |
+| Written in seats' situations, pilots 7 to 10 (joined-11) | 11,445 | 2,842 |
+| Written in seats' situations, wave 2 and pilots 11 to 18 | 3,988 | 997 |
+| Seats' own requests, wave 2 and pilots 11 to 18 | 1,448 | 362 |
+| Seats' own requests, earlier | 385 | 97 |
+| Directions with no form listed, read again under 0.9.3 (85 of 96 agreed with their gold) | 81 | 81 |
+
+The 146 requests set aside from joined-11 were read again by two readers; the 81 they agree on are among the rows
+above. Weighting: an example from a pilot (a seat's own request, or one written in its situation) is in four times,
+as before; generated examples once. Pilot examples are then 35% of the rows and 12% of the distinct requests. One
+seat-day in ten went to validation-real (404), and a third of each kind of the seats' own requests was held back as
+a test (148 and 61). The closed set has 118 choices and lacks nothing of the call language (`cannotSay`: none);
+`per_request` is in two examples. 141 rows longer than the reader's 1,024 tokens were left out.
+
+**Scores, old model beside new, scored the same day with the same code** (right; no draft, wrong draft):
+
+| Test | Old (`pod-small-d16-s1`) | Seed 1 | Seed 2 | Seed 3 |
+|---|---|---|---|---|
+| Seen (99) | 61 | 81 (6, 12) | 82 (8, 9) | 85 (7, 7) |
+| Held out (66) | 41 (14, 11) | 46 (11, 9) | 46 (11, 9) | 48 (11, 7) |
+| The 180 real requests | 130 (35, 15) | 147 (20, 13) | 146 (18, 16) | 149 (19, 12) |
+| Parity test (1,466; generated, with groups) | 998 (304, 164) | 1,366 (47, 53) | 1,366 (50, 50) | 1,365 (48, 53) |
+| Held-back seats' requests, wave 2 (148) | 13 | 122 (10, 16) | 122 (11, 15) | 126 (8, 14) |
+| Held-back seats' requests, late pilots (61) | 5 | 55 (1, 5) | 54 (2, 5) | 56 (2, 3) |
+| Test-only pilots, seats' own (77: live checks, w2-22, w2-23) | 10 | 57 (9, 11) | 55 (13, 9) | 57 (10, 10) |
+| Test-only pilots, seats' own (59: stage 2c) | 5 | 44 (7, 8) | 48 (1, 10) | 45 (3, 11) |
+| Test-only pilots, written in their situations (187) | 121 | 161 (11, 15) | 160 (8, 19) | 159 (10, 18) |
+| Test-only pilots, written in their situations (108: stage 2c) | 57 | 92 (8, 8) | 95 (4, 9) | 93 (5, 10) |
+
+The older figure of 141 real for the old model was under earlier scoring code and eval cases; today it is 130.
+
+**By kind** (parity test, old then the three seeds): holds 0, then 30 of 30 each; entries on one's own file 0, then
+24 of 24; standing work 0, then 60, 60, 59 of 60; `look_first` 0, then 66, 67, 66 of 68; standing payments 9, then
+18, 19, 20 of 20; forms 45, then 182, 175, 182 of 250 (a form the request does not name does about as well as a
+named one, so pointing at the form shown works); agreements 57 to 67%. On the 180 real: statements 13 of 22, forms 24
+of 31, messages 17 of 21 (seed 1). On the test-only pilots' own requests: money 0 of 7 and 12 of 17, work 2 of 8.
+
+**By group** (groups of 20 or more; best to worst, and how many groups are under 90%):
+
+| Test, dimension | Old | Seed 1 | Seed 2 | Seed 3 |
+|---|---|---|---|---|
+| Parity, register (18) | gap 41; 17 under | 100 to 88.9 (slips); 1 under | to 87.3; 2 | to 85.7; 3 |
+| Parity, asker (13) | gap 53; 12 under | 100 to 80.8 (banker); 1 | to 82.7; 1 | to 86.5; 1 |
+| Parity, writer (6) | gap 70; 5 under | 100 to 79.3; 2 | to 77.9; 2 | to 78.3; 2 |
+| Parity, way of writing money (15) | gap 14; 15 under | 99.3 to 83.9; 4 | to 86.8; 3 | to 83.9; 4 |
+| Parity, ask-back rate across groups | 0 to 59% | 0 to 14% | 0 to 12% | 0 to 14% |
+| Test pilots' own requests, seat model | all under 15% | Haiku 5.5 38/41, gpt-6.1-sol 12/20, Sonnet 5.5 6/12, gpt-6-luna 1/4 | 35/41, 13/20 | 35/41, 14/20 |
+| Stage 2c's own requests, profile | | in-tn 16/17, mx-jal 24/37 | 15/17, 29/37 | 14/17, 28/37 |
+| Held-back, profile | | gb-eng 21/22, us-oh 37/44, de-ni 53/62, au-vic 11/20 | gap 21 | gap 33 |
+
+The lowest writer on the parity test is the largest Claude model's writing (it wrote the forms parts, the hardest
+kind); the simple writer (Haiku 5.5 at low effort) is the other under 90%. On real requests the gaps by seat model
+and by profile are 15 to 40 points, on cells of 10 to 60: too wide to release on, and too small to rank groups by.
+
+**Replays.** Live check 2's pilot 2 (44 requests, of which the old model refused 31): 39 have a label two readers
+agreed on; the old model gets 6, the new 36, 35 and 35. w2-26 and w2-56 gave one request between them.
+
+**Sureness and the cut-off** (seed 1, the 180 real; right, no draft, wrong): 0: 149, 17, 14; 0.1 (the default): 147,
+20, 13; 0.3: 139, 32, 9; 0.5: 128, 47, 5; 0.8: 113, 65, 2; 0.95: 99, 81, 0. On the 2,106 set answers 39 are under
+0.1 and 199 under 0.5; the median is 0.998. Wrong drafts reach 1% only by asking back on a third or more.
+
+**The audits by another family.** Of the wide set: `codex/gpt-6.1-sol` read 297 (nine of each of 33 kinds) and
+agrees with 287; the one low kind, standing work (4 of 9), is sol adding `first="0 days"` for "from now on", which
+the prompt's own worked example does not; nothing was set aside. Of the pipeline's own examples (two Claude readers,
+since a Codex window cannot carry a pipeline's readings): sol agrees with 97 of 120, and the differences gather in
+refusal labels: `too_much` 0 of 9 (sol writes a payment and its report as two lines), `unknown_form` 5 of 8,
+agreements 6 of 9. **Owed before the next round:** sol reads the pipeline's refusals in full; 13 `too_much` examples
+of this kind trained these models.
+
+**The readers disagree a great deal on what seats really ask**: of the 3,555 requests the two pipelines sent to both readers, 2,382 became examples and 1,040
+were dropped because the readers disagreed; by function, money 217 of 447, messages 125 of 284, agreements 19
+of 94, work 14 of 84 (the first pipeline's training lane and the second's). What trains is therefore the easier half
+of the hard kinds, which is where the models are weakest.
+
+**The v2 decision** ("which kind of turn is this"; `v2-head/`): the same reader with one choice head over twelve
+kinds of turn (an act for v1, a look, a notebook entry, a letter, a confirmation, done for now, opting out, several
+uses, and the four plain replies to a preview), trained on the banked turns with a sixth held back: 689 of 698
+right; every kind 96% or better but opting out (0 of 1; four examples in the bank); registers, askers and writers
+all 95% or better; four wrong answers given with sureness over 0.9. It is a small addition and not a hard decision.
+
+**Where it is weak, and what data would mend it.**
+- Money on pilots it has not seen (wages with withholding, remittances, payments citing several records) and
+  statements: more of the seats' own requests of these kinds, and the readers' disagreements settled by a third
+  reader instead of dropped (1,040 requests here).
+- Forms at 70 to 73% on the parity test and 76% on stage 2c's own: forms with several amounts, dates and lists.
+- Agreements (57 to 67%): the fewest examples from pilots (19).
+- Profiles and seat models it met least: mx-jal, gb-eng and au-vic seats, and Codex seats (one training pilot).
+- `per_request`: two examples. A bank seat's requests are needed, or a generated part for it.
+
+**What it can translate for now.** Nothing in place of Sonnet 5.5 where a wrong draft costs: 7 to 9% wrong drafts
+on real requests is seven times the mark. It is fit to be measured beside Sonnet 5.5 as a second translator in
+pilots whose requests are mostly holds, entries, standing work, votes and forms an office lists (a registry or
+works seat on a profile it has seen), which is where it now scores 90% or more.
+
+**Spend.** RunPod 1.98 USD of a limit of 6.00 (seed 1: 75 minutes, 0.46; a pod whose queue stopped with nothing
+brought home: 100 minutes, 0.57; seeds 2 and 3: 140 minutes, 0.92); the provider lists no pod of ours. Plan usage
+as Claude Code reckons it: 216 USD (Haiku 5.5 as second reader 94, Opus 5.5 52, Sonnet 5.5 50, Haiku 5.5 at low
+effort 21). Codex: 417 requests read by gpt-6.1-sol, no charge per call.
+
+**How it was run** (so that it can be run again): `scripts/` in the run folder has the small scripts (blind readings and
+their reckoning, the base set, the configs, the manifest, scoring, the tables by group). Two pipeline folders, chained:
+`pipeline/` over the pilots finished when it started, with `standing` the base set (joined-11, the wide set's train file
+less what shares a source with the parity test, the rescued directions and set-aside requests), and `pipeline-late/` over
+the pilots that finished later and stage 2c's test-only pilots, with `standing` the first's `joined/`; the second's
+`joined/` and `data/` are joined-12 and data-18. Start the pipeline with `OIKOS_CLAUDE_BIN` naming a Claude Code new
+enough for every writer (the first on the path was not). The pod step was by hand, a seed first and then two:
+`pod.sh run <data> "NAME:microsoft/deberta-v3-small:SEED:--forms-most 18 --token-budget 4096"`. Give
+`--token-budget 4096` whatever the card: a pod with a 24 GB card, left to the trainer's default, ran 100 minutes and
+brought nothing home (why is not known; `pod.sh` now brings the runs' last log lines home when it finds the queue stopped).
+
 ## A wide part
 
 Written 2026-10-09 (data pipeline 0.13.0), for the owner's concern that the data is too narrow: the pilots' requests
