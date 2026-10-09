@@ -1,6 +1,6 @@
 {
   "name": "city.works",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "doc": "docs/behaviour/services.md",
   "params": {
     "collect_every_days": {

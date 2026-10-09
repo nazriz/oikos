@@ -447,7 +447,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     // An office that employs staff of its own (its module says so: `staffed`): whoever holds it knows its posts, who is
     // in each and which are vacant, from the office's own papers (behaviour/roster.ts). Kept from what the seat is shown.
     const staffedBy = office ? mods[office.role_module?.code ?? ""]?.staffed?.(office.role_module?.params ?? {}) : undefined;
-    const roster = office && staffedBy ? new Roster(ctxFor(p.id, office.id, entity, {}), entity, office.id, staffedBy) : undefined;
+    const roster = office && staffedBy ? new Roster(ctxFor(p.id, office.id, entity, {}), entity, office.id, staffedBy, (mods[office.role_module?.code ?? ""]?.routines ?? []).map((r) => r.task)) : undefined;
     // Its in-trays (what a paper filed with its office comes into): its own papers of some kinds only, or a folder of
     // some kinds; and the folders that hold every paper of its organisation's. And whose papers are its office's own
     // doing: its own, and its staff's where they are a post of their own.

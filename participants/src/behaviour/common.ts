@@ -1244,6 +1244,88 @@ export class StandingWork {
     const all = book.standingOf("work_order").filter((x) => x.speaks_for === this.me);
     return all.length ? all.map((x) => `${x.id} (${x.data?.work?.task} every ${Math.round(Number(x.data?.every) / DAY)} days${this.order(book, String(x.data?.work?.task), t)?.id === x.id ? "" : ", not in force"})`).join(", ") : "none";
   }
+
+  // ---- the staff's report to their office (docs/behaviour/standing-work.md, "The staff's report"). The staff keep
+  // their own count of what they did under each order, and of why an order in force was not carried out when it fell
+  // due; they report it to whoever holds the office, on the organisation's own file: at once when how an order stands
+  // has changed, and each week otherwise. Nothing is asked of the engine: it is what they did and what they found.
+  private readonly count = new Map<string, { times: number; units: number }>(); // task -> done since the last report
+  private readonly stuck = new Map<string, string>(); // task -> why it was not done, since the staff last took stock
+  private readonly said = new Map<string, string>(); // task -> how it stands beyond the count (what is left, what is next)
+  private readonly lastAt = new Map<string, { at: number; task: string }>(); // person -> when they last worked under an order
+  private reported: { at: number; key: string } | undefined;
+
+  /** The staff did a task under its order: once more, so many units, by whom. */
+  did(task: string, t: number, o: { units?: number; by?: string[] } = {}): void {
+    if (this.part !== "staff") return;
+    const c = this.count.get(task) ?? { times: 0, units: 0 };
+    this.count.set(task, { times: c.times + 1, units: c.units + (o.units ?? 0) });
+    this.stuck.delete(task);
+    for (const w of o.by ?? []) this.lastAt.set(w, { at: t, task });
+  }
+
+  /** What was counted as done turned out not to be (the act was refused): taken back. */
+  undid(task: string, o: { units?: number } = {}): void {
+    const c = this.count.get(task);
+    if (c) this.count.set(task, { times: Math.max(0, c.times - 1), units: Math.max(0, c.units - (o.units ?? 0)) });
+  }
+
+  /** A task whose order is in force could not be done when it fell due, and why, as the staff would tell it. */
+  heldUp(task: string, why: string): void {
+    if (this.part === "staff") this.stuck.set(task, why);
+  }
+
+  /** How a task stands beyond the count, for the report (what was left undone, when it next falls due); none: nothing to add. */
+  note(task: string, text?: string): void {
+    if (text) this.said.set(task, text);
+    else this.said.delete(task);
+  }
+
+  /**
+   * The staff's report, when one is due: called when the staff have taken stock of a working day (what they did, or
+   * why not). `office`: the post whose staff they are; `from`: what they are called in the report's words; `tasks`:
+   * the routines they have, each with what its count is of ("calls", "loads"); `inPost` and `noPlace`: where the
+   * staff are people, who is in post, and who of them has no place of work in their agreement or its advertisement.
+   * With nobody in post there is nobody to report (the office-holder's own roster says so).
+   */
+  report(book: Book, t: number, o: { office: string; from: string; tasks: { [task: string]: [times: string, units?: string] }; inPost?: string[]; noPlace?: string[]; every?: number }): Step[] {
+    if (this.part !== "staff" || (o.inPost && !o.inPost.length)) return [];
+    const dated = (x: number) => `year ${Math.floor(x / (365 * DAY)) + 1}, day ${Math.floor((x % (365 * DAY)) / DAY) + 1}`;
+    const named = Object.keys(o.tasks);
+    const all = book.standingOf("work_order").filter((x) => x.speaks_for === this.me && (x.in_position === o.office || named.includes(String(x.data?.work?.task)))).sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : 1));
+    if (!all.length) return [];
+    const orders = all.map((r) => {
+      const task = String(r.data?.work?.task);
+      const every = Number(r.data?.every) || 0;
+      const head = { order: r.id, task, every };
+      if (!named.includes(task)) return { ...head, state: "no_such_task", words: `not carried out: the staff have no routine called "${task}" (their routines: ${named.join(", ")})` };
+      const latest = all.filter((x) => String(x.data?.work?.task) === task).reduce((a, b) => (b.at >= a.at ? b : a));
+      if (latest.id !== r.id) return { ...head, state: "replaced", words: `replaced by ${latest.id}` };
+      const from = r.at + (Number.isSafeInteger(r.data?.first) ? (r.data!.first as number) : 0);
+      if (book.onHold(r.id, [this.me])) return { ...head, state: "on_hold", words: "on hold: not carried out while the hold stands" };
+      if (t < from) return { ...head, state: "not_begun", words: `begins ${dated(from)}` };
+      if (Number.isSafeInteger(r.data?.until) && t >= (r.data!.until as number)) return { ...head, state: "ended", words: `ended ${dated(r.data!.until as number)}` };
+      const c = this.count.get(task), why = this.stuck.get(task), more = this.said.get(task);
+      const [times, units] = o.tasks[task]!;
+      if (why !== undefined && !c?.times) return { ...head, state: "not_carried_out", why, words: `not carried out: ${why}${more ? `; ${more}` : ""}` };
+      return { ...head, state: "followed", ...(c ? { times: c.times, units: c.units } : {}),
+        words: `${c?.times ? `carried out: ${c.times} ${times}${units && c.units ? `, ${c.units} ${units}` : ""}` : "in force; nothing fell due"}${why !== undefined ? `; then not carried out: ${why}` : ""}${more ? `; ${more}` : ""}` };
+    });
+    // (How the orders stand, apart from the counts: a change in it is reported the day it is found.)
+    const key = orders.map((x) => `${x.order}:${x.state}:${"why" in x ? x.why : ""}`).join("|");
+    const last = this.reported;
+    this.stuck.clear();
+    const due = !last || (key !== last.key ? Math.floor(t / DAY) > Math.floor(last.at / DAY) : t - last.at >= (o.every ?? 7 * DAY) - DAY / 2);
+    if (!due) return [];
+    const since = last?.at;
+    this.reported = { at: t, key };
+    this.count.clear();
+    const staff = (o.inPost ?? []).map((person) => ({ person, ...(this.lastAt.has(person) ? { last: this.lastAt.get(person)!.at, task: this.lastAt.get(person)!.task } : {}), ...(o.noPlace?.includes(person) ? { no_place: true } : {}) }));
+    const people = staff.length ? ` In post ${staff.length}: ${staff.map((x) => `${x.person} ${"last" in x ? `last worked ${dated(x.last!)} (${x.task})` : `has not come in to work${x.no_place ? " (no place of work in the employment agreement or the advertisement it cites)" : ""}`}`).join("; ")}.` : "";
+    const text = `Report of ${o.from}, ${dated(t)}, on the work under the office's standing work orders${since !== undefined ? ` since ${dated(since)}` : ""}. ${orders.map((x) => `${x.task} (${x.order}, every ${Math.round(x.every / DAY) || "?"} day${Math.round(x.every / DAY) === 1 ? "" : "s"}): ${x.words}`).join(". ")}.${people}`;
+    return [because(`Reporting to the office on the work under its standing orders${last && key !== last.key ? ": how an order stands has changed" : ""}.`,
+      say("staff_report", text, { to: [this.me], visible: [this.me], data: { office: o.office, ...(since !== undefined ? { since } : {}), orders: orders.map(({ words, ...x }) => ({ ...x, says: words })), ...(staff.length ? { staff } : {}) } }))];
+  }
 }
 
 /**
@@ -1334,12 +1416,35 @@ export function leaseTerms(a: Record | undefined, tenant: string): { rent: numbe
   return { rent: cents(pays?.amount), rentTo: pays?.to, space, structure: space ? structureOf(space) : undefined };
 }
 
-/** A job's wage and pay period (from the employer) and workplace (the space the worker commits to be in). */
-export function jobTerms(a: Record | undefined, worker: string): { wage: number; period: number; workplace?: string } {
+/**
+ * The advertisement an employment agreement was made on, where it cites one: the advertisement itself, or the
+ * application that answered it (docs/behaviour/firms.md, "An offer made on an advertisement"). Read from what the
+ * reader has been shown: the worker saw the advertisement when they applied, and it is the employer's own.
+ */
+export function advertisedJob(book: Book, a: Record | undefined): StatementRecord | undefined {
+  if (a?.record !== "agreement") return undefined;
+  for (const id of basesOf(a)) {
+    const r = book.records.get(id);
+    if (r?.record !== "statement") continue;
+    if (r.kind === "job_posting") return r;
+    const cited = r.kind === "job_application" && typeof r.data?.posting === "string" ? book.records.get(r.data.posting) : undefined;
+    if (cited?.record === "statement" && cited.kind === "job_posting") return cited;
+  }
+  return undefined;
+}
+
+/**
+ * A job's wage and pay period (from the employer) and workplace (the space the worker commits to be in). An offer
+ * that says nothing of where the work is and was made on an advertisement is on the advertisement's terms: with the
+ * reader's `book`, the workplace is then the advertised one.
+ */
+export function jobTerms(a: Record | undefined, worker: string, book?: Book): { wage: number; period: number; workplace?: string } {
   if (a?.record !== "agreement") return { wage: 0, period: 14 * DAY };
   const employer = a.terms.parties.find((x) => x !== worker)!;
   const pays = commitmentOf(a, employer);
-  return { wage: cents(pays.outcome?.money?.amount), period: pays.every ?? 14 * DAY, workplace: commitmentOf(a, worker).outcome?.occupancy?.in };
+  const stated = commitmentOf(a, worker).outcome?.occupancy?.in;
+  const advertised = stated || !book ? undefined : advertisedJob(book, a)?.data?.space;
+  return { wage: cents(pays.outcome?.money?.amount), period: pays.every ?? 14 * DAY, workplace: stated ?? (typeof advertised === "string" && advertised ? advertised : undefined) };
 }
 
 export const between = (lo: number, hi: number, u: number) => lo + Math.floor(u * (hi - lo + 1));

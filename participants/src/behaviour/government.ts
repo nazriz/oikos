@@ -835,7 +835,7 @@ export const works: BehaviourModule = {
       fields: { every: { type: "duration", required: true, description: "How often each address on the round is to be collected from (a week, a fortnight)." } },
       follows: "While it stands, the crew collects from each address on the round once in that time, as its hours allow, homes complained about first. With no direction, the office keeps to its own round." },
   ],
-  version: "0.5.0", // 0.5.0: sends the office that pays the town's staff a payroll notice of each new starter and each leaver (docs/behaviour/firms.md, "Payroll notices"); 0.4.0: takes written directions on its staffing and on how often it collects (docs/behaviour/directions.md); 0.3.0: collects from its own round of addresses and keeps up the town's own assets, each seen by the crew that works on it or by going to inspect; no longer shown the town
+  version: "0.6.0", // 0.6.0: its staff report to the office what they did under each standing order, or why not, and who of them worked (docs/behaviour/standing-work.md, "The staff's report"); 0.5.0: sends the office that pays the town's staff a payroll notice of each new starter and each leaver (docs/behaviour/firms.md, "Payroll notices"); 0.4.0: takes written directions on its staffing and on how often it collects (docs/behaviour/directions.md); 0.3.0: collects from its own round of addresses and keeps up the town's own assets, each seen by the crew that works on it or by going to inspect; no longer shown the town
   doc: "docs/behaviour/services.md",
   cadence: () => DAY,
   firstWake: (ctx) => 7 * 3600 + ctx.rng("first-wake").below(3600),
@@ -983,7 +983,17 @@ export const works: BehaviourModule = {
         const mine = new Set(workers);
         // (Those here with the most time between them, the work shared evenly: someone who's done a day's work elsewhere
         // today joins tomorrow.)
-        const present = team([...new Set(room?.occupants ?? [])].filter((w) => mine.has(w)).sort(), (w) => p.working_day - (used.get(w) ?? 0)).who;
+        const here = [...new Set(room?.occupants ?? [])].filter((w) => mine.has(w)).sort();
+        const present = team(here, (w) => p.working_day - (used.get(w) ?? 0)).who;
+        // (The crew takes stock of the day when its work is set out: at the day's look, where the world has working
+        // hours; whenever, where the crew is at the depot all day.)
+        const tod = t - day * DAY;
+        // Those in post since before today (someone taken on today is expected tomorrow): with none of them here,
+        // whatever is ordered is done by nobody, and the crew's report says so.
+        const before = staffOnly ? staffing.staff(book, t).filter((a: any) => (book.signedAt(a.id) ?? 0) < day * DAY).length : 0;
+        const settingOut = staffOnly && day % 7 < p.work_days && (!p.look_at || (tod >= p.look_at && tod < p.look_at + 3600)) && (here.length > 0 || before > 0);
+        if (settingOut && !here.length) for (const task of [p.collect_task, p.maintain_task]) if (routines.order(book, task, t))
+          routines.heldUp(task, `none of the ${before} in post was at the depot (${p.workplace}) when the day's work was set out`);
         if (day % 7 < p.work_days && present.length && routines.part !== "seat") {
           const left = () => Math.min(...present.map((w) => p.working_day - (used.get(w) ?? 0))) * present.length;
           const spend = (seconds: number) => { for (const w of present) used.set(w, (used.get(w) ?? 0) + Math.ceil(seconds / present.length)); };
@@ -1026,8 +1036,12 @@ export const works: BehaviourModule = {
                 complained.delete(b.structure);
               }
               collectedKg += fit;
+              routines.did(p.collect_task, t, { units: fit, by: present });
               round.push({ on: b.structure, call: job(p.collect_task, fit, b.structure), before, full: fit === units, fit, of: units });
             }
+            // (For the crew's report: what the day's hours left undone.)
+            const undone = due.filter((b) => addresses.has(b.structure) && !round.some((x) => x.on === b.structure && x.full)).length;
+            routines.note(p.collect_task, !addresses.size ? "the office's round has no addresses on it" : undone ? `${undone} address${undone > 1 ? "es" : ""} due were left when the crew's hours ran out` : undefined);
           }
           for (let i = 0; i < round.length; i += 30) {
             const part = round.slice(i, i + 30);
@@ -1052,6 +1066,7 @@ export const works: BehaviourModule = {
                 return;
               }
               for (const x of part) if (x.before === undefined) collectedAt.delete(x.on); else collectedAt.set(x.on, x.before);
+              for (const x of part) routines.undid(p.collect_task, { units: x.fit });
               // Someone's day is fuller than our count of it (work elsewhere today): the world's count, from now on.
               const short = outOfTime(out);
               if (short?.who) used.set(short.who, p.working_day - short.left);
@@ -1071,11 +1086,21 @@ export const works: BehaviourModule = {
               spend(units * p.maintain_labour);
               upkeep.push(job(p.maintain_task, units, x.b.structure));
               names.push(x.b.structure);
+              if (upkeep.length <= 30) routines.did(p.maintain_task, t, { units, by: present });
             }
+            // (For the crew's report: none worn enough is nothing due; worn ones left are hours run out.)
+            routines.note(p.maintain_task, worn.length > names.length ? `${worn.length - names.length} worn asset${worn.length - names.length > 1 ? "s" : ""} were left when the crew's hours ran out` : undefined);
             if (upkeep.length) steps.push(because(`Upkeep of the most worn of the town's assets: ${names.join(", ")}.`, ...upkeep.slice(0, 30)));
           }
         }
 
+        // The crew's report to the works manager, once the day's work is set out: what was done under each standing
+        // order, or why not, and who of the crew was at work (docs/behaviour/standing-work.md, "The staff's report").
+        if (settingOut) {
+          const noPlace = staffing.staff(book, t).filter((a: any) => !jobTerms(a, a.terms.parties[1], book).workplace).map((a: any) => String(a.terms.parties[1]));
+          steps.push(...routines.report(book, t, { office: (ctx.position ?? "").replace(/-staff$/, ""), from: `the ${p.role}`, inPost: workers, noPlace,
+            tasks: { [p.collect_task]: ["calls at addresses", "loads"], [p.maintain_task]: ["upkeep jobs", "units of upkeep"] } }));
+        }
         // (The office-holder, with the crew a post of its own, reports what is its to know: the crew, the budget, the
         // directions it follows and the standing orders it has set. The round is the crew's.)
         if (routines.part === "seat") steps.push(...letters.answer(() => `Report from the works office: a crew of ${workers.length} (the adopted budget's ${p.staff_line} line, ${usd(line)}, pays for ${target} at ${usd(annual)} a year each, ${usd(p.wage)} every ${Math.round(p.period / DAY)} days). Standing work orders the crew follows: ${routines.words(book, t)}.`));

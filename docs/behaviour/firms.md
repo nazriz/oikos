@@ -113,6 +113,37 @@ Most employers hire and pay through one office. A town does not: its works manag
 
 **Leaves out.** Pay for the part of a pay period worked before a leaver's last day: the payment simply ends, so the days since the last pay day go unpaid (so before this change too; a gap, listed for a decision: it needs a final payment reckoned by the day). A notice of a change of pay (the town's staff have had none: no enterprise agreement reaches them). A death in service is told to the payroll by the hiring office only if the registry's entry reached the town's papers.
 
+## An offer made on an advertisement (2026-10-09)
+
+**Source:** `advertisedJob` and `jobTerms` (`participants/src/behaviour/common.ts`); `Staffing.roleOf`; the citizen's
+three readings of a job offered (`citizen.ts`); the offer's preview (`translator/src/preview.ts`).
+
+The code that runs an employer writes an offer of employment whole: the pay, the place of work (the worker "will be
+in" the workplace), the notice, and words that name the post. A person in a seat says "offer employment as works crew
+to c0113 on my posting rec.1081, at this pay", and the agreement that is written has the pay and the advertisement it
+cites, and nothing else. In the wave's first works pilot five people signed such offers, had no place of work, never
+came to the depot, and no waste was collected in 180 days.
+
+- **An offer that says nothing of where the work is, made on an advertisement, is on the advertisement's terms.**
+  The advertisement is the one the agreement cites, or the one the application it cites answered. Whoever reads the
+  agreement reads it so from papers they have: the worker saw the advertisement when they applied (and goes to work
+  where it says, `data.space`); the employer wrote it (and counts the worker in the post it advertised, `data.role`).
+- **What the offer itself says stands.** A place of work or a post named in the agreement is the place and the post.
+- **An offer that names no place and cites no advertisement that does has none.** The person is employed and paid
+  and has nowhere to come to; the offer's preview says so before it is confirmed ("It names no place of work and
+  cites no job advertisement that does: whoever signs it is paid and has nowhere to come to work."), and the staff's
+  report and the office's roster say it after (docs/behaviour/standing-work.md).
+- **Nothing changes for an employer run by code**: its offers state the place and name the post.
+
+**Real-world basis.** An employer must give a worker written particulars that include the place of work, and where a
+contract is silent a term is taken from what was advertised and from what the parties did. United Kingdom: Employment
+Rights Act 1996, s. 1(4)(h) (the place of work among the particulars) **(to confirm: the section not opened; implied
+terms from an advertisement are general contract law, no case opened)**.
+
+**Leaves out.** An offer on terms that differ from the advertisement's in the pay is read as it is written (the pay
+is the agreement's). A worker with no place of work does not write to ask where to come, and an employer cannot add
+one to a signed agreement: it gives notice and offers again.
+
 ## Calibration notes for the checkpoint
 
 Over a 2-year run of the 200-citizen town (`worlds/town.yaml`):

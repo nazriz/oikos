@@ -70,7 +70,7 @@ const ACT_TIME = {
   },
 };
 
-export const GENERATOR_VERSION = "0.44.0"; // 0.44.0: main's 0.39.1 (an office's own form says what issuing it does) with the institutions' opening papers (0.43.0)
+export const GENERATOR_VERSION = "0.45.0"; // 0.45.0: a seat with routine work is shown its staff's reports on the work under its standing orders, and its procedure says they are made; 0.44.0: main's 0.39.1 (an office's own form says what issuing it does) with the institutions' opening papers (0.43.0)
 const DAY = 86_400;
 const MONTH = 30 * DAY;
 const YEAR = 365 * DAY;
@@ -1890,10 +1890,12 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       part.controller.params.mock.params = { ...own, part: "seat" };
       pos.role_module = { code: impl, params: { ...own, part: "seat" } };
       records.push({ id: `proc-${id}-routines`, record: "statement", author: "genesis", at: 0, visible_to: [pos.entity], speaks_for: pos.entity, kind: "procedure", addressed_to: [pos.entity],
-        text: `The routine work of the ${pos.title.charAt(0).toLowerCase()}${pos.title.slice(1)}'s office is done by its staff, by the office's standing work orders and only by them. A standing work order says what task, where and how often, and may say on what, from when and for how long. While one is in force the staff do the task each time it falls due, in their working hours; with none in force for a task, they do not do it. An order is changed by withdrawing it and making another, and put on hold like any standing paper. The tasks: ${routines.map((r) => `${r.task}, at ${(own as any)[r.at] || id}: ${r.what}`).join(" ")}`,
+        text: `The routine work of the ${pos.title.charAt(0).toLowerCase()}${pos.title.slice(1)}'s office is done by its staff, by the office's standing work orders and only by them. A standing work order says what task, where and how often, and may say on what, from when and for how long. While one is in force the staff do the task each time it falls due, in their working hours; with none in force for a task, they do not do it. An order is changed by withdrawing it and making another, and put on hold like any standing paper. The staff report to the office on the work under its orders, on the organisation's own file: what was done under each, or that one is not being carried out and why, the day that changes and otherwise about weekly. The tasks: ${routines.map((r) => `${r.task}, at ${(own as any)[r.at] || id}: ${r.what}`).join(" ")}`,
         data: { routines: routines.map((r) => ({ task: r.task, at: (own as any)[r.at] || id })) } });
       pos.channels.push(K.mine("standing", ["procedure", "work_order", "hold"], { title: "The office's procedures and standing orders" }));
       part.controller.params.standing = [...part.controller.params.standing, "standing"];
+      // What the staff report of the work under those orders: a paper of the organisation's own, as it comes.
+      pos.channels.push(K.mine("staff-reports", ["staff_report"], { title: "Reports from the staff on the work under the standing work orders" }));
     }
   }
   // Settings of every seat a model holds, as the town's description gives them: whether papers bring it back, and how

@@ -67,6 +67,17 @@ export class Knowledge {
   /** The staff of the office the participant holds, where the office employs any (the run keeps it from the office's
    * own papers): what they are called and how many are in post. A draft's preview says when work is ordered of nobody. */
   ownStaff?: { role: string; inPost: number };
+  private readonly jobs = new Map<string, { advertisement: string; space?: string }>();
+  private readonly applications = new Map<string, string>();
+  /** The job advertisement among the papers cited (itself, or through an application that answers it), as far as the
+   * participant has been shown them: its id, and where it says the work is if it has seen the advertisement. */
+  advertisedJob(cited: string[]): { advertisement: string; space?: string } | undefined {
+    for (const id of cited) {
+      const ad = this.jobs.has(id) ? id : this.applications.get(id);
+      if (ad !== undefined) return this.jobs.get(ad) ?? { advertisement: ad };
+    }
+    return undefined;
+  }
 
   absorb(obs: Observation): void {
     this.entity = obs.entity;
@@ -120,6 +131,9 @@ export class Knowledge {
     if (r.record === "statement") {
       if (r.addressed_to?.length) this.addressed.set(r.id, r.addressed_to);
       if (r.kind === "form") this.formsById.set(r.id, r);
+      // Job advertisements, and the applications that answer them: an offer of employment made on one is on its terms.
+      if (r.kind === "job_posting") this.jobs.set(r.id, { advertisement: r.id, ...(typeof r.data?.space === "string" && r.data.space ? { space: r.data.space } : {}) });
+      if (r.kind === "job_application" && typeof r.data?.posting === "string") this.applications.set(r.id, r.data.posting);
       // An organisation's rule on who may direct its offices (a paper it has put out: its data names the posts).
       if (r.data?.directions && typeof r.data.directions === "object" && r.speaks_for) this.directionRules.set(r.id, r);
       if (r.kind === "law" && r.formal?.condition) this.laws.set(r.id, r);

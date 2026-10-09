@@ -62,6 +62,46 @@ being told each time. **(to confirm: common practice; no source opened. Candidat
 collection schedule and service standards; a hospital or clinic rostering policy; a school timetable policy; a water
 retailer's billing cycle in its customer charter.)**
 
+## The staff's report: what was done under each order, or why not
+
+**Source:** `did`, `heldUp`, `note` and `report` on `StandingWork` (`participants/src/behaviour/common.ts`); each staff
+part's own count; `Roster.orders` (`participants/src/behaviour/roster.ts`). Decision: docs/decisions.md, "An office
+held by a seat gets its work done" (2026-10-09).
+
+A manager who sets a round does not watch it; the depot tells them how it went. In the wave's first works pilot
+nothing did: a crew of five was in post, nobody came to work, and in 180 days nothing the seat was shown said so
+("crew 6/6, nothing more to do"). The water seat wrote of its billing order: "Silent success and silent failure look
+identical."
+
+- **The staff keep their own count** of what they did under each order (how many times, how much, who of them worked)
+  and of why an order in force was not carried out when it fell due. Nothing is asked of the engine: it is what they
+  did and what they found at their own premises.
+- **They report it to the office**, as a paper on the organisation's own file (a statement of kind `staff_report`,
+  addressed to the organisation and seen by it alone; `data.office` names the office, `data.orders` each order with
+  how it stands, `data.staff` each person in post with when they last worked). **The day how an order stands
+  changes** (it is being carried out; it is not, and why; it is on hold; it names a task the staff do not have), and
+  **about weekly otherwise**. With nobody in post there is nobody to report: the office-holder's own roster says that.
+- **How an order stands, as the staff say it:** `carried out: 430 calls at addresses, 1026 loads`, with what the
+  hours left undone (`12 addresses due were left when the crew's hours ran out`); `in force; nothing fell due`;
+  `not carried out: none of the 5 in post was at the depot (town-hall/workplace.1) when the day's work was set out`;
+  `not carried out: the staff have no routine called "sweep" (their routines: collect, maintain)`; `on hold`;
+  `begins year 1, day 37`; `replaced by rec.9`.
+- **The office-holder sees it twice**: the report as a paper when it comes ("Reports from the staff on the work under
+  the standing work orders"), and its roster (docs/behaviour/office-papers.md, "An office's own staff"), which now
+  says for each person in post when they last worked and at what, or that they have not come in and why, and under
+  it each standing order as the staff last reported it. A report from its own staff does not bring a seat back early
+  (its office's own papers never do): it is read at the seat's next sitting.
+- **Why a person has nowhere to come to work** is the staff's to know from the papers: the employment agreement names
+  no place of work, and cites no advertisement that does (docs/behaviour/firms.md, "An offer made on an
+  advertisement").
+
+**Real-world basis.** A depot keeps a daily worksheet and a supervisor returns it; a waste service reports missed
+collections and their reasons against its schedule; a manager's exception report says what was not done and why.
+**(to confirm: common practice; no source opened.)**
+
+**Built for the works office.** The other staff parts (clinic, school, the utilities, the rates office) keep no count
+yet: see "Leaves out".
+
 ## The routines that exist
 
 | Office | Task | What the staff do while an order for it is in force |
@@ -113,8 +153,11 @@ not converted; both offices are in the wave as seats and will show the block.
 - **Rosters of named people and shifts.** `by` is recorded, not enforced; there are no shifts.
 - **A staff post that does not follow.** The staff follow every order in force; there is no parameter for a crew that
   shirks, as there is for an office that ignores a direction.
-- **The seat's sight of the routine.** The works manager with a staff post reports its crew, its budget and its
-  orders; how the round is going is the crew's to know. A seat learns of trouble from complaints and from what it
-  goes to see.
+- **The seat's sight of the routine** is the staff's report and no more: counts and reasons, about weekly. Which
+  addresses were left is not in it; a seat learns that from complaints and from what it goes to see.
+- **An order's `at` is not checked against the staff's premises.** The staff work from their own premises whatever
+  place an order names; a wrong place is not reported.
+- **A seat that sits before its staff arrive** still sees "0 people" at its premises in that sitting's look (the
+  look is of that moment); the roster's "last at work" is what tells it the staff came.
 - **Energy used while a supply order is on hold** is still owed by the network and supplied when the order is back;
   water not drawn on a day is not drawn later.

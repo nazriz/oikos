@@ -118,7 +118,7 @@ interface Job { agreement: string; employer: string; wage: number; period: numbe
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.43.1", // 0.43.1: tells their own business when they move home; 0.43.0: someone who works for themself (own_work): not out of work, their income what the business pays them, at their pitch in working hours; 0.42.1: work by the day (a day's pay known as pay; no claim for a day not worked); 0.42.0: reads the support law, stops work at an age of its own (0.41.0 on its branch), with main's 0.41.1
+  version: "0.43.2", // 0.43.2: offered a job that names no place of work, on an advertisement, goes to work where the advertisement says; 0.43.1: tells their own business when they move home; 0.43.0: someone who works for themself (own_work): not out of work, their income what the business pays them, at their pitch in working hours; 0.42.1: work by the day (a day's pay known as pay; no claim for a day not worked); 0.42.0: reads the support law, stops work at an age of its own (0.41.0 on its branch), with main's 0.41.1
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -654,7 +654,7 @@ export const citizen: BehaviourModule = {
         }
         if (r.terms.template === "employment" && !job) {
           const employer = r.terms.parties.find((x) => x !== me)!;
-          job = { agreement: r.id, employer, ...jobTerms(r, me), since };
+          job = { agreement: r.id, employer, ...jobTerms(r, me, book), since };
           joinAsked = r.id; // (whether we belong to a union at the start is the world's)
         }
       }
@@ -1175,7 +1175,7 @@ export const citizen: BehaviourModule = {
         const r = book.records.get(switching.offer);
         switching = null;
         if (r?.record === "agreement" && !book.signedBy(r.id, me) && !retired) {
-          const terms = jobTerms(r, me);
+          const terms = jobTerms(r, me, book);
           const s: Step = because(`Our notice is worked out: starting the job we took (${usd(terms.wage)} every ${Math.round(terms.period / DAY)} days).`, sign(r.id));
           if (terms.workplace && !p.round) s.push(moveIn(terms.workplace)); // (with the round, we go when work starts)
           steps.push(s);
@@ -1291,7 +1291,7 @@ export const citizen: BehaviourModule = {
           thanked = undefined;
           homelessSince = null;
         } else if (r.terms.template === "employment" && !job) {
-          const terms = jobTerms(r, me);
+          const terms = jobTerms(r, me, book);
           const s: Step = because(`Taking the job offered: ${usd(terms.wage)} every ${Math.round(terms.period / DAY)} days${thank(terms.workplace ? structureOf(terms.workplace) : undefined, t)}.`, sign(r.id));
           if (terms.workplace && !p.round) s.push(moveIn(terms.workplace)); // (with the round, we go when work starts)
           steps.push(s);
@@ -1302,7 +1302,7 @@ export const citizen: BehaviourModule = {
         } else if (r.terms.template === "employment" && job && !switching && !retired && other !== job.employer) {
           // Offered a better-paid job while in one (we applied for it): we take it, give notice at ours, and start the
           // new one when the notice is worked out.
-          const terms = jobTerms(r, me);
+          const terms = jobTerms(r, me, book);
           if (terms.wage * job.period <= job.wage * terms.period) continue;
           switching = { offer: r.id, wage: terms.wage };
           steps.push(because(`Offered a better-paid job (${usd(terms.wage)} every ${Math.round(terms.period / DAY)} days, against our ${usd(job.wage)} every ${Math.round(job.period / DAY)}): taking it, and giving our employer the notice our contract asks.`,
