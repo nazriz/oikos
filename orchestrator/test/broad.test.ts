@@ -8,7 +8,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import { join } from "node:path";
 import { calls } from "@oikos/participants";
 import { MockAdapter, type ContentBlock, type LlmRequest, type Price } from "@oikos/participants/llm";
-import { literals, type Example } from "../../translator/train/data";
+import { functionOf, literals, type Example } from "../../translator/train/data";
 import { readerUses, type Use, type V2Example } from "../../translator/train/v2";
 import { batches, checkBroadConfig, choiceCases, collect, currencyShape, PLAIN_SYSTEM, plainBrief, runBroad, v2Cases, v2FromPilots, type BroadConfig, type Groups } from "../src/broad";
 import type { Hooks } from "../src/pipeline";
@@ -253,8 +253,11 @@ test("the parts of a run are collected with their groups, and a parity test is c
   expect(parity.length).toBeGreaterThan(0);
   expect(train.length).toBeGreaterThan(0);
   // No gold program is on both sides, and every example says which groups it is of.
-  const golds = new Set(train.map((e) => e.gold ?? e.id));
-  for (const e of parity) expect(golds.has(e.gold ?? e.id)).toBe(false);
+  // (As the cut is made: by gold program within each function. A refusal built from a payment's program is another
+  // function's example, and may fall on the other side: held true of them too only by the draw until 2026-10-09.)
+  const cut = (e: Example) => `${functionOf(e)}:${e.gold ?? e.id}`;
+  const golds = new Set(train.map(cut));
+  for (const e of parity) expect(golds.has(cut(e))).toBe(false);
   for (const e of [...train, ...parity]) {
     expect(Object.keys(e.groups).sort()).toEqual(["asker", "currency", "part", "register", "source", "writer", "writing"]);
     expect(e.groups.part).toBe("part-1");

@@ -419,6 +419,14 @@
         }
       },
       "writes": {
+        "sends": [
+          {
+            "to": [
+              "@planning"
+            ],
+            "why": "The planning office decides permits, and refuses them on the lots the register lists."
+          }
+        ],
         "kind": "habitat_register",
         "text": "Habitat register, round {round}: {lots}.",
         "to": [

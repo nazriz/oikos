@@ -30,6 +30,8 @@ export interface FormWrites {
   basis?: string;
   offer?: unknown;
   assertion?: unknown;
+  /** Whom the form itself sends every paper to, whatever its fields say, and why, in the form's own words. */
+  sends?: { to: string[]; why: string }[];
 }
 export interface FormData { form: string; office?: string; submit_as: string; submit_to: string[]; fields: { [name: string]: FormFieldSpec }; writes?: FormWrites }
 

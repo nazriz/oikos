@@ -490,6 +490,14 @@
         }
       },
       "writes": {
+        "sends": [
+          {
+            "to": [
+              "@landfill"
+            ],
+            "why": "The landfill takes the load and charges by the docket."
+          }
+        ],
         "kind": "disposal_docket",
         "text": "Delivered: {quantity} of {kind}.",
         "to": [

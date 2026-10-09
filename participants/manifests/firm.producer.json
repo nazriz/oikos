@@ -665,6 +665,14 @@
         }
       },
       "writes": {
+        "sends": [
+          {
+            "to": [
+              "@police"
+            ],
+            "why": "The police investigate what is reported to them."
+          }
+        ],
         "kind": "crime_report",
         "text": "Report: {quantity} {kind} taken from {at}.",
         "to": [

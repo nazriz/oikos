@@ -67,9 +67,75 @@ export class Preview {
     if (holder === this.me) return `your account (${id})`;
     return id;
   }
-  private details(raw: unknown, form?: string): string {
+  /**
+   * The form of the office's own that a paper was made on (docs/behaviour/office-papers.md), found by writing the
+   * paper back to its fields (a paper of this kind does not cite its form): the form, the fields it was filled in
+   * with, and what the form says each of the paper's details is (an amount, a date), so that they read as money and
+   * days. None: it is no paper of a form the seat holds.
+   */
+  private madeOn(b: any): { form: any; fields: forms.Filled; kinds: FieldKinds } | undefined {
+    if (b.place || b.adico !== undefined || b.formal !== undefined) return undefined;
+    const self = b.speaks_for ?? this.me;
+    const paper: forms.Paper = { kind: b.kind, text: b.text, ...(b.data !== undefined ? { data: b.data } : {}), ...(b.addressed_to?.length ? { addressed_to: b.addressed_to } : {}),
+      ...(b.visible_to !== undefined ? { visible_to: b.visible_to } : {}), ...(typeof b.basis === "string" ? { basis: b.basis } : {}), ...(b.offer !== undefined ? { offer: b.offer } : {}), ...(b.assertion !== undefined ? { assertion: b.assertion } : {}) };
+    for (const f of this.k.forms) {
+      const spec = f.data as forms.FormData | undefined;
+      if (!spec?.writes || spec.writes.kind !== b.kind || typeof spec.office !== "string") continue;
+      const got = forms.fieldsFor(spec, paper, { self, now: this.k.t, money: (a) => this.sum(a) });
+      if (!got) continue;
+      // (A detail the form writes from one field is what that field is.)
+      const kinds: FieldKinds = {};
+      const t = spec.writes.data;
+      if (t && typeof t === "object" && !Array.isArray(t)) for (const [key, x] of Object.entries(t)) {
+        const name = typeof x === "string" && /^[=#?+][a-z_][a-z0-9_]{0,31}$/.test(x) ? x.slice(1) : undefined;
+        const type = name === undefined ? undefined : spec.fields[name]?.type;
+        if (type === "amount" || type === "date" || (type === "duration" && x[0] === "=")) kinds[key] = { type };
+      }
+      return { form: f, fields: got.fields, kinds };
+    }
+    return undefined;
+  }
+
+  /**
+   * Whom a paper made on the office's own form goes to, and why each: someone a field of the form names, with that
+   * field and what the form says of it; someone the form itself sends every paper to, with the form's own reason
+   * (`sends`), or, where the form gives none, that it is the form that names them. Then who else sees it. Nothing
+   * here is the platform's: it is the form on the seat's own file, read out (wave 2b: a registrar took the two
+   * bodies every death entry goes to for mistakes of the draft, and declined seven right registrations).
+   */
+  private goesTo(b: any, made: { form: any; fields: forms.Filled }): string {
+    const to: string[] = b.addressed_to ?? [];
+    if (!to.length) return "";
+    const spec = made.form.data as forms.FormData;
+    const me = b.speaks_for ?? this.me;
+    const left = new Set(to);
+    const parts: string[] = [];
+    const names = (ids: string[]) => { const w = ids.map((x) => (x === me ? "your own organisation's file" : this.whom(x))); return w.length < 2 ? w.join("") : `${w.slice(0, -1).join(", ")} and ${w[w.length - 1]}`; };
+    for (const x of spec.writes!.to ?? []) {
+      const name = typeof x === "string" && /^=[a-z_][a-z0-9_]{0,31}$/.test(x) && x !== "=self" ? x.slice(1) : undefined;
+      if (name === undefined) continue;
+      const v = made.fields[name];
+      const ids = (Array.isArray(v) ? v : typeof v === "string" ? [v] : []).filter((id) => left.has(id));
+      if (!ids.length) continue;
+      for (const id of ids) left.delete(id);
+      const says = spec.fields[name]?.description;
+      parts.push(`${names(ids)} (${name.replace(/_/g, " ")} on the form${says ? `: "${says}"` : ""})`);
+    }
+    for (const s of spec.writes!.sends ?? []) {
+      const ids = s.to.filter((id) => left.has(id));
+      if (!ids.length) continue;
+      for (const id of ids) left.delete(id);
+      parts.push(`${names(ids)} (not for you to choose: the form, ${made.form.id}, sends every paper made on it to ${ids.length > 1 ? "them" : "it"}: "${s.why}")`);
+    }
+    if (left.size) parts.push(`${names([...left])} (named on the form itself, ${made.form.id}, for every paper made on it)`);
+    const others = Array.isArray(b.visible_to) ? b.visible_to.filter((x: string) => x !== me && !to.includes(x) && this.k.entityOf(x) !== this.me) : [];
+    const seen = b.visible_to === "public" ? " It is public." : Array.isArray(b.visible_to) ? ` It is seen only by you${others.length ? `, ${names(others)}` : ""} and those it goes to.` : "";
+    return ` It goes to: ${parts.join("; ")}.${seen}`;
+  }
+
+  private details(raw: unknown, form?: string, kinds?: FieldKinds): string {
     if (raw === null || typeof raw !== "object") return "";
-    const data = this.read(raw, form);
+    const data = kinds ? readable(raw, { money: (a) => this.sum(a), fields: kinds }) : this.read(raw, form);
     if (data === null || typeof data !== "object") return String(data);
     const entries = Object.entries(data as object);
     const flat = entries.every(([, v]) => v === null || ["string", "number", "boolean"].includes(typeof v));
@@ -223,6 +289,15 @@ export class Preview {
         if (b.kind === "work_order" && b.data?.work && b.data?.every) {
           const others = (Array.isArray(b.visible_to) ? b.visible_to : []).filter((x: string) => this.k.entityOf(x) !== (b.speaks_for ?? this.me));
           return [`You will put a standing work order on ${this.k.entityOf(b.speaks_for ?? this.me) === this.me ? "your own file" : `the file of ${this.who(b.speaks_for)}`}${others.length ? `, shown to ${others.map((x: string) => this.who(x)).join(", ")}` : ""}: "${b.text}". Nothing is done now: the staff whose work it is follow it each time it falls due, in their own working hours, while it stands.${this.firstFalls(b.data, "order", 0)}${Number.isSafeInteger(b.data.until) ? (b.data.until % 86_400 === 0 ? ` It stands to the end of ${forms.dateWords(b.data.until - 86_400)}.` : ` It stands until ${moment(b.data.until)}.`) : ""}${this.k.ownStaff?.inPost === 0 && this.k.entityOf(b.speaks_for ?? this.me) === this.me ? ` There is nobody in the post whose work this is: your office has no ${this.k.ownStaff.role} in post, so nothing is done under it until someone is taken on.` : ""} To change it, withdraw it and make another; to pause it, put it on hold.${citing(b, " It cites ")}${this.rule(b)}`,
+            ["kind", "text", "data", "addressed_to", "adico", "formal", ...RECORD]];
+        }
+        // A paper of the office's own, made on its form: its details read as the form says each is, and of everyone
+        // it goes to, why, in the form's own words.
+        const made = this.madeOn(b);
+        if (made) {
+          const dd = this.details(b.data, undefined, made.kinds);
+          const goes = this.goesTo(b, made);
+          return [`You will publish a${/^[aeiou]/i.test(String(b.kind)) ? "n" : ""} ${String(b.kind).replace(/_/g, " ")}${named(b)}${goes ? "" : this.seenBy(b.visible_to)}: "${b.text}"${dd ? `, with these details: ${dd}` : ""}${citing(b)}.${goes}${this.rule(b)}`,
             ["kind", "text", "data", "addressed_to", "adico", "formal", ...RECORD]];
         }
         const d = this.details(b.data, typeof b.basis === "string" ? b.basis : undefined);

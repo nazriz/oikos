@@ -135,7 +135,9 @@ export interface Issued {
   /** What issuing the paper does, in a sentence, for whoever holds the office: said on the form with its name. */
   does?: string;
   fields: { [name: string]: FormField };
-  writes: { kind: string; text: string; data?: unknown; to?: unknown[]; visible?: "public" | unknown[]; basis?: string; offer?: unknown; assertion?: unknown };
+  /** (`sends`: whom the form itself sends every paper to, whatever its fields say, and why, in the form's own words:
+   * each of the office's own named in `to` ("@feeds") that no field puts there. Said on the form and in a draft's preview.) */
+  writes: { kind: string; text: string; data?: unknown; to?: unknown[]; visible?: "public" | unknown[]; basis?: string; offer?: unknown; assertion?: unknown; sends?: { to: string[]; why: string }[] };
 }
 
 /**

@@ -51,6 +51,14 @@
         }
       },
       "writes": {
+        "sends": [
+          {
+            "to": [
+              "@banks"
+            ],
+            "why": "The banks hold what the debtor has: the order is theirs to pay."
+          }
+        ],
         "kind": "garnishee_order",
         "text": "Order to pay {amount} from what {debtor} holds, into {pay_into}, under {order}.",
         "basis": "=order",

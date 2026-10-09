@@ -105,7 +105,21 @@
         "visible": { "oneOf": [{ "const": "public" }, { "type": "array", "maxItems": 64 }] },
         "basis": { "type": "string", "pattern": "^=[a-z_][a-z0-9_]{0,31}$" },
         "offer": { "type": "object" },
-        "assertion": { "type": "object" }
+        "assertion": { "type": "object" },
+        "sends": {
+          "description": "Whom every paper made on the form goes to whatever its fields say (those named in `to` by the form itself, not by a field), and why, in the form's own words: what whoever fills the form in is told of them, on the form and in a draft's preview. Each `to` lists them (in a module's declaration, \"@name\" for what is the office's own). It changes nothing a paper carries.",
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "type": "object",
+            "required": ["to", "why"],
+            "additionalProperties": false,
+            "properties": {
+              "to": { "type": "array", "maxItems": 64, "items": { "type": "string", "maxLength": 128 } },
+              "why": { "type": "string", "minLength": 5, "maxLength": 400 }
+            }
+          }
+        }
       }
     },
     "FormData": {

@@ -254,6 +254,14 @@
         }
       },
       "writes": {
+        "sends": [
+          {
+            "to": [
+              "@tribunal"
+            ],
+            "why": "The tribunal hears the charge."
+          }
+        ],
         "kind": "tribunal_application",
         "text": "Charge against {against}, on report {report}.",
         "basis": "=report",
@@ -296,6 +304,14 @@
         }
       },
       "writes": {
+        "sends": [
+          {
+            "to": [
+              "@registry"
+            ],
+            "why": "The registrar registers deaths, on a notification."
+          }
+        ],
         "kind": "death_notification",
         "text": "Notification of a death: {deceased}.",
         "to": [

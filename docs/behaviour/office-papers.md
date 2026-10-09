@@ -30,6 +30,17 @@ nobody, and the registrar asked twice to register a death and registered none.
 4. **A form of this kind does not cite itself.** A paper's basis is what the form says it is (the notification a
    registration is made on).
 
+5. **A form says whom it sends every paper to, and why** (`sends` in `writes`, 2026-10-09). Some recipients are no
+   field's: the registrar's entries go, as of right, to whoever keeps a roll of electors and whoever pays a pension
+   or support (`feeds`); a docket goes to the landfill. Each form states them with the reason, in its own words, on
+   the form itself ("Every paper made on it also goes to outside and electoral-commission: They are sent every
+   entry in the register of deaths as of right, ...") and a draft's preview says of every recipient why it is there:
+   the field that names them with what the form says of that field, or the form's own reason, marked "not for you
+   to choose". A registrar declined seven right death registrations in a pilot because two bodies were on each and
+   nothing said why. `orchestrator/test/office-form-preview.test.ts` holds every module's forms to it: none sends a
+   paper to someone of the office's own without a reason. The same reading gives each detail of such a paper its
+   kind, so a sum reads as money in the preview ("rent received: £3,813.75", where it read "381375").
+
 A field may be a `list` (several ids) or a `date` ("year 1, day 12", as reports write one; or a moment in seconds as
 a record has it); a count may be nought. In `writes`, "=name" is the field as read, "#name" an amount or count as a
 whole number, "?name" a yes or no as true or false, "+name" a length of time counted from now, "=self" whoever the

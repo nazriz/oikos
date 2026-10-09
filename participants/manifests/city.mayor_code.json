@@ -187,6 +187,14 @@
         }
       },
       "writes": {
+        "sends": [
+          {
+            "to": [
+              "@electoral"
+            ],
+            "why": "The body that runs the election takes the nominations and puts the names on the ballot paper."
+          }
+        ],
         "kind": "nomination",
         "text": "Nomination for {office}: {name}. {platform}",
         "to": [

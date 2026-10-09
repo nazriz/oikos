@@ -234,6 +234,7 @@ A model call that fails (after its adapter's own time limits and retries) is rec
 - **A form's summary in words** (both resolvers): a form-made statement's text says an amount as the world writes its money and a length of time in days ("every 14 days"), where it said the bare integer.
 - **The fixes after wave 2b's review** (2026-10-09; `runs/pilot-queues/wave-2b.review.md` on the run server; under the standing approval, to look over):
   - **`per_request` on `money` is a record's id or nothing** (calls.md; `calls.schema.json` unchanged). It was read only where the payer keeps the account, with a name looked up as if it could be a person, and passed over unread on a payment that is a request to the keeper: four of a pilot's payments carried words or a table there. Now words in quotes and data are refused there, and so is any `per_request` on a payment its maker does not itself move. Both resolvers are held to `contracts/test/payments.json` (9 cases, two seats).
+  - `outcomes.schema.json`, **`FormWrites.sends`** (optional; so also a module's `issues[].writes`): whom a form of an office's own sends every paper to whatever its fields say, and why, in the form's own words (`[{ to: [...], why }]`; in a module's declaration `to` holds "@name" for what is the office's own). It changes nothing a paper carries and no resolver reads it: the form's published words and a draft's preview say it.
 
 ## Changes from v0.7 (v0.8, closed 2026-10-02; docs/design/world-expansion.md)
 

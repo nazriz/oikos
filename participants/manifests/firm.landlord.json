@@ -396,6 +396,14 @@
         }
       },
       "writes": {
+        "sends": [
+          {
+            "to": [
+              "@city"
+            ],
+            "why": "The return is made to the town, which the rent is reported to."
+          }
+        ],
         "kind": "tax_report",
         "text": "Rent received this month: {rent_received}.",
         "to": [
@@ -419,6 +427,14 @@
         }
       },
       "writes": {
+        "sends": [
+          {
+            "to": [
+              "@city"
+            ],
+            "why": "The town's registrar registers deaths, on a notification."
+          }
+        ],
         "kind": "death_notification",
         "text": "Notification of a death: {deceased}.",
         "to": [

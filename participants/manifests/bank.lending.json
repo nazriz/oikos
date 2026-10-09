@@ -267,6 +267,14 @@
         }
       },
       "writes": {
+        "sends": [
+          {
+            "to": [
+              "@funder"
+            ],
+            "why": "The funder is who the draw is made on: it pays it."
+          }
+        ],
         "kind": "funding_draw",
         "text": "Funding drawn: {amount} into {account}.",
         "to": [

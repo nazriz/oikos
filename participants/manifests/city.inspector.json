@@ -115,6 +115,14 @@
         }
       },
       "writes": {
+        "sends": [
+          {
+            "to": [
+              "@valuer"
+            ],
+            "why": "The valuer values the town's lots: the request is the valuer's to act on."
+          }
+        ],
         "kind": "valuation_request",
         "text": "Supplementary valuation asked for, on notice {notice}.",
         "basis": "=notice",

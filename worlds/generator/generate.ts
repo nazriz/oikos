@@ -292,13 +292,21 @@ function ownFilled(t: unknown, own: { [name: string]: unknown }): unknown {
  * filled in, it is the paper itself, written as the form says. Seen by the office's organisation alone.
  */
 export function stationeryForm(office: string, entity: string, x: Issued, own: { [name: string]: unknown }, holder?: string): any {
-  const writes = ownFilled(x.writes, own) as Issued["writes"];
+  const filled = ownFilled(x.writes, own) as Issued["writes"];
+  // Whom the form itself sends every paper to, and why: only those this office has (one it lacks is left out), and
+  // said on the form, so that whoever fills it in has read it before a draft shows them (a registrar declined seven
+  // right death registrations for two recipients nothing had told it of: wave 2b).
+  const sends = (filled.sends ?? []).filter((s) => s.to.length);
+  const { sends: _, ...rest } = filled;
+  const writes: Issued["writes"] = { ...rest, ...(sends.length ? { sends } : {}) };
+  const list = (ids: string[]) => (ids.length < 2 ? ids.join("") : `${ids.slice(0, -1).join(", ")} and ${ids[ids.length - 1]}`);
+  const sent = sends.map((s) => `Every paper made on it also goes to ${list(s.to)}: ${s.why}`).join(" ");
   // One line a form: its name, what issuing it does (where the module says), and who may fill it in: the office's
   // holder, of its own accord. (A works manager read its staffing direction form as needing the mayor, and never used
   // its own job advertisement, which was on file beside it and said nothing of what it was for: 2026-10-09.)
   const whose = holder ? `Filled in by the ${holder.charAt(0).toLowerCase()}${holder.slice(1)}, of the office's own accord (nobody's direction or leave is needed)` : "A paper of the office's own";
   return { id: `form-${office}-${x.form}`.replace(/_/g, "-"), record: "statement", author: "genesis", at: 0, visible_to: [entity], speaks_for: entity, kind: "form",
-    text: `${x.title}. ${x.does ? `${x.does} ` : ""}${whose}: filled in, it is issued as the form sets it out.`,
+    text: `${x.title}. ${x.does ? `${x.does} ` : ""}${sent ? `${sent} ` : ""}${whose}: filled in, it is issued as the form sets it out.`,
     data: { form: x.form, office, submit_as: writes.kind, submit_to: [entity], fields: x.fields,
       writes: { ...writes, text: writes.text.replace(/\{@([a-z_][a-z0-9_]*)\}/g, (_, name: string) => String(own[name] ?? "")) } } };
 }
