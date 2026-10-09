@@ -6,7 +6,7 @@
 
 import { cents, moneyNow } from "../money";
 import type { Body, Observation, Outcome, Reading, Record, SiteCell, SiteStructure, Transaction, VariableView } from "../contracts";
-import { channels, citedWords } from "../contracts";
+import { channels, citedWords, firstDue } from "../contracts";
 import { refusalText } from "./words";
 
 const DAY = 86_400;
@@ -35,14 +35,16 @@ export function duration(s: number): string {
 // hundredths of a per cent; a detail is known for one of those by the name the world's papers give it (the lists
 // below: names, never a place's figures), by the unit written beside it ({unit, value}), or, on a form, by what the
 // form says the field is. Anything else stands as it is.
-const MONEY_DETAILS = new Set(["amount", "unit_price", "price", "refund", "wage", "rent", "land", "levy_from", "balance", "cost", "fee", "deposit", "bond", "principal", "payment", "carrying"]);
+const MONEY_DETAILS = new Set(["amount", "unit_price", "price", "refund", "wage", "rent", "land", "levy_from", "balance", "cost", "fee", "fine", "deposit", "bond", "principal", "payment", "carrying"]);
 const MONEY_LISTS = new Set(["prices", "demolition", "goods", "lines", "amounts"]);
 const TIME_SPANS = new Set(["every", "period", "notice", "term"]);
-const MOMENTS = new Set(["at", "until", "first", "closes", "opens", "due"]);
+// (Dates by the names the world's office papers give them: a payroll notice's first pay day read "first pay: 6652800"
+// to the seats of 2026-10-09.)
+const MOMENTS = new Set(["at", "until", "first", "closes", "opens", "due", "first_due", "first_pay", "last_day", "last_from", "period_end"]);
 const whole = (v: unknown): v is number | string => (typeof v === "number" && Number.isSafeInteger(v)) || (typeof v === "string" && /^-?(0|[1-9][0-9]{0,37})$/.test(v));
 const percent = (v: number, per: number) => `${String(Number(((v * 100) / per).toFixed(6)))}%`;
 /** A moment as a date, with the time of day where it is not the day's start (so that two moments never read alike). */
-function moment(t: number): string {
+export function moment(t: number): string {
   const s = ((t % DAY) + DAY) % DAY;
   const two = (x: number) => String(x).padStart(2, "0");
   const day = t < 0 ? `${duration(Math.ceil(-t / DAY) * DAY)} before the start` : when(t);
@@ -76,11 +78,16 @@ export function readable(x: unknown, how: { fields?: FieldKinds; money?: (a: str
       continue;
     }
     if (type) out[k] = type === "amount" ? sum(v) : type === "duration" ? duration(Number(v)) : type === "date" ? moment(Number(v)) : v;
+    // (Of a standing instruction or a standing work order, `first` is how long after the paper was lodged its first
+    // time falls, not a date: read as a date it was a day counted from the world's start, and a seat declined four
+    // right drafts and confirmed a wrong one by it, 2026-10-09.)
+    else if (k === "first" && (o.outcome !== undefined || o.work !== undefined)) out[k] = Number(v) === 0 ? "when it is lodged" : `${duration(Number(v))} after it is lodged`;
     else if (k.endsWith("_bps")) out[k.slice(0, -4)] = percent(Number(v), 10_000);
     else if (k.endsWith("_ppm")) out[k.slice(0, -4)] = percent(Number(v), 1_000_000);
     else if (MONEY_DETAILS.has(k) || (k === "from" && under === "brackets")) out[k] = sum(v);
     else if (TIME_SPANS.has(k) || k.endsWith("_seconds")) out[k.endsWith("_seconds") ? k.slice(0, -8) : k] = duration(Number(v));
-    else if (MOMENTS.has(k) || k.endsWith("_at")) out[k] = moment(Number(v));
+    // (A notice of a new rent: the day it starts, beside the day the rent now paid started.)
+    else if (MOMENTS.has(k) || k.endsWith("_at") || (k === "from" && whole(o.last_from))) out[k] = moment(Number(v));
     else out[k] = v;
   }
   return out;
@@ -216,14 +223,17 @@ function describe(r: Record, readings?: { [id: string]: Reading }): string {
   const who = r.speaks_for ?? writer(r.author);
   switch (r.record) {
     case "statement": {
-      if (r.kind === "request" && r.data?.outcome) return `[${r.id}] ${who} asked ${(r.addressed_to ?? []).join(", ")} to ${outcomeWords(r.data.outcome, r.data.every)}${from}`;
+      // (A standing instruction says when it first falls due, as whoever acts on it counts.)
+      if (r.kind === "request" && r.data?.outcome) return `[${r.id}] ${who} asked ${(r.addressed_to ?? []).join(", ")} to ${outcomeWords(r.data.outcome, r.data.every)}${whole(r.data.every) && Number(r.data.every) > 0 ? `, the first due ${moment(firstDue(r, Number(r.data.every)))}` : ""}${from}`;
       // A ballot that is closed is said to be closed, with where its result is, and never as closing on a day gone
       // by; a result says who voted which way where the paper says (a council's votes are public record: an
       // election's result carries no names, and none are shown).
       const closed = r.kind === "ballot" && r.data?.closed === true;
       const named = r.kind === "ballot_result" && (Array.isArray(r.data?.voted_for) || Array.isArray(r.data?.voted_against));
       const shownData = closed ? Object.fromEntries(Object.entries(r.data as object).filter(([k]) => !["closes_at", "closed", "result"].includes(k)))
-        : named ? Object.fromEntries(Object.entries(r.data as object).filter(([k]) => k !== "voted_for" && k !== "voted_against")) : r.data;
+        : named ? Object.fromEntries(Object.entries(r.data as object).filter(([k]) => k !== "voted_for" && k !== "voted_against"))
+        // (A standing work order: when it first falls due, as its staff count, in place of how that was written.)
+        : r.kind === "work_order" && r.data?.work && whole(r.data?.every) ? { ...Object.fromEntries(Object.entries(r.data as object).filter(([k]) => k !== "first" && k !== "first_at")), first_due: firstDue(r, 0) } : r.data;
       const voters = (list: unknown) => (Array.isArray(list) && list.length ? list.map((p) => writer(String(p))).join(", ") : "nobody");
       const d = [closed ? `closed: no more votes are taken${typeof r.data.result === "string" ? `; its result is ${r.data.result}` : ""}` : "", dataWords({ kind: r.kind, data: shownData }),
         named ? `voted for: ${voters(r.data.voted_for)}; voted against: ${voters(r.data.voted_against)}` : ""].filter(Boolean).join("; ");
