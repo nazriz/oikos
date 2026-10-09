@@ -85,6 +85,30 @@ test("a form's field is an argument by pointing at it in the form as shown; a va
   expect(pieces("Pay acc-c0032 $1,200.90").map((p) => p.text)).toEqual(["Pay", "acc", "-", "c0032", "$", "1", ",", "200", ".", "90"]);
 });
 
+test("an office's own form named only by what it is for, and the office it goes to, are pointed at in the forms shown, never choices of the closed set", () => {
+  const r = "Register the death of c0412, who died on year 1, day 40.";
+  const forms = ["- rental_listing, to=housing, id form-a: fields rent (amount)", "- death_registration, to=pos.41, id form-b: fields deceased (person, required), died (date), notify (one of yes | no)"];
+  const program = 'form(deceased=c0412, died="year 1, day 40", form=death_registration, notify=yes, to=pos.41)';
+  const e = encode({ request: r, forms, program, spans: [
+    { arg: "deceased", value: "c0412", how: "copy", at: at(r, "c0412") }, { arg: "died", value: "year 1, day 40", how: "copy", at: at(r, "year 1, day 40") },
+    { arg: "form", value: "death_registration", how: "implied" }, { arg: "notify", value: "yes", how: "implied" }, { arg: "to", value: "pos.41", how: "implied" }] });
+  expect(decode(e.input, e.steps)).toBe(canonical(program));
+  // The form's name and its office: places in the second form's line. The yes the wording implies: a choice.
+  const ids = e.steps.filter((s): s is ["id", number, number] => typeof s !== "string" && s[0] === "id" && s[1] > r.length);
+  expect(ids.map((s) => e.input.slice(s[1], s[2]))).toEqual(["death_registration", "pos.41"]);
+  expect(vocabulary([e]).filter((c) => c.startsWith("const:"))).toEqual(["const:yes"]);
+  // Whole pieces of the input, so the export keeps it, and the program comes back from the pieces.
+  const x = row("a", "positive", e)!;
+  expect(decode(e.input, stepsOf(x, x.steps))).toBe(canonical(program));
+  // An office two forms go to is taken from the line of the form being filled; a form that is not shown stays a choice.
+  const two = ["- a_form, to=pos.9, id form-a: fields n (text)", "- b_form, to=pos.9, id form-b: fields n (text)"];
+  const b = encode({ request: "File the second one saying hello.", forms: two, program: 'form(form=b_form, n="hello", to=pos.9)', spans: [{ arg: "form", value: "b_form", how: "implied" }, { arg: "n", value: "hello", how: "copy", at: [27, 32] }, { arg: "to", value: "pos.9", how: "implied" }] });
+  const to = b.steps.filter((s): s is ["id", number, number] => typeof s !== "string" && s[0] === "id").at(-1)!;
+  expect(to[1]).toBeGreaterThan(b.input.indexOf("- b_form"));
+  const none = encode({ request: "File it.", forms: [], program: "form(form=b_form, to=pos.9)", spans: [{ arg: "form", value: "b_form", how: "implied" }, { arg: "to", value: "pos.9", how: "implied" }] });
+  expect(none.steps).toContain("const:b_form");
+});
+
 test("the adapter reads the request and the forms out of what the translator sends a model", () => {
   expect(shown("Request: Pay c0412 $5.")).toEqual({ request: "Pay c0412 $5.", forms: [] });
   expect(shown("Request: Fill it in.\nSecond line.\n\nForms this person knows of:\n- a, to=x, id f: fields n (text)\n- b, to=y, id g: fields m (text)")).toEqual({ request: "Fill it in.\nSecond line.", forms: ["- a, to=x, id f: fields n (text)", "- b, to=y, id g: fields m (text)"] });

@@ -58,9 +58,12 @@ export function encode(e: { request: string; forms: string[]; program: string; s
       if (at < 0) throw new NotEncodable(`no span for ${path}=${value}`);
       return q.splice(at, 1)[0]!;
     };
-    const scalar = (path: string, value: string, quoted: boolean) => {
+    const scalar = (path: string, value: string, quoted: boolean, shown?: [number, number]) => {
       const s = take(path, value);
-      if (s.how === "implied") return void steps.push(`const:${quoted ? JSON.stringify(value) : value}`);
+      // What the request implies and never says is a choice from the closed set, unless it stands in the forms shown
+      // (an office's own form named by what it is for, and the office it goes to): that is pointed at where it is
+      // shown, like a form's field, so that a form or an office no example had can still be written.
+      if (s.how === "implied") return void steps.push(shown ? [quoted ? "text" : "id", shown[0], shown[1]] : `const:${quoted ? JSON.stringify(value) : value}`);
       if (!s.at) throw new NotEncodable(`no place for ${path}=${value}`);
       const said = e.request.slice(s.at[0], s.at[1]);
       if (said === value) steps.push([quoted ? "text" : "id", s.at[0], s.at[1]]);
@@ -81,10 +84,10 @@ export function encode(e: { request: string; forms: string[]; program: string; s
         steps.push("}");
       } else scalar(path, String(v), true);
     };
-    const value = (path: string, v: calls.Value) => {
+    const value = (path: string, v: calls.Value, shown?: (value: string) => [number, number] | undefined) => {
       if ("var" in v) steps.push(`var:${v.var}`);
-      else if ("id" in v) scalar(path, v.id, false);
-      else if ("text" in v) scalar(path, v.text, true);
+      else if ("id" in v) scalar(path, v.id, false, shown?.(v.id));
+      else if ("text" in v) scalar(path, v.text, true, shown?.(v.text));
       else if ("call" in v) call(v.call, `${path}.`);
       else data(path, v.json);
     };
@@ -103,9 +106,10 @@ export function encode(e: { request: string; forms: string[]; program: string; s
           if (!at) throw new NotEncodable(`the field ${k} is in no form shown`);
           steps.push(["field", at[0], at[1]]);
         }
-        value(prefix + k, c.args[k]!);
+        value(prefix + k, c.args[k]!, c.fn === "form" && FORM_ARGS.has(k) ? (v) => shownAt(input, e.request.length, c, k as "form" | "to", v) : undefined);
         const mine = steps.splice(before);
-        const said = mine.filter((x): x is Pointer => typeof x !== "string" && x[0] !== "field").map((x) => x[1]);
+        // (Where the request says a value: a place in the forms shown is not one.)
+        const said = mine.filter((x): x is Pointer => typeof x !== "string" && x[0] !== "field" && x[1] < e.request.length).map((x) => x[1]);
         const long = mine.some((x) => typeof x !== "string" && x[0] === "text" && x[2] - x[1] >= LONG);
         parts.push({ name: k, from: said.length ? Math.min(...said) : -1, long, steps: mine });
       }
@@ -121,15 +125,38 @@ export function encode(e: { request: string; forms: string[]; program: string; s
   return { input, steps };
 }
 
-/** Where a form's field is named in the forms shown: in the line of the form the call fills, if it can be told. */
-function fieldAt(input: string, from: number, c: calls.Call, field: string): [number, number] | undefined {
-  const named = c.args.form && ("id" in c.args.form ? c.args.form.id : "text" in c.args.form ? c.args.form.text : undefined);
+/** The lines of the forms shown, each with where it begins in the input. */
+function formLines(input: string, from: number): [number, string][] {
   const lines: [number, string][] = [];
   for (let at = from + 1; at <= input.length; ) {
     const end = input.indexOf("\n", at) < 0 ? input.length : input.indexOf("\n", at);
     lines.push([at, input.slice(at, end)]);
     at = end + 1;
   }
+  return lines;
+}
+
+/** Where a form's own name, or the office it goes to, stands in the forms shown (`- name, to=office, id record: fields
+ * ...`): the name at the head of its line; the office after `to=` in the line of the form the call fills. */
+function shownAt(input: string, from: number, c: calls.Call, arg: "form" | "to", value: string): [number, number] | undefined {
+  const lines = formLines(input, from);
+  if (arg === "form") {
+    const mine = lines.find(([, l]) => l.startsWith(`- ${value},`));
+    return mine ? [mine[0] + 2, mine[0] + 2 + value.length] : undefined;
+  }
+  const named = c.args.form && ("id" in c.args.form ? c.args.form.id : "text" in c.args.form ? c.args.form.text : undefined);
+  for (const [at, l] of [...lines.filter(([, l]) => named !== undefined && l.startsWith(`- ${named},`)), ...lines]) {
+    const head = l.indexOf(": fields ") < 0 ? l : l.slice(0, l.indexOf(": fields "));
+    const i = head.indexOf(`, to=${value},`);
+    if (i >= 0) return [at + i + 5, at + i + 5 + value.length];
+  }
+  return undefined;
+}
+
+/** Where a form's field is named in the forms shown: in the line of the form the call fills, if it can be told. */
+function fieldAt(input: string, from: number, c: calls.Call, field: string): [number, number] | undefined {
+  const named = c.args.form && ("id" in c.args.form ? c.args.form.id : "text" in c.args.form ? c.args.form.text : undefined);
+  const lines = formLines(input, from);
   const mine = lines.filter(([, l]) => named !== undefined && (l.startsWith(`- ${named},`) || l.includes(`id ${named}:`)));
   for (const [at, l] of [...mine, ...lines]) {
     const fields = l.indexOf(": fields ");

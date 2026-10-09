@@ -92,6 +92,10 @@ export interface PipelineConfig {
   seeds?: number[];
   trainExtra?: string[];
   deadlineHours?: number;
+  /** The limits past which a reader's answers are taken for a rule's and the run stops (`UNIFORMITY`), where a run's
+   * requests are known to be lopsided: the wave's writers, put in a seat, ask to be shown things about one time in
+   * three, which is no act, so a batch of 30 passes the default share of one program (0.4) by chance. */
+  uniformity?: Partial<UniformityLimits>;
   /** Minutes one call to a writer or reader may take before it is given up and made again (15). */
   callMinutes?: number;
   /** A name for the data and the runs (the folder's name). */
@@ -574,9 +578,19 @@ export async function runPipeline(cfg: PipelineConfig, hooks: Hooks = {}): Promi
         size += n;
       }
       for (const [gi, group] of groups.entries()) {
-        const file = join(dir, "written", `${safe(model)}-${String(gi + 1).padStart(3, "0")}.json`);
+        // (A call's file is named for its writer, and for the seat model family too where several families share one
+        // writer: named for the writer alone, each family's calls took the other's files, and every resume asked them again.)
+        const shared = Object.entries(selected).filter(([g, xs]) => g !== f && xs.length && cfg.writers[g] === model).length > 0;
+        const file = join(dir, "written", `${safe(model)}${shared ? `-for-${safe(f)}` : ""}-${String(gi + 1).padStart(3, "0")}.json`);
         const unitFp = fp(group, model, sha(writerSystem), sha(writerCall));
         let u = read<{ fp: string; answers: any[]; used: Used; reply_chars: number }>(file);
+        if (u?.fp !== unitFp && shared && existsSync(join(dir, "written"))) {
+          // An answer to this very call kept under the older name (or set aside from it as stale) is this call's answer.
+          for (const old of readdirSync(join(dir, "written")).filter((n) => n.startsWith(`${safe(model)}-`)).sort()) {
+            const o = read<{ fp: string; answers: any[]; used: Used; reply_chars: number }>(join(dir, "written", old));
+            if (o?.fp === unitFp && Array.isArray(o.answers)) { if (u) setAside(file, "stale"); putJson(file, o); u = o; break; }
+          }
+        }
         if (u?.fp !== unitFp) {
           if (u) setAside(file, "stale");
           const user = `${writerCall}\n\n=== CHUNK ===\n${group.map((id) => JSON.stringify({ id, system: have.get(id)!.system, shown: have.get(id)!.shown })).join("\n")}\n`;
@@ -660,7 +674,7 @@ export async function runPipeline(cfg: PipelineConfig, hooks: Hooks = {}): Promi
             if (u) setAside(file, "stale");
             const r = await askReader(caller, reader, { step: key("read"), unit: `${safe(reader)}/${basename(file)}` }, system, task, batch);
             const mine = r.answers;
-            const odd = implausiblyUniform(mine, false);
+            const odd = implausiblyUniform(mine, false, { ...UNIFORMITY, ...cfg.uniformity });
             if (odd) {
               putJson(`${file}.rejected-1`, { fp: unitFp, why: odd, answers: mine, used: r.used });
               throw new Stopped("reader uniform", `${reader}'s answers to ${basename(file)} are implausibly uniform (${odd}); they are set aside as ${basename(file)}.rejected-1 and the run stopped. A reader that answers by a rule is not a reader`);
@@ -675,7 +689,7 @@ export async function runPipeline(cfg: PipelineConfig, hooks: Hooks = {}): Promi
         }
       }
       const whole = [...got].map(([id, program]) => ({ id, program }));
-      const odd = implausiblyUniform(whole, true);
+      const odd = implausiblyUniform(whole, true, { ...UNIFORMITY, ...cfg.uniformity });
       if (odd) {
         setAside(rdir, "rejected");
         throw new Stopped("reader uniform", `${reader}'s answers are implausibly uniform (${odd}); its answers are set aside (${basename(rdir)}.rejected-1) and the run stopped. A reader that answers by a rule is not a reader`);
@@ -787,6 +801,8 @@ export async function runPipeline(cfg: PipelineConfig, hooks: Hooks = {}): Promi
     // (An example names its run from the runs folder on, with `runs/` before it or, as the pilots' own requests do, without.)
     const testRuns = m.sources.filter((s) => s.test && s.logs.length).map((s) => inRuns(s.logs[0]!));
     const ofTestRun = (e: { id: string; source?: string }) => testRuns.some((r) => [e.source ?? "", e.id].some((x) => x.startsWith(`${r}/`) || x.startsWith(`runs/${r}/`)));
+    // (A standing set that is named and is not there stops the run: joined with nothing, the new examples alone would be exported as the whole set.)
+    if (cfg.standing && !existsSync(join(cfg.standing, "train.jsonl"))) throw new Stopped("standing set missing", `${cfg.standing} has no train.jsonl: the join waits for it (the same command goes on when it is there)`);
     const stand = (name: string): any[] => (cfg.standing && existsSync(join(cfg.standing, name)) ? jsonl<any>(join(cfg.standing, name)) : []);
     const standing = { train: stand("train.jsonl"), validation: stand("validation.jsonl"), real: stand("validation-real.jsonl") };
     let droppedRun = 0, droppedWords = 0;

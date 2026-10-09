@@ -248,7 +248,17 @@ test("the parts of a run are collected with their groups, and a parity test is c
   const all = join(out, "all");
   const r = collect(all, [part], { share: 0.4, floor: 2, seed: 5, heldOut: false });
   const train = jsonl<Example & { groups: Groups }>(join(all, "train.jsonl")), parity = jsonl<Example & { groups: Groups }>(join(all, "parity-test.jsonl"));
-  expect(r.examples).toBe(train.length + parity.length);
+  const shared = jsonl<Example>(join(all, "shared-with-parity.jsonl"));
+  expect(r.examples).toBe(train.length + parity.length + shared.length);
+  expect(r.shared_with_parity).toBe(shared.length);
+  // Across functions too: nothing that trains has a parity case's source program or request, or was built from one.
+  const src = (e: Example) => e.gold ?? (e.kind === "positive" ? e.program : undefined);
+  const parityGold = new Set(parity.map(src).filter(Boolean)), parityIds = new Set(parity.map((e) => e.id)), parityRequests = new Set(parity.map((e) => e.request));
+  for (const e of train) {
+    expect(parityGold.has(src(e))).toBe(false);
+    expect(parityRequests.has(e.request)).toBe(false);
+    expect((e.built_from ?? []).some((id) => parityIds.has(id))).toBe(false);
+  }
   expect(r.examples).toBe(jsonl(join(part, "checked.jsonl")).length);
   expect(parity.length).toBeGreaterThan(0);
   expect(train.length).toBeGreaterThan(0);

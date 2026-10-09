@@ -773,7 +773,7 @@ export const groupsOf = (e: Example, part: string): Groups => ({
   source: e.kind === "refusal" ? (e.written_by ? "generated: a situation to be refused" : "built from kept requests") : e.origin === "synthetic" ? "generated from the contract" : e.origin === "case" ? "a seen test case's program" : (e.origin ?? "log"), part,
 });
 
-export interface Collected { examples: number; train: number; parity: number; by: { [dim: string]: { [key: string]: number } }; cells: { [dim: string]: { functions: number; min: number; under: { [cell: string]: number } } }; parity_cells: { [dim: string]: { [cell: string]: number } }; leak_check: { held_out_cases_here: number; cases_named: number } }
+export interface Collected { examples: number; train: number; parity: number; /** Left out of training for sharing a source program or a request with a parity case (on neither side). */ shared_with_parity: number; by: { [dim: string]: { [key: string]: number } }; cells: { [dim: string]: { functions: number; min: number; under: { [cell: string]: number } } }; parity_cells: { [dim: string]: { [cell: string]: number } }; leak_check: { held_out_cases_here: number; cases_named: number } }
 
 /**
  * `oikos translator-data-collect <OUT> <PART>...`: every part's checked examples as one set, each with its groups
@@ -797,7 +797,18 @@ export function collect(out: string, parts: string[], o: { share?: number; floor
   const goldOf = new Map(all.map((e) => [e.id, e.gold ?? e.program]));
   const key = (e: Example) => e.gold ?? (e.built_from?.length ? goldOf.get(e.built_from[0]!) : undefined) ?? e.id;
   const held = (e: Example) => parseInt(sha(`${seed}:${fnOf(e)}:${key(e)}`).slice(0, 8), 16) / 0xffffffff < share;
-  const parity = all.filter(held), train = all.filter((e) => !held(e));
+  const parity = all.filter(held);
+  // The cut is made within each function, so a refusal made from a payment's program is another function's example
+  // and could train while that payment is a parity case (found 2026-10-09: 442 training rows of the first wide set).
+  // Nothing trains that shares a source program or a request with a parity case, was built from one or from a row of
+  // such a program, or that a parity case was built from: those are set aside (`shared-with-parity.jsonl`), on neither side.
+  const source = (e: Example) => e.gold ?? (e.kind === "positive" ? e.program : undefined);
+  const parityGold = new Set(parity.map(source).filter((g): g is string => !!g)), parityRequests = new Set(parity.map((e) => e.request));
+  const parityIds = new Set(parity.map((e) => e.id)), parityBuiltFrom = new Set(parity.flatMap((e) => e.built_from ?? []));
+  const sourceById = new Map(all.map((e) => [e.id, source(e)]));
+  const shares = (e: Example) => (!!source(e) && parityGold.has(source(e)!)) || parityRequests.has(e.request) || parityBuiltFrom.has(e.id) || (e.built_from ?? []).some((id) => parityIds.has(id) || (!!sourceById.get(id) && parityGold.has(sourceById.get(id)!)));
+  const shared = all.filter((e) => !held(e) && shares(e));
+  const train = all.filter((e) => !held(e) && !shares(e));
   const dims = ["writer", "register", "asker", "writing", "currency", "source", "part"] as const;
   const by: Collected["by"] = { function: {} }, cells: Collected["cells"] = {}, parity_cells: Collected["parity_cells"] = {};
   const fns = [...new Set(all.map(fnOf))].sort();
@@ -824,8 +835,9 @@ export function collect(out: string, parts: string[], o: { share?: number; floor
   put(join(out, "set-aside-direction-unlisted.jsonl"), lines(unlisted));
   put(join(out, "train.jsonl"), lines(train));
   put(join(out, "parity-test.jsonl"), lines(parity));
-  const r: Collected = { examples: all.length, train: train.length, parity: parity.length, by, cells, parity_cells, leak_check: { held_out_cases_here: heldOut?.length ?? 0, cases_named: named } };
+  put(join(out, "shared-with-parity.jsonl"), lines(shared));
+  const r: Collected = { examples: all.length, train: train.length, parity: parity.length, shared_with_parity: shared.length, by, cells, parity_cells, leak_check: { held_out_cases_here: heldOut?.length ?? 0, cases_named: named } };
   putJson(join(out, "manifest.json"), { data_version: DATA_VERSION, translator_prompt: TRANSLATOR_VERSION, parts: parts.map((p) => resolve(p)), parity_share: share, floor, seed, ...r,
-    note: "parity-test.jsonl never trains: it is cut by gold program within each function, and every example carries `groups` (writer, register, asker, currency, writing, source). A cell under the floor is too small to be measured on its own.", sha256: { train: sha(lines(train)), parity: sha(lines(parity)) } });
+    note: "parity-test.jsonl never trains: it is cut by gold program within each function, what would train and shares a source program or a request with a parity case is in shared-with-parity.jsonl and trains nothing, and every example carries `groups` (writer, register, asker, currency, writing, source). A cell under the floor is too small to be measured on its own.", sha256: { train: sha(lines(train)), parity: sha(lines(parity)) } });
   return r;
 }
