@@ -99,10 +99,18 @@ identical."
 collections and their reasons against its schedule; a manager's exception report says what was not done and why.
 **(to confirm: common practice; no source opened.)**
 
-**Built for** the works crew and the energy retailer's staff (who also say what is held, and why nothing was bought
-when it ran below a fortnight's use: "a month's from the grid comes to ... and the account holds ..., so nothing was
-ordered: a smaller order is the office's to place on its order form"). The other staff parts (clinic, school, water,
-the rates office) keep no count yet.
+**Built for every staff part.** The works crew (calls and loads, upkeep jobs, what the hours left undone); the
+doctors (patients seen) and the teachers (lessons, classrooms left without a teacher, enrolments answered), each
+with who of them worked and "none of the N in post was at the clinic (...) when it opened" where nobody came; the
+energy retailer's staff (days' supply, what is held, why nothing was bought when stock ran low, when the next bills
+go out); the water corporation's staff (days' draw, "the river could not give what the town uses", when the meters
+are read and the next bills go out); the rates clerks (notices sent, when the next go out, or that no property has
+been valued yet).
+
+**A round of bills is counted from its order** (2026-10-09). The water and energy staff send the first bills one
+period after the standing order came into force (and a new order starts its own count); until then they kept the
+office's own first date whatever the order said, so a seat that ordered water bills every 30 days had none in 43.
+The rates notices keep the rating law's instalments: the order says that they are sent, the law says when.
 
 ## The routines that exist
 

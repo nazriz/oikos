@@ -7,7 +7,7 @@
 import * as C from "../calls";
 import type { SiteStructure } from "../contracts";
 import { need, params, type BehaviourModule, type ParticipantContext } from "../module";
-import { because, Book, DAY, outOfTime, say, StandingWork, type Step } from "./common";
+import { because, Book, DAY, jobTerms, outOfTime, say, StandingWork, type Step } from "./common";
 import { Staffing, stepper } from "./firms";
 import * as P from "./papers";
 
@@ -20,7 +20,7 @@ export const practice: BehaviourModule = {
   issues: [P.JOB_ADVERTISEMENT],
   staffed: (p) => ({ role: p.role ?? "doctor", posts: { establishment: p.doctors ?? 0 } }),
   issuesWith: (p) => P.staffingOwn({ role: p.role ?? "doctor", industry: p.industry ?? "health_care", workplace: p.workplace, notice_days: p.notice_days ?? 14 }),
-  version: "0.2.1",
+  version: "0.3.0", // 0.3.0: its doctors report to the manager who was seen under the standing order, or why nobody was
   doc: "docs/behaviour/health.md",
   // (When it opens each working day, and whenever a patient asks: someone who comes in and asks is seen then, if it's
   // open.)
@@ -52,6 +52,7 @@ export const practice: BehaviourModule = {
     const queued = new Set<string>();
     const used = new Map<string, number>(); // doctor -> seconds worked today
     let usedDay = -1;
+    let reportDay = -1;
     return stepper(
       (obs) => {
         book.absorb(obs);
@@ -81,11 +82,22 @@ export const practice: BehaviourModule = {
         for (let i = queue.length - 1; i >= 0; i--) if (t - queue[i]!.at > p.give_up_days * DAY) queue.splice(i, 1);
         const open = day % 7 < p.work_days && t % DAY >= p.opens && t % DAY < p.closes;
         // (Closed: those who asked are seen when it opens, at its morning look.)
-        if (!open || !queue.length || !routines.does(book, p.treat_task, t, { every: DAY })) return steps;
         const inRoom = (space: string) => [...new Set(view?.spaces.find((sp) => sp.space === space)?.occupants ?? [])];
-        const waiting = new Set(inRoom(p.waiting));
         const mine = new Set(staffing.workers(book, t));
         const doctors = inRoom(p.workplace).filter((w) => mine.has(w)).sort();
+        // The doctors' report to the manager, once each day the clinic opens: who was seen, or that nobody of those
+        // in post (since before today) was at the clinic (docs/behaviour/standing-work.md, "The staff's report").
+        const tell = (): Step[] => {
+          if (p.part !== "staff" || !open || reportDay === day) return [];
+          const before = staffing.staff(book, t).filter((a: any) => (book.signedAt(a.id) ?? 0) < day * DAY).length;
+          if (!doctors.length && !before) return [];
+          reportDay = day;
+          if (!doctors.length && routines.order(book, p.treat_task, t)) routines.heldUp(p.treat_task, `none of the ${before} in post was at the clinic (${p.workplace}) when it opened`);
+          const noPlace = staffing.staff(book, t).filter((a: any) => !jobTerms(a, a.terms.parties[1], book).workplace).map((a: any) => String(a.terms.parties[1]));
+          return routines.report(book, t, { office: (ctx.position ?? "").replace(/-staff$/, ""), from: `the clinic's ${p.role}s`, tasks: { [p.treat_task]: ["patients seen", "consultations"] }, inPost: [...mine].sort(), noPlace });
+        };
+        if (!open || !queue.length || !routines.does(book, p.treat_task, t, { every: DAY })) return [...steps, ...tell()];
+        const waiting = new Set(inRoom(p.waiting));
         for (const q of [...queue]) {
           if (!waiting.has(q.patient)) continue;
           const units = p.consults.find((c) => c.kind === q.kind && (!c.severity || c.severity === q.severity))?.consults ?? 1;
@@ -94,6 +106,7 @@ export const practice: BehaviourModule = {
           if (!doctor) break; // (the doctors' day is full: the rest wait)
           used.set(doctor, (used.get(doctor) ?? 0) + need);
           queue.splice(queue.indexOf(q), 1);
+          routines.did(p.treat_task, t, { units, by: [doctor] });
           const st = because(`${q.patient} is waiting with a ${q.severity} ${q.kind}: ${doctor} sees them (${units} consultation${units === 1 ? "" : "s"}).`,
             C.call("work", { task: p.treat_task, units: String(units), at: p.building, by: C.json([doctor]), on: q.patient }),
             say("consultation", `You've been seen at the clinic.`, { to: [q.patient], visible: [q.patient, me], basis: q.request, data: { request: q.request, by: doctor } }));
@@ -101,11 +114,13 @@ export const practice: BehaviourModule = {
             if (out.status === "applied") return;
             // (Not seen after all: back in the queue, first.)
             queue.unshift(q);
+            routines.undid(p.treat_task, { units });
             const short = outOfTime(out);
             if (short?.who) used.set(short.who, p.working_day - short.left);
           };
           steps.push(st);
         }
+        steps.push(...tell());
         return steps;
       },
       // (Next: when it next opens, unless it's open now and news comes first. A wake on its cadence would drift with

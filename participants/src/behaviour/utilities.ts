@@ -25,7 +25,7 @@ export const water: BehaviourModule = {
     { what: "property_roll", why: "Its customer roll: the valuer's roll of each property it supplies is given to it, as valuations are given to a rating authority." },
     { what: "acquisition_notice", why: "Its customer roll: each notice that land it supplies has changed hands is given to it." },
   ],
-  version: "0.2.0", // 0.2.0: bills by its customer roll and the meters it reads; draws what the published population uses; no longer shown the town or the land register
+  version: "0.3.0", // 0.3.0: its staff's first round of bills falls due one period after the standing order came into force, and they report the draws, the bills and when the next go out; 0.2.0: bills by its customer roll and the meters it reads; draws what the published population uses; no longer shown the town or the land register
   doc: "docs/behaviour/utilities.md",
   cadence: () => DAY,
   firstWake: (ctx) => 6 * 3600 + ctx.rng("first-wake").below(3600),
@@ -63,6 +63,8 @@ export const water: BehaviourModule = {
     let outSince = 0;
     let lastDay = -1;
     let nextBill = p.bill_every_days * DAY;
+    let billedUnder = ""; // the standing order the round of bills is counted from (the staff's)
+    let reportDay = -1;
     let roundFor = -1; // the bill date the round under way is for
     let restricted = false;
     const building = (lot: string, structure: string) => {
@@ -122,6 +124,13 @@ export const water: BehaviourModule = {
         const billing = routines.does(book, "bill", t, { every: p.bill_every_days * DAY });
         billingNow = !!billing;
         if (billing) billEvery = billing.every;
+        // (Under a standing order the round is the order's: the first bills go out one period after it came into force,
+        // and a new order starts its own count. Until 2026-10-09 the staff kept the office's own first date whatever
+        // the order said: a seat that ordered bills every 30 days had none in 43.)
+        if (billing?.order && billing.order.id !== billedUnder) {
+          billedUnder = billing.order.id;
+          nextBill = billing.order.from + billing.every;
+        }
         const day = Math.floor(t / DAY);
         if (day !== lastDay) {
           const days = lastDay < 0 ? 1 : day - lastDay;
@@ -132,8 +141,13 @@ export const water: BehaviourModule = {
           const kl = routines.does(book, p.task, t, { every: DAY }) ? Math.ceil((people * p.litres_per_person_per_day * days) / 1000) : 0;
           if (kl > 0) {
             const st = because(`The town of ${people} used about ${kl} kL of water (${days} day${days > 1 ? "s" : ""}): drawing it from the river.`, C.call("work", { task: p.task, units: C.text(String(kl)), at: p.works }));
+            routines.did(p.task, t, { units: kl });
             st.then = (out) => {
               const dry = out.status !== "applied" && out.refusal?.code === "field_exhausted";
+              if (out.status !== "applied") {
+                routines.undid(p.task, { units: kl });
+                routines.heldUp(p.task, dry ? "the river could not give what the town uses" : `the draw was refused (${out.refusal?.code ?? "no reason given"})`);
+              }
               if (dry && !restricted) {
                 restricted = true;
                 return [because("The river can't give what the town uses: announcing water restrictions.", say("water_restrictions", "Water restrictions: the river is too low to supply the town as usual.", { visible: "public", data: { since: t } }))];
@@ -159,10 +173,17 @@ export const water: BehaviourModule = {
             if (read) billedAt.set(h, read.litres);
             if (!owner || owner === me) continue;
             const amount = p.service_per_quarter + kl * p.price_per_kl;
+            routines.did("bill", t);
             steps.push(because(`The quarter's water bill for ${h}: ${usd(p.service_per_quarter)} service, and ${kl} kL at ${usd(p.price_per_kl)}.`,
               say("invoice", `Water bill for ${h}: ${usd(amount)} (service ${usd(p.service_per_quarter)}; ${kl} kL used).`, { to: [owner], visible: [owner, me],
                 data: { outcome: { money: { to: acc.account, amount: String(amount) } }, service: "water", home: h, kl } })));
           }
+        }
+        // The staff's report to the office, once a day (docs/behaviour/standing-work.md, "The staff's report").
+        if (billing) routines.note("bill", `${p.meters ? `the meters are read from ${dated(Math.max(0, nextBill - p.read_days * DAY))} and ` : ""}the next bills go out on ${dated(nextBill)}`);
+        if (p.part === "staff" && reportDay !== day) {
+          reportDay = day;
+          steps.push(...routines.report(book, t, { office: (ctx.position ?? "").replace(/-staff$/, ""), from: "the water corporation's staff", tasks: { [p.task]: ["days' draw", "kL"], bill: ["bills"] } }));
         }
         return steps;
       },
@@ -195,7 +216,7 @@ export const energy: BehaviourModule = {
   ],
   // (What it buys in, it orders on its own order form: its staff's orders to the grid are that paper.)
   issues: [P.ORDER],
-  version: "0.2.0", // 0.2.0: has an order form of its own for buying from the grid; its staff report what they supplied and billed, and why they did not buy when stock ran low (docs/behaviour/standing-work.md, "The staff's report")
+  version: "0.2.1", // 0.2.1: its staff's first bills fall due one period after the standing order came into force; 0.2.0: has an order form of its own for buying from the grid; its staff report what they supplied and billed, and why they did not buy when stock ran low (docs/behaviour/standing-work.md, "The staff's report")
   doc: "docs/behaviour/utilities.md",
   cadence: () => DAY,
   firstWake: (ctx) => 6 * 3600 + ctx.rng("first-wake").below(3600),
@@ -222,6 +243,7 @@ export const energy: BehaviourModule = {
     let onOrder = 0; // ordered from the grid, not yet delivered (or refunded)
     const deliveries = new Deliveries();
     let nextBill = p.bill_every_days * DAY;
+    let billedUnder = ""; // the standing order the round of bills is counted from (the staff's)
     let reportDay = -1;
     return stepper(
       (obs) => void book.absorb(obs),
@@ -289,6 +311,10 @@ export const energy: BehaviourModule = {
           }
         }
         // ---- the month's bills: each customer, the supply charge and their use; a customer gone, their last ----
+        if (billingBy?.order && billingBy.order.id !== billedUnder) {
+          billedUnder = billingBy.order.id;
+          nextBill = billingBy.order.from + billingBy.every;
+        }
         const billing = !!billingBy && t >= nextBill;
         if (billing) nextBill = t + billingBy!.every;
         if (acc && billingBy) for (const [who, c] of [...customers].sort(([a], [b]) => (a < b ? -1 : 1))) {

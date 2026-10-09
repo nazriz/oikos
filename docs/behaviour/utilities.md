@@ -40,6 +40,11 @@ bill follows who was in it, hour by hour (the meter), not who was there at one l
 **Leaves out:** a meter reader is nobody's working day (the corporation has no staff in the world: its draw of water
 takes none either); estimated readings; the tenant as the customer.
 
+**Under a standing order** (a model in the office: docs/behaviour/standing-work.md) the billing staff count the round
+from the order: the first bills go out one period after it came into force, the meter round begins `read_days`
+before that, and their report to the office says both dates ("the meters are read from year 1, day 41 and the next
+bills go out on year 1, day 62").
+
 ## The energy retailer
 
 | | Rule | Source |

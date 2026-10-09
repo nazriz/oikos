@@ -9,7 +9,7 @@ import * as C from "../calls";
 import type { SiteStructure } from "../contracts";
 import { basesOf } from "../contracts";
 import { need, params, type BehaviourModule, type ParticipantContext } from "../module";
-import { because, Book, DAY, outOfTime, say, type Step } from "./common";
+import { because, Book, DAY, jobTerms, outOfTime, say, type Step } from "./common";
 import { Staffing, stepper } from "./firms";
 import { StandingWork } from "./common";
 import * as P from "./papers";
@@ -44,7 +44,7 @@ export const principal: BehaviourModule = {
     { what: "school_enrolment", why: "A school keeps its own roll: every pupil's enrolment is made with it." },
     { what: "school_place", why: "The places it has given, each to a pupil on its own roll." },
   ],
-  version: "0.2.1",
+  version: "0.3.0", // 0.3.0: its teachers report to the principal the lessons taught under the standing order, or why none were
   doc: "docs/behaviour/education.md",
   cadence: () => DAY,
   firstWake: (ctx) => 8 * 3600 + ctx.rng("first-wake").below(1800),
@@ -76,6 +76,8 @@ export const principal: BehaviourModule = {
     const answered = new Set<string>();
     const certified = new Set<string>(); // pupils who've finished (or died): off the roll
     let taughtDay = -1;
+    let reportDay = -1;
+    let telling = false; // the school day has just begun: the teachers take stock
     const year = p.year;
     return stepper(
       (obs) => {
@@ -100,6 +102,7 @@ export const principal: BehaviourModule = {
         const placed = new Map(book.open("school_place").filter((x) => x.speaks_for === me).map((x) => [String((x.addressed_to ?? [])[0]), x]));
         for (const r of enrolling ? book.open("school_enrolment").filter((x) => (x.addressed_to ?? []).includes(me) && !answered.has(x.id)) : []) {
           answered.add(r.id);
+          routines.did("enrol", t);
           const who = r.speaks_for!;
           if (placed.has(who)) continue; // (already has a place)
           const born = Number(r.data?.born_at);
@@ -123,12 +126,20 @@ export const principal: BehaviourModule = {
           const mine = new Set(staffing.workers(book, t));
           const here = inRoom(p.workplace).filter((w) => mine.has(w)).sort();
           const rooms = p.classrooms.filter((room) => inRoom(room).some((x) => !mine.has(x)));
+          // (For the teachers' report: who taught, the classrooms left without a teacher, or that nobody of those in
+          // post since before today was at the school.)
+          const before = staffing.staff(book, t).filter((a: any) => (book.signedAt(a.id) ?? 0) < day * DAY).length;
+          if (!here.length && before) routines.heldUp(p.teach_task, `none of the ${before} in post was at the school (${p.workplace}) when the school day began`);
+          routines.note(p.teach_task, here.length && rooms.length > here.length ? `${rooms.length - here.length} classroom${rooms.length - here.length > 1 ? "s" : ""} with pupils had no teacher today` : undefined);
+          telling = p.part === "staff" && (here.length > 0 || before > 0);
           rooms.forEach((room, i) => {
             const teacher = here[i];
             if (!teacher) return;
+            routines.did(p.teach_task, t, { units: 1, by: [teacher] });
             const st = because(`A school day: ${teacher} teaches ${room} (${inRoom(room).length} pupils).`,
               C.call("work", { task: p.teach_task, units: "1", at: p.building, by: C.json([teacher]), on: room }));
             st.then = (out) => {
+              if (out.status !== "applied") routines.undid(p.teach_task, { units: 1 });
               if (out.status !== "applied" && outOfTime(out)) taughtDay = -1; // (try again later today)
             };
             steps.push(st);
@@ -147,6 +158,13 @@ export const principal: BehaviourModule = {
           steps.push(because(`${who} has finished school: a certificate of ${years} years.`,
             say("school_certificate", `Certificate: ${who} completed ${years} years of school.`, { to: [who], visible: [who, me], data: { person: who, years, school: me } })));
         }
+        // The teachers' report to the principal, once each school day (docs/behaviour/standing-work.md, "The staff's report").
+        if (telling && reportDay !== day) {
+          reportDay = day;
+          const noPlace = staffing.staff(book, t).filter((a: any) => !jobTerms(a, a.terms.parties[1], book).workplace).map((a: any) => String(a.terms.parties[1]));
+          steps.push(...routines.report(book, t, { office: (ctx.position ?? "").replace(/-staff$/, ""), from: `the school's ${p.role}s`, tasks: { [p.teach_task]: ["lessons"], enrol: ["enrolments answered"] }, inPost: staffing.workers(book, t), noPlace }));
+        }
+        telling = false;
         return steps;
       },
       // (Next: the morning, when the school day starts; not wherever the news that last woke it left its cadence.)
