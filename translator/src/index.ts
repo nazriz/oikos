@@ -280,11 +280,11 @@ export type ResolveFn = (req: TranslateRequest, program: calls.Program) => Promi
  */
 export const NOT_PUT = "That couldn't be put into effect as it was said, and nothing was done. You could say it again, or another way.";
 /** The acts were worked out, and checking them failed (not a refusal: the check itself). */
-export const NOT_CHECKED = "That couldn't be put into effect, and nothing was done. Saying it another way may not help.";
+export const NOT_CHECKED = "The draft could not be drawn up, and the fault is not in what you asked: it has been noted. Please ask for it again; if it fails again, ask for it in smaller steps.";
 
 /** Resolver answers that are about how the call was put together (an argument of the wrong shape), not about anything
  * the participant said or knows: the call is at fault, so it's tried again, and the participant never reads these. */
-const MALFORMED = /should name something, not (data|a call)\.$|should name a record by its id\.$|^per_request is written only by|should be written out\.$|should be data or text\.$|should be a list of names or ids\.$|^A commitment can be money, goods|^A hold says only what it holds|\(then=periodic\)/;
+const MALFORMED = /should name something, not (data|a call)\.$|should name a record by its id\.$|^per_request is written only by|should be written out\.$|should be data or text\.$|should be a list of names or ids\.$|^A commitment can be money, goods|^In an agreement each side commits itself|^A hold says only what it holds|\(then=periodic\)/;
 
 /** Resolver questions another attempt at the call could fix (a name it didn't recognise, a refusal's own text). */
 const RETRYABLE = /^You don't know of anyone or anything called|^It isn't clear what should happen|^That's for someone else to decide|^Please state the amount itself|^Please take this one step at a time|^You haven't seen a form by that name|^That's something to look up or read|^Nothing here does that as such|^That needs something found out first/;
@@ -384,7 +384,8 @@ export function createTranslator(io: LlmIO, check: KernelCheck, typeOf: (type: s
     const retryable = !settled && (!!r.ok || !!(r as any).invalid || "none" in program || (r as any).questions.some((q: string) => RETRYABLE.test(q)));
     if (!r.ok) return { ok: false, notices: r.questions, call, ...(r.invalid ? { invalid: r.invalid } : {}), ...(retryable ? {} : { final: true }), ...("none" in program ? { none: true as const } : {}) };
     const k = await check(req.participant, req.as, r.blocks);
-    if (k.error) return { ok: false, notices: [NOT_CHECKED], call, invalid: [`the check failed: ${String(k.error).slice(0, 500)}`], final: true };
+    // (The check itself failing is nobody's wording: it is on record as a fault, and the call is tried once more.)
+    if (k.error) return { ok: false, notices: [NOT_CHECKED], call, invalid: [`platform fault: the check failed: ${String(k.error).slice(0, 500)}`] };
     const warnings = lawWarnings(r.blocks, req.knowledge, typeOf, req.as);
     const draft: Draft = {
       id: req.draftId, participant: req.participant, ...(req.as ? { as: req.as } : {}), proposal: req.proposal.slice(0, 16384), call, resolver: RESOLVER,
