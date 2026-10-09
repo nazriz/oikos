@@ -137,6 +137,7 @@ The rates notices keep the rating law's instalments: the order says that they ar
 | water | `bill` | the meters read on a round, then every owner billed; how often is the order's |
 | energy | `supply_energy` | each day's supply to the customers; the grid bought from when stock is low; customers taken on and off |
 | energy | `bill` | every customer billed; how often is the order's |
+| council clerk | `enact` | each amendment the council has passed and the clerk has declared is written into the law by its schedule, published in place of the law in force, which is withdrawn (docs/behaviour/government.md, "A council in the hands of seats") |
 | rates | `levy` | the notices sent to every owner at each instalment the rating law sets, and penalty interest added monthly to what is overdue (the law says when; the order says that it is done) |
 
 ## Which offices can be seats now

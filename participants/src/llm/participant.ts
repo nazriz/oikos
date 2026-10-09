@@ -963,7 +963,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
           if (since.left) await note({ carried_not_shown: { reports: since.left, of: since.of, limit_characters: CARRY_MAX } });
           // Its own office's staff, at its first sitting and whenever the list has changed since it was last set out.
           staffNow = c.staff ? inWorld(c.staff.text(obs.t)) : undefined;
-          const staffPart = staffNow !== undefined && staffNow !== staffShown ? `\n\n${staffNow}` : "";
+          const staffPart = staffNow && staffNow !== staffShown ? `\n\n${staffNow}` : "";
           sending = [{ role: "user", content: `Your notebook: ${notes ? `${notes}\n${notebookRoom(notes.length)}` : "(empty)"}\n\n${unsaid.length ? `${unsaid.join("\n")}\n\n` : ""}${since.before ? `Since you last looked:\n${since.before}\n\nNow:\n` : ""}${now}${staffPart}` }];
         }
 
