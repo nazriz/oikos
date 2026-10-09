@@ -20,6 +20,7 @@ import * as P from "./papers";
 export const station: BehaviourModule = {
   name: "police.station",
   issues: [P.JOB_ADVERTISEMENT, ...P.POLICE],
+  staffed: (p) => ({ role: p.role ?? "police officer", posts: { establishment: p.officers ?? 0 } }),
   issuesWith: (p) => ({ ...P.staffingOwn({ role: p.role ?? "police officer", industry: p.industry ?? "public_safety", workplace: p.workplace, notice_days: p.notice_days ?? 14 }), tribunal: p.tribunal, registry: p.registry }),
   version: "0.3.0", // 0.3.0: calls at a home when asked to (a welfare check), by going there; no longer shown the town's homes
   doc: "docs/behaviour/crime.md",

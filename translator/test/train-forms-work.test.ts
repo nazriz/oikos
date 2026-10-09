@@ -23,7 +23,7 @@ const acts = (g: Gold) => resolve(calls.parseProgram(g.program), g.forms?.length
 
 test("the versions, and the three rules in the translator's instructions", () => {
   expect(DATA_VERSION).toBe("0.12.0");
-  expect(TRANSLATOR_VERSION).toBe("0.9.0");
+  expect(TRANSLATOR_VERSION).toBe("0.9.1");
   const s = translatorSystem();
   for (const rule of [
     "the direction is that form filled in, not a message.",
@@ -272,7 +272,9 @@ test("generated gold: standing work orders in their combinations, each a work or
   expect(plan[0]!.brief).toContain("What is put on hold is");
   expect(plan[1]!.brief).toContain("the routine is ended for good, not paused");
   // Holds of other standing papers are still there, with nothing said of work.
-  expect(statements.filter((g) => !g.tag && g.shape.startsWith("statement(") && "hold" in argsOf(g)).length).toBeGreaterThan(40);
+  // (Tagged `hold` since 2026-10-09, so that a part can be made of them by name; an entry likewise.)
+  expect(statements.filter((g) => g.tag === "hold" && g.shape.startsWith("statement(") && "hold" in argsOf(g)).length).toBeGreaterThan(40);
+  expect(statements.filter((g) => "hold" in argsOf(g) && !["hold", "standing_work_hold"].includes(g.tag ?? "")).length).toBe(0);
 });
 
 test("the whole call language's gold has the new kinds in it, by the function each is of", () => {

@@ -25,7 +25,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { calls, canonical, DECISIONS, OUTCOMES, inCurrency, paramErrors, modules as builtin, Randomness, slice, View, type BehaviourModule, type Controller, type Currency, type DecisionRecord, type OutcomeRecord, type LookRequest, type Observation, type ParticipantAction, type ParticipantContext } from "@oikos/participants";
+import { calls, canonical, DECISIONS, OUTCOMES, inCurrency, paramErrors, modules as builtin, Randomness, Roster, slice, View, type BehaviourModule, type Controller, type Currency, type DecisionRecord, type OutcomeRecord, type LookRequest, type Observation, type ParticipantAction, type ParticipantContext } from "@oikos/participants";
 import { CONSULT_VERSION, createConsult, createLlmParticipant, LLM_PARTICIPANT_VERSION, MOCK_VERSION, MockAdapter, mockPolicies, PRICES, ModelCallFailed, ModelUnreachable, SpendingLimitReached, type Budget, type LlmAdapter, type LlmController, type LlmIO, type MockBrain, type Price } from "@oikos/participants/llm";
 import { createTranslator, draftText, Knowledge, RESOLVER, resolve, TRANSLATOR_VERSION, type Draft, type Resolution, NOT_CHECKED } from "@oikos/translator";
 import { Kernel } from "./kernel";
@@ -188,7 +188,7 @@ interface Unit {
   entity: string;
   module: BehaviourModule;
   controller: Controller;
-  llm?: { controller: LlmController; config: any; drafts: { draft: Draft; hash: string; reasoning?: string }[]; drafted: number };
+  llm?: { controller: LlmController; config: any; drafts: { draft: Draft; hash: string; reasoning?: string }[]; drafted: number; roster?: Roster };
   ctx: ParticipantContext;
   /** How long it sleeps when it waits without saying until when, and when it first wakes: for the engine's schedule
    * (kernel/src/schedule.rs), which decides every wake from then on. */
@@ -444,7 +444,11 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     const boards = new Set<string>((cfg.knowing?.published ?? []).filter((x: any) => x.board).map((x: any) => x.what));
     const ways = new Map<string, { way: string; by?: string[]; board?: boolean }>(chans.filter((x) => x.ch.way).map((x) => [x.path, { way: x.ch.way, ...(x.ch.by ? { by: x.ch.by } : {}),
       ...(x.ch.way === "published" && !x.ch.from && (x.ch.match?.statement_kinds ?? []).some((k: string) => boards.has(k)) ? { board: true } : {}) }]));
-    const config = { whoIs, participant: p.id, entity, entityName, onRequest, kinds, ways, title: office?.title ?? p.title, role: office?.role, framing: p.framing, standing: standingIds, titles, cadenceDays: pp.cadence_days ?? 7, draftText,
+    // An office that employs staff of its own (its module says so: `staffed`): whoever holds it knows its posts, who is
+    // in each and which are vacant, from the office's own papers (behaviour/roster.ts). Kept from what the seat is shown.
+    const staffedBy = office ? mods[office.role_module?.code ?? ""]?.staffed?.(office.role_module?.params ?? {}) : undefined;
+    const roster = office && staffedBy ? new Roster(ctxFor(p.id, office.id, entity, {}), entity, office.id, staffedBy) : undefined;
+    const config = { ...(roster ? { staff: { text: (at: number) => roster.text(at, office!.title ?? office!.id, (id: string) => whoIs(id)?.name) } } : {}), whoIs, participant: p.id, entity, entityName, onRequest, kinds, ways, title: office?.title ?? p.title, role: office?.role, framing: p.framing, standing: standingIds, titles, cadenceDays: pp.cadence_days ?? 7, draftText,
       ...(pp.sessions ? { sessions: pp.sessions } : {}), ...(pp.max_actions ? { maxActions: pp.max_actions } : {}),
       // Folders that hold some kinds of paper only (by the channel's own id, as `standing` is given), and the most a prompt may be.
       ...(pp.folders ? { folders: new Map<string, string[]>(Object.entries(pp.folders as { [id: string]: string[] }).flatMap(([id, kinds]) => chans.filter((x) => x.path === id || x.path.endsWith(`/${id}`)).map((x) => [x.path, kinds] as [string, string[]]))) } : {}),
@@ -468,7 +472,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     }
     return {
       key: p.id, participant: p.id, entity, module, controller: controller as unknown as Controller, ctx,
-      llm: { controller, config: p, drafts: [], drafted: 0 },
+      llm: { controller, config: p, drafts: [], drafted: 0, ...(roster ? { roster } : {}) },
       cadence: ceilTo(cadence, tick), firstWake: wakeAt ?? 0, wokeFor: "start", since: 0,
       knowledge: new Knowledge(currency), view: new View(new Set(standingIds)), notices: [],
     };
@@ -639,6 +643,10 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     const r = await begin(u, { command: "act", participant: u.participant, ...(as ? { as } : {}), blocks: d.blocks,
       provenance: { via: "translator", proposal: d.proposal, draft: d.id, draft_hash: p.hash, translator: d.translator, call: d.call, resolver: d.resolver }, ...(p.reasoning ? { reasoning: p.reasoning } : {}) });
     if (r === null) await notSent(u, "confirmed", `What you confirmed (${d.id}) could not be put into effect as it was drawn up, and nothing was done. You could ask for it again, in other words.`, { rejected_draft: d.id });
+    // A standing work order of an office with nobody in post: on file, and said plainly with its result that nobody
+    // follows it yet (a works manager set two for a crew of nobody and waited a month: 2026-10-09).
+    else if (u.knowledge.ownStaff?.inPost === 0 && d.blocks.some((b: any) => b.block === "publish" && b.kind === "work_order" && u.knowledge.entityOf(b.speaks_for ?? u.entity) === u.entity))
+      u.notices.push({ t, text: `The standing work order you confirmed is on file, and there is nobody in the post whose work it is: your office has no ${u.knowledge.ownStaff.role} in post, so nothing is done under it until someone is taken on.` });
   };
 
   /** A participant whose decisions keep failing (D59): its stand-in carries it on if the world names one (as after
@@ -702,6 +710,12 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     // drafts' previews and law warnings.)
     if (u.llm || RESOLVER_MODE !== "engine") u.knowledge.absorb(raw);
     const obs: Observation = { ...u.view.apply(raw), woke_for: u.wokeFor, since: u.since };
+    // (A seat's roster of its own staff, and what a draft's preview may say of it: read from what it is shown.)
+    if (u.llm?.roster) {
+      const roster = u.llm.roster;
+      roster.absorb(obs);
+      u.knowledge.ownStaff = { role: roster.now(obs.t).role, inPost: roster.count(obs.t) };
+    }
     platformMs += performance.now() - p00;
     if (o.inspect) await o.inspect(u.participant, obs, k, u.capacity, raw);
     // Recorded in full, if asked: what it received (what's new since its last observation), for training data.
@@ -1012,9 +1026,13 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
             }
             const inARow = modelDown ? failures.get(x.u.key) ?? 0 : (failures.get(x.u.key) ?? 0) + 1;
             failures.set(x.u.key, inARow);
-            await k.request({ op: "annotate", annotation: { annotation: "note", subject: x.u.participant, data: { participant_error: { unit: x.u.key, error: `${err?.name ?? "Error"}: ${String(err?.message ?? err)}`.slice(0, 2000), in_a_row: inARow } } } });
-            log(`${o.runId}: ${x.u.key} failed to decide at t=${t} (it waits this wake): ${String(err?.message ?? err).slice(0, 200)}`);
+            // (A seat whose model did not answer says when it sits again, its next working day's sitting: the engine is
+            // told, or it would not be woken before its usual rhythm came round, days later.)
+            const backAt = modelDown && typeof (err as ModelCallFailed).backAt === "number" ? (err as ModelCallFailed).backAt : undefined;
+            await k.request({ op: "annotate", annotation: { annotation: "note", subject: x.u.participant, data: { participant_error: { unit: x.u.key, error: `${err?.name ?? "Error"}: ${String(err?.message ?? err)}`.slice(0, 2000), in_a_row: inARow, ...(backAt !== undefined ? { back_at: backAt } : {}) } } } });
+            log(`${o.runId}: ${x.u.key} failed to decide at t=${t} (${backAt !== undefined ? `it missed this sitting, and sits again at t=${backAt}` : "it waits this wake"}): ${String(err?.message ?? err).slice(0, 200)}`);
             if (inARow >= MAX_FAILURES_IN_A_ROW) await retire(x.u);
+            else if (backAt !== undefined && units.get(x.u.key) === x.u) await k.request({ op: "finished", key: x.u.key, until: backAt });
             continue;
           }
           failures.delete(x.u.key);

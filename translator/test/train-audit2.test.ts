@@ -44,7 +44,7 @@ const PLACE = /^(str\.|lot-|cell\.|(apts|house|shop|hall|works|store)-[0-9]+)/;
 
 test("the two rules the call language left unclear are in the translator's instructions, in general words, and the seen cases and generated gold keep to them", () => {
   const system = translatorSystem();
-  expect(TRANSLATOR_VERSION).toBe("0.9.0");
+  expect(TRANSLATOR_VERSION).toBe("0.9.1");
   for (const rule of [
     "to= is who receives them (a person or an organisation), at= is the place they are delivered to (a building or a place) and from_at= the place they come from; a place named as where they go is at=, never to=, and with no one named to receive them they are your own (no to=).",
     "Work done by several people is one work(...) with by= as a list of them (by=[\"c0042\",\"c0043\"]), never a line for each of them: units= is the whole job.",

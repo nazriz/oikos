@@ -83,6 +83,29 @@ test("the report reads what the script did, from the log alone, plain or compres
   expect(JSON.parse(readFileSync(join(out, "pilot-report.json"), "utf8"))).toEqual(r); // (the first was the one written)
 }, 120_000);
 
+test("a pilot in which a seat missed a sitting is not a finished pilot: the report says so in its first line, and counts the sittings missed", async () => {
+  // A mayor whose second call gets no answer (as a provider's failure would be); the run goes on to its until.
+  let n = 0;
+  const inner = new MockAdapter("mock", { participant: () => [{ type: "tool_use", id: `d${n}`, name: "done_for_now", input: { days: 2 } }], translator: () => [], debrief: () => [{ type: "text", text: "Thanks." }] });
+  const adapter = { provider: inner.provider, model: inner.model, complete: async (req: LlmRequest) => {
+    if (req.purpose === "participant" && ++n === 2) throw new Error("no answer within 180 s");
+    return inner.complete(req);
+  } };
+  const out = join(root, "runs", "test-pilot-report-missed");
+  rmSync(out, { recursive: true, force: true });
+  await runWorld({ config: generate({ ...spec, citizens: 40, nature: false, mayor: "llm" }), runId: "town.seed1", outDir: out, until: 10 * DAY, adapter: adapter as any });
+  writeFileSync(join(out, "PILOT.txt"), `a test\n\n${JSON.stringify({ name: "missed", until: 10 * DAY })}\n`);
+  const r = await pilotReport(out, false);
+  expect(r.stopped.finished).toBe(true); // (the town ran its ten days)
+  expect(r.not_whole.seats).toMatchObject([{ seat: "mayor-system", sittings_missed: 1 }]);
+  expect(r.per_seat["mayor-system"]).toMatchObject({ sittings_missed: 1, failed_calls: 1 });
+  // (It sat again, the working day after the one it missed.)
+  expect(r.per_seat["mayor-system"].last_sat_day).toBeGreaterThan(r.not_whole.seats[0].days[0]);
+  const text = renderReport(r);
+  expect(text.split("\n")[0]).toMatch(/^NOT A FINISHED PILOT: a seat sat for less than its run\. mayor-system missed 1 sitting \(day \d+; its model did not answer\) and last sat on day \d+ of 10$/);
+  expect(text).toContain("SITTINGS MISSED: 1");
+}, 120_000);
+
 test("how a request ended, matters, and runs of ask-backs", () => {
   expect(endingOf("none(unclear)", "It isn't clear which words are to go as they stand. Put them in quotation marks.")).toEqual({ ending: "asked_back" });
   expect(endingOf("none(unclear)", "It isn't clear what should happen. Could you say it more plainly?")).toEqual({ ending: "refused", label: "unclear" }); // (an older log)

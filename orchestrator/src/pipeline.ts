@@ -33,7 +33,8 @@ import { TRANSLATOR_VERSION, translatorSystem } from "@oikos/translator";
 import { formOfLine, type BlindAnswer } from "../../translator/train/blind";
 import { functionOf, sameProgram, type Example, type FormSpec } from "../../translator/train/data";
 import { withListsQuoted, type LabelManifest, type Unlabelled } from "../../translator/train/readers";
-import { evaluateSet, loadSet, type SetReport } from "@oikos/translator/eval";
+import { evaluateSet, loadHeldOut, loadSet, type SetReport } from "@oikos/translator/eval";
+import { sharesWording } from "../../translator/eval/held-out";
 import { DecideAdapter } from "../../translator/model/adapter";
 import { chooseModel } from "./models";
 import { blindFile, briefOf, chunksFor, inSitu, inSituInstructions, label, runName, takeInFiles, type Situation } from "./in-situ";
@@ -174,6 +175,8 @@ export interface Hooks {
   /** In place of the rented GPU (tests): given the data folder, the runs and where they come home, leaves each run's
    * folder as the pod script does, and answers with that script's exit code. */
   pod?: (o: { data: string; runs: { name: string; encoder: string; seed: number }[]; models: string; state: string }) => number;
+  /** In place of the held-out cases of this machine (tests): requests whose wording nothing joined may share. `false`: none. */
+  heldOut?: { id: string; request: string; expect: string[] }[] | false;
 }
 
 export interface Used { input_tokens: number; output_tokens: number; cache_read_tokens: number; cache_write_tokens: number; cost_microusd: number; calls: number }
@@ -760,6 +763,16 @@ export async function runPipeline(cfg: PipelineConfig, hooks: Hooks = {}): Promi
     // Nothing that is in a test's words trains.
     const sameAsTest = candidates.filter((e) => requestsOf.has(e.request.trim()) && !heldIds.has(e.id));
     const dropIds = new Set(sameAsTest.map((e) => e.id));
+    // Nor anything that shares wording with a held-out case, new or standing, in training or beside it: the check the
+    // generated data has always had (data.ts) and requests labelled by readers never did (found 2026-10-09: six held-out
+    // cases shared wording with 94 rows of the standing set). The file is read by the check alone, where this machine
+    // has it, and what is dropped is counted, never listed.
+    const heldOutCases = hooks.heldOut === false ? undefined : hooks.heldOut ?? loadHeldOut();
+    const shares = heldOutCases?.length ? sharesWording(heldOutCases as Parameters<typeof sharesWording>[0]) : undefined;
+    let sharedStanding = 0;
+    const sharedNew = shares ? candidates.filter((e) => !dropIds.has(e.id) && shares(e.request)) : [];
+    for (const e of sharedNew) dropIds.add(e.id);
+    const keptDays = heldDays.filter((e) => !dropIds.has(e.id));
     const newTrain = candidates.filter((e) => !heldIds.has(e.id) && !dropIds.has(e.id));
 
     // The standing set, less anything of a test-only pilot (its examples, by run) or in a test's words.
@@ -769,24 +782,25 @@ export async function runPipeline(cfg: PipelineConfig, hooks: Hooks = {}): Promi
     const stand = (name: string): any[] => (cfg.standing && existsSync(join(cfg.standing, name)) ? jsonl<any>(join(cfg.standing, name)) : []);
     const standing = { train: stand("train.jsonl"), validation: stand("validation.jsonl"), real: stand("validation-real.jsonl") };
     let droppedRun = 0, droppedWords = 0;
-    const clean = (rows: any[]) => rows.filter((e) => (ofTestRun(e) ? (droppedRun++, false) : requestsOf.has(String(e.request).trim()) ? (droppedWords++, false) : true));
+    const clean = (rows: any[]) => rows.filter((e) => (ofTestRun(e) ? (droppedRun++, false) : requestsOf.has(String(e.request).trim()) ? (droppedWords++, false) : shares?.(String(e.request)) ? (sharedStanding++, false) : true));
     const joined = join(out, "joined");
     const repeat = cfg.repeat ?? 4;
     const trainRows = [...clean(standing.train), ...Array.from({ length: repeat }, () => newTrain).flat()];
     const valRows = clean(standing.validation);
-    const realRows = [...clean(standing.real), ...heldDays, ...(cfg.testsInValidationReal && test ? test.examples : [])];
+    const realRows = [...clean(standing.real), ...keptDays, ...(cfg.testsInValidationReal && test ? test.examples : [])];
     const counts = {
       standing: { train: standing.train.length, validation: standing.validation.length, validation_real: standing.real.length },
       new_examples: train?.examples.length ?? 0, held_back_as_tests: (train?.examples.length ?? 0) - candidates.length,
-      new_in_training: newTrain.length, repeated: repeat, new_validation_real: heldDays.length, test_examples_in_validation_real: cfg.testsInValidationReal && test ? test.examples.length : 0,
+      new_in_training: newTrain.length, repeated: repeat, new_validation_real: keptDays.length, test_examples_in_validation_real: cfg.testsInValidationReal && test ? test.examples.length : 0,
       dropped_new_same_as_a_test: sameAsTest.length, dropped_standing_same_as_a_test: droppedWords, dropped_standing_from_test_runs: droppedRun,
+      checked_against_held_out: !!shares, dropped_new_sharing_held_out_wording: sharedNew.length, dropped_standing_sharing_held_out_wording: sharedStanding,
     };
     put(join(joined, "train.jsonl"), lines(trainRows));
     put(join(joined, "validation.jsonl"), lines(valRows));
     put(join(joined, "validation-real.jsonl"), lines(realRows));
-    put(join(joined, "NOTE"), `The standing set${cfg.standing ? ` (${cfg.standing})` : " (none)"} plus, ${repeat} times each, the pipeline's new examples (${newTrain.length}); ${heldDays.length} new examples of whole seat-days (one in ${dayOne}) are in validation-real, kept out of training. Tests are in ../tests and never join.\n`);
+    put(join(joined, "NOTE"), `The standing set${cfg.standing ? ` (${cfg.standing})` : " (none)"} plus, ${repeat} times each, the pipeline's new examples (${newTrain.length}); ${keptDays.length} new examples of whole seat-days (one in ${dayOne}) are in validation-real, kept out of training. Tests are in ../tests and never join.\n`);
     m.steps["join"] = counts;
-    say(`join: ${trainRows.length} training lines (${newTrain.length} new, ${repeat} times each), ${valRows.length} validation, ${realRows.length} validation-real; ${counts.dropped_new_same_as_a_test + counts.dropped_standing_same_as_a_test} left out for being in a test's words`);
+    say(`join: ${trainRows.length} training lines (${newTrain.length} new, ${repeat} times each), ${valRows.length} validation, ${realRows.length} validation-real; ${counts.dropped_new_same_as_a_test + counts.dropped_standing_same_as_a_test} left out for being in a test's words${shares ? `, ${sharedNew.length + sharedStanding} for sharing wording with a held-out case` : "; not checked against the held-out cases (this machine has none)"}`);
     save();
 
     // Steps for the model.

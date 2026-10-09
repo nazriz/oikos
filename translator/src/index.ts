@@ -20,7 +20,7 @@ import { Knowledge } from "./knowledge";
 import { Preview } from "./preview";
 import { LABEL_TEXT, RESOLVER, resolve, type Resolution, type StructureTypeInfo } from "./resolver";
 
-export const TRANSLATOR_VERSION = "0.9.0"; // 0.9.0: a direction to an office and a paper of one's own office go on the form listed for them; work done again and again is a standing order (work with every=)
+export const TRANSLATOR_VERSION = "0.9.1"; // 0.9.1: a form listed as a direction to the person's own office is marked so in the list, and the standing-work rule says the office's own order to its staff is never that form; a worked example each of a direction on a form and of an own paper on a form; 0.9.0: a direction to an office and a paper of one's own office go on the form listed for them; work done again and again is a standing order (work with every=)
 
 export interface TranslatorId {
   id: string;
@@ -120,7 +120,7 @@ export function translatorSystem(): string {
     "- Recording something in one's own books or on one's own file, which moves nothing and tells nobody, is statement(kind=entry, visible=own, text=\"<what is recorded>\"), with the record it concerns, if one is named, as basis=. The text is copied from the request: its own words for what is recorded, as they stand.",
     "- \"Prepare … for my review\" or \"show me before it takes effect\" still asks for the act: everything is shown to the person before it is confirmed. What a request says is to stay as it is (\"keep the records\", \"cancel nothing else\") or to be shown with the draft asks for nothing more: it adds no line and is no reason to refuse.",
     "- Telling, asking, directing or instructing someone to see to something is a message to them: message(to=<them>, text=\"<what's asked of them>\"). The text is copied from the request: its own words for what they are to do, as they stand, from the first of them to the last, with nothing added (no \"Please\"), nothing reworded and nothing left out. Words the request quotes for them are the text, without the quotation marks. Having or getting someone to do something that is theirs to decide (\"get them to drop the complaint\", \"have the board sign it\") is asking them: a message too. work(...) for a job done once is for when the request itself gives the task, how much of it and where (\"have c0042 do 3 units of make at str.7\"): then it's work(task=make, units=\"3\", at=str.7, by=c0042), whoever is to do it. And where a form listed below the request is that office's own form for what it is being directed to do (its to= is the office, and its fields say what the office is to do), the direction is that form filled in, not a message.",
-    "- Work one's own staff are to do again and again as a standing routine (a round, a roster, a schedule: \"every week\", \"daily\", \"from now on\") is one line: work(task=..., at=..., every=\"<how often, as written>\"), with on= and by= only if the request names what it is done to or who is to do it (several as a list), units= only if it says how much each time, first= only if it says how long until it starts, and until= only if it says for how long it is to go on. Changing such a routine is withdrawing it and making another; pausing it is statement(hold=<it>).",
+    "- Work one's own staff are to do again and again as a standing routine (a round, a roster, a schedule: \"every week\", \"daily\", \"from now on\") is one line: work(task=..., at=..., every=\"<how often, as written>\"), with on= and by= only if the request names what it is done to or who is to do it (several as a list), units= only if it says how much each time, first= only if it says how long until it starts, and until= only if it says for how long it is to go on. Changing such a routine is withdrawing it and making another; pausing it is statement(hold=<it>). A form listed below as a direction to this person's own office is never how that is written, whatever the form's fields: that form is for whoever directs the office, and the office's own order to its staff is work(...).",
     "- Things moved or delivered: to= is who receives them (a person or an organisation), at= is the place they are delivered to (a building or a place) and from_at= the place they come from; a place named as where they go is at=, never to=, and with no one named to receive them they are your own (no to=).",
     "- Work done by several people is one work(...) with by= as a list of them (by=[\"c0042\",\"c0043\"]), never a line for each of them: units= is the whole job.",
     "- template= is the request's own word for the kind of newcomer, of child or of system (\"arrives as an apprentice\" is template=apprentice, \"we are having a baby\" is template=baby): the noun the request uses and never a word it didn't say, and left out if it uses none.",
@@ -156,6 +156,9 @@ export function translatorSystem(): string {
     "  Note on our own file that the deposit under rec.52 is held for the tenant.  ->  statement(kind=entry, visible=own, text=\"the deposit under rec.52 is held for the tenant\", basis=rec.52)",
     "  Go to str.9 and see whether the roof has been mended.  ->  none(no_such_act)",
     "  From now on the crew at str.3 is to do the mend round every week.  ->  work(task=mend, at=str.3, every=\"every week\")",
+    "  (Where a form is listed as: mend_round, to=depot, fields every.) Direct the depot to do the mend round every fortnight.  ->  form(form=mend_round, to=depot, every=\"every fortnight\")",
+    "  (Where that form is listed as a direction to this person's own office.) Our crew at str.3 is to do the mend round every fortnight from now on.  ->  work(task=mend, at=str.3, every=\"every fortnight\")",
+    "  (Where a form is listed as: job_advertisement, to=depot, fields wage, period, posts.) Advertise 2 posts at 1,900 a fortnight.  ->  form(form=job_advertisement, to=depot, wage=\"1,900\", period=\"a fortnight\", posts=\"2\")",
     "  Ask the registrar to send me last month's payments out of acc-1.  ->  message(to=\"the registrar\", text=\"send me last month's payments out of acc-1\")",
     "  Get Sami Farrow (ent.177) to drop the complaint they made.  ->  message(to=ent.177, text=\"drop the complaint they made\")",
     "  See to it that ent.177 drops the complaint they made.  ->  none(not_yours)",
@@ -174,9 +177,14 @@ export function translatorSystem(): string {
 /** A form as the translator is shown it, one line: its name, where it goes (the `to` to write: the office it was made
  * in, or its author's organisation), its record's id (people cite a form by the id on the paper as often as by its
  * name; 2026-10-06), and its fields; a choice field lists its options. */
-export function formShown(f: Knowledge["forms"][number]): string {
+export const formShown = (f: Knowledge["forms"][number]): string => formShownTo(f);
+/** A form as the translator is shown it for someone who holds these posts: one that directs their own office says so. */
+export function formShownTo(f: Knowledge["forms"][number], held?: ReadonlySet<string>): string {
   const field = ([k, v]: [string, any]) => `${k} (${v.type === "choice" && v.options?.length ? `one of ${v.options.join(" | ")}` : v.type}${v.required ? ", required" : ""})`;
-  return `- ${f.data?.form}, to=${Knowledge.formOf(f)}, id ${f.id}: fields ${Object.entries(f.data?.fields ?? {}).map(field).join(", ")}`;
+  // (A form for directing an office, shown to whoever holds that office: marked, so that the office's own order to
+  // its staff is not written on the form others direct it by.)
+  const own = f.data?.submit_as === "direction" && typeof f.data?.office === "string" && held?.has(f.data.office) ? " (a direction to this person's own office: for whoever directs that office, not for this person)" : "";
+  return `- ${f.data?.form}, to=${Knowledge.formOf(f)}, id ${f.id}${own}: fields ${Object.entries(f.data?.fields ?? {}).map(field).join(", ")}`;
 }
 
 /** What a translator may say was unclear, beside `none(unclear)`: one of a few things, never words of its own. A
@@ -214,7 +222,7 @@ export function unsureText(u: unknown, req: TranslateRequest): string | undefine
 
 /** What the translator is given: the request, and the forms this person knows of (where each goes, and its fields). */
 export function translatorContext(req: TranslateRequest): string {
-  const forms = req.knowledge.forms.map(formShown);
+  const forms = req.knowledge.forms.map((f) => formShownTo(f, req.knowledge.held));
   return [`Request: ${req.proposal}`, ...(forms.length ? ["", "Forms this person knows of:", ...forms] : [])].join("\n");
 }
 
@@ -351,7 +359,7 @@ export function createTranslator(io: LlmIO, check: KernelCheck, typeOf: (type: s
     const warnings = lawWarnings(r.blocks, req.knowledge, typeOf, req.as);
     const draft: Draft = {
       id: req.draftId, participant: req.participant, ...(req.as ? { as: req.as } : {}), proposal: req.proposal.slice(0, 16384), call, resolver: RESOLVER,
-      blocks: r.blocks, summary: new Preview(req.knowledge, req.knowledge.actingFor(req.as), req.called).of(r.blocks).slice(0, 16384),
+      blocks: r.blocks, summary: new Preview(req.knowledge, req.knowledge.actingFor(req.as), req.called, req.as).of(r.blocks).slice(0, 16384),
       check: { ok: k.ok, ...(k.refusal ? { refusal: k.refusal } : {}), ...(warnings.length ? { warnings } : {}) },
       translator: tid,
     };
@@ -390,7 +398,7 @@ export function draftText(d: Draft): string {
   return [
     `Before this goes ahead (${d.id}), here is exactly what will happen:`,
     d.summary,
-    d.check.ok ? "Nothing stands in the way right now." : `This can't be done right now: ${refusalText(d.check.refusal?.code)}.`,
+    d.check.ok ? (d.summary.includes(" The office will not follow it: ") ? "Nothing stops it being filed, and filed it would change nothing, as said above." : "Nothing stands in the way right now.") : `This can't be done right now: ${refusalText(d.check.refusal?.code)}.`,
     ...(d.check.warnings?.length ? [`Legal note: ${d.check.warnings.join(" ")}`] : []),
     "Confirm it, or decline it.",
   ].join("\n");

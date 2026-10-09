@@ -28,6 +28,7 @@
     {
       "form": "tribunal_order",
       "title": "Order of the tribunal on an application",
+      "does": "Decides an application before the tribunal and tells both sides: what is found, and for an order to pay, how much, into which account and by when.",
       "fields": {
         "application": {
           "type": "record",

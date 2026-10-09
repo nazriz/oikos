@@ -50,7 +50,8 @@ there and whole is skipped.
 8. **Join**: the standing set (`standing`: a folder with `train.jsonl`, `validation.jsonl`, optionally `validation-real.jsonl`),
    plus the new examples `repeat` times (4). Whole seat-days, one in `validationDays` (10), go to `validation-real` instead,
    kept out of training. Left out: any example, new or standing, whose request is in the words of any test; any standing
-   example of a test-only pilot's run.
+   example of a test-only pilot's run; and (since 2026-10-09) any example, new or standing, on any side, that shares five
+   words running with a held-out case, where this machine has them (counted in the manifest's `join`, never listed).
 9. **Export** (`translator/model/export.ts`, arguments by name): the steps the model is trained on, in `data/`.
 10. **Train** (`"train": true`): `pod.sh run data NAME:ENCODER:SEED …` rents a GPU, sets it up, sends the trainer and `data/`,
     queues the runs, brings each home as it ends, ends the pod, and then scores each run here (`translator-eval --model
@@ -235,14 +236,124 @@ short on the pod is trained again from its start on a new one.
 
 ## What is never done
 
-- The held-out test (`~/oikos-private/`) is not read, and no test leaves this machine: scoring is here.
+- The held-out test (`~/oikos-private/`) is read by nobody and by two pieces of code alone: the scoring, and the join's
+  check for shared wording. Nothing of it is written anywhere but counts and case ids, and no test leaves this machine.
 - A test-only pilot's requests or situations never train; nothing in a test's words trains, new or standing.
 - A reader's answers are not made by keyword rules or scripts, and a reader whose answers look as if they were is rejected.
 - A model's run is never deleted: the ledger keeps every prompt and answer, and anything set aside is renamed.
 - `gpt-6-astra` is not used. Nothing is pushed.
 - Nothing in `runs/` is overwritten: the pipeline writes into its own new folder.
 
+## The retrain after the wave
+
+Written 2026-10-09, before wave 2, with no model called and nothing trained (the owner's word: the retrain that matters
+needs the wave's requests first, and writing data now would compete with the wave for the same Claude limit). The
+model on disk (`decide/pod-small-d16-s1`) was taught no hold, entry on one's own file, `look_first`, form of an office's
+own, direction on a form or standing work. Three steps; the third is the one command above.
+
+**What is ready.**
+- The standing set re-keyed to prompt 0.9.0: `runs/translator-data-in-situ/joined-11` (its README has the rules and the
+  counts; exported as `runs/translator-model/data-17`). It passes the leak check against the held-out cases, which
+  `joined-10` did not (six cases shared wording with 94 rows: every held-out score of a data-13 or data-16 model was
+  measured with that). 146 requests whose label may be stale and that no rule settles are in its `set-aside.jsonl`,
+  for two readers.
+- A part can be made of the new kinds by name: `--only` takes `hold`, `entry`, `standing_work`, `standing_work_hold`,
+  `standing_work_withdraw`, `direction`, `paper`, `direction_unlisted` beside functions, and `--generated N` then counts
+  the programs of the function each is drawn among.
+- The trainer never shows a letter to an office beside a form that goes to that office (`with_forms`: since an office
+  may have its own form for being directed, that pairing would teach a letter where the rule says the form), and
+  `--forms-most N` sets how many forms are added beside an example (5 as before unless given).
+- The export carries every new shape whole (`translator/test/model-export-shapes.test.ts`).
+
+**1. Generated parts, weighted toward what the model lacks** (pipeline 0.12.0; briefs for three writers, then
+`translator-data-write` and the blind check as for every part; or the same options with `--model` and `--back-model`,
+which is a call a request). Counted by a dry run of the plans, with no model:
+
+```
+oikos translator-data <a log> --briefs --writers sonnet,haiku,fable --no-spares --out <runs>/translator-data-wave-2/part-h \
+  --only hold,entry,standing_work_hold,standing_work_withdraw --generated 6000 --ceiling 0 --per-gold 2 \
+  --refusal-labels look_first --refusal-floor 300 --seed 311 --validation 0
+oikos translator-data <a log> --briefs --writers sonnet,haiku,fable --no-spares --out <runs>/translator-data-wave-2/part-f \
+  --only direction,paper,direction_unlisted,standing_work --generated 2500 --ceiling 0 --per-gold 2 \
+  --refusal-labels no_such_act,unknown_form --refusal-floor 150 --seed 312 --validation 0
+```
+
+- `part-h`, 3,324 briefs: 1,070 holds of a payment or a paper (406 of several), 520 holds of a standing work order,
+  288 standing work orders withdrawn, 1,146 entries, 300 `look_first` in its three kinds.
+- `part-f`, 4,318 briefs: 1,004 directions on an office's form, 1,004 papers on an office's own form (lists and dates
+  among the fields; every third set is the worlds' own 38 declared papers), 624 of the same directions as letters where
+  no form is listed, 1,536 standing work orders, 150 refusals.
+- Both: every one of the 26 ways of writing money the generator draws (the nine profiles' and seventeen invented: a
+  decimal comma, the sign after, groups of two with number words, no smaller unit), 80 to 290 briefs each; a little
+  over half in the seats' two voices (`early`, `late`), the rest spread over eleven styles.
+- Add a small general part for what seats ask beside these (`--only statement,money,vote,message --generated 400`:
+  withdrawals said as lifting a hold, payments, votes, letters with and without an id for what they are about) if the
+  wave's own requests turn out thin there. Decide the sizes after the wave: what its seats asked for is the weight.
+- Writers: `claude-code/claude-sonnet-5-5`, `claude-code/claude-haiku-5-5`, `claude-code/claude-fable-5-1`, a third
+  each (and `codex/gpt-6.1-sol` as a fourth voice only if its window is open). The blind reader is never the writer.
+
+**2. Join them to the standing set** as `joined-12`: joined-11's three files, plus each new part's `checked.jsonl`,
+split by gold program as `runs/translator-data-2026-10-06b/split.ts` does, the part's validation side added to
+`validation.jsonl`. The 146 set aside go to the readers with the wave's requests (`in-situ-blind` on
+`set-aside.jsonl`, then `in-situ-label`), and what two readers agree on joins too. Not one command: see "Not built".
+
+**3. The pipeline over every pilot so far**, one command, with a config of this shape:
+
+```json
+{
+  "out": "/Users/clawd/oikos/runs/translator-pipeline-wave-2",
+  "pilots": [
+    { "path": "/Users/clawd/oikos/runs/<each wave-2 pilot>" },
+    { "path": "/Users/clawd/oikos/runs/pilot-11" }, { "path": "/Users/clawd/oikos/runs/pilot-12" },
+    { "path": "/Users/clawd/oikos/runs/pilot-13" }, { "path": "/Users/clawd/oikos/runs/pilot-18" },
+    { "path": "/Users/clawd/oikos/runs/live-check-2026-10-09/<each>" },
+    { "path": "/Users/clawd/oikos/runs/live-check-2-2026-10-09/<each>" },
+    { "path": "/Users/clawd/oikos/runs/claude-translator-check-2026-10-09/<each>" }
+  ],
+  "writers": { "claude-code": "claude-code/claude-sonnet-5-5", "codex": "codex/gpt-6.1-sol" },
+  "readers": ["claude-code/claude-sonnet-5-5", "codex/gpt-6.1-sol"],
+  "situations": 400, "testSituations": 120, "extraInstructions": ["writer-round2.txt"],
+  "standing": "/Users/clawd/oikos/runs/translator-data-in-situ/joined-12",
+  "budget": 150,
+  "train": true, "encoder": "microsoft/deberta-v3-small", "seeds": [1, 2, 3],
+  "trainExtra": ["--forms-most", "18"], "deadlineHours": 3, "name": "pod-small-w2"
+}
+```
+
+- A pilot marked `"test": true` (every live-check pilot, the translator check's, and the wave's eleven) is a test set
+  and never trains; the config cannot take the mark away. Pilots 12, 13 and 18 ran with the old trained translator in
+  front of their seats: their requests train, their drafts are not labels.
+- Readers: Sonnet 5.5 with gpt-6.1-sol if the Codex window can carry it; if not, Sonnet 5.5 with Fable 5.1 (measured
+  2026-10-09 under prompt 0.9.0 on the same 40 requests, `runs/reader-comparison-2026-10-09/`: they agree on 36 of 40,
+  each with 33 or 34 of the 34 settled labels; Sonnet with Haiku at its default effort agrees on 38 and costs less as
+  reported, and is one family twice over, as is any Claude pair: say which in the run's notes).
+- `--forms-most 18`: a seat of today's towns knows of 13 to 18 forms (measured on the live check: 533 to 760 of the
+  reader's 1,024 tokens before the request is read); every model so far was shown at most five beside an example.
+  It changes training, so the first batch should have one seed without it for comparison. Watch `left_out` in a run's
+  report (`long`: an input past the reader's limit is left out of training and asked back in use).
+- The pod step by hand, if the pipeline stopped after the export:
+  `OIKOS_POD_STATE=<out>/pod OIKOS_POD_MODELS=<out>/models zsh translator/model/pod/pod.sh run <out>/data pod-small-w2-s1:microsoft/deberta-v3-small:1:"--forms-most 18" …`
+  (about 18 minutes and 0.12 USD a run on 2026-10-08; `pod.sh pods` afterwards must list none of ours).
+
+**Scoring, the same day, old model beside new** (scores are comparable only under the same scoring code):
+- `oikos translator-eval --model decide/<run> --real --out <file>` for the new runs and again for
+  `decide/pod-small-d16-s1`: seen, held out (by case id and outcome only) and the 180 real requests, right / no draft /
+  wrong draft. The held-out cases were written before the hold and `look_first`: any keyed to the old rules count
+  against a model that is right now, and whoever keeps them re-keys by case id.
+- By kind: the pipeline scores each run on its test sets by function, pilot, seat model, profile and currency
+  (`test_scores`). Read holds, forms, directions, standing work, entries and `look_first` off the by-function lines
+  and the set's labels (`translator-eval --only-sets --set <out>/tests/test-pilots-real.jsonl`).
+- The live check's pilot 2 (the 44 requests of which the old model refused 31): it is a test-only pilot, so its
+  requests are in `tests/test-pilots-real.jsonl` with `pilot` on each line; its line in `test_scores` is the replay.
+  Only requests two readers agreed on are scored: say how many of the 44 that is.
+- Sureness: `OIKOS_DECIDE_LOG=<file>` logs each answer's sureness; report its spread and what the cut-off of 0.1 asks
+  back. `DecideAdapter.cannot` must report nothing lacking for the new runs.
+
 ## Not built
+
+- The retrain's first two steps as one command: generated parts are written and checked by their own commands, and
+  joined to the standing set by a short script (as `runs/translator-data-2026-10-06b/split.ts`). Writers of generated
+  parts are called one request at a call through an adapter, or work by file in batches.
 
 - Scoring a prompt-driven model on the test sets from the pipeline itself: it scores the runs it trained; any other model is
   scored by hand (`oikos translator-eval --model provider/model --only-sets --set <out>/tests/<file>.jsonl`).

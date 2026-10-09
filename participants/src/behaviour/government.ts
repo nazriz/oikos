@@ -778,6 +778,7 @@ export const works: BehaviourModule = {
   ],
   issues: [P.JOB_ADVERTISEMENT, ...P.WORKS],
   issuesWith: (p) => ({ ...P.staffingOwn({ role: p.role ?? "works crew", industry: p.industry, workplace: p.workplace, notice_days: p.notice_days ?? 14 }), landfill: p.landfill }),
+  staffed: (p) => ({ role: p.role ?? "works crew", own: "role_or_unnamed", posts: { budget_line: p.staff_line ?? "staff", wage: p.wage ?? 0, period: p.period ?? 14 * DAY } }),
   keeps: [{ what: "service_address", why: "The round is the works office's own: it makes an entry for each address its crew collects from, and adds to it as homes are built." }],
   takes: [
     staffingForm("works_staffing", "the works office", "works crew"),

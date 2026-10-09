@@ -211,6 +211,7 @@
     {
       "form": "job_advertisement",
       "title": "Job advertisement",
+      "does": "How the office takes on staff of its own: it puts the posts on the jobs board at the wage given, for people to apply, and the office then offers employment to those it takes on. It commits no money until someone is taken on.",
       "fields": {
         "wage": {
           "type": "amount",
@@ -276,6 +277,7 @@
     {
       "form": "habitat_register",
       "title": "Register of the lots where a listed species was found",
+      "does": "Publishes the lots where a survey found a listed species: the planning office refuses permits on them.",
       "fields": {
         "round": {
           "type": "count",

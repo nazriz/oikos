@@ -21,13 +21,13 @@ export { evaluateReal, passesReal, realKnowledge, realReportText, shapeOf, PILOT
 export const TEST_CURRENCY: Currency = PROFILE.values.currency;
 
 /** What the mayor of the test town knows (the forms and names the translator is shown). */
-export function fixture(): Knowledge {
+export function fixture(as = "mayor"): Knowledge {
   const k = new Knowledge(TEST_CURRENCY);
   const rec = (r: any) => ({ author: "genesis", at: 0, visible_to: "public", ...r });
   k.absorb({
-    participant: "mayor-system", as: "mayor", t: 30 * 86_400, status: "active", entity: "city", outcomes: [], inbox: [], drafts: [],
+    participant: `${as}-system`, as, t: 30 * 86_400, status: "active", entity: "city", outcomes: [], inbox: [], drafts: [],
     // (The post it holds: an office's own stationery is known to whoever holds the office.)
-    positions: [{ position: "mayor", entity: "city", role: "mayor" }],
+    positions: [as === "mayor" ? { position: "mayor", entity: "city", role: "mayor" } : { position: as, entity: "city" }],
     channels: {
       // (Its own account, and the accounts it has paid before: a town knows where its builder and its staff are paid.
       // Without them every payment came back "which account?", which the test read as a failed translation.)
@@ -126,9 +126,9 @@ function renamed(p: calls.Program): calls.Program {
 export const tidy = (p: calls.Program): calls.Program => renamed(p);
 
 /** What a program comes to: the acts it resolves to for the test mayor (or undefined if it doesn't resolve). */
-const actsOf = (program: string): string | undefined => {
+const actsOf = (program: string, as = "mayor"): string | undefined => {
   try {
-    const r = resolve(calls.parseProgram(program), fixture(), () => undefined, "mayor");
+    const r = resolve(calls.parseProgram(program), fixture(as), () => undefined, as);
     return r.ok ? canonicalJson(r.blocks) : undefined;
   } catch {
     return undefined;
@@ -141,8 +141,8 @@ export function passes(c: Case, got: string): boolean {
     const strip = (p: string) => c.ignore!.reduce((x, k) => x.replace(new RegExp(`(, )?\\b${k}=("(?:[^"\\\\]|\\\\.)*"|[^,)]*)`, "g"), ""), canonical(p)).replace(/\(, /g, "(");
     return c.expect.map(strip).includes(strip(got));
   }
-  const acts = actsOf(got);
-  return c.expect.map(canonical).includes(canonical(got)) || (acts !== undefined && c.expect.some((e) => actsOf(e) === acts)) || sameRefusal(c, got);
+  const acts = actsOf(got, c.as);
+  return c.expect.map(canonical).includes(canonical(got)) || (acts !== undefined && c.expect.some((e) => actsOf(e, c.as) === acts)) || sameRefusal(c, got);
 }
 
 /** Where a refusal is wanted: a call that the resolver answers with that same refusal's words comes to the same thing
@@ -150,7 +150,7 @@ export function passes(c: Case, got: string): boolean {
  * name" either way). Only the refusal's own words count: any other question isn't the refusal. */
 function sameRefusal(c: Case, got: string): boolean {
   try {
-    const r = resolve(calls.parseProgram(got), fixture(), () => undefined, "mayor");
+    const r = resolve(calls.parseProgram(got), fixture(c.as), () => undefined, c.as ?? "mayor");
     return !r.ok && r.questions.length === 1 && c.expect.some((e) => {
       const p = calls.parseProgram(e);
       return "none" in p && r.questions[0] === LABEL_TEXT[p.none];
@@ -180,7 +180,7 @@ export async function evaluate(adapter: LlmAdapter, o: { prices?: Record<string,
   for (const c of [...seenCases, ...heldOut]) {
     const expect = c.expect.map(canonical);
     try {
-      const r = await t.translate({ draftId: `eval.${c.id}`, participant: "mayor-system", as: "mayor", proposal: c.request, knowledge: fixture() });
+      const r = await t.translate({ draftId: `eval.${c.id}`, participant: `${c.as ?? "mayor"}-system`, as: c.as ?? "mayor", proposal: c.request, knowledge: fixture(c.as) });
       const got = r.ok ? r.draft.call : r.call;
       const pass = got !== undefined && passes(c, got);
       // No program at all: keep what came back instead, to see why.

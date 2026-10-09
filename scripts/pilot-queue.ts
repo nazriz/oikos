@@ -98,7 +98,9 @@ for (;;) {
     k.offsets.set(state.log, r.offset);
     // (A prompt too long for a seat's model: each one. Things a seat sent that were not sent: past the third.)
     for (const x of r.faults) {
-      if (x.kind === "prompt_too_long") tell(`PROMPT TOO LONG ${p.name}: ${x.participant} on day ${x.day}: its model would not take the prompt (${x.detail}); that sitting was not held`);
+      // (A sitting a seat missed because its model did not answer: each one. The seat sits again the next working day.)
+      if (x.kind === "sitting_missed") tell(`SITTING MISSED ${p.name}: ${x.participant} on day ${x.day}: its model did not answer, so nobody was in that seat that day; ${x.detail}`);
+      else if (x.kind === "prompt_too_long") tell(`PROMPT TOO LONG ${p.name}: ${x.participant} on day ${x.day}: its model would not take the prompt (${x.detail}); that sitting was not held`);
       else if (++k.notSent === NOT_SENT_ALERT) tell(`NOT SENT ${p.name}: ${k.notSent} things seats sent were not sent so far (each seat was told why); the latest, ${x.participant} on day ${x.day}: ${x.detail}`);
     }
     for (const o of r.optOuts) if (!k.optedOut.has(`${p.name}/${o.participant}`)) { k.optedOut.add(`${p.name}/${o.participant}`); tell(`OPT-OUT ${p.name}: ${o.participant} opted out on day ${o.day} ${JSON.stringify(o.statement.slice(0, 160))}`); }
@@ -108,10 +110,15 @@ for (;;) {
   const after = await runState(dir, p.until);
   const why = String(after.detail ?? after.ended ?? "no end written").slice(0, 200);
   if (after.stop === "done") continue; // (said done when it is looked at again, which is at once)
-  if (after.stop === "usage_limit") {
+  // A usage limit; or the model not answering (call after call unanswered, nothing said of a limit: a provider limiting
+  // without saying so looks the same, and so does a network down). Either way no call of that sign-in goes through
+  // for a while: the pilot is parked and come back to, never left as a failure with its seats empty.
+  if (after.stop === "usage_limit" || after.stop === "unreachable") {
+    const silent = after.stop === "unreachable";
+    const what = silent ? "with its model not answering" : "at a usage limit";
     if (!park) {
-      say(`${p.name}: stopped at a usage limit on day ${day(after.t)} (${why.slice(0, 120)}); asking again in ${minutes}`);
-      tell(`USAGE LIMIT ${p.name}: waiting ${minutes} from day ${day(after.t)}`);
+      say(`${p.name}: stopped ${what} on day ${day(after.t)} (${why.slice(0, 120)}); asking again in ${minutes}`);
+      tell(`${silent ? "MODEL NOT ANSWERING" : "USAGE LIMIT"} ${p.name}: waiting ${minutes} from day ${day(after.t)}`);
       await Bun.sleep(waitMs);
       tell(`usage-limit wait over for ${p.name}: trying again`);
       continue;
@@ -122,8 +129,8 @@ for (;;) {
     for (const x of who) limitedUntil.set(x, again);
     parked.set(p.name, { name: p.name, day: day(after.t), providers: who, since: localStamp(), next_try: localStamp(new Date(again)) });
     writeParked();
-    say(`${p.name}: parked at a usage limit on day ${day(after.t)} (${who.join(", ")}: ${why.slice(0, 120)}); the queue goes on, and it is tried again in ${minutes}`);
-    tell(`PARKED ${p.name}: at a usage limit (${who.join(", ")}) on day ${day(after.t)}; the queue goes on to what does not need ${who.join(" or ")}, and tries it again in ${minutes}`);
+    say(`${p.name}: parked ${what} on day ${day(after.t)} (${who.join(", ")}: ${why.slice(0, 120)}); the queue goes on, and it is tried again in ${minutes}`);
+    tell(`PARKED ${p.name}: ${what} (${who.join(", ")}) on day ${day(after.t)}; the queue goes on to what does not need ${who.join(" or ")}, and tries it again in ${minutes}`);
     continue;
   }
   // A spending limit is the pilot's own: it is over, as far as it got.

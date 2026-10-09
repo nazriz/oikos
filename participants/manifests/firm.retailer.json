@@ -465,6 +465,7 @@
     {
       "form": "job_advertisement",
       "title": "Job advertisement",
+      "does": "How the office takes on staff of its own: it puts the posts on the jobs board at the wage given, for people to apply, and the office then offers employment to those it takes on. It commits no money until someone is taken on.",
       "fields": {
         "wage": {
           "type": "amount",

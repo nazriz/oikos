@@ -31,6 +31,7 @@
     {
       "form": "death_registration",
       "title": "Entry in the register of deaths",
+      "does": "Registers a death on the notification of it: the entry is what a bank, the land registry and the family act on, and it is sent to whoever reported the death.",
       "fields": {
         "deceased": {
           "type": "entity",
@@ -97,6 +98,7 @@
     {
       "form": "death_certificate",
       "title": "Certified copy of an entry of death",
+      "does": "Gives whoever asks a certified copy of a death already registered.",
       "fields": {
         "deceased": {
           "type": "entity",
@@ -130,6 +132,7 @@
     {
       "form": "birth_registration",
       "title": "Entry in the register of births",
+      "does": "Registers a birth on the notification of it, and sends the entry to whoever reported it.",
       "fields": {
         "child": {
           "type": "entity",
@@ -178,6 +181,7 @@
     {
       "form": "transmission_application",
       "title": "Application to the land registry for a dead owner's land to pass",
+      "does": "Asks the land registry to pass a dead owner's land to the heir the law of succession names.",
       "fields": {
         "deceased": {
           "type": "entity",
