@@ -3660,6 +3660,9 @@ See the design note, §16.
   - **Not verified here:** that a model learns to point into a line of 13 to 18 forms as well as it chose among 95 names; the retrain's scores by form say (docs/translator-pipeline.md).
   - **Revisit if** forms asked for by what they are for score under forms named in the request (then the reader needs the form's own words for what it is for, which the line does not carry), or a world lists two forms an unnamed request could mean.
 
+- **Nothing trains that shares a source program with the parity test** (2026-10-09, the retrain after the wave; `orchestrator/src/broad.ts` `collect`; test `orchestrator/test/broad.test.ts`). The wide set's parity slice is cut by gold program within each function, so a refusal made from a payment's program (another function's example) could train while that payment was a parity case. Of the first wide set's 14,178 training rows, 324 share a source program with a parity case, 91 are rows a parity case was built from and 27 were built from a parity case or its program: 442 in all (and 28 more on the validation side). The retrain's join leaves them out (`runs/translator-retrain-2026-10-10/scripts/base.ts`, counted in its manifest), and `collect` now sets such rows aside as `shared-with-parity.jsonl`, on neither side, so a set collected from now on has none. The cut itself is unchanged (the parity file on disk is the same file), so parity scores stay comparable.
+  - **What it means for earlier numbers:** none were published on the parity test before this; the old model's parity score is unaffected (it trained on none of the wide set).
+  - **Revisit if** the parity test is cut again (then cut by source program across functions in the first place, and the set-aside file is empty).
 
 ## Open (to decide at the Stage 2 checkpoint or before)
 
