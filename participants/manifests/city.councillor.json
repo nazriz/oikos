@@ -1,6 +1,6 @@
 {
   "name": "city.councillor",
-  "version": "0.5.2",
+  "version": "0.6.0",
   "doc": "docs/behaviour/government.md",
   "params": {
     "budget_yes_bps": {
@@ -17,6 +17,10 @@
       },
       "default": 0,
       "source": "placeholder"
+    },
+    "motion": {
+      "schema": {},
+      "source": "the world gives it (no default)"
     },
     "noise_bps": {
       "schema": {

@@ -148,6 +148,31 @@ Spatial voting on one axis, from pro-development (−100) to pro-tenant (+100) (
 
 The generator seats five councillors at −80, −40, 0, 40 and 80. That makes tenant-protection proposals a coin-flip-ish affair: the two pro-tenant councillors plus noise. The council's composition is an experimental variable.
 
+- **A motion of their own** (0.6.0, 2026-10-09): a councillor given one by the town's description (`motion`: what is proposed, its `kind`, whom it `affects`, and `on_day`; none by default) puts it to the council once, on the council proposal form, as the standing orders let any councillor. Only a councillor with the form on file can (a post a model holds has; the code's post is shown ballots only), so it is how a council of mock seats is given business: nothing in a generated town sets one.
+
+## The council's standing orders (`proc-council`, 2026-10-09)
+
+The charter says who may propose ("on proposals from the mayor or any councillor") and that the council decides by majority. How its business is done was nowhere on file: a model clerk told a councillor it had "found no rule on file that says who may make a proposal", and five model councillors, shown one closed ballot and nothing else, did nothing for 45 days. A real council has standing orders. The town's are a published procedure under the charter (law data: a record, not code), in seven orders that say what the clerk's office does and no more:
+
+1. the mayor or any councillor may put a proposal of their own motion, with no seconder and no notice beyond filing it;
+2. on the council proposal form, or a law's amendment form for a figure in a law in force, filed with the clerk by being handed in;
+3. the clerk puts every proposal so filed to a ballot of the councillors, open for 14 days from when the clerk opens it;
+4. each councillor votes yes or no in their own post while it is open, the latest vote counts, the mayor has no vote, and a vote after the close or by anyone else is not counted;
+5. it passes if more vote yes than no and the yes votes are more than half of all the councillors;
+6. at the close the clerk counts and declares the result in public, naming who voted for, who against and who did not vote, and publishes what passed;
+7. a petition lodged with the council lies on its table; the council is not bound to act on one, and the mayor or any councillor may take it up by a proposal.
+
+Real councils differ in the detail (a seconder, days of notice before a meeting, a show of hands); this one meets on paper, so a motion is on notice from the day it is filed and the ballot's fourteen days are its debate. The code clerk ballots a proposal on the form from whoever files it; the orders say who may put one, which is for whoever holds the clerk's post to hold to.
+
+**What a council seat has on its desk when a person (a model) holds it** (generator 0.45.0; the code in these posts is given none of it, and reads only what it acts on):
+
+| Post | On file (standing) | Comes to it |
+|---|---|---|
+| a councillor | the charter, the standing orders and procedures, the town's laws; the forms (the council proposal form, each law's amendment form) | proposals put to the council and its ballots, as papers of its own body (one filed brings the seat back to its desk at the next working day's sitting); petitions lodged, their counts and answers, budgets adopted, results declared; its files and who's who on request |
+| the clerk | the charter and the standing orders; its own stationery (ballot, result, law, budget) | as before (the council's business, proposals, votes), and petitions, budgets and results |
+
+Nothing here tells a seat to act: it is what the office can do, on paper it would have.
+
 ## `city.finance_officer` (0.9.0)
 
 **Payroll (C4b):** the finance officer also runs the town's payroll: wages for the crew the works office hires, net of the income tax withheld, which it pays over monthly ([services.md](services.md), [public-finance.md](public-finance.md)). Wages count against the adopted budget with the invoices it pays. Since 0.10.0 it sets a new starter's wage up on the hiring office's **payroll notice**, from the first pay day the notice gives; with no notice after `payroll_wait_days` (3) it sets it up from the agreement on file ([firms.md](firms.md), "Payroll notices").
