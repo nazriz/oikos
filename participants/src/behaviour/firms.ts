@@ -21,7 +21,7 @@ import { params, wait, type Belief, type BehaviourModule, type ParticipantContex
 import { distribute } from "./lengnick";
 import { dayPayPeriod, incomeTaxLaw, withheld, type Charge } from "./tax";
 import { message } from "./common";
-import { ask, Asked, because, between, Book, PAYEE_DIED, breaches, noting, callAction, usd, cellsOf, commitmentOf, DAY, jobTerms, leaseTerms, MONTH, notice, offer, ownAccount, pay, publishedPrice, say, stoodEmpty, structureOf, withdraw, type Step } from "./common";
+import { advertisedJob, ask, Asked, because, between, Book, firstDue, PAYEE_DIED, breaches, noting, callAction, usd, cellsOf, commitmentOf, DAY, jobTerms, leaseTerms, MONTH, notice, offer, ownAccount, pay, publishedPrice, say, stoodEmpty, structureOf, withdraw, type Step } from "./common";
 import * as P from "./papers";
 
 /**
@@ -734,9 +734,14 @@ export class Staffing {
   }
   /** Payroll notices this office has sent, by "<starter|leaver>:<agreement>" (and what is on file says the same). */
   private readonly notified = new Set<string>();
-  /** The role an employment agreement names ("... works for X as <role> for <the wage> every N days."), if any. */
-  private roleOf(a: any): string | undefined {
-    return / as (.+?) for (?:(?! for ).)+ every \d+ days\.(?: First pay .*)?$/.exec(a.terms?.text ?? "")?.[1];
+  /** The role an employment agreement names ("... works for X as <role> for <the wage> every N days."), if any; one
+   * that names none and was made on an advertisement is for the post advertised (an offer in the office-holder's own
+   * words: docs/behaviour/firms.md, "An offer made on an advertisement"). */
+  private roleOf(a: any, book: Book): string | undefined {
+    const named = / as (.+?) for (?:(?! for ).)+ every \d+ days\.(?: First pay .*)?$/.exec(a.terms?.text ?? "")?.[1];
+    if (named !== undefined) return named;
+    const advertised = advertisedJob(book, a)?.data?.role;
+    return typeof advertised === "string" && advertised ? advertised : undefined;
   }
   private ours(role: string | undefined): boolean {
     return !this.o.own || role === this.o.role || (this.o.own === "role_or_unnamed" && role === undefined);
@@ -764,7 +769,7 @@ export class Staffing {
   }
 
   private contracts(book: Book): any[] {
-    return book.ofType("agreement").filter((r) => r.record === "agreement" && r.terms.template === "employment" && r.terms.parties[0] === this.me && this.ours(this.roleOf(r)));
+    return book.ofType("agreement").filter((r) => r.record === "agreement" && r.terms.template === "employment" && r.terms.parties[0] === this.me && this.ours(this.roleOf(r, book)));
   }
   private endOf(book: Book, a: any): number {
     return book.endsAt(a.id) ?? Infinity;
@@ -894,7 +899,7 @@ export class Staffing {
     if (this.o.payroll && !doesPay && this.o.does?.hire !== false) {
       const filed = book.open("payroll_notice").filter((n) => n.speaks_for === me);
       const sent = (what: string, a: any) => this.notified.has(`${what}:${a.id}`) || filed.some((n) => n.data?.notice === what && n.data?.agreement === a.id);
-      const post = (a: any) => this.roleOf(a) ?? this.o.role;
+      const post = (a: any) => this.roleOf(a, book) ?? this.o.role;
       for (const a of staff) {
         const signed = book.signedAt(a.id);
         // (Those the organisation started with were on its payroll before the year began.)
@@ -1085,7 +1090,7 @@ export class Staffing {
   private nextDue(book: Book, order: string, t: number): number {
     const r = book.records.get(order);
     const every = r?.record === "statement" ? Number(r.data?.every) || this.o.period : this.o.period;
-    const start = (r?.at ?? 0) + (r?.record === "statement" && Number.isInteger(r.data?.first) ? r.data!.first : every);
+    const start = r?.record === "statement" ? firstDue(r, every) : (r?.at ?? 0) + every;
     return start > t ? start : start + Math.ceil((t - start + 1) / every) * every;
   }
 

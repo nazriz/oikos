@@ -72,7 +72,7 @@
 //         [--shard I/N] [--per-shape N] [--per-gold N] [--refusals N] [--refusal-floor N] [--floor N] [--generated N]
 //         [--ceiling N] [--validation SHARE] [--limit N] [--seed N]
 //         [--only FN,FN,...] [--indirect SHARE] [--refusal-labels L,L,...]
-//         [--amount-forms N] [--pairs SHARE [--pairs-only]] [--broad] [--world-forms N]   (these options on a run with models too)
+//         [--amount-forms N] [--pairs SHARE [--pairs-only]] [--broad] [--world-forms N] [--styles S,S]   (these options on a run with models too)
 //     No model: the plan of what is to be written (DIR/plan.json), what each writer is asked, item by item
 //     (DIR/briefs.jsonl: {id, kind, brief}; with --writers, DIR/briefs-NAME.jsonl each, the items dealt in turn), and
 //     the writers' instructions (DIR/writer-instructions.txt), for writers who work on files. --shard I/N: part I of
@@ -121,7 +121,14 @@
 //     read blind by a model that did not write it, the gold programs compared by meaning, the leak check. The config:
 //     {out, writers: {name: provider/model}, readers: {writer's provider/model: reader, "*": reader}, budget, …}.
 //     Resumable: the same command goes on where it stopped. A folder with a v2-plan.json is the banked part.
-//   oikos translator-v2-data [PILOT_DIR...] --out DIR [--from-pilots N] [--generated N] [--writers NAME,…] [--seed N]
+//   oikos translator-data-collect <OUT> <PART>... [--share S] [--floor N]
+//     Every part's checked examples as one set, each with its groups (writer, register, asker, currency, writing,
+//     source), cut by gold program into train.jsonl and parity-test.jsonl (never trained on); the cells of each
+//     group by function, and which are under the floor.
+//   oikos translator-choices-data <PILOT_DIR>... --out DIR [--citizens N] [--replies N] [--writers NAME,…]
+//     The plan of citizens' turns (a code citizen's decision told in plain words; the label is what it chose) and
+//     of plain replies to real draft previews (translator/train/choices.ts). No model is called.
+//   oikos translator-v2-data [PILOT_DIR...] --out DIR [--from-pilots N] [--generated N] [--turns N --acts FILE...] [--writers NAME,…] [--seed N]
 //     The plan of the cases banked for a later translator (translator/train/v2.ts, docs/design/translator-v2.md):
 //     plain-text turns whose right reading is a look, a letter, a note, being done or a yes or no, from what real
 //     seats did (never a test-only pilot's) and generated. No model is called.
@@ -343,7 +350,7 @@ try {
       perShape: num("per-shape"), perGold: num("per-gold"), refusalsPerLabel: num("refusals"), refusalFloor: num("refusal-floor"), floor: num("floor"), generated: num("generated"), ceiling: num("ceiling"), validation: num("validation"),
       limit: num("limit"), seed: num("seed"), log: console.log,
       ...(flag("indirect") !== undefined ? { indirect: Number(flag("indirect")) } : {}), ...(flag("only") ? { only: list("only") } : {}), ...(flag("refusal-labels") ? { refusalLabels: list("refusal-labels") } : {}),
-      amountForms: num("amount-forms"), pairs: num("pairs"), pairsOnly: has("pairs-only"), broad: has("broad"), worldForms: num("world-forms"),
+      amountForms: num("amount-forms"), pairs: num("pairs"), pairsOnly: has("pairs-only"), broad: has("broad"), worldForms: num("world-forms"), ...(flag("styles") ? { styles: list("styles") } : {}),
     });
     if (has("briefs")) console.log(`${r.briefs} briefs written to ${r.out} (plan.json, briefs.jsonl${flag("writers") ? ", a briefs file for each writer" : ""}, writer-instructions.txt)`);
     else console.log(`${r.examples} examples written to ${r.out} (examples.jsonl, manifest.json)${r.stopped ? `; writing stopped early: ${r.stopped}` : ""}`);
@@ -405,11 +412,25 @@ try {
     for (const [m, u] of Object.entries(r.usage)) console.log(`  ${m}: ${u.calls} calls, ${u.input_tokens + u.cache_read_tokens} tokens in, ${u.output_tokens} out, ${(u.cost_microusd / 1e6).toFixed(2)} USD as reckoned`);
     console.log(r.status);
     if (r.status !== "complete") process.exit(3);
+  } else if (cmd === "translator-choices-data" && flag("out") && positional()[0]) {
+    // The plan of citizens' turns and of plain replies to previews (translator/train/choices.ts): no model is called.
+    const { choiceCases } = await import("./broad");
+    const num = (name: string) => (flag(name) ? Number(flag(name)) : undefined);
+    const p = await choiceCases({ out: flag("out")!, pilots: positional(), ...(num("citizens") !== undefined ? { citizens: num("citizens")! } : {}), ...(num("replies") !== undefined ? { replies: num("replies")! } : {}), writers: (flag("writers") ?? "writer").split(",").map((x) => x.trim()).filter(Boolean), ...(num("seed") !== undefined ? { seed: num("seed")! } : {}) });
+    console.log(`${p.items.length} cases planned in ${flag("out")} (choices-plan.json): ${Object.entries(p.by_kind).map(([k, n]) => `${k} ${n}`).join(", ")}`);
+    console.log(`  read: ${JSON.stringify(p.counts)}`);
+  } else if (cmd === "translator-data-collect" && positional()[1]) {
+    // Every part's checked examples as one set with its groups, cut into what may train and a parity test (broad.ts).
+    const { collect } = await import("./broad");
+    const num = (name: string) => (flag(name) ? Number(flag(name)) : undefined);
+    const r = collect(positional()[0]!, positional().slice(1), { ...(num("share") !== undefined ? { share: num("share")! } : {}), ...(num("floor") !== undefined ? { floor: num("floor")! } : {}), ...(num("seed") !== undefined ? { seed: num("seed")! } : {}) });
+    console.log(`${r.examples} examples: ${r.train} may train, ${r.parity} are the parity test (never trained on); the leak check names ${r.leak_check.cases_named} held-out cases`);
+    for (const [d, c] of Object.entries(r.cells)) console.log(`  ${d} × function: smallest cell ${c.min}; ${Object.keys(c.under).length} cells under the floor`);
   } else if (cmd === "translator-v2-data" && flag("out")) {
     // The plan of the cases banked for a later translator (translator/train/v2.ts): no model is called.
     const { v2Cases } = await import("./broad");
     const num = (name: string) => (flag(name) ? Number(flag(name)) : undefined);
-    const p = await v2Cases({ out: flag("out")!, pilots: positional(), ...(num("from-pilots") !== undefined ? { fromPilots: num("from-pilots")! } : {}), ...(num("generated") !== undefined ? { generated: num("generated")! } : {}), ...(num("max-carried") !== undefined ? { maxCarried: num("max-carried")! } : {}), writers: (flag("writers") ?? "writer").split(",").map((x) => x.trim()).filter(Boolean), ...(num("seed") !== undefined ? { seed: num("seed")! } : {}) });
+    const p = await v2Cases({ out: flag("out")!, pilots: positional(), ...(num("from-pilots") !== undefined ? { fromPilots: num("from-pilots")! } : {}), ...(num("generated") !== undefined ? { generated: num("generated")! } : {}), ...(num("max-carried") !== undefined ? { maxCarried: num("max-carried")! } : {}), ...(num("turns") !== undefined ? { turns: num("turns")!, acts: flags("acts") } : {}), writers: (flag("writers") ?? "writer").split(",").map((x) => x.trim()).filter(Boolean), ...(num("seed") !== undefined ? { seed: num("seed")! } : {}) });
     console.log(`${p.items.length} cases planned in ${flag("out")} (v2-plan.json): ${Object.entries(p.by_kind).map(([k, n]) => `${k} ${n}`).join(", ")}`);
     console.log(`  from pilots: ${JSON.stringify(p.counts)}`);
   } else if (cmd === "translator-pipeline" && positional()[0]) {

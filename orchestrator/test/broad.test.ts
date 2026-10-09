@@ -10,7 +10,7 @@ import { calls } from "@oikos/participants";
 import { MockAdapter, type ContentBlock, type LlmRequest, type Price } from "@oikos/participants/llm";
 import { literals, type Example } from "../../translator/train/data";
 import { readerUses, type Use, type V2Example } from "../../translator/train/v2";
-import { batches, checkBroadConfig, currencyShape, runBroad, v2Cases, v2FromPilots, type BroadConfig } from "../src/broad";
+import { batches, checkBroadConfig, choiceCases, collect, currencyShape, PLAIN_SYSTEM, plainBrief, runBroad, v2Cases, v2FromPilots, type BroadConfig, type Groups } from "../src/broad";
 import type { Hooks } from "../src/pipeline";
 import { trainingData, type Plan } from "../src/training";
 
@@ -188,15 +188,15 @@ function pilot(name: string, o: { test?: boolean } = {}): string {
 test("what real seats did becomes cases one use at a time, never an act, never from a test-only pilot", async () => {
   const p = pilot("test-broad-pilot");
   const { cases, counts: c } = await v2FromPilots([p], { seed: 3 });
-  expect(c).toMatchObject({ situations: 3, test_situations: 0, uses: 7, do: 1, too_long: 2, said_before: 1 });
-  // (No case holds the act; the long letter is no brief, alone or in its turn; the paper read twice is one case.)
+  expect(c).toMatchObject({ situations: 3, test_situations: 0, uses: 7, do: 1, too_long: 1, said_before: 1 });
+  // (No case holds the act; the long letter is no brief by itself, and is one as part of its turn, which may be longer; the paper read twice is one case.)
   expect(cases.some((x) => x.uses.some((u) => u.tool === "do"))).toBe(false);
-  expect(cases.map((x) => x.kind).sort()).toEqual(["confirm:confirm", "done_for_now", "look:paper", "notebook:add", "turn"]);
+  expect(cases.map((x) => x.kind).sort()).toEqual(["confirm:confirm", "done_for_now", "look:paper", "notebook:add", "turn", "turn"]);
   const look = cases.find((x) => x.kind === "look:paper")!;
   expect(look.uses).toEqual([{ tool: "look", input: { report: "clerk/files", paper: "rec.12" } }]);
   expect(look.knows.reports).toEqual([{ id: "clerk/files", title: "Clerk: Files" }, { id: "clerk/in-tray", title: "Clerk: In-tray" }]);
   expect(look.from).toBe("test-broad-pilot/clerk-system/d0/1/use-1");
-  const turn = cases.find((x) => x.kind === "turn")!;
+  const turn = cases.find((x) => x.kind === "turn" && x.uses[0]!.tool === "confirm")!;
   expect(turn.uses.map((u) => u.tool)).toEqual(["confirm", "done_for_now"]);
   expect(turn.knows.awaiting).toEqual(["draft.clerk-system.1"]);
   await expect(v2FromPilots([pilot("test-broad-held", { test: true })])).rejects.toThrow(/test-only/);
@@ -205,7 +205,7 @@ test("what real seats did becomes cases one use at a time, never an act, never f
 test("the banked part is written, checked for what a turn must carry, read blind by a model that did not write, and compared", async () => {
   const dir = join(out, "v2");
   const p = await v2Cases({ out: dir, pilots: [join(root, "runs", "test-broad-pilot")], generated: 30, writers: ["w1", "w2"], seed: 3 });
-  expect(p.items.length).toBe(35);
+  expect(p.items.length).toBe(36);
   expect(Object.keys(p.by_kind).some((k) => k.startsWith("pilot "))).toBe(true);
   // A stand-in writer: every id and number, and the words to be given as written, each said once; one turn in seven
   // names a tool, and one in five loses its words.
@@ -224,7 +224,7 @@ test("the banked part is written, checked for what a turn must carry, read blind
   const rep = r.parts[0]!;
   const examples = jsonl<V2Example>(join(dir, "v2-examples.jsonl"));
   const rejects = jsonl<any>(join(dir, "v2-rejects.jsonl"));
-  expect(examples.length + rejects.length).toBe(35);
+  expect(examples.length + rejects.length).toBe(36);
   expect(rejects.some((x) => /a tool's own name/.test(x.why))).toBe(true);
   expect(rejects.some((x) => /not as written|not there/.test(x.why))).toBe(true);
   const checked = jsonl<V2Example>(join(dir, "v2-checked.jsonl"));
@@ -242,4 +242,97 @@ test("the banked part is written, checked for what a turn must carry, read blind
   const again: Counts = { writes: {}, reads: {}, turns: 0 };
   await runBroad(config(), [dir], hooks(again, { turn, wrong: wrongTurn }));
   expect(again).toEqual({ writes: {}, reads: {}, turns: 0 });
+});
+
+test("the parts of a run are collected with their groups, and a parity test is cut by gold program that never trains", () => {
+  const all = join(out, "all");
+  const r = collect(all, [part], { share: 0.4, floor: 2, seed: 5, heldOut: false });
+  const train = jsonl<Example & { groups: Groups }>(join(all, "train.jsonl")), parity = jsonl<Example & { groups: Groups }>(join(all, "parity-test.jsonl"));
+  expect(r.examples).toBe(train.length + parity.length);
+  expect(r.examples).toBe(jsonl(join(part, "checked.jsonl")).length);
+  expect(parity.length).toBeGreaterThan(0);
+  expect(train.length).toBeGreaterThan(0);
+  // No gold program is on both sides, and every example says which groups it is of.
+  const golds = new Set(train.map((e) => e.gold ?? e.id));
+  for (const e of parity) expect(golds.has(e.gold ?? e.id)).toBe(false);
+  for (const e of [...train, ...parity]) {
+    expect(Object.keys(e.groups).sort()).toEqual(["asker", "currency", "part", "register", "source", "writer", "writing"]);
+    expect(e.groups.part).toBe("part-1");
+    expect(e.groups.writer).toBe(e.written_by ?? "(built)");
+    expect(e.groups.register).toBe(e.style ?? "(built)");
+  }
+  // The cells of each group by function are counted, and the small ones named.
+  for (const d of ["writer", "register", "asker", "writing"]) { expect(r.cells[d]!.min).toBeGreaterThanOrEqual(0); expect(Object.values(r.cells[d]!.under).every((n) => n < 2)).toBe(true); }
+  expect(Object.values(r.by.writer!).reduce((a, n) => a + n, 0)).toBe(r.examples);
+  expect(Object.values(r.parity_cells.function!).reduce((a, n) => a + n, 0)).toBe(parity.length);
+  expect(collect(all, [part], { share: 0.4, floor: 2, seed: 5, heldOut: false })).toEqual(r);
+  expect(JSON.parse(readFileSync(join(all, "manifest.json"), "utf8")).parity).toBe(parity.length);
+});
+
+test("a plain writer is given the situation and no careful briefing", async () => {
+  expect(plainBrief("Call:\nx(a=1)\n\nWhat it brings about:\nthing\n\nHow to say it:\nThe act, said something like: \"y\".\n\nStyle: long words\n\nWho is asking: a tenant.")).toBe("Call:\nx(a=1)\n\nWhat it brings about:\nthing\n\nWho is asking: a tenant.");
+  const dir = join(out, "part-plain");
+  await trainingData({ sources: [log], out: dir, briefsOnly: true, briefsFor: ["weak"], noSpares: true, floor: 0, perGold: 1, limit: 6, indirect: 0, broad: true, styles: ["own"], validation: 0, seed: 8 });
+  const sent: { system: string; user: string }[] = [];
+  const base = hooks({ writes: {}, reads: {}, turns: 0 });
+  const tap: Hooks = { ...base, adapter: (name) => { const m = base.adapter!(name); return { ...m, adapter: { provider: m.adapter.provider, model: m.adapter.model, complete: async (req) => { sent.push({ system: req.system ?? "", user: String((req.messages[0] as any).content) }); return m.adapter.complete(req); } } }; } };
+  const r = await runBroad(config({ writers: { weak: "mock/writer-a" }, plain: ["weak"] }), [dir], tap, { only: "write" });
+  expect(r.parts[0]!.briefs).toBe(6);
+  const writes = sent.filter((x) => x.user.includes("=== BRIEFS ==="));
+  expect(writes.length).toBeGreaterThan(0);
+  for (const w of writes) { expect(w.system).toBe(PLAIN_SYSTEM); expect(w.user).not.toContain("How to say it"); expect(w.user).not.toContain("Style:"); expect(w.user).toContain("Who is asking"); expect(w.user).toContain("Call:"); }
+  expect(jsonl<Example>(join(dir, "examples.jsonl")).every((e) => e.style === "own")).toBe(true);
+});
+
+test("citizens' decisions and a seat's replies are planned from a pilot's log, written, and kept where a reader of another model picks the label", async () => {
+  // A pilot with two citizens' decisions and a preview the seat confirmed.
+  const dir = join(root, "runs", "test-broad-citizens");
+  rmSync(dir, { recursive: true, force: true });
+  mkdirSync(dir, { recursive: true });
+  const decision = (t: number, subject: string, data: object) => entry(t, "annotation", { annotation: "decision", subject, data });
+  const opts = [{ key: "shop-1", facts: { goods_per_month: 4, money_per_month: -5000 } }, { key: "shop-2", facts: { goods_per_month: 0, money_per_month: 0 } }];
+  writeFileSync(join(dir, "town.seed1.jsonl"), [
+    entry(0, "header", { run_id: "town.seed1", config: { world: { currencies: [{ code: "XTS", minor_units: 2, symbol: "¤" }] } } }),
+    decision(5, "c0001-self", { domain: "shop", choice: "shop-2", n: 1, options: opts, circumstances: { savings: 10000 } }),
+    decision(6, "c0002-self", { domain: "shop", choice: "shop-2", n: 1, options: opts, circumstances: { savings: 10000 } }),
+    decision(7, "c0003-self", { domain: "practice", choice: "stay", n: 2, options: [{ key: "club-1-gathering", facts: { company: 1 } }, { key: "stay" }] }),
+    decision(8, "c0004-self", { domain: "job", choice: "city", n: 3, options: [{ key: "city", facts: { money_per_month: 9 } }] }),
+    said(100, "clerk-system", 1, "It is year 1, day 1.\n## Waiting for you to confirm\nBefore this goes ahead (draft.clerk-system.1), here is exactly what will happen:\nYou will pay ¤5.00 to acc-b.\nConfirm it, or decline it.", [use("u1", "confirm", { ref: "draft.clerk-system.1", decision: "confirm" })], "You are the clerk."),
+  ].join("\n") + "\n");
+  const cdir = join(out, "choices");
+  const p = await choiceCases({ out: cdir, pilots: [dir], writers: ["w1", "w2"], seed: 4 });
+  expect(p.counts).toMatchObject({ decisions: 4, one_option: 1, told_before: 1, previews: 1, answered_by_seat: 1 });
+  const citizens = p.items.filter((t) => t.case.kind === "citizen");
+  expect(citizens.map((t) => t.case.label).sort()).toEqual(["shop-2", "stay"]);
+  expect(citizens.find((t) => t.case.label === "shop-2")!.case.from).toMatchObject({ run: "test-broad-citizens", subject: "c0001-self", domain: "shop", n: 1 });
+  expect(typeof citizens[0]!.case.from.seq).toBe("number");
+  const replies = p.items.filter((t) => t.case.kind === "reply");
+  expect(replies.some((t) => t.case.label === "confirm" && t.case.from.real)).toBe(true);
+  expect(replies.some((t) => ["decline_and_ask", "unclear"].includes(t.case.label) && !t.case.from.real)).toBe(true);
+  await expect(choiceCases({ out: join(out, "choices-held"), pilots: [join(root, "runs", "test-broad-held")], writers: ["w"] })).rejects.toThrow(/test-only/);
+  // Stand-ins: the writer says the label's own words in a sentence; the reader picks what the sentence says, but for one.
+  const label = new Map(p.items.map((t) => [t.id, t.case.label]));
+  const zero: Price = { input: 0, output: 0, cache_read: 0, cache_write: 0 };
+  let reads = 0;
+  const mock = (n: string) => new MockAdapter(n, { consult: (req: LlmRequest): ContentBlock[] => {
+    const body = req.messages[0]!.content as string;
+    if (body.includes("=== BRIEFS ===")) return [{ type: "tool_use", id: "t", name: "hand_in", input: { answers: body.split("=== BRIEFS ===\n")[1]!.split("\n").filter(Boolean).map((l) => JSON.parse(l)).map((b: any) => ({ id: b.id, request: `I say ${label.get(b.id)!.replace(/_/g, " ")} (${b.id.slice(0, 4)})` })) } }];
+    reads++;
+    return [{ type: "tool_use", id: "t", name: "hand_in", input: { answers: body.split("=== TURNS ===\n")[1]!.split("\n").filter(Boolean).map((l) => JSON.parse(l)).map((b: any) => { expect(Object.keys(b).sort()).toEqual(["answer", "id", "told", "values"]); const said = /I say (.*) \(/.exec(b.answer)![1]!.replace(/ /g, "_"); return { id: b.id, choice: said === "stay" ? "club-1-gathering" : b.values.map((v: string) => v.split(":")[0]).find((k: string) => k === said || k.replace(/_/g, " ") === said.replace(/_/g, " ")) ?? "unclear" }; }) } }];
+  } });
+  const adapters = new Map(["writer-a", "writer-b"].map((n) => [`mock/${n}`, mock(n)]));
+  const h: Hooks = { heldOut: false, sleep: async () => {}, log: () => {}, adapter: (name) => ({ adapter: adapters.get(name)!, prices: { [name]: zero } }) };
+  const r = await runBroad(config(), [cdir], h);
+  expect(r.status).toBe("complete");
+  const checked = jsonl<any>(join(cdir, "choices-checked.jsonl")), disagreed = jsonl<any>(join(cdir, "choices-disagreed.jsonl"));
+  expect(checked.length + disagreed.length).toBe(p.items.length);
+  expect(disagreed.map((e) => e.label)).toEqual(["stay"]);
+  for (const e of checked) expect(e.verified_by).not.toBe(e.written_by);
+  const turns = jsonl<any>(join(cdir, "citizen-turns.jsonl"));
+  expect(turns.length).toBe(1);
+  expect(turns[0]).toMatchObject({ kind: "citizen", label: "shop-2", from: { subject: "c0001-self", domain: "shop" } });
+  expect(jsonl<any>(join(cdir, "replies.jsonl")).length).toBe(replies.length);
+  const before = reads;
+  await runBroad(config(), [cdir], h);
+  expect(reads).toBe(before);
 });

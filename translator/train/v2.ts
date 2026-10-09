@@ -29,12 +29,18 @@ import { canonical as canonicalJson } from "@oikos/participants";
 import { ASKERS, askerLine, sampler, shuffled } from "./data";
 import { Draw, everyCurrency } from "./synthetic";
 
-export const V2_VERSION = "0.1.0";
+export const V2_VERSION = "0.2.0"; // 0.2.0: whole turns with their segmentation (`v2Turns`); a report named by its title alone
 
 /** The seat's tools, by name (participant.ts `tools`). */
 export const V2_TOOLS = ["look", "write", "notebook", "done_for_now", "confirm", "opt_out", "do"] as const;
 export type Tool = (typeof V2_TOOLS)[number];
-export interface Use { tool: Tool; input: { [k: string]: any } }
+export interface Use {
+  tool: Tool; input: { [k: string]: any };
+  /** An act's reading by the first translator, where it is known (a whole turn built with a checked v1 example as one
+   * of its parts: `v2Turns`): the program, and what kind of part that makes it. No part of whether two uses are the same. */
+  program?: string;
+  reads?: "act" | "unreadable" | "ask_back";
+}
 /** What the participant could name in its turn. */
 export interface Knows { reports: { id: string; title?: string }[]; awaiting?: string[] }
 export interface V2Case {
@@ -204,6 +210,52 @@ export function v2Generated(o: { n?: number; seed?: number } = {}): { case: V2Ca
   return out;
 }
 
+/**
+ * Whole turns with their segmentation (0.2.0): one to five things said in order in one turn, as a participant with
+ * no tools would write them, each part with its reading. A part is an act (a checked example of the first
+ * translator's data: its request, word for word, is the part's `what`, and its program is the part's reading; one
+ * whose program is `none(unclear)` is a part that cannot be read, and any other refusal is a part that must be asked
+ * back) or a use of another tool (`v2Generated`'s); half end with being done for some days. What the turn can name is
+ * what its parts can. For a seed, always the same.
+ */
+export function v2Turns(o: { acts: { request: string; program: string }[]; n?: number; seed?: number }): { case: V2Case; asker: string }[] {
+  const rand = sampler((o.seed ?? 1) * 104729 + 11);
+  const pick = <T>(xs: T[]): T => xs[Math.floor(rand() * xs.length)]!;
+  const others = v2Generated({ n: Math.max(40, (o.n ?? 100) * 3), seed: (o.seed ?? 1) + 17 }).filter((x) => x.case.uses.length === 1 && x.case.uses[0]!.tool !== "opt_out" && x.case.uses[0]!.tool !== "done_for_now");
+  // (Short acts: a turn of several things is not several long instructions. A refusal built by pasting requests together is no one part.)
+  const acts = o.acts.filter((a) => a.request.length <= 320 && a.program !== "none(too_much)" && a.program !== "none(unknown_form)");
+  const plain = acts.filter((a) => !a.program.startsWith("none(")), unreadable = acts.filter((a) => a.program === "none(unclear)"), askBack = acts.filter((a) => a.program.startsWith("none(") && a.program !== "none(unclear)");
+  const out: { case: V2Case; asker: string }[] = [];
+  const seen = new Set<string>();
+  for (let tries = 0; out.length < (o.n ?? 100) && tries < (o.n ?? 100) * 20 && acts.length && others.length; tries++) {
+    const r = rand();
+    const parts = r < 0.15 ? 1 : r < 0.5 ? 2 : r < 0.8 ? 3 : r < 0.95 ? 4 : 5;
+    const first = pick(others);
+    const uses: Use[] = [];
+    const reports = new Map(first.case.knows.reports.map((x) => [x.id, x])), awaiting = new Set(first.case.knows.awaiting ?? []);
+    for (let i = 0; i < parts; i++) {
+      const k = rand();
+      // (About half the parts are acts; of those one in eight cannot be read and one in six must be asked back.)
+      if (k < 0.5 || (parts === 1 && i === 0)) {
+        const kind = rand();
+        const a = kind < 0.12 && unreadable.length ? pick(unreadable) : kind < 0.28 && askBack.length ? pick(askBack) : pick(plain.length ? plain : acts);
+        uses.push({ tool: "do", input: { what: a.request }, program: a.program, reads: a.program === "none(unclear)" ? "unreadable" : a.program.startsWith("none(") ? "ask_back" : "act" });
+      } else {
+        const g = i === 0 ? first : pick(others);
+        uses.push(g.case.uses[0]!);
+        for (const x of g.case.knows.reports) reports.set(x.id, x);
+        for (const x of g.case.knows.awaiting ?? []) awaiting.add(x);
+      }
+    }
+    if (parts > 1 && rand() < 0.5) uses.push({ tool: "done_for_now", input: rand() < 0.7 ? { days: pick([1, 2, 3, 5, 7, 14]) } : {} });
+    const key = canonicalJson(uses);
+    if (seen.has(key) || new Set(uses.map((u) => canonicalJson(u))).size !== uses.length) continue;
+    seen.add(key);
+    out.push({ asker: first.asker, case: { id: `t-${sha(key).slice(0, 12)}`, source: "generated", kind: `whole_turn:${uses.length}`, uses, knows: { reports: [...reports.values()], ...(awaiting.size ? { awaiting: [...awaiting] } : {}) } } });
+  }
+  return out;
+}
+
 // ---------------------------------------------------------------- what a writer is given
 
 /** What a writer is told of each tool: for its understanding, never wording to use. */
@@ -251,6 +303,7 @@ export function v2Brief(c: V2Case, style: string, asker: string): string {
   const tools = [...new Set(c.uses.map((u) => u.tool))];
   return [
     `What the participant did in this turn, in order:\n${c.uses.map((u, i) => `${i + 1}. ${u.tool} ${JSON.stringify(u.input)}`).join("\n")}`,
+    ...(c.uses.some((u) => u.tool === "do") ? ["A thing done (do) is said in its own words exactly as given, every word of them and no others, as a sentence or sentences of the turn (no quotation marks round it, nothing added to it, nothing of it left out or reworded, even where it is vague or has slips in it). What comes before and after it is yours."] : []),
     `What each is (for your understanding: don't reuse this wording):\n${tools.map((t) => `- ${GLOSS[t]}`).join("\n")}`,
     ...(c.knows.reports.length ? [`What it can look into (for your understanding; a report you name is named by its id, or by its title with the id in brackets): ${c.knows.reports.map((r) => `${r.id}${r.title ? ` "${r.title}"` : ""}`).join("; ")}.`] : []),
     `Style: ${V2_STYLES[style] ?? style}`,

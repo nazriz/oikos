@@ -62,9 +62,24 @@ There is nobody in post, so the work that is the staff's is done by nobody. The 
 beginning with an advertisement on its job advertisement form (form-works-job-advertisement).
 ```
 
+Once staff are in post and have reported (docs/behaviour/standing-work.md, "The staff's report"), it says what each
+last did and when, and how each standing work order stands:
+
+```
+In post (5): c0113, since year 1, day 4, under rec.1697, last at work year 1, day 11 (maintain); ...
+Vacant: 1.
+Your standing work orders, as your staff reported on year 1, day 11 (rec.3256):
+- rec.1082, collect every 7 days: carried out: 430 calls at addresses, 1026 loads.
+- rec.1083, maintain every 1 day: carried out: 77 upkeep jobs, 123 units of upkeep; 275 worn assets were left when the crew's hours ran out.
+```
+
+Someone who has never come in reads "has not come in to work: no place of work in the employment agreement or in an
+advertisement it cites"; an order nobody carries out reads "carried out by nobody: there is nobody in post" or "not
+carried out: none of the 5 in post was at the depot (...) when the day's work was set out".
+
 - It is read from the office's own papers and nothing else (`mine`, docs/no-god-view.md): the employment agreements
-  its organisation is party to, in the office's role, in force; and, where the posts are what a budget line pays for,
-  the adopted budget. The code that runs the office reads the same papers the same way (`Staffing`). Nothing is asked
+  its organisation is party to, in the office's role, in force; its standing work orders and its staff's reports;
+  and, where the posts are what a budget line pays for, the adopted budget. The code that runs the office reads the same papers the same way (`Staffing`). Nothing is asked
   of the engine, and no one else's staff are shown.
 - Posts are the office's establishment (clinic, school, police: its funder's figure, a parameter) or what its budget
   line pays for at its rate of pay (works, environment). The code office also keeps within its room at the depot; the
@@ -135,9 +150,10 @@ what each field is; whether a seat reads them is for the first pilot to show.
 ## Leaves out
 
 - **Hiring is still a chain**: advertise, read the applications, offer, and (for an office that pays its own staff)
-  set up the wage. The form is the first link; the others are existing acts. An offer's words are the seat's own, and
-  the environment office tells its own staff from the town's others by those words (`roleOf`, firms.ts): a seat's
-  offer worded otherwise is counted with the works crew.
+  set up the wage. The form is the first link; the others are existing acts. An offer's words are the seat's own:
+  one that names no post or place of work and was made on an advertisement is for the post and the place advertised
+  (docs/behaviour/firms.md, "An offer made on an advertisement"), so the environment office's hire is no longer
+  counted with the works crew. An offer that cites no advertisement and names no post still is.
 - **Checking what a form is given.** A form checks its fields' types and nothing else: it will register the death of
   someone alive.
 - **Forms for papers other offices send in** (a death notification to the registrar, a nomination to the electoral

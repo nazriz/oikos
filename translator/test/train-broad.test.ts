@@ -9,7 +9,7 @@ import { synthetic, worldForms } from "../train/synthetic";
 const gold = synthetic({ perFunction: 12, seed: 3 });
 
 test("the pipeline's version says there is a wide part", () => {
-  expect(DATA_VERSION).toBe("0.13.0");
+  expect(DATA_VERSION).toBe("0.13.1");
 });
 
 test("the wide deal is made of the styles and the three registers, and the older deal has none of the registers", () => {
@@ -105,4 +105,15 @@ test("a wide part's refusal briefs: any act on a record whose id the speaker lac
   const given = await fromWritten(plan, [{ writer: "w", requests: [{ id: item.id, request: `See to ${item.refusal.mustNot![0]}: ${others}.` }] }], { refusalFloor: 0, refusalLabels: ["look_first"] });
   expect(given.examples.length).toBe(0);
   expect(given.rejects[0]!.why).toBe("not_copied");
+});
+
+test("a wide part's programs have grouped counts and starts given as days, each read by the contract; without it none has", () => {
+  const wide = synthetic({ perFunction: 150, seed: 3, only: ["goods", "work", "money", "take"], wide: true });
+  const plain = synthetic({ perFunction: 150, seed: 3, only: ["goods", "work", "money", "take"] });
+  const grouped = (g: { program: string }) => /(quantity|units)="[0-9]{1,3}([,. '][0-9]{2,3})+"/.test(g.program);
+  const dated = (g: { program: string }) => /(first|until)="(year [0-9]+, )?day [0-9]+"/.test(g.program);
+  expect(wide.filter(grouped).length).toBeGreaterThan(10);
+  expect(wide.filter(dated).length).toBeGreaterThan(5);
+  expect(plain.some(grouped) || plain.some(dated)).toBe(false);
+  for (const g of wide.filter((x) => grouped(x) || dated(x))) expect(calls.contractErrors(calls.parseProgram(g.program))).toEqual([]);
 });

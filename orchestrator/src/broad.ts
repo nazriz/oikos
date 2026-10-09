@@ -36,9 +36,12 @@ import { loadHeldOut } from "@oikos/translator/eval";
 import { leaks, sharesWording } from "../../translator/eval/held-out";
 import { blindRequests, checkAnswers, type BlindAnswer } from "../../translator/train/blind";
 import { DATA_VERSION, functionOf, type Example } from "../../translator/train/data";
-import { carriedLength, kindOf, notCarried, readerUses, sameUses, useOf, v2Generated, v2Plan, v2ReaderSystem, v2WriterSystem, V2_VERSION, type Knows, type Use, type V2Case, type V2Example, type V2PlanItem } from "../../translator/train/v2";
+import { carriedLength, kindOf, notCarried, readerUses, sameUses, useOf, v2Generated, v2Turns, v2Plan, v2ReaderSystem, v2WriterSystem, V2_VERSION, type Knows, type Use, type V2Case, type V2Example, type V2PlanItem } from "../../translator/train/v2";
+import type { Currency } from "@oikos/participants";
+import { CHOICES_VERSION, choiceBrief as _choiceBrief, choicePlan, choiceReaderSystem, choiceWriterSystem, citizenCase, previewsIn, replyCases, type ChoiceCase, type ChoiceExample, type ChoicePlanItem, type DecisionRecord } from "../../translator/train/choices";
 import { logsIn } from "./corpus";
-import { situationsOf } from "./in-situ";
+import { runName, situationsOf } from "./in-situ";
+import { logLines } from "./logs";
 import { askReader, Caller, implausiblyUniform, objectsIn, pilotMeta, Stopped, type Hooks, type Used } from "./pipeline";
 import { writerInstructions, writtenData, type Plan } from "./training";
 
@@ -69,6 +72,10 @@ export interface BroadConfig {
   maxWaitHours?: number;
   callMinutes?: number;
   seed?: number;
+  /** Writers (by name) that are given the plain situation and no careful briefing: a short instruction in place of
+   * the writers' own, and each brief without its way of saying the act and without a style. For writers that really
+   * are simple ones (a small model, a model at low effort), so that what they hand in is their own voice. */
+  plain?: string[];
 }
 
 export function checkBroadConfig(c: BroadConfig): BroadConfig {
@@ -154,6 +161,13 @@ export const V2_WRITER_CALL = [
   "There is no file to write: hand the answers in as your answer, in the form asked for (`hand_in`): `answers`, a list with an object for each brief, {\"id\": \"<the brief's id, copied exactly>\", \"request\": \"<the turn you wrote>\"}, in the same order as the briefs. Each is a plain string, written as it is.",
 ].join("\n");
 
+/** What a plain writer of turns is told, whole. */
+export const PLAIN_SYSTEM_V2 = [
+  "You are a person in a town with no tools: you read plain text and write plain text, and someone works out from your words what you meant. You are shown what you do this turn as a short list. Say it in your own words, the way you would really say it.",
+  "Keep every id and every number exactly as written. Words that are sent or kept (a letter, a note) go in word for word. Say nothing the list doesn't have.",
+  "Answer with what you would say, and nothing else.",
+].join("\n");
+
 export const V2_READER_CALL = [
   "The system message is your instructions. Below is TURNS: lines of {\"id\": \"...\", \"turn\": \"...\", \"reports\": [...], \"awaiting\": [...]}, in no particular order. `reports` are the reports this participant can look into, each by its id with its title; `awaiting` are the references of what is waiting for its yes or no.",
   "Read each turn yourself and work it out on its own merits: do not sort or answer them with a script, keyword rules or a pattern, and do not assume what kinds of turn the file holds (it is a mixture).",
@@ -161,6 +175,17 @@ export const V2_READER_CALL = [
 ].join("\n");
 
 interface Brief { id: string; kind?: string; brief: string }
+
+/** What a plain writer is told, whole. */
+export const PLAIN_SYSTEM = [
+  "You are a person in a town. Something is to happen, and you tell whoever carries things out for you, in your own words, the way you would really say it.",
+  "You are shown what is to happen as a small formal call (function(argument=value, ...)) with a line on what it brings about, or as a situation described in a few sentences. Say it as that person would. Keep every id and every figure exactly as written. Say nothing it doesn't say.",
+  "Answer with what you would say, and nothing else.",
+].join("\n");
+/** A brief as a plain writer is given it: without the way of saying the act and without the style (who is asking stays). */
+export const plainBrief = (brief: string): string => brief.split("\n\n").filter((p) => !p.startsWith("How to say it:") && !p.startsWith("Style:")).join("\n\n");
+/** The same task for a plain writer: what to hand in, and no more. */
+export const PLAIN_CALL = "Below is BRIEFS: lines of {id, kind, brief}. For each one, say what the person would say. Hand the answers in in the form asked for (`hand_in`): `answers`, a list with an object for each brief, {\"id\": \"<the brief's id, copied exactly>\", \"request\": \"<what you would say>\"}, in the same order.";
 interface Unit<T> { fp: string; model: string; ids: string[]; answers: T[]; missing: string[]; used: Used; ms: number }
 
 /**
@@ -234,9 +259,10 @@ export async function runPart(cfg: BroadConfig, dir: string, caller: Caller, say
   for (const name of plan.writers) {
     const model = cfg.writers[name];
     if (!model) throw new Error(`${part}: its plan names the writer "${name}", and the config has no model for it`);
-    const briefs = jsonl<Brief & { spare?: boolean }>(join(dir, `briefs-${safe(name)}.jsonl`)).map(({ id, kind, brief }) => ({ id, kind, brief }));
+    const plain = !!cfg.plain?.includes(name);
+    const briefs = jsonl<Brief & { spare?: boolean }>(join(dir, `briefs-${safe(name)}.jsonl`)).map(({ id, kind, brief }) => ({ id, kind, brief: plain ? plainBrief(brief) : brief }));
     briefsN += briefs.length;
-    const answers = await writeBriefs(caller, cfg, dir, name, model, briefs, { system, task: WRITER_CALL, subject: "translator-data-batch/writer", say, part });
+    const answers = await writeBriefs(caller, cfg, dir, name, model, briefs, { system: plain ? PLAIN_SYSTEM : system, task: plain ? PLAIN_CALL : WRITER_CALL, subject: "translator-data-batch/writer", say, part });
     const file = join(dir, `requests-${safe(name)}.jsonl`);
     put(file, lines(answers));
     files.push({ file, writer: model });
@@ -338,7 +364,7 @@ export async function runBroad(cfg: BroadConfig, parts: string[], hooks: Hooks =
   try {
     for (const p of parts) {
       const dir = resolve(p);
-      const r = existsSync(join(dir, "v2-plan.json")) ? await runV2(cfg, dir, caller, say, { ...(hooks.heldOut !== undefined ? { heldOut: hooks.heldOut } : {}) }) : await runPart(cfg, dir, caller, say, { ...o, ...(hooks.heldOut !== undefined ? { heldOut: hooks.heldOut } : {}) });
+      const r = existsSync(join(dir, "choices-plan.json")) ? await runChoices(cfg, dir, caller, say, { ...(hooks.heldOut !== undefined ? { heldOut: hooks.heldOut } : {}) }) : existsSync(join(dir, "v2-plan.json")) ? await runV2(cfg, dir, caller, say, { ...(hooks.heldOut !== undefined ? { heldOut: hooks.heldOut } : {}) }) : await runPart(cfg, dir, caller, say, { ...o, ...(hooks.heldOut !== undefined ? { heldOut: hooks.heldOut } : {}) });
       reports.push(r);
       putJson(join(out, `report-${r.part}.json`), r);
     }
@@ -369,6 +395,10 @@ export interface V2Options {
   /** The most cases from pilots (all of them, if absent), and how many generated. */
   fromPilots?: number;
   generated?: number;
+  /** Whole turns built with checked v1 examples as their acts (v2.ts `v2Turns`): how many, and the files of examples
+   * (`checked.jsonl` of v1 parts) the acts are drawn from. */
+  turns?: number;
+  acts?: string[];
   /** The most characters of words to be carried as written in one case (700): a longer letter or note is no brief. */
   maxCarried?: number;
   writers: string[];
@@ -409,8 +439,8 @@ export async function v2FromPilots(pilots: string[], o: { max?: number; maxCarri
         counts.uses! += all.length;
         counts.do! += all.filter((u) => u.tool === "do").length;
         const others = all.filter((u) => u.tool !== "do");
-        const add = (uses: Use[], n: string) => {
-          if (carriedLength(uses) > cap) return void counts.too_long!++;
+        const add = (uses: Use[], n: string, most = cap) => {
+          if (carriedLength(uses) > most) return void counts.too_long!++;
           const key = JSON.stringify(uses);
           if (seen.has(key)) return void counts.said_before!++;
           seen.add(key);
@@ -419,7 +449,7 @@ export async function v2FromPilots(pilots: string[], o: { max?: number; maxCarri
         };
         others.forEach((u, i) => add([u], `use-${i + 1}`));
         // (A whole turn, where it is two or three things and none of them an act: the order said is the order done.)
-        if (others.length === all.length && all.length >= 2 && all.length <= 3) add(all, "turn");
+        if (others.length === all.length && all.length >= 2 && all.length <= 5) add(all, "turn", cap * 2);
       }
     }
   }
@@ -443,7 +473,8 @@ export interface V2Plan { version: string; seed: number; writers: string[]; pilo
 export async function v2Cases(o: V2Options): Promise<V2Plan> {
   const seed = o.seed ?? 1;
   const real = o.pilots?.length ? await v2FromPilots(o.pilots, { ...(o.fromPilots !== undefined ? { max: o.fromPilots } : {}), ...(o.maxCarried ? { maxCarried: o.maxCarried } : {}), seed }) : { cases: [], counts: {} };
-  const made = o.generated ? v2Generated({ n: o.generated, seed }) : [];
+  const acts = (o.acts ?? []).flatMap((f) => jsonl<{ request: string; program: string }>(f)).map((e) => ({ request: e.request, program: e.program }));
+  const made = [...(o.generated ? v2Generated({ n: o.generated, seed }) : []), ...(o.turns ? v2Turns({ acts, n: o.turns, seed }) : [])];
   // (Dealt alternately while both last, so every writer and every style meets both kinds.)
   const cases: { case: V2Case; asker?: string }[] = [];
   for (let i = 0; i < Math.max(real.cases.length, made.length); i++) {
@@ -472,8 +503,9 @@ export async function runV2(cfg: BroadConfig, dir: string, caller: Caller, say: 
   for (const name of plan.writers) {
     const model = cfg.writers[name];
     if (!model) throw new Error(`${part}: its plan names the writer "${name}", and the config has no model for it`);
-    const briefs = plan.items.filter((t) => t.writer === name).map((t) => ({ id: t.id, brief: t.brief }));
-    const answers = await writeBriefs(caller, cfg, dir, name, model, briefs, { system, task: V2_WRITER_CALL, subject: "translator-v2-data/writer", say, part });
+    const plain = !!cfg.plain?.includes(name);
+    const briefs = plan.items.filter((t) => t.writer === name).map((t) => ({ id: t.id, brief: plain ? plainBrief(t.brief) : t.brief }));
+    const answers = await writeBriefs(caller, cfg, dir, name, model, briefs, { system: plain ? PLAIN_SYSTEM_V2 : system, task: V2_WRITER_CALL, subject: "translator-v2-data/writer", say, part });
     for (const a of answers) if (!texts.has(a.id)) texts.set(a.id, { text: a.request.trim(), by: model });
     written[model] = (written[model] ?? 0) + answers.length;
   }
@@ -545,4 +577,240 @@ export async function runV2(cfg: BroadConfig, dir: string, caller: Caller, say: 
     leak_check: { held_out_cases_here: heldOut?.length ?? 0, turns_taken_out: leaked, cases_named_after: named }, sha256: sha(checked.map((e) => JSON.stringify(e)).join("\n")) });
   say(`${part}: read ${examples.length}, agreed ${checked.length}, disagreed ${disagreed.length}, unanswered ${unanswered.length}; kept ${checked.length}`);
   return report;
+}
+
+// ------------------------------------------------------------------------------------------------------ choices: citizens' turns, and a plain yes or no
+
+export interface ChoicesOptions {
+  out: string;
+  /** Pilots' folders (never a test-only pilot's). */
+  pilots: string[];
+  /** The most citizens' decisions, and the most previews replied to, in all. */
+  citizens?: number;
+  replies?: number;
+  writers: string[];
+  seed?: number;
+}
+export interface ChoicesPlan { version: string; seed: number; writers: string[]; pilots: string[]; counts: { [k: string]: number }; by_kind: { [k: string]: number }; items: ChoicePlanItem[] }
+
+/**
+ * `oikos translator-choices-data`: the plan of the citizens' turns and of the replies to previews (`choices-plan.json`),
+ * with no model called. Citizens' decisions are read from the logs' `decision` annotations and taken in turn by area
+ * and by what was chosen, so the thousands of evenings stayed in do not crowd out the few jobs taken; one told and
+ * chosen exactly as another is taken once. Previews are those seats were shown, with what the seat did where it
+ * answered in the same sitting.
+ */
+export async function choiceCases(o: ChoicesOptions): Promise<ChoicesPlan> {
+  const seed = o.seed ?? 1;
+  const { sampler, shuffled } = await import("../../translator/train/data");
+  const rand = sampler(seed + 71);
+  const counts: { [k: string]: number } = { decisions: 0, one_option: 0, told_before: 0, previews: 0, answered_by_seat: 0, test_situations: 0 };
+  const byGroup = new Map<string, ChoiceCase[]>();
+  const replies: ChoiceCase[] = [];
+  const told = new Set<string>();
+  for (const p of o.pilots) {
+    const dir = resolve(p);
+    if (pilotMeta(dir).test) throw new Error(`${dir} is marked test-only: nothing of it is a source`);
+    for (const log of logsIn(dir)) {
+      const run = runName(log).replace(/^runs\//, "");
+      let currency: Currency | undefined;
+      if (o.citizens !== 0) for await (const line of logLines(log)) {
+        if (!line) continue;
+        if (!currency && line.includes('"kind":"header"')) { currency = JSON.parse(line).body?.config?.world?.currencies?.[0]; continue; }
+        if (!line.includes('"annotation":"decision"') || !currency) continue;
+        const e = JSON.parse(line);
+        if (e.body?.annotation !== "decision") continue;
+        counts.decisions!++;
+        const c = citizenCase(e.body.data as DecisionRecord, currency, { run, seq: e.seq, subject: e.body.subject });
+        if (!c) { counts.one_option!++; continue; }
+        const key = `${c.situation}\u0001${c.label}`;
+        if (told.has(key)) { counts.told_before!++; continue; }
+        told.add(key);
+        const g = `${c.from.domain}/${["stay", "not", "none"].includes(c.label) ? c.label : "chosen"}`;
+        (byGroup.get(g) ?? byGroup.set(g, []).get(g)!).push(c);
+      }
+      if (o.replies !== 0) {
+        const { situations } = await situationsOf(log);
+        const seen = new Set<string>();
+        for (const x of situations) {
+          if (x.test) { counts.test_situations!++; continue; }
+          for (const pv of previewsIn(x.shown)) {
+            if (seen.has(pv.draft)) continue;
+            const did = (x.uses ?? []).find((u) => u.name === "confirm" && (u.input as any)?.ref === pv.draft);
+            const real = did ? ((did.input as any).decision === "decline" ? "decline" : "confirm") : undefined;
+            // (A preview is taken where the seat answers it; one never answered, at its last showing: here, once.)
+            if (!real) continue;
+            seen.add(pv.draft);
+            counts.previews!++;
+            counts.answered_by_seat!++;
+            replies.push(...replyCases(run, pv.draft, pv.preview, real, (n) => Math.floor(rand() * n)));
+          }
+        }
+      }
+    }
+  }
+  const queues = [...byGroup.keys()].sort().map((k) => shuffled(byGroup.get(k)!, rand));
+  const citizens: ChoiceCase[] = [];
+  for (let i = 0, empty = 0; citizens.length < (o.citizens ?? Infinity) && empty < queues.length; i++) {
+    const q = queues[i % queues.length]!;
+    if (q.length) { citizens.push(q.shift()!); empty = 0; } else empty++;
+  }
+  const some = shuffled(replies, rand).slice(0, o.replies ?? Infinity);
+  const cases: ChoiceCase[] = [];
+  for (let i = 0; i < Math.max(citizens.length, some.length); i++) { if (i < citizens.length) cases.push(citizens[i]!); if (i < some.length) cases.push(some[i]!); }
+  const items = choicePlan(cases, { writers: o.writers, seed });
+  const by_kind: { [k: string]: number } = {};
+  for (const t of items) { const k = t.case.kind === "citizen" ? `citizen ${t.case.from.domain}: ${["stay", "not", "none"].includes(t.case.label) ? t.case.label : "an option chosen"}` : `reply ${t.case.label}${t.case.from.real ? " (as the seat did)" : " (made on a real preview)"}`; by_kind[k] = (by_kind[k] ?? 0) + 1; }
+  const plan: ChoicesPlan = { version: CHOICES_VERSION, seed, writers: o.writers, pilots: o.pilots.map((p) => resolve(p)), counts, by_kind: Object.fromEntries(Object.entries(by_kind).sort()), items };
+  mkdirSync(o.out, { recursive: true });
+  putJson(join(o.out, "choices-plan.json"), plan);
+  put(join(o.out, "choices-writer-instructions.txt"), `${choiceWriterSystem()}\n`);
+  put(join(o.out, "choices-reader-instructions.txt"), `${choiceReaderSystem()}\n`);
+  return plan;
+}
+
+export const CHOICE_WRITER_CALL = "The system message is your instructions. Below is BRIEFS: lines of {id, brief}. For EACH brief write what the person says, from that brief alone, yourself and in your own words (no script, no template; vary how they open). Hand the answers in in the form asked for (`hand_in`): `answers`, a list with an object for each brief, {\"id\": \"<the brief's id, copied exactly>\", \"request\": \"<what the person says>\"}, in the same order.";
+export const CHOICE_READER_CALL = "The system message is your instructions. Below is TURNS: lines of {\"id\", \"told\", \"values\", \"answer\"}, in no particular order: what the person was told, the values their answer can be read as (key: what it is), and their answer. Read each yourself, on its own merits (no script, no keyword rule). Hand the answers in in the form asked for (`hand_in`): `answers`, a list with an object for each line, {\"id\": \"<the same id>\", \"choice\": \"<the key of the value picked, or unclear>\"}, in the same order.";
+
+/** The choices from their plan to checked cases: written, read by a model that did not write (shown what the person
+ * was told, the values and the answer), kept where the reader picks the label. */
+export async function runChoices(cfg: BroadConfig, dir: string, caller: Caller, say: (s: string) => void, o: { heldOut?: Hooks["heldOut"] } = {}): Promise<PartReport> {
+  const part = dir.split("/").filter(Boolean).pop()!;
+  const plan = read<ChoicesPlan>(join(dir, "choices-plan.json"))!;
+  const texts = new Map<string, { text: string; by: string }>();
+  const written: { [writer: string]: number } = {};
+  for (const name of plan.writers) {
+    const model = cfg.writers[name];
+    if (!model) throw new Error(`${part}: its plan names the writer "${name}", and the config has no model for it`);
+    const plain = !!cfg.plain?.includes(name);
+    const briefs = plan.items.filter((t) => t.writer === name).map((t) => ({ id: t.id, brief: plain ? plainBrief(t.brief) : t.brief }));
+    const answers = await writeBriefs(caller, cfg, dir, name, model, briefs, { system: choiceWriterSystem(), task: CHOICE_WRITER_CALL, subject: "translator-choices-data/writer", say, part });
+    for (const a of answers) if (!texts.has(a.id)) texts.set(a.id, { text: a.request.trim(), by: model });
+    written[model] = (written[model] ?? 0) + answers.length;
+  }
+  const heldOut = o.heldOut === false ? undefined : (o.heldOut as ReturnType<typeof loadHeldOut>) ?? loadHeldOut();
+  const shares = heldOut?.length ? sharesWording(heldOut) : () => false;
+  const examples: ChoiceExample[] = [], rejects: unknown[] = [];
+  let noText = 0, leaked = 0;
+  for (const t of plan.items) {
+    const w = texts.get(t.id);
+    if (!w) { noText++; continue; }
+    // (A label said as a code word is no person's answer.)
+    const why = /\b(decline_and_ask|option [0-9]+)\b/i.test(w.text) ? "a label's own name" : undefined;
+    if (why) { rejects.push({ id: t.id, text: w.text, label: t.case.label, why, written_by: w.by, style: t.style }); continue; }
+    if (shares(w.text)) { leaked++; continue; }
+    examples.push({ id: t.id, kind: t.case.kind, text: w.text, situation: t.case.situation, options: t.case.options, label: t.case.label, style: t.style, written_by: w.by, from: t.case.from });
+  }
+  put(join(dir, "choices-examples.jsonl"), lines(examples));
+  put(join(dir, "choices-rejects.jsonl"), lines(rejects));
+  const readerOf = (e: ChoiceExample) => cfg.readers[e.written_by] ?? cfg.readers["*"]!;
+  const byReader = new Map<string, ChoiceExample[]>();
+  for (const e of examples) (byReader.get(readerOf(e)) ?? byReader.set(readerOf(e), []).get(readerOf(e))!).push(e);
+  const { sampler, shuffled } = await import("../../translator/train/data");
+  const got = new Map<string, string>();
+  const system = choiceReaderSystem();
+  for (const [reader, own] of byReader) {
+    const blind = shuffled([...own].sort((a, b) => (a.id < b.id ? -1 : 1)), sampler((cfg.seed ?? plan.seed) + 4099)).map((e) => ({ id: e.id, told: e.situation, values: e.options.map((x) => `${x.key}: ${x.is}`), answer: e.text }));
+    const cut = batches(blind, cfg.readBatch ?? 30, 60_000, (b) => b.told.length + b.answer.length + 300);
+    let done = 0;
+    await pool(cut, cfg.jobs ?? 4, async (batch, k) => {
+      const file = join(dir, "read", safe(reader), `${pad(k)}.json`);
+      const user = `${CHOICE_READER_CALL}\n\n=== TURNS ===\n${batch.map((b) => JSON.stringify(b)).join("\n")}\n`;
+      const mark = fp(reader, system, user);
+      let unit = read<Unit<{ id: string; choice: string }>>(file);
+      if (unit?.fp !== mark) {
+        if (unit) setAside(file, "stale");
+        const ids = new Set(batch.map((b) => b.id));
+        const r = await caller.ask(reader, { step: `${part}/read/${reader}`, unit: pad(k) }, { system, user, maxTokens: Math.min(20_000, 1_000 + 60 * batch.length), subject: "translator-choices-data/reader", form: "choices" });
+        const answers = objectsIn(r.text).filter((a) => typeof a.id === "string" && ids.has(a.id) && typeof a.choice === "string");
+        unit = { fp: mark, model: reader, ids: batch.map((b) => b.id), answers, missing: batch.filter((b) => !answers.some((a) => a.id === b.id)).map((b) => b.id), used: r.used, ms: r.ms };
+        putJson(file, unit);
+      }
+      for (const a of unit.answers) got.set(a.id, a.choice.trim());
+      if (++done % 5 === 0 || done === cut.length) say(`${part}: ${reader} ${done} of ${cut.length} batches read this sitting`);
+    });
+  }
+  const checked: ChoiceExample[] = [], disagreed: unknown[] = [], unanswered: ChoiceExample[] = [];
+  const by: PartReport["agreement"] = { kind: {}, label: {}, style: {}, writer: {}, reader: {} };
+  const count = (kind: string, key: string, what: "agreed" | "disagreed" | "unanswered") => void ((by[kind]![key] ??= { agreed: 0, disagreed: 0, unanswered: 0 })[what]++);
+  for (const e of examples) {
+    const answer = got.get(e.id);
+    const what = answer === undefined ? "unanswered" : answer === e.label ? "agreed" : "disagreed";
+    count("kind", e.kind === "citizen" ? `citizen ${e.from.domain}` : `reply ${e.label}`, what); count("label", e.kind === "citizen" ? (["stay", "not", "none"].includes(e.label) ? `citizen: ${e.label}` : "citizen: an option chosen") : e.label, what); count("style", e.style, what); count("writer", e.written_by, what); count("reader", readerOf(e), what);
+    if (what === "agreed") checked.push({ ...e, verified_by: readerOf(e) });
+    else if (what === "disagreed") disagreed.push({ ...e, answer, reader: readerOf(e) });
+    else unanswered.push(e);
+  }
+  put(join(dir, "choices-checked.jsonl"), lines(checked));
+  // (The citizens' turns in a file of their own, each with its decision's `seq`, to join to the outcome records.)
+  put(join(dir, "citizen-turns.jsonl"), lines(checked.filter((e) => e.kind === "citizen")));
+  put(join(dir, "replies.jsonl"), lines(checked.filter((e) => e.kind === "reply")));
+  put(join(dir, "choices-disagreed.jsonl"), lines(disagreed));
+  const agreement = Object.fromEntries(Object.entries(by).map(([k, v]) => [k, Object.fromEntries(Object.entries(v).sort())]));
+  const report: PartReport = { part, briefs: plan.items.length, written, examples: examples.length, rejects: rejects.length, no_request: noText, read: examples.length, agreed: checked.length, disagreed: disagreed.length, unanswered: unanswered.length, leaked, kept: checked.length, agreement };
+  putJson(join(dir, "choices-manifest.json"), { version: CHOICES_VERSION, seed: plan.seed, pilots: plan.pilots, counts: plan.counts, planned_by_kind: plan.by_kind, writers_models: cfg.writers, readers: cfg.readers, ...report, sha256: sha(checked.map((e) => JSON.stringify(e)).join("\n")) });
+  say(`${part}: read ${examples.length}, agreed ${checked.length}, disagreed ${disagreed.length}, unanswered ${unanswered.length}; kept ${checked.length}`);
+  return report;
+}
+
+// ------------------------------------------------------------------------------------------------------ the whole of a run: groups, floors, and a parity test
+
+/** The groups error rates are to be compared across (docs/design/translator-v2.md, "Unbiased by design"): on every
+ * example, so a test set carries them. */
+export interface Groups { writer: string; register: string; asker: string; currency: string; writing: string; source: string; part: string }
+export const groupsOf = (e: Example, part: string): Groups => ({
+  writer: e.written_by ?? "(built)", register: e.style ?? "(built)", asker: e.asker ?? "(none)", currency: e.currency?.code ?? "(none)", writing: currencyShape(e.currency),
+  source: e.kind === "refusal" ? (e.written_by ? "generated: a situation to be refused" : "built from kept requests") : e.origin === "synthetic" ? "generated from the contract" : e.origin === "case" ? "a seen test case's program" : (e.origin ?? "log"), part,
+});
+
+export interface Collected { examples: number; train: number; parity: number; by: { [dim: string]: { [key: string]: number } }; cells: { [dim: string]: { functions: number; min: number; under: { [cell: string]: number } } }; parity_cells: { [dim: string]: { [cell: string]: number } }; leak_check: { held_out_cases_here: number; cases_named: number } }
+
+/**
+ * `oikos translator-data-collect <OUT> <PART>...`: every part's checked examples as one set, each with its groups
+ * (`groups`), cut once into what may train (`train.jsonl`) and a parity test that never does (`parity-test.jsonl`):
+ * about one gold program in `share` of each function, whole (every request written for it goes with it, so no
+ * program is on both sides), which keeps the slice spread over writers, registers, askers and ways of writing money
+ * as the whole is. The manifest counts the whole every way, the cells of each group by function (and which fall
+ * under `floor`: a cell too small to be measured on its own), and the parity test's cells.
+ */
+export function collect(out: string, parts: string[], o: { share?: number; floor?: number; seed?: number; heldOut?: Hooks["heldOut"] } = {}): Collected {
+  const share = o.share ?? 0.1, floor = o.floor ?? 20, seed = o.seed ?? 1;
+  const all: (Example & { groups: Groups })[] = [];
+  const seen = new Set<string>();
+  for (const p of parts) for (const e of jsonl<Example>(join(resolve(p), "checked.jsonl"))) {
+    if (seen.has(e.id)) continue;
+    seen.add(e.id);
+    all.push({ ...e, groups: groupsOf(e, resolve(p).split("/").pop()!) });
+  }
+  const fnOf = (e: Example) => functionOf(e);
+  // (A built refusal goes where the requests it was built from go: with the first of them.)
+  const goldOf = new Map(all.map((e) => [e.id, e.gold ?? e.program]));
+  const key = (e: Example) => e.gold ?? (e.built_from?.length ? goldOf.get(e.built_from[0]!) : undefined) ?? e.id;
+  const held = (e: Example) => parseInt(sha(`${seed}:${fnOf(e)}:${key(e)}`).slice(0, 8), 16) / 0xffffffff < share;
+  const parity = all.filter(held), train = all.filter((e) => !held(e));
+  const dims = ["writer", "register", "asker", "writing", "currency", "source", "part"] as const;
+  const by: Collected["by"] = { function: {} }, cells: Collected["cells"] = {}, parity_cells: Collected["parity_cells"] = {};
+  const fns = [...new Set(all.map(fnOf))].sort();
+  for (const e of all) by.function![fnOf(e)] = (by.function![fnOf(e)] ?? 0) + 1;
+  for (const d of dims) {
+    const whole: { [k: string]: number } = {}, cell: { [k: string]: number } = {}, pc: { [k: string]: number } = {};
+    for (const e of all) { whole[e.groups[d]] = (whole[e.groups[d]] ?? 0) + 1; cell[`${e.groups[d]} × ${fnOf(e)}`] = (cell[`${e.groups[d]} × ${fnOf(e)}`] ?? 0) + 1; }
+    for (const e of parity) pc[e.groups[d]] = (pc[e.groups[d]] ?? 0) + 1;
+    by[d] = Object.fromEntries(Object.entries(whole).sort());
+    parity_cells[d] = Object.fromEntries(Object.entries(pc).sort());
+    if (d === "part" || d === "currency" || d === "source") continue;
+    const sizes = Object.keys(whole).flatMap((g) => fns.map((f) => [`${g} × ${f}`, cell[`${g} × ${f}`] ?? 0] as [string, number]));
+    cells[d] = { functions: fns.length, min: Math.min(...sizes.map(([, n]) => n)), under: Object.fromEntries(sizes.filter(([, n]) => n < floor).sort()) };
+  }
+  parity_cells.function = {};
+  for (const e of parity) parity_cells.function[fnOf(e)] = (parity_cells.function[fnOf(e)] ?? 0) + 1;
+  const heldOut = o.heldOut === false ? undefined : (o.heldOut as ReturnType<typeof loadHeldOut>) ?? loadHeldOut();
+  const named = heldOut?.length ? new Set(leaks(heldOut, [{ name: "collected", text: all.map((e) => e.request).join("\n\n") }]).map((l) => l.id)).size : 0;
+  mkdirSync(out, { recursive: true });
+  put(join(out, "train.jsonl"), lines(train));
+  put(join(out, "parity-test.jsonl"), lines(parity));
+  const r: Collected = { examples: all.length, train: train.length, parity: parity.length, by, cells, parity_cells, leak_check: { held_out_cases_here: heldOut?.length ?? 0, cases_named: named } };
+  putJson(join(out, "manifest.json"), { data_version: DATA_VERSION, translator_prompt: TRANSLATOR_VERSION, parts: parts.map((p) => resolve(p)), parity_share: share, floor, seed, ...r,
+    note: "parity-test.jsonl never trains: it is cut by gold program within each function, and every example carries `groups` (writer, register, asker, currency, writing, source). A cell under the floor is too small to be measured on its own.", sha256: { train: sha(lines(train)), parity: sha(lines(parity)) } });
+  return r;
 }

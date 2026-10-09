@@ -91,7 +91,7 @@ import { FLAG_YES, FLAGS, sameMeaning, type MeaningContext } from "./meaning";
 
 export { meaningOf, sameMeaning, type MeaningContext } from "./meaning";
 
-export const DATA_VERSION = "0.13.0"; // 0.13.0: a wide part (`broad`): registers beside the styles (rambling, flat, slips), who is asking (`ASKERS`), every paper the worlds' offices issue with every field filled (synthetic.ts `worldForms`), look_first for any act on a record named by description, no_such_act for attending; 0.12.0: a direction on an office's form and a paper of one's own office (and the same direction as a letter where no form is listed), fields that are lists and dates, standing work orders
+export const DATA_VERSION = "0.13.1"; // 0.13.1: a wide part's programs have, now and then, a large count written with the place's digit grouping and a start or an end given as a day (contracts 2026-10-09: a count is grouped as an amount is; first and until take a date); 0.13.0: a wide part (`broad`): registers beside the styles (rambling, flat, slips), who is asking (`ASKERS`), every paper the worlds' offices issue with every field filled (synthetic.ts `worldForms`), look_first for any act on a record named by description, no_such_act for attending; 0.12.0: a direction on an office's form and a paper of one's own office (and the same direction as a letter where no form is listed), fields that are lists and dates, standing work orders
 
 const sha256 = (s: string) => new Bun.CryptoHasher("sha256").update(s).digest("hex");
 
@@ -1107,6 +1107,14 @@ export const REGISTERS: { [style: string]: string } = {
   slips: "As someone typing fast on a small keyboard, or writing in a language that is not their first: one to three slips in ordinary words (a letter dropped or doubled, two letters swapped, a missing \"the\", a word out of its usual order, no capital at the start, a full stop forgotten), in a request that is otherwise short and plain. The slips are never in an id, a name, an amount, a number, a length of time, a date, a form's name or labels, or words the call quotes: every one of those is exact, character for character. It must still be plain what is asked.",
 };
 
+/**
+ * No style at all (0.13.1): what a writer that really is a simple one is told (a small model, or one at low effort:
+ * orchestrator/src/broad.ts `plain`), where the registers above are a capable model writing as if it were. It is
+ * given no way of saying the act and no voice to keep: what comes back is its own. Dealt only where a part asks
+ * for it by name (`--styles own`).
+ */
+export const OWN: { [style: string]: string } = { own: "In your own words, however you would put it yourself. Short is fine." };
+
 /** The seats' two voices (pilot-style.md), each a whole way of writing and not one habit. */
 export const SEATS = ["early", "late"];
 
@@ -1312,7 +1320,7 @@ const ABSORBS_A_RECORD = ["basis", "re", "settles"];
  * a request to it: the manifest counts lengths by style (`request_length`), which is where to look.
  */
 export function styleBrief(style: string, g: Gold, rand: () => number, o: { indirect?: boolean } = {}): { style: string; instruction: string; riders: Rider[]; /** Ids a letter asked for indirectly is to name inside its marked words. */ inside?: string[] } {
-  const base = STYLES[style] ?? REGISTERS[style] ?? style;
+  const base = STYLES[style] ?? REGISTERS[style] ?? OWN[style] ?? style;
   const choose = <T>(xs: T[]): T => xs[Math.floor(rand() * xs.length)]!;
   // The seats' voices name other things by id (0.7.0). In a request for an act: things the act leaves alone, in what
   // follows it, each a rider. In a letter asked for indirectly: what the task concerns, inside the marked words
@@ -2661,7 +2669,7 @@ export const refusalStyle = (b: RefusalBrief, style: string): string => (style =
  * first part written came out with one-line requests to read and to pause, where a seat's run to several sentences.) */
 export const refusalRequestBrief = (b: RefusalBrief, style: string): string => {
   const s = refusalStyle(b, style);
-  return `Situation:\n${b.brief}${b.seats && SEATS.includes(s) ? `\n${b.seats}` : ""}\n\nStyle: ${REFUSAL_STYLES[s] ?? STYLES[s] ?? REGISTERS[s]?.replaceAll("the call", "the situation") ?? s}`;
+  return `Situation:\n${b.brief}${b.seats && SEATS.includes(s) ? `\n${b.seats}` : ""}\n\nStyle: ${REFUSAL_STYLES[s] ?? STYLES[s] ?? REGISTERS[s]?.replaceAll("the call", "the situation") ?? OWN[s] ?? s}`;
 };
 
 /** A request for a refusal brief, from a model. */
@@ -2961,7 +2969,7 @@ async function fromPlan(plan: PlanItem[], o: {
         else if (onlyInsideAnother(withoutRiders(request, t.riders), program, t.gold.forms ?? [])) out.why = "not_copied";
         // (Nor is an amount two fields share, unless the request says it for each straight after that field's label.)
         else if (!sharedAmountsPlaced(withoutRiders(request, t.riders), program, t.gold.forms ?? [])) out.why = "not_copied";
-        else out.why = badlyWritten(request, program, t.riders) ?? ((SEATS.includes(t.style) || t.style in REGISTERS) && strayIds(request, program, { riders: t.riders, ...(t.gold.forms ? { forms: t.gold.forms } : {}) }).length ? "stray_id" : undefined);
+        else out.why = badlyWritten(request, program, t.riders) ?? ((SEATS.includes(t.style) || t.style in REGISTERS || t.style in OWN) && strayIds(request, program, { riders: t.riders, ...(t.gold.forms ? { forms: t.gold.forms } : {}) }).length ? "stray_id" : undefined);
         if (!out.why && out.check) {
           const failed = dropped.failed;
           const got = await attempt(() => out.check!.back.translate(request, formsOf(t.gold), said ? { ...t.gold, program } : t.gold));

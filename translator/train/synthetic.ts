@@ -35,7 +35,7 @@
 
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { calls, type Currency } from "@oikos/participants";
+import { calls, groupDigits, type Currency } from "@oikos/participants";
 // (The papers offices issue, as their modules declare them: read for their names, fields and types only.)
 import * as PAPERS from "../../participants/src/behaviour/papers";
 import { amountWritings, FIELD_TYPES, goldText, howOften, implausible, literals, sampler, shapeOf, shuffled, whyNot, type FormField, type FormSpec, type Gold, type WrittenCurrency } from "./data";
@@ -192,6 +192,9 @@ export class Draw {
    * else its writer is to be told (`Gold.notes`). */
   tag?: string;
   notes: string[] = [];
+  /** A wide part's draws (0.13.1; `SyntheticOptions.wide`): now and then a large count written with the place's
+   * digit grouping ("1,200"), and a start or an end given as a day ("year 1, day 22") where it may be a length of time. */
+  wide = false;
   currency: Currency;
   constructor(readonly rand: () => number, currencies: Currency[]) {
     this.currency = this.pick(currencies);
@@ -350,6 +353,7 @@ export class Draw {
     return list([...new Set(Array.from({ length: this.pick([1, 2, 2, 3, 3, 4]) }, one))]);
   }
   count(max = 400): V {
+    if (this.wide && max >= 60 && this.maybe(0.15)) return tx(groupDigits(String(this.int(1, 60) * this.pick([1000, 1000, 500, 250]) + this.pick([0, 0, 0, 40, 125])), this.currency));
     return tx(this.maybe(0.1) ? this.pick(["one", "two", "three", "four", "five", "six", "ten", "twelve"]) : String(this.maybe(0.6) ? this.int(1, 20) : this.int(1, max)));
   }
   purpose(): V {
@@ -458,7 +462,7 @@ const post = (d: Draw): V => id(d.maybe(0.6) ? `${slug(d.pick(TRADES))}-${slug(d
 const RECIPES: { [fn in Exclude<calls.Fn, "form">]: (d: Draw) => Lines } = {
   money: (d) => {
     const every = d.maybe(0.3);
-    return [call("money", { to: d.maybe(0.6) ? d.account() : d.party(), amount: d.amount(), from: d.maybe(0.6) ? d.account() : undefined, every: every ? d.every() : undefined, first: every && d.maybe(0.25) ? d.duration() : undefined, for: d.maybe(0.55) ? d.purpose() : undefined, basis: d.maybe(0.15) ? d.record() : undefined, settles: d.maybe(0.12) ? d.rec() : undefined })];
+    return [call("money", { to: d.maybe(0.6) ? d.account() : d.party(), amount: d.amount(), from: d.maybe(0.6) ? d.account() : undefined, every: every ? d.every() : undefined, first: every && d.maybe(0.25) ? (d.wide && d.maybe(0.5) ? d.date() : d.duration()) : undefined, for: d.maybe(0.55) ? d.purpose() : undefined, basis: d.maybe(0.15) ? d.record() : undefined, settles: d.maybe(0.12) ? d.rec() : undefined })];
   },
   // (No `for`: only a payment has a purpose, and nothing reads whose name goods move or work is done in.)
   goods: (d) => [delivery(d, d.maybe(0.6) ? d.party(["org", "person"]) : undefined)],
@@ -476,8 +480,8 @@ const RECIPES: { [fn in Exclude<calls.Fn, "form">]: (d: Draw) => Lines } = {
       return [call("work", {
         task: id(task), at: d.maybe(0.85) ? d.structure() : d.ground(), every: tx(d.pick(howOften(d.pick(["1 day", "1 day", "2 days", "7 days", "7 days", "7 days", "14 days", "14 days", "28 days", "30 days", "3 weeks", "90 days"])))),
         on, by: !d.maybe(0.45) ? undefined : d.maybe(0.6) ? id(d.personId()) : d.several("person"), units: d.maybe(0.3) ? d.count(12) : undefined,
-        first: d.maybe(0.2) ? tx(d.pick(["1 day", "2 days", "3 days", "7 days", "a week", "10 days", "14 days", "a fortnight", "a month"])) : undefined,
-        until: d.maybe(0.3) ? tx(d.maybe(0.6) ? `${d.int(2, 12)} weeks` : d.pick(["30 days", "60 days", "90 days", "3 months", "6 months", "a year", "a month", "a fortnight"])) : undefined,
+        first: d.maybe(0.2) ? (d.wide && d.maybe(0.5) ? d.date() : tx(d.pick(["1 day", "2 days", "3 days", "7 days", "a week", "10 days", "14 days", "a fortnight", "a month"]))) : undefined,
+        until: d.maybe(0.3) ? d.wide && d.maybe(0.35) ? d.date() : tx(d.maybe(0.6) ? `${d.int(2, 12)} weeks` : d.pick(["30 days", "60 days", "90 days", "3 months", "6 months", "a year", "a month", "a fortnight"])) : undefined,
       })];
     }
     // What it's done to, where the work is done to something: a building, or (teaching, treating) a person or a room of people.
@@ -645,6 +649,9 @@ function goldOf(lines: Lines, d: Draw, source: string, forms?: FormSpec[], dropp
 export interface SyntheticOptions {
   /** Different programs to make for each function (default 300). */
   perFunction?: number;
+  /** A wide part's draws: grouped counts, and starts and ends as days (`Draw.wide`). The programs of a seed made
+   * without it are what they were. */
+  wide?: boolean;
   seed?: number;
   /** Only these functions (default: all of the call language's). */
   only?: string[];
@@ -684,6 +691,7 @@ export function synthetic(o: SyntheticOptions = {}): Gold[] {
     if (fn === "message") for (const g of directions({ seed: o.seed ?? 1, ...(o.currencies ? { currencies: o.currencies } : {}), ...(o.dropped ? { dropped: o.dropped } : {}), n: Math.floor(per / 8), unlisted: true })) (seen.add(g.program), out.push(g));
     for (let tries = 0; seen.size < per && tries < per * 40; tries++) {
       const d = new Draw(rand, o.currencies ?? everyCurrency());
+      d.wide = !!o.wide;
       const lines = dependent.length && rand() < (o.dependent ?? 0.12) ? d.pick(dependent)(d) : RECIPES[fn](d);
       const g = goldOf(lines, d, `synthetic: ${fn}`, undefined, o.dropped);
       if (!g || seen.has(g.program)) continue;

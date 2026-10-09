@@ -34,6 +34,7 @@ import { formOfLine, type BlindAnswer } from "../../translator/train/blind";
 import { functionOf, sameProgram, type Example, type FormSpec } from "../../translator/train/data";
 import { withListsQuoted, type LabelManifest, type Unlabelled } from "../../translator/train/readers";
 import { V2_ANSWER } from "../../translator/train/v2";
+import { CHOICE_ANSWER } from "../../translator/train/choices";
 import { evaluateSet, loadHeldOut, loadSet, type SetReport } from "@oikos/translator/eval";
 import { sharesWording } from "../../translator/eval/held-out";
 import { DecideAdapter } from "../../translator/model/adapter";
@@ -200,6 +201,8 @@ export const HAND_IN = {
   /** A writer of generated parts (broad.ts): one request, or one turn, for each brief. */
   request: handIn({ id: { type: "string", description: "the brief's id, copied exactly" }, request: { type: "string", description: "what you wrote for it, as it is said" } }),
   /** A reader of plain-text turns (translator/train/v2.ts): the uses of a seat's tools each turn is. */
+  /** A reader of choices (translator/train/choices.ts): the value each turn is, of those given with it. */
+  choices: { answer: { name: "hand_in", schema: CHOICE_ANSWER }, tools: [{ name: "hand_in", description: "Hand in the answer file: `answers` is the file's lines, in order, one object for each turn.", input_schema: CHOICE_ANSWER }] },
   turns: { answer: { name: "hand_in", schema: V2_ANSWER }, tools: [{ name: "hand_in", description: "Hand in the answer file: `answers` is the file's lines, in order, one object for each turn.", input_schema: V2_ANSWER }] },
 };
 

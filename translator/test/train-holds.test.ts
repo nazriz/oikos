@@ -25,7 +25,7 @@ const isEntry = (g: Gold) => /visible=own/.test(g.program);
 
 test("the translator's instructions say the three things, and nothing of any world", () => {
   const s = translatorSystem();
-  expect(TRANSLATOR_VERSION).toBe("0.9.1");
+  expect(TRANSLATOR_VERSION).toBe("0.9.2");
   expect(s).toContain("is statement(hold=<it>), one statement for several");
   expect(s).toContain("Resuming it is withdrawing the hold: statement(withdraw=<the hold>).");
   expect(s).toContain("is statement(kind=entry, visible=own, text=");
@@ -45,7 +45,7 @@ test("the translator's instructions say the three things, and nothing of any wor
 });
 
 test("generated gold: holds of one record or a few, and entries on one's own file, in the money of every world drawn", () => {
-  expect(DATA_VERSION).toBe("0.13.0");
+  expect(DATA_VERSION).toBe("0.13.1");
   const gold = statements();
   const holds = gold.filter(isHold), entries = gold.filter(isEntry);
   expect(holds.length).toBeGreaterThan(60);
