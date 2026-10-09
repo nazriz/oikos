@@ -801,6 +801,8 @@ export async function runPipeline(cfg: PipelineConfig, hooks: Hooks = {}): Promi
     // (An example names its run from the runs folder on, with `runs/` before it or, as the pilots' own requests do, without.)
     const testRuns = m.sources.filter((s) => s.test && s.logs.length).map((s) => inRuns(s.logs[0]!));
     const ofTestRun = (e: { id: string; source?: string }) => testRuns.some((r) => [e.source ?? "", e.id].some((x) => x.startsWith(`${r}/`) || x.startsWith(`runs/${r}/`)));
+    // (A standing set that is named and is not there stops the run: joined with nothing, the new examples alone would be exported as the whole set.)
+    if (cfg.standing && !existsSync(join(cfg.standing, "train.jsonl"))) throw new Stopped("standing set missing", `${cfg.standing} has no train.jsonl: the join waits for it (the same command goes on when it is there)`);
     const stand = (name: string): any[] => (cfg.standing && existsSync(join(cfg.standing, name)) ? jsonl<any>(join(cfg.standing, name)) : []);
     const standing = { train: stand("train.jsonl"), validation: stand("validation.jsonl"), real: stand("validation-real.jsonl") };
     let droppedRun = 0, droppedWords = 0;
