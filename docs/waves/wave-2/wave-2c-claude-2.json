@@ -12,7 +12,7 @@
   "translator": "claude-code/claude-sonnet-5-5",
   "translator_choice": "sonnet",
   "until": 3888000,
-  "budget": 35,
+  "budget": 20,
   "env": {
    "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
    "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
@@ -34,7 +34,7 @@
   "translator": "claude-code/claude-sonnet-5-5",
   "translator_choice": "sonnet",
   "until": 3888000,
-  "budget": 30,
+  "budget": 20,
   "env": {
    "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
    "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"

@@ -52,7 +52,7 @@ test("a councillor's or a clerk's post held by a model has the council's papers 
   const seat = (id: string) => config.participants.find((p: any) => p.id === `${id}-system`).controller.params;
   // The councillor a model holds.
   const c1 = pos("councillor-1");
-  expect(ids(c1)).toEqual(["ballots", "files", "who", "laws", "forms", "council", "civic"]);
+  expect(ids(c1)).toEqual(["ballots", "files", "who", "laws", "forms", "council", "civic", "votes"]);
   const by = Object.fromEntries(c1.channels.map((c: any) => [c.id, c]));
   expect(by.laws).toMatchObject({ way: "published", match: { statement_kinds: ["charter", "procedure", "law"] } });
   expect(by.forms).toMatchObject({ way: "published", match: { statement_kinds: ["form"] } });

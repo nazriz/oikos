@@ -229,3 +229,36 @@ It works only from what is reported, so under-reporting is invisible to it. Audi
 - Spending lines other than parks.
 - Public consultation.
 - The work time all of this takes (D24).
+
+## A council in the hands of seats: the count, a member's own vote, and a passed amendment (2026-10-09)
+
+**Source:** `participants/src/behaviour/tally.ts` (`Tally`), `orchestrator/src/run.ts` (set out with a seat's roster),
+the generator's `ballot_count` on the council's desks, `city.council_clerk` 0.11.0 (`part`, the routine `enact`,
+`enactAmendment`). Test: `orchestrator/test/council-machinery.test.ts`. Decision: docs/decisions.md, "A council's
+machinery in the hands of seats".
+
+- **The whole count, set out for whoever keeps the ballots.** A code clerk counts from its own book. A person in the
+  clerk's seat is shown papers as they come, so each vote reached it once, in the sitting after it was cast. It now
+  reads, at every sitting where it has changed, the count of each ballot of the council with no result declared, from
+  every vote on file: the latest vote of each post cast while the ballot was open, who voted which way, and what was
+  not counted (a post's earlier votes, votes at or after the close, votes in no post). These are the council's own
+  papers, which the clerk keeps: nothing is asked of anyone.
+- **A member reads its own vote on file** ("your vote on file is "yes" (rec.2824, cast year 1, day 10)"), on each
+  ballot not yet declared. A councillor's desk has the council's votes (a council's votes are its own record, and
+  public).
+- **A passed amendment is put in force by the office's drafters.** Writing an amended law out from its schedule is
+  drafting, which the code clerk does in the step that declares the result. Where a seat holds the office the
+  drafters are the office's staff (docs/behaviour/standing-work.md): under the standing work order for `enact`
+  (daily by the office's procedure; an order that says nothing of how often follows that), each amendment the council
+  has passed and the clerk has declared is written into the law by its schedule, published in place of the law in
+  force, which is withdrawn, once; and they report it. The clerk's result form says that declaring a result does not
+  by itself change a law. A law proposed in free words, and a budget, are the clerk's own to publish, as before.
+
+**Real-world basis.** A returning officer or clerk counts from the ballot papers in hand, not from memory; division
+lists record how each member voted; an amended act is engrossed by the clerk's or the drafting office after the vote.
+**(to confirm: common practice; no source opened.)**
+
+**Leaves out.** The count is of the council's ballots only (an election's count is the electoral office's). A search
+of the votes by what they cite still finds nothing, since a vote names its ballot and cites nothing: the count is
+where to read them. Who has not voted is not listed (the seat knows its council's members from who's who, not from
+the votes).

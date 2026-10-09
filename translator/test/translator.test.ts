@@ -105,11 +105,13 @@ test("a call put together wrongly, no call at all, and a check that fails are to
   // No call came back.
   const silent = { adapter: new MockAdapter("mock", { translator: () => [{ type: "text", text: "I'd rather not." }] }), annotate: async () => {}, now: () => 0 };
   expect(await createTranslator(silent, ok, type).translate(req)).toMatchObject({ ok: false, notices: [NOT_PUT], invalid: ["no call came back"] });
-  // The acts were worked out and the check of them failed: saying it again won't help, and it isn't tried again.
+  // The acts were worked out and the check of them failed: a fault of the platform's, on record as one; the call is
+  // tried once more, and then the seat is told nothing was done and to ask again (never "may not help").
   const failing = async () => ({ ok: false, error: "the engine stopped" });
   const checked = await createTranslator(io('statement(kind=notice, text="Hello.")'), failing, type).translate(req);
-  expect(checked).toMatchObject({ ok: false, notices: [NOT_CHECKED], invalid: ["the check failed: the engine stopped"] });
-  expect((checked as any).retries).toBeUndefined();
+  expect(checked).toMatchObject({ ok: false, notices: [NOT_CHECKED], invalid: ["platform fault: the check failed: the engine stopped"] });
+  expect((checked as any).retries).toHaveLength(1);
+  expect(NOT_CHECKED).not.toContain("may not help");
   // A request that really is unclear still reads as before.
   expect(await createTranslator(io("none(unclear)"), ok, type).translate(req)).toMatchObject({ ok: false, notices: ["It isn't clear what should happen. Could you say it more plainly?"] });
 });

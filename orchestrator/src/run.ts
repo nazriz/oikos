@@ -25,7 +25,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { calls, canonical, DECISIONS, OUTCOMES, inCurrency, paramErrors, modules as builtin, Randomness, Roster, slice, View, type BehaviourModule, type Controller, type Currency, type DecisionRecord, type OutcomeRecord, type LookRequest, type Observation, type ParticipantAction, type ParticipantContext } from "@oikos/participants";
+import { calls, canonical, DECISIONS, OUTCOMES, inCurrency, paramErrors, modules as builtin, Randomness, Roster, slice, Tally, View, type BehaviourModule, type Controller, type Currency, type DecisionRecord, type OutcomeRecord, type LookRequest, type Observation, type ParticipantAction, type ParticipantContext } from "@oikos/participants";
 import { CONSULT_VERSION, createConsult, createLlmParticipant, LLM_PARTICIPANT_VERSION, MOCK_VERSION, MockAdapter, mockPolicies, PRICES, ModelCallFailed, ModelUnreachable, SpendingLimitReached, type Budget, type LlmAdapter, type LlmController, type LlmIO, type MockBrain, type Price } from "@oikos/participants/llm";
 import { createTranslator, draftText, Knowledge, RESOLVER, resolve, TRANSLATOR_VERSION, type Draft, type Resolution, NOT_CHECKED } from "@oikos/translator";
 import { Kernel } from "./kernel";
@@ -188,7 +188,7 @@ interface Unit {
   entity: string;
   module: BehaviourModule;
   controller: Controller;
-  llm?: { controller: LlmController; config: any; drafts: { draft: Draft; hash: string; reasoning?: string }[]; drafted: number; roster?: Roster };
+  llm?: { controller: LlmController; config: any; drafts: { draft: Draft; hash: string; reasoning?: string }[]; drafted: number; roster?: Roster; tally?: Tally };
   ctx: ParticipantContext;
   /** How long it sleeps when it waits without saying until when, and when it first wakes: for the engine's schedule
    * (kernel/src/schedule.rs), which decides every wake from then on. */
@@ -448,6 +448,10 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     // in each and which are vacant, from the office's own papers (behaviour/roster.ts). Kept from what the seat is shown.
     const staffedBy = office ? mods[office.role_module?.code ?? ""]?.staffed?.(office.role_module?.params ?? {}) : undefined;
     const roster = office && staffedBy ? new Roster(ctxFor(p.id, office.id, entity, {}), entity, office.id, staffedBy, (mods[office.role_module?.code ?? ""]?.routines ?? []).map((r) => r.task)) : undefined;
+    // A seat that keeps its body's ballots, or votes on them (the world says which: `ballot_count`), has the count of
+    // each ballot not yet declared, or its own vote on file, set out from the votes it has been shown (behaviour/tally.ts).
+    const tally = office && (pp.ballot_count === "keeper" || pp.ballot_count === "member") ? new Tally(entity, pp.ballot_count === "member" ? office.id : undefined) : undefined;
+    const setOut = (at: number) => [roster ? roster.text(at, office!.title ?? office!.id, (id: string) => whoIs(id)?.name) : "", tally ? tally.text(at, office!.title ?? office!.id) : ""].filter(Boolean).join("\n\n");
     // Its in-trays (what a paper filed with its office comes into): its own papers of some kinds only, or a folder of
     // some kinds; and the folders that hold every paper of its organisation's. And whose papers are its office's own
     // doing: its own, and its staff's where they are a post of their own.
@@ -457,7 +461,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     const trays = { kinds: new Map<string, string[] | true>(own.flatMap((x): [string, string[] | true][] => (folderKinds.has(x.path) ? [[x.path, folderKinds.get(x.path)!]] : narrow(x.ch.match) ? [[x.path, true]] : []))),
       all: new Set(own.filter((x) => !folderKinds.has(x.path) && !narrow(x.ch.match)).map((x) => x.path)) };
     const ownAuthors = mine.flatMap((x) => { const staff = positions.get(`${x.id}-staff`)?.holder; return staff ? [staff] : []; });
-    const config = { trays, ownAuthors, ...(pp.wake_on_papers === false ? { wakeOnPapers: false } : {}), ...(typeof pp.effort === "string" && pp.effort ? { effort: pp.effort } : {}), ...(roster ? { staff: { text: (at: number) => roster.text(at, office!.title ?? office!.id, (id: string) => whoIs(id)?.name) } } : {}), whoIs, participant: p.id, entity, entityName, onRequest, kinds, ways, title: office?.title ?? p.title, role: office?.role, framing: p.framing, standing: standingIds, titles, cadenceDays: pp.cadence_days ?? 7, draftText,
+    const config = { trays, ownAuthors, ...(pp.wake_on_papers === false ? { wakeOnPapers: false } : {}), ...(typeof pp.effort === "string" && pp.effort ? { effort: pp.effort } : {}), ...(roster || tally ? { staff: { text: setOut } } : {}), whoIs, participant: p.id, entity, entityName, onRequest, kinds, ways, title: office?.title ?? p.title, role: office?.role, framing: p.framing, standing: standingIds, titles, cadenceDays: pp.cadence_days ?? 7, draftText,
       ...(pp.sessions ? { sessions: pp.sessions } : {}), ...(pp.max_actions ? { maxActions: pp.max_actions } : {}),
       // Folders that hold some kinds of paper only (by the channel's own id, as `standing` is given), and the most a prompt may be.
       ...(pp.folders ? { folders: new Map<string, string[]>(Object.entries(pp.folders as { [id: string]: string[] }).flatMap(([id, kinds]) => chans.filter((x) => x.path === id || x.path.endsWith(`/${id}`)).map((x) => [x.path, kinds] as [string, string[]]))) } : {}),
@@ -481,7 +485,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     }
     return {
       key: p.id, participant: p.id, entity, module, controller: controller as unknown as Controller, ctx,
-      llm: { controller, config: p, drafts: [], drafted: 0, ...(roster ? { roster } : {}) },
+      llm: { controller, config: p, drafts: [], drafted: 0, ...(roster ? { roster } : {}), ...(tally ? { tally } : {}) },
       cadence: ceilTo(cadence, tick), firstWake: wakeAt ?? 0, wokeFor: "start", since: 0,
       knowledge: new Knowledge(currency), view: new View(new Set(standingIds)), notices: [],
     };
@@ -720,6 +724,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     if (u.llm || RESOLVER_MODE !== "engine") u.knowledge.absorb(raw);
     const obs: Observation = { ...u.view.apply(raw), woke_for: u.wokeFor, since: u.since };
     // (A seat's roster of its own staff, and what a draft's preview may say of it: read from what it is shown.)
+    u.llm?.tally?.absorb(obs);
     if (u.llm?.roster) {
       const roster = u.llm.roster;
       roster.absorb(obs);
@@ -846,8 +851,12 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     }
     if (action.type === "propose") {
       // (Translated already, with the round's others, or now.)
-      const pre = translated.get(u.key) ?? (await translateFor(u, action, as));
+      let pre = translated.get(u.key) ?? (await translateFor(u, action, as));
       translated.delete(u.key);
+      // (A draft the log will not take is drawn up once more: `again`.)
+      let again = false;
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
       const { draftId, tr } = pre;
       // (Emptied as they're written, so that a run stopping later doesn't write them again.)
       for (const annotation of pre.notes.splice(0)) await k.request({ op: "annotate", annotation });
@@ -862,12 +871,25 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       // A draft the log won't take (something in it breaks the contract: a kind that isn't a label, an id that isn't
       // one) is a failed translation, told to the participant as one, and never the end of the run. Pilot 9 stopped on
       // day 63 on such a draft (2026-10-06): what a model wrote reached the log unchecked, and the refusal was fatal.
-      const drafted = await k.tryRequest({ op: "annotate", annotation: { annotation: "draft", draft: tr.draft } });
+      // (Since 2026-10-09 what did this in the wave is asked about by the resolver, with its cause: a draft's name or a
+      // made-up id where an id goes, a paper put up on what is no place, an agreement with nothing on either side.
+      // What still gets here is the platform's own fault: it is on record as one, with the engine's words for the
+      // log, the request is drawn up once more, and the seat is told that nothing was done and to ask again.)
+      const [drafted] = await k.tryRequestMany([{ op: "annotate", annotation: { annotation: "draft", draft: tr.draft } }]);
       if (drafted === null) {
-        await k.request({ op: "annotate", annotation: { annotation: "translation_failure", subject: u.participant, data: { draft: draftId, proposal: action.text, reason: NOT_CHECKED, call: tr.draft.call, invalid: ["the draft breaks the contract and couldn't be recorded"] } } });
+        const why = k.lastError.slice(0, 500);
+        await k.request({ op: "annotate", annotation: { annotation: "translation_failure", subject: u.participant, data: { draft: draftId, proposal: action.text, reason: NOT_CHECKED, call: tr.draft.call, invalid: [`platform fault: the draft breaks the contract and couldn't be recorded: ${why}`], platform_fault: true, ...(again ? {} : { drawn_up_again: true }) } } });
+        if (!again) {
+          again = true;
+          pre = await translateFor(u, action, as);
+          continue;
+        }
         u.notices.push({ t, text: aboutRequest(action.text, NOT_CHECKED), re: draftId });
         return true;
       }
+      break;
+      }
+      const draftId = pre.draftId, tr = pre.tr as Extract<typeof pre.tr, { ok: true }>;
       const pending = { draft: tr.draft, hash: tr.hash, ...(action.reasoning ? { reasoning: action.reasoning } : {}) };
       const onlyWords = tr.draft.blocks.every((b) => b.block === "message");
       if (confirm === "never" || (confirm === "consequential" && onlyWords)) await submit(u, pending, "accept", `confirmation: ${confirm}`);
@@ -1096,6 +1118,11 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   // resumed run ends. (At the spending limit the run is over unless someone raises it: they're debriefed, as designed.)
   const toBeResumed = stoppedBy !== undefined && stoppedBy !== "SpendingLimitReached";
   if (toBeResumed && [...debriefs.values()].some((d) => d.part.framing?.debrief)) await k.request({ op: "annotate", annotation: { annotation: "note", subject: "orchestrator", data: { debriefs_deferred: "the run stopped to be resumed: its participants are debriefed when it ends" } } });
+  // A draft a seat was shown and had not answered when the run ended (it had no sitting left): on record as
+  // unanswered, so that nobody reading the log takes it for declined or for confirmed. (A run stopped to be resumed
+  // keeps its drafts open: they are answered when it goes on.)
+  if (!toBeResumed) for (const u of [...units.values()].sort((a, b) => (a.key < b.key ? -1 : 1))) for (const d of u.llm?.drafts ?? [])
+    await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { draft_unanswered: { draft: d.draft.id, why: "the run ended before the seat sat again" } } } });
   if (!toBeResumed) for (const d of debriefs.values()) if (d.part.framing?.debrief) {
     try {
       await d.controller.debrief(debriefText(d.part));

@@ -219,11 +219,11 @@ test("a language-model participant sees all its capacities: the one it acts in d
   expect(asMayor.ok && new Preview(k, k.actingFor("mayor")).of(asMayor.blocks)).toContain("from your account (acc-city)");
 });
 
-test("a statement can be put up on a lot, and the preview says where", () => {
+test("a statement can be put up on a lot, and the preview says where: on the lot's cell, which is what the contract takes", () => {
   const k = town();
   const r = run('statement(kind=notice, text="Park works start Monday.", on=lot-00)', k);
-  expect(r.ok && r.blocks).toEqual([{ block: "publish", kind: "notice", text: "Park works start Monday.", place: "lot-00", speaks_for: "city" }]);
-  expect(r.ok && new Preview(k).of(r.blocks)).toContain('You will put up a notice on lot-00: "Park works start Monday."');
+  expect(r.ok && r.blocks).toEqual([{ block: "publish", kind: "notice", text: "Park works start Monday.", place: "cell.1.0", speaks_for: "city" }]);
+  expect(r.ok && new Preview(k).of(r.blocks)).toContain('You will put up a notice on cell.1.0: "Park works start Monday."');
 });
 
 test("every block kind is reachable from some call", () => {
@@ -235,7 +235,7 @@ test("every block kind is reachable from some call", () => {
     'entity(kind=trust, name="T", position="Trustee")', 'presence(name="Ana", age="31 years", template=newcomer, carrying="$2,400")', "presence(leave=yes)",
     'birth(name="Kim", template=child, with=c0042)', "harm(who=c0042)", 'position(title="Clerk", role=clerk)', "position(appoint=planning, to=c0042)", "position(vacate=planning)",
     'system(template=payroll, title="Payroll")', "system(retire=par.9)", 'claim(position=right, holder=city, against=builder, about={"kind":"debt","amount":100})', "claim(transfer=rec.1, to=builder)", "claim(release=rec.1)",
-    "agreement(with=builder)", "agreement(sign=rec.5)", "agreement(notice=rec.5)", 'statement(kind=notice, text="x")', "statement(withdraw=rec.2)",
+    "agreement(with=builder, we_do=account(holder=builder))", "agreement(sign=rec.5)", "agreement(notice=rec.5)", 'statement(kind=notice, text="x")', "statement(withdraw=rec.2)",
     "vote(ballot=rec.3, choice=yes)", 'message(to=builder, text="hi")',
   ];
   const kinds = new Set<string>();
@@ -340,7 +340,7 @@ test("an act may rest on several records: basis as a list goes through in the or
   expect(blocks('money(to=acc-greenco, amount="$2,150", from=acc-city, settles=rec.640, basis=["rec.611","rec.627","rec.305"])')[0]).toMatchObject({ block: "publish", kind: "request", basis: ["rec.611", "rec.627", "rec.305"] });
   // A building someone else puts up: the offered agreement does.
   expect(blocks('structure(type=park, on=lot-00, by=greenco, price="$60,000", from=acc-city, basis=["rec.512","rec.498"])')[0]).toMatchObject({ block: "propose_agreement", basis: ["rec.512", "rec.498"] });
-  expect(blocks('agreement(with=greenco, terms="Mowing, weekly.", basis=["rec.9","rec.3"])')[0]).toMatchObject({ block: "propose_agreement", basis: ["rec.9", "rec.3"] });
+  expect(blocks('agreement(with=greenco, terms="Mowing, weekly.", we_do=account(holder=greenco), basis=["rec.9","rec.3"])')[0]).toMatchObject({ block: "propose_agreement", basis: ["rec.9", "rec.3"] });
   expect(blocks('claim(position=liberty, holder=greenco, about={"action":"build","object":"lot-00"}, basis=["law-planning","rec.861"])')).toEqual([
     { block: "record_claim", position: "liberty", holder: "greenco", about: { action: "build", object: "lot-00" }, speaks_for: "city", basis: ["law-planning", "rec.861"] }]);
   expect(blocks('claim(release=rec.70, basis=["rec.71","rec.72"])')[0]).toMatchObject({ block: "release_claim", basis: ["rec.71", "rec.72"] });

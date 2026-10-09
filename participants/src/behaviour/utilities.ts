@@ -18,8 +18,8 @@ export const water: BehaviourModule = {
   name: "utility.water",
   answers: {"office": "the water corporation", "acts": "What it acts on: its roll of properties, each billed by its meter each quarter; and the notices it is given of land changing hands and of building work."},
   routines: [
-    { task: "draw_water", at: "works", what: "Each day the works draws from the river what the town uses, by the published estimate of how many live in it, and says so when the river cannot give it." },
-    { task: "bill", at: "works", what: "Before each round of bills a reader goes round the meters; then each property's owner is sent a bill for the service charge and what its meter shows was used. How often the bills go out is the order's." },
+    { task: "draw_water", at: "works", every: 1, what: "Each day the works draws from the river what the town uses, by the published estimate of how many live in it, and says so when the river cannot give it." },
+    { task: "bill", at: "works", every: ["bill_every_days", 91], what: "Before each round of bills a reader goes round the meters; then each property's owner is sent a bill for the service charge and what its meter shows was used. How often the bills go out is the order's." },
   ],
   keeps: [
     { what: "property_roll", why: "Its customer roll: the valuer's roll of each property it supplies is given to it, as valuations are given to a rating authority." },
@@ -211,8 +211,8 @@ export const energy: BehaviourModule = {
   name: "utility.energy",
   answers: {"office": "the energy retailer", "acts": "What it acts on: its customers' accounts, each billed each quarter; and notice that a customer has left or has died."},
   routines: [
-    { task: "supply_energy", at: "depot", what: "Each day the network supplies what the customers use from what the retailer holds, and more is bought from the grid when it runs below a fortnight's use. Those who ask to be supplied are taken on, and those gone taken off." },
-    { task: "bill", at: "depot", what: "Each customer is sent a bill for the supply charge and what they used; one who has gone, their last. How often the bills go out is the order's." },
+    { task: "supply_energy", at: "depot", every: 1, what: "Each day the network supplies what the customers use from what the retailer holds, and more is bought from the grid when it runs below a fortnight's use. Those who ask to be supplied are taken on, and those gone taken off." },
+    { task: "bill", at: "depot", every: ["bill_every_days", 30], what: "Each customer is sent a bill for the supply charge and what they used; one who has gone, their last. How often the bills go out is the order's." },
   ],
   // (What it buys in, it orders on its own order form: its staff's orders to the grid are that paper.)
   issues: [P.ORDER],

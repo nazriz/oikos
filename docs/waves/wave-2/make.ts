@@ -32,7 +32,7 @@ const MODELS = {
 } as const;
 type ModelKey = keyof typeof MODELS;
 /** The translator of a pilot is a late, cheap choice, so each pilot says which it may have:
- *  - `sonnet`: the general model under the translator's prompt (0.9.2), and no other: where a request not getting through
+ *  - `sonnet`: the general model under the translator's prompt (0.9.3), and no other: where a request not getting through
  *    loses the pilot's point (probes, elections, a crew to take on), where one thing is being measured, and every test pilot;
  *  - `trained-ok`: our own trained translator if the retrained one's scores on the pilot's kinds of act are good enough when
  *    the stage is started (--retrained), else the general model, which is what the files have until then;
@@ -132,12 +132,12 @@ const dependsOnClerk = (p: Plan) => p.seats.includes("council-clerk");
 // runs/live-check-2-2026-10-09: nine pilots of three or four seats, 12 and 30 days) and, for the translator, from
 // runs/translator-eval-claude-2026-10-09 and runs/claude-translator-check-2026-10-09.
 const RATE: { [m in ModelKey]: { answers: number; usdPerAnswer: number; secondsPerCall: number; requests: number; letters: number; measured: string } } = {
-  sonnet: { answers: 0.5, usdPerAnswer: 0.025, secondsPerCall: 5, requests: 0.6, letters: 0.02,
-    measured: "the shake-down's four pilots (w2-10, w2-44, w2-09, w2-01): 326 answers in 662 weighted seat-days (0.32, 1.45, 0.37 and 0.49 a seat-day: the 1.45 is an energy office trying one order again and again); 7.61 recorded, 0.023 an answer; 66 requests where the offices' sixty-day business came to 45 at the earlier factor of 0.4" },
+  sonnet: { answers: 0.47, usdPerAnswer: 0.02, secondsPerCall: 4, requests: 0.3, letters: 0.02,
+    measured: "stage 2b's eight finished pilots on this model: 884 answers where 948 were expected at 0.5 a weighted seat-day, 0.019 an answer pooled (0.012 to 0.035), 91 requests where 176 were expected at a factor of 0.6 (councils and elections gave almost none); a lender's seat is counted apart" },
   haiku: { answers: 1.5, usdPerAnswer: 0.2, secondsPerCall: 30, requests: 1.5, letters: 0.85,
     measured: "w2-04 at default effort: 105 answers in 106 weighted seat-days, 0.205 an answer (21.54 for 45 days), 25 requests, 89 letters; w2-26's five councillors: 204 answers in 68 (three a seat-day: a councillor's weight understates this model), 0.132 an answer. No pilot to come uses it at default effort" },
-  haikuLow: { answers: 1.55, usdPerAnswer: 0.09, secondsPerCall: 7, requests: 1.5, letters: 0.45,
-    measured: "w2-54: 109 answers in 70.5 weighted seat-days, 0.090 an answer (9.86 for 30 days) against 0.205 at default effort in the same offices (w2-04); one answer in 109 unread, four malformed uses; 25 requests, all one office's wage payments, where the offices' business came to 3: counted as three times a Sonnet seat's, not eight" },
+  haikuLow: { answers: 0.82, usdPerAnswer: 0.066, secondsPerCall: 7, requests: 0.6, letters: 0.45,
+    measured: "stage 2b's four pilots at low effort: 466 answers where 879 were expected at 1.55 a weighted seat-day, 0.066 an answer (31.36 in all), 55 requests where 135 were expected at a factor of 1.5" },
   fable: { answers: 0.3, usdPerAnswer: 0.22, secondsPerCall: 12, requests: 0.6, letters: 0.13,
     measured: "w2-14: 39 answers in 135 weighted seat-days, 0.220 an answer (8.58 for 45 days), 12 requests where 8 were expected, 10 of 10 matters through, 17 letters" },
   sol: { answers: 1.3, usdPerAnswer: 0, secondsPerCall: 24, requests: 1.1, letters: 2.0,
@@ -151,7 +151,14 @@ const TRANSLATOR_USD_A_CALL = 0.0095; // (the general translator in the shake-do
 const TRANSLATOR_SECONDS_A_CALL = 3;
 /** The stage that has run: its queue files are the record of what ran and are not written again; its pilots stay in the
  * matrix and the coverage, and are left out of what is still to be expected. */
-const RUN: Plan["stage"][] = ["2a"];
+const RUN: Plan["stage"][] = ["2a", "2b"];
+/** Stopped partway and out of the wave (the owner stopped the largest Claude model's use, 2026-10-09: it drains the plan). */
+const STOPPED = [15];
+/** Models no pilot still to run may seat. */
+const NO_LONGER_A_SEAT_MODEL: ModelKey[] = ["fable"];
+/** What a lender's seat costs beyond another office's: about 1.25 answers a day at 0.22 each (w2-05: 113 calls in 91
+ * days, most of its sittings with something left out of a prompt at its limit, 42 loan decisions). */
+const LENDER_ANSWERS_A_DAY = 1.25, LENDER_USD_AN_ANSWER = 0.22;
 const scenariosOf = (p: Plan) => (p.scenario ? p.scenario.split("+") : []);
 const isElection = (p: Plan) => scenariosOf(p).includes("election-due");
 /** Offices that cannot be seats yet (the shake-down's trade probe: serving and making are acts by hand for each order,
@@ -223,10 +230,11 @@ const plans: Plan[] = [
 
   // ---- wave 2c: the long one and the tests; after 2b's reports are read. Lane claude-1.
   P(13, "flood-long", "2c", "sonnet", "au-vic-2026", 180, ["mayor", "finance", "planning", "inspector", "landlord-1-office", "landlord-2-office"], "trained-ok", "The longest: half a year of a wet year with six seats.", { scenario: "wet-year" }),
-  P(58, "year", "2c", "sonnet", "gb-eng-2026", 400, ["mayor", "finance", "council-clerk", ...C3, "registry"], "sonnet", "The one pilot past a budget year's end (day 365): the next year's budget proposed, put to a ballot by a model clerk, voted by councillors and adopted, or not; and the first births (due from about day 275) for a registrar. Last in its lane and the one to drop: it turns on a clerk seat counting a ballot, which w2-55 shows first."),
   P(16, "newplace", "2c", "sonnet", "mx-jal-2026", 90, ["mayor", "landlord-1-office", "bank-lending", "finance"], "sonnet", "Test-only: a profile no training pilot uses.", { test: true }),
   P(49, "newmoney-registers", "2c", "sonnet", "in-tn-2026", 180, ["registry", "land-registrar", "finance"], "sonnet", "Test-only: the registers and the treasury in a profile whose amounts are grouped in twos and said in lakh and crore; half a year, for the registers' sake.", { test: true }),
   P(18, "newoffices", "2c", "sonnet", "au-vic-2026", 90, ["police-oic", "union-organiser", "finance"], "sonnet", "Test-only: two offices no training pilot has as a seat (the police and the union).", { test: true }),
+  P(59, "newplace-justice", "2c", "sonnet", "mx-jal-2026", 90, ["tribunal-member", "tribunal-registrar", "landlord-2-office", "planning"], "sonnet", "Test-only: the tribunal, a landlord and planning in the profile no training pilot uses: orders, leases, occupancy and permit decisions, of which the wave has had almost none.", { test: true }),
+  P(58, "year", "2c", "sonnet", "gb-eng-2026", 400, ["mayor", "finance", "council-clerk", ...C3, "registry"], "sonnet", "The one pilot past a budget year's end (day 365): the next year's budget proposed, put to a ballot by a model clerk, voted by councillors and adopted, or not; and the first births (due from about day 275) for a registrar. Last in its lane and the one to drop: it turns on a clerk seat counting a ballot, which w2-55 shows first."),
   // ---- wave 2c: lane claude-2.
   P(47, "newplace-works", "2c", "haikuLow", "mx-jal-2026", 45, ["works", "environment", "finance"], "sonnet", "Test-only: that profile's works office on the smaller model.", { test: true }),
   P(17, "newmoney", "2c", "haikuLow", "in-tn-2026", 45, ["mayor", "finance", "planning"], "sonnet", "Test-only: the town hall of the profile whose amounts are grouped in twos, on the smaller model.", { test: true }),
@@ -238,6 +246,12 @@ const plans: Plan[] = [
 
 /** What changed from the second version (2026-10-09, morning), and why. Heads matrix.md; plan.md says more. */
 const CHANGES: string[] = [
+  "**After stage 2b (`runs/pilot-queues/wave-2b.review.md`), stage 2c is rebuilt for a new pinned wave, `wave-2c`**, on origin/main d769817 (prompt 0.9.3). The 2b queue files are left as they ran; `make.ts` writes the 2c files only.",
+  "**No seat on the largest Claude model** (the owner stopped its use: it drains the plan). w2-14 and w2-46 finished and stay training data; w2-15 was stopped partway and is out; `make.ts` refuses one in a pilot still to run. Stage 2c had none.",
+  "**What the test holds out now:** two profiles (mx-jal, in-tn) and two offices (the police, the union), each in pilots that need no Codex, and gpt-6-luna seats only if the Codex window opens. There is no unseen seat model otherwise: the fallback of marking the largest model's pilots test-only is gone with the model.",
+  "**No pilot of councillors alone** (w2-26 and w2-56 made one request between them; `make.ts` refuses one). w2-58, the 400-day pilot with a mayor, a clerk and three councillors past a budget year's end, stays, last in its lane.",
+  "**One test pilot more** (w2-59: the tribunal, a landlord and planning in the Mexican town), since the retrained translator is scored on 2c's tests and the wave has had almost no tribunal order, lease, occupancy or permit decision.",
+  "**Rates and limits from stage 2b's twelve finished pilots:** Sonnet 0.47 answers a weighted seat-day at 0.02 and half the requests expected (factor 0.3); Haiku at low effort 0.82 at 0.066 and four tenths of them (0.6); a lender's seat about 1.25 answers a day at 0.22, counted apart. Spending limits are three times the estimate.",
   "**After the shake-down (stage 2a; `runs/pilot-queues/wave-2a.review.md`), stages 2b and 2c are rebuilt for a new pinned wave, `wave-2b`.** The eight Claude-lane pilots of 2a gave 129 requests for about 76 recorded (27.18 for the first six; 21.77 and 26.98 for the two on the smaller model at default effort); the 2a queue files are left as they ran and `make.ts` no longer writes them.",
   "**A hired crew now works**, so the works pilots the review held run as planned (w2-42, w2-41, w2-46, w2-34, w2-35, w2-47, w2-38).",
   "**Shops and factories cannot be seats yet** (serving and making are acts by hand for each order; no form writes a price list): w2-30-trade is dropped, and `make.ts` refuses a shop or factory seat.",
@@ -262,7 +276,7 @@ const CHANGES: string[] = [
   "**Works pilots that start with no crew (w2-10, w2-42, w2-33) wait for nothing now** (final pass): a seat is told its office's staff and what each of its own forms is for. In the second live check such a seat never learned it had none, hired nobody, and the town had 301 complaints; the stopping rule for these pilots stays.",
   "**Final pass on origin/main 923d139** (everything the wave waited for is there): the low-effort measurement (w2-54) sets `seat_effort=low` for its seats and names the model plainly, so the translator's effort is untouched; `wake_on_papers` is left on everywhere (a paper filed with an office brings its seat back the next working day), which every estimate here predates; the translator's prompt is 0.9.1; five towns are marked as flooding through their wet seasons until the river's change lands.",
   "**Estimates are rebuilt on the second live check's thirty-day pilots:** a seat on the first Claude model sits weekly (0.42 answers a weighted seat-day, 3 or 4 requests a pilot-month); the smaller one is busy and dear (1.5 answers, 0.17 an answer); gpt-6.1-sol asked for 3 things in 25 days, not the five in twelve the second version was built on. They predate a change now on main (a paper filed with an office brings its seat back the next working day), with which seats sit more often.",
-  "**53 pilots in all** (eleven of them the shake-down's): 33 on Claude seats still to run in 2b and 2c, 9 optional on Codex seats; 12 test-only.",
+  "**(As it stood before stage 2b.)** 53 pilots in all (eleven of them the shake-down's): 33 on Claude seats still to run in 2b and 2c, 9 optional on Codex seats; 12 test-only.",
 ];
 
 // ---- checks on the plan itself.
@@ -298,6 +312,9 @@ for (const p of plans) {
   if (new Set(p.seats).size !== p.seats.length) throw new Error(`pilot ${p.n}: a seat named twice`);
   if (!p.test && (TEST_ONLY.profiles.includes(p.profile) || TEST_ONLY.models.includes(p.model) || p.seats.some((s) => TEST_ONLY.offices.includes(s)))) throw new Error(`pilot ${p.n} trains on something held out`);
   for (const sc of scenariosOf(p)) if (!SCENARIOS_OFFERED.includes(sc)) throw new Error(`pilot ${p.n}: ${sc} is not a scenario that reaches an office`);
+  if (!RUN.includes(p.stage) && NO_LONGER_A_SEAT_MODEL.includes(p.model)) throw new Error(`pilot ${p.n}: ${MODELS[p.model]} is no longer a seat model`);
+  // Seats that can only vote or propose, with nobody of their council a seat beside them: two such pilots made no request.
+  if (!RUN.includes(p.stage) && p.seats.every((x) => officeOf(x) === "councillor")) throw new Error(`pilot ${p.n}: a pilot of councillors alone`);
   if (!RUN.includes(p.stage) && p.seats.some((x) => NOT_YET_A_SEAT.includes(officeOf(x)))) throw new Error(`pilot ${p.n}: a shop or a factory cannot be a seat yet`);
   // A council that is seats has business by its scenario: a calm town gave seven seats nothing to decide in 45 days.
   if (!RUN.includes(p.stage) && p.n !== THE_YEAR && p.seats.some((x) => officeOf(x) === "councillor" || x === "council-clerk") && !scenariosOf(p).some((sc) => sc === "dear-rents" || sc === "lean-council")) throw new Error(`pilot ${p.n}: council seats with nothing put before them (dear-rents or lean-council)`);
@@ -344,17 +361,16 @@ const kindsOf = (p: Plan): Mix => {
 const requestsOf = (p: Plan) => Object.values(kindsOf(p)).reduce((a, b) => a + b, 0);
 const translatorCallsOf = (p: Plan) => (translatorOf(p) === GENERAL ? requestsOf(p) * TRANSLATOR_CALLS_A_REQUEST : 0);
 /** Plan usage, as the run records it: the seats' answers where they are Claude models, and the translator's calls. */
-const usdOf = (p: Plan) => answersOf(p) * RATE[p.model].usdPerAnswer + translatorCallsOf(p) * TRANSLATOR_USD_A_CALL;
+const usdOf = (p: Plan) => answersOf(p) * RATE[p.model].usdPerAnswer + translatorCallsOf(p) * TRANSLATOR_USD_A_CALL + (isClaude(p) && p.seats.includes("bank-lending") ? p.days * LENDER_ANSWERS_A_DAY * LENDER_USD_AN_ANSWER : 0);
 /** Calls on the Codex subscription: the seats' answers, in the optional lane only. */
 const codexCallsOf = (p: Plan) => (isClaude(p) ? 0 : answersOf(p));
 const codexMinutesOf = (p: Plan) => (codexCallsOf(p) * RATE[p.model].secondsPerCall) / 60;
 const minutesOf = (p: Plan) => (answersOf(p) * RATE[p.model].secondsPerCall + translatorCallsOf(p) * TRANSLATOR_SECONDS_A_CALL + p.days * MOCK_SECONDS_A_DAY) / 60;
-/** The spending limit a pilot is given. Seats on the first and the largest Claude model: five times the estimate, in
- * fives, at least ten (a tripwire for a fault that makes single answers dear, more than a budget). Seats on the smaller
- * one: twice the estimate, in fives, at least fifteen (its estimate is the measured rate of a busy month; a per-seat
- * effort setting is being added, which should bring it under). Codex seats: ten, for the translator's calls alone. */
+/** The spending limit a pilot is given: three times its estimate, in fives, at least ten, now that the estimates rest
+ * on twenty finished pilots (stage 2b cost about half its estimates overall; the two pilots with a lender's seat stopped
+ * at limits of 35, which that seat's own cost now goes into). Codex seats: ten, for the translator's calls alone. */
 const five = (x: number) => Math.ceil(x / 5) * 5;
-const budgetOf = (p: Plan) => (!isClaude(p) ? 10 : laneOf(p.model) === "claude-2" ? Math.max(15, five(usdOf(p) * 2)) : Math.max(10, five(usdOf(p) * 5)));
+const budgetOf = (p: Plan) => (!isClaude(p) ? 10 : Math.max(10, five(usdOf(p) * 3)));
 
 // ---- the queue entries.
 const name = (p: Plan) => `w2-${String(p.n).padStart(2, "0")}-${p.tag}`;
@@ -392,7 +408,7 @@ const f1 = (x: number) => x.toFixed(x < 10 ? 1 : 0);
 const hours = (m: number) => (m < 90 ? `${Math.round(m)} min` : `${(m / 60).toFixed(1)} h`);
 const total = (ps: Plan[], of: (p: Plan) => number) => ps.reduce((a, p) => a + of(p), 0);
 const laneName = (p: Plan) => laneOf(p.model);
-const marks = (p: Plan) => [RUN.includes(p.stage) ? "run in the shake-down" : "", p.test ? "test only" : "", p.probe ? "probe" : "", p.noCrew ? "no crew at the start" : "", dependsOnClerk(p) ? "model clerk" : "", p.model === "haikuLow" ? "seats at low effort" : "", laneOf(p.model) === "codex" ? "optional" : ""].filter(Boolean).join("; ");
+const marks = (p: Plan) => [STOPPED.includes(p.n) ? "stopped partway; out" : p.stage === "2a" ? "run in the shake-down" : p.stage === "2b" ? "stage 2b (run, or running under wave-2b)" : "", p.test ? "test only" : "", p.probe ? "probe" : "", p.noCrew ? "no crew at the start" : "", dependsOnClerk(p) ? "model clerk" : "", p.model === "haikuLow" ? "seats at low effort" : "", laneOf(p.model) === "codex" ? "optional" : ""].filter(Boolean).join("; ");
 const L: string[] = ["# Wave 2: the tables", "", "Written by `make.ts`; do not edit by hand. The reasoning is in `plan.md`.", ""];
 L.push("## What changed from the second version (2026-10-09, morning), and why", "", ...CHANGES.map((c) => `- ${c}`), "");
 L.push("## The matrix", "", "Every town is 1,000 people and a town of its own (generated from its seed); every pilot's confirmation mode is `always` (the only one a generated town has). The order is the order in the queue files. Lanes: `claude-1` and `claude-2` need the Claude sign-in alone; `codex` is the optional lane (Codex seats, a Claude translator).", "",
@@ -400,12 +416,12 @@ L.push("## The matrix", "", "Every town is 1,000 people and a town of its own (g
 for (const p of plans) L.push(`| ${name(p)} | ${p.stage} | ${laneName(p)} | ${p.profile} | ${p.seed} | ${p.days} | ${p.scenario ?? "none"} | ${p.seats.join(", ")} | ${MODELS[p.model]} | ${p.translator} | ${translatorOf(p)} | ${marks(p)} |`);
 L.push("", "## Towns that are not their place", "", "Used as they are: a town in trouble gives requests too. **Nothing in a pilot in one of these towns says anything about the country or the region its profile is named for.** Every profile also carries placeholder figures (docs/profiles.md).", "", "| profile | pilots | known not to be faithful in |", "|---|---|---|");
 for (const [profile, why] of Object.entries(NOT_FAITHFUL)) L.push(`| ${profile} | ${plans.filter((p) => p.profile === profile).map(name).join(", ")} | ${why} |`);
-L.push("", "## Expected usage and time: stages 2b and 2c", "", "The shake-down's pilots are left out: what they did is in `plan.md`. Plan usage is in US dollars at published prices, as the run records it: the seats' answers where they are Claude models, and the translator's calls (a Codex call is recorded as nothing). Time is the pilot's own, without waits at a usage limit. Codex calls are the seats' answers of the optional lane. Deaths are what a registry seat can expect to have to register (one code-run town of each profile; noisy).", "",
+L.push("", "## Expected usage and time: stage 2c", "", "The pilots of stages 2a and 2b are left out: what they did is in `plan.md`. Plan usage is in US dollars at published prices, as the run records it: the seats' answers where they are Claude models, and the translator's calls (a Codex call is recorded as nothing). Time is the pilot's own, without waits at a usage limit. Codex calls are the seats' answers of the optional lane. Deaths are what a registry seat can expect to have to register (one code-run town of each profile; noisy).", "",
   "| pilot | seats | weighted seat-days | seat answers | requests through `do` | letters | plan usage | spending limit | Codex calls | deaths to register | time |", "|---|---|---|---|---|---|---|---|---|---|---|");
 for (const p of plans.filter((p) => !RUN.includes(p.stage))) L.push(`| ${name(p)} | ${p.seats.length} | ${Math.round(weightOf(p) * p.days)} | ${Math.round(answersOf(p))} | ${Math.round(requestsOf(p))} | ${Math.round(lettersOf(p))} | ${f1(usdOf(p))} | ${budgetOf(p)} | ${Math.round(codexCallsOf(p))} | ${p.seats.includes("registry") ? f1(deathsOf(p)) : ""} | ${hours(minutesOf(p))} |`);
 const sumRow = (label: string, ps: Plan[]) => `| ${label} | ${ps.length} | ${Math.round(total(ps, answersOf))} | ${Math.round(total(ps, requestsOf))} | ${Math.round(total(ps.filter((p) => !p.test), requestsOf))} | ${f1(total(ps, usdOf))} | ${total(ps, budgetOf)} | ${Math.round(total(ps, codexCallsOf))} | ${hours(total(ps, codexMinutesOf))} | ${hours(total(ps, minutesOf))} |`;
 L.push("", "| stage and lane | pilots | seat answers | requests through `do` | of them in training pilots | plan usage | sum of spending limits | Codex calls | Codex time | time, one after another |", "|---|---|---|---|---|---|---|---|---|---|");
-for (const stage of ["2b", "2c"] as const) for (const lane of ["claude-1", "claude-2", "codex"] as const) L.push(sumRow(`${stage}, ${lane}`, lanes[`wave-${stage}-${lane}.json`]!));
+for (const stage of ["2c"] as const) for (const lane of ["claude-1", "claude-2", "codex"] as const) L.push(sumRow(`${stage}, ${lane}`, lanes[`wave-${stage}-${lane}.json`]!));
 const toCome = plans.filter((p) => !RUN.includes(p.stage));
 const sure = toCome.filter(assured), optional = toCome.filter((p) => laneOf(p.model) === "codex");
 L.push(sumRow("**Codex unavailable throughout: the Claude lanes**", sure), sumRow("**the optional lane (Codex seats)**", optional), sumRow("**Codex available: both**", toCome));
@@ -415,7 +431,7 @@ const TODAY: Mix = { message: 1173, statement: 291, form: 204, money: 32, struct
 const sum = (ps: Plan[]) => { const out: Mix = {}; for (const p of ps) for (const [k, v] of Object.entries(kindsOf(p))) out[k] = (out[k] ?? 0) + v; return out; };
 const cols: [string, Plan[]][] = [["training, Claude lanes", sure.filter((p) => !p.test)], ["training, optional lane", optional.filter((p) => !p.test)], ["test-only, Claude lanes", sure.filter((p) => p.test)], ["test-only, optional lane", optional.filter((p) => p.test)]];
 const sums = cols.map(([, ps]) => sum(ps));
-L.push("", "## Expected requests through `do`, by kind: stages 2b and 2c", "", "Central guesses (a seat's requests, drafted or not); the range that is honest is a third of each to three times it. A form is a paper on a form: a council proposal, a direction to an office, or one of the office's own (an advertisement, a register entry, a decision). A standing work order counts under work; a hold and an entry on one's own file under statement. Letters are written with `write`, which no translator reads: they are counted apart.", "",
+L.push("", "## Expected requests through `do`, by kind: stage 2c", "", "Central guesses (a seat's requests, drafted or not); the range that is honest is a third of each to three times it. A form is a paper on a form: a council proposal, a direction to an office, or one of the office's own (an advertisement, a register entry, a decision). A standing work order counts under work; a hold and an entry on one's own file under statement. Letters are written with `write`, which no translator reads: they are counted apart.", "",
   `| kind | as of 2026-10-08 (real and in-situ) | ${cols.map(([c]) => c).join(" | ")} |`, `|---|---|${cols.map(() => "---").join("|")}|`);
 for (const k of Object.keys(TODAY)) L.push(`| ${k} | ${k === "message" ? "1,173" : TODAY[k]} | ${cols.map(([, ps], i) => (k === "message" ? `(letters: about ${Math.round(total(ps, lettersOf))})` : Math.round(sums[i]![k] ?? 0))).join(" | ")} |`);
 const tot = (m: Mix) => Math.round(Object.values(m).reduce((a, b) => a + b, 0));

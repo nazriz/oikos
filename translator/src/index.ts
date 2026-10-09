@@ -280,34 +280,36 @@ export type ResolveFn = (req: TranslateRequest, program: calls.Program) => Promi
  */
 export const NOT_PUT = "That couldn't be put into effect as it was said, and nothing was done. You could say it again, or another way.";
 /** The acts were worked out, and checking them failed (not a refusal: the check itself). */
-export const NOT_CHECKED = "That couldn't be put into effect, and nothing was done. Saying it another way may not help.";
+export const NOT_CHECKED = "The draft could not be drawn up, and the fault is not in what you asked: it has been noted. Please ask for it again; if it fails again, ask for it in smaller steps.";
 
 /** Resolver answers that are about how the call was put together (an argument of the wrong shape), not about anything
  * the participant said or knows: the call is at fault, so it's tried again, and the participant never reads these. */
-const MALFORMED = /should name something, not (data|a call)\.$|should name a record by its id\.$|^per_request is written only by|should be written out\.$|should be data or text\.$|should be a list of names or ids\.$|^A commitment can be money, goods|^A hold says only what it holds|\(then=periodic\)/;
+const MALFORMED = /should name something, not (data|a call)\.$|should name a record by its id\.$|^per_request is written only by|should be written out\.$|should be data or text\.$|should be a list of names or ids\.$|^A commitment can be money, goods|^In an agreement each side commits itself|^A hold says only what it holds|\(then=periodic\)/;
 
 /** Resolver questions another attempt at the call could fix (a name it didn't recognise, a refusal's own text). */
 const RETRYABLE = /^You don't know of anyone or anything called|^It isn't clear what should happen|^That's for someone else to decide|^Please state the amount itself|^Please take this one step at a time|^You haven't seen a form by that name|^That's something to look up or read|^Nothing here does that as such|^That needs something found out first/;
 
 /** A resolver's answer that a value in the call could not be read as what its place takes (an amount, a length of
  * time, a count): which value, and what it should have been. */
-const UNIT_FAULT = /^(not an amount|badly grouped digits|a point with three digits after it can be read two ways|this money has no decimals|more than \S+(?: \S+)? decimals|fraction of [^:]*|too large|not a duration|not a date or a duration|not a count): (.*)\. Please say it another way\.$/s;
+const UNIT_FAULT = /^(not an amount|badly grouped digits|a point with three digits after it can be read two ways|this money has no decimals|more than \S+(?: \S+)? decimals|fraction of [^:]*|too large|not a duration|not how often|not a date or a duration|not a count): (.*)\. Please say it another way\.$/s;
 const unitFault = (q: string): { value: string; what: string } | undefined => {
   const m = UNIT_FAULT.exec(q);
-  return m ? { value: m[2]!, what: m[1] === "not a duration" ? "a length of time" : m[1] === "not a date or a duration" ? "a date or a length of time" : m[1] === "not a count" ? "a number" : "an amount" } : undefined;
+  return m ? { value: m[2]!, what: m[1] === "not how often" ? "how often" : m[1] === "not a duration" ? "a length of time" : m[1] === "not a date or a duration" ? "a date or a length of time" : m[1] === "not a count" ? "a number" : "an amount" } : undefined;
 };
 /** How each of those is to be said again, in the terms a seat's own papers use. */
 const SAY_AGAIN: { [what: string]: string } = {
   "an amount": "Please say it again with that amount written in figures.",
   "a number": "Please say it again with that number written in figures.",
   "a length of time": 'Please say it again with that written as a number of days, weeks or months, like "14 days".',
+  // (Of a standing work order. What how often can be: a length of time, or the paper that sets when; never a count a year.)
+  "how often": 'How often can be a length of time ("every 7 days", "weekly", "each working day"); or, where a law or a paper on your file sets when the work is done, that paper named by its id ("as" and the id, then "sets"). Please say it again one of those ways.',
   "a date or a length of time": 'Please say it again with a date, written like "year 1, day 12", or a length of time from now, like "14 days".',
 };
 /** What a seat is asked about words of its own that could not be read as what their place takes. */
 export const ownWords = (value: string, what: string): string => `"${value}", in what you asked, could not be read as ${what}. ${SAY_AGAIN[what] ?? SAY_AGAIN["an amount"]!}`;
 /** What the translator is told of such a value, before it is asked once more. */
 const unreadValue = (value: string, what: string): string =>
-  `"${value}" can't be read as ${what}. Write there only what the request gives for that argument, as the request wrote it (a date like "year 1, day 12", a length of time like "14 days", a number or an amount in its figures); if the request gives nothing for it, leave the argument out; if what the request gives for it can't be written so, answer none(unclear)`;
+  `"${value}" can't be read as ${what}. Write there only what the request gives for that argument, as the request wrote it (a date like "year 1, day 12", a length of time like "14 days", a number or an amount in its figures; for how often, a length of time like "every 7 days", or the id of the paper that sets when); if the request gives nothing for it, leave the argument out; if what the request gives for it can't be written so, answer none(unclear)`;
 /** The form a call fills in, as the seat has it (its name, and what each of its fields takes), if it fills one in. */
 function formOf(program: calls.Program, k: Knowledge): { name: string; fields: { [field: string]: { type?: string } } } | undefined {
   if (!("lines" in program)) return undefined;
@@ -327,12 +329,12 @@ function formOf(program: calls.Program, k: Knowledge): { name: string; fields: {
  * filed, and what the form it can see takes, so that it can say its request again.
  */
 export function askAgain(what: string, form?: { name: string; fields: { [field: string]: { type?: string } } }): string {
-  const KIND: { [what: string]: [string, string] } = { "an amount": ["amount", "amounts"], "a length of time": ["duration", "lengths of time"], "a number": ["count", "numbers"] };
+  const KIND: { [what: string]: [string, string] } = { "an amount": ["amount", "amounts"], "a length of time": ["duration", "lengths of time"], "how often": ["duration", "lengths of time"], "a number": ["count", "numbers"] };
   const [type, plural] = KIND[what] ?? KIND["an amount"]!;
   const takes = form ? Object.entries(form.fields).filter(([, f]) => f?.type === type).map(([k]) => k.replace(/_/g, " ")) : [];
   return form
     ? `It could not be set out on the ${form.name} form from what you said${takes.length ? `: the form takes these ${plural}: ${takes.join(", ")}` : ""}. Please say it again, giving each one you mean as a figure and leaving out any you don't.`
-    : `It could not be drawn up from what you said: ${what} in it could not be made out. ${what === "a date or a length of time" || what === "a length of time" ? SAY_AGAIN[what]! : "Please say it again, with each figure written out."}`;
+    : `It could not be drawn up from what you said: ${what} in it could not be made out. ${what === "a date or a length of time" || what === "a length of time" || what === "how often" ? SAY_AGAIN[what]! : "Please say it again, with each figure written out."}`;
 }
 
 export function createTranslator(io: LlmIO, check: KernelCheck, typeOf: (type: string) => StructureTypeInfo | undefined, id = "translator", attempts = 2, resolver?: ResolveFn) {
@@ -382,7 +384,8 @@ export function createTranslator(io: LlmIO, check: KernelCheck, typeOf: (type: s
     const retryable = !settled && (!!r.ok || !!(r as any).invalid || "none" in program || (r as any).questions.some((q: string) => RETRYABLE.test(q)));
     if (!r.ok) return { ok: false, notices: r.questions, call, ...(r.invalid ? { invalid: r.invalid } : {}), ...(retryable ? {} : { final: true }), ...("none" in program ? { none: true as const } : {}) };
     const k = await check(req.participant, req.as, r.blocks);
-    if (k.error) return { ok: false, notices: [NOT_CHECKED], call, invalid: [`the check failed: ${String(k.error).slice(0, 500)}`], final: true };
+    // (The check itself failing is nobody's wording: it is on record as a fault, and the call is tried once more.)
+    if (k.error) return { ok: false, notices: [NOT_CHECKED], call, invalid: [`platform fault: the check failed: ${String(k.error).slice(0, 500)}`] };
     const warnings = lawWarnings(r.blocks, req.knowledge, typeOf, req.as);
     const draft: Draft = {
       id: req.draftId, participant: req.participant, ...(req.as ? { as: req.as } : {}), proposal: req.proposal.slice(0, 16384), call, resolver: RESOLVER,

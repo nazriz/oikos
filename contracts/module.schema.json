@@ -99,7 +99,9 @@
         "properties": {
           "task": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$" },
           "what": { "type": "string", "minLength": 20, "maxLength": 1000 },
-          "at": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$", "description": "The parameter that holds the place the work is done at." }
+          "at": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$", "description": "The parameter that holds the place the work is done at." },
+          "every": { "description": "The routine's own rhythm, where the office's practice has one: days, or the parameter that gives them with what it is where none is given. Said in the office's procedure; a standing work order that does not say how often follows it.", "oneOf": [{ "type": "integer", "minimum": 1, "maximum": 3650 }, { "type": "array", "prefixItems": [{ "type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$" }, { "type": "integer", "minimum": 1, "maximum": 3650 }], "items": false, "minItems": 2, "maxItems": 2 }] },
+          "follows": { "description": "Where when the routine is done is set by a published paper and not by a rhythm (a rating law's instalments): the parameter that names the paper, with the paper where none is given. A standing work order may name it in place of how often, or say nothing.", "type": "array", "prefixItems": [{ "type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$" }, { "type": "string", "pattern": "^[a-z][a-z0-9_-]{0,63}$" }], "items": false, "minItems": 2, "maxItems": 2 }
         }
       },
       "maxItems": 16

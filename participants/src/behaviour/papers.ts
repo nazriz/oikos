@@ -110,10 +110,10 @@ export const MAYOR: Issued[] = [
 ];
 
 export const COUNCIL_CLERK: Issued[] = [
-  { form: "council_ballot", title: "A ballot of the council on a proposal",
+  { form: "council_ballot", title: "A ballot of the council on a proposal", does: "Puts a proposal to the vote of the councillors, each in their own post, for as long as it says. The latest vote of each post cast while it is open is the one that counts.",
     fields: { proposal: f("record", "The proposal put to the vote.", req), open_for: f("duration", "How long the ballot stays open.", req), tags: f("list", "What the proposal is about, a word each (budget, tenant_protection, development).") },
     writes: { kind: "ballot", text: "Ballot of the council on {proposal}, open for {open_for}.", basis: "=proposal", data: { proposal: "=proposal", options: ["yes", "no"], closes_at: "+open_for", electorate: "council", tags: "=tags" } } },
-  { form: "council_result", title: "The result of a ballot of the council",
+  { form: "council_result", title: "The result of a ballot of the council", does: "Declares how a ballot went, from the count of every vote on file, naming who voted which way. Declaring a result does not by itself change a law: a passed proposal made on a law's amendment form is written into that law by the office's drafters, under its standing work order for enact; a law proposed in words, or a budget, the clerk publishes.",
     fields: { ballot: f("record", "The ballot counted.", req), yes: f("count", "Votes for.", req), no: f("count", "Votes against.", req), passed: f("choice", "Whether it passed.", { ...req, options: YES_NO }),
       voted_for: f("list", "The councillors' posts that voted for (a council's votes are public record)."), voted_against: f("list", "The councillors' posts that voted against.") },
     writes: { kind: "ballot_result", text: "Result of {ballot}: {yes} for, {no} against.", basis: "=ballot", data: { ballot: "=ballot", yes: "=yes", no: "=no", passed: "?passed", voted_for: "=voted_for", voted_against: "=voted_against" } } },

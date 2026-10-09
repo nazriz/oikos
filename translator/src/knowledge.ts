@@ -122,7 +122,36 @@ export class Knowledge {
    * a payment that cites one is set against in its draft's preview (a wage against the pay agreed). */
   readonly agreements = new Map<string, { template?: string; parties: string[]; pays: { who: string; to?: string; amount: string; every?: number }[] }>();
 
+  private readonly routineFacts = new Map<string, { procedure: string; every?: number; schedule?: string }>();
+  private readonly procedures = new Map<string, string>();
+  /** The words of a procedure that states routines, as the participant has it on file. */
+  procedureText(id: string): string | undefined {
+    return this.procedures.get(id);
+  }
+  /** A routine of the participant's office as its own procedure states it (a paper on its file: `proc-<office>-routines`):
+   * the procedure, and the routine's published rhythm where it has one (how often, or the paper that sets when).
+   * What a standing work order that does not say how often follows. None: no procedure it has seen names the task. */
+  routine(task: string): { procedure: string; every?: number; schedule?: string } | undefined {
+    const r = this.routineFacts.get(task);
+    return r && !this.withdrawn.has(r.procedure) ? r : undefined;
+  }
+
+  /** The participant's own papers, as far as it has been shown them (those made in its own name, or in the name of an
+   * organisation it holds a post of; agreements it or that organisation is party to): what each is, in a few words.
+   * What a withdrawal's preview says it withdraws. */
+  readonly papers = new Map<string, { kind: string; text: string; to?: string[]; standing?: boolean; agreement?: { template?: string; parties: string[] } }>();
+  private own(e: string | undefined): boolean {
+    return e !== undefined && (e === this.entity || [...this.held].some((p) => this.positions.get(p) === e));
+  }
+
   private add(r: Record): void {
+    if (r.record === "statement" && r.kind !== "form" && this.own(r.speaks_for ?? undefined)) this.papers.set(r.id, { kind: r.kind, text: r.text.length > 300 ? `${r.text.slice(0, 300)}…` : r.text, ...(r.addressed_to?.length ? { to: r.addressed_to } : {}), ...(Number.isSafeInteger(r.data?.every) && r.data.every > 0 ? { standing: true } : {}) });
+    if (r.record === "agreement" && (r.terms?.parties ?? []).some((p) => this.own(p))) this.papers.set(r.id, { kind: "agreement", text: "", agreement: { ...(r.terms.template ? { template: r.terms.template } : {}), parties: r.terms.parties } });
+    if (r.record === "statement" && r.kind === "procedure" && Array.isArray(r.data?.routines)) this.procedures.set(r.id, r.text);
+    if (r.record === "statement" && r.kind === "procedure" && Array.isArray(r.data?.routines)) for (const x of r.data.routines as any[]) {
+      if (typeof x?.task !== "string") continue;
+      this.routineFacts.set(x.task, { procedure: r.id, ...(Number.isSafeInteger(x.every) && x.every > 0 ? { every: x.every } : {}), ...(typeof x.schedule === "string" && x.schedule ? { schedule: x.schedule } : {}) });
+    }
     if (r.record === "agreement") {
       const pays = (r.terms?.commitments ?? []).flatMap((c) => {
         const m = c.does?.outcome?.money;

@@ -18,7 +18,7 @@ const seat = () => { const k = new Knowledge(TABLE.currency); k.absorb(TABLE.obs
 
 test("every case of the shared table: the acts, or the questions back", () => {
   expect(JSON.stringify(TABLE.observation)).toBe(canonical(TABLE.observation));
-  expect(CASES.length).toBeGreaterThanOrEqual(12);
+  expect(CASES.length).toBeGreaterThanOrEqual(26);
   const k = seat();
   for (const c of CASES) {
     const r = resolve(calls.parseProgram(c.program), k, () => undefined, c.as);

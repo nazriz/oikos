@@ -199,6 +199,9 @@ export async function exportDataset(logPath: string, outDir: string, o: DatasetO
       } else if (a === "note" && b.data?.translation_retry) {
         const r = b.data.translation_retry;
         tr(r.draft, e.t, b.subject).retries.push({ attempt: r.attempt, reason: r.reason, ...(r.call ? { call: r.call } : {}) });
+      } else if (a === "note" && b.data?.draft_unanswered) {
+        // (Shown to its seat and never answered: the run ended first. Neither declined nor confirmed.)
+        tr(b.data.draft_unanswered.draft, e.t, b.subject).signoff = { decision: "unanswered", note: b.data.draft_unanswered.why };
       } else if (a === "signoff") {
         tr(b.draft, e.t, b.participant).signoff = { decision: b.decision, ...(b.note ? { note: b.note } : {}) };
         const dec = openDecision.get(b.participant);

@@ -34,6 +34,18 @@ standing work order, and the staff follow it until it is changed. The manager se
    what it found there last time, the doctors the consultations a condition takes. That knowledge was the office's
    code and still is.
 
+5. **How often may be left to the office's procedure, or to a published paper** (2026-10-09). Each routine has a
+   published rhythm, stated in the office's own procedure (`proc-<office>-routines`) beside what the task is: its own
+   ("The office's own rhythm for it is every 7 days"), or a paper's ("When it is done is set by law-rates": the
+   rating law's instalments). An order that says nothing of how often follows it; an order for a routine a paper
+   sets may name the paper in place of how often ("as law-rates sets"). The preview says which, quoting the
+   procedure: "It gives no rhythm of its own: when levy is done is set by law-rates, as your office's procedure
+   (proc-rates-routines) says: ...". An order that gives days for a routine a paper sets is taken as given, and the
+   preview says the staff keep the paper's time whatever the order says. Words for how often that cannot be read are
+   answered from the procedure ("... the staff do levy when law-rates sets: say "as law-rates sets", or leave how
+   often out and the order follows it"). A rates seat never had a levy order in a pilot's 30 days: an order had to
+   give a number of days, and it would not invent one. Declared on each module's `routines` (`every`, `follows`).
+
 **Who the staff are.** Each office module can run as one of three parts (`part`):
 
 | Part | Who | Does |
@@ -125,6 +137,7 @@ The rates notices keep the rating law's instalments: the order says that they ar
 | water | `bill` | the meters read on a round, then every owner billed; how often is the order's |
 | energy | `supply_energy` | each day's supply to the customers; the grid bought from when stock is low; customers taken on and off |
 | energy | `bill` | every customer billed; how often is the order's |
+| council clerk | `enact` | each amendment the council has passed and the clerk has declared is written into the law by its schedule, published in place of the law in force, which is withdrawn (docs/behaviour/government.md, "A council in the hands of seats") |
 | rates | `levy` | the notices sent to every owner at each instalment the rating law sets, and penalty interest added monthly to what is overdue (the law says when; the order says that it is done) |
 
 ## Which offices can be seats now

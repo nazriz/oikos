@@ -9,7 +9,7 @@ import { cents, moneyNow } from "../money";
 import * as C from "../calls";
 import { dateWords } from "../forms";
 import type { SiteStructure, StatementRecord } from "../contracts";
-import { basesOf, channels } from "../contracts";
+import { basesOf, channels, cites } from "../contracts";
 import { need, params, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
 import { nextLook, because, Book, cellsOf, DAY, draftLaw, figureGiven, figureWords, heldValue, jobTerms, Letters, lotOf, message, MONTH, ownAccount, pay, publishedCount, publishedPrice, record, say, type LawFigure, type LawSchedule, type Step, usd, variableToday, vote, withdraw, outOfTime, team, lookUp, goSee, visited, VISIT_MAX, Directions, StandingWork } from "./common";
 import { Staffing, staffingForm, staffingUnder, stepper } from "./firms";
@@ -288,7 +288,8 @@ export const councilClerk: BehaviourModule = {
   name: "city.council_clerk",
   answers: {"office": "the council clerk's office", "acts": "What it acts on: a proposal put to the council on the council proposal form (council_proposal) or on a law's amendment form, which it puts to a ballot of the councillors; and the votes cast in a councillor's post while a ballot is open.", "forms": [{"about": ["propos", "motion", "amend", "resolution", "put to the council", "put to council"], "say": "What you want the council to decide goes on the council proposal form (council_proposal); a change to a figure in a law in force goes on that law's amendment form."}], "report": true},
   issues: P.COUNCIL_CLERK,
-  version: "0.10.0", // 0.10.0: a result names who voted for and against; a vote on a closed ballot, or by someone who is no councillor, is not counted and its caster is told; 0.9.1: amends a law of optional figures (one added, one taken away by nought, a law made from one figure); 0.9.0: a proposal already balloted and a ballot already declared, by the office's own papers, are not put or counted again; a budget is for the year its proposal names
+  routines: [{ task: "enact", at: "office", every: 1, what: "When the council has passed a proposal made on a law's amendment form and the clerk has declared the result, the office's drafters write the amended law out by the law's own schedule, with the figures the proposal gives and the rest as they stand, publish it in place of the law in force, and withdraw that one. Declaring a result does not by itself change a law: this does. A law proposed in free words, or a budget, is not theirs: the clerk publishes that." }],
+  version: "0.11.0", // 0.11.0: where a seat holds the office, its drafters are a staff post that writes a passed amendment into the law under the standing order for enact, and the office-holder declares the result without it; 0.10.0: a result names who voted for and against; a vote on a closed ballot, or by someone who is no councillor, is not counted and its caster is told; 0.9.1: amends a law of optional figures (one added, one taken away by nought, a law made from one figure); 0.9.0: a proposal already balloted and a ballot already declared, by the office's own papers, are not put or counted again; a budget is for the year its proposal names
   doc: "docs/behaviour/government.md",
   cadence: () => DAY,
   create(ctx: ParticipantContext) {
@@ -297,8 +298,15 @@ export const councilClerk: BehaviourModule = {
       members_role: "councillor", members_every_days: 30,
       // The body that runs elections to the town's offices, where it is not the town's own: the clerk seats whoever
       // it declares elected (none: whoever runs the election seats the winner).
-      electoral: "" }, ctx.params);
+      electoral: "",
+      // Which part of the office this is (docs/behaviour/standing-work.md): "" the whole office, as code runs one;
+      // "seat" the clerk alone, who runs the ballots and declares the results; "staff" the office's drafters, who
+      // write a passed amendment into the law it amends, under the standing order for enact.
+      part: "" as "" | "seat" | "staff", office: "" }, ctx.params);
     const book = new Book();
+    const routines = new StandingWork(ctx.entity, p.part);
+    const enactedFor = new Set<string>();
+    let reportDay = -1;
     const seated = new Set<string>();
     const balloted = new Set<string>();
     const closed = new Set<string>();
@@ -317,6 +325,34 @@ export const councilClerk: BehaviourModule = {
         // The council's members are its councillor positions: a vote counts when made in one (one per position; the latest).
         // (As the clerk last looked them up: its own council's list of members, below.)
         const councillors = new Set((channels.directory(obs)?.positions ?? []).filter((x) => x.role === "councillor" && x.entity === me).map((x) => x.position));
+        // The office's drafters (the staff part): each amendment the council has passed and the clerk has declared is
+        // written into the law, once, while the standing order for it is in force; and they report how it stands.
+        if (p.part === "staff") {
+          const working = routines.does(book, "enact", t, { every: DAY });
+          let waiting = 0;
+          for (const r of book.open("ballot_result")) {
+            if (r.speaks_for !== me || r.data?.passed !== true || typeof r.data?.ballot !== "string" || enactedFor.has(r.data.ballot)) continue;
+            const ballot = book.records.get(r.data.ballot) as StatementRecord | undefined;
+            const am = amendment(book, me, ballot ? (book.records.get(ballot.data?.proposal) as StatementRecord | undefined) : undefined);
+            if (!ballot || !am) continue;
+            // (Written into law already, by the office's own record: a law that rests on the ballot.)
+            if (book.all("law").some((l) => l.speaks_for === me && cites(l, ballot.id))) { enactedFor.add(ballot.id); continue; }
+            if (!working) { waiting++; continue; }
+            enactedFor.add(ballot.id);
+            const made = enactAmendment(am, ballot.id);
+            if (made.calls.length) {
+              routines.did("enact", t, { units: 1 });
+              steps.push(because(`The council passed an amendment on ${ballot.id} and its result is declared (${r.id}): writing it into the law by the law's schedule.`, ...made.calls));
+            } else routines.heldUp("enact", `the amendment passed on ${ballot.id} could not be written into law:${made.note}`);
+          }
+          if (working) routines.note("enact", waiting ? undefined : "no amendment the council has passed is waiting to be written into law");
+          if (reportDay !== Math.floor(t / DAY)) {
+            reportDay = Math.floor(t / DAY);
+            steps.push(...routines.report(book, t, { office: (ctx.position ?? "").replace(/-staff$/, ""), from: "the clerk's drafters", tasks: { enact: ["amendments written into law"] } }));
+          }
+          return steps;
+        }
+        steps.push(...routines.set(book, [{ task: "enact", at: p.office || ctx.position || "office", every: DAY, why: "Setting the drafters' work: an amendment the council has passed is written into the law it amends, as a standing work order." }]));
         // An election declared by the electoral body: whoever it declares elected takes the office (the town's own act:
         // an office of the town is filled by the town).
         if (p.electoral) for (const r of book.open("ballot_result")) {
@@ -359,24 +395,13 @@ export const councilClerk: BehaviourModule = {
           const enact = am ? undefined : prop?.data?.enact ?? fromForm(prop, t);
           const enacted: C.Call[] = [];
           let note = ""; // what the result says became of it, in the town's terms
-          if (passed && am) {
-            // The amended law, by the schedule the law was made with: the figures given, the rest as they stand in the law
-            // in force now (it may have been amended since the proposal was made).
-            const values: { [k: string]: number } = { ...Object.fromEntries(Object.entries(am.law?.data?.figures ?? {}).map(([k, f]: [string, any]) => [k, f?.value])), ...am.given };
-            // (What the law can't be written without: a figure it must have; or, where it may do without each, any at all.)
-            const needed = Object.entries(am.s.figures).filter(([k, f]) => !f.optional && !figureGiven(f, values[k])).map(([k]) => k);
-            const missing = needed.length ? needed : Object.entries(am.s.figures).some(([k, f]) => figureGiven(f, values[k])) ? [] : Object.keys(am.s.figures);
-            // (A schedule that can't be written from, a fault in the world's content: nothing is enacted, and the result says so.)
-            const law = missing.length ? undefined : (() => { try { return draftLaw(am.schedule.id, am.s, values); } catch { return undefined; } })();
-            if (missing.length) note = ` Nothing is enacted: ${am.s.title} is no longer in force, and the proposal doesn't give ${missing.map((k) => am.s.figures[k]!.label ?? k).join(" or ")}.`;
-            else if (!law) note = ` Nothing is enacted: ${am.s.title} couldn't be written out from its figures.`;
-            else {
-              enacted.push(say("law", `${law.text} (${am.law ? `As amended by the council on ballot ${ballot.id}; this replaces ${am.law.id}.` : `Made by the council on ballot ${ballot.id}.`})`,
-                { basis: ballot.id, visible: "public", adico: law.adico, formal: law.formal?.condition, data: { ...law.data, ...(am.law ? { replaces: am.law.id } : {}) } }));
-              if (am.law) enacted.push(withdraw(am.law.id, `Amended by the council on ballot ${ballot.id}.`));
-              note = ` ${am.s.title[0]!.toUpperCase()}${am.s.title.slice(1)} is amended: ${changes(am, "was")}.${am.law ? ` The amended law takes the place of ${am.law.id}.` : ""}` +
-                (law.formal ? " It is written as the law it replaces was, so acts are checked against it in the same way." : ` ${WORDS_ONLY}`);
-            }
+          if (passed && am && p.part === "seat") {
+            // (The office-holder declares; its drafters write the law, under the standing order for enact.)
+            note = ` ${am.s.title[0]!.toUpperCase()}${am.s.title.slice(1)} is to be amended: ${changes(am)}. The office's drafters write the amended law out and publish it in place of the law in force.`;
+          } else if (passed && am) {
+            const made = enactAmendment(am, ballot.id);
+            enacted.push(...made.calls);
+            note = made.note;
           } else if (passed && enact) {
             enacted.push(say(enact.kind, enact.text, { basis: ballot.id, adico: enact.adico, formal: enact.formal?.condition, data: enact.data }));
             // A law in free words: say plainly what kind of law the council has passed, and where figures are changed.
@@ -718,7 +743,7 @@ export const taxClerk: BehaviourModule = {
 export const ratesOfficer: BehaviourModule = {
   name: "city.rates_officer",
   answers: {"office": "the rates office", "acts": "What it acts on: the valuer's valuations, on which it levies under the rating law; a payment that names the rates it pays; and a direction on its recovery form (rates_recovery) from those the town's rule on directions names.", "report": true},
-  routines: [{ task: "levy", at: "office", what: "At each instalment the rating law sets, the rates clerks send every owner on the rate book a notice of their share and record it as owed to the town; each month they add the law's penalty interest to what is overdue and write to the owner. When the notices go out is the law's: the order says only that they are to be sent." }],
+  routines: [{ task: "levy", at: "office", follows: ["law", "law-rates"], what: "At each instalment the rating law sets, the rates clerks send every owner on the rate book a notice of their share and record it as owed to the town; each month they add the law's penalty interest to what is overdue and write to the owner. When the notices go out is the law's: the first once the valuer has valued the town's properties and not before the office's first levy day, then one for each instalment the law sets, evenly through the year (two instalments a year are 182 days apart, four are 91). The order says only that they are to be sent." }],
   keeps: [
     { what: "valuation", why: "The rating authority keeps the rate book: the valuer sends it the valuation of every rateable lot, which is what it levies on." },
   ],
@@ -846,8 +871,8 @@ export const works: BehaviourModule = {
   name: "city.works",
   answers: {"office": "the works office", "acts": "What it acts on: the adopted budget's staff line, which sets its crew; a complaint of a collection missed; and a direction on one of its own forms from those the town's rule on directions names.", "forms": [{"about": ["staff", "recruit", "hire", "hiring", "crew", "vacanc", "posts"], "say": "On staffing it follows a direction on its staffing form (works_staffing) from those the town's rule on directions names, and no letter."}, {"about": ["collect", "round", "waste", "bin", "rubbish"], "say": "On how often it collects it follows a direction on its collection form (works_collection) from those the town's rule on directions names; a collection missed is reported as a complaint."}], "report": true},
   routines: [
-    { task: "collect", at: "depot", what: "The crew at the depot collects waste from each address on the round as often as the order says, homes complained about first, as far as its hours go, and takes what it has collected to the landfill each week with a docket." },
-    { task: "maintain", at: "depot", what: "With the hours the round leaves, the crew keeps up the most worn of the town's own assets, and someone is sent to inspect an asset nobody has seen." },
+    { task: "collect", at: "depot", every: ["collect_every_days", 7], what: "The crew at the depot collects waste from each address on the round as often as the order says, homes complained about first, as far as its hours go, and takes what it has collected to the landfill each week with a docket." },
+    { task: "maintain", at: "depot", every: 1, what: "With the hours the round leaves, the crew keeps up the most worn of the town's own assets, and someone is sent to inspect an asset nobody has seen." },
   ],
   issues: [P.JOB_ADVERTISEMENT, ...P.PAYROLL, ...P.WORKS],
   issuesWith: (p) => ({ ...P.staffingOwn({ role: p.role ?? "works crew", industry: p.industry, workplace: p.workplace, notice_days: p.notice_days ?? 14 }), landfill: p.landfill, payroll_office: p.payroll_office || undefined }),
@@ -1185,6 +1210,28 @@ function amendment(book: Book, me: string, prop: StatementRecord | undefined): A
   const given: { [figure: string]: number } = {};
   for (const [k, f] of Object.entries(found.s.figures)) if (Number.isSafeInteger(prop.data?.[k]) && prop.data[k] >= 0) given[k] = heldValue(f, prop.data[k]);
   return { schedule: found.schedule, s: found.s, law: found.law, given };
+}
+
+/**
+ * A passed amendment written into law: the amended law, by the schedule the law was made with (the figures given,
+ * the rest as they stand in the law in force now: it may have been amended since the proposal was made), published in
+ * place of the law in force, which is withdrawn; and what the result says became of it. No calls where it cannot be
+ * written (a figure the law must have is missing; a schedule that can't be written from).
+ */
+function enactAmendment(am: Amendment, ballot: string): { calls: C.Call[]; note: string } {
+  const values: { [k: string]: number } = { ...Object.fromEntries(Object.entries(am.law?.data?.figures ?? {}).map(([k, f]: [string, any]) => [k, f?.value])), ...am.given };
+  // (What the law can't be written without: a figure it must have; or, where it may do without each, any at all.)
+  const needed = Object.entries(am.s.figures).filter(([k, f]) => !f.optional && !figureGiven(f, values[k])).map(([k]) => k);
+  const missing = needed.length ? needed : Object.entries(am.s.figures).some(([k, f]) => figureGiven(f, values[k])) ? [] : Object.keys(am.s.figures);
+  // (A schedule that can't be written from, a fault in the world's content: nothing is enacted, and the result says so.)
+  const law = missing.length ? undefined : (() => { try { return draftLaw(am.schedule.id, am.s, values); } catch { return undefined; } })();
+  if (missing.length) return { calls: [], note: ` Nothing is enacted: ${am.s.title} is no longer in force, and the proposal doesn't give ${missing.map((k) => am.s.figures[k]!.label ?? k).join(" or ")}.` };
+  if (!law) return { calls: [], note: ` Nothing is enacted: ${am.s.title} couldn't be written out from its figures.` };
+  const calls: C.Call[] = [say("law", `${law.text} (${am.law ? `As amended by the council on ballot ${ballot}; this replaces ${am.law.id}.` : `Made by the council on ballot ${ballot}.`})`,
+    { basis: ballot, visible: "public", adico: law.adico, formal: law.formal?.condition, data: { ...law.data, ...(am.law ? { replaces: am.law.id } : {}) } })];
+  if (am.law) calls.push(withdraw(am.law.id, `Amended by the council on ballot ${ballot}.`));
+  return { calls, note: ` ${am.s.title[0]!.toUpperCase()}${am.s.title.slice(1)} is amended: ${changes(am, "was")}.${am.law ? ` The amended law takes the place of ${am.law.id}.` : ""}` +
+    (law.formal ? " It is written as the law it replaces was, so acts are checked against it in the same way." : ` ${WORDS_ONLY}`) };
 }
 
 /** What an amendment changes, in words: "notice of an increase 90 days (now 60 days)" (once made: "was 60 days"). */

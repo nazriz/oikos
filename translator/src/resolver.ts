@@ -41,6 +41,17 @@ export const LABEL_TEXT: Record<calls.Label, string> = {
 };
 
 class Ask extends Error {}
+/** An id as the contract writes one (common.schema.json: a chosen id, a minted one, a cell, a space), or a name bound
+ * in the same act. Anything else written where an id goes can never be recorded: it is asked about, with what it is. */
+const WRITTEN_ID = /^([a-z][a-z0-9_-]{0,63}|(ent|acc|str|rec|act|msg|par|pos|cnd)\.[0-9]{1,15}|cell\.[0-9]{1,6}\.[0-9]{1,6}|([a-z][a-z0-9_-]{0,63}|str\.[0-9]{1,15})\/[a-z][a-z0-9_-]{0,63}\.[0-9]{1,6})$/;
+const BOUND_NAME = /^[a-z][a-z0-9_]{0,31}$/;
+const ID_SHAPE = { test: (x: string): boolean => (x.startsWith("$") ? BOUND_NAME.test(x.slice(1)) : WRITTEN_ID.test(x)) };
+/** What is said of something written where an id goes that is no id (a draft's name; a made-up id). */
+export const notAnId = (x: string, what: string): string => (x.startsWith("draft.") ? `${x} is the name a draft went by before it was confirmed, not a paper on record. Once confirmed it is on record under an id of its own (rec. and a number): look it up in your papers and name that.` : `"${x}" (for ${what}) is not the id of anything on record: an id is written exactly as your papers show it, like rec.412. Look it up and name it so.`);
+/** Said of work in an agreement that names someone other than the side committing to it (the call's fault). */
+export const WORK_IS_ITS_OWN = "In an agreement each side commits itself: the work a side commits to is its own to do, and nobody else is named for it.";
+/** Said of an agreement with nothing on either side. */
+export const NO_COMMITMENTS = "An agreement says what each side is to do or pay, and this one says nothing either side commits to. Say what you will do or pay, and what they will: money, goods, a building, occupancy, an account or work.";
 /** Asked of work with neither how much nor how often: which of the two it is, in the words of whoever asked (a seat
  * that wanted a standing order to maintain was asked "How much of it?" four times, 2026-10-09). */
 export const ONCE_OR_ROUTINE = "Is this work to be done once, or as a standing routine of your staff? Done once: say how much of it. As a routine: say how often (every day, every week), and it is a standing work order.";
@@ -133,7 +144,10 @@ class Resolver {
     if (v === undefined) return undefined;
     // No id has a capital letter (ids are lowercase): a bare word with one is a name, as if it were quoted.
     const named = "text" in v ? v.text : "id" in v && /[A-Z]/.test(v.id) ? v.id : undefined;
-    if ("id" in v && named === undefined) return v.id;
+    if ("id" in v && named === undefined) {
+      if (!ID_SHAPE.test(v.id)) throw new Ask(notAnId(v.id, what));
+      return v.id;
+    }
     if ("var" in v) return `$${v.var}`;
     if (named !== undefined) {
       const found = this.k.byName(named);
@@ -159,7 +173,10 @@ class Resolver {
       const ref = this.bound.has(x) ? x : undefined;
       let id: string;
       if (ref !== undefined) id = `$${ref}`;
-      else if (/^[a-z0-9_.:\/-]+$/.test(x)) id = x;
+      else if (/^[a-z0-9_.:\/-]+$/.test(x)) {
+        if (!ID_SHAPE.test(x)) throw new Ask(notAnId(x, "basis"));
+        id = x;
+      }
       else {
         const found = this.k.byName(x);
         if (found.length === 0) throw new Ask(`You don't know of anyone or anything called "${x}" (for basis).`);
@@ -342,6 +359,10 @@ class Resolver {
     const cells = survey ? this.ids(c, "cells") : undefined;
     if (survey && !cells?.length) throw new Ask("Survey which cells?");
     const units = this.quantity(c, "units") ?? (cells ? String(cells.length) : undefined);
+    // Neither how much nor how often, of a routine whose rhythm the office's own procedure states: a standing order
+    // that follows it (a rates office asked for its levy "at each instalment the rating law sets" and was asked
+    // "once or as a routine?": wave 2b). The preview says which rhythm, and from which paper.
+    if ((!units || units === "0") && !survey && !this.has(c, "investigate") && (this.k.routine(task)?.every || this.k.routine(task)?.schedule)) return this.standingWork(c, task, bind);
     if (!units || units === "0") throw new Ask(ONCE_OR_ROUTINE);
     const at = this.need(c, "at", "Where?");
     const by = this.has(c, "by") ? (this.ids(c, "by") ?? [this.id(c, "by")!]).map((p) => this.k.entityOf(p)) : [];
@@ -367,8 +388,30 @@ class Resolver {
   private standingWork(c: Call, task: string, bind?: string): Block[] {
     if (this.has(c, "survey") || this.has(c, "investigate")) throw new Ask("A survey or an investigation is asked for each time, with what it is of: it can't be a standing order.");
     const at = this.need(c, "at", "Where?");
-    const every = this.seconds(c, "every")!;
-    if (every <= 0) throw new Ask("How often?");
+    // How often: a length of time; or, of a routine whose time a published paper sets, that paper named ("as
+    // law-rates sets"); or nothing, and the order follows the rhythm the office's own procedure states for the task.
+    const routine = this.k.routine(task);
+    const said = this.str(c, "every");
+    let every: number | undefined;
+    let schedule: string | undefined;
+    if (said === undefined) {
+      if (routine?.schedule) schedule = routine.schedule;
+      else if (routine?.every) every = routine.every;
+      else throw new Ask("How often?");
+    } else {
+      try {
+        every = calls.parseDuration(said);
+      } catch (e) {
+        if (!(e instanceof calls.UnitError)) throw e;
+        const named = routine?.schedule !== undefined && said.toLowerCase().split(/[^a-z0-9_.-]+/).map((w) => w.replace(/\.+$/, "")).includes(routine.schedule);
+        if (named) schedule = routine!.schedule;
+        else if (routine?.schedule) throw new Ask(`"${said}" could not be read as how often. By your office's procedure (${routine.procedure}) the staff do ${task} when ${routine.schedule} sets: say "as ${routine.schedule} sets", or leave how often out and the order follows it.`);
+        else if (routine?.every) throw new Ask(`"${said}" could not be read as how often. Say it as a length of time ("every 7 days", "each working day"), or leave it out: by your office's procedure (${routine.procedure}) the staff do ${task} every ${durationWords(routine.every)}, and an order that does not say how often follows that.`);
+        else throw new calls.UnitError(`not how often: ${said}`);
+      }
+    }
+    if (every !== undefined && every <= 0) throw new Ask("How often?");
+    const rhythm = schedule !== undefined ? `as ${schedule} sets` : `every ${durationWords(every!)}`;
     const first = this.when(c, "first");
     const until = this.when(c, "until");
     // (An end given as a date is the end of that day; as a length of time, so long from now.)
@@ -377,9 +420,9 @@ class Resolver {
     const on = this.has(c, "on") ? [...new Set(this.ids(c, "on")!)] : undefined;
     const units = this.quantity(c, "units");
     const me = this.id(c, "for") ?? this.me;
-    const text = `Standing work order: ${task} at ${at}${on ? `, on ${on.join(", ")}` : ""}${by ? `, by ${by.join(", ")}` : ""}${units ? `, ${units} each time` : ""}, every ${durationWords(every)}${first === undefined ? "" : "at" in first ? `, the first on ${forms.dateWords(first.at)}` : `, the first in ${durationWords(first.in)}`}${until === undefined ? "" : "at" in until ? `, until the end of ${forms.dateWords(until.at)}` : `, for ${durationWords(until.in)}`}.`;
+    const text = `Standing work order: ${task} at ${at}${on ? `, on ${on.join(", ")}` : ""}${by ? `, by ${by.join(", ")}` : ""}${units ? `, ${units} each time` : ""}, ${rhythm}${first === undefined ? "" : "at" in first ? `, the first on ${forms.dateWords(first.at)}` : `, the first in ${durationWords(first.in)}`}${until === undefined ? "" : "at" in until ? `, until the end of ${forms.dateWords(until.at)}` : `, for ${durationWords(until.in)}`}.`;
     return [{ block: "publish", kind: "work_order", text, speaks_for: me, addressed_to: [me], visible_to: [...new Set([me, ...(by ?? [])])],
-      data: { work: { task, at, ...(on ? { on } : {}), ...(by ? { by } : {}), ...(units ? { units: Number(units) } : {}) }, every, ...(first === undefined ? {} : "at" in first ? { first_at: first.at } : { first: first.in }), ...(ends !== undefined ? { until: ends } : {}) },
+      data: { work: { task, at, ...(on ? { on } : {}), ...(by ? { by } : {}), ...(units ? { units: Number(units) } : {}) }, ...(schedule !== undefined ? { schedule } : { every }), ...(said === undefined ? { by_procedure: routine!.procedure } : {}), ...(first === undefined ? {} : "at" in first ? { first_at: first.at } : { first: first.in }), ...(ends !== undefined ? { until: ends } : {}) },
       ...(bind ? { ref: bind } : {}) }];
   }
 
@@ -615,15 +658,20 @@ class Resolver {
     if (v === undefined) return undefined;
     if (!("call" in v)) return { does: { text: "text" in v ? v.text : JSON.stringify("json" in v ? v.json : v) } };
     const c = v.call;
-    const every = c.fn === "money" || c.fn === "goods" ? this.seconds(c, "every") : undefined;
+    const every = c.fn === "money" || c.fn === "goods" || c.fn === "work" ? this.seconds(c, "every") : undefined;
+    if (c.fn === "work" && this.has(c, "by") && this.ids(c, "by")!.some((p) => this.k.entityOf(p) !== this.k.entityOf(who))) throw new Ask(WORK_IS_ITS_OWN);
     const outcome =
       c.fn === "money" ? this.moneyOutcome(c, this.id(c, "from"), true)
       : c.fn === "goods" ? { goods: { kind: this.need(c, "kind", "Of what?"), quantity: this.quantity(c, "quantity") ?? "0", to: this.k.entityOf(this.need(c, "to", "Delivered to whom?")), at: this.need(c, "at", "Delivered where?"), ...(this.id(c, "from_at") ? { from: this.id(c, "from_at") } : {}) } }
       : c.fn === "occupancy" ? this.occupancyOutcome(c)
       : c.fn === "structure" ? { structure: this.id(c, "remove") ? { remove: this.id(c, "remove") } : { type: this.id(c, "type"), on: this.id(c, "on") } }
       : c.fn === "account" ? { account: { holder: this.id(c, "holder") ?? who, ...(this.id(c, "close") ? { close: this.id(c, "close") } : {}) } }
+      // Work a side commits to (an employment agreement's "works as crew at the depot"): the kind of work, as a
+      // label, where it is done, and how much each time if said. The contract's commitments have had it all along;
+      // refused here, every offer of employment a translator wrote this way cost a second call (wave 2b: 8 of 8).
+      : c.fn === "work" ? { work: { task: asLabel(this.str(c, "task") ?? "") || "work", ...(this.id(c, "at") ? { at: this.id(c, "at") } : {}), ...(this.quantity(c, "units") ? { units: this.quantity(c, "units") } : {}) } }
       : undefined;
-    if (!outcome) throw new Ask(`A commitment can be money, goods, a building, occupancy or an account, not ${c.fn}.`);
+    if (!outcome) throw new Ask(`A commitment can be money, goods, a building, occupancy, an account or work, not ${c.fn}.`);
     return { does: { outcome }, ...(every ? { every } : {}) };
   }
 
@@ -637,6 +685,7 @@ class Resolver {
     const ours = this.outcome(this.raw(c, "we_do"), me);
     const theirs = this.outcome(this.raw(c, "they_do"), other);
     const commitments = [...(ours ? [{ who: me, ...ours }] : []), ...(theirs ? [{ who: other, ...theirs }] : [])];
+    if (!commitments.length) throw new Ask(NO_COMMITMENTS);
     const term = this.seconds(c, "term");
     // After the term: it may continue, periodically, until ended by notice.
     const then = this.str(c, "then") || undefined;
@@ -670,7 +719,15 @@ class Resolver {
     const data = this.json(c, "data");
     const adico = this.json(c, "adico");
     const formal = this.str(c, "formal");
-    const on = this.id(c, "on");
+    // Where it is put up: a cell of ground. A lot of one cell is that cell; of several, which is asked; anything else
+    // is no place (a clerk asked to publish a law "in place of" another, and the other's id was written here).
+    let on = this.id(c, "on");
+    if (on !== undefined && !on.startsWith("$") && !/^cell\.[0-9]{1,6}\.[0-9]{1,6}$/.test(on)) {
+      const cells = this.k.lots.get(on);
+      if (cells?.length === 1) on = cells[0]!;
+      else if (cells && cells.length > 1) throw new Ask(`Which cell of ${on} should it be put up on: ${cells.slice(0, 12).join(", ")}${cells.length > 12 ? ", …" : ""}?`);
+      else throw new Ask(`A paper is put up at a place on the ground: a lot, or a cell of one. ${on} is neither, as far as you know. To publish it and put it up nowhere, leave the place out; to put one paper in another's place, withdraw the other and publish this.`);
+    }
     // What someone may take up, and a recurring situation people take part in (docs/design/ai-citizens.md 2a, 2b):
     // facts in the typed vocabulary, checked by the contract when the act is.
     const offer = this.json(c, "offer");

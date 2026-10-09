@@ -151,6 +151,13 @@ export interface Routine {
   what: string;
   /** The parameter that holds the place the work is done at (the depot, the clinic). */
   at: string;
+  /** The routine's own rhythm, where the office's practice has one: days, or the parameter that gives them with what
+   * it is where none is given. Said in the office's procedure; a standing order that does not say how often follows it. */
+  every?: number | [param: string, otherwise: number];
+  /** Where when the routine is done is set by a published paper (a rating law's instalments), not by a rhythm: the
+   * parameter that names the paper, with the paper where none is given. A standing order may name it in place of
+   * how often, or say nothing. */
+  follows?: [param: string, otherwise: string];
 }
 
 /**
