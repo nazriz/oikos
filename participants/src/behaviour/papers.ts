@@ -269,12 +269,16 @@ export const EDITOR: Issued[] = [
 // ------------------------------------------------------------------ shops and works
 
 /** An order to a supplier, a delivery note and a report of theft, as a shop or a works writes them (trade.ts). */
-export const TRADE: Issued[] = [
-  { form: "order", title: "An order to a supplier, paid with the order",
+/** An order to a supplier (trade.ts, `order`): the paper a seller acts on. Any office that buys in has it. */
+export const ORDER: Issued = { form: "order", title: "An order to a supplier, paid with the order",
+    does: "How the office buys from a supplier, the outside world's market among them: it places the order at the seller's listed price. The form pays nothing by itself: pay the whole sum into the account the seller's price list names, at the same sitting. The seller delivers once an order is paid in full, sends back money that comes with no order waiting for it, and declines an order unpaid after a week.",
     fields: { seller: f("entity", "Whom it is ordered from.", req), kind: f("text", "What is ordered.", req), quantity: f("count", "How many.", req), unit_price: f("amount", "The price of each, as the seller advertises it.", req),
       deliver_to: f("entity", "Who is to receive them.", req), at: f("structure", "Where they are to be delivered.", req), account: f("account", "The account the order is paid from.", req), retry_of: f("record", "An earlier order this one repeats."), for_days: f("count", "How many days the order may be served over.") },
     writes: { kind: "order", text: "Order: {quantity} {kind} at {unit_price} each, delivered to {deliver_to} at {at}. Paid with this order.", to: ["=seller"], visible: ["=self", "=seller"],
-      data: { kind: "=kind", quantity: "=quantity", unit_price: "#unit_price", deliver_to: "=deliver_to", at: "=at", account: "=account", retry_of: "=retry_of", for_days: "=for_days" } } },
+      data: { kind: "=kind", quantity: "=quantity", unit_price: "#unit_price", deliver_to: "=deliver_to", at: "=at", account: "=account", retry_of: "=retry_of", for_days: "=for_days" } } };
+
+export const TRADE: Issued[] = [
+  ORDER,
   { form: "delivery_note", title: "A delivery note for an order served",
     fields: { order: f("record", "The order.", req), buyer: f("entity", "Who ordered.", req), kind: f("text", "What was ordered.", req), ordered: f("count", "How many were ordered.", req), delivered: f("count", "How many were delivered.", req), refund: f("amount", "What was refunded for those not delivered.", req),
       declined: f("choice", "Where nothing was delivered because it was not paid for.", { options: ["unpaid"] }) },

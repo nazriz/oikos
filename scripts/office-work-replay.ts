@@ -75,6 +75,34 @@ export const PLAYS: { [name: string]: { world: string; sets: string[]; days: num
   },
 };
 
+// The first utilities pilot: its town (seed, profile and the scenario that makes the grid dear), each seat's standing
+// work orders as it made them on day 1, and the energy seat's order to the grid on day 15, in its words. `energy`: the
+// call a translator writes for those words now that the office has an order form; `energy-as-drafted`: the call the
+// pilot's translator wrote, a payment alone, which the market sent back.
+const UTILITIES = { world: "worlds/town-1000.yaml", sets: ["seed=144", "profile=au-vic-2026", "model_seats=water-operations,energy-operations,rates", "scenario=energy-price-shock"], days: 45 };
+const ASKED = "Order 60000 energy from outside at $0.36 each (total $21600), paying with the order from acc-energy-co to acc-outside, per price list rec.4, delivered to the substation.";
+const utilities = (order: string): { [office: string]: Sitting[] } => ({
+  "energy-operations": [
+    { day: 0, asks: () => [
+      { what: "Make a standing work order for the office staff: task supply_energy, at substation, every day, from now, until withdrawn.", program: 'work(at=substation, every="every day", task=supply_energy)' },
+      { what: "Make a standing work order for the office staff: task bill, at substation, every 30 days, from now, until withdrawn.", program: 'work(at=substation, every="every 30 days", task=bill)' }] },
+    { day: 14, asks: () => [{ what: ASKED, program: order }] },
+    ...[15, 21, 28, 35, 42].map((day) => ({ day, asks: () => [] })),
+  ],
+  "water-operations": [
+    { day: 0, asks: () => [
+      { what: "Make a standing work order for the office staff: task draw_water, at water-works (lot-19-28), every 1 day, starting today, on the published population estimate rec.5 (1001 residents), with no end date.", program: 'work(at=lot-19-28, every="every 1 day", on=rec.5, task=draw_water)' },
+      { what: "Make a standing work order for the office staff: task bill, at water-works (lot-19-28), every 30 days, starting today, with a meter reading round before each round of bills, with no end date.", program: 'work(at=lot-19-28, every="every 30 days", task=bill)' }] },
+    ...[8, 29, 32, 35, 42].map((day) => ({ day, asks: () => [] })),
+  ],
+  rates: [
+    { day: 0, asks: () => [{ what: "Make a standing work order for the rates clerks: task levy, at rates, every 91 days, in force now with no end. The notices go out as the rating law (law-rates) sets.", program: 'work(at=rates, every="every 91 days", task=levy)' }] },
+    ...[7, 14, 21, 28, 35, 42].map((day) => ({ day, asks: () => [] })),
+  ],
+});
+PLAYS.energy = { ...UTILITIES, seats: utilities('form(account=acc-energy-co, at=substation, deliver_to=energy-co, form=order, kind="energy", quantity="60000", seller=outside, to=energy-operations, unit_price="$0.36")\nmoney(amount="$21600", basis=rec.4, for="Order: 60000 energy.", from=acc-energy-co, to=acc-outside)') };
+PLAYS["energy-as-drafted"] = { ...UTILITIES, seats: utilities('money(amount="$21600", basis=rec.4, for="60000 energy", from=acc-energy-co, to=acc-outside)') };
+
 if (import.meta.main) {
   const play = process.argv[2] ?? "";
   const arg = (name: string, d?: string) => { const i = process.argv.indexOf(`--${name}`); return i >= 0 ? process.argv[i + 1] : d; };
@@ -95,7 +123,10 @@ if (import.meta.main) {
   const byWeek = () => Array.from({ length: weeks }, () => 0);
   const worked: { [k: string]: number[] } = {};
   const complaints = byWeek(), came = byWeek();
+  const lastOf = new Map<string, string>();
   const orders: string[] = [], reports: string[] = [], refused: string[] = [], notDrafted: string[] = [], bought: string[] = [];
+  const entities = new Set<string>(offices.map((o) => config.participants.find((p: any) => p.id === `${o}-staff-system`)?.owner ?? (config.world.positions ?? []).find((p: any) => p.id === o)?.entity).filter(Boolean));
+  const bills: { [who: string]: number[] } = {};
   const depot = config.participants.find((p: any) => p.id === "works-staff-system")?.controller?.params?.workplace as string | undefined;
   for await (const line of logLines(s.logPath)) {
     let e: any;
@@ -104,12 +135,14 @@ if (import.meta.main) {
     if (e.kind === "event" && b.event === "worked" && ours(b.by)) (worked[`${b.by.replace(/-system$/, "")} ${b.task}`] ??= byWeek())[w]!++;
     else if (e.kind === "event" && b.event === "occupied" && depot && b.space === depot) came[w]!++;
     else if (e.kind === "event" && b.event === "action_refused" && ours(b.participant)) refused.push(`day ${Math.floor(e.t / DAY) + 1} ${b.participant}: ${b.code} ${b.detail}`);
-    else if (e.kind === "event" && b.event === "goods_moved" && b.from === "outside" && offices.some((o) => config.world.positions?.some?.((p: any) => p.id === o && p.entity === b.to))) bought.push(`day ${Math.floor(e.t / DAY) + 1}: ${b.quantity} ${b.kind} delivered to ${b.to} at ${b.to_at}`);
+    else if (e.kind === "event" && b.event === "goods_moved" && b.from === "outside" && entities.has(b.to)) bought.push(`day ${Math.floor(e.t / DAY) + 1}: ${b.quantity} ${b.kind} delivered to ${b.to} at ${b.to_at}`);
+    else if (e.kind === "event" && b.event === "transfer" && [b.from, b.to].includes("acc-outside") && [b.from, b.to].includes("acc-energy-co")) bought.push(`day ${Math.floor(e.t / DAY) + 1}: ${b.amount} (in the smallest unit of money) from ${b.from} to ${b.to}`);
     else if (e.kind === "event" && b.event === "recorded") {
       const r = b.record;
       if (r.kind === "complaint" && (r.addressed_to ?? []).includes("city")) complaints[w]!++;
+      if (r.kind === "invoice" && /-staff$/.test(String(r.in_position)) && offices.includes(String(r.in_position).replace(/-staff$/, ""))) (bills[r.in_position] ??= byWeek())[w]!++;
       if (r.kind === "work_order") orders.push(`day ${Math.floor(r.at / DAY) + 1} ${r.id} (${r.in_position}): "${r.text}"`);
-      if (r.kind === "staff_report" && offices.includes(String(r.data?.office))) reports.push(`day ${Math.floor(r.at / DAY) + 1} ${r.id}: ${r.text}`);
+      if (r.kind === "staff_report" && offices.includes(String(r.data?.office))) { reports.push(`day ${Math.floor(r.at / DAY) + 1} ${r.id}: ${r.text}`); lastOf.set(String(r.data.office), reports.at(-1)!); }
     } else if (e.kind === "annotation" && b.annotation === "translation_failure" && ours(b.subject)) notDrafted.push(`day ${Math.floor(e.t / DAY) + 1} ${b.subject}: ${b.data?.call} -> ${b.data?.reason}`);
   }
   const row = (xs: number[]) => xs.map((x, i) => `w${i + 1}:${x}`).join(" ");
@@ -122,9 +155,11 @@ if (import.meta.main) {
   if (!Object.keys(worked).length) console.log("  none");
   if (depot) console.log(`\nArrivals at the depot (${depot}) by week: total ${came.reduce((a, x) => a + x, 0)}: ${row(came)}`);
   if (depot) console.log(`\nComplaints to the town by week: total ${complaints.reduce((a, x) => a + x, 0)}: ${row(complaints)}`);
-  if (bought.length) console.log(`\nDelivered from outside (${bought.length}):\n${bought.map((x) => `  ${x}`).join("\n")}`);
+  for (const [k, v] of Object.entries(bills).sort()) console.log(`\nBills sent by ${k}, by week: total ${v.reduce((a, x) => a + x, 0)}: ${row(v)}`);
+  if (bought.length) console.log(`\nBetween the office and the outside world (${bought.length}):\n${bought.map((x) => `  ${x}`).join("\n")}`);
   if (refused.length) console.log(`\nActs refused (${refused.length}); the first few:\n${refused.slice(0, 6).map((x) => `  ${x}`).join("\n")}`);
   console.log(`\nThe staff's reports to their office (${reports.length}); the first four and the last:\n${[...reports.slice(0, 4), ...(reports.length > 5 ? ["  ..."] : []), ...reports.slice(4).slice(-1)].map((x) => `  ${x}`).join("\n") || "  none"}`);
+  for (const o of offices) { const last = reports.filter((x) => x.includes(`Report of`) && lastOf.get(o) === x).at(-1); if (last && offices.length > 2) console.log(`\nThe last report of the ${o} office's staff:\n  ${last}`); }
   const offers = seats.previews.filter((p) => /employment agreement/.test(p.text));
   if (offers.length) console.log(`\nThe preview of the first offer of employment (day ${offers[0]!.day + 1}):\n  ${offers[0]!.text}`);
   for (const seat of offices) {

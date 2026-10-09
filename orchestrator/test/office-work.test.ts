@@ -14,6 +14,7 @@ import { expect, test } from "bun:test";
 import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { modules } from "@oikos/participants";
 import { generate } from "@oikos/worlds/generator/generate";
 import { runWorld } from "../src/run";
 import { applicantsTo, offeredTo, postingFor, scriptedSeats, type Sitting } from "../../scripts/scripted-seats";
@@ -98,3 +99,58 @@ test("offers that cite no advertisement: the preview says there is no place of w
   expect(last).toMatch(/under rec\.\d+, has not come in to work: no place of work in the employment agreement or in an advertisement it cites/);
   expect(last).toMatch(/- rec\.\d+, collect every 7 days: not carried out: none of the \d in post was at the depot/);
 }, 600_000);
+
+// An office that buys from outside can place the order (the shake-down review, fault 3). In the first utilities pilot
+// the energy seat's stock ran low and it had no paper to order with: its payments to the world market, with no order
+// waiting for them, were sent back, and the market's letters never said what an order is. Here the seat has the
+// office's order form, which says how buying is done; an order on it, paid in full, is delivered; a payment alone is
+// sent back, as before.
+test("an energy seat orders from the grid on its own order form and is delivered; a payment with no order is sent back; its stationery says how", async () => {
+  const config = generate({ ...spec, model_seats: ["energy-operations"] });
+  const market = config.participants.find((p: any) => p.id === "outside-trade-system").controller.params;
+  const own = config.participants.find((p: any) => p.id === "energy-operations-staff-system").controller.params;
+  const price = (market.sells.energy / 100).toFixed(2), least = Math.max(market.min_order ?? 100, 500);
+  const sum = (n: number) => ((n * market.sells.energy) / 100).toFixed(2);
+  const energy: Sitting[] = [
+    { day: 0, asks: () => [
+      { what: "The staff supply the customers each day.", program: `work(at=${own.depot}, every="every day", task=supply_energy)` },
+      { what: "The staff bill the customers each month.", program: `work(at=${own.depot}, every="every 30 days", task=bill)` }] },
+    { day: 3, asks: () => [{ what: `Order ${least} energy from outside, paying with the order.`,
+      program: `form(account=acc-energy-co, at=${own.depot}, deliver_to=energy-co, form=order, kind="energy", quantity="${least}", seller=outside, to=energy-operations, unit_price="${price}")\nmoney(amount="${sum(least)}", for="Order: ${least} energy.", from=acc-energy-co, to=acc-outside)` }] },
+    { day: 6, asks: () => [{ what: "Pay the outside world for 700 energy.", program: `money(amount="${sum(700)}", for="700 energy", from=acc-energy-co, to=acc-outside)` }] },
+    { day: 9, asks: () => [] },
+  ];
+  const seats = scriptedSeats({ "energy-operations": energy });
+  const s = await runWorld({ config, runId: "office-order", outDir: mkdtempSync(join(tmpdir(), "oikos-office-order-")), until: 11 * DAY, adapter: seats.adapter, recordObservations: "none", recordDecisions: "none" });
+  expect(s.participantErrors).toBe(0);
+  const events = readFileSync(s.logPath, "utf8").trim().split("\n").map((l) => JSON.parse(l)).filter((e) => e.kind === "event").map((e) => ({ t: e.t, ...e.body }));
+  const records = events.filter((e) => e.event === "recorded").map((e) => e.record);
+  // The order: the paper the staff's own orders to the grid are, made by the seat; delivered once paid.
+  const order = records.find((r) => r.kind === "order" && r.in_position === "energy-operations")!;
+  expect(order).toMatchObject({ speaks_for: "energy-co", addressed_to: ["outside"], data: { kind: "energy", quantity: least, unit_price: market.sells.energy, deliver_to: "energy-co", at: own.depot, account: "acc-energy-co" } });
+  expect(events.some((e) => e.event === "goods_moved" && e.from === "outside" && e.to === "energy-co" && e.kind === "energy" && Number(e.quantity) === least && e.t >= order.at)).toBe(true);
+  expect(records.some((r) => r.kind === "delivery_note" && r.data?.order === order.id && r.data.delivered === least)).toBe(true);
+  // The payment with no order: the market sends it back, and delivers nothing for it.
+  const bare = String(700 * market.sells.energy);
+  const out = events.find((e) => e.event === "transfer" && e.from === "acc-energy-co" && e.to === "acc-outside" && e.amount === bare)!;
+  expect(out).toBeDefined();
+  expect(events.some((e) => e.event === "transfer" && e.from === "acc-outside" && e.to === "acc-energy-co" && e.amount === bare && e.t >= out.t)).toBe(true);
+  expect(events.filter((e) => e.event === "goods_moved" && e.from === "outside" && e.to === "energy-co" && Number(e.quantity) === 700)).toEqual([]);
+  // What the seat is told: its order form among its stationery, with what it is for and how the order is paid.
+  const form = seats.shown[0]!.system.split("\n").find((l) => l.startsWith("- [form-energy-operations-order]"))!;
+  expect(form).toContain("How the office buys from a supplier, the outside world's market among them");
+  expect(form).toContain("The form pays nothing by itself: pay the whole sum");
+  expect(form).toContain("sends back money that comes with no order waiting for it");
+  // And its staff's report says what was supplied and what is held.
+  expect(records.some((r) => r.kind === "staff_report" && r.data.office === "energy-operations" && /supply_energy \(rec\.\d+, every 1 day\): carried out: \d+ days' supply, \d+ units; \d+ energy held/.test(r.text))).toBe(true);
+}, 600_000);
+
+test("every office that buys in has an order form that says how buying is done; the world market's answer to a letter says what an order is", () => {
+  for (const name of ["utility.energy", "firm.retailer", "firm.producer", "firm.builder"]) {
+    const order = (modules[name]!.issues ?? []).find((f) => f.form === "order");
+    expect(`${name}: ${order?.does ?? ""}`).toMatch(/: How the office buys from a supplier.*pay the whole sum.*delivers once an order is paid in full/);
+    expect(order!.writes.kind).toBe("order");
+  }
+  expect(modules["world.trade"]!.answers!.acts).toContain("a paper on the buyer's own order form, addressed to it, with the whole sum paid into the account its price list names");
+  expect(modules["world.trade"]!.answers!.acts).toContain("sends back money that comes with no order waiting for it");
+});

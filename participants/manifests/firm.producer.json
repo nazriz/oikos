@@ -391,6 +391,7 @@
     {
       "form": "order",
       "title": "An order to a supplier, paid with the order",
+      "does": "How the office buys from a supplier, the outside world's market among them: it places the order at the seller's listed price. The form pays nothing by itself: pay the whole sum into the account the seller's price list names, at the same sitting. The seller delivers once an order is paid in full, sends back money that comes with no order waiting for it, and declines an order unpaid after a week.",
       "fields": {
         "seller": {
           "type": "entity",

@@ -9,6 +9,10 @@ import { need, params, type BehaviourModule, type ParticipantContext } from "../
 import { because, Book, DAY, goSee, ownAccount, say, StandingWork, type Step, usd, variableToday, visited, VISIT_MAX } from "./common";
 import { stepper } from "./firms";
 import { Deliveries, goodsPrices, held as heldAt, order } from "./trade";
+import * as P from "./papers";
+
+/** A date as papers write one. */
+const dated = (t: number) => `year ${Math.floor(t / (365 * DAY)) + 1}, day ${Math.floor((t % (365 * DAY)) / DAY) + 1}`;
 
 export const water: BehaviourModule = {
   name: "utility.water",
@@ -189,7 +193,9 @@ export const energy: BehaviourModule = {
     { task: "supply_energy", at: "depot", what: "Each day the network supplies what the customers use from what the retailer holds, and more is bought from the grid when it runs below a fortnight's use. Those who ask to be supplied are taken on, and those gone taken off." },
     { task: "bill", at: "depot", what: "Each customer is sent a bill for the supply charge and what they used; one who has gone, their last. How often the bills go out is the order's." },
   ],
-  version: "0.1.1",
+  // (What it buys in, it orders on its own order form: its staff's orders to the grid are that paper.)
+  issues: [P.ORDER],
+  version: "0.2.0", // 0.2.0: has an order form of its own for buying from the grid; its staff report what they supplied and billed, and why they did not buy when stock ran low (docs/behaviour/standing-work.md, "The staff's report")
   doc: "docs/behaviour/utilities.md",
   cadence: () => DAY,
   firstWake: (ctx) => 6 * 3600 + ctx.rng("first-wake").below(3600),
@@ -216,6 +222,7 @@ export const energy: BehaviourModule = {
     let onOrder = 0; // ordered from the grid, not yet delivered (or refunded)
     const deliveries = new Deliveries();
     let nextBill = p.bill_every_days * DAY;
+    let reportDay = -1;
     return stepper(
       (obs) => void book.absorb(obs),
       (obs) => {
@@ -227,7 +234,14 @@ export const energy: BehaviourModule = {
           { task: "bill", at: p.depot, every: p.bill_every_days * DAY, why: `Setting the billing round: every customer billed every ${p.bill_every_days} days, as a standing work order.` }]));
         const supplying = routines.does(book, p.task, t, { every: DAY });
         const billingBy = routines.does(book, "bill", t, { every: p.bill_every_days * DAY });
-        if (!supplying && !billingBy) return steps;
+        // The staff's report to the office, once a day (docs/behaviour/standing-work.md, "The staff's report").
+        const tell = (): Step[] => {
+          const today = Math.floor(t / DAY);
+          if (p.part !== "staff" || reportDay === today) return [];
+          reportDay = today;
+          return routines.report(book, t, { office: (ctx.position ?? "").replace(/-staff$/, ""), from: "the energy retailer's staff", tasks: { [p.task]: ["days' supply", "units"], bill: ["bills"] } });
+        };
+        if (!supplying && !billingBy) return [...steps, ...tell()];
         // ---- customers: who asked to be supplied; those gone (died, left) or who asked to stop, no longer ----
         for (const r of book.open("supply_request").filter((x) => (x.addressed_to ?? []).includes(me) && !customers.has(x.speaks_for!) && !ended.has(x.id))) {
           ended.add(r.id);
@@ -248,12 +262,22 @@ export const energy: BehaviourModule = {
         if (supply > 0) {
           owed -= supply;
           steps.push(because(`Supplying the ${supply} units our ${customers.size} customers used.`, C.call("work", { task: p.task, units: C.text(String(supply)), at: p.depot })));
+          routines.did(p.task, t, { units: supply });
         }
         // (Below a fortnight's use, with what's on order: a month's from the grid.)
         const fortnight = customers.size * p.units_per_customer_per_day * 14;
         const grid = goodsPrices(book, p.grid);
         const unit = grid.prices[p.kind];
-        if (supplying && acc && unit !== undefined && grid.account && held - supply + onOrder < fortnight + owed) {
+        // (For the staff's report: what is held, and why nothing was bought when it ran below a fortnight's use.)
+        const low = !!supplying && held - supply + onOrder < fortnight + owed;
+        if (supplying) {
+          const q = Math.max(1, customers.size * p.units_per_customer_per_day * 30 + owed);
+          const holds = `${held - supply} ${p.kind} held${onOrder ? ` and ${onOrder} on order` : ""}`;
+          if (owed - supply > 0 && held - supply <= 0) routines.heldUp(p.task, `nothing is held to supply from: ${owed - supply} units used by customers are still to be supplied`);
+          routines.note(p.task, !low ? holds : unit === undefined || !grid.account ? `${holds}, below a fortnight's use (${fortnight}); the grid's price list is not on file, so nothing was ordered`
+            : acc && acc.balance < q * unit ? `${holds}, below a fortnight's use (${fortnight}); a month's from the grid (${q} at ${usd(unit)} each) comes to ${usd(q * unit)} and the account holds ${usd(acc.balance)}, so nothing was ordered: a smaller order is the office's to place on its order form` : `${holds}; a month's (${q}) ordered from the grid`);
+        }
+        if (supplying && acc && unit !== undefined && grid.account && low) {
           const q = Math.max(1, customers.size * p.units_per_customer_per_day * 30 + owed);
           if (acc.balance >= q * unit) {
             onOrder += q;
@@ -275,10 +299,13 @@ export const energy: BehaviourModule = {
             if (days === 0 || gone.has(who) && book.all("death_registration").some((r) => r.data?.deceased === who)) continue;
             const units = p.units_per_customer_per_day * days;
             const amount = days * p.supply_per_day + units * p.price_per_unit;
+            routines.did("bill", t);
             steps.push(because(`${who}'s energy bill: ${days} days' supply and ${units} units.`,
               say("invoice", `Energy bill: ${usd(amount)} (${days} days' supply at ${usd(p.supply_per_day)}; ${units} units at ${usd(p.price_per_unit)}).`, { to: [who], visible: [who, me],
                 data: { outcome: { money: { to: acc.account, amount: String(amount) } }, service: "energy", days, units } })));
         }
+        if (billingBy) routines.note("bill", `the next bills go out on ${dated(nextBill)}`);
+        steps.push(...tell());
         return steps;
       },
     );

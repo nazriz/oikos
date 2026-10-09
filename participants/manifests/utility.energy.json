@@ -1,6 +1,6 @@
 {
   "name": "utility.energy",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "doc": "docs/behaviour/utilities.md",
   "params": {
     "bill_every_days": {
@@ -77,6 +77,79 @@
   },
   "perceives": [],
   "state": "none",
+  "issues": [
+    {
+      "form": "order",
+      "title": "An order to a supplier, paid with the order",
+      "does": "How the office buys from a supplier, the outside world's market among them: it places the order at the seller's listed price. The form pays nothing by itself: pay the whole sum into the account the seller's price list names, at the same sitting. The seller delivers once an order is paid in full, sends back money that comes with no order waiting for it, and declines an order unpaid after a week.",
+      "fields": {
+        "seller": {
+          "type": "entity",
+          "required": true,
+          "description": "Whom it is ordered from."
+        },
+        "kind": {
+          "type": "text",
+          "required": true,
+          "description": "What is ordered."
+        },
+        "quantity": {
+          "type": "count",
+          "required": true,
+          "description": "How many."
+        },
+        "unit_price": {
+          "type": "amount",
+          "required": true,
+          "description": "The price of each, as the seller advertises it."
+        },
+        "deliver_to": {
+          "type": "entity",
+          "required": true,
+          "description": "Who is to receive them."
+        },
+        "at": {
+          "type": "structure",
+          "required": true,
+          "description": "Where they are to be delivered."
+        },
+        "account": {
+          "type": "account",
+          "required": true,
+          "description": "The account the order is paid from."
+        },
+        "retry_of": {
+          "type": "record",
+          "description": "An earlier order this one repeats."
+        },
+        "for_days": {
+          "type": "count",
+          "description": "How many days the order may be served over."
+        }
+      },
+      "writes": {
+        "kind": "order",
+        "text": "Order: {quantity} {kind} at {unit_price} each, delivered to {deliver_to} at {at}. Paid with this order.",
+        "to": [
+          "=seller"
+        ],
+        "visible": [
+          "=self",
+          "=seller"
+        ],
+        "data": {
+          "kind": "=kind",
+          "quantity": "=quantity",
+          "unit_price": "#unit_price",
+          "deliver_to": "=deliver_to",
+          "at": "=at",
+          "account": "=account",
+          "retry_of": "=retry_of",
+          "for_days": "=for_days"
+        }
+      }
+    }
+  ],
   "routines": [
     {
       "task": "supply_energy",

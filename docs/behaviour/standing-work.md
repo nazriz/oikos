@@ -99,8 +99,10 @@ identical."
 collections and their reasons against its schedule; a manager's exception report says what was not done and why.
 **(to confirm: common practice; no source opened.)**
 
-**Built for the works office.** The other staff parts (clinic, school, the utilities, the rates office) keep no count
-yet: see "Leaves out".
+**Built for** the works crew and the energy retailer's staff (who also say what is held, and why nothing was bought
+when it ran below a fortnight's use: "a month's from the grid comes to ... and the account holds ..., so nothing was
+ordered: a smaller order is the office's to place on its order form"). The other staff parts (clinic, school, water,
+the rates office) keep no count yet.
 
 ## The routines that exist
 
@@ -133,7 +135,22 @@ code as the seat part; what the staff posts did is the count in the last column)
 | `builder-foreman` | not yet | | Its site work is the same shape (a routine "build what is begun, each working day") and was not converted: taking a contract on, buying materials, beginning a building and invoicing are the foreman's acts, about five a job, and need a careful split of the module's one plan |
 | `fund-trustee` | not yet (and off unless a town asks for a fund) | | Its pension run is one bulk instruction a month: the same pattern as `bill` (a routine "pay_pensions"), not converted |
 | `bank-payments` | no | | It is the payment system: every payment in town is its routine. A seat there would set one order and could do nothing useful but stop it. Machinery, not an office |
-| shops and factories (probes) | as before | | Serving and making are hand-work of the same shape; not converted |
+| shops and factories | **cannot be seats yet** (2026-10-09) | In the first trade pilot a shop seat and a factory seat sat for 30 days and nothing was sold or made | See "Shops and factories" below |
+
+**Shops and factories: not seats yet, and why (2026-10-09).** Their code does by hand, many times a day, what no
+seat can: a shop takes each paid order, has those of its staff who are in at that moment serve it (`work`, naming
+them), moves the goods to the customer's home, writes a delivery note and refunds what it could not serve within
+three days; a factory, each working day, has those in at that moment make what the inputs and its stock band allow.
+A seat sits about weekly, before its staff arrive (its premises read "0 people"), and makes eight acts an answer. Two
+more things are missing for a shop: its prices are a price list with an offer and the account to pay, which no form
+of fields writes, and nobody can order from a shop with no price list; and what customers wanted is counted by the
+code as it serves, so a seat would not know its demand. Neither seat was told any of this: no paper on their files
+says how the office's work gets done. What it takes: `serve`, `make` and the filling of wholesale orders as routines
+of a staff post (the same plumbing as the works crew, with the module's one plan split in three: what the staff do,
+what they report of demand and stock, what the manager decides from the report); a price list form; and the staff's
+report. That is a redesign of two modules, not a patch, and it was not half-done: a shop or factory named in
+`model_seats` still generates (the mock in the seat runs the whole office by hand, which is how the forms are
+exercised), and a model put there will repeat the first trade pilot.
 
 **The bulk act.** The wave's second gap was that an office that bills or notifies everyone makes hundreds of acts an
 instalment. No bulk act was built. It fell out of this one: billing is the billing clerks' routine, set going by a
