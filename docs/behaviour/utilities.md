@@ -40,6 +40,11 @@ bill follows who was in it, hour by hour (the meter), not who was there at one l
 **Leaves out:** a meter reader is nobody's working day (the corporation has no staff in the world: its draw of water
 takes none either); estimated readings; the tenant as the customer.
 
+**Under a standing order** (a model in the office: docs/behaviour/standing-work.md) the billing staff count the round
+from the order: the first bills go out one period after it came into force, the meter round begins `read_days`
+before that, and their report to the office says both dates ("the meters are read from year 1, day 41 and the next
+bills go out on year 1, day 62").
+
 ## The energy retailer
 
 | | Rule | Source |
@@ -47,6 +52,19 @@ takes none either); estimated readings; the tenant as the customer.
 | **Customers** | A household that holds a home and lives there asks to be supplied (`supply_request`). It stops being a customer when it leaves, dies, or asks to stop (`supply_end`), with a last bill. | — |
 | **Supply** | Each day the network supplies its customers' use (`units_per_customer_per_day`, 11 kWh) from what it holds: work that uses a kWh and emits the grid's 780 g of CO2e. Below a fortnight's use (with what's on order), it buys a month's from the grid (the outside's market). | AER / ESC average Victorian household (to confirm); NGA Factors 2024, Victoria scope 2 (to confirm) |
 | **Bills** | Monthly, to each customer: the supply charge ($1.10 a day) and their use (30 cents a kWh). | The Victorian Default Offer 2025–26 (to confirm) |
+
+**Buying from the grid (2026-10-09).** The retailer's order to the grid is a paper of kind `order` addressed to the
+outside's market, paid in full into the account the market's price list names; the market delivers when it is paid
+and sends back money that comes with no order waiting for it. Run by code, or by its staff under a supply order, the
+office buys a month's use when what it holds and has on order is below a fortnight's, if its account can pay for the
+whole month; if it cannot, it buys nothing. Where a model holds the office it has the order form among its
+stationery, which says how buying is done, and its staff's weekly report says what is held and why nothing was
+bought ("a month's from the grid (125400 at ... each) comes to ... and the account holds ..., so nothing was
+ordered: a smaller order is the office's to place on its order form"). In the first utilities pilot the office had
+no form: the seat's payments were sent back three times and the town's supply ran out for three weeks
+(docs/decisions.md, 2026-10-09, "An office that buys from outside can place the order"). **Left as it is:** staff
+that buy a whole month or nothing (under a dear grid the account cannot pay for a month before the first bills come
+in, with code in the office as well); a seat is not shown the words that come with a payment sent back.
 
 ## Households
 

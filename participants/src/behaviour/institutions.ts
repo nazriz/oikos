@@ -301,7 +301,7 @@ export const inspector: BehaviourModule = {
 export const builder: BehaviourModule = {
   name: "firm.builder",
   answers: {"office": "the builder's office", "acts": "What it acts on: a construction agreement signed with it, built once a permit for the site is in force and invoiced as agreed. Its prices are published.", "report": true},
-  issues: [P.JOB_ADVERTISEMENT],
+  issues: [P.JOB_ADVERTISEMENT, P.ORDER],
   issuesWith: (p) => P.staffingOwn({ role: "construction worker", industry: p.industry, workplace: p.workplace, notice_days: p.notice_days ?? 14 }),
   version: "0.12.3", // 0.12.3: takes on the share of its hands the world gives by the day, and pays them for the days there is building to do; 0.12.2: registers the share of its jobs the world gives for its kind; 0.12.1: with what 0.11.2 changed; 0.12.0: goes to a lot before building on it, sees its sites as its crew works on them, and gives notice of building work; no longer shown the town
   doc: "docs/behaviour/institutions.md",

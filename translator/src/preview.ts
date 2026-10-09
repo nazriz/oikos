@@ -196,7 +196,7 @@ export class Preview {
           return [`You will put a${/^[aeiou]/.test(kind) ? "n" : ""} ${kind} on ${this.k.entityOf(b.visible_to[0]) === this.me ? "your own file" : `the file of ${this.who(b.visible_to[0])}`}, seen by nobody else: "${b.text}"${d ? `, with these details: ${d}` : ""}${citing(b)}. It moves nothing and tells nobody.${this.rule(b)}`,
             ["kind", "text", "data", "adico", "formal", ...RECORD]];
         }
-        return [`You will ${b.place ? "put up" : "publish"} a ${String(b.kind).replace(/_/g, " ")}${b.place ? ` on ${b.place}` : ""}${named(b)}${to}${this.seenBy(b.visible_to)}: "${b.text}"${d ? `, with these details: ${d}` : ""}${citing(b)}.${this.rule(b)}`,
+        return [`You will ${b.place ? "put up" : "publish"} a${/^[aeiou]/i.test(String(b.kind)) ? "n" : ""} ${String(b.kind).replace(/_/g, " ")}${b.place ? ` on ${b.place}` : ""}${named(b)}${to}${this.seenBy(b.visible_to)}: "${b.text}"${d ? `, with these details: ${d}` : ""}${citing(b)}.${this.rule(b)}`,
           ["kind", "text", "data", "place", "addressed_to", "adico", "formal", ...RECORD]];
       }
       case "propose_agreement": {
@@ -214,7 +214,7 @@ export class Preview {
           place = ad ? ` It names no place of work: it is made on the job advertisement ${ad.advertisement}, so the work is where that advertisement says${ad.space ? ` (${ad.space})` : ""}.`
             : " It names no place of work and cites no job advertisement that does: whoever signs it is paid and has nowhere to come to work. Cite the advertisement or the application it answers, or say where they are to work.";
         }
-        return [`You will offer ${others.join(" and ") || "the parties"} ${t.template ? `a ${t.template} agreement` : "an agreement"}${named(b)}${t.term ? ` for ${span(t.term)}` : ""}${t.then === "periodic" ? ", continuing afterwards from one period to the next until someone ends it by notice" : ""}${this.seenBy(b.visible_to)}: ${commits || "(no commitments)"}${notices ? `; ${notices}` : ""}${t.text ? `. Its terms: "${t.text}"` : ""}${citing(b, ". It cites ")}${signs}. Its parties: ${t.parties.map((p: string) => this.who(p)).join(", ")}.${place}${this.also(t, ["template", "parties", "commitments", "term", "termination", "text", ...(t.then === "periodic" ? ["then"] : [])])}`,
+        return [`You will offer ${others.join(" and ") || "the parties"} ${t.template ? `a${/^[aeiou]/i.test(String(t.template)) ? "n" : ""} ${t.template} agreement` : "an agreement"}${named(b)}${t.term ? ` for ${span(t.term)}` : ""}${t.then === "periodic" ? ", continuing afterwards from one period to the next until someone ends it by notice" : ""}${this.seenBy(b.visible_to)}: ${commits || "(no commitments)"}${notices ? `; ${notices}` : ""}${t.text ? `. Its terms: "${t.text}"` : ""}${citing(b, ". It cites ")}${signs}. Its parties: ${t.parties.map((p: string) => this.who(p)).join(", ")}.${place}${this.also(t, ["template", "parties", "commitments", "term", "termination", "text", ...(t.then === "periodic" ? ["then"] : [])])}`,
           ["terms", ...RECORD]];
       }
       case "sign_agreement":

@@ -124,6 +124,25 @@ code did, said as a seat says it). "Existing act" is a call the language had alr
 | union organiser | `wage_claim`, `offer_accepted`, `action_ballot`, `industrial_action`, `stop_work`, `return_to_work` | membership agreements | `membership_offer` (published once); its ballot's result (nobody reads its content) |
 | shop and factory managers | `job_advertisement`, `order`, `delivery_note`, `wage_offer`, `export_invoice`, `crime_report` | serving and making (`work`), moving goods, payments, employment | **the price list** (a table of prices by kind, with an offer); the dividend (as landlords); `loan_application` (the lender's form: not made); setting up a new shop |
 
+| energy operations | `order` (2026-10-09: an order to the grid; the form says the sum is paid with it, by a payment) | the payment; standing work orders | its bills are its staff's routine |
+| builder's foreman | `job_advertisement`, `order` | | not a seat yet (docs/behaviour/standing-work.md) |
+
+**Who buys from outside, and whether a seat there can** (2026-10-09). An order is one paper everywhere (`order`:
+what, how many, the seller's listed price, who receives it and where, the account it is paid from), paid in full into
+the account the seller's price list names; the seller delivers when it is paid, and sends back money that comes with
+no order. The form says so, and so does the world market when written to.
+
+| Office | Buys | A seat there |
+|---|---|---|
+| energy operations | energy from the grid (the outside's market) | **can**: its staff buy a month's under the supply order when stock is low and the account can pay; the seat orders on the office's own `order` form and pays (it had no form until 2026-10-09) |
+| shop manager | goods from factories or the outside's market | has the `order` form; **not a seat yet** for other reasons |
+| factory manager | inputs from the outside's market; sells to it on `export_invoice` | has both forms; **not a seat yet** |
+| builder's foreman | materials from the outside's market | has the `order` form now; **not a seat yet** |
+| works | nothing bought; its waste goes to the landfill with a `disposal_docket`, which the landfill invoices and the finance office pays | **can** (the crew takes the week's load under the `collect` order; the docket form is the seat's) |
+| water operations | nothing: water is drawn from the river (`draw_water`) | nothing to order |
+| clinic, school, police, the town's other offices | nothing | nothing to order |
+| someone working for themself | goods from the outside's market | not an office |
+
 Not made, and why: a builder's invoice and price list, the utilities' bills, the rates notice, the fund's pension run
 (offices the wave does not seat; the bills are the bulk gap, docs/behaviour/standing-work.md).
 

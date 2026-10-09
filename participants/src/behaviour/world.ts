@@ -55,7 +55,7 @@ export const exportDemand: BehaviourModule = {
  */
 export const trade: BehaviourModule = {
   name: "world.trade",
-  answers: {"office": "the world market's office", "acts": "What it acts on: an order for what it lists, paid for at its published prices."},
+  answers: {"office": "the world market's office", "acts": "What it acts on: an order for what it lists, at its published prices: a paper on the buyer's own order form, addressed to it, with the whole sum paid into the account its price list names. It delivers when an order is paid in full, sends back money that comes with no order waiting for it, and declines an order unpaid after a week."},
   boundary: [
     { what: "future", why: "A researcher's scripted shocks to world prices and demand are a scenario's boundary condition: this module is the world market and applies each from its day, publishing nothing of one before it comes." },
     { what: "every:factory", why: "The outside world's demand for the town's goods is a boundary condition, split when the world is made among the factories that export." },

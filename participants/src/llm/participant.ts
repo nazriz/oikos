@@ -340,8 +340,13 @@ const TO_MAX = 64;
 /** Whether something is written as an id (the contracts' forms: one a world gives, one made in the run, a cell of
  * ground, a room of a building): only that can be a letter's reference or whom it goes to. */
 export const isId = (s: string) => /^([a-z][a-z0-9_-]{0,63}|(ent|acc|str|rec|act|msg|par|pos|cnd)\.[0-9]{1,15}|cell\.[0-9]{1,6}\.[0-9]{1,6}|([a-z][a-z0-9_-]{0,63}|str\.[0-9]{1,15})\/[a-z][a-z0-9_-]{0,63}\.[0-9]{1,6})$/.test(s);
-/** An id as written, without the brackets a report shows it in. */
-const bare = (s: string) => s.trim().replace(/^\[(.*)\]$/, "$1").trim();
+/** An id as written: without the square brackets a report shows it in, and out of the form a report names someone
+ * in, "Name (id)" (a seat is shown "Town of Millbrook (city)", and wrote to exactly that: 2026-10-09). */
+const bare = (s: string) => {
+  const t = s.trim().replace(/^\[(.*)\]$/, "$1").trim();
+  const named = /\(\s*\[?([^()\[\]\s]+)\]?\s*\)$/.exec(t);
+  return named && !isId(t) && isId(named[1]!) ? named[1]! : t;
+};
 /** The look that follows one for a kind of paper that found nothing: the folder's latest, looked through for kinds like it. */
 type Follow = { said: string; action: ParticipantAction; looked: [string, Looked] };
 const text = (x: unknown): x is string => typeof x === "string" && x.length > 0;
@@ -626,7 +631,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
 
   /** What a tool use asks for, as an action; or, if it can't be done as written, what it was and why not, in words. */
   const read = (use: Use, held: Set<string>): { what: string } & ({ action: ParticipantAction; label?: string; looked?: [string, Looked]; kindSaid?: Follow; clipped?: string; subject?: string } | { why: string }) => {
-    const i = use.input;
+    let i = use.input;
     const what = use.name === "do" ? (text(i?.what) ? `what you asked for (${quote(i.what)})` : "something you asked for")
       : use.name === "confirm" ? (text(i?.ref) ? `your answer on ${i.ref}` : "your answer on something waiting for you to confirm")
       : use.name === "write" ? (text(i?.text) ? `your letter (${quote(i.text)})` : "a letter of yours")
@@ -659,7 +664,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
       // Whom it goes to, each by id (written in brackets or not). Nothing that can't be delivered is sent on and lost.
       const to: string[] = [...new Set((i.to as string[]).map(bare))];
       const strangers = to.filter((x) => !isId(x));
-      if (strangers.length) return no(`${strangers.map((x) => quote(x, 60)).join(" and ")} ${strangers.length === 1 ? "isn't an id" : "aren't ids"}: a letter goes to people and organisations by the ids your reports give them (to find one, look them up in who's who)`);
+      if (strangers.length) return no(`${strangers.map((x) => quote(x, 60)).join(" and ")} ${strangers.length === 1 ? "isn't an id" : "aren't ids"}: a letter goes to people and organisations by the ids your reports give them, the word in brackets after a name, as in "Name (id)" (to find one, look them up in who's who)`);
       if (to.length > TO_MAX) return no(`a letter goes to at most ${TO_MAX} at once, and this named ${to.length}`);
       if (i.about !== undefined && i.about !== null && typeof i.about !== "string") return no("what it's about couldn't be read");
       // What it is about: one id is the letter's reference; anything else heads the letter as its subject line, and
@@ -678,6 +683,21 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
       const kind = reports.get(i.report);
       if (!kind) return no("that isn't one of the reports you can look at");
       const limit = Number.isInteger(i.limit) ? Math.min(LOOK_MAX, Math.max(1, i.limit)) : 20;
+      // Words to find in papers, or what they are about, written as one of the things to find (find: field "words"):
+      // taken as the look's own `words` and `about`, which is where a look takes them. (A seat asked so twice and was
+      // told '"words" isn't something papers can be found by': 2026-10-09.)
+      if (i && typeof i === "object" && !Array.isArray(i)) {
+        const given: unknown[] = Array.isArray(i.find) ? i.find : i.find === undefined || i.find === null ? [] : [i.find];
+        const taken: { words?: string; about?: string } = {};
+        const kept = given.filter((w: any) => {
+          const field = typeof w?.field === "string" ? w.field.trim().toLowerCase() : "";
+          const as = field === "words" || field === "text" ? "words" : field === "about" ? "about" : undefined;
+          if (!as || !text(w.value) || (w.op !== undefined && w.op !== "=" && w.op !== "contains") || text(i[as]) || taken[as] !== undefined) return true;
+          taken[as] = w.value;
+          return false;
+        });
+        if (kept.length !== given.length) i = { ...i, ...taken, find: kept };
+      }
       const finds: unknown[] = Array.isArray(i.find) ? i.find : i.find === undefined || i.find === null ? [] : [i.find];
       const names: string[] | undefined = i.named === undefined || i.named === null ? [] : text(i.named) ? [i.named] : Array.isArray(i.named) && i.named.every(text) ? i.named : undefined;
       if (!names) return no("the names of what to look at couldn't be read");
@@ -726,7 +746,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
       // One paper, by its id, read in full (a long one a part at a time): named in `paper`, or as the one thing named,
       // or as the only thing to find.
       const byId = where.length === 1 && where[0]!.field === "id" && where[0]!.op === "=" && typeof where[0]!.value === "string" ? where[0]!.value : undefined;
-      const paper: string | undefined = text(i.paper) ? i.paper.trim() : names.length === 1 ? names[0]!.trim() : byId;
+      const paper: string | undefined = text(i.paper) ? bare(i.paper) : names.length === 1 ? bare(names[0]!) : byId;
       if (paper !== undefined && !byId) {
         if (where.length || kinds.length || text(i.about)) return no("to read one paper in full, give only its id (and, for a long one, the entry to start from or the words to find in it)");
         where.push({ field: "id", op: "=", value: paper });

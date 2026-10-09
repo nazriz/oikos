@@ -44,7 +44,7 @@ export function scriptedSeats(seats: { [office: string]: Sitting[] }) {
   const use = (name: string, input: object) => ({ type: "tool_use" as const, id: `t${++n}`, name, input });
   const programs = new Map<string, string>();
   const state = new Map<string, Me & { seen: Seen; todo: Sitting[]; asked?: number }>();
-  const shown: { seat: string; day: number; text: string }[] = [];
+  const shown: { seat: string; day: number; text: string; system: string }[] = [];
   const previews: { seat: string; day: number; id: string; text: string }[] = [];
   const adapter = new MockAdapter("mock", {
     participant: (req: LlmRequest) => {
@@ -54,7 +54,7 @@ export function scriptedSeats(seats: { [office: string]: Sitting[] }) {
       const obs = req.context.observation;
       for (const o of [...(req.context.missed ?? []), obs]) for (const ch of Object.values(o.channels ?? {}) as any[]) for (const r of ch.records ?? []) st.seen.set(r.id, r);
       const day = Math.floor(obs.t / DAY);
-      if (req.messages.length === 1) shown.push({ seat: office, day, text: lastText(req) });
+      if (req.messages.length === 1) shown.push({ seat: office, day, text: lastText(req), system: req.system });
       const drafts = (obs.drafts ?? []) as { id: string; summary: string }[];
       if (drafts.length) {
         for (const d of drafts) previews.push({ seat: office, day, id: d.id, text: d.summary });

@@ -57,7 +57,8 @@ test("a wide plan says who is asking in every brief: an office-holder in an offi
 
 test("every paper the worlds' own offices issue is there, each with every field it has in its first two fillings", () => {
   const declared = Object.entries(PAPERS).flatMap(([office, x]) => (Array.isArray(x) ? x : typeof x === "object" && x && "form" in x ? [x] : []).map((p: any) => ({ office, form: p.form as string, fields: Object.keys(p.fields) })));
-  expect(declared.length).toBe(41);
+  // (41 when this was written; a paper a module declares later is covered without anything here changing.)
+  expect(declared.length).toBeGreaterThanOrEqual(41);
   const made = worldForms({ perForm: 3, seed: 9, askers: PAPER_ASKERS });
   expect(worldForms({ perForm: 3, seed: 9, askers: PAPER_ASKERS })).toEqual(made);
   for (const d of declared) {

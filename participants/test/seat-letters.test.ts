@@ -71,7 +71,7 @@ test("what could not go is told at once, in the seat's terms, and nothing else i
   expect(await p.step(obs(9 * HOUR), ctx)).toEqual({ type: "sign", draft: "draft.mayor-system.1", decision: "reject", note: long.slice(0, TEXT_MAX) });
   await p.step(obs(9 * HOUR), ctx);
   const r = resultsOf(calls[1]!);
-  expect(r.a).toBe(`Not done: "Council Clerk" isn't an id: a letter goes to people and organisations by the ids your reports give them (to find one, look them up in who's who).`);
+  expect(r.a).toBe(`Not done: "Council Clerk" isn't an id: a letter goes to people and organisations by the ids your reports give them, the word in brackets after a name, as in "Name (id)" (to find one, look them up in who's who).`);
   expect(r.b).toBe("Not done: the letter ran to 20,000 characters, and a letter can be at most 16,384.");
   expect(r.e).toBe("Not done: it ran to 20,000 characters, and what you ask for can be at most 16,384.");
   expect(notes.filter((n) => n.malformed_tool_use).length).toBe(3);
@@ -127,4 +127,46 @@ test("a request that came to nothing is put to the seat at once, in the same sit
   await p.step(obs(2 * 86_400 + 9 * HOUR), ctx);
   expect(calls.length).toBe(3);
   expect(calls[2]!.messages[0]!.content as string).toStartWith(`Your notebook: (empty)\n\nWhen you were last here, after you had finished: about what you asked for ("File the budget proposal."): nothing was filed or done.`);
+});
+
+// Wave 2a (2026-10-09): a seat at low effort wrote to "Town of Millbrook (city)", exactly as its reports name the
+// town, and to "Millbrook Savings Bank"; and asked a look for papers by a field called "words". Someone named as a
+// report names them, "Name (id)", is that id. A name alone is still no id, and the sentence says where the id is.
+// Words to find, given among the things to find, are the look's own words.
+test("a letter to someone named as a report names them, Name (id), goes to that id; a name alone is told where the id is", async () => {
+  const { p, calls } = harness([[
+    use("a", "write", { to: ["Town of Millbrook (city)"], text: "The claims belong with finance.", as: "mayor" }),
+    use("b", "write", { to: ["Millbrook Savings Bank (bank)", "Finance officer ([finance])"], text: "Noted.", as: "mayor", about: "Standing instruction (rec.44)" }),
+    use("c", "write", { to: ["Millbrook Savings Bank"], text: "Which instructions stand?", as: "mayor" }),
+    use("d", "write", { to: ["the works (depot, probably)"], text: "Hello.", as: "mayor" }),
+  ]]);
+  expect(await p.step(obs(9 * HOUR), ctx)).toEqual({ type: "message", to: ["city"], as: "mayor", text: "The claims belong with finance." });
+  expect(await p.step(sent(9 * HOUR), ctx)).toEqual({ type: "message", to: ["bank", "finance"], as: "mayor", text: "Noted.", re: "rec.44" });
+  await p.step(sent(9 * HOUR), ctx);
+  const r = resultsOf(calls[1]!);
+  expect(r.c).toBe(`Not done: "Millbrook Savings Bank" isn't an id: a letter goes to people and organisations by the ids your reports give them, the word in brackets after a name, as in "Name (id)" (to find one, look them up in who's who).`);
+  // (Brackets that hold no id are not one.)
+  expect(r.d).toContain(`"the works (depot, probably)" isn't an id`);
+});
+
+test("words to find, written as one of the things to find, are the look's own words; what papers cannot be found by is still said", async () => {
+  const papers = { "mayor/files": { kind: "records", records: [], search: true } };
+  const { p, calls } = harness([[
+    use("a", "look", { report: "mayor/files", find: [{ field: "words", value: "unpaid wages" }] }),
+    use("b", "look", { report: "mayor/files", find: [{ field: "kind", value: "claim" }, { field: "about", value: "c0018" }] }),
+    use("c", "look", { report: "mayor/files", find: [{ field: "colour", value: "red" }] }),
+  ]], { titles: new Map([["mayor/files", "The town's files"]]), kinds: new Map([["mayor/files", "records"]]), onRequest: ["mayor/files"] } as any);
+  const first = (await p.step(obs(9 * HOUR, { channels: papers }), ctx)) as any;
+  // The first look is a look into the files (as many as one search gives, looked through for the words), not a refusal.
+  expect(first.type).toBe("look");
+  expect(first.looks[0].channel).toBe("mayor/files");
+  expect(JSON.stringify(first.looks[0].query?.where ?? [])).not.toContain("words");
+  const second = (await p.step(obs(9 * HOUR, { channels: papers }), ctx)) as any;
+  expect(second.type).toBe("look");
+  expect(JSON.stringify(second.looks[0].query.where)).not.toContain("about");
+  // A field papers cannot be found by is said as it was.
+  const other = harness([[use("c", "look", { report: "mayor/files", find: [{ field: "colour", value: "red" }] }), use("d", "write", { to: ["bank"], text: "Hello.", as: "mayor" })]], { titles: new Map([["mayor/files", "The town's files"]]), kinds: new Map([["mayor/files", "records"]]), onRequest: ["mayor/files"] } as any);
+  await other.p.step(obs(9 * HOUR, { channels: papers }), ctx);
+  await other.p.step(sent(9 * HOUR), ctx);
+  expect(resultsOf(other.calls[1]!).c).toBe(`Not done: "colour" isn't something papers can be found by.`);
 });
