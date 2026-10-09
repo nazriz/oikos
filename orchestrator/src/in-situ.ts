@@ -152,6 +152,14 @@ export interface LogSituations {
 }
 
 /**
+ * Whether a line of a log is read as JSON here: annotations, the header, the acts a translator made, and how acts end
+ * (the corpus joins an act to its end by the action's id, which the start of the action names).
+ */
+export const needsCorpus = (line: string): boolean =>
+  line.includes('"annotation"') || line.includes('"kind":"header"') || line.includes('"via":"translator"') ||
+  line.includes('"action_refused"') || line.includes('"action_started"') || line.includes('"action_applied"');
+
+/**
  * The situations in one log: every model call to a seat (the mock's are left out: it is asked nothing a writer could
  * be), in order. `run`: the run's name (default: its folder, `runName`); `tests`: the test cases (default: the real
  * ones). The log is read once, a line at a time.
@@ -187,7 +195,7 @@ export async function situationsOf(logPath: string, o: { run?: string; tests?: T
   for await (const line of logLines(logPath)) {
     if (!line) continue;
     // (A log is mostly the world's own entries: only annotations and the header are read as JSON here.)
-    if (!line.includes('"annotation"') && !line.includes('"kind":"header"') && !line.includes('"via":"translator"') && !line.includes('"action_refused"')) continue;
+    if (!needsCorpus(line)) continue;
     const e = JSON.parse(line);
     const b = e.body ?? {};
     if (e.kind === "header") {
