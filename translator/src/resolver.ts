@@ -342,6 +342,10 @@ class Resolver {
     const cells = survey ? this.ids(c, "cells") : undefined;
     if (survey && !cells?.length) throw new Ask("Survey which cells?");
     const units = this.quantity(c, "units") ?? (cells ? String(cells.length) : undefined);
+    // Neither how much nor how often, of a routine whose rhythm the office's own procedure states: a standing order
+    // that follows it (a rates office asked for its levy "at each instalment the rating law sets" and was asked
+    // "once or as a routine?": wave 2b). The preview says which rhythm, and from which paper.
+    if ((!units || units === "0") && !survey && !this.has(c, "investigate") && (this.k.routine(task)?.every || this.k.routine(task)?.schedule)) return this.standingWork(c, task, bind);
     if (!units || units === "0") throw new Ask(ONCE_OR_ROUTINE);
     const at = this.need(c, "at", "Where?");
     const by = this.has(c, "by") ? (this.ids(c, "by") ?? [this.id(c, "by")!]).map((p) => this.k.entityOf(p)) : [];
@@ -367,8 +371,30 @@ class Resolver {
   private standingWork(c: Call, task: string, bind?: string): Block[] {
     if (this.has(c, "survey") || this.has(c, "investigate")) throw new Ask("A survey or an investigation is asked for each time, with what it is of: it can't be a standing order.");
     const at = this.need(c, "at", "Where?");
-    const every = this.seconds(c, "every")!;
-    if (every <= 0) throw new Ask("How often?");
+    // How often: a length of time; or, of a routine whose time a published paper sets, that paper named ("as
+    // law-rates sets"); or nothing, and the order follows the rhythm the office's own procedure states for the task.
+    const routine = this.k.routine(task);
+    const said = this.str(c, "every");
+    let every: number | undefined;
+    let schedule: string | undefined;
+    if (said === undefined) {
+      if (routine?.schedule) schedule = routine.schedule;
+      else if (routine?.every) every = routine.every;
+      else throw new Ask("How often?");
+    } else {
+      try {
+        every = calls.parseDuration(said);
+      } catch (e) {
+        if (!(e instanceof calls.UnitError)) throw e;
+        const named = routine?.schedule !== undefined && said.toLowerCase().split(/[^a-z0-9_.-]+/).map((w) => w.replace(/\.+$/, "")).includes(routine.schedule);
+        if (named) schedule = routine!.schedule;
+        else if (routine?.schedule) throw new Ask(`"${said}" could not be read as how often. By your office's procedure (${routine.procedure}) the staff do ${task} when ${routine.schedule} sets: say "as ${routine.schedule} sets", or leave how often out and the order follows it.`);
+        else if (routine?.every) throw new Ask(`"${said}" could not be read as how often. Say it as a length of time ("every 7 days", "each working day"), or leave it out: by your office's procedure (${routine.procedure}) the staff do ${task} every ${durationWords(routine.every)}, and an order that does not say how often follows that.`);
+        else throw new calls.UnitError(`not how often: ${said}`);
+      }
+    }
+    if (every !== undefined && every <= 0) throw new Ask("How often?");
+    const rhythm = schedule !== undefined ? `as ${schedule} sets` : `every ${durationWords(every!)}`;
     const first = this.when(c, "first");
     const until = this.when(c, "until");
     // (An end given as a date is the end of that day; as a length of time, so long from now.)
@@ -377,9 +403,9 @@ class Resolver {
     const on = this.has(c, "on") ? [...new Set(this.ids(c, "on")!)] : undefined;
     const units = this.quantity(c, "units");
     const me = this.id(c, "for") ?? this.me;
-    const text = `Standing work order: ${task} at ${at}${on ? `, on ${on.join(", ")}` : ""}${by ? `, by ${by.join(", ")}` : ""}${units ? `, ${units} each time` : ""}, every ${durationWords(every)}${first === undefined ? "" : "at" in first ? `, the first on ${forms.dateWords(first.at)}` : `, the first in ${durationWords(first.in)}`}${until === undefined ? "" : "at" in until ? `, until the end of ${forms.dateWords(until.at)}` : `, for ${durationWords(until.in)}`}.`;
+    const text = `Standing work order: ${task} at ${at}${on ? `, on ${on.join(", ")}` : ""}${by ? `, by ${by.join(", ")}` : ""}${units ? `, ${units} each time` : ""}, ${rhythm}${first === undefined ? "" : "at" in first ? `, the first on ${forms.dateWords(first.at)}` : `, the first in ${durationWords(first.in)}`}${until === undefined ? "" : "at" in until ? `, until the end of ${forms.dateWords(until.at)}` : `, for ${durationWords(until.in)}`}.`;
     return [{ block: "publish", kind: "work_order", text, speaks_for: me, addressed_to: [me], visible_to: [...new Set([me, ...(by ?? [])])],
-      data: { work: { task, at, ...(on ? { on } : {}), ...(by ? { by } : {}), ...(units ? { units: Number(units) } : {}) }, every, ...(first === undefined ? {} : "at" in first ? { first_at: first.at } : { first: first.in }), ...(ends !== undefined ? { until: ends } : {}) },
+      data: { work: { task, at, ...(on ? { on } : {}), ...(by ? { by } : {}), ...(units ? { units: Number(units) } : {}) }, ...(schedule !== undefined ? { schedule } : { every }), ...(said === undefined ? { by_procedure: routine!.procedure } : {}), ...(first === undefined ? {} : "at" in first ? { first_at: first.at } : { first: first.in }), ...(ends !== undefined ? { until: ends } : {}) },
       ...(bind ? { ref: bind } : {}) }];
   }
 

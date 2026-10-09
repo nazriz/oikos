@@ -1919,13 +1919,22 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     const routines = modules[impl]?.routines ?? [];
     if (routines.length) {
       const own = params ?? {};
+      // Each routine's published rhythm, where its office's practice has one: how often, or the paper that sets when.
+      // A standing work order that does not say how often follows it (a rates office never had a levy order in a
+      // pilot's 30 days: the law sets its instalments, and an order had to give a number of days: wave 2b).
+      const rhythm = (r: (typeof routines)[number]): { every?: number; schedule?: string } => {
+        if (r.follows) return { schedule: String((own as any)[r.follows[0]] || r.follows[1]) };
+        const days = typeof r.every === "number" ? r.every : r.every ? Number((own as any)[r.every[0]] ?? r.every[1]) : undefined;
+        return days && Number.isSafeInteger(days) && days > 0 ? { every: days * 86_400 } : {};
+      };
+      const rhythmWords = (r: (typeof routines)[number]) => { const x = rhythm(r); return x.schedule ? ` When it is done is set by ${x.schedule}: an order for it says "as ${x.schedule} sets" in place of how often, or says nothing of how often.` : x.every ? ` The office's own rhythm for it is every ${x.every / 86_400} day${x.every === 86_400 ? "" : "s"}: an order that does not say how often follows that.` : ""; };
       const shown = pos.channels.filter((c: any) => !c.on_request || c.kind === "sites").map((c: any) => ({ ...c }));
       office(`${id}-staff`, pos.entity, `Staff of the ${pos.title.charAt(0).toLowerCase()}${pos.title.slice(1)}`, undefined, shown, code(impl, { ...own, part: "staff" }), part.lanes ? { lanes: part.lanes } : {});
       part.controller.params.mock.params = { ...own, part: "seat" };
       pos.role_module = { code: impl, params: { ...own, part: "seat" } };
       records.push({ id: `proc-${id}-routines`, record: "statement", author: "genesis", at: 0, visible_to: [pos.entity], speaks_for: pos.entity, kind: "procedure", addressed_to: [pos.entity],
-        text: `The routine work of the ${pos.title.charAt(0).toLowerCase()}${pos.title.slice(1)}'s office is done by its staff, by the office's standing work orders and only by them. A standing work order says what task, where and how often, and may say on what, from when and for how long. While one is in force the staff do the task each time it falls due, in their working hours; with none in force for a task, they do not do it. An order is changed by withdrawing it and making another, and put on hold like any standing paper. The staff report to the office on the work under its orders, on the organisation's own file: what was done under each, or that one is not being carried out and why, the day that changes and otherwise about weekly. The tasks: ${routines.map((r) => `${r.task}, at ${(own as any)[r.at] || id}: ${r.what}`).join(" ")}`,
-        data: { routines: routines.map((r) => ({ task: r.task, at: (own as any)[r.at] || id })) } });
+        text: `The routine work of the ${pos.title.charAt(0).toLowerCase()}${pos.title.slice(1)}'s office is done by its staff, by the office's standing work orders and only by them. A standing work order says what task, where and how often, and may say on what, from when and for how long. While one is in force the staff do the task each time it falls due, in their working hours; with none in force for a task, they do not do it. An order is changed by withdrawing it and making another, and put on hold like any standing paper. The staff report to the office on the work under its orders, on the organisation's own file: what was done under each, or that one is not being carried out and why, the day that changes and otherwise about weekly. The tasks: ${routines.map((r) => `${r.task}, at ${(own as any)[r.at] || id}: ${r.what}${rhythmWords(r)}`).join(" ")}`,
+        data: { routines: routines.map((r) => ({ task: r.task, at: (own as any)[r.at] || id, ...rhythm(r) })) } });
       pos.channels.push(K.mine("standing", ["procedure", "work_order", "hold"], { title: "The office's procedures and standing orders" }));
       part.controller.params.standing = [...part.controller.params.standing, "standing"];
       // What the staff report of the work under those orders: a paper of the organisation's own, as it comes.

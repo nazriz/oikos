@@ -718,7 +718,7 @@ export const taxClerk: BehaviourModule = {
 export const ratesOfficer: BehaviourModule = {
   name: "city.rates_officer",
   answers: {"office": "the rates office", "acts": "What it acts on: the valuer's valuations, on which it levies under the rating law; a payment that names the rates it pays; and a direction on its recovery form (rates_recovery) from those the town's rule on directions names.", "report": true},
-  routines: [{ task: "levy", at: "office", what: "At each instalment the rating law sets, the rates clerks send every owner on the rate book a notice of their share and record it as owed to the town; each month they add the law's penalty interest to what is overdue and write to the owner. When the notices go out is the law's: the order says only that they are to be sent." }],
+  routines: [{ task: "levy", at: "office", follows: ["law", "law-rates"], what: "At each instalment the rating law sets, the rates clerks send every owner on the rate book a notice of their share and record it as owed to the town; each month they add the law's penalty interest to what is overdue and write to the owner. When the notices go out is the law's: the first once the valuer has valued the town's properties and not before the office's first levy day, then one for each instalment the law sets, evenly through the year (two instalments a year are 182 days apart, four are 91). The order says only that they are to be sent." }],
   keeps: [
     { what: "valuation", why: "The rating authority keeps the rate book: the valuer sends it the valuation of every rateable lot, which is what it levies on." },
   ],
@@ -846,8 +846,8 @@ export const works: BehaviourModule = {
   name: "city.works",
   answers: {"office": "the works office", "acts": "What it acts on: the adopted budget's staff line, which sets its crew; a complaint of a collection missed; and a direction on one of its own forms from those the town's rule on directions names.", "forms": [{"about": ["staff", "recruit", "hire", "hiring", "crew", "vacanc", "posts"], "say": "On staffing it follows a direction on its staffing form (works_staffing) from those the town's rule on directions names, and no letter."}, {"about": ["collect", "round", "waste", "bin", "rubbish"], "say": "On how often it collects it follows a direction on its collection form (works_collection) from those the town's rule on directions names; a collection missed is reported as a complaint."}], "report": true},
   routines: [
-    { task: "collect", at: "depot", what: "The crew at the depot collects waste from each address on the round as often as the order says, homes complained about first, as far as its hours go, and takes what it has collected to the landfill each week with a docket." },
-    { task: "maintain", at: "depot", what: "With the hours the round leaves, the crew keeps up the most worn of the town's own assets, and someone is sent to inspect an asset nobody has seen." },
+    { task: "collect", at: "depot", every: ["collect_every_days", 7], what: "The crew at the depot collects waste from each address on the round as often as the order says, homes complained about first, as far as its hours go, and takes what it has collected to the landfill each week with a docket." },
+    { task: "maintain", at: "depot", every: 1, what: "With the hours the round leaves, the crew keeps up the most worn of the town's own assets, and someone is sent to inspect an asset nobody has seen." },
   ],
   issues: [P.JOB_ADVERTISEMENT, ...P.PAYROLL, ...P.WORKS],
   issuesWith: (p) => ({ ...P.staffingOwn({ role: p.role ?? "works crew", industry: p.industry, workplace: p.workplace, notice_days: p.notice_days ?? 14 }), landfill: p.landfill, payroll_office: p.payroll_office || undefined }),

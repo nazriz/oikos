@@ -104,11 +104,16 @@
     {
       "task": "draw_water",
       "at": "works",
+      "every": 1,
       "what": "Each day the works draws from the river what the town uses, by the published estimate of how many live in it, and says so when the river cannot give it."
     },
     {
       "task": "bill",
       "at": "works",
+      "every": [
+        "bill_every_days",
+        91
+      ],
       "what": "Before each round of bills a reader goes round the meters; then each property's owner is sent a bill for the service charge and what its meter shows was used. How often the bills go out is the order's."
     }
   ]

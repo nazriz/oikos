@@ -154,11 +154,16 @@
     {
       "task": "supply_energy",
       "at": "depot",
+      "every": 1,
       "what": "Each day the network supplies what the customers use from what the retailer holds, and more is bought from the grid when it runs below a fortnight's use. Those who ask to be supplied are taken on, and those gone taken off."
     },
     {
       "task": "bill",
       "at": "depot",
+      "every": [
+        "bill_every_days",
+        30
+      ],
       "what": "Each customer is sent a bill for the supply charge and what they used; one who has gone, their last. How often the bills go out is the order's."
     }
   ]

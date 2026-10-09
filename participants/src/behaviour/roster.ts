@@ -75,13 +75,13 @@ export class Roster {
    * nobody in post, that nobody carries it out; or that the staff have not reported on it yet. From the office's own
    * papers: the orders on its file and its staff's reports.
    */
-  orders(t: number): { order: string; task: string; every: number; says: string }[] {
+  orders(t: number): { order: string; task: string; every: number; schedule?: string; says: string }[] {
     const tasks = this.routines;
     const mine = this.book.standingOf("work_order").filter((r) => r.speaks_for === this.entity && (r.in_position === this.office || tasks.includes(String(r.data?.work?.task)))).sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : 1));
     const report = this.report();
     const told = new Map<string, string>(((report?.data?.orders ?? []) as { order: string; says: string }[]).map((x) => [x.order, x.says]));
     const n = this.count(t);
-    return mine.map((r) => ({ order: r.id, task: String(r.data?.work?.task), every: Number(r.data?.every) || 0,
+    return mine.map((r) => ({ order: r.id, task: String(r.data?.work?.task), every: Number(r.data?.every) || 0, ...(typeof r.data?.schedule === "string" ? { schedule: r.data.schedule as string } : {}),
       says: !n ? `carried out by nobody: there is nobody in post` : told.get(r.id) ?? (report && r.at <= report.at ? "not in your staff's last report" : "your staff have not reported on it yet (they report when the day's work is next set out)") }));
   }
 
@@ -106,7 +106,7 @@ export class Roster {
       n ? `In post (${n}): ${r.held.map((h) => `${who(h.person)}${h.since !== undefined ? `, since ${dated(h.since)}` : ""}, under ${h.agreement}${did(h.person)}`).join("; ")}.` : "In post: nobody.",
       ...(vacant !== undefined ? [`Vacant: ${vacant}.${r.posts !== undefined && n > r.posts ? ` (${n - r.posts} more in post than there are posts.)` : ""}`] : []),
       ...(n ? [] : [`There is nobody in post, so the work that is the staff's is done by nobody.${r.form ? ` The office takes on its own staff, beginning with an advertisement on its job advertisement form (${r.form}).` : ""}`]),
-      ...(orders.length ? [`Your standing work orders${report && n ? `, as your staff reported on ${dated(report.at)} (${report.id})` : ""}:`, ...orders.map((o) => `- ${o.order}, ${o.task} every ${Math.round(o.every / DAY) || "?"} day${Math.round(o.every / DAY) === 1 ? "" : "s"}: ${o.says}.`)] : []),
+      ...(orders.length ? [`Your standing work orders${report && n ? `, as your staff reported on ${dated(report.at)} (${report.id})` : ""}:`, ...orders.map((o) => `- ${o.order}, ${o.task} ${o.schedule ? `as ${o.schedule} sets` : `every ${Math.round(o.every / DAY) || "?"} day${Math.round(o.every / DAY) === 1 ? "" : "s"}`}: ${o.says}.`)] : []),
     ].join("\n");
   }
 }

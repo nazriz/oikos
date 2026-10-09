@@ -1,19 +1,607 @@
 {
-  "about": "Standing work orders (contracts/calls.md; docs/behaviour/standing-work.md): what both resolvers (translator/src/resolver.ts and kernel/crates/resolver) must make of each program, from what this seat knows. Each case has `blocks` (the acts) or `asks` (the questions back, whole).",
-  "currency": { "code": "XYZ", "minor_units": 2 },
-  "observation": {"channels":{"mine":{"kind":"records","records":[{"addressed_to":["city"],"at":100,"author":"works-system","data":{"every":604800,"work":{"at":"town-hall","task":"collect"}},"id":"rec.70","in_position":"works","kind":"work_order","record":"statement","speaks_for":"city","text":"Standing work order: collect at town-hall, every 7 days.","visible_to":["city"]},{"addressed_to":["city"],"at":100,"author":"works-system","data":{"every":86400,"work":{"at":"town-hall","task":"maintain"}},"id":"rec.71","in_position":"works","kind":"work_order","record":"statement","speaks_for":"city","text":"Standing work order: maintain at town-hall, every 1 day.","visible_to":["city"]}]},"who":{"entities":[{"entity":"city","kind":"town","name":"Millbrook"},{"entity":"c0050","kind":"person","name":"Ira Vale","participant":"works-system"},{"entity":"c0061","kind":"person","name":"Sam Okoro","participant":"c0061-self"}],"kind":"directory","positions":[]}},"drafts":[],"entity":"c0050","inbox":[],"outcomes":[],"participant":"works-system","positions":[{"entity":"city","position":"works","role":"works_manager","title":"Works manager"}],"status":"active","t":2592000},
-  "cases": [
-    {"name":"work to be done again and again: a standing order on the organisation's own file, addressed to itself, for its staff to follow","program":"work(task=collect, at=town-hall, every=\"7 days\")","as":"works","blocks":[{"block":"publish","kind":"work_order","text":"Standing work order: collect at town-hall, every 7 days.","speaks_for":"city","addressed_to":["city"],"visible_to":["city"],"data":{"work":{"task":"collect","at":"town-hall"},"every":604800}}]},
-    {"name":"how often, in any of the ways a length of time is written","program":"work(task=maintain, at=town-hall, every=\"daily\")","as":"works","blocks":[{"block":"publish","kind":"work_order","text":"Standing work order: maintain at town-hall, every 1 day.","speaks_for":"city","addressed_to":["city"],"visible_to":["city"],"data":{"work":{"task":"maintain","at":"town-hall"},"every":86400}}]},
-    {"name":"on what, by whom, how much each time, from when and for how long, where the order says","program":"work(task=collect, at=town-hall, on=[\"apts-13\",\"apts-14\"], by=[\"c0061\",\"c0062\"], units=\"2\", every=\"weekly\", first=\"3 days\", until=\"8 weeks\")","as":"works","blocks":[{"block":"publish","kind":"work_order","text":"Standing work order: collect at town-hall, on apts-13, apts-14, by c0061, c0062, 2 each time, every 7 days, the first in 3 days, for 56 days.","speaks_for":"city","addressed_to":["city"],"visible_to":["city","c0061","c0062"],"data":{"work":{"task":"collect","at":"town-hall","on":["apts-13","apts-14"],"by":["c0061","c0062"],"units":2},"every":604800,"first":259200,"until":7430400}}]},
-    {"name":"one place and one person, and a person named by name","program":"work(task=teach, at=school-building, on=school-building/classroom.1, by=\"Sam Okoro\", every=\"1 day\")","as":"works","blocks":[{"block":"publish","kind":"work_order","text":"Standing work order: teach at school-building, on school-building/classroom.1, by c0061, every 1 day.","speaks_for":"city","addressed_to":["city"],"visible_to":["city","c0061"],"data":{"work":{"task":"teach","at":"school-building","on":["school-building/classroom.1"],"by":["c0061"]},"every":86400}}]},
-    {"name":"one named twice is named once","program":"work(task=collect, at=town-hall, on=[\"apts-13\",\"apts-13\"], every=\"7 days\")","as":"works","blocks":[{"block":"publish","kind":"work_order","text":"Standing work order: collect at town-hall, on apts-13, every 7 days.","speaks_for":"city","addressed_to":["city"],"visible_to":["city"],"data":{"work":{"task":"collect","at":"town-hall","on":["apts-13"]},"every":604800}}]},
-    {"name":"with no place, it is not a call the contract accepts","program":"work(task=collect, every=\"7 days\")","as":"works","asks":["It isn't clear what should happen. Could you say it more plainly?"]},
-    {"name":"a survey is asked for each time","program":"work(task=survey, at=town-hall, survey=wrens, cells=[\"cell.1.1\"], every=\"90 days\")","as":"works","asks":["A survey or an investigation is asked for each time, with what it is of: it can't be a standing order."]},
-    {"name":"when it starts and for how long are said only of work done again and again","program":"work(task=collect, units=\"3\", at=town-hall, by=c0061, on=apts-13, until=\"8 weeks\")","as":"works","asks":["Work asked for once is done now. When it starts and how long it goes on are said of work done again and again: say how often."]},
-    {"name":"work asked for once is as it was","program":"work(task=collect, units=\"3\", at=town-hall, by=[\"c0061\"], on=apts-13)","as":"works","blocks":[{"block":"work","task":"collect","units":3,"at":"town-hall","performers":["c0061"],"on":"apts-13"}]},
-    {"name":"a standing order is put on hold on the organisation's own file, where its staff read it","program":"statement(hold=rec.70)","as":"works","blocks":[{"block":"publish","kind":"hold","text":"Please hold rec.70: nothing is to be done under it until this is withdrawn.","addressed_to":["city"],"data":{"holds":["rec.70"]},"visible_to":["city"],"speaks_for":"city"}]},
-    {"name":"several at once, with why","program":"statement(hold=[\"rec.70\",\"rec.71\"], text=\"No rounds over the holiday.\")","as":"works","blocks":[{"block":"publish","kind":"hold","text":"No rounds over the holiday.","addressed_to":["city"],"data":{"holds":["rec.70","rec.71"]},"visible_to":["city"],"speaks_for":"city"}]},
-    {"name":"and withdrawn like any standing paper","program":"statement(withdraw=rec.71)","as":"works","blocks":[{"block":"withdraw","record":"rec.71","speaks_for":"city"}]}
-  ]
+ "about": "Standing work orders (contracts/calls.md; docs/behaviour/standing-work.md): what both resolvers (translator/src/resolver.ts and kernel/crates/resolver) must make of each program, from what this seat knows. Each case has `blocks` (the acts) or `asks` (the questions back, whole).",
+ "currency": {
+  "code": "XYZ",
+  "minor_units": 2
+ },
+ "observation": {
+  "channels": {
+   "mine": {
+    "kind": "records",
+    "records": [
+     {
+      "addressed_to": [
+       "city"
+      ],
+      "at": 100,
+      "author": "works-system",
+      "data": {
+       "every": 604800,
+       "work": {
+        "at": "town-hall",
+        "task": "collect"
+       }
+      },
+      "id": "rec.70",
+      "in_position": "works",
+      "kind": "work_order",
+      "record": "statement",
+      "speaks_for": "city",
+      "text": "Standing work order: collect at town-hall, every 7 days.",
+      "visible_to": [
+       "city"
+      ]
+     },
+     {
+      "addressed_to": [
+       "city"
+      ],
+      "at": 100,
+      "author": "works-system",
+      "data": {
+       "every": 86400,
+       "work": {
+        "at": "town-hall",
+        "task": "maintain"
+       }
+      },
+      "id": "rec.71",
+      "in_position": "works",
+      "kind": "work_order",
+      "record": "statement",
+      "speaks_for": "city",
+      "text": "Standing work order: maintain at town-hall, every 1 day.",
+      "visible_to": [
+       "city"
+      ]
+     },
+     {
+      "addressed_to": [
+       "city"
+      ],
+      "at": 0,
+      "author": "genesis",
+      "data": {
+       "routines": [
+        {
+         "at": "town-hall",
+         "every": 604800,
+         "task": "collect"
+        },
+        {
+         "at": "town-hall",
+         "every": 86400,
+         "task": "maintain"
+        },
+        {
+         "at": "rates-office",
+         "schedule": "law-rates",
+         "task": "levy"
+        }
+       ]
+      },
+      "id": "proc-works-routines",
+      "kind": "procedure",
+      "record": "statement",
+      "speaks_for": "city",
+      "text": "The routine work of the office is done by its staff, by the office's standing work orders and only by them. The tasks: collect, at town-hall: The crew collects from each address on the round. The office's own rhythm for it is every 7 days: an order that does not say how often follows that. maintain, at town-hall: The crew keeps up the most worn of the town's assets. The office's own rhythm for it is every 1 day: an order that does not say how often follows that. levy, at rates-office: At each instalment the rating law sets, the clerks send every owner a notice. When it is done is set by law-rates: an order for it says \"as law-rates sets\" in place of how often, or says nothing of how often.",
+      "visible_to": [
+       "city"
+      ]
+     }
+    ]
+   },
+   "who": {
+    "entities": [
+     {
+      "entity": "city",
+      "kind": "town",
+      "name": "Millbrook"
+     },
+     {
+      "entity": "c0050",
+      "kind": "person",
+      "name": "Ira Vale",
+      "participant": "works-system"
+     },
+     {
+      "entity": "c0061",
+      "kind": "person",
+      "name": "Sam Okoro",
+      "participant": "c0061-self"
+     }
+    ],
+    "kind": "directory",
+    "positions": []
+   }
+  },
+  "drafts": [],
+  "entity": "c0050",
+  "inbox": [],
+  "outcomes": [],
+  "participant": "works-system",
+  "positions": [
+   {
+    "entity": "city",
+    "position": "works",
+    "role": "works_manager",
+    "title": "Works manager"
+   }
+  ],
+  "status": "active",
+  "t": 2592000
+ },
+ "cases": [
+  {
+   "name": "work to be done again and again: a standing order on the organisation's own file, addressed to itself, for its staff to follow",
+   "program": "work(task=collect, at=town-hall, every=\"7 days\")",
+   "as": "works",
+   "blocks": [
+    {
+     "block": "publish",
+     "kind": "work_order",
+     "text": "Standing work order: collect at town-hall, every 7 days.",
+     "speaks_for": "city",
+     "addressed_to": [
+      "city"
+     ],
+     "visible_to": [
+      "city"
+     ],
+     "data": {
+      "work": {
+       "task": "collect",
+       "at": "town-hall"
+      },
+      "every": 604800
+     }
+    }
+   ]
+  },
+  {
+   "name": "how often, in any of the ways a length of time is written",
+   "program": "work(task=maintain, at=town-hall, every=\"daily\")",
+   "as": "works",
+   "blocks": [
+    {
+     "block": "publish",
+     "kind": "work_order",
+     "text": "Standing work order: maintain at town-hall, every 1 day.",
+     "speaks_for": "city",
+     "addressed_to": [
+      "city"
+     ],
+     "visible_to": [
+      "city"
+     ],
+     "data": {
+      "work": {
+       "task": "maintain",
+       "at": "town-hall"
+      },
+      "every": 86400
+     }
+    }
+   ]
+  },
+  {
+   "name": "on what, by whom, how much each time, from when and for how long, where the order says",
+   "program": "work(task=collect, at=town-hall, on=[\"apts-13\",\"apts-14\"], by=[\"c0061\",\"c0062\"], units=\"2\", every=\"weekly\", first=\"3 days\", until=\"8 weeks\")",
+   "as": "works",
+   "blocks": [
+    {
+     "block": "publish",
+     "kind": "work_order",
+     "text": "Standing work order: collect at town-hall, on apts-13, apts-14, by c0061, c0062, 2 each time, every 7 days, the first in 3 days, for 56 days.",
+     "speaks_for": "city",
+     "addressed_to": [
+      "city"
+     ],
+     "visible_to": [
+      "city",
+      "c0061",
+      "c0062"
+     ],
+     "data": {
+      "work": {
+       "task": "collect",
+       "at": "town-hall",
+       "on": [
+        "apts-13",
+        "apts-14"
+       ],
+       "by": [
+        "c0061",
+        "c0062"
+       ],
+       "units": 2
+      },
+      "every": 604800,
+      "first": 259200,
+      "until": 7430400
+     }
+    }
+   ]
+  },
+  {
+   "name": "one place and one person, and a person named by name",
+   "program": "work(task=teach, at=school-building, on=school-building/classroom.1, by=\"Sam Okoro\", every=\"1 day\")",
+   "as": "works",
+   "blocks": [
+    {
+     "block": "publish",
+     "kind": "work_order",
+     "text": "Standing work order: teach at school-building, on school-building/classroom.1, by c0061, every 1 day.",
+     "speaks_for": "city",
+     "addressed_to": [
+      "city"
+     ],
+     "visible_to": [
+      "city",
+      "c0061"
+     ],
+     "data": {
+      "work": {
+       "task": "teach",
+       "at": "school-building",
+       "on": [
+        "school-building/classroom.1"
+       ],
+       "by": [
+        "c0061"
+       ]
+      },
+      "every": 86400
+     }
+    }
+   ]
+  },
+  {
+   "name": "one named twice is named once",
+   "program": "work(task=collect, at=town-hall, on=[\"apts-13\",\"apts-13\"], every=\"7 days\")",
+   "as": "works",
+   "blocks": [
+    {
+     "block": "publish",
+     "kind": "work_order",
+     "text": "Standing work order: collect at town-hall, on apts-13, every 7 days.",
+     "speaks_for": "city",
+     "addressed_to": [
+      "city"
+     ],
+     "visible_to": [
+      "city"
+     ],
+     "data": {
+      "work": {
+       "task": "collect",
+       "at": "town-hall",
+       "on": [
+        "apts-13"
+       ]
+      },
+      "every": 604800
+     }
+    }
+   ]
+  },
+  {
+   "name": "with no place, it is not a call the contract accepts",
+   "program": "work(task=collect, every=\"7 days\")",
+   "as": "works",
+   "asks": [
+    "It isn't clear what should happen. Could you say it more plainly?"
+   ]
+  },
+  {
+   "name": "a survey is asked for each time",
+   "program": "work(task=survey, at=town-hall, survey=wrens, cells=[\"cell.1.1\"], every=\"90 days\")",
+   "as": "works",
+   "asks": [
+    "A survey or an investigation is asked for each time, with what it is of: it can't be a standing order."
+   ]
+  },
+  {
+   "name": "when it starts and for how long are said only of work done again and again",
+   "program": "work(task=collect, units=\"3\", at=town-hall, by=c0061, on=apts-13, until=\"8 weeks\")",
+   "as": "works",
+   "asks": [
+    "Work asked for once is done now. When it starts and how long it goes on are said of work done again and again: say how often."
+   ]
+  },
+  {
+   "name": "work asked for once is as it was",
+   "program": "work(task=collect, units=\"3\", at=town-hall, by=[\"c0061\"], on=apts-13)",
+   "as": "works",
+   "blocks": [
+    {
+     "block": "work",
+     "task": "collect",
+     "units": 3,
+     "at": "town-hall",
+     "performers": [
+      "c0061"
+     ],
+     "on": "apts-13"
+    }
+   ]
+  },
+  {
+   "name": "a standing order is put on hold on the organisation's own file, where its staff read it",
+   "program": "statement(hold=rec.70)",
+   "as": "works",
+   "blocks": [
+    {
+     "block": "publish",
+     "kind": "hold",
+     "text": "Please hold rec.70: nothing is to be done under it until this is withdrawn.",
+     "addressed_to": [
+      "city"
+     ],
+     "data": {
+      "holds": [
+       "rec.70"
+      ]
+     },
+     "visible_to": [
+      "city"
+     ],
+     "speaks_for": "city"
+    }
+   ]
+  },
+  {
+   "name": "several at once, with why",
+   "program": "statement(hold=[\"rec.70\",\"rec.71\"], text=\"No rounds over the holiday.\")",
+   "as": "works",
+   "blocks": [
+    {
+     "block": "publish",
+     "kind": "hold",
+     "text": "No rounds over the holiday.",
+     "addressed_to": [
+      "city"
+     ],
+     "data": {
+      "holds": [
+       "rec.70",
+       "rec.71"
+      ]
+     },
+     "visible_to": [
+      "city"
+     ],
+     "speaks_for": "city"
+    }
+   ]
+  },
+  {
+   "name": "and withdrawn like any standing paper",
+   "program": "statement(withdraw=rec.71)",
+   "as": "works",
+   "blocks": [
+    {
+     "block": "withdraw",
+     "record": "rec.71",
+     "speaks_for": "city"
+    }
+   ]
+  },
+  {
+   "name": "a routine whose time a published paper sets: the order names the paper in place of how often",
+   "as": "works",
+   "program": "work(task=levy, at=rates-office, every=\"as law-rates sets\")",
+   "blocks": [
+    {
+     "block": "publish",
+     "kind": "work_order",
+     "text": "Standing work order: levy at rates-office, as law-rates sets.",
+     "speaks_for": "city",
+     "addressed_to": [
+      "city"
+     ],
+     "visible_to": [
+      "city"
+     ],
+     "data": {
+      "work": {
+       "task": "levy",
+       "at": "rates-office"
+      },
+      "schedule": "law-rates"
+     }
+    }
+   ]
+  },
+  {
+   "name": "the paper named in the request's own words for it",
+   "as": "works",
+   "program": "work(task=levy, at=rates-office, every=\"at each instalment law-rates sets\")",
+   "blocks": [
+    {
+     "block": "publish",
+     "kind": "work_order",
+     "text": "Standing work order: levy at rates-office, as law-rates sets.",
+     "speaks_for": "city",
+     "addressed_to": [
+      "city"
+     ],
+     "visible_to": [
+      "city"
+     ],
+     "data": {
+      "work": {
+       "task": "levy",
+       "at": "rates-office"
+      },
+      "schedule": "law-rates"
+     }
+    }
+   ]
+  },
+  {
+   "name": "saying nothing of how often, the order follows what the office's procedure states for the task: the paper that sets when",
+   "as": "works",
+   "program": "work(task=levy, at=rates-office)",
+   "blocks": [
+    {
+     "block": "publish",
+     "kind": "work_order",
+     "text": "Standing work order: levy at rates-office, as law-rates sets.",
+     "speaks_for": "city",
+     "addressed_to": [
+      "city"
+     ],
+     "visible_to": [
+      "city"
+     ],
+     "data": {
+      "work": {
+       "task": "levy",
+       "at": "rates-office"
+      },
+      "schedule": "law-rates",
+      "by_procedure": "proc-works-routines"
+     }
+    }
+   ]
+  },
+  {
+   "name": "or the office's own rhythm for it",
+   "as": "works",
+   "program": "work(task=maintain, at=town-hall)",
+   "blocks": [
+    {
+     "block": "publish",
+     "kind": "work_order",
+     "text": "Standing work order: maintain at town-hall, every 1 day.",
+     "speaks_for": "city",
+     "addressed_to": [
+      "city"
+     ],
+     "visible_to": [
+      "city"
+     ],
+     "data": {
+      "work": {
+       "task": "maintain",
+       "at": "town-hall"
+      },
+      "every": 86400,
+      "by_procedure": "proc-works-routines"
+     }
+    }
+   ]
+  },
+  {
+   "name": "a count a year is not how often, and of a routine a paper sets the seat is told which paper, from its own procedure",
+   "as": "works",
+   "program": "work(task=levy, at=rates-office, every=\"2 a year\")",
+   "asks": [
+    "\"2 a year\" could not be read as how often. By your office's procedure (proc-works-routines) the staff do levy when law-rates sets: say \"as law-rates sets\", or leave how often out and the order follows it."
+   ]
+  },
+  {
+   "name": "of a routine with a rhythm of its own, what that rhythm is",
+   "as": "works",
+   "program": "work(task=maintain, at=town-hall, every=\"twice a week\")",
+   "asks": [
+    "\"twice a week\" could not be read as how often. Say it as a length of time (\"every 7 days\", \"each working day\"), or leave it out: by your office's procedure (proc-works-routines) the staff do maintain every 1 day, and an order that does not say how often follows that."
+   ]
+  },
+  {
+   "name": "of a task no procedure the seat has speaks of, only that it could not be read",
+   "as": "works",
+   "program": "work(task=teach, at=school-building, every=\"2 a year\")",
+   "asks": [
+    "not how often: 2 a year. Please say it another way."
+   ]
+  },
+  {
+   "name": "a length of time given for a routine a paper sets is taken as given (the preview says whose the time is)",
+   "as": "works",
+   "program": "work(task=levy, at=rates-office, every=\"every 182 days\")",
+   "blocks": [
+    {
+     "block": "publish",
+     "kind": "work_order",
+     "text": "Standing work order: levy at rates-office, every 182 days.",
+     "speaks_for": "city",
+     "addressed_to": [
+      "city"
+     ],
+     "visible_to": [
+      "city"
+     ],
+     "data": {
+      "work": {
+       "task": "levy",
+       "at": "rates-office"
+      },
+      "every": 15724800
+     }
+    }
+   ]
+  },
+  {
+   "name": "each working day is every day",
+   "as": "works",
+   "program": "work(task=maintain, at=town-hall, every=\"each working day\")",
+   "blocks": [
+    {
+     "block": "publish",
+     "kind": "work_order",
+     "text": "Standing work order: maintain at town-hall, every 1 day.",
+     "speaks_for": "city",
+     "addressed_to": [
+      "city"
+     ],
+     "visible_to": [
+      "city"
+     ],
+     "data": {
+      "work": {
+       "task": "maintain",
+       "at": "town-hall"
+      },
+      "every": 86400
+     }
+    }
+   ]
+  },
+  {
+   "name": "and each school day",
+   "as": "works",
+   "program": "work(task=teach, at=school-building, every=\"each school day\")",
+   "blocks": [
+    {
+     "block": "publish",
+     "kind": "work_order",
+     "text": "Standing work order: teach at school-building, every 1 day.",
+     "speaks_for": "city",
+     "addressed_to": [
+      "city"
+     ],
+     "visible_to": [
+      "city"
+     ],
+     "data": {
+      "work": {
+       "task": "teach",
+       "at": "school-building"
+      },
+      "every": 86400
+     }
+    }
+   ]
+  },
+  {
+   "name": "a task with no rhythm stated anywhere, asked with neither how much nor how often, is still asked which",
+   "as": "works",
+   "program": "work(task=teach, at=school-building)",
+   "asks": [
+    "Is this work to be done once, or as a standing routine of your staff? Done once: say how much of it. As a routine: say how often (every day, every week), and it is a standing work order."
+   ]
+  }
+ ]
 }

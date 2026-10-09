@@ -291,23 +291,25 @@ const RETRYABLE = /^You don't know of anyone or anything called|^It isn't clear 
 
 /** A resolver's answer that a value in the call could not be read as what its place takes (an amount, a length of
  * time, a count): which value, and what it should have been. */
-const UNIT_FAULT = /^(not an amount|badly grouped digits|a point with three digits after it can be read two ways|this money has no decimals|more than \S+(?: \S+)? decimals|fraction of [^:]*|too large|not a duration|not a date or a duration|not a count): (.*)\. Please say it another way\.$/s;
+const UNIT_FAULT = /^(not an amount|badly grouped digits|a point with three digits after it can be read two ways|this money has no decimals|more than \S+(?: \S+)? decimals|fraction of [^:]*|too large|not a duration|not how often|not a date or a duration|not a count): (.*)\. Please say it another way\.$/s;
 const unitFault = (q: string): { value: string; what: string } | undefined => {
   const m = UNIT_FAULT.exec(q);
-  return m ? { value: m[2]!, what: m[1] === "not a duration" ? "a length of time" : m[1] === "not a date or a duration" ? "a date or a length of time" : m[1] === "not a count" ? "a number" : "an amount" } : undefined;
+  return m ? { value: m[2]!, what: m[1] === "not how often" ? "how often" : m[1] === "not a duration" ? "a length of time" : m[1] === "not a date or a duration" ? "a date or a length of time" : m[1] === "not a count" ? "a number" : "an amount" } : undefined;
 };
 /** How each of those is to be said again, in the terms a seat's own papers use. */
 const SAY_AGAIN: { [what: string]: string } = {
   "an amount": "Please say it again with that amount written in figures.",
   "a number": "Please say it again with that number written in figures.",
   "a length of time": 'Please say it again with that written as a number of days, weeks or months, like "14 days".',
+  // (Of a standing work order. What how often can be: a length of time, or the paper that sets when; never a count a year.)
+  "how often": 'How often can be a length of time ("every 7 days", "weekly", "each working day"); or, where a law or a paper on your file sets when the work is done, that paper named by its id ("as" and the id, then "sets"). Please say it again one of those ways.',
   "a date or a length of time": 'Please say it again with a date, written like "year 1, day 12", or a length of time from now, like "14 days".',
 };
 /** What a seat is asked about words of its own that could not be read as what their place takes. */
 export const ownWords = (value: string, what: string): string => `"${value}", in what you asked, could not be read as ${what}. ${SAY_AGAIN[what] ?? SAY_AGAIN["an amount"]!}`;
 /** What the translator is told of such a value, before it is asked once more. */
 const unreadValue = (value: string, what: string): string =>
-  `"${value}" can't be read as ${what}. Write there only what the request gives for that argument, as the request wrote it (a date like "year 1, day 12", a length of time like "14 days", a number or an amount in its figures); if the request gives nothing for it, leave the argument out; if what the request gives for it can't be written so, answer none(unclear)`;
+  `"${value}" can't be read as ${what}. Write there only what the request gives for that argument, as the request wrote it (a date like "year 1, day 12", a length of time like "14 days", a number or an amount in its figures; for how often, a length of time like "every 7 days", or the id of the paper that sets when); if the request gives nothing for it, leave the argument out; if what the request gives for it can't be written so, answer none(unclear)`;
 /** The form a call fills in, as the seat has it (its name, and what each of its fields takes), if it fills one in. */
 function formOf(program: calls.Program, k: Knowledge): { name: string; fields: { [field: string]: { type?: string } } } | undefined {
   if (!("lines" in program)) return undefined;
@@ -327,12 +329,12 @@ function formOf(program: calls.Program, k: Knowledge): { name: string; fields: {
  * filed, and what the form it can see takes, so that it can say its request again.
  */
 export function askAgain(what: string, form?: { name: string; fields: { [field: string]: { type?: string } } }): string {
-  const KIND: { [what: string]: [string, string] } = { "an amount": ["amount", "amounts"], "a length of time": ["duration", "lengths of time"], "a number": ["count", "numbers"] };
+  const KIND: { [what: string]: [string, string] } = { "an amount": ["amount", "amounts"], "a length of time": ["duration", "lengths of time"], "how often": ["duration", "lengths of time"], "a number": ["count", "numbers"] };
   const [type, plural] = KIND[what] ?? KIND["an amount"]!;
   const takes = form ? Object.entries(form.fields).filter(([, f]) => f?.type === type).map(([k]) => k.replace(/_/g, " ")) : [];
   return form
     ? `It could not be set out on the ${form.name} form from what you said${takes.length ? `: the form takes these ${plural}: ${takes.join(", ")}` : ""}. Please say it again, giving each one you mean as a figure and leaving out any you don't.`
-    : `It could not be drawn up from what you said: ${what} in it could not be made out. ${what === "a date or a length of time" || what === "a length of time" ? SAY_AGAIN[what]! : "Please say it again, with each figure written out."}`;
+    : `It could not be drawn up from what you said: ${what} in it could not be made out. ${what === "a date or a length of time" || what === "a length of time" || what === "how often" ? SAY_AGAIN[what]! : "Please say it again, with each figure written out."}`;
 }
 
 export function createTranslator(io: LlmIO, check: KernelCheck, typeOf: (type: string) => StructureTypeInfo | undefined, id = "translator", attempts = 2, resolver?: ResolveFn) {

@@ -60,11 +60,23 @@ pub struct Knowledge {
     /// Statements seen that are addressed to someone: who each is addressed to (whoever acts on it). What a hold on
     /// one is addressed to.
     pub addressed: BTreeMap<Arc<str>, Arc<[String]>>,
+    /// A routine of the seat's office as its own procedure states it (a paper on its file): task -> the procedure,
+    /// and the routine's published rhythm where it has one (how often, or the paper that sets when). What a standing
+    /// work order that does not say how often follows.
+    pub routines: BTreeMap<String, RoutineFact>,
     pub entity: String,
     pub t: i64,
     /// How the world's money is written (its config's first currency): how the resolver reads and writes amounts.
     /// Absent (a seat nothing has been said to about the world's money): amounts can't be read.
     pub currency: Option<crate::calls::Currency>,
+}
+
+/// A routine as a procedure states it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RoutineFact {
+    pub procedure: String,
+    pub every: Option<i64>,
+    pub schedule: Option<String>,
 }
 
 /// What a record adds to what a seat knows, worked out from the record alone (never from what the seat knew before):
@@ -83,6 +95,8 @@ pub struct RecordFacts {
     stated: Option<(String, String)>,
     /// A statement addressed to someone: its id, and who it is addressed to.
     addressed: Option<(Arc<str>, Arc<[String]>)>,
+    /// A procedure that states routines: each task, as it states it.
+    routines: Vec<(String, RoutineFact)>,
 }
 
 impl RecordFacts {
@@ -101,6 +115,13 @@ impl RecordFacts {
             let id: Arc<str> = s(&r["id"]).unwrap_or_default().into();
             if let Some(to) = r["addressed_to"].as_array().filter(|a| !a.is_empty()) {
                 facts.addressed = Some((id.clone(), to.iter().filter_map(|x| x.as_str().map(String::from)).collect()));
+            }
+            if s(&r["kind"]) == Some("procedure") {
+                for x in r["data"]["routines"].as_array().into_iter().flatten() {
+                    if let Some(task) = s(&x["task"]) {
+                        facts.routines.push((task.to_string(), RoutineFact { procedure: id.to_string(), every: x["every"].as_i64().filter(|e| *e > 0), schedule: s(&x["schedule"]).filter(|p| !p.is_empty()).map(String::from) }));
+                    }
+                }
             }
             match s(&r["kind"]) {
                 Some("form") => facts.form = Some((id, Arc::new(r.clone()))),
@@ -173,7 +194,7 @@ impl Registers {
     /// The map a seat that knows of no lot makes of this list, if every record in it is a lot and nothing more
     /// (learning them one by one from nothing gives exactly this map: each lot's cells, the last said of each).
     fn of(&mut self, list: &[Arc<RecordFacts>]) -> Option<Lots> {
-        if list.len() < A_REGISTER || !list.iter().all(|f| f.lot.is_some() && f.withdraws.is_none() && f.declares.is_none() && f.form.is_none() && f.stated.is_none() && f.addressed.is_none()) {
+        if list.len() < A_REGISTER || !list.iter().all(|f| f.lot.is_some() && f.withdraws.is_none() && f.declares.is_none() && f.form.is_none() && f.stated.is_none() && f.addressed.is_none() && f.routines.is_empty()) {
             return None;
         }
         if let Some((_, lots)) = self.lists.iter().find(|(known, _)| known.len() == list.len() && known.iter().zip(list).all(|(a, b)| Arc::ptr_eq(a, b))) {
@@ -430,6 +451,15 @@ impl Knowledge {
         if let Some((id, to)) = &facts.addressed {
             self.addressed.insert(id.clone(), to.clone());
         }
+        for (task, fact) in &facts.routines {
+            self.routines.insert(task.clone(), fact.clone());
+        }
+    }
+
+    /// A routine as the seat's own procedure states it; none where no procedure it has seen names the task, or that
+    /// procedure is withdrawn.
+    pub fn routine(&self, task: &str) -> Option<&RoutineFact> {
+        self.routines.get(task).filter(|r| !self.withdrawn.contains(&r.procedure))
     }
 
     fn name_of(&self, e: &str) -> Option<&str> {

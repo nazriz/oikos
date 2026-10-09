@@ -1185,7 +1185,8 @@ export class Directions {
 }
 
 /** A standing work order as the staff read it (contracts/calls.md, a standing work order). */
-export interface WorkOrder { id: string; task: string; at?: string; on?: string[]; by?: string[]; units?: number; every: number; from: number; until?: number }
+/** (`every`: nought where the order names the paper that sets when, `schedule`, in place of a rhythm.) */
+export interface WorkOrder { id: string; task: string; at?: string; on?: string[]; by?: string[]; units?: number; every: number; schedule?: string; from: number; until?: number }
 
 /**
  * Standing work (docs/behaviour/standing-work.md). An office's routine work is its staff's: they follow the
@@ -1208,11 +1209,12 @@ export class StandingWork {
     if (!r) return undefined;
     const d = r.data ?? {};
     const from = firstDue(r, 0);
-    if (!Number.isSafeInteger(d.every) || d.every <= 0 || t < from || (Number.isSafeInteger(d.until) && t >= d.until)) return undefined;
+    const schedule = typeof d.schedule === "string" && d.schedule ? d.schedule : undefined;
+    if ((schedule === undefined && (!Number.isSafeInteger(d.every) || d.every <= 0)) || t < from || (Number.isSafeInteger(d.until) && t >= d.until)) return undefined;
     if (book.onHold(r.id, [this.me])) return undefined;
     const list = (x: unknown) => (Array.isArray(x) && x.every((y) => typeof y === "string") ? (x as string[]) : undefined);
     const w = d.work;
-    return { id: r.id, task, every: d.every, from, ...(typeof w.at === "string" ? { at: w.at } : {}), ...(list(w.on) ? { on: list(w.on)! } : {}), ...(list(w.by) ? { by: list(w.by)! } : {}),
+    return { id: r.id, task, every: schedule === undefined ? d.every : 0, ...(schedule !== undefined ? { schedule } : {}), from, ...(typeof w.at === "string" ? { at: w.at } : {}), ...(list(w.on) ? { on: list(w.on)! } : {}), ...(list(w.by) ? { by: list(w.by)! } : {}),
       ...(Number.isSafeInteger(w.units) ? { units: w.units } : {}), ...(Number.isSafeInteger(d.until) ? { until: d.until } : {}) };
   }
 
@@ -1224,7 +1226,8 @@ export class StandingWork {
     if (this.part === "seat") return undefined;
     if (this.part === "") return own;
     const order = this.order(book, task, t);
-    return order ? { every: order.every, order } : undefined;
+    // (An order that names the paper that sets when, in place of a rhythm: the staff's own practice keeps the time.)
+    return order ? { every: order.every || own.every, order } : undefined;
   }
 
   /** For the office-holder: a standing order for each routine that has none on file, made once (what it does after
@@ -1244,7 +1247,7 @@ export class StandingWork {
   /** The standing orders of ours that stand, in words, for a report. */
   words(book: Book, t: number): string {
     const all = book.standingOf("work_order").filter((x) => x.speaks_for === this.me);
-    return all.length ? all.map((x) => `${x.id} (${x.data?.work?.task} every ${Math.round(Number(x.data?.every) / DAY)} days${this.order(book, String(x.data?.work?.task), t)?.id === x.id ? "" : ", not in force"})`).join(", ") : "none";
+    return all.length ? all.map((x) => `${x.id} (${x.data?.work?.task} ${typeof x.data?.schedule === "string" ? `as ${x.data.schedule} sets` : `every ${Math.round(Number(x.data?.every) / DAY)} days`}${this.order(book, String(x.data?.work?.task), t)?.id === x.id ? "" : ", not in force"})`).join(", ") : "none";
   }
 
   // ---- the staff's report to their office (docs/behaviour/standing-work.md, "The staff's report"). The staff keep
@@ -1299,7 +1302,7 @@ export class StandingWork {
     const orders = all.map((r) => {
       const task = String(r.data?.work?.task);
       const every = Number(r.data?.every) || 0;
-      const head = { order: r.id, task, every };
+      const head = { order: r.id, task, every, ...(typeof r.data?.schedule === "string" ? { schedule: r.data.schedule as string } : {}) };
       if (!named.includes(task)) return { ...head, state: "no_such_task", words: `not carried out: the staff have no routine called "${task}" (their routines: ${named.join(", ")})` };
       const latest = all.filter((x) => String(x.data?.work?.task) === task).reduce((a, b) => (b.at >= a.at ? b : a));
       if (latest.id !== r.id) return { ...head, state: "replaced", words: `replaced by ${latest.id}` };
@@ -1324,7 +1327,7 @@ export class StandingWork {
     this.count.clear();
     const staff = (o.inPost ?? []).map((person) => ({ person, ...(this.lastAt.has(person) ? { last: this.lastAt.get(person)!.at, task: this.lastAt.get(person)!.task } : {}), ...(o.noPlace?.includes(person) ? { no_place: true } : {}) }));
     const people = staff.length ? ` In post ${staff.length}: ${staff.map((x) => `${x.person} ${"last" in x ? `last worked ${dated(x.last!)} (${x.task})` : `has not come in to work${x.no_place ? " (no place of work in the employment agreement or the advertisement it cites)" : ""}`}`).join("; ")}.` : "";
-    const text = `Report of ${o.from}, ${dated(t)}, on the work under the office's standing work orders${since !== undefined ? ` since ${dated(since)}` : ""}. ${orders.map((x) => `${x.task} (${x.order}, every ${Math.round(x.every / DAY) || "?"} day${Math.round(x.every / DAY) === 1 ? "" : "s"}): ${x.words}`).join(". ")}.${people}`;
+    const text = `Report of ${o.from}, ${dated(t)}, on the work under the office's standing work orders${since !== undefined ? ` since ${dated(since)}` : ""}. ${orders.map((x) => `${x.task} (${x.order}, ${"schedule" in x && x.schedule ? `as ${x.schedule} sets` : `every ${Math.round(x.every / DAY) || "?"} day${Math.round(x.every / DAY) === 1 ? "" : "s"}`}): ${x.words}`).join(". ")}.${people}`;
     return [because(`Reporting to the office on the work under its standing orders${last && key !== last.key ? ": how an order stands has changed" : ""}.`,
       say("staff_report", text, { to: [this.me], visible: [this.me], data: { office: o.office, ...(since !== undefined ? { since } : {}), orders: orders.map(({ words, ...x }) => ({ ...x, says: words })), ...(staff.length ? { staff } : {}) } }))];
   }

@@ -657,9 +657,15 @@ pub fn parse_duration(s: &str) -> Result<i64, UnitError> {
     let err = || UnitError(format!("not a duration: {s}"));
     let mut t = s.trim().to_lowercase().split_whitespace().collect::<Vec<_>>().join(" ");
     // ("once a week", "once every 2 weeks": how often, as people say it.)
-    for p in ["once ", "every ", "per "] {
+    // ("every" or "each", one of the two, as the other parser reads it.)
+    let mut one = false;
+    for p in ["once ", "every ", "each ", "per "] {
+        if (p == "every " || p == "each ") && one {
+            continue;
+        }
         if let Some(r) = t.strip_prefix(p) {
             t = r.to_string();
+            one = one || p == "every " || p == "each ";
         }
     }
     // "12-month" (as in "a 12-month lease") reads as "12 month".
@@ -667,6 +673,18 @@ pub fn parse_duration(s: &str) -> Result<i64, UnitError> {
         let (a, b) = t.split_at(dash);
         if !a.is_empty() && (a.chars().all(|c| c.is_ascii_digit()) || a.chars().all(|c| c.is_ascii_lowercase())) && b[1..].starts_with(|c: char| c.is_ascii_lowercase()) {
             t = format!("{a} {}", &b[1..]);
+        }
+    }
+    // ("each working day", "every school day": a day, of the days those whose work it is are at work.)
+    'days: for adj in ["working", "school", "business", "week"] {
+        for unit in ["days", "day"] {
+            for sep in [" ", ""] {
+                let tail = format!("{adj}{sep}{unit}");
+                if t == tail || t.ends_with(&format!(" {tail}")) {
+                    t = format!("{}{unit}", &t[..t.len() - tail.len()]);
+                    break 'days;
+                }
+            }
         }
     }
     let adverb = match t.as_str() {

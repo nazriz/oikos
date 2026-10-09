@@ -428,6 +428,12 @@ impl Resolver<'_> {
         };
         // (Neither how much nor how often: which of the two is asked, in the asker's terms. The words are the other
         // resolver's, `ONCE_OR_ROUTINE` in translator/src/resolver.ts.)
+        // Neither how much nor how often, of a routine whose rhythm the office's own procedure states: a standing
+        // order that follows it.
+        let none = units.as_deref().map_or(true, |u| u == "0");
+        if none && survey.is_none() && !Self::has(c, "investigate") && self.k.routine(&task).is_some_and(|r| r.every.is_some() || r.schedule.is_some()) {
+            return self.standing_work(c, task, bind);
+        }
         let Some(units) = units.filter(|u| u != "0") else {
             return ask("Is this work to be done once, or as a standing routine of your staff? Done once: say how much of it. As a routine: say how often (every day, every week), and it is a standing work order.");
         };
@@ -463,10 +469,46 @@ impl Resolver<'_> {
             return ask("A survey or an investigation is asked for each time, with what it is of: it can't be a standing order.");
         }
         let at = self.need(c, "at", "Where?")?;
-        let every = Self::seconds(c, "every")?.unwrap_or(0);
-        if every <= 0 {
+        // How often: a length of time; or, of a routine whose time a published paper sets, that paper named; or
+        // nothing, and the order follows the rhythm the office's own procedure states for the task.
+        let routine = self.k.routine(&task).cloned();
+        let said = Self::str_(c, "every")?;
+        let mut every: Option<i64> = None;
+        let mut schedule: Option<String> = None;
+        match &said {
+            None => match &routine {
+                Some(r) if r.schedule.is_some() => schedule = r.schedule.clone(),
+                Some(r) if r.every.is_some() => every = r.every,
+                _ => return ask("How often?"),
+            },
+            Some(s) => match calls::parse_duration(s) {
+                Ok(e) => every = Some(e),
+                Err(_) => {
+                    let lower = s.to_lowercase();
+                    let named = routine.as_ref().and_then(|r| r.schedule.as_ref()).is_some_and(|p| {
+                        lower.split(|ch: char| !(ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '_' || ch == '.' || ch == '-')).any(|w| w.trim_end_matches('.') == p)
+                    });
+                    match &routine {
+                        Some(r) if named => schedule = r.schedule.clone(),
+                        Some(r) if r.schedule.is_some() => {
+                            let p = r.schedule.as_ref().unwrap();
+                            return ask(format!("\"{s}\" could not be read as how often. By your office's procedure ({}) the staff do {task} when {p} sets: say \"as {p} sets\", or leave how often out and the order follows it.", r.procedure));
+                        }
+                        Some(r) if r.every.is_some() => {
+                            return ask(format!("\"{s}\" could not be read as how often. Say it as a length of time (\"every 7 days\", \"each working day\"), or leave it out: by your office's procedure ({}) the staff do {task} every {}, and an order that does not say how often follows that.", r.procedure, duration_words(r.every.unwrap())));
+                        }
+                        _ => return unit(Err(calls::UnitError(format!("not how often: {s}")))),
+                    }
+                }
+            },
+        }
+        if every.is_some_and(|e| e <= 0) {
             return ask("How often?");
         }
+        let rhythm = match &schedule {
+            Some(p) => format!("as {p} sets"),
+            None => format!("every {}", duration_words(every.unwrap_or(0))),
+        };
         let first = self.when(c, "first")?;
         let until = self.when(c, "until")?;
         let by: Option<Vec<String>> = if Self::has(c, "by") {
@@ -504,7 +546,7 @@ impl Resolver<'_> {
         if let Some(u) = &units {
             text.push_str(&format!(", {u} each time"));
         }
-        text.push_str(&format!(", every {}", duration_words(every)));
+        text.push_str(&format!(", {rhythm}"));
         match first {
             Some(calls::When::At(at)) => text.push_str(&format!(", the first on {}", forms::date_words(at))),
             Some(calls::When::In(f)) => text.push_str(&format!(", the first in {}", duration_words(f))),
@@ -536,7 +578,19 @@ impl Resolver<'_> {
         }
         let mut data = serde_json::Map::new();
         data.insert("work".into(), Json::Object(work));
-        data.insert("every".into(), json!(every));
+        match &schedule {
+            Some(p) => {
+                data.insert("schedule".into(), json!(p));
+            }
+            None => {
+                data.insert("every".into(), json!(every.unwrap_or(0)));
+            }
+        }
+        if said.is_none() {
+            if let Some(r) = &routine {
+                data.insert("by_procedure".into(), json!(r.procedure));
+            }
+        }
         match first {
             Some(calls::When::At(at)) => {
                 data.insert("first_at".into(), json!(at));
@@ -1468,7 +1522,7 @@ mod tests {
         let mut k = Knowledge::new(Currency::from_config(&table["currency"]));
         k.absorb(&table["observation"]);
         let cases = table["cases"].as_array().unwrap();
-        assert!(cases.len() >= 12);
+        assert!(cases.len() >= 23);
         for c in cases {
             let name = c["name"].as_str().unwrap();
             let program = parse_program(c["program"].as_str().unwrap()).unwrap_or_else(|e| panic!("{name}: {e:?}"));

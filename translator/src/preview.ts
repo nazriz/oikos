@@ -222,6 +222,32 @@ export class Preview {
     return "";
   }
 
+  /**
+   * How often a standing work order is carried out, where that is not simply the rhythm the seat gave: the paper
+   * that sets when, with what the office's own procedure says of the routine; a rhythm taken from that procedure
+   * because the order gave none; or a rhythm given for a routine whose time a paper sets whatever an order says.
+   * All of it is the seat's own procedure, read out.
+   */
+  private rhythmOf(d: any): string {
+    const task = String(d.work?.task);
+    const r = this.k.routine(task);
+    const adopted = typeof d.by_procedure === "string";
+    if (typeof d.schedule === "string") return ` ${adopted ? "It gives no rhythm of its own: when" : "When"} ${task} is done is set by ${d.schedule}, as your office's procedure${r ? ` (${r.procedure})` : ""} says${this.saidOf(task, r?.procedure)}`;
+    if (adopted) return ` It gives no rhythm of its own: every ${span(d.every)} is the office's own rhythm for ${task}, by its procedure (${d.by_procedure}).`;
+    if (r?.schedule) return ` By your office's procedure (${r.procedure}) when ${task} is done is set by ${r.schedule}, whatever an order says of how often: the staff keep to that.`;
+    return "";
+  }
+  /** What a procedure the seat has on file says of one of its routines, quoted (": \"...\""), or a full stop. */
+  private saidOf(task: string, procedure?: string): string {
+    const text = procedure === undefined ? undefined : this.k.procedureText(procedure);
+    const at = text?.indexOf(` ${task}, at `) ?? -1;
+    if (text === undefined || at < 0) return ".";
+    const from = text.indexOf(": ", at) + 2;
+    const rest = text.slice(from);
+    const end = rest.search(/ (When it is done is set by|The office's own rhythm for it is) /);
+    return `: "${(end < 0 ? rest : rest.slice(0, end)).trim().slice(0, 600)}"`;
+  }
+
   outcome(o: any, every?: number): string {
     const rep = every ? ` every ${span(every)}` : "";
     // (Whatever a sentence leaves out of its outcome follows it in brackets, by name.)
@@ -286,9 +312,9 @@ export class Preview {
             ["kind", "text", "data", "addressed_to", "adico", "formal", ...RECORD]];
         }
         // A standing work order: on the organisation's own file, for its staff to follow. Nothing is done now.
-        if (b.kind === "work_order" && b.data?.work && b.data?.every) {
+        if (b.kind === "work_order" && b.data?.work && (b.data?.every || typeof b.data?.schedule === "string")) {
           const others = (Array.isArray(b.visible_to) ? b.visible_to : []).filter((x: string) => this.k.entityOf(x) !== (b.speaks_for ?? this.me));
-          return [`You will put a standing work order on ${this.k.entityOf(b.speaks_for ?? this.me) === this.me ? "your own file" : `the file of ${this.who(b.speaks_for)}`}${others.length ? `, shown to ${others.map((x: string) => this.who(x)).join(", ")}` : ""}: "${b.text}". Nothing is done now: the staff whose work it is follow it each time it falls due, in their own working hours, while it stands.${this.firstFalls(b.data, "order", 0)}${Number.isSafeInteger(b.data.until) ? (b.data.until % 86_400 === 0 ? ` It stands to the end of ${forms.dateWords(b.data.until - 86_400)}.` : ` It stands until ${moment(b.data.until)}.`) : ""}${this.k.ownStaff?.inPost === 0 && this.k.entityOf(b.speaks_for ?? this.me) === this.me ? ` There is nobody in the post whose work this is: your office has no ${this.k.ownStaff.role} in post, so nothing is done under it until someone is taken on.` : ""} To change it, withdraw it and make another; to pause it, put it on hold.${citing(b, " It cites ")}${this.rule(b)}`,
+          return [`You will put a standing work order on ${this.k.entityOf(b.speaks_for ?? this.me) === this.me ? "your own file" : `the file of ${this.who(b.speaks_for)}`}${others.length ? `, shown to ${others.map((x: string) => this.who(x)).join(", ")}` : ""}: "${b.text}". Nothing is done now: the staff whose work it is follow it each time it falls due, in their own working hours, while it stands.${this.rhythmOf(b.data)}${this.firstFalls(b.data, "order", 0)}${Number.isSafeInteger(b.data.until) ? (b.data.until % 86_400 === 0 ? ` It stands to the end of ${forms.dateWords(b.data.until - 86_400)}.` : ` It stands until ${moment(b.data.until)}.`) : ""}${this.k.ownStaff?.inPost === 0 && this.k.entityOf(b.speaks_for ?? this.me) === this.me ? ` There is nobody in the post whose work this is: your office has no ${this.k.ownStaff.role} in post, so nothing is done under it until someone is taken on.` : ""} To change it, withdraw it and make another; to pause it, put it on hold.${citing(b, " It cites ")}${this.rule(b)}`,
             ["kind", "text", "data", "addressed_to", "adico", "formal", ...RECORD]];
         }
         // A paper of the office's own, made on its form: its details read as the form says each is, and of everyone

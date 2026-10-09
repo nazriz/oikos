@@ -122,7 +122,26 @@ export class Knowledge {
    * a payment that cites one is set against in its draft's preview (a wage against the pay agreed). */
   readonly agreements = new Map<string, { template?: string; parties: string[]; pays: { who: string; to?: string; amount: string; every?: number }[] }>();
 
+  private readonly routineFacts = new Map<string, { procedure: string; every?: number; schedule?: string }>();
+  private readonly procedures = new Map<string, string>();
+  /** The words of a procedure that states routines, as the participant has it on file. */
+  procedureText(id: string): string | undefined {
+    return this.procedures.get(id);
+  }
+  /** A routine of the participant's office as its own procedure states it (a paper on its file: `proc-<office>-routines`):
+   * the procedure, and the routine's published rhythm where it has one (how often, or the paper that sets when).
+   * What a standing work order that does not say how often follows. None: no procedure it has seen names the task. */
+  routine(task: string): { procedure: string; every?: number; schedule?: string } | undefined {
+    const r = this.routineFacts.get(task);
+    return r && !this.withdrawn.has(r.procedure) ? r : undefined;
+  }
+
   private add(r: Record): void {
+    if (r.record === "statement" && r.kind === "procedure" && Array.isArray(r.data?.routines)) this.procedures.set(r.id, r.text);
+    if (r.record === "statement" && r.kind === "procedure" && Array.isArray(r.data?.routines)) for (const x of r.data.routines as any[]) {
+      if (typeof x?.task !== "string") continue;
+      this.routineFacts.set(x.task, { procedure: r.id, ...(Number.isSafeInteger(x.every) && x.every > 0 ? { every: x.every } : {}), ...(typeof x.schedule === "string" && x.schedule ? { schedule: x.schedule } : {}) });
+    }
     if (r.record === "agreement") {
       const pays = (r.terms?.commitments ?? []).flatMap((c) => {
         const m = c.does?.outcome?.money;

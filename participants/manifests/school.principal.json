@@ -237,11 +237,13 @@
     {
       "task": "teach",
       "at": "building",
+      "every": 1,
       "what": "Each school day, each classroom with pupils in it is taught by one of the teachers at work."
     },
     {
       "task": "enrol",
       "at": "building",
+      "every": 1,
       "what": "The school office answers each enrolment: a place in the least full classroom for a child of school age, or a letter saying why not; and gives each leaver a certificate of their years."
     }
   ]
