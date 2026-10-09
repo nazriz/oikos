@@ -1483,7 +1483,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     procedure: "proc-payments", approval_over: V.town_finance.payment_approval_over }));
   // The works office: hires the crew the staff line pays for, and sets them to the services from the hall (its depot).
   const hallCell = structures.find((x) => x.id === "town-hall")!.at;
-  office("works", "city", "Works manager", "works_manager", [mine("works-business"), K.mine("budgets", ["budget", "complaint"]), { id: "stock", kind: "holdings" },
+  office("works", "city", "Works manager", "works_manager", [mine("works-business"), K.mine("budgets", ["budget", "complaint"], { title: "Budgets, and complaints about the town's services" }), { id: "stock", kind: "holdings" },
     // (Its round, the addresses it collects from: its own register. The town's assets it has not seen, inspected.)
     K.kept("round", ["service_address"]), goAndSee("inspections", "a building of the town's by its id"), K.premises("depot", [hallCell])],
     code("city.works", { round: "round", inspections: "inspections", depot: "town-hall", workplace: "town-hall/workplace.1", industry: "public_administration", wage: wages.construction, period: PAY, working_day: WORKING_DAY, work_days: WORK_DAYS,
