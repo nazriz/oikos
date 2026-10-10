@@ -598,7 +598,7 @@ of 49 (the mark was 42). On the 180 real it is the lowest of the three, by more 
 0, 1, 2); and it never offered a form with a required field left out on the parity test (control 8 times, last round 14,
 all wrongly), though 3 times on the 180 real, each wrongly (control 2). **And the longer schedule alone is most of the
 parity gain**: the control has 27 of the 46 more parity cases, and 28 of the 45 more forms. One seed an arm: differences of
-three cases in 180 or one in 66 are within what a seed moves (last round's two seeds differed by 6 on the 180).
+three cases in 180 or one in 66 cannot be told from what a seed moves (no second seed was run to measure it).
 
 **So:** six epochs is the schedule to keep. Slot-by-slot decoding is kept in the code as a second decoding and is not made
 the default: it is better on generated forms and no better where it was meant to be. The failures it was aimed at are not
