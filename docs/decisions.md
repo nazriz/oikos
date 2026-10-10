@@ -3705,9 +3705,9 @@ See the design note, §16.
   named for a later line; (4) its function; (5) each slot of the function, in a stated order: for a form `form`, `to`, then
   every field of that form's line as shown, in the line's order; for any other function every argument the contract allows
   it, in the contract's order (`contracts/calls.schema.json`). A slot is left out (`-`), a closed-set value, or a copied
-  span (or a call or a list of its own, as before). Nothing closes a call or ends a program, so neither can end early; a
-  slot that must be filled (the contract's required arguments, a form's required fields as its line says) cannot be left
-  out of an answer; a field the form's line does not list has no slot and cannot be written. The model is told which slot
+  span (or a call or a list of its own, as before). Nothing closes a call or ends a program, so neither can end early; an
+  argument the contract requires cannot be left out; a field the form's line does not list has no slot and cannot be
+  written. The model is told which slot
   each decision is for (a learned mark for each of the contract's arguments; for a form's field, where its name stands in
   the form as shown), and only what a slot allows is in the running, in training as when answering. The closed-set-or-copy
   shape is as it was: the model still writes nothing it was not shown or given, and its sureness is still the product of
@@ -3718,11 +3718,20 @@ See the design note, §16.
   decoding takes, and both arms leave the same examples out).
 - **The same examples, written the other way.** `export.ts --decoding slots` on round 2's `joined-13`: 57,591 training,
   4,682 validation and 559 real validation rows, the same rows as `data-19`, none added or removed, each coming back to
-  its program exactly. 104 training labels (and 2 of the real validation rows) leave a form's required field out, because
-  the request does not give it: they are kept and trained as labelled (the label is always in the running), and an answer
-  cannot repeat them: it must fill the field, and is then usually too unsure to be offered. The same rule is written
+  its program exactly. The same rule is written
   twice, in the exporter's language and the trainer's; `py/check_slots.py` follows every label with the trainer's and
   found no example the two read differently (and a test holds them together on a few).
+- **A form's required field may be left out, in training and in answering alike** (the coordinating agent's decision,
+  2026-10-10, before any model was trained). 104 training labels (and 2 of the real validation rows) leave a form's
+  required field out because the request does not give it, and they are right as labelled: the answer is then not offered
+  as a draft, and the participant is told which fields the form still lacks (`formsMisfit`, as before). Forcing a value
+  there would be an invented value offered as a draft. So only the contract's own required arguments (and which form a
+  form is) cannot be left out; no label leaves one of those out.
+- **A fault found on the way, in the check of a draft against the forms shown.** Where two offices each have a form of
+  one name, `formsMisfit` checked a draft against the last such line shown, whichever office the draft went to (a right
+  draft for the first office was told it filled in a field that is not the form's). It now reads the line the call fills,
+  by name and office, the same line the slots are read off. It applies to every model, and all three scored here are
+  scored with it.
 - **What was not changed.** No prompt (0.9.4), no data, no label. A model's folder says which decoding it answers in
   (`config.json`, `decoding`; absent means `steps`), and the adapter reads it, so every earlier model answers as it did.
   The check of a draft against the forms shown (`formsMisfit`) stays for both.
@@ -3737,9 +3746,9 @@ See the design note, §16.
 - **Revisit if** the contract gains a function with many more arguments (a decision for each slot, mostly "left out", is
   cheap now: a mean of 8.8 decisions an example against 8.8 before, the longest 145); forms come to be shown some other way
   than a line with its fields (the slots are read off that line, in two languages); a seat needs a program of more lines
-  than any example has (the count is a closed choice); required-and-absent turns out to be common in what seats ask (the
-  model then asks back with nothing said of which field: let a required slot be left out and say which, as the form check
-  does); or lists start being closed early (give them a count as lines have).
+  than any example has (the count is a closed choice); the model leaves a form's required field out where the request
+  does give it (the early close in another dress: count it on every test before trusting a gain); or lists start being
+  closed early (give them a count as lines have).
 
 ## Open (to decide at the Stage 2 checkpoint or before)
 

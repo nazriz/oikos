@@ -7,7 +7,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import type { LlmAdapter, LlmRequest, LlmResponse } from "@oikos/participants/llm";
 import { calls } from "@oikos/participants";
-import { inputOf, programFrom, type Decoding } from "./encode";
+import { formsIn, inputOf, lineOf, programFrom, type Decoding } from "./encode";
 import { pieces } from "./export";
 
 const HERE = import.meta.dir;
@@ -26,7 +26,8 @@ export function shown(text: string): { request: string; forms: string[] } {
  * that is none of the input), or a program that is not in the call language as it stands (a model trained on another
  * version of the language may hold a label or an argument this one doesn't have: its closed set is its own, kept with
  * it in config.json). The steps are read in the decoding the model was trained in (`decodingOf` its folder): slot by
- * slot, decisions that break the slots' rule (a required slot left out, too few or too many) are no program either. */
+ * slot, decisions that break the slots' rule (an argument the contract requires left out, too few or too many) are no
+ * program either. (A form's required field left out is a program; `formsMisfit` then says which field it lacks.) */
 export function programOf(input: string, ps: { at: [number, number] }[], steps: (string | [string, number, number])[], decoding: Decoding = "steps"): string {
   try {
     const program = programFrom(input, steps.map((s) => {
@@ -121,6 +122,7 @@ export function formsMisfit(program: string, forms: string[]): Misfit | undefine
   if (!program.includes("form(")) return undefined;
   const shownForms = formsShown(forms);
   if (!shownForms.size) return undefined;
+  const lines = formsIn(["", ...forms].join("\n"));
   let p: calls.Program;
   try {
     p = calls.parseProgram(program);
@@ -136,7 +138,10 @@ export function formsMisfit(program: string, forms: string[]): Misfit | undefine
     }
     if (c.fn !== "form") return undefined;
     const form = said(c.args.form) ?? "";
-    const f = shownForms.get(form);
+    // (Two offices may each have a form of one name, with fields of their own: the call fills the one that goes to
+    // the office it names, the same line the slots are read off, encode.ts `lineOf`.)
+    const mine = lineOf(lines, form, said(c.args.to));
+    const f = (mine && mine.line.startsWith(`- ${form},`) ? [...formsShown([mine.line]).values()][0] : undefined) ?? shownForms.get(form);
     if (!f) return { label: "unknown_form" };
     const given = Object.keys(c.args).filter((k) => k !== "form" && k !== "to");
     const strange = given.filter((k) => !f.fields.has(k));

@@ -5,8 +5,8 @@
 Every example's label is followed with the rule the decoder answers by, over the input as the encoder's tokens. Counts,
 for each side: `misfit` (the label is not the decisions the rule lists: encode.ts and slots.py differ, and there must
 be none), `inexact` (a span or a field's name that isn't exactly a run of tokens: left out of training), `long` (more
-tokens than --max-tokens, 1024), `off_rule` (the label makes a decision an answer may not: it leaves a required slot
-out; kept), and how many decisions an example is at most. Run before training on a new export.
+tokens than --max-tokens, 1024), `off_rule` (the label makes a decision an answer may not: there should be none), and
+how many decisions an example is at most. Run before training on a new export.
 """
 from __future__ import annotations
 

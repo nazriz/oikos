@@ -1,15 +1,15 @@
 // Slot-by-slot decoding (translator/model/encode.ts, "Slot by slot"; py/slots.py): code lists what there is to decide,
 // the model decides each slot once. Held here: a program comes back exactly from its decisions (every kind of value,
 // and every example the pipeline's own generator makes), as pieces too; a call cannot end early and a program cannot
-// (there is nothing to end them with); a required slot cannot be left out of an answer; a field a form's line does not
-// list cannot be written; the rule is the same in the trainer's language; and a model of the earlier decoding is read
+// (there is nothing to end them with); an argument the contract requires cannot be left out, and a form's required
+// field can (the answer then says which it lacks); a field a form's line does not list cannot be written; the rule is the same in the trainer's language; and a model of the earlier decoding is read
 // as it always was.
 import { expect, test } from "bun:test";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { calls } from "@oikos/participants";
-import { cannotSay, decodingOf, programOf, vocabularyOf } from "../model/adapter";
+import { cannotSay, decodingOf, formsMisfit, programOf, vocabularyOf } from "../model/adapter";
 import { decode, decodeSlots, encode, formsIn, grammar, LEFT_OUT, lineOf, NotEncodable, PROGRAM, programFrom, slotsOf, vocabulary, type Span, type Step } from "../model/encode";
 import { pieces, row, stepsOf } from "../model/export";
 import { papers, directions, synthetic } from "../train/synthetic";
@@ -124,14 +124,13 @@ test("a call cannot end early and a program cannot: too few decisions, or too ma
   expect(() => encode({ request: "x", forms: [], program: "v1 = system(retire=sys-1)", spans: [{ arg: "retire", value: "sys-1", how: "implied" }] }, "name", "slots")).toThrow(NotEncodable);
 });
 
-test("a required slot cannot be left out of an answer; a label may leave one out, and says so", () => {
+test("an argument the contract requires cannot be left out; a form's required field can, and the answer then says which", () => {
   const input = "Pay c0412 $5.";
   // money needs to and amount (the contract): the first two slots.
   const whole: Step[] = [PROGRAM, "lines:1", "fn:money", ["id", 4, 9], ["text", 10, 12], ...Array(7).fill(LEFT_OUT)];
   expect(decodeSlots(input, whole)).toBe('money(amount="$5", to=c0412)');
   const without: Step[] = whole.map((s, i) => (i === 4 ? LEFT_OUT : s));
   expect(() => decodeSlots(input, without)).toThrow("money needs amount");
-  expect(decodeSlots(input, without, { lenient: true })).toBe("money(to=c0412)");
   // As a model's answer over pieces: no program, so it asks back. (In the other decoding the same call is offered,
   // and whoever resolves it asks for the amount.)
   const ps = pieces(input);
@@ -139,18 +138,28 @@ test("a required slot cannot be left out of an answer; a label may leave one out
   expect(programOf(input, ps, [PROGRAM, "lines:1", "fn:money", ["id", 1, 1], ["text", 2, 3], ...Array(7).fill(LEFT_OUT)], "slots")).toBe('money(amount="$5", to=c0412)');
   expect(programOf(input, ps, ["fn:money", "arg:to", ["id", 1, 1], ")", "eos"])).toBe("money(to=c0412)");
   expect(programOf(input, ps, ["none:not_yours"], "slots")).toBe("none(not_yours)");
-  // A form's required field, as its line says: year.
+  // A form must say which form (the contract).
   const c = cases()[4]!;
   const e = slots(c);
+  expect(() => decodeSlots(e.input, [PROGRAM, "lines:1", "fn:form", LEFT_OUT, LEFT_OUT])).toThrow("form needs form");
+  // A form's own required field, as its line says (year), may be left out: the request may not give it, and nothing
+  // is made up to fill it. The decisions are a program, with the field it lacks noted.
   const year = e.steps.findIndex((s) => typeof s !== "string" && e.input.slice(s[1], s[2]) === "year 3");
   const left = e.steps.map((s, i) => (i === year ? LEFT_OUT : s));
-  expect(() => decodeSlots(e.input, left)).toThrow("form needs year");
-  expect(decodeSlots(e.input, left, { lenient: true })).toBe('form(form=budget_proposal, staff="$41,000", to=pos.41)');
-  // The label that leaves it out is still encoded (the request may not give it), and comes back leniently.
+  const lacks: { form: string; field: string }[] = [];
+  expect(decodeSlots(e.input, left, { lacks })).toBe('form(form=budget_proposal, staff="$41,000", to=pos.41)');
+  expect(lacks).toEqual([{ form: "budget_proposal", field: "year" }]);
+  const none: { form: string; field: string }[] = [];
+  decodeSlots(e.input, e.steps, { lacks: none });
+  expect(none).toEqual([]);
+  // The label that leaves it out is those same decisions.
   const label = encode({ ...c, program: 'form(form=budget_proposal, staff="$41,000", to=pos.41)', spans: c.spans.filter((s) => s.arg !== "year") }, "name", "slots");
   expect(label.steps).toEqual(left);
-  // A form must say which form.
-  expect(() => decodeSlots(e.input, [PROGRAM, "lines:1", "fn:form", LEFT_OUT, LEFT_OUT])).toThrow("form needs form");
+  // As an answer it is not offered as a draft: the participant is told which field the form still lacks.
+  const r = row("x", "positive", label)!;
+  const program = programOf(label.input, pieces(label.input), r.steps, "slots");
+  expect(program).toBe('form(form=budget_proposal, staff="$41,000", to=pos.41)');
+  expect(formsMisfit(program, c.forms)).toEqual({ label: "unclear", unsure: { kind: "form_needs", form: "budget_proposal", fields: ["year"] } });
 });
 
 test("a field the form's line does not list cannot be written: it has no slot", () => {
@@ -215,7 +224,8 @@ test("the trainer's language holds the same rule: it follows every label to its 
   const leftOut = all[4]!.steps.map((s, i) => (i === 5 ? LEFT_OUT : s));
   const asked = { grammar: grammar(), cases: [
     ...all.map((e) => ({ input: e.input, steps: e.steps })),
-    { input: all[4]!.input, steps: leftOut },                                   // a required field left out: followed, and off the rule there
+    { input: all[4]!.input, steps: leftOut },                                   // a form's required field left out: allowed
+    { input: all[0]!.input, steps: all[0]!.steps.map((s, i) => (i === 4 ? LEFT_OUT : s)) }, // the contract's required amount left out: off the rule there
     { input: all[4]!.input, steps: all[4]!.steps.slice(0, -1) },                // too few
     { input: all[4]!.input, steps: [...all[4]!.steps, LEFT_OUT] },              // too many
     { input: all[2]!.input, steps: all[2]!.steps.map((s, i) => (i === 2 ? LEFT_OUT : s)) }, // a name used and never bound
@@ -227,13 +237,14 @@ test("the trainer's language holds the same rule: it follows every label to its 
   expect(got[4]!.slots).toEqual(["kind", "lines", "fn", "arg:form", "arg:to", "field:year", "field:works", "field:staff", "field:reserve", "field:note"]);
   expect(got[0]!.slots.slice(2)).toEqual(["fn", ...[...calls.ARGS.money!.allowed!].map((a) => `arg:${a}`)]);
   const n = all.length;
-  expect([got[n]!.fits, got[n]!.off]).toEqual([true, [5]]);
-  expect(got[n + 1]!.fits).toBe(false);
+  expect([got[n]!.fits, got[n]!.off]).toEqual([true, []]);
+  expect([got[n + 1]!.fits, got[n + 1]!.off]).toEqual([true, [4]]);
   expect(got[n + 2]!.fits).toBe(false);
-  expect(got[n + 3]!.off.length).toBe(1);
-  // And the other way: what the other language calls off the rule, this one refuses.
-  expect(() => decodeSlots(all[4]!.input, leftOut)).toThrow();
-  expect(() => decodeSlots(asked.cases[n + 3]!.input, asked.cases[n + 3]!.steps)).toThrow();
+  expect(got[n + 3]!.fits).toBe(false);
+  expect(got[n + 4]!.off.length).toBe(1);
+  // And the other way: what the other language allows, this one reads; what it calls off the rule, this one refuses.
+  expect(decodeSlots(all[4]!.input, leftOut)).toContain("form(");
+  for (const k of [1, 2, 3, 4]) expect(() => decodeSlots(asked.cases[n + k]!.input, asked.cases[n + k]!.steps)).toThrow();
 });
 
 test("a model's folder says which decoding it answers in; one that says nothing is read as every model before", () => {

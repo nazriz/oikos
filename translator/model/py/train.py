@@ -55,7 +55,7 @@ def slot_columns(row: dict, model: Translator, t, text: str, choice: list[int]) 
     is allowed there (slots.py, following the label). Or why not: "misfit" (the label is not the decisions the rule
     lists for it: the two languages' rules differ, or the input was changed so that they no longer fit) or "inexact"
     (a field's name that isn't exactly a run of tokens). `off_rule`: the label makes a decision the rule would not
-    allow an answer (it leaves a required slot out); the example is kept, and its label is always in the running."""
+    allow an answer (none does in the data so far); the example is kept, and its label is always in the running."""
     follow = Follow(model.cfg.grammar, model.cfg.slots, model.masks, text, t, exact=True)
     slot, a, z, named, mask, off = [], [], [], [], [], False
     try:

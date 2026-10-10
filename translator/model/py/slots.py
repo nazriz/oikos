@@ -5,8 +5,9 @@ lines, and for each line whether its result is named, its function, and each slo
 order (a form: `form`, `to`, then the fields of that form's line as shown, in the line's order; any other function:
 every argument the contract allows it, in the contract's order: `grammar`, from the export). The model only ever
 answers "what is this slot": left out (`-`), a choice from the closed set, or a copied span. Nothing closes a call or
-ends a program, so neither can end early; a slot that must be filled cannot be left out; a field the form's line does
-not list has no slot.
+ends a program, so neither can end early; a slot the contract requires cannot be left out (a form's own required
+field can: the request may not give it, and a value is never made up; the answer is then told back with what the form
+lacks); a field the form's line does not list has no slot. Training and answering follow this one rule.
 
 `Machine` is the rule over characters; `Follow` is a machine beside one input as a reader's tokens: for each decision,
 the slot's number, where a field's name stands in tokens, and which choices are allowed.
@@ -124,9 +125,9 @@ class Machine:
             form = yield from self._slot("arg:form", None, True)
             to = yield from self._slot("arg:to", None, False)
             line = self.forms.line_of(form, to)
-            for name, required, a, z in (line["fields"] if line else []):
+            for name, _wanted, a, z in (line["fields"] if line else []):
                 if name not in FORM_ARGS:
-                    yield from self._slot("field", (a, z), required)
+                    yield from self._slot("field", (a, z), False)
         else:
             for a in g["args"]:
                 yield from self._slot(f"arg:{a}", None, a in g["required"])

@@ -5,7 +5,7 @@
 // `--decoding slots`: the steps are the decisions of slot-by-slot decoding (encode.ts, "Slot by slot"); export.json
 // then says so and carries the contract's slots (`grammar`), each row how many steps it is in the other decoding
 // (`old`: a trainer told to can leave out exactly the rows a model of that decoding leaves out), and the report how
-// many labels leave a required slot out (kept: a label may, an answer may not).
+// many labels leave a form's required field out (the request does not give it; an answer may too).
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { calls } from "@oikos/participants";
@@ -49,7 +49,7 @@ if (import.meta.main) {
   const decoding: Decoding = process.argv[process.argv.indexOf("--decoding") + 1] === "slots" && process.argv.includes("--decoding") ? "slots" : "steps";
   mkdirSync(out, { recursive: true });
   const all: Encoded[] = [];
-  const report: { [side: string]: { examples: number; cut: number; longest_input: number; longest_steps: number; required_left_out?: number; lines?: { [n: string]: number } } } = {};
+  const report: { [side: string]: { examples: number; cut: number; longest_input: number; longest_steps: number; form_required_left_out?: number; lines?: { [n: string]: number } } } = {};
   // (validation-real: requests written in real situations and kept out of training, where the data has them. They
   // add nothing to the closed set of choices: one that makes a choice training never did is left out and counted.)
   const sides = ["train", "validation", ...(existsSync(join(data, "validation-real.jsonl")) ? ["validation-real"] : [])];
@@ -70,9 +70,11 @@ if (import.meta.main) {
         const want = calls.programText(calls.parseProgram(e.program));
         const other = encode(e);
         const otherRow = row(e.id, e.kind, other);
-        if (!r || !otherRow || decode(other.input, stepsOf(otherRow, otherRow.steps)) !== decode(other.input, other.steps) || decodeSlots(enc.input, stepsOf(r, r.steps), { lenient: true }) !== want) { cut++; continue; }
+        if (!r || !otherRow || decode(other.input, stepsOf(otherRow, otherRow.steps)) !== decode(other.input, other.steps) || decodeSlots(enc.input, stepsOf(r, r.steps)) !== want) { cut++; continue; }
         r.old = other.steps.length;
-        try { decodeSlots(enc.input, enc.steps); } catch { lenient++; }
+        const lacks: { form: string; field: string }[] = [];
+        decodeSlots(enc.input, enc.steps, { lacks });
+        if (lacks.length) lenient++;
         const n = typeof enc.steps[1] === "string" && enc.steps[1].startsWith("lines:") ? enc.steps[1].slice(6) : "0";
         lines[n] = (lines[n] ?? 0) + 1;
       } else if (!r || decode(enc.input, stepsOf(r, r.steps)) !== decode(enc.input, enc.steps)) { cut++; continue; }
@@ -82,7 +84,7 @@ if (import.meta.main) {
       rows.push(r);
     }
     writeFileSync(join(out, `${side}.jsonl`), rows.map((r) => JSON.stringify(r)).join("\n") + "\n");
-    report[side] = { examples: rows.length, cut, longest_input: Math.max(...rows.map((r) => r.pieces.length)), longest_steps: Math.max(...rows.map((r) => r.steps.length)), ...(decoding === "slots" ? { required_left_out: lenient, lines } : {}) };
+    report[side] = { examples: rows.length, cut, longest_input: Math.max(...rows.map((r) => r.pieces.length)), longest_steps: Math.max(...rows.map((r) => r.steps.length)), ...(decoding === "slots" ? { form_required_left_out: lenient, lines } : {}) };
   }
   writeFileSync(join(out, "vocabulary.json"), JSON.stringify(vocabulary(all), null, 1) + "\n");
   // How the steps were written, kept with them: a model answers in the order it was trained in.

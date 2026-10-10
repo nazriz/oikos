@@ -164,9 +164,11 @@ export function encode(e: { request: string; forms: string[]; program: string; s
 //      (`id`, `text`, `word`), a call of its own (`fn:…`, then that function's slots), or a list or data (`[` … `]`,
 //      `{` `key:…` … `}`: of copied texts and closed-set values, closed by a decision as before).
 // A call has ended when its slots are decided, and a program when its lines are: nothing closes a call or ends a
-// program, so neither can be closed early. A slot that must be filled (the contract's required arguments, a form's
-// required fields as its line says) cannot be left out; a field the form's line does not list has no slot, so it
-// cannot be written. `decodeSlots` holds an answer to that rule; the model's own decoder (py/slots.py) is the same
+// program, so neither can be closed early. A slot the contract requires (a function's required arguments; which form
+// a form is) cannot be left out. A form's own required field can: a request may not give it, the label then leaves it
+// out, and so may an answer, which is then not offered as a draft but told back with which fields the form still
+// lacks (adapter.ts `formsMisfit`); a value is never made up to fill one. A field the form's line does not list has
+// no slot, so it cannot be written. The rule is the same in training and in answering. `decodeSlots` holds an answer to that rule; the model's own decoder (py/slots.py) is the same
 // rule in the other language, and the trainer follows every example's label with it before it trains (an example
 // the two would read differently is counted, `misfit`, and there must be none).
 
@@ -205,13 +207,14 @@ export function lineOf(forms: FormLine[], form: string | undefined, to: string |
 }
 const said = (v: calls.Value | undefined): string | undefined => (v && "id" in v ? v.id : v && "text" in v ? v.text : undefined);
 
-export interface Slot { name: string; required: boolean; field?: [number, number] }
+/** `required`: the contract requires it, and it cannot be left out. `wanted`: a form's field its line marks required. */
+export interface Slot { name: string; required: boolean; wanted?: boolean; field?: [number, number] }
 /** A call's slots, in order. A form's are known once `form` and `to` are (pass them; without them, its own two). */
 export function slotsOf(fn: string, forms: FormLine[], form?: string, to?: string): Slot[] {
   const a = calls.ARGS[fn];
   if (!a) throw new NotEncodable(`${fn} is no function`);
   if (fn !== "form") return [...(a.allowed ?? [])].map((name) => ({ name, required: a.required.includes(name) }));
-  return [{ name: "form", required: true }, { name: "to", required: false }, ...(lineOf(forms, form, to)?.fields ?? []).filter((f) => !FORM_ARGS.has(f.name)).map((f) => ({ name: f.name, required: f.required, field: f.at }))];
+  return [{ name: "form", required: true }, { name: "to", required: false }, ...(lineOf(forms, form, to)?.fields ?? []).filter((f) => !FORM_ARGS.has(f.name)).map((f) => ({ name: f.name, required: false, wanted: f.required, field: f.at }))];
 }
 
 /** What the contract gives a model's decoder: each function's slots in order and which must be filled (a form's own
@@ -220,10 +223,10 @@ export const grammar = (): { [fn: string]: { args: string[]; required: string[] 
   Object.fromEntries(Object.entries(calls.ARGS).map(([fn, a]) => [fn, fn === "form" ? { args: ["form", "to"], required: ["form"] } : { args: [...(a.allowed ?? [])], required: a.required.filter((k) => a.allowed?.has(k)) }]));
 
 /** The program a run of slot decisions comes to. Throws on decisions no program is made of: too few or too many, one
- * that is not allowed where it stands (a required slot left out, a name used before it is bound, a pointer where a
- * choice is wanted). `lenient`: a required slot may be left out (a label may: 104 training examples leave a form's
- * required field out because the request does not give it; a model's answer may not). */
-export function decodeSlots(input: string, steps: Step[], o: { lenient?: boolean } = {}): string {
+ * that is not allowed where it stands (an argument the contract requires left out, a name used before it is bound, a
+ * pointer where a choice is wanted). `lacks`: given a list, every required field of a form that was left out is added
+ * to it (104 training labels leave one out, because the request does not give it). */
+export function decodeSlots(input: string, steps: Step[], o: { lacks?: { form: string; field: string }[] } = {}): string {
   let at = 0;
   const next = (): Step => {
     if (at >= steps.length) throw new NotEncodable("the decisions end early");
@@ -285,7 +288,8 @@ export function decodeSlots(input: string, steps: Step[], o: { lenient?: boolean
     const fill = (slot: Slot) => {
       const s = next();
       if (s !== LEFT_OUT) args[slot.name] = value(s);
-      else if (slot.required && !o.lenient) throw new NotEncodable(`${fn} needs ${slot.name}: it cannot be left out`);
+      else if (slot.required) throw new NotEncodable(`${fn} needs ${slot.name}: it cannot be left out`);
+      else if (slot.wanted) o.lacks?.push({ form: said(args.form) ?? "", field: slot.name });
     };
     if (fn === "form") {
       const own = slotsOf(fn, forms);
@@ -313,7 +317,7 @@ export function decodeSlots(input: string, steps: Step[], o: { lenient?: boolean
 }
 
 /** The program a model's decisions come to, in the decoding it was trained in. */
-export const programFrom = (input: string, steps: Step[], decoding: Decoding = "steps", o: { lenient?: boolean } = {}): string => (decoding === "slots" ? decodeSlots(input, steps, o) : decode(input, steps));
+export const programFrom = (input: string, steps: Step[], decoding: Decoding = "steps"): string => (decoding === "slots" ? decodeSlots(input, steps) : decode(input, steps));
 
 /** The lines of the forms shown, each with where it begins in the input. */
 function formLines(input: string, from: number): [number, string][] {
