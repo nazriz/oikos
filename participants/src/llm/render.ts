@@ -449,7 +449,9 @@ export function paperKind(r: Record): string {
 /** A kind as someone might say it, for matching: case, underscores, hyphens and a plural "s" don't matter. */
 export const kindSaid = (s: string) => plain(s).replace(/\s+/g, " ").replace(/(?<=[a-z]{3})s$/, "");
 /** Whether a paper is of one of the kinds said (a folder's, or what a look asked for). */
-export const ofKind = (r: Record, kinds: string[]) => kinds.some((k) => kindSaid(paperKind(r)) === kindSaid(k));
+export const ofKind = (r: Record, kinds: string[]) => kinds.some((k) => kindSaid(paperKind(r)) === kindSaid(k) || (kindSaid(k) === "standing payment" && standingPayment(r)));
+/** A standing payment: a request to pay, again and again (what a payroll folder holds beside the agreements it pays). */
+const standingPayment = (r: Record) => r.record === "statement" && r.kind === "request" && Number.isSafeInteger(r.data?.every) && r.data.every > 0 && !!r.data?.outcome?.money;
 /** Whether a paper names an id anywhere in it (its parties, whom it is to, what it cites, its details). */
 const namesId = (r: Record, id: string) => JSON.stringify(r).includes(JSON.stringify(id));
 /** Whether every word asked for is somewhere in a paper (capitals aside). */

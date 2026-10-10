@@ -1298,8 +1298,17 @@ export class StandingWork {
     const dated = (x: number) => `year ${Math.floor(x / (365 * DAY)) + 1}, day ${Math.floor((x % (365 * DAY)) / DAY) + 1}`;
     const named = Object.keys(o.tasks);
     const all = book.standingOf("work_order").filter((x) => x.speaks_for === this.me && (x.in_position === o.office || named.includes(String(x.data?.work?.task)))).sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : 1));
-    if (!all.length) return [];
-    const orders = all.map((r) => {
+    // A routine of theirs with no standing order on file: they are not doing it, and they say so (from their second
+    // working day: an office opens with its orders still to make). Until 2026-10-11 the staff reported only on orders
+    // that existed, so an office-holder who made none heard nothing: a clerk's drafters wrote no amendment into law
+    // in 400 days and a works crew collected nothing in 45, each without a word (wave 2c's review, fault 1).
+    const unordered = t >= DAY ? named.filter((task) => !all.some((x) => String(x.data?.work?.task) === task)) : [];
+    if (!all.length && !unordered.length) return [];
+    const none = unordered.map((task) => {
+      const more = this.said.get(task);
+      return { task, every: 0, state: "no_order", words: `not being done: no standing work order for ${task} is on file, and with none the staff do not do it (whoever holds the office makes one)${more ? `; ${more}` : ""}` };
+    });
+    const orders: { order?: string; task: string; every: number; schedule?: string; state: string; why?: string; times?: number; units?: number; words: string }[] = all.map((r) => {
       const task = String(r.data?.work?.task);
       const every = Number(r.data?.every) || 0;
       const head = { order: r.id, task, every, ...(typeof r.data?.schedule === "string" ? { schedule: r.data.schedule as string } : {}) };
@@ -1317,7 +1326,8 @@ export class StandingWork {
         words: `${c?.times ? `carried out: ${c.times} ${times}${units && c.units ? `, ${c.units} ${units}` : ""}` : "in force; nothing fell due"}${why !== undefined ? `; then not carried out: ${why}` : ""}${more ? `; ${more}` : ""}` };
     });
     // (How the orders stand, apart from the counts: a change in it is reported the day it is found.)
-    const key = orders.map((x) => `${x.order}:${x.state}:${"why" in x ? x.why : ""}`).join("|");
+    orders.push(...none);
+    const key = orders.map((x) => `${x.order ?? x.task}:${x.state}:${"why" in x ? x.why : ""}`).join("|");
     const last = this.reported;
     this.stuck.clear();
     const due = !last || (key !== last.key ? Math.floor(t / DAY) > Math.floor(last.at / DAY) : t - last.at >= (o.every ?? 7 * DAY) - DAY / 2);
@@ -1327,7 +1337,7 @@ export class StandingWork {
     this.count.clear();
     const staff = (o.inPost ?? []).map((person) => ({ person, ...(this.lastAt.has(person) ? { last: this.lastAt.get(person)!.at, task: this.lastAt.get(person)!.task } : {}), ...(o.noPlace?.includes(person) ? { no_place: true } : {}) }));
     const people = staff.length ? ` In post ${staff.length}: ${staff.map((x) => `${x.person} ${"last" in x ? `last worked ${dated(x.last!)} (${x.task})` : `has not come in to work${x.no_place ? " (no place of work in the employment agreement or the advertisement it cites)" : ""}`}`).join("; ")}.` : "";
-    const text = `Report of ${o.from}, ${dated(t)}, on the work under the office's standing work orders${since !== undefined ? ` since ${dated(since)}` : ""}. ${orders.map((x) => `${x.task} (${x.order}, ${"schedule" in x && x.schedule ? `as ${x.schedule} sets` : `every ${Math.round(x.every / DAY) || "?"} day${Math.round(x.every / DAY) === 1 ? "" : "s"}`}): ${x.words}`).join(". ")}.${people}`;
+    const text = `Report of ${o.from}, ${dated(t)}, on the work under the office's standing work orders${since !== undefined ? ` since ${dated(since)}` : ""}. ${orders.map((x) => (x.order === undefined ? `${x.task}: ${x.words}` : `${x.task} (${x.order}, ${"schedule" in x && x.schedule ? `as ${x.schedule} sets` : `every ${Math.round(x.every / DAY) || "?"} day${Math.round(x.every / DAY) === 1 ? "" : "s"}`}): ${x.words}`)).join(". ")}.${people}`;
     return [because(`Reporting to the office on the work under its standing orders${last && key !== last.key ? ": how an order stands has changed" : ""}.`,
       say("staff_report", text, { to: [this.me], visible: [this.me], data: { office: o.office, ...(since !== undefined ? { since } : {}), orders: orders.map(({ words, ...x }) => ({ ...x, says: words })), ...(staff.length ? { staff } : {}) } }))];
   }

@@ -55,6 +55,27 @@ pub fn parse_date(s: &str) -> Result<i64, String> {
         day = Some(n);
         rest = after[len..].trim_start();
     }
+    // A day may be followed by a time of day, as the town's own papers write a moment ("year 1, day 289, 13:00").
+    let mut of_day = 0;
+    if day.is_some() && !rest.is_empty() {
+        let at = rest.strip_prefix(',').map_or(rest, str::trim_start);
+        let Some((h, hl)) = digits(at, 2) else { return Err(not_a_date(s)) };
+        let Some(after) = at[hl..].strip_prefix(':') else { return Err(not_a_date(s)) };
+        let two = |x: &str| -> Option<i64> { (x.len() >= 2 && x.as_bytes()[..2].iter().all(u8::is_ascii_digit)).then(|| x[..2].parse().ok()).flatten() };
+        let Some(m) = two(after) else { return Err(not_a_date(s)) };
+        let mut tail = &after[2..];
+        let mut sec = 0;
+        if let Some(x) = tail.strip_prefix(':') {
+            let Some(v) = two(x) else { return Err(not_a_date(s)) };
+            sec = v;
+            tail = &x[2..];
+        }
+        if h > 23 || m > 59 || sec > 59 {
+            return Err(not_a_date(s));
+        }
+        of_day = h * 3_600 + m * 60 + sec;
+        rest = tail.trim_start();
+    }
     if !rest.is_empty() || (year.is_none() && day.is_none()) {
         return Err(not_a_date(s));
     }
@@ -62,7 +83,7 @@ pub fn parse_date(s: &str) -> Result<i64, String> {
     if year < 1 || !(1..=365).contains(&day) {
         return Err(not_a_date(s));
     }
-    Ok(((year - 1) * 365 + (day - 1)) * DAY)
+    Ok(((year - 1) * 365 + (day - 1)) * DAY + of_day)
 }
 
 fn is_name(n: &str) -> bool {

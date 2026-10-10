@@ -141,6 +141,11 @@ test("a planning decision on its form is the decision the module sends, and the 
   expect(r.map((x) => x.turned.program).join("\n")).toContain("form(applicant=c0005, application=rec.30, decision=granted, form=permit_decision");
   expect(r.map((x) => x.turned.program).join("\n")).toContain('missing=["structure_type"]');
   expect(r.map((x) => x.turned.program).join("\n")).toContain("claim(");
+  // The form says so of itself: a decision granted on it records no permission, and what does (wave 2c: a planning
+  // seat granted a park on this form alone, and the inspector fined the town and ordered the park down the same day).
+  const form = papers.find((f: any) => f.data.form === "permit_decision") as any;
+  expect(form.text).toContain("A decision is the notice of it and no more.");
+  expect(form.text).toContain("the applicant's liberty to build that kind of building on that lot, which the planning officer records beside a decision to grant");
 });
 
 test("every paper a module declares is a form the contract accepts, names fields it has, and is shown to the translator as its office's", () => {

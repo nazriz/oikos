@@ -66,11 +66,15 @@ export function dateWords(t: number): string {
 export function parseDate(s: string): number {
   // (A moment as a record has it, in seconds: bare digits.)
   if (/^\s*[0-9]{1,15}\s*$/.test(s)) return Number(s.trim());
-  const m = /^\s*(?:year\s*([0-9]{1,6}))?\s*,?\s*(?:day\s*([0-9]{1,3}))?\s*$/i.exec(s);
+  // (A day may be followed by a time of day, as the town's own papers write a moment: "year 1, day 289, 13:00". A
+  // registrar copying a birth notification's "born at" wrote it so, with and without the commas, and was told it was
+  // not a date: wave 2c's review, fault 10.)
+  const m = /^\s*(?:year\s*([0-9]{1,6}))?\s*,?\s*(?:day\s*([0-9]{1,3})(?:\s*,?\s*([0-9]{1,2}):([0-9]{2})(?::([0-9]{2}))?)?)?\s*$/i.exec(s);
   if (!m || (m[1] === undefined && m[2] === undefined)) throw new FormError(`not a date: ${s}. A date is written like "year 1, day 12".`);
   const year = Number(m[1] ?? 1), day = Number(m[2] ?? 1);
-  if (year < 1 || day < 1 || day > 365) throw new FormError(`not a date: ${s}. A date is written like "year 1, day 12".`);
-  return ((year - 1) * 365 + (day - 1)) * DAY;
+  const hour = Number(m[3] ?? 0), minute = Number(m[4] ?? 0), second = Number(m[5] ?? 0);
+  if (year < 1 || day < 1 || day > 365 || hour > 23 || minute > 59 || second > 59) throw new FormError(`not a date: ${s}. A date is written like "year 1, day 12".`);
+  return ((year - 1) * 365 + (day - 1)) * DAY + hour * 3_600 + minute * 60 + second;
 }
 
 const MARKS = ["=", "#", "?", "+"];

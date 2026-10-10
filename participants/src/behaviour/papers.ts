@@ -124,7 +124,7 @@ export const COUNCIL_CLERK: Issued[] = [
 ];
 
 export const PLANNING: Issued[] = [
-  { form: "permit_decision", title: "Decision on a planning permit application", does: "Decides a permit application (granted, refused, or sent back as incomplete) and tells the applicant.",
+  { form: "permit_decision", title: "Decision on a planning permit application", does: "Decides a permit application (granted, refused, or sent back as incomplete) and tells the applicant. A decision is the notice of it and no more. The permission is the applicant's liberty to build that kind of building on that lot, which the planning officer records beside a decision to grant, citing the application: the building inspector reads that record, and fines work that has none.",
     fields: { application: f("record", "The application decided.", req), applicant: f("entity", "Who applied: the decision is sent to them.", req),
       decision: f("choice", "Granted, refused, or sent back as incomplete.", { ...req, options: ["granted", "refused", "incomplete"] }),
       law: f("record", "The law the building would breach, if any."), missing: f("list", "For an incomplete application: what it does not say (lot, structure_type).") },

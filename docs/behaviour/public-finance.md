@@ -79,7 +79,7 @@ A charge may also say `itemised`: the employer's report of it names each worker 
   - records it as the town's claim against them (`about.kind` rates, with the account to pay and the due date);
   - a month after the due date, and monthly while any stays unpaid, records a month's penalty interest (`rates_interest`) and writes to the owner.
 
-  A payment into the town's account that names the claim (`settles`) settles it. Its report gives the rate, what's been levied and received, and who's overdue.
+  A payment into the town's account that names the claim (`settles`) settles it. So does one that names the notice the claim was recorded with (same owner, sum and due day): whoever is sent a notice pays the notice (2026-10-11; docs/decisions.md, "A payment that names the rates notice pays the rates"). Its report gives the rate, what's been levied and received, and who's overdue.
 - **Owners pay.** Landlords pay rates as they pay fines, when they have the money (a non-complying landlord may not). Firms treat rates as debts: they pay them while they can, keeping the next pay period's wages, and unpaid rates count towards insolvency (docs/behaviour/insolvency.md). The builder pays the rates on its yard.
 
 **Leaves out:**
