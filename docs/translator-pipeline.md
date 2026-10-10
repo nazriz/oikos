@@ -478,6 +478,82 @@ enough for every writer (the first on the path was not). The pod step was by han
 `--token-budget 4096` whatever the card: a pod with a 24 GB card, left to the trainer's default, ran 100 minutes and
 brought nothing home (why is not known; `pod.sh` now brings the runs' last log lines home when it finds the queue stopped).
 
+### Round 2's results (2026-10-10)
+
+Run folder: `runs/translator-round-2-2026-10-10/` (README, `STATUS`; `scores/groups-all.txt` has every table, old seed beside
+new). Model: `pod-small-r2-s1` (`microsoft/deberta-v3-small`, seed 1's settings: `--forms-most 18 --token-budget 4096`), trained
+on `runs/translator-model/data-19`, the export of `runs/translator-data-in-situ/joined-13`. **It does not pass**: 85% right on
+the 180 real requests against 90%, wrong drafts 6.7% against 1%, held out 48 of 66.
+
+**What the round found first** (`step1/`): of the 1,040 requests the last round dropped, 802 were of training pilots. Read by
+cluster and a third time by `codex/gpt-6.1-sol`: 319 differed in copied free text alone, about 290 turned on rules the prompt
+left open, about 80 were one reader's slip; the third reader agreed with one of the two on 401 and with neither on 400. Nine
+rulings followed (docs/decisions.md, "The translator's prompt is 0.9.4"): prompt 0.9.4, and free text no longer compared
+between readers or by the set scorer (`text_exact` is reported beside `passed`).
+
+**What trained** (57,591 rows; 40,557 distinct examples):
+
+| Source | Rows |
+|---|---|
+| The last round's set (joined-12), each in-situ example a ruling could touch checked under 0.9.4: 591 stand, 40 relabelled, 26 dropped, 3 set aside | 49,396 |
+| The readers' former disagreements, read again under 0.9.4: 541 of 802 settle (481 train, four times; 58 to validation-real; 2 set aside) | 1,924 |
+| w2-58, the 400-day council pilot (315 of 335 requests agreed; 257 train; 31 held back as a test) | 1,028 |
+| Written in finance, bank, landlord and manager seats' situations under `writer-round3.txt` (728 of 828 agreed; 652 train, less 9 set aside) | 2,572 |
+| Generated this round, the weak kinds (`wide/`: 3,014 kept of 3,277 briefs; 8 dropped for a source shared with the parity test; 376 to validation) | 2,675 |
+
+Distinct examples, before and now: money 1,266 and 2,255 (from pilots 170 and 420), a payment with its report 0 and 53,
+agreements 829 and 1,257 (from pilots 15 and 53), statements 1,795 and 2,141, forms 5,292 and 6,403, `per_request` 2 and 253,
+asked by a banker 369 and 1,036. 14 single payments on a later day are set aside (docs/design/call-language-gaps.md B.9).
+The closed set has 118 choices and lacks nothing; nothing that trains shares a source with the parity test, is in a test's
+words, or comes from a test-only pilot.
+
+**Who read what.** Under 0.9.3: sol read the 802, and every refusal example of the last round's pipelines (797: it read 38
+otherwise, `too_much` 11 of 13). Under 0.9.4: Sonnet 5.5 read everything first; the second reader was sol for 390 of the 802 and
+Opus 5.5 for the other 412 and for both new pipelines (1,163 requests), because the Codex window shut after about 2,300 requests
+and reopened four hours later. So most of this round's new labels are two Claude readers'. Not read again under 0.9.4: 669
+single forms and 622 `not_an_act` examples of the last round, and the 2,712 in-situ examples of pilots 7 to 10.
+
+**Scores, last round's seed 1 beside the new seed, both scored the same day with the same code** (right; no draft, wrong):
+
+| Test | `pod-small-w2-s1` | `pod-small-r2-s1` |
+|---|---|---|
+| Seen, the 99 of before | 81 (wrong 12) | 83 (wrong 9) |
+| Seen, with the 17 cases of 0.9.4 | 89 of 116 | 95 of 116 |
+| Held out (66) | 46 (11, 9) | 48 (10, 8) |
+| The 180 real requests | 147 (20, 13) | 153 (15, 12) |
+| Parity test (1,466) | 1,367 (47, 52) | 1,379 (33, 54) |
+| Held-back seats' requests, wave 2 (148) | 128 (10, 10) | 136 (3, 9) |
+| Held-back seats' requests, late pilots (61) | 56 (1, 4) | 56 (3, 2) |
+| Held-back seats' requests, w2-58 (31; new this round) | 22 (4, 5) | 28 (2, 1) |
+| Test-only pilots, seats' own (77) | 57 (10, 10) | 60 (7, 10) |
+| Test-only pilots, seats' own, stage 2c (59) | 47 (7, 5) | 48 (1, 10) |
+| Test-only pilots, written in their situations (187) | 161 (11, 15) | 162 (9, 16) |
+| Test-only pilots, written in their situations, stage 2c (108) | 96 (8, 4) | 96 (6, 6) |
+
+The scorer's change by itself moved the old seed little (held-back 122 to 128 of 148; parity 1,366 to 1,367). Of the new
+seed's right answers on the set tests, the free text is the label's too in 96% (533 of 558 on the six pipeline-made files).
+
+**By kind** (parity test, old then new): agreements 30 then 35 of 49 (wrong 14 both); forms 183 then 186 of 250 (asked back 40
+then 31, wrong 27 then 33); money 48 then 50 of 50; standing payments 18 then 20 of 20. On the 180 real: statements 13 then 16
+of 22, forms 24 then 27 of 31, holds 3 then 6 of 9, a form with a letter 11 then 9 of 13. On the test-only pilots' own requests:
+money 0 of 7 both (2 then 5 wrong), work 2 then 5 of 8.
+
+**By group** (groups of 20 or more): parity by asker, the banker 43 then 47 of 52 and no asker under 90% (one before); by way of
+writing money, 4 then 1 under 90% (code only with no decimals, 26 then 25 of 31); by register, one under 90% both times (slips
+112 then 115 of 126; now `named`, 48 of 54); by writer, the largest Claude model's forms 172 then 173 of 217. Held-back by
+profile: au-vic 11 then 15 of 20, gap 40 then 25 points. Test pilots' own by seat model: gpt-6.1-sol 12 then 14 of 20.
+
+**What it still lacks.** More data of the same kinds moved the scores a little and the pass mark not at all. (a) Forms of
+several amounts written by the strongest writer: 1,096 more form examples changed 3 cases of 250; it now drafts where it asked
+back, and is wrong as often as right when it does. (b) Agreements: 426 more, and the same 14 wrong drafts. Both point at what the
+small reader can hold in one pass (many values of one type, nested calls), not at missing examples: the next experiment is the
+reader, or how such programs are decoded, not another part. (c) Money in pilots it has not seen: 0 of 7. (d) Wrong drafts on
+real requests are 12 of 180; they do not fall with data.
+
+**Spend.** RunPod 0.55 USD of a limit of 2.00 (one pod, 87 minutes at 0.39; the provider lists none). Plan usage as Claude Code
+reckons it: 115 USD (Opus 5.5 78: writing 54, reading 24; Sonnet 5.5 29; Haiku 5.5 at low effort 8), 53% of the last round's
+216; Haiku at default effort was not used. Codex: about 2,300 requests read by gpt-6.1-sol in one window.
+
 ## A wide part
 
 Written 2026-10-09 (data pipeline 0.13.0), for the owner's concern that the data is too narrow: the pilots' requests
@@ -540,5 +616,5 @@ program. The join's own leak check runs again there.
 - Scoring a prompt-driven model on the test sets from the pipeline itself: it scores the runs it trained; any other model is
   scored by hand (`oikos translator-eval --model provider/model --only-sets --set <out>/tests/<file>.jsonl`).
 - Resuming a training run on the pod after the pod is ended: the checkpoint is not brought home, so it starts again.
-- A third reader to settle disagreements (the label step drops them).
+- A third reader to settle disagreements as a step of the pipeline (round 2 did it by hand: `runs/translator-round-2-2026-10-10/scripts/`; the label step still drops them).
 - Choosing among the trained runs: the manifest lists them, and a person chooses.
