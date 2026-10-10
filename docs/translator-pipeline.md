@@ -550,6 +550,15 @@ small reader can hold in one pass (many values of one type, nested calls), not a
 reader, or how such programs are decoded, not another part. (c) Money in pilots it has not seen: 0 of 7. (d) Wrong drafts on
 real requests are 12 of 180; they do not fall with data.
 
+**The 27 real requests it still fails** (`scripts/real-errors.ts` in the run folder: ids, functions and argument names only).
+Twelve wrong drafts: seven are the council's budget proposal form with an amount field left out or the amounts in each other's
+fields (`staff`, `services`, `parks`, `environment`); four are a program of several lines written as one line (a second form, a
+second letter, statements beside a form); one is a statement where nothing can be done. Fifteen with no draft: seven refused
+`look_first` or `unclear` where one or several statements (withdrawals, holds, notices) were wanted; five gave another refusal
+than the right one (`no_such_act` for `look_first`, `needs_calculation` or `not_an_act` for `no_such_act`); three refused where a
+letter, or a payment with its report, was wanted. So the wrong drafts are two things, forms of several amounts and counting
+lines, and neither is a kind the data lacks.
+
 **Spend.** RunPod 0.55 USD of a limit of 2.00 (one pod, 87 minutes at 0.39; the provider lists none). Plan usage as Claude Code
 reckons it: 115 USD (Opus 5.5 78: writing 54, reading 24; Sonnet 5.5 29; Haiku 5.5 at low effort 8), 53% of the last round's
 216; Haiku at default effort was not used. Codex: about 2,300 requests read by gpt-6.1-sol in one window.
