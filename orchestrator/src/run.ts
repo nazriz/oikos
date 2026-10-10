@@ -27,7 +27,7 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { calls, canonical, DECISIONS, OUTCOMES, inCurrency, paramErrors, modules as builtin, Randomness, Roster, slice, Tally, View, type BehaviourModule, type Controller, type Currency, type DecisionRecord, type OutcomeRecord, type LookRequest, type Observation, type ParticipantAction, type ParticipantContext } from "@oikos/participants";
 import { CONSULT_VERSION, createConsult, createLlmParticipant, LLM_PARTICIPANT_VERSION, MOCK_VERSION, MockAdapter, mockPolicies, PRICES, ModelCallFailed, ModelUnreachable, SpendingLimitReached, type Budget, type LlmAdapter, type LlmController, type LlmIO, type MockBrain, type Price } from "@oikos/participants/llm";
-import { createTranslator, draftText, Knowledge, RESOLVER, resolve, TRANSLATOR_VERSION, type Draft, type Resolution, NOT_CHECKED } from "@oikos/translator";
+import { createArrangement, createTranslator, draftText, Knowledge, RESOLVER, resolve, TRANSLATOR_VERSION, type Draft, type Resolution, type Route, NOT_CHECKED } from "@oikos/translator";
 import { Kernel } from "./kernel";
 import { divergences } from "./truth";
 import type { Watchdog } from "./watchdog";
@@ -49,6 +49,11 @@ export interface RunOptions {
   adapter?: LlmAdapter;
   /** The translator's own model (default: the same as the participants'). */
   translatorAdapter?: LlmAdapter;
+  /** A translator that answers first, with the translator behind it (translator/src/arrangement.ts): our own trained
+   * model. `translatorArrangement`: "then" (the default: the one behind takes what the first fails) or "beside" (the
+   * first's answers are only recorded). */
+  translatorFirst?: LlmAdapter;
+  translatorArrangement?: "then" | "beside";
   /** Prices for real models (micro-USD per million tokens, keyed "provider/model"), added to the mock's. */
   prices?: Record<string, Price>;
   /** A spending limit for real models: the run stops (and says why) rather than exceed it. 5% is kept back for debriefs. */
@@ -519,14 +524,22 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   };
   for (const pid of [...parts.keys()].sort()) await syncUnits(pid);
 
-  const translator = createTranslator(o.translatorAdapter ? { ...io, adapter: watched(o.translatorAdapter) } : io, async (participant, position, blocks) => {
+  const kernelCheck: Parameters<typeof createTranslator>[1] = async (participant, position, blocks) => {
     const r = await k.tryRequest({ op: "check", participant, ...(position ? { as: position } : {}), blocks });
     return r === null ? { ok: false, error: "the blocks could not be read" } : r.check;
-  }, typeOf, undefined, undefined, RESOLVER_MODE === "ts" ? undefined : async (req, program) => {
+  };
+  const engineResolver: Parameters<typeof createTranslator>[5] = RESOLVER_MODE === "ts" ? undefined : async (req, program) => {
     // (A language-model seat perceives all its capacities: its knowledge is the engine's under its participant.)
     const e = await k.request({ op: "resolve", participant: req.participant, ...(req.as ? { as: req.as } : {}), program: calls.programText(program) });
     return (e.blocks ? { ok: true, blocks: e.blocks } : { ok: false, questions: e.questions, ...(e.invalid ? { invalid: e.invalid } : {}) }) as Resolution;
-  });
+  };
+  const one = createTranslator(o.translatorAdapter ? { ...io, adapter: watched(o.translatorAdapter) } : io, kernelCheck, typeOf, undefined, undefined, engineResolver);
+  // A translator that answers first, if the run has one: the two are one translator to every seat (arrangement.ts).
+  // (The first is asked once a request: it decides without sampling, so asked again it says the same.)
+  const arranged = o.translatorFirst
+    ? createArrangement(createTranslator({ ...io, adapter: watched(o.translatorFirst) }, kernelCheck, typeOf, undefined, 1, engineResolver), one, { arrangement: o.translatorArrangement ?? "then" })
+    : undefined;
+  const translator: { id: typeof one.id; translate(req: Parameters<typeof one.translate>[0]): Promise<Awaited<ReturnType<typeof one.translate>> & { route?: Route }> } = arranged ?? one;
 
   // Welfare (VISION §15; D55): a world that offers violence (life.harm) to language-model people says so in the log.
   const modelPeople = [...cfg.participants, ...(cfg.templates ?? [])].filter((x: any) => x.kind === "person" && x.controller?.type === "llm").map((x: any) => x.id);
@@ -545,7 +558,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   // What code ran this world is part of the record (D30).
   await k.request({ op: "annotate", annotation: { annotation: "orchestrator", subject: "orchestrator", data: {
     version: ORCHESTRATOR_VERSION, modules: used, thinking_time: cfg.orchestration.thinking_time, confirm,
-    ...(Object.keys(bindings).length ? { llm: { participant_version: LLM_PARTICIPANT_VERSION, translator: translator.id, translator_version: TRANSLATOR_VERSION, mock_version: MOCK_VERSION, prices: Object.entries(io.prices!).filter(([key]) => key === `${io.adapter.provider}/${io.adapter.model}` || key === translator.id.model || key === "mock/mock").map(([key, price]) => ({ model: key, ...price })), participants: bindings, ...(o.budget ? { spending_limit_microusd: o.budget.limitMicroUsd } : {}) } } : {}),
+    ...(Object.keys(bindings).length ? { llm: { participant_version: LLM_PARTICIPANT_VERSION, translator: translator.id, ...(arranged ? { translator_arrangement: { arrangement: arranged.arrangement, first: arranged.first, behind: arranged.behind, stands: arranged.stands } } : {}), translator_version: TRANSLATOR_VERSION, mock_version: MOCK_VERSION, prices: Object.entries(io.prices!).filter(([key]) => key === `${io.adapter.provider}/${io.adapter.model}` || key === translator.id.model || key === arranged?.first.model || key === arranged?.behind.model || key === "mock/mock").map(([key, price]) => ({ model: key, ...price })), participants: bindings, ...(o.budget ? { spending_limit_microusd: o.budget.limitMicroUsd } : {}) } } : {}),
   } } });
 
   const unitsOf = (pid: string) => units.of(pid);
@@ -651,6 +664,8 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   const submit = async (u: Unit, p: { draft: Draft; hash: string; reasoning?: string }, decision: "accept" | "reject", note?: string) => {
     const d = p.draft;
     await k.request({ op: "annotate", annotation: { annotation: "signoff", participant: u.participant, draft: d.id, draft_hash: p.hash, decision, ...(note ? { note } : {}) } });
+    // (With two translators as one: a draft of the first's that is declined sends the seat's next request behind.)
+    arranged?.signed(d.id, decision);
     if (decision !== "accept") return;
     const as = d.as ?? capacityOf(u);
     const r = await begin(u, { command: "act", participant: u.participant, ...(as ? { as } : {}), blocks: d.blocks,
@@ -863,6 +878,9 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       // Earlier attempts the translator retried (its own, not the participant's): kept on record.
       for (const [i, x] of (tr.retries ?? []).entries())
         await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { translation_retry: { draft: draftId, attempt: i + 1, reason: x.reason, ...(x.call ? { call: x.call } : {}) } } } });
+      // With two translators as one: who drafted this request, why it went behind, and what each answered. For the
+      // record only: nothing of it is ever said to a seat.
+      if (tr.route) await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { translation_route: { draft: draftId, ...tr.route } } } });
       if (!tr.ok) {
         await k.request({ op: "annotate", annotation: { annotation: "translation_failure", subject: u.participant, data: { draft: draftId, proposal: action.text, reason: tr.notices.join(" "), ...(tr.asked_back ? { asked_back: true } : {}), ...(tr.call ? { call: tr.call } : {}), ...(tr.invalid ? { invalid: tr.invalid } : {}), ...(tr.raw !== undefined ? { raw: JSON.stringify(tr.raw) } : {}) } } });
         for (const text of tr.notices) u.notices.push({ t, text: aboutRequest(action.text, text), re: draftId });

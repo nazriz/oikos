@@ -63,7 +63,9 @@ export async function realModelIn(path: string): Promise<string | undefined> {
         continue; // (a last line cut off as the process ended)
       }
       const provider = b?.provider ?? b?.data?.provider;
-      if (typeof provider === "string" && provider !== "mock") return `${provider}/${b?.model ?? b?.data?.model ?? "?"}`;
+      // (Our own trained translator, `decide`, answers from files on disk without sampling: what it said can be made
+      // again, as the mock's can. A pilot's log holds its seats' answers too, and those are what is kept.)
+      if (typeof provider === "string" && provider !== "mock" && provider !== "decide") return `${provider}/${b?.model ?? b?.data?.model ?? "?"}`;
     }
   } catch (e) {
     // A compressed log cut short: what was read held no real model's answer, but the rest can't be vouched for.

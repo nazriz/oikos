@@ -351,6 +351,11 @@ export function askAgain(what: string, form?: { name: string; fields: { [field: 
     : `It could not be drawn up from what you said: ${what} in it could not be made out. ${what === "a date or a length of time" || what === "a length of time" || what === "how often" ? SAY_AGAIN[what]! : "Please say it again, with each figure written out."}`;
 }
 
+/** What a translator's model said with its last answer, beside the program, where it says how sure it is (our own
+ * trained model answering first, translator/model/adapter.ts): its sureness of the whole answer (parts per million), the time it took (milliseconds), why
+ * it offers no draft where that is its adapter's doing, and what it had written then. Never shown to anyone. */
+export interface Answered { sure_ppm: number; ms?: number; withheld?: string; wrote?: string; unsure?: unknown }
+
 export function createTranslator(io: LlmIO, check: KernelCheck, typeOf: (type: string) => StructureTypeInfo | undefined, id = "translator", attempts = 2, resolver?: ResolveFn) {
   const tid: TranslatorId = { id, version: TRANSLATOR_VERSION, model: `${io.adapter.provider}/${io.adapter.model}` };
   const seen = new Set<string>();
@@ -411,7 +416,7 @@ export function createTranslator(io: LlmIO, check: KernelCheck, typeOf: (type: s
   }
   return {
     id: tid,
-    async translate(req: TranslateRequest): Promise<Translation & { retries?: { call?: string; reason: string }[] }> {
+    async translate(req: TranslateRequest): Promise<Translation & { retries?: { call?: string; reason: string }[]; answered?: Answered }> {
       const messages: LlmMessage[] = [{ role: "user", content: translatorContext(req) }];
       const retries: { call?: string; reason: string }[] = [];
       // (An attempt that failed on a value it could not read: what the seat is asked if the next attempt does no
@@ -428,7 +433,9 @@ export function createTranslator(io: LlmIO, check: KernelCheck, typeOf: (type: s
           const { final: _, unit: _u, none: _n, ...t } = r as Failure & { final?: boolean; unit?: true; none?: true };
           // (Asked again after a value it could not read, and it gave the request up: the seat is asked about the value.)
           if (!r.ok && unread && r.none && !r.unit) return { ...unread, ...(t.call ? { call: t.call } : {}), retries };
-          return { ...(r.ok ? r : t), ...(retries.length ? { retries } : {}) };
+          // (What a model that says how sure it is said with its answer: for an arrangement of translators, arrangement.ts.)
+          const answered = typeof out?.input?.sure_ppm === "number" ? (({ program: _p, ...more }) => more)(out.input as { program?: unknown }) as Answered : undefined;
+          return { ...(r.ok ? r : t), ...(retries.length ? { retries } : {}), ...(answered ? { answered } : {}) };
         }
         if (r.unit) {
           const { final: _, unit: _u, none: _n, ...t } = r;
@@ -457,6 +464,7 @@ export function draftText(d: Draft): string {
   ].join("\n");
 }
 
+export { createArrangement, STANDS, type Arrangement, type Arranged, type Route, type RouteSide, type Why } from "./arrangement";
 export { Knowledge } from "./knowledge";
 export { Preview } from "./preview";
 export { LABEL_TEXT, RESOLVER, resolve, type Resolution } from "./resolver";

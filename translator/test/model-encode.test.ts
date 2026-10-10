@@ -215,3 +215,34 @@ test("the trained model asks back only when very unsure, and never twice running
   expect((await ask("draft.mayor-system.3")).input).toEqual({ program: "none(unclear)", unsure: { kind: "which" } }); // a new matter is asked back as any is
   expect(CUT_OFF).toBe(0.1);
 });
+
+test("answering first, with another translator behind it: the cut-off holds every time, and its answer says how sure, how long and why no draft", async () => {
+  const a = new DecideAdapter("none", { first: true });
+  const pay = ["fn:money", "arg:to", ["id", 1, 1], ")", "eos"];
+  const answers: any[] = [
+    { steps: pay, sure: 0.04, ms: 61.4, parts: { choices: 0.9, places: 0.05, texts: 1, least: 0.05 } },
+    { steps: pay, sure: 0.04, ms: 61.4, parts: { choices: 0.9, places: 0.05, texts: 1, least: 0.05 } },
+    { steps: pay, sure: 0.93, ms: 70.6 },
+    { steps: ["none:look_first", "eos"], sure: 0.81, ms: 20.2 },
+    { steps: ["none:unclear", "eos"], sure: 1, ms: 0, too_long: true },
+    { steps: ["fn:money", "arg:nonsense", ["id", 1, 1], ")", "eos"], sure: 0.9, ms: 33 },
+    { steps: ["fn:form", "arg:form", ["id", 1, 1], ")", "eos"], sure: 0.9, ms: 40 },
+  ];
+  (a as any).ask = async () => answers.shift();
+  const ask = async (ref: string, content = "Request: Pay c0412 what is owed.") => (await a.complete({ purpose: "translator", subject: "translator", ref, system: "", maxTokens: 10, messages: [{ role: "user", content }] })).content[0] as any;
+  // Under the cut-off: no draft, and why; what it had written is kept for the record. Asked again by the same seat, the
+  // same (nobody was told it was unsure: the request went behind, so there is no "best draft the next time").
+  const unsure = { program: "none(unclear)", unsure: { kind: "which" }, sure_ppm: 40_000, ms: 61, withheld: "cut_off", wrote: "money(to=c0412)" };
+  expect((await ask("draft.mayor-system.1")).input).toEqual(unsure);
+  expect((await ask("draft.mayor-system.2")).input).toEqual(unsure);
+  // Sure: its draft, or its own refusal, with nothing withheld. Whole numbers only: a log takes no others.
+  expect((await ask("draft.mayor-system.3")).input).toEqual({ program: "money(to=c0412)", sure_ppm: 930_000, ms: 71 });
+  expect((await ask("draft.mayor-system.4")).input).toEqual({ program: "none(look_first)", sure_ppm: 810_000, ms: 20 });
+  // Longer than it reads; steps that make no program of the call language; a form that is none of the forms shown.
+  expect((await ask("draft.mayor-system.5")).input).toMatchObject({ program: "none(unclear)", withheld: "too_long" });
+  expect((await ask("draft.mayor-system.6")).input).toMatchObject({ program: "none(unclear)", withheld: "no_program", sure_ppm: 900_000 });
+  expect((await ask("draft.mayor-system.7", "Request: File c0412.\n\nForms this person knows of:\n- permit, to=city, id form-permit: fields lot (text, required)")).input).toMatchObject({ program: "none(unknown_form)", withheld: "form_check", wrote: "form(form=c0412)" });
+  // A model's folder that holds no model is said before anything is started on it.
+  expect(() => new DecideAdapter("nowhere", { dir: "/nonexistent/model", quiet: true }).check()).toThrow("/nonexistent/model/config.json is not there");
+  await expect(new DecideAdapter("nowhere", { dir: "/nonexistent/model", quiet: true }).ready()).rejects.toThrow("is not there");
+});

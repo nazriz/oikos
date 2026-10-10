@@ -113,10 +113,19 @@ export async function loadModules(file?: string): Promise<RunOptions["modules"]>
   return m.modules;
 }
 
+/** How a run's two translators are arranged, from what was asked: `then` unless it says `beside`; and nothing may be
+ * said of an arrangement where no first translator is named. */
+export function translatorArrangement(o: { translatorFirst?: string; translatorArrangement?: string }): "then" | "beside" {
+  const a = o.translatorArrangement;
+  if (a !== undefined && a !== "then" && a !== "beside") throw new Error(`--translator-arrangement is then or beside, not "${a}"`);
+  if (a !== undefined && !o.translatorFirst) throw new Error("--translator-arrangement needs --translator-first: the translator that answers first");
+  return a ?? "then";
+}
+
 /** Run one seed in this process and write its summary next to its log. Or resume a run that stopped (`resume`: its
  * log): run again from its own config, with every model response served from that log (resume.ts, D59). `town`: the
  * town's seed (the spec's `seed` set to it, after any `sets`), named in the run's id; absent, the spec's own. */
-export async function runOne(o: { world?: string; seed?: number; town?: number; out?: string; resume?: string; overwrite?: boolean; stop?: StopSignal; until?: number; sets?: string[]; modules?: string; model?: string; translatorModel?: string; budgetUsd?: number; baseUrl?: string; recordObservations?: string; recordDecisions?: string; logDetail?: string; consult?: boolean; consultAvoid?: string }): Promise<RunRecord> {
+export async function runOne(o: { world?: string; seed?: number; town?: number; out?: string; resume?: string; overwrite?: boolean; stop?: StopSignal; until?: number; sets?: string[]; modules?: string; model?: string; translatorModel?: string; translatorFirst?: string; translatorArrangement?: string; budgetUsd?: number; baseUrl?: string; recordObservations?: string; recordDecisions?: string; logDetail?: string; consult?: boolean; consultAvoid?: string }): Promise<RunRecord> {
   let config: any, runId: string, out: string, serving: Serving | undefined, stoppedLog: string | undefined;
   let consult = !!o.consult;
   let recordObservations = o.recordObservations;
@@ -147,6 +156,12 @@ export async function runOne(o: { world?: string; seed?: number; town?: number; 
   const real = o.model ? chooseModel(o.model, { budgetUsd: o.budgetUsd, baseUrl: o.baseUrl }) : undefined;
   // The translator on its own model, if one is named (sharing the run's spending limit).
   const tr = real && o.translatorModel ? chooseModel(o.translatorModel, { budgetUsd: o.budgetUsd, baseUrl: o.baseUrl }) : undefined;
+  // A translator that answers first, if one is named (our own trained model: translator/src/arrangement.ts), with the
+  // translator above behind it; without --model the one behind is the mock. It is loaded here, once, before the run:
+  // a model that cannot load stops the run now, and no request pays for the load.
+  const arrangement = translatorArrangement(o);
+  const first = o.translatorFirst ? chooseModel(o.translatorFirst, { budgetUsd: o.budgetUsd, baseUrl: o.baseUrl, first: true }) : undefined;
+  await (first?.adapter as { ready?: () => Promise<void> } | undefined)?.ready?.();
   const serve = (a: LlmAdapter) => (serving ? serving.wrap(a) : a);
   const modules = await loadModules(o.modules);
   mkdirSync(out, { recursive: true });
@@ -157,8 +172,9 @@ export async function runOne(o: { world?: string; seed?: number; town?: number; 
   let s: RunSummary;
   try {
     s = await runWorld({ config, runId, outDir: out, until: o.until, watchdog, ...(o.stop ? { stop: o.stop } : {}), ...(modules ? { modules } : {}), ...(consult ? { consult, ...(consultAvoid ? { consultAvoid } : {}) } : {}), ...(recordObservations ? { recordObservations: recordWho(recordObservations) } : {}), ...(recordDecisions === "none" ? { recordDecisions: "none" as const } : {}),
-      ...(real ? { adapter: serve(real.adapter), prices: { ...real.prices, ...(tr?.prices ?? {}) }, ...(real.budget ? { budget: real.budget } : {}) } : {}),
+      ...(real ? { adapter: serve(real.adapter), prices: { ...real.prices, ...(tr?.prices ?? {}), ...(first?.prices ?? {}) }, ...(real.budget ? { budget: real.budget } : {}) } : first ? { prices: first.prices } : {}),
       ...(tr ? { translatorAdapter: serve(tr.adapter) } : {}),
+      ...(first ? { translatorFirst: serve(first.adapter), translatorArrangement: arrangement } : {}),
       ...(serving ? { resumedFrom: { log: basename(stoppedLog!), serving } } : {}) });
   } catch (e) {
     const err = e as Error;
@@ -170,7 +186,7 @@ export async function runOne(o: { world?: string; seed?: number; town?: number; 
     watchdog.stop();
     // A model that runs as a process of ours (the trained translator) is ended with the run: left up, it kept a
     // stopped run's process from exiting (pilot 11).
-    for (const m of [real, tr]) (m?.adapter as { close?: () => void } | undefined)?.close?.();
+    for (const m of [real, tr, first]) (m?.adapter as { close?: () => void } | undefined)?.close?.();
   }
   const rec: RunRecord = { ...s, seed: Number(config.seed), ...(o.town !== undefined && !o.resume ? { town: o.town } : {}), wallMs: Math.round(performance.now() - t0) };
   writeFileSync(join(out, `${runId}.summary.json`), JSON.stringify(rec, null, 2));
@@ -226,9 +242,12 @@ export interface StopSignal {
   onRequest?: () => void;
 }
 
+/** The flags that name a first translator and its arrangement, as a command takes them. */
+const firstFlags = (o: { translatorFirst?: string; translatorArrangement?: string }): string[] => (o.translatorFirst ? ["--translator-first", o.translatorFirst, ...(o.translatorArrangement ? ["--translator-arrangement", o.translatorArrangement] : [])] : []);
+
 /** The command that resumes a run that stopped, with the models and limit it ran with. */
-export function resumeCommand(logPath: string, o: { model?: string; translatorModel?: string; budgetUsd?: number; baseUrl?: string; modules?: string } = {}): string {
-  return ["oikos", "resume", logPath, ...(o.model ? ["--model", o.model] : []), ...(o.model && o.translatorModel ? ["--translator-model", o.translatorModel] : []), ...(o.budgetUsd !== undefined ? ["--budget", String(o.budgetUsd)] : []),
+export function resumeCommand(logPath: string, o: { model?: string; translatorModel?: string; translatorFirst?: string; translatorArrangement?: string; budgetUsd?: number; baseUrl?: string; modules?: string } = {}): string {
+  return ["oikos", "resume", logPath, ...(o.model ? ["--model", o.model] : []), ...(o.model && o.translatorModel ? ["--translator-model", o.translatorModel] : []), ...firstFlags(o), ...(o.budgetUsd !== undefined ? ["--budget", String(o.budgetUsd)] : []),
     ...(o.baseUrl ? ["--base-url", o.baseUrl] : []), ...(o.modules ? ["--modules", resolve(o.modules)] : [])].join(" ");
 }
 
@@ -271,6 +290,10 @@ export interface BatchOptions {
    */
   keep?: "log" | "measures";
   translatorModel?: string;
+  /** A translator that answers first ("decide/<name>", our own trained model), the translator behind it; and how the
+   * two are arranged: "then" (the default) or "beside" (translator/src/arrangement.ts). */
+  translatorFirst?: string;
+  translatorArrangement?: string;
   /** A real model for every language-model participant and the translator ("provider/model"); default: the mock. */
   model?: string;
   /** Spending limit per run, in dollars (required with a model that costs money, unless `batchBudgetUsd` is given). */
@@ -312,6 +335,8 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
   const perRunUsd = o.budgetUsd ?? o.batchBudgetUsd;
   if (o.model) chooseModel(o.model, { budgetUsd: perRunUsd, baseUrl: o.baseUrl }); // fail early: a price, a limit and a key
   if (o.model && o.translatorModel) chooseModel(o.translatorModel, { budgetUsd: perRunUsd, baseUrl: o.baseUrl });
+  translatorArrangement(o);
+  if (o.translatorFirst) (chooseModel(o.translatorFirst, { budgetUsd: perRunUsd, baseUrl: o.baseUrl, first: true }).adapter as { check?: () => void }).check?.();
   // The batch's spending: what finished runs spent, and the limits held for runs under way (micro-USD).
   const batchLimit = o.batchBudgetUsd !== undefined ? Math.round(o.batchBudgetUsd * 1e6) : undefined;
   let batchSpent = 0;
@@ -382,7 +407,7 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
         limitUsd = held / 1e6;
       }
       const args = [process.execPath, CLI, "run-one", o.world, "--seed", String(seed), ...(town !== undefined ? ["--town", String(town)] : []), "--out", out, ...(o.until !== undefined ? ["--until", String(o.until)] : []), ...sets.flatMap((s) => ["--set", s]),
-        ...(o.recordObservations ? ["--record-observations", o.recordObservations] : []), ...(o.recordDecisions ? ["--record-decisions", o.recordDecisions] : []), ...(o.logDetail ? ["--log", o.logDetail] : []), ...(o.consult ? ["--consult"] : []), ...(o.consultAvoid ? ["--consult-avoid", o.consultAvoid] : []), ...(o.model ? ["--model", o.model] : []), ...(o.model && o.translatorModel ? ["--translator-model", o.translatorModel] : []), ...(limitUsd !== undefined ? ["--budget", String(limitUsd)] : []), ...(o.baseUrl ? ["--base-url", o.baseUrl] : []),
+        ...(o.recordObservations ? ["--record-observations", o.recordObservations] : []), ...(o.recordDecisions ? ["--record-decisions", o.recordDecisions] : []), ...(o.logDetail ? ["--log", o.logDetail] : []), ...(o.consult ? ["--consult"] : []), ...(o.consultAvoid ? ["--consult-avoid", o.consultAvoid] : []), ...(o.model ? ["--model", o.model] : []), ...(o.model && o.translatorModel ? ["--translator-model", o.translatorModel] : []), ...firstFlags(o), ...(limitUsd !== undefined ? ["--budget", String(limitUsd)] : []), ...(o.baseUrl ? ["--base-url", o.baseUrl] : []),
         ...(o.modules ? ["--modules", resolve(o.modules)] : []), ...(o.overwrite ? ["--overwrite"] : [])];
       const p = Bun.spawn(args, { stdout: "pipe", stderr: "pipe", env: slotted ? insideSlot(1, { ...process.env }) : { ...process.env } }); // (the environment as it is now)
       children.add(p);

@@ -3757,6 +3757,73 @@ See the design note, §16.
   does give it (the early close in another dress: count it on every test before trusting a gain); or lists start being
   closed early (give them a count as lines have).
 
+## 2026-10-11 · Our own trained translator in pilots: it answers first, the prompt-driven one behind it
+
+- **The owner's decision (2026-10-11).** The trained translator is parked at its present quality and used. It translates
+  first; when it fails, the prompt-driven translator (`claude-code/claude-sonnet-5-5`, prompt 0.9.4) takes that request.
+  An interim arrangement for pilots: one model that works alone remains the goal, no training or prompt change comes with
+  it, and it changes nothing in what a translator is (a request in, a program of the call language out, a draft offered).
+- **Which model: `pod-small-r2-s1`** (`runs/translator-round-2-2026-10-10/models/`), not the six-epoch control
+  `pod-small-steps6-s1`. On the 180 real requests it is right 153 (the control 150), offers 12 wrong drafts (13) and no
+  draft on 15 (17); on seats' own requests in the set tests (376) the two are 328 and 331 right, 32 and 33 wrong. That is no
+  measured difference (one seed each; three cases in 180 is within what a seed moves), so the choice is the one with most
+  right and fewest wrong drafts on real requests, which is also the model every table of round 2 describes. The control is
+  better on generated forms (parity forms 214 of 250 against 186), which is not what seats ask. Changing it is one name in a
+  queue entry, and `beside` (below) is how the other is measured without touching a world.
+- **The arrangement** (`translator/src/arrangement.ts`; `--translator-first decide/NAME`, with the run's translator behind
+  it; a queue entry's `translator_first`). Under `then`, the default, the first's draft is offered, and the request goes to
+  the one behind when:
+  - the first offers no draft: it is under its cut-off of sureness (`unsure`), its draft is not one of the forms shown as
+    shown (`form_check`), its answer is no program of the call language (`no_program`), the resolver cannot make acts of its
+    call (`not_resolved`), the check of them failed (`check_failed`), it did not answer (`first_failed`), or it refuses with
+    a label that does not stand (`refused`);
+  - the seat declined a draft of the first's: its next request, whatever it is (`declined_before`); or the seat asks again,
+    in much the same words (half or more of the words of the two requests in both), for something answered and not confirmed
+    (`asked_again`). Such a matter stays behind until the seat confirms a draft or asks for something else.
+- **Which of the first's refusals stand: `not_an_act` only**, and only where it is sure. The evidence, `pod-small-r2-s1`
+  on the 180 real requests (right, wrong): `not_an_act` 56, 2; `no_such_act` 13, 2; `look_first` 6, 5; `too_much` 4, 0;
+  `unclear` 0, 3; `needs_calculation` 0, 2; `unknown_form` 0, 1. On seats' own requests in the set tests: `not_an_act` 3, 0;
+  `look_first` 4, 3; `unclear` 0, 12; `needs_calculation` 5, 0; `no_such_act` 1, 1. So 15 of its 27 failures on real
+  requests are refusals, and only `not_an_act` is both frequent (a third of what seats ask) and reliable (59 of 61).
+  `too_much` is 4 of 4 on real requests and 44 of 44 on generated ones, and is still sent behind: four cases is too few to
+  rest a refusal on. This is the owner's lean, and the scores bear it out.
+- **Why the next request after a decline goes behind whatever it says.** The trained model decides without sampling: a
+  request said again in other words mostly gets the same draft. Telling whether two requests are one matter by their words
+  would miss the reworded ones, and a seat shown the declined draft again is stuck. The cost of being generous is one call
+  to the model behind for an unrelated request.
+- **What the first is not.** Never a substitute: if the one behind is at a usage limit or cannot be reached, the error is
+  the run's as any translator's is (the pilot is parked by the queue), whatever the first had answered. And never asked
+  twice: its attempts are one (asked again it says the same), and it no longer hands "its best draft the next time" to a
+  seat it was unsure for, since that seat was never told so.
+- **`beside`** (`--translator-arrangement beside`): the one behind answers every request and the first's answer is only
+  recorded. For measuring a model on a pilot's real requests without it touching the world; a world run so ends as it does
+  with the one behind alone (tested).
+- **The seat sees one translator.** Drafts are worded from their acts alone and refusals from the call language's fixed
+  sentences, whoever answered; the first's own questions back never reach a seat (they go behind). A test reads every
+  prompt a seat's model was given and finds no name of either.
+- **What a log holds.** Every model call of either, as ever (`usage` and `transcript`, each naming its provider and model;
+  our own model's cost is zero and its transcript holds its sureness in parts per million, its time in milliseconds, why it
+  offered no draft and what it had written). One note a request, `translation_route`: the arrangement, whose answer was
+  used, why it went behind, what each answered, and whether they agree where both did (by meaning, copied free text left
+  out, as the real requests' scorer compares). The first is asked for every request, also one that is going behind anyway:
+  that costs nothing and is the record of what it would have done. A draft and its act name the model that drew it up. The
+  run's `orchestrator` entry says the arrangement, both models and which refusals stand. `pilot-report` has one line of it
+  and the counts under `translator_arrangement`; the corpus and the dataset carry `route`, and their example's exchange is
+  that of the translator whose answer was used.
+- **The contract change, for sign-off:** `dataset.schema.json`, `Translation.route` (optional, opaque). Nothing else: the
+  route in the log is a `note`, the arrangement is named on the command line and in a queue entry, and no world config,
+  participant API or call-language schema changes.
+- **How it is served.** One Python process a run, started and awaited before the run begins (`ready()`): a model that
+  cannot load stops the run there, and no request pays the load (about 5 seconds here). It answers lines over a pipe, on
+  the CPU, greedily. If the process ends mid-run the request goes behind (`first_failed`) and the next request starts it
+  again. Its time in the log is the one thing of a run with it that is not the same twice; no decision reads it.
+- **Revisit if** a pilot's report shows the two agreeing on a label nearly always over a few dozen cases (it moves into
+  `STANDS`), or disagreeing on `not_an_act` (it moves out); seats decline the first's drafts often (then its drafts of that
+  kind go behind by rule: forms of several amounts are the known case); the next request after a decline is mostly another
+  matter (then tell matters apart); the share the first answers falls under about half (the arrangement then buys little
+  over the one behind alone); a trained model passes its mark (the arrangement goes, and that model works alone); or the
+  model behind changes (its prompt is not this arrangement's to change).
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Calibration, measured again after the first-year risk fix** (2026-10-05, at 0251d3a, `runs/calibration-2026-10-05` on the run server; the small town, 3 seeds × 2 years, code only, as below). Health: 4 breaches of 15 (8 measured). Recorded, not chased: Naz decides what to do with the numbers.

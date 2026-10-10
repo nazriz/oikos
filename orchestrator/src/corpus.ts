@@ -39,6 +39,33 @@ export interface CorpusExample {
   signoff?: { decision: string; note?: string };
   /** Carried out: the command's position in the log, and whether the kernel applied it. */
   executed?: { seq: number; applied: boolean; refusal?: unknown };
+  /** Where the run had two translators as one (translator/src/arrangement.ts): whose answer was used, why the request
+   * went behind if it did, and what each answered. The example's `model`, `system_sha256` and `exchange` are then
+   * those of the one whose answer was used. */
+  route?: unknown;
+}
+
+/** Which model each turn of an example's exchange was, and under which system prompt (kept beside the example, not in it). */
+const TURNS = new WeakMap<CorpusExample, { model: string; system_sha256?: string }[]>();
+/** A translator's turn, added to its example's exchange. */
+export function takeTurn(x: CorpusExample, d: { provider: string; model: string; system_sha256?: string; turn: number; input: unknown; output: unknown }): void {
+  const model = `${d.provider}/${d.model}`;
+  Object.assign(x, { model, synthetic: d.provider === "mock", system_sha256: d.system_sha256 });
+  x.exchange.push({ turn: d.turn, input: d.input, output: d.output });
+  TURNS.set(x, [...(TURNS.get(x) ?? []), { model, system_sha256: d.system_sha256 }]);
+}
+/** A request's route (the run's `translation_route` note, written after both translators' turns): the example keeps it,
+ * and its exchange, model and system prompt become those of the translator whose answer was used. */
+export function takeRoute(x: CorpusExample, noted: { draft?: unknown; used?: string; [k: string]: unknown }): void {
+  const { draft: _, ...route } = noted;
+  x.route = route;
+  const used = (route[String(route.used)] as { model?: string } | undefined)?.model;
+  const turns = TURNS.get(x) ?? [];
+  const mine = turns.find((t) => t.model === used);
+  if (!used || !mine) return;
+  x.exchange = x.exchange.filter((_, i) => turns[i]?.model === used);
+  TURNS.set(x, turns.filter((t) => t.model === used));
+  Object.assign(x, { model: used, synthetic: used.startsWith("mock/"), ...(mine.system_sha256 ? { system_sha256: mine.system_sha256 } : {}) });
 }
 
 /** The logs in a folder (a run's, or a batch's), each run once (its current log: what a resumed run left behind,
@@ -71,11 +98,7 @@ export function corpusReader(run: string): { take(e: any): void; rows(): CorpusE
           const d = b.data ?? {};
           if (d.system_sha256 && d.system) systems.set(d.system_sha256, d.system);
           if (d.purpose !== "translator" || !d.ref) return;
-          const x = get(d.ref, e.t);
-          x.model = `${d.provider}/${d.model}`;
-          x.synthetic = d.provider === "mock";
-          x.system_sha256 = d.system_sha256;
-          x.exchange.push({ turn: d.turn, input: d.input, output: d.output });
+          takeTurn(get(d.ref, e.t), d);
         } else if (b.annotation === "draft") {
           const d = b.draft;
           const x = get(d.id, e.t, d.participant);
@@ -84,6 +107,8 @@ export function corpusReader(run: string): { take(e: any): void; rows(): CorpusE
           const d = b.data ?? {};
           const x = get(d.draft, e.t, b.subject);
           Object.assign(x, { participant: b.subject, proposal: d.proposal, result: "failed", failure: { reason: d.reason, ...(d.call ? { call: d.call } : {}), ...(d.invalid ? { invalid: d.invalid } : {}), ...(d.raw ? { raw: d.raw } : {}) } });
+        } else if (b.annotation === "note" && b.data?.translation_route) {
+          takeRoute(get(String(b.data.translation_route.draft), e.t, b.subject), b.data.translation_route);
         } else if (b.annotation === "note" && b.data?.translation_retry) {
           const r = b.data.translation_retry;
           get(r.draft, e.t, b.subject).retries.push({ attempt: r.attempt, reason: r.reason, ...(r.call ? { call: r.call } : {}) });

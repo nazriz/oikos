@@ -91,12 +91,51 @@ oikos translator-eval --model anthropic/claude-haiku-4-5 --budget 1 --out runs/t
 The owner's rule: **Codex when it is available; never something that blocks.** "I don't have an issue using codex when it's available, but when it runs out, it shouldn't block things."
 
 - **The general (prompt-driven) translator is `claude-code/claude-sonnet-5-5`**, alone, with no chain of fallbacks: `--translator-model claude-code/claude-sonnet-5-5`. No run's translation is put behind the Codex sign-in. Measured under prompt 0.9.0 (`runs/translator-eval-claude-2026-10-09/`): seen 80 of 86, held out 61 of 66, real requests 163 of 180 (10 with no draft, 7 wrong drafts, of which five are a letter's addressee written as a description, which the resolver asks back on); 0.008 a call as Claude Code reports, 2.6 seconds of model time. gpt-6.1-sol scored again the same day under the same prompt: 169 of 180 real. Fable 5.1: 170, 61 held out, 0.038 a call; it is a seat model by the owner's word and is not used as a translator. Haiku 5.5: 147 and 57; not a translator to choose. In four short pilots (`runs/claude-translator-check-2026-10-09/`) it drafted five of ten requests, four confirmed; docs/waves/wave-2/plan.md, "Translators", has both in full.
-- **Our own trained translator** (`decide/<run>`) where it is sound: a wave's plan marks each pilot as one that must have the general model, one that may have ours if its scores allow, or one where ours is wanted for its failures.
+- **Our own trained translator first, the general one behind it** in pilots from 2026-10-11 (the next section). Before that: **our own trained translator** (`decide/<run>`) where it is sound: a wave's plan marks each pilot as one that must have the general model, one that may have ours if its scores allow, or one where ours is wanted for its failures.
 - **Seats:** Sonnet 5.5 (cheap: a seat comes back weekly; a 30-day pilot of three recorded under a dollar), Haiku 5.5 (the weaker voice; busy and dear at default effort: 15 to 19 for the same thirty days; `…@low` names a lower effort), Fable 5.1 (the most capable; unmeasured in a seat), all through Claude Code. gpt-6.1-sol and gpt-6-luna through the Codex CLI when its window is open, in a queue of their own, with the Claude translator: a Codex stall parks that pilot and nothing else (below, "Running many pilots").
 - **Readers for the translator's pipeline:** Sonnet 5.5 with gpt-6.1-sol; with the Codex window shut, Sonnet 5.5 with Haiku 5.5 at default effort, and an audit by a Codex model owed (docs/translator-pipeline.md, "The readers").
 - Never `gpt-6-astra`. No API key of any kind without the owner's go-ahead. Always name the model.
 
 The pilots further down this page were run under the earlier agreement (gpt-6.1-sol in the driver seat, gpt-6-luna and then gpt-6.1-sol as the translator); the Codex subscription's limit stopped pilot 9 on 2026-10-06 and stalled the second live check for hours on 2026-10-09, which is what changed it (docs/decisions.md, 2026-10-09, "Codex when it is available, never something that blocks").
+
+## Our own translator first, the prompt-driven one behind it (2026-10-11)
+
+The owner's decision (docs/decisions.md, 2026-10-11): the trained translator is used at its present quality, in front of
+the prompt-driven one. Interim, for pilots; one model that works alone remains the goal. Code: `translator/src/arrangement.ts`.
+
+```bash
+OIKOS_TRANSLATOR_MODELS=~/oikos/runs/translator-round-2-2026-10-10/models \
+oikos run worlds/town-1000.yaml --set mayor=llm --set model_seats=finance \
+  --model claude-code/claude-sonnet-5-5 --translator-model claude-code/claude-sonnet-5-5 --budget 6 \
+  --translator-first decide/pod-small-r2-s1 [--translator-arrangement then|beside]
+```
+
+- `--translator-first decide/NAME` puts that trained model first; the run's translator (`--translator-model`, else the
+  run's model, else the mock) is the one behind. Without the flag a run is as it always was. A queue entry says
+  `"translator_first": "decide/NAME"` and, if not `then`, `"translator_arrangement": "beside"`; `oikos resume` takes the
+  same flags (the queue passes them; a stopped run's resume command names them).
+- **`then`** (the default). The first's draft is offered. A request goes behind when the first offers no draft (unsure,
+  the form check, no program, not resolved, the check failed, it did not answer, or a refusal that does not stand), when
+  the seat declined a draft of the first's (its next request), or when it asks again in much the same words for something
+  answered and not confirmed. Only `none(not_an_act)` stands of the first's refusals, where it is sure (`STANDS`).
+- **`beside`**. The one behind answers everything; the first's answer is only recorded. For measuring a trained model
+  on a pilot's requests without it touching the world.
+- **One translator to a seat.** Nothing a seat is shown says which answered or that there are two.
+- **Never a substitute.** The one behind at a usage limit parks the pilot, as ever; a model folder that holds no model
+  stops the run before it starts.
+- **Served** by one Python process a run (`translator/model/py/predict.py`, under `uv`), loaded before the run begins
+  (about 5 seconds), answering on the CPU without sampling: the same request gets the same answer.
+- **In the log:** every call of either (`usage`, `transcript`; ours at no cost, with `sure_ppm`, `ms`, `withheld`,
+  `wrote`), and one `note` a request, `translation_route`: `arrangement`, `used` (`first` or `behind`), `why`, `first` and
+  `behind` (model, result, call, label, the first's sureness and time), `agree` where both answered. `oikos pilot-report`
+  prints one line (`two translators (then): …`) and writes the counts under `translator_arrangement`, among them how often
+  the two agreed by what the first had answered, which is the evidence for changing `STANDS`. The corpus and the dataset
+  carry `route` on each translation.
+- **A dry run** (`scripts/pilot-mock.ts`, `pilot-wave.ts --mock`) keeps an entry's trained first translator, with the mock
+  behind it: it costs nothing and goes through the arrangement.
+- **Which model:** `pod-small-r2-s1` (153 of the 180 real requests right, 12 wrong drafts, no draft on 15; the reasons are
+  in the decisions log). **The shake-down** is `runs/tiu-01-shakedown/` (its numbers: the decisions log's entry of the day
+  and `runs/translator-in-use-2026-10-11/`).
 
 ## How an answer is asked for and read (2026-10-08)
 

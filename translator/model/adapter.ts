@@ -166,6 +166,11 @@ export function formsMisfit(program: string, forms: string[]): Misfit | undefine
  * drafts, 21 asked back; at 0.5: 131, 7, 42 (docs/decisions.md, 2026-10-08). */
 export const CUT_OFF = 0.1;
 
+/** Why this adapter offers no draft where the model's own answer was not a refusal it is sure of: its sureness is under
+ * the cut-off; the form it filled in is not one of the forms shown as shown; or its steps make no program of the call
+ * language; or the request with its forms is longer than the model reads. */
+export type Withheld = "cut_off" | "form_check" | "no_program" | "too_long";
+
 export class DecideAdapter implements LlmAdapter {
   provider = "decide";
   private proc?: ChildProcess;
@@ -181,7 +186,10 @@ export class DecideAdapter implements LlmAdapter {
   readonly cannot: [choice: string, what: string][];
   /** The decoding the model answers in (its folder says). */
   readonly decoding: Decoding;
-  constructor(public model: string, private o: { dir?: string; threshold?: number; unchecked?: boolean; quiet?: boolean } = {}) {
+  /** `first`: this model answers first with another translator behind it (translator/src/arrangement.ts), so whoever
+   * it is unsure for is never told so by it: the request goes behind. Then nobody is "given its best draft the next
+   * time", and the cut-off holds for every request. */
+  constructor(public model: string, private o: { dir?: string; threshold?: number; unchecked?: boolean; quiet?: boolean; first?: boolean } = {}) {
     const vocabulary = vocabularyOf(this.dir());
     this.decoding = decodingOf(this.dir());
     this.cannot = vocabulary ? cannotSay(vocabulary) : [];
@@ -205,6 +213,33 @@ export class DecideAdapter implements LlmAdapter {
       }
     });
     this.waiting.push(() => {}); // the line that says it is ready
+    // A process that ends (the model's folder is not a model, Python is missing, it was killed) answers nothing more:
+    // whoever is waiting is told, never left waiting, and the next request starts it again.
+    const gone = (why: string) => {
+      if (this.proc !== proc) return;
+      this.proc = undefined;
+      this.buffer = "";
+      const left = this.waiting.splice(0);
+      this.failed = why;
+      for (const w of left) w("");
+    };
+    proc.on("error", (e) => gone(String(e.message)));
+    proc.on("exit", (code, signal) => gone(`the model's process ended (${signal ?? `exit ${code}`})`));
+  }
+
+  /** Why the model's process last ended while something waited on it. */
+  private failed = "";
+
+  /** The model loaded and answering: one request of nothing, awaited. A run asks this once at its start, so that a
+   * model that cannot load stops the run there, and no request pays for the load. */
+  async ready(): Promise<void> {
+    this.check();
+    await this.ask({ pieces: [], breaks: [], at: [] });
+  }
+
+  /** That the model's folder holds a model (said before anything is started on it). */
+  check(): void {
+    for (const f of ["config.json", "model.safetensors"]) if (!existsSync(join(this.dir(), f))) throw new Error(`decide/${this.model}: ${join(this.dir(), f)} is not there (the models' folder is OIKOS_TRANSLATOR_MODELS, by default runs/translator-model)`);
   }
 
   /** While an answer is awaited the model’s process keeps this one alive; between answers it doesn’t, so whoever
@@ -214,9 +249,9 @@ export class DecideAdapter implements LlmAdapter {
   }
 
   private ask(o: object): Promise<any> {
-    const next = this.queue.then(() => new Promise<any>((done) => {
+    const next = this.queue.then(() => new Promise<any>((done, fail) => {
       if (!this.proc) this.start();
-      this.waiting.push((line) => done(JSON.parse(line)));
+      this.waiting.push((line) => { try { done(JSON.parse(line)); } catch { fail(new Error(`decide/${this.model} did not answer: ${this.failed || "its answer could not be read"}`)); } });
       this.hold(true);
       this.proc!.stdin!.write(JSON.stringify(o) + "\n");
     }));
@@ -225,7 +260,7 @@ export class DecideAdapter implements LlmAdapter {
   }
 
   /** The program for a request and the forms known, and how sure the model is. */
-  async translate(request: string, forms: string[], o: { draft?: boolean } = {}): Promise<{ program: string; sure: number; ms: number; unsure?: object; asked?: boolean }> {
+  async translate(request: string, forms: string[], o: { draft?: boolean } = {}): Promise<{ program: string; sure: number; ms: number; unsure?: object; asked?: boolean; withheld?: Withheld; wrote?: string }> {
     const input = inputOf(request, forms);
     const ps = pieces(input);
     const breaks: number[] = [];
@@ -234,12 +269,19 @@ export class DecideAdapter implements LlmAdapter {
     // answers in pieces as every model does.
     const a = await this.ask({ pieces: ps.map((p) => p.text), breaks, at: ps.map((p) => p.at) });
     let program = programOf(input, ps, a.steps, this.decoding);
+    // Why no draft is offered, where the reason is this adapter's and not the model's own refusal, and what the model
+    // had written (for the record: it is never offered).
+    let withheld: Withheld | undefined;
+    const wrote = program;
+    if (a.too_long) withheld = "too_long";
+    else if (program === "none(unclear)" && !(a.steps.length && a.steps[0] === "none:unclear")) withheld = "no_program";
     // What was unclear, where it asks back: the part of its answer it was least sure of (what to do, which thing is
     // meant, or which words are to be copied), or what about a form doesn't fit the form as shown.
     let unsure: object | undefined;
     let asked = false;
     if (!o.draft && a.sure < (this.o.threshold ?? CUT_OFF)) {
       asked = true;
+      withheld = "cut_off";
       const least = a.parts ? (["choices", "places", "texts"] as const).reduce((x, y) => (a.parts[y] < a.parts[x] ? y : x)) : "choices";
       program = "none(unclear)";
       unsure = { kind: least === "places" ? "which" : least === "texts" ? "words" : "act" };
@@ -247,11 +289,12 @@ export class DecideAdapter implements LlmAdapter {
     // (A form that can't be one of the forms shown is not offered, however sure the model is.)
     const misfit = this.o.unchecked ? undefined : formsMisfit(program, forms);
     if (misfit) {
+      withheld = "form_check";
       program = `none(${misfit.label})`;
       unsure = misfit.label === "unclear" ? misfit.unsure : undefined;
     }
     this.answers.push({ sure: a.sure, ms: a.ms, program, steps: a.steps.length, ...(a.parts ? { parts: a.parts } : {}), ...(unsure ? { unsure } : {}) });
-    return { program, sure: a.sure, ms: a.ms, ...(unsure ? { unsure } : {}), ...(asked ? { asked } : {}) };
+    return { program, sure: a.sure, ms: a.ms, ...(unsure ? { unsure } : {}), ...(asked ? { asked } : {}), ...(withheld ? { withheld, ...(wrote !== program ? { wrote } : {}) } : {}) };
   }
 
   async complete(req: LlmRequest): Promise<LlmResponse> {
@@ -262,9 +305,13 @@ export class DecideAdapter implements LlmAdapter {
     // where it is very unsure, and never twice running: whoever was just asked back for that is given the model's
     // best draft the next time they ask, to confirm or decline. (Who is asking: the draft's id without its number.)
     const who = req.ref?.replace(/\.\d+$/, "");
-    const { program, unsure, asked } = await this.translate(request, forms, { draft: !!who && this.askedBack.has(who) });
+    const { program, unsure, asked, sure, ms, withheld, wrote } = await this.translate(request, forms, { draft: !this.o.first && !!who && this.askedBack.has(who) });
     if (who) asked ? this.askedBack.add(who) : this.askedBack.delete(who);
-    return { content: [{ type: "tool_use", id: "decide", name: req.tools?.[0]?.name ?? "call", input: { program, ...(unsure ? { unsure } : {}) } }], usage: { input_tokens: 0, output_tokens: 0 }, estimated: true };
+    // (With another translator behind it, its answer says how sure it was, how long it took and why it offers no
+    // draft where it offers none: the arrangement routes on that, and the transcript keeps it. Whole numbers, as
+    // everything in a log is: sureness in parts per million, time in milliseconds.)
+    const more = this.o.first ? { sure_ppm: Math.round(sure * 1e6), ms: Math.round(ms), ...(withheld ? { withheld } : {}), ...(wrote !== undefined ? { wrote } : {}) } : {};
+    return { content: [{ type: "tool_use", id: "decide", name: req.tools?.[0]?.name ?? "call", input: { program, ...(unsure ? { unsure } : {}), ...more } }], usage: { input_tokens: 0, output_tokens: 0 }, estimated: true };
   }
 
   close(): void {

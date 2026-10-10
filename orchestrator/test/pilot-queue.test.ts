@@ -268,3 +268,39 @@ test("with only a parked pilot left the queue waits and says so, and its note na
     p2.kill();
   }
 }, 120_000);
+
+test("an entry's first translator and its arrangement are passed to the run, and to its resume", async () => {
+  const here = join(base, "first"), runs = join(here, "runs");
+  mkdirSync(here, { recursive: true });
+  // (A stand-in for the CLI that keeps what it was asked: stopped by a signal's word the first time, through the second.)
+  const cli = join(here, "cli.ts");
+  writeFileSync(cli, `
+import { appendFileSync, existsSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+const a = process.argv.slice(2);
+if (a[0] === "pilot-report") process.exit(0);
+const get = (n: string) => a[a.indexOf(n) + 1]!;
+const log = a[0] === "resume" ? a[1]! : join(get("--out"), "town.seed1.jsonl");
+const asked = ${JSON.stringify(join(here, "asked.txt"))};
+const again = existsSync(asked);
+appendFileSync(asked, a.filter((x) => !x.includes("/runs/")).join(" ") + "\\n");
+const until = Number(get("--until"));
+const end = again ? { kind: "end", t: until, body: { reason: "aborted", detail: "stopped at " + until } } : { kind: "end", t: 86400, body: { reason: "aborted", detail: "the Claude plan's limit for claude -p was reached (You have hit your limit): the run stops here" } };
+writeFileSync(log, [{ kind: "header", t: 0, body: {} }, end].map((e) => JSON.stringify(e)).join("\\n") + "\\n");
+process.exit(again ? 0 : 1);
+`);
+  const queue = join(here, "lane.json");
+  writeFileSync(queue, JSON.stringify([{ ...entry("ours-first", "claude-code/s"), translator_first: "decide/pod-small-r2-s1", translator_arrangement: "then" }]));
+  const p = Bun.spawn(["bun", QUEUE, queue, "--wait", "0.02"], { env: queueEnv(runs, cli), stdout: "pipe", stderr: "pipe" });
+  const [out, code] = await Promise.all([new Response(p.stdout).text(), p.exited]);
+  expect(code).toBe(0);
+  expect(out).toContain("ours-first: starting (claude-code/s, translator claude-code/s, decide/pod-small-r2-s1 first (then))");
+  // The one behind at its usage limit: the pilot is parked for that sign-in, as any is, and taken up again.
+  expect(out).toMatch(/ours-first: parked at a usage limit on day 1 \(claude-code: /);
+  expect(out).toContain("ours-first: done (day 30)");
+  const asked = readFileSync(join(here, "asked.txt"), "utf8").trim().split("\n");
+  expect(asked.length).toBe(2);
+  expect(asked[0]).toStartWith("run worlds/town-1000.yaml --seeds 1 --out");
+  for (const line of asked) expect(line).toEndWith("--model claude-code/s --translator-model claude-code/s --translator-first decide/pod-small-r2-s1 --translator-arrangement then --budget 1");
+  expect(asked[1]).toStartWith("resume ");
+}, 60_000);

@@ -115,6 +115,11 @@ For a session starting cold: on a new machine, in the cloud, after a break. Read
   `runs/stress-1-2026-10-06`: no errors, 94 seat calls where pilot 9 needed over 200.
 
 ## The translator (the priority: Naz, 2026-10-05, "before the citizens, the translator")
+- **In pilots from 2026-10-11: our own trained translator first, the prompt-driven one behind it** (the owner's decision;
+  decisions log of the day; docs/real-models.md, "Our own translator first"). `--translator-first decide/pod-small-r2-s1`
+  (a queue entry's `translator_first`) with `claude-code/claude-sonnet-5-5` behind; `--translator-arrangement beside`
+  records a trained model's answers without using them. Each request's route is in the log, and `pilot-report` has a line
+  of it. Interim: one model that works alone is still the goal. The shake-down is `runs/tiu-01-shakedown/`.
 - **The held-out test cases are outside the repository** (`~/oikos-private/translator/held-out.json`, 66 cases).
   **Never read that file while working on the prompt or on training data**, and never quote it:
   `translator/eval/held-out.ts` says why. Results come by case id, outcome and shape only. Changes to it are made by

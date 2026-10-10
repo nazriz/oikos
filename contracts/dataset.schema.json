@@ -390,6 +390,10 @@
         },
         "executed": {
           "$ref": "#/$defs/Executed"
+        },
+        "route": {
+          "description": "Where the run had two translators as one (a first, and one behind it): whose answer was used (used: first or behind), why the request went behind if it did (why), what each answered (first, behind: model, result, call, label; the first's sureness in parts per million, its time in milliseconds, why it offered no draft), and whether they agree where both answered. Then model, system_sha256 and exchange are those of the one whose answer was used. Absent in a run with one translator.",
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/Opaque"
         }
       }
     },

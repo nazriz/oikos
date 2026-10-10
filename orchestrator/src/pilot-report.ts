@@ -96,6 +96,10 @@ export async function reportOfLog(dir: string, log: string): Promise<any> {
     return s;
   };
   const tr = { model_calls: 0, failed_calls: 0, cost_microusd: 0, retries: 0 };
+  // With two translators as one (translator/src/arrangement.ts): each request's route, as the run noted it, and what
+  // the translator's calls cost by model.
+  const routes = new Map<string, any>();
+  const trByModel: { [model: string]: { calls: number; cost_microusd: number; input_tokens: number; output_tokens: number } } = {};
   // The whole run's recorded cost (every model call in the log, whoever it was for: a resumed run's log holds the
   // calls of every part of the run), and the debriefs given and not given.
   let totalMicroUsd = 0, totalCalls = 0;
@@ -133,6 +137,10 @@ export async function reportOfLog(dir: string, log: string): Promise<any> {
     else if (b.annotation === "usage") {
       // Cost and tokens by who the call was for: the translator ("translator") or a seat.
       const into = b.subject === "translator" || b.purpose === "translator" ? tr : seat(b.subject);
+      if (into === tr) {
+        const m = (trByModel[`${b.provider}/${b.model}`] ??= { calls: 0, cost_microusd: 0, input_tokens: 0, output_tokens: 0 });
+        m.calls++; m.cost_microusd += b.cost_microusd ?? 0; m.input_tokens += b.input_tokens ?? 0; m.output_tokens += b.output_tokens ?? 0;
+      }
       into.cost_microusd += b.cost_microusd ?? 0;
       totalMicroUsd += b.cost_microusd ?? 0;
       totalCalls++;
@@ -161,6 +169,7 @@ export async function reportOfLog(dir: string, log: string): Promise<any> {
       const d = b.data;
       if (b.subject === "orchestrator") continue;
       if (d.translation_retry) { tr.retries++; const r = req(d.translation_retry.draft, e.t); if (r) r.retries++; continue; }
+      if (d.translation_route) { routes.set(String(d.translation_route.draft), d.translation_route); continue; }
       const s = seat(b.subject);
       if (d.malformed_tool_use !== undefined) count(s.malformed_tool_uses, String(d.reason ?? "?"));
       if (d.dropped_tool_use !== undefined) count(s.dropped_tool_uses, String(d.reason ?? "?"));
@@ -249,6 +258,7 @@ export async function reportOfLog(dir: string, log: string): Promise<any> {
     ...(existsSync(join(dir, "NOTE")) ? { folder_note: readFileSync(join(dir, "NOTE"), "utf8").trim() } : {}),
     seats: Object.fromEntries([...seats].filter(([, s]) => s.model_calls || s.model || s.opted_out).map(([k, s]) => [k, { model: s.model ?? null, ...(s.configured ? { configured: s.configured } : {}) }])),
     translator: { model: config?.llm?.translator?.model ?? null, version: config?.llm?.translator?.version ?? null },
+    ...(config?.llm?.translator_arrangement || routes.size ? { translator_arrangement: arrangementOf(config?.llm?.translator_arrangement, routes, reqs, trByModel) } : {}),
     confirm: config?.confirm ?? null,
     days_run: Math.round(((end?.t ?? last) / 86_400) * 10) / 10, until_days: until !== undefined ? Math.round((until / 86_400) * 10) / 10 : null,
     stopped,
@@ -269,6 +279,49 @@ export async function reportOfLog(dir: string, log: string): Promise<any> {
       longest_ask_back_run: stuck,
       by_seat: bySeat,
     },
+  };
+}
+
+/**
+ * Two translators as one, by a run's own notes (`translation_route`, one a request: orchestrator/src/run.ts): how many
+ * requests the first answered (its drafts, and its refusals that stood) and how many went behind, by why; where both
+ * answered, whether they agreed (in all, and by what the first had answered: that is the evidence for which of the
+ * first's refusals may stand); what the seats answered to the drafts of each; and each one's calls, time and cost.
+ */
+export function arrangementOf(config: any, routes: Map<string, any>, reqs: Map<string, { signoff?: "accept" | "reject" }>, byModel: { [model: string]: { calls: number; cost_microusd: number; input_tokens: number; output_tokens: number } }): any {
+  const all = [...routes.entries()];
+  const why: { [k: string]: number } = {}, agreedBy: { [k: string]: { agreed: number; of: number } } = {};
+  const signoffs = () => ({ drafts: 0, confirmed: 0, declined: 0, unanswered: 0 });
+  const answers = { first: signoffs(), behind: signoffs() };
+  let stood = 0, both = 0, agreed = 0, ms = 0, timed = 0;
+  for (const [draft, r] of all) {
+    const used: "first" | "behind" = r.used === "first" ? "first" : "behind";
+    if (used === "behind") count(why, String(r.why ?? "?"));
+    else if (r.first?.result !== "draft") stood++;
+    if (r[used]?.result === "draft") {
+      const s = reqs.get(draft)?.signoff, a = answers[used];
+      a.drafts++;
+      if (s === "accept") a.confirmed++; else if (s === "reject") a.declined++; else a.unanswered++;
+    }
+    if (typeof r.first?.ms === "number") { ms += r.first.ms; timed++; }
+    if (typeof r.agree === "boolean") {
+      both++;
+      if (r.agree) agreed++;
+      const k = r.first?.result === "refusal" ? `refusal:${r.first.label}` : String(r.first?.result ?? "?");
+      const x = (agreedBy[k] ??= { agreed: 0, of: 0 });
+      x.of++;
+      if (r.agree) x.agreed++;
+    }
+  }
+  const first = config?.first?.model ?? all[0]?.[1]?.first?.model ?? null, behind = config?.behind?.model ?? all.find(([, r]) => r.behind)?.[1]?.behind?.model ?? null;
+  const byFirst = all.filter(([, r]) => r.used === "first").length;
+  return {
+    arrangement: config?.arrangement ?? all[0]?.[1]?.arrangement ?? null, first, behind, ...(config?.stands ? { stands: config.stands } : {}),
+    requests: all.length, answered_by_first: byFirst, first_refusals_that_stood: stood, handed_behind: all.length - byFirst, handed_behind_why: why,
+    both_answered: both, agreed, agreed_by_what_the_first_answered: agreedBy,
+    seats_answers: answers,
+    first_calls: { ...(first && byModel[first] ? byModel[first] : {}), ms: ms, mean_ms: timed ? Math.round(ms / timed) : null },
+    behind_calls: behind && byModel[behind] ? byModel[behind] : {},
   };
 }
 
@@ -315,6 +368,8 @@ export function renderReport(r: any): string {
   const t = r.translator_report;
   L.push(`-- translator: ${t.requests} requests, ${t.model_calls} calls (${t.its_own_retries} own retries), ${t.cost_microusd} microusd`);
   L.push(`   endings: ${kv(t.endings)}; refused by label: ${kv(t.refused_by_label)}`);
+  const a = r.translator_arrangement;
+  if (a) L.push(`   two translators (${a.arrangement}): ${a.requests} requests; the first (${a.first}) answered ${a.answered_by_first} (drafts ${a.seats_answers.first.drafts}: confirmed ${a.seats_answers.first.confirmed}, declined ${a.seats_answers.first.declined}; refusals that stood ${a.first_refusals_that_stood}; ${a.first_calls.mean_ms ?? "?"} ms a request); behind (${a.behind}) ${a.handed_behind}: ${kv(a.handed_behind_why)} (drafts ${a.seats_answers.behind.drafts}: confirmed ${a.seats_answers.behind.confirmed}, declined ${a.seats_answers.behind.declined}; ${a.behind_calls.cost_microusd ?? 0} microusd); both answered ${a.both_answered}, agreed ${a.agreed}`);
   for (const a of t.asked_back) L.push(`   asked back ${a.draft}: ${a.sentence}`);
   L.push(`   drafts offered ${t.drafts_offered}: confirmed ${t.drafts_confirmed}, declined ${t.drafts_declined}, unanswered ${t.drafts_unanswered}`);
   L.push(`   matters ${t.matters}, through within two tries ${t.matters_through_within_two_tries}; longest run of ask-backs ${t.longest_ask_back_run.length}${t.longest_ask_back_run.seat ? ` (${t.longest_ask_back_run.seat})` : ""}`);

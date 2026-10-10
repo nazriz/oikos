@@ -24,7 +24,7 @@ export interface ModelChoice {
 }
 
 /** An adapter for "provider/model", with its price and the run's spending limit (in dollars; required for a model that costs money). */
-export function chooseModel(name: string, o: { budgetUsd?: number; baseUrl?: string; env?: Record<string, string | undefined>; /** One attempt's time limit for a model called through a command-line tool (theirs if absent: three minutes). */ timeoutMs?: number } = {}): ModelChoice {
+export function chooseModel(name: string, o: { budgetUsd?: number; baseUrl?: string; env?: Record<string, string | undefined>; /** One attempt's time limit for a model called through a command-line tool (theirs if absent: three minutes). */ timeoutMs?: number; /** The model answers first, with another translator behind it (translator/src/arrangement.ts). */ first?: boolean } = {}): ModelChoice {
   const env = o.env ?? process.env;
   const [provider, ...rest] = name.split("/");
   const model = rest.join("/");
@@ -49,7 +49,7 @@ export function chooseModel(name: string, o: { budgetUsd?: number; baseUrl?: str
     : provider === "openai" ? new OpenAICompatibleAdapter("openai", model, { apiKey: need("OPENAI_API_KEY"), ...(o.baseUrl ? { baseUrl: o.baseUrl } : {}) })
     : provider === "codex" ? new CodexCliAdapter(model, undefined, o.timeoutMs ? { timeoutMs: o.timeoutMs } : {}) // ("model@effort": the effort is part of the model's name, so the log records it)
     : provider === "claude-code" ? new ClaudeCodeAdapter(model, undefined, o.timeoutMs ? { timeoutMs: o.timeoutMs } : {}) // ("model@effort", as for codex)
-    : provider === "decide" ? new DecideAdapter(model, { ...(env.OIKOS_DECIDE_THRESHOLD ? { threshold: Number(env.OIKOS_DECIDE_THRESHOLD) } : {}), ...(env.OIKOS_DECIDE_UNCHECKED ? { unchecked: true } : {}) }) // our own trained model (translator/model)
+    : provider === "decide" ? new DecideAdapter(model, { ...(env.OIKOS_DECIDE_THRESHOLD ? { threshold: Number(env.OIKOS_DECIDE_THRESHOLD) } : {}), ...(env.OIKOS_DECIDE_UNCHECKED ? { unchecked: true } : {}), ...(o.first ? { first: true } : {}) }) // our own trained model (translator/model)
     : provider === "ollama" ? new OpenAICompatibleAdapter("ollama", model, { baseUrl: o.baseUrl ?? "http://localhost:11434/v1" })
     : provider === "local" ? new OpenAICompatibleAdapter("local", model, { baseUrl: o.baseUrl ?? (() => { throw new Error("local/<model> needs --base-url (an OpenAI-compatible server)"); })() })
     : (() => { throw new Error(`unknown provider "${provider}": anthropic, openai, codex, claude-code, ollama or local`); })();

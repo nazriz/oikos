@@ -30,3 +30,14 @@ test("a queue file is run entry by entry, results in queue order", async () => {
   const r = await mockWave([q], join(base, "w2.mock"), 1, 2);
   expect(r.map((x) => [x.pilot, x.generated, x.ranToEnd])).toEqual([["a", true, true], ["b", false, false]]);
 }, 120_000);
+
+test("an entry's trained translator answers first in the dry run too: one whose model is not there cannot run, and says so", async () => {
+  // (The dry run keeps the entry's first translator and its arrangement, with the mock behind it. A model's folder
+  // that holds no model stops the run before it starts: requests are never sent behind in silence for want of it.)
+  const r = await mockPilot({ ...good, name: "first-missing", translator: "claude-code/claude-sonnet-5-5", translator_first: "decide/none-such", translator_arrangement: "then", env: { OIKOS_TRANSLATOR_MODELS: "/nonexistent/models" } }, join(base, "w3.mock"), 1);
+  expect(r).toMatchObject({ generated: true, ranToEnd: false });
+  expect(r.reason).toContain("decide/none-such: /nonexistent/models/none-such/config.json is not there");
+  // (A first translator that is not our own trained model is not kept: the dry run calls nothing that costs.)
+  const other = await mockPilot({ ...good, name: "first-not-ours", translator_first: "claude-code/claude-haiku-5-5", translator_arrangement: "beside" }, join(base, "w3.mock"), 1);
+  expect(other).toMatchObject({ generated: true, ranToEnd: true });
+}, 120_000);

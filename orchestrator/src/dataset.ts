@@ -6,7 +6,7 @@ import { mkdirSync, statSync } from "node:fs";
 import { basename, join } from "node:path";
 import { actEnds } from "./act-ends";
 import { logLines, runOf } from "./logs";
-import type { CorpusExample } from "./corpus";
+import { takeRoute, takeTurn, type CorpusExample } from "./corpus";
 
 export const DATASET_VERSION = "0.3.0";
 
@@ -173,9 +173,7 @@ export async function exportDataset(logPath: string, outDir: string, o: DatasetO
         if (d.system_sha256 && d.system) systems.set(d.system_sha256, d.system);
         const model = `${d.provider}/${d.model}`;
         if (d.purpose === "translator" && d.ref) {
-          const x = tr(d.ref, e.t);
-          Object.assign(x, { model, synthetic: d.provider === "mock", system_sha256: d.system_sha256 });
-          x.exchange.push({ turn: d.turn, input: d.input, output: d.output });
+          takeTurn(tr(d.ref, e.t), d);
         } else if (d.purpose !== "translator") {
           const usage = pendingUsage.get(b.subject);
           pendingUsage.delete(b.subject);
@@ -196,6 +194,10 @@ export async function exportDataset(logPath: string, outDir: string, o: DatasetO
         Object.assign(tr(d.draft, e.t, b.subject), { participant: b.subject, proposal: d.proposal, result: "failed", failure: { reason: d.reason, ...(d.call ? { call: d.call } : {}), ...(d.invalid ? { invalid: d.invalid } : {}), ...(d.raw ? { raw: d.raw } : {}) } });
         const dec = openDecision.get(b.subject);
         if (dec && !dec.drafts.includes(d.draft)) dec.drafts.push(d.draft);
+      } else if (a === "note" && b.data?.translation_route) {
+        // Two translators as one: who answered, and what each said. The example's exchange, model and system prompt
+        // are then those of the one whose answer was used; the other's answer is in the route (corpus.ts).
+        takeRoute(tr(String(b.data.translation_route.draft), e.t, b.subject), b.data.translation_route);
       } else if (a === "note" && b.data?.translation_retry) {
         const r = b.data.translation_retry;
         tr(r.draft, e.t, b.subject).retries.push({ attempt: r.attempt, reason: r.reason, ...(r.call ? { call: r.call } : {}) });

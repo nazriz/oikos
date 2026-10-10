@@ -5,7 +5,9 @@
 // folders), as far as --days (30 by default) of its run. One line each: generated or not, ran to the end or not, and why
 // not. No model is called: the run is given no --model, nothing of the entry's env is passed on, and the log is checked
 // afterwards (a seat or translator that was not the mock fails the pilot). Purpose: find the entry that cannot run
-// before real usage is spent on it.
+// before real usage is spent on it. One thing of the entry's is kept: a translator that answers first (`translator_first`,
+// our own trained model: it runs on this machine and costs nothing) answers first here too, in the entry's arrangement,
+// with the mock behind it, from the models' folder the entry's env names; so the dry run goes through the arrangement.
 import { existsSync, readFileSync } from "node:fs";
 import { cpus, homedir } from "node:os";
 import { join, resolve } from "node:path";
@@ -25,7 +27,11 @@ async function notMock(log: string): Promise<string | undefined> {
     if (!l.includes('"annotation":"orchestrator"')) continue;
     const llm = JSON.parse(l).body?.data?.llm ?? {};
     for (const [seat, p] of Object.entries<any>(llm.participants ?? {})) if (!String(p.adapter ?? "").startsWith("mock/")) return `${seat} on ${p.adapter}`;
-    if (llm.translator && !String(llm.translator.model ?? "").startsWith("mock/")) return `translator on ${llm.translator.model}`;
+    // (With a translator that answers first, the one behind must be the mock, and the first our own trained model.)
+    const two = llm.translator_arrangement;
+    if (two && !String(two.behind?.model ?? "").startsWith("mock/")) return `translator behind on ${two.behind?.model}`;
+    if (two && !String(two.first?.model ?? "").startsWith("decide/")) return `translator first on ${two.first?.model}`;
+    if (!two && llm.translator && !String(llm.translator.model ?? "").startsWith("mock/")) return `translator on ${llm.translator.model}`;
     return undefined;
   }
   return undefined;
@@ -45,8 +51,12 @@ export async function mockPilot(p: any, outRoot: string, days: number): Promise<
   const until = Math.min(p.until, Math.round(days * DAY));
   const out = join(outRoot, p.name);
   // (No --model: the mock answers in every seat and as the translator. The entry's own env is not passed on.)
-  const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^OIKOS_(CLAUDE|CODEX|DECIDE|TRANSLATOR_MODELS)/.test(k)));
-  const cmd = ["bun", "orchestrator/src/cli.ts", "run", p.world, "--seeds", "1", "--out", out, "--until", String(until), "--overwrite", "--no-measure", ...sets.flatMap((x) => ["--set", x]), ...(p.args ?? [])];
+  const env: { [k: string]: string | undefined } = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^OIKOS_(CLAUDE|CODEX|DECIDE|TRANSLATOR_MODELS)/.test(k)));
+  // (But for a trained translator that answers first: kept, with where its models are.)
+  const first: string | undefined = typeof p.translator_first === "string" && p.translator_first.startsWith("decide/") ? p.translator_first : undefined;
+  if (first && p.env?.OIKOS_TRANSLATOR_MODELS) env.OIKOS_TRANSLATOR_MODELS = p.env.OIKOS_TRANSLATOR_MODELS;
+  const cmd = ["bun", "orchestrator/src/cli.ts", "run", p.world, "--seeds", "1", "--out", out, "--until", String(until), "--overwrite", "--no-measure", ...sets.flatMap((x) => ["--set", x]), ...(p.args ?? []),
+    ...(first ? ["--translator-first", first, ...(p.translator_arrangement ? ["--translator-arrangement", p.translator_arrangement] : [])] : [])];
   const child = Bun.spawn(cmd, { cwd: root, stdin: "ignore", stdout: "pipe", stderr: "pipe", env });
   const [text, err, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
   const log = existsSync(out) ? currentLogs(out).find((f) => /\.seed\d+\.jsonl(\.zst)?$/.test(f)) : undefined;
