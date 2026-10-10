@@ -141,6 +141,19 @@ test("the rates officer, directed to add no penalty interest, adds none while th
   expect(letters(w)).toEqual(["From the rates office: your direction rec.50 is received. No penalty interest is added to overdue rates while it stands; the rates are still owed. It stands until you replace or withdraw it."]);
 });
 
+test("a payment that names the rates notice pays the rates: no interest is added, as none is for one that names the claim", () => {
+  const law = statement("law-rates", 0, "law", { data: { tax: "rates", rate_ppm: 5000, instalments: 4, due_days: 30, penalty_interest_bps: 1000 } });
+  const claim = { id: "rec.20", at: 30 * DAY, record: "claim", author: "rates-system", in_position: "rates", speaks_for: "city", position: "right", holder: "city", counterparty: "landlord-1", visible_to: ["city", "landlord-1"], about: { kind: "rates", amount: 120_000, account: "acc-city", due: 60 * DAY, lots: ["lot-1"] } };
+  const notice = { ...statement("rec.19", 30 * DAY, "rates_notice", { author: "rates-system", in_position: "rates", addressed_to: ["landlord-1"], visible_to: ["city", "landlord-1"], data: { amount: 120_000, lots: ["lot-1"], due: 60 * DAY, account: "acc-city" } }) };
+  const treasury = (settles?: string) => ({ treasury: { kind: "accounts", transactions: settles ? [{ t: 40 * DAY, from: "acc-landlord-1", to: "acc-city", amount: "120000", settles }] : [], accounts: [{ account: "acc-city", holder: "city", custodian: "bank", balance: "1000000", currency: "XYZ" }] } });
+  const rates = () => modules["city.rates_officer"]!.create(context("rates-system", "city", {}, { position: "rates" }));
+  const interest = (settles?: string) => wake(rates(), 100 * DAY, { ...records(law, notice, claim), ...treasury(settles) }, { entity: "city" }).of("claim").filter((c) => c.args.about?.kind === "rates_interest").length;
+  expect(interest()).toBe(1); // unpaid: a month's interest
+  expect(interest("rec.20")).toBe(0); // paid, naming the claim
+  expect(interest("rec.19")).toBe(0); // paid, naming the notice (wave 2c: both landlords of one pilot were charged and paid twice)
+  expect(interest("rec.99")).toBe(1); // a payment that names something else pays neither
+});
+
 test("a direction its giver puts on hold is not followed while the hold stands, and is followed again when the hold is withdrawn; anyone else's hold is nothing", () => {
   const d = direction("rec.50", 5 * DAY, "form-works-staffing", "mayor", { recruit: "no" });
   const hold = (by: string) => statement("rec.55", 6 * DAY, "hold", { author: "mayor-system", speaks_for: by, addressed_to: [by], visible_to: [by], data: { holds: ["rec.50"] } });

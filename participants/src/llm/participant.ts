@@ -761,7 +761,10 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
       // A folder of some kinds only: asked for by its kind where it has one, and told from the list here otherwise.
       const folder = c.folders?.get(i.report);
       if (folder && !kinds.length) {
-        if (folder.length === 1) where.push(...kindWhere(folder[0]!).where);
+        // (A standing payment is no kind a search can be asked: a folder that holds them beside one other kind is
+        // searched for that kind, and the standing payments are shown as they come and found in the office's files.)
+        const asked = folder.filter((k) => kindSaid(k) !== "standing payment");
+        if (asked.length === 1) where.push(...kindWhere(asked[0]!).where);
         here = true;
       }
       // What a search cannot be asked (what a paper names, the words in it, what an agreement is for) is told from

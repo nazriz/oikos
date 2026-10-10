@@ -70,7 +70,7 @@ const ACT_TIME = {
   },
 };
 
-export const GENERATOR_VERSION = "0.45.2"; // 0.45.2: the council's standing orders are a published procedure of the town's (proc-council), and a councillor's or a clerk's post held by a model has the council's papers on its desk (the charter, the standing orders, the laws, the forms, proposals and ballots as papers of its own body, petitions, budgets and results); 0.45.1: the tax law says, step by step and with each rounding, how what is withheld from a pay is reckoned (the one function every payroll uses), where it said "reckoned as a year's pay"; 0.45.0: a seat with routine work is shown its staff's reports on the work under its standing orders, and its procedure says they are made; 0.44.0: main's 0.39.1 (an office's own form says what issuing it does) with the institutions' opening papers (0.43.0)
+export const GENERATOR_VERSION = "0.45.3"; // 0.45.3: a payroll folder holds the standing payments beside the employment agreements; an office's routines procedure says who makes a standing work order and how; the permit decision form says what records the permission; 0.45.2: the council's standing orders are a published procedure of the town's (proc-council), and a councillor's or a clerk's post held by a model has the council's papers on its desk (the charter, the standing orders, the laws, the forms, proposals and ballots as papers of its own body, petitions, budgets and results); 0.45.1: the tax law says, step by step and with each rounding, how what is withheld from a pay is reckoned (the one function every payroll uses), where it said "reckoned as a year's pay"; 0.45.0: a seat with routine work is shown its staff's reports on the work under its standing orders, and its procedure says they are made; 0.44.0: main's 0.39.1 (an office's own form says what issuing it does) with the institutions' opening papers (0.43.0)
 const DAY = 86_400;
 const MONTH = 30 * DAY;
 const YEAR = 365 * DAY;
@@ -1901,9 +1901,11 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     part.controller = { type: "llm", impl: "anthropic", model: "claude-sonnet-5",
       params: { cadence_days: 7, standing: ["laws", "forms", "prices"], ...(RD ? { sessions: { start: RD.work_start_hour * HOUR, end: RD.work_end_hour * HOUR, days: RD.work_days } } : {}),
         // (What a folder holds, for whoever reads it: the code in the office reads every paper of the organisation's own
-        // through its payroll channel; a person is shown the employment agreements under that name, and finds the rest
-        // in the office's files.)
-        ...(pos.channels.some((c: any) => c.id === "payroll") ? { folders: { payroll: ["employment agreement"] } } : {}),
+        // through its payroll channel; a person is shown the employment agreements under that name and the standing
+        // payments that pay them, and finds the rest in the office's files. Until 2026-10-11 it was the agreements
+        // alone: three finance seats paid wages by hand on top of the standing payments the town opens with, or made
+        // the same standing payment twice, never having been shown one: wave 2c's review, fault 2.)
+        ...(pos.channels.some((c: any) => c.id === "payroll") ? { folders: { payroll: ["employment agreement", "standing payment"] } } : {}),
         mock: { brain: impl, params: params ?? {} } } };
     // What a person in the office could look up, and the code never needed to (pilot 8: finance and planning spent
     // their days asking to "inspect the ledger" and "see who holds the mayor's post", which nothing could do for them):
@@ -1940,7 +1942,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       part.controller.params.mock.params = { ...own, part: "seat" };
       pos.role_module = { code: impl, params: { ...own, part: "seat" } };
       records.push({ id: `proc-${id}-routines`, record: "statement", author: "genesis", at: 0, visible_to: [pos.entity], speaks_for: pos.entity, kind: "procedure", addressed_to: [pos.entity],
-        text: `The routine work of the ${pos.title.charAt(0).toLowerCase()}${pos.title.slice(1)}'s office is done by its staff, by the office's standing work orders and only by them. A standing work order says what task, where and how often, and may say on what, from when and for how long. While one is in force the staff do the task each time it falls due, in their working hours; with none in force for a task, they do not do it. An order is changed by withdrawing it and making another, and put on hold like any standing paper. The staff report to the office on the work under its orders, on the organisation's own file: what was done under each, or that one is not being carried out and why, the day that changes and otherwise about weekly. The tasks: ${routines.map((r) => `${r.task}, at ${(own as any)[r.at] || id}: ${r.what}${rhythmWords(r)}`).join(" ")}`,
+        text: `The routine work of the ${pos.title.charAt(0).toLowerCase()}${pos.title.slice(1)}'s office is done by its staff, by the office's standing work orders and only by them. A standing work order says what task, where and how often, and may say on what, from when and for how long. While one is in force the staff do the task each time it falls due, in their working hours; with none in force for a task, they do not do it. Whoever holds the office makes its standing work orders, of the office's own accord: by saying so in their own words (a standing work order for the task, where, and how often or as the procedure has it); it is on no form and needs nobody's direction or leave. None is in force until one is made. An order is changed by withdrawing it and making another, and put on hold like any standing paper. The staff report to the office on the work under its orders, on the organisation's own file: what was done under each, or that one is not being carried out and why, the day that changes and otherwise about weekly. The tasks: ${routines.map((r) => `${r.task}, at ${(own as any)[r.at] || id}: ${r.what}${rhythmWords(r)}`).join(" ")}`,
         data: { routines: routines.map((r) => ({ task: r.task, at: (own as any)[r.at] || id, ...rhythm(r) })) } });
       pos.channels.push(K.mine("standing", ["procedure", "work_order", "hold"], { title: "The office's procedures and standing orders" }));
       part.controller.params.standing = [...part.controller.params.standing, "standing"];

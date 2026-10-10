@@ -122,7 +122,7 @@ test("a law's rule and the condition it's checked by are shown; an offer signed 
   expect(law).toContain("Its rule, as recorded: landlords must not raise a rent, with less than 90 days' notice; or else: the rise is invalid.");
   expect(law).toContain("The condition acts are checked against, as written: block.kind == 'rent_increase' && block.data.from - now < 7776000.");
   // A law in words only says nothing of a rule: what isn't there isn't shown.
-  expect(preview.of([{ block: "publish", kind: "law", text: "Be kind." } as any])).toBe('You will publish a law: "Be kind.".');
+  expect(preview.of([{ block: "publish", kind: "law", text: "Be kind." } as any])).toBe('This does one thing: a law.\n1. You will publish a law: "Be kind.".\n   - Words only: no rule is recorded with it for acts to be checked against.');
   const offer = { block: "propose_agreement", ref: "g", terms: { parties: ["city", "builder"], commitments: [{ who: "builder", does: { text: "mow" } }] } } as any;
   expect(preview.of([offer, { block: "sign_agreement", agreement: "$g", as: "city" } as any])).toContain("and sign it on your side");
   expect(preview.of([offer, { block: "sign_agreement", agreement: "$g", as: "builder" } as any])).toContain("2. You will sign agreement $g for Millbrook Builders (builder).");

@@ -58,7 +58,7 @@ test("a crew taken on by offers of the pay alone, made on the office's advertise
   // The offers were of the pay alone: no place of work in them. Their preview says where the work is, by the advertisement.
   const offers = records.filter((r) => r.record === "agreement" && r.in_position === "works");
   for (const a of offers) expect(a.terms.commitments.map((c: any) => Object.keys(c.does.outcome)[0])).toEqual(["money"]);
-  const preview = seats.previews.find((p) => p.text.includes("employment agreement"))!.text;
+  const preview = seats.previews.find((p) => p.text.includes("You will offer"))!.text;
   expect(preview).toMatch(new RegExp(`It names no place of work: it is made on the job advertisement rec\\.\\d+, so the work is where that advertisement says \\(${depot.replace(/[.\/]/g, "\\$&")}\\)\\.`));
   // The crew comes in, and the round is collected by them.
   const came = new Set(events.filter((e) => e.event === "occupied" && e.space === depot).map((e) => e.occupant));
@@ -85,7 +85,7 @@ test("a crew taken on by offers of the pay alone, made on the office's advertise
 test("offers that cite no advertisement: the preview says there is no place of work, nobody comes, and the crew's report and the seat's roster say the order is not carried out and why", async () => {
   const { seats, events, records, hired, depot, shown } = await worksSeat(false);
   expect(hired.length).toBeGreaterThan(0);
-  expect(seats.previews.find((p) => p.text.includes("employment agreement"))!.text).toContain("It names no place of work and cites no job advertisement that does: whoever signs it is paid and has nowhere to come to work.");
+  expect(seats.previews.find((p) => p.text.includes("You will offer"))!.text).toContain("It names no place of work and cites no job advertisement that does: whoever signs it is paid and has nowhere to come to work.");
   expect(events.filter((e) => e.event === "occupied" && e.space === depot && hired.includes(e.occupant))).toEqual([]);
   expect(events.filter((e) => e.event === "worked" && e.by === "works-staff-system")).toEqual([]);
   const reports = records.filter((r) => r.kind === "staff_report");

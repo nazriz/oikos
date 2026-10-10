@@ -98,6 +98,14 @@ identical."
   `not carried out: none of the 5 in post was at the depot (town-hall/workplace.1) when the day's work was set out`;
   `not carried out: the staff have no routine called "sweep" (their routines: collect, maintain)`; `on hold`;
   `begins year 1, day 37`; `replaced by rec.9`.
+- **A routine with no order on file is said too** (2026-10-11; docs/decisions.md, "An office's staff say when a routine
+  of theirs has no standing order"): `enact: not being done: no standing work order for enact is on file, and with
+  none the staff do not do it (whoever holds the office makes one)`, with what is waiting where the staff know it
+  (`1 amendment the council has passed and the clerk has declared waits to be written into law`). From the staff's
+  second working day, the day it is found and weekly after; `state: "no_order"` in the report's data. Four seats in
+  four pilots made no order and heard nothing; the office's procedure now also says who makes an order and how
+  ("Whoever holds the office makes its standing work orders, of the office's own accord: by saying so in their own
+  words ... it is on no form and needs nobody's direction or leave").
 - **The office-holder sees it twice**: the report as a paper when it comes ("Reports from the staff on the work under
   the standing work orders"), and its roster (docs/behaviour/office-papers.md, "An office's own staff"), which now
   says for each person in post when they last worked and at what, or that they have not come in and why, and under

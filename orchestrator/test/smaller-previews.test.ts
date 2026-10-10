@@ -35,13 +35,13 @@ test("a withdrawal says what it withdraws and what stops: a standing payment, an
   const hold = { id: "rec.61", record: "statement", author: "finance-system", in_position: "finance", speaks_for: "city", at: 5, kind: "hold", text: "Please hold rec.45: nothing is to be done under it until this is withdrawn.", addressed_to: ["bank"], visible_to: ["city", "bank"], data: { holds: ["rec.45"] } };
   const k = seat([job, hold]);
   // The standing wage: its own words, and that what it pays stops.
-  expect(preview(k, "statement(withdraw=rec.44)")).toBe('You will withdraw rec.44. It is your standing request to Millbrook Bank (bank): "Please pay XYZ 2393.34 from acc-city to acc-c0003 every 14 days, for Wages.". Once it is withdrawn nothing more is to be done under it: what it pays or has done stops.');
+  expect(preview(k, "statement(withdraw=rec.44)")).toBe('This does one thing: a withdrawal.\n1. You will withdraw rec.44.\n   - It is your standing request to Millbrook Bank (bank): "Please pay XYZ 2393.34 from acc-city to acc-c0003 every 14 days, for Wages.". Once it is withdrawn nothing more is to be done under it: what it pays or has done stops.');
   // The pilot's draft: the agreement's id where the wage under it was meant.
-  expect(preview(k, "statement(withdraw=job-c0004)")).toBe("You will withdraw job-c0004. It is the employment agreement itself, between you and c0004: not a payment or an order made under it. Anything standing under it is a paper of its own, and goes on until that paper is withdrawn.");
+  expect(preview(k, "statement(withdraw=job-c0004)")).toBe("This does one thing: a withdrawal.\n1. You will withdraw job-c0004.\n   - It is the employment agreement itself, between you and c0004: not a payment or an order made under it. Anything standing under it is a paper of its own, and goes on until that paper is withdrawn.");
   expect(preview(k, "statement(withdraw=rec.61)")).toContain("It is your hold to Millbrook Bank (bank): \"Please hold rec.45: nothing is to be done under it until this is withdrawn.\". Withdrawing it lifts the hold: what it held is acted on again.");
   expect(preview(k, "statement(withdraw=rec.50)")).toContain('It is your notice: "The hall is closed.". Once it is withdrawn it no longer stands.');
   expect(preview(k, "statement(withdraw=rec.48)")).toContain("It has been withdrawn already.");
-  expect(preview(k, "statement(withdraw=rec.900)")).toBe("You will withdraw rec.900. No paper by that id is among your own papers as you have been shown them: check that it is the one you mean.");
+  expect(preview(k, "statement(withdraw=rec.900)")).toBe("This does one thing: a withdrawal.\n1. You will withdraw rec.900.\n   - No paper by that id is among your own papers as you have been shown them: check that it is the one you mean.");
   // Someone else's paper is not described: the seat was shown it, and it is not its own to withdraw.
   expect(preview(k, "statement(withdraw=rec.47)")).toContain("No paper by that id is among your own papers");
 });
@@ -54,7 +54,7 @@ test("an offer of employment that says the work and where: resolved, no place-of
   const terms = (r.blocks[0] as any).terms;
   expect(terms.commitments[1]).toEqual({ who: "c0003", does: { outcome: { work: { task: "works_crew", at: "town-hall/workplace.1" } } } });
   const p = new Preview(k, k.actingFor("finance"), () => undefined, "finance").of(r.blocks);
-  expect(p).toContain("c0003 will do works_crew at town-hall/workplace.1");
+  expect(p).toContain("   - c0003 would be bound to: do works_crew at town-hall/workplace.1.");
   expect(p).not.toContain("It names no place of work");
   expect(jobTerms({ id: "rec.9", record: "agreement", author: "x", at: 0, visible_to: "public", terms } as any, "c0003")).toMatchObject({ wage: 512738, period: 30 * DAY, workplace: "town-hall/workplace.1" });
   // Coming to a place is still read first, where both are said.

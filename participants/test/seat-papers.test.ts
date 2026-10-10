@@ -158,6 +158,21 @@ test("a folder named for payroll holds payroll papers: as they come, and looked 
   expect(r.b).toContain("the paper asset-register\nThere is no paper with that id there.");
 });
 
+test("a payroll folder shows the standing payments that pay its agreements, as they come: a finance office is shown what the bank already pays", async () => {
+  // (Wave 2c: three finance seats were shown their agreements and not the standing wage instructions the town opens
+  // with; they paid by hand on top of them, or made the same standing payment twice.)
+  const folders = new Map([["finance/payroll", ["employment agreement", "standing payment"]]]);
+  const once = { id: "rec.901", record: "statement", author: "finance-system", at: 0, visible_to: ["city", "bank"], speaks_for: "city", kind: "request", addressed_to: ["bank"], text: "Please pay XYZ 10.00 from acc-city to acc-outside.", data: { outcome: { money: { from: "acc-city", to: "acc-outside", amount: "1000" } } } };
+  const text = renderObservation(found(0, "finance/payroll", [...papers, once], false), { folders });
+  expect(text).toContain("[job-c0012] employment agreement between city and c0012");
+  expect(text).toContain("[job-c0012-wages]");
+  // A payment asked for once, a signature and the town's other papers are still not payroll papers.
+  for (const other of ["asset-register", "habitat-map", "law-charter", "rec.900", "rec.901", "-sig-"]) expect(text).not.toContain(other);
+  // Looked into, the folder is still searched for its agreements (a standing payment is no kind a search can be asked).
+  const { p } = harness([[use("a", "look", { report: "finance/payroll" })]], { folders });
+  expect(await p.step(base(9 * HOUR), ctx)).toEqual({ type: "look", looks: [{ channel: "finance/payroll", query: { where: [{ field: "record", op: "=", value: "agreement" }], order: { field: "at", desc: true }, limit: 200 } }] });
+});
+
 test("a folder read only when chosen, looked into with nothing to find, shows what has come since the last look: a list, the newest first", async () => {
   const { p, calls } = harness([[use("a", "look", { report: "finance/files", limit: 5 })]]);
   expect(await p.step(base(9 * HOUR), ctx)).toEqual({ type: "look", looks: [{ channel: "finance/files" }] });

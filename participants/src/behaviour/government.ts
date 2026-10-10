@@ -289,7 +289,7 @@ export const councilClerk: BehaviourModule = {
   answers: {"office": "the council clerk's office", "acts": "What it acts on: a proposal put to the council on the council proposal form (council_proposal) or on a law's amendment form, which it puts to a ballot of the councillors; and the votes cast in a councillor's post while a ballot is open.", "forms": [{"about": ["propos", "motion", "amend", "resolution", "put to the council", "put to council"], "say": "What you want the council to decide goes on the council proposal form (council_proposal); a change to a figure in a law in force goes on that law's amendment form."}], "report": true},
   issues: P.COUNCIL_CLERK,
   routines: [{ task: "enact", at: "office", every: 1, what: "When the council has passed a proposal made on a law's amendment form and the clerk has declared the result, the office's drafters write the amended law out by the law's own schedule, with the figures the proposal gives and the rest as they stand, publish it in place of the law in force, and withdraw that one. Declaring a result does not by itself change a law: this does. A law proposed in free words, or a budget, is not theirs: the clerk publishes that." }],
-  version: "0.11.0", // 0.11.0: where a seat holds the office, its drafters are a staff post that writes a passed amendment into the law under the standing order for enact, and the office-holder declares the result without it; 0.10.0: a result names who voted for and against; a vote on a closed ballot, or by someone who is no councillor, is not counted and its caster is told; 0.9.1: amends a law of optional figures (one added, one taken away by nought, a law made from one figure); 0.9.0: a proposal already balloted and a ballot already declared, by the office's own papers, are not put or counted again; a budget is for the year its proposal names
+  version: "0.11.1", // 0.11.1: its drafters, with no standing order for enact, say what waits to be written into law; 0.11.0: where a seat holds the office, its drafters are a staff post that writes a passed amendment into the law under the standing order for enact, and the office-holder declares the result without it; 0.10.0: a result names who voted for and against; a vote on a closed ballot, or by someone who is no councillor, is not counted and its caster is told; 0.9.1: amends a law of optional figures (one added, one taken away by nought, a law made from one figure); 0.9.0: a proposal already balloted and a ballot already declared, by the office's own papers, are not put or counted again; a budget is for the year its proposal names
   doc: "docs/behaviour/government.md",
   cadence: () => DAY,
   create(ctx: ParticipantContext) {
@@ -346,6 +346,8 @@ export const councilClerk: BehaviourModule = {
             } else routines.heldUp("enact", `the amendment passed on ${ballot.id} could not be written into law:${made.note}`);
           }
           if (working) routines.note("enact", waiting ? undefined : "no amendment the council has passed is waiting to be written into law");
+          // (With no order for it: what is waiting, for the report that says the work is not being done.)
+          else routines.note("enact", waiting ? `${waiting} amendment${waiting === 1 ? "" : "s"} the council has passed and the clerk has declared ${waiting === 1 ? "waits" : "wait"} to be written into law` : undefined);
           if (reportDay !== Math.floor(t / DAY)) {
             reportDay = Math.floor(t / DAY);
             steps.push(...routines.report(book, t, { office: (ctx.position ?? "").replace(/-staff$/, ""), from: "the clerk's drafters", tasks: { enact: ["amendments written into law"] } }));
@@ -750,7 +752,7 @@ export const ratesOfficer: BehaviourModule = {
   takes: [{ form: "rates_recovery", title: "Recovery direction to the rates officer",
     fields: { interest: { type: "choice", options: ["yes", "no"], required: true, description: "Whether rates left unpaid after their due date are charged the law's penalty interest: yes, as the office does of its own accord; no, none is added." } },
     follows: "While a direction with interest no stands, the rates officer adds no penalty interest to overdue rates and writes to nobody about them. The rates themselves are still levied and still owed, and interest already recorded stays on record." }],
-  version: "0.4.0", // 0.4.0: its clerks report to the rates officer the notices sent under the standing order and when the next go out; 0.3.0: takes a written direction on penalty interest (docs/behaviour/directions.md)
+  version: "0.4.1", // 0.4.1: a payment that names the rates notice pays the claim recorded with it; 0.4.0: its clerks report to the rates officer the notices sent under the standing order and when the next go out; 0.3.0: takes a written direction on penalty interest (docs/behaviour/directions.md)
   doc: "docs/behaviour/public-finance.md",
   cadence: () => DAY,
   create(ctx: ParticipantContext) {
@@ -768,6 +770,11 @@ export const ratesOfficer: BehaviourModule = {
     const directions = new Directions(ctx, { under: p.directed_under, compliance_bps: p.direction_compliance_bps, office_words: "the rates office" });
     const routines = new StandingWork(ctx.entity, p.part);
     const settled = new Set<string>(); // claims a payment into our account has named
+    // A payment that names the notice pays what the notice asks: the claim recorded with it (same owner, same sum, same
+    // due day). Whoever is sent a rates notice pays "the rates notice"; until 2026-10-11 only a payment naming the
+    // claim counted, and two landlord seats who paid on the notice were charged interest and paid again (wave 2c's
+    // review, fault 4).
+    const paid = (book: Book, c: any): boolean => settled.has(c.id) || book.all("rates_notice").some((n) => settled.has(n.id) && (n.addressed_to ?? []).includes(c.counterparty) && n.data?.due === c.about?.due && Number(n.data?.amount) === Number(c.about?.amount));
     const lastInterest = new Map<string, number>(); // overdue claim -> when interest was last charged
     let next = p.first_day * DAY;
     let reportDay = -1;
@@ -835,7 +842,7 @@ export const ratesOfficer: BehaviourModule = {
         const recovery = directions.standing(book, "rates_recovery");
         if (p.part !== "staff") steps.push(...directions.letters(book, (d) => (d.data?.interest === "no" ? "No penalty interest is added to overdue rates while it stands; the rates are still owed." : "Overdue rates are charged the law's penalty interest.")));
         if (levying && interestBps > 0 && recovery?.data?.interest !== "no") for (const c of book.ofType("claim").filter((r) => r.record === "claim" && r.position === "right" && r.holder === me && r.about?.kind === "rates") as any[]) {
-          if (settled.has(c.id) || t < c.about.due) continue;
+          if (paid(book, c) || t < c.about.due) continue;
           if (t - (lastInterest.get(c.id) ?? c.about.due) < 30 * DAY) continue;
           lastInterest.set(c.id, t);
           const interest = Math.floor((cents(c.about.amount) * interestBps) / 10_000 / 12);
@@ -844,7 +851,7 @@ export const ratesOfficer: BehaviourModule = {
             message([c.counterparty], `Rates of ${usd(cents(c.about.amount))} are overdue; interest of ${usd(interest)} has been added.`, c.id)));
         }
         steps.push(...letters.answer(() => {
-          const overdue = [...new Set((book.ofType("claim").filter((r) => r.record === "claim" && r.position === "right" && r.holder === me && r.about?.kind === "rates" && !settled.has(r.id) && t >= (r as any).about.due) as any[]).map((c) => c.counterparty))];
+          const overdue = [...new Set((book.ofType("claim").filter((r) => r.record === "claim" && r.position === "right" && r.holder === me && r.about?.kind === "rates" && !paid(book, r) && t >= (r as any).about.due) as any[]).map((c) => c.counterparty))];
           const valued = new Set(book.open("valuation").map((v) => v.data?.lot)).size;
           const when = !valued ? " No property has been valued yet (the valuer values every property once a year): the first notices go out once it has."
             : t >= next ? " The next instalment's notices go out today." : ` The next instalment's notices go out on day ${Math.floor(next / DAY) + 1}.`;

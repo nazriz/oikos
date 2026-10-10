@@ -44,7 +44,7 @@ test("a draft carries the call, the resolver, a mechanical preview, the dry run 
   if (!r.ok) throw new Error(r.notices.join(" "));
   expect(r.draft.call).toBe("structure(by=city, on=p1, type=park)");
   expect(r.draft.blocks).toEqual([{ block: "construct", at: "cell.0.0", structure_type: "park" }]);
-  expect(r.draft.summary).toBe("You will start building a park with its corner at cell.0.0 yourself.");
+  expect(r.draft.summary).toBe("This does one thing: a building begun.\n1. You will start building a park with its corner at cell.0.0 yourself.");
   expect(r.draft.check).toEqual({ ok: false, refusal: { code: "insufficient_funds" }, warnings: ['This appears to go against law-planning: "No building without a permit."'] });
   expect(r.hash).toBe(draftHash(r.draft));
   const text = draftText(r.draft);

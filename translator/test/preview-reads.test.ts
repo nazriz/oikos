@@ -28,24 +28,24 @@ test("a proposal put to the town and a letter to its clerk are not addressed to 
   const k = mayor(GB.values.currency);
   const p = new Preview(k, k.actingFor("mayor"));
   const proposal = p.of([{ block: "publish", kind: "proposal", speaks_for: "city", addressed_to: ["city"], basis: "form-council-proposal", text: "council proposal: kind budget, staff £270,000.00.", data: { kind: "budget", proposal: "The year's budget.", staff: "27000000", parks: "0" } } as any]);
-  expect(proposal).toStartWith("You will publish a proposal, addressed to Town of Millbrook (city), which you act for: ");
+  expect(proposal).toStartWith("This does one thing: a council proposal form.\n1. You will file the council proposal form (form-council-proposal) with Town of Millbrook (city), which you act for, as a proposal: ");
   expect(proposal).not.toContain("addressed to you");
   const letters = p.of([{ block: "message", to: ["council-clerk"], text: "Please put it to a ballot." } as any, { block: "message", to: ["bank", "c0297", "mayor"], text: "For your records.", re: "rec.12" } as any]);
-  expect(letters).toBe('1. You will write to the council clerk (council-clerk): "Please put it to a ballot.".\n2. You will write to Millbrook Savings Bank (bank), Ada Okafor (c0297), the mayor of Millbrook (mayor), about rec.12: "For your records.".');
+  expect(letters).toBe('This does two things, in this order: two letters.\n1. You will write to the council clerk (council-clerk): "Please put it to a ballot.".\n   - A letter only: it pays, files and orders nothing.\n2. You will write to Millbrook Savings Bank (bank), Ada Okafor (c0297), the mayor of Millbrook (mayor), about rec.12: "For your records.".\n   - A letter only: it pays, files and orders nothing.');
   // Asked of, and instructed: named the same way. What it does itself is still "you".
-  expect(p.of([{ block: "publish", kind: "hold", speaks_for: "city", addressed_to: ["bank"], visible_to: ["city", "bank"], text: "Please hold rec.5.", data: { holds: ["rec.5"] } } as any])).toStartWith("You will instruct Millbrook Savings Bank (bank) to hold rec.5, seen only by you, Millbrook Savings Bank (bank).");
-  expect(p.of([{ block: "transfer", from: "acc-city", to: "acc-builder", amount: "5000000" } as any])).toBe("You will move £50,000.00 from acc-city to acc-builder.");
+  expect(p.of([{ block: "publish", kind: "hold", speaks_for: "city", addressed_to: ["bank"], visible_to: ["city", "bank"], text: "Please hold rec.5.", data: { holds: ["rec.5"] } } as any])).toStartWith("This does one thing: a hold.\n1. You will instruct Millbrook Savings Bank (bank) to hold rec.5.\n");
+  expect(p.of([{ block: "transfer", from: "acc-city", to: "acc-builder", amount: "5000000" } as any])).toBe("This does one thing: a payment.\n1. You will move £50,000.00 from acc-city to acc-builder now.");
   // A person acting as themselves, writing to themselves: you.
   const self = new Knowledge(GB.values.currency);
   self.absorb({ t: 0, entity: "c0001", outcomes: [], inbox: [], drafts: [], channels: {} } as unknown as Observation);
-  expect(new Preview(self).of([{ block: "message", to: ["c0001"], text: "A note." } as any])).toBe('You will write to you: "A note.".');
+  expect(new Preview(self).of([{ block: "message", to: ["c0001"], text: "A note." } as any])).toBe('This does one thing: a letter.\n1. You will write to you: "A note.".\n   - A letter only: it pays, files and orders nothing.');
 });
 
 test("what a form was filled in with reads as the form says each field is: money as the place writes it, time in days, a date as a date", () => {
   const data = { kind: "budget", proposal: "The year's budget.", staff: "27000000", parks: "0", notice: 7_776_000, from: 400 * DAY };
   const gb = mayor(GB.values.currency);
   const text = new Preview(gb, "city").of([{ block: "publish", kind: "proposal", speaks_for: "city", addressed_to: ["city"], basis: "form-council-proposal", text: "council proposal.", data } as any]);
-  expect(text).toContain("with these details: kind: budget; proposal: The year's budget.; staff: £270,000.00; parks: £0.00; notice: 90 days; from: year 2, day 36, citing form-council-proposal.");
+  expect(text).toContain('Filled in: kind: budget; proposal: "The year\'s budget."; staff: £270,000.00; parks: £0.00; notice: 90 days; from: year 2, day 36.');
   expect(text).not.toContain("27000000");
   expect(text).not.toContain("7776000");
   // The same paper in a town that writes its money another way.
@@ -53,10 +53,10 @@ test("what a form was filled in with reads as the form says each field is: money
   expect(new Preview(de, "city").of([{ block: "publish", kind: "proposal", speaks_for: "city", addressed_to: ["city"], basis: "form-council-proposal", text: "council proposal.", data } as any])).toContain("staff: 270.000,00 €; parks: 0,00 €; notice: 90 days");
   // A job advertised with a year's pay as its wage and a year as its period says so: paid once a year.
   const advert = new Preview(gb, "city").of([{ block: "publish", kind: "job_posting", speaks_for: "city", visible_to: "public", text: "Hiring: £85,000.00 every 365 days.", data: { wage: "8500000", period: 365 * DAY, role: "crew" } } as any]);
-  expect(advert).toContain("with these details: wage: £85,000.00; period: 1 year; role: crew");
+  expect(advert).toContain("With these details: wage: £85,000.00; period: 1 year; role: crew.");
   // An agreement's terms beyond its sentence, and an act's other fields: the same reading.
   expect(new Preview(gb, "city").of([{ block: "publish", kind: "notice", speaks_for: "city", visible_to: "public", text: "Rates.", data: { rate_bps: 1600, closes_at: 3 * DAY + 9 * 3600, lines: { parks: "6000000", staff: "27000000" }, figures: { notice: { unit: "seconds", value: 5_184_000 } } } } as any]))
-    .toContain('with these details: {"rate":"16%","closes_at":"year 1, day 4, 09:00","lines":{"parks":"£60,000.00","staff":"£270,000.00"},"figures":{"notice":"60 days"}}');
+    .toContain('With these details: {"rate":"16%","closes_at":"year 1, day 4, 09:00","lines":{"parks":"£60,000.00","staff":"£270,000.00"},"figures":{"notice":"60 days"}}.');
 });
 
 test("lengths of time are said as people say them", () => {

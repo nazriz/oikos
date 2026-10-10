@@ -66,11 +66,11 @@ test("the preview of a direction says what is filed and to whom, and nothing of 
   const k = seat();
   const r = resolve(calls.parseProgram('form(form=works_collection, to=works, every="2 weeks")'), k, () => undefined, "mayor");
   if (!r.ok) throw new Error(r.questions.join(" "));
-  expect(new Preview(k, "city").of(r.blocks)).toBe('You will give the Works manager (works) a written direction on its works collection form (form-works-collection): "works collection: every 14 days.". This by itself changes nothing: the office follows a direction only from those its organisation\'s rules say may direct it, and writes back to say whether it does. It stands until you replace it with another or withdraw it.');
+  expect(new Preview(k, "city").of(r.blocks)).toBe('This does one thing: a written direction.\n1. You will give the Works manager (works) a written direction on its works collection form (form-works-collection).\n   - Filled in: every: 14 days.\n   - This by itself changes nothing: the office follows a direction only from those its organisation\'s rules say may direct it, and writes back to say whether it does.\n   - It stands until you replace it with another or withdraw it.');
   // Filed by someone as themselves, it says in whose name.
   const own = resolve(calls.parseProgram("form(form=works_staffing, to=works, recruit=no)"), k);
   if (!own.ok) throw new Error(own.questions.join(" "));
-  expect(new Preview(k, "c0001").of(own.blocks)).toStartWith('You will give the Works manager (works) a written direction on its works staffing form (form-works-staffing): "works staffing: recruit no."');
+  expect(new Preview(k, "c0001").of(own.blocks)).toStartWith('This does one thing: a written direction.\n1. You will give the Works manager (works) a written direction on its works staffing form (form-works-staffing).\n   - Filled in: recruit: no.\n   - Left empty: posts.\n');
 });
 
 test("a length of time in words", () => {

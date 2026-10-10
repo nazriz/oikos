@@ -116,7 +116,7 @@ test("4.1: paying someone asks the bank that keeps the account", () => {
   if (!r.ok) throw new Error(r.questions.join(" "));
   expect(r.blocks).toEqual([{ block: "publish", kind: "request", speaks_for: "city", addressed_to: ["bank"], visible_to: ["city", "bank"],
     text: "Please pay $500.00 from acc-city to acc-builder, for the fence.", data: { outcome: { money: { from: "acc-city", to: "acc-builder", amount: "50000", for: "the fence" } } } }]);
-  expect(new Preview(town()).of(r.blocks)).toBe('You will ask Millbrook Bank (bank) to pay $500.00 from your account (acc-city) to acc-builder, for the fence, seen only by you, Millbrook Bank (bank). Your request will read: "Please pay $500.00 from acc-city to acc-builder, for the fence.".');
+  expect(new Preview(town()).of(r.blocks)).toBe('This does one thing: a payment.\n1. You will ask Millbrook Bank (bank) to pay $500.00 from your account (acc-city) to acc-builder, once.\n   - For, in words only: "the fence"');
 });
 
 test("4.2: a repeating payment is a standing request", () => {
@@ -134,8 +134,8 @@ test("4.3: with the inputs supplied, an offered agreement to whoever builds, cit
       text: "GreenCo (greenco) will build a park on lot-00; Millbrook (city) pays $60,000.00 from acc-city." } },
     { block: "sign_agreement", agreement: "$offer1", as: "city" },
   ]);
-  expect(new Preview(town()).of(r.blocks)).toContain("You will offer GreenCo (greenco) a construction agreement: GreenCo (greenco) will build a park on lot-00; you will pay $60,000.00 from your account (acc-city) to GreenCo (greenco)");
-  expect(new Preview(town()).of(r.blocks)).toContain("It cites rec.412, and sign it on your side.");
+  expect(new Preview(town()).of(r.blocks)).toContain("You will offer GreenCo (greenco) a construction agreement, and sign it on your side.\n   - You would be bound to: pay $60,000.00 from your account (acc-city) to GreenCo (greenco).\n   - GreenCo (greenco) would be bound to: build a park on lot-00.");
+  expect(new Preview(town()).of(r.blocks)).toContain("   - Cites: rec.412.");
 });
 
 test("4.4: filling in a published form, checked against its fields", () => {
@@ -370,8 +370,8 @@ test("an act may rest on several records: basis as a list goes through in the or
     for (const b of blocks(src)) expect([src, valid(b), valid.errors]).toEqual([src, true, null]);
   // The preview says each of them.
   const p = new Preview(town());
-  expect(p.of(blocks('statement(kind=notice, text="The pool closes.", basis=["rec.733","rec.741"])'))).toContain("citing rec.733 and rec.741.");
-  expect(p.of(blocks('claim(release=rec.70, basis=["rec.71","rec.72","rec.73"])'))).toContain("citing rec.71, rec.72 and rec.73.");
+  expect(p.of(blocks('statement(kind=notice, text="The pool closes.", basis=["rec.733","rec.741"])'))).toContain("Cites: rec.733 and rec.741.");
+  expect(p.of(blocks('claim(release=rec.70, basis=["rec.71","rec.72","rec.73"])'))).toContain("Cites: rec.71, rec.72 and rec.73.");
 });
 
 test("the payment pilot 10 lost (a finance seat's, citing four dockets and a budget) now resolves, to a request that cites all five", () => {
@@ -386,5 +386,5 @@ test("the payment pilot 10 lost (a finance seat's, citing four dockets and a bud
     data: { outcome: { money: { from: "acc-city", to: "acc-outside", amount: "318773", for: "disposal of waste", settles: "rec.28337" } } },
     basis: ["rec.11904", "rec.16123", "rec.21887", "rec.25703", "rec.25150"],
   }]);
-  expect(new Preview(town()).of(r.blocks)).toContain("citing rec.11904, rec.16123, rec.21887, rec.25703 and rec.25150.");
+  expect(new Preview(town()).of(r.blocks)).toContain("Cites: rec.11904, rec.16123, rec.21887, rec.25703 and rec.25150.");
 });

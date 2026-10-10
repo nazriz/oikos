@@ -32,7 +32,7 @@ test("the preview of a standing payment says when the first payment falls, as th
   // A date: that date, and nothing counted from anywhere.
   const dated = pay(', first="year 1, day 45"');
   expect(dated.text).toContain("The first payment falls due on year 1, day 45, and then every 14 days from that date.");
-  expect(dated.text).toContain('Your request will read: "Please pay XYZ 2,393.34 from acc-city to acc-c0003 every 14 days, the first on year 1, day 45.".');
+  expect(dated.text).toContain("to acc-c0003 every 14 days.\n   - The first payment falls due on year 1, day 45, and then every 14 days from that date.");
   expect(due(dated.blocks[0], 14 * DAY)).toBe(44 * DAY);
   expect(due(dated.blocks[0], 14 * DAY, 3 * DAY)).toBe(44 * DAY); // (whenever it is lodged)
   // A length of time: counted from when it is lodged, said so, with the day that comes to today. (The wave's case:
@@ -58,11 +58,11 @@ test("the preview of a standing payment says when the first payment falls, as th
 
 test("the preview of a standing work order says when it starts and when it ends", () => {
   const dated = preview('work(task=collect, at=town-hall, every="7 days", first="year 1, day 40", until="year 1, day 90")');
-  expect(dated.text).toContain("It is in force from year 1, day 40. It stands to the end of year 1, day 90.");
+  expect(dated.text).toContain("   - It is in force from year 1, day 40.\n   - It stands to the end of year 1, day 90.");
   expect(due(dated.blocks[0], 0)).toBe(39 * DAY);
   expect(dated.blocks[0].data.until).toBe(90 * DAY);
   const counted = preview('work(task=collect, at=town-hall, every="weekly", first="3 days", until="8 weeks")');
-  expect(counted.text).toContain("It comes into force 3 days after it is put on file: on year 1, day 34 if that is today (year 1, day 31). It stands until year 1, day 87, 09:00.");
+  expect(counted.text).toContain("It comes into force 3 days after it is put on file: on year 1, day 34 if that is today (year 1, day 31).\n   - It stands until year 1, day 87, 09:00.");
   expect(preview('work(task=collect, at=town-hall, every="weekly")').text).toContain("It is in force as soon as it is on file.");
 });
 

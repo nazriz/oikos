@@ -89,7 +89,9 @@ test("nobody of the crew at the depot: the order is not carried out, and the rep
   expect(w.of("work")).toEqual([]);
   const [r] = reports(w);
   expect(r!.args.data.orders).toEqual([{ order: "rec.1", task: "collect", every: 7 * DAY, state: "not_carried_out",
-    why: "none of the 2 in post was at the depot (town-hall/workplace.1) when the day's work was set out", says: "not carried out: none of the 2 in post was at the depot (town-hall/workplace.1) when the day's work was set out" }]);
+    why: "none of the 2 in post was at the depot (town-hall/workplace.1) when the day's work was set out", says: "not carried out: none of the 2 in post was at the depot (town-hall/workplace.1) when the day's work was set out" },
+    // (The crew's other routine has no order on file: said too.)
+    { task: "maintain", every: 0, state: "no_order", says: "not being done: no standing work order for maintain is on file, and with none the staff do not do it (whoever holds the office makes one)" }]);
   // Who has nowhere to come to: the one whose agreement names no place of work and cites no advertisement.
   expect(r!.args.data.staff).toEqual([{ person: "c0001", no_place: true }, { person: "c0002" }]);
   expect(r!.args.text).toContain("In post 2: c0001 has not come in to work (no place of work in the employment agreement or the advertisement it cites); c0002 has not come in to work.");
@@ -98,9 +100,34 @@ test("nobody of the crew at the depot: the order is not carried out, and the rep
   expect(reports(today)).toEqual([]);
 });
 
-test("with nobody in post there is nobody to report; with no order there is nothing to report on", () => {
+test("with nobody in post there is nobody to report; a routine with no order on file is reported as not being done", () => {
   expect(reports(wake(staff(), MONDAY, shown([], order("rec.1", DAY, "collect", 7 * DAY)), { entity: "city" }))).toEqual([]);
-  expect(reports(wake(staff(), MONDAY, shown(["c0001"], ...offer("rec.20", "c0001", { at: "town-hall/workplace.1" })), { entity: "city" }))).toEqual([]);
+  // (Wave 2c: a works crew of five collected nothing in 45 days and a clerk's drafters wrote no amendment into law in
+  // 400, and neither office heard a word, because the staff reported only on orders that existed.)
+  const [r] = reports(wake(staff(), MONDAY, shown(["c0001"], ...offer("rec.20", "c0001", { at: "town-hall/workplace.1" })), { entity: "city" }));
+  expect(r!.args.data.orders.map((x: any) => [x.order, x.task, x.state])).toEqual([[undefined, "collect", "no_order"], [undefined, "maintain", "no_order"]]);
+  expect(r!.args.text).toContain("collect: not being done: no standing work order for collect is on file, and with none the staff do not do it (whoever holds the office makes one).");
+  // One routine ordered, the other not: each is said as it stands.
+  const [one] = reports(wake(staff(), MONDAY, shown(["c0001"], order("rec.1", DAY, "collect", 7 * DAY), ...offer("rec.20", "c0001", { at: "town-hall/workplace.1" })), { entity: "city" }));
+  expect(one!.args.data.orders.map((x: any) => [x.order, x.task, x.state === "no_order"])).toEqual([["rec.1", "collect", false], [undefined, "maintain", true]]);
+});
+
+test("an office's first day is not reported as work not ordered; said once, then weekly; and no more once the order is made", () => {
+  const routines = new StandingWork("city", "staff");
+  const none = book();
+  const tell = (b: Book, day: number) => routines.report(b, day * DAY + 8 * 3600, { office: "council-clerk", from: "the clerk's drafters", tasks: { enact: ["amendments written into law"] } });
+  expect(tell(none, 0)).toEqual([]);
+  routines.note("enact", "1 amendment the council has passed and the clerk has declared waits to be written into law");
+  const first = tell(none, 1);
+  expect(first).toHaveLength(1);
+  expect(JSON.stringify(first)).toContain("enact: not being done: no standing work order for enact is on file, and with none the staff do not do it (whoever holds the office makes one); 1 amendment the council has passed and the clerk has declared waits to be written into law.");
+  for (let d = 2; d <= 7; d++) expect(tell(none, d)).toEqual([]);
+  expect(tell(none, 8)).toHaveLength(1);
+  // The order made: how it stands has changed, said the next day, and nothing of "no order" after.
+  const made = book(order("rec.1", 9 * DAY, "enact", DAY));
+  const after = tell(made, 10);
+  expect(after).toHaveLength(1);
+  expect(JSON.stringify(after)).not.toContain("no_order");
 });
 
 test("an order for a task the staff do not have, one on hold and one not yet begun are each said as they stand", () => {
