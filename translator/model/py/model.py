@@ -14,7 +14,7 @@ from __future__ import annotations
 import math
 import re
 import zlib
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 
 import torch
 import torch.nn as nn
@@ -43,6 +43,13 @@ class Config:
     # of it an input may be (longer is asked back, never cut).
     encoder: str = ""
     max_tokens: int = 512
+    # How the model writes a program (translator/model/encode.ts): "steps" (it names each argument, closes each call
+    # and ends the program by decisions of its own: every model before 2026-10-10, and what a config without this
+    # says), or "slots" (code lists the slots, the model decides each once: slots.py). With "slots": the contract's
+    # slots as the export gave them, and every slot's name in the order of the model's slot numbers.
+    decoding: str = "steps"
+    grammar: dict = field(default_factory=dict)
+    slots: list[str] = field(default_factory=list)
 
     def to_json(self) -> dict:
         return asdict(self)
@@ -122,6 +129,10 @@ class Translator(nn.Module):
             self.read_norm = nn.LayerNorm(d)
             layer = nn.TransformerEncoderLayer(d, cfg.heads, cfg.feed, cfg.dropout, batch_first=True, norm_first=True)
             self.reader = nn.TransformerEncoder(layer, cfg.reader_layers, enable_nested_tensor=False)
+        if cfg.decoding == "slots":
+            # Which slot a decision is for: told to the writer with each step (and, for a form's field, where its
+            # name stands, through `span`), since the model no longer names the argument itself.
+            self.slot = nn.Embedding(len(cfg.slots), d)
         self.step = nn.Embedding(self.n_choices + 1, d)  # the last is the start of a program
         self.step_place = nn.Embedding(cfg.max_steps + 1, d)
         self.span = nn.Linear(2 * d, d)
@@ -161,6 +172,24 @@ class Translator(nn.Module):
         x = x + pointed * is_span.unsqueeze(-1)
         return x + self.step_place(torch.arange(x.shape[1], device=x.device)).unsqueeze(0)
 
+    def slot_inputs(self, read: torch.Tensor, slot: torch.Tensor, start: torch.Tensor, end: torch.Tensor, named: torch.Tensor) -> torch.Tensor:
+        """What the writer is told of the decision it is about to make (slot by slot): which slot it is for, and for
+        a form's field (`named`), where the field's name stands in what was read."""
+        b = torch.arange(read.shape[0], device=read.device).unsqueeze(1)
+        return self.slot(slot) + self.span(torch.cat([read[b, start], read[b, end]], -1)) * named.unsqueeze(-1)
+
+    def write_next(self, read: torch.Tensor, x: torch.Tensor, kept: list) -> torch.Tensor:
+        """The writer's state at one more step, given what it kept of the steps before (`kept`: a list, one place a
+        layer, begun as [None, ...]): the same numbers `write` gives for that step, without writing the earlier
+        steps again. One input at a time (no padding), not in training."""
+        for i, layer in enumerate(self.writer.layers):
+            h = layer.norm1(x)
+            kept[i] = h if kept[i] is None else torch.cat([kept[i], h], 1)
+            x = x + layer.self_attn(h, kept[i], kept[i], need_weights=False)[0]
+            x = x + layer.multihead_attn(layer.norm2(x), read, read, need_weights=False)[0]
+            x = x + layer.linear2(layer.activation(layer.linear1(layer.norm3(x))))
+        return self.write_norm(x)
+
     def write(self, read: torch.Tensor, pad: torch.Tensor, inputs: torch.Tensor) -> torch.Tensor:
         t = inputs.shape[1]
         causal = torch.triu(torch.ones(t, t, dtype=torch.bool, device=inputs.device), 1)
@@ -186,8 +215,14 @@ class Translator(nn.Module):
         bos = torch.full_like(choice[:, :1], self.n_choices)
         zero = torch.zeros_like(start[:, :1])
         inputs = self.step_inputs(read, torch.cat([bos, choice[:, :-1].clamp(min=0)], 1), torch.cat([zero, start[:, :-1]], 1), torch.cat([zero, end[:, :-1]], 1))
+        if "slot" in batch:
+            inputs = inputs + self.slot_inputs(read, batch["slot"], batch["slot_start"], batch["slot_end"], batch["slot_named"])
         state = self.write(read, batch["pad"], inputs)
-        total = F.cross_entropy(self.choose(state).transpose(1, 2), choice, ignore_index=-100, reduction="sum")
+        scores = self.choose(state)
+        if "allowed" in batch:
+            # Only what the slot allows is ever in the running (as when answering), and the label always is.
+            scores = scores.masked_fill(~batch["allowed"], float("-inf"))
+        total = F.cross_entropy(scores.transpose(1, 2), choice, ignore_index=-100, reduction="sum")
         is_span = choice >= self.first_pointer
         if is_span.any():
             kind = (choice - self.first_pointer).clamp(min=0)
@@ -237,4 +272,60 @@ class Translator(nn.Module):
                     if name.startswith("none:"):
                         steps.append("eos")
                     break
+        return steps, math.exp(sure), {**{k: math.exp(v) for k, v in parts.items()}, "least": math.exp(least)}
+
+    @torch.no_grad()
+    def translate_slots(self, f: dict[str, torch.Tensor], follow, masks: torch.Tensor | None = None, whole: bool = False) -> tuple[list, float, dict]:
+        """One request, greedily, slot by slot: `follow` (slots.Follow) says what is to be decided next and what it
+        may be, and is told each decision; the answer is whole when it says so. The same three results as `translate`.
+        Sureness is the product of every decision's probability among what its slot allows. An answer that would take
+        more steps than the model has places for is not given: (None, 0, {}). `whole`: every step written anew from
+        the first (as in training; for checking `write_next` against it)."""
+        dev = f["line"].device
+        pad = torch.zeros(1, f["line"].shape[1], dtype=torch.bool, device=dev)
+        read = self.read(f, pad)
+        prev, a0, z0 = self.n_choices, 0, 0
+        kept: list = [None] * len(self.writer.layers)
+        inputs = []
+        steps: list = []
+        sure, least = 0.0, 0.0
+        parts = {"choices": 0.0, "places": 0.0, "texts": 0.0}
+        at = 0
+        while follow.now is not None:
+            if at >= self.cfg.max_steps:
+                return None, 0.0, {}
+            slot, named, mask = follow.now
+            x = self.step(torch.tensor([[prev]], device=dev))
+            if self.first_pointer <= prev < self.n_choices:
+                x = x + self.span(torch.cat([read[:, a0], read[:, z0]], -1)).unsqueeze(1)
+            x = x + self.slot(torch.tensor([[slot]], device=dev))
+            if named is not None:
+                x = x + self.span(torch.cat([read[:, named[0]], read[:, named[1]]], -1)).unsqueeze(1)
+            x = x + self.step_place(torch.tensor([[at]], device=dev))
+            if whole:
+                inputs.append(x)
+                state = self.write(read, pad, torch.cat(inputs, 1))[:, -1:]
+            else:
+                state = self.write_next(read, x, kept)
+            allowed = (follow.masks.rows[mask] if masks is None else masks[mask]).to(dev)
+            p = F.log_softmax(self.choose(state)[0, 0].masked_fill(~allowed, float("-inf")), -1)
+            c = int(p.argmax())
+            sure += float(p[c]); parts["choices"] += float(p[c]); least = min(least, float(p[c]))
+            if c >= self.first_pointer:
+                kind = torch.tensor([[c - self.first_pointer]], device=dev)
+                ps = F.log_softmax(self.start_scores(state, kind, read, pad)[0, 0], -1)
+                a = int(ps.argmax())
+                pe = F.log_softmax(self.end_scores(state, kind, torch.tensor([[a]], device=dev), read, pad)[0, 0], -1)
+                z = int(pe.argmax())
+                sure += float(ps[a]) + float(pe[z])
+                parts["texts" if POINTERS[c - self.first_pointer] == "text" else "places"] += float(ps[a]) + float(pe[z])
+                least = min(least, float(ps[a]), float(pe[z]))
+                step = [POINTERS[c - self.first_pointer], a, z]
+                a0, z0 = a, z
+            else:
+                step = self.choices[c]
+            steps.append(step)
+            follow.take_tokens(step)
+            prev = c
+            at += 1
         return steps, math.exp(sure), {**{k: math.exp(v) for k, v in parts.items()}, "least": math.exp(least)}

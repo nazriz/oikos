@@ -3691,6 +3691,56 @@ See the design note, §16.
 
 - **Round 2 of the trained translator: a better-labelled set and one seed; it does not pass, and data of the same kinds is no longer what it lacks** (2026-10-10; docs/translator-pipeline.md, "Round 2's results"; `runs/translator-round-2-2026-10-10/`). **What was done.** The 802 disagreements read again under 0.9.4 by Sonnet 5.5 and a second reader (sol for 390, Opus 5.5 for 412 when the Codex window shut): 541 settle. The last round's examples a ruling could touch checked under 0.9.4 (40 relabelled, 26 dropped). w2-58 through the pipeline; 200 situations of finance, bank, landlord and manager seats written under a round-three writer text (`runs/…/writer-round3.txt`: payments, bank business, agreements, statements, forms of several amounts); 3,014 generated examples of the weak kinds (the generator's new options, the entry above). `joined-13` / `data-19`: 57,591 rows. **Result.** `pod-small-r2-s1` beside last round's seed 1, same code, same day: real 153 against 147 of 180 (wrong 12 against 13), held out 48 against 46 of 66, parity 1,379 against 1,367; banker as asker 47 against 43 of 52; agreements 35 against 30 of 49 with the same 14 wrong; forms 186 against 183 of 250. **What it says.** Settling labels and filling kinds bought about three points on real requests. Forms of several amounts and agreements did not move with 1,096 and 426 more examples, so the limit there is the small reader or the decoding, not the data. **Choices made.** Haiku at default effort was not used as a reader (the dearest last round); Opus 5.5 was the fallback second reader (about 0.013 a request, half of Haiku's figure), which makes most of this round's new labels one family's. Plan usage 115 against 216. **Not verified:** a second seed (one was asked for); the examples not read again under 0.9.4 (1,291 of last round's, 2,712 older); the pipeline-made test sets still carry the older labelling, reported beside the part a reader of another family agrees with. **Revisit if** a larger reader (the next encoder up, or a second pass for forms) on this same data moves forms and agreements: then keep the data and change the model; if it does not either, the form and agreement programs need a different decoding (a field at a time).
 
+## 2026-10-10 · The trained translator writes a call slot by slot, and says how many lines first
+
+- **What was wrong.** `pod-small-r2-s1` fails by one confident wrong choice far more often than by a wrong copy (the design
+  measurements, `runs/translator-decode-design-2026-10-10/` on the run server). It closed a form or a call too early: the
+  council's budget form wanting one amount was right 1 time in 4 with `)` chosen at 0.996, yet made to write the field it
+  found the value at 0.95 or more in 11 of 11; on the parity test a field or argument left out or added was 55 of 85
+  failures (all 14 of the agreements' among them), and answers that did not fit the form shown 19 of 87. And it ended the
+  program too early (`eos` at 0.93 or more): 11 of 18 real programs of two lines right, 2 of 7 of three or more.
+- **The change** (`translator/model/encode.ts`, "Slot by slot"; `py/slots.py`; a second decoding, `slots`, beside the
+  first, `steps`). Code lists what there is to decide and the model decides each thing once: (1) the kind of answer, a
+  refusal or a program; (2) how many lines, `lines:N`; then for each line (3) unless it is the last, whether its result is
+  named for a later line; (4) its function; (5) each slot of the function, in a stated order: for a form `form`, `to`, then
+  every field of that form's line as shown, in the line's order; for any other function every argument the contract allows
+  it, in the contract's order (`contracts/calls.schema.json`). A slot is left out (`-`), a closed-set value, or a copied
+  span (or a call or a list of its own, as before). Nothing closes a call or ends a program, so neither can end early; a
+  slot that must be filled (the contract's required arguments, a form's required fields as its line says) cannot be left
+  out of an answer; a field the form's line does not list has no slot and cannot be written. The model is told which slot
+  each decision is for (a learned mark for each of the contract's arguments; for a form's field, where its name stands in
+  the form as shown), and only what a slot allows is in the running, in training as when answering. The closed-set-or-copy
+  shape is as it was: the model still writes nothing it was not shown or given, and its sureness is still the product of
+  its decisions' probabilities (now among what each slot allows). Lists and data keep their closing mark (`]`, `}`): they
+  were not among the failures measured.
+- **The number of lines** is one of those the training examples have: 1 to 9 in the closed set (`lines:7` is in no
+  example), and 1 to 4, 6 and 8 in what a model trains on (the programs of 5 and 9 lines are longer than the earlier
+  decoding takes, and both arms leave the same examples out).
+- **The same examples, written the other way.** `export.ts --decoding slots` on round 2's `joined-13`: 57,591 training,
+  4,682 validation and 559 real validation rows, the same rows as `data-19`, none added or removed, each coming back to
+  its program exactly. 104 training labels (and 2 of the real validation rows) leave a form's required field out, because
+  the request does not give it: they are kept and trained as labelled (the label is always in the running), and an answer
+  cannot repeat them: it must fill the field, and is then usually too unsure to be offered. The same rule is written
+  twice, in the exporter's language and the trainer's; `py/check_slots.py` follows every label with the trainer's and
+  found no example the two read differently (and a test holds them together on a few).
+- **What was not changed.** No prompt (0.9.4), no data, no label. A model's folder says which decoding it answers in
+  (`config.json`, `decoding`; absent means `steps`), and the adapter reads it, so every earlier model answers as it did.
+  The check of a draft against the forms shown (`formsMisfit`) stays for both.
+- **A decision that follows from it.** Slot by slot, a call that lacks a required argument is no answer (the model asks
+  back); in the earlier decoding it was offered and whoever resolved it asked for the argument. No label in the training
+  set leaves a contract's required argument out, so nothing taught is lost.
+- **Speed.** Answering slot by slot keeps what the writer made of the earlier steps (`write_next`) instead of writing them
+  all again at each step; the earlier decoding answers as before.
+- **Measured against a control**, not against the last round alone: the earlier decoding trained again on the same data
+  for the same six epochs (the design report saw real validation still rising at epoch 4), one seed each, scored the same
+  day with the same code as `pod-small-r2-s1`. The results are in docs/translator-pipeline.md, "Slot-by-slot decoding".
+- **Revisit if** the contract gains a function with many more arguments (a decision for each slot, mostly "left out", is
+  cheap now: a mean of 8.8 decisions an example against 8.8 before, the longest 145); forms come to be shown some other way
+  than a line with its fields (the slots are read off that line, in two languages); a seat needs a program of more lines
+  than any example has (the count is a closed choice); required-and-absent turns out to be common in what seats ask (the
+  model then asks back with nothing said of which field: let a required slot be left out and say which, as the form check
+  does); or lists start being closed early (give them a count as lines have).
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Calibration, measured again after the first-year risk fix** (2026-10-05, at 0251d3a, `runs/calibration-2026-10-05` on the run server; the small town, 3 seeds × 2 years, code only, as below). Health: 4 breaches of 15 (8 measured). Recorded, not chased: Naz decides what to do with the numbers.

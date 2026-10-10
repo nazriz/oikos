@@ -12,6 +12,11 @@ import { calls } from "@oikos/participants";
  * lower-case word (a kind, a task, a form's name: "footpath declaration" for footpath_declaration), `field` a form's
  * field named as an argument (a span of the forms shown, never of the request). */
 export type Pointer = ["id" | "text" | "word" | "field", number, number];
+/** How a program is written as decisions. `steps` (every model before 2026-10-10): the model names each argument it
+ * writes, closes each call (`)`) and ends the program (`eos`) by decisions of its own. `slots`: code lists what there
+ * is to decide and the model decides each once (below, "Slot by slot"). A model answers in the decoding it was trained
+ * in; its folder says which (config.json `decoding`; absent: `steps`). */
+export type Decoding = "steps" | "slots";
 /** A choice from the closed set (`vocabulary`), or a span. */
 export type Step = string | Pointer;
 
@@ -42,12 +47,15 @@ const FORM_ARGS = new Set(["form", "to"]);
 const fixedArgs = (fn: string): Set<string> | undefined => (fn === "form" ? FORM_ARGS : calls.ARGS[fn]?.allowed);
 
 /** The steps of an example's program. Throws NotEncodable where a value is neither a span nor marked implied. */
-export function encode(e: { request: string; forms: string[]; program: string; spans?: Span[] }, order: Order = ORDER): Encoded {
+export function encode(e: { request: string; forms: string[]; program: string; spans?: Span[] }, order: Order = ORDER, decoding: Decoding = "steps"): Encoded {
   const input = inputOf(e.request, e.forms);
   const p = calls.parseProgram(e.program);
-  if ("none" in p) return { input, steps: [`none:${p.none}`, "eos"] };
+  const slots = decoding === "slots";
+  if ("none" in p) return { input, steps: slots ? [`none:${p.none}`] : [`none:${p.none}`, "eos"] };
   const steps: Step[] = [];
   const several = p.lines.length > 1;
+  const shownForms = slots ? formsIn(input) : [];
+  if (slots) steps.push(PROGRAM, `lines:${p.lines.length}`);
   p.lines.forEach((line, i) => {
     // This line's spans, by the path of the argument they fill, in the order the pipeline found them.
     const queue = new Map<string, Span[]>();
@@ -93,6 +101,17 @@ export function encode(e: { request: string; forms: string[]; program: string; s
     };
     const call = (c: calls.Call, prefix: string) => {
       steps.push(`fn:${c.fn}`);
+      if (slots) {
+        // Slot by slot: each slot of the call in its stated order, its value or that it is left out. No argument is
+        // named and nothing closes the call: which slot a decision is for is known by counting.
+        const mine = slotsOf(c.fn, shownForms, said(c.args.form), said(c.args.to));
+        for (const k of Object.keys(c.args)) if (!mine.some((s) => s.name === k)) throw new NotEncodable(c.fn === "form" ? `the field ${k} is not one of the form as shown` : `${c.fn} has no slot ${k}`);
+        for (const s of mine) {
+          if (!(s.name in c.args)) steps.push(LEFT_OUT);
+          else value(prefix + s.name, c.args[s.name]!, c.fn === "form" && FORM_ARGS.has(s.name) ? (v) => shownAt(input, e.request.length, c, s.name as "form" | "to", v) : undefined);
+        }
+        return;
+      }
       const fixed = fixedArgs(c.fn);
       // Each argument's steps, then the arguments in the order asked for. By name unless told otherwise; `said`:
       // what the request doesn't spell first, by name, then each by where its value first stands.
@@ -118,12 +137,183 @@ export function encode(e: { request: string; forms: string[]; program: string; s
       for (const part of parts) steps.push(...part.steps);
       steps.push(")");
     };
-    if (line.bind) steps.push(`bind:${line.bind}`);
+    if (slots) {
+      // Whether the line's result is named for a later line to use: a decision of every line but the last.
+      if (i < p.lines.length - 1) steps.push(line.bind ? `bind:${line.bind}` : LEFT_OUT);
+      else if (line.bind) throw new NotEncodable("the last line's result is named, and nothing can use it");
+    } else if (line.bind) steps.push(`bind:${line.bind}`);
     call(line.call, "");
   });
-  steps.push("eos");
+  if (!slots) steps.push("eos");
   return { input, steps };
 }
+
+// ---------------------------------------------------------------- Slot by slot (`slots`, 2026-10-10)
+//
+// The decisions of a program, in order, and what each may be:
+//   1. the kind of answer: a refusal (`none:<label>`, and that is the whole answer) or `program`;
+//   2. how many lines it has: `lines:N`, N from 1 to the most any training example has;
+//   then for each line:
+//   3. unless it is the last, whether its result is named for a later line: `bind:<name>` or `-`;
+//   4. its function: `fn:<name>`;
+//   5. each slot of the function, once, in this order: for a form, `form`, `to`, then every field of that form in the
+//      order its line as shown lists them (the line whose name, or record id, is the value just given to `form`: of
+//      several, the one that goes to the office just given to `to`); for any other function, every argument the
+//      contract allows it, in the contract's own order (contracts/calls.schema.json). A slot is left out (`-`), or
+//      takes a value: a choice from the closed set (`const:…`, a name bound on an earlier line `var:…`), a copied span
+//      (`id`, `text`, `word`), a call of its own (`fn:…`, then that function's slots), or a list or data (`[` … `]`,
+//      `{` `key:…` … `}`: of copied texts and closed-set values, closed by a decision as before).
+// A call has ended when its slots are decided, and a program when its lines are: nothing closes a call or ends a
+// program, so neither can be closed early. A slot that must be filled (the contract's required arguments, a form's
+// required fields as its line says) cannot be left out; a field the form's line does not list has no slot, so it
+// cannot be written. `decodeSlots` holds an answer to that rule; the model's own decoder (py/slots.py) is the same
+// rule in the other language, and the trainer follows every example's label with it before it trains (an example
+// the two would read differently is counted, `misfit`, and there must be none).
+
+/** A slot left out. */
+export const LEFT_OUT = "-";
+/** The answer is a program (the other kinds of answer are the refusals). */
+export const PROGRAM = "program";
+
+/** A form as its line shows it: where the line begins in the input, its name, what stands before its fields, and each
+ * field with whether it must be filled in and where its name stands. */
+export interface FormLine { line: string; head: string; fields: { name: string; required: boolean; at: [number, number] }[] }
+/** The forms shown in an input: every line after the first that begins `- ` (the request is the first line). */
+export function formsIn(input: string): FormLine[] {
+  const out: FormLine[] = [];
+  for (let nl = input.indexOf("\n"); nl >= 0; ) {
+    const next = input.indexOf("\n", nl + 1), end = next < 0 ? input.length : next;
+    let at = nl + 1;
+    while (at < end && /\s/.test(input[at]!)) at++;
+    const line = input.slice(at, end);
+    if (line.startsWith("- ")) {
+      const f = line.indexOf(": fields ");
+      const fields: FormLine["fields"] = [];
+      if (f >= 0) for (const m of line.slice(f + 9).matchAll(/([^\s,()]+) \(([^)]*)\)/g)) fields.push({ name: m[1]!, required: /(^|, )required$/.test(m[2]!), at: [at + f + 9 + m.index!, at + f + 9 + m.index! + m[1]!.length] });
+      // (A field named twice on a line is one slot: the first.)
+      out.push({ line, head: f < 0 ? line : line.slice(0, f), fields: fields.filter((x, i) => fields.findIndex((y) => y.name === x.name) === i) });
+    }
+    nl = next;
+  }
+  return out;
+}
+/** The line of the form a call fills: the first whose name or record id is `form`; of several, the first that goes to `to`. */
+export function lineOf(forms: FormLine[], form: string | undefined, to: string | undefined): FormLine | undefined {
+  if (form === undefined) return undefined;
+  const mine = forms.filter((f) => f.line.startsWith(`- ${form},`) || f.line.includes(`id ${form}:`));
+  return (to === undefined ? undefined : mine.find((f) => f.head.includes(`, to=${to},`) || f.head.endsWith(`, to=${to}`))) ?? mine[0];
+}
+const said = (v: calls.Value | undefined): string | undefined => (v && "id" in v ? v.id : v && "text" in v ? v.text : undefined);
+
+export interface Slot { name: string; required: boolean; field?: [number, number] }
+/** A call's slots, in order. A form's are known once `form` and `to` are (pass them; without them, its own two). */
+export function slotsOf(fn: string, forms: FormLine[], form?: string, to?: string): Slot[] {
+  const a = calls.ARGS[fn];
+  if (!a) throw new NotEncodable(`${fn} is no function`);
+  if (fn !== "form") return [...(a.allowed ?? [])].map((name) => ({ name, required: a.required.includes(name) }));
+  return [{ name: "form", required: true }, { name: "to", required: false }, ...(lineOf(forms, form, to)?.fields ?? []).filter((f) => !FORM_ARGS.has(f.name)).map((f) => ({ name: f.name, required: f.required, field: f.at }))];
+}
+
+/** What the contract gives a model's decoder: each function's slots in order and which must be filled (a form's own
+ * two; its fields come from its line). Kept with the export and with the model (config.json `grammar`). */
+export const grammar = (): { [fn: string]: { args: string[]; required: string[] } } =>
+  Object.fromEntries(Object.entries(calls.ARGS).map(([fn, a]) => [fn, fn === "form" ? { args: ["form", "to"], required: ["form"] } : { args: [...(a.allowed ?? [])], required: a.required.filter((k) => a.allowed?.has(k)) }]));
+
+/** The program a run of slot decisions comes to. Throws on decisions no program is made of: too few or too many, one
+ * that is not allowed where it stands (a required slot left out, a name used before it is bound, a pointer where a
+ * choice is wanted). `lenient`: a required slot may be left out (a label may: 104 training examples leave a form's
+ * required field out because the request does not give it; a model's answer may not). */
+export function decodeSlots(input: string, steps: Step[], o: { lenient?: boolean } = {}): string {
+  let at = 0;
+  const next = (): Step => {
+    if (at >= steps.length) throw new NotEncodable("the decisions end early");
+    return steps[at++]!;
+  };
+  const choice = (what: string, prefix: string): string => {
+    const s = next();
+    if (typeof s !== "string" || !s.startsWith(prefix)) throw new NotEncodable(`${what} was expected`);
+    return s.slice(prefix.length);
+  };
+  const first = next();
+  if (typeof first === "string" && first.startsWith("none:")) {
+    if (at < steps.length) throw new NotEncodable("decisions after a refusal");
+    return `none(${first.slice(5)})`;
+  }
+  if (first !== PROGRAM) throw new NotEncodable("the kind of answer was expected");
+  const n = Number(choice("the number of lines", "lines:"));
+  if (!Number.isInteger(n) || n < 1) throw new NotEncodable("the number of lines is no number");
+  const forms = formsIn(input);
+  const bound = new Set<string>();
+  const data = (s: Step): unknown => {
+    if (s === "[") {
+      const xs: unknown[] = [];
+      for (let x = next(); x !== "]"; x = next()) xs.push(data(x));
+      return xs;
+    }
+    if (s === "{") {
+      const obj: { [k: string]: unknown } = {};
+      for (let k = next(); k !== "}"; k = next()) {
+        if (typeof k !== "string" || !k.startsWith("key:")) throw new NotEncodable("a key was expected");
+        obj[k.slice(4)] = data(next());
+      }
+      return obj;
+    }
+    if (typeof s === "string") {
+      if (s.startsWith("const:")) return s[6] === "\"" ? JSON.parse(s.slice(6)) : s.slice(6);
+      throw new NotEncodable(`${s} is no value`);
+    }
+    if (s[0] !== "text") throw new NotEncodable("in a list or data a copy is a text");
+    return input.slice(s[1], s[2]);
+  };
+  const value = (s: Step): calls.Value => {
+    if (typeof s !== "string") {
+      if (s[0] === "field") throw new NotEncodable("a field's name is no value");
+      const text = input.slice(s[1], s[2]);
+      return s[0] === "text" ? { text } : { id: s[0] === "word" ? asWord(text) : text };
+    }
+    if (s.startsWith("var:")) {
+      if (!bound.has(s.slice(4))) throw new NotEncodable(`${s.slice(4)} is used before it is bound`);
+      return { var: s.slice(4) };
+    }
+    if (s.startsWith("const:")) return s[6] === "\"" ? { text: JSON.parse(s.slice(6)) as string } : { id: s.slice(6) };
+    if (s.startsWith("fn:")) return { call: call(s.slice(3)) };
+    if (s === "[" || s === "{") return { json: data(s) };
+    throw new NotEncodable(`${s} is no value`);
+  };
+  const call = (fn: string): calls.Call => {
+    const args: { [k: string]: calls.Value } = {};
+    const fill = (slot: Slot) => {
+      const s = next();
+      if (s !== LEFT_OUT) args[slot.name] = value(s);
+      else if (slot.required && !o.lenient) throw new NotEncodable(`${fn} needs ${slot.name}: it cannot be left out`);
+    };
+    if (fn === "form") {
+      const own = slotsOf(fn, forms);
+      own.forEach(fill);
+      slotsOf(fn, forms, said(args.form), said(args.to)).slice(own.length).forEach(fill);
+    } else slotsOf(fn, forms).forEach(fill);
+    return { fn: fn as calls.Fn, args };
+  };
+  const lines: calls.Line[] = [];
+  for (let i = 0; i < n; i++) {
+    let bind: string | undefined;
+    if (i < n - 1) {
+      const b = next();
+      if (b !== LEFT_OUT) {
+        if (typeof b !== "string" || !b.startsWith("bind:") || bound.has(b.slice(5))) throw new NotEncodable("a name for the line's result, or none, was expected");
+        bind = b.slice(5);
+      }
+    }
+    const c = call(choice("a function", "fn:"));
+    if (bind) bound.add(bind);
+    lines.push(bind ? { bind, call: c } : { call: c });
+  }
+  if (at < steps.length) throw new NotEncodable("decisions after the last line");
+  return calls.programText({ lines });
+}
+
+/** The program a model's decisions come to, in the decoding it was trained in. */
+export const programFrom = (input: string, steps: Step[], decoding: Decoding = "steps", o: { lenient?: boolean } = {}): string => (decoding === "slots" ? decodeSlots(input, steps, o) : decode(input, steps));
 
 /** The lines of the forms shown, each with where it begins in the input. */
 function formLines(input: string, from: number): [number, string][] {
