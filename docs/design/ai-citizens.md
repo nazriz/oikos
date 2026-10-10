@@ -469,6 +469,131 @@ Full citations: docs/research/references.md.
 | Framing swings results (TRAILS); personas collapse to an average | The checks and "no personas" (4) |
 | Concordia's model game master | Not taken: the kernel adjudicates, never a model |
 
+## 10. A living world: one model, entities with wants (draft, 2026-10-11; not signed off)
+
+**Status:** a draft from a conversation with Naz on 2026-10-11, for him to mark up. Nothing here is built. Where it
+departs from what he signed off on 2026-09-29, it says so; those departures need his word.
+
+**What he asked for.** "A sense of dynamism and uniqueness in choices": an economy "filled with various actors with
+different motivations"; not citizens only but every entity (shops, factories, landlords: "AI entities"); a world
+where a family goes through a bereavement and turns to religion and its local church, or where people made redundant
+"do... things": "a living breathing world". His sketch: one model loaded, each entity a string of data (traits,
+personality, history) that the model reads; its requests go through the translator; several models by kind of
+request later, if that is cheaper. History must be kept compact. Richness has dials. Welfare matters (VISION 15).
+
+**What is already here, and what is missing.** The mind of sections 3 to 5 gives people values, temperament, needs,
+four ways of deciding, learning and bounded memory, and sections 2a and 2b let any group or gathering exist as
+content (a church's membership and its weekly service are the examples there). What it does not give:
+- **Initiative.** A person decides when the world puts a decision to them: a posting seen, a rent raised, a
+  gathering next week. Nobody sets out to get something. Founding is a cited monthly chance (a business) or absent
+  (a group, a congregation, a cause).
+- **An inner life that events change.** Needs move with circumstances; values and what a person is looking for do
+  not. A death in the household changes income and the household's size and nothing else.
+- **Anything new.** A person can take up what exists. Nobody composes an offer, a practice, a creed or a rule.
+- **Motives for anyone but people.** Firms and landlords follow their routines (docs/behaviour/firms.md).
+
+### 10a. Wants
+
+Each entity carries a short list of wants: things it is trying to bring about, each with what it is about (its home,
+its pay, a person, a grievance, a meaning), how much it matters, and since when. Needs (3a) say how things are;
+a want says what the entity means to do about it. Wants come from needs as values weigh them, from events (a loss,
+a windfall, a slight, something heard), and from others (what those one copies are after: 3b). A want unmet for long
+grows or is given up, and which is temperament.
+
+An entity acts when a want and an opening meet, not only when the world asks: this is the change that makes things
+happen. To keep it affordable an entity is woken by an event that touches a want or a need, or by a want gone unmet
+past its patience, as seats are woken by papers; most entities, most days, repeat (3b).
+
+Firms, landlords and other organisations have wants too (to keep trading, to grow, to be rid of a tenant, to keep
+a customer), held by the organisation and acted on by whoever holds its posts. Their motives differ as their owners'
+do: a firm's wants are drawn from its owner's values, not from one rule for all firms.
+
+### 10b. What an entity can do: compose, not choose from a list
+
+No list of verbs. An entity acts through the same call language the seats use, on the same building blocks, limited
+by the liberties it holds: it can sign what is offered, write to anyone it knows of, spend its time and money, and
+**put up offers and practices of its own** (2a, 2b), which is how a congregation, a union branch, a mutual-aid fund,
+a club for the newly redundant, a business or a movement comes to exist. The kernel knows none of these by name
+(no laws in the kernel; VISION 16): a church is a group whose founder wrote what it is for, with a gathering and a
+collection. What it stands for is words, which others read or hear (5), and which move their wants.
+
+Time is the general currency of a life: each person's hours go somewhere (work, the household, a gathering,
+looking for work, nothing), and where they go is an act like any other. Someone made redundant has lost income
+and gained hours; what they do with them is theirs.
+
+### 10c. The record the model reads
+
+One fixed-size record per entity, kept by the kernel as state and written only by it:
+- who they are (values, temperament: 3a), drawn from the profile's sourced data;
+- how things stand (needs, money against obligations, household, work, home);
+- wants (10a);
+- whom they know and what they think of them (a few, the closest and the most resented);
+- beliefs held and from whom (5);
+- memory: the last few events in full, and a few that defined them, kept for good (5's bounded memory, with the
+  defining events never forgotten).
+
+It never grows. The whole history stays in the log; a hash of each entity's events, chained, is recorded with the
+record so that any record can be rebuilt from the log and checked. (Naz suggested a Merkle root: it proves a history
+was not altered; it is not something a model can read, so the record carries the summary and the hash sits beside
+it.)
+
+### 10d. The models, and who draws
+
+- **The everyday model: small, local, one for everyone.** It reads an entity's record and its situation (what has
+  happened, the openings it can see, in the world's own terms) and gives, for each thing the entity could do,
+  including nothing, a probability. **The kernel draws** with its seeded generator, so a run is reproducible and
+  the variety is the model's odds, not noise. This is the shape the trained translator already has (a closed set or
+  something pointed at, a probability on every decision: docs/design/translator-v2.md, "Unbiased by design"), and
+  the shape of section 7's records, which are its first training data.
+- **The composing model: rarer, and it writes.** When an entity founds something or a life turns (a want of a new
+  kind), words are needed: what the group is for, what it asks of members, what the person now believes. This is
+  the model of section 4, asked for more than a score. Its words pass through the translator into offers,
+  practices and statements, as a seat's do. Whether a turn happens is the everyday model's odds and the kernel's
+  draw; the composing model only writes what was drawn.
+- **How small can the composing model be?** Open. A model under a billion parameters, trained for this one job
+  (a record and a situation in, a paragraph and a few structured choices out), plausibly writes well enough; the
+  risks are sameness (every creed alike, which is the opposite of what is wanted) and weak hold on the record.
+  The route is the translator's: a large model first, in pilots, its outputs kept; then a small one trained on
+  them and compared blind, with a measure of variety beside the measure of fit.
+- **Departures from what was signed off, for Naz:** section 4 asks a model rarely, for scores, remembers the answer
+  per kind of person, and is off until he switches it on; this asks it to write, per entity, and to be on in
+  richer worlds. Section 3a says traits are never a model's persona; that stands (traits are drawn from data), but
+  the model here does read one entity's record, so the audits of section 4 (rewording, fidelity) and a check that
+  town-wide rates stay where the sources put them (3e) apply to it.
+
+### 10e. What it learns from (to be talked through with Naz)
+
+1. The code mind's recorded decisions and outcomes (7): the starting point, so the model begins as the calibrated
+   citizen and no worse.
+2. A large model taking entities' parts in pilots, for what the code mind cannot do (initiative, composing): rich,
+   and prone to stereotype, so checked against 3 and 4.
+3. Sourced rates per place for how often people do things (complain, move, join, found, strike, worship): the
+   anchor for the town as a whole, with traits and history moving individuals around it (3e's sway).
+4. Records of what people actually did, where they exist.
+5. Outcomes as reward (7's outcome signal): what got an entity what it wanted. Used to update the entity's own
+   learning (3c). Whether it should also train the model is the open question: it makes optimisers, and people are
+   not.
+
+### 10f. Dials, measurement and welfare
+
+- **Dials** (world config): the share of entities that take initiative; how often the composing model may be
+  asked; which blocks entities may put up; the everyday model or the code mind. Off, the world is today's.
+- **Measurement.** A richer world varies more from seed to seed, so an experiment needs more repeats to show what a
+  steward caused; the platform still judges nothing (measurement reads logs).
+- **Welfare (VISION 15).** An entity with wants, beliefs and a remembered history is nearer to what that section is
+  about than a rule is. Before building: what such an entity is told about its situation, whether the composing
+  model is ever asked to write suffering in the first person, and what a bereavement or a redundancy is to the
+  model that reads it. A paragraph in VISION 15 with the build, not after.
+
+### 10g. A first slice
+
+One want carried end to end, in one town, with the code mind for everything else: a household's want for a secure
+home after a rent rise or a notice to leave. The record (10c); the openings (pay, move, ask the landlord for time,
+complain, go to the tribunal, join or found a tenants' group: all of which exist as blocks today except founding);
+odds from a large model at first, the kernel drawing; founding a group through the composing model and the
+translator. Compared against the same town on the code mind alone: does a landlord or a housing seat face something
+different, in a way that shows in the log?
+
 ## Open
 
 1. The needs and values: sources per place for values (European Social Survey, World Values Survey) and for needs.
