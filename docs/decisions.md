@@ -3810,13 +3810,33 @@ See the design note, §16.
   run's `orchestrator` entry says the arrangement, both models and which refusals stand. `pilot-report` has one line of it
   and the counts under `translator_arrangement`; the corpus and the dataset carry `route`, and their example's exchange is
   that of the translator whose answer was used.
-- **The contract change, for sign-off:** `dataset.schema.json`, `Translation.route` (optional, opaque). Nothing else: the
+- **The contract change:** `dataset.schema.json`, `Translation.route` (optional, opaque). Accepted by the coordinator on
+  2026-10-11 under the owner's standing permission of 2026-10-05 for contract changes that ready the platform for
+  translator data, and told to the owner: his to look over. Nothing else: the
   route in the log is a `note`, the arrangement is named on the command line and in a queue entry, and no world config,
   participant API or call-language schema changes.
+- **A log whose only model is our own may be made again** (`realModelIn`, orchestrator/src/logs.ts): the trained model
+  answers from files on disk without sampling, so a dry run of the mock with it in front is regenerable as a mock run is,
+  and may be overwritten when asked. A log with any call of a real seat or of a prompt-driven translator is never
+  overwritten, as before (tested, case by case).
 - **How it is served.** One Python process a run, started and awaited before the run begins (`ready()`): a model that
   cannot load stops the run there, and no request pays the load (about 5 seconds here). It answers lines over a pipe, on
   the CPU, greedily. If the process ends mid-run the request goes behind (`first_failed`) and the next request starts it
   again. Its time in the log is the one thing of a run with it that is not the same twice; no decision reads it.
+- **The shake-down** (`runs/tiu-01-shakedown/` on the run server, kept; wave `translator-in-use`, pinned at the commit
+  of this entry's code; `runs/translator-in-use-2026-10-11/routes.py <log>` lists each request's route): 30 days, a mayor
+  and a finance seat on `claude-code/claude-sonnet-5-5`, profile `ke-nakuru-2026`, seed 351, `then`. It ran to its end
+  in four minutes for 0.58 USD of a limit of 6 (seats 0.52, the one behind 0.05 for its one call), with nothing broken,
+  and it is small: **five requests**, all the finance seat's (the mayor asked for nothing). The first answered four with
+  drafts: three confirmed (single payments of withheld tax), one declined. The declined one is the known failure: a wage
+  "less the tax-law withholding" drafted as the gross wage, where `needs_calculation` was right, at a sureness of 0.1009
+  against a cut-off of 0.1; the seat saw the preview pay gross and declined. Its next request (the net figure worked out)
+  went behind (`declined_before`) and was confirmed; the first would have drafted the same payment without the report
+  line the one behind added, so the two did not agree. No request went behind for lack of a draft, and no refusal arose,
+  so the pilot says nothing yet on those paths or on `STANDS`. The first took 155 to 317 ms a request (mean 218), not
+  the 70 ms of the test sets: a seat's request with its forms is about 450 to 510 of the reader's tokens. No prompt a seat
+  was given names either translator. The cost report (`cost.txt`) lists the first's calls under the translator's
+  configured model with no price: its table is by purpose, not by model, and was left as it is.
 - **Revisit if** a pilot's report shows the two agreeing on a label nearly always over a few dozen cases (it moves into
   `STANDS`), or disagreeing on `not_an_act` (it moves out); seats decline the first's drafts often (then its drafts of that
   kind go behind by rule: forms of several amounts are the known case); the next request after a decline is mostly another

@@ -124,7 +124,8 @@ oikos run worlds/town-1000.yaml --set mayor=llm --set model_seats=finance \
 - **Never a substitute.** The one behind at a usage limit parks the pilot, as ever; a model folder that holds no model
   stops the run before it starts.
 - **Served** by one Python process a run (`translator/model/py/predict.py`, under `uv`), loaded before the run begins
-  (about 5 seconds), answering on the CPU without sampling: the same request gets the same answer.
+  (about 5 seconds), answering on the CPU without sampling: the same request gets the same answer. A seat's request with
+  its forms took 155 to 317 ms in the shake-down.
 - **In the log:** every call of either (`usage`, `transcript`; ours at no cost, with `sure_ppm`, `ms`, `withheld`,
   `wrote`), and one `note` a request, `translation_route`: `arrangement`, `used` (`first` or `behind`), `why`, `first` and
   `behind` (model, result, call, label, the first's sureness and time), `agree` where both answered. `oikos pilot-report`
@@ -134,8 +135,9 @@ oikos run worlds/town-1000.yaml --set mayor=llm --set model_seats=finance \
 - **A dry run** (`scripts/pilot-mock.ts`, `pilot-wave.ts --mock`) keeps an entry's trained first translator, with the mock
   behind it: it costs nothing and goes through the arrangement.
 - **Which model:** `pod-small-r2-s1` (153 of the 180 real requests right, 12 wrong drafts, no draft on 15; the reasons are
-  in the decisions log). **The shake-down** is `runs/tiu-01-shakedown/` (its numbers: the decisions log's entry of the day
-  and `runs/translator-in-use-2026-10-11/`).
+  in the decisions log). **The shake-down** is `runs/tiu-01-shakedown/` (30 days, a mayor and a finance seat, `ke-nakuru-2026`):
+  five requests, four answered by the first (three confirmed, one declined: a wage less withholding drafted gross), one
+  behind after the decline (confirmed); 218 ms a request for the first; 0.58 USD. The decisions log has the detail.
 
 ## How an answer is asked for and read (2026-10-08)
 

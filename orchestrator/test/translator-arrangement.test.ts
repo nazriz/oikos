@@ -6,14 +6,14 @@
 
 import { expect, test } from "bun:test";
 import Ajv2020 from "ajv/dist/2020";
-import { mkdtempSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { MockAdapter, type LlmAdapter, type LlmRequest } from "@oikos/participants/llm";
 import { generate } from "@oikos/worlds/generator/generate";
 import { resumeCommand, translatorArrangement } from "../src/batch";
 import { exportDataset } from "../src/dataset";
-import { realModelIn } from "../src/logs";
+import { clearForFreshRun, realModelIn } from "../src/logs";
 import { pilotReport, renderReport } from "../src/pilot-report";
 import { prepareResume, recordedCalls, Serving } from "../src/resume";
 import { runWorld } from "../src/run";
@@ -194,4 +194,28 @@ test("naming the arrangement: then unless beside is said, nothing without a firs
   expect(resumeCommand("runs/p/town.seed1.jsonl", { model: "claude-code/claude-sonnet-5-5", translatorFirst: "decide/pod-small-r2-s1", translatorArrangement: "then", budgetUsd: 12 }))
     .toBe("oikos resume runs/p/town.seed1.jsonl --model claude-code/claude-sonnet-5-5 --translator-first decide/pod-small-r2-s1 --translator-arrangement then --budget 12");
   expect(resumeCommand("runs/p/town.seed1.jsonl", { model: "claude-code/claude-sonnet-5-5", budgetUsd: 12 })).toBe("oikos resume runs/p/town.seed1.jsonl --model claude-code/claude-sonnet-5-5 --budget 12");
+});
+
+test("a log whose only model is our own trained one may be made again; one with any real seat's or prompt-driven translator's call is never overwritten", async () => {
+  const usage = (provider: string, model: string, purpose: string, subject: string) => JSON.stringify({ kind: "annotation", t: 0, body: { annotation: "usage", purpose, subject, provider, model, input_tokens: 0, output_tokens: 0, cost_microusd: 0 } });
+  const header = JSON.stringify({ kind: "header", t: 0, body: {} });
+  const ours = usage("decide", "trained-x1", "translator", "translator"), mock = usage("mock", "mock", "participant", "mayor-system");
+  const cases: [string, string[], string | undefined][] = [
+    ["the mock and our own model", [mock, ours, usage("mock", "mock", "translator", "translator")], undefined],
+    ["a prompt-driven translator behind ours", [mock, ours, usage("claude-code", "claude-sonnet-5-5", "translator", "translator")], "claude-code/claude-sonnet-5-5"],
+    ["a real seat, ours the only translator", [usage("claude-code", "claude-sonnet-5-5", "participant", "mayor-system"), ours], "claude-code/claude-sonnet-5-5"],
+    ["a real seat on another sign-in", [ours, usage("codex", "gpt-6.1-sol", "participant", "finance-system")], "codex/gpt-6.1-sol"],
+  ];
+  for (const [name, entries, real] of cases) {
+    const d = dir("guard");
+    const log = join(d, "town.seed1.jsonl");
+    writeFileSync(log, [header, ...entries].join("\n") + "\n");
+    expect([name, await realModelIn(log)]).toEqual([name, real]);
+    // (Asked to overwrite: only the log that can be made again goes.)
+    if (real) await expect(clearForFreshRun(d, "town.seed1", true)).rejects.toThrow("holds a real model's answers");
+    else await clearForFreshRun(d, "town.seed1", true);
+    expect([name, existsSync(log)]).toEqual([name, !!real]);
+    // (And not asked to: nothing is ever overwritten.)
+    if (real) await expect(clearForFreshRun(d, "town.seed1")).rejects.toThrow("runs are never overwritten");
+  }
 });
