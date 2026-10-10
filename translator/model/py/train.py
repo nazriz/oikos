@@ -20,6 +20,7 @@ import torch
 from safetensors.torch import save_file
 
 from model import Config, POINTERS, Translator, features
+from slots import Follow, Masks, slot_names
 from tokens import spans, text_of, to_pieces, tokenize
 
 
@@ -31,7 +32,8 @@ def token_item(row: dict, model: Translator, tokenizer) -> dict | str:
     """An example for the pretrained reader: its tokens, and each span as its first and last token. Or why not:
     "long" (more tokens than the reader takes: such an input is asked back, never cut) or "inexact" (a span that
     isn't exactly a run of tokens)."""
-    t = tokenize(tokenizer, text_of(row["pieces"], row["at"], row["breaks"]), model.cfg.max_lines)
+    text = text_of(row["pieces"], row["at"], row["breaks"])
+    t = tokenize(tokenizer, text, model.cfg.max_lines)
     if len(t.ids) > model.cfg.max_tokens:
         return "long"
     at = spans(t, row["at"], row["steps"])
@@ -39,7 +41,42 @@ def token_item(row: dict, model: Translator, tokenizer) -> dict | str:
         return "inexact"
     index = {c: i for i, c in enumerate(model.choices)}
     choice = [index[s] if isinstance(s, str) else model.first_pointer + POINTERS.index(s[0]) for s in row["steps"]]
-    return {"row": row, "f": t.features(), "choice": choice, "start": [a for a, _ in at], "end": [z for _, z in at], "cfg": model.cfg, "tokens": t, "model": model, "tokenizer": tokenizer}
+    item = {"row": row, "f": t.features(), "choice": choice, "start": [a for a, _ in at], "end": [z for _, z in at], "cfg": model.cfg, "tokens": t, "model": model, "tokenizer": tokenizer}
+    if model.cfg.decoding == "slots":
+        cols = slot_columns(row, model, t, text, choice)
+        if isinstance(cols, str):
+            return cols
+        item.update(cols, text=text)
+    return item
+
+
+def slot_columns(row: dict, model: Translator, t, text: str, choice: list[int]) -> dict | str:
+    """Slot by slot: for each decision of the label, which slot it is for, where a field's name stands, and what
+    is allowed there (slots.py, following the label). Or why not: "misfit" (the label is not the decisions the rule
+    lists for it: the two languages' rules differ, or the input was changed so that they no longer fit) or "inexact"
+    (a field's name that isn't exactly a run of tokens). `off_rule`: the label makes a decision the rule would not
+    allow an answer (none does in the data so far); the example is kept, and its label is always in the running."""
+    follow = Follow(model.cfg.grammar, model.cfg.slots, model.masks, text, t, exact=True)
+    slot, a, z, named, mask, off = [], [], [], [], [], False
+    try:
+        for s, c in zip(row["steps"], choice):
+            now = follow.now
+            if now is None:
+                return "misfit"
+            slot.append(now[0]); mask.append(now[2])
+            a.append(now[1][0] if now[1] else 0); z.append(now[1][1] if now[1] else 0); named.append(1.0 if now[1] else 0.0)
+            off = off or not bool(model.masks.rows[now[2]][c])
+            if isinstance(s, str):
+                follow.take_chars(s)
+            else:
+                follow.take_chars(s, row["at"][s[1]][0], row["at"][s[2]][1])
+        if follow.now is not None:
+            return "misfit"
+    except Follow.Inexact:
+        return "inexact"
+    except (KeyError, ValueError, IndexError, TypeError):
+        return "misfit"
+    return {"slot": slot, "slot_start": a, "slot_end": z, "slot_named": named, "mask": mask, "off_rule": off}
 
 
 def prepare(rows: list[dict], model: Translator, tokenizer=None, left_out: dict | None = None) -> list[dict]:
@@ -47,11 +84,16 @@ def prepare(rows: list[dict], model: Translator, tokenizer=None, left_out: dict 
     out = []
     if tokenizer is not None:
         for r in rows:
-            i = token_item(r, model, tokenizer) if len(r["steps"]) <= model.cfg.max_steps else "long"
+            # (`old`: how many steps the example is in the other decoding, where the export says. With --old-steps-most
+            # an example that a model of that decoding leaves out as too long is left out here too: the same examples.)
+            fits = len(r["steps"]) <= model.cfg.max_steps and not (OLD_MOST and r.get("old", 0) > OLD_MOST)
+            i = token_item(r, model, tokenizer) if fits else "long"
             if isinstance(i, str):
                 if left_out is not None:
                     left_out[i] = left_out.get(i, 0) + 1
             else:
+                if left_out is not None and i.get("off_rule"):
+                    left_out["kept_though_label_off_rule"] = left_out.get("kept_though_label_off_rule", 0) + 1
                 out.append(i)
         return out
     for r in rows:
@@ -105,6 +147,8 @@ _JOINS = {"-", "/", "_"}
 # The most forms added beside an example (`--forms-most`; 5 unless given: what every model so far was trained with).
 # A seat of the towns since 2026-10-09 knows of 13 to 18 forms, an office's own stationery among them.
 FORMS_MOST = 5
+# With slot-by-slot data: leave out the examples longer than this in the other decoding (0: none on that account).
+OLD_MOST = 0
 
 
 def office_of(line: list[str]) -> list[str]:
@@ -203,6 +247,18 @@ def together(items: list[dict], device: torch.device) -> dict[str, torch.Tensor]
             m, s = i["f"]["tokens"].shape[0], len(i["choice"])
             batch["tokens"][k, :m] = i["f"]["tokens"]; batch["line"][k, :m] = i["f"]["line"]; batch["pad"][k, :m] = False
             batch["choice"][k, :s] = torch.tensor(i["choice"]); batch["start"][k, :s] = torch.tensor(i["start"]); batch["end"][k, :s] = torch.tensor(i["end"])
+        if "slot" in items[0]:
+            # Slot by slot: which slot each decision is for, where a field's name stands, and what is allowed there
+            # (everything where there is no decision; the label always).
+            table = items[0]["model"].masks.table()
+            batch.update({"slot": torch.zeros(b, t, dtype=torch.long), "slot_start": torch.zeros(b, t, dtype=torch.long), "slot_end": torch.zeros(b, t, dtype=torch.long),
+                          "slot_named": torch.zeros(b, t), "allowed": torch.ones(b, t, table.shape[1], dtype=torch.bool)})
+            for k, i in enumerate(items):
+                s = len(i["choice"])
+                batch["slot"][k, :s] = torch.tensor(i["slot"]); batch["slot_start"][k, :s] = torch.tensor(i["slot_start"]); batch["slot_end"][k, :s] = torch.tensor(i["slot_end"])
+                batch["slot_named"][k, :s] = torch.tensor(i["slot_named"])
+                batch["allowed"][k, :s] = table[torch.tensor(i["mask"])]
+                batch["allowed"][k, torch.arange(s), torch.tensor(i["choice"])] = True
         return {k: v.to(device) for k, v in batch.items()}
     n = max(i["f"]["shape"].shape[0] for i in items)
     t = max(len(i["choice"]) for i in items)
@@ -232,7 +288,11 @@ def score(model: Translator, items: list[dict], device: torch.device) -> dict:
     total = {"positive": 0, "refusal": 0}
     results = []
     for i in items:
-        steps, sure, _ = model.translate(single(i["f"], device))
+        if "slot" in i:
+            steps, sure, _ = model.translate_slots(single(i["f"], device), Follow(model.cfg.grammar, model.cfg.slots, model.masks, i["text"], i["tokens"]))
+            steps = steps or []
+        else:
+            steps, sure, _ = model.translate(single(i["f"], device))
         if "tokens" in i:
             steps = to_pieces(i["tokens"], i["row"]["at"], steps)
         ok = steps == i["row"]["steps"]
@@ -251,15 +311,24 @@ def main() -> None:
     ap.add_argument("--batch", type=int, default=48); ap.add_argument("--lr", type=float, default=6e-4)
     ap.add_argument("--renumber", type=float, default=0.0); ap.add_argument("--forms", type=float, default=0.0); ap.add_argument("--dropout", type=float, default=0.1); ap.add_argument("--piece-dropout", type=float, default=0.0)
     ap.add_argument("--forms-most", type=int, default=5)
+    ap.add_argument("--max-steps", type=int, default=None); ap.add_argument("--old-steps-most", type=int, default=0)
     ap.add_argument("--resume", action="store_true"); ap.add_argument("--stop-after", type=int, default=0)
     ap.add_argument("--seed", type=int, default=1); ap.add_argument("--device", default="mps" if torch.backends.mps.is_available() else "cpu")
     a = ap.parse_args()
-    global FORMS_MOST
+    global FORMS_MOST, OLD_MOST
     FORMS_MOST = max(1, a.forms_most)
+    OLD_MOST = a.old_steps_most
     torch.manual_seed(a.seed); random.seed(a.seed)
     data, out = Path(a.data), Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
     vocabulary = json.loads((data / "vocabulary.json").read_text())
+    # How the data's steps were written (export.json): as steps, or slot by slot, with the contract's slots.
+    export = json.loads((data / "export.json").read_text()) if (data / "export.json").exists() else {}
+    how = {"decoding": "slots", "grammar": export["grammar"], "slots": slot_names(export["grammar"])} if export.get("decoding") == "slots" else {}
+    if a.max_steps:
+        how["max_steps"] = a.max_steps
+    if how.get("decoding") == "slots" and not a.encoder:
+        sys.exit("slot-by-slot data needs a reader with tokens (--encoder)")
     device = torch.device(a.device)
     tokenizer, left_out = None, {"train": {}, "validation": {}, "validation_forms_known": {}}
     if a.encoder:
@@ -271,11 +340,12 @@ def main() -> None:
         # trained at; one that counts places from the start can't.
         relative = bool(getattr(made, "relative_attention", False)) and not getattr(made, "position_biased_input", True)
         limit = a.max_tokens or (1024 if relative else min(512, getattr(made, "max_position_embeddings", 512)))
-        cfg = Config(vocabulary=vocabulary, width=width, heads=max(h for h in (1, 4, 6, 8) if width % h == 0), feed=width * 8 // 3, dropout=a.dropout, encoder=a.encoder, max_tokens=limit)
+        cfg = Config(vocabulary=vocabulary, width=width, heads=max(h for h in (1, 4, 6, 8) if width % h == 0), feed=width * 8 // 3, dropout=a.dropout, encoder=a.encoder, max_tokens=limit, **how)
         model = Translator(cfg, pretrained=True).to(device)
+        model.masks = Masks(model.choices)
     else:
         width = a.width or 192
-        cfg = Config(vocabulary=vocabulary, width=width, feed=width * 8 // 3, dropout=a.dropout, piece_dropout=a.piece_dropout)
+        cfg = Config(vocabulary=vocabulary, width=width, feed=width * 8 // 3, dropout=a.dropout, piece_dropout=a.piece_dropout, **how)
         model = Translator(cfg).to(device)
     train_rows, val_rows = load(data / "train.jsonl"), load(data / "validation.jsonl")
     pool = form_lines(train_rows)
@@ -302,7 +372,7 @@ def main() -> None:
     else:
         opt = torch.optim.AdamW(model.parameters(), lr=a.lr, weight_decay=0.01)
         sched = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=a.lr, total_steps=steps_total, pct_start=0.06)
-    report = {"parameters": params, "config": {k: v for k, v in cfg.to_json().items() if k != "vocabulary"}, "seed": a.seed, "renumber": a.renumber, "forms": a.forms, "forms_most": FORMS_MOST, "epochs": []}
+    report = {"parameters": params, "config": {k: v for k, v in cfg.to_json().items() if k != "vocabulary"}, "seed": a.seed, "renumber": a.renumber, "forms": a.forms, "forms_most": FORMS_MOST, "old_steps_most": OLD_MOST, "epochs": []}
     if a.encoder:
         report.update({"encoder_lr": a.encoder_lr, "lr": a.lr, "left_out": left_out})
     best, first = -1, 1

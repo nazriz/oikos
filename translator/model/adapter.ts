@@ -7,7 +7,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import type { LlmAdapter, LlmRequest, LlmResponse } from "@oikos/participants/llm";
 import { calls } from "@oikos/participants";
-import { decode, inputOf } from "./encode";
+import { formsIn, inputOf, lineOf, programFrom, type Decoding } from "./encode";
 import { pieces } from "./export";
 
 const HERE = import.meta.dir;
@@ -25,15 +25,17 @@ export function shown(text: string): { request: string; forms: string[] } {
  * made of them: steps that don't parse, a span of no piece (a reader with tokens of its own can point at a mark
  * that is none of the input), or a program that is not in the call language as it stands (a model trained on another
  * version of the language may hold a label or an argument this one doesn't have: its closed set is its own, kept with
- * it in config.json). */
-export function programOf(input: string, ps: { at: [number, number] }[], steps: (string | [string, number, number])[]): string {
+ * it in config.json). The steps are read in the decoding the model was trained in (`decodingOf` its folder): slot by
+ * slot, decisions that break the slots' rule (an argument the contract requires left out, too few or too many) are no
+ * program either. (A form's required field left out is a program; `formsMisfit` then says which field it lacks.) */
+export function programOf(input: string, ps: { at: [number, number] }[], steps: (string | [string, number, number])[], decoding: Decoding = "steps"): string {
   try {
-    const program = decode(input, steps.map((s) => {
+    const program = programFrom(input, steps.map((s) => {
       if (typeof s === "string") return s;
       const a = ps[s[1]], z = ps[s[2]];
       if (!a || !z || z.at[1] <= a.at[0]) throw new Error("a span of no piece");
       return [s[0] as "id", a.at[0], z.at[1]];
-    }));
+    }), decoding);
     // (A function or an argument the language doesn't have. An argument left out is not that: whoever resolves the
     // call asks for it.)
     if (calls.contractErrors(calls.parseProgram(program)).some((e) => !/ needs [a-z_]+$/.test(e))) throw new Error("not in the call language");
@@ -64,14 +66,29 @@ export const ADDED: [choice: string, what: string][] = [
 /** What of `ADDED` a model with this closed set cannot say. */
 export const cannotSay = (vocabulary: readonly string[]): [choice: string, what: string][] => ADDED.filter(([choice]) => !vocabulary.includes(choice));
 
-/** A trained model's own closed set, from its folder (undefined where it can't be read: nothing is then known of it). */
+/** A trained model's own closed set, from its folder (undefined where it can't be read: nothing is then known of it).
+ * A model that writes slot by slot names no argument by a choice: the arguments it can write are its slots, and
+ * they are given here as the choices a model of the other decoding would have for them (`arg:…`). */
 export function vocabularyOf(dir: string): string[] | undefined {
   try {
     const file = join(dir, "config.json");
-    const v = existsSync(file) ? JSON.parse(readFileSync(file, "utf8")).vocabulary : undefined;
-    return Array.isArray(v) && v.every((x) => typeof x === "string") ? v : undefined;
+    const c = existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : undefined;
+    const v = c?.vocabulary;
+    if (!Array.isArray(v) || !v.every((x) => typeof x === "string")) return undefined;
+    return c.decoding === "slots" && Array.isArray(c.slots) ? [...v, ...c.slots.filter((x: unknown) => typeof x === "string" && x.startsWith("arg:"))] : v;
   } catch {
     return undefined;
+  }
+}
+
+/** The decoding a trained model was trained in, as its folder says (config.json `decoding`): `steps` where it says
+ * nothing (every model before 2026-10-10) or can't be read. */
+export function decodingOf(dir: string): Decoding {
+  try {
+    const file = join(dir, "config.json");
+    return existsSync(file) && JSON.parse(readFileSync(file, "utf8")).decoding === "slots" ? "slots" : "steps";
+  } catch {
+    return "steps";
   }
 }
 
@@ -105,6 +122,7 @@ export function formsMisfit(program: string, forms: string[]): Misfit | undefine
   if (!program.includes("form(")) return undefined;
   const shownForms = formsShown(forms);
   if (!shownForms.size) return undefined;
+  const lines = formsIn(["", ...forms].join("\n"));
   let p: calls.Program;
   try {
     p = calls.parseProgram(program);
@@ -120,7 +138,10 @@ export function formsMisfit(program: string, forms: string[]): Misfit | undefine
     }
     if (c.fn !== "form") return undefined;
     const form = said(c.args.form) ?? "";
-    const f = shownForms.get(form);
+    // (Two offices may each have a form of one name, with fields of their own: the call fills the one that goes to
+    // the office it names, the same line the slots are read off, encode.ts `lineOf`.)
+    const mine = lineOf(lines, form, said(c.args.to));
+    const f = (mine && mine.line.startsWith(`- ${form},`) ? [...formsShown([mine.line]).values()][0] : undefined) ?? shownForms.get(form);
     if (!f) return { label: "unknown_form" };
     const given = Object.keys(c.args).filter((k) => k !== "form" && k !== "to");
     const strange = given.filter((k) => !f.fields.has(k));
@@ -158,8 +179,11 @@ export class DecideAdapter implements LlmAdapter {
   private askedBack = new Set<string>();
   /** What of the call language this model was trained without, and so can never answer with (`ADDED`). */
   readonly cannot: [choice: string, what: string][];
+  /** The decoding the model answers in (its folder says). */
+  readonly decoding: Decoding;
   constructor(public model: string, private o: { dir?: string; threshold?: number; unchecked?: boolean; quiet?: boolean } = {}) {
     const vocabulary = vocabularyOf(this.dir());
+    this.decoding = decodingOf(this.dir());
     this.cannot = vocabulary ? cannotSay(vocabulary) : [];
     if (this.cannot.length && !o.quiet) console.error(`decide/${model} was trained before these were in the call language and cannot answer with them: ${this.cannot.map(([, what]) => what).join("; ")}. A request for one gets what the model was taught then. Retrain to add them.`);
   }
@@ -209,7 +233,7 @@ export class DecideAdapter implements LlmAdapter {
     // Where each piece stands goes too: a model whose reader has tokens of its own reads the input by them, and
     // answers in pieces as every model does.
     const a = await this.ask({ pieces: ps.map((p) => p.text), breaks, at: ps.map((p) => p.at) });
-    let program = programOf(input, ps, a.steps);
+    let program = programOf(input, ps, a.steps, this.decoding);
     // What was unclear, where it asks back: the part of its answer it was least sure of (what to do, which thing is
     // meant, or which words are to be copied), or what about a form doesn't fit the form as shown.
     let unsure: object | undefined;

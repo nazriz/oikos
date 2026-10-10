@@ -26,6 +26,7 @@ import torch
 from safetensors.torch import load_file
 
 from model import Config, Translator, features
+from slots import Follow, Masks
 from tokens import text_of, to_pieces, tokenize
 
 
@@ -40,7 +41,8 @@ def main() -> None:
     model.load_state_dict(load_file(str(d / "model.safetensors")))
     model.eval()
     torch.set_num_threads(4)
-    print(json.dumps({"ready": True, "parameters": sum(p.numel() for p in model.parameters()), "reader": cfg.encoder or "pieces"}), flush=True)
+    masks = Masks(model.choices) if cfg.decoding == "slots" else None
+    print(json.dumps({"ready": True, "parameters": sum(p.numel() for p in model.parameters()), "reader": cfg.encoder or "pieces", "decoding": cfg.decoding}), flush=True)
     log = open(os.environ["OIKOS_DECIDE_LOG"], "a") if os.environ.get("OIKOS_DECIDE_LOG") else None
 
     def answer(a: dict) -> None:
@@ -53,15 +55,23 @@ def main() -> None:
             continue
         r = json.loads(line)
         t0 = time.perf_counter()
-        ask_back = {"steps": ["none:unclear", "eos"], "sure": 1.0, "ms": 0.0, "too_long": True, "read": len(r["pieces"])}
+        ask_back = {"steps": ["none:unclear"] if masks is not None else ["none:unclear", "eos"], "sure": 1.0, "ms": 0.0, "too_long": True, "read": len(r["pieces"])}
         if not r["pieces"]:
             answer(ask_back)
         elif tokenizer is not None:
-            t = tokenize(tokenizer, text_of(r["pieces"], r["at"], r.get("breaks", [])), cfg.max_lines)
+            text = text_of(r["pieces"], r["at"], r.get("breaks", []))
+            t = tokenize(tokenizer, text, cfg.max_lines)
             if len(t.ids) > cfg.max_tokens:
                 answer(ask_back | {"read": len(t.ids)})
                 continue
-            steps, sure, parts = model.translate({k: v.unsqueeze(0) for k, v in t.features().items()})
+            if masks is not None:
+                # Slot by slot (slots.py). An answer of more decisions than the model has places for is asked back.
+                steps, sure, parts = model.translate_slots({k: v.unsqueeze(0) for k, v in t.features().items()}, Follow(cfg.grammar, cfg.slots, masks, text, t))
+                if steps is None:
+                    answer({"steps": ["none:unclear"], "sure": 1.0, "ms": round(1000 * (time.perf_counter() - t0), 2), "too_long": True, "read": len(t.ids)})
+                    continue
+            else:
+                steps, sure, parts = model.translate({k: v.unsqueeze(0) for k, v in t.features().items()})
             answer({"steps": to_pieces(t, r["at"], steps), "sure": sure, "parts": parts, "ms": round(1000 * (time.perf_counter() - t0), 2), "read": len(t.ids)})
         elif len(r["pieces"]) > cfg.max_pieces:
             answer(ask_back)
