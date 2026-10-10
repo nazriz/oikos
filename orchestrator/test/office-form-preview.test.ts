@@ -36,8 +36,10 @@ test("a death registration's preview says why each recipient is on it: the repor
   const k = seat("registry", "city", papers);
   // (The pilot's draft, to the letter.)
   const p = preview(k, "registry", 'form(deceased=c0362, form=death_registration, notification=rec.1496, partner=c0363, reported_by=c0363, tell=["bank","energy-co"], to=registry)');
-  expect(p).toBe('You will publish a death registration: "Death registered: c0362.", with these details: deceased: c0362; reported by: c0363; partner: c0363, citing rec.1496.' +
-    ' It goes to: c0363 (reported by on the form: "Who reported the death: they are sent the entry."); Millbrook Savings Bank (bank) and Energy retailer (energy-co) (tell on the form: "Those the notification asks to be told, who are sent the entry too.");' +
+  expect(p).toBe('This does one thing: a death registration.\n1. You will issue a death registration (form-registry-death-registration): "Death registered: c0362.".\n' +
+    "   - Filled in: deceased: c0362; reported by: c0363; partner: c0363; tell: bank, energy-co; notification: rec.1496.\n" +
+    "   - Left empty: children, without adult, estate.\n" +
+    '   - It goes to: c0363 (reported by on the form: "Who reported the death: they are sent the entry."); Millbrook Savings Bank (bank) and Energy retailer (energy-co) (tell on the form: "Those the notification asks to be told, who are sent the entry too.");' +
     ' The outside world (outside) and Electoral commission (electoral-commission) (not for you to choose: the form, form-registry-death-registration, sends every paper made on it to them: "They are sent every entry in the register of deaths as of right, to keep their own records by: whoever keeps a roll of electors takes the dead off it, and whoever pays someone a pension or support stops paying it.").' +
     " It is seen only by you and those it goes to.");
   // What the registrar read in the pilot, and declined seven times.
@@ -96,5 +98,5 @@ test("a paper that goes to nobody says nothing of recipients, and one made on no
   const p = preview(k, "council-clerk", 'form(form=council_result, ballot=rec.2626, yes="5", no="0", passed=yes, to=council-clerk)');
   expect(p).not.toContain("It goes to");
   const plain = preview(k, "council-clerk", 'statement(kind=notice, text="The hall is closed.", to=bank, visible=public)');
-  expect(plain).toBe('You will publish a notice, addressed to Millbrook Savings Bank (bank), publicly: "The hall is closed.".');
+  expect(plain).toBe('This does one thing: a notice.\n1. You will publish a notice, addressed to Millbrook Savings Bank (bank): "The hall is closed.".\n   - Public: anyone may read it.');
 });

@@ -65,27 +65,27 @@ test("a standing wage that is the whole agreed pay says so, and that nothing is 
   const k = knowing([agreement("rec.1225")]);
   const p = preview(k, 'money(amount="1.944,46 €", basis=["rec.1225","law-income-tax"], every="every 14 days", first="year 1, day 40", for="wage", from=acc-city, to=acc-c0003)');
   expect(p).toContain("pay 1.944,46 € from your account (acc-city) to acc-c0003 every 14 days");
-  expect(p).toEndWith(" This is the whole of the pay agreed in rec.1225 (1.944,46 € every 14 days), with nothing withheld from it.");
+  expect(p).toContain("   - This is the whole of the pay agreed in rec.1225 (1.944,46 € every 14 days), with nothing withheld from it.");
 });
 
 test("a standing wage below the agreed pay says by how much; above it, by how much more", () => {
   const k = knowing([agreement("rec.1225")]);
   expect(preview(k, 'money(amount="1.080,81 €", basis=["law-income-tax","rec.1225"], every="every 14 days", for="wages", from=acc-city, to=acc-c0003)'))
-    .toEndWith(" This is 863,65 € less than the pay agreed in rec.1225 (1.944,46 € every 14 days).");
+    .toContain("   - This is 863,65 € less than the pay agreed in rec.1225 (1.944,46 € every 14 days).");
   expect(preview(k, 'money(amount="2.000,00 €", basis=rec.1225, every="14 days", from=acc-city, to=acc-c0003)'))
-    .toEndWith(" This is 55,54 € more than the pay agreed in rec.1225 (1.944,46 € every 14 days).");
+    .toContain("   - This is 55,54 € more than the pay agreed in rec.1225 (1.944,46 € every 14 days).");
 });
 
 test("paid at another rhythm, both are said and no difference; paid once, it is one period's pay", () => {
   const k = knowing([agreement("rec.1225")]);
   expect(preview(k, 'money(amount="1.944,46 €", basis=rec.1225, every="30 days", from=acc-city, to=acc-c0003)'))
-    .toEndWith(" The pay agreed in rec.1225 is 1.944,46 € every 14 days; this pays 1.944,46 € every 30 days.");
+    .toContain("   - The pay agreed in rec.1225 is 1.944,46 € every 14 days; this pays 1.944,46 € every 30 days.");
   expect(preview(k, 'money(amount="1.944,46 €", basis=rec.1225, from=acc-city, to=acc-c0003)'))
-    .toEndWith(" This is the whole of one period's pay agreed in rec.1225 (1.944,46 € every 14 days), with nothing withheld from it.");
+    .toContain("   - This is the whole of one period's pay agreed in rec.1225 (1.944,46 € every 14 days), with nothing withheld from it.");
 });
 
 test("nothing is said where the seat has not seen the agreement, cites none, or pays someone the agreement does not", () => {
-  const plain = (p: string) => { expect(p).toContain("Your request will read:"); expect(p).not.toMatch(/agreed in/); };
+  const plain = (p: string) => { expect(p).toContain("1. You will ask Millbrook Bank (bank) to pay 1.944,46 € from your account (acc-city) to acc-c0"); expect(p).not.toMatch(/agreed in/); };
   // Not seen: the seat was shown no such paper.
   plain(preview(knowing([]), 'money(amount="1.944,46 €", basis=rec.1225, every="14 days", from=acc-city, to=acc-c0003)'));
   // Seen and not cited.
@@ -98,7 +98,7 @@ test("nothing is said where the seat has not seen the agreement, cites none, or 
 
 test("an agreement that is not employment is a sum agreed, with no word of withholding", () => {
   const k = knowing([agreement("rec.70", { template: "lease", amount: "85000", every: 2_592_000 })]);
-  expect(preview(k, 'money(amount="850,00 €", basis=rec.70, every="monthly", from=acc-city, to=acc-c0003)')).toEndWith(" This is the whole of the sum agreed in rec.70 (850,00 € every 30 days).");
+  expect(preview(k, 'money(amount="850,00 €", basis=rec.70, every="monthly", from=acc-city, to=acc-c0003)')).toContain("   - This is the whole of the sum agreed in rec.70 (850,00 € every 30 days).");
 });
 
 // --- the translator's exchange

@@ -100,7 +100,9 @@ test("the works office's advertisement for crew, on its form, is the advertiseme
   // Eight posts in one advertisement: what pilot 12's works manager asked for and could not say.
   const eight = resolve(calls.parseProgram('form(form="job advertisement", to=works, wage="3,000", period="fortnightly", posts="8")'), k, () => undefined, "works");
   expect(eight.ok && (eight.blocks[0] as any).offer.available).toBe(8);
-  expect(new Preview(k, "city").of(eight.ok ? eight.blocks : [])).toStartWith('You will publish a job posting: "Hiring: XYZ 3,000.00 every 14 days."');
+  expect(new Preview(k, "city").of(eight.ok ? eight.blocks : [])).toStartWith('This does one thing: a job posting.\n1. You will issue a job posting (form-works-job-advertisement): "Hiring: XYZ 3,000.00 every 14 days."');
+  // (What it offers reads in words, whoever takes it coming to the place of work: it read as raw data, and "let someone live or be in".)
+  expect(new Preview(k, "city").of(eight.ok ? eight.blocks : [])).toContain("   - It offers an employment agreement, by you (8 available), taken up by applying: you will pay XYZ 3,000.00 to someone every 14 days, for wages; whoever takes it will come to town-hall/workplace.1. You may end it on 14 days' notice; whoever takes it may end it on 14 days' notice. Open to: min age years: 18.");
 });
 
 test("the works office's payroll notice of a new starter, on its form, is the notice the module sends the finance office", () => {

@@ -1,12 +1,20 @@
 // The preview (option B, §10): exactly what the resolved acts will do, in
 // world words, generated mechanically from the blocks, never written by the
-// translator. The participant reads this before confirming.
+// translator. The participant reads this before confirming: it is its own draft read back to it.
 //
-// Nothing an act carries is left out. Each kind of act is put in a sentence, and whatever the sentence doesn't say
-// (a law's rule and the formal condition it's checked by, a payment's invoice, who a record is visible to) follows
-// it as "Also: …", by name. A law that reads one way and binds another, or binds nothing, shows here before it's
-// confirmed (the 2026-10-05 audit: the preview left a statement's `adico` and `formal` out). The test changes every
-// field of every kind of act and expects the preview to change.
+// How it is set out (docs/behaviour/preview.md). A first line says how many things the draft does, and each is
+// numbered, one alone too: a draft that does one thing is seen to do one. Each act is a short sentence of what
+// happens (who pays whom how much from where; which form goes where; what is offered to whom), and under it one plain
+// line for each further thing the act carries: what a form has filled in and which of its fields are left empty,
+// what an agreement would bind each side to and what in it is words only, what a payment's purpose is (words on the
+// payment and nothing more), when a standing paper first falls due, what it cites, who sees it. Nothing is said twice:
+// a paper's own words are left out where they only repeat what the lines say.
+//
+// Nothing an act carries is left out: whatever no line says follows as "Also: …", by name. A law that reads one way
+// and binds another, or binds nothing, shows here before it's confirmed (the 2026-10-05 audit: the preview left a
+// statement's `adico` and `formal` out). The test changes every field of every kind of act and expects the preview to
+// change. It renders what the draft is, from the draft and the seat's own papers, and nothing else: it does not read
+// the request, and says nothing of what the draft does not touch.
 
 import { basesOf, citedWords, formatMoney, forms, type Block } from "@oikos/participants";
 import { duration, moment, readable, ruleWords, type FieldKinds } from "@oikos/participants/llm";
@@ -66,6 +74,13 @@ export class Preview {
     const holder = this.k.accounts.get(id)?.holder;
     if (holder === this.me) return `your account (${id})`;
     return id;
+  }
+  /** Whom a payment goes to: the account, and whose it is where the seat has seen that account (its own knowledge;
+   * of an account it has not seen, the id as written and no more). */
+  private payee(id: string): string {
+    const holder = this.k.accounts.get(id)?.holder;
+    if (holder === undefined) return this.who(id);
+    return holder === this.me ? `your account (${id})` : `${id}, ${this.named(holder)}'s account,`;
   }
   /**
    * The form of the office's own that a paper was made on (docs/behaviour/office-papers.md), found by writing the
@@ -268,53 +283,136 @@ export class Preview {
     return ` It is your ${p.kind.replace(/_/g, " ")}${to}${words}. Once it is withdrawn it no longer stands.`;
   }
 
-  outcome(o: any, every?: number): string {
+  outcome(o: any, every?: number, by?: string): string {
     const rep = every ? ` every ${span(every)}` : "";
     // (Whatever a sentence leaves out of its outcome follows it in brackets, by name.)
     const more = (x: any, said: string[]) => this.also(x, said, " (").replace(/\.$/, ")");
     if (o?.money) return `pay ${this.sum(o.money.amount)}${o.money.from ? ` from ${this.acct(o.money.from)}` : ""} to ${this.who(o.money.to)}${rep}${o.money.for ? `, for ${o.money.for}` : ""}${o.money.settles ? `, settling ${o.money.settles}` : ""}${more(o.money, ["amount", "from", "to", "for", "settles"])}`;
     if (o?.goods) return `deliver ${o.goods.quantity} ${o.goods.kind}${o.goods.from ? ` from ${o.goods.from}` : ""} to ${this.who(o.goods.to)} at ${o.goods.at}${rep}${more(o.goods, ["quantity", "kind", "from", "to", "at"])}`;
     if (o?.structure) return `${o.structure.remove ? `demolish ${o.structure.remove}` : `build a ${o.structure.type} on ${o.structure.on}`}${rep}${more(o.structure, o.structure.remove ? ["remove"] : ["type", "on"])}`;
-    if (o?.occupancy) return `${o.occupancy.leave ? `have ${this.who(o.occupancy.who)} leave ${o.occupancy.in}` : `let ${this.who(o.occupancy.who)} live or be in ${o.occupancy.in}`}${rep}${more(o.occupancy, ["who", "in", "leave"])}`;
+    // (Someone who commits to be in a place themselves: they come there. An employment agreement's worker and their
+    // place of work read "c0009 will let c0009 live or be in town-hall/workplace.1" until 2026-10-11.)
+    if (o?.occupancy) return `${o.occupancy.leave ? (by !== undefined && o.occupancy.who === by ? `leave ${o.occupancy.in}` : `have ${this.who(o.occupancy.who)} leave ${o.occupancy.in}`) : by !== undefined && o.occupancy.who === by ? `come to ${o.occupancy.in}` : `let ${this.who(o.occupancy.who)} live or be in ${o.occupancy.in}`}${rep}${more(o.occupancy, ["who", "in", "leave"])}`;
     if (o?.account) return `${o.account.close ? `close account ${o.account.close}` : `open an account for ${this.who(o.account.holder)}`}${rep}${more(o.account, o.account.close ? ["close"] : ["holder"])}`;
     if (o?.work) return `do ${o.work.units !== undefined ? `${o.work.units} of ` : ""}${o.work.task}${o.work.hours !== undefined ? `, ${o.work.hours} hours` : ""}${o.work.at ? ` at ${o.work.at}` : ""}${rep}${more(o.work, ["units", "task", "hours", "at"])}`;
     if (o?.attend) return `attend ${o.attend.practice}${o.attend.role ? ` as ${o.attend.role}` : ""}${rep}${more(o.attend, ["practice", "role"])}`;
     return `do this${rep}: ${JSON.stringify(o)}`;
   }
 
-  /** One act, in a sentence, and then whatever the sentence didn't say (`ref` aside: a name within the act itself). */
-  block(b: Block, next?: Block): string {
-    const [text, said] = this.sentence(b, next);
-    return text + this.also(b, ["block", "ref", ...said]);
+  /** One act: what happens, in a sentence; then a line for each further thing it carries; then whatever no line said
+   * (`ref` aside: a name within the act itself). */
+  private act(b: Block, next?: Block): Act {
+    const a = this.sentence(b, next);
+    const rest = this.also(b, ["block", "ref", ...a.said], "Also: ");
+    return rest ? { ...a, lines: [...a.lines, rest] } : a;
   }
 
-  /** The sentence for an act, and which of its fields the sentence says. */
-  private sentence(b: Block, next?: Block): [string, string[]] {
+  /** One act as it reads alone: its sentence, and its lines under it. */
+  block(b: Block, next?: Block): string {
+    const a = this.act(b, next);
+    return [a.head, ...a.lines.map((l) => `- ${l}`)].join("\n");
+  }
+
+  /** What a form has filled in, each field read as the form says it is, and which of its fields are left empty. */
+  private filled(spec: forms.FormData, fields: { [name: string]: unknown }, skip: string[] = []): string[] {
+    const word = (name: string, v: unknown): string => {
+      const type = spec.fields[name]?.type;
+      if (Array.isArray(v)) return v.length ? v.map((x) => (typeof x === "string" ? x : JSON.stringify(x))).join(", ") : "none";
+      if (type === "amount" && (typeof v === "string" || typeof v === "number") && /^[0-9]+$/.test(String(v))) return this.sum(v);
+      if (type === "duration" && typeof v === "number") return span(v);
+      if (type === "date" && typeof v === "number") return forms.dateWords(v);
+      if (type === "text" && typeof v === "string") return `"${v}"`;
+      return v !== null && typeof v === "object" ? JSON.stringify(this.read(v)) : String(v);
+    };
+    const given = Object.keys(fields).filter((k) => fields[k] !== undefined && !skip.includes(k));
+    const empty = Object.keys(spec.fields).filter((k) => fields[k] === undefined && !skip.includes(k));
+    return [`Filled in: ${given.length ? given.map((k) => `${k.replace(/_/g, " ")}: ${word(k, fields[k])}`).join("; ") : "nothing"}.`,
+      ...(empty.length ? [`Left empty: ${empty.map((k) => k.replace(/_/g, " ")).join(", ")}.`] : [])];
+  }
+
+  /** What a paper offers to whoever takes it up (a listing, an advertisement), in words: each side's part, how it is
+   * taken up, how many there are; whatever else it carries, by name. */
+  private offered(o: any): string {
+    const t = o?.terms ?? {};
+    const taker = (x: string) => (x === "taker" ? "whoever takes it" : this.who(x));
+    // (Whoever takes up an offer and is to be somewhere, with nobody named: they come there themselves.)
+    const parts = ((t.commitments ?? []) as any[]).map((c) => `${taker(c.who)} will ${c.who === "taker" && c.does?.outcome?.occupancy && c.does.outcome.occupancy.who === undefined && !c.does.outcome.occupancy.leave ? `come to ${c.does.outcome.occupancy.in}${c.every ? ` every ${span(c.every)}` : ""}` : c.does?.outcome ? this.outcome(c.does.outcome, c.every, c.who) : `do: ${JSON.stringify(c.does)}`}`);
+    const ends = ((t.termination ?? []) as any[]).map((x) => `${taker(x.party)} may end it on ${Number.isSafeInteger(x.notice) ? span(x.notice) : x.notice}' notice`);
+    const rest = this.also(t, ["commitments", "template", "then", "termination"], " (").replace(/\.$/, ")");
+    const open = o?.to !== undefined ? ` Open to: ${this.details(o.to) || JSON.stringify(o.to)}.` : "";
+    const more = `${ends.length ? ` ${ends.join("; ").replace(/^you /, "You ")}.` : ""}${open}${this.also(o, ["terms", "by", "take_up", "available", "to"], " Also: ")}`;
+    return `It offers${t.template ? ` a${/^[aeiou]/i.test(String(t.template)) ? "n" : ""} ${t.template} agreement${t.then === "periodic" ? ", periodic after its term" : t.then ? `, then ${t.then}` : ""}` : ""}${o?.by ? `, by ${this.who(o.by)}` : ""}${o?.available !== undefined ? ` (${o.available} available)` : ""}${o?.take_up ? `, taken up by ${o.take_up === "apply" ? "applying" : String(o.take_up).replace(/_/g, " ")}` : ""}: ${parts.join("; ") || "(no terms)"}${rest}.${more}`;
+  }
+
+  /** A payment request's words as whoever draws one up writes them from its figures: said in the lines already, so
+   * a request that reads exactly so is not read out again. */
+  private payWords(d: any): string {
+    const m = d?.outcome?.money ?? {};
+    return `Please pay ${this.sum(m.amount)} from ${m.from} to ${m.to}${d.every ? ` every ${Math.round(d.every / 86_400)} days` : ""}${Number.isSafeInteger(d.first_at) ? `, the first on ${forms.dateWords(d.first_at)}` : ""}${m.for ? `, for ${m.for}` : ""}.`;
+  }
+
+  /** The sentence for an act, the lines under it, and which of its fields they say. */
+  private sentence(b: Block, next?: Block): Act {
     const named = (x: any) => (x.speaks_for && this.k.entityOf(x.speaks_for) !== this.me ? ` in the name of ${this.who(x.speaks_for)}` : "");
-    const citing = (x: any, lead = ", citing ") => (x.basis ? `${lead}${citedWords(x)}` : "");
-    const RECORD = ["speaks_for", "visible_to", "basis"]; // said by `named`, `seenBy` and `citing`, on the acts that make a record
+    const cites = (x: any): string[] => (x.basis ? [`Cites: ${citedWords(x)}.`] : []);
+    const rule = (x: any): string[] => { const r = this.rule(x).trim(); return r ? [r] : []; };
+    const list = (xs: string[]) => (xs.length < 2 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`);
+    /** Who sees a paper, where that is not simply whoever makes it and those it is addressed to. */
+    const seen = (x: any): string[] => {
+      const v = x.visible_to;
+      if (v === undefined) return [];
+      if (v === "public") return ["Public: anyone may read it."];
+      if (!Array.isArray(v)) return [`Visible to ${JSON.stringify(v)}.`];
+      const usual = new Set([x.speaks_for ?? this.me, ...(x.addressed_to ?? [])]);
+      if (v.length === usual.size && v.every((y: string) => usual.has(y))) return [];
+      return [`Seen only by ${list(v.map((y: string) => this.who(y)))}.`];
+    };
+    const an = (x: string) => `a${/^[aeiou]/i.test(x) ? "n" : ""} ${x}`;
+    const one = (head: string, said: string[], lines: string[] = [], what = WHAT[b.block] ?? "an act"): Act => ({ head, lines, said, what });
+    const RECORD = ["speaks_for", "visible_to", "basis"]; // said by `named`, `seen` and `cites`, on the acts that make a record
     switch (b.block) {
       case "publish": {
         const to = b.addressed_to?.length ? `, addressed to ${b.addressed_to.map((x: string) => this.whom(x)).join(", ")}` : "";
+        const PAPER = ["kind", "text", "data", "addressed_to", "adico", "formal", ...RECORD];
         if (b.kind === "request" && b.data?.outcome) {
-          // (Of a standing instruction, when its first time falls is said in a sentence of its own, as it will be counted.)
+          // (Of a standing instruction, when its first time falls is said in a line of its own, as it will be counted.)
           const standing = Number.isSafeInteger(b.data.every) && b.data.every > 0;
-          const rest = this.also(b.data, ["outcome", "every", ...(standing ? ["first", "first_at"] : [])], ", with these details: ").replace(/\.$/, "");
-          return [`You will ask ${this.whom(b.addressed_to?.[0])} to ${this.outcome(b.data.outcome, b.data.every)}${named(b)}${b.addressed_to?.length > 1 ? to : ""}${this.seenBy(b.visible_to)}${rest}${citing(b)}. Your request will read: "${b.text}".${standing ? this.firstFalls(b.data, b.data.outcome?.money ? "payment" : "time", b.data.every) : ""}${this.againstAgreed(b)}${this.rule(b)}`,
-            ["kind", "text", "data", "addressed_to", "adico", "formal", ...RECORD]];
+          const m = b.data.outcome.money;
+          const lines: string[] = [];
+          let head: string;
+          if (m) {
+            // Who pays whom how much from where, and how often. What the payment is for is words on it, and only that.
+            head = `You will ask ${this.whom(b.addressed_to?.[0])} to pay ${this.sum(m.amount)} from ${m.from ? this.acct(m.from) : "an account this does not name"} to ${`${this.payee(m.to)}${standing ? ` every ${span(b.data.every)}` : ", once"}`.replace(",,", ",")}${m.settles ? `, settling ${m.settles}` : ""}${named(b)}.`;
+            if (m.for) lines.push(`For, in words only: "${m.for}"`);
+            const more = this.also(m, ["amount", "from", "to", "for", "settles"], "Also on the payment: ");
+            if (more) lines.push(more);
+          } else head = `You will ask ${this.whom(b.addressed_to?.[0])} to ${this.outcome(b.data.outcome, b.data.every)}${named(b)}.`;
+          if (b.addressed_to?.length > 1) lines.push(`Addressed to ${list(b.addressed_to.map((x: string) => this.whom(x)))}.`);
+          if (standing) lines.push(this.firstFalls(b.data, m ? "payment" : "time", b.data.every).trim());
+          const against = this.againstAgreed(b).trim();
+          if (against) lines.push(against);
+          const rest = this.also(b.data, ["outcome", "every", ...(standing ? ["first", "first_at"] : [])], "Also: ");
+          if (rest) lines.push(rest);
+          if (!m || b.text !== this.payWords(b.data)) lines.push(`In these words: "${b.text}"`);
+          return one(head, PAPER, [...lines, ...cites(b), ...seen(b), ...rule(b)], m ? (standing ? "a standing payment" : "a payment") : "a request");
         }
         // A hold: an instruction to whoever acts on something standing. What it does is theirs to do, and it settles nothing.
         if (b.kind === "hold" && Array.isArray(b.data?.holds) && b.addressed_to?.length) {
-            const held = b.data.holds as string[];
-            const many = held.length > 1;
-            const rest = this.also(b.data, ["holds"], " With these details: ");
-            // (On its own file, where what is held is the organisation's own to act on: its own staff read it.)
-            const ownFile = b.addressed_to.every((x: string) => this.k.entityOf(x) === this.me);
-            return [`You will ${ownFile ? "tell your own staff, on your own file," : `instruct ${b.addressed_to.map((x: string) => this.whom(x)).join(", ")}`} to hold ${held.join(", ")}${named(b)}${this.seenBy(b.visible_to)}${citing(b)}. ${many ? "They stay" : "It stays"} on record. This by itself stops nothing and settles nothing: whoever you instruct acts on it, or doesn't, and whatever ${many ? "they were" : "it was"} for is still owed. To resume ${many ? "them" : "it"}, withdraw this instruction. Your instruction will read: "${b.text}".${rest}${this.rule(b)}`,
-              ["kind", "text", "data", "addressed_to", "adico", "formal", ...RECORD]];
+          const held = b.data.holds as string[];
+          const many = held.length > 1;
+          const rest = this.also(b.data, ["holds"], "With these details: ");
+          // (On its own file, where what is held is the organisation's own to act on: its own staff read it.)
+          const ownFile = b.addressed_to.every((x: string) => this.k.entityOf(x) === this.me);
+          return one(`You will ${ownFile ? "tell your own staff, on your own file," : `instruct ${b.addressed_to.map((x: string) => this.whom(x)).join(", ")}`} to hold ${held.join(", ")}${named(b)}.`, PAPER,
+            [`${many ? "They stay" : "It stays"} on record. This by itself stops nothing and settles nothing: whoever you instruct acts on it, or doesn't, and whatever ${many ? "they were" : "it was"} for is still owed.`,
+              `To resume ${many ? "them" : "it"}, withdraw this instruction.`, `In these words: "${b.text}"`, ...(rest ? [rest] : []), ...cites(b), ...seen(b), ...rule(b)], "a hold");
         }
         // A direction on an office's own form: what is filed, with whom, and that following it is the office's to do.
         const filedOn = typeof b.basis === "string" ? this.k.forms.find((f) => f.id === b.basis) : undefined;
+        const spec = filedOn?.data as forms.FormData | undefined;
+        const onForm = spec && spec.fields && b.data !== null && typeof b.data === "object" && !Array.isArray(b.data) && Object.keys(b.data).every((k) => k in spec.fields);
+        /** The form's own summary of what was filled in, which the lines say field by field: not read out again. */
+        const formWords = spec && typeof spec.form === "string" && typeof b.text === "string" && b.text.startsWith(`${spec.form.replace(/_/g, " ")}: `) && Object.values(b.data ?? {}).every((v) => typeof v !== "string" || !/^[^0-9]/.test(v) || b.text.includes(v));
         if (b.kind === "direction" && typeof filedOn?.data?.office === "string") {
           const office: string = filedOn.data.office;
           const title = this.k.positionWords.get(office)?.title;
@@ -326,115 +424,151 @@ export class Preview {
           const may = this.k.mayDirect(office);
           const titled = (p: string) => this.k.positionWords.get(p)?.title ? `the ${this.k.positionWords.get(p)!.title} (${p})` : p;
           const not = may && post && !may.posts.includes(post)
-            ? ` The office will not follow it: by the rule on directions (${may.rule}) it takes written directions only from ${may.posts.map(titled).join(" and ") || "nobody"}, and this one is given as ${titled(post)}.${post === office ? " A direction is how others direct an office; what its own staff are to do as routine is set by a standing work order on its own file." : ""}`
-            : "";
-          return [`You will give ${title ? `the ${title} (${office})` : office} a written direction on its ${String(filedOn.data.form).replace(/_/g, " ")} form (${filedOn.id})${named(b)}${this.seenBy(b.visible_to)}: "${b.text}".${not} This by itself changes nothing: the office follows a direction only from those its organisation's rules say may direct it, and writes back to say whether it does. It stands until you replace it with another or withdraw it.${this.rule(b)}`,
-            ["kind", "text", "data", "addressed_to", "adico", "formal", ...RECORD]];
+            ? [`The office will not follow it: by the rule on directions (${may.rule}) it takes written directions only from ${may.posts.map(titled).join(" and ") || "nobody"}, and this one is given as ${titled(post)}.${post === office ? " A direction is how others direct an office; what its own staff are to do as routine is set by a standing work order on its own file." : ""}`]
+            : [];
+          return one(`You will give ${title ? `the ${title} (${office})` : office} a written direction on its ${String(filedOn.data.form).replace(/_/g, " ")} form (${filedOn.id})${named(b)}${onForm && formWords ? "." : `: "${b.text}".`}`, PAPER,
+            [...(onForm ? this.filled(spec!, b.data) : this.details(b.data) ? [`With these details: ${this.details(b.data)}.`] : []), ...not,
+              "This by itself changes nothing: the office follows a direction only from those its organisation's rules say may direct it, and writes back to say whether it does.",
+              "It stands until you replace it with another or withdraw it.", ...seen(b), ...rule(b)], "a written direction");
         }
         // A standing work order: on the organisation's own file, for its staff to follow. Nothing is done now.
         if (b.kind === "work_order" && b.data?.work && (b.data?.every || typeof b.data?.schedule === "string")) {
           const others = (Array.isArray(b.visible_to) ? b.visible_to : []).filter((x: string) => this.k.entityOf(x) !== (b.speaks_for ?? this.me));
-          return [`You will put a standing work order on ${this.k.entityOf(b.speaks_for ?? this.me) === this.me ? "your own file" : `the file of ${this.who(b.speaks_for)}`}${others.length ? `, shown to ${others.map((x: string) => this.who(x)).join(", ")}` : ""}: "${b.text}". Nothing is done now: the staff whose work it is follow it each time it falls due, in their own working hours, while it stands.${this.rhythmOf(b.data)}${this.firstFalls(b.data, "order", 0)}${Number.isSafeInteger(b.data.until) ? (b.data.until % 86_400 === 0 ? ` It stands to the end of ${forms.dateWords(b.data.until - 86_400)}.` : ` It stands until ${moment(b.data.until)}.`) : ""}${this.k.ownStaff?.inPost === 0 && this.k.entityOf(b.speaks_for ?? this.me) === this.me ? ` There is nobody in the post whose work this is: your office has no ${this.k.ownStaff.role} in post, so nothing is done under it until someone is taken on.` : ""} To change it, withdraw it and make another; to pause it, put it on hold.${citing(b, " It cites ")}${this.rule(b)}`,
-            ["kind", "text", "data", "addressed_to", "adico", "formal", ...RECORD]];
+          const lines = ["Nothing is done now: the staff whose work it is follow it each time it falls due, in their own working hours, while it stands.",
+            this.rhythmOf(b.data).trim(), this.firstFalls(b.data, "order", 0).trim(),
+            Number.isSafeInteger(b.data.until) ? (b.data.until % 86_400 === 0 ? `It stands to the end of ${forms.dateWords(b.data.until - 86_400)}.` : `It stands until ${moment(b.data.until)}.`) : "",
+            this.k.ownStaff?.inPost === 0 && this.k.entityOf(b.speaks_for ?? this.me) === this.me ? `There is nobody in the post whose work this is: your office has no ${this.k.ownStaff.role} in post, so nothing is done under it until someone is taken on.` : "",
+            "To change it, withdraw it and make another; to pause it, put it on hold."].filter(Boolean);
+          return one(`You will put a standing work order on ${this.k.entityOf(b.speaks_for ?? this.me) === this.me ? "your own file" : `the file of ${this.who(b.speaks_for)}`}${others.length ? `, shown to ${others.map((x: string) => this.who(x)).join(", ")}` : ""}: "${b.text}".`, PAPER,
+            [...lines, ...cites(b), ...rule(b)], "a standing work order");
         }
-        // A paper of the office's own, made on its form: its details read as the form says each is, and of everyone
-        // it goes to, why, in the form's own words.
+        // A paper of the office's own, made on its form: what the form has filled in and what it leaves empty, and of
+        // everyone it goes to, why, in the form's own words.
         const made = this.madeOn(b);
         if (made) {
-          const dd = this.details(b.data, undefined, made.kinds);
-          const goes = this.goesTo(b, made);
-          return [`You will publish a${/^[aeiou]/i.test(String(b.kind)) ? "n" : ""} ${String(b.kind).replace(/_/g, " ")}${named(b)}${goes ? "" : this.seenBy(b.visible_to)}: "${b.text}"${dd ? `, with these details: ${dd}` : ""}${citing(b)}.${goes}${this.rule(b)}`,
-            ["kind", "text", "data", "addressed_to", "adico", "formal", ...RECORD]];
+          const goes = this.goesTo(b, made).trim();
+          const kind = String(b.kind).replace(/_/g, " ");
+          // (What it cites is a field of the form where the form writes it from one: said there, and not again.)
+          const cited = basesOf(b as any).every((id) => Object.values(made.fields).some((v) => v === id || (Array.isArray(v) && v.includes(id)))) ? [] : cites(b);
+          return one(`You will issue a${/^[aeiou]/i.test(kind) ? "n" : ""} ${kind} (${made.form.id})${named(b)}: "${b.text}".`, [...PAPER, ...(b.offer !== undefined ? ["offer"] : [])],
+            [...this.filled(made.form.data as forms.FormData, made.fields), ...(b.offer !== undefined ? [this.offered(b.offer)] : []), ...(goes ? [goes] : seen(b)), ...cited, ...rule(b)], an(kind));
+        }
+        // A form filed with whoever takes it (a proposal to the council, an application): the same two lines.
+        if (onForm && filedOn) {
+          const kind = String(b.kind).replace(/_/g, " ");
+          return one(`You will file the ${spec!.form.replace(/_/g, " ")} form (${filedOn.id})${b.addressed_to?.length ? ` with ${list(b.addressed_to.map((x: string) => this.whom(x)))}` : ""}, as a${/^[aeiou]/i.test(kind) ? "n" : ""} ${kind}${named(b)}${formWords ? "." : `: "${b.text}".`}`, PAPER,
+            [...this.filled(spec!, b.data), ...seen(b), ...rule(b)], `${an(spec!.form.replace(/_/g, " "))} form`);
         }
         const d = this.details(b.data, typeof b.basis === "string" ? b.basis : undefined);
+        const details = d ? [`With these details: ${d}.`] : [];
+        // (A law with no rule recorded with it is its words and no more: said, as an agreement's terms in words are.)
+        const wordsOnly = b.kind === "law" && b.adico === undefined && b.formal === undefined ? ["Words only: no rule is recorded with it for acts to be checked against."] : [];
         // On its own file: seen by nobody but whoever it is made for, and addressed to nobody.
         const own = Array.isArray(b.visible_to) && b.visible_to.length === 1 && b.visible_to[0] === (b.speaks_for ?? this.me) && !b.addressed_to?.length && !b.place;
-        if (own) {
-          const kind = String(b.kind).replace(/_/g, " ");
-          return [`You will put a${/^[aeiou]/.test(kind) ? "n" : ""} ${kind} on ${this.k.entityOf(b.visible_to[0]) === this.me ? "your own file" : `the file of ${this.who(b.visible_to[0])}`}, seen by nobody else: "${b.text}"${d ? `, with these details: ${d}` : ""}${citing(b)}. It moves nothing and tells nobody.${this.rule(b)}`,
-            ["kind", "text", "data", "adico", "formal", ...RECORD]];
-        }
-        return [`You will ${b.place ? "put up" : "publish"} a${/^[aeiou]/i.test(String(b.kind)) ? "n" : ""} ${String(b.kind).replace(/_/g, " ")}${b.place ? ` on ${b.place}` : ""}${named(b)}${to}${this.seenBy(b.visible_to)}: "${b.text}"${d ? `, with these details: ${d}` : ""}${citing(b)}.${this.rule(b)}`,
-          ["kind", "text", "data", "place", "addressed_to", "adico", "formal", ...RECORD]];
+        const kind = String(b.kind).replace(/_/g, " ");
+        if (own) return one(`You will put a${/^[aeiou]/.test(kind) ? "n" : ""} ${kind} on ${this.k.entityOf(b.visible_to[0]) === this.me ? "your own file" : `the file of ${this.who(b.visible_to[0])}`}, seen by nobody else: "${b.text}".`, ["kind", "text", "data", "adico", "formal", ...RECORD],
+          [...details, "It moves nothing and tells nobody.", ...cites(b), ...rule(b)], `${an(kind)} on your own file`);
+        return one(`You will ${b.place ? "put up" : "publish"} a${/^[aeiou]/i.test(kind) ? "n" : ""} ${kind}${b.place ? ` on ${b.place}` : ""}${named(b)}${to}: "${b.text}".`, ["place", ...PAPER],
+          [...details, ...wordsOnly, ...cites(b), ...seen(b), ...rule(b)], an(kind));
       }
       case "propose_agreement": {
         const t = b.terms;
-        const others = t.parties.filter((p: string) => this.k.entityOf(p) !== this.me && p !== b.speaks_for).map((p: string) => this.who(p));
-        const commits = t.commitments.map((c: any) => `${this.who(c.who)} will ${c.does?.outcome ? this.outcome(c.does.outcome, c.every) : `do${c.every ? ` every ${span(c.every)}` : ""}: ${c.does?.text !== undefined && Object.keys(c.does).length === 1 ? `"${c.does.text}"` : JSON.stringify(c.does)}`}${this.also(c, ["who", "does", "every"], " (").replace(/\.$/, ")")}`).join("; ");
-        const notices = (t.termination ?? []).map((x: any) => `${this.who(x.party)} may end it on ${span(x.notice)}' notice${this.also(x, ["party", "notice"], " (").replace(/\.$/, ")")}`).join("; ");
-        const signs = this.signsWith(b, next) ? ", and sign it on your side" : "";
+        const mine = (p: string) => this.k.entityOf(p) === this.me || p === b.speaks_for;
+        const others = t.parties.filter((p: string) => !mine(p)).map((p: string) => this.who(p));
+        const signs = this.signsWith(b, next);
+        // What it would bind each side to: each act set down, by whoever is to do it; a side with none, said; and what
+        // is words only, said to be that (the pilots' offers of employment whose whole duty was a line of terms).
+        const lines: string[] = [];
+        const by = new Map<string, string[]>();
+        const words: string[] = [];
+        for (const c of t.commitments as any[]) {
+          const extra = this.also(c, ["who", "does", "every"], " (").replace(/\.$/, ")");
+          if (c.does?.outcome) by.set(c.who, [...(by.get(c.who) ?? []), `${this.outcome(c.does.outcome, c.every, c.who)}${extra}`]);
+          else words.push(`${this.who(c.who)}${c.every ? `, every ${span(c.every)}` : ""}: ${c.does?.text !== undefined && Object.keys(c.does).length === 1 ? `"${c.does.text}"` : JSON.stringify(c.does)}${extra}`);
+        }
+        const sides = [...new Set<string>([...t.parties, ...(t.commitments as any[]).map((c) => c.who)])];
+        const cap = (s: string) => (s === "you" ? "You" : s);
+        for (const p of sides) {
+          const does = by.get(p);
+          lines.push(does ? `${cap(this.who(p))} would be bound to: ${does.join("; ")}.` : `${cap(this.who(p))} would be bound to nothing: no act of ${this.who(p) === "you" ? "yours" : "theirs"} is set down.`);
+        }
+        if (words.length) lines.push(`In words only, which bind nobody to an act that can be checked: ${words.join("; ")}.`);
+        if (t.text) lines.push(`Its terms, in words only: "${t.text}"`);
+        for (const x of t.termination ?? []) lines.push(`${cap(this.who(x.party))} may end it on ${span(x.notice)}' notice${this.also(x, ["party", "notice"], " (").replace(/\.$/, ")")}.`);
         // An offer of employment that says nothing of where the work is: made on an advertisement, it is on the
         // advertisement's terms; made on none, whoever signs it has nowhere to come to work (2026-10-09: a crew of
         // five was taken on by offers of the pay alone, and none of them ever came to the depot).
-        let place = "";
         if (t.template === "employment" && this.k.entityOf(b.speaks_for ?? this.me) === this.me && !t.commitments.some((c: any) => c.does?.outcome?.occupancy || c.does?.outcome?.work?.at)) {
           const ad = this.k.advertisedJob(Array.isArray(b.basis) ? b.basis : typeof b.basis === "string" ? [b.basis] : []);
-          place = ad ? ` It names no place of work: it is made on the job advertisement ${ad.advertisement}, so the work is where that advertisement says${ad.space ? ` (${ad.space})` : ""}.`
-            : " It names no place of work and cites no job advertisement that does: whoever signs it is paid and has nowhere to come to work. Cite the advertisement or the application it answers, or say where they are to work.";
+          lines.push(ad ? `It names no place of work: it is made on the job advertisement ${ad.advertisement}, so the work is where that advertisement says${ad.space ? ` (${ad.space})` : ""}.`
+            : "It names no place of work and cites no job advertisement that does: whoever signs it is paid and has nowhere to come to work. Cite the advertisement or the application it answers, or say where they are to work.");
         }
-        return [`You will offer ${others.join(" and ") || "the parties"} ${t.template ? `a${/^[aeiou]/i.test(String(t.template)) ? "n" : ""} ${t.template} agreement` : "an agreement"}${named(b)}${t.term ? ` for ${span(t.term)}` : ""}${t.then === "periodic" ? ", continuing afterwards from one period to the next until someone ends it by notice" : ""}${this.seenBy(b.visible_to)}: ${commits || "(no commitments)"}${notices ? `; ${notices}` : ""}${t.text ? `. Its terms: "${t.text}"` : ""}${citing(b, ". It cites ")}${signs}. Its parties: ${t.parties.map((p: string) => this.who(p)).join(", ")}.${place}${this.also(t, ["template", "parties", "commitments", "term", "termination", "text", ...(t.then === "periodic" ? ["then"] : [])])}`,
-          ["terms", ...RECORD]];
+        const rest = this.also(t, ["template", "parties", "commitments", "term", "termination", "text", ...(t.then === "periodic" ? ["then"] : [])], "Also: ");
+        if (rest) lines.push(rest);
+        return one(`You will offer ${others.join(" and ") || "the parties"} ${t.template ? `a${/^[aeiou]/i.test(String(t.template)) ? "n" : ""} ${t.template} agreement` : "an agreement"}${named(b)}${t.term ? ` for ${span(t.term)}` : ""}${t.then === "periodic" ? ", continuing afterwards from one period to the next until someone ends it by notice" : ""}${signs ? ", and sign it on your side" : ""}.`,
+          ["terms", ...RECORD], [...lines, ...cites(b), ...seen({ ...b, addressed_to: t.parties })], `an offer of ${t.template ? an(`${t.template} agreement`) : "an agreement"}`);
       }
       case "sign_agreement":
-        return [`You will sign agreement ${b.agreement} for ${this.who(b.as)}.`, ["agreement", "as"]];
+        return one(`You will sign agreement ${b.agreement} for ${this.who(b.as)}.`, ["agreement", "as"]);
       case "give_notice":
-        return [`You will give notice on agreement ${b.agreement} for ${this.who(b.as)}${b.text ? `: "${b.text}"` : ""}.`, ["agreement", "as", "text"]];
+        return one(`You will give notice on agreement ${b.agreement} for ${this.who(b.as)}${b.text ? `: "${b.text}"` : ""}.`, ["agreement", "as", "text"]);
       case "transfer":
-        return [`You will move ${this.sum(b.amount)} from ${this.acct(b.from)} to ${this.acct(b.to)}${b.memo ? `, for ${b.memo}` : ""}${b.settles ? `, settling ${b.settles}` : ""}${b.per_instruction ? `, as ${b.per_instruction} asked` : ""}.`, ["amount", "from", "to", "memo", "settles", "per_instruction"]];
+        return one(`You will move ${this.sum(b.amount)} from ${this.acct(b.from)} to ${this.acct(b.to)} now${b.settles ? `, settling ${b.settles}` : ""}${b.per_instruction ? `, as ${b.per_instruction} asked` : ""}.`, ["amount", "from", "to", "memo", "settles", "per_instruction"],
+          b.memo ? [`For, in words only: "${b.memo}"`] : []);
       case "open_account":
-        return [`You will open an account for ${this.who(b.holder)}, kept by you.`, ["holder"]];
+        return one(`You will open an account for ${this.who(b.holder)}, kept by you.`, ["holder"]);
       case "close_account":
-        return [`You will close account ${b.account}.`, ["account"]];
+        return one(`You will close account ${b.account}.`, ["account"]);
       case "construct":
-        return [`You will start building a ${b.structure_type} with its corner at ${b.at} yourself${b.materials_at ? `, with materials from what you hold at ${b.materials_at}` : ""}.`, ["structure_type", "at", "materials_at"]];
+        return one(`You will start building a ${b.structure_type} with its corner at ${b.at} yourself${b.materials_at ? `, with materials from what you hold at ${b.materials_at}` : ""}.`, ["structure_type", "at", "materials_at"]);
       case "demolish":
-        return [`You will begin demolishing ${b.structure}: anyone inside will have to leave.`, ["structure"]];
+        return one(`You will begin demolishing ${b.structure}: anyone inside will have to leave.`, ["structure"]);
       case "work":
-        return [`${(b.performers ?? []).length ? `${(b.performers as string[]).map((p) => this.who(p)).join(" and ")} will do` : "You will do"} ${b.units} of ${b.task} at ${b.at}${b.on ? `, on ${b.on}` : ""}.`, ["performers", "units", "task", "at", "on"]];
+        return one(`${(b.performers ?? []).length ? `${(b.performers as string[]).map((p) => this.who(p)).join(" and ")} will do` : "You will do"} ${b.units} of ${b.task} at ${b.at}${b.on ? `, on ${b.on}` : ""}.`, ["performers", "units", "task", "at", "on"]);
       case "move_goods":
-        return [`You will move ${b.quantity} ${b.kind} from ${b.from_at} to ${b.to === this.me ? "yourself" : this.who(b.to)} at ${b.to_at}.`, ["quantity", "kind", "from_at", "to", "to_at"]];
+        return one(`You will move ${b.quantity} ${b.kind} from ${b.from_at} to ${b.to === this.me ? "yourself" : this.who(b.to)} at ${b.to_at}.`, ["quantity", "kind", "from_at", "to", "to_at"]);
       case "take":
-        return [`You will take ${b.quantity} ${b.kind} from ${this.who(b.from)} at ${b.at}, without their agreement.`, ["quantity", "kind", "from", "at"]];
+        return one(`You will take ${b.quantity} ${b.kind} from ${this.who(b.from)} at ${b.at}, without their agreement.`, ["quantity", "kind", "from", "at"]);
       case "occupy":
-        return [b.who ? `You will bring ${this.who(b.who)} into ${b.space}.` : `You will move into ${b.space}.`, ["who", "space"]];
+        return one(b.who ? `You will bring ${this.who(b.who)} into ${b.space}.` : `You will move into ${b.space}.`, ["who", "space"]);
       case "vacate":
-        return [this.k.entityOf(b.occupant) === this.k.entity ? `You will leave ${b.from}.` : `You will remove ${this.who(b.occupant)} from ${b.from}.`, ["occupant", "from"]];
+        return one(this.k.entityOf(b.occupant) === this.k.entity ? `You will leave ${b.from}.` : `You will remove ${this.who(b.occupant)} from ${b.from}.`, ["occupant", "from"]);
       case "create_entity": {
         const p = b.first_position;
-        return [`You will set up a new ${b.kind} called "${b.name}"${named(b)}${this.seenBy(b.visible_to)}${p ? `, with you as its ${p.title ?? "first officer"}${this.also(p, ["title", "ref"], " (").replace(/\.$/, ")")}` : ""}.`, ["kind", "name", "first_position", "speaks_for", "visible_to"]];
+        return one(`You will set up a new ${b.kind} called "${b.name}"${named(b)}${this.seenBy(b.visible_to)}${p ? `, with you as its ${p.title ?? "first officer"}${this.also(p, ["title", "ref"], " (").replace(/\.$/, ")")}` : ""}.`, ["kind", "name", "first_position", "speaks_for", "visible_to"]);
       }
       case "arrive":
-        return [b.person ? `You will let ${this.who(b.person)} back into the world.` : `You will let a newcomer, ${b.name}, into the world${b.carrying ? `, carrying ${this.sum(b.carrying)}` : ""}.`, b.person ? ["person"] : ["name", "carrying"]];
+        return one(b.person ? `You will let ${this.who(b.person)} back into the world.` : `You will let a newcomer, ${b.name}, into the world${b.carrying ? `, carrying ${this.sum(b.carrying)}` : ""}.`, b.person ? ["person"] : ["name", "carrying"]);
       case "leave":
-        return [!b.person || this.k.entityOf(b.person) === this.k.entity ? "You will leave the world." : `You will remove ${this.who(b.person)} from the world.`, b.person && this.k.entityOf(b.person) !== this.k.entity ? ["person"] : []];
+        return one(!b.person || this.k.entityOf(b.person) === this.k.entity ? "You will leave the world." : `You will remove ${this.who(b.person)} from the world.`, b.person && this.k.entityOf(b.person) !== this.k.entity ? ["person"] : []);
       case "birth":
-        return [`You will conceive a child, to be named ${b.name}${b.with ? `, with ${this.who(b.with)}` : ""}.`, ["name", "with"]];
+        return one(`You will conceive a child, to be named ${b.name}${b.with ? `, with ${this.who(b.with)}` : ""}.`, ["name", "with"]);
       case "harm":
-        return [`You will physically harm ${this.who(b.person)}.`, ["person"]];
+        return one(`You will physically harm ${this.who(b.person)}.`, ["person"]);
       case "create_position":
-        return [`You will create a new position${b.title ? `, ${b.title}` : ""}${b.role ? ` (${b.role})` : ""}, vacant for now.`, ["title", "role"]];
+        return one(`You will create a new position${b.title ? `, ${b.title}` : ""}${b.role ? ` (${b.role})` : ""}, vacant for now.`, ["title", "role"]);
       case "appoint":
-        return [b.participant ? `You will appoint ${this.who(b.participant)} to ${b.position}.` : `You will leave ${b.position} with nobody in it.`, ["participant", "position"]];
+        return one(b.participant ? `You will appoint ${this.who(b.participant)} to ${b.position}.` : `You will leave ${b.position} with nobody in it.`, ["participant", "position"]);
       case "deploy":
-        return [`You will put a new system to work${b.title ? `, ${b.title}` : ""} (${b.template}).`, ["title", "template"]];
+        return one(`You will put a new system to work${b.title ? `, ${b.title}` : ""} (${b.template}).`, ["title", "template"]);
       case "retire":
-        return [`You will switch off ${b.participant} for good.`, ["participant"]];
+        return one(`You will switch off ${b.participant} for good.`, ["participant"]);
       case "record_claim": {
         const pos = ({ right: "has a right", liberty: "is permitted", power: "has the power", immunity: "is immune" } as Record<string, string>)[b.position] ?? `holds a ${b.position}`;
-        return [`You will record${named(b)} that ${this.who(b.holder)} ${pos}${b.counterparty ? ` against ${this.who(b.counterparty)}` : ""}: ${this.details(b.about) || "(no details)"}${this.seenBy(b.visible_to)}${citing(b)}.`, ["position", "holder", "counterparty", "about", ...RECORD]];
+        return one(`You will record${named(b)} that ${this.who(b.holder)} ${pos}${b.counterparty ? ` against ${this.who(b.counterparty)}` : ""}: ${this.details(b.about) || "(no details)"}.`, ["position", "holder", "counterparty", "about", ...RECORD], [...cites(b), ...seen(b)]);
       }
       case "transfer_claim":
-        return [`You will record${named(b)} that claim ${b.claim} now belongs to ${this.who(b.to)}${this.seenBy(b.visible_to)}${citing(b)}.`, ["claim", "to", ...RECORD]];
+        return one(`You will record${named(b)} that claim ${b.claim} now belongs to ${this.who(b.to)}.`, ["claim", "to", ...RECORD], [...cites(b), ...seen(b)]);
       case "release_claim":
-        return [`You will release claim ${b.claim}${named(b)}${this.seenBy(b.visible_to)}${citing(b)}.`, ["claim", ...RECORD]];
+        return one(`You will release claim ${b.claim}${named(b)}.`, ["claim", ...RECORD], [...cites(b), ...seen(b)]);
       case "withdraw":
-        return [`You will withdraw ${b.record}${named(b)}${b.text ? `: "${b.text}"` : ""}${this.seenBy(b.visible_to)}${citing(b)}.${this.withdrawn(b.record)}`, ["record", "text", ...RECORD]];
+        return one(`You will withdraw ${b.record}${named(b)}${b.text ? `: "${b.text}"` : ""}.`, ["record", "text", ...RECORD], [this.withdrawn(b.record).trim(), ...cites(b), ...seen(b)].filter(Boolean));
       case "vote":
-        return [`You will vote "${b.choice}" on ${b.ballot}${named(b)}${this.seenBy(b.visible_to)}.`, ["choice", "ballot", "speaks_for", "visible_to"]];
+        return one(`You will vote "${b.choice}" on ${b.ballot}${named(b)}.`, ["choice", "ballot", "speaks_for", "visible_to"], seen(b));
       case "message":
-        return [`You will write to ${b.to.map((x: string) => this.whom(x)).join(", ")}${b.re ? `, about ${b.re}` : ""}: "${b.text}".`, ["to", "re", "text"]];
+        return one(`You will write to ${b.to.map((x: string) => this.whom(x)).join(", ")}${b.re ? `, about ${b.re}` : ""}: "${b.text}".`, ["to", "re", "text"], ["A letter only: it pays, files and orders nothing."]);
       default:
-        return [`You will do this (${b.block}).`, []];
+        return one(`You will do this (${b.block}).`, []);
     }
   }
 
@@ -443,15 +577,42 @@ export class Preview {
     return b.block === "propose_agreement" && next?.block === "sign_agreement" && next.agreement === `$${b.ref}` && this.k.entityOf(next.as) === this.me && Object.keys(next).every((k) => ["block", "agreement", "as", "ref"].includes(k));
   }
 
-  /** The whole preview, one line per act; an offer and its signature read as one. */
+  /**
+   * The whole preview. Its first line says how many things the draft does; each is numbered, one alone too, with its
+   * lines under it. An offer and its signature read as one.
+   */
   of(blocks: Block[]): string {
-    const out: string[] = [];
+    const acts: Act[] = [];
     for (let i = 0; i < blocks.length; i++) {
       const b = blocks[i]!;
       const next = blocks[i + 1];
-      out.push(this.block(b, next));
+      acts.push(this.act(b, next));
       if (this.signsWith(b, next)) i++;
     }
-    return out.map((l, i) => (out.length > 1 ? `${i + 1}. ${l}` : l)).join("\n");
+    const n = acts.length;
+    const count = n === 1 ? "one thing" : n < 13 ? `${["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"][n]} things, in this order` : `${n} things, in this order`;
+    // (What the things are, by kind, in the same line: "one thing: a payment"; "three things, in this order: a
+    // payment, a payment and a report".)
+    const NUM = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"];
+    const kinds: string[] = [];
+    for (let i = 0; i < acts.length; ) {
+      let j = i;
+      while (j < acts.length && acts[j]!.what === acts[i]!.what) j++;
+      const w = acts[i]!.what, k = j - i;
+      // (Several of one kind running: "two payments"; a kind that takes no plain plural is said as many times over.)
+      kinds.push(k === 1 ? w : / (of|on) /.test(w) ? `${NUM[k] ?? k} times ${w}` : `${NUM[k] ?? k} ${w.replace(/^an? /, "")}s`);
+      i = j;
+    }
+    const named = kinds.length < 2 ? kinds.join("") : `${kinds.slice(0, -1).join(", ")} and ${kinds[kinds.length - 1]}`;
+    return [`This does ${count}: ${named}.`, ...acts.map((a, i) => [`${i + 1}. ${a.head}`, ...a.lines.map((l) => `   - ${l}`)].join("\n"))].join("\n");
   }
 }
+
+/** What each kind of act is called in the preview's first line (a paper is called by its own kind). */
+const WHAT: { [block: string]: string } = { sign_agreement: "a signature", give_notice: "a notice on an agreement", transfer: "a payment", open_account: "an account opened", close_account: "an account closed", construct: "a building begun",
+  demolish: "a demolition", work: "a piece of work", move_goods: "goods moved", take: "a taking", occupy: "a moving in", vacate: "a moving out", create_entity: "an organisation set up", arrive: "an arrival", leave: "a leaving", birth: "a child",
+  harm: "a harm", create_position: "a post created", appoint: "an appointment", deploy: "a system put to work", retire: "a system switched off", record_claim: "a claim recorded", transfer_claim: "a claim passed on", release_claim: "a claim released",
+  withdraw: "a withdrawal", vote: "a vote", message: "a letter", publish: "a paper", propose_agreement: "an offer of an agreement" };
+
+/** An act as the preview sets it out: what happens, the lines under it, and which of the act's fields they say. */
+interface Act { head: string; lines: string[]; said: string[]; /** What kind of thing it is, in a word or three ("a payment", "a letter"). */ what: string }

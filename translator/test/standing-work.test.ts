@@ -47,7 +47,7 @@ test("an order that ends says the moment it ends, counted from when it is made",
 test("the preview of a standing order, and of a hold on one: what will happen, and that nothing is done now", () => {
   const k = seat();
   const preview = (src: string) => { const r = resolve(calls.parseProgram(src), k, () => undefined, "works"); if (!r.ok) throw new Error(r.questions.join(" ")); return new Preview(k, "city").of(r.blocks); };
-  expect(preview('work(task=collect, at=town-hall, every="7 days")')).toBe('You will put a standing work order on your own file: "Standing work order: collect at town-hall, every 7 days.". Nothing is done now: the staff whose work it is follow it each time it falls due, in their own working hours, while it stands. It is in force as soon as it is on file. To change it, withdraw it and make another; to pause it, put it on hold.');
+  expect(preview('work(task=collect, at=town-hall, every="7 days")')).toBe('This does one thing: a standing work order.\n1. You will put a standing work order on your own file: "Standing work order: collect at town-hall, every 7 days.".\n   - Nothing is done now: the staff whose work it is follow it each time it falls due, in their own working hours, while it stands.\n   - It is in force as soon as it is on file.\n   - To change it, withdraw it and make another; to pause it, put it on hold.');
   expect(preview('work(task=collect, at=town-hall, by="Sam Okoro", every="7 days")')).toContain("on your own file, shown to Sam Okoro (c0061):");
-  expect(preview("statement(hold=rec.70)")).toStartWith("You will tell your own staff, on your own file, to hold rec.70, seen only by you.");
+  expect(preview("statement(hold=rec.70)")).toStartWith("This does one thing: a hold.\n1. You will tell your own staff, on your own file, to hold rec.70.\n");
 });
