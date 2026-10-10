@@ -563,6 +563,51 @@ lines, and neither is a kind the data lacks.
 reckons it: 115 USD (Opus 5.5 78: writing 54, reading 24; Sonnet 5.5 29; Haiku 5.5 at low effort 8), 53% of the last round's
 216; Haiku at default effort was not used. Codex: about 2,300 requests read by gpt-6.1-sol in one window.
 
+### Slot-by-slot decoding (2026-10-10)
+
+A second way for the trained model to write a program (`translator/model/encode.ts`, "Slot by slot"; `py/slots.py`;
+docs/decisions.md of the day): code lists what there is to decide (the kind of answer, the number of lines, each line's
+function, then each slot once: a form's fields in its line's order, any other function's arguments in the contract's) and
+the model decides each: left out, a closed-set value or a copied span. `export.ts <joined> <out> --decoding slots` writes
+the data that way, `py/check_slots.py <out>` checks it against the trainer's rule, and a model's `config.json` says which
+decoding it answers in. Tried once, against a control: `pod-small-slots-s1` (slot by slot) and `pod-small-steps6-s1` (the
+earlier decoding), both on round 2's `joined-13`, six epochs, seed 1, scored the same day with the same code as
+`pod-small-r2-s1` (four epochs). Everything is in `runs/translator-slot-decoding-2026-10-10/` on the run server.
+
+| Test (right; no draft, wrong) | slot by slot | control, 6 epochs | `pod-small-r2-s1` |
+|---|---|---|---|
+| The 180 real requests | 147 (24, 9) | 150 (17, 13) | 153 (15, 12) |
+| Held out, 66 | 49 (9, 8) | 50 (7, 9) | 48 (10, 8) |
+| Seen, 116 | 99 (wrong 10) | 99 (wrong 10) | 95 (wrong 11) |
+| Parity, 1,466 | 1,425 (6, 35) | 1,406 (15, 45) | 1,379 (33, 54) |
+| Parity forms, 250 | 231 (2, 17) | 214 (14, 22) | 186 (31, 33) |
+| Parity agreements, 49 | 37 (1, 11) | 36 (0, 13) | 35 (0, 14) |
+| Held-back seats' requests: wave 2, 148; late, 61; w2-58, 31 | 136, 58, 28 | 134, 57, 28 | 136, 56, 28 |
+| Test pilots' own: 77; late, 59 | 62, 52 | 60, 52 | 60, 48 |
+| Test pilots' written: 187; late, 108 | 164, 101 | 168, 99 | 162, 96 |
+| Mean time a request on the run server (the 362 fixed cases; the set files) | 60 ms; 67 ms | 67; 80 | 68; 93 |
+
+**It did not do what it was built for on real requests.** The council's budget form with one amount: 1 of 5 (control 2,
+last round 2); the model still leaves `staff` out, now by deciding the slot is left out instead of closing the form. Real
+wrong form drafts 6 (control 7, last round 9; the mark was 3). Real programs of two lines 11 of 18 (control 12, last round
+11), three or more 2 of 7 in all three: saying the number of lines first did not make it count them better. Agreements 37
+of 49 (the mark was 42). On the 180 real it is the lowest of the three, by more refusals of its own at the first decision
+(24 with no draft: all but four the model's own refusal, three the form check, one the cut-off), not by the cut-off.
+**What it did do:** forms on the parity test, 231 of 250 against the control's 214, and every group of the parity test at
+90% or more but agreements (currencies under 90%: 0 of 27, control 3, last round 7; ways of writing money 0, 1, 1; writers
+0, 1, 2); and it never offered a form with a required field left out on the parity test (control 8 times, last round 14,
+all wrongly), though 3 times on the 180 real, each wrongly (control 2). **And the longer schedule alone is most of the
+parity gain**: the control has 27 of the 46 more parity cases, and 28 of the 45 more forms. One seed an arm: differences of
+three cases in 180 or one in 66 are within what a seed moves (last round's two seeds differed by 6 on the 180).
+
+**So:** six epochs is the schedule to keep. Slot-by-slot decoding is kept in the code as a second decoding and is not made
+the default: it is better on generated forms and no better where it was meant to be. The failures it was aimed at are not
+the decoder's shape: with no way to close early, the model chooses "left out" for the same field, and miscounts lines in the
+same cases. That points back at what the model is taught about those requests (the label and the examples of a budget
+proposal naming one head; acts with their reports as several lines), which was set aside for this experiment. Spend: 1.50
+USD of a 3.00 limit (two pods, 119 and 109 minutes at 0.39; two that were ended in their first two minutes; the provider
+lists none).
+
 ## A wide part
 
 Written 2026-10-09 (data pipeline 0.13.0), for the owner's concern that the data is too narrow: the pilots' requests

@@ -3743,6 +3743,13 @@ See the design note, §16.
 - **Measured against a control**, not against the last round alone: the earlier decoding trained again on the same data
   for the same six epochs (the design report saw real validation still rising at epoch 4), one seed each, scored the same
   day with the same code as `pod-small-r2-s1`. The results are in docs/translator-pipeline.md, "Slot-by-slot decoding".
+- **What it came to** (one seed an arm; docs/translator-pipeline.md, "Slot-by-slot decoding"). Better on generated forms
+  (parity forms 231 of 250, control 214, last round 186; parity 1,425, 1,406, 1,379) and not on what it was built for: the
+  budget form with one amount 1 of 5 (control 2), real wrong form drafts 6 (control 7; the mark was 3), agreements 37 of 49
+  (the mark was 42), real programs of two lines 11 of 18 (control 12), the 180 real 147 (control 150, last round 153). With
+  no way to close a form early the model decides the same field is left out. Most of the parity gain is the six epochs,
+  which the control has too. **Decided:** six epochs is the schedule; the slot decoding stays as a second decoding, not the
+  default; no pilot is served by `pod-small-slots-s1` on this evidence.
 - **Revisit if** the contract gains a function with many more arguments (a decision for each slot, mostly "left out", is
   cheap now: a mean of 8.8 decisions an example against 8.8 before, the longest 145); forms come to be shown some other way
   than a line with its fields (the slots are read off that line, in two languages); a seat needs a program of more lines
