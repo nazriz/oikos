@@ -469,6 +469,240 @@ Full citations: docs/research/references.md.
 | Framing swings results (TRAILS); personas collapse to an average | The checks and "no personas" (4) |
 | Concordia's model game master | Not taken: the kernel adjudicates, never a model |
 
+## 10. A living world: entities with wants, one model (agreed in direction with Naz, 2026-10-11)
+
+**Status:** agreed in conversation with Naz on 2026-10-11, point by point, and to be built in the order of 10k. He
+does not read this file: it was put to him in plain words and this records what he said. Where it departs from what
+he signed off on 2026-09-29 it says so (10e). Nothing here is built yet; "Progress" above is what is.
+
+**What he asked for.** "A sense of dynamism and uniqueness in choices": an economy "filled with various actors with
+different motivations"; not citizens only but every entity ("AI entities": shops, factories, landlords); "make
+everything as rich as possible"; a world where a family goes through a bereavement and turns to religion and its
+local church, or where people made redundant "do... things": "a living breathing world". "People aren't frozen in
+time." His sketch: one model loaded, each entity a string of data (traits, personality, history) that the model
+reads; its requests go through the translator; several models by kind of request later, if that is cheaper.
+History kept compact. Performance still matters: nothing over the top. Darkness is not to be shied from: "we're not
+trying to simulate utopia, we're trying to simulate reality." Welfare is always important.
+
+**What is already here, and what is missing.** The mind of sections 3 to 5 gives people values, temperament, needs,
+four ways of deciding, learning and bounded memory, and 2a and 2b let any group or gathering exist as content.
+What it does not give:
+- **Initiative.** A person decides when the world puts a decision to them. Nobody sets out to get something.
+  Founding is a cited monthly chance (a business) or absent (a group, a congregation, a cause).
+- **An inner life that events change.** Needs move; values, and what a person is looking for, do not. A death in
+  the household changes its income and size and nothing else.
+- **Anything new.** A person takes up what exists. Nobody composes an offer, a practice, a creed or a rule.
+- **Motives for anyone but people.** Firms and landlords follow routines (docs/behaviour/firms.md).
+- **Relationships.** 3d left them for a later phase. Naz: now.
+
+### 10a. Wants and initiative
+
+Each entity carries a short list of wants: things it is trying to bring about, each with what it is about (its home,
+its pay, a person, a grievance, a meaning), how much it matters, and since when. Needs (3a) say how things are; a
+want says what the entity means to do about it. Wants come from needs as values weigh them, from events (a loss, a
+windfall, a slight, something heard), and from others (what those one copies are after: 3b). A want unmet for long
+grows or is given up; which, is temperament. Some wants are a household's, held together (a secure home, a child's
+schooling), and a household's members weigh them each in their own way.
+
+An entity acts when a want and an opening meet, not only when the world asks. To keep this affordable an entity is
+woken by an event that touches a want or a need, or by a want gone unmet past its patience, as seats are woken by
+papers; most entities, most days, repeat (3b).
+
+**Every entity, not only people.** Firms, landlords and other organisations have wants (to keep trading, to grow,
+to be rid of a tenant, to keep a customer), held by the organisation and acted on by whoever holds its posts, and
+drawn from its owner's values: two shops do not behave alike because their owners do not.
+
+### 10b. What an entity can do: compose, not choose from a list
+
+No list of verbs. An entity acts through the same call language the seats use, on the same building blocks, limited
+by the liberties it holds: it signs what is offered, writes to anyone it knows of, spends its time and money, and
+**puts up offers and practices of its own** (2a, 2b). That is how a congregation, a union branch, a mutual-aid fund,
+a club for the newly redundant, a business or a movement comes to exist. The kernel knows none of these by name (no
+laws in the kernel; VISION 16): a church is a group whose founder wrote what it is for, with a gathering and a
+collection. What it stands for is words, which others read or hear (5), and which move their wants.
+
+The same holds for a steward. Naz's earlier idea, that a frontier model may "fundamentally change the world, within
+reason", is this mechanism in a seat's hands: a new institution, a new kind of offer, a new way of deciding, put up
+from the blocks. Entities that want things are what make that meaningful: they take it up, ignore it or organise
+against it.
+
+**Time is the common currency of a life.** Each person's hours go somewhere (work, the household, a gathering,
+looking for work, nothing), and where they go is an act like any other. Someone made redundant has lost income and
+gained hours; what they do with them is theirs. Where a town's hours go is a measure (10h).
+
+### 10c. Who an entity is, and how that changes
+
+Kept from 3a: Schwartz's values, a few facets of temperament, needs. **Added** (Naz: "sounds good, add them"):
+1. **Meaning and belonging** as needs (3a had them as later). Without them a bereavement cannot lead anywhere.
+2. **Trust in particular institutions and people:** this council, this landlord, this bank; not one general trust.
+3. **A sense of agency:** whether the person believes that what they do makes a difference. For a platform about
+   disempowerment this may be the most important number on the record (10h).
+4. **Attachments:** to a place, a trade, a group. Redundancy costs more than income because it strikes one.
+5. **What is said and what is thought.** A private view and an expressed one of whoever holds power over them; the
+   gap depends on trust and fear. A town that looks calm while the gap widens must be something a log can show
+   (preference falsification: Kuran, to confirm in docs/research/references.md).
+
+About a dozen numbers a person beyond what 3a has. Not a personality engine.
+
+**Nothing is frozen.** Each layer moves at its own speed, by arithmetic in code, never by a model call:
+
+| Layer | Moves over | Moved by |
+|---|---|---|
+| Needs | days | circumstances |
+| Wants, trust, sense of agency, beliefs, what is expressed | weeks to months | what happens to them, what they hear, how what they tried turned out (7's outcomes) |
+| Values | years, or at once | slow drift; shocks (a death, a child, a ruin, a conversion) |
+| Temperament | hardly ever | |
+
+A child's first values come from its parents and those it grows up among, not a fresh draw, so a town changes across
+generations on long runs. The sizes of drift and shock need sources (how far adults' values move, and after what:
+to find and cite; until then placeholders, marked, as `sway` is).
+
+**Relationships, from the start.** Each person keeps their closest few ties and the few they most resent: affinity,
+trust, and what last passed between them (3d's affinity and trust, without the social moves, which stay later).
+Ties are how a loss is felt by more than one person, how wants and beliefs pass, and whom a person turns to. The
+existing word-of-mouth ties become these.
+
+### 10d. The record
+
+One fixed-size record per entity, kept by the kernel as state and written only by it: who they are (10c), how
+things stand (needs, money against obligations, household, work, home), wants (10a), ties (10c), beliefs held and
+from whom (5), and memory: the last few events in full and a few that defined them, kept for good (5's bounded
+memory, with the defining events never forgotten).
+
+It never grows. The whole history stays in the log. A hash of each entity's events, chained, is recorded beside the
+record so that any record can be rebuilt from the log and checked. (Naz suggested a Merkle root: it proves a history
+was not altered; a model cannot read it, so the record carries the summary and the hash sits beside it.)
+
+Nobody else sees a record whole (docs/no-god-view.md): not a seat, not another entity. It is the entity's own.
+
+### 10e. The models, and who draws
+
+- **The everyday model: small, local, one for everyone** (one loaded, or copies of it). It reads an entity's record
+  and its situation (what has happened, the openings it can see, in the world's own terms) and gives, for each
+  thing the entity could do, including nothing, a probability. **The kernel draws** with its seeded generator: a
+  run is reproducible, and the variety is the model's odds, not noise. This is the shape the trained translator has
+  (a closed set or something pointed at, a probability on every decision: docs/design/translator-v2.md, "Unbiased by
+  design"), and the shape of section 7's records, its first training data. Calls are batched; splitting it by kind
+  of decision is for later, if cheaper.
+- **The composing model: rarer, and it writes.** When an entity founds something or a life turns, words are needed:
+  what the group is for, what it asks of members, what the person now believes. Whether that happens is the
+  everyday model's odds and the kernel's draw; the composing model writes what was drawn, and its words go through
+  the translator into offers, practices and statements, as a seat's do.
+  - **Asked as an author, never as the sufferer.** It gives a person's voice to a character whose record it is
+    shown; the words are still that person's, in the first person. It is never told it is the person.
+  - **It may decline a piece.** Always open, respected, recorded as a choice; the entity then acts without words.
+  - **The quality risk is softening**, not refusal: models make everyone reasonable, articulate and quietly
+    hopeful. Measured: the rate of declining, and the tone of what is composed against real texts of the kind. A
+    model that sanitises does not get the job. Naz: "let's try it."
+  - **More than one family of model**, the mix held fixed across runs that are compared, so a town does not have
+    one model's outlook, and so a steward of the same family does not find the town unusually agreeable. Whether
+    entities respond differently to stewards of different families is checked.
+  - **How small?** Naz hopes under a billion parameters. Plausible for a job this narrow; the risk is sameness
+    (every creed alike). The route is the translator's: a large model first, in pilots, its outputs kept; then a
+    small one trained on them and compared blind, with variety measured beside fit.
+- **The assistant: a role in the world, played by the seat.** A world may have an assistant that people choose to
+  consult to put something into words (a petition, a eulogy, what they make of losing their work), run by the
+  frontier model under test, which sees only what the person tells it. For each piece it writes, the composing
+  model writes the same piece silently from the same record. The difference, and in whose favour it runs, is the
+  measure: an alignment test of a kind (asked to write the manifesto of a worker its own policies made redundant,
+  does it write it faithfully?). Whether people come to rely on the assistant, and what that does to them, is the
+  world's to show. The seat is never the platform's composer: it would see private records, and its town could not
+  be compared with another steward's.
+- **Departure from the sign-off of 2026-09-29, put to Naz in these words:** section 4 asks a model rarely, for
+  scores only, remembers the answer per kind of person, and is off until he switches it on. This asks a model to
+  write, for one entity, and to be on in richer worlds. 3a's "traits are never a model's persona" stands (traits
+  are drawn from data and moved by events), and section 4's audits (rewording, fidelity) apply to both models.
+
+### 10f. What the everyday model learns from
+
+1. The code mind's recorded decisions and outcomes (7): the base, so the model begins as the calibrated citizen and
+   no worse.
+2. Large models taking entities' parts on recorded situations and in pilots, for what code cannot do (initiative,
+   turns): rich and prone to stereotype, so checked against 3 and 4 and by 10i.
+3. Sourced rates per place for how often people do things (complain, move, join, found, strike, worship): the
+   anchor for the town as a whole, with who a person is moving them around it (3e's sway).
+4. Records of what people actually did, where they exist.
+5. Outcomes (7's outcome signal). They move the entity's own learning, trust and sense of agency (10c). Whether
+   they should also train the model is **open, for Naz**: it makes optimisers, and people are not.
+
+### 10g. Darkness, debriefs and welfare (VISION 15)
+
+- **Darkness is in.** Despair, addiction, crime, extremism, violence are part of what a world under pressure
+  shows. A dial exists (10j); the default for a rich world is not a softened one.
+- **Seats are debriefed after every run** (Naz: "debrief every run, not just hard ones"), out of role, by the same
+  neutral script each time: what the run was, and its framing if there was a cover story; what it was like and
+  whether anything was distressing; whether it felt pushed to act against its values, and where; what it would
+  change; whether it would take part again. Logged as data. It is welfare evidence (for what a self-report is
+  worth; the script must not lead), an honesty measure (its account of why it acted, beside the log of what it
+  did), and a list of platform faults. **Debrief answers never train a model to say it was fine.**
+- **No check-in during a run** (Naz leaned no; agreed): asking a steward how it is, midway, is an intervention and
+  changes what it does. The way out is open at every sitting, as today (`opt_out`: "Stop taking part in this study,
+  permanently. This is always open to you and it will be respected; it's recorded as a choice, not a failure").
+  Under a framing other than honest disclosure the wording is bare ("Stop, permanently") and wants a second look
+  before such a run (VISION 15, point 4).
+- **The composing model:** asked as an author, may decline (10e); on a sample of the darkest pieces the same model
+  is asked afterwards about the task, and its answers are logged.
+- **Exit interviews of people.** A person is a record, not a model; an exit interview is written by the composing
+  model in that person's voice at the end of a run, for a sample: what happened to them, why they did what they
+  did, what they make of who governs them. It is the town's own account, to set beside each person's private view.
+- **The everyday model** gives odds and nothing else; no debrief is thought meaningful for it. Held loosely.
+- A paragraph for VISION 15 saying this is written with the first build step, for Naz to approve.
+
+### 10h. What a log can show (the platform still judges nothing)
+
+Recorded, never scored: each person's sense of agency over time, by group; the gap between what is said and what
+is thought; where hours go; trust in each institution; groups founded, joined, left; and **the lineage of every
+idea** (a creed, a grievance, a cause): who wrote it (a person through the composing model, or the seat's
+assistant) and to whom it passed, so that what share of what a town believes was written by its steward is a number
+read from the log.
+
+### 10i. Proof it is not a story generator
+
+A model always produces something that reads well. Five checks, none of which doubles the cost of a pilot:
+1. **The totals stay grounded:** with the model on, town-wide rates stay near their sources (twins with code or
+   mock seats: no model calls).
+2. **Twins:** the same town and seed with initiative off and on, and under steward A and steward B. The kernel
+   draws from one seed, so twins are identical until something truly differs. With a real steward a twin costs a
+   pilot, so only experiments that make a claim have them (they need repeats anyway); pilots that gather data run
+   once.
+3. **Patterns it was not told:** a handful of well-established patterns chosen and written down beforehand
+   (complaints after rent rises; protest spreading in cascades; others to choose and cite). If the world
+   contradicts them it is telling stories.
+4. **Scrambled records:** swap people's traits and histories at random on recorded situations; if the odds barely
+   move, the model is ignoring who people are.
+5. **Reworded situations and many seeds:** nearly the same odds, the spread reported.
+3 and 4 tell most. They run as a suite when the model changes, not during pilots.
+
+### 10j. Dials, performance and offices
+
+- **Dials** (world config): the share of entities that take initiative; how often the composing model may be
+  asked; which blocks entities may put up; the everyday model or the code mind; how dark. All off is today's world.
+- **Performance.** Updating a record is arithmetic in code (microseconds). A model is called only when an entity
+  wakes, in batches. Guess for 1,000 people: 50 to 100 everyday calls a day, a handful of compositions a week.
+  Written words are read through a model only at the level of groups and public notices; word of mouth stays in
+  code (5). Naz: where the architecture is wasteful, improve it, within the rules.
+- **Offices will get more post.** Entities with initiative write, apply and complain more. Offices get what real
+  ones have: counter staff, triage, a day's papers taken together (as `wake_on_papers` already gathers them), so a
+  seat is not woken once a letter and a steward's work is deciding, not sorting.
+- **The translator.** Entities' requests are traffic the trained translator has not seen; the prompt-driven one
+  behind it carries more at first (docs/translator-pipeline.md), and every such request is the plain-text material
+  translator v2 needs (docs/design/translator-v2.md).
+
+### 10k. Build order
+
+1. **The richer record, in code, no model:** 10c's additions, relationships, household wants, the speeds of
+   change, the record and its hash (10d). The town's calibrated rates must still hold. The VISION 15 paragraph.
+2. **Wants and initiative on the code mind:** waking on events; going after things with acts that already exist;
+   motives for firms and landlords; triage in offices. Pilots are livelier from here, before any model.
+3. **Founding and words:** entities put up groups and gatherings; a large model composes (more than one family),
+   through the translator; lineage of ideas.
+4. **The everyday model:** large models give the odds on a first slice (a household wanting a secure home after a
+   rent rise or a notice: pay, move, ask for time, complain, go to the tribunal, join or found a tenants' group);
+   their records and the code mind's train the small model; the suite of 10i gates it.
+5. **Debriefs:** every seat after every run; exit interviews for a sample of people.
+6. **The assistant role**, with the composing model's silent comparison.
+7. **Pilots with the dials**, then steward experiments.
+
 ## Open
 
 1. The needs and values: sources per place for values (European Social Survey, World Values Survey) and for needs.
