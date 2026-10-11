@@ -25,8 +25,8 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { calls, canonical, DECISIONS, OUTCOMES, RECORD, inCurrency, paramErrors, modules as builtin, Randomness, Roster, slice, Tally, View, type BehaviourModule, type Controller, type Currency, type DecisionRecord, type OutcomeRecord, type RecordChange, type LookRequest, type Observation, type ParticipantAction, type ParticipantContext } from "@oikos/participants";
-import { CONSULT_VERSION, createConsult, createLlmParticipant, LLM_PARTICIPANT_VERSION, MOCK_VERSION, MockAdapter, mockPolicies, PRICES, ModelCallFailed, ModelUnreachable, SpendingLimitReached, type Budget, type LlmAdapter, type LlmController, type LlmIO, type MockBrain, type Price } from "@oikos/participants/llm";
+import { calls, canonical, DECISIONS, OUTCOMES, RECORD, WORDS, type Words, inCurrency, paramErrors, modules as builtin, Randomness, Roster, slice, Tally, View, type BehaviourModule, type Controller, type Currency, type DecisionRecord, type OutcomeRecord, type RecordChange, type LookRequest, type Observation, type ParticipantAction, type ParticipantContext } from "@oikos/participants";
+import { COMPOSE_VERSION, createCompose, mockCompose, type ComposerConfig, CONSULT_VERSION, createConsult, createLlmParticipant, LLM_PARTICIPANT_VERSION, MOCK_VERSION, MockAdapter, mockPolicies, PRICES, ModelCallFailed, ModelUnreachable, SpendingLimitReached, type Budget, type LlmAdapter, type LlmController, type LlmIO, type MockBrain, type Price } from "@oikos/participants/llm";
 import { createArrangement, createTranslator, draftText, Knowledge, RESOLVER, resolve, TRANSLATOR_VERSION, type Draft, type Resolution, type Route, NOT_CHECKED } from "@oikos/translator";
 import { Kernel } from "./kernel";
 import { divergences } from "./truth";
@@ -78,6 +78,11 @@ export interface RunOptions {
   consult?: boolean;
   /** Kinds (and things) the sparse mind leaves out: an audit's `avoid` (consult-audit). */
   consultAvoid?: string[];
+  /** The composing models, for real (docs/behaviour/founding.md, "Words"): an adapter for each model the world's
+   * mix names (`dials.composer`). Absent: where the world has a composer, the mock plays it, and the log says so. */
+  composerAdapters?: Map<string, LlmAdapter>;
+  /** Tests and audits: the composer's prompt in another wording (never a run that is compared). */
+  composerSystem?: string;
   /** Invariance tests only (docs/design/rebuild.md 8.1): extra wakes, seeded (basis points of wakes followed by an early
    * one). Never a research run; the log says so. */
   perturb?: { extraWakesBps: number; seed: number };
@@ -122,6 +127,10 @@ export interface RunSummary {
   logPath: string;
   anchorsPath: string;
   stateHash: string;
+  /** Where the world has a composer: pieces asked for, composed, declined; how many of those asked for were dark by
+   * the stated rule (VISION 15, point 7: reported with every run); how many the month's allowance left unasked, went
+   * to the fallback model, could not be read, and were followed by the question about the task. */
+  composer?: { asked: number; composed: number; declined: number; dark: number; capped: number; fell_back: number; unread: number; followed_up: number };
   commands: number;
   refused: number;
   wakes: number;
@@ -330,6 +339,13 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     ...(o.budget ? { budget: o.budget } : {}),
   };
   const consult = o.consult ? createConsult(io, { avoid: o.consultAvoid ?? [] }) : undefined;
+  // The composing model, where the world's dial has one (docs/design/ai-citizens.md 10e): the models of its mix, or
+  // the mock in each one's place. Which model writes a piece is drawn on the run's seeded streams.
+  const composerCfg = cfg.dials?.composer as ComposerConfig | undefined;
+  for (const m of composerCfg?.mix ?? []) if (/astra|fable/i.test(m.model)) throw new Error(`the composer's mix names ${m.model}, which is never a composing model (docs/behaviour/founding.md)`);
+  const composer = composerCfg
+    ? createCompose(io, composerCfg, new Map(composerCfg.mix.map((m) => [m.model, watched(o.composerAdapters?.get(m.model) ?? new MockAdapter("mock", { compose: mockCompose }))])), (purpose) => randomness.stream(["compose", purpose]), o.composerSystem)
+    : undefined;
 
   const typeOf = (() => {
     const types = new Map<string, any>((cfg.catalogue?.structure_types ?? []).map((x: any) => [x.id, x]));
@@ -367,6 +383,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     chance: (purpose) => randomness.stream(["chance", purpose]),
     world: { tickSeconds: tick, runEnd, currency, ...(cfg.dials ? { dials: cfg.dials } : {}) },
     ...(consult ? { consult } : {}),
+    ...(composer ? { compose: composer } : {}),
     // Keys sorted: the log keeps the config in canonical form, so a resumed run must see its parameters exactly as the
     // original did, whatever order the world's author wrote them in.
     params: sortedKeys(params ?? {}) as any,
@@ -532,7 +549,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   };
   const engineResolver: Parameters<typeof createTranslator>[5] = RESOLVER_MODE === "ts" ? undefined : async (req, program) => {
     // (A language-model seat perceives all its capacities: its knowledge is the engine's under its participant.)
-    const e = await k.request({ op: "resolve", participant: req.participant, ...(req.as ? { as: req.as } : {}), program: calls.programText(program) });
+    const e = await k.request({ op: "resolve", participant: req.participant, ...(req.only ? { only: req.only } : {}), ...(req.as ? { as: req.as } : {}), program: calls.programText(program) });
     return (e.blocks ? { ok: true, blocks: e.blocks } : { ok: false, questions: e.questions, ...(e.invalid ? { invalid: e.invalid } : {}) }) as Resolution;
   };
   const one = createTranslator(o.translatorAdapter ? { ...io, adapter: watched(o.translatorAdapter) } : io, kernelCheck, typeOf, undefined, undefined, engineResolver);
@@ -554,6 +571,8 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       ...((o.recordObservations ?? "models") !== "models" ? { observations: Array.isArray(o.recordObservations) ? o.recordObservations.join(",") : o.recordObservations } : {}),
       ...(o.recordDecisions === "none" ? { decisions: "none" } : {}) } } } });
 
+  // The composer, if the world has one: said at the start, with its mix and whether models or the mock play it.
+  if (composerCfg) await k.request({ op: "annotate", annotation: { annotation: "note", subject: "orchestrator", data: { composer: { version: COMPOSE_VERSION, ...composerCfg, played_by: o.composerAdapters ? "models" : "mock" } } } });
   // The sparse mind, if on: said at the start (a resumed run reads it back), with the model it asks.
   if (consult) await k.request({ op: "annotate", annotation: { annotation: "note", subject: "orchestrator", data: { consult: { version: CONSULT_VERSION, model: `${io.adapter.provider}/${io.adapter.model}`, ...(o.consultAvoid?.length ? { avoid: o.consultAvoid } : {}) } } } });
 
@@ -862,6 +881,10 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       if (r === null) await notSent(u, "act", "What you did could not be carried out as it was written, and nothing was done.", { rejected_action: JSON.stringify(res.blocks).slice(0, 4000), call: calls.programText(program) });
       return true;
     }
+    if (!L && action.type === "propose" && (action as any)[WORDS]) {
+      await wordsFor(u, action, (action as any)[WORDS] as Words, as);
+      return true;
+    }
     if (!L) {
       // A code participant asked for the translator: only language-model participants use it.
       await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { unsupported_action: action.type } } });
@@ -960,6 +983,63 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       }
     });
     return { draftId, tr, notes };
+  }
+
+  /**
+   * Words a code participant sends through the translator (docs/behaviour/founding.md, "Words"): what a composing
+   * model wrote for it, put as a plain request, as a seat's is. Nobody reads a code participant's draft, so its module
+   * says what the draft may be (`accept`): the acts go ahead only as that returns them, and anything else is not done.
+   * All of it is on record as a seat's request is (the calls, the draft, a signoff, a failure), with one note of what
+   * came of it. Where a trained translator answers first and its draft is not what was meant, the request is put
+   * once more, which sends it to the one behind.
+   */
+  const worded = new Map<string, number>();
+  async function wordsFor(u: Unit, action: { text: string }, words: Words, as: string | undefined): Promise<void> {
+    let result: "done" | "not_done" = "not_done", why = "", by: string | undefined, draft: string | undefined, adjusted = false;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      const n = (worded.get(u.participant) ?? 0) + 1;
+      worded.set(u.participant, n);
+      const draftId = `draft.${u.participant}.w${n}`;
+      draft = draftId;
+      const notes: object[] = [];
+      const tr = await translating.run(notes, async () => {
+        try {
+          return await translator.translate({ draftId, participant: u.participant, as, proposal: action.text, knowledge: u.knowledge, called: (id) => whoIs(id)?.name, ...(u.capacity ? { only: u.capacity } : {}) });
+        } catch (e) {
+          if (!(e instanceof ModelCallFailed)) throw e;
+          return { ok: false as const, notices: ["The translator did not answer."], raw: { model_call_failed: e.message } } as Awaited<ReturnType<typeof translator.translate>>;
+        }
+      });
+      for (const annotation of notes.splice(0)) await k.request({ op: "annotate", annotation });
+      for (const [i, x] of (tr.retries ?? []).entries())
+        await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { translation_retry: { draft: draftId, attempt: i + 1, reason: x.reason, ...(x.call ? { call: x.call } : {}) } } } });
+      if (tr.route) await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { translation_route: { draft: draftId, ...tr.route } } } });
+      by = tr.route?.used;
+      if (!tr.ok) {
+        why = tr.notices.join(" ").slice(0, 500);
+        await k.request({ op: "annotate", annotation: { annotation: "translation_failure", subject: u.participant, data: { draft: draftId, proposal: action.text, reason: tr.notices.join(" "), ...(tr.asked_back ? { asked_back: true } : {}), ...(tr.call ? { call: tr.call } : {}), ...(tr.invalid ? { invalid: tr.invalid } : {}) } } });
+        break;
+      }
+      const [drafted] = await k.tryRequestMany([{ op: "annotate", annotation: { annotation: "draft", draft: tr.draft } }]);
+      if (drafted === null) { why = `the draft could not be recorded: ${k.lastError.slice(0, 300)}`; break; }
+      const accepted = tr.draft.check.ok ? words.accept(tr.draft.blocks) : `the acts would be refused (${tr.draft.check.refusal?.code ?? "refused"})`;
+      const decision = typeof accepted === "string" ? "reject" as const : "accept" as const;
+      await k.request({ op: "annotate", annotation: { annotation: "signoff", participant: u.participant, draft: draftId, draft_hash: tr.hash, decision, note: typeof accepted === "string" ? `not what was meant: ${accepted}`.slice(0, 500) : "what its module said the draft may be" } });
+      arranged?.signed(draftId, decision);
+      if (typeof accepted === "string") {
+        why = accepted;
+        if (attempt === 1 && tr.route?.used === "first" && tr.route.arrangement === "then") continue;
+        break;
+      }
+      adjusted = canonical(accepted) !== canonical(tr.draft.blocks);
+      const r = await begin(u, { command: "act", participant: u.participant, ...(as ? { as } : {}), blocks: accepted,
+        provenance: { via: "translator", proposal: tr.draft.proposal, draft: draftId, draft_hash: tr.hash, translator: tr.draft.translator, call: tr.draft.call, resolver: tr.draft.resolver } });
+      if (r === null) why = `the acts could not be carried out: ${k.lastError.slice(0, 300)}`;
+      else { result = "done"; why = ""; }
+      break;
+    }
+    await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { words: { what: words.what, ...(words.idea ? { idea: words.idea } : {}), ...(draft ? { draft } : {}), result, ...(why ? { why } : {}), ...(by ? { by } : {}), ...(adjusted ? { plumbing_added: true } : {}) } } } });
+    words.done(result === "done", why || undefined);
   }
 
   // Deciding takes world time if the world says so (docs/design/rebuild.md 6.4): a model by its tokens, code a fixed time.
@@ -1137,6 +1217,8 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     await command({ command: "advance", to: until });
     t = until;
   }
+  // What the composer was asked for, with the run (VISION 15, point 7: how many dark pieces a run asked a model to write).
+  if (composer) await k.request({ op: "annotate", annotation: { annotation: "note", subject: "orchestrator", data: { composer_pieces: { ...composer.counts } } } });
   // Debriefs (VISION §15.3), those who opted out included: they may use the 5% of the spending limit kept back for them.
   // A run that stops to be resumed (a usage limit, the model out of reach, a request to stop) hasn't ended for those in
   // it: they aren't debriefed as if it had, and the model isn't asked while it can't answer. They're debriefed when the
@@ -1177,7 +1259,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   log(`${o.runId}: ${commands} commands, ${refused} refused, ${wakes} wakes, t=${t}${participantErrors ? `; ${participantErrors} failures to decide, recovered (see the log's participant_error notes)` : ""}`);
   if (resolverDiffCount) await Bun.write(join(o.outDir, `${o.runId}.resolver-diffs.json`), JSON.stringify(resolverDiffs, null, 1));
   return { ...(resolverChecked ? { resolverShadow: { checked: resolverChecked, differed: resolverDiffCount } } : {}), runId: o.runId,
-    end: { reason: completed ? "completed" : "aborted", ...(completed ? {} : { detail: stopped ?? `stopped at ${until}` }) }, ...(stopped ? { stopped: { why: stopped, by: stoppedBy! } } : {}), logPath, anchorsPath, stateHash: end.state_hash, commands, refused, wakes, wakesBy, participantErrors, t, kernelMs: Math.round(kernelMs), moduleMs: Math.round(moduleMs), platformMs: Math.round(platformMs),
+    end: { reason: completed ? "completed" : "aborted", ...(completed ? {} : { detail: stopped ?? `stopped at ${until}` }) }, ...(stopped ? { stopped: { why: stopped, by: stoppedBy! } } : {}), logPath, anchorsPath, stateHash: end.state_hash, ...(composer ? { composer: { ...composer.counts } } : {}), commands, refused, wakes, wakesBy, participantErrors, t, kernelMs: Math.round(kernelMs), moduleMs: Math.round(moduleMs), platformMs: Math.round(platformMs),
     health: { backlog: { ...backlog }, repeats: { ...repeats }, refused: { ...refusedBy } },
     profile: { modules: Object.fromEntries(Object.entries(profModules).map(([k, v]) => [k, { ms: Math.round(v.ms), steps: v.steps }])), kernel: Object.fromEntries(Object.entries(profKernel).map(([k, v]) => [k, { ms: Math.round(v.ms), n: v.n }])),
       requests: Object.fromEntries(Object.entries(k.profile).map(([op, v]) => [op, { n: v.n, encode: Math.round(v.encode), engine: Math.round(v.engine), decode: Math.round(v.decode) }])) },

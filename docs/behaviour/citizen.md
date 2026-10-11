@@ -189,6 +189,17 @@ What goes wrong for a person, how often, and what they can do about it is one pa
 - **A need short at the start has been short for a while.** A need found below its level in a town's first week is taken to have been so for a part of the 60 days it takes to become a want, drawn for the person. Before, every clock started at day 0 and nobody wanted anything for two months of any run (the first living pilot: 73 wants in 60 days, nearly all landlords').
 - **What is told to the household is said once, until it changes** (everyone): a member's income is told to the leaseholder when the sum as it is said changes. One household in the first living pilot was sent "My pay is now 0.00" 478 times in 60 days: the figures compared were not the figures said.
 
+## Founding, and what is founded (0.47.0)
+
+One page: [founding.md](founding.md). In a town with the dial for it on (`living.founding`), a person who takes initiative and gives a want up, or can see nothing that would answer it, and who knows at least two others in the same case, may start something of their own: a group that gathers at their home, a fund its members pay into and draw on, a body that takes its members' grievances up, or (by the existing way) a business. Whether and what shape are two draws on the person's own stream, from who they are and what the want is about. What they found is an organisation with them in its first post (`group.founded`), which says what it is for, puts up a gathering and offers membership.
+
+- **Others' foundings are openings like any other.** A standing offer of membership (a public statement of kind `membership`) is read for what its terms bring in typed outcomes and, where its offerer says it takes up matters like ours for its members, whom that bears on; the mind chooses it among the ways for a want, or not. Joining is an application, the membership agreement offered, signed, and dues by standing payment where it asks any.
+- **Leaving.** Someone who has not come for `founding.leave_after_days` gives notice and stops their dues; so does every member of a thing that winds up.
+- **A fund.** A member short of money to fall back on asks for the draw its terms state, at most once a month; the fund pays or says why not.
+- **Eligibility by dealing.** An offer or a gathering may be for those party to an agreement in force with someone (`dealing_with`: their tenants, their workers), which a person checks against their own agreements.
+- **Who shares a want** is only what the person knows: their household, what those they caught up with said, who told them they were wronged, who mourns the same death, who lives in the same building.
+- With the dial off none of it is read, and the town is step 2b's to the state hash.
+
 ## What a citizen does
 
 | | Rule | Source |
@@ -358,5 +369,5 @@ Unless a source is named above, a figure is a placeholder, to calibrate.
 - The other social moves: help, snub, gossip, reputation.
 - Goals with sub-goals; learning which methods work.
 - Misremembering. (Memory is bounded since 0.44.0: the last eight things and four that defined the person.)
-- Founding groups and gatherings, and words of one's own (docs/design/ai-citizens.md 10k, step 3).
+- Founding more than once; taking over what someone else founded; a founded thing acting beyond gathering, a fund and a hearing (a picket, a petition of its own, a rule for its members).
 - The sparse mind on a real model: its robustness audit (`oikos consult-audit`) is built and tested on the mock, not yet run on one.

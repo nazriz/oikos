@@ -1,6 +1,6 @@
 {
   "name": "citizen.default",
-  "version": "0.46.0",
+  "version": "0.47.0",
   "doc": "docs/behaviour/citizen.md",
   "params": {
     "accept_fewer_bedrooms_after_days": {
@@ -260,6 +260,11 @@
       },
       "unit": "bps",
       "default": 0,
+      "source": "placeholder"
+    },
+    "founding": {
+      "schema": {},
+      "default": null,
       "source": "placeholder"
     },
     "frictions": {
@@ -693,6 +698,11 @@
       "unit": "bps",
       "default": {},
       "source": "placeholder"
+    },
+    "unmet_bps": {
+      "schema": {},
+      "unit": "bps",
+      "source": "the world gives it (no default)"
     },
     "utilities": {
       "schema": {},

@@ -56,8 +56,8 @@ test("an office with a standing report sends it and then says what it is and wha
 test("every office a generated town has says how it answers a letter; a firm's manager and a person do not", () => {
   const silent = Object.values(modules).filter((m) => !m.answers).map((m) => m.name).sort();
   // (The bank's payment system ends its statement with how it is instructed; the rest are firms, people, and the
-  // world's own machinery, which nobody writes to.)
-  expect(silent).toEqual(["bank.payment_system", "citizen.default", "city.tax_clerk", "firm.employer", "firm.landlord", "firm.producer", "firm.retailer", "idle", "world.export_demand", "world.migration"]);
+  // world's own machinery, which nobody writes to. A group founded in a run is its founder's, as a firm is its manager's.)
+  expect(silent).toEqual(["bank.payment_system", "citizen.default", "city.tax_clerk", "firm.employer", "firm.landlord", "firm.producer", "firm.retailer", "group.founded", "idle", "world.export_demand", "world.migration"]);
   for (const m of Object.values(modules)) {
     if (!m.answers) continue;
     // Fixed words, in the world's terms: no platform word, and nothing that depends on who wrote.

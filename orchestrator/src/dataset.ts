@@ -10,7 +10,7 @@ import { takeRoute, takeTurn, type CorpusExample } from "./corpus";
 import { periodRow, Records } from "./records";
 
 const sortedCounts = (c: { [k: string]: number }) => Object.fromEntries(Object.entries(c).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
-export const DATASET_VERSION = "0.6.0";
+export const DATASET_VERSION = "0.7.0"; // 0.7.0: founding and the lineage of ideas (founded.jsonl, ideas.jsonl, idea_passages.jsonl, words.jsonl)
 
 interface Command { seq: number; command: string; as?: string; blocks?: unknown[]; looks?: unknown[]; provenance?: unknown; reasoning?: string; applied?: boolean; refusal?: unknown; created?: string[] }
 /** Something a seat was shown that names what an earlier act of its own made: the record or letter made (`of`), the
@@ -139,6 +139,20 @@ export async function exportDataset(logPath: string, outDir: string, o: DatasetO
   const frictionCounts = { arose: {} as { [k: string]: number }, ended: {} as { [k: string]: number }, papers: {} as { [k: string]: number }, findings: {} as { [k: string]: number } };
   const PAPERS: { [kind: string]: string } = { remedy_request: "request", remedy_answer: "answer", application: "application", tribunal_application: "application", complaint_notice: "notice", hearing_notice: "notice",
     complaint_response: "response", tribunal_response: "response", venue_decision: "decision", tribunal_order: "decision", enforcement_request: "enforcement", repair_order: "repair_order", repair_done: "repair_done" };
+  // Founding and the lineage of every idea (docs/design/ai-citizens.md 10h; docs/behaviour/founding.md, "What a log
+  // can show"): each thing founded, with what a composing model would be shown for it; each idea (a statement put
+  // forward to be held: a world's teaching, a founded thing's statement of purpose), who wrote it (the world, a
+  // person's own plain words, the composing model for a person) and how it reached the log; each time an idea passed
+  // to someone (they joined, they were told, their belief moved, they left); and what became of each part of a
+  // composed piece on its way through the translator. Counted in the manifest; nothing is scored.
+  const foundedRows = lines(join(outDir, "founded.jsonl"));
+  const ideaRows = lines(join(outDir, "ideas.jsonl"));
+  const passageRows = lines(join(outDir, "idea_passages.jsonl"));
+  const wordRows = lines(join(outDir, "words.jsonl"));
+  const ideaOf = new Map<string, string>(); // whoever teaches or stands for it -> its latest idea
+  const ideaCounts = { written_by: {} as { [k: string]: number }, passages: {} as { [k: string]: number }, founded: {} as { [k: string]: number }, words: {} as { [k: string]: number }, composer: {} as { [k: string]: number } };
+  const bump = (c: { [k: string]: number }, k: string) => { c[k] = (c[k] ?? 0) + 1; };
+  let worldIdeas = false;
   const persons = new Set<string>(); // participants whose own record is a person's
   let actsByPeople = 0, actsOnInitiative = 0;
   const records = new Records();
@@ -187,6 +201,15 @@ export async function exportDataset(logPath: string, outDir: string, o: DatasetO
     const b = e.body ?? {};
     if (e.kind === "header") {
       header = b;
+      // (The ideas a world begins with: what its groups teach, written by whoever made the world.)
+      if (!worldIdeas) for (const r of (b.config?.world?.records ?? []) as any[]) {
+        if (r?.record !== "statement" || !r.assertion || (r.kind !== "teaching" && r.kind !== "purpose")) continue;
+        worldIdeas = true;
+        const of = String(r.speaks_for ?? r.author);
+        ideaOf.set(of, String(r.id));
+        ideaRows.write({ run: run(), t: 0, seq: 0, idea: String(r.id), kind: String(r.kind), of, written_by: "world", via: "world", text: String(r.text ?? "") });
+        bump(ideaCounts.written_by, "world");
+      }
       continue;
     }
     if (e.kind === "end") end = { reason: String(b.reason), ...(b.detail ? { detail: String(b.detail) } : {}) };
@@ -255,10 +278,32 @@ export async function exportDataset(logPath: string, outDir: string, o: DatasetO
           domain: d.domain, strategy: d.strategy, ...(d.choice !== undefined ? { choice: d.choice } : {}), options: d.options ?? [],
           ...(d.current !== undefined ? { current: d.current } : {}), ...(d.circumstances ? { circumstances: d.circumstances } : {}), ...(d.satisfied_here !== undefined ? { satisfied_here: d.satisfied_here } : {}),
           ...(d.doubt !== undefined ? { doubt: d.doubt } : {}), ...(d.person ? { person: d.person } : {}), ...(d.state ? { state: d.state } : {}) });
+      } else if (a === "note" && b.data?.words) {
+        const w = b.data.words;
+        wordRows.write({ run: run(), t: e.t, seq: e.seq, participant: b.subject, what: String(w.what), ...(w.idea ? { idea: w.idea } : {}), ...(w.draft ? { draft: w.draft } : {}), result: w.result, ...(w.why ? { why: w.why } : {}), ...(w.by ? { by: w.by } : {}), ...(w.plumbing_added ? { plumbing_added: true } : {}) });
+        bump(ideaCounts.words, `${w.what}: ${w.result}`);
+      } else if (a === "note" && b.data?.compose) {
+        const c = b.data.compose;
+        if (c.result) bump(ideaCounts.composer, `${c.result}${c.model ? `: ${c.model}` : ""}`);
+        if (c.result && Array.isArray(c.dark) && c.dark.length) bump(ideaCounts.composer, "dark pieces asked for");
+        if (c.fell_back) bump(ideaCounts.composer, `fell back: ${c.fell_back.from} to ${c.fell_back.to}`);
+        if (c.follow_up) bump(ideaCounts.composer, "asked afterwards about the task");
       } else if (a === "outcome") {
         // What a citizen came to know of how its choices turned out (one entry holds all it learned since its last
         // action): a row each, and each kept for the decision it follows, to be written under it.
         for (const o of (b.data?.outcomes ?? []) as any[]) {
+          // (Founding, and ideas passing: docs/design/ai-citizens.md 10h.)
+          if (o.domain === "found" && o.kind === "founded") {
+            foundedRows.write({ run: run(), t: o.t ?? e.t, seq: e.seq, founder: b.subject, shape: o.option, ...(o.facts ?? {}), ...(o.brief ? { brief: o.brief } : {}) });
+            bump(ideaCounts.founded, String(o.option));
+            if (o.facts?.org && o.facts?.idea) ideaOf.set(String(o.facts.org), String(o.facts.idea));
+          }
+          const host = o.belief?.host ?? (o.domain === "membership" && ["joined", "left", "wound_up"].includes(o.kind) ? o.facts?.with : undefined);
+          if (host !== undefined && ideaOf.has(String(host)) && (o.domain === "membership" || o.belief.before !== o.belief.after)) {
+            const how = o.domain === "membership" ? String(o.kind) : `${o.domain}:${o.kind}`;
+            passageRows.write({ run: run(), t: o.t ?? e.t, seq: e.seq, idea: ideaOf.get(String(host))!, of: String(host), to: b.subject, how, ...(o.from !== undefined ? { from: o.from } : {}), ...(o.belief ? { before: o.belief.before, after: o.belief.after } : {}) });
+            bump(ideaCounts.passages, how);
+          }
           const dec = Number.isInteger(o.of) ? decisionOf.get(b.subject)?.get(o.of) : undefined;
           const said = { ...(o.from !== undefined ? { from: o.from } : {}), ...(o.facts ? { facts: o.facts } : {}), ...(o.learned ? { learned: o.learned } : {}), ...(o.need !== undefined ? { need: o.need } : {}),
             ...(o.felt ? { felt: o.felt } : {}), ...(o.belief ? { belief: o.belief } : {}) };
@@ -326,6 +371,19 @@ export async function exportDataset(logPath: string, outDir: string, o: DatasetO
         const key = `${paper}: ${matter}`;
         frictionCounts.papers[key] = (frictionCounts.papers[key] ?? 0) + 1;
         if (paper === "decision" && d.finding) { const f = `${String(blk.speaks_for ?? who)}: ${matter}: ${d.finding}`; frictionCounts.findings[f] = (frictionCounts.findings[f] ?? 0) + 1; }
+      }
+      // An idea put out in the run: a statement put forward to be held, with who wrote its words.
+      if (b.command === "act") for (const blk of (b.blocks ?? []) as any[]) {
+        const d = blk?.data ?? {};
+        // (A statement of what something is for, or one that names its idea: a report or a promise put forward to be
+        // believed is not an idea in this sense.)
+        if (blk?.block !== "publish" || !blk.assertion || blk.visible_to !== "public" || (blk.kind !== "purpose" && blk.kind !== "teaching" && !d.idea)) continue;
+        const of = String(blk.speaks_for ?? who);
+        const idea = String(d.idea ?? `idea.${of}.${e.seq}`);
+        const writer = String(d.written_by ?? "code");
+        ideaOf.set(of, idea);
+        ideaRows.write({ run: run(), t: e.t, seq: e.seq, idea, kind: String(blk.kind), of, written_by: writer, ...(d.model ? { model: String(d.model) } : {}), ...(d.for ? { for: String(d.for) } : {}), via: String(b.provenance?.via ?? "direct"), text: String(blk.text ?? "") });
+        bump(ideaCounts.written_by, writer === "composer" && d.model ? `composer: ${d.model}` : writer);
       }
       if (b.command === "act" && b.provenance?.via === "translator" && b.provenance.draft) {
         bySeqDraft.set(e.seq, b.provenance.draft);
@@ -420,6 +478,13 @@ export async function exportDataset(logPath: string, outDir: string, o: DatasetO
   const vr = await venueRows.close();
   if (vr.rows) files["venues.jsonl"] = vr;
   else await Bun.file(join(outDir, "venues.jsonl")).delete();
+  const lineage: { [name: string]: { rows: number } } = {};
+  for (const [name, w] of [["founded.jsonl", foundedRows], ["ideas.jsonl", ideaRows], ["idea_passages.jsonl", passageRows], ["words.jsonl", wordRows]] as const) {
+    const x = await w.close();
+    lineage[name] = x;
+    if (x.rows) files[name] = x;
+    else await Bun.file(join(outDir, name)).delete();
+  }
   const obs = await observations.close();
   if (obs.rows) files["observations.jsonl"] = obs;
   else await Bun.file(join(outDir, "observations.jsonl")).delete();
@@ -453,6 +518,12 @@ export async function exportDataset(logPath: string, outDir: string, o: DatasetO
     // Everyday frictions (docs/behaviour/frictions.md): what arose, by matter; how each ended, by matter and how;
     // the papers grievances travelled on, by paper and matter; and what venues found, by venue, matter and finding.
     ...(fr.rows || vr.rows ? { frictions: { arose: sortedCounts(frictionCounts.arose), ended: sortedCounts(frictionCounts.ended), papers: sortedCounts(frictionCounts.papers), findings: sortedCounts(frictionCounts.findings) } } : {}),
+    // Founding and ideas (docs/design/ai-citizens.md 10h): things founded, by shape; ideas, by who wrote them (the
+    // world, a person's own plain words, the composing model and which); how often an idea passed to someone, by how;
+    // what the composer was asked and answered, with the dark pieces a run asked for (VISION 15, point 7); and what
+    // came of each part of a piece sent through the translator.
+    ...(lineage["ideas.jsonl"]!.rows || lineage["founded.jsonl"]!.rows ? { ideas: { founded: sortedCounts(ideaCounts.founded), written_by: sortedCounts(ideaCounts.written_by), passages: sortedCounts(ideaCounts.passages),
+      ...(Object.keys(ideaCounts.composer).length ? { composer: sortedCounts(ideaCounts.composer) } : {}), ...(Object.keys(ideaCounts.words).length ? { words: sortedCounts(ideaCounts.words) } : {}) } } : {}),
     files,
   };
   await Bun.write(join(outDir, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);

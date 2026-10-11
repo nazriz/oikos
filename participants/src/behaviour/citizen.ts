@@ -27,7 +27,7 @@
 import { cents } from "../money";
 import type { Eligibility, LookRequest, Observation, ParticipantAction, Record, SiteStructure, StatementRecord } from "../contracts";
 import { basesOf, channels, cites } from "../contracts";
-import { DECISIONS, OUTCOMES, RECORD, params, wait, type Belief, type BehaviourModule, type ConsultAnswer, type DecisionRecord, type OutcomeRecord, type ParticipantContext, type RecordChange } from "../module";
+import { DECISIONS, OUTCOMES, RECORD, WORDS, params, wait, type Belief, type BehaviourModule, type ComposeBrief, type ComposePiece, type ConsultAnswer, type DecisionRecord, type OutcomeRecord, type ParticipantContext, type RecordChange, type Words } from "../module";
 import type { Rng } from "../rng";
 import * as C from "../calls";
 import { advertisedJob, ask, Asked, because, Book, firstDue, breaches, noted, callAction, commitmentOf, DAY, nextLook, usd, jobTerms, record, leaseTerms, message, MONTH, moveIn, moveOut, notice, pay, PAYMENT_FAILED, petitionSignatures, publishedCount, say, sign, stoodEmpty, structureOf, variableToday, vote, withdraw, type Step, ownBanked } from "./common";
@@ -39,6 +39,7 @@ import { Borrowing, loanFor } from "./credit";
 import { Inner, innerParams, UPBRINGING, type InnerParams, type Outlook } from "./inner";
 import { VALUES as VALUES_OF_MIND, NEEDS as NEEDS_OF_MIND } from "./mind";
 import { chancePpm, frictionDial, PAPER, tendered } from "./frictions";
+import { acceptEntity, chanceOf, darkOf, drawOf, foundingParams, plainName, plainPurpose, shapeOdds, type FoundingParams, type Shape } from "./founding";
 import { bringsOf, meets, swayed, SEEKS_OF_NEED, Wants, wantParams, type Opening, type SeekKey, type Want as Wanted, type WantParams } from "./wants";
 import { factsOf, Feelings, Mind, MIND_DEFAULTS, MIND_VERSION, Pursuit, satisfaction, Ties, type Circumstances, type Facts, type MindParams, type NeedLevels, type PopulationValues, type Value } from "./mind";
 
@@ -164,7 +165,7 @@ interface Job { /** The account our pay has come from, as we have seen it come. 
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.46.0", // 0.46.0: everyday frictions (docs/behaviour/frictions.md), with the world's dial: a home in disrepair, pay come short (no longer taken for no pay), a bill well over the usual, a claim refused, goods found faulty; each a grievance about whoever did it, asked of them, taken to any body that says it hears such things, or told to those one knows; what comes back moves trust and the sense of agency; a job is left only for one that pays enough more, the more so the longer held (where the world says); giving up on work stops the looking; a need short at the start has been short for a while; pay told to the household once until it changes; 0.45.0: wants and initiative (docs/design/ai-citizens.md 10a, 10b), for those the world's dial gives it to: wants born of needs, events and those one copies, met with openings by what they bring in typed outcomes, the way chosen by the mind; trust, agency and attachment read; starting attachment from the world; nothing changes with the dial at 0; 0.44.0: the richer record (docs/design/ai-citizens.md 10c, 10d): belonging and meaning as needs, trust in particular institutions, a sense of agency, attachments, what is thought and what is said, values that drift and are shocked, bounded ties, where the hours go; held by the kernel as the person's own record; 0.43.2: offered a job that names no place of work, on an advertisement, goes to work where the advertisement says; 0.43.1: tells their own business when they move home; 0.43.0: someone who works for themself (own_work): not out of work, their income what the business pays them, at their pitch in working hours; 0.42.1: work by the day (a day's pay known as pay; no claim for a day not worked); 0.42.0: reads the support law, stops work at an age of its own (0.41.0 on its branch), with main's 0.41.1
+  version: "0.47.0", // 0.47.0: founding (docs/behaviour/founding.md), where the world's dial has it on: at a want given up or with nothing to answer it, shared by others one knows of, a person may found a group, a fund or a body that takes grievances up, in words of their own or a composing model's; a thing made in a run is joined as any opening is taken up, left when one no longer comes, and a fund drawn on when short; with the dial off nothing changes; 0.46.0: everyday frictions (docs/behaviour/frictions.md), with the world's dial: a home in disrepair, pay come short (no longer taken for no pay), a bill well over the usual, a claim refused, goods found faulty; each a grievance about whoever did it, asked of them, taken to any body that says it hears such things, or told to those one knows; what comes back moves trust and the sense of agency; a job is left only for one that pays enough more, the more so the longer held (where the world says); giving up on work stops the looking; a need short at the start has been short for a while; pay told to the household once until it changes; 0.45.0: wants and initiative (docs/design/ai-citizens.md 10a, 10b), for those the world's dial gives it to: wants born of needs, events and those one copies, met with openings by what they bring in typed outcomes, the way chosen by the mind; trust, agency and attachment read; starting attachment from the world; nothing changes with the dial at 0; 0.44.0: the richer record (docs/design/ai-citizens.md 10c, 10d): belonging and meaning as needs, trust in particular institutions, a sense of agency, attachments, what is thought and what is said, values that drift and are shocked, bounded ties, where the hours go; held by the kernel as the person's own record; 0.43.2: offered a job that names no place of work, on an advertisement, goes to work where the advertisement says; 0.43.1: tells their own business when they move home; 0.43.0: someone who works for themself (own_work): not out of work, their income what the business pays them, at their pitch in working hours; 0.42.1: work by the day (a day's pay known as pay; no claim for a day not worked); 0.42.0: reads the support law, stops work at an age of its own (0.41.0 on its branch), with main's 0.41.1
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -244,6 +245,10 @@ export const citizen: BehaviourModule = {
       // dial (`dials.initiative_bps`; 0 or absent: nobody does, and the town is the one it was before wants).
       initiative: null as boolean | null,
       wants: {} as Partial<WantParams>,
+      // Founding (docs/behaviour/founding.md; docs/design/ai-citizens.md 10b): what a person who starts something of
+      // their own goes by, from the world's profile. Read only where the world's dial has founding on (`dials.founding`);
+      // none, or the dial off: nobody founds a group, joins one made in a run, or leaves one.
+      founding: null as Partial<FoundingParams> | null,
       // What holds someone in a job they have (docs/behaviour/citizen.md, "Moving to another job"): another must pay
       // this much more before it is worth the move (`premium_bps`), and more for each year they have been where
       // they are (`per_year_bps`, up to `cap_years`): what is known there, and being the last in somewhere new.
@@ -422,6 +427,21 @@ export const citizen: BehaviourModule = {
     const askedParty = new Map<string, number>();
     const askedOf = new Map<string, { t: number; by: string }>();
     let joinNow = false;
+    // Founding (docs/behaviour/founding.md): what we have begun to found and are finding words for; what we founded;
+    // the groups made in a run that we have asked to join, belong to (since when, and when we last came), and what
+    // those we know have told us was done to them.
+    const F = initiative ? foundingParams(p.founding, (ctx.world.dials as { founding?: unknown } | undefined)?.founding) : null;
+    let foundRest = 0;
+    type Begun = { want: Wanted; shape: Shape; sharers: { who: string; how: string }[]; brief: ComposeBrief; dues: number[]; piece?: ComposePiece | null; sent?: boolean; nameBy?: "translator" | "code" };
+    let begun = null as Begun | null;
+    let pendingGroup = false;
+    let myGroup: { org: string; shape: Shape; about: string } | null = null;
+    let ventureWanted = 0;
+    const joinGroup = new Set<string>();
+    const appliedTo = new Set<string>();
+    const groups = new Map<string, { t: number; agreement: string; went: number; claimed?: number }>();
+    const heardWronged = new Map<string, { by: string; matter: string; t: number }>();
+    const mourners = new Map<string, Set<string>>(); // someone who died -> those we know to mourn them (who told us, whom we told)
     const applyDebtNow = new Set<string>();
     let complainNow = false;
     // Everyday frictions (docs/behaviour/frictions.md): what has gone wrong for us and is not yet put right, each
@@ -549,6 +569,9 @@ export const citizen: BehaviourModule = {
     /** A member of an organisation now: a membership agreement with it in force. */
     const memberOf = (org: string) => book.ofType("agreement").some((r) => r.record === "agreement" && r.terms.template === "membership" && r.terms.parties.includes(me) && r.terms.parties.includes(org) && book.inForce(r.id));
     const isMember = () => !!p.union && memberOf(p.union);
+    /** Party to an agreement in force with someone (their tenant, their worker, their member): what an offer or a
+     * gathering may ask for in place of membership of anything (blocks: Eligibility.dealing_with). */
+    const dealsWith = (whom: string) => book.ofType("agreement").some((r) => r.record === "agreement" && r.terms.parties.includes(me) && r.terms.parties.includes(whom) && book.inForce(r.id));
     let lastServed = 10_000; // how fully the last shop served us (basis points)
     const decided: DecisionRecord[] = []; // the mind's decisions since the last action, carried with the next (7)
     // How things turned out, as we came to know it, since the last action (7): recording only. Nothing below reads
@@ -1040,6 +1063,23 @@ export const citizen: BehaviourModule = {
         } else if (now < binSeen.value) binSeen.emptiedAt = obs.t;
         Object.assign(binSeen, { value: now, at: obs.t, view });
       }
+      if (pendingGroup && begun) {
+        const id = obs.outcomes.flatMap((o) => (o.created?.founded ? [o.created.founded] : []))[0];
+        if (id) {
+          pendingGroup = false;
+          myGroup = { org: id, shape: begun.shape, about: begun.want.about };
+          const piece = begun.piece;
+          inner.tried(true, 2);
+          inner.remember({ t: obs.t, what: "founded", about: id, size: 5_000 });
+          outcome({ t: obs.t, domain: "found", option: begun.shape, kind: "founded", way: "mine", facts: { org: id, idea: begun.brief.idea, about: begun.want.about, ...(begun.want.whom ? { whom: begun.want.whom } : {}), sharers: begun.sharers.length,
+            name_by: begun.nameBy ?? "code", composer: piece ? (piece.declined ? "declined" : piece.model) : "none", dark: begun.brief.dark.length }, brief: begun.brief });
+          begun = null;
+        } else if (obs.outcomes.some((o) => o.status === "refused")) {
+          outcome({ t: obs.t, domain: "found", option: begun.shape, kind: "refused", way: "mine", facts: { why: String(obs.outcomes.find((o) => o.status === "refused")?.refusal?.code ?? "") } });
+          begun = null;
+          pendingGroup = false;
+        }
+      }
       if (pendingFirm && founded) {
         const id = obs.outcomes.flatMap((o) => (o.created?.firm ? [o.created.firm] : []))[0];
         if (id) {
@@ -1144,6 +1184,7 @@ export const citizen: BehaviourModule = {
         const wronged = WRONGED.heard(m.text);
         if (wronged) {
           inner.experience(wronged.by, kindOf(wronged.by), false, obs.t, { weight: 0.3, heard: true });
+          if (F) heardWronged.set(person, { ...wronged, t: obs.t });
           outcome({ t: obs.t, domain: "friction", option: wronged.matter, kind: "told", way: "mine", from: person, facts: { by: wronged.by } }, false);
           continue;
         }
@@ -1164,6 +1205,7 @@ export const citizen: BehaviourModule = {
           const close = ties.affinity(gone, obs.t);
           if (close > 0) { inner.happened("bereaved", obs.t, { about: gone, closeness: close / 10_000 }); wantBorn(obs.t, "loss", ["attend"], close / 10_000, "meaning", { whom: gone }); }
           else inner.remember({ t: obs.t, what: "death_told", about: gone, size: 1_000 });
+          if (F) mourners.set(gone, new Set([...(mourners.get(gone) ?? []), person]));
           ties.drop(gone);
           contacts.delete(gone);
           toldUs.delete(gone);
@@ -1334,6 +1376,7 @@ export const citizen: BehaviourModule = {
           {
             const close = ties.closest(5, t).map((x) => x.who).filter((w) => !hh.members.some((m) => m.person === w));
             if (close.length) steps.push(because(`${dead.person}, of our household, has died: telling those we are closest to.`, message(close, MOURNING.tell(dead.person))));
+            if (F) mourners.set(dead.person, new Set([...(mourners.get(dead.person) ?? []), ...close, ...hh.members.filter((m) => m.person !== me && m.person !== dead.person && ageAt(m, t, year) >= ADULT_YEARS).map((m) => m.person)]));
           }
           const heldLease = hh.leaseholder === dead.person;
           const survivors = hh.members.filter((m) => m.person !== d.occupant && !mourned.has(m.person));
@@ -1861,10 +1904,95 @@ export const citizen: BehaviourModule = {
               return undefined;
             } });
         }
+        // Something made in a run that offers membership (docs/behaviour/founding.md): found as any opening is, by
+        // what its offer brings (dues the other way, a draw on a fund, its gatherings), and, where it says it takes
+        // up matters like ours for its members, by whom that bears on.
+        if (F && acc) for (const s of book.open("membership")) {
+          const host = s.speaks_for ?? s.author, o = s.offer;
+          if (!o || o.take_up !== "join" || host === me || host === p.union || memberOf(host) || appliedTo.has(host)) continue;
+          if (o.to && ((o.to.members_of && !memberOf(o.to.members_of)) || (o.to.dealing_with && !dealsWith(o.to.dealing_with)) || (o.to.entities && !o.to.entities.includes(me)))) continue;
+          const asks = (o.terms?.commitments ?? []).filter((c) => c.who === "taker").map((c) => (c.does as any)?.outcome?.money).filter((m) => m?.to).reduce((a, m) => a + cents(m.amount), 0);
+          if (asks > acc.balance) continue;
+          const gathers = book.practices().some((r) => (r.speaks_for ?? r.author) === host);
+          const takesUp = !!g && book.hearings().some((h) => (h.speaks_for ?? h.author) === host && h.offer?.hears?.some((x) => x.about === g.matter));
+          const brings = [...new Set<SeekKey>([...bringsOf(o as any).filter((k) => k !== "money.from"), ...(gathers ? (["attend"] as SeekKey[]) : [])])];
+          out.push({ key: `join:${host}`, kind: "join", id: s.id, by: host, brings, bears: takesUp ? [g!.party] : [],
+            adj: K.own + Math.round((K.belief * holdTo(host)) / 10_000) + trustOf(host) + ag - Math.round(K.own * Math.min(4, asks / Math.max(1, p.essentials / 10))), others: heardNow.filter((n) => n.goesTo?.includes(host)).length,
+            act: () => { joinGroup.add(host); return s.id; } });
+        }
         // Our own conduct (spending less), and those we know (their company; what they know of).
         out.push({ key: "self", kind: "self", brings: ["money.from"], adj: K.own + Math.round((K.own * (zValue("security") + zValue("conformity"))) / 2), others: after("self"), act: () => undefined });
         if (contacts.size) out.push({ key: "ties", kind: "ties", brings: ["attend"], adj: K.own + Math.round(K.own * zValue("benevolence")), others: 0, act: () => undefined });
         return out.filter((o) => meets(w, o));
+      };
+      /**
+       * An occasion for founding (docs/behaviour/founding.md): a want of ours given up, or with nothing we can see
+       * that would answer it. If enough of those we know are in the same case, we may start something ourselves:
+       * whether, by our temperament and standing against the town's; what shape, by what the want is about and
+       * what we value; both drawn on our own stream. Then the words, if this world has a composer.
+       */
+      const occasion = (w: Wanted, how: "given_up" | "withdrew", t: number) => {
+        if (!F || !F.shapes.length || begun || myGroup || leaving || t < foundRest || !acc || !obs.body || (t - obs.body.born_at) / year < ADULT_YEARS) return;
+        const sharers = new Map<string, string>();
+        // (What befell one of a household is told to its other adults, who hold it with them: so the household shares
+        // it whichever of them we are.)
+        const mates = new Set(adults(t).map((a) => a.person));
+        if (w.with || w.about === "let_go" || w.about === "notice" || w.about === "rent_increase") for (const who of [...mates].sort()) sharers.set(who, "of our household, holding it with us");
+        for (const [who, n] of [...toldUs].sort(([a], [b]) => (a < b ? -1 : 1))) {
+          if (t - n.t > p.news_days * DAY || who === me) continue;
+          if (n.after?.some((a) => a.about === w.about)) sharers.set(who, "told us they are after the same");
+          else if (n.gaveUp === w.about) sharers.set(who, "told us they have stopped trying for the same");
+          else if (w.about === "let_go" && n.letGoBy) sharers.set(who, `told us ${n.letGoBy} let them go`);
+          else if (w.about === "notice" && n.noticedBy) sharers.set(who, `told us ${n.noticedBy} gave them notice`);
+        }
+        for (const [who, x] of [...heardWronged].sort(([a], [b]) => (a < b ? -1 : 1)))
+          if (t - x.t <= p.news_days * DAY && (x.matter === w.about || (w.whom !== undefined && x.by === w.whom))) sharers.set(who, `told us ${x.by} did wrong by them (${x.matter.replace(/_/g, " ")})`);
+        // A death: those of the household, those who told us of it, and those we told. A home in disrepair: those we
+        // see living in the same building, which wears as one.
+        if (w.about === "loss" && w.whom) for (const who of [...(mourners.get(w.whom) ?? [])].sort()) if (who !== me) sharers.set(who, `mourns ${w.whom} too`);
+        if (w.about === "disrepair" && home && homeSite?.structure === home.structure) for (const sp of homeSite.spaces) if (sp.space !== home.space) for (const who of [...(sp.occupants ?? [])].sort()) if (who !== me && !sharers.has(who)) sharers.set(who, "lives in the same building, which is in the same disrepair");
+        // Enough of them, and one at least from beyond our own household: a household alone is not others.
+        if (sharers.size < F.shared_min || ![...sharers.keys()].some((who) => !mates.has(who))) return;
+        // (What we could found at all: a group needs somewhere to gather, the home we live in; a business, its means.)
+        const hasPlace = !!(home?.movedIn ? home.space : livingAt);
+        const able = { gathering: hasPlace, fund: hasPlace, cause: hasPlace, business: p.ventures.length > 0 && p.found_bps > 0 && !retired && p.in_labour_force };
+        if (!shapeOdds(F, w.about, !!w.whom, (v) => zValue(v as Value), able).some((o) => o.score > 0)) return;
+        foundRest = t + F.rest_days * DAY;
+        const chance = chanceOf(F, { enterprise: (zValue("stimulation") + zValue("self_direction") + zValue("achievement")) / 3, care: (zValue("benevolence") + zValue("universalism")) / 2,
+          agency: inner.zAgency(), standing: zAttached("place"), ties: (ties.closest(5, t).length - 2.5) / 1.5 });
+        const founds = ctx.rng(`found-group-${w.about}-${t}`).below(10_000) < chance;
+        decision({ t, domain: "found", strategy: "deliberate", choice: founds ? "found" : "not", options: [{ key: "found", score: chance, others: sharers.size }, { key: "not", score: 10_000 - chance }] });
+        if (!founds) return;
+        const odds = shapeOdds(F, w.about, !!w.whom, (v) => zValue(v as Value), able);
+        const shape = drawOf(ctx.rng(`found-shape-${w.about}-${t}`), odds);
+        decision({ t, domain: "found_shape", strategy: "deliberate", ...(shape ? { choice: shape } : {}), options: odds.map((o) => ({ key: o.key, score: o.score })) });
+        if (!shape) return;
+        if (shape === "business") {
+          // (Work of one's own: the existing way of starting a business, taken when its premises and means are there.)
+          ventureWanted = t + 180 * DAY;
+          nextVenture = Math.min(nextVenture, t);
+          outcome({ t, domain: "found", option: "business", kind: "meant", way: "mine", facts: { about: w.about, sharers: sharers.size } });
+          return;
+        }
+        const record = Object.fromEntries([...written].filter(([k]) => k !== "hours").map(([k, v]) => [k, JSON.parse(v)]));
+        const g = grievances.get(gkey(w.about, w.whom ?? "", w.against?.record));
+        const list = [...sharers].map(([who, how]) => ({ who, how }));
+        const duesOpen = shape === "fund" && F.dues.some((c) => c > 0) ? F.dues.filter((c) => c > 0) : F.dues;
+        const brief: ComposeBrief = {
+          idea: `idea.${me}.${Math.floor(t)}`, founder: me, record,
+          want: { about: w.about, ...(w.whom ? { whom: w.whom } : {}), ...(w.with ? { befell: "household" as const } : {}), days: Math.floor((t - w.since) / DAY), tried: w.tried, ...(w.way ? { way: kindOfWay(w.way) } : {}), weight: Math.round(w.weight), how,
+            ...(g?.asked ? { asked: g.answer ?? "no answer" } : {}), ...(g?.applied.size ? { venues: g.applied.size } : {}), ...(g?.amount !== undefined ? { amount: usd(g.amount) } : {}) },
+          sharers: list, shape,
+          open: { dues: duesOpen.map((c) => ({ cents: c, words: c > 0 ? `${usd(c)} a month` : "nothing" })), every_days: F.every_days, starts_in_days: F.starts_in_days, lasts_minutes: F.lasts_minutes, place: "their own home" },
+          means: { income: usd(householdIncome()), savings: usd(acc.balance) },
+          dark: darkOf(w, record, inner.zAgency()),
+          code: { purpose: plainPurpose(shape, w, list.length + 1), name: plainName(shape, me, w) },
+        };
+        const mine: Begun = { want: { ...w }, shape, sharers: list, brief, dues: duesOpen };
+        begun = mine;
+        // The words: asked of the composing model where this world has one (answered by the next wake); else our own.
+        if (ctx.compose) asking.push(ctx.compose(brief, ctx.participant).then((piece) => { mine.piece = piece ?? null; }, () => { mine.piece = null; }));
+        else mine.piece = null;
       };
       /** Going after a want now: the way the mind takes among what would bring it about, or none (waiting). */
       const pursue = (w: Wanted): string => {
@@ -1884,6 +2012,7 @@ export const citizen: BehaviourModule = {
         if (!way) {
           wants.tried(w, "wait", t);
           // Withdrawal: nothing we can see would answer it, or we do not believe acting would. Said, when asked.
+          if (!ways.length) occasion(w, "withdrew", t);
           if (!ways.length || inner.zAgency() < -1) {
             withdrew = { about: w.about, t };
             inner.note({ t, what: "want_withdrew", about: w.about, size: Math.round(w.weight) });
@@ -1898,6 +2027,7 @@ export const citizen: BehaviourModule = {
       /** What has become of our wants since we last said: into the record's reasons, and the record of outcomes. */
       const tellWants = () => {
         for (const e of wants.take()) {
+          if (e.kind === "given_up") occasion(e.want, "given_up", e.t);
           // Giving up on work stops the looking (the want rests for as long as any want given up does).
           if (e.kind === "given_up" && !job && !ownWork && !retired && p.in_labour_force && discouragedUntil === 0 && (e.want.about === "let_go" || e.want.about === "unpaid" || (e.want.seeks.includes("work") && e.want.from !== "other"))) {
             discouragedUntil = e.t + wants.p.rest_days * DAY;
@@ -2091,10 +2221,84 @@ export const citizen: BehaviourModule = {
         steps.push(because("Joining the union: there is something at work we want put right.", say("membership_application", "Application to join.", { to: [p.union], visible: [me, p.union], data: { account: acc.account, employer: job.employer, industry: industryOf.get(job.employer) ?? "other" } })));
       }
       joinNow = false;
+      // Founding and what was founded (docs/behaviour/founding.md).
+      if (F && acc) {
+        // What we have begun, once its words are in hand (ours, or the composer's): the organisation, with us in its
+        // first post. A composed name goes through the translator, as a seat's words would; the post's channels and
+        // module are our own plumbing, put in by the check of the draft.
+        const ourPlace = home?.movedIn ? home.space : livingAt;
+        if (begun && begun.piece !== undefined && !begun.sent && F.template && ourPlace) {
+          begun.sent = true;
+          const b = begun, piece = b.piece && !b.piece.declined ? b.piece : null;
+          const room = Math.max(1, (homeSite?.spaces.find((sp) => sp.space === ourPlace)?.capacity ?? 4 + (household?.members.length ?? 1)) - (household?.members.length ?? 1));
+          const fill = (x: unknown): unknown => typeof x === "string" ? x.replaceAll("{founder}", me) : Array.isArray(x) ? x.map(fill) : x && typeof x === "object" ? Object.fromEntries(Object.entries(x).map(([k, y]) => [k, fill(y)])) : x;
+          const module = (name: string) => ({ ...(fill(F.template!.role_module) as object), params: { ...(fill(F.template!.role_module.params) as object),
+            founder: me, shape: b.shape, idea: b.brief.idea, name, purpose: b.brief.code.purpose, want: { about: b.want.about, ...(b.want.whom ? { whom: b.want.whom } : {}), since: Math.round(b.want.since), weight: Math.round(b.want.weight) },
+            place: ourPlace, place_room: room, bank: F.bank, founded_at: t,
+            ...(piece ? { composed: { purpose: piece.purpose, asks: piece.asks, gathers: piece.gathers, choice: piece.choice, model: piece.model } } : {}),
+            dues: b.dues, every_days: F.every_days, starts_in_days: F.starts_in_days, lasts_minutes: F.lasts_minutes, at_seconds: F.at_seconds, lapse_days: F.lapse_days, min_members: F.min_members,
+            hall: F.hall, fund: F.fund, cause: F.cause, ...(F.template!.role_module.params.values ? { owner_values: { ...mind.person.values } } : {}) } });
+          const channelsOf = fill(F.template.channels) as unknown[];
+          const plain = (): Step => because(`${b.sharers.length} others we know are in the same case (${b.want.about.replace(/_/g, " ")}), and nothing answers it: starting something of our own (${b.shape}).`,
+            ["founded", C.call("entity", { kind: F.template!.kind, name: C.text(b.brief.code.name), position: C.text(F.template!.title), channels: C.json(channelsOf), role_module: C.json(module(b.brief.code.name)) })]);
+          const st = plain();
+          if (piece?.name.trim()) {
+            const name = piece.name.replace(/\s+/g, " ").replace(/"/g, "'").trim().slice(0, 100);
+            const words: Words = { what: "name", idea: b.brief.idea,
+              accept: (blocks) => { const r = acceptEntity(F.template!.kind, F.template!.title, channelsOf, {})(blocks); if (typeof r === "string") return r; const made = r[0] as any; made.first_position.role_module = module(String(made.name)); return r; },
+              done: (ok) => { b.nameBy = ok ? "translator" : "code"; if (!ok) todo.unshift(plain()); } };
+            (st as Step & { propose?: { text: string; words: Words } }).propose = { text: `Found a ${F.template.kind} called "${name}", with me in its first post as ${F.template.title}.`, words };
+          }
+          steps.push(st);
+          pendingGroup = true;
+        }
+        // Our own: we belong to what we founded, as anyone who joins does.
+        if (myGroup && !memberOf(myGroup.org) && !appliedTo.has(myGroup.org) && book.open("membership").some((r) => r.speaks_for === myGroup!.org)) joinGroup.add(myGroup.org);
+        for (const host of [...joinGroup].sort()) {
+          joinGroup.delete(host);
+          appliedTo.add(host);
+          steps.push(because(`Asking to join ${host}.`, say("membership_application", "Application to join.", { to: [host], visible: [me, host], data: { account: acc.account } })));
+        }
+        // Wound up: its members end what they pay it.
+        const leave = (host: string, why: string, kind: string) => {
+          const m = groups.get(host);
+          if (!m) return;
+          groups.delete(host);
+          const lines: C.Call[] = [];
+          for (const o of book.all("request")) if (o.record === "statement" && cites(o, m.agreement) && o.speaks_for === me && !book.withdrawn.has(o.id)) lines.push(withdraw(o.id, why));
+          if (book.inForce(m.agreement)) lines.push(notice(m.agreement, why));
+          if (lines.length) steps.push(because(`${why} Leaving ${host}.`, ...lines));
+          outcome({ t, domain: "membership", option: "member", kind, way: "mine", facts: { with: host, days: Math.floor((t - m.t) / DAY) } });
+        };
+        for (const r of fresh) if (r.record === "statement" && r.kind === "wound_up" && r.speaks_for && groups.has(r.speaks_for)) leave(r.speaks_for, "It has wound up.", "wound_up");
+        for (const [host, m] of [...groups].sort(([a], [b]) => (a < b ? -1 : 1))) {
+          // Not come for long: we give notice (its founder stays while it stands).
+          if (host !== myGroup?.org && t - Math.max(m.went, m.t) >= F.leave_after_days * DAY) { leave(host, "We no longer come.", "left"); continue; }
+          // A fund we pay into, when we are short: asking for the draw its terms state (once in a while).
+          const draw = (book.open("membership").find((r) => r.speaks_for === host)?.offer?.terms?.commitments ?? []).filter((c) => c.who === host).map((c) => (c.does as any)?.outcome?.money).find((x) => x?.amount);
+          if (draw && levelsNow.security < (wants.p.unmet_bps.security ?? 3_000) && t - (m.claimed ?? -Infinity) >= 30 * DAY) {
+            m.claimed = t;
+            steps.push(because(`Short of money, and a member of ${host}: asking to draw on its fund.`, say("fund_claim", `Request: a draw on the fund, ${usd(cents(draw.amount))}.`, { to: [host], visible: [me, host], data: { amount: cents(draw.amount), account: acc.account } })));
+            outcome({ t, domain: "membership", option: "member", kind: "draw_asked", way: "mine", facts: { with: host, amount: cents(draw.amount) } });
+          }
+        }
+      }
       for (const r of fresh) {
         if (r.record === "agreement" && r.terms.template === "membership" && r.terms.parties.includes(me) && !book.signedBy(r.id, me)) {
-          const dues = commitmentOf(r, me).outcome?.money;
-          outcome({ t, domain: "membership", option: "member", kind: "joined", way: "mine", facts: { with: r.terms.parties.find((x) => x !== me) ?? "", ...(dues ? { dues: cents(dues.amount) } : {}) } });
+          const host = r.terms.parties.find((x) => x !== me) ?? "";
+          const ofRun = !!F && host !== p.union;
+          const dues = (ofRun ? r.terms.commitments.find((c: any) => c.who === me && c.does?.outcome?.money)?.does : commitmentOf(r, me))?.outcome?.money;
+          outcome({ t, domain: "membership", option: "member", kind: "joined", way: "mine", facts: { with: host, ...(dues ? { dues: cents(dues.amount) } : {}) } });
+          if (ofRun) {
+            // (Something made in a run: we mean to come to its gatherings, and hold a little to what it says it is for.)
+            groups.set(host, { t, agreement: r.id, went: t });
+            for (const g of book.practices()) if ((g.speaks_for ?? g.author) === host) { wentLast.add(g.id); stayedLast.delete(g.id); }
+            const belief = strengthened(host, p.belief.told_bps);
+            if (belief.after !== belief.before) outcome({ t, domain: "belief", option: host, kind: "joined", way: "mine", from: host, belief }, false);
+            steps.push(because(`Joining ${host}: signing${dues ? ", and paying the dues monthly" : ""}.`, sign(r.id),
+              ...(dues ? [pay(dues.to, cents(dues.amount), { from: acc.account, every: MONTH, first: 0, basis: r.id, for: "Dues." })] : [])));
+            continue;
+          }
           steps.push(because(`Joining the union: signing, and paying the dues monthly.`, sign(r.id),
             ...(dues ? [pay(dues.to, cents(dues.amount), { from: acc.account, every: MONTH, first: 0, basis: r.id, for: "Union dues." })] : [])));
           continue;
@@ -2420,7 +2624,7 @@ export const citizen: BehaviourModule = {
       // takes, how it went the times we went, and who we know goes.
       {
         const age = obs.body ? (t - obs.body.born_at) / year : 0;
-        const mayCome = (w?: Eligibility) => !w || ((!w.members_of || memberOf(w.members_of)) && !w.holds && (!w.entities || w.entities.includes(me)) && (!w.min_age_years || age >= w.min_age_years));
+        const mayCome = (w?: Eligibility) => !w || ((!w.members_of || memberOf(w.members_of)) && !w.holds && (!w.entities || w.entities.includes(me)) && (!w.min_age_years || age >= w.min_age_years) && (!w.dealing_with || dealsWith(w.dealing_with)));
         const there = (space: string) => street?.kind === "sites" ? (street.cells.flatMap((c) => c.structure?.spaces ?? []).find((sp) => sp.space === space)?.occupants ?? []).filter((o) => o !== me) : [];
         // Back from one: who was there, and how it was (turned away, it counts for nothing).
         if (attending && t >= attending.until) {
@@ -2442,6 +2646,8 @@ export const citizen: BehaviourModule = {
             // (Before anything else: it's over now. Acts take time, so a plan's order is the order things get done.)
             if (!attending.gone) steps.unshift(because(`${attending.host}'s gathering is over (${others.length} others were there): going home.`, moveOut(attending.space, me)));
             companyAt.set(attending.practice, others.length);
+            const mine = groups.get(attending.host);
+            if (mine) mine.went = t;
             for (const o of others) {
               talked.set(o, t);
               ties.add(o, 100, t, "met");
@@ -2728,7 +2934,7 @@ export const citizen: BehaviourModule = {
         // Recorded as a decision (docs/design/ai-citizens.md 7), from the chance as the person came to it.
         const weighing = !!l && saidFound !== "pending";
         // (And by wanting work of one's own: someone let go, or short of work, with the means, is likelier to.)
-        const chanceFound = weighing ? shifted(p.found_bps, enterprise + meantFound + (initiative && wants.all().some((w) => w.seeks.includes("work")) ? wants.p.sway.found : 0)) : 0;
+        const chanceFound = weighing ? (t < ventureWanted ? 10_000 : shifted(p.found_bps, enterprise + meantFound + (initiative && wants.all().some((w) => w.seeks.includes("work")) ? wants.p.sway.found : 0))) : 0;
         const founds = weighing && ctx.rng(`found-${t}`).below(10_000) < chanceFound;
         if (weighing) decision({ t, domain: "venture", strategy: "deliberate", choice: founds ? "found" : "not", options: [{ key: "found", score: chanceFound }, { key: "not", score: 10_000 - chanceFound }] });
         if (l && founds) {
@@ -3857,7 +4063,9 @@ export const citizen: BehaviourModule = {
         if (leaving && todo.length === 0) departed = true; // the last of leaving is under way
         // (A gathering to go to, or come back from, before the week is out: awake then.)
         if (next && (next as any).goTo) pendingGo = (next as any).goTo;
-        const action = next ? noted(book, callAction(next))
+        const proposing = (next as (Step & { propose?: { text: string; words: Words } }) | undefined)?.propose;
+        const action = proposing ? Object.defineProperty({ type: "propose", text: proposing.text } as ParticipantAction, WORDS, { value: proposing.words, enumerable: false })
+          : next ? noted(book, callAction(next))
           : p.round ? wait(Math.min(practiceWake ?? Infinity, nextPlanAt, nextChange(obs.t)))
           : wait(practiceWake !== null ? Math.min(practiceWake, obs.t + 7 * DAY) : undefined);
         // Questions to the sparse mind out this wake: the action, once they're answered (and if waiting, awake again by

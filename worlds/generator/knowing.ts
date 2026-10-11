@@ -48,6 +48,8 @@ export const lookUp = (id = "who", extra: Extra = {}) => ({ id, kind: "directory
  */
 /** What a town where things go wrong publishes besides (docs/behaviour/frictions.md): given only to such a town. */
 export const PUBLISHED_HEARINGS = { what: "has:hears", why: "A body that hears grievances says publicly what it hears, so that whoever has such a matter can bring it." };
+/** What a town where people found things publishes besides (docs/behaviour/founding.md): given only to such a town. */
+export const PUBLISHED_MEMBERSHIPS = { what: "membership", why: "A group says publicly what joining it asks, so that whoever it is for can find it." };
 export const PUBLISHED: { what: string; why: string; board?: true; most?: number }[] = [
   { what: "law", why: "The law in force is promulgated to everyone it binds." },
   { what: "charter", why: "The town's charter is public, as its laws are." },
@@ -101,7 +103,7 @@ export function answersOf(what: string, town: { holderSearch: string[]; dealings
  * The world's `knowing`: what is published, and the keeper of each register, taken from the behaviour module that
  * does each seat's job (its `keeps`, with the reason) for the organisation the seat belongs to.
  */
-export function knowing(positions: { entity: string; role_module?: { code?: string } }[], town: { holderSearch: string[]; dealings: number; visit_seconds?: number; hearings?: boolean }) {
+export function knowing(positions: { entity: string; role_module?: { code?: string } }[], town: { holderSearch: string[]; dealings: number; visit_seconds?: number; hearings?: boolean; founding?: boolean }) {
   const keepers = new Map<string, { entity: string; what: string; why: string; answers?: ReturnType<typeof answersOf> }>();
   for (const pos of positions) {
     for (const k of modules[pos.role_module?.code ?? ""]?.keeps ?? []) {
@@ -111,5 +113,5 @@ export function knowing(positions: { entity: string; role_module?: { code?: stri
       if (!keepers.has(`${pos.entity}|${k.what}`)) keepers.set(`${pos.entity}|${k.what}`, { entity: pos.entity, what: k.what, why: k.why, ...(answers.length ? { answers } : {}) });
     }
   }
-  return { published: [...PUBLISHED, ...(town.hearings ? [PUBLISHED_HEARINGS] : [])].map((p) => ({ ...p })), keepers: [...keepers.values()].sort((a, b) => (`${a.entity}|${a.what}` < `${b.entity}|${b.what}` ? -1 : 1)), ...(town.visit_seconds !== undefined ? { visit_seconds: town.visit_seconds } : {}) };
+  return { published: [...PUBLISHED, ...(town.hearings ? [PUBLISHED_HEARINGS] : []), ...(town.founding ? [PUBLISHED_MEMBERSHIPS] : [])].map((p) => ({ ...p })), keepers: [...keepers.values()].sort((a, b) => (`${a.entity}|${a.what}` < `${b.entity}|${b.what}` ? -1 : 1)), ...(town.visit_seconds !== undefined ? { visit_seconds: town.visit_seconds } : {}) };
 }

@@ -117,7 +117,7 @@ test("outcomes are observation only: the 1,000-person town, seed 1, 30 days, end
     // The dataset: every decision with its outcomes under it (none: an empty list), the flat list, and the counts.
     const dir = join(out, "on.dataset");
     const m = await exportDataset(on.logPath, dir);
-    expect(m.version).toBe("0.6.0");
+    expect(m.version).toBe("0.7.0");
     expect(valid("Manifest", m)).toBe(true);
     const ds = rows(join(dir, "citizen_decisions.jsonl"));
     const flat = rows(join(dir, "citizen_outcomes.jsonl"));
