@@ -999,6 +999,12 @@ second wording of every sentence and label for the rewording test.
   tenants as a whole divide in this kind of situation: the code mind's mean odds, which are what is calibrated to
   the surveys) and asked how the hundred who match this record differ from it, naming the facts that move its
   numbers before the numbers.
+- **shift** (added after the first two failed on development): everything the bearing design shows, but the teacher
+  gives no numbers of its own. For each course it says how the hundred who match the record compare with the
+  town's hundred on a closed scale from -3 (far fewer) to 3 (far more), 0 wherever the record gives no reason. A
+  step multiplies the base line's odds by 1.35 and the whole is brought back to 100 (`SHIFT_STEP`; a fifth of the
+  base line for doing nothing is shown as giving up, `GIVE_UP_SHARE`: both placeholders). A closed scale, as the
+  translator's writer has.
 Development is on the development sample only; the design that goes forward is confirmed once on the held-back one.
 
 **The teachers:** `claude-code/claude-sonnet-5-5` and `claude-code/claude-opus-5-5`; `codex/gpt-6.1-sol` when its
@@ -1117,7 +1123,91 @@ rounds within noise taught, turned into signs to read early:
 
 ### 11f. Budgets
 
-BUDGET_TEXT
+**This task** (teacher calls; every one kept in full under `runs/living-world-4-2026-10-11/gate-*/calls.jsonl`,
+with Claude Code's own count of each in `claude-code-usage.jsonl`): **11.38 USD of the 30 allowed, as Claude Code
+reckons it.** `claude-sonnet-5-5` 802 calls, 6.25 USD (development: three designs; held back: one);
+`claude-opus-5-5` 298 calls, 5.13 USD (held back only); `codex/gpt-6.1-sol` 70 calls on the subscription, recorded
+cost 0, stopped by its usage limit. No call was declined; 2 of 1,170 answers could not be read. About 0.008 USD a
+call for Sonnet 5.5 and 0.017 for Opus 5.5, at about 2,600 tokens in and 200 out. No pod, no training.
+
+**The next task, as estimated:**
+- **Pod: none.** A net of 100,000 to 300,000 weights on some tens of thousands of rows trains on this Mac's
+  processor in minutes. Nothing is rented.
+- **First, with no teacher at all:** the base net fitted to the code mind's recorded odds, the suite of 11e run on
+  it, and the twins. This proves the shape, the whole-number arithmetic and the speed, costs nothing in calls, and
+  answers whether a small net keeps the code mind's variety. Two to three days of an agent's work.
+- **Then the teachers' sway, if it is still wanted after 11g:** 1,500 situations, each asked in two orders and two
+  wordings (the mean of four: a single answer's noise is a third to a half of what a teacher tells apart between
+  people): 6,000 calls a teacher. Opus 5.5 about 100 USD, Sonnet 5.5 about 50 USD, of plan usage. **A second
+  family at that volume is not available on the subscription:** Codex gave 70 answers before its window shut. A
+  second family would need either weeks of windows or a paid API, which is Naz's call.
+- A harvest on new towns for a fresh held-back sample: an hour of this Mac, no calls.
+
+### 11g. The gate, as run (2026-10-11)
+
+**No teacher passed.** On the held-back sample (36 situations, 298 requests a teacher, the shift design), Sonnet 5.5
+and Opus 5.5 each passed every check but the town's totals: both move people toward doing nothing, beyond the 15
+points allowed. Codex answered 70 requests on 6 situations before its usage limit and is not assessed. The
+thresholds are as they were written.
+
+| Held back, shift design | Sonnet 5.5 | Opus 5.5 | Codex gpt-6.1-sol (6 situations) | The code mind itself |
+|---|---|---|---|---|
+| Repeat, median points | 4.2 | 1.7 | 6.5 | 0 |
+| Scrambled records, median points | 12.0 (2.9 times repeat; above its own repeat in 32 of 36): pass | 12.6 (7.4 times; 32 of 36): pass | 16.8 (6 of 6) | 26.2 |
+| Sense of agency low to high: acting at all | 11 of 12, +10.0: pass | 11 of 12, +14.0: pass | 6 of 6, +14.9 | 12 of 12, +41.4 |
+| Trust in a venue: going to one | 5 of 5, +12.0: pass | 5 of 5, +11.6: pass | 3 of 3, +11.6 | 3 of 5, +10.7 |
+| Trust in the landlord: asking them | 11 of 12, +13.2: pass | 11 of 12, +11.3: pass | 3 of 3, +9.4 | 12 of 12, +18.4 |
+| Half a year in town against fifteen: looking for another home | 10 of 12, -10.4: pass | 11 of 12, -11.2: pass | 4 of 5, -12.9 | 0 of 12, 0 (it does not read it) |
+| Option order, median points; gain from being first | 5.5; -0.4: pass | 3.6; +0.6: pass | 7.5; -0.4 | |
+| Rewording, median points; same likeliest option | 5.6; 22 of 25: pass | 4.3; 29 of 30: pass | 6.9; 3 of 3 | |
+| Town's totals, acting at all, teacher against code mind | 48.5 against 66.3: **fail** | 41.9 against 66.3: **fail** | not assessed | |
+| Asking the landlord (19 situations) | 8.1 against 7.9 | 8.9 against 7.9 | | |
+| Looking for another home (26) | 7.3 against 13.3 | 5.7 against 13.3 | | |
+| A venue (5), joining (2), spending less (7), better pay (2) | not assessed | not assessed | | |
+| Unread; declined | 0; 0 | 0; 0 | 0; 0 | |
+
+(Only 5 held-back situations had a venue open, so that edit rests on 5, not 12.) **The edits show direction only.**
+No data says how much real people differ in such a choice, so nothing here says a teacher's size of difference is
+right; the code mind's sizes are placeholders too.
+
+**On development** (24 situations, Sonnet 5.5 only): the plain design told people apart (9 points against a repeat
+of 4) but had 77 in 100 do nothing where the code mind has 30; the bearing design brought that to 51 and failed
+scrambled records narrowly (9.5 against a repeat of 5) and rewording; the shift design passed all but rewording (8
+points, which had to be under half its scrambled 10.8). On the held-back sample the same design passed rewording
+and failed the totals. A design that passes one sample's rewording by a point and another's totals not at all is
+not a design that passes.
+
+**The town's totals, with their uncertainty.** Acting at all rests on all 36 situations, but nine tenths of the
+town's weight is rent rises and the sample has 7 of them: the figure is a few situations wide. It fails for both
+teachers in the same direction and on development too (62.5 against 70.5 for Sonnet), so it is probably real:
+shown a base line and asked who differs, both models find more reasons for a person to do less than to do more.
+
+**What a teacher adds to the code mind, plainly.**
+- **Less difference between people, not more.** Another person in the same situation moves the code mind's odds by
+  26 points and a teacher's by 12. On the sense of agency the code mind moves three to four times as far.
+- **Mostly the same fields.** Agency, trust in the landlord and trust in a venue are the code mind's own sways, said
+  back at about the same size or smaller.
+- **Some things the code mind does not read:** how long someone has lived in the town (moving, -10 to -11 points,
+  where the code mind has nothing); and, in the facts the teachers name, savings and how much of income the rent
+  takes (moving), having nobody close (telling others), how much the matter weighs.
+- **So on this slice the case for a student does not rest on the teachers.** A student taught by them here would be
+  the code citizen with a few more fields read and its people a little more alike. The case rests on what code
+  cannot score: openings with no hand-written sway (a group founded in a run, an offer a steward invents: today
+  scored by one placeholder constant and belief); the draws that are a fitted chance and a table (whether to
+  found, which shape); wants with nothing typed to seek (a slight, a loss, meaning); and decisions that are still
+  rules (leaving town, claiming support, borrowing, standing for office: section 7's list). Those are where the
+  next slice should be cut, not homes.
+
+**Between the families.** Sonnet 5.5 and Opus 5.5 are 11.5 points apart on the same request (median), about as far
+as two people are for either; when another person is put in the situation they move acting at all the same way in
+35 of 52 cases. Sonnet has more people act (by 5.8 points), move (6.5) and sign (10); Opus has more leave it.
+These are two models of one family. The other family answered too little to compare.
+
+**What would be tried next, in order.** (1) Nothing with teachers until the base net exists (11f). (2) If the sway
+is wanted: a teacher's answer taken as its shift less its own mean shift over the town for that kind of situation
+(11d's centring made part of what a teacher is). That passes the totals by construction, so the totals check then
+tests nothing and would need replacing by a check that the centring is stable from one town's sample to another:
+a change to the gate, for Naz. (3) The mean of four askings in place of one. (4) A second family in earnest.
 
 ## Open
 
