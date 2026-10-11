@@ -4070,6 +4070,31 @@ Step 3 of the living world (docs/design/ai-citizens.md 10k). Behaviour: docs/beh
 - **Calibration and cost**: see the design doc's "Progress".
 - **Revisit if:** a count of unregistered groups is found for any place (replace the multiple); a rate of new congregations, tenants' groups or savings groups is found (the shapes could then have rates of their own); Codex's window opens (run the audit again for the second family and the second judge before any run is compared); the translator learns statements with a practice or an offer (then the closed choice becomes the fallback it was meant to be); pilots show founded things with hundreds of members (then openings need a sense of how much, not only of what kind); a steward's office is to grant or refuse the hall; the composer's prompt changes (a new version, and the audit again); a real founder's notice of the kinds measured is found and can be used (the real texts are the weak side of the tone measure).
 
+## 2026-10-11 · The everyday model: the plan, and a gate its teachers must pass before anything is trained
+
+**What:** step 4 of the living world's build order (docs/design/ai-citizens.md 10k), as a plan (that file's section 11) and a gate run on the large models that would teach. No small model is trained and nothing a run does changes.
+
+**Decided by Naz (2026-10-11):** one model loaded, each entity a compact record it reads; it gives odds and the kernel draws; outcomes do not train the model (they move a person's own trust, agency and learning in their record; this closes 10f point 5); small, local, batched; more than one family of teacher, the mix fixed, never Fable 5.1; blanket approval for this step's contract additions, the hard rules and VISION 15 point 7 excepted.
+
+**Built:**
+- **The situation, recorded.** Every decision about a want, and every draw of whether to found, carries what a model giving the odds would be shown and nothing else (`CitizenSituation`: contracts/README.md, dataset 0.8.0; citizen 0.48.0). `oikos run --record-decisions want,found,found_shape` keeps those decisions alone in a lean log. Recording reads what is there; a town is the same town with or without it (tested).
+- **The harvest** (`oikos everyday-harvest`): the first slice's decisions (a rent rise, a notice, disrepair) from code-only living towns, with a development and a held-back sample.
+- **What a teacher is shown and asked** (`orchestrator/src/everyday.ts`): as an estimator of a hundred people matching one record, in the third person, free to decline; two designs (the plain one, and one that gives each figure with where it stands in the town, what the person knows beside each opening, and a base line to depart from); two wordings.
+- **The gate** (`oikos everyday-gate`): repeats, scrambled records, one-thing edits, option order, rewording, the town's totals, agreement between families; thresholds in code, fixed before any teacher was asked. Mock teachers show each fault is caught.
+
+**Why this way:**
+- *The gate before the student.* Step 3 measured a large model following the situation more than the person. A student trained on that makes everyone the same person, and no test of the student afterwards could tell a bad student from a bad teacher.
+- *The teacher's sway, not its level.* A large model's idea of how often people go to a tribunal has no standing against a survey. What it may know is who is likelier than whom. So only how far its answer for one person sits from its own mean for the town is kept, and the town's totals stay where the code mind's calibration put them (3e's symmetric sway).
+- *A numeric student, not a text reader.* The translator's reader learned its generator's wording. Fields have no wording, a shared scorer has no order: two of step 3's three faults cannot occur in the student. Whole-number arithmetic keeps a run reproducible on any machine. What is lost is reading openings made of words, which has a later way in (11d).
+- *Giving up as an option, withdrawing not.* Giving up was a rule on a count of tries; it becomes odds. Withdrawing stays a recorded reading of leaving it, since a model asked to tell "stop looking" from "give up" has one more thing to get wrong.
+- *Thresholds first.* Written in code and in section 11c, and reported, before the first call; none lowered after.
+
+**VISION 15, point 7:** unchanged and not approached. The model is a function from a record and a situation to odds, keeps nothing, writes nothing, and is never anyone. Teachers estimate in the third person and may decline.
+
+RESULTS_TEXT
+
+**Revisit if:** a teacher's sway turns out to be the code mind's placeholders said back (then it adds nothing, and the student is the fitted citizen); the families' sways disagree in direction on the fields that matter (then one family is not a second opinion but a different town); the model is to take decisions where a person's record says little and the opening's words say most (then a text reader is wanted); anything would have the model carry a person between calls or be fitted to how people fared (then VISION 15 point 7 is reviewed first).
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Calibration, measured again after the first-year risk fix** (2026-10-05, at 0251d3a, `runs/calibration-2026-10-05` on the run server; the small town, 3 seeds × 2 years, code only, as below). Health: 4 breaches of 15 (8 measured). Recorded, not chased: Naz decides what to do with the numbers.

@@ -27,7 +27,7 @@
 import { cents } from "../money";
 import type { Eligibility, LookRequest, Observation, ParticipantAction, Record, SiteStructure, StatementRecord } from "../contracts";
 import { basesOf, channels, cites } from "../contracts";
-import { DECISIONS, OUTCOMES, RECORD, WORDS, params, wait, type Belief, type BehaviourModule, type ComposeBrief, type ComposePiece, type ConsultAnswer, type DecisionRecord, type OutcomeRecord, type ParticipantContext, type RecordChange, type Words } from "../module";
+import { DECISIONS, OUTCOMES, RECORD, WORDS, params, wait, type Belief, type BehaviourModule, type ComposeBrief, type ComposePiece, type ConsultAnswer, type DecisionRecord, type OutcomeRecord, type Situation, type ParticipantContext, type RecordChange, type Words } from "../module";
 import type { Rng } from "../rng";
 import * as C from "../calls";
 import { advertisedJob, ask, Asked, because, Book, firstDue, breaches, noted, callAction, commitmentOf, DAY, nextLook, usd, jobTerms, record, leaseTerms, message, MONTH, moveIn, moveOut, notice, pay, PAYMENT_FAILED, petitionSignatures, publishedCount, say, sign, stoodEmpty, structureOf, variableToday, vote, withdraw, type Step, ownBanked } from "./common";
@@ -165,7 +165,7 @@ interface Job { /** The account our pay has come from, as we have seen it come. 
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.47.0", // 0.47.0: founding (docs/behaviour/founding.md), where the world's dial has it on: at a want given up or with nothing to answer it, shared by others one knows of, a person may found a group, a fund or a body that takes grievances up, in words of their own or a composing model's; a thing made in a run is joined as any opening is taken up, left when one no longer comes, and a fund drawn on when short; with the dial off nothing changes; 0.46.0: everyday frictions (docs/behaviour/frictions.md), with the world's dial: a home in disrepair, pay come short (no longer taken for no pay), a bill well over the usual, a claim refused, goods found faulty; each a grievance about whoever did it, asked of them, taken to any body that says it hears such things, or told to those one knows; what comes back moves trust and the sense of agency; a job is left only for one that pays enough more, the more so the longer held (where the world says); giving up on work stops the looking; a need short at the start has been short for a while; pay told to the household once until it changes; 0.45.0: wants and initiative (docs/design/ai-citizens.md 10a, 10b), for those the world's dial gives it to: wants born of needs, events and those one copies, met with openings by what they bring in typed outcomes, the way chosen by the mind; trust, agency and attachment read; starting attachment from the world; nothing changes with the dial at 0; 0.44.0: the richer record (docs/design/ai-citizens.md 10c, 10d): belonging and meaning as needs, trust in particular institutions, a sense of agency, attachments, what is thought and what is said, values that drift and are shocked, bounded ties, where the hours go; held by the kernel as the person's own record; 0.43.2: offered a job that names no place of work, on an advertisement, goes to work where the advertisement says; 0.43.1: tells their own business when they move home; 0.43.0: someone who works for themself (own_work): not out of work, their income what the business pays them, at their pitch in working hours; 0.42.1: work by the day (a day's pay known as pay; no claim for a day not worked); 0.42.0: reads the support law, stops work at an age of its own (0.41.0 on its branch), with main's 0.41.1
+  version: "0.48.0", // 0.48.0: a decision about a want, and whether to found, is recorded with its situation (docs/design/ai-citizens.md 11a): recording only, nothing a citizen does changes; 0.47.0: founding (docs/behaviour/founding.md), where the world's dial has it on: at a want given up or with nothing to answer it, shared by others one knows of, a person may found a group, a fund or a body that takes grievances up, in words of their own or a composing model's; a thing made in a run is joined as any opening is taken up, left when one no longer comes, and a fund drawn on when short; with the dial off nothing changes; 0.46.0: everyday frictions (docs/behaviour/frictions.md), with the world's dial: a home in disrepair, pay come short (no longer taken for no pay), a bill well over the usual, a claim refused, goods found faulty; each a grievance about whoever did it, asked of them, taken to any body that says it hears such things, or told to those one knows; what comes back moves trust and the sense of agency; a job is left only for one that pays enough more, the more so the longer held (where the world says); giving up on work stops the looking; a need short at the start has been short for a while; pay told to the household once until it changes; 0.45.0: wants and initiative (docs/design/ai-citizens.md 10a, 10b), for those the world's dial gives it to: wants born of needs, events and those one copies, met with openings by what they bring in typed outcomes, the way chosen by the mind; trust, agency and attachment read; starting attachment from the world; nothing changes with the dial at 0; 0.44.0: the richer record (docs/design/ai-citizens.md 10c, 10d): belonging and meaning as needs, trust in particular institutions, a sense of agency, attachments, what is thought and what is said, values that drift and are shocked, bounded ties, where the hours go; held by the kernel as the person's own record; 0.43.2: offered a job that names no place of work, on an advertisement, goes to work where the advertisement says; 0.43.1: tells their own business when they move home; 0.43.0: someone who works for themself (own_work): not out of work, their income what the business pays them, at their pitch in working hours; 0.42.1: work by the day (a day's pay known as pay; no claim for a day not worked); 0.42.0: reads the support law, stops work at an age of its own (0.41.0 on its branch), with main's 0.41.1
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -1764,7 +1764,7 @@ export const citizen: BehaviourModule = {
         if (w.way && w.way !== "wait") inner.tried(true);
         wants.met(w, t, why);
       };
-      type Way = Opening & { adj: number; others: number; act: () => string | undefined };
+      type Way = Opening & { adj: number; others: number; /** What taking it up asks in money at once (a fee, a first month's dues), where its terms say. */ cost?: number; act: () => string | undefined };
       const waysFor = (w: Wanted): Way[] => {
         const K = wants.p.choice;
         const heardNow = newsNow(t);
@@ -1886,7 +1886,7 @@ export const citizen: BehaviourModule = {
             const fee = (h.offer?.terms?.commitments ?? []).filter((c) => c.who === "taker").map((c) => (c.does as any)?.outcome?.money).find((m) => m?.to);
             const cost = fee ? cents(fee.amount) : 0;
             if (cost > acc.balance) continue;
-            out.push({ key: `desk:${venue}`, kind: "desk", id: h.id, by: venue, brings: [], bears: [g.party], adj: trustOf(venue) + ag - K.venue - Math.round((K.own * Math.min(4, cost / Math.max(1, p.essentials / 10)))), others: after("desk"),
+            out.push({ key: `desk:${venue}`, kind: "desk", id: h.id, by: venue, brings: [], bears: [g.party], ...(cost ? { cost } : {}), adj: trustOf(venue) + ag - K.venue - Math.round((K.own * Math.min(4, cost / Math.max(1, p.essentials / 10)))), others: after("desk"),
               act: () => {
                 g.applied.set(venue, { t });
                 steps.push(because(`Taking it to ${venue}, which hears such things (${words} against ${g.party})${cost ? `, with its fee of ${usd(cost)}` : ""}.`,
@@ -1916,7 +1916,7 @@ export const citizen: BehaviourModule = {
           const gathers = book.practices().some((r) => (r.speaks_for ?? r.author) === host);
           const takesUp = !!g && book.hearings().some((h) => (h.speaks_for ?? h.author) === host && h.offer?.hears?.some((x) => x.about === g.matter));
           const brings = [...new Set<SeekKey>([...bringsOf(o as any).filter((k) => k !== "money.from"), ...(gathers ? (["attend"] as SeekKey[]) : [])])];
-          out.push({ key: `join:${host}`, kind: "join", id: s.id, by: host, brings, bears: takesUp ? [g!.party] : [],
+          out.push({ key: `join:${host}`, kind: "join", id: s.id, by: host, brings, bears: takesUp ? [g!.party] : [], ...(asks ? { cost: asks } : {}),
             adj: K.own + Math.round((K.belief * holdTo(host)) / 10_000) + trustOf(host) + ag - Math.round(K.own * Math.min(4, asks / Math.max(1, p.essentials / 10))), others: heardNow.filter((n) => n.goesTo?.includes(host)).length,
             act: () => { joinGroup.add(host); return s.id; } });
         }
@@ -1961,7 +1961,8 @@ export const citizen: BehaviourModule = {
         const chance = chanceOf(F, { enterprise: (zValue("stimulation") + zValue("self_direction") + zValue("achievement")) / 3, care: (zValue("benevolence") + zValue("universalism")) / 2,
           agency: inner.zAgency(), standing: zAttached("place"), ties: (ties.closest(5, t).length - 2.5) / 1.5 });
         const founds = ctx.rng(`found-group-${w.about}-${t}`).below(10_000) < chance;
-        decision({ t, domain: "found", strategy: "deliberate", choice: founds ? "found" : "not", options: [{ key: "found", score: chance, others: sharers.size }, { key: "not", score: 10_000 - chance }] });
+        decision({ t, domain: "found", strategy: "deliberate", choice: founds ? "found" : "not", options: [{ key: "found", score: chance, others: sharers.size }, { key: "not", score: 10_000 - chance }],
+          situation: situationOf(w, [], [{ key: "found", weight: chance }, { key: "not", weight: 10_000 - chance }], t, { occasion: { how, sharers: sharers.size, beyond_household: [...sharers.keys()].filter((who) => !mates.has(who)).length } }) });
         if (!founds) return;
         const odds = shapeOdds(F, w.about, !!w.whom, (v) => zValue(v as Value), able);
         const shape = drawOf(ctx.rng(`found-shape-${w.about}-${t}`), odds);
@@ -1994,6 +1995,43 @@ export const citizen: BehaviourModule = {
         if (ctx.compose) asking.push(ctx.compose(brief, ctx.participant).then((piece) => { mine.piece = piece ?? null; }, () => { mine.piece = null; }));
         else mine.piece = null;
       };
+      /**
+       * The situation a decision about a want was made in, for the record of decisions (docs/design/ai-citizens.md 11):
+       * the want, what stands behind it, each opening as what it would bring in typed terms with what we know of it,
+       * our own record as the kernel holds it, and the odds our mind gave. Recording only: it reads what is already
+       * here (nothing is created by looking: trust is read only where the choice already read it) and nothing reads
+       * it back. Nothing of anyone else's record is in it, and no text we have not read.
+       */
+      const situationOf = (w: Wanted, ways: Way[], odds: { key: string; weight: number }[], t: number, more: { [k: string]: unknown } = {}): Situation => {
+        const g = grievances.get(gkey(w.about, w.whom ?? "", w.against?.record));
+        const paper = w.against ? book.records.get(w.against.record) : undefined;
+        const notice = paper?.record === "statement" && paper.kind === "rent_increase" ? paper.data : undefined;
+        const rentTo = notice?.rent !== undefined ? cents(notice.rent) : undefined;
+        const townTrust = (who: string) => (p.outlook.trust as { [k: string]: number } | undefined)?.[kindOf(who)] ?? inner.p.trust.start_bps;
+        const role = (who: string | undefined) => (who === undefined ? undefined : home && who === home.landlord && !home.owned ? "landlord" : job && who === job.employer ? "employer" : who === w.whom || who === w.against?.by ? "other_side" : kindOf(who));
+        const learnedWay = mind.learned("way");
+        const total = Math.max(1, odds.reduce((a, o) => a + o.weight, 0));
+        return {
+          v: 1,
+          want: { about: w.about, from: w.from, weight: Math.round(w.weight), days: Math.floor((t - w.since) / DAY), tried: w.tried, grown: w.grown, seeks: [...w.seeks], ...(w.with ? { household: true } : {}),
+            ...(w.whom ? { whom: role(w.whom)! } : {}), ...(w.against ? { against: w.against.kind } : {}), ...(w.way ? { last_way: kindOfWay(w.way) } : {}) },
+          ...(g ? { matter: { matter: g.matter, days: Math.floor((t - g.since) / DAY), ...(g.asked ? { asked_days: Math.floor((t - g.asked.t) / DAY), answer: g.answer ?? "none yet" } : {}), venues: g.applied.size, ...(g.amount !== undefined ? { amount: g.amount } : {}), ...(g.told ? { told: true } : {}) } } : {}),
+          ...(home ? { home: { rent: home.rent, ...(home.owned ? { owned: true } : {}), ...(rentTo !== undefined ? { rent_to: rentTo } : {}), ...(rentTo !== undefined && Number.isFinite(Number(notice?.from)) ? { from_days: Math.floor((Number(notice.from) - t) / DAY) } : {}) } } : {}),
+          means: { income: Math.round(householdIncome()), savings: Math.round(acc?.balance ?? 0), essentials: Math.round(p.essentials) },
+          openings: ways.map((o) => {
+            const tr = o.by !== undefined ? inner.trusted(o.by) : undefined;
+            return { kind: o.kind, ...(o.by !== undefined ? { by: role(o.by)! } : {}), brings: [...o.brings], ...(o.undoes ? { undoes: true } : {}), ...(o.bears?.length ? { bears: true } : {}),
+              ...(tr !== undefined ? { trust: { bps: tr, town_bps: townTrust(o.by!) } } : {}),
+              ...(o.by !== undefined && feelings.level("fear", o.by, t) > 0 ? { fear: Math.round(feelings.level("fear", o.by, t)) } : {}),
+              ...(o.by !== undefined && holdTo(o.by) > 0 ? { belief: Math.round(holdTo(o.by)) } : {}),
+              others: o.others, ...(o.cost ? { cost: o.cost } : {}), ...(learnedWay.known(o.kind) ? { learned: Math.round(learnedWay.get(o.kind)) } : {}), adj: Math.round(o.adj) };
+          }),
+          record: Object.fromEntries([...written].filter(([k]) => k !== "hours").map(([k, v]) => [k, JSON.parse(v)])),
+          outlook: { agency: { ...(p.outlook.agency ?? { mean_bps: inner.p.agency.mean_bps, sd_bps: inner.p.agency.sd_bps }) }, ...(p.attach_mean?.place_bps !== undefined ? { place_bps: p.attach_mean.place_bps } : {}) },
+          code: { odds: odds.map((o) => ({ key: o.key, ppm: Math.round((o.weight * 1_000_000) / total) })) },
+          ...more,
+        };
+      };
       /** Going after a want now: the way the mind takes among what would bring it about, or none (waiting). */
       const pursue = (w: Wanted): string => {
         const K = wants.p.choice;
@@ -2007,7 +2045,8 @@ export const citizen: BehaviourModule = {
         options.push({ key: "wait", value: -K.own - Math.round(K.agency * inner.zAgency()) });
         options.sort((a, b) => (a.key < b.key ? -1 : 1));
         const c = learned.choose(ctx.rng(`want-${w.about}-${w.against?.record ?? w.whom ?? ""}-${t}`), options, mind.person.temperament.openness);
-        decision({ t, domain: "want", strategy: "deliberate", choice: c.key, options: options.map((o) => ({ key: o.key, score: Math.round(learned.get(o.key) + o.value), ...(learned.known(o.key) ? { learned: Math.round(learned.get(o.key)) } : {}) })) });
+        decision({ t, domain: "want", strategy: "deliberate", choice: c.key, options: options.map((o) => ({ key: o.key, score: Math.round(learned.get(o.key) + o.value), ...(learned.known(o.key) ? { learned: Math.round(learned.get(o.key)) } : {}) })),
+          situation: situationOf(w, ways, options.map((o, i) => ({ key: o.key, weight: c.weights[i]! })), t) });
         const way = best.get(c.key);
         if (!way) {
           wants.tried(w, "wait", t);

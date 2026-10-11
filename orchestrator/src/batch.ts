@@ -131,7 +131,7 @@ export async function runOne(o: { world?: string; seed?: number; town?: number; 
   let composerReal = !!o.composer;
   let recordObservations = o.recordObservations;
   let recordDecisions = o.recordDecisions;
-  if (recordDecisions !== undefined && recordDecisions !== "full" && recordDecisions !== "none") throw new Error(`--record-decisions is full or none, not "${recordDecisions}"`);
+  if (recordDecisions !== undefined && !/^[a-z_]+(,[a-z_]+)*$/.test(recordDecisions)) throw new Error(`--record-decisions is full, none or a list of areas (want,found), not "${recordDecisions}"`);
   // What an audit found unstable (its report's avoid list), left out of the sparse mind.
   let consultAvoid: string[] | undefined = o.consultAvoid ? (JSON.parse(await Bun.file(o.consultAvoid).text()).avoid as string[]) : undefined;
   if (o.resume) {
@@ -180,7 +180,7 @@ export async function runOne(o: { world?: string; seed?: number; town?: number; 
   const watchdog = new Watchdog({ stallMs: stallMs(), diagnosisPath, runId });
   let s: RunSummary;
   try {
-    s = await runWorld({ config, runId, outDir: out, until: o.until, watchdog, ...(o.stop ? { stop: o.stop } : {}), ...(modules ? { modules } : {}), ...(consult ? { consult, ...(consultAvoid ? { consultAvoid } : {}) } : {}), ...(recordObservations ? { recordObservations: recordWho(recordObservations) } : {}), ...(recordDecisions === "none" ? { recordDecisions: "none" as const } : {}),
+    s = await runWorld({ config, runId, outDir: out, until: o.until, watchdog, ...(o.stop ? { stop: o.stop } : {}), ...(modules ? { modules } : {}), ...(consult ? { consult, ...(consultAvoid ? { consultAvoid } : {}) } : {}), ...(recordObservations ? { recordObservations: recordWho(recordObservations) } : {}), ...(recordDecisions !== undefined && recordDecisions !== "full" ? { recordDecisions } : {}),
       ...(real ? { adapter: serve(real.adapter), prices: { ...real.prices, ...(tr?.prices ?? {}), ...(first?.prices ?? {}) }, ...(real.budget ? { budget: real.budget } : {}) } : first ? { prices: first.prices } : {}),
       ...(tr ? { translatorAdapter: serve(tr.adapter) } : {}),
       ...(first ? { translatorFirst: serve(first.adapter), translatorArrangement: arrangement } : {}),

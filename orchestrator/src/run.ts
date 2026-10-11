@@ -72,7 +72,7 @@ export interface RunOptions {
   recordObservations?: string[] | "models" | "code" | "all" | "none";
   /** Code citizens' decisions as their minds made them (docs/design/ai-citizens.md 7; training data for citizen models):
    * "full" (the default: every one, in a log that is not lean) or "none". */
-  recordDecisions?: "full" | "none";
+  recordDecisions?: string; // "full", "none", or a list of areas ("want,found,found_shape"): those decisions only, kept in a lean log too, with no outcomes
   /** The sparse mind (docs/design/ai-citizens.md 4): code citizens may ask the run's model (the mock, or --model) how
    * much their options would matter, with answers remembered by kind. Off by default. */
   consult?: boolean;
@@ -566,10 +566,10 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     await k.request({ op: "annotate", annotation: { annotation: "note", subject: "orchestrator", data: { welfare: "this world lets language-model people physically harm others (life.harm is set)", participants: modelPeople } } });
 
   // What is recorded beyond the default, said at the start (a resumed run reads it back and records the same).
-  if ((o.recordObservations ?? "models") !== "models" || o.recordDecisions === "none")
+  if ((o.recordObservations ?? "models") !== "models" || (o.recordDecisions !== undefined && o.recordDecisions !== "full"))
     await k.request({ op: "annotate", annotation: { annotation: "note", subject: "orchestrator", data: { recording: {
       ...((o.recordObservations ?? "models") !== "models" ? { observations: Array.isArray(o.recordObservations) ? o.recordObservations.join(",") : o.recordObservations } : {}),
-      ...(o.recordDecisions === "none" ? { decisions: "none" } : {}) } } } });
+      ...(o.recordDecisions !== undefined && o.recordDecisions !== "full" ? { decisions: o.recordDecisions } : {}) } } } });
 
   // The composer, if the world has one: said at the start, with its mix and whether models or the mock play it.
   if (composerCfg) await k.request({ op: "annotate", annotation: { annotation: "note", subject: "orchestrator", data: { composer: { version: COMPOSE_VERSION, ...composerCfg, played_by: o.composerAdapters ? "models" : "mock" } } } });
@@ -723,6 +723,8 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
 
   /** A lean log (the world's log.detail) leaves out a code participant's written reasoning; a model's is always kept. */
   const lean = cfg.log?.detail === "lean";
+  /** Decisions of these areas only (`--record-decisions want,found`): kept whatever the log's detail, with no outcomes. */
+  const areas = o.recordDecisions !== undefined && o.recordDecisions !== "full" && o.recordDecisions !== "none" ? new Set(o.recordDecisions.split(",").map((x) => x.trim()).filter((x) => x)) : undefined;
   const keepReasoning = (u: Unit) => !lean || !!u.llm;
   /** What a unit asks the kernel for when it looks: its own looks, if it asked, or an observation. */
   const perceiveCommand = (u: Unit): { cmd: object; looks?: LookRequest[] } => {
@@ -1171,11 +1173,11 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
           if (x.u.llm) unanswered = 0;
           // A code citizen's decisions on the way to this action (docs/design/ai-citizens.md 7): training data, in full logs.
           const decisions = (r.value as any)?.[DECISIONS] as DecisionRecord[] | undefined;
-          if (decisions?.length && !lean && o.recordDecisions !== "none") for (const d of decisions) await k.request({ op: "annotate", annotation: { annotation: "decision", subject: x.u.participant, data: d } });
+          if (decisions?.length && (areas ? true : !lean && o.recordDecisions !== "none")) for (const d of decisions) if (!areas || areas.has(d.domain)) await k.request({ op: "annotate", annotation: { annotation: "decision", subject: x.u.participant, data: d } });
           // And what it came to know, since its last action, of how its choices turned out: one entry for them all
           // (wages every pay day for every worker are many, and small). Wherever decisions are recorded, and only there.
           const outcomes = (r.value as any)?.[OUTCOMES] as OutcomeRecord[] | undefined;
-          if (outcomes?.length && !lean && o.recordDecisions !== "none") await k.request({ op: "annotate", annotation: { annotation: "outcome", subject: x.u.participant, data: { outcomes } } });
+          if (outcomes?.length && !lean && !areas && o.recordDecisions !== "none") await k.request({ op: "annotate", annotation: { annotation: "outcome", subject: x.u.participant, data: { outcomes } } });
           // A code mind's change to its own record (docs/design/ai-citizens.md 10d): the kernel holds it and is its
           // only writer. It is state, so it is written in every run, whatever the log keeps.
           const change = recordChangeOf(x.u, r.value, positions);

@@ -1243,6 +1243,9 @@
               }
             }
           }
+        },
+        "situation": {
+          "$ref": "#/$defs/CitizenSituation"
         }
       }
     },
@@ -1991,6 +1994,313 @@
         },
         "plumbing_added": {
           "type": "boolean"
+        }
+      }
+    },
+    "CitizenSituation": {
+      "description": "The situation a person's decision about a want was made in (decisions of the areas want and found; docs/design/ai-citizens.md 11): what the everyday model is given, and nothing else. The want; what stands behind it (the matter gone wrong and what was done about it; the home and the paper); the person's means; each opening as what taking it up would bring, in the typed outcomes of the blocks, with what the person knows of it (their trust in whoever it is by beside the town's figure for that kind of institution, fear of them, what they hold of its teaching, how many they know who went that way, what they have learned of that kind of way, what it costs at once); the person's own record as the kernel holds it (contracts/entity-record.schema.json; without the hours); the town's figures the person's standing is read against; and the odds the code mind gave each option (parts per million). Whoever something is by is said as a role (landlord, employer, other_side) or a kind of institution, never a name. Nothing of anyone else's record is here, and no text the person has not read. Recorded, never scored.",
+      "type": "object",
+      "required": [
+        "v",
+        "want",
+        "means",
+        "openings",
+        "record",
+        "outlook",
+        "code"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "v": {
+          "const": 1
+        },
+        "want": {
+          "type": "object",
+          "required": [
+            "about",
+            "from",
+            "weight",
+            "days",
+            "tried",
+            "grown",
+            "seeks"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "about": {
+              "type": "string"
+            },
+            "from": {
+              "enum": [
+                "need",
+                "event",
+                "other"
+              ]
+            },
+            "weight": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "days": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "tried": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "grown": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "seeks": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "household": {
+              "type": "boolean"
+            },
+            "whom": {
+              "type": "string"
+            },
+            "against": {
+              "type": "string"
+            },
+            "last_way": {
+              "type": "string"
+            }
+          }
+        },
+        "matter": {
+          "type": "object",
+          "required": [
+            "matter",
+            "days",
+            "venues"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "matter": {
+              "type": "string"
+            },
+            "days": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "asked_days": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "answer": {
+              "type": "string"
+            },
+            "venues": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "amount": {
+              "type": "integer"
+            },
+            "told": {
+              "type": "boolean"
+            }
+          }
+        },
+        "home": {
+          "type": "object",
+          "required": [
+            "rent"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "rent": {
+              "type": "integer"
+            },
+            "owned": {
+              "type": "boolean"
+            },
+            "rent_to": {
+              "type": "integer"
+            },
+            "from_days": {
+              "type": "integer"
+            }
+          }
+        },
+        "means": {
+          "type": "object",
+          "required": [
+            "income",
+            "savings",
+            "essentials"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "income": {
+              "type": "integer"
+            },
+            "savings": {
+              "type": "integer"
+            },
+            "essentials": {
+              "type": "integer"
+            }
+          }
+        },
+        "openings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "kind",
+              "brings",
+              "others",
+              "adj"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "type": "string"
+              },
+              "by": {
+                "type": "string"
+              },
+              "brings": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "undoes": {
+                "type": "boolean"
+              },
+              "bears": {
+                "type": "boolean"
+              },
+              "trust": {
+                "type": "object",
+                "required": [
+                  "bps",
+                  "town_bps"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "bps": {
+                    "type": "integer"
+                  },
+                  "town_bps": {
+                    "type": "integer"
+                  }
+                }
+              },
+              "fear": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "belief": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "others": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "cost": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "learned": {
+                "type": "integer"
+              },
+              "adj": {
+                "type": "integer"
+              }
+            }
+          }
+        },
+        "record": {
+          "type": "object"
+        },
+        "outlook": {
+          "type": "object",
+          "required": [
+            "agency"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "agency": {
+              "type": "object",
+              "required": [
+                "mean_bps",
+                "sd_bps"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "mean_bps": {
+                  "type": "integer"
+                },
+                "sd_bps": {
+                  "type": "integer"
+                }
+              }
+            },
+            "place_bps": {
+              "type": "integer"
+            }
+          }
+        },
+        "code": {
+          "type": "object",
+          "required": [
+            "odds"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "odds": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "key",
+                  "ppm"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "ppm": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              }
+            }
+          }
+        },
+        "occasion": {
+          "type": "object",
+          "required": [
+            "how",
+            "sharers",
+            "beyond_household"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "how": {
+              "type": "string"
+            },
+            "sharers": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "beyond_household": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
         }
       }
     }

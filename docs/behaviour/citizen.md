@@ -1,4 +1,4 @@
-# `citizen.default` (v0.46.0): the AI citizen in code
+# `citizen.default` (v0.48.0): the AI citizen in code
 
 **Seat:** a townsperson (acts as themselves). **Source:** `participants/src/behaviour/citizen.ts`, with its mind in `participants/src/behaviour/mind.ts`, the richer record in `participants/src/behaviour/inner.ts` and the sparse mind in `participants/src/llm/consult.ts`. **Design:** [docs/design/ai-citizens.md](../design/ai-citizens.md). **Citations:** [docs/research/references.md](../research/references.md).
 
@@ -149,6 +149,7 @@ A want and an opening meet when the opening brings an outcome the want seeks, ca
 - **belief** in what a host teaches counts for turning to it (`belief`);
 - **those they know** who took that way (`others`, weighed again by conformity).
 Each choice is a recorded decision (area `want`); how the way turned out is learned (met: 10,000; granted or refused when asked: 10,000 or 1,000; not yet: 2,000) and moves the sense of agency as anything tried does.
+Since 0.48.0 each such decision, and each draw of whether to found, is recorded with its situation (the want, what stands behind it, every opening in typed terms with what the person knows of it, their own record, the odds the mind gave): what a model giving the odds in the mind's place would be shown (docs/design/ai-citizens.md 11a). Recording only: nothing reads it back.
 
 **When.** A want is gone after when it is born of an event (the wake the event caused), and again each time its way has had its time: `patience_days` (45) stretched by the person's patience (tradition, security, attachment to the place). At most two a week; most weeks, none: people still repeat. Nothing is added to the scheduler: a person wakes weekly and when something names them, as before.
 
