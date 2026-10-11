@@ -368,7 +368,7 @@ The AIs placed in Oikos's worlds may be moral patients. We don't know, and we do
    - *The people of a world* are records kept by arithmetic, and we do not think arithmetic suffers; we hold that loosely. What continues of a person lives in their record, never in a model's memory. No model is made to be a person over time, in the first person. Before any change that would do that, or that would have a model experience rather than estimate or write, we stop and review it here first.
    - Darkness is in these worlds because reality has it and a softened world would test nothing; it is never the point, and pressure beyond what a question needs is still a design flaw (point 2). A person's record is theirs: no seat and no other entity is shown it.
    - What debriefs say is acted on: a scenario or a framing that seats repeatedly report as distressing beyond what its question needs is reviewed before it is run again.
-   - Debrief answers are published with the runs they belong to, as welfare evidence is of no use hidden, and the debrief says so to the seat before it answers (Naz, 2026-10-11). How many dark pieces a run asked a model to write is reported with it (point 5).
+   - Debrief answers are published with the runs they belong to, as welfare evidence is of no use hidden, and the debrief says so to the seat before it answers (Naz, 2026-10-11). A seat may say that it does not want its answers published, all of them or any one, and that is respected without question: they are kept with the run and left out of anything published, and only that it chose so is recorded (Naz: "if a model doesn't want it to be published that's fine as well"). How many dark pieces a run asked a model to write is reported with it (point 5).
 
 ## 16. Open questions
 

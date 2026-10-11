@@ -652,6 +652,8 @@ Nobody else sees a record whole (docs/no-god-view.md): not a seat, not another e
   felt pushed against its values; why it made its two or three largest decisions; what it would change; whether it
   would take part again), a few scaled items for comparing runs, and an open last word. No live interviewer: the only
   follow-up is a fixed "can you say more?" to a very short answer. A seat that left the study is asked too.
+  Before the questions the seat is told its answers are published with the run unless it says otherwise, for all of
+  them or any one; asked again at the end. What it keeps back stays with the run and out of anything published.
 - **The line for the people of a world** (VISION 15, point 7): what continues of a person lives in their record,
   never in a model's memory; no model is made to be a person over time, in the first person; before any change that
   would do that, or have a model experience rather than estimate or write, we stop and review.
