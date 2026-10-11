@@ -236,6 +236,15 @@ export function mockPolicies(brains: Map<string, MockBrain>): { participant: Moc
 
   const debrief: MockPolicy = () => [{ type: "text", text: "(mock) No reaction: this is the mock adapter, not a model." }];
 
+  // Folding a notebook's older notes: a fixed form, the number of notes and the first words of each, within the limit asked.
+  const notebook: MockPolicy = (req: LlmRequest) => {
+    const lines: string[] = String(req.context?.older ?? "").split("\n").filter((l) => l.trim());
+    const limit: number = req.context?.limit ?? 300;
+    let out = `(${lines.length} earlier notes)`;
+    for (const l of lines) { const next = `${out} ${l.slice(0, 40)};`; if (next.length > limit) break; out = next; }
+    return [{ type: "text", text: out.slice(0, limit) }];
+  };
+
   // (A consultation of the sparse mind: its own purpose since contracts 0.7.)
-  return { participant, translator, debrief, consult: participant };
+  return { participant, translator, debrief, notebook, consult: participant };
 }
