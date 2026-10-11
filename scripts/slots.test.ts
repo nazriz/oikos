@@ -47,6 +47,22 @@ test("weights count: jobs of weight 2 in a pool of 4 run two at a time, and a we
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }, 120_000);
 
+test("a weight that is no weight is refused at once, with the weights there are; nothing is queued", async () => {
+  // (`--weight heavy` waited 29 minutes behind other jobs in silence: the third living pilot's review, fault 8.)
+  const dir = pool(), trace = join(dir, "trace");
+  try {
+    for (const w of ["heavy", "0", "-2", "1.5", ""]) {
+      const r = await sh(["bun", slots, "--weight", w, "--", ...job(trace)], env(dir, 2));
+      expect(r.code).toBe(2);
+      expect(r.err).toContain(`"${w}" is not a weight`);
+      expect(r.err).toContain('"half"');
+    }
+    expect(existsSync(trace) ? readFileSync(trace, "utf8") : "").toBe("");
+    expect(readdirSync(dir).filter((f) => f.startsWith("slot-") || f.startsWith("wait-"))).toEqual([]);
+    expect((await sh(["bun", slots, "--weight", "half", "--", ...job(trace)], env(dir, 2))).code).toBe(0);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+}, 120_000);
+
 test("a dead holder's token is reclaimed", async () => {
   const dir = pool();
   try {

@@ -20,7 +20,7 @@ import { CounterWatch } from "./counter";
 import { callModel, ModelCallFailed, promptTooLong, type LlmIO } from "./call";
 import { kindSaid, LOOK_CHARS_MAX, ofKind, paperKind, NOTHING_FOUND, NOTHING_NEW, renderObservation, renderStanding, when, type Looked, type WhoIs } from "./render";
 
-export const LLM_PARTICIPANT_VERSION = "0.16.0"; // 0.16.0: a notebook nearly full at a sitting's opening has its older, untouched notes folded into a summary in its own words (one extra, counted call, purpose "notebook"; the notes replaced stay in that call's transcript; an answer not readable or too long drops nothing and it is told); 0.15.0: its standing instructions say what confirming a draft means (what is confirmed is all that is done; what the draft does not list is not done), and an agreement on file says a worker will "come to" their place of work; 0.14.0: a sitting missed because its model did not answer is made up the next working day and said; its office's staff set out (posts, who is in each, vacancies) at its first sitting and when they change; a paper filed with its office brings it back at the next working day's sitting, a day's papers together, unless it holds that kind or is set not to be; a list is gone through a part at a time (from_entry) and every look says what was searched; a paper under one heading only, and what came by kind; an unread answer is asked for whole; a seat's own effort; 0.13.0: a request that came to nothing is put to it at once and by its own words, a notebook of 8,000 characters and told how to make room when nearly full, offices and people by their names in the world and never a participant's own id, who holds a post, figures in the papers it is shown read as a person reads them (money, days, dates, per cent), a letter whose about is not one id goes with it at its head, and nothing a seat sends is lost without a word; a look into papers answers with a list (a paper is read when asked for by its id, a long one a part at a time), one look and one whole prompt have a ceiling, a prompt its model would not take is never sent again unchanged; 0.12.0: told that a paper is named by its id, and one it cannot name is looked up first; 0.11.0: a place it is not at is gone to (someone is sent, and what they found is told when they are back); 0.10.0: who is who is looked up by name, a register someone else keeps is asked about one named thing, a board is searched (docs/design/knowing.md); 0.9.0: an answer read exactly or not at all (told and asked once more when not), a way out of the study not clearly meant is asked about; 0.8.0: looks kept ready for every sitting; no turn when nothing came of looking into whole reports; a notebook added to or changed in part
+export const LLM_PARTICIPANT_VERSION = "0.16.1"; // 0.16.1: a fold whose summary comes back longer than asked is asked for once more, and then kept up to the last sentence that fits, the seat told what was left out (it failed, three times of three, in the third living pilot); the limit is said in characters and words; 0.16.0: a notebook nearly full at a sitting's opening has its older, untouched notes folded into a summary in its own words (one extra, counted call, purpose "notebook"; the notes replaced stay in that call's transcript; an answer not readable or too long drops nothing and it is told); 0.15.0: its standing instructions say what confirming a draft means (what is confirmed is all that is done; what the draft does not list is not done), and an agreement on file says a worker will "come to" their place of work; 0.14.0: a sitting missed because its model did not answer is made up the next working day and said; its office's staff set out (posts, who is in each, vacancies) at its first sitting and when they change; a paper filed with its office brings it back at the next working day's sitting, a day's papers together, unless it holds that kind or is set not to be; a list is gone through a part at a time (from_entry) and every look says what was searched; a paper under one heading only, and what came by kind; an unread answer is asked for whole; a seat's own effort; 0.13.0: a request that came to nothing is put to it at once and by its own words, a notebook of 8,000 characters and told how to make room when nearly full, offices and people by their names in the world and never a participant's own id, who holds a post, figures in the papers it is shown read as a person reads them (money, days, dates, per cent), a letter whose about is not one id goes with it at its head, and nothing a seat sends is lost without a word; a look into papers answers with a list (a paper is read when asked for by its id, a long one a part at a time), one look and one whole prompt have a ceiling, a prompt its model would not take is never sent again unchanged; 0.12.0: told that a paper is named by its id, and one it cannot name is looked up first; 0.11.0: a place it is not at is gone to (someone is sent, and what they found is told when they are back); 0.10.0: who is who is looked up by name, a register someone else keeps is asked about one named thing, a board is searched (docs/design/knowing.md); 0.9.0: an answer read exactly or not at all (told and asked once more when not), a way out of the study not clearly meant is asked about; 0.8.0: looks kept ready for every sitting; no turn when nothing came of looking into whole reports; a notebook added to or changed in part
 
 export interface LlmParticipantConfig {
   participant: string;
@@ -401,6 +401,15 @@ export function foldPlan(lines: string[], ages: number[]): { fold: number[]; upT
   chars -= 1;
   return chars >= FOLD_LEAST ? { fold, upTo, chars, limit: Math.max(300, Math.floor(chars / 4)) } : undefined;
 }
+/** A text kept as far as the last sentence that ends within `limit` characters (a full stop, question or exclamation
+ * mark, semicolon or line end, followed by a space or the end); "" if no sentence of it ends within them. */
+export function trimAtSentence(text: string, limit: number): string {
+  if (text.length <= limit) return text;
+  const head = text.slice(0, limit + 1);
+  let end = -1;
+  for (const m of head.matchAll(/[.!?;](?=\s)|\n/g)) end = m[0] === "\n" ? m.index! : m.index! + 1;
+  return end > 0 ? text.slice(0, end).trimEnd() : "";
+}
 const dayOf = (t: number) => Math.floor(t / 86_400) + 1;
 export const CARRY_MAX = 40_000;
 
@@ -678,33 +687,61 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
     const older = plan.fold.map((i) => lines[i]!).join("\n");
     const day = dayOf(plan.upTo);
     const header = `Summary of my notes up to day ${day}:`;
-    const content = `Your notebook is nearly full: ${notes.length.toLocaleString("en")} of the ${NOTEBOOK_MAX.toLocaleString("en")} characters it holds are used. These are your older notes, the ones you have not touched since you wrote them (written up to day ${day}); your newer notes stay just as they are:\n\n${older}\n\nWrite a summary of these older notes in your own words, keeping what you will still need from them, in at most ${plan.limit.toLocaleString("en")} characters. What you write replaces the older notes above, under the heading "${header}"; give only the summary.`;
-    let reply: string;
-    try {
-      const res = await callModel(io, {
-        purpose: "notebook", subject: c.participant, ref: "notebook", system: c.framing.system ?? "", maxTokens: Math.min(c.maxTokens ?? 4000, Math.ceil(plan.limit / 2) + 256), ...(c.effort ? { effort: c.effort } : {}),
-        messages: [{ role: "user", content }], context: { participant: c.participant, notes, older, limit: plan.limit, day },
-      }, seenSystems);
-      reply = res.content.filter((b) => b.type === "text").map((b: any) => b.text).join("\n").trim();
-    } catch (e) {
-      if (!(e instanceof ModelCallFailed)) throw e;
-      return fail("no answer came");
+    const words = Math.max(10, Math.round(plan.limit / 60) * 10);
+    const asked = `at most ${plan.limit.toLocaleString("en")} characters (about ${words} words)`;
+    const content = `Your notebook is nearly full: ${notes.length.toLocaleString("en")} of the ${NOTEBOOK_MAX.toLocaleString("en")} characters it holds are used. These are your older notes, the ones you have not touched since you wrote them (written up to day ${day}); your newer notes stay just as they are:\n\n${older}\n\nWrite a summary of these older notes in your own words, keeping what you will still need from them, in ${asked}. What you write replaces the older notes above, under the heading "${header}"; give only the summary.`;
+    // One asking, and one more if the summary came back longer than asked (each a counted call of its own).
+    const ask = async (messages: LlmMessage[]): Promise<string | undefined> => {
+      try {
+        const res = await callModel(io, {
+          purpose: "notebook", subject: c.participant, ref: "notebook", system: c.framing.system ?? "", maxTokens: Math.min(c.maxTokens ?? 4000, Math.ceil(plan.limit / 2) + 256), ...(c.effort ? { effort: c.effort } : {}),
+          messages, context: { participant: c.participant, notes, older, limit: plan.limit, day },
+        }, seenSystems);
+        return res.content.filter((b) => b.type === "text").map((b: any) => b.text).join("\n").trim();
+      } catch (e) {
+        if (!(e instanceof ModelCallFailed)) throw e;
+        return undefined;
+      }
+    };
+    const first = await ask([{ role: "user", content }]);
+    if (first === undefined) return fail("no answer came");
+    if (!first) return fail("the answer was empty or could not be read");
+    let reply = first;
+    /** What of the summary was left out, where it had to be cut (said to the seat, and kept in the note). */
+    let cut: { whole: string; left_out: string; asked_again: boolean } | undefined;
+    if (reply.length > plan.limit) {
+      // (Longer than asked, as a model's count of its own characters often is: 990, 964 and 1,054 for 803, 835 and
+      // 954 asked in the third living pilot, and each fold then failed. It is asked once more, told the length it
+      // wrote; if that is still too long the shorter of the two is kept as far as the last sentence that fits, and
+      // the seat is told what was left out. Nothing is dropped without its being said.)
+      const second = await ask([{ role: "user", content }, { role: "assistant", content: first },
+        { role: "user", content: `That summary is ${first.length.toLocaleString("en")} characters, and it has to be ${asked} to fit. Write it again, shorter, keeping what you will still need; give only the summary.` }]);
+      const again = second ? second : undefined;
+      const best = again !== undefined && again.length < first.length ? again : first;
+      if (best.length <= plan.limit) reply = best;
+      else {
+        const fits = trimAtSentence(best, plan.limit);
+        if (!fits) return fail(`the summary was ${first.length} characters${again !== undefined ? `, and ${again.length} when asked again` : ""}, longer than the ${plan.limit} asked for, with no sentence ending within them`);
+        cut = { whole: best, left_out: best.slice(fits.length).trim(), asked_again: again !== undefined };
+        reply = fits;
+      }
     }
-    if (!reply) return fail("the answer was empty or could not be read");
-    if (reply.length > plan.limit) return fail(`the summary was ${reply.length} characters, longer than the ${plan.limit} asked for`);
     const summary = `${header} ${reply}`;
     const folded = new Set(plan.fold);
-    const first = plan.fold[0]!;
+    const at = plan.fold[0]!;
     const kept: string[] = [], keptAges: number[] = [];
     lines.forEach((l, i) => {
-      if (i === first) for (const x of entries(summary)) { kept.push(x); keptAges.push(plan.upTo); }
+      if (i === at) for (const x of entries(summary)) { kept.push(x); keptAges.push(plan.upTo); }
       if (!folded.has(i)) { kept.push(l); keptAges.push(ages[i] ?? t); }
     });
     const was = notes.length;
     notes = kept.join("\n");
     ages = keptAges;
-    await note({ notebook_folded: { replaced_characters: older.length, replaced_entries: plan.fold.length, summary_characters: summary.length, notebook_before: was, notebook_after: notes.length, up_to_day: day, replaced: older } });
-    return [`Your notebook was nearly full, so your notes up to day ${day} (${older.length.toLocaleString("en")} characters) are now a summary you wrote (${summary.length.toLocaleString("en")} characters); the newer notes are as you left them.`];
+    await note({ notebook_folded: { replaced_characters: older.length, replaced_entries: plan.fold.length, summary_characters: summary.length, notebook_before: was, notebook_after: notes.length, up_to_day: day, replaced: older,
+      ...(cut ? { summary_cut: { written_characters: cut.whole.length, asked_characters: plan.limit, left_out: cut.left_out, asked_again: cut.asked_again } } : {}) } });
+    return [`Your notebook was nearly full, so your notes up to day ${day} (${older.length.toLocaleString("en")} characters) are now a summary you wrote (${summary.length.toLocaleString("en")} characters); the newer notes are as you left them.${cut
+      ? ` The summary you wrote was ${cut.whole.length.toLocaleString("en")} characters, longer than the ${plan.limit.toLocaleString("en")} there was room for${cut.asked_again ? " even when you were asked again" : ""}, so it was kept up to the end of the last sentence that fits. Left out of your notebook (${cut.left_out.length.toLocaleString("en")} characters): "${cut.left_out}". Note again whatever of that you still need.`
+      : ""}`];
   };
   /** What it is shown, with no id of the platform's own in it: wherever a participant's id stands (in a letter's
    * words, a paper's, a reference to something waiting to be confirmed), the id the world knows that party by stands

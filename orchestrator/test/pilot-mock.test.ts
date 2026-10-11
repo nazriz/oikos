@@ -41,3 +41,9 @@ test("an entry's trained translator answers first in the dry run too: one whose 
   const other = await mockPilot({ ...good, name: "first-not-ours", translator_first: "claude-code/claude-haiku-5-5", translator_arrangement: "beside" }, join(base, "w3.mock"), 1);
   expect(other).toMatchObject({ generated: true, ranToEnd: true });
 }, 120_000);
+
+test("an entry whose composing models are called for real is dry-run with the mock as its composer: no limit is asked for", async () => {
+  // (The third living pilot's queue carried `--composer`, and its dry run refused to start for want of a spending limit.)
+  const r = await mockPilot({ ...good, name: "with-composer", sets: ["citizens=20", "mayor=llm", "profile=ke-nakuru-2026"], args: ["--composer"] }, join(base, "w4.mock"), 1);
+  expect(r).toMatchObject({ generated: true, ranToEnd: true });
+}, 120_000);

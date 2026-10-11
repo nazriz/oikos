@@ -55,7 +55,11 @@ export async function mockPilot(p: any, outRoot: string, days: number): Promise<
   // (But for a trained translator that answers first: kept, with where its models are.)
   const first: string | undefined = typeof p.translator_first === "string" && p.translator_first.startsWith("decide/") ? p.translator_first : undefined;
   if (first && p.env?.OIKOS_TRANSLATOR_MODELS) env.OIKOS_TRANSLATOR_MODELS = p.env.OIKOS_TRANSLATOR_MODELS;
-  const cmd = ["bun", "orchestrator/src/cli.ts", "run", p.world, "--seeds", "1", "--out", out, "--until", String(until), "--overwrite", "--no-measure", ...sets.flatMap((x) => ["--set", x]), ...(p.args ?? []),
+  // (An entry that has its composing models called for real (`--composer`) is dry-run without that flag: the mock then
+  // plays the composer, as it does every seat, and no spending limit is asked for. With the flag the run refused to
+  // start for want of a limit, and the entry could not be dry-run at all: the third living pilot's review, fault 8.)
+  const args: string[] = (p.args ?? []).filter((a: string) => a !== "--composer");
+  const cmd = ["bun", "orchestrator/src/cli.ts", "run", p.world, "--seeds", "1", "--out", out, "--until", String(until), "--overwrite", "--no-measure", ...sets.flatMap((x) => ["--set", x]), ...args,
     ...(first ? ["--translator-first", first, ...(p.translator_arrangement ? ["--translator-arrangement", p.translator_arrangement] : [])] : [])];
   const child = Bun.spawn(cmd, { cwd: root, stdin: "ignore", stdout: "pipe", stderr: "pipe", env });
   const [text, err, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
