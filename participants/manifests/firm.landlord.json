@@ -1,6 +1,6 @@
 {
   "name": "firm.landlord",
-  "version": "0.15.0",
+  "version": "0.16.0",
   "doc": "docs/behaviour/firms.md",
   "params": {
     "after_term": {
@@ -89,6 +89,10 @@
       "default": 90,
       "source": "placeholder"
     },
+    "hiring_cost_weeks": {
+      "schema": {},
+      "source": "the world gives it (no default)"
+    },
     "idle_days": {
       "schema": {},
       "unit": "days",
@@ -155,6 +159,11 @@
       "default": null,
       "source": "placeholder"
     },
+    "possession": {
+      "schema": {},
+      "default": null,
+      "source": "placeholder"
+    },
     "register": {
       "schema": {},
       "default": null,
@@ -214,6 +223,11 @@
     "short_days": {
       "schema": {},
       "unit": "days",
+      "source": "the world gives it (no default)"
+    },
+    "smooth_months": {
+      "schema": {},
+      "unit": "months",
       "source": "the world gives it (no default)"
     },
     "spend_share_bps": {

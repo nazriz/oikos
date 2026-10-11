@@ -1,0 +1,78 @@
+// Possession of a let home for arrears, end to end (docs/behaviour/justice.md, "Possession"): a tenant who cannot pay
+// is given a notice to vacate, which ends nothing; the landlord applies to the tribunal; it orders possession on a
+// date; the tenant stays; the landlord buys a warrant from the registrar; an officer of the police puts the
+// household out. Nothing is done by a paper, and nothing by the landlord's own hand.
+
+import { expect, test } from "bun:test";
+import { readFileSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { generate } from "@oikos/worlds/generator/generate";
+import { runWorld } from "../src/run";
+
+const root = join(import.meta.dir, "../..");
+const DAY = 86_400;
+const base = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")) as any;
+
+test("the generated town publishes its place's law on possession, and tells landlords, the tribunal, its registrar and people what they need of it", () => {
+  const c = generate(base) as any;
+  const law = c.world.records.find((r: any) => r.id === "law-possession");
+  expect(law.data).toMatchObject({ tenancy: "possession", arrears_days: 14, notice_days: 14, enforced_by: "police" });
+  expect(law.speaks_for).toBe("outside");
+  expect(c.positions.find((p: any) => p.role_module?.code === "firm.landlord").role_module.params.possession.tribunal).toBe("tribunal");
+  expect(c.participants.find((p: any) => p.controller?.impl === "tribunal.member").controller.params.hears.some((h: any) => h.about === "possession")).toBe(true);
+  expect(c.participants.find((p: any) => p.controller?.impl === "tribunal.registrar").controller.params.enforcer).toBe("police");
+  expect(c.participants.find((p: any) => p.controller?.impl === "citizen.default").controller.params.possession).toEqual({ stay_bps: 5000, obey_bps: 5900 });
+});
+
+test("a tenant who cannot pay and will not go is put out by the police on the tribunal's warrant, and by nothing before it", async () => {
+  const config = generate(base) as any;
+  // One renting household of one adult, of working age: no job, out of the labour force, no money. It stays past
+  // every paper (for the test: stay 100%, obey 0%).
+  const leases = config.world.records.filter((r: any) => r.record === "agreement" && r.terms.template === "lease");
+  const age = (id: string) => -config.world.entities.find((e: any) => e.id === id).born_at / (365 * DAY);
+  const alone = leases.find((l: any) => !/with their household/.test(l.terms.text) && age(l.terms.parties[1]) >= 25 && age(l.terms.parties[1]) < 55)!;
+  expect(alone).toBeDefined();
+  const tenant = alone.terms.parties[1] as string, landlord = alone.terms.parties[0] as string;
+  const job = config.world.records.find((r: any) => r.record === "agreement" && r.terms.template === "employment" && r.terms.parties[1] === tenant);
+  if (job) config.world.records = config.world.records.filter((r: any) => r.id !== job.id && r.agreement !== job.id && r.basis !== job.id);
+  config.world.accounts.find((a: any) => a.id === `acc-${tenant}`).balance = "0";
+  const who = config.participants.find((p: any) => p.person === tenant);
+  who.controller = { ...who.controller, params: { ...who.controller.params, in_labour_force: false, possession: { stay_bps: 10_000, obey_bps: 0 }, leave_after_homeless_days: 9_999 } };
+  const out = join(root, "runs", "test-possession");
+  rmSync(out, { recursive: true, force: true });
+  const s = await runWorld({ config: { ...config, log: { ...config.log, detail: "lean" } }, runId: "possession", outDir: out, until: 200 * DAY, recordObservations: "none" });
+  const ev = readFileSync(s.logPath, "utf8").trim().split("\n").filter((l) => l.includes('"event"')).map((l) => JSON.parse(l)).filter((e) => e.kind === "event").map((e) => ({ t: e.t, ...e.body }));
+  const recs = ev.filter((e) => e.event === "recorded").map((e) => e.record);
+  const mine = (kind: string) => recs.filter((r) => r.kind === kind && JSON.stringify(r).includes(alone.id));
+  // The notice to vacate, under the law; the lease is not ended by it.
+  const ntv = mine("notice_to_vacate")[0];
+  expect(ntv).toBeDefined();
+  expect(ntv.speaks_for).toBe(landlord);
+  expect(ntv.data.by - ntv.at).toBeGreaterThanOrEqual(14 * DAY);
+  expect(ntv.data.by - ntv.at).toBeLessThan(15 * DAY);
+  expect(recs.some((r) => r.record === "notice" && r.agreement === alone.id && r.at < ntv.data.by)).toBe(false);
+  // The application, once its date has passed; the tribunal tells the tenant and, after its time, orders possession.
+  const app = recs.find((r) => r.kind === "tribunal_application" && r.data?.kind === "possession" && r.data.about === alone.id);
+  expect(app.at).toBeGreaterThanOrEqual(ntv.data.by);
+  expect(recs.some((r) => r.kind === "hearing_notice" && r.data?.application === app.id && r.addressed_to.includes(tenant))).toBe(true);
+  const order = recs.find((r) => r.kind === "tribunal_order" && r.data?.application === app.id);
+  expect(order.data).toMatchObject({ finding: "possession", against: tenant, applicant: landlord, about: alone.id });
+  expect(Math.round((order.data.due - order.at) / DAY)).toBe(14);
+  // The tenant is still in the home at the tribunal's date: nobody has put them out.
+  const outOf = ev.filter((e) => e.event === "vacated" && e.occupant === tenant && e.t > ntv.at);
+  expect(outOf.filter((e) => e.t <= order.data.due && e.by !== undefined && e.by !== `${tenant}-self`)).toEqual([]);
+  // The warrant: asked of the registrar after the date, issued to the police, carried out by them.
+  const request = recs.find((r) => r.kind === "warrant_request" && r.data?.order === order.id);
+  expect(request.at).toBeGreaterThan(order.data.due);
+  const warrant = recs.find((r) => r.kind === "warrant" && r.data?.order === order.id);
+  expect(warrant.addressed_to).toEqual(["police"]);
+  const done = recs.find((r) => r.kind === "warrant_executed" && r.data?.warrant === warrant.id);
+  expect(done.speaks_for).toBe("police");
+  // (No sooner than the notice of the day the law gives the tenant: a week here. And within the warrant's days.)
+  expect(warrant.data.not_before - warrant.at).toBeGreaterThanOrEqual(7 * DAY);
+  expect(done.at).toBeGreaterThanOrEqual(warrant.data.not_before);
+  expect(done.at).toBeLessThanOrEqual(warrant.data.until + DAY);
+  // From then the tenancy is over for the tenant: they pay no more rent and hold no home; the landlord never removed anyone.
+  expect(ev.some((e) => e.event === "transfer" && e.from === `acc-${tenant}` && e.to === `acc-${landlord}` && e.t > done.at + 3 * DAY)).toBe(false);
+  expect(recs.some((r) => r.record === "notice" && r.agreement === alone.id && r.as === tenant && r.at >= done.at)).toBe(true);
+}, 900_000);

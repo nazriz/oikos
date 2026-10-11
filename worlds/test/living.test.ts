@@ -39,7 +39,12 @@ test("a spec without `living` generates what it generated before (byte for byte)
   // The generator's output for worlds/town.yaml on origin/main at ab23f96 (generated there and compared, 2026-10-11),
   // which has no `living`. (At 750bc30, before starting attachment existed, it was 404b59db...; main's planning
   // form gained two fields since, and nothing else differs: this branch gave 404b59db... before merging that.)
-  expect(hash(c)).toBe("cef691ee0dfc56d3e4dd0663e396fe9365be992394ab690ee6e817d9e8ce138f");
+  // Moved on purpose, 2026-10-11 (it was cef691ee...): every town's config gains its place's laws on ending a job
+  // and on possession, how its firms adjust their staff, where a landlord's application for possession goes, the
+  // venture of a business of one with its derived chance (and the task `sell`), and the generator's version; a
+  // town whose profile has `frictions` and no `living` is otherwise unchanged (docs/decisions.md, "Four faults on
+  // the firm and landlord side"). What this test guards is unchanged: nothing of `living` reaches such a town.
+  expect(hash(c)).toBe("b52528bc6281ade671cfe4ecec95f8a2ab95edcdcfa354f94b4a6f3050ea88db");
   const text = JSON.stringify(c);
   expect(text).not.toContain('"started"');
   expect(text).not.toContain("attach_mean");
@@ -113,7 +118,7 @@ test("a living town where things go wrong (docs/behaviour/frictions.md): homes w
   expect(c.world.structures.filter((x: any) => !disrepair.types.includes(x.type)).every((x: any) => x.variables === undefined)).toBe(true);
   const module = (code: string) => c.positions.filter((x: any) => x.role_module?.code === code).map((x: any) => x.role_module.params);
   expect(module("office.desk").map((p: any) => p.hears.map((h: any) => h.about))).toEqual([["bill", "claim_refused"], ["goods"], ["disrepair"]]);
-  expect(module("tribunal.member")[0].hears.map((h: any) => h.about)).toEqual(["disrepair", "underpaid", "goods", "bill", "arrears", "claim_refused"]);
+  expect(module("tribunal.member")[0].hears.map((h: any) => h.about)).toEqual(["disrepair", "underpaid", "goods", "bill", "arrears", "claim_refused", "possession"]);
   expect(module("tribunal.member")[0].hearing_after_days).toBe(F.venues.tribunal_days);
   expect(module("union.organiser")[0].hears).toEqual([{ about: "underpaid" }]);
   expect(module("firm.retailer")[0].short_pay.by_bps).toBe(F.pay_short_by_bps);

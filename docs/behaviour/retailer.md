@@ -1,5 +1,7 @@
 # `firm.retailer` (v0.1.0): a shop, after Lengnick (2013)
 
+**Since 0.12.0 (2026-10-11)** the monthly rule for staff is not Lengnick's one-month rule as written below: a shop sets its staff from its trade smoothed over months, holds them through a dip, and lets the most recent hire go only when the surplus has lasted as long as ending the job and hiring again would cost. See [firms.md](firms.md), "Adjusting labour". Prices, wages offered, stock and dividends are as below.
+
 **Seat:** a shop's manager. **Source:** `participants/src/behaviour/retailer.ts`. Shared rules: [trade.md](trade.md) (orders, payments, delivery notes), `lengnick.ts` (prices, wages, dividends; [producer.md](producer.md)).
 
 ## What it does

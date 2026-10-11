@@ -35,11 +35,12 @@ test("unlawful rent increases are taken to the tribunal, found invalid, and with
   // The notices that break the cap (as the law reads them), and only those, are taken to the tribunal.
   const unlawful = kind("rent_increase").filter((n) => n.data.rent * 100 > n.data.was * 104);
   expect(unlawful.length).toBeGreaterThan(3);
-  const applications = kind("tribunal_application");
+  const applications = kind("tribunal_application").filter((a) => a.data.kind === "rent_increase");
   expect(applications.map((a) => a.data.notice).sort()).toEqual(unlawful.map((n) => n.id).sort());
   // Each listed, both sides told, and on the day found invalid under the cap.
-  expect(kind("hearing_notice").length).toBe(applications.length);
-  const orders = kind("tribunal_order");
+  expect(kind("hearing_notice").filter((n) => n.data.kind === "rent_increase").length).toBe(applications.length);
+  // (The tribunal's orders on these notices; it also hears possession now, which is orchestrator/test/possession.test.ts.)
+  const orders = kind("tribunal_order").filter((o) => o.data.kind === "rent_increase");
   expect(orders.length).toBe(applications.length);
   for (const o of orders) {
     expect(o.data.finding).toBe("invalid");

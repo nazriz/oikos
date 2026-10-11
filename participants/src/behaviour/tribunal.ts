@@ -4,6 +4,7 @@
 // order. Nothing happens because of an order unless someone acts on it: the parties obey it or not, and an unpaid
 // order to pay is enforced by the registrar, who orders the debtor's bank to pay from what it holds (a garnishee order).
 
+import { dateWords } from "../forms";
 import { cites } from "../contracts";
 import { cents } from "../money";
 import { need, params, type BehaviourModule, type ParticipantContext } from "../module";
@@ -19,7 +20,7 @@ export const member: BehaviourModule = {
   name: "tribunal.member",
   answers: {"office": "the tribunal", "acts": "What it acts on: an application made to it by a party to a dispute, which it hears and decides by the laws in force."},
   issues: P.TRIBUNAL_MEMBER,
-  version: "0.3.0", // 0.3.0: lists (docs/behaviour/frictions.md): the matters the world says it hears beyond its own three, heard by the common procedure on its own forms, as far as its hearing days go; it says what it hears and what applying costs
+  version: "0.4.0", // 0.4.0: hears applications for possession of a let home for arrears: a plan to pay, or possession on a date (docs/behaviour/justice.md, "Possession"); 0.3.0: lists (docs/behaviour/frictions.md): the matters the world says it hears beyond its own three, heard by the common procedure on its own forms, as far as its hearing days go; it says what it hears and what applying costs
   doc: "docs/behaviour/justice.md",
   cadence: () => DAY,
   firstWake: (ctx) => 9 * 3600 + ctx.rng("first-wake").below(3600),
@@ -36,12 +37,15 @@ export const member: BehaviourModule = {
       uphold_bps: HEARING_DEFAULTS.uphold_bps,
       fee: 0,
       account: "",
+      // Possession of a let home (docs/behaviour/justice.md, "Possession"), where it hears that: the days from its
+      // order to the date for possession, and the longest plan to pay it sets (the world's law's figures).
+      possession: null as { days: number; plan_months: number } | null,
     }, ctx.params);
     const me = ctx.entity;
     const book = new Book();
     const listed = new Map<string, number>(); // application -> its hearing
     const decided = new Set<string>();
-    const lists = p.hears.length ? new Hearings(me, ctx.rng, { hears: p.hears, answer_days: p.hearing_after_days, cases_per_day: p.cases_per_day, uphold_bps: { ...HEARING_DEFAULTS.uphold_bps, ...p.uphold_bps }, within_days: p.pay_within_days, refer_to: {} },
+    const lists = p.hears.length ? new Hearings(me, ctx.rng, { hears: p.hears, answer_days: p.hearing_after_days, cases_per_day: p.cases_per_day, uphold_bps: { ...HEARING_DEFAULTS.uphold_bps, ...p.uphold_bps }, within_days: p.pay_within_days, refer_to: {}, ...(p.possession ? { possession: p.possession } : {}) },
       { application: ["tribunal_application"], notice: "hearing_notice", response: "tribunal_response", decision: "tribunal_order" }, APPLICATION_KINDS) : undefined;
     const listKinds = new Set(p.hears.map((h) => h.about));
     let said = false;
@@ -137,12 +141,14 @@ export const registrar: BehaviourModule = {
   answers: {"office": "the tribunal's registry", "acts": "What it acts on: an order of the tribunal to pay that has gone unpaid, which it enforces by an order to the debtor's bank."},
   issues: P.TRIBUNAL_REGISTRAR,
   issuesWith: (p) => ({ banks: p.banks ?? [] }),
-  version: "0.1.1", // 0.1.1: an order to pay that rests on no recorded debt is settled against the order itself
+  version: "0.2.0", // 0.2.0: issues a warrant of possession, to whoever carries its warrants out, on an order whose date has passed; 0.1.1: an order to pay that rests on no recorded debt is settled against the order itself
   doc: "docs/behaviour/justice.md",
   cadence: () => DAY,
   firstWake: (ctx) => 10 * 3600 + ctx.rng("first-wake").below(3600),
   create(ctx: ParticipantContext) {
-    const p = params({ banks: [] as string[] }, ctx.params); // the banks it can order (the world's)
+    // (The banks it can order; and, where the tribunal orders possession, whoever carries its warrants out and how
+    // long they have: the world's.)
+    const p = params({ banks: [] as string[], enforcer: "", warrant_days: 14, eviction_notice_days: 0 }, ctx.params);
     need(p, ["banks"], "tribunal.registrar");
     const me = ctx.entity;
     const book = new Book();
@@ -167,6 +173,23 @@ export const registrar: BehaviourModule = {
           steps.push(because(`An order to pay ${usd(unpaid)}, due and unpaid: ordering ${o.data.against}'s bank to pay it from what it holds.`,
             say("garnishee_order", `Garnishee order: pay ${usd(unpaid)} owed by ${o.data.against} under order ${o.id} to ${o.data.to}, from what you hold for them.`,
               { to: p.banks, visible: [...p.banks, me, o.data.against, o.data.applicant], basis: o.id, data: { order: o.id, debtor: o.data.against, amount: unpaid, to: o.data.to, claim: o.data.claim ?? o.id } })));
+        }
+        // A landlord asks for a warrant on an order for possession whose date has passed: issued to whoever carries
+        // our warrants out (the world's: its police), naming the home, the tenant and their household, and the day
+        // it runs out. The tenant is told. Nothing is done by the paper: someone must go.
+        for (const r of book.open("warrant_request").filter((x) => (x.addressed_to ?? []).includes(me) && !done.has(x.id))) {
+          const o = book.records.get(String(r.data?.order)) as any;
+          if (o?.kind === "tribunal_order" && o.data?.finding === "possession" && t < Number(o.data.due)) continue; // (not due yet)
+          done.add(r.id);
+          if (!p.enforcer || o?.kind !== "tribunal_order" || o.data?.finding !== "possession" || o.data.applicant !== r.speaks_for) {
+            steps.push(because("A request for a warrant on something that isn't an order for possession to this applicant: declined.", say("enforcement_decline", "Declined: no order for possession to you to enforce.", { to: [r.speaks_for!], visible: [r.speaks_for!, me], basis: r.id })));
+            continue;
+          }
+          // (Not before the tenant has had the law's notice of the day; not after the warrant's last day.)
+          const notBefore = (Math.floor(t / DAY) + 1 + p.eviction_notice_days) * DAY, until = Math.max(notBefore, t + p.warrant_days * DAY);
+          steps.push(because(`An order for possession whose date has passed, and the tenant has not left: a warrant to ${p.enforcer}, to be carried out from ${dateWords(notBefore)} to ${dateWords(until)}.`,
+            say("warrant", `Warrant of possession under order ${o.id}: ${o.data.against} and their household are to be removed from ${o.data.space ?? "the home"}, and possession given to ${o.data.applicant}. To be carried out ${p.eviction_notice_days > 0 ? `no sooner than ${dateWords(notBefore)} and ` : ""}by ${dateWords(until)}.`,
+              { to: [p.enforcer], visible: [p.enforcer, me, o.data.against, o.data.applicant], basis: o.id, data: { order: o.id, lease: o.data.about, tenant: o.data.against, landlord: o.data.applicant, space: o.data.space, structure: o.data.structure, household: o.data.household ?? [o.data.against], not_before: notBefore, until } })));
         }
         return steps;
       },

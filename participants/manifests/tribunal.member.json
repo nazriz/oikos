@@ -1,6 +1,6 @@
 {
   "name": "tribunal.member",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "doc": "docs/behaviour/justice.md",
   "params": {
     "account": {
@@ -47,6 +47,11 @@
       },
       "unit": "days",
       "default": 28,
+      "source": "placeholder"
+    },
+    "possession": {
+      "schema": {},
+      "default": null,
       "source": "placeholder"
     },
     "uphold_bps": {

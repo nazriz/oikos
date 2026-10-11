@@ -9,7 +9,7 @@ import type { LookRequest, Observation, StatementRecord } from "../contracts";
 import { channels } from "../contracts";
 import { need, params, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
 import { ask, nextLook, because, Book, publishedPrice as buildingPrice, DAY, MONTH, ownAccount, Pace, pay, say, type Step, usd, withdraw, outOfTime, team } from "./common";
-import { Bargaining, Staffing, stepper, WindingUp } from "./firms";
+import { Bargaining, LabourPlan, Staffing, stepper, terminationLaw, WindingUp } from "./firms";
 import { Borrowing } from "./credit";
 import { distribute, LENGNICK, movePrice, moveWage, payOut } from "./lengnick";
 import { Deliveries, goodsPrices, held, order, OrderBook, priceList, UNDELIVERABLE, type Order } from "./trade";
@@ -27,7 +27,7 @@ export const retailer: BehaviourModule = {
   name: "firm.retailer",
   issues: [P.JOB_ADVERTISEMENT, ...P.TRADE],
   issuesWith: (p) => ({ ...P.staffingOwn({ role: p.role ?? "shop assistant", industry: p.industry, workplace: p.workplace, notice_days: p.notice_days ?? 14 }), police: p.police }),
-  version: "0.11.0", // 0.11.0: everyday frictions (docs/behaviour/frictions.md): pay that comes short, at the world's rate and its character's; asked, told or ordered to put right short pay or goods said to be faulty; 0.10.0: wants of its own (docs/behaviour/firm-wants.md): a character from its owner's values, which answers a worker who asks for a rise, and a record of its own; 0.9.1: a business of one buys stock when it runs low (daily), keeps its stock money at today's price, follows its owner's home, and closes when its owner has gone; 0.9.0: a business run by its owner alone (operator), stocked for a few days and drawn on by its owner; 0.8.4: takes on the share of its hands the world gives by the day; 0.8.3: registers the share of its jobs the world gives for shops (firms.md, "Jobs an employer does not register")
+  version: "0.12.0", // 0.12.0: adjusts its staff as firms do (docs/behaviour/firms.md, "Adjusting labour"): sales smoothed over months, staff held through a dip and let go only when the surplus has lasted what ending the job costs, redundancy pay under the world's law; a business of one can be founded in a run and is closed when its owner gives it up (docs/behaviour/entry.md); 0.11.0: everyday frictions (docs/behaviour/frictions.md): pay that comes short, at the world's rate and its character's; asked, told or ordered to put right short pay or goods said to be faulty; 0.10.0: wants of its own (docs/behaviour/firm-wants.md): a character from its owner's values, which answers a worker who asks for a rise, and a record of its own; 0.9.1: a business of one buys stock when it runs low (daily), keeps its stock money at today's price, follows its owner's home, and closes when its owner has gone; 0.9.0: a business run by its owner alone (operator), stocked for a few days and drawn on by its owner; 0.8.4: takes on the share of its hands the world gives by the day; 0.8.3: registers the share of its jobs the world gives for shops (firms.md, "Jobs an employer does not register")
   doc: "docs/behaviour/retailer.md",
   cadence: () => DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(24) * 3600,
@@ -64,6 +64,10 @@ export const retailer: BehaviourModule = {
         // The share of its staff's hours a shop plans to fill with serving (placeholder): serving can't be stored, and
         // orders come in lumps, so hands for exactly the average leave queues that never clear (Kingman 1961).
         utilisation_bps: 8000,
+        // How it adjusts its staff to its trade (docs/behaviour/firms.md, "Adjusting labour"): the months it smooths
+        // its sales over, and what taking someone on costs it in weeks of their pay (placeholders; a world's profile
+        // may state its own). 0 and 0: it reacts to each month's sales, as it did until 2026-10-11.
+        adjust: { smooth_months: 3, hiring_cost_weeks: 8 },
         lender: "", // whom it borrows from (none: it doesn't)
         // Insolvency (docs/behaviour/insolvency.md; placeholders): short of wages this long with no credit, or in default on
         // a loan, and it winds up over this long.
@@ -118,6 +122,12 @@ export const retailer: BehaviourModule = {
     const me = ctx.entity;
     const book = new Book();
     const staffing = new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, registered_bps: p.registered_bps, casual_bps: p.casual_bps, day_wage: p.day_wage, work_days: p.work_days, week_days: p.look_days, workplace: p.workplace, role: p.role, ...(p.industry ? { industry: p.industry } : {}), ...(p.short_pay ? { short: p.short_pay } : {}) });
+    const labour = new LabourPlan(p.adjust);
+    // (After letting someone go because we could not pay them, we take nobody on until we hold the wages of those we
+    // would then have for as long as a surplus must last before a job is worth ending, where a month's is enough
+    // otherwise: the test to take someone on is never weaker than the test to keep them. Until 2026-10-11 a works
+    // short of money hired each month on a month's wages in hand and shed weeks later.)
+    const monthsInHand = () => (staffing.cashLayoffAt > -Infinity && (p.adjust.smooth_months > 1 || p.adjust.hiring_cost_weeks > 0) ? labour.waits(terminationLaw(book), 0, 0, p.notice_days) : 1);
     // Asked to put something right (pay kept back, goods said to be faulty), told of a complaint, or ordered to: what our books say of it
     // (what we kept back we know; whether goods were faulty we cannot), and setting someone's pay right from here on.
     let payAccount = "";
@@ -167,7 +177,7 @@ export const retailer: BehaviourModule = {
     let nextDraw = -1;
     // A business of one: where it trades from now (its owner tells it when they move home), whether it has anywhere
     // to, and whether its owner has gone from the town (it then closes: what it holds is its owner's).
-    const at = { premises: p.premises, workplace: p.workplace, cell: p.premises_cell, nowhere: false, read: 0, gone: false, closed: false };
+    const at = { premises: p.premises, workplace: p.workplace, cell: p.premises_cell, nowhere: false, read: 0, gone: false, closed: false, givenUp: false };
     /** A month's sales, as the days of them we stock and keep money for. */
     const stockFor = (monthly: number) => (p.stock_days === 30 ? monthly : Math.ceil((monthly * p.stock_days) / 30));
     const books = { last: null as number | null, in: 0, out: 0, next: 0 }; // the stocktake's books
@@ -198,6 +208,11 @@ export const retailer: BehaviourModule = {
       if (setup.founderAccount && !setup.registered) {
         setup.registered = true;
         steps.push(because("Our shareholders: our founder, who put in the capital.", say("shareholders", `The shareholders of ${me}, and their shares.`, { to: [p.founder!], visible: [me, p.founder!], data: { holders: [{ holder: p.founder, account: setup.founderAccount, shares: 10_000 }] } })));
+      }
+      // (A business of one, founded to trade from its owner's home: no premises to buy. Once the capital is in, it trades.)
+      if (p.operator && !p.listing) {
+        if (setup.founderAccount) setup.ready = true;
+        return setup.ready ? [...steps, because("Our owner's capital is in: opening for trade, from their home.")] : steps;
       }
       // The listing we founded ourselves to buy from; if the seller has published it again (at a new price), that one.
       // (Looked up, where the world gives us the boards: the standing listings of our premises, and a notice of their
@@ -285,6 +300,8 @@ export const retailer: BehaviourModule = {
           if (r.speaks_for !== p.operator || !(r.addressed_to ?? []).includes(me)) continue;
           publishedPrice = -1; // (its prices go up where it now is, or come down)
           if (r.data?.nowhere) { at.nowhere = true; continue; }
+          // (Its owner gives it up: it stops trading, refunds what it had not served, pays what it holds to its owner and says it has closed.)
+          if (r.data?.closed) { at.gone = true; at.givenUp = true; continue; }
           const had = held(obs, at.premises, p.kind);
           const to = String(r.data?.structure);
           if (had > 0 && to !== at.premises) steps.push(because(`Our owner lives at ${r.data?.space} now: taking our stock there.`, C.call("goods", { kind: p.kind, quantity: C.text(String(had)), to: me, at: to, from_at: at.premises })));
@@ -331,17 +348,26 @@ export const retailer: BehaviourModule = {
           const moved = movePrice(p, rng, price, stock, lastDemand, marginalCost, canServe);
           price = moved.price;
           if (moved.why) priceWhy = moved.why;
-          // Headcount: a worker at a time towards the hands last month's sales needed.
-          const needed = p.operator ? 0 : Math.min(p.max_staff, Math.max(p.min_staff, Math.ceil((lastDemand * p.serve_labour * 10_000) / (hoursPerWorkerMonth * p.utilisation_bps))));
+          // Headcount: a worker at a time towards the hands the trade we expect needs: our sales smoothed over a
+          // few months, never one month's alone. Over that, we hold our staff through the dip (their idle hours are
+          // ours to bear), replace nobody who leaves, and let the most recent hire go only once the surplus has
+          // lasted as long as ending the job and hiring again would cost (docs/behaviour/firms.md, "Adjusting labour").
+          const expected = labour.expect(lastDemand);
+          const needed = p.operator ? 0 : Math.min(p.max_staff, Math.max(p.min_staff, Math.ceil((expected * p.serve_labour * 10_000) / (hoursPerWorkerMonth * p.utilisation_bps))));
+          const trade = p.adjust.smooth_months > 1 ? `the trade we expect (${expected} a month; last month ${lastDemand})` : `last month's sales (${lastDemand})`;
           headcount = workers.length;
           headcountWhy = why.length ? `; ${why.join("; ")}` : "";
           if (needed > workers.length) {
+            labour.month(false, 1);
             headcount = workers.length + 1;
-            headcountWhy = `: last month's sales (${lastDemand}) needed ${needed} hands to serve${headcountWhy}`;
+            headcountWhy = `: ${trade} needed ${needed} hands to serve${headcountWhy}`;
           } else if (needed < workers.length) {
-            headcount = workers.length - 1;
-            steps.push(...staffing.letGo(book, t, `Month's end: last month's sales (${lastDemand}) needed ${needed} hands to serve, and we have ${workers.length}: letting one go.`, "Redundancy: there isn't the trade."));
-          }
+            const waits = labour.waits(terminationLaw(book), workers.length, staffing.lastHireYears(book, t), p.notice_days);
+            const m = labour.month(true, waits);
+            headcount = m.letGo ? workers.length - 1 : needed; // (held: nobody who leaves is replaced while we are over)
+            if (m.letGo) steps.push(...staffing.letGo(book, t, `Month's end: ${trade} needed ${needed} hands to serve, and we have ${workers.length}${waits > 1 ? `, as for ${waits} months now` : ""}: letting one go.`, "Redundancy: there isn't the trade."));
+            else steps.push(because(`Month's end: ${trade} needed ${needed} hands to serve, and we have ${workers.length}: keeping them for now (${m.lasted} of the ${waits} months such a surplus must last before letting someone go is worth what it costs), and replacing nobody who leaves.`));
+          } else labour.month(false, 1);
           // Out of the month's earnings, what we hold beyond the buffer goes to the shareholders: a month's wages, a
           // month's stock at cost, and Lengnick's chi of the wage bill.
           const bill = Math.floor((Math.max(workers.length, headcount) * wage * MONTH) / p.period);
@@ -360,7 +386,7 @@ export const retailer: BehaviourModule = {
         steps.push(...staffing.shortening(book, t, acc.account, acc.balance));
         steps.push(...staffing.routine(obs, book, acc.account, {
           // Only with room at the workplace (someone let go may still be there, working out their notice).
-          target: trading && !p.operator ? Math.min(p.max_staff, headcount) : 0, wage, canPost: trading && !p.operator && acc.balance >= Math.floor(((workers.length + 1) * wage * MONTH) / p.period) && roomAtWork(obs, workers.length) > 0,
+          target: trading && !p.operator ? Math.min(p.max_staff, headcount) : 0, wage, canPost: trading && !p.operator && acc.balance >= monthsInHand() * Math.floor(((workers.length + 1) * wage * MONTH) / p.period) && roomAtWork(obs, workers.length) > 0,
           why: `Short of this month's headcount (${workers.length} of ${headcount}${headcountWhy}): posting a job at ${usd(wage)} every ${p.period / DAY} days.`,
         }));
         steps.push(...borrowing.steps(book, t, acc.account));
@@ -389,7 +415,7 @@ export const retailer: BehaviourModule = {
             steps.push(borrowing.apply(t, acc.account, amount, 12, "working capital", `We have ${usd(acc.balance)}, not enough for the next pay period (${workers.length} staff): asking our bank for ${usd(amount)} of working capital before letting anyone go.`));
           } else if (!borrowing.waiting(t)) {
             const s = staffing.letGo(book, t, `Can't cover the next pay period (${usd(acc.balance)} for ${keeping} staff), and no loan to be had: letting the most recent hire go.`, "Redundancy: we can't cover the wage bill.");
-            if (s.length) headcount = Math.min(headcount, keeping - 1);
+            if (s.length) { headcount = Math.min(headcount, keeping - 1); staffing.cashLayoffAt = t; }
             steps.push(...s);
           }
         }
@@ -399,14 +425,14 @@ export const retailer: BehaviourModule = {
         // it was to serve is refunded, and (gone) what it holds goes to its owner's account and it says it has closed.
         if (p.operator && (at.gone || at.nowhere)) {
           const old = book.open("price_list").filter((r) => r.speaks_for === me);
-          if (old.length) steps.push(because(at.gone ? "Our owner has gone: we have stopped trading." : "Nowhere to trade from: our prices come down until there is.", ...old.map((r) => withdraw(r.id, "Not trading."))));
+          if (old.length) steps.push(because(at.givenUp ? "Our owner has given the business up: we have stopped trading." : at.gone ? "Our owner has gone: we have stopped trading." : "Nowhere to trade from: our prices come down until there is.", ...old.map((r) => withdraw(r.id, "Not trading."))));
           publishedPrice = -1;
           for (const x of queue.splice(0)) steps.push(fillWith(x.o, 0, x.served, [], "We are not trading: refunding what we had not served."));
           for (const o of orders.due(book, t).paid) steps.push(fillWith(o, 0, 0, [], "We are not trading: refunding the order."));
           if (at.gone && !at.closed) {
             at.closed = true;
-            const out = distribute(book, me, acc, acc.balance, "Our owner has gone from the town: what the business holds is theirs");
-            steps.push(...out.steps, because("Closed: our owner has gone.", say("closure", `${me} has closed: its owner has gone.`, { visible: "public", data: { firm: me, to_creditors: 0, to_shareholders: out.paid } })));
+            const out = distribute(book, me, acc, acc.balance, at.givenUp ? "Our owner has given the business up: what it holds is theirs" : "Our owner has gone from the town: what the business holds is theirs");
+            steps.push(...out.steps, because(at.givenUp ? "Closed: our owner has given the business up." : "Closed: our owner has gone.", say("closure", `${me} has closed: its owner has ${at.givenUp ? "given it up" : "gone"}.`, { visible: "public", data: { firm: me, to_creditors: 0, to_shareholders: out.paid, ...(at.givenUp ? { given_up: true } : {}) } })));
           }
           return steps;
         }

@@ -1,6 +1,6 @@
 {
   "name": "citizen.default",
-  "version": "0.47.0",
+  "version": "0.48.0",
   "doc": "docs/behaviour/citizen.md",
   "params": {
     "accept_fewer_bedrooms_after_days": {
@@ -262,6 +262,21 @@
       "default": 0,
       "source": "placeholder"
     },
+    "found_own_buffer_months": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "months",
+      "default": 1,
+      "source": "placeholder"
+    },
+    "found_own_ppm": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 0,
+      "source": "placeholder"
+    },
     "founding": {
       "schema": {},
       "default": null,
@@ -280,6 +295,22 @@
         "description": "how long a pregnancy lasts (the world's birth physics: the standard 38 weeks from conception)"
       },
       "default": 22982400,
+      "source": "placeholder"
+    },
+    "give_up_below_bps": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "bps",
+      "default": 5000,
+      "source": "placeholder"
+    },
+    "give_up_months": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "months",
+      "default": 6,
       "source": "placeholder"
     },
     "goals": {
@@ -471,6 +502,11 @@
         "type": "integer"
       },
       "default": 200,
+      "source": "placeholder"
+    },
+    "possession": {
+      "schema": {},
+      "default": null,
       "source": "placeholder"
     },
     "register": {
