@@ -145,7 +145,7 @@ export const lending: BehaviourModule = {
     { what: "request", why: "The bank's own files: its customers' instructions, among them the repayments of the loans this office made." },
     { what: "accounts", why: "The bank's own ledger: it keeps its customers' accounts, and a lending office reads what an applicant holds with it." },
   ],
-  version: "0.4.2", // 0.4.2: a loan standing at the start is counted from its own repayment day where it names one (attrs.first_due), not from the bank's first look; 0.4.1: main's 0.3.1 with this branch's 0.4.0 (an applicant is looked up)
+  version: "0.4.3", // 0.4.3: a loan it offered is read from its own file where it is not in its head, so whoever holds the office pays out what was approved; 0.4.2: a loan standing at the start is counted from its own repayment day where it names one (attrs.first_due), not from the bank's first look; 0.4.1: main's 0.3.1 with this branch's 0.4.0 (an applicant is looked up)
   doc: "docs/behaviour/credit.md",
   cadence: () => DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(24) * 3600,
@@ -184,6 +184,7 @@ export const lending: BehaviourModule = {
     let nextInterest = MONTH;
     let own: string | undefined;
     let termsOffered = false;
+    const paidOut = new Map<string, number>(); // a loan -> when a payment of ours that settles it was seen to leave (its principal paid out)
     let adopted = false; // loans in force when we first looked (the world's: mortgages already being repaid), taken on
 
     return stepper(
@@ -191,6 +192,7 @@ export const lending: BehaviourModule = {
         book.absorb(obs);
         own = own ?? ownAccount(obs)?.account;
         for (const tx of channels.transactions(obs)) {
+          if (own && tx.from === own && tx.settles && !paidOut.has(tx.settles)) paidOut.set(tx.settles, tx.t);
           const list = inflows.get(tx.to) ?? [];
           if (tx.from !== tx.to) list.push({ t: tx.t, amount: cents(tx.amount) });
           while (list.length && list[0]!.t < obs.t - 90 * DAY) list.shift();
@@ -318,6 +320,21 @@ export const lending: BehaviourModule = {
           const amount = payout(l.payment, l.rate_bps ?? p.rate_bps.person!, left);
           steps.push(because(`A payout figure for loan ${l.agreement}: ${left} repayments left, worth ${usd(amount)} now.`,
             say("loan_payout", `To pay off loan ${l.agreement}: ${usd(amount)}, to ${acc.account}, naming the loan.`, { to: [l.borrower], visible: [l.borrower, me], basis: r.id, data: { loan: l.agreement, amount, account: acc.account } })));
+        }
+        // A loan we offered that is on our file and not in our head (2026-10-11): whoever holds the office carries on
+        // from its papers. Until then an offer was remembered only by the id its making gave back; where the offer was
+        // made through someone else's hand (the mock in the lending seat says each act as a seat would, and hears no
+        // id back) nothing was remembered, and no loan it approved was ever paid out: 232 offers, no principal, in a
+        // 120-day run of a 3,000-person town. Read from the agreement: made in the run, ours, not yet paid out.
+        for (const r of book.ofType("agreement")) {
+          if (r.record !== "agreement" || r.terms.template !== "loan" || r.terms.parties[0] !== me || loans.has(r.id) || r.author === "genesis") continue;
+          const who = r.terms.parties[1]!;
+          const lent = r.terms.commitments.find((c: any) => c.who === me)?.does?.outcome?.money;
+          const repay = r.terms.commitments.find((c: any) => c.who === who)?.does?.outcome?.money;
+          if (!lent?.to || !repay?.from) continue;
+          const payment = cents(repay.amount), months = Math.max(1, Math.round((r.terms.term ?? 0) / MONTH));
+          const rateOf = /\(([\d.]+)% a year\)/.exec(String(r.terms.text ?? ""));
+          loans.set(r.id, { agreement: r.id, borrower: who, account: lent.to, principal: cents(lent.amount), payment, months, ...(rateOf ? { rate_bps: Math.round(Number(rateOf[1]) * 100) } : {}), ...(paidOut.has(r.id) ? { start: paidOut.get(r.id)! } : {}) });
         }
         // Signed: pay the principal out (drawing funding first if we're short).
         const toPay = [...loans.values()].filter((l) => l.start === undefined && book.signedBy(l.agreement, l.borrower));

@@ -1,6 +1,6 @@
 {
   "name": "bank.lending",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "doc": "docs/behaviour/credit.md",
   "params": {
     "arrears_days": {
