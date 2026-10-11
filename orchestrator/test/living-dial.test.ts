@@ -41,7 +41,10 @@ const TOWN = join(root, "worlds/town.yaml");
 // "What the third living pilot found" and "A draw is named for what it is about"): a draw about a paper is named for
 // which paper it is to whoever draws, not for the paper's number on file, so every such draw falls anew; a notice to
 // vacate does to a tenant what a notice on the lease did; a possession application names the notice it relies on.
-const STEP_1 = "d48e330ba9123d60d3f8efef3f0f710ee6e50e6ff59e8bc086a4a696959599bb";
+// And again on 2026-10-12, with homes dealt by income (d48e330b... until then; docs/decisions.md, "Homes by income"):
+// every town opens differently: payments in force from the first day, people with nothing coming in living with
+// kin, owners by the head's age, tenancies by what each household has coming in.
+const STEP_1 = "611b0834cbc1e1e0fd3d9e458219afc9fb0816de95c78e1a35c32e6453737d9b";
 
 test("with the dial absent or at 0 a town is step 1's town, to the state hash", async () => {
   const out = mkdtempSync(join(tmpdir(), "oikos-dial-"));

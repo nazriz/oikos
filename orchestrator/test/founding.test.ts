@@ -36,6 +36,13 @@ const TOWN = join(root, "worlds/town.yaml");
 // founding is on day 177: an occasion needs someone from beyond the household known to share the want. So these runs
 // are long ones. A town that is compared runs at the scale of 10,000.)
 const SURE = "living.founding.scale_bps=600000";
+// (2026-10-12, homes by income: one other who shares the want is enough here, where the profile asks two. Until then
+// this small town's occasions were mostly wants about homes its households could not pay for, shared by many; without
+// that artefact nobody in it founds anything in 205 days at the profile's two, nor at one with frictions as sourced: so
+// things also go wrong six times as often as sourced, as the other small-town tests have them. The study's own knob, docs/behaviour/
+// founding.md; the first test, which holds the town with founding off and on to one state, does not use it.)
+const ONE = "living.founding.shared_min=1";
+const WRONGS = "living.friction_bps=60000";
 const LIVING = "living.initiative_bps=10000";
 
 // The state of worlds/town.yaml as a living town (initiative at 10,000, frictions as sourced), seed 1, after 60 days,
@@ -53,7 +60,10 @@ const LIVING = "living.initiative_bps=10000";
 // And again on 2026-10-12, with the fixes after the third living pilot (87f8af1b... until then; docs/decisions.md,
 // "What the third living pilot found" and "A draw is named for what it is about"): draws about a paper no longer
 // turn on the paper's number on file; a notice to vacate does to a tenant what a notice on the lease did.
-const STEP_2B = "0adec141c211e5b7814681ae9e559ec7c5cc3d19cace61bf1c284a6a58d1ec6c";
+// And again on 2026-10-12, with homes dealt by income (0adec141... until then; docs/decisions.md, "Homes by income"):
+// every town opens differently (payments in force, people with nothing coming in living with kin, owners by the
+// head's age, tenancies by income).
+const STEP_2B = "c23648b8d9e07522cdfd4a6c82ab0429b8f234dff188ff287ff5ff5bf8784ce2";
 
 test("with founding off a living town is step 2b's town, to the state hash; turned on with no shape to found, nobody does anything they did not do before", async () => {
   const out = mkdtempSync(join(tmpdir(), "oikos-founding-"));
@@ -81,7 +91,7 @@ test("with founding off a living town is step 2b's town, to the state hash; turn
 test("founding in code: with the composer off no model is called; a founded thing says what it is for in plain words, keeps its founder's want in a record of its own, and is joined", async () => {
   const out = mkdtempSync(join(tmpdir(), "oikos-founding-"));
   try {
-    const config = (await loadWorld(TOWN, [LIVING, "living.founding=true", SURE])).config;
+    const config = (await loadWorld(TOWN, [LIVING, "living.founding=true", SURE, ONE, WRONGS])).config;
     // The generator's part: the profile's sizes reach people, with the post a founder holds and the hall's hire.
     const citizen = config.templates.find((x: any) => x.controller?.params?.founding)?.controller.params.founding ?? config.participants.find((x: any) => x.controller?.params?.founding).controller.params.founding;
     expect(citizen.chance_bps).toBeGreaterThan(0);
@@ -163,7 +173,7 @@ function scriptedTranslator(seen: string[]): LlmAdapter {
 test("words: a composed piece is asked for and logged; its parts go through the translator and are done only as the founder's module says a draft may be; the rest arrives as a closed choice; the same seed, the same town; a resumed run is served the piece", async () => {
   const out = mkdtempSync(join(tmpdir(), "oikos-founding-"));
   try {
-    const world = async () => ({ ...(await loadWorld(TOWN, [LIVING, "living.founding=true", SURE, "living.composer=true"])).config, seed: 1 });
+    const world = async () => ({ ...(await loadWorld(TOWN, [LIVING, "living.founding=true", SURE, ONE, WRONGS, "living.composer=true"])).config, seed: 1 });
     const config = await world();
     expect(config.dials.composer).toEqual({ pieces_per_month: 8, mix: [{ model: "claude-code/claude-sonnet-5-5", share_bps: 5_000 }, { model: "codex/gpt-6.1-sol", share_bps: 5_000 }], fallback: "claude-code/claude-sonnet-5-5", follow_up_bps: 2_500 });
     const asked: string[] = [];
@@ -227,7 +237,7 @@ test("words: a composed piece is asked for and logged; its parts go through the 
 test("the composer is never asked more often than its dial allows: at nothing a month no model is called, and every statement is the plain one", async () => {
   const out = mkdtempSync(join(tmpdir(), "oikos-founding-"));
   try {
-    const config = { ...(await loadWorld(TOWN, [LIVING, "living.founding=true", SURE, "living.composer.pieces_per_month=0"])).config, seed: 1 };
+    const config = { ...(await loadWorld(TOWN, [LIVING, "living.founding=true", SURE, ONE, WRONGS, "living.composer.pieces_per_month=0"])).config, seed: 1 };
     expect(config.dials.composer.pieces_per_month).toBe(0);
     const s = await runWorld({ config: lean(config), runId: "capped", outDir: out, until: 205 * DAY, recordObservations: "none" });
     expect(s.composer).toMatchObject({ asked: 0, composed: 0 });

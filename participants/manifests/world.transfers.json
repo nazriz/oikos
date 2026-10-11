@@ -1,6 +1,6 @@
 {
   "name": "world.transfers",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "doc": "docs/behaviour/boundary.md",
   "params": {
     "account": {
@@ -67,6 +67,16 @@
   },
   "perceives": [],
   "state": "none",
+  "keeps": [
+    {
+      "what": "benefit_claim",
+      "why": "Claims for support are made to this office and to nobody else: the file of them is its own, from the claims already in payment when a year begins."
+    },
+    {
+      "what": "benefit_decision",
+      "why": "Each decision on a claim is this office's own paper: it pays from them, and keeps every one it has made."
+    }
+  ],
   "issues": [
     {
       "form": "benefit_decision",

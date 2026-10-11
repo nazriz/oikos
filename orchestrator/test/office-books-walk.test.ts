@@ -149,7 +149,9 @@ test("what each office's code acts on was in that office's books, as its clerk k
     if (ripe) ripeCases++;
   }
   console.log(`  the tribunal's list: ${listed.length} cases listed, ${tribunal.length} papers; a case on a paper's list ${onList} times; ${ripeCases} cases stood with their day come at some paper, named there ${ripeNamed} times; faults ${missing.length}${missing.length ? ` (${missing.slice(0, 5).join("; ")})` : ""}`);
-  expect(listed.length).toBeGreaterThan(3);
+  // (More than 2 where it was more than 3: with homes dealt by income, 2026-10-12, this town opens with the cases its
+  // own households make, those where someone is out of work as the year begins, not a quarter of its tenancies.)
+  expect(listed.length).toBeGreaterThan(2);
   expect(ripeCases).toBeGreaterThan(0);
   expect(missing).toEqual([]);
 }, 1_800_000);

@@ -71,7 +71,9 @@ test("households live, move and pay together", async () => {
   // a firm acting on what it saw at the moment's start; and a household moving into a home its last tenants are still
   // leaving (refused, and tried again: docs/behaviour/citizen.md); and a child home from school by its own round while the
   // parent's act moving the household in is still under way.
-  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left", "already_present"].includes(e.code))).toEqual([]);
+  // (And, since 2026-10-12, someone going to a building that is under water that day: the flood's own refusal, met in
+  // the town as drawn with homes by income, where it had not happened to fall on anyone's way before.)
+  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left", "already_present", "flooded"].includes(e.code))).toEqual([]);
 }, 300_000);
 
 test("a child born here is brought home by the parent who bore them and added to the household's record", async () => {

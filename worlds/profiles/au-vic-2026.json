@@ -24,7 +24,7 @@
       "decimal_mark": ".",
       "group_mark": ","
     },
-    "households": {
+    "households": {"kin_households_most_bps": 300,
       "lone_bps": 2560,
       "group_bps": 503,
       "couple_bps": 2735,
@@ -509,7 +509,7 @@
       15000000,
       35000000
     ],
-    "support": {
+    "support": {"take_up_bps": {"pension": 6400, "unemployment": 5000},
       "payments": [
         {
           "id": "pension",
@@ -634,7 +634,7 @@
       }
     ],
     "labour_force_participation_bps": 8000,
-    "tenancy": {
+    "tenancy": {"rent_share_of_income": {"of": "gross", "bands": [{"under_bps": 2000, "bps": 5600}, {"under_bps": 3000, "bps": 2300}, {"under_bps": 5000, "bps": 1500}, {"bps": 600}], "placeholder": true},
       "possession": {"arrears_days": 14, "notice_days": 14, "possession_days": 14, "plan_months": 6, "warrant_days": 14, "eviction_notice_days": 7, "stay_past_notice_bps": 5000, "leave_on_order_bps": 5900},
       "end_notice_days": 60,
       "tenant_notice_days": 30,
@@ -813,7 +813,7 @@
     },
     "round": { "work_start_hour": 9, "work_end_hour": 17, "work_days": 5, "school_start_hour": 9, "school_end_hour": 15, "travel_seconds_per_cell": 18, "travel_by_cover": { "water": 120, "wetland": 30, "woodland": 25, "scrub": 25 },
       "roads": { "seconds_per_cell": 2, "within_cells": 3, "budget_per_resident": 30000 } },
-    "ownership": {
+    "ownership": {"owner_bps_by_age": [{"from": 18, "bps": 3600}, {"from": 30, "bps": 5000}, {"from": 50, "bps": 7200}, {"from": 65, "bps": 7940}],
       "house_owner_bps": 7200,
       "mortgage_bps_by_age": [{ "from": 18, "bps": 8500 }, { "from": 45, "bps": 5500 }, { "from": 65, "bps": 1500 }],
       "mortgage_payment_per_month": 173300,
@@ -930,6 +930,10 @@
     }
   },
   "sources": {
+    "tenancy.rent_share_of_income": "PLACEHOLDER bands around one opened mean: private renters' housing costs averaged 20.2% of gross household income in 2019-20; lower-income private renters averaged 32%, and 58% of them paid over 30% (ABS, Housing Occupancy and Costs, 2019-20, https://www.abs.gov.au/statistics/people/housing/housing-occupancy-and-costs/latest-release, release page opened 2026-10-12; national). The bands themselves (56% under a fifth, 23% a fifth to three tenths, 15% three tenths to a half, 6% over a half) were NOT read: they are in the release's data cubes 4, 8 and 13, which were not opened. To replace from cube 4. HOW IT IS USED (docs/behaviour/generator.md, \"Homes by income\"): each renting household of a new town draws its share from these bands (evenly within a band; the open band from its lower bound to twice it, at most everything), which gives the rent it carries; households and let homes are matched by it. A target as well: the town's own distribution at the start is reported beside it and is not fitted to it.",
+    "support.take_up_bps": "pension 64%: DERIVED from an opened page: on 28 March 2025, 62% of people aged 65 and over received income support and 91% of those the Age Pension, so about 56% of those 65 and over (26% at 65-69, 59% at 70-79, 80% at 85 and over; AIHW, Australia's welfare, Income support for older Australians, https://www.aihw.gov.au/reports/australias-welfare/income-support-older-australians, opened 2026-10-12); the pension starts at 67, so the two years before it are taken out of the denominator by a rough twelfth (to confirm against DSS payment demographics by single age). The real pension is means-tested and the profile's is not: those not drawing it here claim it on the first day and are granted. unemployment 50%: PLACEHOLDER: no ratio of JobSeeker recipients to the unemployed was found. HOW IT IS USED (docs/behaviour/generator.md, \"Payments in force\"): of those the payment's rule already entitles as the year begins, this share open with it in payment; the rest claim it when they first look, as before.",
+    "ownership.owner_bps_by_age": "Home ownership by age of the household reference person, Census 2021, national: 36% at 25-29, 50% at 30-34, 72% at 50-54 (AIHW, Australia's welfare, Home ownership and housing tenure, https://www.aihw.gov.au/reports/australias-welfare/home-ownership-and-housing-tenure, opened 2026-10-12); 79.4% at 65 and over (a search summary of ABS Census 2021 reporting: to confirm). The bands between are not filled: 35 to 49 is read at the 30-34 figure and under 30 at the 25-29 figure, which understates both. To replace from the Census table by ten-year bands. HOW IT IS USED (docs/behaviour/generator.md, \"Homes by income\"): only as how much likelier a household of one age is than another to be among the town's owners; their number is the houses the profile's house_owner_bps makes owner-occupied.",
+    "households.kin_households_most_bps": "PLACEHOLDER 3%: the census category (multiple-family households) is published only in tables that could not be read; what was opened is 'other family' households, 0.94% in the rest of Victoria, a different category (ABS, Census 2021, G42 through the ABS Data API, opened 2026-10-12). To source: ABS Census 2021, household composition, multiple-family households. HOW IT IS USED (docs/behaviour/households.md, \"Taken in\"): a ceiling and nothing else: no more households than this hold kin when people with nothing coming in are placed with a household that can carry them.",
     "tenancy.possession": "Residential Tenancies Act 1997 (Vic): a notice to vacate may be given once rent is 14 days or more in arrears, of 14 days (Consumer Affairs Victoria, Late or unpaid rent: opened by a research agent for this work, 2026-10-11, for the 14 days' arrears, that paying by the date ends the notice, that the rental provider must then apply to VCAT, that payment plans can be ordered, and that only the police carry out an order; the 14-day notice period, s 91ZM and ss 330 to 331 to confirm). possession_days 14, plan_months 6 and warrant_days 14 (a warrant of possession is to be executed within 14 days of issue: to confirm) are PLACEHOLDERS for VCAT's practice. The two shares of how tenants answer are the same in every profile: stay_past_notice_bps 5000 is a PLACEHOLDER (no figure was found for the share of tenants who stay past a notice for arrears); leave_on_order_bps 5900 is England's, used everywhere: of 16,848 landlord possession orders in January to March 2026, 6,888 repossessions were by county court bailiffs, 41%, so about 59% of those ordered out were gone without one (Ministry of Justice, Mortgage and Landlord Possession Statistics, January to March 2026: opened by a research agent for this work, 2026-10-11; a ratio of one quarter's flows, not of one cohort). eviction_notice_days: the notice of the day that whoever carries out a warrant gives the tenant; England's county court bailiffs give 14 days' notice of an eviction (Civil Procedure Rules 83.8A: to confirm, recalled), Germany's Gerichtsvollzieher about three weeks (to confirm); every other place's figure is a PLACEHOLDER (7 days; Ohio 3, within its ten). HOW IT IS USED (docs/behaviour/justice.md, \"Possession\"): published in the town as a law; a landlord gives a notice to vacate under it, applies to the tribunal if the tenant stays, and asks for a warrant if they stay past its order; the tribunal sets a plan or a date by it; the police carry the warrant out.",
     "business.entry_bps_per_year": "ABS, Counts of Australian Businesses, including Entries and Exits, 2024-25: 437,150 entries on about 2.66 million businesses at the start, 16.4% (the profile's target of the same name); 2025-26: 16.9% entries, 13.8% exits, and 64.6% of businesses have no employees (opened by a research agent for this work, 2026-10-11). National; Victoria's own rate not retrieved. HOW IT IS USED (docs/behaviour/entry.md, \"Starting a business of one\"): the generator turns it into a monthly chance for those who could start a business of one (in the labour force, of working age, with the savings for its stock), from the businesses the town has: births a year at this rate, over those people. Most real births are businesses with no employees, which is the only kind that can be started here without premises.",
     "employment.adjustment": "PLACEHOLDERS, the same in every profile, with a sourced shape (docs/behaviour/firms.md, \"Adjusting labour\"; docs/research/references.md). smooth_months 3: firms plan production and workforce on smoothed, forecast trade and not on the last period's (Holt, Modigliani, Muth and Simon 1960); no figure for the horizon of a small employer here was found. hiring_cost_weeks 8: what recruiting and training a new worker costs, in weeks of their pay; estimates run from under two weeks to over sixteen (Silva and Toledo 2009; Manning 2011; Blatter, Muehlemann and Schenker 2012; Muehlemann and Leiser 2018: all to confirm, none opened), and none is for this place.",

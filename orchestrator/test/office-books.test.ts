@@ -19,8 +19,25 @@ const spec = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")
 const text = (x: any): string => (typeof x === "string" ? x : (x ?? []).map((b: any) => (typeof b.content === "string" ? b.content : b.text ?? JSON.stringify(b.content ?? ""))).join("\n"));
 const living = { ...spec, profile: "ke-nakuru-2026", living: { initiative_bps: 10_000, friction_bps: 10_000 } };
 
-async function run(seats: string[], days: number, name: string) {
+/** Three tenants who have lost what they lived on: no job, out of the labour force, nothing put by. (With homes dealt
+ * by income, 2026-10-12, a small town has no tenancy behind with its rent in its first hundred days unless something
+ * happens to someone: until then the arrears this file watched were households placed in homes they could not pay for.) */
+function withoutMeans(config: any) {
+  const leases = config.world.records.filter((r: any) => r.record === "agreement" && r.terms.template === "lease" && !/with their household/.test(r.terms.text));
+  for (const l of leases.slice(0, 3)) {
+    const tenant = l.terms.parties[1] as string;
+    const job = config.world.records.find((r: any) => r.record === "agreement" && r.terms.template === "employment" && r.terms.parties[1] === tenant);
+    if (job) config.world.records = config.world.records.filter((r: any) => r.id !== job.id && r.agreement !== job.id && r.basis !== job.id);
+    config.world.records = config.world.records.filter((r: any) => !(r.data?.brought_forward && (r.speaks_for === tenant || (r.addressed_to ?? []).includes(tenant))));
+    config.world.accounts.find((a: any) => a.id === `acc-${tenant}`).balance = "0";
+    const who = config.participants.find((p: any) => p.person === tenant);
+    who.controller = { ...who.controller, params: { ...who.controller.params, in_labour_force: false } };
+  }
+}
+
+async function run(seats: string[], days: number, name: string, prepare?: (config: any) => void) {
   const config = generate({ ...living, model_seats: seats });
+  prepare?.(config);
   const s = await runWorld({ config, runId: name, outDir: mkdtempSync(join(tmpdir(), `oikos-${name}-`)), until: days * DAY });
   const log = readFileSync(s.logPath, "utf8").trim().split("\n").map((l) => JSON.parse(l));
   const statements: any[] = log.filter((e) => e.kind === "event" && e.body.event === "recorded").map((e) => e.body.record).filter((r) => r?.record === "statement");
@@ -32,7 +49,7 @@ test("a landlord's seat is shown who is behind with the rent before its code twi
   const config0 = generate(living);
   const landlords: string[] = config0.positions.filter((p: any) => p.role_module?.code === "firm.landlord").map((p: any) => p.id);
   expect(landlords.length).toBeGreaterThan(2);
-  const { config, statements, shown } = await run(landlords, 100, "office-books-landlords");
+  const { config, statements, shown } = await run(landlords, 100, "office-books-landlords", withoutMeans);
   // Every seated landlord's office has a clerk, and a folder for the books whose name says what the clerk does.
   for (const id of landlords) {
     expect(config.positions.some((p: any) => p.id === `${id}-staff` && p.role_module?.code === "office.clerk")).toBe(true);

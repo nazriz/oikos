@@ -66,6 +66,29 @@ What follows:
 
 The other seven state none. Two of their notes say extended households are common and give no share for them: `in-tn-2026` (the 2011 census publishes no table by household type; its `group_bps` is a placeholder standing for them) and `ke-nakuru-2026` (a national share of nuclear households, and no share of extended ones). The fields are there for their authors.
 
+### Taken in: people with nothing coming in live with kin (generator 0.49.0, 2026-10-12)
+
+**Why.** Who is in the labour force is drawn person by person from the profile's shares by age, as its survey gives them, so some households of working age have nobody in it; no profile's support law has a payment for them. Dealt a home of their own, they opened the year owing rent they could never pay (docs/behaviour/generator.md, "Homes by income"). In the places the profiles describe, people with no income of their own mostly live in someone else's household. **The participation draw is not touched**: its rate and its shares by age stay the profile's; only who shares a household with whom changes.
+
+**Who.** A household with nothing coming in when homes are dealt (no pay, no business of its own, no payment in force for age, nobody out of work and looking) whose leaseholder has not six months of the cheapest rent the town has for a household of its size put by.
+
+**With whom.** A household that can carry it: with enough coming in for a month's essentials for every adult it would then hold (`spending.essentials_per_month` each), room for everyone's bodies in the largest home the town has, and not itself taken in or already hosting. Kin by the pattern of ages the extended households are drawn by, the nearest kind first:
+
+| The host's head is | They are taken in as | Recorded |
+|---|---|---|
+| older than theirs by the mother's age at a first birth (the profile's range) | a grown child's household in the parents' home | the joining head's parents: the host's head and their partner |
+| younger than theirs by that range (one adult, or a couple) | a parent, or both, in a grown child's home | the host's head's parents: the joining adults |
+| within four years of theirs | a brother or sister, with their household | nothing (as for a sibling drawn at the start) |
+| anyone else | another relative, with their household | nothing |
+
+Among hosts of the nearest kind, one is drawn (the stream `taken-in`). The host's leaseholder keeps the lease; the people taken in are members of its household from the first day, with their couples. They live as the members of any extended household do (below): the other adults follow the leaseholder, and pay a share of the rent once they earn.
+
+**How many.** No more households hold kin than the profile's share of extended households (`extended_bps`: the households drawn extended count toward it, and one of those may take someone in without adding to the count); where the profile states no extended households, its ceiling `kin_households_most_bps` (a census figure where one was opened, a marked placeholder where not; nothing is drawn from it). Whoever is left over rents on savings if they have them, or is without a home of their own as the year begins, and looks for one as anyone does.
+
+**Counted** in the town's description: households taken in, households renting on savings, households without a home. At 1,000 people (seed 1): Victoria's 16 taken in, 17 renting on savings; Tamil Nadu's 27 and 34; Nakuru's 44 and 11.
+
+**Leaves out.** Kin are matched by age alone: there are no surnames or family trees to match by, so a "parent" is someone of a parent's age. People with nothing coming in who live in an institution, on a relative's money in a home of their own (remittances), or on a payment the profile's law does not state. A host chosen for being near (everyone is in one town). Leaving again when work is found: they stay members of the household until it moves or they leave town, as an adult child does.
+
 ### How an extended household lives: what today's citizen does, and what was assumed
 
 Nothing in the citizen was changed for extended households except the standard it judges a home by (below). An extended household is a household: its record lists its members, its couples (two, where both grandparents are there) and who holds the lease, and the rules under "What each member does" apply to the larger household exactly as they stand. That means:

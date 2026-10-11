@@ -23,7 +23,7 @@
     "decimal_mark": ".",
     "group_mark": ","
   },
-  "households": {
+  "households": {"kin_households_most_bps": 358,
    "lone_bps": 3094,
    "group_bps": 397,
    "couple_bps": 3343,
@@ -578,7 +578,7 @@
    7500000,
    17500000
   ],
-  "support": {
+  "support": {"take_up_bps": {"pension": 9500, "unemployment": 6000},
    "payments": [
     {
      "id": "pension",
@@ -757,7 +757,7 @@
    }
   ],
   "labour_force_participation_bps": 7910,
-  "tenancy": {
+  "tenancy": {"rent_share_of_income": {"of": "gross", "bands": [{"under_bps": 2000, "bps": 2400}, {"under_bps": 3000, "bps": 2600}, {"under_bps": 5000, "bps": 3200}, {"bps": 1800}], "placeholder": true},
    "possession": {"arrears_days": 56, "notice_days": 28, "possession_days": 14, "plan_months": 6, "warrant_days": 42, "eviction_notice_days": 14, "stay_past_notice_bps": 5000, "leave_on_order_bps": 5900},
    "end_notice_days": 60,
    "tenant_notice_days": 30,
@@ -1056,7 +1056,7 @@
     "budget_per_resident": 30000
    }
   },
-  "ownership": {
+  "ownership": {"owner_bps_by_age": [{"from": 18, "bps": 1700}, {"from": 25, "bps": 4500}, {"from": 55, "bps": 7100}],
    "house_owner_bps": 6943,
    "mortgage_bps_by_age": [
     {
@@ -1386,6 +1386,10 @@
   }
  },
  "sources": {
+    "tenancy.rent_share_of_income": "PLACEHOLDER bands around a mean read from a summary: private renters in England spent on average 34% of gross household income on rent counting housing support as income, 39% without it; by income fifth 63, 40, 28, 21 and 17%; 71% of private renters in the lowest two fifths spent over 30% (MHCLG, English Housing Survey 2023-24, headline findings chapter 2 and the rented sectors report, https://www.gov.uk/government/statistics/chapters-for-english-housing-survey-2023-to-2024-headline-findings-on-demographics-and-household-resilience/chapter-2-housing-costs-and-affordability, read through a fetch summary on 2026-10-12: to confirm; one fetch gave other figures). No bands are published in the chapters; the bands here (24% under a fifth, 26% a fifth to three tenths, 32% three tenths to a half, 18% over a half) are a placeholder shaped to that mean. To replace from the survey's annex tables. HOW IT IS USED (docs/behaviour/generator.md, \"Homes by income\"): each renting household of a new town draws its share from these bands (evenly within a band; the open band from its lower bound to twice it, at most everything), which gives the rent it carries; households and let homes are matched by it. A target as well: the town's own distribution at the start is reported beside it and is not fitted to it.",
+    "support.take_up_bps": "PLACEHOLDERS. pension 95%: the State Pension is near-universal by design; 13.1 million received it in Great Britain in February 2025 (DWP benefits statistics August 2025, opened 2026-10-12) and no population of 66 and over was opened to divide by. unemployment 60%: DWP publishes no take-up estimate for Universal Credit; 1.6 million people on it were searching for work in July 2025 against about 1.67 million unemployed (a search summary), groups that do not match. HOW IT IS USED (docs/behaviour/generator.md, \"Payments in force\"): of those the payment's rule already entitles as the year begins, this share open with it in payment; the rest claim it when they first look, as before.",
+    "ownership.owner_bps_by_age": "Owner-occupiers by age of the household reference person, England, 2023-24: 17% at 16-24, 45% at 25-34, 71% at 55-64 (MHCLG, English Housing Survey 2023-24, headline findings chapter 1, https://www.gov.uk/government/statistics/chapters-for-english-housing-survey-2023-to-2024-headline-findings-on-demographics-and-household-resilience/chapter-1-profile-of-households-and-dwellings, opened 2026-10-12). The bands 35-54 and 65 and over were not in the chapter (Annex Table 1.4, not opened): 35 to 54 is read at the 25-34 figure and 65 and over at the 55-64 figure, which understates both. To replace from the annex table. HOW IT IS USED (docs/behaviour/generator.md, \"Homes by income\"): only as how much likelier a household of one age is than another to be among the town's owners; their number is the houses the profile's house_owner_bps makes owner-occupied.",
+    "households.kin_households_most_bps": "3.58%: 'Other household types', 9,814 of 274,381 households in North Yorkshire (ONS, Census 2021, TS003 Household composition, via Nomis NM_2023_1, https://www.nomisweb.co.uk/api/v01/dataset/NM_2023_1.data.csv?geography=E06000065, opened 2026-10-12). The category holds multi-family households and also students and unrelated sharers, so it is an upper bound for households that hold kin. HOW IT IS USED (docs/behaviour/households.md, \"Taken in\"): a ceiling and nothing else: no more households than this hold kin when people with nothing coming in are placed with a household that can carry them.",
   "tenancy.possession": "Housing Act 1988 s 8 and Schedule 2 ground 8: at least two months' rent unpaid, on four weeks' notice; a possession order usually takes effect 14 days on; a warrant is carried out by county court bailiffs (to confirm: recalled, the Act not opened; the Renters' Rights Act, in force 1 May 2026, changes the grounds). plan_months 6 (courts suspend possession on terms to pay: no figure) and warrant_days 42 are PLACEHOLDERS (the median time from claim to repossession was 26.4 weeks in January to March 2026: Ministry of Justice, opened). The two shares of how tenants answer are the same in every profile: stay_past_notice_bps 5000 is a PLACEHOLDER (no figure was found for the share of tenants who stay past a notice for arrears); leave_on_order_bps 5900 is England's, used everywhere: of 16,848 landlord possession orders in January to March 2026, 6,888 repossessions were by county court bailiffs, 41%, so about 59% of those ordered out were gone without one (Ministry of Justice, Mortgage and Landlord Possession Statistics, January to March 2026: opened by a research agent for this work, 2026-10-11; a ratio of one quarter's flows, not of one cohort). eviction_notice_days: the notice of the day that whoever carries out a warrant gives the tenant; England's county court bailiffs give 14 days' notice of an eviction (Civil Procedure Rules 83.8A: to confirm, recalled), Germany's Gerichtsvollzieher about three weeks (to confirm); every other place's figure is a PLACEHOLDER (7 days; Ohio 3, within its ten). HOW IT IS USED (docs/behaviour/justice.md, \"Possession\"): published in the town as a law; a landlord gives a notice to vacate under it, applies to the tribunal if the tenant stays, and asks for a warrant if they stay past its order; the tribunal sets a plan or a date by it; the police carry the warrant out.",
   "business.entry_bps_per_year": "ONS, Business demography, UK: 2024: birth rate 11.1% of active businesses, death rate 9.8%; five-year survival of 2019 births 38.4% (opened by a research agent for this work, 2026-10-11). United Kingdom; England alone not retrieved. HOW IT IS USED (docs/behaviour/entry.md, \"Starting a business of one\"): the generator turns it into a monthly chance for those who could start a business of one (in the labour force, of working age, with the savings for its stock), from the businesses the town has: births a year at this rate, over those people. Most real births are businesses with no employees, which is the only kind that can be started here without premises.",
   "employment.adjustment": "PLACEHOLDERS, the same in every profile, with a sourced shape (docs/behaviour/firms.md, \"Adjusting labour\"; docs/research/references.md). smooth_months 3: firms plan production and workforce on smoothed, forecast trade and not on the last period's (Holt, Modigliani, Muth and Simon 1960); no figure for the horizon of a small employer here was found. hiring_cost_weeks 8: what recruiting and training a new worker costs, in weeks of their pay; estimates run from under two weeks to over sixteen (Silva and Toledo 2009; Manning 2011; Blatter, Muehlemann and Schenker 2012; Muehlemann and Leiser 2018: all to confirm, none opened), and none is for this place.",

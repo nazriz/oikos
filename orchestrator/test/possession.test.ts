@@ -100,7 +100,9 @@ test("a tenant who cannot pay and goes on the notice gives the home up: they are
   const went = recs.find((r) => r.record === "notice" && r.agreement === alone.id && r.as === tenant);
   expect(went.at).toBeGreaterThanOrEqual(ntv.data.by);
   expect(went.at).toBeLessThan(ntv.data.by + 8 * DAY); // (at their first look after the date: within the week)
-  const space = ev.find((e) => e.event === "vacated" && e.occupant === tenant && e.t >= went.at)?.space;
+  // (The home, not wherever else they were that hour: with homes dealt by income, 2026-10-12, the tenant this test
+  // finds is one who goes to a group's gatherings, and the first place they left after the notice was the hall.)
+  const space = ev.find((e) => e.event === "vacated" && e.occupant === tenant && e.t >= went.at && String(e.space).includes("/dwelling."))?.space;
   expect(space).toBeDefined();
   // They are not back in the home they gave up: not that day, not later. (Until 2026-10-12 the daily round took a
   // person with no home back to the dwelling they had last been in.)

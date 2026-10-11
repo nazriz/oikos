@@ -234,13 +234,17 @@ export const trade: BehaviourModule = {
  */
 export const transfers: BehaviourModule = {
   name: "world.transfers",
+  keeps: [
+    { what: "benefit_claim", why: "Claims for support are made to this office and to nobody else: the file of them is its own, from the claims already in payment when a year begins." },
+    { what: "benefit_decision", why: "Each decision on a claim is this office's own paper: it pays from them, and keeps every one it has made." },
+  ],
   answers: {"office": "the support office", "acts": "What it acts on: a claim for a payment under the support law, made by the person it is for."},
   // The office's routine, where a model holds the office (docs/behaviour/standing-work.md, "The support office"): what
   // the support law's own conditions settle is the staff's; a refusal, a doubt and a review are the office-holder's.
   routines: [{ task: "pay_claims", at: "office", every: 1, what: "Each working day the office's staff decide the claims that have waited their time, the oldest first: a claim that meets the conditions the support law states for its payment is granted, in writing, and paid each period from then until the claimant asks for it to stop, dies, leaves, or its time runs out, which the staff tell them. A claim that does not meet the conditions, or that the staff could not verify, is not refused by the staff: it is put before whoever holds the office, as a note on the office's file saying what it fails on, and decided by them on the office's decision form; a claim they grant on that form is paid by the staff like any other. A request to review a refusal comes to the office-holder.",
     papers: [{ kind: "benefit_claim", how: "decided by the support law's conditions: granted and paid if it meets them, put before the office-holder if it does not or could not be verified" }, { kind: "benefit_change", how: "a claimant's own request to stop their payment: it is stopped" }] }],
   issues: [...P.SUPPORT, P.REMEDY_ANSWER, ...P.VENUE_ANSWERS],
-  version: "0.5.0", // 0.5.0: run in parts where a model holds the office (part): the staff decide and pay what the law's conditions settle under a standing order (pay_claims) and put a refusal or a doubt before the office-holder, who decides it on the office's decision form and answers reviews; a town run by code is unchanged; 0.4.0: a claim may wait to be decided (processing_days), the staff decide so many a day (capacity_per_day), and some qualifying claims are wrongly refused, more while a backlog stands (error_bps, at the friction dial); asked to review a refusal found wrong, the office decides the next claim on its facts
+  version: "0.6.0", // 0.6.0: payments in force before the year (grants brought forward on paper) are taken up when the file is first opened and paid from the day each names; 0.5.0: run in parts where a model holds the office (part): the staff decide and pay what the law's conditions settle under a standing order (pay_claims) and put a refusal or a doubt before the office-holder, who decides it on the office's decision form and answers reviews; a town run by code is unchanged; 0.4.0: a claim may wait to be decided (processing_days), the staff decide so many a day (capacity_per_day), and some qualifying claims are wrongly refused, more while a backlog stands (error_bps, at the friction dial); asked to review a refusal found wrong, the office decides the next claim on its facts
   doc: "docs/behaviour/boundary.md",
   cadence: () => DAY,
   firstWake: () => 0,
@@ -283,6 +287,7 @@ export const transfers: BehaviourModule = {
     let decidedToday = 0;
     type Paying = { person: string; account: string; payment: string; from: string; amount: number; every: number; next: number; until?: number; then?: string };
     const paying = new Map<string, Paying>(); // claim -> what we pay under it
+    let opened = false; // our file has been opened once (payments in force before the year are taken up then)
     /** The payments we pay: the published law's, where we are the payer (no law: none). */
     const rules = (): PaymentRule[] => supportLaw(book)?.payments.filter((r) => r.payer === me) ?? [];
     /** Our book of contributions for one person: the monthly pay employers reported for them, newest first. */
@@ -353,6 +358,21 @@ export const transfers: BehaviourModule = {
         const t = obs.t;
         const steps: Step[] = [];
         const ours = rules();
+        // Payments already in force when our file is first opened (grants made before the year, brought forward on
+        // paper): taken up from the grant's own figures, the next payment on the day it names. Their claims are decided.
+        if (!opened) {
+          opened = true;
+          for (const d of book.all("benefit_decision")) {
+            if (d.speaks_for !== me || !d.data?.brought_forward || d.data?.granted !== true || typeof d.data?.claim !== "string") continue;
+            const claim = book.records.get(d.data.claim) as StatementRecord | undefined;
+            decided.add(d.data.claim);
+            const amount = Math.floor(Number(d.data.amount)), every = Math.floor(Number(d.data.every)), next = Math.floor(Number(d.data.next));
+            if (!claim || !(amount > 0) || !(every > 0) || !(next >= 0) || typeof claim.data?.account !== "string") continue;
+            const rule = ours.find((r) => r.id === String(d.data.payment));
+            paying.set(claim.id, { person: claim.speaks_for!, account: claim.data.account, payment: String(d.data.payment), from: rule?.account || p.account, amount, every, next,
+              ...(Number.isSafeInteger(d.data.until) ? { until: d.data.until as number } : {}), ...(rule?.lasts?.then ? { then: rule.lasts.then } : {}) });
+          }
+        }
         // Claims: granted if the claimant fits the payment's rule; the first payment one period on. A claim waits its
         // processing time; the staff decide the oldest first, so many a day; more waiting than a day's capacity is a
         // backlog, and hurried staff make more mistakes.

@@ -58,6 +58,9 @@ const KEEPERS = [
   "school.principal: school_place",
   "utility.water: acquisition_notice",
   "utility.water: property_roll",
+  // (2026-10-12: a town opens with the claims already in payment on the support office's file, docs/behaviour/generator.md.)
+  "world.transfers: benefit_claim",
+  "world.transfers: benefit_decision",
   "world.valuer: acquisition_notice",
   "world.valuer: property_roll",
 ];

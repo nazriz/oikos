@@ -311,7 +311,14 @@ test("extended households are generated only where a profile states them, at its
     const c = town(id);
     const hh = householdsOf(c);
     const found = hh.filter(extended);
-    if (!H.extended_bps) expect({ id, extended: found.length }).toEqual({ id, extended: 0 });
+    // (A profile that states none draws none. Since 2026-10-12 its town may still hold some: households that took in
+    // kin with nothing coming in, as many as the town says it opened with and no more than the profile's ceiling:
+    // docs/behaviour/households.md, "Taken in".)
+    if (!H.extended_bps) {
+      const taken = Number(/(\d+) households with nothing coming in live with kin/.exec(c.meta.description)?.[1] ?? 0);
+      expect(found.length).toBeLessThanOrEqual(taken);
+      expect(taken).toBeLessThanOrEqual(Math.ceil(((H.kin_households_most_bps ?? 0) * (hh.length + taken)) / 10_000));
+    }
     else {
       // How many is a draw at the profile's share of households: within four standard deviations of it.
       const p = H.extended_bps / (H.lone_bps + H.group_bps + H.couple_bps + H.couple_children_bps + H.one_parent_bps + H.extended_bps);

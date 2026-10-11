@@ -118,7 +118,13 @@ export interface Profile {
        * vacate they cannot pay off, the share who stay past its date; of those ordered out, the share gone by the
        * tribunal's date. Left out: a notice for arrears ends the lease and the tenant leaves, as before. */
       possession?: { arrears_days: number; notice_days: number; possession_days: number; plan_months: number; warrant_days: number; /** The notice of the day the enforcer must give the tenant before carrying a warrant out. */ eviction_notice_days: number; stay_past_notice_bps: number; leave_on_order_bps: number };
-      end_notice_days?: number; tenant_notice_days?: number; rent_review_months?: number; rent_increase_notice_days?: number; rent_review_practice_months?: number; after_fixed_term?: "periodic" };
+      end_notice_days?: number; tenant_notice_days?: number; rent_review_months?: number; rent_increase_notice_days?: number; rent_review_practice_months?: number; after_fixed_term?: "periodic";
+      /** Rent as a share of household income among the place's renting households (docs/behaviour/generator.md, "Homes
+       * by income"): the share of them in each band, lowest first, `under_bps` rising and the last band open; `of` says
+       * what the source divides the rent by ("gross" or "net" income; "expenditure" where no income is surveyed, which the
+       * generator reads as income before tax). A town's first tenancies are dealt by it. Left out: homes are dealt by
+       * size alone, as before. */
+      rent_share_of_income?: { of: "gross" | "net" | "expenditure"; bands: { under_bps?: number; bps: number }[]; placeholder?: boolean } };
     values: { [value: string]: { mean_bps: number; sd_bps: number } };
     /** What holds someone in a job they have (docs/behaviour/citizen.md, "Moving to another job"), read only for a living town: how much more another job must pay, and how much more again for each year they have been where they are. */
     job_move?: { premium_bps: number; per_year_bps: number; cap_years: number; other_trade_bps?: number };
@@ -178,7 +184,10 @@ export interface Profile {
     /** Support paid from outside the town, as its law's list of payments (docs/behaviour/boundary.md): each says who
      * qualifies, how much and for how long, and where it is paid from (`paid_from`: one of `public_finance.funds`; left
      * out: the general government). A place that has no such payment leaves it out of the list. */
-    support: { payments: (Omit<PaymentRule, "payer" | "account"> & { paid_from?: string })[] };
+    /** `take_up_bps`, by payment: of those the payment's rule already entitles as the year begins, the share who have
+     * it in payment on the first day (docs/behaviour/generator.md, "Payments in force"). A payment not listed opens
+     * with nobody drawing it, as before: its people claim in the year. */
+    support: { payments: (Omit<PaymentRule, "payer" | "account"> & { paid_from?: string })[]; take_up_bps?: { [payment: string]: number } };
     /** Who owns firms (docs/behaviour/firm-ownership.md). Fifths are of households by wealth, lowest first. */
     firm_ownership: {
       /** Of the firms of each kind, the share held each way: by one household or a few; from outside; widely. */
@@ -245,7 +254,9 @@ export interface Profile {
        * toward it, and what the town budgets for roads a year per resident (cents). */
       roads?: { seconds_per_cell: number; within_cells: number; budget_per_resident: number } };
     /** Home ownership (world-expansion 6.2): which houses their households own, with a mortgage or outright. */
-    ownership?: { house_owner_bps: number; mortgage_bps_by_age: { from: number; bps: number }[]; mortgage_payment_per_month: number; mortgage_rate_bps: number; mortgage_years_left: [number, number];
+    /** `owner_bps_by_age`: of households, the share who own their home, by the age of the household's head; read as
+     * how much likelier one household is than another to be among the town's owners (their number is the houses'). */
+    ownership?: { house_owner_bps: number; owner_bps_by_age?: { from: number; bps: number }[]; mortgage_bps_by_age: { from: number; bps: number }[]; mortgage_payment_per_month: number; mortgage_rate_bps: number; mortgage_years_left: [number, number];
       /** Buying and selling homes: a renting household's chance a month, the deposit and costs (of the price), the mortgage term; a seller's price cut when unsold. */
       market?: { buy_bps_per_month: number; deposit_bps: number; costs_bps: number; mortgage_months: number; relist_days: number; cut_bps: number; floor_bps: number } };
     /** Utilities (world-expansion 6.1): water drawn from the river and billed to owners; energy bought from the grid and
