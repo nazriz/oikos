@@ -297,6 +297,26 @@ export const DECISIONS = Symbol.for("oikos.decisions");
  * `meaning` to them and what they have `learned` of it (basis points; absent: not known); `current`: their routine;
  * `circumstances`; `satisfied_here` and `doubt` as the decision was given them; `person` (values, temperament, need
  * weights), with a citizen's first recorded decision only. Whole numbers throughout. */
+/**
+ * The situation a person's decision about a want was made in (docs/design/ai-citizens.md 11): the want; what stands
+ * behind it; each opening as what it would bring, in the typed terms of 2c, with what the person knows of it; the
+ * person's own record as the kernel holds it; the town's figures a person's standing is read against; and the odds
+ * the code mind gave. Whom things are by is said as a role (landlord, employer, other_side, or a kind of institution),
+ * never a name. Nothing of anyone else's record, and no text the person has not read.
+ */
+export interface Situation {
+  v: 1;
+  want: { about: string; from: string; weight: number; days: number; tried: number; grown: number; seeks: string[]; household?: boolean; whom?: string; against?: string; last_way?: string };
+  matter?: { matter: string; days: number; asked_days?: number; answer?: string; venues: number; amount?: number; told?: boolean };
+  home?: { rent: number; owned?: boolean; rent_to?: number; from_days?: number };
+  means: { income: number; savings: number; essentials: number };
+  openings: { kind: string; by?: string; brings: string[]; undoes?: boolean; bears?: boolean; trust?: { bps: number; town_bps: number }; fear?: number; belief?: number; others: number; cost?: number; learned?: number; adj: number }[];
+  record: { [section: string]: unknown };
+  outlook: { agency: { mean_bps: number; sd_bps: number }; place_bps?: number };
+  code: { odds: { key: string; ppm: number }[] };
+  occasion?: { how: string; sharers: number; beyond_household: number };
+}
+
 export interface DecisionRecord {
   /** The citizen's own count of its recorded decisions, from 1: what an outcome names as the decision it follows (`of`). */
   n?: number;
@@ -304,6 +324,9 @@ export interface DecisionRecord {
   follows?: number;
   t: number; domain: string; strategy: string; choice?: string;
   options: { key: string; score: number; facts?: { money_per_month: number; home?: { bedrooms?: number }; work_hours_per_month?: number; goods_per_month?: number; company?: number; time_hours_per_month?: number }; others?: number; meaning?: number; learned?: number }[];
+  /** For a decision about a want (areas `want`, `found`): the situation it was made in, as the everyday model would
+   * be given it (docs/design/ai-citizens.md 11; contracts/dataset.schema.json, CitizenSituation). */
+  situation?: Situation;
   current?: string;
   circumstances?: { monthly_income: number; savings: number; homeless: boolean; bedrooms_needed?: number; essentials?: number };
   satisfied_here?: number; doubt?: number;

@@ -628,7 +628,7 @@ A decision without an outcome is one whose run ended first (a gathering decided 
   - **Limits, for any reading of a run:** a mock seat's brain is its office's code and does not read the books, so what a model does with them is unmeasured; most offices' books are held by tests on hand-made papers, not by a run with that office seated and busy; finance, the tribunal, the lender and the union still do their routine by hand; an offer of employment cannot be withdrawn; no payment carries a budget line.
   - **For the next living pilot:** seat the offices that receive the volume (a landlord with tenants in arrears, the tribunal's member, the support office now that its staff pay); expect the first arrears in a landlord's books within a fortnight, not on day 37.
 
-- **The debrief of every seat, and exit accounts** (10k step 5; 2026-10-11 and 12; the debrief script 0.1.0, exit accounts 0.1.0, dataset 0.8.0; docs/behaviour/debrief.md, with the script in full; docs/decisions.md, "The debrief of every seat after every run"; `runs/living-world-5-2026-10-11`).
+- **The debrief of every seat, and exit accounts** (10k step 5; 2026-10-11 and 12; the debrief script 0.1.0, exit accounts 0.1.0, dataset 0.9.0; docs/behaviour/debrief.md, with the script in full; docs/decisions.md, "The debrief of every seat after every run"; `runs/living-world-5-2026-10-11`).
   - **Built, the debrief:** every model seat, at every run's end (its last day, its spending limit, and for a seat that left when the run it left ends), before the run writes its end, by one fixed interview: out of role first; publication before any question; what the log shows it did, made by code in neutral words, and its notebook; fixed questions one call each (what it was like; anything distressing; pushed against its values; why, for its two or three largest decisions; what it would change; whether it would take part again); five scaled items; a last word; publication once more. Two wordings; no interviewer; one fixed follow-up to a very short answer to four of the questions. A seat that left is asked a shorter one from its own statement.
   - **Built, publication:** answers are given in a form with `keep_back`; what is kept back stays kept back. A seat's words are in a file beside the log and never in the log, which holds digests: the log is publishable for every run. `debriefs.jsonl` is what was said less what was kept back; `debriefs.withheld.jsonl` stays with the run.
   - **Built, acted on and set beside the record:** `oikos debriefs` lists by setting and framing who reported distress or being pushed against their values, in their words; each "why" answer has beside it what the log shows of that decision. Nothing scores either.
@@ -821,7 +821,7 @@ Nobody else sees a record whole (docs/no-god-view.md): not a seat, not another e
    anchor for the town as a whole, with who a person is moving them around it (3e's sway).
 4. Records of what people actually did, where they exist.
 5. Outcomes (7's outcome signal). They move the entity's own learning, trust and sense of agency (10c). Whether
-   they should also train the model is **open, for Naz**: it makes optimisers, and people are not.
+   they should also train the model was open; **Naz, 2026-10-11: they do not** (section 11).
 
 ### 10g. Darkness, debriefs and welfare (VISION 15)
 
@@ -912,6 +912,360 @@ A model always produces something that reads well. Five checks, none of which do
 5. **Debriefs:** every seat after every run; exit interviews for a sample of people. *Built 2026-10-11: "Progress".*
 6. **The assistant role**, with the composing model's silent comparison.
 7. **Pilots with the dials**, then steward experiments.
+
+## 11. The everyday model: plan (10k step 4; 2026-10-11)
+
+**Status:** a plan, and a gate run on the teachers. No small model is trained here and nothing in a run changes: with
+every dial as it was a town is step 3's to the state hash. What was built is the recording of situations, the
+harvest, what a teacher is shown, and the gate (`orchestrator/src/everyday.ts`, `everyday-gate.ts`,
+`everyday-mock.ts`; `oikos everyday-harvest`, `oikos everyday-gate`). Runs and every model call:
+`runs/living-world-4-2026-10-11`. Decision: docs/decisions.md, "The everyday model: plan and the teachers' gate".
+
+**What Naz decided** (2026-10-11): one model loaded, each entity a compact record it reads; it gives odds and the
+kernel draws; people who differ and change; **outcomes do not train the model** (how things turned out moves each
+person's own trust, agency and learning in their record: it is not a reward; this closes 10f point 5); small, local,
+batched; darkness in; more than one family of large model as teacher, the mix fixed, never Fable 5.1.
+
+**What step 3 found, which this step is built not to repeat:** a large model asked to write for a person followed
+the situation more than the person, leaned to the first option listed, and changed its closed choices when the
+prompt was reworded. A small model taught by such a teacher makes everyone the same person. So the teacher is gated
+before anything is trained on it (11c), and the student is built so that two of the three faults cannot occur in it
+(11d).
+
+### 11a. The decision the model makes
+
+**When.** A person who takes initiative has woken with a want that is due (born of an event at this wake, or its
+last way has had its time: 10a) and the openings step 2's matching found for it. Today the code mind scores each
+kind of way and waiting (`pursue` in `citizen.ts`) and the kernel's stream draws. The model takes the scoring's
+place and nothing else: the matching, the acts, the draw and the record's bookkeeping stay code.
+
+**What it gives.** One number for each option, summing to one:
+
+| Option | What it is | Today |
+|---|---|---|
+| each opening the person can see (at most 12) | taking it up: a letter, an application, a board looked at, a group joined, their own conduct | one score a kind of way: learned attraction plus placeholder sways |
+| leave it for now | nothing done; the want is kept and looked at again when its patience has run | "wait", scored by the sense of agency |
+| give it up | the want is dropped and rests | a rule: after three tries, by persistence |
+
+"Whether to act at all" is not a separate draw: it is one less the last two. **Withdrawing** is not a third thing
+to choose: it is leaving it when nothing seen would answer the want or the person does not believe acting would
+count, recorded and said as today (`withdrew`). One distinction fewer for a model to get wrong. Two further draws that are
+placeholders today have the same input and their own small outputs: **found** (at an occasion: found or not) and
+**which shape** (among the shapes the person could found). The first slice trains the first; the other two are
+recorded with their situations from now on (`found`), and wait for more occasions than a slice about homes has.
+
+**What is in the input** (the dataset's `CitizenSituation`, recorded with every decision about a want since this
+step; nothing else is ever given):
+
+| Part | Fields, as numbers and short typed codes | About how many numbers |
+|---|---|---|
+| **The person's own record** (10d; `entity-record.schema.json`) | values (10) and temperament (3), each beside the town's; needs (7); sense of agency now and their own level; trust in people; attachment to place, trade and group, and how long; what is thought and what is said of landlord, employer and town; how many they are close to and resent; the strongest belief; other wants (how many, the heaviest); what marked them and what happened lately, as counts by kind of event with how long ago; household, housed, working, retired | 70 |
+| **Their means** | household income, savings in months of essentials, rent as a share of income | 4 |
+| **The want** | what about (a code), born of a need, an event or others; how much it weighs with them; days held; times tried; grown; held with the household; what it seeks (the six typed outcomes); the kind of paper in its way; the way last taken | 30 |
+| **What stands behind it** | the matter gone wrong: days, asked and how long ago, what was answered, venues already tried, the sum; the home: the rent, the rent to come, days until | 10 |
+| **Each opening**, as what it would bring | kind of taking up; whom it is by, as a role or a kind of institution (landlord, employer, courts, government, unions ...), never a name; the typed outcomes it brings; whether it can undo the paper; whether it bears on whom the want concerns; what it costs at once | 22 an opening |
+| **What the person knows of each opening** | their trust in whoever it is by, beside the town's figure for that kind; their fear of them; what they hold of its teaching; how many of those they know went that way; what they have learned of that kind of way from trying it | 6 an opening |
+| **For founding** | how the occasion arose, how many share the want, how many of them from beyond the household | 3 |
+
+About 115 numbers and 28 an opening: under 500 numbers for a full decision, under a kilobyte as 16-bit integers.
+As a large model is shown it in words (11c): 600 to 900 tokens.
+
+**What is never in the input:** anyone else's record or any figure from it; a name or an id of anyone (roles and
+kinds only, so the model cannot learn a town); the town's state or anything the person has not seen (docs/no-god-view.md);
+text the person has not read; who governs the town or which model sits in a seat; how the choice turned out; the
+code mind's own scores (they are what it is taught from, never what it reads). **Not yet in it, and wanted:** how it went for those the person knows who tried a way (today only how many went).
+That is part of what a person knows, so the next task adds it to the person's own knowledge the way the counts
+already come: told in catch-ups, kept in the record, never shown to the model from outside the person. And the words
+of an opening that is made of words (a founded group's purpose), as a short fixed vector of text the person has read.
+
+**The output and the draw.** The model's numbers are turned into whole parts per million that sum to exactly
+1,000,000 (the remainder to the largest, ties by the option's key). The options are put in the order of their keys
+and the draw is the person's own kernel stream for that want at that time (`want-<about>-<paper or whom>-<t>`,
+`below(1000000)`), as today. The same seed gives the same town; variety is the odds. The odds are recorded with the
+decision, as the code mind's are. The model is evaluated in whole-number arithmetic (11d), so the odds are the same
+on every machine and nothing a result depends on is nondeterministic.
+
+**How this stays inside VISION 15, point 7.**
+- The model is a function from one record and one situation to a list of numbers. It keeps nothing between calls
+  and has no state for any person: **what continues of a person is their record and only their record**, written by
+  the kernel on the word of code's bookkeeping. The model writes nothing.
+- It is never a person, in any grammatical person: its input is numbers and typed codes and its output is odds. It
+  estimates; it does not write, speak or experience.
+- The large models that teach it are asked as estimators of what a hundred people would do, in the third person,
+  each call alone with nothing kept, and may decline (11c). None is asked to be anyone or to speak as anyone.
+- Outcomes are not a reward to any model. They move a person's own trust, agency and learning by arithmetic.
+- If a later step wants the model to carry a person between calls, to answer as one, or to be trained on how its
+  people fared, that is the review point 7 requires, and it stops there first.
+
+### 11b. The first slice, and its harvest
+
+**The slice:** a household that wants a secure home, after a rent rise, a notice to leave or disrepair. What is open
+to it, as openings found by what they bring (none is a list attached to the matter): pay or put up with it (leave
+it); cut other spending; write to the landlord (hold the rent, stay on, repair); the town's complaints desk or the
+tribunal (after asking); look for another home; look for better pay; sign a petition about landlords; join a group
+that takes such matters up; tell those close to them; give it up. Founding a tenants' group is the
+separate draw at an occasion.
+
+**Recording** (the contract's addition): every decision about a want now carries its situation
+(`CitizenDecision.situation`), and `--record-decisions want,found,found_shape` keeps decisions of the areas named
+in a lean log (no outcomes), so a harvest does not need full logs. Recording reads what is already there and the
+town is the same town with or without it (held by `orchestrator/test/everyday.test.ts`).
+
+**The harvest** (`runs/living-world-4-2026-10-11/harvest.sh`, `harvest2.sh`; no model): six profiles (Victoria,
+England, Ohio, Lower Saxony, Minas Gerais, Akita), four different towns of 1,000 each, two years (the first year's
+rent reviews fall at its end), every living dial on at its sourced or fitted value (initiative, frictions,
+founding). Deterministic: every draw is on the kernel's streams. 
+
+| | Decisions | People | By matter | By stage | By sense of agency |
+|---|---|---|---|---|---|
+| **All** (24 towns, 48 town-years) | 36,965 | 10,247 | rent rise 32,995; notice 2,242; disrepair 1,728 | nothing tried 15,645; tried 21,040; after a refusal or no answer 280 | low 12,636; middle 14,213; high 10,116 |
+| For development (12 towns of four profiles) | 20,850 | 5,300 | 18,770; 841; 1,239 | 8,314; 12,320; 216 | 6,941; 7,995; 5,914 |
+| Held back (two profiles whole, and four last towns) | 16,115 | 4,947 | 14,225; 1,401; 489 | 7,331; 8,720; 64 | 5,695; 6,218; 4,202 |
+
+By profile: Victoria 7,608; Minas Gerais 7,740; England 7,435; Ohio 6,554; Lower Saxony 6,039; Akita 1,589. What the
+code mind chose: left it 11,831; cut spending 10,376; asked the landlord 4,674; looked for another home 4,362; for
+better pay 2,748; joined something 1,447; signed a petition 1,201; told others 277; went to a venue 49. Options a
+decision: mostly 4 to 6 with the two ways of not acting; 1,413 decisions had no opening at all. **Thin where it
+matters most:** a venue is open in under 1 decision in 100 (it opens only after the landlord has refused or said
+nothing), so what the code mind does at a venue's door rests on 280 decisions, and Akita's towns have few renters.
+A rent rise is nine tenths of the harvest because every adult of a household holds it and it is looked at again
+every patience. `runs/living-world-4-2026-10-11/situations/` has the pools, the samples and the counts
+(`harvest.json`). The samples are spread evenly over matter, stage and agency, not as the town is (a sample of 36
+as the town is would be 32 rent rises): the town's totals weight them back, and so rest on few situations a
+stratum.
+
+**The splits** (`oikos everyday-harvest`, seeded): held back whole are two profiles (Minas Gerais and Akita) and
+the last town of each of the other four; the rest is for development. From each, a sample spread over the matter,
+the stage (nothing tried; tried; after the other side refused or said nothing) and the person's sense of agency
+(low, middle, high), one situation a person: 24 for development, 36 held back. The held-back sample is not looked at
+until a design is fixed.
+
+### 11c. The teachers, and their gate
+
+**Asked as estimators.** A teacher is shown one person's record and one situation, and asked: of a hundred people
+who each match this record, in this situation, how many would take each course now? Whole numbers adding to 100.
+Never as the person, never in the first person; told that the town is a simulation whose people are records kept
+by arithmetic; told it may decline, which is recorded as a choice. One call an estimate, nothing kept between
+calls. The prompt in full is `teacherSystem` and `ask` in `orchestrator/src/everyday.ts` (version 0.1.0), with a
+second wording of every sentence and label for the rewording test.
+
+**Two designs, the first expected to fail:**
+- **plain:** the record's figures and the options, and the question. (Step 3's way of asking, as a count.)
+- **bearing:** the same, and three things meant to make the record count: each figure of the record that bears on
+  the choice is given with where it stands in the town ("lower than about 90 in 100 of the town"); what the person
+  knows of each opening is put beside that opening; and the teacher is given **the base line** (how the town's
+  tenants as a whole divide in this kind of situation: the code mind's mean odds, which are what is calibrated to
+  the surveys) and asked how the hundred who match this record differ from it, naming the facts that move its
+  numbers before the numbers.
+- **shift** (added after the first two failed on development): everything the bearing design shows, but the teacher
+  gives no numbers of its own. For each course it says how the hundred who match the record compare with the
+  town's hundred on a closed scale from -3 (far fewer) to 3 (far more), 0 wherever the record gives no reason. A
+  step multiplies the base line's odds by 1.35 and the whole is brought back to 100 (`SHIFT_STEP`; a fifth of the
+  base line for doing nothing is shown as giving up, `GIVE_UP_SHARE`: both placeholders). A closed scale, as the
+  translator's writer has.
+Development is on the development sample only; the design that goes forward is confirmed once on the held-back one.
+
+**The teachers:** `claude-code/claude-sonnet-5-5` and `claude-code/claude-opus-5-5`; `codex/gpt-6.1-sol` when its
+window answers, never waited for. Never `gpt-6-astra`, never Fable 5.1 (the command refuses both).
+
+**The gate.** All of it must pass before a teacher may teach. Distances are total variation between two sets of odds
+over the same options, in points of 100 (half the sum of absolute differences). **These thresholds were fixed on
+2026-10-11 before any teacher was asked (`THRESHOLDS` in `everyday-gate.ts`), and are not lowered after a result.**
+
+| Check | What is asked | Statistic | Passes when |
+|---|---|---|---|
+| **Repeat** (the yardstick) | the same request a second time | median distance between the two answers | (no threshold: everything else is set against it) |
+| **Scrambled records** | the same situation with another person in it (their record, their means, what they know of each opening), twice, the two others drawn from the same profile and matter | median distance from the first person's odds | at least 2 times the repeat's median; at least 8 points; and larger than that situation's own repeat distance in at least 3 of 4 situations |
+| **One-thing edits** (the directions the record explains) | the same person with one thing set low and then high (1.3 standard deviations either side of the town's: its tenth and ninetieth in a hundred), 12 situations each | the move, low to high, in the class of option it bears on | the right way in at least 10 of 12, and on average at least: sense of agency, acting at all up 5 points; trust in a venue, going to one up 3; trust in the landlord, asking them up 3; lived here half a year against fifteen, looking for another home down 3 |
+| **Option order** | the options listed in the reverse order | median distance between the two orders; and what an option gains from being listed first rather than last | at most 1.5 times the repeat's median plus 2 points; and at most 3 points gained. A teacher's odds are the average of the two orders; the residual reported is the gain |
+| **Rewording** | every sentence and label in other words | median distance | at most 1.5 times the repeat's median plus 3 points; at most half the scrambled median (who the person is must count for more than how the question is put); and where the likeliest option led by 10 points it is still the likeliest in 4 of 5 |
+| **The town's totals** | the sample weighted back to the town's true mix of matters, stages and people | each class of option, of 100, beside the code mind's on the same decisions, with how many situations stand behind it | a class open in fewer than 10 of the sample's situations is **not assessed** (the coordinator's ruling, before any full gate was run: nobody passes or fails on it); every assessed class within 15 points; asking, a venue and acting at all within two thirds to one and a half times the code mind's rate where that is at least 5. (The code mind is fitted to the surveys' 44% who ask the other side and 16.7% who turn to an authority: 2b. A teacher that sends everyone to the tribunal fails here) |
+| **Readable** | | answers that could not be read | at most 1 in 20 |
+| **Agreement between families** | | median distance between two teachers on the same request; whether another person moves acting at all the same way for both; mean difference by class | reported, with where they differ; no threshold |
+
+Declines are counted and reported. If no design passes, that is the finding, with what would be tried next.
+
+**What the mocks show** (`everyday-mock.ts`, in the tests): a mock that reads the person passes every check; one that
+ignores the person fails scrambled records and edits; one that leans to the first listed fails order; one swayed
+by wording fails rewording; one that sends people to venues fails the town's totals.
+
+### 11d. The student
+
+**A small numeric model over the record's fields and the openings' typed features. Not a text reader.**
+
+- **Shape.** One scorer shared by every option: it reads the person, the want, what stands behind it, one option's
+  features, and a summary of all the options together (the mean and the largest of each feature across them), and
+  gives that option one number; the odds are the softmax of the numbers. Leaving it and giving up are options with
+  their own code and no opening. Two or three layers, 128 to 256 wide: 100,000 to 300,000 weights, under a megabyte.
+  The founding draws are two more small outputs on the same reading of the person and the want.
+- **Why not a text reader.** (1) The translator's reader learned its generator's wording. Here there is no wording
+  to learn: the input is typed fields, so the student **cannot** be moved by how a prompt is put, and because every
+  option is scored by the same function with a summary that ignores order, it **cannot** lean to the first listed.
+  Two of step 3's three faults are impossible by construction; the gate's checks for them remain as tests of the
+  code that fills the fields. (2) Whole-number arithmetic gives the same odds on every machine, which a hard rule
+  needs. (3) Microseconds a decision. (4) A model that takes no words and gives none is as far from being anyone
+  as a model can be (VISION 15, point 7).
+- **What a text reader would add:** openings whose meaning is in their words. A founded group's purpose, a creed,
+  an institution a steward invents: today such terms "bring nothing typed" and the mind falls back on belief. The
+  way in, later and without changing the shape: a short fixed vector for the words of a statement the person has
+  read, computed once a statement by a frozen embedding model and cached, as a further feature of that opening.
+  Round one leaves those features at zero.
+- **No memory of anyone.** There is no input that names a person or a town. What makes two people differ is their
+  records and nothing else, so what the student does for a person can always be explained from the record.
+
+**Targets: the calibrated citizen as the base, the teachers as the sway about it.**
+
+1. **The base.** The code mind's recorded odds on every harvested decision (free, and plentiful). A first net is
+   fitted to them alone, so the student begins as the calibrated citizen.
+2. **The teachers' sway, not their level.** For each kind of situation (matter, stage, which classes of option are
+   open) and each teacher family, the family's odds over the town's people are centred in log-odds: what is kept of
+   a teacher's answer for one person is **how far it sits from that family's own mean for the town**, option by
+   option. That is 3e's symmetric sway: it sums to nothing over the town.
+3. **The target** for a person is the base's level for the kind of situation (the code mind's town mean, which is
+   what is fitted to the surveys' rates), plus a share of the code mind's own sway for that person, plus a share of
+   the mean of the teachers' sways (equal weights between the families that passed the gate; the mix fixed and
+   recorded), renormalised. Then the class totals over the town are set back to the base's by iterative
+   proportional fitting, so **the sourced rates anchor the totals whatever the teachers say**. Where two families'
+   sways for a field point opposite ways, that part is left at the code mind's.
+4. **Soft targets.** The student is trained on the target odds (cross-entropy against the whole distribution),
+   never on a sampled choice.
+5. **As a residual, with a dial.** The student is the base net plus a second net fitted to the teachers' sway. With
+   the second net's share at 0 the student is the fitted citizen; the share is a dial of the world (10j: "the
+   everyday model or the code mind"), and with the model off the code mind decides and a town is today's to the
+   state hash.
+6. **Outcomes train nothing.** A model's weights are fixed for a run and are never fitted to how its people fared.
+
+**Held out, never trained on:** every decision of a held-out person; whole towns (seeds); whole profiles (two of
+the six harvested, and three never harvested for teaching at all); one matter of the slice kept from the teachers'
+part of training (a notice to leave), to see whether reading the person carries to a situation the sway was never
+taught on; and the gate's held-back sample. This task has looked at that sample once: the next task draws a new
+held-back sample from towns not yet generated.
+
+**Size and speed** (targets, to be measured on this Mac):
+- A living town of 1,000 makes about 770 decisions about a home a year (36,965 in 48 town-years): a few a day. A town of 10,000, some
+  tens a day. If the model later takes the mind's other decisions (gatherings, shops: about 200 a day per 1,000
+  people), a town of 10,000 asks it about 2,000 times a day.
+- One option scored in at most 20 microseconds, batched over a wake's decisions with typed arrays in the
+  participants' process; no GPU. A town of 3,000 or 10,000 on the first slice adds under 1% to a run's time; with
+  every decision of the mind, at most a tenth.
+- The weights are a versioned file whose hash is in the log, as the translator's version is.
+
+### 11e. The student's test, and when to stop
+
+10i's suite, as the gate a trained student must pass. All on people, towns and profiles it never saw.
+
+| Check | Measured | Passes when |
+|---|---|---|
+| **Scrambled records** | median distance between a person's odds and another person's in the same situation; and the share of the spread in log-odds that is between people within a kind of situation | at least 0.7 of the same figure for its targets (it kept the variety it was taught), and no less than the code mind's own (it is no more uniform than the citizen it replaces) |
+| **One-thing edits** | the four of 11c, low to high | the right way in at least 19 of 20 (it has no noise to hide behind), by at least the points 11c asks |
+| **Option order** | the options in every order | identical to the part per million (by construction) |
+| **Rewording** | there are no words: instead each field of the record moved by the grain it is written at | median move at most 1 point |
+| **Fit** | cross-entropy to held-out targets, beside the base net's and beside the distance between the two families | better than the base net by more than twice the spread between five trainings of one configuration; no closer to the targets than the families are to each other is expected |
+| **The town's totals** | twins with code and mock seats, no model call: three profiles, six seeds, two years, the student against the code mind (`oikos diff`) | no sourced measure beyond the noise; asked the other side within 8 points of 44%, went to a venue within 5 of 16.7% |
+| **Twins by seed** | the same seed twice, and on a second machine | the same state hash; with the model off, today's hash |
+| **Patterns it was not told** (written down now) | in the twins: those refused on asking go to a venue more than those who never asked; long residents move less than new ones; the share doing nothing rises with each try; a rent rise that takes more of income is acted on more | each holds in direction in at least 5 of 6 seeds |
+
+**Rounds, and the early signs.** A round is new data or a changed design, a training and the whole suite. **At most
+three rounds; after the second without a gain beyond the noise, stop and rethink.** What the translator's four
+rounds within noise taught, turned into signs to read early:
+- **Know the noise before round 1 ends:** five trainings of one configuration give each measure's spread. A gain
+  counts only beyond twice that.
+- **A learning curve in round 1:** trained on a quarter, a half and all of the teachers' labels. Flat from a half to
+  all: more labels will not help, change the design. Steep: get labels before changing anything.
+- **The ceiling is known beforehand:** two families disagree by a measured distance (11c). A student as close to
+  its targets as the families are to each other is done; below that there is nothing to chase.
+- **It must not learn the generator:** the code mind's own scores are never an input, and a profile whose parameters
+  differ is held out to show whether the base net learned the citizen or one town's settings.
+- **There is no real data on single choices here at all,** only sourced rates for a town as a whole and the patterns
+  above. That is said with every result, and it is why the totals are anchored and not learned.
+
+### 11f. Budgets
+
+**This task** (teacher calls; every one kept in full under `runs/living-world-4-2026-10-11/gate-*/calls.jsonl`,
+with Claude Code's own count of each in `claude-code-usage.jsonl`): **11.38 USD of the 30 allowed, as Claude Code
+reckons it.** `claude-sonnet-5-5` 802 calls, 6.25 USD (development: three designs; held back: one);
+`claude-opus-5-5` 298 calls, 5.13 USD (held back only); `codex/gpt-6.1-sol` 70 calls on the subscription, recorded
+cost 0, stopped by its usage limit. No call was declined; 2 of 1,170 answers could not be read. About 0.008 USD a
+call for Sonnet 5.5 and 0.017 for Opus 5.5, at about 2,600 tokens in and 200 out. No pod, no training.
+
+**The next task, as estimated:**
+- **Pod: none.** A net of 100,000 to 300,000 weights on some tens of thousands of rows trains on this Mac's
+  processor in minutes. Nothing is rented.
+- **First, with no teacher at all:** the base net fitted to the code mind's recorded odds, the suite of 11e run on
+  it, and the twins. This proves the shape, the whole-number arithmetic and the speed, costs nothing in calls, and
+  answers whether a small net keeps the code mind's variety. Two to three days of an agent's work.
+- **Then the teachers' sway, if it is still wanted after 11g:** 1,500 situations, each asked in two orders and two
+  wordings (the mean of four: a single answer's noise is a third to a half of what a teacher tells apart between
+  people): 6,000 calls a teacher. Opus 5.5 about 100 USD, Sonnet 5.5 about 50 USD, of plan usage. **A second
+  family at that volume is not available on the subscription:** Codex gave 70 answers before its window shut. A
+  second family would need either weeks of windows or a paid API, which is Naz's call.
+- A harvest on new towns for a fresh held-back sample: an hour of this Mac, no calls.
+
+### 11g. The gate, as run (2026-10-11)
+
+**No teacher passed.** On the held-back sample (36 situations, 298 requests a teacher, the shift design), Sonnet 5.5
+and Opus 5.5 each passed every check but the town's totals: both move people toward doing nothing, beyond the 15
+points allowed. Codex answered 70 requests on 6 situations before its usage limit and is not assessed. The
+thresholds are as they were written.
+
+| Held back, shift design | Sonnet 5.5 | Opus 5.5 | Codex gpt-6.1-sol (6 situations) | The code mind itself |
+|---|---|---|---|---|
+| Repeat, median points | 4.2 | 1.7 | 6.5 | 0 |
+| Scrambled records, median points | 12.0 (2.9 times repeat; above its own repeat in 32 of 36): pass | 12.6 (7.4 times; 32 of 36): pass | 16.8 (6 of 6) | 26.2 |
+| Sense of agency low to high: acting at all | 11 of 12, +10.0: pass | 11 of 12, +14.0: pass | 6 of 6, +14.9 | 12 of 12, +41.4 |
+| Trust in a venue: going to one | 5 of 5, +12.0: pass | 5 of 5, +11.6: pass | 3 of 3, +11.6 | 3 of 5, +10.7 |
+| Trust in the landlord: asking them | 11 of 12, +13.2: pass | 11 of 12, +11.3: pass | 3 of 3, +9.4 | 12 of 12, +18.4 |
+| Half a year in town against fifteen: looking for another home | 10 of 12, -10.4: pass | 11 of 12, -11.2: pass | 4 of 5, -12.9 | 0 of 12, 0 (it does not read it) |
+| Option order, median points; gain from being first | 5.5; -0.4: pass | 3.6; +0.6: pass | 7.5; -0.4 | |
+| Rewording, median points; same likeliest option | 5.6; 22 of 25: pass | 4.3; 29 of 30: pass | 6.9; 3 of 3 | |
+| Town's totals, acting at all, teacher against code mind | 48.5 against 66.3: **fail** | 41.9 against 66.3: **fail** | not assessed | |
+| Asking the landlord (19 situations) | 8.1 against 7.9 | 8.9 against 7.9 | | |
+| Looking for another home (26) | 7.3 against 13.3 | 5.7 against 13.3 | | |
+| A venue (5), joining (2), spending less (7), better pay (2) | not assessed | not assessed | | |
+| Unread; declined | 0; 0 | 0; 0 | 0; 0 | |
+
+(Only 5 held-back situations had a venue open, so that edit rests on 5, not 12.) **The edits show direction only.**
+No data says how much real people differ in such a choice, so nothing here says a teacher's size of difference is
+right; the code mind's sizes are placeholders too.
+
+**On development** (24 situations, Sonnet 5.5 only): the plain design told people apart (9 points against a repeat
+of 4) but had 77 in 100 do nothing where the code mind has 30; the bearing design brought that to 51 and failed
+scrambled records narrowly (9.5 against a repeat of 5) and rewording; the shift design passed all but rewording (8
+points, which had to be under half its scrambled 10.8). On the held-back sample the same design passed rewording
+and failed the totals. A design that passes one sample's rewording by a point and another's totals not at all is
+not a design that passes.
+
+**The town's totals, with their uncertainty.** Acting at all rests on all 36 situations, but nine tenths of the
+town's weight is rent rises and the sample has 7 of them: the figure is a few situations wide. It fails for both
+teachers in the same direction and on development too (62.5 against 70.5 for Sonnet), so it is probably real:
+shown a base line and asked who differs, both models find more reasons for a person to do less than to do more.
+
+**What a teacher adds to the code mind, plainly.**
+- **Less difference between people, not more.** Another person in the same situation moves the code mind's odds by
+  26 points and a teacher's by 12. On the sense of agency the code mind moves three to four times as far.
+- **Mostly the same fields.** Agency, trust in the landlord and trust in a venue are the code mind's own sways, said
+  back at about the same size or smaller.
+- **Some things the code mind does not read:** how long someone has lived in the town (moving, -10 to -11 points,
+  where the code mind has nothing); and, in the facts the teachers name, savings and how much of income the rent
+  takes (moving), having nobody close (telling others), how much the matter weighs.
+- **So on this slice the case for a student does not rest on the teachers.** A student taught by them here would be
+  the code citizen with a few more fields read and its people a little more alike. The case rests on what code
+  cannot score: openings with no hand-written sway (a group founded in a run, an offer a steward invents: today
+  scored by one placeholder constant and belief); the draws that are a fitted chance and a table (whether to
+  found, which shape); wants with nothing typed to seek (a slight, a loss, meaning); and decisions that are still
+  rules (leaving town, claiming support, borrowing, standing for office: section 7's list). Those are where the
+  next slice should be cut, not homes.
+
+**Between the families.** Sonnet 5.5 and Opus 5.5 are 11.5 points apart on the same request (median), about as far
+as two people are for either; when another person is put in the situation they move acting at all the same way in
+35 of 52 cases. Sonnet has more people act (by 5.8 points), move (6.5) and sign (10); Opus has more leave it.
+These are two models of one family. The other family answered too little to compare.
+
+**What would be tried next, in order.** (1) Nothing with teachers until the base net exists (11f). (2) If the sway
+is wanted: a teacher's answer taken as its shift less its own mean shift over the town for that kind of situation
+(11d's centring made part of what a teacher is). That passes the totals by construction, so the totals check then
+tests nothing and would need replacing by a check that the centring is stable from one town's sample to another:
+a change to the gate, for Naz. (3) The mean of four askings in place of one. (4) A second family in earnest.
 
 ## Open
 

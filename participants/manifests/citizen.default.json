@@ -1,6 +1,6 @@
 {
   "name": "citizen.default",
-  "version": "0.48.0",
+  "version": "0.49.0",
   "doc": "docs/behaviour/citizen.md",
   "params": {
     "accept_fewer_bedrooms_after_days": {
@@ -18,6 +18,10 @@
       },
       "default": "",
       "source": "placeholder"
+    },
+    "agency": {
+      "schema": {},
+      "source": "the world gives it (no default)"
     },
     "aggrieved_bps": {
       "schema": {
