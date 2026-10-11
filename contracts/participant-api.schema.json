@@ -1029,6 +1029,46 @@
               }
             }
           }
+        },
+        {
+          "description": "The entity's own record (world-config Channel kind own_record): present when it has changed since the previous look, and in a first look where there is one. Its sections are the mind's (a person's: entity-record.schema.json).",
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "own_record"
+            },
+            "record": {
+              "type": "object",
+              "required": [
+                "n",
+                "at",
+                "sections"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "n": {
+                  "$ref": "urn:oikos:contracts:0.8:common#/$defs/Count"
+                },
+                "at": {
+                  "$ref": "urn:oikos:contracts:0.8:common#/$defs/SimTime"
+                },
+                "sections": {
+                  "type": "object",
+                  "maxProperties": 24,
+                  "propertyNames": {
+                    "$ref": "urn:oikos:contracts:0.8:common#/$defs/Label"
+                  },
+                  "additionalProperties": {
+                    "$ref": "urn:oikos:contracts:0.8:common#/$defs/Opaque"
+                  }
+                }
+              }
+            }
+          }
         }
       ]
     },

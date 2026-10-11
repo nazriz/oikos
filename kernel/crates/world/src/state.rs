@@ -99,7 +99,30 @@ pub struct State {
     /// Goods taken without consent (world-expansion 7.3): the truth, which investigation can find.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub takings: Vec<Taking>,
+    /// Each entity's own record (docs/design/ai-citizens.md 10d): who they are and how things stand with them, as
+    /// their mind keeps it. Held here and written only here (the `entity_record` command); bounded in size
+    /// (`caps.entity_record_bytes`), so it never grows. The kernel reads none of it: its sections are opaque.
+    #[serde(default, skip_serializing_if = "Map::is_empty")]
+    pub entity_records: Map<Id, Arc<EntityRecord>>,
 }
+
+/// An entity's own record: its sections (opaque, whole numbers only), how many times it has been set (`n`), when
+/// last (`at`), and the chain of its changes: each change's hash over the one before, so the record can be rebuilt
+/// from the log and checked (`oikos record`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EntityRecord {
+    pub n: u64,
+    pub at: i64,
+    pub chain: String,
+    pub sections: BTreeMap<String, Value>,
+    /// The change stamp of its last change.
+    pub changed: u64,
+}
+
+/// The most an entity's record may hold where the world says nothing (canonical bytes of its sections).
+pub const ENTITY_RECORD_BYTES: u64 = 8192;
+/// The most sections a record may have.
+pub const ENTITY_RECORD_SECTIONS: usize = 24;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Taking {

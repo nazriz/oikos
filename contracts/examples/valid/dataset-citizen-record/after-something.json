@@ -1,0 +1,110 @@
+{
+  "run": "town-300.seed1",
+  "t": 1249200,
+  "seq": 70711,
+  "participant": "c0013-self",
+  "entity": "c0013",
+  "n": 5,
+  "set": {
+    "agency": {
+      "now": 7418,
+      "own": 8010
+    },
+    "attached": {
+      "place": {
+        "bps": 55,
+        "since": 300,
+        "to": "town"
+      }
+    },
+    "circumstances": {
+      "housed": 1,
+      "household": 3,
+      "income": 0,
+      "retired": 0,
+      "savings": 2483650,
+      "working": 0
+    },
+    "hours": {
+      "from": 608400,
+      "seconds": {
+        "home": 496800,
+        "work": 144000
+      },
+      "to": 1249200
+    },
+    "memory": {
+      "defining": [],
+      "recent": [
+        {
+          "about": "builder",
+          "size": 1507,
+          "t": 1249200,
+          "what": "job_lost"
+        }
+      ]
+    },
+    "needs": {
+      "belonging": 5504,
+      "meaning": 1993,
+      "security": 10000,
+      "shelter": 6000,
+      "social": 6000,
+      "status": 3000,
+      "subsistence": 10000
+    },
+    "ties": {
+      "close": [
+        {
+          "affinity": 284,
+          "last": {
+            "t": 3600,
+            "what": "talked"
+          },
+          "trust": 4953,
+          "who": "c0014"
+        }
+      ],
+      "resented": [
+        {
+          "affinity": -1000,
+          "last": {
+            "t": 1249200,
+            "what": "let_go"
+          },
+          "trust": 4850,
+          "who": "builder"
+        }
+      ]
+    },
+    "trust": {
+      "in": [
+        {
+          "bps": 3036,
+          "in": "bank",
+          "kind": "banks"
+        },
+        {
+          "bps": 3101,
+          "in": "builder",
+          "kind": "companies"
+        },
+        {
+          "bps": 2596,
+          "in": "city",
+          "kind": "government"
+        }
+      ],
+      "people": 4850
+    }
+  },
+  "because": [
+    {
+      "about": "builder",
+      "size": 1507,
+      "t": 1249200,
+      "what": "job_lost"
+    }
+  ],
+  "chain": "a4d3e8d7c6583d9be3ddc6da86ccca2be99e276c66c55dc8c52cda4adb438f78"
+}

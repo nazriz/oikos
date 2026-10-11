@@ -19,6 +19,8 @@ A run's log is its complete record: hash-chained, replayable, the truth of what 
 | `actions.jsonl` | act a code participant took (what it did, and why) | with `--actions` |
 | `citizen_decisions.jsonl` | decision a code citizen's mind made, with what the citizen came to know of how it turned out | if the run recorded them (it does, unless lean or asked not to) |
 | `citizen_outcomes.jsonl` | thing a code citizen came to know of how something went (the flat list) | if the run recorded them (with decisions, always) |
+| `citizen_records.jsonl` | change to a person's own record, as the kernel took it (the sections set, what happened since the last, the chain) | whenever people have records (every generated town since 2026-10-11) |
+| `citizen_periods.jsonl` | person and period (a week for an adult, a month for a child): sense of agency, what they thought and said of each who holds power over them and the gap, trust in each institution, where the hours went | the same |
 | `observations.jsonl` | observation of a participant chosen to be recorded | if the run recorded them |
 
 Every line of every file carries `run` (the run id) and, where it applies, `t`, `participant` and `synthetic`.
@@ -127,7 +129,7 @@ Measured 2026-10-08 on the 1,000-person town, 15 days, three model seats: `all` 
 
 ## Versioning and guarantees
 
-- The format has its own version (`0.3.0`), in the manifest. A reader checks it. (0.2.0, 2026-10-08: `citizen_decisions.jsonl` rows gained `seq` and what the citizen had before it, all optional; nothing else changed. 0.3.0, 2026-10-09: `citizen_decisions.jsonl` rows gained `n`, `follows` and `outcomes`; a new file, `citizen_outcomes.jsonl`; the manifest gained `citizens`. All optional: a dataset made from an older log has none of them and is still valid.)
+- The format has its own version (`0.4.0`), in the manifest. (0.4.0, 2026-10-11: two new files, `citizen_records.jsonl` and `citizen_periods.jsonl`, and the manifest's `records`; docs/design/ai-citizens.md 10d, 10h. Recorded and never scored: no column says whether anything is good.) A reader checks it. (0.2.0, 2026-10-08: `citizen_decisions.jsonl` rows gained `seq` and what the citizen had before it, all optional; nothing else changed. 0.3.0, 2026-10-09: `citizen_decisions.jsonl` rows gained `n`, `follows` and `outcomes`; a new file, `citizen_outcomes.jsonl`; the manifest gained `citizens`. All optional: a dataset made from an older log has none of them and is still valid.)
 - Rows follow `contracts/dataset.schema.json`: `orchestrator/test/dataset.test.ts` validates every row of a run's dataset against it, and checks the same log gives the same dataset.
 - Nothing in a dataset is random or dated: the same log always gives the same dataset, byte for byte.
 - Mock rows are marked `synthetic: true`. Only real models' rows are fit to train on.

@@ -1,0 +1,76 @@
+{
+  "agency": {
+    "now": 3546,
+    "own": 3546
+  },
+  "attached": {},
+  "beliefs": [],
+  "circumstances": {
+    "housed": 0,
+    "household": 5,
+    "retired": 0,
+    "working": 0
+  },
+  "memory": {
+    "defining": [],
+    "recent": []
+  },
+  "temperament": {
+    "conformity": 4647,
+    "openness": 5489,
+    "prestige": 3851
+  },
+  "ties": {
+    "close": [
+      {
+        "who": "c0000",
+        "affinity": 100,
+        "trust": 5000
+      },
+      {
+        "who": "c0001",
+        "affinity": 100,
+        "trust": 5000
+      },
+      {
+        "who": "c0002",
+        "affinity": 100,
+        "trust": 5000
+      },
+      {
+        "who": "c0003",
+        "affinity": 100,
+        "trust": 5000
+      },
+      {
+        "who": "c0004",
+        "affinity": 100,
+        "trust": 5000
+      },
+      {
+        "who": "c0005",
+        "affinity": 100,
+        "trust": 5000
+      }
+    ],
+    "resented": []
+  },
+  "trust": {
+    "in": [],
+    "people": 4850
+  },
+  "values": {
+    "achievement": 5186,
+    "benevolence": 9036,
+    "conformity": 5104,
+    "hedonism": 3344,
+    "power": 2516,
+    "security": 7721,
+    "self_direction": 5131,
+    "stimulation": 5847,
+    "tradition": 4189,
+    "universalism": 5969
+  },
+  "views": [],
+  "wants": []
+}

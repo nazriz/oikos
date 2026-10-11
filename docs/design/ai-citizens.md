@@ -441,6 +441,22 @@ A decision without an outcome is one whose run ended first (a gathering decided 
   - untried options need a prior (EWA's initial attractions), or a shop that serves nothing teaches nothing;
   - with no one to copy, a person should go by experience, not habit.
 
+- **The richer record** (10k step 1; 2026-10-11, citizen 0.44.0, mind 0.3.0; docs/behaviour/citizen.md, "The record"; docs/decisions.md, the two entries of that day). In code, no model.
+  - **Built:** belonging and meaning as needs; trust in particular institutions, from each profile's survey figures; a sense of agency; attachments to a place, a trade and a group; what is thought and what is said of whoever holds power over a person; values that drift each month and are shocked by a death, a child, ruin and losing a home; a child's values from their parents'; bounded ties with trust and what last passed, through which a death is told; bounded memory with defining events kept; where the hours go.
+  - **The record:** one a person, kernel state written only by the kernel (the log's `entity_record`), at most 8,192 bytes, chained; `oikos record <log> <person>` rebuilds and checks it; only the person can be shown it. Only a code mind's bookkeeping sets it.
+  - **What a log can show** (10h): `oikos dataset` writes `citizen_records.jsonl` and `citizen_periods.jsonl` (agency, the said-and-thought gap, trust by institution, hours). Nothing is scored.
+  - **Not read by any decision yet:** trust, agency, attachments. Wants are a bounded, empty list in the record.
+  - **Found:** belonging raised by last week's gathering kept goers going (participation up by a third); it now comes from attachment to the group. Adding needs had shrunk every appraised offer by two sevenths; fixed.
+  - **One year of the 1,000-person town, two runs of one town, before and after:** (`runs/living-world-1-2026-10-11`; the branch point against the branch; with six runs each side in brackets):
+    - employment to population 60.5 to 59.0% (six: 59.5 to 59.0); unemployment 0.6 to 0.7% (0.7 to 1.2);
+    - hires 205 to 209 (202 to 202); median rent share 19.6 to 21.1% (20.1 to 20.7);
+    - group participation 41.8 to 44.5% (42.5 to 46.1: the one measure that moved beyond the noise between runs; target 50.0%). Likely cause: with belonging and meaning met, those who go are a little more often satisfied and keep their routine;
+    - union applications 12 to 11 (10.8 to 12.2); ballots 1 to 1.5 (1.5 to 1.3); stoppages 0.5 to 0.5 (0.8 to 0.8); complaints 0 to 0 (0 to 0.2);
+    - arrivals 46 to 50.5 (47.7 to 52.2); departures 102.5 to 102 (103.7 to 103.3).
+    - (These are today's town, after the ages fixes, the opening budget and the rest: not the figures of the entries above.)
+  - **Cost** (a year of 1,000 people): 6% more instructions and 7% more wall time side by side (six lean runs each: 223 to 238 s); about 83,000 changes to 1,054 records, the largest record 2,970 bytes; the log 5% larger in full (2.01 to 2.12 GB raw; 378 to 402 MB compressed) and 8% larger lean (1.29 to 1.39 GB raw; 223 to 246 MB compressed).
+  - **What the records of that year show** (one run; nothing scored): 19 bereavements felt (a household's or a tie's), 101 people let go, 13 given notice to leave a home, 12 ruined, 12 children expected; mean sense of agency flat at 5,050 to 5,060 by quarter; 11,063 person-weeks in which what was said of someone in power differed from what was thought; hours 80.5% at home, 11.1% at work, 3.1% learning, 0.2% at gatherings, 5.0% elsewhere.
+
 ## 9. What the literature taught, and where it's used
 
 Full citations: docs/research/references.md.

@@ -7,8 +7,9 @@ import { basename, join } from "node:path";
 import { actEnds } from "./act-ends";
 import { logLines, runOf } from "./logs";
 import { takeRoute, takeTurn, type CorpusExample } from "./corpus";
+import { periodRow, Records } from "./records";
 
-export const DATASET_VERSION = "0.3.0";
+export const DATASET_VERSION = "0.4.0";
 
 interface Command { seq: number; command: string; as?: string; blocks?: unknown[]; looks?: unknown[]; provenance?: unknown; reasoning?: string; applied?: boolean; refusal?: unknown; created?: string[] }
 /** Something a seat was shown that names what an earlier act of its own made: the record or letter made (`of`), the
@@ -117,6 +118,14 @@ export async function exportDataset(logPath: string, outDir: string, o: DatasetO
   // that is then written again with each decision's outcomes under it: only the outcomes are held meanwhile.
   const citizenDecisions = lines(join(outDir, "citizen_decisions.part.jsonl"));
   const citizenOutcomes = lines(join(outDir, "citizen_outcomes.jsonl"));
+  // Each person's own record (docs/design/ai-citizens.md 10d, 10h): every change to it, as the kernel took it; and,
+  // from the record rebuilt as the log is read, a row a person a period of what a log can show of them.
+  const citizenRecords = lines(join(outDir, "citizen_records.jsonl"));
+  const citizenPeriods = lines(join(outDir, "citizen_periods.jsonl"));
+  const records = new Records();
+  let recordSet: { seq: number; t: number; participant: string; set: any; because?: unknown[] } | undefined;
+  let recordFaults = 0;
+  let largestRecord = 0;
   const decisionSeqs: number[] = []; // each decision row's place in the log, in the order written
   const decisionOf = new Map<string, Map<number, { seq: number; t: number; domain: string }>>(); // citizen -> its own number -> its latest decision of that number
   const outcomesOf = new Map<number, string[]>(); // a decision's seq -> its outcomes, as they will be written under it
@@ -249,6 +258,19 @@ export async function exportDataset(logPath: string, outDir: string, o: DatasetO
         if (models().has(b.subject)) cameBack(b.subject, b.data?.observation);
         observations.write({ run: run(), t: b.data?.t ?? e.t, participant: b.subject, ...(b.data?.as ? { as: b.data.as } : {}), observation: b.data?.observation });
       }
+    } else if (e.kind === "event" && b.event === "entity_recorded" && recordSet && b.cause === recordSet.seq) {
+      const before = records.of.get(b.entity)?.faults.length ?? 0;
+      const r = records.apply({ ...recordSet, entity: b.entity, n: b.n, chain: b.chain, digest: b.digest });
+      recordFaults += r.faults.length - before;
+      largestRecord = Math.max(largestRecord, r.bytes);
+      citizenRecords.write({ run: run(), t: recordSet.t, seq: recordSet.seq, participant: recordSet.participant, entity: b.entity, n: b.n, set: recordSet.set, ...(recordSet.because ? { because: recordSet.because } : {}), chain: b.chain });
+      if (recordSet.set.hours) {
+        const row = periodRow(r, recordSet.t);
+        if (row) citizenPeriods.write({ run: run(), ...row });
+      }
+      recordSet = undefined;
+    } else if (e.kind === "command" && b.command === "entity_record") {
+      recordSet = { seq: e.seq, t: e.t, participant: b.participant, set: b.set, ...(b.because ? { because: b.because } : {}) };
     } else if (e.kind === "command") {
       const who = b.participant;
       if (b.command === "act" && b.provenance?.via === "translator" && b.provenance.draft) {
@@ -330,6 +352,11 @@ export async function exportDataset(logPath: string, outDir: string, o: DatasetO
   const co = await citizenOutcomes.close();
   if (co.rows) files["citizen_outcomes.jsonl"] = co;
   else await Bun.file(join(outDir, "citizen_outcomes.jsonl")).delete();
+  for (const [name, w] of [["citizen_records.jsonl", citizenRecords], ["citizen_periods.jsonl", citizenPeriods]] as const) {
+    const x = await w.close();
+    if (x.rows) files[name] = x;
+    else await Bun.file(join(outDir, name)).delete();
+  }
   const obs = await observations.close();
   if (obs.rows) files["observations.jsonl"] = obs;
   else await Bun.file(join(outDir, "observations.jsonl")).delete();
@@ -351,6 +378,9 @@ export async function exportDataset(logPath: string, outDir: string, o: DatasetO
     // What the run recorded for citizen models: by area of life, the decisions, those the citizen learned at least one
     // outcome of, and the outcomes (those that follow no recorded decision among them).
     ...(cd.rows ? { citizens: { decisions: cd.rows, outcomes: co.rows, by_domain: Object.fromEntries([...byDomain].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) } } : {}),
+    // People's own records: how many people have one, the changes to them, the most any record ever held (bytes: it
+    // never grows past the world's cap), and how many links of their chains did not hold when rebuilt (0, or a fault).
+    ...(records.of.size ? { records: { entities: records.of.size, changes: [...records.of.values()].reduce((x, r) => x + r.n, 0), largest_bytes: largestRecord, chain_faults: recordFaults } } : {}),
     files,
   };
   await Bun.write(join(outDir, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);

@@ -1,6 +1,6 @@
 {
   "name": "citizen.default",
-  "version": "0.43.2",
+  "version": "0.44.0",
   "doc": "docs/behaviour/citizen.md",
   "params": {
     "accept_fewer_bedrooms_after_days": {
@@ -290,6 +290,20 @@
       "default": 90,
       "source": "placeholder"
     },
+    "inner": {
+      "schema": {
+        "type": "object"
+      },
+      "default": {},
+      "source": "placeholder"
+    },
+    "institutions": {
+      "schema": {
+        "type": "object"
+      },
+      "default": {},
+      "source": "placeholder"
+    },
     "leave_after_homeless_days": {
       "schema": {
         "type": "integer"
@@ -339,9 +353,21 @@
       "default": null,
       "source": "placeholder"
     },
+    "outlook": {
+      "schema": {
+        "type": "object"
+      },
+      "default": {},
+      "source": "placeholder"
+    },
     "outside_account": {
       "schema": {},
       "source": "the world gives it (no default)"
+    },
+    "own_values": {
+      "schema": {},
+      "default": null,
+      "source": "placeholder"
     },
     "own_work": {
       "schema": {},
@@ -595,6 +621,10 @@
       "schema": {},
       "default": null,
       "source": "placeholder"
+    },
+    "trust": {
+      "schema": {},
+      "source": "the world gives it (no default)"
     },
     "union": {
       "schema": {},

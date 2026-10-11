@@ -405,6 +405,14 @@ pub enum EventBody {
         participant: Id,
         statement: String,
     },
+    /// An entity's own record was set (docs/design/ai-citizens.md 10d): its `n`th change, the chain of its changes
+    /// up to this one, and the digest of what the record now holds.
+    EntityRecorded {
+        entity: Id,
+        n: u64,
+        chain: String,
+        digest: String,
+    },
 }
 
 impl EventBody {
@@ -451,6 +459,7 @@ impl EventBody {
             EventBody::VisitStarted { .. } => "visit_started",
             EventBody::Visited { .. } => "visited",
             EventBody::ParticipantOptedOut { .. } => "participant_opted_out",
+            EventBody::EntityRecorded { .. } => "entity_recorded",
         }
     }
 

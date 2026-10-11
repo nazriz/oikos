@@ -25,7 +25,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { calls, canonical, DECISIONS, OUTCOMES, inCurrency, paramErrors, modules as builtin, Randomness, Roster, slice, Tally, View, type BehaviourModule, type Controller, type Currency, type DecisionRecord, type OutcomeRecord, type LookRequest, type Observation, type ParticipantAction, type ParticipantContext } from "@oikos/participants";
+import { calls, canonical, DECISIONS, OUTCOMES, RECORD, inCurrency, paramErrors, modules as builtin, Randomness, Roster, slice, Tally, View, type BehaviourModule, type Controller, type Currency, type DecisionRecord, type OutcomeRecord, type RecordChange, type LookRequest, type Observation, type ParticipantAction, type ParticipantContext } from "@oikos/participants";
 import { CONSULT_VERSION, createConsult, createLlmParticipant, LLM_PARTICIPANT_VERSION, MOCK_VERSION, MockAdapter, mockPolicies, PRICES, ModelCallFailed, ModelUnreachable, SpendingLimitReached, type Budget, type LlmAdapter, type LlmController, type LlmIO, type MockBrain, type Price } from "@oikos/participants/llm";
 import { createArrangement, createTranslator, draftText, Knowledge, RESOLVER, resolve, TRANSLATOR_VERSION, type Draft, type Resolution, type Route, NOT_CHECKED } from "@oikos/translator";
 import { Kernel } from "./kernel";
@@ -1093,6 +1093,10 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
           // (wages every pay day for every worker are many, and small). Wherever decisions are recorded, and only there.
           const outcomes = (r.value as any)?.[OUTCOMES] as OutcomeRecord[] | undefined;
           if (outcomes?.length && !lean && o.recordDecisions !== "none") await k.request({ op: "annotate", annotation: { annotation: "outcome", subject: x.u.participant, data: { outcomes } } });
+          // A code mind's change to its own record (docs/design/ai-citizens.md 10d): the kernel holds it and is its
+          // only writer. It is state, so it is written in every run, whatever the log keeps.
+          const change = recordChangeOf(x.u, r.value);
+          if (change) await command({ command: "entity_record", participant: x.u.participant, set: change.set, ...(change.because?.length ? { because: change.because } : {}) });
           if (thinkingCosts) {
             // Its thinking: a model's by the tokens it just used (logged, so a replay is exact), code's a fixed time.
             const used = (notes.get(x.u.participant) ?? []).filter((a: any) => a.annotation === "usage" && a.purpose === "participant") as any[];
@@ -1190,4 +1194,17 @@ function sortedKeys(v: unknown): unknown {
   if (Array.isArray(v)) return v.map(sortedKeys);
   if (v && typeof v === "object") return Object.fromEntries(Object.keys(v).sort().map((k) => [k, sortedKeys((v as { [k: string]: unknown })[k])]));
   return v;
+}
+
+/**
+ * The change to its own record that a code participant's action carries, if this is one whose record is its own
+ * bookkeeping to keep (docs/design/ai-citizens.md 10d): a participant run by code, acting as itself. Whatever a model
+ * returns, and whatever the code behind a model seat returns (a mock's brain, a stand-in), sets nothing: a model has
+ * no way to write who it is. The participant API has no act for it, and a symbol cannot come out of a model's JSON;
+ * this is the second lock, and the kernel's refusal of the command for a participant not run by code the third.
+ */
+export function recordChangeOf(u: { llm?: unknown; capacity?: string }, action: unknown): RecordChange | undefined {
+  if (u.llm || u.capacity !== "self" || !action || typeof action !== "object") return undefined;
+  const c = (action as any)[RECORD] as RecordChange | undefined;
+  return c && c.set && Object.keys(c.set).length ? c : undefined;
 }

@@ -3898,6 +3898,81 @@ See the design note, §16.
   - **Not verified.** Any pilot with the new preview. Whether seats in a run read a numbered list with lines as readily as the replay's notes suggest.
   - **Revisit if** a pilot's seats decline right drafts for something the new lines say (watch "Left empty" on forms with many optional fields, "would be bound to nothing" on offers made on an advertisement, and "Words only" on laws: each is true and each may read as a fault); previews of forms grow past the form itself; or the sentence goes into the seat's instructions, when the replay should be run again on three readings each.
 
+## 2026-10-11 · A person's own record: held by the kernel, computed by the code mind
+
+Step 1 of the living world (docs/design/ai-citizens.md 10k). Behaviour: docs/behaviour/citizen.md, "The record".
+
+- **Who computes and who holds.** The kernel cannot know what a rent rise or a notice is (no laws in the kernel), so the
+  citizen's mind computes each change and the kernel holds the record, bounds it, chains a hash of its changes and is its
+  only writer. The kernel reads none of it: sections are opaque whole numbers, as a record's `data` is.
+- **A command, not a block.** A mind changing is not an act in the world: it takes no time on a person's timeline, and
+  it must not be lost when the act beside it is refused. It is state, so it is in every log (lean ones too) and a replay
+  reaches it.
+- **Only a code mind sets a record, three ways over.** The participant API has no act for it. The orchestrator takes a
+  change only from a non-enumerable symbol on the action of a participant run by code, acting as itself
+  (`recordChangeOf`): nothing a model returns, and nothing the code behind a model seat returns, sets anything. The
+  kernel will not take the command for a participant whose controller is not code. Tests: `kernel/tests/entity_record.rs`,
+  `orchestrator/test/entity-records.test.ts`. **This last lock must change in step 4,** when a model gives an entity's
+  odds and platform code beside it keeps the record: the rule then is "the bookkeeping, never the model", and the kernel
+  cannot tell them apart by the controller's type. Decide then where the bookkeeping runs.
+- **One change a wake at most,** and a section only when it has moved by more than its grain (trust 1%, ties 5%,
+  attachments and views 2%, money a twentieth). Without the grain every tie's weekly fading was written for everyone.
+  The record in the kernel is therefore a summary within that grain of the mind's own figures.
+- **Fixed size.** Every list in `contracts/entity-record.schema.json` is bounded and the kernel refuses a record over
+  8,192 bytes (a person's is 1 to 2 KB). A person's record fills as their life does, up to those bounds; the largest
+  record in a town stops growing (tested over three years).
+- **Contract changes** (the owner's approval of 2026-10-11; listed in contracts/README.md): the log's command
+  `entity_record` and event `entity_recorded`; `caps.entity_record_bytes`; the channel kind `own_record` and its data;
+  the new `entity-record.schema.json`; the dataset's two files and `records` (format 0.4.0). Profiles gained `outlook`.
+- **Revisit if** records are wanted for organisations (the command takes a person's participant only; a firm's would be
+  set by whoever acts for it, which needs a rule for who may); the grain hides something a study needs (lower it: the
+  log grows); a record is to be read by its entity's model (hand out the `own_record` channel: nobody has it yet);
+  or the cap is reached (it would mean a list is unbounded: a fault).
+
+## 2026-10-11 · What moves in a person, how fast, and what reads it
+
+- **Belonging and meaning are needs,** so they count in how satisfied a person is, which decides how they decide.
+  **Trust, agency and attachments are recorded and moved and read by no decision yet**: reading them is wants and
+  initiative (step 2). The exception is what is said: the gap between a private and an expressed view reads trust and fear.
+- **Calibrating the mechanism, found on the 300-person town.** With belonging raised by having gone to a gathering last
+  week, those who went were more satisfied, kept their routine and went again: 44% had been in the last month where 30%
+  had (180 days, two runs). Before, a goer who was unsatisfied compared going with staying each week and dropped out a
+  little over half the time. Belonging to a group now comes from attachment to it, which builds over a year, and the
+  two needs' floors (3,200 and 3,700) are set so that the share of gathering decisions made unsatisfied is what it was
+  (0.33 before; 0.37 with floors of 3,000 and 3,500, 0.28 with 3,000 and 4,000 and the weekly bonus). After: 40.6 to
+  42.9% took part in 180 days, everything else within the noise between runs. The floors are placeholders fitted to
+  leave satisfaction where it was; they are not sourced.
+- **The year, before and after** (the 1,000-person town, the branch point against the branch, two runs of one town
+  with full logs and six lean ones each side; `runs/living-world-1-2026-10-11`; the table is in
+  docs/design/ai-citizens.md, "Progress"). One measure of 57 moved beyond the noise between six runs: group participation,
+  42.5 to 46.1% (target 50.0%). Recorded, not chased: those who go are a little more often satisfied and keep going.
+  Employment to population 59.5 to 59.0%, unemployment 0.7 to 1.2%, hires 202 to 202, median rent share 20.1 to 20.7%,
+  union applications 10.8 to 12.2, ballots 1.5 to 1.3, stoppages 0.8 to 0.8, arrivals 47.7 to 52.2, departures 103.7
+  to 103.3: all within the noise. **Cost:** 6% more instructions, 7% more wall time side by side (223 to 238 s for six
+  runs at once); the log 5% larger in full and 8% larger lean (a lean year of 1,000 people: 1.29 to 1.39 GB raw, 223
+  to 246 MB compressed).
+- **Seen, not caused here (to look at):** in the after runs a factory's manager published the same paper to the
+  outside 40 times in one day (`firm.producer`, seed 1, flagged by the run as a possible retry loop). The baseline's
+  same seed did not; nothing in this work touches the producer, and the run is otherwise a different run.
+- **A fault found and fixed on the way:** adding two needs made an offer's appraisal an average over seven where it had
+  been over five, shrinking every appraised value by two sevenths against what had been learned. An offer's facts say
+  nothing of belonging or meaning, so the appraisal is of the five, as it was.
+- **Values drift** as an Ornstein-Uhlenbeck step each month, about the town's mean, so the town's spread of values is
+  stationary and its rates do not drift with it; the size is from measured stability (0.6 over 3.5 years), which
+  overstates change. **Shocks** have directions from the literature and one placeholder size.
+- **Who lives in a town is the town's.** Every person's values are now drawn by the generator (children's from their
+  parents'), not by each participant from the run's seed: `--seeds N` runs the same people N times, as the measurement
+  doc already said of everything else about them. Every town's runs moved.
+- **Ties are bounded** at contacts plus three (18): the map of everyone ever met at a gathering is gone.
+- **Sources:** each profile's `outlook` is the World Values Survey's wave 7, national, read through a summarising tool
+  (to confirm). No figure was opened for a sense of agency by place, for how alike parents' and children's values are,
+  for the ratio of trust lost to trust won, or for values after a bereavement: each is a named placeholder
+  (docs/behaviour/citizen.md; docs/research/references.md, "The richer record").
+- **Revisit if** a year's rates move when a placeholder is replaced by a sourced figure (expected: re-fit the two
+  floors, nothing else); values should move toward those of the people one is tied to (not built); the shock to values
+  should fade as the one study that followed it found; or long runs show the town's values wandering (they should not:
+  the drift is mean-reverting and shocks are small).
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Calibration, measured again after the first-year risk fix** (2026-10-05, at 0251d3a, `runs/calibration-2026-10-05` on the run server; the small town, 3 seeds × 2 years, code only, as below). Health: 4 breaches of 15 (8 measured). Recorded, not chased: Naz decides what to do with the numbers.

@@ -38,6 +38,7 @@ impl View {
                     }
                 }
             }
+            ChannelData::OwnRecord { .. } => {}
             ChannelData::Holdings { holdings } => {
                 // A holding gone to nothing drops out of the picture (as the participant runtime's view does).
                 for h in holdings {
@@ -134,6 +135,7 @@ fn check_run(params: &WorldParams, ops: &[Op]) -> Result<usize, TestCaseError> {
                 ChannelData::Accounts { .. } => have.accounts = v.accounts.clone(),
                 ChannelData::Holdings { .. } => have.holdings = v.holdings.clone(),
                 ChannelData::Records { .. } => have.records = v.records.clone(),
+                ChannelData::OwnRecord { .. } => {}
                 ChannelData::Sites { .. } => have.cells = v.cells.clone(),
                 ChannelData::Directory { .. } => {
                     have.entities = v.entities.clone();

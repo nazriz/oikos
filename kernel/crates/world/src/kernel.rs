@@ -61,6 +61,16 @@ pub enum Command {
         participant: Id,
         statement: String,
     },
+    /// A person's own record, set (docs/design/ai-citizens.md 10d): the sections given replace those of the same
+    /// name, the rest stand. It is the bookkeeping of a code mind, never an act in the world: it takes no time, and
+    /// only the participant's own person's record can be named, because none is named.
+    EntityRecord {
+        participant: Id,
+        set: BTreeMap<String, Value>,
+        /// What moved it, in a few words of the mind's own (logged and chained; never read here).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        because: Option<Value>,
+    },
 }
 
 /// A command the kernel will not accept at all. Unlike a refusal (a finding,
@@ -253,6 +263,7 @@ impl World {
             totals: c.catalogue.counters.iter().map(|x| (x.id.clone(), 0)).collect(),
             flooded: Default::default(),
             takings: vec![],
+            entity_records: Default::default(),
         };
         for p in &c.positions {
             let position = Position { entity: p.entity.clone(), title: p.title.clone(), role: p.role.clone(), channels: Arc::new(p.channels.clone()), role_module: p.role_module.clone(), holder: p.holder.clone(), changed: 0 };
@@ -558,6 +569,28 @@ impl World {
                     return perr(format!("{participant} has already left or ended"));
                 }
             }
+            Command::EntityRecord { participant, set, .. } => {
+                exists(participant)?;
+                let p = &self.state.participants[participant];
+                // Only the bookkeeping of a code mind sets a record: whatever a model decides, it has no way to
+                // write who it is (docs/design/ai-citizens.md 10d, 10e).
+                if p.def.controller.get("type").and_then(Value::as_str) != Some("code") {
+                    return perr(format!("{participant} is not run by code: its record is not its own to set"));
+                }
+                let Some(entity) = p.person.as_ref() else { return perr(format!("{participant} is not a person: it has no record of its own")) };
+                if set.is_empty() {
+                    return perr("a record is set with at least one section");
+                }
+                let merged = self.merged_record(entity, set);
+                if merged.len() > crate::state::ENTITY_RECORD_SECTIONS {
+                    return perr(format!("a record has at most {} sections", crate::state::ENTITY_RECORD_SECTIONS));
+                }
+                let most = self.s.config.caps.entity_record_bytes.unwrap_or(crate::state::ENTITY_RECORD_BYTES);
+                let size = canon::canonical(&merged).map_err(|e| ProtocolError(e.to_string()))?.len() as u64;
+                if size > most {
+                    return perr(format!("{entity}'s record would hold {size} bytes: a record holds at most {most} and never grows past it"));
+                }
+            }
         }
         Ok(())
     }
@@ -574,6 +607,22 @@ impl World {
             Command::Advance { to } => self.advance(*to),
             // (What a participant perceives is perception's to build, read-only; the engine then has the world deliver it.)
             Command::Observe { .. } | Command::Look { .. } => return perr("observing is the engine's: perception builds it, and the world delivers it"),
+            Command::EntityRecord { participant, set, because } => {
+                let t = self.state.t;
+                let entity = self.state.participants[participant].person.clone().ok_or_else(|| ProtocolError(format!("{participant} is not a person")))?;
+                let sections = self.merged_record(&entity, set);
+                let before = self.state.entity_records.get(&entity);
+                let (n, prev) = before.map_or((1, String::new()), |r| (r.n + 1, r.chain.clone()));
+                // The chain: this change (when, what was set, why) over the chain before it.
+                let change = serde_json::json!({ "t": t, "set": set, "because": because });
+                let mut link = prev.into_bytes();
+                link.extend_from_slice(&canon::canonical(&change).map_err(|e| ProtocolError(e.to_string()))?);
+                let chain = canon::hash_with_domain(canon::DOMAIN_ENTITY_RECORD, &link);
+                let digest = canon::hash_with_domain(canon::DOMAIN_ENTITY_RECORD, &canon::canonical(&sections).map_err(|e| ProtocolError(e.to_string()))?);
+                let changed = self.state.stamp();
+                self.state.entity_records.insert(entity.clone(), Arc::new(crate::state::EntityRecord { n, at: t, chain: chain.clone(), sections, changed }));
+                Output { events: vec![Timed::new(t, EventBody::EntityRecorded { entity, n, chain, digest })] }
+            }
             Command::OptOut { participant, statement } => {
                 let t = self.state.t;
                 let c = self.state.stamp();
@@ -594,6 +643,15 @@ impl World {
                 Output { events }
             }
         })
+    }
+
+    /// An entity's record with these sections set: those given in place of those of the same name, the rest as they stand.
+    fn merged_record(&self, entity: &str, set: &BTreeMap<String, Value>) -> BTreeMap<String, Value> {
+        let mut sections = self.state.entity_records.get(entity).map(|r| r.sections.clone()).unwrap_or_default();
+        for (k, v) in set {
+            sections.insert(k.clone(), v.clone());
+        }
+        sections
     }
 
     /// Dry run: would physics allow this action right now?

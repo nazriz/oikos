@@ -19,6 +19,7 @@ const SCHEMA_FILES = [
   "log.schema.json",
   "calls.schema.json",
   "outcomes.schema.json",
+  "entity-record.schema.json",
   "dataset.schema.json",
   "module.schema.json",
 ];
@@ -39,6 +40,9 @@ const TARGETS: Record<string, string> = {
   "dataset-decision": `${NS}:dataset#/$defs/Decision`,
   "dataset-citizen-decision": `${NS}:dataset#/$defs/CitizenDecision`,
   "dataset-citizen-outcome": `${NS}:dataset#/$defs/CitizenOutcome`,
+  "dataset-citizen-record": `${NS}:dataset#/$defs/CitizenRecord`,
+  "dataset-citizen-period": `${NS}:dataset#/$defs/CitizenPeriod`,
+  "entity-record": `${NS}:entity-record#/$defs/PersonRecord`,
 };
 
 const readJson = (path: string) => JSON.parse(readFileSync(path, "utf8"));

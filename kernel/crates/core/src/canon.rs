@@ -19,6 +19,8 @@ pub const DOMAIN_STATE: &str = "oikos.state.v1\n";
 pub const DOMAIN_CONFIG: &str = "oikos.config.v1\n";
 pub const DOMAIN_OBSERVATION: &str = "oikos.observation.v1\n";
 pub const DOMAIN_DRAFT: &str = "oikos.draft.v1\n";
+/// An entity's own record (docs/design/ai-citizens.md 10d): the chain of its changes, and the digest of what it holds.
+pub const DOMAIN_ENTITY_RECORD: &str = "oikos.entity_record.v1\n";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CanonError {

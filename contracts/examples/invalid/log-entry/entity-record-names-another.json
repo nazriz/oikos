@@ -1,0 +1,63 @@
+{
+  "body": {
+    "command": "entity_record",
+    "participant": "c0038-self",
+    "set": {
+      "agency": {
+        "now": 1618,
+        "own": 1618
+      },
+      "attached": {},
+      "beliefs": [
+        {
+          "bps": 5546,
+          "from": "religious-group-1",
+          "teaching": "religious-group-1-teaching"
+        }
+      ],
+      "circumstances": {
+        "housed": 0,
+        "household": 3,
+        "retired": 0,
+        "working": 0
+      },
+      "memory": {
+        "defining": [],
+        "recent": []
+      },
+      "temperament": {
+        "conformity": 2995,
+        "openness": 5009,
+        "prestige": 2018
+      },
+      "ties": {
+        "close": [],
+        "resented": []
+      },
+      "trust": {
+        "in": [],
+        "people": 4850
+      },
+      "values": {
+        "achievement": 3291,
+        "benevolence": 8161,
+        "conformity": 4221,
+        "hedonism": 4415,
+        "power": 744,
+        "security": 3925,
+        "self_direction": 5794,
+        "stimulation": 4224,
+        "tradition": 1769,
+        "universalism": 10000
+      },
+      "views": [],
+      "wants": []
+    },
+    "entity": "c0002"
+  },
+  "hash": "3a55f05d0712f9814263b4d736bfbdbf23f7237d1264cd197f2d84ccba5b3761",
+  "kind": "command",
+  "prev": "a34aeee20e21d0c2aa2edf43cc08591ab07b8f480654c8862c24310c65ae334a",
+  "seq": 137,
+  "t": 0
+}

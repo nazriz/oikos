@@ -211,6 +211,31 @@
               }
             }
           }
+        },
+        "records": {
+          "description": "People's own records in the run: how many people have one, the changes to them, the most any record ever held (canonical bytes: it never grows past the world's cap), and how many links of their chains did not hold when rebuilt from the log (0, or a fault to report).",
+          "type": "object",
+          "required": [
+            "entities",
+            "changes",
+            "largest_bytes",
+            "chain_faults"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "entities": {
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/Count"
+            },
+            "changes": {
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/Count"
+            },
+            "largest_bytes": {
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/Count"
+            },
+            "chain_faults": {
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/Count"
+            }
+          }
         }
       }
     },
@@ -1260,6 +1285,163 @@
               "minimum": 0,
               "maximum": 10000
             }
+          }
+        }
+      }
+    },
+    "CitizenRecord": {
+      "description": "One change to a person's own record (docs/design/ai-citizens.md 10d), as the kernel took it: who, when, the change's place in the log (`seq`), its count for that person (`n`), the sections set (each whole: entity-record.schema.json), what happened since the last change (`because`), and the chain of the person's changes up to this one. Folding a person's rows in order gives their record at any moment; `oikos record` does it from the log and checks every link.",
+      "type": "object",
+      "required": [
+        "run",
+        "t",
+        "seq",
+        "participant",
+        "entity",
+        "n",
+        "set",
+        "chain"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "run": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "t": {
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/SimTime"
+        },
+        "seq": {
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/Count"
+        },
+        "participant": {
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+        },
+        "entity": {
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+        },
+        "n": {
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/Count"
+        },
+        "set": {
+          "$ref": "urn:oikos:contracts:0.8:entity-record#/$defs/PersonRecord"
+        },
+        "because": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "$ref": "urn:oikos:contracts:0.8:common#/$defs/OpaqueObject"
+          }
+        },
+        "chain": {
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/Hash"
+        }
+      }
+    },
+    "CitizenPeriod": {
+      "description": "What a log can show of one person over one period, recorded and never scored (docs/design/ai-citizens.md 10h): written each time the person's hours are (a week for an adult, a month for a child), from their record as it then stood. `hours`: seconds by what they were at; `agency` and their own level; `views`: of each who holds power over them, what they thought, what they said, and the gap (said less thought); `trust`: in each particular institution, with the kind it is to them; `needs`. Nothing here says whether any of it is good.",
+      "type": "object",
+      "required": [
+        "run",
+        "t",
+        "participant",
+        "entity",
+        "from",
+        "to",
+        "hours",
+        "views",
+        "trust",
+        "trust_kinds"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "run": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "t": {
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/SimTime"
+        },
+        "participant": {
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+        },
+        "entity": {
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+        },
+        "from": {
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/SimTime"
+        },
+        "to": {
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/SimTime"
+        },
+        "hours": {
+          "type": "object",
+          "maxProperties": 10,
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "agency": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "agency_own": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "views": {
+          "type": "array",
+          "maxItems": 4,
+          "items": {
+            "type": "object",
+            "required": [
+              "of",
+              "thought",
+              "said",
+              "gap"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "of": {
+                "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+              },
+              "thought": {
+                "type": "integer"
+              },
+              "said": {
+                "type": "integer"
+              },
+              "gap": {
+                "type": "integer"
+              }
+            }
+          }
+        },
+        "trust": {
+          "type": "object",
+          "maxProperties": 12,
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          }
+        },
+        "trust_kinds": {
+          "type": "object",
+          "maxProperties": 12,
+          "additionalProperties": {
+            "$ref": "urn:oikos:contracts:0.8:common#/$defs/Label"
+          }
+        },
+        "needs": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
           }
         }
       }

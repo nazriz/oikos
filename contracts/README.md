@@ -23,6 +23,7 @@ These schemas are the constitution. Humans review them and the invariant tests; 
 | [`participant-api.schema.json`](participant-api.schema.json) | Observation, ParticipantAction, Draft, StepResult (PettingZoo AEC shape) |
 | [`log.schema.json`](log.schema.json) | Hash-chained log entries: header, commands, events, annotations, checkpoints, end |
 | [`calls.md`](calls.md), [`calls.schema.json`](calls.schema.json) | The call language: structured intents the resolver turns into a participant's own acts |
+| [`entity-record.schema.json`](entity-record.schema.json) | A person's own record: its sections, every list bounded (the kernel holds it and reads none of it) |
 | [`outcomes.schema.json`](outcomes.schema.json) | Shared encodings: requests, commitments as outcomes, forms |
 
 `bun test` checks that every schema compiles under JSON Schema 2020-12 strict mode, every valid example passes, and every invalid example is rejected (187 tests; `examples/refused/` holds worlds that are well formed and that the kernel refuses to load, checked by `kernel/tests/knowing.rs`). The examples include Riverbend rebuilt for v0.4 and a valid empty world.
@@ -210,6 +211,18 @@ A model call that fails (after its adapter's own time limits and retries) is rec
   - `Query`: where the place a condition names holds a list, `=` holds if the list has the value and `!=` if it does not.
   - **Removed:** `way: "whole"` (the migration's form for a view not yet replaced). No world may say it.
 - **Unchanged:** blocks, records, the call language, datasets. Going to look is a look, not an act.
+
+## Changes since v0.8 closed (2026-10-11: an entity's own record; docs/design/ai-citizens.md 10d; under the owner's approval of contract changes of 2026-10-11, to look over)
+
+All additions; a world, a log or a dataset from before is still valid.
+
+- **Log: command `entity_record`** (`participant`, `set`, `because?`): a person's own record, set section by section. The kernel holds the record as state (`entity_records`), is its only writer, reads none of it, and chains a hash of its changes. Not an act: it takes no time and cannot be refused for physics. It names nobody, so only the participant's own person's record can be set; the kernel will not take it for a participant not run by code. Reason: the record is state, so a replay must reach it, and a model must have no way to write who it is.
+- **Log: event `entity_recorded`** (`entity`, `n`, `chain`, `digest`): the count of the change, the chain over the one before (`'oikos.entity_record.v1\n'` + previous chain + the canonical JSON of `{t, set, because}`), and the digest of the sections as they then stand. Reason: any record can be rebuilt from the log and checked (`oikos record`).
+- **World config: `caps.entity_record_bytes`** (optional; 8,192 where absent): the most a record may hold. A change that would pass it, or give a record more than 24 sections, is no command at all (never logged). Reason: a record never grows.
+- **World config: channel kind `own_record`**, and **participant API: `ChannelData` of kind `own_record`**: the seat's own entity's record, when it has changed. The channel has no field that could name anyone. Reason: only the entity is shown its record. No generated town hands it to anyone yet (a code mind wrote its own).
+- **New file [`entity-record.schema.json`](entity-record.schema.json)**: the shape of a person's record as the code citizen writes it (`PersonRecord`), every list bounded. The kernel does not read it; the dataset contract and the tests do.
+- **Dataset (format 0.4.0):** `citizen_records.jsonl` (`CitizenRecord`: each change), `citizen_periods.jsonl` (`CitizenPeriod`: a person a period: agency, what is thought and said, trust by institution, hours), and the manifest's `records` (people, changes, the largest record, chain faults).
+- **The participant API's actions are unchanged:** there is no act that sets a record.
 
 ## Changes since v0.8 closed (2026-10-09: offices that take directions; docs/behaviour/directions.md; under the owner's standing approval for readiness changes, to look over)
 

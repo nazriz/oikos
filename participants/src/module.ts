@@ -242,6 +242,16 @@ export interface DecisionRecord {
  * 7), carried with the action as decisions are. The orchestrator records them as one `outcome` annotation, for full
  * logs, wherever it records decisions.
  */
+/**
+ * A change to a person's own record (docs/design/ai-citizens.md 10d), carried with a code participant's action as a
+ * non-enumerable property under this symbol: the bookkeeping of a code mind, never part of the action and never
+ * anything a participant can ask for (the participant API has no such act). The orchestrator hands it to the kernel,
+ * which holds the record and is its only writer, for participants run by code and for no other.
+ */
+export const RECORD = Symbol.for("oikos.record");
+/** `set`: the sections that changed, each whole (contracts/entity-record.schema.json); `because`: what happened since
+ * the last change, in the mind's own short terms. Whole numbers throughout. */
+export interface RecordChange { set: { [section: string]: unknown }; because?: { t: number; what: string; about?: string; size: number }[] }
 export const OUTCOMES = Symbol.for("oikos.outcomes");
 /**
  * One thing a citizen learned of how something went, when and as it came to know it: never more than it knew. Facts,

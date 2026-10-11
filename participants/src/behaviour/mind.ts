@@ -13,8 +13,9 @@ import type { Rng } from "../rng";
 export const VALUES = ["self_direction", "stimulation", "hedonism", "achievement", "power", "security", "conformity", "tradition", "benevolence", "universalism"] as const;
 export type Value = (typeof VALUES)[number];
 
-/** Needs that rise and fall (Humanoid Agents; D2A). Belonging and meaning come later (docs/design/ai-citizens.md 8). */
-export const NEEDS = ["subsistence", "shelter", "security", "social", "status"] as const;
+/** Needs that rise and fall (Humanoid Agents; D2A). Belonging (being part of something: Baumeister and Leary 1995) and
+ * meaning (D2A's "spiritual satisfaction"; Park 2005) since the richer record (docs/design/ai-citizens.md 10c). */
+export const NEEDS = ["subsistence", "shelter", "security", "social", "status", "belonging", "meaning"] as const;
 export type Need = (typeof NEEDS)[number];
 
 /** A world's figures for drawing people: each value's importance (mean and spread, basis points), from its profile. */
@@ -55,26 +56,43 @@ function normal(rng: Rng, mean: number, sd: number): number {
  * achievement and power, one who copies the respected. (Our mapping, to test against data: docs/design/ai-citizens.md.)
  */
 export function drawPerson(rng: Rng, pop: PopulationValues): Person {
-  const values = Object.fromEntries(VALUES.map((v) => {
+  return personOf(drawValues(rng, pop));
+}
+
+/** A person's values, drawn from a world's figures. */
+export function drawValues(rng: Rng, pop: PopulationValues): Person["values"] {
+  return Object.fromEntries(VALUES.map((v) => {
     const d = pop.values[v] ?? { mean_bps: 5000, sd_bps: 1500 };
     return [v, clamp(normal(rng, d.mean_bps, d.sd_bps))];
   })) as Person["values"];
-  const avg = (...xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
-  const temperament: Temperament = {
-    openness: clamp(avg(values.stimulation, values.self_direction)),
-    conformity: clamp(avg(values.conformity, values.tradition)),
-    prestige: clamp(avg(values.achievement, values.power)),
-  };
-  // Each need weighs 1, plus up to 1 more as its values say (so no need is ever ignored).
+}
+
+const avg = (...xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+
+/** How much each need weighs for someone of these values: 1, plus up to 1 more as its values say (so no need is ever
+ * ignored). Belonging by benevolence, conformity and tradition; meaning by tradition, universalism and benevolence
+ * (the religious value tradition and conformity most: Saroglou, Delpierre and Dernelle 2004, to confirm). */
+export function needWeights(values: Person["values"]): Person["weights"] {
   const w = (x: number) => clamp(10_000 + x, 10_000, 20_000);
-  const weights: Person["weights"] = {
+  return {
     subsistence: w(values.hedonism * 0.5),
     shelter: w(avg(values.security, values.tradition) * 0.5),
     security: w(values.security),
     social: w(avg(values.benevolence, values.conformity)),
     status: w(avg(values.power, values.achievement)),
+    belonging: w(avg(values.benevolence, values.conformity, values.tradition)),
+    meaning: w(avg(values.tradition, values.universalism, values.benevolence)),
   };
-  return { values, temperament, weights };
+}
+
+/** The person these values make: temperament and need weights follow from them (above). */
+export function personOf(values: Person["values"]): Person {
+  const temperament: Temperament = {
+    openness: clamp(avg(values.stimulation, values.self_direction)),
+    conformity: clamp(avg(values.conformity, values.tradition)),
+    prestige: clamp(avg(values.achievement, values.power)),
+  };
+  return { values, temperament, weights: needWeights(values) };
 }
 
 // ---------------------------------------------------------------- how satisfied
@@ -87,6 +105,7 @@ export function satisfaction(p: Person, levels: NeedLevels): number {
   let num = 0;
   let den = 0;
   for (const n of NEEDS) {
+    if (levels[n] === undefined) continue; // (a need nobody judged counts for nothing)
     num += p.weights[n] * levels[n];
     den += p.weights[n];
   }
@@ -204,7 +223,10 @@ export function timeCost(f: Facts): number {
 
 /** What the facts do to each need, as this person weighs them (basis points of need, can be negative). Response curves:
  * money matters less the more one has (a log), a home matters most without one, work costs time. */
-export function appraise(p: Person, f: Facts, circ: Circumstances): { [n in Need]: number } {
+/** (An offer's facts say nothing of belonging or meaning: what a thing means to a person is `meaning`, from belief.
+ * So the appraisal is of the five needs facts speak to, and weighed among those five, as it always was.) */
+export type Appraisal = { [n in Need]?: number };
+export function appraise(p: Person, f: Facts, circ: Circumstances): Appraisal {
   const scale = Math.max(1, circ.essentials ?? 0, circ.monthly_income + Math.floor(circ.savings / 12)); // a month's means, at least a month's essentials
   const money = f.money_per_month / scale; // this month's money against a month's means
   const moneyValue = Math.sign(money) * Math.log1p(Math.abs(money)) * 10_000;
@@ -223,11 +245,12 @@ export function appraise(p: Person, f: Facts, circ: Circumstances): { [n in Need
 }
 
 /** One number: the appraisal weighted by this person's needs (basis points). */
-export function value(p: Person, a: { [n in Need]: number }): number {
+export function value(p: Person, a: Appraisal): number {
   let num = 0;
   let den = 0;
   for (const n of NEEDS) {
-    num += p.weights[n] * a[n];
+    if (a[n] === undefined) continue;
+    num += p.weights[n] * a[n]!;
     den += p.weights[n];
   }
   return den ? Math.round(num / den) : 0;
@@ -264,7 +287,7 @@ export interface Circumstances { monthly_income: number; savings: number; homele
 export interface Choice { key: string; facts?: Facts; others?: number; meaning?: number }
 
 /** The mind that decides, as decision records name it (contracts-0.7 A2: `state.mind`). */
-export const MIND_VERSION = "mind-0.2.0";
+export const MIND_VERSION = "mind-0.3.0";
 
 /** `satisfaction` and `certainty`: as they stood when it decided (basis points). */
 export interface Decision { key?: string; strategy: Strategy; scores: { key: string; score: number }[]; satisfaction?: number; certainty?: number }
@@ -288,8 +311,17 @@ export class Mind {
   private readonly domains = new Map<string, Attractions>();
 
   /** `expect`: what a person expects of an option not yet tried, by area (EWA's initial attractions, Camerer and Ho). */
-  constructor(rng: Rng, pop: PopulationValues, readonly p: MindParams = MIND_DEFAULTS, private readonly expect: { [domain: string]: number } = {}) {
-    this.person = drawPerson(rng, pop);
+  /** `own`: the person's values where the world gave them (who lives in a town is the town's; a child's come from
+   * those who raise them: docs/behaviour/citizen.md, "Upbringing"); none: drawn here from the world's figures. */
+  constructor(rng: Rng, pop: PopulationValues, readonly p: MindParams = MIND_DEFAULTS, private readonly expect: { [domain: string]: number } = {}, own?: { [v: string]: number }) {
+    const given = own && VALUES.every((v) => Number.isFinite(own[v]));
+    this.person = given ? personOf(Object.fromEntries(VALUES.map((v) => [v, clamp(own![v]!)])) as Person["values"]) : drawPerson(rng, pop);
+  }
+
+  /** The person's values have moved (drift, a shock): what they weigh follows. Temperament does not move
+   * (docs/design/ai-citizens.md 10c: hardly ever). */
+  reweigh(): void {
+    Object.assign(this.person.weights, needWeights(this.person.values));
   }
 
   learned(domain: string): Attractions {
@@ -397,20 +429,63 @@ export class Feelings {
 
 /**
  * Ties: affinity with each person known (Comme il Faut's and the Ensemble engine's social networks, lite;
- * docs/design/ai-citizens.md 3d), from -10,000 to 10,000. It grows with time together and with favours, falls with
- * wrongs, and fades toward none without contact (a placeholder half-life).
+ * docs/design/ai-citizens.md 3d, 10c), from -10,000 to 10,000, with how far they are trusted and what last passed
+ * between us. Affinity grows with time together and with favours, falls with wrongs, and fades toward none without
+ * contact (a placeholder half-life). Bounded: only so many are kept (`kept`: the sympathy group of about 15, Hill and
+ * Dunbar 2003), the faintest giving way; a record holds the closest few and the few most resented.
  */
+export interface Tie { who: string; affinity: number; trust: number; last?: { what: string; t: number } }
 export class Ties {
-  private readonly aff = new Map<string, { bps: number; t: number }>();
-  constructor(private readonly halfLifeDays = 180) {}
+  private readonly aff = new Map<string, { bps: number; t: number; trust: number; last?: { what: string; t: number } }>();
+  constructor(private readonly halfLifeDays = 180, private readonly kept = 15, private readonly startTrust = 5_000) {}
 
   affinity(who: string, t: number): number {
     const a = this.aff.get(who);
     return a ? Math.round(a.bps * Math.pow(0.5, (t - a.t) / (this.halfLifeDays * 86_400))) : 0;
   }
 
-  add(who: string, bps: number, t: number): void {
-    this.aff.set(who, { bps: Math.max(-10_000, Math.min(10_000, this.affinity(who, t) + Math.round(bps))), t });
+  /** `what`: what passed between us, in a word (talked, met, tip, wronged, ...), kept as the last thing that did. */
+  add(who: string, bps: number, t: number, what?: string): void {
+    const a = this.aff.get(who);
+    const last = what ? { what, t } : a?.last;
+    this.aff.set(who, { bps: Math.max(-10_000, Math.min(10_000, this.affinity(who, t) + Math.round(bps))), t, trust: a?.trust ?? this.startTrust, ...(last ? { last } : {}) });
+    if (this.aff.size > this.kept) {
+      // The faintest goes (by how strongly felt now, either way; of equals, by name).
+      let drop: string | undefined;
+      let least = Infinity;
+      for (const k of [...this.aff.keys()].sort()) {
+        if (k === who) continue;
+        const x = Math.abs(this.affinity(k, t));
+        if (x < least) (least = x), (drop = k);
+      }
+      if (drop !== undefined) this.aff.delete(drop);
+    }
+  }
+
+  /** How far we trust them, if we keep them. */
+  trust(who: string): number | undefined {
+    return this.aff.get(who)?.trust;
+  }
+  /** They did as they said (a share of the way to complete trust), or did not (of the way to none). */
+  trusted(who: string, good: boolean, bps: number): void {
+    const a = this.aff.get(who);
+    if (a) a.trust = Math.round(good ? a.trust + ((10_000 - a.trust) * bps) / 10_000 : a.trust - (a.trust * bps) / 10_000);
+  }
+  /** No longer anyone to us (they died, or left for good). */
+  drop(who: string): void {
+    this.aff.delete(who);
+  }
+
+  private all(t: number): Tie[] {
+    return [...this.aff.entries()].map(([who, a]) => ({ who, affinity: this.affinity(who, t), trust: a.trust, ...(a.last ? { last: { ...a.last } } : {}) }));
+  }
+  /** The closest few (affinity above nothing), closest first. */
+  closest(n: number, t: number): Tie[] {
+    return this.all(t).filter((x) => x.affinity > 0).sort((a, b) => b.affinity - a.affinity || (a.who < b.who ? -1 : 1)).slice(0, n);
+  }
+  /** The few most resented (affinity below nothing), most first. */
+  resented(n: number, t: number): Tie[] {
+    return this.all(t).filter((x) => x.affinity < 0).sort((a, b) => a.affinity - b.affinity || (a.who < b.who ? -1 : 1)).slice(0, n);
   }
 }
 

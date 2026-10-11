@@ -312,7 +312,7 @@ pub fn seen(obs: &Observation) -> Seen<'_> {
                         entities: entities.iter().map(|e| SeenEntity { entity: &e.entity, name: &e.name, participant: e.participant.as_deref() }).collect(),
                         positions: positions.iter().map(|p| SeenPosition { position: &p.position, entity: &p.entity, title: word(&p.title), role: word(&p.role) }).collect(),
                     },
-                    ChannelData::Records { .. } => SeenChannel::Records(vec![]),
+                    ChannelData::Records { .. } | ChannelData::OwnRecord { .. } => SeenChannel::Records(vec![]),
                 };
                 (path.as_str(), channel)
             })
