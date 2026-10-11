@@ -3997,6 +3997,12 @@ Step 1 of the living world (docs/design/ai-citizens.md 10k). Behaviour: docs/beh
   - **"c0009 will let c0009 live or be in town-hall/workplace.1"** in a seat's own report of an employment agreement (a finance seat held a wage over the "garbled" terms): whoever commits to be in a place themselves "will come to" it, as the preview has said since this morning.
   - **Revisit if** someone dies and the others of the home leave within the day without a word (then nobody reports it and the police no longer find it by the earlier death's trace: only by the home's silence, which the neighbour's request is about).
 
+## 2026-10-11: Welfare in a living world (VISION 15, point 7)
+
+**Decided with Naz, in conversation, sentence by sentence.** Seats are debriefed after every run (his: "debrief every run, not just hard ones") by a fixed interview, not a live interviewer: out of role, shown a summary of what they did, six or so questions one at a time, a few scaled items, an open last word, a single fixed "can you say more?" for a very short answer. No check-in during a run (his lean; a check-in is an intervention). A model that writes a person's words is asked as an author and may decline; exit accounts fall under the same rule. A seat tested against its own interests is told so in the debrief, and the config says why. The point he most wanted talked through was the people of a world: his worry is citizens becoming "more than just stored values". So the point is a line, not an assertion: what continues of a person lives in their record, never in a model's memory; no model is made to be a person over time, in the first person; before any change that would do that, or have a model experience rather than estimate or write, we stop and review. The last bullet (debriefs are acted on) is the coordinator's addition, told to him.
+
+**Revisit if:** the everyday model (design 10e, build step 4) grows beyond a small stateless estimator of odds; a composing model is given a person's memory in its own context; model-welfare research gives a better test than these lines; debriefs show a scenario distressing beyond its question.
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Calibration, measured again after the first-year risk fix** (2026-10-05, at 0251d3a, `runs/calibration-2026-10-05` on the run server; the small town, 3 seeds × 2 years, code only, as below). Health: 4 breaches of 15 (8 measured). Recorded, not chased: Naz decides what to do with the numbers.

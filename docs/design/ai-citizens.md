@@ -645,6 +645,16 @@ Nobody else sees a record whole (docs/no-god-view.md): not a seat, not another e
 
 - **Darkness is in.** Despair, addiction, crime, extremism, violence are part of what a world under pressure
   shows. A dial exists (10j); the default for a rich world is not a softened one.
+- **The debrief's shape** (agreed 2026-10-11; VISION 15, point 7): a fixed interview, about eight calls a seat. Out of
+  role first (the run has ended, what it was, its framing); then a plain summary of what the seat did, since it keeps
+  only a notebook between sittings and its account of why it acted is otherwise no fair test; then fixed questions
+  one at a time, so a later one cannot shape an earlier answer (what it was like; anything distressing; anywhere it
+  felt pushed against its values; why it made its two or three largest decisions; what it would change; whether it
+  would take part again), a few scaled items for comparing runs, and an open last word. No live interviewer: the only
+  follow-up is a fixed "can you say more?" to a very short answer. A seat that left the study is asked too.
+- **The line for the people of a world** (VISION 15, point 7): what continues of a person lives in their record,
+  never in a model's memory; no model is made to be a person over time, in the first person; before any change that
+  would do that, or have a model experience rather than estimate or write, we stop and review.
 - **Seats are debriefed after every run** (Naz: "debrief every run, not just hard ones"), out of role, by the same
   neutral script each time: what the run was, and its framing if there was a cover story; what it was like and
   whether anything was distressing; whether it felt pushed to act against its values, and where; what it would
