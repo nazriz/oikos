@@ -8,6 +8,7 @@ import { actEnds } from "./act-ends";
 import { logLines, runOf } from "./logs";
 import { takeRoute, takeTurn, type CorpusExample } from "./corpus";
 import { periodRow, Records } from "./records";
+import { framingOf } from "@oikos/participants/llm";
 import { accountRows, DEBRIEF_RESTRICTION, debriefCounts, debriefRows, debriefsOf, OLD_LOG_NOT_PUBLISHABLE } from "./debriefs";
 
 /** The README written beside a dataset that holds debriefs: what the files are and the restriction on their use. */
@@ -22,7 +23,7 @@ export function datasetReadme(run: string, withheld: boolean, old = false): stri
 }
 
 const sortedCounts = (c: { [k: string]: number }) => Object.fromEntries(Object.entries(c).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
-export const DATASET_VERSION = "0.9.1"; // 0.9.1: a debrief of the older kind (asked with nothing said of publication) is kept back: a row that says so in debriefs.jsonl, its answer in the withheld file only, and the log marked not publishable; 0.9.0: debriefs and exit accounts (debriefs.jsonl, debriefs.withheld.jsonl, accounts.jsonl, README.md, the manifest's `debriefs` and `restrictions`); a seat's debrief calls and an author's accounts are no longer rows of decisions.jsonl; 0.8.0: a decision about a want carries its situation (docs/design/ai-citizens.md 11); 0.7.0: founding and the lineage of ideas (founded.jsonl, ideas.jsonl, idea_passages.jsonl, words.jsonl)
+export const DATASET_VERSION = "0.9.2"; // 0.9.2: the manifest says how the run was put to its seats (`seats.framing`: each disclosure in use, its reason, and the seats under it), from the log's header; 0.9.1: a debrief of the older kind (asked with nothing said of publication) is kept back: a row that says so in debriefs.jsonl, its answer in the withheld file only, and the log marked not publishable; 0.9.0: debriefs and exit accounts (debriefs.jsonl, debriefs.withheld.jsonl, accounts.jsonl, README.md, the manifest's `debriefs` and `restrictions`); a seat's debrief calls and an author's accounts are no longer rows of decisions.jsonl; 0.8.0: a decision about a want carries its situation (docs/design/ai-citizens.md 11); 0.7.0: founding and the lineage of ideas (founded.jsonl, ideas.jsonl, idea_passages.jsonl, words.jsonl)
 
 interface Command { seq: number; command: string; as?: string; blocks?: unknown[]; looks?: unknown[]; provenance?: unknown; reasoning?: string; applied?: boolean; refusal?: unknown; created?: string[] }
 /** Something a seat was shown that names what an earlier act of its own made: the record or letter made (`of`), the
@@ -533,7 +534,8 @@ export async function exportDataset(logPath: string, outDir: string, o: DatasetO
     initial_state_hash: header?.initial_state_hash,
     log: { file: basename(logPath), entries, last_hash: lastHash },
     versions: { contracts: header?.contracts, kernel: header?.kernel ?? {}, orchestrator: orch.version ?? "", ...(orch.modules ? { modules: orch.modules } : {}), ...(orch.llm?.translator ? { translator: orch.llm.translator } : {}) },
-    seats: { models: orch.llm?.participants ?? {}, ...(orch.llm?.prices ? { prices: orch.llm.prices } : {}) },
+    // (How the run was put to its seats: VISION 15, point 1. From the world's config as the log's header has it.)
+    seats: { models: orch.llm?.participants ?? {}, ...(orch.llm?.prices ? { prices: orch.llm.prices } : {}), ...(framingOf(config).length ? { framing: framingOf(config) } : {}) },
     // How the log itself says it ended: completed, or aborted or error with why (a run cut short, or stopped at a
     // limit); a log with no end entry is a run that was killed, or is still going.
     end: { t: lastT, reason: !end ? "unfinished: the log has no end entry" : end.detail ? `${end.reason}: ${end.detail}` : end.reason },

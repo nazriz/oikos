@@ -38,7 +38,14 @@ export async function loadWorld(path: string, sets: string[] = []): Promise<{ co
   for (const s of sets) setPath(v, s);
   if (v?.generate) {
     const { generate, GENERATOR_VERSION } = await import("@oikos/worlds/generator/generate");
-    return { config: generate(v), spec: v, generator: GENERATOR_VERSION };
+    // What its model seats are told about what the town is (VISION 15, point 1): the spec's `framing`, a disclosure by
+    // name or { disclosure, reason }. It is the run's, not the town's: the generator is not shown it, and the town
+    // made is the same under any; the seats' framing in the config, and so in the log's header, records the
+    // disclosure and its reason (participants/src/llm/framing.ts). Absent: as the generator writes it, honest disclosure.
+    const { framing, ...town } = v;
+    const config = generate(town);
+    if (framing !== undefined) { const { applyFraming } = await import("@oikos/participants/llm"); applyFraming(config, framing); }
+    return { config, spec: v, generator: GENERATOR_VERSION };
   }
   return { config: v };
 }

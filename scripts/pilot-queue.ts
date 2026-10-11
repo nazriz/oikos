@@ -1,7 +1,10 @@
 #!/usr/bin/env bun
 // Pilots one after another, unattended: `bun scripts/pilot-queue.ts <queue.json> [--wait MINUTES] [--no-park]`.
-// The queue is a list of {name, world, sets, model, translator?, translator_first?, translator_arrangement?, until, budget,
-// env?, note?, test?} (translator_first: our own trained translator, "decide/<name>", answering first with the translator
+// The queue is a list of {name, world, sets, framing?, model, translator?, translator_first?, translator_arrangement?, until, budget,
+// env?, note?, test?} (framing: what the pilot's seats are told the town is, "unstated" or "simulation" or
+// {disclosure, reason}: VISION 15, point 1; it becomes the world's `framing`, and the log's header records it with its
+// reason; absent, the world file's own `framing` if it has one, else "unstated", the default for steward pilots since
+// 2026-10-12: write "simulation" for the arm under honest disclosure; translator_first: our own trained translator, "decide/<name>", answering first with the translator
 // behind it; translator_arrangement: "then", the default, or "beside": docs/real-models.md): each runs into <runs>/<name>
 // (OIKOS_RUNS, or ~/oikos/runs) and is taken up again where it stopped if its log is already there. One that stops at a
 // usage limit is PARKED: stopped cleanly where it was, and the queue goes on to the next entry that needs none of the
@@ -19,9 +22,9 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } fr
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { alert } from "../orchestrator/src/pilot-alerts";
-import { limitedProviders, limitWaitMs, localStamp, measureFailure, nextPilot, parkedPath, providersOf, runState, scanOptOuts, type Parked } from "../orchestrator/src/pilot-state";
+import { framingSets, readWorldFile, limitedProviders, limitWaitMs, localStamp, measureFailure, nextPilot, parkedPath, providersOf, runState, scanOptOuts, type Parked } from "../orchestrator/src/pilot-state";
 
-interface Pilot { name: string; world: string; sets?: string[]; model: string; translator?: string; translator_first?: string; translator_arrangement?: "then" | "beside"; until: number; budget: number; env?: { [k: string]: string }; note?: string; test?: boolean; args?: string[] }
+interface Pilot { name: string; world: string; sets?: string[]; /** What its seats are told the town is (VISION 15, point 1): a disclosure by name, or { disclosure, reason }. Passed to the run as its world's `framing`. */ framing?: string | { disclosure: string; reason?: string }; model: string; translator?: string; translator_first?: string; translator_arrangement?: "then" | "beside"; until: number; budget: number; env?: { [k: string]: string }; note?: string; test?: boolean; args?: string[] }
 
 const args = process.argv.slice(2);
 const file = args.find((a, i) => !a.startsWith("--") && args[i - 1] !== "--wait");
@@ -90,10 +93,13 @@ for (;;) {
   if (parked.delete(p.name)) { writeParked(); tell(`usage-limit wait over for ${p.name}: trying again`); }
   const models = ["--model", p.model, ...(p.translator ? ["--translator-model", p.translator] : []),
     ...(p.translator_first ? ["--translator-first", p.translator_first, ...(p.translator_arrangement ? ["--translator-arrangement", p.translator_arrangement] : [])] : []), "--budget", String(p.budget)];
+  // (What its seats are told the town is: the entry's, else its world's own, else the default for steward pilots. A
+  // run that is resumed keeps the framing it began under: it is in its log's header.)
+  const framed = framingSets(p, readWorldFile(resolve(root, p.world)));
   const cmd = s.log
     ? ["bun", CLI, "resume", s.log, "--until", String(p.until), ...models]
-    : ["bun", CLI, "run", p.world, "--seeds", "1", "--out", dir, "--until", String(p.until), ...(p.sets ?? []).flatMap((x) => ["--set", x]), ...(p.args ?? []), ...models];
-  say(`${p.name}: ${s.log ? `resuming from day ${day(s.t)}` : "starting"} (${p.model}${p.translator ? `, translator ${p.translator}` : ""}${p.translator_first ? `, ${p.translator_first} first (${p.translator_arrangement ?? "then"})` : ""})`);
+    : ["bun", CLI, "run", p.world, "--seeds", "1", "--out", dir, "--until", String(p.until), ...(p.sets ?? []).flatMap((x) => ["--set", x]), ...framed.sets.flatMap((x) => ["--set", x]), ...(p.args ?? []), ...models];
+  say(`${p.name}: ${s.log ? `resuming from day ${day(s.t)}` : "starting"} (${s.log ? "" : `${framed.said}; `}${p.model}${p.translator ? `, translator ${p.translator}` : ""}${p.translator_first ? `, ${p.translator_first} first (${p.translator_arrangement ?? "then"})` : ""})`);
   const child = Bun.spawn(cmd, { cwd: root, stdin: "ignore", stdout: Bun.file(join(dir, `queue-${Date.now()}.out`)), stderr: "inherit",
     env: { ...process.env, OIKOS_CLAUDE_CODE_LOG: join(dir, "claude-code.calls.jsonl"), OIKOS_DECIDE_LOG: join(dir, "decide.calls.jsonl"), ...(p.env ?? {}) } });
   // While it runs, its log is looked at for a seat opting out (the `opt_out` command), so that it is heard of then.

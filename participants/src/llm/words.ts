@@ -2,7 +2,7 @@
 // participants). A participant never reads a refusal code; it reads what stood in the way.
 
 const REFUSAL: Record<string, string> = {
-  participant_inactive: "you are no longer taking part",
+  participant_inactive: "you no longer act here",
   not_in_position: "you don't hold that post",
   unknown_ref: "it refers to something that doesn't exist yet",
   duplicate_ref: "it names two different things the same way",
