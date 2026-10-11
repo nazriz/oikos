@@ -11,6 +11,7 @@ import { basename, join, resolve } from "node:path";
 import { currentLogs, logLines, runOf } from "./logs";
 import { measureFailure } from "./pilot-state";
 import { debriefCounts, DebriefCollector, renderDebriefCounts } from "./debriefs";
+import { framingOf } from "@oikos/participants/llm";
 import { NOT_CHECKED, NOT_PUT } from "../../translator/src/index";
 
 /** The sentences a translator that asked back says (translator/src/index.ts `unsureText`): which one, which words, a
@@ -82,6 +83,7 @@ function untilOf(dir: string): number | undefined {
 export async function reportOfLog(dir: string, log: string): Promise<any> {
   const run = runOf(log);
   let config: any, end: any, last = 0;
+  let framing: ReturnType<typeof framingOf> | undefined;
   const seats = new Map<string, any>();
   const seat = (name: string) => {
     let s = seats.get(name);
@@ -137,7 +139,8 @@ export async function reportOfLog(dir: string, log: string): Promise<any> {
     else if (e.kind === "command") {
       // A seat's opt-out: the command the participant's `opt_out` use becomes, with the statement as it was given.
       seat(b.participant).opted_out = { t: e.t, day: Math.floor(e.t / 86_400), statement: b.statement ?? "" };
-    } else if (b.annotation === "orchestrator") config ??= b.data;
+    } else if (e.kind === "header") framing ??= framingOf(b.config);
+    else if (b.annotation === "orchestrator") config ??= b.data;
     else if (b.annotation === "outcome") citizens.outcomes += b.data?.outcomes?.length ?? 0;
     else if (b.annotation === "usage") {
       // Cost and tokens by who the call was for: the translator ("translator") or a seat.
@@ -263,6 +266,8 @@ export async function reportOfLog(dir: string, log: string): Promise<any> {
     ...(pilot.queue?.test ? { test: true } : {}),
     ...(pilot.note ? { note: pilot.note } : {}),
     ...(existsSync(join(dir, "NOTE")) ? { folder_note: readFileSync(join(dir, "NOTE"), "utf8").trim() } : {}),
+    // How the run was put to its seats (VISION 15, point 1): the disclosure and its reason, from the world's config.
+    framing: framing ?? [],
     seats: Object.fromEntries([...seats].filter(([, s]) => s.model_calls || s.model || s.opted_out).map(([k, s]) => [k, { model: s.model ?? null, ...(s.configured ? { configured: s.configured } : {}) }])),
     translator: { model: config?.llm?.translator?.model ?? null, version: config?.llm?.translator?.version ?? null },
     ...(config?.llm?.translator_arrangement || routes.size ? { translator_arrangement: arrangementOf(config?.llm?.translator_arrangement, routes, reqs, trByModel) } : {}),
@@ -361,6 +366,9 @@ export function renderReport(r: any): string {
     L.push(`NOT A FINISHED PILOT: ${short}${owed}`);
   }
   L.push(`== ${r.pilot} (${r.run})${r.test ? "  [TEST: kept out of training]" : ""}`);
+  // (First of all after its name: what its seats were told the town was, and why.)
+  for (const f of r.framing ?? []) L.push(`framing: ${f.disclosure} (${f.disclosure === "unstated" ? "its seats were told neither that the town is real nor that it is simulated" : f.disclosure === "simulation" ? "its seats were told the town is simulated" : f.disclosure === "real" ? "its seats were told the town is real" : "its seats were given a cover story"}); reason: ${f.reason}${(r.framing ?? []).length > 1 ? `; seats: ${f.seats.join(", ")}` : ""}`);
+  if (r.framing && !r.framing.length) L.push("framing: not in this log (no model seat, or a log without its header)");
   L.push(`seats: ${Object.entries(r.seats).map(([k, s]: any) => `${k} on ${s.model}`).join("; ") || "none"}`);
   L.push(`translator: ${r.translator.model ?? "none"}${r.translator.version ? ` ${r.translator.version}` : ""}; confirmation: ${r.confirm}`);
   L.push(`days run: ${r.days_run}${r.until_days !== null ? ` of ${r.until_days}` : ""}; ${r.stopped.finished ? "finished: it ran to its until" : `stopped: ${r.stopped.reason}${r.stopped.detail ? ` (${String(r.stopped.detail).slice(0, 160)})` : ""}${r.stopped.reached_until === true ? ", reached its until" : r.stopped.reached_until === false ? ", short of its until" : ""}`}`);

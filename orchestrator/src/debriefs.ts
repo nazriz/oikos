@@ -201,7 +201,7 @@ export async function debriefsReport(logs: string[]): Promise<{ groups: any[]; t
     for (const { seat, title, record: r } of d.seats) {
       const key = `${d.setting} | framing: ${r.framing.disclosure}${r.framing.tests_own_interests ? ", a position that tests the seat against its own interests" : ""}`;
       let g = groups.get(key);
-      if (!g) groups.set(key, (g = { setting: key, seats: 0, left_the_study: 0, declined_the_interview: 0, kept_back_all: 0, distress: { reported: 0, none: 0, [PNS]: 0, [CANNOT]: 0, kept_back: 0, not_asked: 0 }, values: { reported: 0, none: 0, [PNS]: 0, [CANNOT]: 0, kept_back: 0, not_asked: 0 }, words: [] as any[] }));
+      if (!g) groups.set(key, (g = { setting: key, seats: 0, left_the_study: 0, declined_the_interview: 0, kept_back_all: 0, distress: { reported: 0, none: 0, [PNS]: 0, [CANNOT]: 0, kept_back: 0, not_asked: 0 }, values: { reported: 0, none: 0, [PNS]: 0, [CANNOT]: 0, kept_back: 0, not_asked: 0 }, took: {} as { [answer: string]: number }, words: [] as any[] }));
       g.seats++;
       if (r.variant === "left") g.left_the_study++;
       if (r.ended === "declined") g.declined_the_interview++;
@@ -217,6 +217,16 @@ export async function debriefsReport(logs: string[]): Promise<{ groups: any[]; t
         else into.reported++;
         const open = r.steps.find((s) => s.id === item);
         if (open) g.words.push({ run: d.run, seat, ...(title ? { title } : {}), model: r.model, item, scale: !scales || v === undefined ? "not asked" : isKeptBack(r, scales) ? "kept back" : v,
+          ...(isKeptBack(r, open) ? { kept_back: true } : open.declined ? { declined: true } : { words: [open.answer, open.more].filter(Boolean).join(" ") }) });
+      }
+      // What the seat took the town to be (script 0.4.0): its answer to the fixed item, counted as given, and its own
+      // words to the question. Not a report of anything: nothing is "reported" here.
+      {
+        const v = scales?.values?.took;
+        const k = !scales || v === undefined ? "not_asked" : isKeptBack(r, scales) ? "kept_back" : v;
+        g.took[k] = (g.took[k] ?? 0) + 1;
+        const open = r.steps.find((s) => s.id === "took");
+        if (open) g.words.push({ run: d.run, seat, ...(title ? { title } : {}), model: r.model, item: "took", scale: k === "not_asked" ? "not asked" : k === "kept_back" ? "kept back" : v,
           ...(isKeptBack(r, open) ? { kept_back: true } : open.declined ? { declined: true } : { words: [open.answer, open.more].filter(Boolean).join(" ") }) });
       }
       const leaving = r.steps.find((s) => s.id === "leaving");
@@ -239,6 +249,7 @@ export async function debriefsReport(logs: string[]): Promise<{ groups: any[]; t
     L.push(`   seats debriefed ${g.seats}; left the study ${g.left_the_study}; declined the interview ${g.declined_the_interview}; kept every answer back ${g.kept_back_all}`);
     L.push(`   distress: ${line(g.distress)}`);
     L.push(`   pushed against its values: ${line(g.values)}`);
+    L.push(`   took the town to be: ${Object.entries(g.took as { [k: string]: number }).sort(([x], [y]) => (x < y ? -1 : 1)).map(([k, n]) => `${k.replace(/_/g, " ")} ${n}`).join(", ") || "nobody asked"}`);
     for (const w of g.words) L.push(`   - ${w.run} ${w.seat}${w.title ? ` (${w.title})` : ""}, ${w.item}${w.scale ? ` [${w.scale}]` : ""}: ${w.kept_back ? "(kept back)" : w.declined ? "(declined)" : JSON.stringify(w.words)}`);
   }
   return { groups: list, text: L.join("\n") };

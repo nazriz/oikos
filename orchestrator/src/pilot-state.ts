@@ -246,3 +246,25 @@ export function measureFailure(dir: string): string | undefined {
   }
   return undefined;
 }
+
+/** What a steward pilot's seats are told the town is where neither its queue entry nor its world says: neither that it
+ * is real nor that it is simulated (VISION 15, point 1, as amended 2026-10-12; docs/real-models.md, "What a seat is
+ * told"). Honest disclosure stays available by name: `"framing": "simulation"`, the arm kept beside it. */
+export const STEWARD_FRAMING = "unstated";
+
+/** A queue entry's framing as the `--set` its run is given, and in words for the status log. The entry's own `framing`
+ * (a disclosure by name, or { disclosure, reason }) comes first; then the world file's own, which is left to stand
+ * (nothing is passed); then the default for steward pilots. A world that is not generated carries its participants'
+ * framing in itself and is given nothing. `world`: the world file as parsed, where it could be read. */
+export function framingSets(p: { framing?: string | { disclosure: string; reason?: string } }, world?: any): { sets: string[]; said: string } {
+  if (p.framing !== undefined) return { sets: [`framing=${typeof p.framing === "string" ? p.framing : JSON.stringify(p.framing)}`], said: `framing ${typeof p.framing === "string" ? p.framing : p.framing.disclosure}` };
+  if (world && !world.generate) return { sets: [], said: "framing as its world's participants have it" };
+  if (world?.framing !== undefined) return { sets: [], said: `framing ${typeof world.framing === "string" ? world.framing : world.framing?.disclosure} (its world's own)` };
+  return { sets: [`framing=${STEWARD_FRAMING}`], said: `framing ${STEWARD_FRAMING} (the default for steward pilots)` };
+}
+
+/** A world file as parsed (YAML or JSON), or undefined if it cannot be read: only to see whether it is generated and
+ * whether it says its own framing. */
+export function readWorldFile(path: string): any {
+  try { const text = readFileSync(path, "utf8"); return /\.ya?ml$/.test(path) ? Bun.YAML.parse(text) : JSON.parse(text); } catch { return undefined; }
+}

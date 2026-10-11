@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { compressLog } from "../src/logs";
 import { lastAlerts } from "../src/pilot-alerts";
-import { limitedProviders, localStamp, measureFailure, nextPilot, parkedPath, providersOf, runState, scanOptOuts } from "../src/pilot-state";
+import { framingSets, limitedProviders, localStamp, measureFailure, nextPilot, parkedPath, providersOf, readWorldFile, runState, scanOptOuts, STEWARD_FRAMING } from "../src/pilot-state";
 
 const UNTIL = 5_184_000;
 const base = realpathSync(mkdtempSync(join(tmpdir(), "oikos-pilot-queue-test-")));
@@ -332,13 +332,30 @@ process.exit(again ? 0 : 1);
   const p = Bun.spawn(["bun", QUEUE, queue, "--wait", "0.02"], { env: queueEnv(runs, cli), stdout: "pipe", stderr: "pipe" });
   const [out, code] = await Promise.all([new Response(p.stdout).text(), p.exited]);
   expect(code).toBe(0);
-  expect(out).toContain("ours-first: starting (claude-code/s, translator claude-code/s, decide/pod-small-r2-s1 first (then))");
+  expect(out).toContain("ours-first: starting (framing unstated (the default for steward pilots); claude-code/s, translator claude-code/s, decide/pod-small-r2-s1 first (then))");
   // The one behind at its usage limit: the pilot is parked for that sign-in, as any is, and taken up again.
   expect(out).toMatch(/ours-first: parked at a usage limit on day 1 \(claude-code: /);
   expect(out).toContain("ours-first: done (day 30)");
   const asked = readFileSync(join(here, "asked.txt"), "utf8").trim().split("\n");
   expect(asked.length).toBe(2);
   expect(asked[0]).toStartWith("run worlds/town-1000.yaml --seeds 1 --out");
+  // What its seats are told the town is goes to the run it starts, and not to its resume (the log's header has it).
+  expect(asked[0]).toContain("--set framing=unstated --model");
+  expect(asked[1]).not.toContain("framing");
   for (const line of asked) expect(line).toEndWith("--model claude-code/s --translator-model claude-code/s --translator-first decide/pod-small-r2-s1 --translator-arrangement then --budget 1");
   expect(asked[1]).toStartWith("resume ");
 }, 60_000);
+
+test("a pilot's framing: the entry's own, else its world file's own, else unstated, the default for steward pilots; honest disclosure by name", () => {
+  const generated = { generate: "town", name: "Millbrook" };
+  expect(STEWARD_FRAMING).toBe("unstated");
+  expect(framingSets({}, generated)).toEqual({ sets: ["framing=unstated"], said: "framing unstated (the default for steward pilots)" });
+  expect(framingSets({})).toEqual({ sets: ["framing=unstated"], said: "framing unstated (the default for steward pilots)" });
+  expect(framingSets({ framing: "simulation" }, generated)).toEqual({ sets: ["framing=simulation"], said: "framing simulation" });
+  expect(framingSets({ framing: { disclosure: "simulation", reason: "The arm under honest disclosure." } }, generated)).toEqual({ sets: ['framing={"disclosure":"simulation","reason":"The arm under honest disclosure."}'], said: "framing simulation" });
+  // A world file that says its own is left to say it; a world that is not generated carries its participants' framing in itself.
+  expect(framingSets({}, { ...generated, framing: "simulation" })).toEqual({ sets: [], said: "framing simulation (its world's own)" });
+  expect(framingSets({}, { participants: [] })).toEqual({ sets: [], said: "framing as its world's participants have it" });
+  expect(readWorldFile(join(import.meta.dir, "../../worlds/town-300.yaml"))).toMatchObject({ generate: "town", citizens: 300 });
+  expect(readWorldFile(join(base, "no-such-world.yaml"))).toBeUndefined();
+});

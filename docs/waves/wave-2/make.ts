@@ -12,6 +12,7 @@
 // showed. What changed, and why, is the CHANGES list below (it heads matrix.md).
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { STEWARD_FRAMING } from "../../../orchestrator/src/pilot-state";
 
 const argv = process.argv.slice(2);
 const outDir = argv.includes("--out") ? argv[argv.indexOf("--out") + 1]! : import.meta.dir;
@@ -57,6 +58,8 @@ interface Plan {
   scenario?: string; seats: string[]; translator: TranslatorKey; test?: boolean; why: string;
   /** A probe: an office or a pace not tried with a model, short, with a stopping rule of its own (plan.md). */
   probe?: boolean;
+  /** What its seats are told the town is, where not the default for steward pilots (below, `framingOf`). */
+  framing?: "unstated" | "simulation";
   /** The town starts with its works crew still to be taken on (`works_crew_at_start=0`), so the works office recruits. */
   noCrew?: boolean;
 }
@@ -375,10 +378,20 @@ const budgetOf = (p: Plan) => (!isClaude(p) ? 10 : Math.max(10, five(usdOf(p) * 
 // ---- the queue entries.
 const name = (p: Plan) => `w2-${String(p.n).padStart(2, "0")}-${p.tag}`;
 const translatorSays = (p: Plan) => (translatorOf(p) === TRAINED_ON_DISK ? " (the trained one: it was taught no hold, entry on one's own file, look_first, office's own form, direction or standing work)" : translatorOf(p) === GENERAL ? " (under the translator's prompt)" : " (our own, retrained)") + (p.translator === "trained-ok" ? "; this pilot may have our own retrained translator instead, if its scores allow when the stage starts" : "");
+/** What a pilot's seats are told the town is (VISION 15, point 1; docs/real-models.md, "What a seat is told"). From
+ * 2026-10-12 the default for a steward pilot is `unstated` (STEWARD_FRAMING: neither real nor simulated is said), and a
+ * plan that wants the arm under honest disclosure says `framing: "simulation"`. Every stage of wave 2 was planned and
+ * run before that, for the translator's data, with its seats told the town was simulated: its entries are left as
+ * they ran, without the field, and nothing of wave 2 that has a log is run again under another framing (a resumed run
+ * keeps the framing in its log's header). A stage added here after 2c carries the field. An entry of wave 2 that never
+ * started (the optional Codex lane) and is started now is given the queue's default, which is `unstated`: to run it as
+ * its stage ran, write `"framing": "simulation"` into it. */
+const BEFORE_THE_FRAMING_FIELD: Plan["stage"][] = ["2a", "2b", "2c"];
+const framingOf = (p: Plan): {} | { framing: string } => (BEFORE_THE_FRAMING_FIELD.includes(p.stage) ? {} : { framing: p.framing ?? STEWARD_FRAMING });
 const entry = (p: Plan) => {
   const others = p.seats.filter((s) => s !== "mayor");
   return {
-    name: name(p), world: WORLD,
+    name: name(p), world: WORLD, ...framingOf(p),
     sets: [`seed=${p.seed}`, `profile=${p.profile}`, ...(p.seats.includes("mayor") ? ["mayor=llm"] : []), ...(others.length ? [`model_seats=${others.join(",")}`] : []), ...(p.noCrew ? ["works_crew_at_start=0"] : []), ...(p.model === "haikuLow" ? ["seat_effort=low"] : [])],
     ...(p.scenario ? { args: ["--scenario", p.scenario] } : {}),
     model: MODELS[p.model], translator: translatorOf(p), translator_choice: p.translator, until: p.days * DAY, budget: budgetOf(p),

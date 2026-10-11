@@ -67,7 +67,7 @@ for (const [name, how, by, stop] of [
     expect(live.calls).toBe(stepsOf("full", 0).length);
     const again = notes(r.logPath);
     expect(again.filter((a) => a.annotation === "debrief").map((a) => a.subject)).toEqual(["mayor-system"]);
-    expect(again.find((a) => a.annotation === "debrief")!.data.steps[1]).toMatchObject({ id: "like", status: "unread" });
+    expect(again.find((a) => a.annotation === "debrief")!.data.steps[1]).toMatchObject({ id: "took", status: "unread" });
     expect(readFileSync(r.logPath.replace(/\.jsonl$/, ".debriefs.jsonl"), "utf8")).toContain("It went well enough.");
     expect(r.stateHash).toBe(s.stateHash);
     // The pilot report: whole, with the debrief given.
