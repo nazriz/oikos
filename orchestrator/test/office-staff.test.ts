@@ -19,7 +19,7 @@ const spec = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")
 const text = (x: any): string => (typeof x === "string" ? x : (x ?? []).map((b: any) => b.content ?? b.text ?? "").join("\n"));
 
 test("a works seat with no crew is told so, at its first sitting and when it changes; an order of nobody says so; it hires through its own form", async () => {
-  const config = generate({ ...spec, model_seats: ["works"], works_crew_at_start: 0 });
+  const config = generate({ ...spec, opening_orders: false, model_seats: ["works"], works_crew_at_start: 0 });
   for (const p of config.participants) if (p.id === "works-system") p.controller.params.cadence_days = 1;
   const s = await runWorld({ config, runId: "staff", outDir: mkdtempSync(join(tmpdir(), "oikos-office-staff-")), until: 12 * DAY });
   const log = readFileSync(s.logPath, "utf8").trim().split("\n").map((l) => JSON.parse(l));

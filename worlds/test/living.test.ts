@@ -39,7 +39,11 @@ test("a spec without `living` generates what it generated before (byte for byte)
   // The generator's output for worlds/town.yaml on origin/main at ab23f96 (generated there and compared, 2026-10-11),
   // which has no `living`. (At 750bc30, before starting attachment existed, it was 404b59db...; main's planning
   // form gained two fields since, and nothing else differs: this branch gave 404b59db... before merging that.)
-  expect(hash(c)).toBe("cef691ee0dfc56d3e4dd0663e396fe9365be992394ab690ee6e817d9e8ce138f");
+  // (2026-10-11, the fixes after the second living pilot: each lease and mortgage a town starts with names its own
+  // first due day (`attrs.first_due`), the town publishes its rule on petitions, the payments procedure says which
+  // line a wage is on, the support office has a file for what is put before it, and the mayor's office has a clerk.
+  // Generated before and after and compared: nothing else differs. It was cef691ee... on origin/main at 7d36367.)
+  expect(hash(c)).toBe("5c9252bb3d90799c38bfccc53ef482bddd6f3259813243dd29b03f1f5de39d30");
   const text = JSON.stringify(c);
   expect(text).not.toContain('"started"');
   expect(text).not.toContain("attach_mean");

@@ -136,7 +136,7 @@ export function onOwnForms(program: string, stationery: FormData[], o: { self: s
   return { program: turned ? programText({ lines }) : program, turned, kept };
 }
 
-export function mockPolicies(brains: Map<string, MockBrain>): { participant: MockPolicy; translator: MockPolicy; debrief: MockPolicy; consult: MockPolicy } {
+export function mockPolicies(brains: Map<string, MockBrain>): { participant: MockPolicy; translator: MockPolicy; debrief: MockPolicy; consult: MockPolicy; notebook: MockPolicy } {
   const queues = new Map<string, (ParticipantAction & { type: "call" | "message" })[]>();
   /** Looks each seat's brain has asked for and that have not been made yet: those it asked for while reading what it
    * missed between sittings (nothing could be looked up then), and any beyond what one answer takes. */

@@ -145,7 +145,7 @@ export const lending: BehaviourModule = {
     { what: "request", why: "The bank's own files: its customers' instructions, among them the repayments of the loans this office made." },
     { what: "accounts", why: "The bank's own ledger: it keeps its customers' accounts, and a lending office reads what an applicant holds with it." },
   ],
-  version: "0.4.1", // 0.4.1: main's 0.3.1 with this branch's 0.4.0 (an applicant is looked up)
+  version: "0.4.2", // 0.4.2: a loan standing at the start is counted from its own repayment day where it names one (attrs.first_due), not from the bank's first look; 0.4.1: main's 0.3.1 with this branch's 0.4.0 (an applicant is looked up)
   doc: "docs/behaviour/credit.md",
   cadence: () => DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(24) * 3600,
@@ -235,7 +235,12 @@ export const lending: BehaviourModule = {
             if (!repay?.from) continue;
             const payment = cents(repay.amount), months = Math.max(1, Math.round((r.terms.term ?? 0) / MONTH));
             const rateOf = /\(([\d.]+)% a year\)/.exec(String(r.terms.text ?? ""));
-            loans.set(r.id, { agreement: r.id, borrower: who, account: repay.from, principal: payment * months, payment, months, start: t, ...(rateOf ? { rate_bps: Math.round(Number(rateOf[1]) * 100) } : {}) });
+            // (A loan that names the day its first repayment falls due, so long after it began (`attrs.first_due`: each
+            // borrower's own day), is counted from that day: a month before it is where its months begin. Until
+            // 2026-10-11 every loan standing at the start was counted from the bank's first look, so every borrower
+            // who had not paid fell into arrears, and then into default, on the same day.)
+            const firstDue = Number.isSafeInteger((r.terms as any).attrs?.first_due) && (r.terms as any).attrs.first_due > 0 ? ((r.terms as any).attrs.first_due as number) : undefined;
+            loans.set(r.id, { agreement: r.id, borrower: who, account: repay.from, principal: payment * months, payment, months, start: firstDue !== undefined ? r.at + firstDue - MONTH : t, ...(rateOf ? { rate_bps: Math.round(Number(rateOf[1]) * 100) } : {}) });
           }
         }
         // What borrowing from us is, for anyone who might (docs/design/ai-citizens.md 2a): published once.

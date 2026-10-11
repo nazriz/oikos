@@ -43,6 +43,39 @@ import { desk } from "./behaviour/desk";
 import { energy, water } from "./behaviour/utilities";
 import { station } from "./behaviour/police";
 import { retirementFund } from "./behaviour/fund";
+import { booked, clerk, Clerk, keepers, officeOf } from "./behaviour/books";
+import * as openbooks from "./behaviour/openbooks";
+import * as venueBooks from "./behaviour/openbooks-venues";
+import * as townBooks from "./behaviour/openbooks-townhall";
+export { firstDueOf } from "./behaviour/openbooks";
+export { BOOKS, booksPaper, Clerk, officeOf } from "./behaviour/books";
+
+/** A module that keeps books (`books`), run as its office's staff (`part: "staff"`): the staff's clerk keeps them too,
+ * and files what has changed when the staff's own work for the wake is done (docs/behaviour/office-books.md). */
+/** Each office's books, by the module that runs it (behaviour/openbooks.ts): what its clerk reads. */
+const BOOKS_OF: { [module: string]: BehaviourModule["books"] } = {
+  "firm.landlord": openbooks.landlordBooks,
+  "world.transfers": openbooks.supportBooks,
+  "tribunal.member": venueBooks.tribunalMemberBooks,
+  "tribunal.registrar": venueBooks.tribunalRegistrarBooks,
+  "office.desk": venueBooks.deskBooks,
+  "union.organiser": venueBooks.unionBooks,
+  "bank.lending": venueBooks.lendingBooks,
+  "city.finance_officer": townBooks.financeBooks,
+  "city.mayor_code": townBooks.mayorBooks,
+  "city.works": townBooks.worksBooks,
+  "city.environment": townBooks.environmentBooks,
+  "city.planning_officer": townBooks.planningBooks,
+  "city.council_clerk": townBooks.clerkBooks,
+};
+function keepingBooks<M extends BehaviourModule>(given: M): M {
+  const m = BOOKS_OF[given.name] ? { ...given, books: BOOKS_OF[given.name] } : given;
+  if (!m.books) return m;
+  return { ...m, create: (ctx) => {
+    const c = m.create(ctx);
+    return ctx.params?.part === "staff" ? booked(c, new Clerk(ctx.entity, officeOf(ctx.position), m.books!({ ...ctx, position: officeOf(ctx.position) }))) : c;
+  } };
+}
 
 /** Every behaviour module available to worlds, by the name used in controller.impl. */
 export const modules: { [name: string]: BehaviourModule & { source: string } } = Object.fromEntries(
@@ -92,7 +125,9 @@ export const modules: { [name: string]: BehaviourModule & { source: string } } =
       [energy, "behaviour/utilities.ts"],
       [station, "behaviour/police.ts"],
       [retirementFund, "behaviour/fund.ts"],
+      [clerk, "behaviour/books.ts"],
     ] as const
   // (An office that says how it answers a letter, and has no standing report of its own, acknowledges each: `answering`.)
-  ).map(([m, src]) => [m.name, { ...answering(m), source: new URL(`./${src}`, import.meta.url).pathname }]),
+  ).map(([m, src]) => [m.name, { ...keepingBooks(answering(m)), source: new URL(`./${src}`, import.meta.url).pathname }]),
 );
+for (const m of Object.values(modules)) if (m.books) keepers.set(m.name, m);

@@ -10,6 +10,10 @@
       "default": [],
       "required": true,
       "source": "placeholder"
+    },
+    "part": {
+      "schema": {},
+      "source": "the world gives it (no default)"
     }
   },
   "perceives": [],

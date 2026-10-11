@@ -20,10 +20,10 @@ export const environment: BehaviourModule = {
   name: "city.environment",
   answers: {"office": "the environment office", "acts": "What it acts on: the adopted budget's environment line, which sets its staff; and a direction on its staffing form from those the town's rule on directions names. It surveys the district's wildlife each quarter and publishes what it finds.", "forms": [{"about": ["staff", "recruit", "hire", "hiring", "crew", "vacanc", "posts"], "say": "On staffing it follows a direction on its staffing form (environment_staffing) from those the town's rule on directions names, and no letter."}]},
   issues: [P.JOB_ADVERTISEMENT, ...P.PAYROLL, ...P.ENVIRONMENT],
-  issuesWith: (p) => ({ ...P.staffingOwn({ role: p.role ?? "environmental scientist", industry: p.industry, workplace: p.workplace, notice_days: p.notice_days ?? 14 }), planning: p.planning, payroll_office: p.payroll_office || undefined }),
+  issuesWith: (p) => ({ ...P.staffingOwn({ role: p.role ?? "environmental scientist", industry: p.industry, workplace: p.workplace, notice_days: p.notice_days ?? 14 }), planning: p.planning, payroll_office: p.payroll_office || undefined, budget_line: p.staff_line ?? "environment" }),
   staffed: (p) => ({ role: p.role ?? "environmental scientist", own: "role", posts: { budget_line: p.staff_line ?? "environment", wage: p.wage ?? 0, period: p.period ?? 14 * DAY } }),
   takes: [staffingForm("environment_staffing", "the environment office", "environmental scientists")],
-  version: "0.5.0", // 0.5.0: sends the office that pays the town's staff a payroll notice of each new starter and each leaver (docs/behaviour/firms.md, "Payroll notices"); 0.4.0: takes a written direction on its staffing (docs/behaviour/directions.md); 0.3.0: samples habitat from its own habitat map and asks the land registry which lot a cell is on; no longer shown the district or the register of lots
+  version: "0.5.1", // 0.5.1: its notice of a new starter names the budget line the post is on; told not to recruit, it says what that does of an offer already made (it stands if signed); 0.5.0: sends the office that pays the town's staff a payroll notice of each new starter and each leaver (docs/behaviour/firms.md, "Payroll notices"); 0.4.0: takes a written direction on its staffing (docs/behaviour/directions.md); 0.3.0: samples habitat from its own habitat map and asks the land registry which lot a cell is on; no longer shown the district or the register of lots
   doc: "docs/behaviour/environment.md",
   cadence: () => DAY,
   firstWake: (ctx) => 8 * 3600 + ctx.rng("first-wake").below(3600),
@@ -53,7 +53,7 @@ export const environment: BehaviourModule = {
     const me = ctx.entity;
     const book = new Book();
     const directions = new Directions(ctx, { under: p.directed_under, compliance_bps: p.direction_compliance_bps, office_words: "the environment office" });
-    const staffing = new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, workplace: p.workplace, role: p.role, ...(p.industry ? { industry: p.industry } : {}), does: { hire: true, pay: false }, own: "role", ...(p.payroll_office ? { payroll: p.payroll_office } : {}) });
+    const staffing = new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, workplace: p.workplace, role: p.role, ...(p.industry ? { industry: p.industry } : {}), does: { hire: true, pay: false }, own: "role", ...(p.payroll_office ? { payroll: p.payroll_office, line: p.staff_line } : {}) });
     // cell -> its cover: by the office's own habitat map (its own paper, made up from where its scientists have been),
     // less what the town has since had notice of being built on.
     const cover = new Map<string, string>();
@@ -113,7 +113,7 @@ export const environment: BehaviourModule = {
         steps.push(...staffing.routine(obs, book, "", { target: hireTo, wage: p.wage, canPost: !!budget && hireTo > workers.length, recruit: directed.recruit,
           ...(staffingDir ? { stopped: `Direction ${staffingDir.id} says not to recruit: taking our advertisements down.` } : {}),
           why: `The adopted budget's ${p.staff_line} line (${usd(line)}) pays for ${target} staff${hireTo < target ? ` (and direction ${staffingDir!.id} says to fill ${hireTo})` : ""}; we have ${workers.length}: posting a job.` }));
-        steps.push(...directions.letters(book, (d) => (staffingUnder(d).recruit ? `The office recruits up to ${Math.min(target, staffingUnder(d).posts ?? Infinity)} staff.` : "The office advertises no post, takes down the advertisements it has out and takes nobody on.")));
+        steps.push(...directions.letters(book, (d) => (staffingUnder(d).recruit ? `The office recruits up to ${Math.min(target, staffingUnder(d).posts ?? Infinity)} staff.` : staffing.notRecruiting(book, t))));
 
         // ---- a new round: a sample of each species' habitat, as we've seen the land ----
         if (t >= nextRound && queue.length === 0 && pending === 0) {

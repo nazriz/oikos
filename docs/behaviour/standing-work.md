@@ -18,6 +18,12 @@ standing work order, and the staff follow it until it is changed. The manager se
 
 ## How it works
 
+0. **A town opens with its routines' standing orders in force** (2026-10-11). For each routine of an office a model
+   holds, an order at the procedure's own rhythm is on the office's file when the year begins
+   (`order-<office>-<task>`, made in the office's post), as a real office has its rounds and runs going on the day a
+   new holder arrives. Whoever holds the office may put one on hold, withdraw it or replace it; a task with no order
+   in force is still not done, and the staff still say so. Until then four seats in four pilots made no order for a
+   routine and nothing was done, and a support seat paid 52 pensions by hand each month.
 1. **A standing work order** is `work` with `every`: `work(task=collect, at=town-hall, every="7 days")`. It says what
    task, where and how often, and may say on what (`on`, one thing or several), by whom (`by`), how much each time
    (`units`), how long until it starts (`first`) and for how long it goes on (`until`). It is a statement of kind
@@ -147,6 +153,7 @@ The rates notices keep the rating law's instalments: the order says that they ar
 | energy | `bill` | every customer billed; how often is the order's |
 | council clerk | `enact` | each amendment the council has passed and the clerk has declared is written into the law by its schedule, published in place of the law in force, which is withdrawn (docs/behaviour/government.md, "A council in the hands of seats") |
 | rates | `levy` | the notices sent to every owner at each instalment the rating law sets, and penalty interest added monthly to what is overdue (the law says when; the order says that it is done) |
+| the support office | `pay_claims` | each working day the claims that have waited their time are decided, the oldest first: one that meets the conditions the support law states is granted in writing and paid each period until it ends; one that does not, or that the staff could not verify, is put before the office-holder (`case_for_decision`) and never refused by the staff; a claimant's own request to stop is followed; the period's figures are published (see "The support office" below) |
 
 ## The counter: routine post answered by the staff
 
@@ -175,6 +182,45 @@ Left without one, because their business is not post sorted by rule: the tribuna
 **What always reaches the office-holder, whatever its kind:** anything addressed to the office-holder's own post by name, and anything whose basis is a paper the office-holder made themself. Papers made by the staff never bring the seat back, as before.
 
 A seat that is shown the same papers in another office of the same organisation (the mayor's in-tray holds the complaints the works counter answers) is shown them line by line as before: it has no standing file for the works office's procedure, and none is given it.
+
+## The support office: what the law settles is the staff's
+
+**Source:** `world.transfers` in `participants/src/behaviour/world.ts` (`part`, the routine `pay_claims`, the form
+`benefit_decision` in `papers.ts`); `supportBooks` in `participants/src/behaviour/openbooks.ts`.
+
+In the second living pilot the support office's seat paid 52 pension claims by hand on day 1 and again every month:
+208 requests, 64% of the pilot's spend, and by its own account "administrative and repetitive". A payments office
+does not work so: claims that meet the law's stated conditions are processed by its staff under its procedure, and
+an officer decides what the procedure leaves to judgement.
+
+- **The staff** (`part: "staff"`, while the standing order for `pay_claims` is in force): decide each claim that has
+  waited its processing time, oldest first, as many a day as they have time for. A claim that meets the conditions
+  is granted (`benefit_decision`, to the claimant) and paid each period from then, stopped when the claimant asks,
+  dies, leaves or its time runs out (`benefit_end`). **The staff refuse nothing**: a claim that does not meet the
+  conditions, or that they could not verify (the office's wrong refusals, at the friction dial), is put before the
+  office-holder as a note on the office's file (`case_for_decision`: the claim, the claimant, what it fails on, and
+  for a doubt what the law's rule would pay).
+- **The office-holder** (`part: "seat"`): decides those on the office's decision form (`benefit_decision`: granted or
+  not, the sum, the period, until when, the reason), and answers a request to review a refusal. A claim granted on
+  the form is paid by the staff like any other, from the decision's own figures.
+- **What the office-holder sees:** the claims as a count and a sample ("Answered at your counter under your standing
+  order (52): 52 benefit claims. A sample: ..."); the staff's report ("pay_claims (...): carried out: 7 days' work, 52
+  payments; 52 claims granted and 3 put before the office-holder since the last report (granted lately: ...); 52
+  people are being paid"); and in the office's books (docs/behaviour/office-books.md) each claim put before them and
+  not yet decided, and each review not answered.
+- **To stop it:** the order is put on hold or withdrawn like any standing order; while it is, nothing is decided,
+  paid or stopped by the staff, and their report says so.
+- **A routine may list the papers its staff deal with** (`routines[].papers`), not only the counter's `answer`:
+  while that routine's order is in force those papers do not bring the seat back early and are set out as a count
+  and a sample.
+- A code-run support office (`part: ""`) is unchanged.
+
+Checked for the other offices that can be seats: the works office, the registry, the desks, the clerk, the rates
+office, the clinic, the school and the utilities already give their routine to their staff. Finance's routine
+(paying an invoice within the budget, setting up a wage on a payroll notice, paying over tax withheld), the
+tribunal's listing, the lender's decisions by its published terms and the union's counting of ballots are **not**
+split: each is one plan in its module, and what is routine in them is not separated from what is judgement. Their
+seats do them by hand, with the office's books to say what waits. Left for a later change, office by office.
 
 ## Which offices can be seats now
 

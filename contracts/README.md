@@ -248,6 +248,21 @@ All additions: a world that uses none of them is as it was, and the state of `wo
 - **A record change's `because`** gains the words `friction_arose` (`about`: the matter; `by`: whom it is against; `size`: the money, in whole units, capped) and `friction_ended` (`by`: how; `size`: days). The log's schema already takes any object there.
 - **Statement kinds and participant parameters, not contracts** (listed for whoever reads a world's config): `remedy_request`, `remedy_answer`, `application`, `complaint_notice`, `complaint_response`, `venue_decision`, `hearing`, `repair_order`, `repair_done`, `repair_declined`, `work_search` are a world's vocabulary; a tribunal's order gains nothing but new values of `kind` and `finding` (`do`, `set_aside`), with `matter`, `binding` and `waited_days` in its data. New module: `office.desk`. Parameters: docs/behaviour/frictions.md, "Parameters"; `citizen.default` also takes `job_move`.
 
+## Changes since v0.8 closed (2026-10-11: what the second living pilot found; docs/decisions.md of the day; under the owner's blanket approval of contract changes of 2026-10-11, to look over)
+
+All additions. No schema of a record, a block or the participant API changes shape.
+
+- **Log: a usage annotation's `purpose` gains `notebook`** (`contracts/log.schema.json`): the one extra call that folds a seat's older notebook entries into a summary of its own; its `ref` is `notebook` (docs/real-models.md, "A seat's notebook").
+- **Module (`contracts/module.schema.json` is unchanged; the interface in `participants/src/module.ts` gains one member): `books`**: what stands open at the module's office, read from its own papers and accounts (docs/behaviour/office-books.md). Not in a manifest: it is code, as `create` is.
+- **A routine's `papers`** (already in `contracts/module.schema.json` for the counter's `answer`) may be given on any routine: the kinds of paper that routine's staff deal with while its standing order is in force.
+- **Conventions on what the contracts leave opaque** (for whoever reads a world's config or a log):
+  - `AgreementTerms.attrs.first_due` (seconds): how long after the agreement begins its first periodic payment falls due (a lease's rent day, a loan's repayment day). The generator writes it on the leases and mortgages a town starts with; a landlord and a lender count what is due from it. Absent: from when the agreement begins, as before.
+  - Statement kinds `office_books` (a clerk's paper: `data.office`, `data.at`, `data.open[]` of `{ what, about, says, since?, amount? }`) and, for the support office, `case_for_decision` with `data { claim, claimant, payment, fails, doubt, amount?, every?, until? }`; a `payroll_notice` of a new starter gains `data.line` (the budget line the post is on); a `staff_report` may be the support office's (`pay_claims`).
+  - Genesis records `order-<office>-<task>` (kind `work_order`, made in the office's post): the standing orders a seated office opens with; `proc-petitions` (kind `procedure`, public): the town's rule on petitions, `data.petitions { threshold_bps, of, signatures }`.
+  - A new behaviour module, `office.clerk` (parameters `of`: the module that runs the office; `with`: that office's own parameters), and a `part` parameter on `world.transfers`.
+  - A town's description (the generator's input, not a contract) gains `opening_orders: false`: leave the opening standing orders out.
+- **Pilot tooling (not a contract):** a run folder may hold `measure-failed.txt`; `pilot-report.json` gains `measures_failed`.
+
 ## Changes since v0.8 closed (2026-10-09: offices that take directions; docs/behaviour/directions.md; under the owner's standing approval for readiness changes, to look over)
 
 - **`module.schema.json`: `takes`** (optional): the written directions a module's office takes, each a `Taken`: `form` (the form's name), `title`, `fields` (a form's fields, each with a `description`) and `follows` (what following one means, in words, 20 characters or more). A world publishes one form for each from this declaration; who may direct the office is a record of the world's, never the manifest. A manifest without it is valid as before.

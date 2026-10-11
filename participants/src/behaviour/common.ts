@@ -1139,19 +1139,25 @@ export function answering<M extends BehaviourModule>(m: M): M {
 export class Directions {
   private readonly answered = new Set<string>();
   private readonly acknowledged = new Set<string>();
-  constructor(private readonly ctx: ParticipantContext, private readonly o: { under: string; compliance_bps?: number; office_words: string }) {}
+  /** The office these directions are to: the post itself, or, for its staff's post, the office whose staff they are.
+   * (Until 2026-10-11 a staff post looked for directions to "works-staff", and the forms and the town's rule name
+   * "works": no direction ever reached the staff of an office a model held.) */
+  private readonly office: string | undefined;
+  constructor(private readonly ctx: ParticipantContext, private readonly o: { under: string; compliance_bps?: number; office_words: string }) {
+    this.office = ctx.position?.replace(/-staff$/, "");
+  }
 
   /** The posts that may direct this office, by the organisation's rule as it stands (none: it has no such rule, or the rule is withdrawn). */
   private may(book: Book): string[] {
     const rule = this.o.under ? book.current(this.o.under) : undefined;
     const d = rule?.record === "statement" ? (rule.data?.directions as { by?: unknown; offices?: { [office: string]: unknown } } | undefined) : undefined;
-    const posts = (this.ctx.position && d?.offices?.[this.ctx.position]) ?? d?.by;
+    const posts = (this.office && d?.offices?.[this.office]) ?? d?.by;
     return Array.isArray(posts) ? posts.filter((x): x is string => typeof x === "string") : [];
   }
 
   /** The directions filed on our form `form` that still stand, oldest first. */
   private filed(book: Book, form?: string): StatementRecord[] {
-    const office = this.ctx.position;
+    const office = this.office;
     return book.standingOf("direction").filter((d) => (d.addressed_to ?? []).includes(this.ctx.entity) && basesOf(d).some((b) => {
       const f = book.records.get(b);
       return f?.record === "statement" && f.kind === "form" && f.data?.office === office && (form === undefined || f.data?.form === form);

@@ -6,7 +6,7 @@
 // support payments, industry shares...) comes from the spec's profile (worlds/profiles/, docs/profiles.md), and what
 // isn't there is derived from it here by general formulas, or is a placeholder of the town's own shape.
 
-import { drawValues, raisedValues, UPBRINGING, adultAgeBands, bedroomsNeeded, drawHousehold, drawSavings, formatMoney, forms as formWords, modules, votedWords, Randomness, chargesInWords, dayPayPeriod, forAge, forOutOfWork, linesInWords, paymentsInWords, tabledLines, yearInDays, stopsWorkAt, withholding, withholdingInWords, yearsOfSchooling, draftLaw, type HouseholdSpec, type IncomeTaxLaw, type Issued, type LawSchedule, type PaymentRule, type Taken } from "@oikos/participants";
+import { BOOKS, drawValues, raisedValues, UPBRINGING, adultAgeBands, bedroomsNeeded, drawHousehold, drawSavings, formatMoney, forms as formWords, modules, votedWords, Randomness, chargesInWords, dayPayPeriod, forAge, forOutOfWork, linesInWords, paymentsInWords, tabledLines, yearInDays, stopsWorkAt, withholding, withholdingInWords, yearsOfSchooling, draftLaw, type HouseholdSpec, type IncomeTaxLaw, type Issued, type LawSchedule, type PaymentRule, type Taken } from "@oikos/participants";
 import law from "../law/basic.json";
 import schedules from "../law/schedules.json";
 import { loadProfile, type Profile } from "./profile";
@@ -151,6 +151,8 @@ export interface TownSpec {
   /** Other offices handed to a language model (the mock, until a real one is named): position ids, a list or a
    * comma-separated text ("planning,finance"). Each keeps its code module as the mock's brain and as its role's module. */
   model_seats?: string[] | string;
+  /** Whether an office a model holds opens with the standing work orders for its routines in force (docs/behaviour/standing-work.md). Not given: yes. */
+  opening_orders?: boolean;
   /** Whether a paper filed with a seat's office brings the seat back before the day it gave, at the next working day's
    * sitting, as a letter does (docs/real-models.md, "A seat's settings"). On unless set false: then only a letter does. */
   wake_on_papers?: boolean;
@@ -1085,8 +1087,10 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
         const principal = Math.round((payment * (1 - (1 + i) ** -months)) / i);
         const loan = `mortgage-${lh}`;
         const parties = ["bank", lh];
+        // (Each borrower's own repayment day: the loan's, `attrs.first_due`, as the bank counts what is due from it.)
+        const repayDay = 2 + ownPick.below(29);
         records.push({ id: loan, record: "agreement", author: "genesis", at: 0, visible_to: parties, terms: {
-          template: "loan", parties, term: months * MONTH,
+          template: "loan", parties, term: months * MONTH, attrs: { first_due: repayDay * DAY },
           commitments: [
             { who: "bank", does: { outcome: { money: { to: `acc-${lh}`, amount: String(principal), for: "Loan principal." } } } },
             { who: lh, does: { outcome: { money: { from: `acc-${lh}`, to: "acc-bank", amount: String(payment), for: "Loan repayment." } } }, every: MONTH },
@@ -1094,7 +1098,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
           text: `bank lent ${lh} ${asWritten(principal)} for their home, ${home.space}; ${lh} repays ${asWritten(payment)} a month for ${months} more months (${OW.mortgage_rate_bps / 100}% a year).` } });
         for (const party of parties) records.push({ id: `${loan}-sig-${party}`, record: "signature", author: "genesis", at: 0, visible_to: parties, speaks_for: party, agreement: loan, as: party });
         records.push({ id: `${loan}-repay`, record: "statement", author: "genesis", at: 0, visible_to: [lh, "bank"], speaks_for: lh, kind: "request", addressed_to: ["bank"], basis: loan,
-          text: `Standing instruction to the bank, given by ${lh} before the year began: pay my mortgage repayments under loan agreement ${loan} every month.`, data: { outcome: { money: { from: `acc-${lh}`, to: "acc-bank", amount: String(payment), for: "Loan repayment." } }, every: MONTH, first: (2 + ownPick.below(29)) * DAY } });
+          text: `Standing instruction to the bank, given by ${lh} before the year began: pay my mortgage repayments under loan agreement ${loan} every month.`, data: { outcome: { money: { from: `acc-${lh}`, to: "acc-bank", amount: String(payment), for: "Loan repayment." } }, every: MONTH, first: repayDay * DAY } });
       }
       for (const m of h.members) occupancy.push({ occupant: m.id, space: home.space });
       continue;
@@ -1103,8 +1107,11 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     const term = (12 + pick.below(13)) * MONTH;
     const elapsed = pick.below(term / DAY) * DAY; // tenancies already part-way through
     const visible = [home.landlord, lh];
+    // (Each tenancy's rent day; the others' shares of it reach the leaseholder the day before, as a household arranges it.
+    // It is the lease's own, `attrs.first_due`: the landlord counts what is due from it, as the tenant's bank pays on it.)
+    const rentDay = 2 + pick.below(29);
     records.push({ id: ag, record: "agreement", author: "genesis", at: 0, visible_to: visible, terms: {
-      template: "lease", parties: [home.landlord, lh],
+      template: "lease", parties: [home.landlord, lh], attrs: { first_due: rentDay * DAY },
       commitments: [
         { who: home.landlord, does: { outcome: { occupancy: { who: lh, in: home.space } } } },
         { who: lh, does: { outcome: { money: { from: `acc-${lh}`, to: `acc-${home.landlord}`, amount: String(home.rent), for: "rent" } } }, every: MONTH },
@@ -1114,8 +1121,6 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       termination: [{ party: home.landlord, notice: 60 * DAY }, { party: lh, notice: 30 * DAY }],
       text: `${lh} rents home ${home.space} from ${home.landlord}${others.length ? `, to live there with their household: ${others.map((m) => m.id).join(", ")}` : ""}.` } });
     for (const party of visible) records.push({ id: `${ag}-sig-${party}`, record: "signature", author: "genesis", at: 0, visible_to: visible, speaks_for: party, agreement: ag, as: party });
-    // (Each tenancy's rent day; the others' shares of it reach the leaseholder the day before, as a household arranges it.)
-    const rentDay = 2 + pick.below(29);
     records.push({ id: `${ag}-rent`, record: "statement", author: "genesis", at: 0, visible_to: [lh, "bank"], speaks_for: lh, kind: "request", addressed_to: ["bank"], basis: ag,
       text: `Standing instruction to the bank, given by ${lh} before the year began: pay my rent under lease ${ag} every month.`, data: { outcome: { money: { from: `acc-${lh}`, to: `acc-${home.landlord}`, amount: String(home.rent), for: "rent" } }, every: MONTH, first: rentDay * DAY } });
     // The other adults who earn pay the leaseholder an even share of the rent.
@@ -1471,7 +1476,8 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   // profile's staff per 1,000 residents gives, and the landfill for a year's waste.
   // (With nature, the town's environment office: its scientists, at the public wage.)
   const envStaff = L ? V.nature!.survey_staff : 0;
-  const mayorParams = { population: adultCount, builder: "builder", park_budget: V.town_finance.parks_per_year, visits: "town", budget_lead_days: BUDGET_LEAD_DAYS, ...(E ? { electoral: ELECTORAL } : {}),
+  const PETITION_BPS = 1_500; // PLACEHOLDER (no source): the share of the town's adults whose signatures bring a petition before the council (published as the town's rule on petitions, below)
+  const mayorParams = { population: adultCount, petition_threshold_bps: PETITION_BPS, builder: "builder", park_budget: V.town_finance.parks_per_year, visits: "town", budget_lead_days: BUDGET_LEAD_DAYS, ...(E ? { electoral: ELECTORAL } : {}),
     ...(RDS ? { road_budget: RDS.budget_per_resident * everyone.length, road_within: RDS.within_cells } : {}), staff_budget: crew * crewAnnual, services_budget: servicesBudget, ...(envStaff ? { environment_budget: envStaff * crewAnnual } : {}) };
   const mayorCode = code("city.mayor_code", mayorParams);
   office("mayor", "city", `Mayor of ${spec.name}`, "mayor",
@@ -1703,7 +1709,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     text: "The town's mandate to its bank for its account, given by resolution of the council before the year began: payments from the account are instructed only by the finance officer, and only the finance officer puts a hold on a standing instruction, changes one or withdraws one. The mandate stands until the council replaces it.",
     basis: "law-charter", data: { account: "acc-city", positions: ["finance"] } });
   records.push({ id: "proc-payments", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", kind: "procedure", basis: "law-charter", addressed_to: ["city"],
-    text: `The finance officer pays the town's wages and bills only within the budget the council has adopted for the year. While a year has no adopted budget, the finance officer pays only as the charter allows: what the town is already bound to pay, at no more each month than a twelfth of the budget last adopted. Any one payment over ${approvalOver} needs the mayor's written approval.`,
+    text: `The finance officer pays the town's wages and bills only within the budget the council has adopted for the year. While a year has no adopted budget, the finance officer pays only as the charter allows: what the town is already bound to pay, at no more each month than a twelfth of the budget last adopted. Any one payment over ${approvalOver} needs the mayor's written approval. A wage is paid on the line of the budget its post belongs to: each office that takes on staff does so within its own line (${Object.entries(budgetLines).filter(([, words]) => words.startsWith("the wages")).map(([line]) => line).join(", ")}), and its payroll notice of a new starter names the line. An employment agreement is made and signed for the town by the office that takes the worker on; the finance officer signs nothing, and sets the wage up as a standing payment once the hiring office's notice has come.`,
     adico: { attribute: "the finance officer", deontic: "must_not", aim: "pay the town's wages and bills", condition: `outside the budget adopted for the year (or, while the year has none, beyond what the charter allows in the meantime), or over ${approvalOver} in one payment without the mayor's written approval` } });
   // Who may direct the town's offices (docs/behaviour/directions.md): the town's own rule, a record, as its payments
   // procedure is. The charter gives the town a mayor and a council and no chief executive, so the mayor heads its
@@ -1721,6 +1727,13 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   records.push({ id: "proc-council", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", kind: "procedure", basis: "law-charter", addressed_to: ["city"],
     text: `The council's standing orders. One: the mayor, or any councillor, may put a proposal to the council of their own motion; it needs no seconder and no notice beyond being filed. Two: a proposal is put on the council proposal form (form-council-proposal), saying what is proposed in full, whether it is a law, a budget or something else, and whom it mainly bears on; a change to a figure in a law in force is put on that law's amendment form. A proposal on a form is filed with the council clerk by being handed in. Three: the clerk puts every proposal so filed to a ballot of the councillors, and the ballot stays open for ${COUNCIL_VOTE_DAYS} days from the day the clerk opens it. Four: each councillor votes yes or no on the ballot, in their own post, while it is open, and may change their vote until it closes: the latest counts. The mayor has no vote. A vote cast after the ballot closes, or by anyone who is not a councillor, is not counted. Five: a proposal passes if more councillors vote yes than no and those voting yes are more than half of all the councillors (${Math.floor(COUNCIL_LEANINGS.length / 2) + 1} of ${COUNCIL_LEANINGS.length}); a councillor who does not vote is not counted as a yes. Six: when the ballot closes the clerk counts the votes and declares the result in public, naming who voted for, who against and who did not vote; what is passed the clerk publishes as the law or the budget, resting on the ballot. Seven: a petition lodged with the council lies on its table for the mayor and every councillor to read; the council is not bound to act on one, and any of them may take it up by putting a proposal.`,
     data: { council: { proposers: ["mayor", "councillor"], form: "form-council-proposal", vote_days: COUNCIL_VOTE_DAYS, members: COUNCIL_LEANINGS.length } } });
+  // The town's rule on petitions (2026-10-11): how many signatures bring a petition before the council was a
+  // parameter of the mayor's code, on no paper: a person in the mayor's office could not know it. It is the town's
+  // own published procedure now, with the figure the code goes by.
+  const petitionSignatures = Math.ceil((PETITION_BPS * adultCount) / 10_000);
+  records.push({ id: "proc-petitions", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", kind: "procedure", basis: "law-charter", addressed_to: ["city"],
+    text: `The town's rule on petitions. A petition addressed to the mayor is taken up by the mayor's office once the count its organiser has published reaches ${petitionSignatures} signatures (${PETITION_BPS / 100}% of the ${adultCount} adults in the town when the year began): what it asks is then put to the council, or answered in writing to its organiser. Below that count the office need not act on it.`,
+    data: { petitions: { threshold_bps: PETITION_BPS, of: adultCount, signatures: petitionSignatures } } });
   // Each town office that takes directions publishes its forms for them (what it takes is its module's to say:
   // `takes`), and is told which record says whose it follows.
   for (const pos of positions.filter((x) => x.entity === "city")) {
@@ -2034,7 +2047,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   // law and applies it. Its own book: the claims made to it, and, where a payment is reckoned from a record of
   // contributions, the employers' reports addressed to it.
   office("outside-support", "outside", "Support payments", undefined,
-    [{ id: "ledger", kind: "accounts" }, K.mine("claims", ["benefit_claim", "benefit_change"]),
+    [{ id: "ledger", kind: "accounts" }, K.mine("claims", ["benefit_claim", "benefit_change", "benefit_decision", "case_for_decision"]),
       // (And, where things go wrong: what is asked of it, and what a body that hears such things tells it and decides.)
       ...(FR ? [K.mine("reviews", ["remedy_request", "complaint_notice", "venue_decision", "hearing_notice", "tribunal_order", "benefit_decision"])] : []),
       K.mine("gone", ["death_registration", "departure"]), lawBook,
@@ -2048,6 +2061,13 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     code("fund.retirement", { administrator_account: "acc-outside", cost_bps_of_income: RF!.cost_bps_of_income, pay_every_days: RF!.pension_every_days,
       access_age: V.retirement_age, drawdown_bps_by_age: RF!.drawdown_bps_by_age, report_every_days: 365 }));
 
+  // An office with no routine work for a staff still has someone who keeps its books (docs/behaviour/office-books.md):
+  // a clerk, a post of its own, who reads what the office reads and files what stands open when that has changed.
+  const clerkFor = (id: string, pos: any, part: any, impl: string, params: object) => {
+    const shown = pos.channels.filter((c: any) => !c.on_request || c.kind === "sites").map((c: any) => ({ ...c }));
+    office(`${id}-staff`, pos.entity, `Clerk of the ${pos.title.charAt(0).toLowerCase()}${pos.title.slice(1)}`, undefined, shown, code("office.clerk", { of: impl, with: params }), part.lanes ? { lanes: part.lanes } : {});
+    pos.channels.push(K.mine("staff-reports", [BOOKS], { title: "The office's books, as its clerk keeps them: what has changed, the whole list in each paper" }));
+  };
   // Offices handed to a language model (spec.model_seats): the same office, its channels and its role's module; the
   // model in place of the code, told honestly what it is, keeping office hours where the world has working hours.
   const seats = (Array.isArray(spec.model_seats) ? spec.model_seats : String(spec.model_seats ?? "").split(",")).map((x) => x.trim()).filter(Boolean);
@@ -2105,12 +2125,33 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       part.controller.params.mock.params = { ...own, part: "seat" };
       pos.role_module = { code: impl, params: { ...own, part: "seat" } };
       records.push({ id: `proc-${id}-routines`, record: "statement", author: "genesis", at: 0, visible_to: [pos.entity], speaks_for: pos.entity, kind: "procedure", addressed_to: [pos.entity],
-        text: `The routine work of the ${pos.title.charAt(0).toLowerCase()}${pos.title.slice(1)}'s office is done by its staff, by the office's standing work orders and only by them. A standing work order says what task, where and how often, and may say on what, from when and for how long. While one is in force the staff do the task each time it falls due, in their working hours; with none in force for a task, they do not do it. Whoever holds the office makes its standing work orders, of the office's own accord: by saying so in their own words (a standing work order for the task, where, and how often or as the procedure has it); it is on no form and needs nobody's direction or leave. None is in force until one is made. An order is changed by withdrawing it and making another, and put on hold like any standing paper. The staff report to the office on the work under its orders, on the organisation's own file: what was done under each, or that one is not being carried out and why, the day that changes and otherwise about weekly. The tasks: ${routines.map((r) => `${r.task}, at ${(own as any)[r.at] || id}: ${r.what}${rhythmWords(r)}`).join(" ")}${routines.filter((r) => r.papers?.length).map((r) => ` The office's counter staff answer, under a standing order for ${r.task}: ${r.papers!.map((x) => `${x.kind.replace(/_/g, " ")} (${x.how})`).join("; ")}. Anything addressed to the office-holder by name, or resting on a paper of theirs, comes to them whatever its kind; the rest the counter answers, and the office-holder is told how many and sees a sample.`).join("")}`,
+        text: `The routine work of the ${pos.title.charAt(0).toLowerCase()}${pos.title.slice(1)}'s office is done by its staff, by the office's standing work orders and only by them. A standing work order says what task, where and how often, and may say on what, from when and for how long. While one is in force the staff do the task each time it falls due, in their working hours; with none in force for a task, they do not do it. Whoever holds the office makes its standing work orders, of the office's own accord: by saying so in their own words (a standing work order for the task, where, and how often or as the procedure has it); it is on no form and needs nobody's direction or leave. ${spec.opening_orders === false ? "None is in force until one is made." : "An order for each task below was in force when the year began, at the office's own rhythm (on the office's file, with the others); a task with no order in force is not done."} An order is changed by withdrawing it and making another, and put on hold like any standing paper: while it is on hold the staff do not do that work. The staff report to the office on the work under its orders, on the organisation's own file: what was done under each, or that one is not being carried out and why, the day that changes and otherwise about weekly. The tasks: ${routines.map((r) => `${r.task}, at ${(own as any)[r.at] || id}: ${r.what}${rhythmWords(r)}`).join(" ")}${routines.filter((r) => r.papers?.length).map((r) => ` The office's counter staff answer, under a standing order for ${r.task}: ${r.papers!.map((x) => `${x.kind.replace(/_/g, " ")} (${x.how})`).join("; ")}. Anything addressed to the office-holder by name, or resting on a paper of theirs, comes to them whatever its kind; the rest the counter answers, and the office-holder is told how many and sees a sample.`).join("")}`,
         data: { ...(own.counter ? { office: id } : {}), routines: routines.map((r) => ({ task: r.task, at: (own as any)[r.at] || id, ...rhythm(r), ...(r.papers?.length ? { papers: r.papers } : {}) })) } });
       pos.channels.push(K.mine("standing", ["procedure", "work_order", "hold"], { title: "The office's procedures and standing orders" }));
       part.controller.params.standing = [...part.controller.params.standing, "standing"];
+      // A town opens with the standing orders its offices' procedures call routine already in force, as a real office
+      // has them on the day a new holder arrives (2026-10-11: a support seat paid 52 pensions by hand, and four seats in
+      // four pilots made no order for a routine and nothing was done). Each is the office's own paper, made in its
+      // post before the year began, at the procedure's rhythm; whoever holds the office may hold, withdraw or replace it.
+      // (`opening_orders: false` in a town's description leaves them out: an office that starts with nothing in force.)
+      for (const r of spec.opening_orders === false ? [] : routines) {
+        const x = rhythm(r);
+        if (x.every === undefined && x.schedule === undefined) continue;
+        const at = String((own as any)[r.at] || id);
+        records.push({ id: `order-${id}-${r.task.replace(/_/g, "-")}`, record: "statement", author: "genesis", at: 0, visible_to: [pos.entity], speaks_for: pos.entity, in_position: id, kind: "work_order", addressed_to: [pos.entity],
+          text: `Standing work order: ${r.task} at ${at}, ${x.schedule !== undefined ? `as ${x.schedule} sets` : `every ${x.every! / 86_400} day${x.every === 86_400 ? "" : "s"}`}. (In force when the year began, as the office's procedure has it.)`,
+          data: { work: { task: r.task, at }, ...(x.schedule !== undefined ? { schedule: x.schedule } : { every: x.every }), by_procedure: `proc-${id}-routines` } });
+      }
       // What the staff report of the work under those orders: a paper of the organisation's own, as it comes.
-      pos.channels.push(K.mine("staff-reports", ["staff_report"], { title: "Reports from the staff on the work under the standing work orders" }));
+      pos.channels.push(K.mine("staff-reports", ["staff_report", ...(modules[impl]?.books ? [BOOKS] : [])], { title: `Reports from the staff on the work under the standing work orders${modules[impl]?.books ? ", and the office's books as its clerk keeps them" : ""}` }));
+    } else if (modules[impl]?.books) clerkFor(id, pos, part, impl, params ?? {});
+  }
+  // (The mayor's office, where a model holds it from the start: its clerk and its books, as any office's.)
+  {
+    const pos = positions.find((x) => x.id === "mayor");
+    const part = participants.find((x) => x.id === pos?.holder);
+    if (pos && part?.controller.type === "llm" && !positions.some((x) => x.id === "mayor-staff") && modules["city.mayor_code"]?.books) {
+      clerkFor("mayor", pos, part, "city.mayor_code", mayorParams);
     }
   }
   // Settings of every seat a model holds, as the town's description gives them: whether papers bring it back, and how

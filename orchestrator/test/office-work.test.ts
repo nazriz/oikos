@@ -24,7 +24,7 @@ const DAY = 86_400;
 const spec = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")) as any;
 
 async function worksSeat(citing: boolean) {
-  const config = generate({ ...spec, model_seats: ["works"], works_crew_at_start: 0 });
+  const config = generate({ ...spec, opening_orders: false, model_seats: ["works"], works_crew_at_start: 0 });
   const own = config.participants.find((p: any) => p.id === "works-staff-system").controller.params;
   const wage = (own.wage / 100).toFixed(2), period = `${own.period / DAY} days`;
   const works: Sitting[] = [
@@ -106,7 +106,7 @@ test("offers that cite no advertisement: the preview says there is no place of w
 // office's order form, which says how buying is done; an order on it, paid in full, is delivered; a payment alone is
 // sent back, as before.
 test("an energy seat orders from the grid on its own order form and is delivered; a payment with no order is sent back; its stationery says how", async () => {
-  const config = generate({ ...spec, model_seats: ["energy-operations"] });
+  const config = generate({ ...spec, opening_orders: false, model_seats: ["energy-operations"] });
   const market = config.participants.find((p: any) => p.id === "outside-trade-system").controller.params;
   const own = config.participants.find((p: any) => p.id === "energy-operations-staff-system").controller.params;
   const price = (market.sells.energy / 100).toFixed(2), least = Math.max(market.min_order ?? 100, 500);
@@ -150,7 +150,7 @@ test("an energy seat orders from the grid on its own order form and is delivered
 // (a quarter in) whatever the order said, and nothing told the seat when bills were due. Here the first round goes
 // out one period after the order, and each office's staff report how its orders stand.
 test("bills go out one period after a standing billing order is made; the staff of the water, rates, clinic and school offices each report how their orders stand", async () => {
-  const config = generate({ ...spec, model_seats: ["water-operations", "rates", "clinic-manager", "principal"] });
+  const config = generate({ ...spec, opening_orders: false, model_seats: ["water-operations", "rates", "clinic-manager", "principal"] });
   const params = (id: string) => config.participants.find((p: any) => p.id === `${id}-staff-system`).controller.params;
   const at = { water: params("water-operations").works, clinic: params("clinic-manager").building, school: params("principal").building };
   const idle = [4, 8, 11, 14].map((day) => ({ day, asks: () => [] }));

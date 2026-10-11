@@ -6,7 +6,8 @@ import * as C from "../calls";
 import { channels, type LookRequest, type ParticipantAction, type StatementRecord } from "../contracts";
 import { DAY, need, params, wait, type BehaviourModule } from "../module";
 import { cents } from "../money";
-import { ask, because, Book, callAction, MONTH, pay, publishedPrice, say, usd, withdraw, type Step, Asked, lookUp, LOOKS_MAX } from "./common";
+import { ask, because, Book, callAction, MONTH, pay, publishedPrice, say, StandingWork, usd, withdraw, type Step, Asked, lookUp, LOOKS_MAX } from "./common";
+import * as P from "./papers";
 import { stepper } from "./firms";
 import { fill, held, OrderBook, priceList } from "./trade";
 import { drawHousehold, drawSavings, type HouseholdSpec } from "./household";
@@ -234,7 +235,12 @@ export const trade: BehaviourModule = {
 export const transfers: BehaviourModule = {
   name: "world.transfers",
   answers: {"office": "the support office", "acts": "What it acts on: a claim for a payment under the support law, made by the person it is for."},
-  version: "0.4.0", // 0.4.0: a claim may wait to be decided (processing_days), the staff decide so many a day (capacity_per_day), and some qualifying claims are wrongly refused, more while a backlog stands (error_bps, at the friction dial); asked to review a refusal found wrong, the office decides the next claim on its facts
+  // The office's routine, where a model holds the office (docs/behaviour/standing-work.md, "The support office"): what
+  // the support law's own conditions settle is the staff's; a refusal, a doubt and a review are the office-holder's.
+  routines: [{ task: "pay_claims", at: "office", every: 1, what: "Each working day the office's staff decide the claims that have waited their time, the oldest first: a claim that meets the conditions the support law states for its payment is granted, in writing, and paid each period from then until the claimant asks for it to stop, dies, leaves, or its time runs out, which the staff tell them. A claim that does not meet the conditions, or that the staff could not verify, is not refused by the staff: it is put before whoever holds the office, as a note on the office's file saying what it fails on, and decided by them on the office's decision form; a claim they grant on that form is paid by the staff like any other. A request to review a refusal comes to the office-holder.",
+    papers: [{ kind: "benefit_claim", how: "decided by the support law's conditions: granted and paid if it meets them, put before the office-holder if it does not or could not be verified" }, { kind: "benefit_change", how: "a claimant's own request to stop their payment: it is stopped" }] }],
+  issues: P.SUPPORT,
+  version: "0.5.0", // 0.5.0: run in parts where a model holds the office (part): the staff decide and pay what the law's conditions settle under a standing order (pay_claims) and put a refusal or a doubt before the office-holder, who decides it on the office's decision form and answers reviews; a town run by code is unchanged; 0.4.0: a claim may wait to be decided (processing_days), the staff decide so many a day (capacity_per_day), and some qualifying claims are wrongly refused, more while a backlog stands (error_bps, at the friction dial); asked to review a refusal found wrong, the office decides the next claim on its facts
   doc: "docs/behaviour/boundary.md",
   cadence: () => DAY,
   firstWake: () => 0,
@@ -251,6 +257,9 @@ export const transfers: BehaviourModule = {
         capacity_per_day: 0,
         error_bps: 0,
         respond: {} as object,
+        // Which part of the office this is (docs/behaviour/standing-work.md): "" the whole office, as code runs it;
+        // "seat" whoever holds it; "staff" its staff, who do the routine while a standing order for it is in force.
+        part: "" as "" | "seat" | "staff",
       },
       ctx.params,
     );
@@ -260,6 +269,13 @@ export const transfers: BehaviourModule = {
     const book = new Book();
     const decided = new Set<string>();
     const dial = frictionDial(ctx.world);
+    const routines = new StandingWork(me, p.part, ctx.position ? new Set([ctx.position.replace(/-staff$/, "")]) : undefined);
+    const TASK = "pay_claims";
+    const put = new Map<string, { doubt: boolean; why: string }>(); // claims the staff put before the office-holder (and, for the holder, those it has been shown)
+    const taken = new Set<string>(); // decisions of the office-holder's the staff have taken up
+    const seen = new Set<string>(); // cases the office-holder has decided
+    let granted = 0, putBefore = 0, payments = 0; // since the staff last reported
+    const lately: string[] = [];
     const wronglyRefused = new Set<string>(); // claims refused though the claimant qualified
     const reviewed = new Set<string>(); // person|payment: a refusal reviewed and found wrong, so the next claim is decided on its facts
     let decidedDay = -1;
@@ -341,7 +357,24 @@ export const transfers: BehaviourModule = {
         // backlog, and hurried staff make more mistakes.
         const day = Math.floor(t / DAY);
         if (day !== decidedDay) { decidedDay = day; decidedToday = 0; }
-        const waiting = book.open("benefit_claim").filter((r) => (r.addressed_to ?? []).includes(me) && !decided.has(r.id) && t >= r.at + p.processing_days * DAY).sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : 1));
+        // (Who does the routine now: the whole office; its staff while their standing order is in force; the office-holder never.)
+        const working = !!routines.does(book, TASK, t, { every: DAY });
+        const staff = p.part === "staff";
+        if (p.part === "seat") {
+          // Whoever holds the office: what the staff have put before them is decided (here, as the office's own code
+          // would have: a claim that fails the law's conditions is refused, with the reason; so is one that could not
+          // be verified, which is the wrong refusal a review may later find).
+          for (const n of book.open("case_for_decision").filter((x) => x.speaks_for === me && !seen.has(x.id)).sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : 1))) {
+            seen.add(n.id);
+            const d = n.data ?? {};
+            if (typeof d.claim !== "string" || typeof d.claimant !== "string") continue;
+            if (d.doubt) wronglyRefused.add(d.claim);
+            const why = String(d.fails ?? "");
+            steps.push(because(`A claim the staff put before us (${d.claim}): refused${why ? `: ${why}` : ""}.`,
+              say("benefit_decision", `Claim ${d.claim} refused${why ? `: ${why}` : ""}.`, { to: [d.claimant], visible: [d.claimant, me], basis: d.claim, data: { claim: d.claim, payment: d.payment, granted: false, ...(why ? { reason: why } : {}) } })));
+          }
+        }
+        const waiting = !working ? [] : book.open("benefit_claim").filter((r) => (r.addressed_to ?? []).includes(me) && !decided.has(r.id) && t >= r.at + p.processing_days * DAY).sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : 1));
         const backlog = p.capacity_per_day > 0 && waiting.length > p.capacity_per_day;
         for (const c of waiting) {
           if (p.capacity_per_day > 0 && decidedToday >= p.capacity_per_day) break;
@@ -361,6 +394,20 @@ export const transfers: BehaviourModule = {
               wronglyRefused.add(c.id);
             }
           }
+          // The staff refuse nothing: a claim that does not meet the conditions, or that they could not verify, is
+          // put before whoever holds the office, with what it fails on (and, for a doubt, what it would be paid).
+          if (staff && !d.ok) {
+            const doubt = wronglyRefused.delete(c.id);
+            const would = doubt ? decide(rule, c, t) : undefined;
+            const why = d.why ?? "it does not meet the conditions the support law states for the payment";
+            put.set(c.id, { doubt, why });
+            putBefore++;
+            steps.push(because(`A claim for ${payment} support that ${doubt ? "we could not verify" : "does not meet the law's conditions"}: putting it before the office-holder.`,
+              say("case_for_decision", `For decision: claim ${c.id} by ${who} for ${payment} support (aged ${age}): ${why}.${would?.ok ? ` If it is granted, the payment by the law's rule is ${usd(would.amount)} every ${rule!.every_days} days.` : ""}`,
+                { to: [me], visible: [me], basis: c.id, data: { claim: c.id, claimant: who, payment, fails: why, doubt, ...(would?.ok ? { amount: would.amount, every: rule!.every_days * DAY, ...(would.until !== undefined ? { until: would.until } : {}) } : {}) } })));
+            continue;
+          }
+          if (staff && d.ok) { granted++; lately.push(`${c.id} (${who}, ${payment})`); if (lately.length > 3) lately.shift(); }
           // One payment of a kind a person: a new claim replaces the old.
           for (const [id, x] of paying) if (x.person === who && x.payment === payment) paying.delete(id);
           if (d.ok) paying.set(c.id, { person: who, account: c.data!.account as string, payment, from: rule!.account || p.account, amount: d.amount, every: rule!.every_days * DAY, next: t + rule!.every_days * DAY, ...(d.until !== undefined ? { until: d.until } : {}), ...(rule!.lasts?.then ? { then: rule!.lasts.then } : {}) });
@@ -371,8 +418,26 @@ export const transfers: BehaviourModule = {
               to: [who], visible: [who, me], basis: c.id, data: { claim: c.id, payment, granted: d.ok, ...(p.processing_days > 0 || p.capacity_per_day > 0 ? { waited_days: Math.floor((t - c.at) / DAY) } : {}), ...(d.ok ? { amount: d.amount, every: rule!.every_days * DAY, ...(d.until !== undefined ? { until: d.until } : {}) } : d.why ? { reason: d.why } : {}) },
             })));
         }
-        // Asked to review a refusal (the claimant's request): answered from the office's own books.
-        steps.push(...resp.steps(book, t, p.account, 1e15));
+        // Asked to review a refusal (the claimant's request): answered from the office's own books. Never the staff's.
+        if (!staff) steps.push(...resp.steps(book, t, p.account, 1e15));
+        // A claim the office-holder granted on the office's decision form is paid by the staff like any other: from
+        // the decision's own figures, the first payment one period on.
+        if (staff && working) for (const d of book.all("benefit_decision")) {
+          if (taken.has(d.id) || d.speaks_for !== me) continue;
+          taken.add(d.id);
+          const claim = typeof d.data?.claim === "string" ? (book.records.get(d.data.claim) as StatementRecord | undefined) : undefined;
+          if (!claim || !put.has(claim.id) || d.data?.granted !== true || paying.has(claim.id)) continue;
+          const amount = Math.floor(Number(d.data.amount)), every = Math.floor(Number(d.data.every));
+          if (!(amount > 0) || !(every > 0) || typeof claim.data?.account !== "string") continue;
+          const rule = ours.find((r) => r.id === String(claim.data!.payment));
+          paying.set(claim.id, { person: claim.speaks_for!, account: claim.data.account, payment: String(claim.data.payment), from: rule?.account || p.account, amount, every, next: d.at + every, ...(Number.isSafeInteger(d.data.until) ? { until: d.data.until as number } : {}), ...(rule?.lasts?.then ? { then: rule.lasts.then } : {}) });
+        }
+        if (!working) {
+          // (The routine is not ours now: the office-holder's part, or staff with no standing order in force. The
+          // staff say so in their report; nothing is paid, stopped or published.)
+          if (staff) steps.push(...routines.report(book, t, { office: (ctx.position ?? "").replace(/-staff$/, ""), from: "the support office's staff", tasks: { [TASK]: ["days' work", "payments"] } }));
+          return steps;
+        }
         // Stopping: the claimant asked, died or left.
         const gone = new Set([...book.all("death_registration").map((r) => r.data?.deceased as string), ...book.all("departure").map((r) => r.speaks_for!)]);
         for (const r of book.all("benefit_change")) if (r.data?.stop) paying.delete(r.data.claim);
@@ -388,6 +453,7 @@ export const transfers: BehaviourModule = {
           if (x.until !== undefined && (x.next > x.until || t >= x.until)) ended.push([id, x]);
         }
         for (let i = 0; i < due.length; i += 30) steps.push(because(`Paying the support due (${due.length} payments).`, ...due.slice(i, i + 30)));
+        payments += due.length;
         for (const [id, x] of ended) {
           paying.delete(id);
           steps.push(because(`The ${x.payment} payment under claim ${id} has run its time: telling the claimant it has ended.`,
@@ -399,6 +465,14 @@ export const transfers: BehaviourModule = {
           const recipients = Object.fromEntries(ours.map((r) => r.id).sort().map((k) => [k, [...paying.values()].filter((x) => x.payment === k).length]));
           steps.push(because("Publishing this period's figures: how many we pay, of each kind.",
             say("support_statistics", `Support recipients: ${Object.entries(recipients).map(([k, n]) => `${k} ${n}`).join(", ")}.`, { visible: "public", data: { recipients } })));
+        }
+        if (staff) {
+          // The staff's report (docs/behaviour/standing-work.md): what was done under the order, in counts and a sample.
+          routines.did(TASK, t, { units: due.length });
+          routines.note(TASK, `${granted} claim${granted === 1 ? "" : "s"} granted and ${putBefore} put before the office-holder since the last report${lately.length ? ` (granted lately: ${lately.join("; ")})` : ""}; ${paying.size} ${paying.size === 1 ? "person is" : "people are"} being paid`);
+          const report = routines.report(book, t, { office: (ctx.position ?? "").replace(/-staff$/, ""), from: "the support office's staff", tasks: { [TASK]: ["days' work", "payments"] } });
+          if (report.length) { granted = 0; putBefore = 0; payments = 0; lately.length = 0; }
+          steps.push(...report);
         }
         return steps;
       },

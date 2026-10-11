@@ -1,6 +1,6 @@
 {
   "name": "bank.lending",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "doc": "docs/behaviour/credit.md",
   "params": {
     "arrears_days": {
@@ -89,6 +89,10 @@
       "unit": "bps",
       "default": 0,
       "source": "placeholder"
+    },
+    "part": {
+      "schema": {},
+      "source": "the world gives it (no default)"
     },
     "rate_bps": {
       "schema": {

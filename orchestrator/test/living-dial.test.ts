@@ -29,7 +29,11 @@ const TOWN = join(root, "worlds/town.yaml");
 // The state of worlds/town.yaml, seed 1, after 60 days, as origin/main gave it before wants (commit 750bc30, living
 // world step 1; computed there on 2026-10-11). A change that is meant to move what a town without the dial does
 // (a fault fixed in a module every town runs) changes this value, and says so where it is made.
-const STEP_1 = "b88dee151868eda10f39537d92844d236131b0ae13eec037b1037e8be69da177";
+// (2026-10-11: b88dee15... until rent and loan repayments were counted from each agreement's own day, each landlord went through its rent
+// book on its own day of the week, and the mayor's
+// office was given a clerk: docs/decisions.md, "What the second living pilot found". The test holds what it held: a
+// town with no `living`, and one with every dial at 0, are the same town.)
+const STEP_1 = "4d88759c627e0db75f3ce67d989703f47cc316d8dc737dbc57b5c2845247800d";
 
 test("with the dial absent or at 0 a town is step 1's town, to the state hash", async () => {
   const out = mkdtempSync(join(tmpdir(), "oikos-dial-"));

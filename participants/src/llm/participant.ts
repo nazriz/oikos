@@ -603,6 +603,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
   let staffNow: string | undefined;
 
   /** Carry out the next queued action. */
+  const officePosts = new Set<string>(); // the posts it holds, as its reports have named them
   const next = (obs: Observation): ParticipantAction => {
     const q = queue.shift()!;
     current = q.id;
@@ -903,8 +904,16 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
   };
 
   return {
-    async step(obs, ctx) {
+    async step(given, ctx) {
       inCurrency(ctx.world.currency);
+      // An office's books, and its staff's report of their work, are the office's own: another office of the same
+      // organisation is not shown them, and they do not bring it back (docs/behaviour/office-books.md). An organisation's
+      // papers reach every office of it that reads papers of that kind, so those naming another office are left out here.
+      for (const p of given.positions ?? []) officePosts.add(p.position);
+      const anothers = (r: any) => r.record === "statement" && (r.kind === "office_books" || r.kind === "staff_report") && typeof r.data?.office === "string" && officePosts.size > 0 && !officePosts.has(r.data.office);
+      const obs: Observation = Object.values(given.channels).some((ch) => ch.kind === "records" && ch.records.some(anothers))
+        ? { ...given, channels: Object.fromEntries(Object.entries(given.channels).map(([id, ch]) => [id, ch.kind === "records" ? { ...ch, records: ch.records.filter((r) => !anothers(r)) } : ch])) as Observation["channels"] }
+        : given;
       const standing = inWorld(renderStanding(obs, standingIds, c.whoIs));
       // (What stands now, as this report's standing documents show it: nothing, once the last of them is withdrawn. A
       // report that brings none of those documents leaves what's on file as it was.)

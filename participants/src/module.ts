@@ -179,6 +179,19 @@ export interface Answers { office: string; acts: string; forms?: { about: string
   /** The office has a standing report of its own, which it sends in answer to a letter, with these words after it. */
   report?: true }
 
+/**
+ * One thing that stands open on an office's books (docs/behaviour/office-books.md): what it is by its paper's id (the
+ * lease, the application, the invoice), a line in the world's words, and, where they apply, since when and how much.
+ */
+export interface OpenItem { id: string; line: string; since?: number; amount?: number;
+  /** A running figure (what has been paid against the budget so far): its line moves with every payment, and that
+   * alone is no reason for the clerk to file a paper; it is said as it stands whenever one is filed. */
+  running?: true }
+/** A heading of the books: what kind of thing stands open ("Rent in arrears"), each one, the most pressing first. */
+export interface OpenHeading { what: string; items: OpenItem[] }
+/** An office's books as a clerk keeps them: fed what the office is shown, and asked what stands open now. */
+export interface OfficeBooks { absorb(obs: Observation): void; open(t: number): OpenHeading[] }
+
 export interface BehaviourModule {
   /** How its office answers a letter it cannot act on (docs/behaviour/letters.md). An office with a standing report
    * of its own (`Letters`) adds these words to it; any other acknowledges each letter with them (`answering`). */
@@ -198,6 +211,11 @@ export interface BehaviourModule {
   /** The written directions it takes, each on a form its office publishes (docs/behaviour/directions.md). An office
    * follows only what is filed on its form by someone its organisation says may direct it. */
   takes?: Taken[];
+  /** The office's books (docs/behaviour/office-books.md): what stands open at the office, read from its own papers
+   * and accounts exactly as its code reads them, and from nothing else. Where a model holds the office, its clerk (a
+   * post of the office's staff) keeps them and files a paper on the organisation's own file when what stands open has
+   * changed; a code-run office keeps them in its head, as before. */
+  books?(ctx: ParticipantContext): OfficeBooks;
   /** Its own registers, held whole because this is the office that keeps them (the land registry its register, a bank
    * its customers' instructions): never a way to know what someone else keeps, which is asked for (`ask` in
    * behaviour/common.ts). */
