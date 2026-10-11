@@ -1,6 +1,6 @@
 {
   "name": "firm.landlord",
-  "version": "0.16.1",
+  "version": "0.16.2",
   "doc": "docs/behaviour/firms.md",
   "params": {
     "after_term": {
@@ -500,6 +500,640 @@
         ],
         "data": {
           "deceased": "=deceased"
+        }
+      }
+    },
+    {
+      "form": "rent_reminder",
+      "title": "Request to a tenant for rent owed",
+      "does": "Asks a tenant in writing for rent that is owed, with the sum and the account. It ends nothing and moves no money.",
+      "fields": {
+        "tenant": {
+          "type": "entity",
+          "required": true,
+          "description": "The tenant."
+        },
+        "lease": {
+          "type": "record",
+          "required": true,
+          "description": "The lease."
+        },
+        "amount": {
+          "type": "amount",
+          "required": true,
+          "description": "How much is owed."
+        },
+        "account": {
+          "type": "account",
+          "description": "The account it is to be paid into."
+        }
+      },
+      "writes": {
+        "kind": "remedy_request",
+        "text": "Request: the rent for your home is {amount} in arrears. Please pay it.",
+        "basis": "=lease",
+        "to": [
+          "=tenant"
+        ],
+        "visible": [
+          "=self",
+          "=tenant"
+        ],
+        "data": {
+          "matter": "arrears",
+          "against": "=tenant",
+          "about": "=lease",
+          "amount": "#amount",
+          "account": "=account"
+        }
+      }
+    },
+    {
+      "form": "payment_plan_offer",
+      "title": "Offer to a tenant of a plan to pay rent owed",
+      "does": "Offers a tenant behind with the rent a plan: the rent as it falls due, and a sum a month toward what is owed. The tenant answers on the offer whether the household can pay it, and what it could pay. It ends nothing and binds nobody: a plan agreed is kept, or not, by the tenant's payments.",
+      "fields": {
+        "tenant": {
+          "type": "entity",
+          "required": true,
+          "description": "The tenant."
+        },
+        "lease": {
+          "type": "record",
+          "required": true,
+          "description": "The lease."
+        },
+        "owed": {
+          "type": "amount",
+          "required": true,
+          "description": "How much is owed."
+        },
+        "instalment": {
+          "type": "amount",
+          "required": true,
+          "description": "The sum a month toward what is owed, beyond the rent."
+        },
+        "account": {
+          "type": "account",
+          "description": "The account it is to be paid into."
+        }
+      },
+      "writes": {
+        "kind": "plan_offer",
+        "text": "Offer of a plan: pay the rent as it falls due and {instalment} a month toward the {owed} owed under {lease}. Please answer whether you can.",
+        "basis": "=lease",
+        "to": [
+          "=tenant"
+        ],
+        "visible": [
+          "=self",
+          "=tenant"
+        ],
+        "data": {
+          "lease": "=lease",
+          "owed": "#owed",
+          "instalment": "#instalment",
+          "account": "=account"
+        }
+      }
+    },
+    {
+      "form": "arrears_application",
+      "title": "Application for an order that a tenant pay rent owed",
+      "does": "Applies to a body that says it hears rent in arrears (its notice of what it hears, and what applying costs, is public) for an order that the tenant pay. The body tells the tenant, gives them time to answer and decides. A fee, where the body has one, is paid with it, by a payment. It ends no tenancy.",
+      "fields": {
+        "venue": {
+          "type": "entity",
+          "required": true,
+          "description": "The body applied to."
+        },
+        "hearing": {
+          "type": "record",
+          "description": "Its notice of what it hears."
+        },
+        "tenant": {
+          "type": "entity",
+          "required": true,
+          "description": "The tenant."
+        },
+        "lease": {
+          "type": "record",
+          "required": true,
+          "description": "The lease."
+        },
+        "amount": {
+          "type": "amount",
+          "required": true,
+          "description": "How much is owed."
+        },
+        "account": {
+          "type": "account",
+          "required": true,
+          "description": "The account it is to be paid into."
+        }
+      },
+      "writes": {
+        "kind": "tribunal_application",
+        "text": "Application: {tenant} owes us {amount} in rent under {lease}.",
+        "basis": "=hearing",
+        "to": [
+          "=venue"
+        ],
+        "visible": [
+          "=self",
+          "=venue",
+          "=tenant"
+        ],
+        "data": {
+          "kind": "arrears",
+          "matter": "arrears",
+          "against": "=tenant",
+          "about": "=lease",
+          "amount": "#amount",
+          "account": "=account",
+          "evidence": {
+            "id": "=lease",
+            "record": "agreement"
+          }
+        }
+      }
+    },
+    {
+      "form": "notice_to_vacate",
+      "title": "Notice to a tenant to vacate for rent owed",
+      "does": "Gives a tenant written notice to leave the home by a day, for rent owed. It ends nothing by itself and puts nobody out: if the rent owed is paid before the day the notice is spent (withdraw it); if the tenant is still there after the day, the landlord may apply to the tribunal for possession. How long rent must have been owed before it may be given, and how many days it must run, are in the law on possession. A notice is given when it is on the record, addressed to the tenant: that is how papers are served here.",
+      "fields": {
+        "tenant": {
+          "type": "entity",
+          "required": true,
+          "description": "The tenant."
+        },
+        "lease": {
+          "type": "record",
+          "required": true,
+          "description": "The lease."
+        },
+        "arrears": {
+          "type": "amount",
+          "required": true,
+          "description": "The rent owed."
+        },
+        "by": {
+          "type": "date",
+          "required": true,
+          "description": "The day the tenant is to leave by."
+        },
+        "law": {
+          "type": "record",
+          "description": "The law the notice is given under."
+        }
+      },
+      "writes": {
+        "kind": "notice_to_vacate",
+        "text": "Notice to vacate: the rent under {lease} is {arrears} in arrears. You are to leave the home by {by}. If the arrears are paid before then, this notice lapses. If you are still there after it, we may apply to the tribunal for possession.",
+        "basis": "=lease",
+        "to": [
+          "=tenant"
+        ],
+        "visible": [
+          "=self",
+          "=tenant"
+        ],
+        "data": {
+          "lease": "=lease",
+          "reason": "arrears",
+          "arrears": "#arrears",
+          "by": "=by",
+          "law": "=law"
+        }
+      }
+    },
+    {
+      "form": "possession_application",
+      "title": "Application to the tribunal for possession of a let home",
+      "does": "Applies to the tribunal for possession of a home whose tenant is behind with the rent and has not left on a notice to vacate that has run out. It states the lease, the rent, what is owed, the home and who lives there by the lease, and the notice relied on: which paper, the day it was given and the day it gave. The tribunal tells the tenant, who may answer, and decides: a plan to pay, possession on a day, or dismissal. The tribunal's fee, where it has one, is paid with it, by a payment. It ends no tenancy and puts nobody out.",
+      "fields": {
+        "tenant": {
+          "type": "entity",
+          "required": true,
+          "description": "The tenant."
+        },
+        "lease": {
+          "type": "record",
+          "required": true,
+          "description": "The lease."
+        },
+        "owed": {
+          "type": "amount",
+          "required": true,
+          "description": "The rent owed."
+        },
+        "rent": {
+          "type": "amount",
+          "description": "The rent a month."
+        },
+        "account": {
+          "type": "account",
+          "description": "The account rent is paid into."
+        },
+        "home": {
+          "type": "space",
+          "description": "The home."
+        },
+        "building": {
+          "type": "structure",
+          "description": "The building it is in."
+        },
+        "household": {
+          "type": "list",
+          "description": "Who lives there by the lease: the tenant first."
+        },
+        "notice": {
+          "type": "record",
+          "description": "The notice to vacate relied on."
+        },
+        "notice_given": {
+          "type": "date",
+          "description": "The day that notice was given."
+        },
+        "notice_by": {
+          "type": "date",
+          "description": "The day that notice gave to leave by."
+        },
+        "plan_broken": {
+          "type": "choice",
+          "options": [
+            "yes",
+            "no"
+          ],
+          "description": "Yes, where the tribunal set a plan to pay and it has not been kept."
+        }
+      },
+      "writes": {
+        "sends": [
+          {
+            "to": [
+              "@tribunal"
+            ],
+            "why": "The tribunal hears applications for possession."
+          }
+        ],
+        "kind": "tribunal_application",
+        "text": "Application for possession: {tenant} is {owed} behind with the rent under {lease} and has not left on our notice to vacate.",
+        "basis": "=lease",
+        "to": [
+          "@tribunal"
+        ],
+        "visible": [
+          "=self",
+          "@tribunal",
+          "=tenant"
+        ],
+        "data": {
+          "kind": "possession",
+          "matter": "possession",
+          "against": "=tenant",
+          "about": "=lease",
+          "amount": "#owed",
+          "rent": "#rent",
+          "account": "=account",
+          "breach": "?plan_broken",
+          "space": "=home",
+          "structure": "=building",
+          "household": "=household",
+          "notice": "=notice",
+          "notice_given": "=notice_given",
+          "notice_by": "=notice_by",
+          "evidence": {
+            "id": "=lease",
+            "record": "agreement"
+          }
+        }
+      }
+    },
+    {
+      "form": "warrant_request",
+      "title": "Request to the tribunal's registrar for a warrant of possession",
+      "does": "Asks the tribunal's registrar for a warrant on an order for possession whose day has passed with the tenant still there. The registrar issues it to whoever carries the tribunal's warrants out; the landlord puts nobody out. The fee, where there is one, is paid with it, by a payment. A warrant not carried out by its last day lapses, and another is asked for.",
+      "fields": {
+        "order": {
+          "type": "record",
+          "required": true,
+          "description": "The tribunal's order for possession."
+        }
+      },
+      "writes": {
+        "sends": [
+          {
+            "to": [
+              "@tribunal"
+            ],
+            "why": "The tribunal's registrar issues its warrants."
+          }
+        ],
+        "kind": "warrant_request",
+        "text": "Request for a warrant of possession under order {order}: the tenant has not left.",
+        "basis": "=order",
+        "to": [
+          "@tribunal"
+        ],
+        "visible": [
+          "=self",
+          "@tribunal"
+        ],
+        "data": {
+          "order": "=order"
+        }
+      }
+    },
+    {
+      "form": "repair_order",
+      "title": "Order to the builder for a repair, paid with the order",
+      "does": "Orders the repair of a building of the landlord's from the builder, who does it when its price has come into the builder's account: the price is paid with the order, by a payment. The builder says when it is done, or that it cannot be.",
+      "fields": {
+        "building": {
+          "type": "structure",
+          "required": true,
+          "description": "The building to repair."
+        },
+        "units": {
+          "type": "count",
+          "required": true,
+          "description": "How many units of repair work."
+        },
+        "account": {
+          "type": "account",
+          "required": true,
+          "description": "The account the price is paid from."
+        }
+      },
+      "writes": {
+        "sends": [
+          {
+            "to": [
+              "@builder"
+            ],
+            "why": "The builder does the repair."
+          }
+        ],
+        "kind": "repair_order",
+        "text": "Order: the repair of {building} ({units} units of work), paid with this order.",
+        "to": [
+          "@builder"
+        ],
+        "visible": [
+          "=self",
+          "@builder"
+        ],
+        "data": {
+          "structure": "=building",
+          "units": "=units",
+          "account": "=account"
+        }
+      }
+    },
+    {
+      "form": "variation_answer",
+      "title": "Answer to a tenant's request to vary a tenancy",
+      "does": "Answers a tenant who has asked in writing to vary something of the tenancy (to stay on, for time): yes or no. It changes no lease by itself: what is agreed is then done (a new lease offered, a notice withdrawn).",
+      "fields": {
+        "request": {
+          "type": "record",
+          "required": true,
+          "description": "The request answered."
+        },
+        "tenant": {
+          "type": "entity",
+          "required": true,
+          "description": "The tenant."
+        },
+        "about": {
+          "type": "text",
+          "required": true,
+          "description": "What was asked, as the request names it."
+        },
+        "granted": {
+          "type": "choice",
+          "required": true,
+          "options": [
+            "yes",
+            "no"
+          ],
+          "description": "Whether it is agreed."
+        }
+      },
+      "writes": {
+        "kind": "variation_answer",
+        "text": "Answer to your request {request}: {granted}.",
+        "basis": "=request",
+        "to": [
+          "=tenant"
+        ],
+        "visible": [
+          "=self",
+          "=tenant"
+        ],
+        "data": {
+          "about": "=about",
+          "granted": "?granted"
+        }
+      }
+    },
+    {
+      "form": "remedy_answer",
+      "title": "Answer to a request to put something right",
+      "does": "Answers someone who has asked the office in writing to put something right: yes or no, and where money is owed them and paid, how much. It does nothing by itself: what puts the thing right (a payment, a repair ordered, a paper withdrawn) is done besides.",
+      "fields": {
+        "request": {
+          "type": "record",
+          "required": true,
+          "description": "The request answered."
+        },
+        "to": {
+          "type": "entity",
+          "required": true,
+          "description": "Who asked."
+        },
+        "matter": {
+          "type": "text",
+          "required": true,
+          "description": "What it is about, in the word the request uses."
+        },
+        "granted": {
+          "type": "choice",
+          "required": true,
+          "options": [
+            "yes",
+            "no"
+          ],
+          "description": "Whether it will be put right."
+        },
+        "amount": {
+          "type": "amount",
+          "description": "Where money is owed them and paid: how much."
+        },
+        "reason": {
+          "type": "text",
+          "description": "Where it is refused: why."
+        }
+      },
+      "writes": {
+        "kind": "remedy_answer",
+        "text": "Answer to your request {request}: {granted}.",
+        "basis": "=request",
+        "to": [
+          "=to"
+        ],
+        "visible": [
+          "=to",
+          "=self"
+        ],
+        "data": {
+          "request": "=request",
+          "matter": "=matter",
+          "granted": "?granted",
+          "amount": "#amount",
+          "reason": "=reason"
+        }
+      }
+    },
+    {
+      "form": "complaint_answer",
+      "title": "Answer to a desk's notice of an application against the office",
+      "does": "Answers a body that has told the office of an application against it, from the office's own books: what they show is owed, whether the thing is done, whether the paper complained of was wrong. The body decides on it when the time to answer has run; with no answer it decides in default.",
+      "fields": {
+        "application": {
+          "type": "record",
+          "required": true,
+          "description": "The application answered."
+        },
+        "venue": {
+          "type": "entity",
+          "required": true,
+          "description": "The body that sent the notice."
+        },
+        "applicant": {
+          "type": "entity",
+          "description": "Who applied."
+        },
+        "known": {
+          "type": "choice",
+          "required": true,
+          "options": [
+            "yes",
+            "no"
+          ],
+          "description": "Whether the office's books say anything of it."
+        },
+        "owed": {
+          "type": "amount",
+          "description": "What the books show is owed the applicant (nought: nothing)."
+        },
+        "done": {
+          "type": "choice",
+          "options": [
+            "yes",
+            "no"
+          ],
+          "description": "For a thing to be put right: whether it is done."
+        },
+        "wrong": {
+          "type": "choice",
+          "options": [
+            "yes",
+            "no"
+          ],
+          "description": "For a paper complained of: whether it was wrong."
+        }
+      },
+      "writes": {
+        "kind": "complaint_response",
+        "text": "Answer on {application}.",
+        "basis": "=application",
+        "to": [
+          "=venue"
+        ],
+        "visible": [
+          "=venue",
+          "=self",
+          "=applicant"
+        ],
+        "data": {
+          "application": "=application",
+          "owed": "#owed",
+          "done": "?done",
+          "wrong": "?wrong",
+          "known": "?known"
+        }
+      }
+    },
+    {
+      "form": "tribunal_answer",
+      "title": "Answer to the tribunal's notice of an application against the office",
+      "does": "Answers a body that has told the office of an application against it, from the office's own books: what they show is owed, whether the thing is done, whether the paper complained of was wrong. The body decides on it when the time to answer has run; with no answer it decides in default.",
+      "fields": {
+        "application": {
+          "type": "record",
+          "required": true,
+          "description": "The application answered."
+        },
+        "venue": {
+          "type": "entity",
+          "required": true,
+          "description": "The body that sent the notice."
+        },
+        "applicant": {
+          "type": "entity",
+          "description": "Who applied."
+        },
+        "known": {
+          "type": "choice",
+          "required": true,
+          "options": [
+            "yes",
+            "no"
+          ],
+          "description": "Whether the office's books say anything of it."
+        },
+        "owed": {
+          "type": "amount",
+          "description": "What the books show is owed the applicant (nought: nothing)."
+        },
+        "done": {
+          "type": "choice",
+          "options": [
+            "yes",
+            "no"
+          ],
+          "description": "For a thing to be put right: whether it is done."
+        },
+        "wrong": {
+          "type": "choice",
+          "options": [
+            "yes",
+            "no"
+          ],
+          "description": "For a paper complained of: whether it was wrong."
+        }
+      },
+      "writes": {
+        "kind": "tribunal_response",
+        "text": "Answer on {application}.",
+        "basis": "=application",
+        "to": [
+          "=venue"
+        ],
+        "visible": [
+          "=venue",
+          "=self",
+          "=applicant"
+        ],
+        "data": {
+          "application": "=application",
+          "owed": "#owed",
+          "done": "?done",
+          "wrong": "?wrong",
+          "known": "?known"
         }
       }
     }

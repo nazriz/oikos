@@ -29,7 +29,7 @@ process id you started.
 | `bun test <file>` by hand, from the repo's root | one for the process (`scripts/slots-preload.ts`, in `bunfig.toml`) |
 | `oikos run` | one for each run under way (`--parallel P`: up to P, fewer while the machine is busy). A run that asks a model takes none: it waits for answers, not for a core |
 | `bun run kernel` | half the cores |
-| anything else heavy | `bun scripts/slots.ts [--weight K] -- <command...>` |
+| anything else heavy | `bun scripts/slots.ts [--weight K] -- <command...>` (K a whole number of tokens, or `half`; anything else is refused at once, with the weights there are) |
 
 - `bun scripts/slots.ts status` lists who holds tokens (pid, how long, what, where) and who waits.
 - A job that waits says so once a minute (`slots: waiting 61 s so far for 1 of 12 ...`). Waiting costs time and nothing

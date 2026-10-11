@@ -78,6 +78,18 @@ notes of a payment or a hold), is not a question and is not answered (`officeNot
 **Not covered:** shops, factories and landlords (a firm's manager is not an office anyone petitions; a letter to
 one is still unanswered), and people.
 
+## A letter to a person (2026-10-12; citizen 0.50.0)
+
+**Source:** the inbox in `citizen.ts`; the generator's `practice-<organisation>-letters`. Decision: docs/decisions.md, "What the third living pilot found", 7.
+
+In the third living pilot the seats wrote 57 letters, 30 of them to people: reminders of rent owed, notices to vacate, requests to answer a tribunal within seven days, answers to complainants. None had a reply. A person run by code cannot read words, and must not pretend to.
+
+- **A letter from an office in its own words is read and kept.** It is on the person's record that the office wrote: the outcome `letter: received` (who, how many characters, about what paper if the letter names one) and the reason `office_wrote`. Nothing is done on it, nothing is answered, and nothing of the person's trust, feelings or wants moves: what the letter says is not known to the code.
+- **What a person acts on is a paper of a set kind**, from a seat as from code: a request for rent owed, an offer of a plan (answered), a notice to vacate, a notice of hearing (answered), an order, a decision. Of the pilot's 57 letters 36 were such papers, which the offices' forms now write (docs/behaviour/office-papers.md, "Act by act"); 12 were the tribunal asking landlords for a proof the law does not ask; 9 were free.
+- **The sender is told once, on its own file:** every seated office has a short procedure saying what becomes of a letter to a person, that no reply is the ordinary case and says nothing of whether it was read, and that an answer comes on a paper of its own.
+
+**Not built: reading.** What a letter's words mean to the person who gets it (a kind word, a threat, a question) is a candidate use for a model, and is the owner's decision.
+
 ## Leaves out
 
 - Reading the letter. An office that could tell a question about a payment from a request for a direction would

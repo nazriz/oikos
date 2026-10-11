@@ -57,6 +57,16 @@ In a town where things go wrong the tribunal also hears, on the same forms: a ho
 
 **Leaves out.** Staying with those one is tied to. An order to pay the arrears with the possession order (the landlord's own application for the money is the other list). Possession for anything but arrears (the end of a fixed term, sale, damage: a landlord's ordinary notice still ends a lease as before). A tenant's defence (the notice was wrong, the home was in disrepair), an adjournment, a hearing the tenant does not attend counted apart. Hardship stays. The bond. A landlord who changes the locks (unlawful, and real). Distress for rent. Costs. A bailiff or sheriff as an office of its own (the police stand for whoever enforces).
 
+## The registry lists; the member decides (2026-10-12; tribunal.member 0.5.0)
+
+**Source:** `tribunal.ts` (`routines`, `part`); `Hearings` in `desk.ts` (the parts `list` and `decide`); the generator's staff post and standing order; `orchestrator/test/seat-acts.test.ts`. Decision: docs/decisions.md, "What the third living pilot found".
+
+A tribunal run by code does everything in one head. With a model in the member's chair, in a living town, the tribunal has registry staff (`tribunal-member-staff`, run by the tribunal's own code): under a standing work order in force when the year begins they take each application in, list it, and tell both sides with the day the other side may answer by. They decide nothing. The member decides every case on or after its day: an application for possession on the possession order form (dismissed, a plan, possession on a day), anything else on the order form. The member's books list each case with whether the other side answered and with what. A case is put off by a fresh notice of hearing with a later day. If the member holds or withdraws the standing order, nothing is listed until it is made again. In a town with no `living` there is no registry, and the member lists on the notice of hearing form.
+
+What the code member decides is unchanged (the table above); a seat decides for itself. What the law asks before an order is on the member's file (`proc-tribunal-member-possession`), from the profile's figures: rent owed for the law's days when the notice was given; the notice's days run; the tenant still there. An application names the notice it relies on, the day it was given and the day it gave. **A notice is given when it is on the record addressed to the tenant**: the world has no other way of serving a paper, and the procedure says the law asks no further proof. (The third living pilot's member asked every landlord for "proof of delivery", which nothing here could give.)
+
+**Real-world basis.** A tribunal's registry receives and lists applications and sends notices of hearing; members hear and decide. (To confirm: common practice; VCAT's and the First-tier Tribunal's published procedures not opened.) A landlord offering a plan before a claim: England's Pre-Action Protocol for Possession Claims by Social Landlords asks for it (to confirm; not opened; used only as the reason the form exists).
+
 ## The parties
 
 - **Tenants** (citizen 0.26.0): given a notice of rent increase that breaks the law as they read it, they take it to the

@@ -216,7 +216,7 @@ export const energy: BehaviourModule = {
     { task: "bill", at: "depot", every: ["bill_every_days", 30], what: "Each customer is sent a bill for the supply charge and what they used; one who has gone, their last. How often the bills go out is the order's." },
   ],
   // (What it buys in, it orders on its own order form: its staff's orders to the grid are that paper.)
-  issues: [P.ORDER],
+  issues: [P.ORDER, P.REMEDY_ANSWER, ...P.VENUE_ANSWERS],
   version: "0.3.0", // 0.3.0: some bills are wrong (an estimated reading entered too high), at the friction dial, and the retailer answers a customer who asks for a wrong bill to be put right from its own record of the bill; 0.2.1: its staff's first bills fall due one period after the standing order came into force; 0.2.0: has an order form of its own for buying from the grid; its staff report what they supplied and billed, and why they did not buy when stock ran low (docs/behaviour/standing-work.md, "The staff's report")
   doc: "docs/behaviour/utilities.md",
   cadence: () => DAY,

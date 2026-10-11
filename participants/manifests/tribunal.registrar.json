@@ -106,6 +106,119 @@
           "claim": "=claim"
         }
       }
+    },
+    {
+      "form": "warrant",
+      "title": "Warrant of possession",
+      "does": "Issued on a landlord's request, on an order of the tribunal for possession whose day has passed with the tenant still there: it names the home, the tenant and the household, and the days between which it is to be carried out. It goes to whoever carries the tribunal's warrants out, and the tenant and the landlord see it. It moves nobody by itself: someone must go, and a warrant not carried out by its last day lapses. How much notice of the day the tenant must have, and how long a warrant runs, are in the law on possession.",
+      "fields": {
+        "order": {
+          "type": "record",
+          "required": true,
+          "description": "The tribunal's order for possession."
+        },
+        "lease": {
+          "type": "record",
+          "required": true,
+          "description": "The lease."
+        },
+        "tenant": {
+          "type": "entity",
+          "required": true,
+          "description": "The tenant."
+        },
+        "landlord": {
+          "type": "entity",
+          "required": true,
+          "description": "The landlord."
+        },
+        "home": {
+          "type": "space",
+          "required": true,
+          "description": "The home."
+        },
+        "building": {
+          "type": "structure",
+          "description": "The building it is in."
+        },
+        "household": {
+          "type": "list",
+          "required": true,
+          "description": "Who is to be removed: the tenant and those living there by the lease."
+        },
+        "not_before": {
+          "type": "date",
+          "required": true,
+          "description": "The first day it may be carried out (after the notice of the day the law gives the tenant)."
+        },
+        "until": {
+          "type": "date",
+          "required": true,
+          "description": "Its last day: after it, it has lapsed."
+        }
+      },
+      "writes": {
+        "sends": [
+          {
+            "to": [
+              "@enforcer"
+            ],
+            "why": "They carry the tribunal's warrants out: nobody else may."
+          }
+        ],
+        "kind": "warrant",
+        "text": "Warrant of possession under order {order}: {tenant} and their household are to be removed from {home}, and possession given to {landlord}. To be carried out no sooner than {not_before} and by {until}.",
+        "basis": "=order",
+        "to": [
+          "@enforcer"
+        ],
+        "visible": [
+          "@enforcer",
+          "=self",
+          "=tenant",
+          "=landlord"
+        ],
+        "data": {
+          "order": "=order",
+          "lease": "=lease",
+          "tenant": "=tenant",
+          "landlord": "=landlord",
+          "space": "=home",
+          "structure": "=building",
+          "household": "=household",
+          "not_before": "=not_before",
+          "until": "=until"
+        }
+      }
+    },
+    {
+      "form": "enforcement_decline",
+      "title": "A request to enforce, declined",
+      "does": "Tells whoever asked for an order to be enforced, or for a warrant, that it is declined: there is no such order to them to enforce. It does nothing else.",
+      "fields": {
+        "request": {
+          "type": "record",
+          "required": true,
+          "description": "The request declined."
+        },
+        "to": {
+          "type": "entity",
+          "required": true,
+          "description": "Who asked."
+        }
+      },
+      "writes": {
+        "kind": "enforcement_decline",
+        "text": "Declined: no such order to you to enforce (request {request}).",
+        "basis": "=request",
+        "to": [
+          "=to"
+        ],
+        "visible": [
+          "=to",
+          "=self"
+        ]
+      }
     }
   ]
 }

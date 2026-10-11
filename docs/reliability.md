@@ -52,6 +52,16 @@ This runs the world again from the log's own config: not the world file, which m
 
 `--modules FILE` (for `run` and `resume`) loads behaviour modules from a file exporting `modules: { [name]: BehaviourModule }`, which worlds then name in a controller's `impl`. The reliability tests use it for modules that hang or throw on purpose (`orchestrator/test/fixtures/faulty-modules.ts`).
 
+## Draws and the order papers were filed in (2026-10-12)
+
+A participant's random stream is keyed on the seed, the participant, the capacity it acts in, the hour, and a purpose it names. A record made in a run is numbered in the order every record of the town was made, so a purpose that names a record's number makes the draw depend on how many papers anyone had filed before. One more paper from a seat then changes draws all over the town, and a pilot parts from its twin by nothing its steward did.
+
+- The run (`stablePurpose`, `orchestrator/src/run.ts`) writes a record's number in a purpose as "the nth such paper this participant has drawn on for this purpose". Nothing in a module needs to know.
+- Where it matters most a module names the draw for who and what (`Occurrences`, `participants/src/behaviour/common.ts`): who asked, the matter, the lease or building, and which time that is for the pair.
+- **When writing a draw:** name it for the entity deciding, who or what it is about, the kind of thing, and its occurrence; never for an id the world handed out in filing order. A draw named for the moment (`${t}`) holds only while that moment is the same in both towns.
+- `orchestrator/test/twin-draws.test.ts` holds it: a town with an office filing two papers of no effect a day is, apart from those papers, the same town to the word.
+- **Not covered:** a seat's acts land at other moments than its code twin's, and draws people make are named for the moment. Two towns that truly differ go on to differ by chance. Compare a pilot with its twin in totals against the spread between runs, and case by case only among those the seats did not deal with, in runs made at or after this change.
+
 ## Limits (as of 2026-09-28)
 
 - **A hang stops the whole run**, not only the module that hung. That's consistent with the split: a hang is a timing failure. Isolating each module in its own thread, so one could be stopped alone, isn't built.

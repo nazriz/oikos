@@ -700,6 +700,27 @@ export function noted(book: Book, action: ParticipantAction): ParticipantAction 
   return action;
 }
 
+/**
+ * What a draw about a paper is named for (docs/reliability.md, "Draws and the order papers were filed in"): who it
+ * is from, what it concerns, and which time this is for that pair ("the second request from this tenant about this
+ * building"), never the paper's number in the world's file, which moves with every paper anyone files. The same
+ * paper is always the same occurrence. Names that are themselves a record's number in the file are left out.
+ */
+export class Occurrences {
+  private readonly count = new Map<string, number>();
+  private readonly of = new Map<string, string>();
+  key(paper: string, ...about: (string | undefined)[]): string {
+    const had = this.of.get(paper);
+    if (had) return had;
+    const base = about.map((x) => (x === undefined || /^rec\.[0-9]+$/.test(x) ? "" : x)).join("/");
+    const n = (this.count.get(base) ?? 0) + 1;
+    this.count.set(base, n);
+    const k = `${base}#${n}`;
+    this.of.set(paper, k);
+    return k;
+  }
+}
+
 /** A controller whose every action is `noted`: for a module that weighs acts against the laws in its book. */
 export function noting<T extends { step(obs: Observation, ...rest: any[]): ParticipantAction }>(book: Book, controller: T): T {
   const step = controller.step.bind(controller);

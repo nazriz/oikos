@@ -453,6 +453,73 @@
           "members": "=members"
         }
       }
+    },
+    {
+      "form": "ballot_result",
+      "title": "Result of a ballot of members on industrial action",
+      "does": "Declares the result of a ballot of members on industrial action, to the employer and the members: how many could vote, how many did, how many said yes, and whether it is approved. Action may be notified only on a ballot that meets what the law on industrial action asks.",
+      "fields": {
+        "ballot": {
+          "type": "record",
+          "description": "The ballot."
+        },
+        "employer": {
+          "type": "entity",
+          "required": true,
+          "description": "The employer."
+        },
+        "members": {
+          "type": "list",
+          "required": true,
+          "description": "The members balloted."
+        },
+        "eligible": {
+          "type": "count",
+          "required": true,
+          "description": "How many could vote."
+        },
+        "voted": {
+          "type": "count",
+          "required": true,
+          "description": "How many voted."
+        },
+        "yes": {
+          "type": "count",
+          "required": true,
+          "description": "How many voted yes."
+        },
+        "passed": {
+          "type": "choice",
+          "required": true,
+          "options": [
+            "yes",
+            "no"
+          ],
+          "description": "Whether it is approved."
+        }
+      },
+      "writes": {
+        "kind": "ballot_result",
+        "text": "Protected action ballot at {employer}: {voted} of {eligible} members voted, {yes} yes; approved {passed}.",
+        "basis": "=ballot",
+        "to": [
+          "=employer",
+          "=members"
+        ],
+        "visible": [
+          "=self",
+          "=employer",
+          "=members"
+        ],
+        "data": {
+          "employer": "=employer",
+          "ballot": "=ballot",
+          "voted": "=voted",
+          "yes": "=yes",
+          "eligible": "=eligible",
+          "passed": "?passed"
+        }
+      }
     }
   ]
 }

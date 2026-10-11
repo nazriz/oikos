@@ -1290,7 +1290,7 @@
           "type": "string"
         },
         "domain": {
-          "description": "The area of life, as decisions name it (shop, job, home, practice, membership, goal, venture, petition); `belief` for what the citizen holds.",
+          "description": "The area of life, as decisions name it (shop, job, home, practice, membership, goal, venture, petition); `belief` for what the citizen holds; `friction` for something gone wrong heard of; `letter` for a letter an office wrote the citizen in its own words (kind `received`: read and kept, nothing done on it).",
           "type": "string"
         },
         "option": {

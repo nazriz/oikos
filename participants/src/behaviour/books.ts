@@ -22,6 +22,8 @@ import { because, callAction, DAY, say } from "./common";
 /** The kind of the paper a clerk files (a statement on the organisation's own file). */
 export const BOOKS = "office_books";
 /** The most entries of a heading a paper's words name (the rest are in its list), and the most its list holds. */
+/** How old the clerk's last paper may be before a running figure that has moved is filed for its own sake (days). */
+export const RUNNING_EVERY_DAYS = 7;
 const NAMED = 4;
 const LISTED = 200;
 
@@ -70,7 +72,12 @@ export class Clerk {
     const day = Math.floor(t / DAY);
     if (!this.last && !open.length) return undefined;
     const paper = booksPaper(this.office, t, open, this.last?.open);
-    if (this.last && (this.last.key === paper.key || this.last.day === day)) return undefined;
+    // (A figure that moves with every payment is no reason for a paper each time it moves; but it is not left to
+    // stand for months either: where one has moved and the last paper is a week old, a paper is filed. Until
+    // 2026-10-12 it was said only when something else changed, and finance's "tax withheld and not yet paid over"
+    // stood at its day-9 figure until day 93 of the third living pilot.)
+    const moved = !!this.last && day - this.last.day >= RUNNING_EVERY_DAYS && open.some((h) => h.items.some((x) => x.running && this.last!.open.get(h.what)?.get(x.id) !== x.line));
+    if (this.last && ((this.last.key === paper.key && !moved) || this.last.day === day)) return undefined;
     this.last = { key: paper.key, day, open: new Map(open.map((h) => [h.what, new Map(h.items.map((x) => [x.id, x.line]))])) };
     return callAction(because("What stands open on the office's books has changed: filing it for whoever holds the office.", say(BOOKS, paper.text, { to: [this.me], visible: [this.me], data: paper.data })));
   }
@@ -98,7 +105,7 @@ export const keepers = new Map<string, BehaviourModule>();
  */
 export const clerk: BehaviourModule = {
   name: "office.clerk",
-  version: "0.1.0", // 0.1.0: keeps the books of an office a model holds, and files what has changed
+  version: "0.1.1", // 0.1.1: a running figure that has moved is filed once the last paper is a week old; 0.1.0: keeps the books of an office a model holds, and files what has changed
   doc: "docs/behaviour/office-books.md",
   cadence: () => DAY,
   firstWake: (ctx) => 6 * 3_600 + ctx.rng("first-wake").below(3 * 3_600),

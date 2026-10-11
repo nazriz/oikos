@@ -157,6 +157,49 @@ no order. The form says so, and so does the world market when written to.
 Not made, and why: a builder's invoice and price list, the utilities' bills, the rates notice, the fund's pension run
 (offices the wave does not seat; the bills are the bulk gap, docs/behaviour/standing-work.md).
 
+## Act by act: what the code does, and how a seat does the same (2026-10-12)
+
+**Source:** `participants/src/behaviour/papers.ts`; `opens` on a module; the generator's `proc-<office>-possession` and `practice-<organisation>-letters`; `orchestrator/test/seat-acts.test.ts`. Decision: docs/decisions.md, "What the third living pilot found".
+
+The table above was written when the forms were. The third living pilot showed what it missed: its tribunal member decided none of 54 applications for want of a form to decide them on, and its landlord wrote letters where code gives notices. The audit behind this table: the pilot's own town for 120 days with 21 offices in mock seats, and each module read. A mock seat's brain is the office's code, and the mock says each typed paper on the office's form where one writes it to the letter; what stays off a form is what a model could not have done.
+
+| Office | Act the code takes | A seat takes it by |
+|---|---|---|
+| Landlord | asks for rent owed | form `rent_reminder` (new) |
+| | offers a plan to pay (no code landlord does) | form `payment_plan_offer` (new); the tenant answers with what the household could pay |
+| | applies for an order to pay | form `arrears_application` (new), to a tribunal; the fee by a payment |
+| | gives notice to vacate; withdraws it when paid | form `notice_to_vacate` (new); withdrawing a paper (existing call) |
+| | applies for possession | form `possession_application` (new), naming the notice relied on; the fee by a payment |
+| | asks for a warrant | form `warrant_request` (new) |
+| | ends the tenancy on the record | notice on the lease (existing call) |
+| | orders a repair | form `repair_order` (new); the price by a payment |
+| | answers a request to put right, a body's notice, a request to vary | forms `remedy_answer`, `complaint_answer`, `tribunal_answer`, `variation_answer` (new) |
+| | lists a home, raises a rent, reports rent, notifies a death, lets, pays | as before |
+| Tribunal member | says what it hears | on file when the seat arrives (`notice-tribunal-member-hearing`) |
+| | lists a case and tells both sides | its registry staff, under a standing order (a living town); or form `hearing_notice` (lists) or `hearing_listing` (a rent increase, a debt, a charge), both new |
+| | puts a case off | a fresh `hearing_notice` with a later day |
+| | orders a plan, possession on a day, or dismisses | form `possession_order` (new) |
+| | orders on its other lists and its three older ones | form `tribunal_order` (widened: the matter, binding, the lease or building, to put right by a day, rejected) |
+| Registrar | orders a bank to pay; issues a warrant; declines | forms `garnishee_order`, `warrant` (new), `enforcement_decline` (new) |
+| Finance | pays, sets up wages | as before |
+| | reports tax withheld | form `withholding_return` (new), in totals; its books count from the last return |
+| Mayor | answers a petition | form `petition_response` (new); the rest as before |
+| Support office | answers a request to review, a body's notice | forms `remedy_answer`, `complaint_answer`, `tribunal_answer` (new) |
+| Desks | tell the other side; decide | forms `complaint_notice`, `venue_decision`, widened to carry the paper, the sum and the building the application names; `binding` is yes or no |
+| | say what they hear | on file when the seat arrives |
+| Union | declares a ballot's result | form `ballot_result` (new); what it takes up is on file when the seat arrives |
+| Bank, lending | writes to a borrower behind; declares default | forms `loan_arrears`, `loan_default` (new) |
+| Police | says a warrant is carried out, or lapsed; closes an investigation | forms `warrant_executed`, `warrant_lapsed`, `investigation_closed` (new). Putting someone out is an existing call |
+| Works, planning, council clerk, registry, inspector, environment | | as in the table above: nothing found missing |
+
+**On file at the start.** A body that hears grievances says what it hears in a public notice, with what applying costs: whoever has a matter finds it by that. The office's code publishes it at its first look. Where a model holds the office the world opens with it published (`opens` on the module), as it opens with the office's standing work orders in force.
+
+**The procedure says what the law asks, never what to decide.** Where the place has a law on possession, a landlord's seat, the tribunal member's and the registrar's each have on their own file the steps the law has, the office's form for each, and what the law asks before each, from the profile's figures. It says a notice to vacate is given when it is on the record addressed to the tenant, and that the law asks no further proof. Each form's own line says what issuing it does and does not do.
+
+**Still in words, or not possible** (a mock seat still makes these as plain statements; `OFF_FORM` in the test): a dividend's one instruction listing every payment (a seat pays each holder); a return of tax withheld with a line for each charge (the seat's form gives totals); a lender's terms and a union's offer of membership, published once; a survey report by species; a budget carried as data. And docs/design/call-language-gaps.md, D.
+
+**What it costs a seat.** A landlord's office now has fifteen forms on file where it had four, each with a line of a few sentences: several thousand characters more in what stands in its prompt. Finance, which had no form, now has one and with it a folder of forms, which holds the town's public forms too: its largest prompt in the test town went from 40,505 characters to 49,371 (`orchestrator/test/seat-sight.test.ts`). If that cost shows in a pilot, the folder should hold the office's own forms only, which the world's channels cannot yet say.
+
 ## Pilot 12's sixteen requests, each as a program
 
 The works manager's fourteen were one thing in fourteen wordings; the registrar's two were one thing each.

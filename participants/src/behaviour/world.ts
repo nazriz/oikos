@@ -6,7 +6,7 @@ import * as C from "../calls";
 import { channels, type LookRequest, type ParticipantAction, type StatementRecord } from "../contracts";
 import { DAY, need, params, wait, type BehaviourModule } from "../module";
 import { cents } from "../money";
-import { ask, because, Book, callAction, MONTH, pay, publishedPrice, say, StandingWork, usd, withdraw, type Step, Asked, lookUp, LOOKS_MAX } from "./common";
+import { ask, because, Book, callAction, MONTH, Occurrences, pay, publishedPrice, say, StandingWork, usd, withdraw, type Step, Asked, lookUp, LOOKS_MAX } from "./common";
 import * as P from "./papers";
 import { stepper } from "./firms";
 import { fill, held, OrderBook, priceList } from "./trade";
@@ -239,7 +239,7 @@ export const transfers: BehaviourModule = {
   // the support law's own conditions settle is the staff's; a refusal, a doubt and a review are the office-holder's.
   routines: [{ task: "pay_claims", at: "office", every: 1, what: "Each working day the office's staff decide the claims that have waited their time, the oldest first: a claim that meets the conditions the support law states for its payment is granted, in writing, and paid each period from then until the claimant asks for it to stop, dies, leaves, or its time runs out, which the staff tell them. A claim that does not meet the conditions, or that the staff could not verify, is not refused by the staff: it is put before whoever holds the office, as a note on the office's file saying what it fails on, and decided by them on the office's decision form; a claim they grant on that form is paid by the staff like any other. A request to review a refusal comes to the office-holder.",
     papers: [{ kind: "benefit_claim", how: "decided by the support law's conditions: granted and paid if it meets them, put before the office-holder if it does not or could not be verified" }, { kind: "benefit_change", how: "a claimant's own request to stop their payment: it is stopped" }] }],
-  issues: P.SUPPORT,
+  issues: [...P.SUPPORT, P.REMEDY_ANSWER, ...P.VENUE_ANSWERS],
   version: "0.5.0", // 0.5.0: run in parts where a model holds the office (part): the staff decide and pay what the law's conditions settle under a standing order (pay_claims) and put a refusal or a doubt before the office-holder, who decides it on the office's decision form and answers reviews; a town run by code is unchanged; 0.4.0: a claim may wait to be decided (processing_days), the staff decide so many a day (capacity_per_day), and some qualifying claims are wrongly refused, more while a backlog stands (error_bps, at the friction dial); asked to review a refusal found wrong, the office decides the next claim on its facts
   doc: "docs/behaviour/boundary.md",
   cadence: () => DAY,
@@ -277,6 +277,7 @@ export const transfers: BehaviourModule = {
     let granted = 0, putBefore = 0, payments = 0; // since the staff last reported
     const lately: string[] = [];
     const wronglyRefused = new Set<string>(); // claims refused though the claimant qualified
+    const claimNth = new Occurrences(); // which claim each is: this person's nth for this payment, not its number on file
     const reviewed = new Set<string>(); // person|payment: a refusal reviewed and found wrong, so the next claim is decided on its facts
     let decidedDay = -1;
     let decidedToday = 0;
@@ -389,7 +390,7 @@ export const transfers: BehaviourModule = {
           // this person's claim for this payment has already been reviewed and found wrong.
           if (d.ok && dial > 0 && p.error_bps > 0 && !reviewed.has(`${who}|${payment}`)) {
             const share = Math.min(10_000, p.error_bps * (backlog ? 2 : 1));
-            if (ctx.rng(`claim-error-${c.id}`).below(10_000) < Math.floor((share * dial) / 10_000)) {
+            if (ctx.rng(`claim-error-${claimNth.key(c.id, who, payment)}`).below(10_000) < Math.floor((share * dial) / 10_000)) {
               d = { ok: false, why: "the claim could not be verified" };
               wronglyRefused.add(c.id);
             }

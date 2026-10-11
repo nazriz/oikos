@@ -1,6 +1,6 @@
 {
   "name": "tribunal.member",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "doc": "docs/behaviour/justice.md",
   "params": {
     "account": {
@@ -15,6 +15,13 @@
         "type": "integer"
       },
       "default": 4,
+      "source": "placeholder"
+    },
+    "counter": {
+      "schema": {
+        "type": "boolean"
+      },
+      "default": false,
       "source": "placeholder"
     },
     "fee": {
@@ -40,9 +47,19 @@
       "default": [],
       "source": "placeholder"
     },
+    "office": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
+      "source": "placeholder"
+    },
     "part": {
-      "schema": {},
-      "source": "the world gives it (no default)"
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
+      "source": "placeholder"
     },
     "pay_within_days": {
       "schema": {
@@ -73,14 +90,14 @@
   "state": "none",
   "issues": [
     {
-      "form": "tribunal_order",
-      "title": "Order of the tribunal on an application",
-      "does": "Decides an application before the tribunal and tells both sides: what is found, and for an order to pay, how much, into which account and by when.",
+      "form": "hearing_listing",
+      "title": "Notice of hearing: a rent increase, a debt or a charge",
+      "does": "Lists an application about a notice of rent increase, a debt or a charge for a hearing on a day, and tells both sides; the respondent may answer before then. It decides nothing. (An application on the tribunal's other lists is listed on the notice of hearing form.)",
       "fields": {
         "application": {
           "type": "record",
           "required": true,
-          "description": "The application decided."
+          "description": "The application listed."
         },
         "kind": {
           "type": "choice",
@@ -90,7 +107,7 @@
             "debt",
             "charge"
           ],
-          "description": "What the application was."
+          "description": "What the application is."
         },
         "applicant": {
           "type": "entity",
@@ -100,6 +117,234 @@
         "against": {
           "type": "entity",
           "required": true,
+          "description": "Whom it is against."
+        },
+        "hearing": {
+          "type": "date",
+          "required": true,
+          "description": "The day of the hearing."
+        }
+      },
+      "writes": {
+        "kind": "hearing_notice",
+        "text": "Notice of hearing: application {application} ({kind}) by {applicant} against {against}, to be heard on {hearing}. The respondent may answer before then.",
+        "basis": "=application",
+        "to": [
+          "=applicant",
+          "=against"
+        ],
+        "visible": [
+          "=applicant",
+          "=against",
+          "=self"
+        ],
+        "data": {
+          "application": "=application",
+          "kind": "=kind",
+          "applicant": "=applicant",
+          "against": "=against",
+          "hearing_at": "=hearing"
+        }
+      }
+    },
+    {
+      "form": "hearing_notice",
+      "title": "Notice of hearing on the tribunal's lists",
+      "does": "Lists an application on the tribunal's lists (possession of a let home, rent in arrears, a home in disrepair, pay come short, faulty goods, a wrong bill, a refused claim) and tells both sides: what is said, and the day the other side may answer by. The other side answers a notice on this form, and no letter. It decides nothing. A case already listed is put off (adjourned) by a fresh notice with a later day.",
+      "fields": {
+        "application": {
+          "type": "record",
+          "required": true,
+          "description": "The application listed."
+        },
+        "matter": {
+          "type": "text",
+          "required": true,
+          "description": "What it is about, in the word the application uses (possession, arrears, disrepair ...)."
+        },
+        "applicant": {
+          "type": "entity",
+          "required": true,
+          "description": "Who applied."
+        },
+        "against": {
+          "type": "entity",
+          "required": true,
+          "description": "Whom it is against."
+        },
+        "answer_by": {
+          "type": "date",
+          "required": true,
+          "description": "The day the other side may answer by: the case is decided on or after it."
+        },
+        "about": {
+          "type": "record",
+          "description": "The lease or other paper the application is about, where it names one (a tenant answers a notice about possession only if it names the lease)."
+        },
+        "amount": {
+          "type": "amount",
+          "description": "The sum the application says is owed, where it gives one."
+        },
+        "structure": {
+          "type": "structure",
+          "description": "The building, where the application names one."
+        },
+        "seeks": {
+          "type": "text",
+          "description": "What the application seeks, where it says."
+        }
+      },
+      "writes": {
+        "kind": "hearing_notice",
+        "text": "{applicant} has applied to us about {matter} (application {application}). You may answer by {answer_by}.",
+        "basis": "=application",
+        "to": [
+          "=applicant",
+          "=against"
+        ],
+        "visible": [
+          "=applicant",
+          "=against",
+          "=self"
+        ],
+        "data": {
+          "application": "=application",
+          "kind": "=matter",
+          "matter": "=matter",
+          "applicant": "=applicant",
+          "against": "=against",
+          "hearing_at": "=answer_by",
+          "answer_by": "=answer_by",
+          "about": "=about",
+          "amount": "#amount",
+          "structure": "=structure",
+          "seeks": "=seeks"
+        }
+      }
+    },
+    {
+      "form": "possession_order",
+      "title": "Order on an application for possession of a let home",
+      "does": "Decides an application for possession of a let home for rent owed, and tells landlord and tenant: dismissed (the tenant stays, and the notice to vacate is spent); a plan (the tenant stays, paying the rent and a sum a month toward what is owed; a plan not kept, the landlord may apply again); or possession on a day (the tenant and household are to leave by it). It moves nobody: a tenant still there after the day is put out only on a warrant the landlord asks the tribunal's registrar for, by whoever carries its warrants out. What the law asks before an order, how long a plan may run and how many days on the day for possession falls are in the law on possession and the tribunal's procedure.",
+      "fields": {
+        "application": {
+          "type": "record",
+          "required": true,
+          "description": "The application decided."
+        },
+        "landlord": {
+          "type": "entity",
+          "required": true,
+          "description": "The landlord who applied."
+        },
+        "tenant": {
+          "type": "entity",
+          "required": true,
+          "description": "The tenant."
+        },
+        "lease": {
+          "type": "record",
+          "required": true,
+          "description": "The lease."
+        },
+        "finding": {
+          "type": "choice",
+          "required": true,
+          "options": [
+            "dismissed",
+            "plan",
+            "possession"
+          ],
+          "description": "What is ordered."
+        },
+        "owed": {
+          "type": "amount",
+          "description": "The rent found owed (a plan, or possession)."
+        },
+        "instalment": {
+          "type": "amount",
+          "description": "For a plan: the sum a month toward what is owed, beyond the rent."
+        },
+        "pay_into": {
+          "type": "account",
+          "description": "For a plan: the account it is paid into."
+        },
+        "date": {
+          "type": "date",
+          "description": "For possession: the day the tenant is to leave by."
+        },
+        "home": {
+          "type": "space",
+          "description": "The home, as the application names it (needed for a warrant to be issued on the order)."
+        },
+        "building": {
+          "type": "structure",
+          "description": "The building it is in."
+        },
+        "household": {
+          "type": "list",
+          "description": "Who lives there by the lease, as the application names them."
+        },
+        "waited_days": {
+          "type": "count",
+          "description": "Days from the application to this order, for the tribunal's own figures."
+        }
+      },
+      "writes": {
+        "kind": "tribunal_order",
+        "text": "Order on {application}: {finding}.",
+        "basis": "=application",
+        "to": [
+          "=landlord",
+          "=tenant"
+        ],
+        "visible": [
+          "=landlord",
+          "=tenant",
+          "=self"
+        ],
+        "data": {
+          "application": "=application",
+          "kind": "possession",
+          "matter": "possession",
+          "applicant": "=landlord",
+          "against": "=tenant",
+          "finding": "=finding",
+          "binding": true,
+          "waited_days": "=waited_days",
+          "about": "=lease",
+          "amount": "#owed",
+          "instalment": "#instalment",
+          "to": "=pay_into",
+          "due": "=date",
+          "space": "=home",
+          "structure": "=building",
+          "household": "=household"
+        }
+      }
+    },
+    {
+      "form": "tribunal_order",
+      "title": "Order of the tribunal on an application",
+      "does": "Decides an application before the tribunal (anything but possession of a let home, which has its own form) and tells both sides: what is found, and for an order to pay, how much, into which account and by when; for a thing to be put right, by when. It moves no money and does nothing by itself: an order to pay left unpaid is enforced by the registrar, when the one owed asks.",
+      "fields": {
+        "application": {
+          "type": "record",
+          "required": true,
+          "description": "The application decided."
+        },
+        "kind": {
+          "type": "text",
+          "required": true,
+          "description": "What the application was, in the word it uses (rent_increase, debt, charge; or the matter on the tribunal's lists: arrears, disrepair, bill ...)."
+        },
+        "applicant": {
+          "type": "entity",
+          "required": true,
+          "description": "Who applied."
+        },
+        "against": {
+          "type": "entity",
           "description": "Whom it was against."
         },
         "finding": {
@@ -107,12 +352,27 @@
           "required": true,
           "options": [
             "dismissed",
+            "rejected",
+            "pay",
+            "do",
+            "set_aside",
             "invalid",
             "valid",
-            "pay",
             "paid"
           ],
-          "description": "What is found."
+          "description": "What is found: dismissed; rejected (not something the tribunal hears); pay (money to the applicant); do (put it right); set_aside (a paper); for a rent increase, invalid or valid; for a debt already paid, paid."
+        },
+        "matter": {
+          "type": "text",
+          "description": "For a case on the tribunal's lists: the matter, in the same word as the application's (those ordered act on an order only with it)."
+        },
+        "binding": {
+          "type": "choice",
+          "options": [
+            "yes",
+            "no"
+          ],
+          "description": "For a case on the tribunal's lists: yes (an order of the tribunal binds)."
         },
         "notice": {
           "type": "record",
@@ -136,7 +396,7 @@
         },
         "due": {
           "type": "date",
-          "description": "For an order to pay: the day it is due by."
+          "description": "For an order to pay or to put right: the day it is due by."
         },
         "victim": {
           "type": "entity",
@@ -149,6 +409,22 @@
         "paid": {
           "type": "amount",
           "description": "For a debt found paid: how much was paid."
+        },
+        "about": {
+          "type": "record",
+          "description": "The paper the application is about, where it names one."
+        },
+        "structure": {
+          "type": "structure",
+          "description": "The building, where the application names one."
+        },
+        "seeks": {
+          "type": "text",
+          "description": "What the application sought, where it said."
+        },
+        "waited_days": {
+          "type": "count",
+          "description": "Days from the application to this order, for the tribunal's own figures."
         }
       },
       "writes": {
@@ -167,9 +443,15 @@
         "data": {
           "application": "=application",
           "kind": "=kind",
+          "matter": "=matter",
           "applicant": "=applicant",
           "against": "=against",
           "finding": "=finding",
+          "binding": "?binding",
+          "waited_days": "=waited_days",
+          "about": "=about",
+          "structure": "=structure",
+          "seeks": "=seeks",
           "notice": "=notice",
           "laws": "=laws",
           "claim": "=claim",
@@ -181,6 +463,24 @@
           "paid": "#paid"
         }
       }
+    }
+  ],
+  "routines": [
+    {
+      "task": "answer",
+      "at": "office",
+      "every": 1,
+      "what": "The tribunal's registry staff take in each application, list it for a hearing and tell both sides, with the day the other side may answer by. They decide nothing: every case is the member's to decide, on or after its day.",
+      "papers": [
+        {
+          "kind": "tribunal_application",
+          "how": "taken in and listed; both sides are told, and the other side given the tribunal's time to answer. An application the tribunal does not hear is told so. The case is then the member's to decide"
+        },
+        {
+          "kind": "tribunal_response",
+          "how": "filed with its application, for the member who decides it"
+        }
+      ]
     }
   ]
 }

@@ -6,7 +6,7 @@ import PROFILE from "../../worlds/profiles/au-vic-2026.json";
 import type { Observation } from "../src/contracts";
 import type { ContentBlock, LlmRequest } from "../src/llm/adapter";
 import { callModel } from "../src/llm/call";
-import { editNotebook, foldPlan, createLlmParticipant, notebookAges, NOTEBOOK_MAX, NOTEBOOK_NEARLY, type LlmParticipantConfig } from "../src/llm/participant";
+import { editNotebook, foldPlan, createLlmParticipant, notebookAges, trimAtSentence, NOTEBOOK_MAX, NOTEBOOK_NEARLY, type LlmParticipantConfig } from "../src/llm/participant";
 
 const DAY = 86_400;
 const ctx = { world: { currency: PROFILE.values.currency } } as any;
@@ -91,9 +91,70 @@ for (const [name, answer] of [["empty", [{ type: "text", text: "  " }]], ["too l
     const last = shown(s.calls.filter((c) => c.purpose === "participant")[7]!);
     expect(last).toContain("older notes could not be folded into a summary this time: they are all still there.");
     for (let d = 1; d <= 7; d++) expect(last).toContain(line(d, 900));
-    expect(s.calls.filter((c) => c.purpose === "notebook").length).toBe(1); // not asked again at once
+    // (Not asked again at the next sitting. A summary too long is asked for once more at the same sitting, and one
+    // with no sentence ending within the room there is cannot be cut: nothing is dropped.)
+    expect(s.calls.filter((c) => c.purpose === "notebook").length).toBe(name === "too long" ? 2 : 1);
   });
 }
+
+// The third living pilot: three folds, three failures, each summary 10 to 20% longer than asked (990 for 803).
+const sentences = (chars: number) => { let out = ""; for (let i = 1; out.length < chars; i++) out += `Point ${i} of what the older notes held, kept. `; return out.trim(); };
+
+test("the limit is said in characters and in words", async () => {
+  const s = seat((n) => (n <= 8 ? [use("n", "notebook", { add: line(n, 900) })] : []));
+  for (let d = 1; d <= 8; d++) await s.sit(d);
+  const asked = shown(s.calls.find((c) => c.purpose === "notebook")!);
+  expect(asked).toMatch(/in at most [\d,]+ characters \(about \d+ words\)/);
+});
+
+test("a summary longer than asked is asked for once more, told its length; the shorter one is taken, and nothing is cut", async () => {
+  let n = 0;
+  const s = seat((k) => (k <= 8 ? [use("n", "notebook", { add: line(k, 900) })] : []), (r) => {
+    const limit = (r.context as any).limit as number;
+    return [{ type: "text", text: ++n === 1 ? sentences(Math.round(limit * 1.2)) : sentences(Math.round(limit * 0.8)) }];
+  });
+  for (let d = 1; d <= 8; d++) await s.sit(d);
+  const calls = s.calls.filter((c) => c.purpose === "notebook");
+  expect(calls.length).toBe(2);
+  expect(shown(calls[1]!)).toMatch(/That summary is [\d,]+ characters, and it has to be at most [\d,]+ characters \(about \d+ words\) to fit\. Write it again, shorter/);
+  expect(calls[1]!.messages.length).toBe(3);
+  const f = s.notes.find((x) => x.notebook_folded).notebook_folded;
+  expect(f.summary_cut).toBeUndefined();
+  expect(s.notes.some((x) => x.notebook_fold_failed)).toBe(false);
+  expect(s.annotations.filter((a) => a.annotation === "usage" && a.purpose === "notebook").length).toBe(2); // both counted
+});
+
+test("a summary still too long when asked again is kept to the last sentence that fits; the seat is told what was left out, and the note keeps it", async () => {
+  const s = seat((k) => (k <= 8 ? [use("n", "notebook", { add: line(k, 900) })] : []), (r) => [{ type: "text", text: sentences(Math.round(((r.context as any).limit as number) * 1.2)) }]);
+  for (let d = 1; d <= 8; d++) await s.sit(d);
+  expect(s.calls.filter((c) => c.purpose === "notebook").length).toBe(2);
+  expect(s.notes.some((x) => x.notebook_fold_failed)).toBe(false);
+  const f = s.notes.find((x) => x.notebook_folded).notebook_folded;
+  expect(f.summary_cut.written_characters).toBeGreaterThan(f.summary_cut.asked_characters);
+  expect(f.summary_cut.left_out.length).toBeGreaterThan(0);
+  expect(f.summary_cut.asked_again).toBe(true);
+  await s.sit(9);
+  const sittings = s.calls.filter((c) => c.purpose === "participant");
+  const told = shown(sittings[7]!);
+  expect(told).toContain("longer than the");
+  expect(told).toContain("even when you were asked again");
+  expect(told).toContain(`Left out of your notebook (${f.summary_cut.left_out.length.toLocaleString("en")} characters): "${f.summary_cut.left_out}"`);
+  // What is in the notebook ends on a whole sentence, within the room asked; whole plus left out is what was written.
+  const book = /Summary of my notes up to day \d+: ([^\n]*)/.exec(shown(sittings.at(-1)!))![1]!;
+  expect(book.endsWith("kept.")).toBe(true);
+  expect(book.length).toBeLessThanOrEqual(f.summary_cut.asked_characters);
+  expect(`${book} ${f.summary_cut.left_out}`).toBe(sentences(Math.round(f.summary_cut.asked_characters * 1.2)));
+});
+
+test("a text is cut at the end of a sentence, never inside one", () => {
+  expect(trimAtSentence("One. Two. Three.", 100)).toBe("One. Two. Three.");
+  expect(trimAtSentence("One. Two. Three.", 10)).toBe("One. Two.");
+  expect(trimAtSentence("One. Two. Three.", 9)).toBe("One. Two.");
+  expect(trimAtSentence("One. Two. Three.", 8)).toBe("One.");
+  expect(trimAtSentence("KSh 1.5 owed; ask again. More", 14)).toBe("KSh 1.5 owed;");
+  expect(trimAtSentence("line one\nline two", 12)).toBe("line one");
+  expect(trimAtSentence("x".repeat(50), 10)).toBe("");
+});
 
 test("400 sittings of a seat that adds 35 to 250 characters and never prunes: under the limit, every fold recorded", async () => {
   const s = seat((n) => [use("n", "notebook", { add: line(n, 35 + ((n * 37) % 216)) })]);

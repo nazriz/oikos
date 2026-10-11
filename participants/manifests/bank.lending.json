@@ -294,6 +294,88 @@
           "rate_bps": "=rate_bps"
         }
       }
+    },
+    {
+      "form": "loan_arrears",
+      "title": "Letter to a borrower behind with a loan",
+      "does": "Tells a borrower in writing that a loan is behind, and by how much. It changes nothing of the loan.",
+      "fields": {
+        "loan": {
+          "type": "record",
+          "required": true,
+          "description": "The loan agreement."
+        },
+        "borrower": {
+          "type": "entity",
+          "required": true,
+          "description": "The borrower."
+        },
+        "behind": {
+          "type": "amount",
+          "required": true,
+          "description": "How much is behind."
+        }
+      },
+      "writes": {
+        "kind": "loan_arrears",
+        "text": "Loan {loan}: {behind} behind. Please pay.",
+        "basis": "=loan",
+        "to": [
+          "=borrower"
+        ],
+        "visible": [
+          "=borrower",
+          "=self"
+        ],
+        "data": {
+          "loan": "=loan",
+          "behind": "#behind"
+        }
+      }
+    },
+    {
+      "form": "loan_default",
+      "title": "Notice to a borrower that a loan is in default",
+      "does": "Tells a borrower in writing that a loan is in default: how much is behind and how much is owing in all. It moves nothing by itself.",
+      "fields": {
+        "loan": {
+          "type": "record",
+          "required": true,
+          "description": "The loan agreement."
+        },
+        "borrower": {
+          "type": "entity",
+          "required": true,
+          "description": "The borrower."
+        },
+        "behind": {
+          "type": "amount",
+          "required": true,
+          "description": "How much is behind."
+        },
+        "outstanding": {
+          "type": "amount",
+          "required": true,
+          "description": "How much is owing in all."
+        }
+      },
+      "writes": {
+        "kind": "loan_default",
+        "text": "Loan {loan} is in default: {behind} behind, {outstanding} owing.",
+        "basis": "=loan",
+        "to": [
+          "=borrower"
+        ],
+        "visible": [
+          "=borrower",
+          "=self"
+        ],
+        "data": {
+          "loan": "=loan",
+          "behind": "#behind",
+          "outstanding": "#outstanding"
+        }
+      }
     }
   ]
 }

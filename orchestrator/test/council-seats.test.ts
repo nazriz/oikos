@@ -52,14 +52,15 @@ test("a councillor's or a clerk's post held by a model has the council's papers 
   const seat = (id: string) => config.participants.find((p: any) => p.id === `${id}-system`).controller.params;
   // The councillor a model holds.
   const c1 = pos("councillor-1");
-  expect(ids(c1)).toEqual(["ballots", "files", "who", "laws", "forms", "council", "civic", "votes"]);
+  // ("letters" since 2026-10-12: every seat has on its file what becomes of a letter to a person.)
+  expect(ids(c1)).toEqual(["ballots", "files", "who", "laws", "forms", "council", "civic", "votes", "letters"]);
   const by = Object.fromEntries(c1.channels.map((c: any) => [c.id, c]));
   expect(by.laws).toMatchObject({ way: "published", match: { statement_kinds: ["charter", "procedure", "law"] } });
   expect(by.forms).toMatchObject({ way: "published", match: { statement_kinds: ["form"] } });
   // (Proposals and ballots as papers of its own body: what is filed there brings the seat back to its desk.)
   expect(by.council).toMatchObject({ way: "mine", match: { statement_kinds: ["proposal", "ballot"] } });
   expect(by.civic).toMatchObject({ way: "published", match: { statement_kinds: ["petition", "petition_count", "petition_response", "budget", "ballot_result"] } });
-  expect(seat("councillor-1").standing).toEqual(["laws", "forms", "prices"]);
+  expect(seat("councillor-1").standing).toEqual(["laws", "forms", "prices", "letters"]);
   // The clerk a model holds: the charter and the standing orders on file, and the council's table.
   expect(ids(pos("council-clerk"))).toEqual(expect.arrayContaining(["business", "proposals", "votes", "who", "laws", "civic", "stationery"]));
   expect(pos("council-clerk").channels.find((c: any) => c.id === "laws")).toMatchObject({ way: "published", match: { statement_kinds: ["charter", "procedure"] } });

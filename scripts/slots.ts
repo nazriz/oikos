@@ -114,6 +114,7 @@ export async function take(weight = 1, what = process.argv.slice(1, 3).join(" ")
   if (ancestorHolds(dir)) return nothing;
   hookExit();
   const size = poolSize();
+  if (!Number.isFinite(weight)) throw new Error(`slots: ${weight} is not a weight (a number of tokens)`);
   const want = Math.max(1, Math.min(size, Math.round(weight)));
   const body = { pid: process.pid, since: Date.now(), what, cwd: process.cwd() };
   const got: string[] = [];
@@ -176,6 +177,9 @@ if (import.meta.main) {
   if (!args.length || Object.keys(opts).some((k) => k !== "weight" && k !== "what")) { console.error("usage: bun scripts/slots.ts [--weight K|half] [--what TEXT] -- <command...> | status"); process.exit(2); }
   const opt = (name: string) => opts[name];
   const w = opt("weight") ?? "1";
+  // (A weight that is no weight is refused, with the ones there are: `--weight heavy` once waited 29 minutes behind
+  // other jobs without a word, since a number that is not one never fits the pool: the third living pilot's review.)
+  if (w !== "half" && !/^[1-9][0-9]{0,3}$/.test(w)) { console.error(`slots: "${w}" is not a weight. The weights: a whole number of tokens from 1 (1 by default; more than the pool takes the whole pool), or "half" (half the cores, as the kernel's build takes).`); process.exit(2); }
   const weight = w === "half" ? Math.ceil(availableParallelism() / 2) : Number(w);
   const cmd = args;
   const slot = await take(weight, opt("what") ?? cmd.join(" ").slice(0, 80));

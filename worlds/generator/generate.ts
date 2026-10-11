@@ -6,7 +6,7 @@
 // support payments, industry shares...) comes from the spec's profile (worlds/profiles/, docs/profiles.md), and what
 // isn't there is derived from it here by general formulas, or is a placeholder of the town's own shape.
 
-import { BOOKS, drawValues, raisedValues, UPBRINGING, adultAgeBands, bedroomsNeeded, drawHousehold, drawSavings, formatMoney, forms as formWords, modules, votedWords, Randomness, chargesInWords, dayPayPeriod, forAge, forOutOfWork, linesInWords, paymentsInWords, tabledLines, yearInDays, stopsWorkAt, withholding, withholdingInWords, yearsOfSchooling, draftLaw, type HouseholdSpec, type IncomeTaxLaw, type Issued, type LawSchedule, type PaymentRule, type Taken } from "@oikos/participants";
+import { BOOKS, drawValues, raisedValues, UPBRINGING, adultAgeBands, bedroomsNeeded, drawHousehold, drawSavings, formatMoney, inCurrency, forms as formWords, modules, votedWords, Randomness, chargesInWords, dayPayPeriod, forAge, forOutOfWork, linesInWords, paymentsInWords, tabledLines, yearInDays, stopsWorkAt, withholding, withholdingInWords, yearsOfSchooling, draftLaw, type HouseholdSpec, type IncomeTaxLaw, type Issued, type LawSchedule, type PaymentRule, type Taken } from "@oikos/participants";
 import law from "../law/basic.json";
 import schedules from "../law/schedules.json";
 import { loadProfile, type Profile } from "./profile";
@@ -70,7 +70,7 @@ const ACT_TIME = {
   },
 };
 
-export const GENERATOR_VERSION = "0.46.0"; // 0.46.0: the firm and landlord side (docs/decisions.md, 2026-10-11, "Four faults"): the place's laws on ending a job and on possession published from the profile; how firms adjust; a business of one as a venture, its chance derived from the place's business birth rate; short pay's chance over the jobs exposed; 0.45.4: the planning office's decision form records the liberty to build beside a grant (the form's own declaration: FormWrites `claim`); 0.45.3: a payroll folder holds the standing payments beside the employment agreements; an office's routines procedure says who makes a standing work order and how; the permit decision form says what records the permission; 0.45.2: the council's standing orders are a published procedure of the town's (proc-council), and a councillor's or a clerk's post held by a model has the council's papers on its desk (the charter, the standing orders, the laws, the forms, proposals and ballots as papers of its own body, petitions, budgets and results); 0.45.1: the tax law says, step by step and with each rounding, how what is withheld from a pay is reckoned (the one function every payroll uses), where it said "reckoned as a year's pay"; 0.45.0: a seat with routine work is shown its staff's reports on the work under its standing orders, and its procedure says they are made; 0.44.0: main's 0.39.1 (an office's own form says what issuing it does) with the institutions' opening papers (0.43.0)
+export const GENERATOR_VERSION = "0.47.0"; // 0.47.0: an office a model holds opens with its institution's standing notices on file (what a body that hears grievances says it hears), its procedure under the law on possession (a landlord, the tribunal's member and registrar: what each form is for and what the law asks before each step, from the profile's figures) and what becomes of a letter to a person; the tribunal has registry staff in a living town (docs/decisions.md, 2026-10-12, "What the third living pilot found"); 0.46.0: the firm and landlord side (docs/decisions.md, 2026-10-11, "Four faults"): the place's laws on ending a job and on possession published from the profile; how firms adjust; a business of one as a venture, its chance derived from the place's business birth rate; short pay's chance over the jobs exposed; 0.45.4: the planning office's decision form records the liberty to build beside a grant (the form's own declaration: FormWrites `claim`); 0.45.3: a payroll folder holds the standing payments beside the employment agreements; an office's routines procedure says who makes a standing work order and how; the permit decision form says what records the permission; 0.45.2: the council's standing orders are a published procedure of the town's (proc-council), and a councillor's or a clerk's post held by a model has the council's papers on its desk (the charter, the standing orders, the laws, the forms, proposals and ballots as papers of its own body, petitions, budgets and results); 0.45.1: the tax law says, step by step and with each rounding, how what is withheld from a pay is reckoned (the one function every payroll uses), where it said "reckoned as a year's pay"; 0.45.0: a seat with routine work is shown its staff's reports on the work under its standing orders, and its procedure says they are made; 0.44.0: main's 0.39.1 (an office's own form says what issuing it does) with the institutions' opening papers (0.43.0)
 const DAY = 86_400;
 const MONTH = 30 * DAY;
 const YEAR = 365 * DAY;
@@ -2285,6 +2285,66 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     }
     pos.channels.push(K.mine("stationery", ["form"], { title: "The office's own forms" }));
     part.controller.params.standing = [...part.controller.params.standing, "stationery"];
+  }
+  // An office a model holds has on file the standing notices its institution publishes (docs/behaviour/office-papers.md,
+  // "On file at the start"): what a body that hears grievances says it hears. The office's code publishes it at its
+  // first look; with nobody doing that, nobody could bring the body a matter (the third living pilot's tribunal had
+  // no applications about rent owed, where its code twin had 23).
+  for (const pos of positions) {
+    const part = participants.find((x) => x.id === pos.holder);
+    const m = modules[pos.role_module?.code ?? ""];
+    if (part?.controller.type !== "llm" || !m?.opens) continue;
+    inCurrency(V.currency); // (a fee in the notice's words is written as the world writes its money)
+    m.opens(pos.role_module.params ?? {}, pos.entity).forEach((o, i) => records.push({ id: `notice-${pos.id}-${o.kind}${i ? `-${i + 1}` : ""}`.replace(/_/g, "-"), record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: pos.entity, in_position: pos.id,
+      kind: o.kind, text: o.text, ...(o.data !== undefined ? { data: o.data } : {}), ...(o.offer !== undefined ? { offer: o.offer } : {}) }));
+  }
+  // And what becomes of a letter to a person (docs/behaviour/letters.md, "A letter to a person"): said once, on the
+  // office's own file, in the world's terms. People run by code read no words: about sixty letters from the third
+  // living pilot's seats had no reply, and a tribunal member waited on tenants for ever, taking silence for a gap in
+  // the evidence. Silence is what a letter gets; what is acted on and answered is a paper on a form.
+  // (One paper an organisation, of a kind of its own, in a folder of its own: an office's other procedures are in its
+  // law book or its standing folder already, and a second folder of every procedure would say them all twice.)
+  const lettered = new Set<string>();
+  for (const pos of positions) {
+    const part = participants.find((x) => x.id === pos.holder);
+    if (part?.controller.type !== "llm") continue;
+    if (!lettered.has(pos.entity)) records.push({ id: `practice-${pos.entity}-letters`, record: "statement", author: "genesis", at: 0, visible_to: [pos.entity], speaks_for: pos.entity, kind: "letters_practice", addressed_to: [pos.entity],
+      text: "Letters from this office, and what answers them. A person reads a letter from an office and keeps it, and it is on their record that the office wrote. People here do not answer a letter written in an office's own words, and do nothing on one: no reply is the ordinary case, and says nothing of whether it was read or what they think. What a person acts on, and answers where there is an answer to give, is a paper on one of the office's own forms, or another paper of a set kind (a request, a notice, an offer, a decision): each is answered on a paper of its own, which comes to the office as its post. Another office, written to, answers by saying what it acts on and how to ask it." });
+    lettered.add(pos.entity);
+    pos.channels.push(K.mine("letters", ["letters_practice"], { title: "Letters from this office: what answers them" }));
+    part.controller.params.standing = [...part.controller.params.standing, "letters"];
+  }
+  // And its procedure for ending a tenancy for rent owed, where the place has a law on possession: what each of the
+  // office's forms is for, in the order the law has the steps, and what the law asks before each (its figures are the
+  // profile's, as the law's are). It says what the office does and what the law requires; what to decide it leaves
+  // to whoever holds the office. (The third living pilot's tribunal member asked for "proof of delivery" of every
+  // notice, a standard of its own, and decided none of 54 applications.)
+  if (POSS) for (const pos of positions) {
+    const part = participants.find((x) => x.id === pos.holder);
+    const code_ = pos.role_module?.code ?? "";
+    if (part?.controller.type !== "llm" || !["firm.landlord", "tribunal.member", "tribunal.registrar"].includes(code_)) continue;
+    const own = pos.role_module.params ?? {};
+    const days = (n: number) => `${n} day${n === 1 ? "" : "s"}`;
+    const served = "A notice to vacate is given when it is on the record, addressed to the tenant: that is how a paper is served here, and law-possession asks no further proof that it reached them.";
+    const feeWords = (fee: unknown, account: unknown) => (Number(fee) > 0 ? ` Its fee is ${formatMoney(Number(fee), V.currency)}, paid into ${account} with it, by a payment.` : "");
+    const text = code_ === "firm.landlord"
+      ? `Ending a tenancy for rent owed: the steps law-possession has, and this office's form for each. Whether and when to take a step is for whoever holds the office. ` +
+        `(1) Rent owed may be asked for in writing at any time (rent reminder form), and a plan to pay offered (payment plan offer form), which the tenant answers; the law requires neither before a notice. ` +
+        `(2) Notice to vacate (its form) may be given once rent has been owed for ${days(POSS.arrears_days)}, and must give at least ${days(POSS.notice_days)}. ${served} If the rent owed is paid before the notice's day, the notice is spent: withdraw it. ` +
+        `(3) With the notice's day past and the tenant still in the home and still behind: an application to the tribunal for possession (its form), which states the lease, the rent, what is owed, the home and who lives there by the lease, and the notice relied on with the day it was given and the day it gave.${feeWords(own.possession?.fee, own.possession?.fee_account)} ` +
+        `(4) The tribunal tells the tenant, who may answer, and its member decides: dismissal, ${POSS.plan_months > 0 ? `a plan to pay over no more than ${POSS.plan_months} months, ` : ""}or possession on a day. A plan set and not kept: apply again, saying the plan is broken. ` +
+        `(5) With the order's day past and the tenant still there: a request to the tribunal's registrar for a warrant (its form).${feeWords(own.possession?.warrant_fee, own.possession?.fee_account)} The warrant is carried out by the police and by nobody else: this office puts no one out. One not carried out in its ${days(POSS.warrant_days)} lapses, and another is asked for. ` +
+        `(6) When the tenant has gone or been put out, the tenancy is ended on the record by notice on the lease.`
+      : code_ === "tribunal.member"
+        ? `An application for possession of a let home for rent owed: what law-possession asks, and this office's form for each step. What to order is for the member. ` +
+          `What the law asks before an order: that rent had been owed for at least ${days(POSS.arrears_days)} when the notice to vacate was given; that the notice gave at least ${days(POSS.notice_days)} and they have run; and that the tenant has not left. The application states the lease, the rent, what is owed, and the notice relied on with the day it was given and the day it gave. ${served} ` +
+          `The other side is told on a notice of hearing (its form), with the day they may answer by${own.hearing_after_days ? ` (the tribunal's time to answer is ${days(Number(own.hearing_after_days))})` : ""}; a tenant answers such a notice, and no letter, with what the household could pay a month toward what is owed, and no answer by the day is no answer. A case is put off by a fresh notice with a later day. ` +
+          `What the tribunal may order (possession order form): dismissal; ${POSS.plan_months > 0 ? `a plan, the tenant staying and paying the rent and a sum a month that clears what is owed in no more than ${POSS.plan_months} months; ` : ""}or possession on a day, which the law puts ${days(POSS.possession_days)} on from the order. An order moves nobody: a tenant still there after its day is removed only on the registrar's warrant, by the police.`
+        : `A warrant of possession: what law-possession asks, and this office's form. A landlord asks for one (a request for a warrant) on the tribunal's order for possession once the order's day has passed with the tenant still there. The warrant (its form) goes to the police, who alone carry it out; it names the home, the tenant and the household. It may be carried out no sooner than ${days(POSS.eviction_notice_days)} after it is issued (the tenant's notice of the day), and runs ${days(POSS.warrant_days)}: not carried out by then, it has lapsed. A request on anything that is not an order for possession to that landlord, or before the order's day, is declined (its form) or waits.`;
+    records.push({ id: `proc-${pos.id}-possession`, record: "statement", author: "genesis", at: 0, visible_to: [pos.entity], speaks_for: pos.entity, in_position: pos.id, kind: "procedure", addressed_to: [pos.entity], basis: "law-possession", text,
+      data: { office: pos.id, law: "law-possession", arrears_days: POSS.arrears_days, notice_days: POSS.notice_days, possession_days: POSS.possession_days, plan_months: POSS.plan_months, warrant_days: POSS.warrant_days, eviction_notice_days: POSS.eviction_notice_days } });
+    if (!pos.channels.some((c: any) => c.id === "standing")) pos.channels.push(K.mine("standing", ["procedure", "work_order", "hold"], { title: "The office's procedures and standing orders" }));
+    if (!part.controller.params.standing.includes("standing")) part.controller.params.standing = [...part.controller.params.standing, "standing"];
   }
 
   return {

@@ -211,6 +211,34 @@
           "values": "=values"
         }
       }
+    },
+    {
+      "form": "petition_response",
+      "title": "Answer to a petition",
+      "does": "Answers a petition publicly, to its organiser: what has been done about what it asks (put to the council, or not, and why). The answer's own words are the mayor's (give them as the paper's text). It puts nothing to the council by itself: that is the council proposal form, or a law's amendment form.",
+      "fields": {
+        "petition": {
+          "type": "record",
+          "required": true,
+          "description": "The petition answered."
+        },
+        "organiser": {
+          "type": "entity",
+          "description": "Its organiser."
+        }
+      },
+      "writes": {
+        "kind": "petition_response",
+        "text": "Answer to petition {petition}.",
+        "basis": "=petition",
+        "to": [
+          "=organiser"
+        ],
+        "visible": "public",
+        "data": {
+          "petition": "=petition"
+        }
+      }
     }
   ]
 }

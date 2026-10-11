@@ -204,7 +204,13 @@ export function mayorBooks(ctx: ParticipantContext): OfficeBooks {
   const acted = new Set<string>(); // what the office has acted on (the bases of its records)
   return {
     absorb(obs) {
-      for (const r of book.absorb(obs)) if (ours(r)) for (const b of basesOf(r)) acted.add(b);
+      for (const r of book.absorb(obs)) if (ours(r)) {
+        for (const b of basesOf(r)) acted.add(b);
+        // (A paper of the office's own that names a petition in its words is the office acting on it, as one that
+        // cites it is: a seat put two petitions to the council on the proposal form, whose paper cites nothing, and
+        // its books listed all four as not acted on for the 45 days that followed: the third living pilot.)
+        if (r.record === "statement" && (r.kind === "proposal" || r.kind === "petition_response") && typeof r.text === "string") for (const id of r.text.match(/\brec\.[0-9]+\b/g) ?? []) acted.add(id);
+      }
       money.absorb(obs);
     },
     open(t) {
