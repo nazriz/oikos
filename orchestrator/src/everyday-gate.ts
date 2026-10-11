@@ -17,7 +17,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { canonical, Randomness } from "@oikos/participants";
 import { callModel, ModelCallFailed, SpendingLimitReached, type Budget, type ContentBlock, type LlmAdapter, type LlmResponse, type Price } from "@oikos/participants/llm";
-import { answerSchema, ask, baseLine, byClass, codeOdds, edited, editable, EDIT_FIELDS, EDIT_MOVES, optionsOf, readAnswer, scrambled, stageOf, TEACHER_VERSION, tv, zAgency, type Design, type EditField, type Harvested } from "./everyday";
+import { answerSchema, ask, baseLine, byClass, codeOdds, codeOddsFor, edited, editable, EDIT_FIELDS, EDIT_MOVES, optionsOf, readAnswer, scrambled, stageOf, TEACHER_VERSION, tv, zAgency, type Design, type EditField, type Harvested } from "./everyday";
 
 export const GATE_VERSION = "0.1.0";
 
@@ -41,6 +41,10 @@ export const THRESHOLDS = {
    * mind's rate; asking, a venue and acting at all are within these ratios of it where the code mind's rate is at
    * least 5 in 100. */
   town_points: 15, town_ratio: [0.67, 1.5] as [number, number], town_ratio_classes: ["ask", "venue", "act"],
+  /** A class of option is assessed in the town's totals only where at least this many of the sample's situations had
+   * it open (the coordinator's ruling, 2026-10-11, before any full gate was run: a teacher neither passes nor fails
+   * on a class that rests on fewer; it is marked not assessed). */
+  town_min_situations: 10,
   /** Answers that could not be read, at most. */
   unread_share: 0.05,
 };
@@ -183,7 +187,7 @@ export async function gate(o: GateOptions) {
     })) as { [f in EditField]: { pairs: number; right: number; mean_points: number | null; needed_points: number } };
     // The town's totals: the teacher's odds (the two orders averaged where both were read) beside the code mind's on
     // the same decisions, each weighted back to the town's true mix.
-    const town: { [cls: string]: { teacher: number; code: number } } = {};
+    const town: { [cls: string]: { teacher: number; code: number; n: number } } = {};
     let W = 0;
     for (const { h, base } of rows) {
       const y = get("reversed", h);
@@ -192,9 +196,18 @@ export async function gate(o: GateOptions) {
       W += w;
       // (The code mind never draws giving up: its waiting is set beside the teacher's leaving it and giving up together.)
       t.not_acting = (t.leave ?? 0) + (t.give_up ?? 0); c.not_acting = (c.leave ?? 0) + (c.give_up ?? 0);
-      for (const cls of new Set([...Object.keys(t), ...Object.keys(c)])) { const x = (town[cls] ??= { teacher: 0, code: 0 }); x.teacher += w * (t[cls] ?? 0); x.code += w * (c[cls] ?? 0); }
+      for (const cls of new Set([...Object.keys(t), ...Object.keys(c)])) { const x = (town[cls] ??= { teacher: 0, code: 0, n: 0 }); x.teacher += w * (t[cls] ?? 0); x.code += w * (c[cls] ?? 0); if (cls in t || cls in c) x.n++; }
     }
-    const totals = Object.fromEntries(Object.entries(town).filter(([cls]) => cls !== "leave" && cls !== "give_up").sort(([a], [b]) => (a < b ? -1 : 1)).map(([cls, x]) => [cls, { teacher: r1((100 * x.teacher) / Math.max(1e-9, W))!, code: r1((100 * x.code) / Math.max(1e-9, W))! }]));
+    const totals = Object.fromEntries(Object.entries(town).filter(([cls]) => cls !== "leave" && cls !== "give_up").sort(([a], [b]) => (a < b ? -1 : 1)).map(([cls, x]) => [cls, { teacher: r1((100 * x.teacher) / Math.max(1e-9, W))!, code: r1((100 * x.code) / Math.max(1e-9, W))!, situations: x.n, assessed: x.n >= T.town_min_situations }]));
+    const assessed = Object.entries(totals).filter(([, x]) => x.assessed);
+    // What the code mind's own sway makes of the same scrambles and edits (how far it tells people apart by itself).
+    const reqOf = new Map(reqs.map((q) => [q.key, q]));
+    const shownAs = (variant: string, h: Harvested) => reqOf.get(`${o.design}/${variant}/${h.id}`)?.shown;
+    const codeScr = o.sample.flatMap((h) => { const ds = ["scrambled1", "scrambled2"].flatMap((v) => { const sh = shownAs(v, h); return sh ? [tv(codeOdds(h.situation), codeOddsFor(sh.situation, h.situation))] : []; }); return ds.length ? [mean(ds)!] : []; });
+    const codeEdits = Object.fromEntries(EDIT_FIELDS.map((f) => {
+      const pairs = o.sample.flatMap((h) => { const lo = shownAs(`edit:${f}:low`, h), hi = shownAs(`edit:${f}:high`, h); if (!lo || !hi) return []; const m = EDIT_MOVES[f]; const d = 100 * ((byClass(h.situation, codeOddsFor(hi.situation, h.situation))[m.cls] ?? 0) - (byClass(h.situation, codeOddsFor(lo.situation, h.situation))[m.cls] ?? 0)); return [m.down ? -d : d]; });
+      return [f, { pairs: pairs.length, right: pairs.filter((d) => d > 0).length, mean_points: r1(mean(pairs)) }];
+    }));
     const mRepeat = median(repeat.map((x) => x.d)), mScr = median(scr.map((x) => x.d)), mRev = median(rev.map((x) => x.d)), mRew = median(rew.map((x) => x.d));
     const c = counts[name] ?? { asked: 0, served: 0, unanswered: 0, unread: 0, declined: 0, cost_microusd: 0, input_tokens: 0, output_tokens: 0 };
     const total = reqs.length;
@@ -204,7 +217,7 @@ export async function gate(o: GateOptions) {
       edits: EDIT_FIELDS.every((f) => edits[f].pairs > 0 && edits[f].right / edits[f].pairs >= T.edit_right_share && (edits[f].mean_points ?? 0) >= T.edit_points[f]),
       order: mRepeat !== null && mRev !== null && mRev <= T.order_over_repeat * mRepeat + T.order_plus_points && Math.abs(mean(firstGain) ?? 99) <= T.first_place_points,
       reworded: mRepeat !== null && mRew !== null && mScr !== null && mRew <= T.reword_over_repeat * mRepeat + T.reword_plus_points && mRew <= T.reword_under_scrambled * mScr && clear.length > 0 && clear.filter(({ x, y }) => top(x.base)[0]![0] === top(y)[0]![0]).length / clear.length >= T.reword_same_top_share,
-      town: Object.keys(totals).length > 0 && Object.entries(totals).every(([cls, x]) => Math.abs(x.teacher - x.code) <= T.town_points && (!T.town_ratio_classes.includes(cls) || x.code < 5 || (x.teacher / x.code >= T.town_ratio[0] && x.teacher / x.code <= T.town_ratio[1]))),
+      town: !assessed.length ? ("not assessed" as const) : assessed.every(([cls, x]) => Math.abs(x.teacher - x.code) <= T.town_points && (!T.town_ratio_classes.includes(cls) || x.code < 5 || (x.teacher / x.code >= T.town_ratio[0] && x.teacher / x.code <= T.town_ratio[1]))),
     };
     return {
       teacher: name, calls: { ...c, cost_usd: Math.round(c.cost_microusd / 1e4) / 100 }, read: rows.length,
@@ -213,7 +226,8 @@ export async function gate(o: GateOptions) {
       edits,
       order: { n: rev.length, median: r1(mRev), first_place_gain_points: r1(mean(firstGain)) },
       reworded: { n: rew.length, median: r1(mRew), clear: clear.length, same_top: clear.filter(({ x, y }) => top(x.base)[0]![0] === top(y)[0]![0]).length },
-      town: totals, pass, passed: Object.values(pass).every((x) => x),
+      town: totals, code_mind: { scrambled: { n: codeScr.length, median: r1(median(codeScr)), mean: r1(mean(codeScr)) }, edits: codeEdits },
+      pass, passed: Object.values(pass).every((x) => x === true || x === "not assessed"),
     };
   });
   // Agreement between teachers: the distance between their odds on the same request, and whether another person in the
@@ -246,7 +260,8 @@ export function gateText(r: Awaited<ReturnType<typeof gate>>): string {
     L.push(`  one-thing edits [${ok(t.pass.edits)}]: ${Object.entries(t.edits).map(([f, e]) => `${f} right way ${e.right} of ${e.pairs}, mean ${e.mean_points} (needs ${e.needed_points})`).join("; ")}`);
     L.push(`  option order [${ok(t.pass.order)}]: median ${t.order.median} points over ${t.order.n}; listed first rather than last gains ${t.order.first_place_gain_points} points`);
     L.push(`  reworded [${ok(t.pass.reworded)}]: median ${t.reworded.median} points over ${t.reworded.n}; the same likeliest option in ${t.reworded.same_top} of ${t.reworded.clear} where it led clearly`);
-    L.push(`  the town's totals [${ok(t.pass.town)}], teacher against the code mind, of 100: ${Object.entries(t.town).map(([cls, x]) => `${cls} ${x.teacher}/${x.code}`).join("; ")}`);
+    L.push(`  the town's totals [${t.pass.town === "not assessed" ? "not assessed" : ok(t.pass.town)}], teacher against the code mind, of 100 (situations behind it; * not assessed, under ${r.thresholds.town_min_situations}): ${Object.entries(t.town).map(([cls, x]) => `${cls} ${x.teacher}/${x.code} (${x.situations}${x.assessed ? "" : "*"})`).join("; ")}`);
+    L.push(`  the code mind's own sway on the same requests: scrambled median ${t.code_mind.scrambled.median} points over ${t.code_mind.scrambled.n}; edits: ${Object.entries(t.code_mind.edits).map(([f, e]) => `${f} right way ${e.right} of ${e.pairs}, mean ${e.mean_points}`).join("; ")}`);
   }
   for (const a of r.agreement) L.push(`${a.a} and ${a.b}: median ${a.median_distance} points apart over ${a.n}; another person moves acting at all the same way in ${a.same_direction_when_the_person_changes.same} of ${a.same_direction_when_the_person_changes.of}; first less second by class: ${Object.entries(a.a_less_b_points_by_class).map(([c, x]) => `${c} ${x}`).join(", ")}`);
   return L.join("\n");

@@ -52,6 +52,39 @@ export function codeOdds(s: Situation): { [id: string]: number } {
   for (const o of opts) out[o.id] ??= 0;
   return out;
 }
+/**
+ * The code mind's odds for another person shown in a recorded situation (a scramble, an edit), beside its recorded
+ * odds for the person it was recorded with: what the code mind's own sway makes of the change. The mind's score for
+ * a kind of way is what it has learned of it plus its sways (wants.choice: trust 1,500 and agency 1,500 a standard
+ * deviation, fear 3,000 at full, 500 for each of up to five known to have gone that way, weighed again by
+ * conformity), chosen by a logit the more open explore more in. Only the parts a situation holds are moved (trust in
+ * whoever an opening is by, fear of them, the sense of agency, those known to have gone that way, what was learned,
+ * openness and conformity); the rest of each score (a value's lean toward spending less or telling others, attachment
+ * to a trade) stays as it was recorded. So this understates a little how far the code mind tells people apart, and
+ * it has no reading of how long someone has lived in a town at all: the code mind does not use it here.
+ */
+export function codeOddsFor(shown: Situation, recorded: Situation): { [id: string]: number } {
+  const K = { trust: 1_500, agency: 1_500, fear: 3_000, others: 500, own: 500 };
+  const z = (s: Situation) => Math.max(-3, Math.min(3, zAgency(s)));
+  const temper = (s: Situation) => (s.record.temperament ?? {}) as { openness?: number; conformity?: number };
+  const lam = (s: Situation) => 4 * (1 - (temper(s).openness ?? 5_000) / 20_000);
+  const moved = (s: Situation, o: Situation["openings"][number] | undefined): number => {
+    if (!o) return -K.agency * z(s); // leaving it
+    const acts = !["self", "tell", "ties"].includes(o.kind);
+    return (o.trust ? (K.trust * Math.max(-3, Math.min(3, (o.trust.bps - o.trust.town_bps) / TRUST_SD))) : 0) - (K.fear * (o.fear ?? 0)) / 10_000 + (acts ? K.agency * z(s) : 0)
+      + (K.others * Math.min(5, o.others) * (10_000 + (temper(s).conformity ?? 5_000))) / 10_000 + (o.learned ?? 5_000);
+  };
+  const base = codeOdds(recorded), was = new Map(optionsOf(recorded).map((o) => [o.id, o.opening])), now = new Map(optionsOf(shown).map((o) => [o.id, o.opening]));
+  const w: { [id: string]: number } = {};
+  for (const [id, p] of Object.entries(base)) {
+    if (p <= 0) { w[id] = 0; continue; }
+    // (The recorded odds give each option's whole score up to a constant; the moved parts are taken out and put back.)
+    const score = Math.log(p) / lam(recorded) + (moved(shown, now.get(id)) - moved(recorded, was.get(id))) / 10_000;
+    w[id] = Math.exp(lam(shown) * score);
+  }
+  const total = Object.values(w).reduce((a, b) => a + b, 0) || 1;
+  return Object.fromEntries(Object.entries(w).map(([id, x]) => [id, x / total]));
+}
 /** Odds by class (asking, a venue, moving ...; `act`: everything but leaving it and giving up). */
 export function byClass(s: Situation, odds: { [id: string]: number }): { [cls: string]: number } {
   const out: { [cls: string]: number } = { act: 0 };

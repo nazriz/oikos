@@ -10,7 +10,7 @@ import { PRICES } from "@oikos/participants/llm";
 import type { Situation } from "@oikos/participants";
 import { loadWorld } from "../src/batch";
 import { exportDataset } from "../src/dataset";
-import { ask, baseLine, byClass, codeOdds, edited, optionsOf, readAnswer, scrambled, split, standing, tv, type Harvested } from "../src/everyday";
+import { ask, baseLine, byClass, codeOdds, codeOddsFor, edited, optionsOf, readAnswer, scrambled, split, standing, tv, type Harvested } from "../src/everyday";
 import { gate, requests, THRESHOLDS } from "../src/everyday-gate";
 import { mockTeacher, type MockKind } from "../src/everyday-mock";
 import { runWorld } from "../src/run";
@@ -128,6 +128,14 @@ test("the gate passes a teacher that reads the person and catches each fault", a
     expect(again.calls.served).toBeGreaterThan(100);
     expect(again.scrambled).toEqual(reads.scrambled);
     expect(THRESHOLDS.scrambled_points).toBe(8);
+    // The code mind's own sway is reported beside: for the person a situation was recorded with it is its recorded odds.
+    expect(tv(codeOddsFor(s.dev[0]!.situation, s.dev[0]!.situation), codeOdds(s.dev[0]!.situation))).toBeLessThan(0.001);
+    expect(reads.code_mind.edits.agency!.right).toBe(reads.code_mind.edits.agency!.pairs);
+    expect(reads.code_mind.edits.residence!.mean_points).toBe(0); // the code mind does not read how long someone has lived here
+    // A class of option open in fewer situations than the stated minimum is not assessed in the town's totals.
+    const few = (await gate({ sample: s.dev.slice(0, 6), pool: s.pool.dev, teachers: new Map([["venues", mockTeacher("venues")]]), design: "bearing", prices: PRICES, outDir: join(out, "few"), edits: 0 })).teachers[0]!;
+    expect(Object.values(few.town).every((x) => !x.assessed)).toBe(true);
+    expect(few.pass.town).toBe("not assessed");
   } finally {
     rmSync(out, { recursive: true, force: true });
   }

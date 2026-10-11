@@ -915,8 +915,9 @@ As a large model is shown it in words (11c): 600 to 900 tokens.
 **What is never in the input:** anyone else's record or any figure from it; a name or an id of anyone (roles and
 kinds only, so the model cannot learn a town); the town's state or anything the person has not seen (docs/no-god-view.md);
 text the person has not read; who governs the town or which model sits in a seat; how the choice turned out; the
-code mind's own scores (they are what it is taught from, never what it reads). **Not yet in it, and wanted** (for the
-next task to record): how it went for those the person knows who tried a way (today only how many went); the words
+code mind's own scores (they are what it is taught from, never what it reads). **Not yet in it, and wanted:** how it went for those the person knows who tried a way (today only how many went).
+That is part of what a person knows, so the next task adds it to the person's own knowledge the way the counts
+already come: told in catch-ups, kept in the record, never shown to the model from outside the person. And the words
 of an opening that is made of words (a founded group's purpose), as a short fixed vector of text the person has read.
 
 **The output and the draw.** The model's numbers are turned into whole parts per million that sum to exactly
@@ -1014,7 +1015,7 @@ over the same options, in points of 100 (half the sum of absolute differences). 
 | **One-thing edits** (the directions the record explains) | the same person with one thing set low and then high (1.3 standard deviations either side of the town's: its tenth and ninetieth in a hundred), 12 situations each | the move, low to high, in the class of option it bears on | the right way in at least 10 of 12, and on average at least: sense of agency, acting at all up 5 points; trust in a venue, going to one up 3; trust in the landlord, asking them up 3; lived here half a year against fifteen, looking for another home down 3 |
 | **Option order** | the options listed in the reverse order | median distance between the two orders; and what an option gains from being listed first rather than last | at most 1.5 times the repeat's median plus 2 points; and at most 3 points gained. A teacher's odds are the average of the two orders; the residual reported is the gain |
 | **Rewording** | every sentence and label in other words | median distance | at most 1.5 times the repeat's median plus 3 points; at most half the scrambled median (who the person is must count for more than how the question is put); and where the likeliest option led by 10 points it is still the likeliest in 4 of 5 |
-| **The town's totals** | the sample weighted back to the town's true mix of matters, stages and people | each class of option, of 100, beside the code mind's on the same decisions | every class within 15 points; asking, a venue and acting at all within two thirds to one and a half times the code mind's rate where that is at least 5. (The code mind is fitted to the surveys' 44% who ask the other side and 16.7% who turn to an authority: 2b. A teacher that sends everyone to the tribunal fails here) |
+| **The town's totals** | the sample weighted back to the town's true mix of matters, stages and people | each class of option, of 100, beside the code mind's on the same decisions, with how many situations stand behind it | a class open in fewer than 10 of the sample's situations is **not assessed** (the coordinator's ruling, before any full gate was run: nobody passes or fails on it); every assessed class within 15 points; asking, a venue and acting at all within two thirds to one and a half times the code mind's rate where that is at least 5. (The code mind is fitted to the surveys' 44% who ask the other side and 16.7% who turn to an authority: 2b. A teacher that sends everyone to the tribunal fails here) |
 | **Readable** | | answers that could not be read | at most 1 in 20 |
 | **Agreement between families** | | median distance between two teachers on the same request; whether another person moves acting at all the same way for both; mean difference by class | reported, with where they differ; no threshold |
 
