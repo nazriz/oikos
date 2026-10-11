@@ -73,6 +73,7 @@ One line per decision a code citizen's mind made (docs/design/ai-citizens.md 7),
 - `seq`: where it stands in the log. What the citizen did next is the rows of `actions.jsonl` for that participant with a higher `seq` (each says whether it was applied, or why refused); the log has every event after it.
 - `n`: the citizen's own count of its recorded decisions, from 1. An outcome names the decision it follows by it.
 - `outcomes`: what the citizen came to know of how the choice turned out, in the order it learned it (below). **An empty list means the citizen learned nothing of it before the run ended** (the manifest's `end.t`): not known, which is not a payoff of nought. A row with no `outcomes` at all comes from a log made before outcomes were recorded.
+- `situation` (0.8.0), on a decision about a want (areas `want` and `found`): what the everyday model would be given for that decision and nothing else (docs/design/ai-citizens.md 11a; the contract's `CitizenSituation`): the want, what stands behind it, each opening in typed terms with what the citizen knows of it, the citizen's own record, and the odds the code mind gave. `oikos run --record-decisions want,found,found_shape` keeps those decisions alone, in a lean log too; `oikos everyday-harvest` gathers them from many runs.
 - `follows`: on a decision that follows up another (trying a second shop for what the first could not serve), that one's `n`.
 - Facts and the mind's own figures only. Nothing says whether a choice was good: that is for whoever reads it.
 

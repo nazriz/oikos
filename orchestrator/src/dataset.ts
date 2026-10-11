@@ -10,7 +10,7 @@ import { takeRoute, takeTurn, type CorpusExample } from "./corpus";
 import { periodRow, Records } from "./records";
 
 const sortedCounts = (c: { [k: string]: number }) => Object.fromEntries(Object.entries(c).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
-export const DATASET_VERSION = "0.7.0"; // 0.7.0: founding and the lineage of ideas (founded.jsonl, ideas.jsonl, idea_passages.jsonl, words.jsonl)
+export const DATASET_VERSION = "0.8.0"; // 0.8.0: a decision about a want carries its situation (docs/design/ai-citizens.md 11); 0.7.0: founding and the lineage of ideas (founded.jsonl, ideas.jsonl, idea_passages.jsonl, words.jsonl)
 
 interface Command { seq: number; command: string; as?: string; blocks?: unknown[]; looks?: unknown[]; provenance?: unknown; reasoning?: string; applied?: boolean; refusal?: unknown; created?: string[] }
 /** Something a seat was shown that names what an earlier act of its own made: the record or letter made (`of`), the
@@ -277,7 +277,7 @@ export async function exportDataset(logPath: string, outDir: string, o: DatasetO
         citizenDecisions.write({ run: run(), t: d.t ?? e.t, seq: e.seq, participant: b.subject, ...(Number.isInteger(d.n) ? { n: d.n } : {}), ...(Number.isInteger(d.follows) ? { follows: d.follows } : {}),
           domain: d.domain, strategy: d.strategy, ...(d.choice !== undefined ? { choice: d.choice } : {}), options: d.options ?? [],
           ...(d.current !== undefined ? { current: d.current } : {}), ...(d.circumstances ? { circumstances: d.circumstances } : {}), ...(d.satisfied_here !== undefined ? { satisfied_here: d.satisfied_here } : {}),
-          ...(d.doubt !== undefined ? { doubt: d.doubt } : {}), ...(d.person ? { person: d.person } : {}), ...(d.state ? { state: d.state } : {}) });
+          ...(d.doubt !== undefined ? { doubt: d.doubt } : {}), ...(d.person ? { person: d.person } : {}), ...(d.state ? { state: d.state } : {}), ...(d.situation ? { situation: d.situation } : {}) });
       } else if (a === "note" && b.data?.words) {
         const w = b.data.words;
         wordRows.write({ run: run(), t: e.t, seq: e.seq, participant: b.subject, what: String(w.what), ...(w.idea ? { idea: w.idea } : {}), ...(w.draft ? { draft: w.draft } : {}), result: w.result, ...(w.why ? { why: w.why } : {}), ...(w.by ? { by: w.by } : {}), ...(w.plumbing_added ? { plumbing_added: true } : {}) });

@@ -56,6 +56,13 @@
 //     The composing model's audits, on the situations a run's foundings recorded (a dataset's founded.jsonl): tone by
 //     word counts and by the rubric as each judge reads it, beside real texts; how often it declines; scrambled
 //     records; the prompt reworded. The mock by default. Every call is kept, and served again from the same folder.
+//   oikos everyday-harvest <DIR> [--held-profiles a,b] [--dev 24] [--held 36] [--out DIR]
+//     The everyday model's recorded situations (docs/design/ai-citizens.md 11): the decisions about a secure home in
+//     the datasets under DIR (a folder a profile), with a development and a held-back sample. No model is called.
+//   oikos everyday-gate <sample.jsonl> --pool <pool.jsonl> [--models a,b] [--design plain|bearing|shift] [--edits N] [--jobs N]
+//                 [--skip repeat,reversed,reworded,scrambled] [--budget DOLLARS] [--out DIR]
+//     The teachers' gate: scrambled records, one-thing edits, option order, rewording, the town's totals, agreement.
+//     The mock by default. Every call is kept, and served again from the same folder.
 //   oikos dataset <DIR|log.jsonl> [--out DIR] [--actions]
 //     Run datasets: each log's data as training examples, in <run>.dataset/ (docs/design/run-datasets.md): the manifest,
 //     system prompts, translations, model participants' decisions; code participants' acts with --actions; code
@@ -339,6 +346,48 @@ try {
     const outDir = flag("out") ?? join("runs", "compose-audit");
     const report = await composeAudit({ briefs, composers, judges, prices, ...(budget ? { budget } : {}), outDir, ...(flag("repeats") ? { repeats: Number(flag("repeats")) } : {}), ...(flag("follow-ups") ? { followUps: Number(flag("follow-ups")) } : {}), log: console.log });
     console.log(auditText(report));
+    console.log(`\nReport: ${join(outDir, "report.json")}; every call: ${join(outDir, "calls.jsonl")}`);
+  } else if (cmd === "everyday-harvest" && positional()[0]) {
+    // The everyday model's recorded situations (docs/design/ai-citizens.md 11): every decision about a want of the
+    // first slice in the datasets under a folder (one folder a profile), split into a development and a held-back
+    // sample. No model is called.
+    const { harvest, split, stageOf, zAgency, optionsOf } = await import("./everyday");
+    const all = harvest(positional()[0]!);
+    const held = (flag("held-profiles") ?? "").split(",").filter((x) => x);
+    const s = split(all, { heldProfiles: held, dev: Number(flag("dev", "24")), held: Number(flag("held", "36")), seed: Number(flag("seed", "4")) });
+    const outDir = flag("out") ?? positional()[0]!;
+    const { mkdirSync } = await import("node:fs");
+    mkdirSync(outDir, { recursive: true });
+    const lines = (xs: object[]) => xs.map((x) => JSON.stringify(x)).join("\n") + (xs.length ? "\n" : "");
+    await Bun.write(join(outDir, "situations.dev-pool.jsonl"), lines(s.pool.dev));
+    await Bun.write(join(outDir, "situations.held-pool.jsonl"), lines(s.pool.held));
+    await Bun.write(join(outDir, "sample.dev.jsonl"), lines(s.dev));
+    await Bun.write(join(outDir, "sample.held.jsonl"), lines(s.held));
+    const count = (xs: typeof all, f: (h: (typeof all)[number]) => string) => { const m: { [k: string]: number } = {}; for (const h of xs) m[f(h)] = (m[f(h)] ?? 0) + 1; return Object.fromEntries(Object.entries(m).sort(([a], [b]) => (a < b ? -1 : 1))); };
+    const spread = (xs: typeof all) => ({ n: xs.length, people: new Set(xs.map((h) => `${h.profile}/${h.run}/${h.participant}`)).size, by_profile: count(xs, (h) => h.profile), by_matter: count(xs, (h) => h.situation.want.about), by_stage: count(xs, (h) => stageOf(h.situation)),
+      by_agency: count(xs, (h) => (zAgency(h.situation) < -0.5 ? "low" : zAgency(h.situation) > 0.5 ? "high" : "middle")), by_code_choice: count(xs, (h) => h.choice ?? "none"), by_options: count(xs, (h) => String(optionsOf(h.situation).length)) });
+    const manifest = { harvest: "oikos-everyday-harvest", from: positional()[0], held_profiles: held, all: spread(all), dev_pool: spread(s.pool.dev), held_pool: spread(s.pool.held), dev_sample: spread(s.dev), held_sample: spread(s.held) };
+    await Bun.write(join(outDir, "harvest.json"), JSON.stringify(manifest, null, 2) + "\n");
+    console.log(JSON.stringify(manifest, null, 2));
+  } else if (cmd === "everyday-gate" && positional()[0]) {
+    // The teachers' gate (docs/design/ai-citizens.md 11): oikos everyday-gate <sample.jsonl> --pool <pool.jsonl>
+    //   --models a,b --design plain|bearing|shift [--edits N] [--jobs N] [--skip repeat,reworded] [--budget DOLLARS] --out DIR
+    // The mock (which reads the person, by construction) unless models are named. Every call is kept beside the report.
+    const { gate, gateText } = await import("./everyday-gate");
+    const { mockTeacher } = await import("./everyday-mock");
+    const { readFileSync } = await import("node:fs");
+    const read = (f: string) => readFileSync(f, "utf8").split("\n").filter((l) => l.trim()).map((l) => JSON.parse(l));
+    const named = (flag("models") ?? "").split(",").map((x) => x.trim()).filter((x) => x);
+    for (const m of named) if (/astra|fable/i.test(m)) throw new Error(`${m} is never a teacher`);
+    const budgetUsd = flag("budget") ? Number(flag("budget")) : undefined;
+    let budget: { limitMicroUsd: number; spentMicroUsd: number } | undefined;
+    const prices: Record<string, any> = { ...PRICES };
+    const adapterOf = (name: string) => { const c = chooseModel(name, { budgetUsd, timeoutMs: 180_000 }); Object.assign(prices, c.prices); budget ??= c.budget; return c.adapter; };
+    const teachers = new Map(named.length ? named.map((m) => [m, adapterOf(m)] as const) : [["mock", mockTeacher("reads")] as const]);
+    const outDir = flag("out") ?? join("runs", "everyday-gate");
+    const report = await gate({ sample: read(positional()[0]!), pool: read(flag("pool") ?? positional()[0]!), teachers, design: (flag("design") ?? "shift") as "plain" | "bearing" | "shift", prices, ...(budget ? { budget } : {}), outDir,
+      edits: Number(flag("edits", "12")), jobs: Number(flag("jobs", "3")), skip: (flag("skip") ?? "").split(",").filter((x) => x), log: console.log });
+    console.log(gateText(report));
     console.log(`\nReport: ${join(outDir, "report.json")}; every call: ${join(outDir, "calls.jsonl")}`);
   } else if (cmd === "translator-eval" && flag("model")) {
     // The held-out cases are outside the repository (translator/eval/held-out.ts): with them, their results go out by
