@@ -8,6 +8,7 @@ import { cites } from "../contracts";
 import { cents } from "../money";
 import { need, params, type BehaviourModule, type ParticipantContext } from "../module";
 import { because, Book, breaches, noting, DAY, say, type Step, usd } from "./common";
+import { hearingOffer, Hearings, HEARING_DEFAULTS, type Hears } from "./desk";
 import { stepper } from "./firms";
 import * as P from "./papers";
 
@@ -18,7 +19,7 @@ export const member: BehaviourModule = {
   name: "tribunal.member",
   answers: {"office": "the tribunal", "acts": "What it acts on: an application made to it by a party to a dispute, which it hears and decides by the laws in force."},
   issues: P.TRIBUNAL_MEMBER,
-  version: "0.2.1",
+  version: "0.3.0", // 0.3.0: lists (docs/behaviour/frictions.md): the matters the world says it hears beyond its own three, heard by the common procedure on its own forms, as far as its hearing days go; it says what it hears and what applying costs
   doc: "docs/behaviour/justice.md",
   cadence: () => DAY,
   firstWake: (ctx) => 9 * 3600 + ctx.rng("first-wake").below(3600),
@@ -26,19 +27,41 @@ export const member: BehaviourModule = {
     const p = params({
       hearing_after_days: 21, // listed for a hearing this long after it's made (the respondent's time to answer)
       pay_within_days: 28, // an order to pay: within this long
+      // Its lists (docs/behaviour/frictions.md, "Venues"): the matters it hears beyond a rent increase, a debt and
+      // a charge (none: it hears those three and says nothing of it, as before); how many such cases a day's
+      // hearings decide; how often it finds for an applicant with nothing to show; what applying costs, and where
+      // the fee is paid.
+      hears: [] as Hears[],
+      cases_per_day: HEARING_DEFAULTS.cases_per_day,
+      uphold_bps: HEARING_DEFAULTS.uphold_bps,
+      fee: 0,
+      account: "",
     }, ctx.params);
     const me = ctx.entity;
     const book = new Book();
     const listed = new Map<string, number>(); // application -> its hearing
     const decided = new Set<string>();
+    const lists = p.hears.length ? new Hearings(me, ctx.rng, { hears: p.hears, answer_days: p.hearing_after_days, cases_per_day: p.cases_per_day, uphold_bps: { ...HEARING_DEFAULTS.uphold_bps, ...p.uphold_bps }, within_days: p.pay_within_days, refer_to: {} },
+      { application: ["tribunal_application"], notice: "hearing_notice", response: "tribunal_response", decision: "tribunal_order" }, APPLICATION_KINDS) : undefined;
+    const listKinds = new Set(p.hears.map((h) => h.about));
+    let said = false;
     return noting(book, stepper(
       (obs) => void book.absorb(obs),
       (obs) => {
         const t = obs.t;
         const steps: Step[] = [];
+        // ---- what it hears, said once, so that whoever has such a matter can bring it ----
+        if (lists && !said) {
+          said = true;
+          const all: Hears[] = [{ about: "rent_increase", can: ["order"], undoes: true, form: "tribunal_application" }, { about: "debt", can: ["order"], form: "tribunal_application" }, ...p.hears.map((h) => ({ ...h, form: "tribunal_application" }))];
+          if (!book.open("hearing").some((r) => r.speaks_for === me)) steps.push(because("Saying what the tribunal hears, so that whoever has such a matter can bring it.",
+            say("hearing", `The tribunal hears: ${all.map((h) => h.about.replace(/_/g, " ")).join(", ")}. Apply in writing${p.fee > 0 ? `; the fee is ${usd(p.fee)}` : "; there is no fee"}.`, { visible: "public", offer: hearingOffer(me, all, { fee: p.fee, account: p.account }), data: { hears: all.map((h) => h.about), ...(p.fee > 0 ? { fee: p.fee } : {}) } })));
+        }
+        if (lists) steps.push(...lists.steps(book, t));
         // ---- applications: listed for a hearing, both sides told ----
         for (const a of book.open("tribunal_application").filter((x) => (x.addressed_to ?? []).includes(me) && !listed.has(x.id) && !decided.has(x.id))) {
           const kind = String(a.data?.kind ?? "");
+          if (listKinds.has(kind)) continue; // (heard on its lists, above)
           const against = String(a.data?.against ?? "");
           const applicant = a.speaks_for!;
           if (!(APPLICATION_KINDS as readonly string[]).includes(kind) || !against || against === applicant) {
@@ -114,7 +137,7 @@ export const registrar: BehaviourModule = {
   answers: {"office": "the tribunal's registry", "acts": "What it acts on: an order of the tribunal to pay that has gone unpaid, which it enforces by an order to the debtor's bank."},
   issues: P.TRIBUNAL_REGISTRAR,
   issuesWith: (p) => ({ banks: p.banks ?? [] }),
-  version: "0.1.0",
+  version: "0.1.1", // 0.1.1: an order to pay that rests on no recorded debt is settled against the order itself
   doc: "docs/behaviour/justice.md",
   cadence: () => DAY,
   firstWake: (ctx) => 10 * 3600 + ctx.rng("first-wake").below(3600),
@@ -143,7 +166,7 @@ export const registrar: BehaviourModule = {
           if (unpaid <= 0) continue;
           steps.push(because(`An order to pay ${usd(unpaid)}, due and unpaid: ordering ${o.data.against}'s bank to pay it from what it holds.`,
             say("garnishee_order", `Garnishee order: pay ${usd(unpaid)} owed by ${o.data.against} under order ${o.id} to ${o.data.to}, from what you hold for them.`,
-              { to: p.banks, visible: [...p.banks, me, o.data.against, o.data.applicant], basis: o.id, data: { order: o.id, debtor: o.data.against, amount: unpaid, to: o.data.to, claim: o.data.claim } })));
+              { to: p.banks, visible: [...p.banks, me, o.data.against, o.data.applicant], basis: o.id, data: { order: o.id, debtor: o.data.against, amount: unpaid, to: o.data.to, claim: o.data.claim ?? o.id } })));
         }
         return steps;
       },

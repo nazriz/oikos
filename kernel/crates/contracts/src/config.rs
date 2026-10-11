@@ -659,6 +659,9 @@ pub struct StructureCfg {
     pub structure_type: Id,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub built_by: Option<Id>,
+    /// Its starting variables (the catalogue's that apply to its type; others start at `initial`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub variables: Option<BTreeMap<Id, i64>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

@@ -152,7 +152,7 @@ class Pages {
 /** Does taking a record in do something to a book beyond the record being there (`Book.mark`)? */
 const acts = (r: Record): boolean =>
   r.record === "claim_release" || r.record === "withdrawal" || r.record === "signature" || r.record === "notice" ||
-  (r.record === "statement" && (typeof r.data?.replaces === "string" || !!r.practice || !!r.assertion));
+  (r.record === "statement" && (typeof r.data?.replaces === "string" || !!r.practice || !!r.assertion || !!r.offer?.hears));
 
 /** The shelves made so far, by the record each begins with (for as long as that record is held by anyone). */
 const SHELVES = new WeakMap<Record, Pages[]>();
@@ -227,6 +227,7 @@ export class Book {
   readonly released = new Set<string>();
   private readonly withPractice = new Map<string, StatementRecord>(); // statements carrying a practice, not withdrawn
   private readonly withAssertion = new Map<string, StatementRecord>(); // statements put forward to be believed, not withdrawn
+  private readonly withHears = new Map<string, StatementRecord>(); // statements whose offer says what its offerer hears, not withdrawn
   /** participant -> the person it acts as (from a directory). */
   readonly participantPerson = new Map<string, string>();
   /** position -> its organisation, role and holder (from a directory). */
@@ -431,6 +432,7 @@ export class Book {
     if (r.record === "statement" && !this.withdrawn.has(r.id)) {
       if (r.practice) this.withPractice.set(r.id, r);
       if (r.assertion) this.withAssertion.set(r.id, r);
+      if (r.offer?.hears) this.withHears.set(r.id, r);
     }
     if (r.record === "notice") this.notices.set(r.agreement, [...(this.notices.get(r.agreement) ?? []), { as: r.as, at: r.at }]);
   }
@@ -444,6 +446,7 @@ export class Book {
     if (!this.withdrawnAt.has(id)) this.withdrawnAt.set(id, at);
     this.withPractice.delete(id);
     this.withAssertion.delete(id);
+    this.withHears.delete(id);
   }
 
   /** The record in force that an id names now: itself while it stands, or what has replaced it (an amended law, and
@@ -526,6 +529,12 @@ export class Book {
   /** Statements carrying a practice (a gathering: docs/design/ai-citizens.md 2b), still standing, in the order seen. */
   practices(): StatementRecord[] {
     return [...this.withPractice.values()];
+  }
+
+  /** Statements whose offer says what its offerer hears (a desk, a list, a group that takes up grievances:
+   * docs/behaviour/frictions.md), still standing, in the order seen. */
+  hearings(): StatementRecord[] {
+    return [...this.withHears.values()];
   }
 
   /** Statements put forward to be believed (an `assertion`: a teaching, a report, a promise), not withdrawn. */

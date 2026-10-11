@@ -65,6 +65,8 @@ export interface Offer {
   available?: number;
   until?: number;
   practice?: Id;
+  /** What the offerer hears (take_up: apply): the matters it takes up, and what it may do about one. */
+  hears?: { about: string; can?: ("order" | "recommend" | "mediate" | "refer" | "represent" | "publish")[]; undoes?: boolean; form?: string; within?: number }[];
 }
 
 /** Something put forward to be believed (blocks: Assertion; contracts 0.7 A1). No power; belief is the reader's. */

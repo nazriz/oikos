@@ -46,6 +46,16 @@ Whether a building fits a lot's open ground exactly is the resolver's to judge w
 
 **What a client does with a decline** is the client's own rule. A landlord reads it a week on and offers again at the price named, if it can pay it (docs/behaviour/firms.md, "Development"). The town's office does not read it: a park or road declined is not offered again, though the next year's park is applied for afresh (known, not changed: docs/decisions.md, "A landlord whose offer is declined").
 
+## Repairs
+
+A landlord whose home has fallen into disrepair engages the town's builder. The builder takes an order (a statement of kind `repair_order` addressed to it, from whoever speaks for the orderer, with `data: { structure, units, account }`) once the money for it, `units` times its `repair_price`, has come into its account from the account the order names. An order whose money has not come within 14 days is declined in writing (`repair_declined`, to the orderer, basis the order); so is one for a building that is gone, or one the world's refuses again and again. Money that came after a decline is not sent back (left out).
+
+Orders are done oldest first. Each working day the crew at the yard does as many units of the repair task on the order's structure as its hours allow (`floor(hours left / repair_labour)`), and when the units are done the builder tells the orderer (`repair_done`, visible to both, basis the order). With `repair_first` (the default) the day's repairs come before its building work, a small job fitted in; without it, after. A work call refused for want of time is tried again the next day. The hours in hand for repairs count in the size of the crew it wants.
+
+Parameters (module `firm.builder`): `repair_task` (the catalogue task that repairs; empty, the default: the builder takes no repair orders and behaves as before), `repair_labour` (seconds of work a unit takes), `repair_price` (cents a unit), `repair_first`. The figures are the generator's, from the profile (docs/behaviour/frictions.md); the module has none of its own.
+
+Left out: one crew for building and repairs (a repair waits behind the day's work when `repair_first` is off, and takes hours from building when it is on); no travel to the site; no emergency call-out; no refund of money for an order declined.
+
 ## Leaves out
 
 - **One kind of material**, instead of concrete, timber, steel and fittings.

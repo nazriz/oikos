@@ -93,7 +93,7 @@ of the outside world's offices does too. The estimate has no error added of its 
 (a search returns the oldest standing lists first, so in a town with more outlets than the sample it leans to shops
 whose prices have not changed: at 200 this bites above about 200 sellers); the collectors' time.
 
-## `world.transfers` (v0.3.0): the payments office, applying the published support law
+## `world.transfers` (v0.4.0): the payments office, applying the published support law
 
 Support paid to people in the world by someone outside it: for a town, a higher government's payments office. Until 2026-10-08 the payments were the office's own settings (a kind, an amount, how often, the ages). Now **a payment is a rule of a published law**, and the office reads the law and applies it, as an employer reads the tax law.
 
@@ -114,6 +114,8 @@ and `every_days` (how often it is paid: 14, 30, 61 for a pension paid every two 
 - *Net pay:* the published tax law, which the office reads as anyone may.
 
 It grants or refuses (`benefit_decision`: the sum, how often, and `until` where the payment's time is limited; a refusal says why, except for age), pays on the payment's schedule from the payment's account, and stops when the claimant asks (`benefit_change`), dies (a death registration), leaves (a departure), or the payment's time runs out. Then it tells the claimant (`benefit_end`, naming what may be claimed next). One payment of each kind a person: a new claim for the same payment replaces the old; different payments are drawn together (a pension and a household's payment).
+
+**Under load** (0.4.0). A payments office has a processing time and limited staff, and hurried staff make mistakes. Three parameters, all 0 by default (the office then decides every claim the day it sees it, as before): `processing_days` (a claim is decided that long after it was made), `capacity_per_day` (how many claims its staff decide in a day; 0: no limit; claims are decided oldest first, then by id) and `error_bps` (of claims that qualify, the share wrongly refused, scaled by the world's friction dial `dials.friction_bps`; twice that share while more claims wait than a day's capacity). A wrong refusal is a `benefit_decision` that says "the claim could not be verified" (drawn from the office's stream `claim-error-<claim>`); the office remembers it as wrong. When the first two are set, each decision states `waited_days`. A claimant who asks the office to review the refusal (`remedy_request`, matter `claim_refused`, `about` the decision, answered by `respond`: docs/behaviour/frictions.md) is told yes if its books show the refusal was wrong and no if the claim was rightly refused; a review pays nothing, but that person's next claim for the payment is decided on its facts, with no error draw, and they claim again. The figures are the profile's, with their sources (`frictions.support`: docs/behaviour/frictions.md).
 
 **Who claims what** is the citizen's (docs/behaviour/citizen.md, "Retiring and support").
 

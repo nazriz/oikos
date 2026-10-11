@@ -152,6 +152,43 @@
             }
           }
         },
+        "frictions": {
+          "description": "Everyday frictions in the run (docs/behaviour/frictions.md), counted and never scored: what arose, by matter; how each ended, by matter and how; the papers grievances travelled on, by paper and matter; what venues found, by venue, matter and finding.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "arose",
+            "ended",
+            "papers",
+            "findings"
+          ],
+          "properties": {
+            "arose": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "urn:oikos:contracts:0.8:common#/$defs/Count"
+              }
+            },
+            "ended": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "urn:oikos:contracts:0.8:common#/$defs/Count"
+              }
+            },
+            "papers": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "urn:oikos:contracts:0.8:common#/$defs/Count"
+              }
+            },
+            "findings": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "urn:oikos:contracts:0.8:common#/$defs/Count"
+              }
+            }
+          }
+        },
         "files": {
           "description": "Each file written: its rows, and how many are synthetic (from the mock).",
           "type": "object",
@@ -1562,6 +1599,137 @@
         "by": {
           "type": "string",
           "maxLength": 160
+        }
+      }
+    },
+    "Friction": {
+      "description": "A row of frictions.jsonl: something went wrong for a person at someone's hands (`arose`: the matter, whom it is against, and its size: money in whole units, capped), or stopped being so (`ended`: how, with whether they had asked and what was answered and how many venues they went to; the days it lasted). From the person's record's reasons.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "run",
+        "t",
+        "seq",
+        "entity",
+        "event",
+        "matter"
+      ],
+      "properties": {
+        "run": {
+          "type": "string"
+        },
+        "t": {
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/SimTime"
+        },
+        "seq": {
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/Count"
+        },
+        "entity": {
+          "type": "string"
+        },
+        "event": {
+          "enum": [
+            "arose",
+            "ended"
+          ]
+        },
+        "matter": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "against": {
+          "type": "string"
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "how": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "days": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        }
+      }
+    },
+    "VenuePaper": {
+      "description": "A row of venues.jsonl: a paper a grievance travelled on, as the act that made it said. `paper`: request (to the other side), answer, application (to a venue), notice (the venue to the other side), response, decision, enforcement, repair_order, repair_done. `by`: whom it speaks for; `to`: whom it is addressed to.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "run",
+        "t",
+        "seq",
+        "paper",
+        "kind",
+        "by",
+        "matter"
+      ],
+      "properties": {
+        "run": {
+          "type": "string"
+        },
+        "t": {
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/SimTime"
+        },
+        "seq": {
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/Count"
+        },
+        "paper": {
+          "enum": [
+            "request",
+            "answer",
+            "application",
+            "notice",
+            "response",
+            "decision",
+            "enforcement",
+            "repair_order",
+            "repair_done"
+          ]
+        },
+        "kind": {
+          "type": "string"
+        },
+        "by": {
+          "type": "string"
+        },
+        "to": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 64
+        },
+        "matter": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "against": {
+          "type": "string"
+        },
+        "applicant": {
+          "type": "string"
+        },
+        "finding": {
+          "type": "string"
+        },
+        "binding": {
+          "type": "boolean"
+        },
+        "granted": {
+          "type": "boolean"
+        },
+        "amount": {
+          "type": "integer"
+        },
+        "waited_days": {
+          "type": "integer",
+          "minimum": 0
         }
       }
     }

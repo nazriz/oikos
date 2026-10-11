@@ -72,27 +72,63 @@ test("a living town: the housed have a place, the employed a trade, children nei
   expect(Math.abs(share(placeYears, 0, 1) - O.residence!.bands[0]!.bps)).toBeLessThan(700);
   expect(Math.abs(share(tradeYears, 0, 1) - O.job_tenure!.bands[0]!.bps)).toBeLessThan(700);
   expect(share(tradeYears, 10, 1e9)).toBeGreaterThan(O.job_tenure!.bands.at(-1)!.bps * 0.4);
-  expect(c.dials).toBeUndefined();
+  // (No initiative dial given: none written. What goes wrong goes wrong at the profile's rates unless the spec says.)
+  expect(c.dials).toEqual({ friction_bps: 10_000 });
 });
 
 test("`living` with the starting attachment off gives no started; the initiative dial is written when given", () => {
   const c = generate({ ...small, living: { starting_attachment: false, initiative_bps: 2500 } }) as any;
   expect(JSON.stringify(c)).not.toContain('"started"');
   expect(params(c).every((p: any) => p.attach_mean !== undefined)).toBe(true);
-  expect(c.dials).toEqual({ initiative_bps: 2500 });
+  expect(c.dials).toEqual({ initiative_bps: 2500, friction_bps: 10_000 });
 });
 
 test("a living town is deterministic and leaves every other draw as it was", () => {
-  const a = generate({ ...small, living: {} }) as any, b = generate({ ...small, living: {} }) as any;
+  // (With the friction dial at 0: what goes wrong is the test below's.)
+  const a = generate({ ...small, living: { friction_bps: 0 } }) as any, b = generate({ ...small, living: { friction_bps: 0 } }) as any;
   expect(JSON.stringify(a)).toBe(JSON.stringify(b));
+  expect(a.dials).toBeUndefined();
   // (What a living town adds, and nothing else: people's starting attachments and the town's mean; firms' and
   // landlords' owners' values, the town's figures they are read against, what the profile says of asking, and the
   // posts that keep their records.)
   const strip = (c: any) => JSON.parse(JSON.stringify(c, function (this: any, k, v) {
-    if (k === "started" || k === "attach_mean" || k === "keeps_record" || k === "owner_values" || k === "org") return undefined;
+    // (And, since step 2b: what holds people in a job and how fast belief fades in a living town, where the profile says.)
+    if (k === "started" || k === "attach_mean" || k === "keeps_record" || k === "owner_values" || k === "org" || k === "job_move" || k === "belief") return undefined;
     // (The town's figures, given to a firm's module beside its owner's values: a firm's parameters name its premises, its works or its rents.)
     if (k === "values" && this && ("premises" in this || "works" in this || "base_rent" in this)) return undefined;
     return v;
   }));
   expect(strip(a)).toEqual(strip(generate(small)));
+});
+
+test("a living town where things go wrong (docs/behaviour/frictions.md): homes wear from where each starts, the builder repairs, bodies say what they hear, and each organisation has its rates from the profile; at the dial's 0 none of it", () => {
+  const c = generate({ ...small, living: {} }) as any;
+  const F = loadProfile(small.profile!).values.frictions!;
+  const disrepair = c.catalogue.variables.find((v: any) => v.id === "disrepair");
+  expect(disrepair.per_day).toBeGreaterThan(0);
+  expect(c.catalogue.tasks.find((t: any) => t.id === "repair").changes.disrepair * F.repair_hours).toBeLessThanOrEqual(-50_000);
+  const homes = c.world.structures.filter((x: any) => disrepair.types.includes(x.type));
+  expect(homes.every((x: any) => x.variables.disrepair >= 0 && x.variables.disrepair < 50_000)).toBe(true);
+  expect(new Set(homes.map((x: any) => x.variables.disrepair)).size).toBeGreaterThan(homes.length / 2);
+  expect(c.world.structures.filter((x: any) => !disrepair.types.includes(x.type)).every((x: any) => x.variables === undefined)).toBe(true);
+  const module = (code: string) => c.positions.filter((x: any) => x.role_module?.code === code).map((x: any) => x.role_module.params);
+  expect(module("office.desk").map((p: any) => p.hears.map((h: any) => h.about))).toEqual([["bill", "claim_refused"], ["goods"], ["disrepair"]]);
+  expect(module("tribunal.member")[0].hears.map((h: any) => h.about)).toEqual(["disrepair", "underpaid", "goods", "bill", "arrears", "claim_refused"]);
+  expect(module("tribunal.member")[0].hearing_after_days).toBe(F.venues.tribunal_days);
+  expect(module("union.organiser")[0].hears).toEqual([{ about: "underpaid" }]);
+  expect(module("firm.retailer")[0].short_pay.by_bps).toBe(F.pay_short_by_bps);
+  expect(module("firm.landlord")[0].respond.grant_bps).toEqual(F.put_right_on_asking_bps);
+  expect(module("firm.landlord")[0].repair.units).toBe(F.repair_hours);
+  expect(module("firm.builder")[0].repair_task).toBe("repair");
+  expect(module("utility.energy")[0].billing_error_bps_per_year).toBe(F.per_adult_bps_per_year.bill);
+  expect(module("world.transfers")[0]).toMatchObject({ processing_days: F.support.processing_days, error_bps: F.support.wrong_refusal_bps });
+  expect(c.knowing.published.some((x: any) => x.what === "has:hears")).toBe(true);
+  expect(c.participants.find((x: any) => x.controller?.impl === "citizen.default").channels.some((ch: any) => ch.match?.has?.includes("hears"))).toBe(true);
+  // Twice as much goes wrong: the dial says so, and a home wears twice as fast.
+  const twice = generate({ ...small, living: { friction_bps: 20_000 } }) as any;
+  expect(twice.dials).toEqual({ friction_bps: 20_000 });
+  expect(twice.catalogue.variables.find((v: any) => v.id === "disrepair").per_day).toBeGreaterThanOrEqual(2 * disrepair.per_day - 1);
+  // Nothing of the kind: no variable, no venue, no dial.
+  const none = JSON.stringify(generate({ ...small, living: { friction_bps: 0 } }));
+  for (const word of ["disrepair", "office.desk", "ombudsman", "short_pay", "friction_bps", "has:hears", "billing_error"]) expect(none).not.toContain(word);
 });

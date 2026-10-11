@@ -2,7 +2,10 @@
 with r as (select run_id, world, seed, end_t, greatest(0, end_t - 12 * 2592000) as from_t from runs),
 ret as (select distinct run_id, (json_extract_string(params, '$.retirement_age'))::BIGINT as age from participants where impl = 'citizen.default' and json_extract_string(params, '$.retirement_age') is not null),
 gone as (select run_id, person, min(t) as t from life where event in ('person_left', 'person_died') group by all),
-outside_lf as (select run_id, person from participants where impl = 'citizen.default' and json_extract_string(params, '$.in_labour_force') = 'false'),
+-- (And whoever last said they are no longer looking for work, having given up on it: a note of their own, in a living town.)
+search as (select s.run_id, s.speaks_for as person, arg_max(json_extract_string(s.body, '$.data.looking'), s.t) as looking from records s join r on r.run_id = s.run_id where s.kind = 'work_search' and s.t <= r.end_t group by all),
+outside_lf as (select run_id, person from participants where impl = 'citizen.default' and json_extract_string(params, '$.in_labour_force') = 'false'
+  union select run_id, person from search where looking = 'false'),
 stops as (select run_id, person, json_extract_string(params, '$.stops_work_at') as own from participants where impl = 'citizen.default' and json_extract_string(params, '$.stops_work_at') is not null),
 people as (select e.run_id, e.entity, e.born_at, e.created_t, g.t as gone_t, o.person is not null as outside_lf, s.own as stops_own from entities e left join gone g on g.run_id = e.run_id and g.person = e.entity
   left join outside_lf o on o.run_id = e.run_id and o.person = e.entity left join stops s on s.run_id = e.run_id and s.person = e.entity where e.kind = 'person'),

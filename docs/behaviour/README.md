@@ -56,6 +56,7 @@ Rules every module follows (so re-runs are reproducible):
 | (a death made known) | those who share a home report a death there; someone with nobody at home is found by their landlord or the police; in the citizen's, the landlord's and the police's modules | [deaths.md](deaths.md) |
 | (floods) | the river over its banks, buildings flooded and their people to the relief centre | [floods.md](floods.md) |
 | `tribunal.member` | a tribunal's member: lists applications, tells both sides, and on the day decides on the record under the laws in force (a rent increase invalid or valid; a debt ordered paid) | [justice.md](justice.md) |
+| `office.desk` | a body that hears grievances (a town's complaints desk, an ombudsman, a consumer desk): says what it hears, tells the other side, decides by its procedure as fast as its staff can; and what goes wrong in a living town, and how often | [frictions.md](frictions.md) |
 | `tribunal.registrar` | a tribunal's registrar: enforces an unpaid order to pay by a garnishee order to the debtor's bank | [justice.md](justice.md) |
 | `city.electoral_office` | the town's elections: keeps the roll, gives notice, takes nominations, publishes the ballot, counts by instant runoff, and appoints the winner | [elections.md](elections.md) |
 | `firm.newspaper` | the local paper's editor: runs the week's most newsworthy public records, with a tone toward the town's government and a leaning | [news.md](news.md) |

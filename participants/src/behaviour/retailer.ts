@@ -2,6 +2,7 @@
 // docs/behaviour/retailer.md, with sources.
 
 import { keeping, Org, type OrgParams } from "./orgwants";
+import { Respondent, type RespondParams } from "./frictions";
 import * as C from "../calls";
 import { cents } from "../money";
 import type { LookRequest, Observation, StatementRecord } from "../contracts";
@@ -26,7 +27,7 @@ export const retailer: BehaviourModule = {
   name: "firm.retailer",
   issues: [P.JOB_ADVERTISEMENT, ...P.TRADE],
   issuesWith: (p) => ({ ...P.staffingOwn({ role: p.role ?? "shop assistant", industry: p.industry, workplace: p.workplace, notice_days: p.notice_days ?? 14 }), police: p.police }),
-  version: "0.10.0", // 0.10.0: wants of its own (docs/behaviour/firm-wants.md): a character from its owner's values, which answers a worker who asks for a rise, and a record of its own; 0.9.1: a business of one buys stock when it runs low (daily), keeps its stock money at today's price, follows its owner's home, and closes when its owner has gone; 0.9.0: a business run by its owner alone (operator), stocked for a few days and drawn on by its owner; 0.8.4: takes on the share of its hands the world gives by the day; 0.8.3: registers the share of its jobs the world gives for shops (firms.md, "Jobs an employer does not register")
+  version: "0.11.0", // 0.11.0: everyday frictions (docs/behaviour/frictions.md): pay that comes short, at the world's rate and its character's; asked, told or ordered to put right short pay or goods said to be faulty; 0.10.0: wants of its own (docs/behaviour/firm-wants.md): a character from its owner's values, which answers a worker who asks for a rise, and a record of its own; 0.9.1: a business of one buys stock when it runs low (daily), keeps its stock money at today's price, follows its owner's home, and closes when its owner has gone; 0.9.0: a business run by its owner alone (operator), stocked for a few days and drawn on by its owner; 0.8.4: takes on the share of its hands the world gives by the day; 0.8.3: registers the share of its jobs the world gives for shops (firms.md, "Jobs an employer does not register")
   doc: "docs/behaviour/retailer.md",
   cadence: () => DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(24) * 3600,
@@ -103,6 +104,11 @@ export const retailer: BehaviourModule = {
         owner_values: null as { [value: string]: number } | null,
         values: {} as { [value: string]: { mean_bps: number; sd_bps: number } },
         org: {} as Partial<OrgParams>,
+        // Everyday frictions (docs/behaviour/frictions.md): of those it takes on, the share it pays short and by how
+        // much (the world's; none: nobody); and how it answers when asked to put something right, told of a
+        // complaint, or ordered to (the world's rates; its character sways them).
+        short_pay: null as { per_year_bps: number; by_bps: number } | null,
+        respond: {} as Partial<RespondParams>,
         ...LENGNICK, // Lengnick (2013), Table 1
       },
       ctx.params,
@@ -111,7 +117,13 @@ export const retailer: BehaviourModule = {
     if (p.founder) need(p, ["bank"], "firm.retailer");
     const me = ctx.entity;
     const book = new Book();
-    const staffing = new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, registered_bps: p.registered_bps, casual_bps: p.casual_bps, day_wage: p.day_wage, work_days: p.work_days, week_days: p.look_days, workplace: p.workplace, role: p.role, ...(p.industry ? { industry: p.industry } : {}) });
+    const staffing = new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, registered_bps: p.registered_bps, casual_bps: p.casual_bps, day_wage: p.day_wage, work_days: p.work_days, week_days: p.look_days, workplace: p.workplace, role: p.role, ...(p.industry ? { industry: p.industry } : {}), ...(p.short_pay ? { short: p.short_pay } : {}) });
+    // Asked to put something right (pay kept back, goods said to be faulty), told of a complaint, or ordered to: what our books say of it
+    // (what we kept back we know; whether goods were faulty we cannot), and setting someone's pay right from here on.
+    let payAccount = "";
+    const answering = new Respondent(ctx.rng, me, org, { params: p.respond, forms: [{ notice: "hearing_notice", response: "tribunal_response", decision: "tribunal_order" }],
+      truth: (m) => (m.matter === "underpaid" && m.about ? { owed: staffing.owedShort(m.about) } : undefined),
+      remedy: (m, _from, t, why) => (m.matter === "underpaid" && m.about && payAccount ? staffing.payInFull(book, t, payAccount, m.about, why) : undefined) });
     const borrowing = new Borrowing(me, p.lender);
     const bargaining = new Bargaining(me);
     const winding = new WindingUp(me, { short_days: p.short_days, wind_up_days: p.wind_up_days, idle_days: p.idle_days, reprice_days: p.reprice_days, reprice_bps: p.reprice_bps });
@@ -343,6 +355,9 @@ export const retailer: BehaviourModule = {
         // Bargaining with a union (docs/behaviour/unions.md): a claim answered, an agreement's rise, a strike.
         steps.push(...bargaining.steps(book, t, staffing, acc.account, acc.balance, (rise) => { wage = Math.floor((wage * (10_000 + rise)) / 10_000); }));
         steps.push(...staffing.asked(book, t, acc.account, acc.balance));
+        payAccount = acc.account;
+        steps.push(...answering.steps(book, t, acc.account, acc.balance));
+        steps.push(...staffing.shortening(book, t, acc.account, acc.balance));
         steps.push(...staffing.routine(obs, book, acc.account, {
           // Only with room at the workplace (someone let go may still be there, working out their notice).
           target: trading && !p.operator ? Math.min(p.max_staff, headcount) : 0, wage, canPost: trading && !p.operator && acc.balance >= Math.floor(((workers.length + 1) * wage * MONTH) / p.period) && roomAtWork(obs, workers.length) > 0,

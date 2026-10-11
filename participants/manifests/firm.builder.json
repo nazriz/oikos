@@ -1,6 +1,6 @@
 {
   "name": "firm.builder",
-  "version": "0.12.3",
+  "version": "0.13.0",
   "doc": "docs/behaviour/institutions.md",
   "params": {
     "build_markup_bps": {
@@ -118,6 +118,34 @@
       },
       "unit": "bps",
       "default": 10000,
+      "source": "placeholder"
+    },
+    "repair_first": {
+      "schema": {
+        "type": "boolean"
+      },
+      "default": true,
+      "source": "placeholder"
+    },
+    "repair_labour": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 0,
+      "source": "placeholder"
+    },
+    "repair_price": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 0,
+      "source": "placeholder"
+    },
+    "repair_task": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
       "source": "placeholder"
     },
     "sites": {

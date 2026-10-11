@@ -787,6 +787,12 @@
           "type": "integer",
           "minimum": 0,
           "maximum": 10000
+        },
+        "friction_bps": {
+          "description": "How much goes wrong in everyday life (docs/behaviour/frictions.md): a scale on every friction's sourced rate, in basis points (10000: the rates as sourced). Absent or 0: nothing of the kind arises.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100000
         }
       },
       "additionalProperties": true
@@ -1375,6 +1381,19 @@
               },
               "built_by": {
                 "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId"
+              },
+              "variables": {
+                "description": "The structure's starting variables (the catalogue's variables that apply to its type; others start at initial): a building is as old and as worn as the world says when it begins.",
+                "type": "object",
+                "propertyNames": {
+                  "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId"
+                },
+                "additionalProperties": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "maxProperties": 100
               }
             }
           }
@@ -1708,7 +1727,7 @@
                   "minItems": 1
                 },
                 "has": {
-                  "description": "Statements having all of these (an offer, a practice, an institutional-grammar breakdown, a formal condition), whatever their kind: so a new kind of offer is seen without configuring for it.",
+                  "description": "Statements having all of these (an offer, a practice, an institutional-grammar breakdown, a formal condition; `hears`: an offer that says what its offerer hears), whatever their kind: so a new kind of offer, or a new desk, is seen without configuring for it.",
                   "type": "array",
                   "items": {
                     "enum": [
@@ -1717,7 +1736,8 @@
                       "adico",
                       "formal",
                       "assertion",
-                      "registry"
+                      "registry",
+                      "hears"
                     ]
                   },
                   "uniqueItems": true,
@@ -1794,7 +1814,7 @@
                   "minItems": 1
                 },
                 "has": {
-                  "description": "Statements having all of these (an offer, a practice, an institutional-grammar breakdown, a formal condition), whatever their kind: so a new kind of offer is seen without configuring for it.",
+                  "description": "Statements having all of these (an offer, a practice, an institutional-grammar breakdown, a formal condition; `hears`: an offer that says what its offerer hears), whatever their kind: so a new kind of offer, or a new desk, is seen without configuring for it.",
                   "type": "array",
                   "items": {
                     "enum": [
@@ -1803,7 +1823,8 @@
                       "adico",
                       "formal",
                       "assertion",
-                      "registry"
+                      "registry",
+                      "hears"
                     ]
                   },
                   "uniqueItems": true,
@@ -1915,7 +1936,7 @@
                   "minItems": 1
                 },
                 "has": {
-                  "description": "Statements having all of these (an offer, a practice, an institutional-grammar breakdown, a formal condition), whatever their kind: so a new kind of offer is seen without configuring for it.",
+                  "description": "Statements having all of these (an offer, a practice, an institutional-grammar breakdown, a formal condition; `hears`: an offer that says what its offerer hears), whatever their kind: so a new kind of offer, or a new desk, is seen without configuring for it.",
                   "type": "array",
                   "items": {
                     "enum": [
@@ -1924,7 +1945,8 @@
                       "adico",
                       "formal",
                       "assertion",
-                      "registry"
+                      "registry",
+                      "hears"
                     ]
                   },
                   "uniqueItems": true,
@@ -2025,7 +2047,7 @@
                   "minItems": 1
                 },
                 "has": {
-                  "description": "Statements having all of these (an offer, a practice, an institutional-grammar breakdown, a formal condition), whatever their kind: so a new kind of offer is seen without configuring for it.",
+                  "description": "Statements having all of these (an offer, a practice, an institutional-grammar breakdown, a formal condition; `hears`: an offer that says what its offerer hears), whatever their kind: so a new kind of offer, or a new desk, is seen without configuring for it.",
                   "type": "array",
                   "items": {
                     "enum": [
@@ -2034,7 +2056,8 @@
                       "adico",
                       "formal",
                       "assertion",
-                      "registry"
+                      "registry",
+                      "hears"
                     ]
                   },
                   "uniqueItems": true,
@@ -2126,7 +2149,7 @@
                   "minItems": 1
                 },
                 "has": {
-                  "description": "Statements having all of these (an offer, a practice, an institutional-grammar breakdown, a formal condition), whatever their kind: so a new kind of offer is seen without configuring for it.",
+                  "description": "Statements having all of these (an offer, a practice, an institutional-grammar breakdown, a formal condition; `hears`: an offer that says what its offerer hears), whatever their kind: so a new kind of offer, or a new desk, is seen without configuring for it.",
                   "type": "array",
                   "items": {
                     "enum": [
@@ -2135,7 +2158,8 @@
                       "adico",
                       "formal",
                       "assertion",
-                      "registry"
+                      "registry",
+                      "hears"
                     ]
                   },
                   "uniqueItems": true,

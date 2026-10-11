@@ -485,3 +485,32 @@ fn a_person_works_alone_in_their_own_business_at_home_or_at_a_pitch() {
     assert_eq!(refusal(&r), None);
     assert!(r.events.iter().any(|e| matches!(&e.body, EventBody::Worked { task, labour: 1200, .. } if task == "sell_at_pitch")));
 }
+
+/// An organisation founded in a run keeps a record of its own where the post made with it says so (its role module's
+/// `keeps_record`, with a `code`): the kernel takes that organisation's record from whoever holds the post, names the
+/// post's module as the keeper, and from nobody else. A post made without it keeps none, as before.
+#[test]
+fn an_organisation_founded_in_a_run_keeps_a_record_through_the_post_made_with_it() {
+    use std::collections::BTreeMap;
+    let set = |participant: &str, entity: &str| Command::EntityRecord { participant: participant.into(), entity: Some(entity.into()), set: serde_json::from_value::<BTreeMap<String, Value>>(json!({"character": {"keep": 5000}})).unwrap(), because: None };
+    let mut run = town();
+    let found = |run: &mut Run<Vec<u8>>, module: Value| {
+        let r = act(run, "carol-self", None, json!([{"block": "create_entity", "kind": "cooperative", "name": "Carol's Co-op", "first_position": {"title": "Founder", "channels": [{"id": "books", "kind": "accounts"}], "role_module": module, "ref": "founder"}, "ref": "coop"}]));
+        assert_eq!(refusal(&r), None);
+        match &r.events[0].body {
+            EventBody::ActionApplied { created: Some(c), .. } => c["coop"].clone(),
+            other => panic!("{other:?}"),
+        }
+    };
+    let kept = found(&mut run, json!({"code": "firm.retailer", "params": {}, "keeps_record": true}));
+    let r = run.command(&set("carol-self", &kept)).unwrap();
+    match &r.events[0].body {
+        EventBody::EntityRecorded { entity, keeper, .. } => assert_eq!((entity.as_str(), keeper.as_deref()), (kept.as_str(), Some("firm.retailer"))),
+        other => panic!("{other:?}"),
+    }
+    // Nobody but the holder of that post; and an organisation whose post does not say so keeps none.
+    assert!(run.command(&set("dave-self", &kept)).is_err());
+    let plain = found(&mut run, json!({"code": "firm.retailer", "params": {}}));
+    let e = run.command(&set("carol-self", &plain)).unwrap_err();
+    assert!(e.to_string().contains("has no bookkeeping named for its record"), "{e}");
+}

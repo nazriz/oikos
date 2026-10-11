@@ -110,7 +110,7 @@ export interface WantParams {
    * - `agency`: how much a standard deviation of the sense of agency counts for acting at all against waiting;
    * - `belief`: how much holding what a host teaches counts for turning to it;
    * - `others`: how much each person known to have taken a way counts (weighed again by conformity in imitation). */
-  choice: { expect: number; trust: number; fear: number; agency: number; belief: number; others: number; own: number };
+  choice: { expect: number; trust: number; fear: number; agency: number; belief: number; others: number; own: number; /** What the bother of taking something to a venue counts against it (forms, waiting, a hearing), beside its fee. FITTED to the share of people with a problem who turn to an authority or third party (docs/behaviour/frictions.md). */ venue: number };
   /** How far a standard deviation of trust, of the sense of agency and of attachment sways the cited rates they are
    * read by (docs/behaviour/citizen.md, "Readers"): symmetric about the town's mean, as `sway` is. PLACEHOLDERS. */
   sway: { trust: number; agency: number; attachment: number; /** How far wanting work of one's own raises the month's chance of founding a business (a share of it). */ found: number };
@@ -135,7 +135,7 @@ export const WANT_DEFAULTS: WantParams = {
   event_bps: 6_000,
   need_bps: 6_000,
   copy_from: 2,
-  choice: { expect: 5_000, trust: 1_500, fear: 3_000, agency: 1_500, belief: 3_000, others: 500, own: 500 },
+  choice: { expect: 5_000, trust: 1_500, fear: 3_000, agency: 1_500, belief: 3_000, others: 500, own: 500, venue: 1_500 },
   sway: { trust: 0.3, agency: 0.3, attachment: 0.3, found: 1 },
   ask_again_days: 365,
   rise_bps: 500,

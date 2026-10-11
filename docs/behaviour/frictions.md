@@ -1,0 +1,108 @@
+# Everyday frictions, and the venues that hear them
+
+**Source:** `participants/src/behaviour/frictions.ts` (the dial, the arithmetic of a rate, the papers, `Respondent`), `desk.ts` (`office.desk` 0.1.0, `Hearings`), and each cause in the module where it lives: `firms.ts` (`Staffing`, `firm.landlord` 0.15.0), `institutions.ts` (`firm.builder` 0.13.0), `utilities.ts` (`utility.energy` 0.3.0), `world.ts` (`world.transfers` 0.4.0), `citizen.ts` (0.46.0), `tribunal.ts` (`tribunal.member` 0.3.0), `union.ts` (0.6.0). **Design:** docs/design/ai-citizens.md 10a and 10k, step 2b. **Decision:** docs/decisions.md, "Everyday frictions" (2026-10-11). **Figures:** each profile's `frictions`, with sources (docs/profiles.md).
+
+Step 2 gave people wants and a town stayed calm, because almost nothing went wrong in it and there was almost nowhere to take a grievance. This is what goes wrong, how often, and who hears it. Three rules hold throughout.
+
+- **A friction is a mechanism where its cause lives**, at a rate the place's profile gives with its source: a building that wears, an employer that begins to pay short, a billing run that errs, an office that refuses wrongly. Nothing here is a score, and a town with more grievances is not a worse run.
+- **Nothing blocks and nothing carries itself out.** A friction leaves a state of the world or a paper. Asking is a letter; a venue's decision is words; money moves when the other side pays or a tribunal's registrar has the bank take it. A grievance's papers never become a recorded debt: a firm pays any debt recorded against it without question, and no paper here reaches that.
+- **Only a living town has any of it** (`living` in a town's spec, and a profile with `frictions`). With no `living`, a town is step 1's to the state hash (`orchestrator/test/living-dial.test.ts`).
+
+## The dial
+
+`dials.friction_bps` in the world's config (contracts/world-config.schema.json), written by the generator from `living.friction_bps`: a scale on every rate below, in basis points. Nothing said in a living town: 10,000, the rates as sourced. 0: nothing of the kind arises, and the town is step 2's living town. 20,000: twice as much goes wrong. Twins are the same town at two settings (`--set living.friction_bps=0`).
+
+A yearly rate becomes a period's chance in whole numbers (`chancePpm`: parts per million, linear in the days, never over certainty), so a run is the same on every machine. Every draw is on a stream of the module's own, keyed by what it is about (a job and a week, a bill, a claim, a delivery).
+
+## What goes wrong
+
+Each profile states, for five kinds of problem, **the share of adults who have one in a year** (`frictions.per_adult_bps_per_year`). For all nine places it is half the share who had one in the last two years in the World Justice Project's Global Insights on Access to Justice 2019 (General Population Poll 2017-18; national, about 1,000 people a country; the three largest cities only for Brazil and Mexico). The generator turns each into a rate for those exposed, with the town's own counts. Halving a two-year share understates a yearly one where the same people have a problem in both years: to confirm against a yearly survey.
+
+| Friction | Its cause, and how often | What it does | The profile's figure (Victoria) |
+|---|---|---|---|
+| **A home in disrepair** | A state variable of every dwelling's building (`disrepair`, 0 to 100,000; the kernel keeps it and gives it no meaning). It rises each day by so much that, of the town's homes, the share reaching the level that needs repair (50,000) in a year is the profile's share of adults with a landlord problem, over the homes there are. Each building starts somewhere below that level, drawn evenly (the steady state of homes wearing and being repaired; no figure for dwellings by age was found). A repair is work: an hour of the builder's hand takes it down by so much that the profile's `repair_hours` clear it. | Whoever lives in a let home sees it (they are there). It is the landlord's to put right: a tenant's grievance, `disrepair`. A whole building wears together, so everyone in a block of flats has the same grievance at once. | `landlord` 640 (12.8% of adults in two years had a problem with a landlord over agreements, payments, repairs, deposits or eviction: all of it is given to disrepair here, which overstates repairs). In the 1,000-person town about 13% of homes a year. |
+| **Pay that comes short** | Each week an employer (a shop, a factory) may begin to pay one of its staff less than it agreed: by `pay_short_by_bps` of the pay, with a yearly chance per job that is the profile's share of adults with a wages problem over the share of adults in the labour force; more often the more its character would pay less (firm-wants.md), and twice as often while it has less in the bank than two pay periods' wages. What it withholds for tax is still what the full wage asks. **Late and withheld pay were already here**: an employer whose account cannot cover its wage orders does not pay (`job:unpaid`). | The worker sees pay from their employer's account that is less than the wage after tax: it is pay, and short (before, anything but the exact wage was no pay at all, and a fortnight on they resigned). The difference, pay after pay, is owed: `underpaid`. The employer's own books hold what it has kept back. | `wages` 420 (8.4% of adults in two years had difficulty obtaining wages or employment benefits agreed in advance). |
+| **A wrong bill** | The energy retailer's billing run sends a customer a bill that overstates the units used by `bill_over_bps` (an estimated reading entered too high; marked `estimated`), with a yearly chance per customer that is the profile's share (utilities.md, "Wrong bills"). | A customer whose bill comes to well over the last one, a day, looks at it twice (`bill_over_bps` halved): the difference from the usual is what they say they were overcharged, `bill`. It is paid all the same. Asked, the retailer works the bill out again from its own tariff: it knows whether it was wrong and by how much. A bill that rose for a true reason is complained of too, and found right. | `bill` 1,080 (21.6% in two years had a major disruption of supply or incorrect billing: all of it is given to wrong bills). |
+| **A claim for support wrongly refused, or late** | The support office decides a claim `processing_days` after it is made, oldest first, as many a day as its staff can (`capacity_per_day`; none set: no limit), so a wave of claims waits. Of claims that qualify it wrongly refuses `wrong_refusal_bps` ("the claim could not be verified"), twice as many while more are waiting than a day's capacity (boundary.md, "Under load"). | Every refusal is a grievance to the one refused, `claim_refused`, whether or not it was right: they believe they qualify. Asked to look again, or told to by a venue, the office reviews the claim on its facts; a refusal that was wrong is set aside and the claimant claims again, with no second error. One that was right stands. | `processing_days` 6 (Services Australia, July 2024; 22 early that year). `wrong_refusal_bps` 700: a **placeholder**, to set against `benefits` 600 (12.0% in two years had difficulty obtaining public benefits). |
+| **Goods that are faulty** | Found at home after a shopping trip: of a trip's goods, `goods_faulty_share_bps` are of no use, with a yearly chance per shopping household that is the profile's share. The draw is the buyer's, keyed by the order: the kernel's goods have no quality, so the fault is known only on being found. | The faulty goods are thrown out with the week's use (they are really gone, and the household is shorter for it). What was paid for them is asked back from the shop: `goods`, with the delivery note to show. The shop cannot know from its books whether they were faulty. | `goods` 825: a consumer problem (38.1% in two years) less the utility share that the survey counts within it (derived; poor professional services are in it too). |
+
+**What a person makes of it** is theirs. For someone who takes initiative (step 2's dial) a friction is a want about whoever did it (docs/behaviour/citizen.md, "Wants and initiative"): it seeks money where money is owed, and names the paper where there is one. For someone who takes none it is recorded and nothing is done.
+
+## What a person can do
+
+A grievance meets openings as any want does. None is a list attached to the grievance: each is found by what it bears on or says.
+
+| Way | What it is | What sways it |
+|---|---|---|
+| **Put up with it** | Waiting, always open. | Chosen more by those who do not believe what they do counts (the sense of agency). |
+| **Ask** | A letter to the other side (`remedy_request`): what is wrong, the paper it rests on, the money owed and where to pay it. Once. | Trust in them, against fear of someone depended on. |
+| **Go to a venue** | An application to any body whose published offer says it hears the matter (the contract's `hears`, below): found by what it says, never by its name. **After asking**: a venue is for what asking did not settle (the other side said no, said nothing, or said yes and did not do it), as an ombudsman or a consumer desk asks of whoever comes to it. Its fee, if it has one, is paid with the application by one who has it. Once to each. | Trust in that kind of institution; the bother of it (`wants.choice.venue`: forms, waiting, a hearing; **fitted** to the share of people with a problem who turn to an authority or third party, 16.7% in the survey for Australia), the fee against a month's essentials; and what was learned of going to a desk. A person's time at a venue is not yet taken from their day. |
+| **Tell others** | A message to the three closest people known: who did what. Whoever hears it thinks a little less of them (trust, at three tenths of an experience of one's own). | Benevolence. |
+| **Leave** | The job board or the homes board, as step 2 has them: they bear on an employer or a landlord. | As step 2. |
+
+**What comes back moves the record** (step 1). Granted: asking is learned to work, the sense of agency rises, trust in the other side rises. Refused, or no answer in `answer_days` (14): the reverse, and the mind looks again at once. A promise not kept in `promise_days` (45) counts as worse than a refusal. A venue that finds for a person raises trust in its kind of institution and the sense of agency; one that dismisses, or whose decision the other side ignores, lowers them. A grievance with nothing in train for a year is let go, and the record keeps it as given up. **A grievance with no venue stays in the record.**
+
+**Getting even** is not built beyond what step 2 has (a want long unmet with little trust and agency sways the chance of taking from an employer).
+
+## How the other side answers
+
+One helper, `Respondent`, for every organisation that can be complained of (a landlord, a shop, a factory, the energy retailer, the support office). Its own books say what is true where they can; whether it does anything is its character's.
+
+| Asked or told | What it does | Rate |
+|---|---|---|
+| **Asked to put something right** | Works out what its books say: what it owes (pay kept back, an overcharge), whether the thing is done (a repair), whether its paper was wrong (a refusal), or nothing (it cannot know: goods said to be faulty, where it takes the asker's sum). Books showing nothing owed: it says so, and pays nothing. Otherwise it puts it right as often as `put_right_on_asking_bps` for the matter says, if it can pay: the money is paid with its answer (`remedy_answer`), a repair is ordered from the builder and paid for, a worker's pay is set right from the next pay day, a refusal is marked for review. Not doing it, it says no half the time and says nothing the rest (`answers_bps`, a placeholder). | The profile's, by matter. Victoria: disrepair 5,400 (of renters who reported an issue with their rental provider, 13 in 28 had it unresolved: Consumer Policy Research Centre's Victorian survey); goods 4,500 (of consumers who took action, 45% had it satisfactorily resolved: Australian Consumer Survey 2023); the rest 4,210, a **placeholder** standing at the share of people with any problem who say it is done and resolved. |
+| **Told of a complaint by a venue** | Answers from its books, truthfully (nobody lies yet), 80% of the time (`responds_bps`, a placeholder; more for one that cares how it is thought of). | Placeholder. |
+| **Ordered, or recommended to** | Does as an order says 80% of the time unasked again, and as a recommendation says 60% (`comply_bps`, `heed_bps`: placeholders), if it can pay. An order it ignores can be enforced; a recommendation cannot. | Placeholders. |
+
+Character (firm-wants.md) sways each rate about the town's mean: keeping those it deals with and being thought well of, against paying less, half the rate a standard deviation. An organisation with no character answers at the rates as given.
+
+**A repair** is ordered from the town's builder with its price (`repair_hours` at the builder's hourly charge), paid with the order; the builder's crew does it in its own hours, before the day's building work (building.md, "Repairs"). A landlord with no money for it does not grant it.
+
+**A landlord owed rent** now goes after it (firm-wants.md): it writes to the tenant when its want is born; a month on, one that would sooner keep the tenant than be rid of them applies to a body that says it hears arrears, for an order to pay; the notice its routine gives comes when its patience runs out, as before. A tenant ordered to pay does, if it leaves them the month's essentials; if not, the landlord may have the order enforced.
+
+## Venues
+
+**A typed way to say what one hears.** An offer to apply (`take_up: apply`) may carry `hears`: each matter it takes (`about`: a kind of paper or of thing gone wrong, in the world's labels), what it may do about one (`can`: order, recommend, mediate, refer, represent, publish), whether it may set a paper aside (`undoes`), the form an application is made on (`form`; none: `application`), and how long it says it takes (`within`). A channel may show statements whose offer hears something (`has: ["hears"]`), whatever their kind. A person's openings are read from every such statement they have seen: a desk, a list or a group made in a run is found exactly as these are. This is what step 2 lacked (`Offer.about` was dropped there).
+
+**One procedure** (`Hearings`), for a desk and for the tribunal's lists:
+1. An application comes. A matter not heard: it says so. One for another office to act on (`refer`): passed on, and the applicant told.
+2. The other side is told what is said (`complaint_notice`, or the tribunal's `hearing_notice`), and has `answer_days` to answer.
+3. When that time has run, cases are decided oldest first, **as many a day as the venue's staff decide** (`cases_per_day`): a venue with more than that falls behind, and its waits are what they come to.
+4. On the record. The other side's answer says money is owed: that sum. Its paper was wrong: set aside. The thing is not done: put it right. It is done, or nothing is owed: dismissed. **No answer: the applicant's account stands** (a decision in default).
+5. **Where the other side cannot say from its records** (goods said to be faulty): the thing did or did not happen, and nobody lies yet, so every claim is true. What a code office's rate stands for is **failure of proof**, never a coin on the truth. An applicant who can show a paper for it (the delivery note, the agreement, the notice, the request they made first) has made it out. One with only their word is believed as often as `uphold_without_proof_bps` says (5,000, a placeholder; a venue's own figures by outcome would replace it). **A model seat in a venue decides for itself**: the rate is the code office's only.
+6. The decision goes to both (`venue_decision`, or `tribunal_order`): pay by a date, put it right by a date, the paper set aside, dismissed; `binding` says whether it is an order or a recommendation.
+
+| Venue | Whose | Hears | Can | Costs |
+|---|---|---|---|---|
+| **The other side itself** | | whatever it did | put it right | a letter |
+| **The town's complaints desk** (`complaints`, a post of the town) | the town's | disrepair | recommend | no fee; a fortnight for the answer |
+| **The tribunal's lists** (`tribunal-member`) | the state's | disrepair, underpaid, goods, bill, arrears, claim refused (and, as before, a rent increase, a debt, a charge) | order; enforcement of an order to pay through its registrar and the bank | a fee (`tribunal_fee_hours_of_pay` hours of a shop worker's pay, a placeholder), paid with the application; `tribunal_days` to the hearing (Victoria: 49, the residential tenancies list's median time to finalise) |
+| **The ombudsman** (`ombudsman-officer`) | the state's | bill, claim refused | recommend | no fee |
+| **The consumer desk** (`consumer-officer`) | the state's | goods | recommend | no fee |
+| **The union** (`union.organiser`) | its members' | underpaid, for members only | represent: it puts the matter to the employer and says what should be paid | dues |
+
+Each is a post a seat can hold: the desk's papers are forms (`complaint_notice`, `venue_decision`: office-papers.md), and the tribunal's order form is as it was. **With a seat in a desk, the work is deciding, not sorting** (standing-work.md, "The counter"): the desk's staff take applications in, tell the other side, and decide whatever the record settles; a case the record cannot settle is put before the office-holder with what each side said. The tribunal's member has no counter yet (its module is not split into a seat and staff): a seat there is shown every application.
+
+## What a log can show
+
+Recorded, never scored. Outcomes in the domain `friction`: `arose` (the matter, whom it is against, the cause, the sum), `ended` (how: put right on asking, paid under an order, paid on a recommendation, repaired, granted on review, settled, left, let go; days; whether asked, what was answered, how many venues), `told`, `ordered_to_pay`. The papers are in every log, lean ones too. `oikos dataset` writes `frictions.jsonl` (one row a grievance: what, against whom, cause, what was done, how it ended) and `venues.jsonl` (one row an application: the venue, the matter, days to a decision, the finding, whether it was followed), and counts both in the manifest.
+
+## Parameters
+
+Profile `frictions`: `per_adult_bps_per_year` (`landlord`, `wages`, `bill`, `benefits`, `goods`), `put_right_on_asking_bps` (by matter; `other`), `pay_short_by_bps`, `bill_over_bps`, `goods_faulty_share_bps`, `repair_hours`, `support` (`processing_days`, `wrong_refusal_bps`), `venues` (`answer_days`, `tribunal_days`, `tribunal_fee_hours_of_pay`, `cases_per_day`, `uphold_without_proof_bps`). Each has its source or is marked a placeholder in the profile's `sources`.
+
+Modules: `citizen.default` `frictions` (`disrepair`: the variable and the level; `bill_over_bps`; `answer_days`; `promise_days`; `faulty_bps_per_year`; `faulty_share_bps`); `firm.retailer` and `firm.producer` `short_pay`, `respond`; `firm.landlord` `repair`, `respond`; `firm.builder` `repair_task`, `repair_labour`, `repair_price`, `repair_first`; `utility.energy` `billing_error_bps_per_year`, `billing_over_bps`, `respond`; `world.transfers` `processing_days`, `capacity_per_day`, `error_bps`, `respond`; `office.desk` `title`, `hears`, `answer_days`, `cases_per_day`, `uphold_bps`, `within_days`, `refer_to`, `fee`, `account`, `members_of`; `tribunal.member` `hears`, `cases_per_day`, `uphold_bps`, `fee`, `account`; `union.organiser` `hears`, `cases_per_day`, `answer_days`. `respond`: `grant_bps`, `answers_bps`, `responds_bps`, `comply_bps`, `heed_bps`, `sway`.
+
+## Leaves out
+
+- **A bond withheld at a tenancy's end.** The town's leases take no bond; adding one changes what a move costs and so who can move. Victoria's figures are in docs/research/references.md for when it is built.
+- **A dispute between neighbours**, and mediation: nobody knows who lives next door by name except by having shared a building, and a neighbour is not an organisation with books. The survey's shares are in the references.
+- **An accident or illness that costs**: an out-of-pocket fee at the clinic, lost pay without leave, compensation for an injury at work.
+- **A service the town owes beyond waste**: a road left worn, the clinic's wait, a school place. The complaints desk hears disrepair only.
+- **The paper** as a venue (a letter printed, readers' trust moved).
+- **A rates or tax notice that is wrong**; a water bill (it goes to owners).
+- **An owner-occupier's own repairs** (their home wears and nothing is done).
+- **A landlord's upkeep unasked**, and an inspector who goes to look: a venue takes the landlord's own word for whether a repair is done.
+- **Lying to a venue**, appeals, costs, representation; a venue checking that its fee was paid.
+- **Getting even**: rent withheld, work slowed.
+- **Possession orders** (justice.md).

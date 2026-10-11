@@ -1,6 +1,6 @@
 {
   "name": "firm.landlord",
-  "version": "0.14.0",
+  "version": "0.15.0",
   "doc": "docs/behaviour/firms.md",
   "params": {
     "after_term": {
@@ -181,6 +181,11 @@
       "default": null,
       "source": "placeholder"
     },
+    "repair": {
+      "schema": {},
+      "default": null,
+      "source": "placeholder"
+    },
     "reprice_bps": {
       "schema": {},
       "unit": "bps",
@@ -190,6 +195,13 @@
       "schema": {},
       "unit": "days",
       "source": "the world gives it (no default)"
+    },
+    "respond": {
+      "schema": {
+        "type": "object"
+      },
+      "default": {},
+      "source": "placeholder"
     },
     "rise_cover_periods": {
       "schema": {},

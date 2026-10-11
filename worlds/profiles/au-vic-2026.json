@@ -889,11 +889,56 @@
       "survey_hours_per_ha": 1,
       "survey_staff": 1,
       "spin_up_years": 10
+    },
+    "job_move": {"premium_bps": 1000, "per_year_bps": 200, "cap_years": 10, "other_trade_bps": 2000},
+    "belief": {"living_fade_bps_per_month": 250},
+    "frictions": {
+      "per_adult_bps_per_year": {
+        "landlord": 640,
+        "wages": 420,
+        "bill": 1080,
+        "benefits": 600,
+        "goods": 825
+      },
+      "put_right_on_asking_bps": {
+        "disrepair": 5400,
+        "underpaid": 4210,
+        "bill": 4210,
+        "claim_refused": 4210,
+        "goods": 4500,
+        "other": 4210
+      },
+      "pay_short_by_bps": 500,
+      "bill_over_bps": 3000,
+      "goods_faulty_share_bps": 2500,
+      "repair_hours": 16,
+      "support": {
+        "processing_days": 6,
+        "wrong_refusal_bps": 700
+      },
+      "venues": {
+        "answer_days": 14,
+        "tribunal_days": 49,
+        "tribunal_fee_hours_of_pay": 3,
+        "cases_per_day": 4,
+        "uphold_without_proof_bps": 5000
+      }
     }
   },
   "sources": {
+    "frictions": "Everyday frictions (docs/behaviour/frictions.md): what goes wrong, how often, and how the bodies that hear it work. Read by the generator only for a town whose spec has `living`.",
+    "frictions.per_adult_bps_per_year": "Of adults, the share who had each kind of problem, a year: half the share who had it in the last two years in World Justice Project, Global Insights on Access to Justice 2019 (General Population Poll 2017-18, about 1,000 respondents a country; the summary statistics workbook was opened; national, and for Brazil and Mexico the three largest cities only). landlord: a problem with a landlord over agreements, payments, repairs, deposits or eviction (12.8% in two years; all of it is given to disrepair here, which overstates repairs: the town has no other landlord problem of the kind yet). wages: difficulty obtaining wages or employment benefits agreed in advance (8.4%). bill: major disruption of a utility's supply or incorrect billing (21.6%; all of it is given to wrong bills). benefits: difficulty obtaining public benefits or government assistance (12.0%). goods: a consumer problem (38.1%) less the utility share, since the survey's consumer problems include it (derived; poor professional services are in it too). The generator turns each into a rate for those exposed (a let dwelling, a job, a customer, a claim) with the town's own counts. Halving a two-year share understates a yearly one where people have a problem in both years (to confirm against a yearly survey). Cross-checks for Victoria (docs/research/references.md): 28% of renters reported an issue with their rental provider in a year and 13% had it unresolved (Consumer Policy Research Centre's Victorian survey, opened), against 22% of renters a year here; 13% had a faulty item in a year (the same survey), against 8% here; 11.5% of the workforce underpaid (McKell Institute, read through a summary: to confirm), against about 6% of employees a year here.",
+    "frictions.put_right_on_asking_bps": "Asked to put it right, how often the other side does. disrepair: of Victorian renters who reported an issue with their rental provider, 13 in 28 had it unresolved, so 54% resolved (Consumer Policy Research Centre's Victorian survey, opened). goods: 45% of consumers who took action on a problem had it satisfactorily resolved (Australian Consumer Survey 2023, opened). The rest: PLACEHOLDERS standing at the share of people with any problem who say it is done and fully resolved (42.1%: World Justice Project, Global Insights on Access to Justice 2019 (General Population Poll 2017-18, about 1,000 respondents a country; the summary statistics workbook was opened; national, and for Brazil and Mexico the three largest cities only)), which is an outcome of everything people tried, not the rate at which the other side agrees when asked: to replace with a figure by kind of problem.",
+    "frictions.pay_short_by_bps": "PLACEHOLDER: by how much pay that comes short is short (5%). The Fair Work Ombudsman recovered $473 million for nearly 160,000 workers in 2023-24 (annual report, opened), about $2,960 a worker, which is of that order against a year's pay; no share of pay was found.",
+    "frictions.bill_over_bps": "PLACEHOLDER: by how much a wrong bill overstates what was used (30%). No figure was found.",
+    "frictions.goods_faulty_share_bps": "PLACEHOLDER: of a shopping trip's goods, the share that is faulty when some are (a quarter). No figure was found.",
+    "frictions.repair_hours": "PLACEHOLDER: the hours of a builder's hand a repair takes (two days' work). No figure was found for a typical rental repair.",
+    "frictions.support": "processing_days: a claim for the payment for those out of work took 6 days to process in July 2024, down from 22 early that year (Services Australia annual report 2023-24, opened). wrong_refusal_bps: of claims that qualify, the share wrongly refused. FITTED in the 1,000-person town of the first profile (7% of qualifying claims gives about as many refusals a year as 6% of adults, its survey share with difficulty obtaining public benefits, counting the refusals that are right), and for every other place scaled by its own survey share against that one: a stand-in until a place's own rate of decisions changed on review is found. Of Centrelink decisions taken to the Administrative Review Tribunal, 24% were changed (caseload report, 14 Oct 2024 to 30 Jun 2025, opened; the row was inferred: to confirm): a rate among those appealed, not among all refusals.",
+    "frictions.venues": "tribunal_days: the residential tenancies list's median time to finalise, 7 weeks (VCAT annual report 2023-24, opened). answer_days (the time the other side is given to answer a desk), tribunal_fee_hours_of_pay (the fee as hours of a shop worker's pay), cases_per_day (cases a desk's staff decide in a day) and uphold_without_proof_bps (how often a desk finds for someone with nothing to show, where the other side cannot say from its records): PLACEHOLDERS; no figure was opened (VCAT's fee and its outcomes by list are not in the report's narrative).",
     "outlook": "How people start out in what they trust (docs/behaviour/citizen.md, 'The record'). National figures for Australia, not the region's: none by region was found. trust: the share with 'a great deal' or 'quite a lot' of confidence in each kind of institution (`government`, `policing`: the police, `courts`, the civil service, banks, the press, labour unions, churches or religious organisations, major companies); people_bps: the share who say most people can be trusted. World Values Survey and European Values Study, joint wave 7 (fieldwork 2017 to 2022), as Our World in Data publishes it (ourworldindata.org/grapher/trust-state-institutions-wvs, trust-organizations-wvs, self-reported-trust-attitudes), opened 2026-10-11 through a tool that returns a page's figures in summary: to confirm against the survey's own tables. The share is read as the mean level of trust a person starts with, which is a simplification (a share above a threshold is not a mean). Not stated, so the citizen's own placeholders apply (to source: the survey's question on freedom of choice and control over one's life, its mean and spread, needs the microdata): how much control over their lives people feel (outlook.agency). asked.rise_granted_bps: of employees who asked their employer for a pay rise, the share who got one: 20% of men and 16% of women, like for like, in the Australian Workplace Relations Survey 2013-14 (4,600 workers, over 800 employers): Artz, Goodall and Oswald, 'Do Women Ask?', Industrial Relations 57(4), 2018; the University of Warwick's summary of the paper was opened (warwick.ac.uk/fac/soc/economics/news/2016/9/new_study_suggests_women_do_ask_for_pay_rises_but_dont_get_them), the paper itself not (to confirm). 18% taken, between the two. National, and a decade old.",
     "outlook.residence": "How long people have lived at their current address (starting attachment to the place; docs/behaviour/citizen.md). ABS, 2021 Census, 'Population movement in Australia' (released 8 November 2022; abs.gov.au/articles/population-movement-australia), opened 2026-10-11: 53.1% of the population lived at the same address five years before the Census; 14.3% changed address within Australia in the year before; 0.7% had lived overseas a year before. Bands here: under 1 year = 14.3 + 0.7 = 15.0%; 1 to under 5 = the rest (31.9%); 5 and over = 53.1%. They are built from the one-year and five-year mobility rates, so the 1 to under 5 band is the remainder, and the 5-and-over share is the share at the same address five years earlier (population aged 5 and over, not adults only). National figures, not Victoria's: the Victoria figures were not found on an opened page. The open band is read as 5 to 15 years by the generator.",
+    "belief": "living_fade_bps_per_month: how fast a belief not kept up fades, a month, in a living town. FITTED to the census's trend in stated affiliation (Christian 52.1% in 2016 and 43.9% in 2021: 1.6 points a year; ABS Census, opened): a living town's gatherings are fuller than a town's without wants, which keeps belief up, and people with initiative turn to a congregation in a loss; the rate the module has (3% a month) was fitted before either. The fit is in docs/decisions.md, 'Everyday frictions'.",
+    "job_move": "What holds someone in a job they have: another must pay premium_bps more before it is worth moving, and per_year_bps more for each year in the job, up to cap_years; and other_trade_bps more again for a job in another line of work (starting over). FITTED, not sourced figure by figure: set so that the share of employed people who change employer in a year comes near the ABS's (Job mobility, February 2025, opened: 7.7% in the year to February 2025, 8.0% in 2024, 9.6% in 2023), in a town where any better-paid posting was taken before (about 21% a year). The shape has a basis: people who change jobs gain about 9% in pay over those who stay (e61 Institute, read through the trade press: to confirm), so few move for much less; and the chance of leaving a job falls steeply with years in it (Farber 1999, 'Mobility and stability', Handbook of Labor Economics: to confirm). The fit is in docs/decisions.md, 'Everyday frictions'.",
     "outlook.job_tenure": "How long employed people have been with their current employer (starting attachment to the trade). OECD, 'Employment by job tenure intervals' (dataset OECD.ELS.SAE DSD_TENURE@DF_TENURE_FREQ, measure TENURE_EMP, share of employment by time with the current employer; both sexes, all ages), national figures for Australia, 2025; read from the OECD SDMX API (sdmx.oecd.org/public/rest/data/OECD.ELS.SAE,DSD_TENURE@DF_TENURE_FREQ) on 2026-10-11, the response opened and the figures copied: under 1 year, 1 to under 3, 3 to under 5, 5 to under 10, 10 and over. National, not the region's: none by region was found. It covers the employed (employees and the self-employed), where a person's tenure is the time in the present job. The open band (10 and over) is read as 10 to 30 years by the generator. The shares sum to 99.9 to 100 in the source and are scaled to 10000. Cross-check, opened 2026-10-11: ABS, Job mobility, February 2026 (released 31 July 2026; abs.gov.au/statistics/labour/jobs/job-mobility/latest-release): under 1 year 16.4%, 1 to 4 years 39.3%, 5 to 9 18.7%, 10 to 19 15.5%, 20 and over 10.0% (employed persons, duration in current job); these agree with the bands used (under 1: 17.1; under 5: 56.8 against 55.7).",
     "knowing.visit_seconds": "How long looking at one place takes someone who has gone there (an inspection at a notified stage, a valuer's external look, a welfare check at the door), beside the way there and back. Half an hour: a placeholder. No source was found for any of the three (docs/behaviour/knowing.md, section 3).",
     "knowing.meter_read_seconds": "How long reading one water meter takes a reader who has gone to it. Two minutes: a placeholder. No source was found (docs/behaviour/utilities.md, 'Who knows what').",
@@ -1063,6 +1108,36 @@
       "what": "weekly_contact_outside_household_pct",
       "value": 67.8,
       "source": "ABS, General Social Survey 2019: 67.8% of people aged 15 and over had face-to-face contact with family or friends living outside the household at least once a week"
+    },
+    {
+      "what": "tenancy_tribunal_applications_per_1000_renting_households_per_year",
+      "value": 71.6,
+      "source": "Derived: 51,092 applications to VCAT's residential tenancies list in 2023-24 (VCAT annual report 2023/24, opened) over 713,277 renting households (Census 2021, read through a summary: to confirm). Who applies, and for what, is not in the report's narrative."
+    },
+    {
+      "what": "problems_taken_to_an_authority_or_third_party_pct",
+      "value": 16.7,
+      "source": "World Justice Project, Global Insights on Access to Justice 2019 (General Population Poll 2017-18, about 1,000 respondents a country; the summary statistics workbook was opened; national, and for Brazil and Mexico the three largest cities only): of those with a problem in two years, the share who turned to an authority or third party to mediate, adjudicate or resolve it."
+    },
+    {
+      "what": "problems_fully_resolved_pct",
+      "value": 42.1,
+      "source": "World Justice Project, Global Insights on Access to Justice 2019 (General Population Poll 2017-18, about 1,000 respondents a country; the summary statistics workbook was opened; national, and for Brazil and Mexico the three largest cities only): of those with a problem, the share who say it is done and fully resolved."
+    },
+    {
+      "what": "problems_no_action_taken_pct",
+      "value": 18.0,
+      "source": "Law and Justice Foundation of NSW, Legal Australia-Wide Survey 2012 (n=20,716; opened): of legal problems, 18% had no action taken, 51% advice sought, 31% handled without advice."
+    },
+    {
+      "what": "job_mobility_pct_of_employed_per_year",
+      "value": 7.7,
+      "source": "ABS, Job mobility, February 2025 (opened): 7.7% of employed people changed employer or business in the year; 8.0% in 2024, 9.6% in 2023 (9.5% as first read)."
+    },
+    {
+      "what": "religious_affiliation_fall_points_per_year",
+      "value": 1.6,
+      "source": "ABS Census (media release, opened): Christian 52.1% in 2016 and 43.9% in 2021 in Australia (1.6 points a year); 47.9% and 40.9% in Victoria (1.4 a year; the 2016 figure to confirm)."
     }
   ]
 }

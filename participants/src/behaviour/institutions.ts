@@ -13,7 +13,7 @@ import { standingClaims } from "../law";
 import { need, params, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
 import { ask, Asked, Directions, goSee, ownerLooks, visited, VISIT_MAX, nextLook, because, Book, prohibitions, holdsOf, noting, cellsOf, commitmentOf, DAY, Letters, lotOf, ownAccount, record, say, sign, type Step, usd, withdraw, outOfTime, team, StandingWork, CounterWork } from "./common";
 import { Deliveries, goodsPrices, held, order } from "./trade";
-import { Bargaining, Staffing, stepper, WindingUp } from "./firms";
+import { Bargaining, receipts, Staffing, stepper, WindingUp } from "./firms";
 import * as P from "./papers";
 
 /** Who the registry says owns a lot: the latest standing ownership claim, following transfers. */
@@ -303,7 +303,7 @@ export const builder: BehaviourModule = {
   answers: {"office": "the builder's office", "acts": "What it acts on: a construction agreement signed with it, built once a permit for the site is in force and invoiced as agreed. Its prices are published.", "report": true},
   issues: [P.JOB_ADVERTISEMENT, P.ORDER],
   issuesWith: (p) => P.staffingOwn({ role: "construction worker", industry: p.industry, workplace: p.workplace, notice_days: p.notice_days ?? 14 }),
-  version: "0.12.3", // 0.12.3: takes on the share of its hands the world gives by the day, and pays them for the days there is building to do; 0.12.2: registers the share of its jobs the world gives for its kind; 0.12.1: with what 0.11.2 changed; 0.12.0: goes to a lot before building on it, sees its sites as its crew works on them, and gives notice of building work; no longer shown the town
+  version: "0.13.0", // 0.13.0: takes repair orders from a client who has paid for them (`repair_task`; none by default: nothing changes), done by its crew in its own hours, oldest first; 0.12.3: takes on the share of its hands the world gives by the day, and pays them for the days there is building to do; 0.12.2: registers the share of its jobs the world gives for its kind; 0.12.1: with what 0.11.2 changed; 0.12.0: goes to a lot before building on it, sees its sites as its crew works on them, and gives notice of building work; no longer shown the town
   doc: "docs/behaviour/institutions.md",
   cadence: () => DAY,
   create(ctx: ParticipantContext) {
@@ -340,6 +340,10 @@ export const builder: BehaviourModule = {
         // Whom it gives notice of building work to as it begins (the council, whose inspector comes; whoever connects
         // the services): the world gives them.
         notify: [] as string[],
+        // Repairs (docs/behaviour/building.md, "Repairs"): the catalogue task that repairs a building ("": it takes no
+        // repair orders), the seconds of work a unit takes, what it charges a unit (cents), and whether the day's repairs
+        // are done before its building work (a small job fitted in) or after it.
+        repair_task: "", repair_labour: 0, repair_price: 0, repair_first: true,
       },
       ctx.params,
     );
@@ -396,6 +400,12 @@ export const builder: BehaviourModule = {
     const used = new Map<string, number>(); // worker -> seconds worked today
     let usedDay = -1;
     let publishedAt = "";
+    // Repairs. Money that has come into our account, by the account it came from; what of it is already spoken for by
+    // orders we took on; the orders we have dealt with; and the ones we have taken on and not finished.
+    const paidIn = new Map<string, number>();
+    const spokenFor = new Map<string, number>();
+    const dealtWith = new Set<string>();
+    const repairs: { id: string; orderer: string; structure: string; units: number; left: number; at: number; refused: number }[] = [];
     // Hourly pay: the wage over the hours it pays for (working days in the period x the working day).
     let wage: number = p.wage; // (an enterprise agreement raises it)
     const bargaining = new Bargaining(ctx.entity);
@@ -406,6 +416,8 @@ export const builder: BehaviourModule = {
         staffing.absorb(obs);
         dues.absorb(obs, ownAccount(obs)?.account);
         letters.take(obs, book);
+        const own = p.repair_task ? ownAccount(obs) : undefined;
+        if (own) for (const [from, c] of receipts(obs, own.account)) paidIn.set(from, (paidIn.get(from) ?? 0) + c);
         // (The register's answer comes with the observation after we ask: a lot it has no plan of is not on it.)
         for (const lot of plansOut) if (!book.records.has(lot)) noPlan.add(lot);
         plansOut.clear();
@@ -582,6 +594,28 @@ export const builder: BehaviourModule = {
           steps.push(s);
         }
 
+        // Repair orders addressed to us: taken on once the money for them has come in from the account the order names
+        // (a repair is paid for first); declined, in writing, if it has not come within 14 days, or if there is nothing
+        // we can do. Oldest first, so that where one account pays for several, the older is covered first.
+        if (p.repair_task) {
+          const orders = book.open("repair_order").filter((r) => !dealtWith.has(r.id) && (r.addressed_to ?? []).includes(me)).sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : 1));
+          for (const r of orders) {
+            const orderer = r.speaks_for ?? "", structure = r.data?.structure, units = r.data?.units, from = r.data?.account;
+            const decline = (reason: string, text: string) => {
+              dealtWith.add(r.id);
+              steps.push(because(`${orderer} ordered a repair of ${structure ?? "something"} and ${reason}: declining, and saying so.`,
+                say("repair_declined", text, { to: [orderer], visible: [me, orderer], basis: r.id, data: { order: r.id, ...(typeof structure === "string" ? { structure } : {}), reason } })));
+            };
+            if (typeof structure !== "string" || !Number.isSafeInteger(units) || units <= 0 || typeof from !== "string") { decline("the order is not one we can read", "We can't take this order: it must name the building, a number of units, and the account it is paid from."); continue; }
+            const due = units * p.repair_price;
+            if ((paidIn.get(from) ?? 0) - (spokenFor.get(from) ?? 0) >= due) {
+              dealtWith.add(r.id);
+              spokenFor.set(from, (spokenFor.get(from) ?? 0) + due);
+              repairs.push({ id: r.id, orderer, structure, units, left: units, at: r.at, refused: 0 });
+            } else if (t - r.at >= 14 * DAY) decline("the money has not come", `We have not taken your repair order for ${structure}: the ${usd(due)} for it has not come into our account in 14 days. Send the order again with the money.`);
+          }
+        }
+
         // The day's work: the crew at the yard, on our sites, oldest first, each up to a working day.
         const day = Math.floor(t / DAY);
         if (day !== usedDay) {
@@ -594,6 +628,41 @@ export const builder: BehaviourModule = {
         // (Those here with the most time between them, the work shared evenly: someone who's done a day's work elsewhere
         // today joins tomorrow.)
         const crew = team(here, (w) => p.working_day - (used.get(w) ?? 0)).who;
+        // Repairs, oldest order first, in the crew's hours: as many units as the hours left allow, each order until its units
+        // are done, and then the orderer is told. (Our one crew does the repairs and the building: what one takes the other
+        // does not have.)
+        const repairWork = () => {
+          if (!p.repair_task || p.repair_labour <= 0) return;
+          for (const r of [...repairs]) {
+            if (r.left <= 0) continue;
+            const avail = Math.min(...crew.map((w) => p.working_day - (used.get(w) ?? 0)));
+            const units = Math.min(r.left, Math.floor((Math.max(0, avail) * crew.length) / p.repair_labour));
+            if (units <= 0) break;
+            const share = Math.ceil((units * p.repair_labour) / crew.length);
+            for (const w of crew) used.set(w, (used.get(w) ?? 0) + share);
+            const close = (kind: "repair_done" | "repair_declined", why: string, text: string, data: object) => {
+              repairs.splice(repairs.indexOf(r), 1);
+              return [because(why, say(kind, text, { to: [r.orderer], visible: [me, r.orderer], basis: r.id, data: { order: r.id, structure: r.structure, ...data } }))];
+            };
+            const s = because(`The day's work: ${crew.length} of our crew repairing ${r.structure} (${units} of the ${r.left} units left).`,
+              C.call("work", { task: p.repair_task, units: C.text(String(units)), at: p.yard, by: C.json(crew), on: r.structure }));
+            s.then = (out) => {
+              if (out.status === "applied") {
+                r.left -= units;
+                return r.left <= 0 ? close("repair_done", `The repair of ${r.structure} is done: telling ${r.orderer}.`, `The repair of ${r.structure} is done: ${r.units} units.`, { units: r.units }) : undefined;
+              }
+              for (const w of crew) used.set(w, Math.max(0, (used.get(w) ?? 0) - share));
+              const short = outOfTime(out);
+              if (short?.who) used.set(short.who, p.working_day - short.left);
+              else if (short) for (const w of crew) used.set(w, p.working_day);
+              if (short) return undefined; // (tomorrow)
+              // The building is gone; or the work is refused again and again: the order is closed, saying so.
+              if (out.refusal?.code === "unknown_structure" || ++r.refused >= 3) return close("repair_declined", `The repair of ${r.structure} cannot be done (${out.refusal?.code ?? "refused"}): telling ${r.orderer}.`, `We cannot repair ${r.structure}: ${out.refusal?.code === "unknown_structure" ? "it is not there" : "the work was refused"}.`, { reason: out.refusal?.code ?? "refused" });
+            };
+            steps.push(s);
+          }
+        };
+        if (day % 7 < p.work_days && crew.length && p.repair_first) repairWork();
         if (day % 7 < p.work_days && crew.length) {
           for (const pr of [...projects]) {
             // A building finished (its hours done, or seen finished by the crew): nothing more to do there. (One that is
@@ -624,9 +693,10 @@ export const builder: BehaviourModule = {
             steps.push(s);
           }
         }
+        if (day % 7 < p.work_days && crew.length && !p.repair_first) repairWork();
         // The crew: enough hands for the work in hand (waiting and begun) within the horizon, within the yard's room.
         const crewNow = staffing.workers(book, t);
-        const inHand = projects.reduce((x, pr) => x + Math.max(0, pr.left), 0) + waiting.reduce((x, w) => x + ((w.remove ? p.types[typeOf.get(w.remove) ?? ""]?.demolition_labour : w.type ? p.types[w.type]?.build_labour : 0) ?? 0), 0);
+        const inHand = projects.reduce((x, pr) => x + Math.max(0, pr.left), 0) + repairs.reduce((x, r) => x + r.left * p.repair_labour, 0) + waiting.reduce((x, w) => x + ((w.remove ? p.types[typeOf.get(w.remove) ?? ""]?.demolition_labour : w.type ? p.types[w.type]?.build_labour : 0) ?? 0), 0);
         const perHand = (p.horizon_days * p.working_day * p.work_days) / 7;
         const want = Math.min(p.max_crew, Math.max(p.min_crew, Math.ceil(inHand / perHand)));
         const bill = Math.floor((crewNow.length * wage * 30 * DAY) / p.period);

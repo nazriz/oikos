@@ -578,7 +578,8 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
           break;
         }
         case "position_created":
-          positions.set(e.position, { id: e.position, entity: e.entity, title: e.title, role: e.role, channels: [], role_module: e.role_module });
+          // (A post made in a run keeps its organisation's record where its role module says so: a business founded here.)
+          positions.set(e.position, { id: e.position, entity: e.entity, title: e.title, role: e.role, channels: [], role_module: e.role_module, ...(e.role_module?.keeps_record === true ? { keeps_record: true } : {}) });
           break;
         case "appointed": {
           const x = positions.get(e.position);

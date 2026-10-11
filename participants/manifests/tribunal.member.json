@@ -1,8 +1,29 @@
 {
   "name": "tribunal.member",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "doc": "docs/behaviour/justice.md",
   "params": {
+    "account": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
+      "source": "placeholder"
+    },
+    "cases_per_day": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 4,
+      "source": "placeholder"
+    },
+    "fee": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 0,
+      "source": "placeholder"
+    },
     "hearing_after_days": {
       "schema": {
         "type": "integer",
@@ -12,6 +33,13 @@
       "default": 21,
       "source": "placeholder"
     },
+    "hears": {
+      "schema": {
+        "type": "array"
+      },
+      "default": [],
+      "source": "placeholder"
+    },
     "pay_within_days": {
       "schema": {
         "type": "integer",
@@ -19,6 +47,16 @@
       },
       "unit": "days",
       "default": 28,
+      "source": "placeholder"
+    },
+    "uphold_bps": {
+      "schema": {
+        "type": "object"
+      },
+      "unit": "bps",
+      "default": {
+        "other": 5000
+      },
       "source": "placeholder"
     }
   },

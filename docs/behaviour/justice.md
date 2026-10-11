@@ -20,6 +20,10 @@ records.
 | **A charge** (0.2.0) | From the police, with what their investigation found. If it names the respondent: proven, and an order to make good the goods' value to the one they were taken from. | docs/behaviour/crime.md |
 | **Enforcement** | A creditor whose order to pay is due and unpaid asks the registrar (`enforcement_request`). The registrar orders the debtor's banks (a `garnishee_order`) to pay what's unpaid from what they hold for the debtor. | Garnishee orders (Judgment Debt Recovery Act 1984 (Vic), to confirm) |
 
+## Lists (tribunal.member 0.3.0; docs/behaviour/frictions.md, "Venues")
+
+In a town where things go wrong the tribunal also hears, on the same forms: a home in disrepair, pay come short, faulty goods, a wrong bill, rent in arrears, and a refused claim for support. It says what it hears in a public notice (an offer to apply, with `hears` and its fee), and hears these by the common procedure of every venue (`Hearings`): the other side is told and has until the hearing to answer; cases are decided oldest first, as many a day as `cases_per_day`; on the other side's own answer where it gives one; in default where it gives none; and where it cannot say from its records, for an applicant who can show a paper for it, or else as often as `uphold_bps` says (failure of proof, never a coin on the truth: a seat in the tribunal decides for itself). It can order payment by a date, order a thing put right, or set a paper aside. An order to pay that rests on no recorded debt is enforced like any other: the registrar's garnishee order settles it against the order itself. A person ordered to pay (rent in arrears) pays if it leaves them the month's essentials. Its three older lists (a rent increase, a debt, a charge) are as they were.
+
 ## The parties
 
 - **Tenants** (citizen 0.26.0): given a notice of rent increase that breaks the law as they read it, they take it to the

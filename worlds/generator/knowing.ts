@@ -46,6 +46,8 @@ export const lookUp = (id = "who", extra: Extra = {}) => ({ id, kind: "directory
  * notices (a market): it is published, but nobody is shown a market: it is gone round, a few entries at a time
  * (`most`, how many one reading takes in).
  */
+/** What a town where things go wrong publishes besides (docs/behaviour/frictions.md): given only to such a town. */
+export const PUBLISHED_HEARINGS = { what: "has:hears", why: "A body that hears grievances says publicly what it hears, so that whoever has such a matter can bring it." };
 export const PUBLISHED: { what: string; why: string; board?: true; most?: number }[] = [
   { what: "law", why: "The law in force is promulgated to everyone it binds." },
   { what: "charter", why: "The town's charter is public, as its laws are." },
@@ -99,7 +101,7 @@ export function answersOf(what: string, town: { holderSearch: string[]; dealings
  * The world's `knowing`: what is published, and the keeper of each register, taken from the behaviour module that
  * does each seat's job (its `keeps`, with the reason) for the organisation the seat belongs to.
  */
-export function knowing(positions: { entity: string; role_module?: { code?: string } }[], town: { holderSearch: string[]; dealings: number; visit_seconds?: number }) {
+export function knowing(positions: { entity: string; role_module?: { code?: string } }[], town: { holderSearch: string[]; dealings: number; visit_seconds?: number; hearings?: boolean }) {
   const keepers = new Map<string, { entity: string; what: string; why: string; answers?: ReturnType<typeof answersOf> }>();
   for (const pos of positions) {
     for (const k of modules[pos.role_module?.code ?? ""]?.keeps ?? []) {
@@ -109,5 +111,5 @@ export function knowing(positions: { entity: string; role_module?: { code?: stri
       if (!keepers.has(`${pos.entity}|${k.what}`)) keepers.set(`${pos.entity}|${k.what}`, { entity: pos.entity, what: k.what, why: k.why, ...(answers.length ? { answers } : {}) });
     }
   }
-  return { published: PUBLISHED.map((p) => ({ ...p })), keepers: [...keepers.values()].sort((a, b) => (`${a.entity}|${a.what}` < `${b.entity}|${b.what}` ? -1 : 1)), ...(town.visit_seconds !== undefined ? { visit_seconds: town.visit_seconds } : {}) };
+  return { published: [...PUBLISHED, ...(town.hearings ? [PUBLISHED_HEARINGS] : [])].map((p) => ({ ...p })), keepers: [...keepers.values()].sort((a, b) => (`${a.entity}|${a.what}` < `${b.entity}|${b.what}` ? -1 : 1)), ...(town.visit_seconds !== undefined ? { visit_seconds: town.visit_seconds } : {}) };
 }

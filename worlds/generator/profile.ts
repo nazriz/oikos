@@ -100,6 +100,18 @@ export interface Profile {
      * such law is written); landlords then review rents as often as `rent_review_practice_months` says, if it's given. */
     tenancy: { end_notice_days?: number; tenant_notice_days?: number; rent_review_months?: number; rent_increase_notice_days?: number; rent_review_practice_months?: number; after_fixed_term?: "periodic" };
     values: { [value: string]: { mean_bps: number; sd_bps: number } };
+    /** What holds someone in a job they have (docs/behaviour/citizen.md, "Moving to another job"), read only for a living town: how much more another job must pay, and how much more again for each year they have been where they are. */
+    job_move?: { premium_bps: number; per_year_bps: number; cap_years: number; other_trade_bps?: number };
+    /** How fast a belief not kept up fades, a month, in a living town: fitted to the place's trend in stated affiliation (docs/behaviour/citizen.md, "Belief"). */
+    belief?: { living_fade_bps_per_month?: number };
+    /** Everyday frictions (docs/behaviour/frictions.md), read only for a living town: of adults, the share who have
+     * each kind of problem in a year; how often the other side puts a thing right when asked, by matter; the sizes
+     * of a short pay, a wrong bill and a faulty lot of goods; a repair's hours; the support office's processing time
+     * and its share of wrong refusals; and how the bodies that hear grievances work. Each with its source or marked
+     * a placeholder. */
+    frictions?: { per_adult_bps_per_year: { landlord: number; wages: number; bill: number; benefits: number; goods: number }; put_right_on_asking_bps: { [matter: string]: number };
+      pay_short_by_bps: number; bill_over_bps: number; goods_faulty_share_bps: number; repair_hours: number; support: { processing_days: number; wrong_refusal_bps: number };
+      venues: { answer_days: number; tribunal_days: number; tribunal_fee_hours_of_pay: number; cases_per_day: number; uphold_without_proof_bps: number } };
     /** How people here start out in what they trust and how much control they feel (docs/behaviour/citizen.md, "The
      * record"): the share with confidence in each kind of institution (government, policing, courts, civil_service,
      * banks, press, unions, religious, companies: whichever the place's survey gives), the share who say most people
