@@ -168,7 +168,7 @@ export interface TownSpec {
     founding?: boolean | { shapes?: string[] | string; scale_bps?: number; /** How many others must share a want before founding is weighed, where a study sets it apart from the profile's. */ shared_min?: number };
     /** The composing model (docs/behaviour/founding.md, "Words"): off unless set. `true`: the two families in equal
      * shares, eight pieces a month; or how many pieces a month, the mix, the fallback and the follow-up sample. */
-    composer?: boolean | { pieces_per_month?: number; mix?: { model: string; share_bps: number }[]; fallback?: string; follow_up_bps?: number } };
+    composer?: boolean | { pieces_per_month?: number; mix?: { model: string; share_bps: number }[]; fallback?: string; follow_up_bps?: number; accounts?: number } };
   /** How hard a seat's model reasons, where its way in takes that (docs/real-models.md, "A seat's settings"): one word
    * for every seat ("low"), or by office id ({ finance: "low" }). Not given: the model's own default. */
   seat_effort?: string | { [seat: string]: string };
@@ -549,7 +549,8 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   const CO_SPEC = spec.living?.composer === true ? {} : spec.living?.composer || undefined;
   if (CO_SPEC && !FND) throw new Error("living.composer needs living.founding: the composer writes the words of what is founded");
   const COMPOSER = CO_SPEC ? { pieces_per_month: CO_SPEC.pieces_per_month ?? 8, mix: CO_SPEC.mix ?? [{ model: "claude-code/claude-sonnet-5-5", share_bps: 5_000 }, { model: "codex/gpt-6.1-sol", share_bps: 5_000 }],
-    fallback: CO_SPEC.fallback ?? (CO_SPEC.mix ?? [{ model: "claude-code/claude-sonnet-5-5" }])[0]!.model, follow_up_bps: CO_SPEC.follow_up_bps ?? 2_500 } : undefined;
+    fallback: CO_SPEC.fallback ?? (CO_SPEC.mix ?? [{ model: "claude-code/claude-sonnet-5-5" }])[0]!.model, follow_up_bps: CO_SPEC.follow_up_bps ?? 2_500,
+    ...(CO_SPEC.accounts !== undefined ? { accounts: Number(CO_SPEC.accounts) } : {}) } : undefined;
   const frictionRng = rng("frictions");
   const worn = () => (FR ? { variables: { disrepair: frictionRng.below(DISREPAIR_AT) } } : {});
   const UT = V.utilities && spec.utilities !== false ? V.utilities : undefined;

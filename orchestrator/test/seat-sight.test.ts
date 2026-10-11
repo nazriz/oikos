@@ -93,7 +93,7 @@ test("a mayor's letters all go, whatever it writes as what they are about; none 
   let debrief = "";
   for await (const line of logLines(join(out, "town.seed1.jsonl"))) {
     if (line.includes('"rejected_action"') || line.includes('"not_sent"')) rejected.push(line);
-    if (line.includes('"annotation":"debrief"')) debrief = JSON.parse(line).body.data.prompt;
+    if (line.includes('"annotation":"transcript"') && line.includes('"ref":"debrief/consent"')) debrief = JSON.parse(line).body.data.input;
     if (!line.includes('"block":"message"') || !line.includes('"kind":"command"')) continue;
     const e = JSON.parse(line);
     if (e.body.participant === "mayor-system") letters.push(...e.body.blocks);
@@ -106,7 +106,8 @@ test("a mayor's letters all go, whatever it writes as what they are about; none 
   ]);
   // It is told each went, and its own record of the run counts what was sent.
   expect(shown[1]).toContain('Done: your letter to bank (headed "About: acc-city payments": what it is about is not one id, so it heads the letter).');
-  expect(debrief).toContain("3 letters of yours were sent, you asked for 0 things to be done");
+  expect(debrief).toContain("You asked for 0 things to be done.");
+  expect(debrief).toContain("3 letters of yours were delivered.");
   // The offices answer, and their letters are signed by post and organisation; nothing it is ever shown, in a letter, a
   // paper or its standing instructions, has an id of the platform's own in it (principle 14).
   expect(shown.join("\n")).toMatch(/- From [^\n]*\((finance|council-clerk|bank-payments)\), [^\n]*\((city|bank)\) \(year 1, day \d+\)/);

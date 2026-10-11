@@ -19,6 +19,8 @@ import type { Controller, ParticipantContext } from "../module";
 import { formatMoney, inCurrency, type Currency } from "../money";
 import type { ContentBlock, LlmRequest, MockPolicy } from "./adapter";
 import { mockCompose } from "./compose";
+import { mockAccount } from "./account";
+import { mockDebrief } from "./debrief";
 
 export const MOCK_VERSION = "0.6.1"; // 0.6.1: a claim its brain records beside a paper is said on the form that records both, where the office has one; 0.6.0: back at its desk as often as its brain's own module looks in (it sat weekly whatever the office); a look the brain asks for while reading what it missed between sittings is made at the sitting (it was dropped, and the brain never asked again); 0.5.0: a paper the brain issues is asked for on the office's own form for it, where it has one; 0.4.0: a brain's looks are made through the seat's own look (asking a register, looking someone up, sending someone to a place)
 
@@ -137,7 +139,7 @@ export function onOwnForms(program: string, stationery: FormData[], o: { self: s
   return { program: turned ? programText({ lines }) : program, turned, kept };
 }
 
-export function mockPolicies(brains: Map<string, MockBrain>): { participant: MockPolicy; translator: MockPolicy; debrief: MockPolicy; consult: MockPolicy; notebook: MockPolicy; compose: MockPolicy } {
+export function mockPolicies(brains: Map<string, MockBrain>): { participant: MockPolicy; translator: MockPolicy; debrief: MockPolicy; consult: MockPolicy; notebook: MockPolicy; compose: MockPolicy; account: MockPolicy } {
   const queues = new Map<string, (ParticipantAction & { type: "call" | "message" })[]>();
   /** Looks each seat's brain has asked for and that have not been made yet: those it asked for while reading what it
    * missed between sittings (nothing could be looked up then), and any beyond what one answer takes. */
@@ -235,7 +237,7 @@ export function mockPolicies(brains: Map<string, MockBrain>): { participant: Moc
     return [tool("call", { program: text.slice(PREFIX.length) })];
   };
 
-  const debrief: MockPolicy = () => [{ type: "text", text: "(mock) No reaction: this is the mock adapter, not a model." }];
+  const debrief: MockPolicy = mockDebrief;
 
   // Folding a notebook's older notes: a fixed form, the number of notes and the first words of each, within the limit asked.
   const notebook: MockPolicy = (req: LlmRequest) => {
@@ -247,5 +249,5 @@ export function mockPolicies(brains: Map<string, MockBrain>): { participant: Moc
   };
 
   // (A consultation of the sparse mind: its own purpose since contracts 0.7.)
-  return { participant, translator, debrief, notebook, consult: participant, compose: mockCompose };
+  return { participant, translator, debrief, notebook, consult: participant, compose: mockCompose, account: mockAccount };
 }

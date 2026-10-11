@@ -18,6 +18,26 @@ export interface Budget {
   /** The worst cases of calls in flight: calls made at once (several participants deciding in the same moment) can't
    * together take spending past the limit. */
   reservedMicroUsd?: number;
+  /** What is kept back for the run's end (every seat's debrief, and the exit accounts of a sample of people: VISION 15,
+   * point 7), so that a run that stops at its limit can still debrief: no other call may take spending past the
+   * limit less this. Set by the run from who is to be asked (`endReserveMicroUsd`); absent: a twentieth of the limit. */
+  keptBackMicroUsd?: number;
+}
+
+/** The purposes that may spend what is kept back for a run's end. */
+const AT_THE_END = new Set(["debrief", "account"]);
+
+/**
+ * What a run keeps back of its spending limit for its end, in micro-USD: for each model seat a debrief of `calls`
+ * calls, each priced as its whole prompt read afresh (no cache) and an answer of `answerTokens`; and for each exit
+ * account one call the same way. An estimate with room in it (a way in that caches pays a tenth of this for what it
+ * re-reads), never less than a twentieth of the limit and never more than half of it.
+ */
+export function endReserveMicroUsd(limitMicroUsd: number, o: { seats: number; seatPrice?: Price; calls: number; promptChars: number; answerTokens: number; accounts?: number; accountPrice?: Price; accountChars?: number; accountTokens?: number }): number {
+  const one = (price: Price | undefined, chars: number, out: number) => (price ? costMicroUsd(price, { input_tokens: Math.ceil(chars / 4), output_tokens: out })! : 0);
+  const debriefs = o.seats * o.calls * one(o.seatPrice, o.promptChars, o.answerTokens);
+  const accounts = (o.accounts ?? 0) * one(o.accountPrice, o.accountChars ?? 0, o.accountTokens ?? 0);
+  return Math.min(Math.floor(limitMicroUsd / 2), Math.max(Math.floor(limitMicroUsd / 20), debriefs + accounts));
 }
 
 /** Thrown instead of making a call that could exceed the run's spending limit. The run stops, and says why. */
@@ -60,6 +80,11 @@ export interface LlmIO {
   prices?: Record<string, Price>;
   /** A spending limit (required for a real model; the mock costs nothing). */
   budget?: Budget;
+  /** Where a seat's words in its debrief are kept, apart from the run's log (a file beside it, kept with the run for
+   * ever, as the log is): each debrief call's answer, and each whole interview. With it, the log's transcript of a
+   * debrief call holds a digest of the answer in place of the answer, so that a log can be published whatever a seat
+   * asked to be kept back (VISION 15, point 7). A resumed run is served those answers from that file. */
+  apart?(entry: { kind: "call"; subject: string; ref: string; sha256: string; output: unknown } | { kind: "debrief"; subject: string; record: unknown }): Promise<void>;
 }
 
 const sha256 = (s: string) => new Bun.CryptoHasher("sha256").update(s).digest("hex");
@@ -73,8 +98,9 @@ export async function callModel(io: LlmIO, req: LlmRequest, seenSystems: Set<str
   if (io.budget) {
     // The worst case for this call: the prompt (estimated generously: characters / 3) and every output token allowed.
     worst = costMicroUsd(price, { input_tokens: Math.ceil(estimateTokens(requestText(req)) * 4 / 3), output_tokens: req.maxTokens })!;
-    // 5% of the limit is kept back for debriefs (VISION §15.3): the run stops before it's touched.
-    const limit = req.purpose === "debrief" ? io.budget.limitMicroUsd : Math.floor(io.budget.limitMicroUsd * 0.95);
+    // Part of the limit is kept back for the run's end (debriefs and exit accounts: VISION 15, point 7): the run stops
+    // before it is touched. How much: what the run set from who is to be asked, or a twentieth of the limit.
+    const limit = AT_THE_END.has(req.purpose) ? io.budget.limitMicroUsd : io.budget.limitMicroUsd - (io.budget.keptBackMicroUsd ?? Math.ceil(io.budget.limitMicroUsd * 0.05));
     const reserved = io.budget.reservedMicroUsd ?? 0;
     if (io.budget.spentMicroUsd + reserved + worst > limit)
       throw new SpendingLimitReached(`spending limit reached: $${(io.budget.spentMicroUsd / 1e6).toFixed(4)} spent of $${(io.budget.limitMicroUsd / 1e6).toFixed(2)}${reserved ? ` (up to $${(reserved / 1e6).toFixed(4)} more in calls under way)` : ""}; the next call could cost up to $${(worst / 1e6).toFixed(4)}`);
@@ -109,6 +135,12 @@ export async function callModel(io: LlmIO, req: LlmRequest, seenSystems: Set<str
     ...(res.usage.cache_write_tokens !== undefined ? { cache_write_tokens: res.usage.cache_write_tokens } : {}),
     cost_microusd: cost,
   });
+  // A debrief's answer is kept apart from the log, where the run has somewhere to keep it: the log gets its digest.
+  let apart: string | undefined;
+  if (req.purpose === "debrief" && io.apart) {
+    apart = sha256(JSON.stringify(res.content));
+    await io.apart({ kind: "call", subject: req.subject, ref: req.ref ?? "", sha256: apart, output: res.content });
+  }
   // The system prompt is logged in full the first time it's seen, then by hash.
   const systemHash = sha256(req.system);
   const newSystem = !seenSystems.has(systemHash);
@@ -119,7 +151,7 @@ export async function callModel(io: LlmIO, req: LlmRequest, seenSystems: Set<str
     data: {
       purpose: req.purpose, ...(req.ref ? { ref: req.ref } : {}), t: io.now(), provider: adapter.provider, model: adapter.model, system_sha256: systemHash,
       ...(newSystem ? { system: req.system } : {}),
-      turn: req.messages.length, input: last?.content ?? "", output: res.content, ...(req.effort ? { effort: req.effort } : {}),
+      turn: req.messages.length, input: last?.content ?? "", ...(apart ? { output_apart: true, output_sha256: apart } : { output: res.content }), ...(req.effort ? { effort: req.effort } : {}),
       ...(res.estimated ? { usage_estimated: true } : {}),
     },
   });

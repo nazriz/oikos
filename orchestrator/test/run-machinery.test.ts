@@ -283,7 +283,7 @@ test("what a resume leaves behind is history, not another run: a folder's reader
   const r0 = prepareResume(join(out, "town.seed1.jsonl"));
   const serving = new Serving(recordedCalls(r0.stoppedLog));
   const r = await runWorld({ config: r0.config, runId: r0.runId, outDir: out, until: 20 * DAY, adapter: serving.wrap(new MockAdapter("mock", {})), resumedFrom: { log: "town.seed1.stopped-1.jsonl", serving } });
-  expect(readdirSync(out).filter((f) => f.endsWith(".jsonl") && !f.includes("anchors")).sort()).toEqual(["town.seed1.jsonl", "town.seed1.stopped-1.jsonl"]);
+  expect(readdirSync(out).filter((f) => f.endsWith(".jsonl") && !f.includes("anchors")).sort()).toEqual(["town.seed1.debriefs.jsonl", "town.seed1.jsonl", "town.seed1.stopped-1.debriefs.jsonl", "town.seed1.stopped-1.jsonl"]); // (each with what its seats said in their debriefs beside it, which is no log)
   // The folder is one run: for the corpus and datasets, and for measurement.
   expect(isLog("town.seed1.stopped-1.jsonl")).toBe(false);
   expect(isLog("town.seed1.stopped-12.jsonl.zst")).toBe(false);

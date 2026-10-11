@@ -78,19 +78,25 @@ test("what could not go is told at once, in the seat's terms, and nothing else i
   expect(notes.filter((n) => n.clipped)).toEqual([{ clipped: "why (20000 characters; 16384 kept)", use: "do" }, { clipped: "note (20000 characters; 16384 kept)", use: "confirm" }]);
 });
 
-test("the debrief counts the letters that were sent, beside those written; and the days it sat, to the last", async () => {
-  const { p, debriefs } = harness([
-    [use("a", "write", { to: ["bank"], text: "One.", as: "mayor" }), use("b", "write", { to: ["bank"], text: "Two.", as: "mayor" }), use("c", "write", { to: ["nobody-here"], text: "Three.", as: "mayor" })],
+test("the debrief is said beneath the seat's own standing instructions, with its notebook as it left it and what the run's record shows it did", async () => {
+  // (What it did is counted from the run's log, by code: orchestrator/src/debrief-summary.ts, where the letters that
+  // went are told from those it wrote. The seat's own tally of them is no longer what it is shown.)
+  const { p, calls, debriefs } = harness([
+    [use("a", "write", { to: ["bank"], text: "One.", as: "mayor" })],
     [use("n", "notebook", { add: "Day 8: waiting on the bank." }), use("d", "done_for_now", {})],
   ]);
   await p.step(obs(9 * HOUR), ctx);
-  await p.step(sent(9 * HOUR), ctx); // the first went
-  await p.step(obs(9 * HOUR, { notices: [{ t: 9 * HOUR, text: "Your letter to bank was not sent." }] }), ctx); // the second did not
-  await p.step(obs(9 * HOUR, { outcomes: [{ action: "act.3", t: 9 * HOUR, status: "refused", refusal: { code: "unknown_participant" } }] }), ctx); // nor the third: nobody of that name
-  // A later sitting in which it only writes in its notebook is still a day it sat.
+  await p.step(sent(9 * HOUR), ctx);
   await p.step(obs(7 * 86_400 + 9 * HOUR), ctx);
-  await p.debrief("The run is over. How was it?");
-  expect(debriefs[0].prompt).toContain("From day 1 to day 8 1 letter of yours was sent (2 more that you wrote were not: you were told at the time), you asked for 0 things to be done");
+  const sitting = calls.filter((c) => c.purpose === "participant").at(-1)!;
+  const r = await p.debrief({ wording: "a", town: "Millbrook", ended: { how: "last_day", day: 20, of: 20 }, others: { models: 0 }, summary: "1 letter of yours was delivered.", decisions: [] });
+  const first = calls.find((c) => c.purpose === "debrief")!;
+  expect(first.system).toBe(sitting.system);
+  expect(first.messages[0]!.content).toContain("WHAT THE RECORD SHOWS OF WHAT YOU DID\nYou keep only your notebook from one sitting to the next, so this is set out for you. It was made by code from the run's record. It says what was done, and nothing of how any of it turned out.\n1 letter of yours was delivered.");
+  expect(first.messages[0]!.content).toContain("YOUR NOTEBOOK, AS YOU LEFT IT\nDay 8: waiting on the bank.");
+  // (This harness answers a debrief in plain words, not in the form asked for: every answer is kept as given, and kept back.)
+  expect(r.steps.every((s) => s.unread)).toBe(true);
+  expect(debriefs[0]).toEqual(r);
 });
 
 test("a notebook has room for a half-year, and a seat is told how to make room before it is full", async () => {

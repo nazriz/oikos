@@ -12,3 +12,5 @@ export * from "./codex";
 export * from "./claude-code";
 export * from "./consult";
 export * from "./compose";
+export * from "./account";
+export * from "./debrief";

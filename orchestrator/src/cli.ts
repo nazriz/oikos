@@ -214,7 +214,7 @@ function stopOnSignal(): StopSignal {
   return stop;
 }
 
-const usage = "usage: oikos run <world> [--seeds N (runs of one town)] [--towns T (different towns, each run --seeds times)] [--parallel P] [--out DIR] [--until S] [--set k=v] [--scenario NAME[+NAME]] [--modules FILE] [--translator-model m] [--translator-first decide/NAME [--translator-arrangement then|beside]] [--no-measure] [--overwrite] [--model provider/model --budget USD [--base-url URL]] | resume <log.jsonl[.zst]|DIR> [--until S] [--model ... as for run] | measure <DIR> [QUERY...] [--sql SQL] [--list] | diff <BASELINE> <CHANGE> [QUERY...] | health <DIR> [--profile NAME] | cost <DIR> [--translator-model m] | translator-eval --model provider/model [--budget USD] [--out FILE] [--real | --only-real] [--jobs N] | scenarios [--all] | pilot-report <DIR>... [--no-write] | replay <log.jsonl> | story <log.jsonl> [participant] | record <log.jsonl[.zst]> <entity|participant> [--at S]";
+const usage = "usage: oikos run <world> [--seeds N (runs of one town)] [--towns T (different towns, each run --seeds times)] [--parallel P] [--out DIR] [--until S] [--set k=v] [--scenario NAME[+NAME]] [--modules FILE] [--translator-model m] [--translator-first decide/NAME [--translator-arrangement then|beside]] [--no-measure] [--overwrite] [--model provider/model --budget USD [--base-url URL]] | resume <log.jsonl[.zst]|DIR> [--until S] [--model ... as for run] | measure <DIR> [QUERY...] [--sql SQL] [--list] | diff <BASELINE> <CHANGE> [QUERY...] | health <DIR> [--profile NAME] | cost <DIR> [--translator-model m] | translator-eval --model provider/model [--budget USD] [--out FILE] [--real | --only-real] [--jobs N] | scenarios [--all] | pilot-report <DIR>... [--no-write] | debriefs <DIR|log>... [--json] | replay <log.jsonl> | story <log.jsonl> [participant] | record <log.jsonl[.zst]> <entity|participant> [--at S]";
 
 try {
   if (cmd === "run" && positional()[0]) {
@@ -223,7 +223,7 @@ try {
       until: flag("until") ? Number(flag("until")) : undefined, sets: sets(), translatorModel: flag("translator-model"), translatorFirst: flag("translator-first"), translatorArrangement: flag("translator-arrangement"), measure: !has("no-measure"), log: console.log,
       model: flag("model"), budgetUsd: flag("budget") ? Number(flag("budget")) : undefined, baseUrl: flag("base-url"), modules: flag("modules"),
       recordObservations: flag("record-observations"), recordDecisions: flag("record-decisions"), logDetail: flag("log"), compress: !has("no-compress"), keep: flag("keep") as "log" | "measures" | undefined,
-      batchBudgetUsd: flag("batch-budget") ? Number(flag("batch-budget")) : undefined, consult: has("consult"), composer: has("composer"), consultAvoid: flag("consult-avoid"),
+      batchBudgetUsd: flag("batch-budget") ? Number(flag("batch-budget")) : undefined, consult: has("consult"), composer: has("composer"), consultAvoid: flag("consult-avoid"), debriefWording: flag("debrief-wording"),
       overwrite: has("overwrite"), stop: stopOnSignal(),
     });
     if (r.measureDir) {
@@ -266,7 +266,7 @@ try {
   } else if (cmd === "run-one" && positional()[0]) {
     await runOne({ world: positional()[0]!, seed: Number(flag("seed")), ...(flag("town") !== undefined ? { town: Number(flag("town")) } : {}), out: flag("out", "runs")!, until: flag("until") ? Number(flag("until")) : undefined, sets: sets(),
       model: flag("model"), translatorModel: flag("translator-model"), translatorFirst: flag("translator-first"), translatorArrangement: flag("translator-arrangement"), budgetUsd: flag("budget") ? Number(flag("budget")) : undefined, baseUrl: flag("base-url"), modules: flag("modules"),
-      recordObservations: flag("record-observations"), recordDecisions: flag("record-decisions"), logDetail: flag("log"), consult: has("consult"), composer: has("composer"), consultAvoid: flag("consult-avoid"), overwrite: has("overwrite"), stop: stopOnSignal() });
+      recordObservations: flag("record-observations"), recordDecisions: flag("record-decisions"), logDetail: flag("log"), consult: has("consult"), composer: has("composer"), consultAvoid: flag("consult-avoid"), debriefWording: flag("debrief-wording"), overwrite: has("overwrite"), stop: stopOnSignal() });
   } else if (cmd === "resume" && positional()[0]) {
     // A run that stopped (a stall, a crash, cut short): run again from its own config, serving its recorded model calls.
     const o = { until: flag("until") ? Number(flag("until")) : undefined, modules: flag("modules"),
@@ -290,6 +290,13 @@ try {
     // A pilot folder's report from its log alone (pilot-report.ts), printed and written as <DIR>/pilot-report.json.
     const { pilotReport, renderReport } = await import("./pilot-report");
     for (const dir of positional()) console.log(renderReport(await pilotReport(dir, !has("no-write"))) + "\n");
+  } else if (cmd === "debriefs" && positional()[0]) {
+    // Debriefs across runs (VISION 15, point 7; debriefs.ts): by setting and framing, how often seats reported distress
+    // or being pushed against their values, with their words, for review before a scenario is run again. It lists; it
+    // does not score. What a seat kept back is counted and never shown. --json: the same as data.
+    const { debriefsReport, logsOfRuns } = await import("./debriefs");
+    const r = await debriefsReport(logsOfRuns(positional()));
+    console.log(has("json") ? JSON.stringify(r.groups, null, 2) : r.text);
   } else if (cmd === "health" && positional()[0]) {
     // The health report (docs/design/rebuild.md 8.4): the batch's measures against its profile's targets.
     const { drawn, health, healthText } = await import("@oikos/measure");

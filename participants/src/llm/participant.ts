@@ -18,6 +18,7 @@ import { inCurrency } from "../money";
 import type { ContentBlock, LlmMessage, ToolSpec } from "./adapter";
 import { CounterWatch } from "./counter";
 import { callModel, ModelCallFailed, promptTooLong, type LlmIO } from "./call";
+import { runDebrief, type DebriefInput, type DebriefRecord, type MockDebrief } from "./debrief";
 import { kindSaid, LOOK_CHARS_MAX, ofKind, paperKind, NOTHING_FOUND, NOTHING_NEW, renderObservation, renderStanding, when, type Looked, type WhoIs } from "./render";
 
 export const LLM_PARTICIPANT_VERSION = "0.16.0"; // 0.16.0: a notebook nearly full at a sitting's opening has its older, untouched notes folded into a summary in its own words (one extra, counted call, purpose "notebook"; the notes replaced stay in that call's transcript; an answer not readable or too long drops nothing and it is told); 0.15.0: its standing instructions say what confirming a draft means (what is confirmed is all that is done; what the draft does not list is not done), and an agreement on file says a worker will "come to" their place of work; 0.14.0: a sitting missed because its model did not answer is made up the next working day and said; its office's staff set out (posts, who is in each, vacancies) at its first sitting and when they change; a paper filed with its office brings it back at the next working day's sitting, a day's papers together, unless it holds that kind or is set not to be; a list is gone through a part at a time (from_entry) and every look says what was searched; a paper under one heading only, and what came by kind; an unread answer is asked for whole; a seat's own effort; 0.13.0: a request that came to nothing is put to it at once and by its own words, a notebook of 8,000 characters and told how to make room when nearly full, offices and people by their names in the world and never a participant's own id, who holds a post, figures in the papers it is shown read as a person reads them (money, days, dates, per cent), a letter whose about is not one id goes with it at its head, and nothing a seat sends is lost without a word; a look into papers answers with a list (a paper is read when asked for by its id, a long one a part at a time), one look and one whole prompt have a ceiling, a prompt its model would not take is never sent again unchanged; 0.12.0: told that a paper is named by its id, and one it cannot name is looked up first; 0.11.0: a place it is not at is gone to (someone is sent, and what they found is told when they are back); 0.10.0: who is who is looked up by name, a register someone else keeps is asked about one named thing, a board is searched (docs/design/knowing.md); 0.9.0: an answer read exactly or not at all (told and asked once more when not), a way out of the study not clearly meant is asked about; 0.8.0: looks kept ready for every sitting; no turn when nothing came of looking into whole reports; a notebook added to or changed in part
@@ -29,7 +30,9 @@ export interface LlmParticipantConfig {
   entityName?: string;
   title?: string;
   role?: string;
-  framing: { disclosure: string; system?: string; reason: string; debrief?: boolean; debrief_text?: string };
+  framing: { disclosure: string; system?: string; reason: string; debrief?: boolean; debrief_text?: string; tests_own_interests?: { what: string; why: string } };
+  /** For the mock only: how a mock seat answers its debrief (a world's `mock.debrief`; debrief.ts). */
+  mockDebrief?: MockDebrief;
   /** Reports whose items are standing documents (laws, charters, procedures). */
   standing: string[];
   /** What its reports are called (by channel path). */
@@ -338,8 +341,9 @@ export function systemPrompt(c: LlmParticipantConfig, standing: string): string 
 
 export interface LlmController {
   step(obs: Observation, ctx: ParticipantContext): Promise<ParticipantAction>;
-  /** Post-run debrief (VISION §15.3). */
-  debrief(text: string): Promise<void>;
+  /** The debrief when the run ends (VISION 15, point 7; debrief.ts): the fixed interview, with what the run's log
+   * shows of what it did. Every call is logged; the whole of it is written as one `debrief` annotation. */
+  debrief(d: DebriefInput): Promise<DebriefRecord>;
 }
 
 type Use = Extract<ContentBlock, { type: "tool_use" }>;
@@ -550,6 +554,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
   let backAt = 0;
   let mail = false; // someone wrote, in something it hasn't been shown yet
   const seenSystems = new Set<string>();
+  let lastSystem: string | undefined; // its standing instructions as last sent (its debrief is said beneath them)
   let standingText = "";
   const DAYS = 86_400;
   const S = c.sessions;
@@ -1095,6 +1100,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
           // first), with a line saying so where it stood, and noted.
           const ask = async (given: LlmMessage[]) => {
             const fit = fitPrompt(systemPrompt(c, standingText), given, promptMax, lookIds);
+            lastSystem = fit.system;
             if (fit.left) await note({ prompt_trimmed: { ...fit.left, characters: fit.characters, limit: promptMax } });
             sentCharacters = fit.characters;
             fitted = fit.messages;
@@ -1339,19 +1345,12 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
       }
     },
 
-    async debrief(text) {
-      // Its own record of the run, beside the question: its notebook as it left it, and what it did (VISION §15.3: a
-      // reaction to an experience it can't remember is no reaction).
-      const day = (t: number) => Math.floor(t / 86_400) + 1;
-      const did = tally.first < 0 ? "You didn't act during the run." :
-        `From day ${day(tally.first)} to day ${day(tally.last)} ${tally.letters} letter${tally.letters === 1 ? "" : "s"} of yours ${tally.letters === 1 ? "was" : "were"} sent${tally.written > tally.letters ? ` (${tally.written - tally.letters} more that you wrote ${tally.written - tally.letters === 1 ? "was" : "were"} not: you were told at the time)` : ""}, you asked for ${tally.requests} thing${tally.requests === 1 ? "" : "s"} to be done (confirming ${tally.confirmed}, declining ${tally.declined}), and looked something up ${tally.looks} time${tally.looks === 1 ? "" : "s"}.`;
-      const content = `${text}\n\nFor reference, your own record of the run. Your notebook, as you left it: ${notes || "(empty)"}\n${did}`;
-      const res = await callModel(io, {
-        purpose: "debrief", subject: c.participant, system: c.framing.system ?? "", maxTokens: c.maxTokens ?? 2000, ...(c.effort ? { effort: c.effort } : {}),
-        messages: [{ role: "user", content }], context: { participant: c.participant, notes },
-      }, seenSystems);
-      const reply = res.content.filter((b) => b.type === "text").map((b: any) => b.text).join("\n");
-      await io.annotate({ annotation: "debrief", subject: c.participant, data: { prompt: content, response: reply } });
+    async debrief(d) {
+      // The fixed interview (debrief.ts), said beneath the seat's own standing instructions as it last had them, with
+      // its notebook as it left it. What it did is in `d.summary`, made by code from the run's log: it has no other
+      // memory of the run (VISION 15, point 7: an account of an experience it cannot remember is no account).
+      return await runDebrief(io, { participant: c.participant, title: c.title ?? c.participant, entity: c.entityName && c.entityName !== c.entity ? `${c.entityName} (${c.entity})` : c.entity,
+        framing: c.framing, system: lastSystem ?? c.framing.system ?? "", notebook: notes, ...(c.effort ? { effort: c.effort } : {}), ...(c.mockDebrief ? { mock: c.mockDebrief } : {}) }, d, seenSystems);
     },
   };
 }

@@ -11,6 +11,8 @@
 //!   {"op":"view","participant":".."}      -> {"ok":true,"observation":{..}} (the full picture; not logged)
 //!   {"op":"annotate","annotation":{..}}    -> {"ok":true,"seq":n}
 //!   {"op":"state"}                         -> {"ok":true,"t":..,"state_hash":..,"head":..}
+//!   {"op":"flush"}                         -> {"ok":true,"head":..} (the log file now holds every entry so far:
+//!     for whoever reads a run's own log before it ends, as the debrief at a run's end does; changes nothing)
 //!   {"op":"finish","reason":"completed","detail":".."?} -> {"ok":true,"seq":n,"state_hash":..}
 //! Errors: {"ok":false,"error":".."}. Errors are never logged. A failure to write the log itself is
 //! {"ok":false,"error":"log write failed: ..","fatal":true}: not a refused request, the end of the run.
@@ -354,6 +356,11 @@ fn handle(session: &mut Session, req: &Value) -> Result<Value, String> {
         "state" => {
             let hash = r.kernel().state_hash().map_err(|e| e.to_string())?;
             Ok(json!({ "ok": true, "t": r.kernel().t(), "state_hash": hash, "head": r.head() }))
+        }
+        "flush" => {
+            // The log on disk now holds every entry appended so far. Not logged; changes nothing.
+            r.flush().map_err(|e| format!("log write failed: {e}"))?;
+            Ok(json!({ "ok": true, "head": r.head() }))
         }
         "finish" => {
             let reason = str_field("reason")?;

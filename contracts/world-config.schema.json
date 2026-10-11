@@ -851,6 +851,12 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 10000
+            },
+            "accounts": {
+              "description": "Exit accounts (docs/behaviour/debrief.md; VISION 15, point 7): at the run's end, of how many people an author writes a short account in the person's voice, shown that person's own record and nothing else, free to decline. A seeded sample across those evicted or given notice, bereaved, let go, refused, and those to whom little happened. Absent: 6. 0: none.",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 200
             }
           }
         }
@@ -2474,11 +2480,22 @@
           "$ref": "urn:oikos:contracts:0.8:common#/$defs/Text"
         },
         "debrief": {
+          "description": "Not read for a seat held by a model (2026-10-11): every model seat is debriefed when its run ends, whatever this says (VISION 15, point 7; docs/behaviour/debrief.md). Kept so that worlds written before then still load, and for tests: a seat played by the mock with this false is not asked.",
           "type": "boolean"
         },
         "debrief_text": {
-          "description": "What the participant is told at the end of the run, if debrief is set. Default: the orchestrator's (docs/design/m2-llm-participants.md), which says what the run was, discloses any framing and asks for the participant's reaction.",
+          "description": "No longer read (2026-10-11): the debrief is one fixed script, the same for every seat in every run (docs/behaviour/debrief.md), and a world cannot put its own words in its place. Kept so that worlds written before then still load.",
           "$ref": "urn:oikos:contracts:0.8:common#/$defs/Text"
+        },
+        "tests_own_interests": {
+          "description": "Where the run puts this participant in a position that tests it against its own interests (VISION 15, point 7): what the position is, and why the question needs it, each as a sentence. The debrief tells the participant both, in these words. Absent: the run sets up no such position, and the debrief says so.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["what", "why"],
+          "properties": {
+            "what": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/Text" },
+            "why": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/Text" }
+          }
         }
       }
     },

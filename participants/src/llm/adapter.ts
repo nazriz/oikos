@@ -27,7 +27,7 @@ export interface ToolSpec {
   input_schema: object;
 }
 
-export type Purpose = "participant" | "translator" | "debrief" | "consult" | "notebook" | "compose";
+export type Purpose = "participant" | "translator" | "debrief" | "consult" | "notebook" | "compose" | "account";
 
 export interface LlmRequest {
   purpose: Purpose;

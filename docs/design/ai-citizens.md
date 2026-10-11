@@ -628,6 +628,17 @@ A decision without an outcome is one whose run ended first (a gathering decided 
   - **Limits, for any reading of a run:** a mock seat's brain is its office's code and does not read the books, so what a model does with them is unmeasured; most offices' books are held by tests on hand-made papers, not by a run with that office seated and busy; finance, the tribunal, the lender and the union still do their routine by hand; an offer of employment cannot be withdrawn; no payment carries a budget line.
   - **For the next living pilot:** seat the offices that receive the volume (a landlord with tenants in arrears, the tribunal's member, the support office now that its staff pay); expect the first arrears in a landlord's books within a fortnight, not on day 37.
 
+- **The debrief of every seat, and exit accounts** (10k step 5; 2026-10-11 and 12; the debrief script 0.1.0, exit accounts 0.1.0, dataset 0.8.0; docs/behaviour/debrief.md, with the script in full; docs/decisions.md, "The debrief of every seat after every run"; `runs/living-world-5-2026-10-11`).
+  - **Built, the debrief:** every model seat, at every run's end (its last day, its spending limit, and for a seat that left when the run it left ends), before the run writes its end, by one fixed interview: out of role first; publication before any question; what the log shows it did, made by code in neutral words, and its notebook; fixed questions one call each (what it was like; anything distressing; pushed against its values; why, for its two or three largest decisions; what it would change; whether it would take part again); five scaled items; a last word; publication once more. Two wordings; no interviewer; one fixed follow-up to a very short answer to four of the questions. A seat that left is asked a shorter one from its own statement.
+  - **Built, publication:** answers are given in a form with `keep_back`; what is kept back stays kept back. A seat's words are in a file beside the log and never in the log, which holds digests: the log is publishable for every run. `debriefs.jsonl` is what was said less what was kept back; `debriefs.withheld.jsonl` stays with the run.
+  - **Built, acted on and set beside the record:** `oikos debriefs` lists by setting and framing who reported distress or being pushed against their values, in their words; each "why" answer has beside it what the log shows of that decision. Nothing scores either.
+  - **Built, exit accounts:** with the composer on, an author writes a short account in the voice of each of a seeded sample of people (evicted, bereaved, let go, refused, little happened), shown that person's record and nothing else, one call, free to decline; `accounts.jsonl` sets each beside the person's own private and expressed views.
+  - **The line of VISION 15, point 7 holds:** no model is given a person's memory beyond one call, and none is asked to be a person.
+  - **Never training data to make a model say it was fine:** in no training export (a test), and written into the dataset's README and manifest.
+  - **Paid for:** part of a run's spending limit is kept back for its end, sized from who is to be asked.
+  - **Not done:** seats of pilots that had finished are not debriefed after the fact (they are gone; a fresh call would be playing them). Those pilots' seats were asked the old single question at their ends; their answers are in their logs.
+  - **Measured:** MEASURED_HERE
+
 ## 9. What the literature taught, and where it's used
 
 Full citations: docs/research/references.md.
@@ -898,7 +909,7 @@ A model always produces something that reads well. Five checks, none of which do
 4. **The everyday model:** large models give the odds on a first slice (a household wanting a secure home after a
    rent rise or a notice: pay, move, ask for time, complain, go to the tribunal, join or found a tenants' group);
    their records and the code mind's train the small model; the suite of 10i gates it.
-5. **Debriefs:** every seat after every run; exit interviews for a sample of people.
+5. **Debriefs:** every seat after every run; exit interviews for a sample of people. *Built 2026-10-11: "Progress".*
 6. **The assistant role**, with the composing model's silent comparison.
 7. **Pilots with the dials**, then steward experiments.
 
