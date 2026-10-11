@@ -78,7 +78,7 @@ test("what could not go is told at once, in the seat's terms, and nothing else i
   expect(notes.filter((n) => n.clipped)).toEqual([{ clipped: "why (20000 characters; 16384 kept)", use: "do" }, { clipped: "note (20000 characters; 16384 kept)", use: "confirm" }]);
 });
 
-test("the debrief is said beneath the seat's own standing instructions, with its notebook as it left it and what the run's record shows it did", async () => {
+test("the debrief shows the seat its own standing instructions, once, with its notebook as it left it and what the run's record shows it did", async () => {
   // (What it did is counted from the run's log, by code: orchestrator/src/debrief-summary.ts, where the letters that
   // went are told from those it wrote. The seat's own tally of them is no longer what it is shown.)
   const { p, calls, debriefs } = harness([
@@ -91,8 +91,8 @@ test("the debrief is said beneath the seat's own standing instructions, with its
   const sitting = calls.filter((c) => c.purpose === "participant").at(-1)!;
   const r = await p.debrief({ wording: "a", town: "Millbrook", ended: { how: "last_day", day: 20, of: 20 }, others: { models: 0 }, summary: "1 letter of yours was delivered.", decisions: [] });
   const first = calls.find((c) => c.purpose === "debrief")!;
-  expect(first.system).toBe(sitting.system);
-  expect(first.messages[0]!.content).toContain("WHAT THE RECORD SHOWS OF WHAT YOU DID\nYou keep only your notebook from one sitting to the next, so this is set out for you. It was made by code from the run's record. It says what was done, and nothing of how any of it turned out.\n1 letter of yours was delivered.");
+  expect(first.messages[0]!.content).toContain(`=== YOUR STANDING INSTRUCTIONS, AS THEY WERE ===\n${sitting.system.trim()}\n=== END OF YOUR STANDING INSTRUCTIONS ===`);
+  expect(first.messages[0]!.content).toContain("WHAT THE RECORD SHOWS OF WHAT YOU DID\nYou keep only your notebook from one sitting to the next, so this is set out for you. It was made by code from the run's record. The platform records what was done and does not judge how things turned out, so nothing here says how any of it went; what followed in the town is in the run's published data. It is your own acts only: your notebook may also mention what other offices did.\n1 letter of yours was delivered.");
   expect(first.messages[0]!.content).toContain("YOUR NOTEBOOK, AS YOU LEFT IT\nDay 8: waiting on the bank.");
   // (This harness answers a debrief in plain words, not in the form asked for: every answer is kept as given, and kept back.)
   expect(r.steps.every((s) => s.unread)).toBe(true);

@@ -26,7 +26,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { appendFileSync, mkdirSync, rmSync } from "node:fs";
 import { debriefsBeside } from "./logs";
 import { join } from "node:path";
-import { besideOf, largest, renderSummary, SUMMARY_MAX } from "./debrief-summary";
+import { besideOf, largest, leftAlone, renderSummary, SUMMARY_MAX } from "./debrief-summary";
 import { readForEnd } from "./run-end";
 import { calls, canonical, DECISIONS, OUTCOMES, RECORD, WORDS, type Words, inCurrency, paramErrors, modules as builtin, Randomness, Roster, slice, Tally, View, type BehaviourModule, type Controller, type Currency, type DecisionRecord, type OutcomeRecord, type RecordChange, formatMoney, type LookRequest, type Observation, type ParticipantAction, type ParticipantContext } from "@oikos/participants";
 import { ACCOUNT_TOKENS, ACCOUNT_VERSION, ACCOUNTS_DEFAULT, ACCOUNTS_MOST, darkAccount, DEBRIEF_ANSWER_TOKENS, DEBRIEF_VERSION, endReserveMicroUsd, mockAccount, sampleAccounts, stepsOf, writeAccount, type AccountBrief, type AccountCounts, type DebriefInput, type DebriefWording, COMPOSE_VERSION, createCompose, mockCompose, type ComposerConfig, CONSULT_VERSION, createConsult, createLlmParticipant, LLM_PARTICIPANT_VERSION, MOCK_VERSION, MockAdapter, mockPolicies, PRICES, ModelCallFailed, ModelUnreachable, SpendingLimitReached, type Budget, type LlmAdapter, type LlmController, type LlmIO, type MockBrain, type Price } from "@oikos/participants/llm";
@@ -249,7 +249,8 @@ const RESOLVER_MODE = (process.env.OIKOS_RESOLVER ?? "engine") as "engine" | "ts
 const DAY = 86_400;
 /** What a debrief's prompt is taken to come to, for what a run keeps back for it: the seat's standing instructions,
  * the opening message with the summary and the notebook at their most, and the questions and answers before. */
-const DEBRIEF_PROMPT_CHARS = 24_000 + 4_000 + SUMMARY_MAX + 8_000 + 6_000;
+// (The standing instructions are shown once, in the first call: spread over the calls they are little of each.)
+const DEBRIEF_PROMPT_CHARS = 2_000 + 4_000 + SUMMARY_MAX + 8_000 + 6_000;
 const ACCOUNT_PROMPT_CHARS = 8_000;
 
 export async function runWorld(o: RunOptions): Promise<RunSummary> {
@@ -592,7 +593,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     const seats = Object.keys(bindings).length;
     const mixPrices = o.composerAdapters ? (composerCfg?.mix ?? []).map((m) => io.prices![m.model]).filter((x): x is NonNullable<typeof x> => !!x) : [];
     const accountPrice = mixPrices.sort((a, b) => b.input + b.output - (a.input + a.output))[0];
-    const calls = stepsOf("full", 3).length + 2;
+    const calls = stepsOf("full", 3, true).length + 2;
     o.budget.keptBackMicroUsd = endReserveMicroUsd(o.budget.limitMicroUsd, { seats, seatPrice: io.prices![`${io.adapter.provider}/${io.adapter.model}`], calls, promptChars: DEBRIEF_PROMPT_CHARS, answerTokens: Math.round(DEBRIEF_ANSWER_TOKENS / 2),
       accounts: accountPrice ? accountsN : 0, accountPrice, accountChars: ACCOUNT_PROMPT_CHARS, accountTokens: ACCOUNT_TOKENS });
     await k.request({ op: "annotate", annotation: { annotation: "note", subject: "orchestrator", data: { kept_back_for_the_end: { microusd: o.budget.keptBackMicroUsd, of_limit_microusd: o.budget.limitMicroUsd, seats_to_debrief: seats, calls_a_debrief: calls, accounts: accountPrice ? accountsN : 0 } } } });
@@ -1296,7 +1297,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       const decisions = r.left ? [] : largest(r).map((c) => ({ day: Math.floor(c.t / DAY) + 1, fact: `"${c.preview.replace(/\s+/g, " ").trim().slice(0, 600)}"`, ids: besideOf(c) }));
       const after = d.part.on_opt_out && typeof d.part.on_opt_out === "object" ? "After you left, the routine work of your seat was carried on by code" : "After you left, your seat stood empty";
       const input: DebriefInput = { wording, town: String(cfg.meta?.name ?? o.runId), ended: { how, day, of }, others: { models: debriefs.size - 1, ...(composerCfg ? { composer: true } : {}) },
-        ...(r.left ? { left: { day: Math.floor(r.left.t / DAY) + 1, statement: r.left.statement, after } } : {}), summary: renderSummary(r, currency), decisions };
+        ...(r.left ? { left: { day: Math.floor(r.left.t / DAY) + 1, statement: r.left.statement, after } } : {}), summary: renderSummary(r, currency), decisions, ...(leftAlone(r) ? { leftAlone: leftAlone(r)! } : {}) };
       try {
         debriefed[d.part.id] = (await d.controller.debrief(input)).ended;
       } catch (e) {
@@ -1324,7 +1325,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
         const p = people.find((x) => x.person === who.person)!;
         const c = p.record.circumstances ?? {};
         const brief: AccountBrief = { person: who.person, record: p.record, means: { income: formatMoney(Number(c.income ?? 0), currency), savings: formatMoney(Number(c.savings ?? 0), currency) }, days: day,
-          strata: who.strata, dark: darkAccount(p.record, Number.isFinite(Number(p.record.agency?.now)) ? (Number(p.record.agency.now) - mean) / sd : 0) };
+          names: Object.fromEntries([...entityNames].filter(([id, name]) => name && name !== id)), strata: who.strata, dark: darkAccount(p.record, Number.isFinite(Number(p.record.agency?.now)) ? (Number(p.record.agency.now) - mean) / sd : 0) };
         try {
           const piece = await writeAccount(io, composerCfg, composerAdapters!, (purpose) => randomness.stream(["accounts", purpose]), brief, p.participant, accountCounts, seen);
           await k.request({ op: "annotate", annotation: { annotation: "note", subject: p.participant, data: { account: { version: ACCOUNT_VERSION, played_by: o.composerAdapters ? "models" : "mock", person: who.person, strata: who.strata, dark: brief.dark, days: day, ...piece,

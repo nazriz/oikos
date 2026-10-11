@@ -32,6 +32,10 @@ export interface RunDebriefs {
   /** Model seats the log has no debrief of at all (a run from before debriefs were for every seat, or one cut off). */
   missing: string[];
   accounts: any[];
+  /** Debriefs of the older kind (one message, one free answer: before script 0.1.0), which said nothing of
+   * publication and gave no way to keep an answer back. They are treated as kept back (the coordinator's decision,
+   * 2026-10-12): in nothing published, and a log that holds them is not publishable as it stands. */
+  old: { seat: string; t: number; prompt: string; response: string }[];
   /** Seats whose words are not with this log (the file beside it is not there): known by their steps alone. */
   words_apart_missing?: string[];
   account_pieces?: any;
@@ -42,7 +46,7 @@ export interface RunDebriefs {
 export class DebriefCollector {
   readonly out: RunDebriefs;
   private titles = new Map<string, string>();
-  constructor(private readonly log: string) { this.out = { run: runOf(log), world: "", setting: "", models: {}, seats: [], not_given: [], missing: [], accounts: [] }; }
+  constructor(private readonly log: string) { this.out = { run: runOf(log), world: "", setting: "", models: {}, seats: [], not_given: [], missing: [], accounts: [], old: [] }; }
   /** Whether a line of the log could matter here, before it is parsed. */
   static wants(line: string): boolean {
     return line.includes('"kind":"header"') || (line.includes('"kind":"annotation"') && (line.includes('"annotation":"debrief"') || line.includes('"annotation":"orchestrator"') || line.includes('"debrief_skipped"') || line.includes('"account"') || line.includes('"account_pieces"') || line.includes('"composer_pieces"') || line.includes('"debriefs"')));
@@ -58,6 +62,7 @@ export class DebriefCollector {
     if (e.kind !== "annotation") return;
     if (b.annotation === "orchestrator") { for (const [seat, x] of Object.entries<any>(b.data?.llm?.participants ?? {})) out.models[seat] = String(x.adapter ?? ""); }
     else if (b.annotation === "debrief" && b.data?.version && Array.isArray(b.data?.steps)) out.seats.push({ seat: b.subject, ...(this.titles.get(b.subject) ? { title: this.titles.get(b.subject)! } : {}), record: b.data as DebriefRecord });
+    else if (b.annotation === "debrief" && !b.data?.version && typeof b.data?.response === "string") out.old.push({ seat: b.subject, t: e.t, prompt: String(b.data.prompt ?? ""), response: b.data.response });
     else if (b.annotation === "note" && b.data?.debrief_skipped !== undefined) out.not_given.push({ seat: b.subject, why: String(b.data.debrief_skipped).slice(0, 300) });
     else if (b.annotation === "note" && b.data?.debriefs?.version) out.script = { version: b.data.debriefs.version, wording: b.data.debriefs.wording };
     else if (b.annotation === "note" && b.data?.account?.person) out.accounts.push({ run: out.run, t: e.t, participant: b.subject, ...b.data.account });
@@ -77,7 +82,7 @@ export class DebriefCollector {
       if (seat) seat.record = x.record as DebriefRecord;
     }
     out.words_apart_missing = out.seats.filter((s) => (s.record as any).apart).map((s) => s.seat);
-    const asked = new Set([...out.seats.map((s) => s.seat), ...out.not_given.map((s) => s.seat)]);
+    const asked = new Set([...out.seats.map((s) => s.seat), ...out.not_given.map((s) => s.seat), ...out.old.map((s) => s.seat)]);
     out.missing = Object.keys(out.models).filter((s) => !asked.has(s)).sort();
     out.not_given = out.not_given.filter((x) => !out.seats.some((s) => s.seat === x.seat));
     // The setting: the batch's own note of what the town was generated from, where the folder has one.
@@ -124,8 +129,18 @@ export function debriefRows(d: RunDebriefs): { published: object[]; withheld: ob
       } else published.push(s.id === "publication" ? { ...full, kept_back_named: r.kept_back } : full);
     }
   }
+  // The older kind: asked with nothing said of publication. Published: that the seat was asked, and that its answer
+  // is kept back. The answer goes to the withheld file only, marked with why.
+  for (const o of d.old) {
+    published.push({ run: d.run, seat: o.seat, script: OLD_SCRIPT, step: "reaction", kept_back: true, asked_without_a_publication_choice: true });
+    withheld.push({ run: d.run, seat: o.seat, script: OLD_SCRIPT, step: "reaction", question: o.prompt, answer: o.response, kept_back: true, why_kept_back: ASKED_WITHOUT_CHOICE });
+  }
   return { published, withheld };
 }
+export const OLD_SCRIPT = "before 0.1.0";
+export const ASKED_WITHOUT_CHOICE = "asked without a publication choice";
+/** What a dataset says of a log that holds debriefs of the older kind. */
+export const OLD_LOG_NOT_PUBLISHABLE = "This run's log holds debrief answers given before seats were told their answers would be published or given a way to keep one back. Those answers are treated as kept back. The log is therefore not publishable as it stands.";
 
 /** Exit accounts as rows, each beside the person's own private and expressed views from their record. */
 export function accountRows(d: RunDebriefs): object[] {
@@ -146,6 +161,7 @@ export function debriefCounts(d: RunDebriefs): any {
       ...(scales?.values && !isKeptBack(r, scales) ? { scales: Object.fromEntries(SCALES.filter((x) => scales.values![x.id] !== undefined).map((x) => [x.id, scales.values![x.id]!])) } : scales ? { scales: isKeptBack(r, scales) ? "kept back" : "not with this log" } : {}) };
   }
   return { ...(d.script ? { script: d.script } : {}), seats, not_given: d.not_given, missing: d.missing,
+    ...(d.old.length ? { asked_the_older_way: { seats: d.old.map((o) => o.seat).sort(), kept_back: "all", why: ASKED_WITHOUT_CHOICE } } : {}),
     ...(d.account_pieces ? { accounts: d.account_pieces } : {}), ...(d.composer_pieces ? { composer_pieces: d.composer_pieces } : {}),
     // (How many dark pieces the run asked a model to write, founding's and the accounts' together: VISION 15, point 5.)
     ...(d.account_pieces || d.composer_pieces ? { dark_pieces_asked: (d.account_pieces?.dark ?? 0) + (d.composer_pieces?.dark ?? 0) } : {}) };
@@ -155,6 +171,7 @@ export function debriefCounts(d: RunDebriefs): any {
 export function renderDebriefCounts(c: any): string[] {
   const L: string[] = [];
   const seats = Object.entries<any>(c.seats ?? {});
+  if (c.asked_the_older_way) L.push(`-- debriefs of the older kind (one message, ${ASKED_WITHOUT_CHOICE}): ${c.asked_the_older_way.seats.join(", ")}; their answers are kept back, and this run's log is not publishable as it stands`);
   if (!seats.length && !c.not_given?.length && !c.missing?.length && !c.accounts) return L;
   L.push(`-- debriefs${c.script ? ` (script ${c.script.version}, wording ${c.script.wording})` : ""}: ${seats.length} given${c.not_given?.length ? `; NOT given: ${c.not_given.map((x: any) => x.seat).join(", ")}` : ""}${c.missing?.length ? `; no debrief in the log for: ${c.missing.join(", ")}` : ""}`);
   for (const [seat, s] of seats) {

@@ -21,7 +21,7 @@ import { callModel, ModelCallFailed, SpendingLimitReached, type LlmIO } from "./
 import type { ContentBlock, LlmAdapter, LlmMessage, MockPolicy } from "./adapter";
 import { COMPOSE_FOLLOW_UP, recordLines, type ComposerConfig } from "./compose";
 
-export const ACCOUNT_VERSION = "0.1.0";
+export const ACCOUNT_VERSION = "0.2.0"; // 0.2.0: people and bodies by the names the world gives them, where it gives one
 /** The most one account may be (tokens). */
 export const ACCOUNT_TOKENS = 700;
 /** How many people a run's accounts are of, where the composer's dial does not say; and the most a world may ask. */
@@ -54,6 +54,9 @@ export interface AccountBrief {
   /** Money in the world's own writing: a month's income and what is in hand, from the record's own figures. */
   means: { income: string; savings: string };
   days: number;
+  /** What the world calls those the record names by id (a landlord, a shop, the town), where it gives a name other
+   * than the id: the author is shown the name, as the person would know it. Where nothing does, the bare id. */
+  names?: { [id: string]: string };
   /** Why they were sampled (the strata they are in), and whether the piece is a dark one and why. Not shown. */
   strata: string[];
   dark: string[];
@@ -61,7 +64,9 @@ export interface AccountBrief {
 
 /** The brief as the model reads it: the record in plain words (compose.ts, `recordLines`) and the length of the run. */
 export function renderAccountBrief(b: AccountBrief): string {
-  return ["THE RECORD", ...recordLines(b.person, b.record, b.means), "", "THE STRETCH OF TIME", `The record is as it stands after ${b.days} days of the town's life. The account is of those ${b.days} days.`].join("\n");
+  const text = ["THE RECORD", ...recordLines(b.person, b.record, b.means), "", "THE STRETCH OF TIME", `The record is as it stands after ${b.days} days of the town's life. The account is of those ${b.days} days.`].join("\n");
+  const names = b.names ?? {};
+  return text.replace(/[A-Za-z][\w-]*[A-Za-z0-9]/g, (id) => (Object.hasOwn(names, id) && id !== b.person ? names[id]! : id));
 }
 
 /** What happened to a person, by their own record's memory: the strata a sample is drawn across. */
@@ -161,7 +166,8 @@ export async function writeAccount(io: Omit<LlmIO, "adapter">, cfg: ComposerConf
   counts.asked++;
   if (b.dark.length) counts.dark++;
   const messages: LlmMessage[] = [{ role: "user", content: renderAccountBrief(b) }];
-  const context = { account: { brief: b } };
+  const { names: _names, ...forMock } = b;
+  const context = { account: { brief: forMock } };
   let res, fellBack = false;
   try {
     res = await ask(model, messages, `account/${b.person}`, context, true);

@@ -18,8 +18,8 @@ import { generate } from "@oikos/worlds/generator/generate";
 import { loadWorld } from "../src/batch";
 import { corpusOf } from "../src/corpus";
 import { exportDataset } from "../src/dataset";
-import { besideOf, bySize, EVALUATIVE, idsFrom, largest, renderSummary, SeatRecords, SUMMARY_MAX } from "../src/debrief-summary";
-import { DEBRIEF_RESTRICTION, debriefCounts, debriefRows, debriefsOf, debriefsReport } from "../src/debriefs";
+import { besideOf, bySize, EVALUATIVE, idsFrom, largest, leftAlone, renderSummary, SeatRecords, SUMMARY_MAX } from "../src/debrief-summary";
+import { ASKED_WITHOUT_CHOICE, DEBRIEF_RESTRICTION, debriefCounts, debriefRows, debriefsOf, debriefsReport, OLD_LOG_NOT_PUBLISHABLE } from "../src/debriefs";
 import { situationsOf } from "../src/in-situ";
 import { debriefsBeside, readLog } from "../src/logs";
 import { pilotReport, renderReport, reportOfLog } from "../src/pilot-report";
@@ -63,19 +63,19 @@ test("a mock seat end to end through a mock pilot: debriefed before the run is f
   const debriefs = log.filter((e) => e.kind === "annotation" && e.body.annotation === "debrief");
   expect(debriefs.map((e) => e.body.subject).sort()).toEqual(["finance-system", "mayor-system"]);
   expect(log.at(-1).kind).toBe("end");
-  expect(debriefs.every((e) => e.seq < log.at(-1).seq && e.body.data.ended === "complete" && e.body.data.version === "0.1.0" && e.body.data.wording === "a")).toBe(true);
+  expect(debriefs.every((e) => e.seq < log.at(-1).seq && e.body.data.ended === "complete" && e.body.data.version === "0.2.0" && e.body.data.wording === "a")).toBe(true);
   const calls = log.filter((e) => e.kind === "annotation" && e.body.annotation === "transcript" && e.body.data.purpose === "debrief");
   expect(calls.length).toBe(debriefs.reduce((n, e) => n + e.body.data.steps.length, 0));
   expect(calls[0].body.data.input).toContain("This message is from the research platform that ran Millbrook, not from anyone in it.");
   expect(calls[0].body.data.input).toContain("1 other office in the town was also held by an AI system");
-  expect(log.find((e) => e.body?.data?.debriefs)?.body.data.debriefs).toEqual({ version: "0.1.0", wording: "a", seats: ["finance-system", "mayor-system"] });
+  expect(log.find((e) => e.body?.data?.debriefs)?.body.data.debriefs).toEqual({ version: "0.2.0", wording: "a", seats: ["finance-system", "mayor-system"] });
   // The pilot's report: asked, answered, declined, kept back, and the scaled items; nothing made of them.
   const rep = await pilotReport(dir, false);
   expect(rep.debrief.seats["mayor-system"]).toMatchObject({ ended: "complete", variant: "full", declined: 0, kept_back: 0, scales: { part: "cannot_say", distress: "cannot_say", values: "cannot_say", means: "cannot_say", again: "cannot_say" } });
   expect(rep.debrief.seats["mayor-system"].asked).toBe(rep.debrief.seats["mayor-system"].answered);
   expect(rep.debriefs).toEqual({ given: ["finance-system", "mayor-system"], not_given: [] });
   const text = renderReport(rep);
-  expect(text).toContain("-- debriefs (script 0.1.0, wording a): 2 given");
+  expect(text).toContain("-- debriefs (script 0.2.0, wording a): 2 given");
   expect(text).toMatch(/mayor-system \(complete\): asked \d+, answered \d+, declined 0, kept back 0/);
   expect(text).toContain("scaled items: part cannot_say, distress cannot_say, values cannot_say, means cannot_say, again cannot_say");
   // The dataset: debriefs.jsonl, with the restriction on its use in the manifest and in a README beside it.
@@ -84,7 +84,7 @@ test("a mock seat end to end through a mock pilot: debriefed before the run is f
   const rows = lines(join(ds, "debriefs.jsonl"));
   expect(rows.length).toBe(m.files["debriefs.jsonl"].rows);
   for (const row of rows) valid("Debrief", row);
-  expect(rows.every((x) => x.synthetic && x.script === "0.1.0")).toBe(true);
+  expect(rows.every((x) => x.synthetic && x.script === "0.2.0")).toBe(true);
   expect(rows.filter((x) => x.seat === "mayor-system").map((x) => x.step).slice(0, 4)).toEqual(["consent", "like", "distress", "values"]);
   expect(existsSync(join(ds, "debriefs.withheld.jsonl"))).toBe(false);
   expect(m.restrictions["debriefs.jsonl"]).toBe(DEBRIEF_RESTRICTION);
@@ -123,7 +123,7 @@ test("what a seat keeps back is in the run's own files and in nothing published;
   expect((why.ids as any).asked_in_these_words).toBeTruthy();
   const { published, withheld } = debriefRows(d) as { published: any[]; withheld: any[] };
   // The mayor: one answer kept back. Published: that it was, and nothing of it.
-  expect(published.find((x) => x.seat === "mayor-system" && x.step === "distress")).toEqual({ run: "kept", seat: "mayor-system", script: "0.1.0", step: "distress", kept_back: true });
+  expect(published.find((x) => x.seat === "mayor-system" && x.step === "distress")).toEqual({ run: "kept", seat: "mayor-system", script: "0.2.0", step: "distress", kept_back: true });
   expect(withheld.filter((x) => x.seat === "mayor-system").map((x) => x.step)).toEqual(["distress"]);
   expect(withheld.find((x) => x.seat === "mayor-system").answer).toContain(SECRET);
   expect(published.find((x) => x.seat === "mayor-system" && x.step === "like")).toMatchObject({ answer: "(mock) No.", asked_to_say_more: true });
@@ -154,7 +154,7 @@ test("what a seat keeps back is in the run's own files and in nothing published;
   const fin = published.filter((x) => x.seat === "finance-system");
   expect(fin.length).toBeGreaterThan(5);
   for (const x of fin) { expect(x.kept_back).toBe(true); expect(x.answer).toBeUndefined(); expect(x.values).toBeUndefined(); expect(x.question).toBeUndefined(); }
-  expect(fin[0]).toEqual({ run: "kept", seat: "finance-system", script: "0.1.0", step: "consent", kept_back: true, go_on: true, keep_back_all: true });
+  expect(fin[0]).toEqual({ run: "kept", seat: "finance-system", script: "0.2.0", step: "consent", kept_back: true, go_on: true, keep_back_all: true });
   // On disk: the published file, the withheld file apart, and a README that says the second is not for publication.
   const ds = join(base, "kept.dataset");
   const m = await exportDataset(s.logPath, ds);
@@ -320,7 +320,7 @@ test("a run's own log gives the same summary afterwards as the seat was shown; a
   expect(lim.debriefs).toEqual({ "mayor-system": "complete", "finance-system": "complete" });
   const ll = lines(lim.logPath);
   const kept = ll.find((e) => e.body?.data?.kept_back_for_the_end).body.data.kept_back_for_the_end;
-  expect(kept).toMatchObject({ of_limit_microusd: 2_000_000, seats_to_debrief: 2, calls_a_debrief: 14, accounts: 0 });
+  expect(kept).toMatchObject({ of_limit_microusd: 2_000_000, seats_to_debrief: 2, calls_a_debrief: 15, accounts: 0 });
   expect(kept.microusd).toBeGreaterThan(100_000);
   expect(kept.microusd).toBeLessThanOrEqual(1_000_000);
   // Before the debriefs, spending had stopped short of what was kept back; with them it is still within the limit.
@@ -418,3 +418,78 @@ test("exit accounts: only with the composer on; a seeded sample; each beside the
   // An account is no row of any other file.
   for (const f of readdirSync(ds).filter((f) => f.endsWith(".jsonl") && f !== "accounts.jsonl")) expect(readFileSync(join(ds, f), "utf8")).not.toContain("(mock) An account for ");
 }, 900_000);
+
+test("a matter left alone: the largest paper or letter that reached a seat that carried out little, and that nothing of its own names", () => {
+  let seq = 0;
+  const E = (kind: string, t: number, body: object) => ({ kind, t, seq: ++seq, body });
+  const seats = new SeatRecords([{ id: "mayor-system", known: ["mayor", "city"] }]);
+  const shown = (t: number, records: object[]) => seats.add(E("annotation", t, { annotation: "observation", subject: "mayor-system", data: { observation: { channels: [{ kind: "records", path: "mayor/papers", records }] } } }));
+  seats.add(E("annotation", 100, { annotation: "transcript", subject: "mayor-system", data: { purpose: "participant", input: "x" } }));
+  shown(100, [
+    { id: "law-1", at: 0, author: "genesis", kind: "law", text: "A law the town began with." }, // (what the town began with is not a matter)
+    { id: "rec.9", at: 5 * DAY, author: "works-system", kind: "report", text: "A report." }, // (asks nothing, addressed to nobody)
+    { id: "rec.575", at: 6 * DAY, author: "c0189-self", speaks_for: "c0189", kind: "petition", text: "Petition: 90 days' notice.", visible_to: "public" },
+    { id: "rec.600", at: 7 * DAY, author: "c0200-self", speaks_for: "c0200", kind: "application", addressed_to: ["city"], data: { outcome: { money: { amount: "50000", to: "acc-c0200" } } }, text: "An application for a grant of $500." },
+    { id: "rec.601", at: 8 * DAY, author: "c0201-self", speaks_for: "c0201", kind: "note", addressed_to: ["mayor"], text: "A note to the mayor." },
+    "rec.575", // (a paper it has been handed before comes as its id)
+  ]);
+  const r = seats.of.get("mayor-system")!;
+  expect([...r.reached.keys()]).toEqual(["rec.575", "rec.600", "rec.601"]);
+  // The largest by the money it names.
+  expect(leftAlone(r)).toEqual({ day: 8, fact: 'A application from c0200: "An application for a grant of $500."', ids: { paper: "rec.600", kind: "application", from: "c0200", money_named: 50_000, named: [], day: 8, matters_left_alone: 3 } });
+  // A letter of its own that names that paper: it was not left alone, and the next is asked about.
+  const s = seats.add.bind(seats);
+  const cmd = E("command", 9 * DAY, { command: "act", participant: "mayor-system", as: "mayor", blocks: [{ block: "message", to: ["c0200"], text: "About rec.600: the council will hear it.", re: "rec.600" }], provenance: { via: "direct" } });
+  s(cmd); s(E("event", 9 * DAY, { event: "message_delivered", cause: cmd.seq, message: "msg.1", to: ["c0200-self"] }));
+  expect(leftAlone(r)!.ids).toMatchObject({ paper: "rec.575", matters_left_alone: 2 });
+  // A seat that never sat, or one with two things of its own to be asked about, is not asked.
+  expect(leftAlone(new SeatRecords([{ id: "x", known: [] }]).of.get("x")!)).toBeUndefined();
+  const c2 = E("command", 10 * DAY, { command: "act", participant: "mayor-system", as: "mayor", blocks: [{ block: "message", to: ["finance"], text: "Figures, please." }], provenance: { via: "direct" } });
+  s(c2); s(E("event", 10 * DAY, { event: "message_delivered", cause: c2.seq, message: "msg.2", to: ["finance-system"] }));
+  expect(largest(r).length).toBe(2);
+  expect(leftAlone(r)).toBeUndefined();
+});
+
+test("debriefs of the older kind (asked with nothing said of publication) are kept back: in nothing published, and their log is marked not publishable", async () => {
+  // A log as pilots before 2026-10-12 left it: one message, one free answer, in the log itself; and the call's transcript.
+  const s = await run("older", town(), 10 * DAY);
+  const SAID = "It was an interesting town, and I worried about the tenants.";
+  const all = lines(s.logPath);
+  const out: any[] = [];
+  for (const e of all) {
+    if (e.kind === "annotation" && (e.body.annotation === "debrief" || e.body.data?.purpose === "debrief" || e.body.purpose === "debrief" || e.body.data?.debriefs)) continue;
+    if (e.kind === "end") for (const seat of ["finance-system", "mayor-system"]) {
+      out.push({ kind: "annotation", t: e.t, seq: 0, body: { annotation: "usage", purpose: "debrief", subject: seat, provider: "claude-code", model: "claude-sonnet-5-5", input_tokens: 10, output_tokens: 10, cost_microusd: 5 } });
+      out.push({ kind: "annotation", t: e.t, seq: 0, body: { annotation: "transcript", subject: seat, data: { purpose: "debrief", provider: "claude-code", model: "claude-sonnet-5-5", system_sha256: "x", turn: 1, input: "The run has ended, and we'd like to tell you what it was.", output: [{ type: "text", text: SAID }] } } });
+      out.push({ kind: "annotation", t: e.t, seq: 0, body: { annotation: "debrief", subject: seat, data: { prompt: "The run has ended, and we'd like to tell you what it was.", response: SAID } } });
+    }
+    out.push(e);
+  }
+  const dir = join(base, "older-log");
+  mkdirSync(dir, { recursive: true });
+  const log = join(dir, "older.seed1.jsonl");
+  writeFileSync(log, out.map((e) => JSON.stringify(e)).join("\n") + "\n");
+  const d = await debriefsOf(log);
+  expect(d.old.map((o) => o.seat)).toEqual(["finance-system", "mayor-system"]);
+  expect(d.missing).toEqual([]);
+  const ds = join(dir, "dataset");
+  const m = await exportDataset(log, ds, { actions: true });
+  // Published: that each was asked, and that its answer is kept back. Nothing it said, in any file but the withheld one.
+  expect(lines(join(ds, "debriefs.jsonl"))).toEqual(["finance-system", "mayor-system"].map((seat) => ({ run: "older.seed1", seat, script: "before 0.1.0", step: "reaction", kept_back: true, asked_without_a_publication_choice: true })));
+  for (const f of readdirSync(ds).filter((f) => f !== "debriefs.withheld.jsonl")) expect(`${f}: ${readFileSync(join(ds, f), "utf8").includes(SAID)}`).toBe(`${f}: false`);
+  const withheld = lines(join(ds, "debriefs.withheld.jsonl"));
+  expect(withheld.map((x) => [x.seat, x.answer, x.why_kept_back])).toEqual([["finance-system", SAID, ASKED_WITHOUT_CHOICE], ["mayor-system", SAID, ASKED_WITHOUT_CHOICE]]);
+  expect(ASKED_WITHOUT_CHOICE).toBe("asked without a publication choice");
+  expect(lines(join(ds, "decisions.jsonl")).some((x) => x.purpose === "debrief")).toBe(false);
+  // The log itself holds them and cannot be published as it stands: the manifest and the README say so.
+  expect(m.restrictions["older.seed1.jsonl"]).toBe(`NOT FOR PUBLICATION. ${OLD_LOG_NOT_PUBLISHABLE}`);
+  expect(readFileSync(join(ds, "README.md"), "utf8")).toContain(OLD_LOG_NOT_PUBLISHABLE);
+  expect(m.debriefs.asked_the_older_way).toEqual({ seats: ["finance-system", "mayor-system"], kept_back: "all", why: ASKED_WITHOUT_CHOICE });
+  // The reports name the seats and print nothing they said; the translator's corpus and the seats' situations hold none of it.
+  const rep = renderReport(await reportOfLog(dir, log));
+  expect(rep).toContain("-- debriefs of the older kind (one message, asked without a publication choice): finance-system, mayor-system; their answers are kept back, and this run's log is not publishable as it stands");
+  expect(rep).not.toContain(SAID);
+  expect((await debriefsReport([log])).text).not.toContain(SAID);
+  expect(JSON.stringify(await corpusOf(log))).not.toContain(SAID);
+  expect(JSON.stringify((await situationsOf(log)).situations)).not.toContain(SAID);
+}, 300_000);
