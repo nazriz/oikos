@@ -17,7 +17,8 @@ const PLACE = "de-ni-2026";
 
 function town(employment: object | undefined) {
   const P = structuredClone(loadProfile(PLACE));
-  if (employment) P.values.employment = employment as any;
+  // (Beside what the profile says of employment otherwise: its law on ending a job, how its firms adjust.)
+  if (employment) P.values.employment = { ...(P.values.employment ?? {}), ...employment } as any;
   return generateFrom({ ...base, profile: PLACE }, P);
 }
 

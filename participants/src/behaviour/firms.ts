@@ -24,7 +24,7 @@ import { dayPayPeriod, incomeTaxLaw, withheld, type Charge } from "./tax";
 import { message } from "./common";
 import { chancePpm, frictionDial, PAPER, Respondent, type RespondParams } from "./frictions";
 import { swayed } from "./wants";
-import { advertisedJob, ask, Asked, because, between, Book, firstDue, PAYEE_DIED, breaches, noting, callAction, usd, cellsOf, commitmentOf, DAY, jobTerms, leaseTerms, MONTH, notice, offer, ownAccount, pay, publishedPrice, say, stoodEmpty, structureOf, withdraw, type Step } from "./common";
+import { advertisedJob, ask, Asked, because, between, Book, firstDue, PAYEE_DIED, PAYMENT_FAILED, breaches, noting, callAction, usd, cellsOf, commitmentOf, DAY, jobTerms, leaseTerms, MONTH, notice, offer, ownAccount, pay, publishedPrice, say, stoodEmpty, structureOf, withdraw, type Step } from "./common";
 import * as P from "./papers";
 
 /**
@@ -98,7 +98,7 @@ export const landlord: BehaviourModule = {
   name: "firm.landlord",
   issues: P.LANDLORD,
   issuesWith: (p) => ({ city: p.city }),
-  version: "0.15.0", // 0.15.0: everyday frictions (docs/behaviour/frictions.md): a home of ours in disrepair is repaired by the builder when we are asked or ordered and will, at its price; we answer a venue from our books; rent owed us is asked for and then taken to a body that hears arrears; 0.14.0: wants of its own (docs/behaviour/firm-wants.md), for one the world's dial gives initiative: a character from its owner's values, which answers a tenant who asks it to hold a rent or to stay on, sways its markup and its patience with arrears, and a record of its own; 0.13.4: main's 0.13.3 (the builder's answer read with the week's post; what is owed counted before building or asking) with a certified copy of a registration made on someone else's report counting as the registration
+  version: "0.16.0", // 0.16.0: possession under the world's law (docs/behaviour/justice.md, "Possession"): a notice to vacate, an application to the tribunal, a warrant, never putting anyone out itself; 0.15.0: everyday frictions (docs/behaviour/frictions.md): a home of ours in disrepair is repaired by the builder when we are asked or ordered and will, at its price; we answer a venue from our books; rent owed us is asked for and then taken to a body that hears arrears; 0.14.0: wants of its own (docs/behaviour/firm-wants.md), for one the world's dial gives initiative: a character from its owner's values, which answers a tenant who asks it to hold a rent or to stay on, sways its markup and its patience with arrears, and a record of its own; 0.13.4: main's 0.13.3 (the builder's answer read with the week's post; what is owed counted before building or asking) with a certified copy of a registration made on someone else's report counting as the registration
   doc: "docs/behaviour/firms.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -112,6 +112,10 @@ export const landlord: BehaviourModule = {
       landlord_notice_days: 60,
       tenant_notice_days: 30,
       arrears_months_before_notice: 2,
+      // Possession (docs/behaviour/justice.md, "Possession"): where the world has a law on it, the tribunal an
+      // application for possession goes to, and what it and its registrar charge (the world's; none: a tenant
+      // behind with the rent is given notice on the lease, which ends it, as before).
+      possession: null as { tribunal: string; fee?: number; fee_account?: string; warrant_fee?: number } | null,
       spend_share_bps: 6000, // owners' spending of rental income, at local shops
       upkeep_share_bps: 2000, // maintenance bought from outside
       base_rent: {} as { [type: string]: number | { bedrooms: number; rent: number }[] }, // a rent per type, or per type and bedrooms
@@ -213,6 +217,8 @@ export const landlord: BehaviourModule = {
       agreements: book.ofType("agreement").filter((r) => r.record === "agreement" && r.terms.template === "lease" && r.terms.parties[0] === me && book.inForce(r.id)).map((r) => r.id) }];
     // Repairs: those we have ordered and not yet heard are done, and when each building of ours was last repaired.
     const askedFor = new Map<string, number>(); // a lease -> when we last wrote to ask for the rent owed under it
+    // Tenancies we are ending for arrears under the world's law on possession: where each has got to.
+    const ending = new Map<string, { stage: "noticed" | "applied" | "plan" | "ordered" | "warrant"; by: number; notice?: string; seen: Set<string>; plan?: { at: number; owed: number; instalment: number } }>();
     const repairing = new Map<string, number>();
     const repaired = new Map<string, number>();
     let payFrom = "";
@@ -400,8 +406,9 @@ export const landlord: BehaviourModule = {
         const from = a.terms.commitments?.find((c: any) => c.who === tenant)?.does?.outcome?.money?.from;
         if (tenant && from && !payingAccount.get(tenant)) payingAccount.set(tenant, from);
       }
+      const law = p.possession ? possessionLaw(book) : undefined;
       for (const a of active) {
-        if (noticeGiven.has(a.id)) continue;
+        if (noticeGiven.has(a.id) && !ending.has(a.id)) continue;
         const tenant = tenantOf(a);
         const rent = rentAt(a, t);
         // Each lease is judged on its own: what has fallen due under it against what has come in since its rent began
@@ -450,6 +457,89 @@ export const landlord: BehaviourModule = {
             }
           }
         }
+        // ---- possession, where the world has a law on it (docs/behaviour/justice.md, "Possession") ----
+        // A tenant behind with the rent is given a notice to vacate, which ends nothing by itself: paid up before
+        // its date, it lapses; gone by its date, that is the end of it; still there, we apply to the tribunal for
+        // possession. The tribunal may give the tenant a plan to pay (we come back if it is not kept) or order
+        // possession by a date; a tenant still there after it is removed by the police, on a warrant we buy from
+        // the tribunal's registrar. We never put anyone out ourselves.
+        const e = ending.get(a.id);
+        if (law && p.possession && e) {
+          const behindNow = owed - paid;
+          const gone = (book.notices.get(a.id) ?? []).some((n) => n.as === tenant);
+          const orders = book.all("tribunal_order").filter((o) => o.data?.kind === "possession" && o.data?.applicant === me && o.data?.about === a.id && !e.seen.has(o.id));
+          const executed = book.all("warrant_executed").some((w) => w.data?.lease === a.id);
+          if (gone || executed) {
+            // (They have gone, or been put out: the tenancy is over. On the record it ends by its own terms.)
+            if (!noticeGiven.has(a.id)) { noticeGiven.set(a.id, t); steps.push(because(`${tenant} has left ${leaseTerms(a, tenant).space ?? "the home"}: ending the tenancy on the record.`, notice(a.id, "Notice: the tenancy is ended for arrears; the tenant has left."))); }
+            ending.delete(a.id);
+          } else if (e.stage === "noticed" && behindNow < rent) {
+            ending.delete(a.id);
+            const n = book.open("notice_to_vacate").find((r) => r.speaks_for === me && r.data?.lease === a.id);
+            org.remember(t, "arrears_paid", tenant, 1_000);
+            steps.push(because(`${tenant} has paid the rent that was owed: our notice to vacate lapses.`, ...(n ? [withdraw(n.id, "Lapsed: the arrears are paid.")] : [])));
+          } else if (e.stage === "noticed" && t >= e.by) {
+            const fee = p.possession.fee ?? 0;
+            if (acc.balance >= fee) {
+              e.stage = "applied";
+              const home = leaseTerms(a, tenant);
+              steps.push(because(`Our notice to vacate has run out and ${tenant} is still in ${home.space ?? "the home"}, ${usd(behindNow)} behind: applying to the tribunal for possession.`,
+                say("tribunal_application", `Application for possession: ${tenant} is ${usd(behindNow)} behind with the rent under ${a.id} and has not left on our notice to vacate.`, { to: [p.possession.tribunal], visible: [me, p.possession.tribunal, tenant], basis: a.id,
+                  data: { kind: "possession", matter: "possession", against: tenant, about: a.id, amount: behindNow, rent, account: acc.account, ...(home.space ? { space: home.space, structure: home.structure } : {}), household: householdNamed(a, tenant), evidence: { id: a.id, record: "agreement" } } }),
+                ...(fee > 0 && p.possession.fee_account ? [pay(p.possession.fee_account, fee, { from: acc.account, for: "Application fee." })] : [])));
+            }
+          } else if ((e.stage === "applied" || e.stage === "plan") && orders.length) {
+            const o = orders.sort((x, y) => y.at - x.at)[0]!;
+            for (const x of orders) e.seen.add(x.id);
+            if (o.data?.finding === "plan") {
+              e.stage = "plan";
+              e.plan = { at: t, owed: behindNow, instalment: cents(o.data.instalment ?? 0) };
+            } else if (o.data?.finding === "possession") {
+              e.stage = "ordered";
+              e.by = Number(o.data.due) || t;
+              e.notice = o.id;
+              // (The tenancy is ended on the record now: by the lease's own terms, which is some weeks on.)
+              if (!noticeGiven.has(a.id)) { noticeGiven.set(a.id, t); steps.push(because(`The tribunal orders possession of ${leaseTerms(a, tenant).space ?? "the home"} by ${dateWords(e.by)}: ending the tenancy on the record.`, notice(a.id, "Notice: possession ordered by the tribunal for arrears."))); }
+            } else ending.delete(a.id); // (dismissed: the arrears were paid, or it was not made out; we begin again if they fall behind)
+          } else if (e.stage === "plan" && e.plan) {
+            // A plan kept: the arrears come down by the instalment each month. Paid off: done. Not kept a month
+            // and a week on: back to the tribunal, saying so.
+            const months = Math.floor((t - e.plan.at) / MONTH);
+            if (behindNow < rent) ending.delete(a.id);
+            else if (t - e.plan.at >= MONTH + 7 * DAY && behindNow > e.plan.owed - months * e.plan.instalment + rent / 2 && acc.balance >= (p.possession.fee ?? 0)) {
+              e.stage = "applied";
+              const home = leaseTerms(a, tenant), fee = p.possession.fee ?? 0;
+              steps.push(because(`${tenant} has not kept the plan the tribunal set (${usd(behindNow)} behind, where the plan would have it under ${usd(Math.max(0, e.plan.owed - months * e.plan.instalment))}): applying again for possession.`,
+                say("tribunal_application", `Application for possession: ${tenant} has not kept the payment plan ordered, and is ${usd(behindNow)} behind with the rent under ${a.id}.`, { to: [p.possession.tribunal], visible: [me, p.possession.tribunal, tenant], basis: a.id,
+                  data: { kind: "possession", matter: "possession", against: tenant, about: a.id, amount: behindNow, rent, account: acc.account, breach: true, ...(home.space ? { space: home.space, structure: home.structure } : {}), household: householdNamed(a, tenant), evidence: { id: a.id, record: "agreement" } } }),
+                ...(fee > 0 && p.possession.fee_account ? [pay(p.possession.fee_account, fee, { from: acc.account, for: "Application fee." })] : [])));
+            }
+          } else if (e.stage === "ordered" && t >= e.by + DAY && acc.balance >= (p.possession.warrant_fee ?? 0)) {
+            e.stage = "warrant";
+            const fee = p.possession.warrant_fee ?? 0;
+            steps.push(because(`The date the tribunal set for possession has passed and ${tenant} has not left: asking the tribunal's registrar for a warrant.`,
+              say("warrant_request", `Request for a warrant of possession under order ${e.notice}: ${tenant} has not left.`, { to: [p.possession.tribunal], visible: [me, p.possession.tribunal], basis: e.notice!, data: { order: e.notice } }),
+              ...(fee > 0 && p.possession.fee_account ? [pay(p.possession.fee_account, fee, { from: acc.account, for: "Warrant fee." })] : [])));
+          } else if (e.stage === "warrant") {
+            // (A warrant nobody came to carry out in its time has lapsed: we ask for another.)
+            const lapsed = book.all("warrant_lapsed").filter((w) => w.data?.lease === a.id && !e.seen.has(w.id));
+            if (lapsed.length) { for (const w of lapsed) e.seen.add(w.id); e.stage = "ordered"; }
+          }
+          continue;
+        }
+        if (law && p.possession && (owed - paid) >= bears * rent && t - since >= bears * MONTH && owed - paid >= rent && !noticeGiven.has(a.id)) {
+          // (A date by the day: the first day to begin once the notice's days have run in full, counted from when it is on the record.)
+          const by = (Math.floor(t / DAY) + 1 + law.notice_days) * DAY;
+          ending.set(a.id, { stage: "noticed", by, seen: new Set(book.all("tribunal_order").filter((o) => o.data?.about === a.id).map((o) => o.id)) });
+          const behind = org.wants.get("arrears", a.id);
+          if (behind) org.wants.tried(behind, "notice", t, a.id);
+          org.remember(t, "gave_notice", tenant, 3_000);
+          steps.push(because(`Rent is ${bears} or more months in arrears (${usd(owed - paid)}): giving ${tenant} notice to vacate by ${dateWords(by)}, as ${law.id} allows after ${law.arrears_days} days' arrears. Paid before then, it lapses.`,
+            say("notice_to_vacate", `Notice to vacate: the rent under ${a.id} is ${usd(owed - paid)} in arrears. You are to leave ${leaseTerms(a, tenant).space ?? "the home"} by ${dateWords(by)}. If the arrears are paid before then, this notice lapses. If you are still there after it, we may apply to the tribunal for possession.`,
+              { to: [tenant], visible: [me, tenant], basis: a.id, data: { lease: a.id, reason: "arrears", arrears: owed - paid, by, law: law.id } })));
+          continue;
+        }
+        if (noticeGiven.has(a.id)) continue;
         if ((owed - paid) >= bears * rent && t - since >= bears * MONTH) {
           noticeGiven.set(a.id, t);
           const behind = org.wants.get("arrears", a.id);
@@ -759,6 +849,82 @@ export const byTheDay = (a: any): boolean => a?.record === "agreement" && a.term
 /** The notice such an agreement gives: none (the least a term can say). */
 export const NO_NOTICE = 1;
 
+/**
+ * The law on possession of a let home for arrears, as its lawmaker published it (docs/behaviour/justice.md,
+ * "Possession"): how long rent must be owed before a notice to vacate may be given, the notice it must give, how
+ * long after its order the tribunal's date for possession falls, the longest plan to pay it will set, how long
+ * whoever enforces a warrant has to carry it out, and the notice of the day they must give the tenant. A record a landlord, a tenant and the tribunal read; no place's
+ * figures here, and a world with no such law has none of it.
+ */
+export interface PossessionLaw { id: string; arrears_days: number; notice_days: number; possession_days: number; plan_months: number; warrant_days: number; eviction_notice_days: number; enforced_by?: string }
+export function possessionLaw(book: Book): PossessionLaw | undefined {
+  const l = book.open("law").filter((r) => r.data?.tenancy === "possession").sort((a, b) => b.at - a.at || (a.id < b.id ? 1 : -1))[0];
+  if (!l) return undefined;
+  const n = (x: unknown, d: number) => (Number.isFinite(Number(x)) && Number(x) >= 0 ? Number(x) : d);
+  return { id: l.id, arrears_days: n(l.data?.arrears_days, 0), notice_days: n(l.data?.notice_days, 0), possession_days: n(l.data?.possession_days, 0), plan_months: n(l.data?.plan_months, 0), warrant_days: n(l.data?.warrant_days, 0), eviction_notice_days: n(l.data?.eviction_notice_days, 0),
+    ...(typeof l.data?.enforced_by === "string" ? { enforced_by: l.data.enforced_by } : {}) };
+}
+/** Whom a lease names as living in the home with the tenant (its words say: "... to live there with their household: a, b."; none named: the tenant alone). */
+export function householdNamed(a: any, tenant: string): string[] {
+  const named = /with their household: ([^.]+)\./.exec(String(a?.terms?.text ?? ""))?.[1]?.split(",").map((x) => x.trim()).filter(Boolean) ?? [];
+  return [...new Set([tenant, ...named])];
+}
+
+/**
+ * The law on ending a job for redundancy, as its lawmaker published it (docs/behaviour/firms.md, "Adjusting labour"):
+ * the least notice and the redundancy pay an employer owes, each by length of service, in days of pay (a week is seven); and the size
+ * of employer below which no redundancy pay is owed, where the law has one. A record an employer reads; nothing here
+ * holds any place's figures, and a world with no such law owes what its agreements say and nothing more.
+ */
+export interface TerminationLaw { id: string; notice: { from_years: number; days: number }[]; redundancy_pay: { from_years: number; days: number }[]; small_employer_under?: number }
+export function terminationLaw(book: Book): TerminationLaw | undefined {
+  const l = book.open("law").filter((r) => r.data?.employment === "termination").sort((a, b) => b.at - a.at || (a.id < b.id ? 1 : -1))[0];
+  if (!l) return undefined;
+  const steps = (x: unknown) => (Array.isArray(x) ? x.filter((b) => Number.isFinite(b?.from_years) && Number.isFinite(b?.days)).map((b) => ({ from_years: Number(b.from_years), days: Number(b.days) })).sort((a, b) => a.from_years - b.from_years) : []);
+  const under = Number(l.data?.small_employer_under);
+  return { id: l.id, notice: steps(l.data?.notice), redundancy_pay: steps(l.data?.redundancy_pay), ...(under > 0 ? { small_employer_under: under } : {}) };
+}
+/** A schedule by service (days of pay), read at a length of service as weeks of pay (the last step at or below it; before the first: nothing). */
+export const weeksAt = (steps: { from_years: number; days: number }[], years: number): number => steps.reduce((x, b) => (years >= b.from_years ? b.days : x), 0) / 7;
+
+/**
+ * How an employer adjusts its staff to its trade (docs/behaviour/firms.md, "Adjusting labour"). Three things real
+ * firms do, each with its source there: they plan on trade smoothed over a horizon, never on one month's (Holt,
+ * Modigliani, Muth and Simon 1960); they hold labour through a dip, because letting someone go and hiring again
+ * both cost (Oi 1962; Hamermesh 1989; Bentolila and Bertola 1990; Fay and Medoff 1985), so a worker is let go only
+ * once the surplus has lasted as long as letting them go and replacing them would cost in their pay; and while over
+ * their need they shed by not replacing those who leave (Davis, Faberman and Haltiwanger 2012).
+ * `smooth_months`: the horizon (0: last month's figure, the rule as it was). `hiring_cost_weeks`: what taking someone
+ * on costs, in weeks of their pay. With neither (`smooth_months` 0 and no cost), an employer reacts to each month as before.
+ */
+export interface AdjustParams { smooth_months: number; hiring_cost_weeks: number }
+export class LabourPlan {
+  private level = -1;
+  private surplus = 0; // months in a row with more staff than the trade expected needs
+  constructor(private readonly p: AdjustParams) {}
+  /** The trade expected, after another month's figure: an average weighted to the recent months over the horizon. */
+  expect(month: number): number {
+    const h = Math.max(0, this.p.smooth_months);
+    this.level = this.level < 0 || h <= 1 ? month : Math.round(this.level + ((month - this.level) * 2) / (h + 1));
+    return this.level;
+  }
+  get expected(): number { return this.level; }
+  /** How many months a surplus must have lasted before the most recent hire is let go: what ending the job costs
+   * under the law (notice and redundancy pay for their service, where our size owes it) and hiring again, in weeks
+   * of pay, as months (never less than one: the month the surplus is first seen). */
+  waits(law: TerminationLaw | undefined, staff: number, years: number, noticeDays: number): number {
+    const notice = Math.max(law ? weeksAt(law.notice, years) : 0, noticeDays / 7);
+    const redundancy = law && !(law.small_employer_under && staff < law.small_employer_under) ? weeksAt(law.redundancy_pay, years) : 0;
+    return Math.max(1, Math.ceil(((notice + redundancy + Math.max(0, this.p.hiring_cost_weeks)) * 12) / 52));
+  }
+  /** The month's look: `over` (more staff than the expected trade needs) or not. Returns whether to let one go now. */
+  month(over: boolean, waits: number): { letGo: boolean; lasted: number } {
+    this.surplus = over ? this.surplus + 1 : 0;
+    if (over && this.surplus >= waits) { this.surplus = 0; return { letGo: true, lasted: waits }; }
+    return { letGo: false, lasted: this.surplus };
+  }
+}
+
 /** How a hiring office's letter to the payroll office begins (an office's note: `officeNote`). */
 export const PAYROLL_NOTE = "Payroll notice from the hiring office, ";
 
@@ -808,6 +974,10 @@ export class Staffing {
    * said: all of them). A job it does not register is paid whole: nothing is withheld from it and no report names
    * its worker (docs/behaviour/firms.md, "Jobs an employer does not register"). */
   constructor(private readonly ctx: ParticipantContext, private readonly me: string, private readonly o: { period: number; notice_days: number; workplace?: string; role: string; industry?: string; does?: { hire?: boolean; pay?: boolean }; own?: "role" | "role_or_unnamed"; payroll?: string; notice_wait?: number; registered_bps?: number; casual_bps?: number; day_wage?: number; work_days?: number; week_days?: number; short?: { per_year_bps: number; by_bps: number } }) {}
+  /** When we last let someone go because we could not pay them (from then we take on only with more in hand: the module asks). */
+  cashLayoffAt = -Infinity;
+  /** Redundancy pay (and pay in lieu of notice the agreement fell short of) owed at the end of a job we ended for redundancy: agreement -> the sum. */
+  private readonly severance = new Map<string, number>();
   // Work by the day (`casual_bps`: of the jobs this employer fills, the share it fills by the day; `day_wage`: what it
   // pays for a day, at the wage it began with; `work_days`: the days of the week it works; `week_days`: the working days of the world's week, over which a day's
   // pay is reckoned as a year's for what the law withholds). Whom we have paid for
@@ -877,6 +1047,8 @@ export class Staffing {
     for (const m of obs.inbox) {
       const who = PAYEE_DIED.who(m.text);
       if (who) this.bankSaysDead.add(who);
+      // (A wage our account could not cover: the bank says so, naming our order. It is still owed: the ledger below.)
+      if (m.re && PAYMENT_FAILED.is(m.text)) this.failed.push({ order: m.re, t: obs.t });
     }
     for (const x of obs.outcomes) for (const [ref, id] of Object.entries(x.created ?? {})) if (this.pendingOrder.has(ref)) {
       this.orders.set(this.pendingOrder.get(ref)!, id);
@@ -1088,6 +1260,16 @@ export class Staffing {
       steps.push(because("Employment has ended: stopping the wages.", withdraw(this.orders.get(a.id)!, "Employment ended; stop wages.")));
       this.orders.delete(a.id);
     }
+    // Ended for redundancy, with pay owed under the law: owed in our books from the day the job ends, and paid with
+    // the wages we owe (at once if the account covers it; late if not).
+    for (const a of doesPay ? contracts : []) if (this.severance.has(a.id) && book.concluded(a.id) && t >= this.endOf(book, a)) {
+      const to = this.payee(book, a);
+      if (to) this.unpaid.push({ agreement: a.id, to, amount: this.severance.get(a.id)!, withheld: NOTHING_WITHHELD, due: this.endOf(book, a), what: "Redundancy pay" });
+      this.severance.delete(a.id);
+    }
+
+    if (doesPay) steps.push(...this.latePay(book, t, account, (() => { const b = channels.accounts(obs).find((x) => x.account === account)?.balance; return b === undefined ? undefined : cents(b); })(),
+      staff.reduce((x, a) => x + (this.noticed.has(a.id) || byTheDay(a) ? 0 : this.wageOf(a)), 0)));
 
     // Work by the day: each hand who is at work today is paid the day's wage today, once, by a payment of its own
     // (less what the law withholds from a day's pay, where the job is one we register). A day we have no work for
@@ -1296,14 +1478,52 @@ export class Staffing {
     }
     return steps;
   }
-  /** What our books say we have kept back from someone's pay under an agreement. */
+  // The wage ledger (docs/behaviour/firms.md, "Wages owed"): an agreed wage is owed in full. What we kept back from a
+  // pay (above) and a pay our account could not cover on its day (the bank tells us, naming our order) both stand in
+  // our books as owed to that worker under that agreement, until paid. A missed pay is paid late, oldest first, as
+  // soon as the account covers it beside the next pay day's wages for those we keep; a worker who has left and
+  // recorded the wages as a debt against us is paid as any creditor is, and the ledger's line gives way to the debt.
+  private readonly failed: { order: string; t: number }[] = [];
+  private readonly unpaid: { agreement: string; to: string; amount: number; withheld: Withheld; due: number; what?: string }[] = [];
+  /** What our books say we owe someone in wages under an agreement: kept back, and missed. */
   owedShort(agreement: string): number {
-    return this.kept.get(agreement) ?? 0;
+    return (this.kept.get(agreement) ?? 0) + this.unpaid.reduce((x, u) => x + (u.agreement === agreement ? u.amount : 0), 0);
+  }
+  /** Wages our books say are owed and unpaid, in all (for whoever winds us up, and for what we can spend). */
+  wagesOwed(): number {
+    return this.unpaid.reduce((x, u) => x + u.amount, 0);
+  }
+  /** Missed pays entered in the ledger, and those the account now covers paid late (keeping `keep` for the next pay day). */
+  private latePay(book: Book, t: number, account: string, balance: number | undefined, keep: number): Step[] {
+    const byOrder = new Map([...this.orders].map(([agreement, order]) => [order, agreement]));
+    for (const f of this.failed.splice(0)) {
+      const agreement = byOrder.get(f.order);
+      const money = (book.records.get(f.order) as any)?.data?.outcome?.money;
+      if (!agreement || !money?.to || !(cents(money.amount) > 0)) continue;
+      this.unpaid.push({ agreement, to: money.to, amount: cents(money.amount), withheld: this.withholds.get(f.order) ?? NOTHING_WITHHELD, due: f.t });
+    }
+    if (!this.unpaid.length) return [];
+    // (A worker's own claim for the wages, recorded as a debt against us, replaces our line: it is paid as a debt.)
+    const claimed = new Set(book.ofType("claim").filter((c: any) => c.counterparty === this.me && c.about?.kind === "debt").flatMap((c: any) => basesOf(c)));
+    for (let i = this.unpaid.length - 1; i >= 0; i--) if (claimed.has(this.unpaid[i]!.agreement)) this.unpaid.splice(i, 1);
+    if (balance === undefined) return [];
+    let left = balance - keep;
+    const lines: C.Call[] = [];
+    while (this.unpaid.length && this.unpaid[0]!.amount <= left && lines.length < 30) {
+      const u = this.unpaid.shift()!;
+      left -= u.amount;
+      const worker = (book.records.get(u.agreement) as any)?.terms?.parties?.[1] ?? "our employee";
+      if (!this.offBooks.has(u.agreement)) this.owe(this.lawId, u.withheld, u.agreement, u.amount + u.withheld.total);
+      this.wagesPaid += u.amount + u.withheld.total;
+      lines.push(pay(u.to, u.amount, { from: account, basis: u.agreement, for: u.what ? `${u.what} for ${worker}.` : `Wages for ${worker}, late: due ${dateWords(u.due)}.` }));
+    }
+    return lines.length ? [because(`Owed in our books to people who work or worked for us (wages not paid on their day, redundancy pay): paying ${lines.length} of them now.`, ...lines)] : [];
   }
   /** Putting short pay right from here on: their wage order replaced by one at the wage agreed. (What was kept back
    * is paid by whoever answers for us.) */
   payInFull(book: Book, t: number, account: string, agreement: string, why: string): Step[] {
     this.kept.delete(agreement);
+    for (let i = this.unpaid.length - 1; i >= 0; i--) if (this.unpaid[i]!.agreement === agreement) this.unpaid.splice(i, 1);
     if (!this.skim.delete(agreement)) return [];
     const a = this.staff(book, t).find((x) => x.id === agreement);
     return a ? this.raise(book, t, account, 0, why, { agreement, wage: this.wageOf(a) }) : [];
@@ -1392,16 +1612,48 @@ export class Staffing {
 
   /** Let one worker go (the most recent hire not already under notice), with the notice their contract gives. */
   letGo(book: Book, t: number, why: string, reason: string): Step[] {
-    const last = this.staff(book, t).filter((a) => !this.noticed.has(a.id)).sort((x, y) => book.signedAt(y.id)! - book.signedAt(x.id)!)[0];
+    const staff = this.staff(book, t);
+    const last = staff.filter((a) => !this.noticed.has(a.id)).sort((x, y) => book.signedAt(y.id)! - book.signedAt(x.id)!)[0];
     if (!last) return [];
     this.noticed.set(last.id, t);
-    return [because(why, notice(last.id, reason))];
+    const owes = this.redundancyOwed(book, t, last, staff.length);
+    if (owes.sum > 0) this.severance.set(last.id, owes.sum);
+    return [because(owes.sum > 0 ? `${why} Under ${owes.law}, ${owes.words}: ${usd(owes.sum)}, paid when the job ends.` : why, notice(last.id, reason))];
+  }
+
+  /** How long the most recent hire we are keeping has been with us, in years (nobody: 0). */
+  lastHireYears(book: Book, t: number): number {
+    const last = this.staff(book, t).filter((a) => !this.noticed.has(a.id)).sort((x, y) => book.signedAt(y.id)! - book.signedAt(x.id)!)[0];
+    return last ? this.serviceYears(book, t, last) : 0;
+  }
+  /** How long someone has worked for us under an agreement, in years (those we began with: as long as the run). */
+  serviceYears(book: Book, t: number, a: any): number {
+    return Math.max(0, (t - (book.signedAt(a.id) ?? a.at ?? t)) / (365 * DAY));
+  }
+  /** What the law on ending a job says we owe someone let go for redundancy, beyond their notice: redundancy pay for
+   * their service (unless we are smaller than the law's small employer), and pay for the notice the law gives them
+   * beyond what their agreement does. In weeks of their pay. No such law in the world: nothing. */
+  redundancyOwed(book: Book, t: number, a: any, staff: number): { sum: number; law: string; words: string } {
+    const law = terminationLaw(book);
+    if (!law || byTheDay(a)) return { sum: 0, law: "", words: "" };
+    const terms = jobTerms(a, a.terms.parties[1]), years = this.serviceYears(book, t, a);
+    const weekly = (this.wageOf(a) * 7 * DAY) / terms.period;
+    const small = !!law.small_employer_under && staff < law.small_employer_under;
+    const redundancy = small ? 0 : weeksAt(law.redundancy_pay, years);
+    const agreed = (a.terms.termination?.find((x: any) => x.party === this.me)?.notice ?? 0) / (7 * DAY);
+    const lieu = Math.max(0, weeksAt(law.notice, years) - agreed);
+    const sum = Math.floor(weekly * (redundancy + lieu));
+    return { sum, law: law.id, words: [redundancy > 0 ? `${redundancy} weeks' redundancy pay` : "", lieu > 0 ? `${Math.round(lieu * 10) / 10} weeks' pay for notice beyond the agreement's` : ""].filter(Boolean).join(" and ") + ` for ${Math.floor(years)} years' service` };
   }
 
   /** Let everyone go, with the notice their contracts give (in batches: a program has at most 32 lines). */
   letGoAll(book: Book, t: number, why: string, reason: string): Step[] {
     const all = this.staff(book, t).filter((a) => !this.noticed.has(a.id));
-    for (const a of all) this.noticed.set(a.id, t);
+    for (const a of all) {
+      this.noticed.set(a.id, t);
+      const owes = this.redundancyOwed(book, t, a, all.length);
+      if (owes.sum > 0) this.severance.set(a.id, owes.sum);
+    }
     const out: Step[] = [];
     for (let i = 0; i < all.length; i += 30) out.push(because(why, ...all.slice(i, i + 30).map((a) => notice(a.id, reason))));
     return out;

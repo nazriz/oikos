@@ -43,7 +43,10 @@ test("rents are reviewed as landlords practise, within the law as a record says 
   const byLease = new Map<string, any[]>();
   for (const r of increases) byLease.set(r.data.lease, [...(byLease.get(r.data.lease) ?? []), r]);
   // Reviews as practised (6 months apart), and every increase within the law: 9 months after the last change.
-  for (const [, rs] of byLease) for (let i = 1; i < rs.length; i++) expect(rs[i].at - rs[i - 1].at).toBeGreaterThanOrEqual(6 * MONTH);
+  // (To the minute: a notice is on the record a second or so after the landlord decides, by how much else it did in
+  // that wake, and it reviews by when it decided. With a notice to vacate given in the same wake as an earlier
+  // review, two notices of one lease came 6 months less a second apart, 2026-10-11.)
+  for (const [, rs] of byLease) for (let i = 1; i < rs.length; i++) expect(rs[i].at - rs[i - 1].at).toBeGreaterThanOrEqual(6 * MONTH - 60);
   for (const r of increases) expect(r.data.from - r.data.last_from).toBeGreaterThanOrEqual(law.months * MONTH);
   // (The law held some back: an increase noticed at 6 months starts at 9, not after 60 days.)
   expect(increases.some((r) => r.data.from - r.at > 60 * DAY)).toBe(true);

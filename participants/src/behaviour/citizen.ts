@@ -159,12 +159,16 @@ interface Home {
   owned?: boolean;
   /** Rent orders replaced by a new rent's, to stop once their last payment is made (when). */
   retiring?: { order: string; at: number }[];
+  /** Told to leave it for arrears (docs/behaviour/justice.md, "Possession"): by the landlord's notice to vacate, by
+   * the tribunal's order for possession (`ordered`), or put out on its warrant (`removed`); by when; and whether we
+   * mean to stay past that. */
+  vacate?: { paper: string; by: number; stays: boolean; ordered?: boolean; removed?: boolean };
 }
 interface Job { /** The account our pay has come from, as we have seen it come. */ paidFrom?: string; /** What our pay has come short of what was agreed, in all, and not yet put right. */ short?: number; agreement: string; employer: string; wage: number; period: number; workplace?: string; since: number; /** When we walked out (unpaid), whatever the terms say. */ leftAt?: number; paidAt?: number; claimed?: boolean }
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.46.0", // 0.46.0: everyday frictions (docs/behaviour/frictions.md), with the world's dial: a home in disrepair, pay come short (no longer taken for no pay), a bill well over the usual, a claim refused, goods found faulty; each a grievance about whoever did it, asked of them, taken to any body that says it hears such things, or told to those one knows; what comes back moves trust and the sense of agency; a job is left only for one that pays enough more, the more so the longer held (where the world says); giving up on work stops the looking; a need short at the start has been short for a while; pay told to the household once until it changes; 0.45.0: wants and initiative (docs/design/ai-citizens.md 10a, 10b), for those the world's dial gives it to: wants born of needs, events and those one copies, met with openings by what they bring in typed outcomes, the way chosen by the mind; trust, agency and attachment read; starting attachment from the world; nothing changes with the dial at 0; 0.44.0: the richer record (docs/design/ai-citizens.md 10c, 10d): belonging and meaning as needs, trust in particular institutions, a sense of agency, attachments, what is thought and what is said, values that drift and are shocked, bounded ties, where the hours go; held by the kernel as the person's own record; 0.43.2: offered a job that names no place of work, on an advertisement, goes to work where the advertisement says; 0.43.1: tells their own business when they move home; 0.43.0: someone who works for themself (own_work): not out of work, their income what the business pays them, at their pitch in working hours; 0.42.1: work by the day (a day's pay known as pay; no claim for a day not worked); 0.42.0: reads the support law, stops work at an age of its own (0.41.0 on its branch), with main's 0.41.1
+  version: "0.47.0", // 0.47.0: takes for pay only what is paid as wages (a refund or a dividend from an employer is not pay come short); starts a business of one from home, and gives one up that pays no living (docs/behaviour/entry.md); told to vacate for arrears, goes or stays, answers the tribunal, and is out when its warrant is carried out (docs/behaviour/justice.md, "Possession"); 0.46.0: everyday frictions (docs/behaviour/frictions.md), with the world's dial: a home in disrepair, pay come short (no longer taken for no pay), a bill well over the usual, a claim refused, goods found faulty; each a grievance about whoever did it, asked of them, taken to any body that says it hears such things, or told to those one knows; what comes back moves trust and the sense of agency; a job is left only for one that pays enough more, the more so the longer held (where the world says); giving up on work stops the looking; a need short at the start has been short for a while; pay told to the household once until it changes; 0.45.0: wants and initiative (docs/design/ai-citizens.md 10a, 10b), for those the world's dial gives it to: wants born of needs, events and those one copies, met with openings by what they bring in typed outcomes, the way chosen by the mind; trust, agency and attachment read; starting attachment from the world; nothing changes with the dial at 0; 0.44.0: the richer record (docs/design/ai-citizens.md 10c, 10d): belonging and meaning as needs, trust in particular institutions, a sense of agency, attachments, what is thought and what is said, values that drift and are shocked, bounded ties, where the hours go; held by the kernel as the person's own record; 0.43.2: offered a job that names no place of work, on an advertisement, goes to work where the advertisement says; 0.43.1: tells their own business when they move home; 0.43.0: someone who works for themself (own_work): not out of work, their income what the business pays them, at their pitch in working hours; 0.42.1: work by the day (a day's pay known as pay; no claim for a day not worked); 0.42.0: reads the support law, stops work at an age of its own (0.41.0 on its branch), with main's 0.41.1
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -208,8 +212,22 @@ export const citizen: BehaviourModule = {
       // Starting a business (docs/behaviour/entry.md): the kinds of venture this world has (a template each: its capital
       // beyond the premises, the founder's position's channels and rules, with "{structure}", "{cell}", "{listing}",
       // "{founder}" and "{capital}" filled in), and the monthly chance a person able to, seeing premises for sale, does.
-      ventures: [] as { kind: string; name: string; capital: number; channels: unknown[]; role_module: { code: string; params: { [k: string]: unknown } } }[],
+      ventures: [] as { kind: string; name: string; capital: number; channels: unknown[]; role_module: { code: string; params: { [k: string]: unknown } };
+        /** A business its founder runs alone, from their home (docs/behaviour/entry.md, "Starting a business of one"):
+         * it needs no premises bought. `expect_per_month`: what such a business is expected to clear at first. */
+        own?: boolean; expect_per_month?: number }[],
       found_bps: 0,
+      // Starting a business of one: the month's chance, in parts per million, for someone with a home to trade from
+      // and the means (the world derives it from its place's business birth rate and its own counts; 0: nobody does);
+      // the months of housing and essentials a founder keeps back beyond the capital; and when its owner gives it
+      // up: after `give_up_months` in which it paid them less than `give_up_below_bps` of a month's essentials
+      // (placeholders: docs/behaviour/entry.md).
+      found_own_ppm: 0, found_own_buffer_months: 1, give_up_months: 6, give_up_below_bps: 5000,
+      // Possession (docs/behaviour/justice.md, "Possession"): of tenants given a notice to vacate for arrears they
+      // cannot pay, the share who stay past its date; and of those the tribunal orders out, the share who are gone
+      // by its date (the rest stay until they are put out). The world's figures (placeholders there); none: a
+      // tenant leaves when told, as before.
+      possession: null as { stay_bps: number; obey_bps: number } | null,
       // Shopping (Lengnick 2013, Table 1): how often, and how many shops a trip may try. Which shop is the mind's
       // (docs/design/ai-citizens.md 3b, 3c): it replaces Lengnick's price and quantity switching rules.
       shop_every_days: 14,
@@ -785,7 +803,7 @@ export const citizen: BehaviourModule = {
     let deferred = 0; // money we meant to spend on goods and got back (a shop couldn't serve), spent on the next trip
     const borrowing = new Borrowing(me, ctx.params.bank ?? ""); // (no bank named: no borrowing)
     let nextVenture = ctx.rng("venture-day").below(30) * DAY;
-    let founded: { firm?: string; capital: number; paid: boolean } | null = null;
+    let founded: { firm?: string; capital: number; paid: boolean; own?: { home: string; expect: number } } | null = null;
     let pendingFirm = false; // a business we've just founded: its id comes back in the outcome
     const deliveries = new Deliveries();
     let departed = false;
@@ -849,7 +867,13 @@ export const citizen: BehaviourModule = {
     // What our own business has paid us (our drawings), for what it brings in a month: over the days our income is
     // reckoned on; before that many days have passed, what it was expected to.
     const drawings: { t: number; amount: number }[] = [];
-    const ownWork = p.own_work;
+    const drawnLog: { t: number; amount: number }[] = []; // what our own business paid us, kept as long as we judge it by
+    let ownWork = p.own_work;
+    // A business of one we mean to start once our job has ended (we gave notice to); and when ours began, if in this run.
+    let venturing: { at: number } | null = null;
+    let ownSince = p.own_work ? 0 : -1;
+    let nextOwnVenture = ctx.rng("own-venture-day").below(30) * DAY;
+    let nextOwnReview = MONTH + ctx.rng("own-review-day").below(30) * DAY;
     let tradingFrom: string | null = ownWork?.home ?? null; // where our business, worked from home, has been told it trades
     const ownIncome = (t: number) => (!ownWork ? 0 : t < p.income_window_days * DAY ? ownWork.expect_per_month : Math.floor((drawings.reduce((x, d) => x + d.amount, 0) * MONTH) / (p.income_window_days * DAY)));
     const wageIncome = () => ownIncome(book.now) + (!job ? 0 : job.period === DAY ? Math.floor((job.wage * 30 * (p.round?.work_days ?? 5)) / 7) : Math.floor((job.wage * MONTH) / job.period));
@@ -1072,6 +1096,7 @@ export const citizen: BehaviourModule = {
         inflows.push({ t: tx.t, amount: cents(tx.amount) });
         if (ownWork && tx.from === ownWork.account) {
           drawings.push({ t: tx.t, amount: cents(tx.amount) });
+          drawnLog.push({ t: tx.t, amount: cents(tx.amount) });
           // (For the record: what our own business paid us. The mind makes nothing of it; it follows no decision.)
           outcome({ t: obs.t, domain: "own_work", option: ownWork.firm, kind: "drawn", way: "mine", facts: { amount: cents(tx.amount), paid_at: tx.t } });
         }
@@ -1091,7 +1116,12 @@ export const citizen: BehaviourModule = {
           const net = job.wage - withholding(incomeTaxLaw(book), job.wage, job.period);
           // (Only what a standing wage order pays: a part pay at the return from a stoppage, or any other single
           // payment from our employer, is not our wage come short.)
-          if (from && tx.from === from && tx.per_instruction && cents(tx.amount) < net && cents(tx.amount) * 2 >= net) {
+          // (And only what was paid as wages: the bank's statement says what the payer said a payment was for. A refund
+          // from the shop we work at, or a dividend from the works we hold a share of, is not our pay come short. Until
+          // 2026-10-11 the bank narrated nothing, and about three in five "short pays" in a year were those. A payment
+          // that says nothing of what it is for is judged by its size, as before.)
+          const asWages = !tx.memo || /wage|salar|\bpay\b|day's work/i.test(tx.memo);
+          if (from && tx.from === from && tx.per_instruction && asWages && cents(tx.amount) < net && cents(tx.amount) * 2 >= net) {
             job.paidAt = tx.t;
             job.short = (job.short ?? 0) + net - cents(tx.amount);
             learn("job", job.employer, 6_000, { t: obs.t, kind: "short", way: "mine", facts: { amount: cents(tx.amount), agreed: net, short: net - cents(tx.amount), paid_at: tx.t } });
@@ -1504,8 +1534,16 @@ export const citizen: BehaviourModule = {
         for (const x of home.retiring.filter((x) => t >= x.at)) steps.push(because("The old rent's last payment is made: stopping its order; the new one takes over.", withdraw(x.order, "Replaced by a new standing order.")));
         home.retiring = home.retiring.filter((x) => t < x.at);
       }
-      // A tenancy that has ended: move out and stop paying rent.
-      if (home && t >= endsAt(home)) {
+      // A tenancy that has ended: move out and stop paying rent. (Told to leave for arrears: at the date we were
+      // given, if we mean to go; one who means to stay is there until the tribunal's date, or until put out.)
+      const put = home?.vacate;
+      if (home && (put ? (!put.stays && t >= put.by) || (!put.stays && t >= endsAt(home)) : t >= endsAt(home))) {
+        if (put) {
+          outcome({ t, domain: "home", option: home.space, kind: "evicted", way: "mine", from: home.landlord, facts: { how: put.removed ? "removed" : put.ordered ? "left_on_order" : "left_on_notice" } });
+          inner.happened("evicted", t, { about: home.landlord });
+          // (Ours to end on the record too, if nobody has: we are gone.)
+          if (endsAt(home) === Number.MAX_SAFE_INTEGER || t < endsAt(home)) if (!(book.notices.get(home.agreement) ?? []).some((n) => n.as === me)) steps.push(because(put.removed ? "We have been put out of our home on the tribunal's warrant." : put.ordered ? "The tribunal has ordered us out of our home, and its date has come: leaving." : "We cannot pay what is owed and have been given notice to vacate: leaving.", notice(home.agreement, "Leaving: told to vacate for arrears.")));
+        }
         // Looking for somewhere cheaper (a goal's method): for the first month of the hunt, only homes that beat this rent.
         if (pursuing("cheaper home")) cheaperThan = { rent: Math.floor((home.rent * p.goals.cheaper_bps) / 10_000), until: t + MONTH };
         if (!home.owned) outcome({ t, domain: "home", option: home.space, kind: "ended", way: "mine", facts: { by: endedBy(home.agreement), rent: home.rent, ...(book.signedAt(home.agreement) !== undefined ? { held_days: Math.floor((t - book.signedAt(home.agreement)!) / DAY) } : {}) } });
@@ -2199,6 +2237,37 @@ export const citizen: BehaviourModule = {
           } else if (f !== "referred") again(g);
         }
       }
+      // Told to leave our home for arrears (docs/behaviour/justice.md, "Possession"). A notice to vacate: we go by
+      // its date, or stay (the rent we can pay is paid as it can be, as always; paid up, the notice lapses). An
+      // application for possession: we answer the tribunal with what we could pay a month toward what is owed.
+      // Its order: a plan (we stay), or possession by a date, which we obey or not. Its warrant carried out: we are out.
+      for (const r of fresh) {
+        if (r.record !== "statement" || !home || home.owned) continue;
+        if (r.kind === "notice_to_vacate" && r.data?.lease === home.agreement && (r.addressed_to ?? []).includes(me)) {
+          const stays = ctx.rng(`stay-${r.id}`).below(10_000) < (p.possession?.stay_bps ?? 0);
+          home.vacate = { paper: r.id, by: Number(r.data.by) || t, stays };
+          outcome({ t, domain: "home", option: home.space, kind: "notice_to_vacate", way: "mine", from: home.landlord, facts: { arrears: cents(r.data.arrears ?? 0), by: home.vacate.by, stays } });
+          inner.doneTo();
+        } else if (r.kind === "hearing_notice" && r.data?.kind === "possession" && r.data?.against === me && r.data?.about === home.agreement) {
+          const offer = Math.max(0, householdIncome() - home.rent - p.essentials);
+          if (offer > 0) steps.push(because(`${home.landlord} has applied for possession of our home: answering the tribunal that we can pay ${usd(offer)} a month toward what is owed, beyond the rent.`,
+            say("tribunal_response", `Answer to application ${r.data.application}: we can pay ${usd(offer)} a month toward the rent owed, and the rent as it falls due.`, { to: [r.speaks_for!], visible: [me, r.speaks_for!, home.landlord], basis: String(r.data.application), data: { application: r.data.application, offer } })));
+        } else if (r.kind === "tribunal_order" && r.data?.kind === "possession" && r.data?.against === me && r.data?.about === home.agreement) {
+          if (r.data.finding === "possession") {
+            const obeys = ctx.rng(`obey-${r.id}`).below(10_000) < (p.possession?.obey_bps ?? 10_000);
+            home.vacate = { paper: r.id, by: Number(r.data.due) || t, stays: !obeys, ordered: true };
+            outcome({ t, domain: "home", option: home.space, kind: "possession_ordered", way: "mine", from: home.landlord, facts: { by: home.vacate.by, obeys } });
+            inner.doneTo();
+          } else {
+            home.vacate = undefined;
+            outcome({ t, domain: "home", option: home.space, kind: r.data.finding === "plan" ? "plan_ordered" : "possession_dismissed", way: "mine", from: home.landlord, facts: r.data.finding === "plan" ? { instalment: cents(r.data.instalment ?? 0), owed: cents(r.data.amount ?? 0) } : {} });
+          }
+        } else if (r.kind === "warrant_executed" && r.data?.lease === home.agreement) {
+          home.vacate = { paper: r.id, by: t, stays: false, ordered: true, removed: true };
+        }
+      }
+      // (A notice to vacate that has lapsed: the arrears were paid.)
+      if (home?.vacate && !home.vacate.ordered && book.withdrawn.has(home.vacate.paper)) home.vacate = undefined;
       // Ordered to pay someone (rent in arrears, by a tribunal that heard it): paid, if it can be and leave the
       // month's essentials; if not, it is theirs to have enforced.
       for (const r of fresh) {
@@ -2711,6 +2780,66 @@ export const citizen: BehaviourModule = {
         const amount = Math.min(acc.balance, Math.floor(Number(r.data?.amount) || 0));
         if (amount > 0) steps.push(because(`Putting the ${usd(amount)} of capital into our new business.`, pay(String(r.data.account), amount, { from: acc.account, for: "Capital." })));
         outcome({ t, domain: "venture", option: "found", kind: "capital_called", way: "mine", facts: { firm: founded.firm, asked: Math.floor(Number(r.data?.amount) || 0), paid: Math.max(0, amount) } });
+        // (A business of one: it is our work from now on. It trades from our home, and what it clears is our income.)
+        if (founded.own && founded.firm) {
+          ownWork = { firm: founded.firm, account: String(r.data.account), home: founded.own.home, expect_per_month: founded.own.expect };
+          tradingFrom = founded.own.home;
+          ownSince = t;
+          nextOwnReview = t + MONTH;
+        }
+      }
+      // Starting a business of one (docs/behaviour/entry.md, "Starting a business of one"): someone in the labour
+      // force with a home to trade from, and savings for its stock beside a month or so of housing and essentials,
+      // does it with the month's chance (the world's, from its place's business birth rate), shifted by who they are
+      // as for any venture. Most new businesses are these: no premises, no staff. Someone in a job gives notice
+      // first and starts when it has run; someone out of work starts at once.
+      const ownV = p.ventures.find((v) => v.own);
+      if (ownV && !founded && !ownWork && p.found_own_ppm > 0 && !retired && p.in_labour_force && (venturing ? !job : t >= nextOwnVenture)) {
+        nextOwnVenture = t + MONTH;
+        const dwelling = home?.movedIn ? home.space : livingAt ?? null;
+        const where = dwelling ? channels.cells(obs).find((c) => c.structure?.structure === structureOf(dwelling))?.cell : undefined;
+        const housing = home?.rent ?? share?.cents ?? 0;
+        const means = !!dwelling && !!where && acc.balance >= ownV.capital + p.found_own_buffer_months * (housing + p.essentials);
+        const enterprise = p.sway.enterprise_openness * (zValue("stimulation") + zValue("self_direction")) / 2 + p.sway.enterprise_achievement * zValue("achievement");
+        const chance = means ? Math.round((p.found_own_ppm * shifted(1_000, enterprise + (initiative && wants.all().some((w) => w.seeks.includes("work")) ? wants.p.sway.found : 0))) / 1_000) : 0;
+        const founds = means && (!!venturing || ctx.rng(`found-own-${t}`).below(1_000_000) < chance);
+        if (means && !venturing) decision({ t, domain: "venture", strategy: "deliberate", choice: founds ? "found_own" : "not", options: [{ key: "found_own", score: Math.round(chance / 100) }, { key: "not", score: 10_000 - Math.round(chance / 100) }] });
+        if (!means) venturing = null;
+        else if (founds && job && !switching) {
+          // (In a job: notice first. The business starts when the job has ended.)
+          if (!venturing) {
+            venturing = { at: t };
+            if (t < jobEnds(job) && !(book.notices.get(job.agreement) ?? []).length) steps.push(because(`We have ${usd(acc.balance)} saved and mean to work for ourselves: giving notice at ${job.employer}, to start a business of our own when it has run.`, notice(job.agreement, "Resigning: starting a business of my own.")));
+          }
+        } else if (founds && !job) {
+          venturing = null;
+          const fill = (x: unknown): unknown => typeof x === "string"
+            ? ({ "{structure}": structureOf(dwelling!), "{home}": dwelling, "{cell}": where, "{founder}": me, "{capital}": ownV.capital, "{values}": { ...mind.person.values } } as { [k: string]: unknown })[x] ?? x
+            : Array.isArray(x) ? x.map(fill) : x && typeof x === "object" ? Object.fromEntries(Object.entries(x).map(([k, y]) => [k, fill(y)])) : x;
+          founded = { capital: ownV.capital, paid: false, own: { home: dwelling!, expect: ownV.expect_per_month ?? 0 } };
+          steps.push(because(`We have ${usd(acc.balance)} saved and a home to trade from: starting a business of our own there (${ownV.name.toLowerCase()}), putting in ${usd(ownV.capital)}.`,
+            ["firm", C.call("entity", { kind: ownV.kind, name: C.text(`${ownV.name} (${me})`), position: C.text("Owner"), channels: C.json(fill(ownV.channels)), role_module: C.json(fill(ownV.role_module)) })]));
+          pendingFirm = true;
+        }
+      }
+      // Giving a business of one up: one that has not paid its owner a living for months is closed by them, and they
+      // look for work again (a business that fails closes; most that close are closed by their owners:
+      // docs/behaviour/entry.md). Not in its first months, while customers are still finding it.
+      if (ownWork && ownSince >= 0 && t >= nextOwnReview) {
+        nextOwnReview = t + MONTH;
+        const months = Math.floor((t - ownSince) / MONTH);
+        const since = t - p.give_up_months * MONTH;
+        const drawn = drawnLog.reduce((x, d) => x + (d.t >= since ? d.amount : 0), 0);
+        while (drawnLog.length && drawnLog[0]!.t < since) drawnLog.shift();
+        if (months >= p.give_up_months && drawn * 10_000 < p.give_up_below_bps * p.essentials * p.give_up_months) {
+          outcome({ t, domain: "own_work", option: ownWork.firm, kind: "given_up", way: "mine", facts: { months, drawn, essentials: p.essentials } });
+          steps.push(because(`Our business has paid us ${usd(drawn)} in ${p.give_up_months} months, under ${p.give_up_below_bps / 100}% of what essentials cost: closing it, and looking for work.`,
+            say("trading_from", "Closing: the business is given up.", { to: [ownWork.firm], visible: [me, ownWork.firm], data: { closed: true } })));
+          ownWork = null;
+          tradingFrom = null;
+          ownSince = -1;
+          founded = null;
+        }
       }
       if (!founded && p.ventures.length && p.found_bps > 0 && t >= nextVenture && !retired && p.in_labour_force) {
         nextVenture = t + MONTH;

@@ -56,6 +56,15 @@ Three things a profile may state for a living town (a spec with `living`); each 
 
 **Keep a figure that only a living town reads out of `outlook`:** everything under `outlook` is given to every person of every town, so a new key there moves every town's state (found on 2026-10-11; `orchestrator/test/living-dial.test.ts` catches it).
 
+## The firm and landlord side: ending a job, possession, and business births (2026-10-11)
+
+Four more optional sections, each with its source in the profile and each read as a law or a derived rate, never as a default in code (docs/decisions.md, "Four faults on the firm and landlord side").
+
+- `employment.termination`: the place's law on ending a job for redundancy (least notice and redundancy pay by service, in days of pay; the small-employer exemption). Published in the town as `law-ending-employment`; employers read it. Every profile's statute is cited and none was opened: to confirm.
+- `employment.adjustment`: the months a firm smooths its trade over and what hiring costs in weeks of pay. **Placeholders, the same in all nine profiles**, with a sourced shape (docs/behaviour/firms.md, "Adjusting labour").
+- `tenancy.possession`: the place's law on possession for arrears (days of arrears, notice, the tribunal's date, the longest plan, the warrant's days and the notice of the day it is carried out), published as `law-possession` where the town has a tribunal and police; and two shares of how tenants answer (`stay_past_notice_bps`, a placeholder; `leave_on_order_bps`, England's, used everywhere). Victoria's steps were opened; the rest are to confirm or placeholders, named in each profile.
+- `business.entry_bps_per_year`: the place's business birth rate. The generator derives the monthly chance of starting a business of one from it and the town's own counts. Opened for Australia and the United Kingdom; summaries for the United States, Japan and Mexico; placeholders for Germany, Brazil, India and Kenya.
+
 ## What a profile states, and what the generator derives
 
 A profile states what can be observed in a place: wages, rents, prices of real things, rates, shares, ages, how its institutions work. The generator derives the rest by formulas that are the same everywhere. An author never picks a scale.

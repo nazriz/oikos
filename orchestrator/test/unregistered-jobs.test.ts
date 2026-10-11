@@ -78,7 +78,10 @@ test("an unregistered job is paid whole and reported to nobody; a registered one
     const a = jobs.get(o.basis);
     const pays = a.terms.commitments.find((c: any) => c.who === employerOf(a));
     let gross = Number(pays.does.outcome.money.amount);
-    for (const ea of eas.filter((x) => x.data.employer === employerOf(a) && x.at <= o.at && x.at >= a.at)) gross = Math.floor((gross * (10_000 + ea.data.rise_bps)) / 10_000);
+    // (A rise reaches those on the staff when it is made: someone offered a job before it who signs after it starts on
+    // the wage their agreement says.)
+    const joined = Math.max(a.at, ...all.filter((r: any) => r.record === "signature" && r.agreement === a.id).map((r: any) => r.at));
+    for (const ea of eas.filter((x) => x.data.employer === employerOf(a) && x.at <= o.at && x.at >= joined)) gross = Math.floor((gross * (10_000 + ea.data.rise_bps)) / 10_000);
     const due = withholding(law, gross, pays.every);
     expect(due).toBeGreaterThan(0);
     expect(Number(o.data.outcome.money.amount)).toBe(off.has(a.id) ? gross : gross - due);

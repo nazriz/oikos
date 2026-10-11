@@ -189,6 +189,14 @@ What goes wrong for a person, how often, and what they can do about it is one pa
 - **A need short at the start has been short for a while.** A need found below its level in a town's first week is taken to have been so for a part of the 60 days it takes to become a want, drawn for the person. Before, every clock started at day 0 and nobody wanted anything for two months of any run (the first living pilot: 73 wants in 60 days, nearly all landlords').
 - **What is told to the household is said once, until it changes** (everyone): a member's income is told to the leaseholder when the sum as it is said changes. One household in the first living pilot was sent "My pay is now 0.00" 478 times in 60 days: the figures compared were not the figures said.
 
+## Pay, a home lost for arrears, and a business of one (0.47.0, 2026-10-11)
+
+Three changes on the person's side of the firm and landlord fixes (docs/decisions.md, "Four faults on the firm and landlord side"); each is described where its mechanism lives.
+
+- **What counts as pay.** Money from an employer's account is pay only if the bank's line says it was paid as wages. A refund from the shop one works at, or a dividend from the works one holds a share of, is not pay come short (docs/behaviour/firms.md, "Wages owed").
+- **Told to leave for arrears** (docs/behaviour/justice.md, "Possession"; only where the world has a law on possession). A notice to vacate: gone by its date, or staying, by a draw of the person's own at the world's share (`possession.stay_bps`). An application for possession: the tenant answers the tribunal with what the household could pay a month toward the arrears (its income less rent and essentials), if anything. A plan: they stay. An order for possession: gone by its date or not (`possession.obey_bps`). A warrant carried out: out, from that hour. Then as anyone without a home. The record keeps it as an eviction.
+- **A business of one** (docs/behaviour/entry.md, "Starting a business of one"): started with the month's chance by someone with a home to trade from and the savings (after notice, if in a job); given up after months in which it has paid them under half of essentials.
+
 ## What a citizen does
 
 | | Rule | Source |
