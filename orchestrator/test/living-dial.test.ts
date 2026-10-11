@@ -34,7 +34,10 @@ const TOWN = join(root, "worlds/town.yaml");
 // bank writes on each payment what it was for; shops and factories set staff from smoothed trade and hold them
 // through a dip; the town publishes its place's laws on ending a job and on possession, and a tenant behind with the
 // rent is given a notice to vacate, not a notice on the lease; and a business of one can be started.
-const STEP_1 = "03f67a4b35de9635167bcfa2d2819ccf58fd572b26dd093eddf75c3f400a7ba2";
+// And again at the merge of the fixes after the second living pilot, the same day (03f67a4b... until then;
+// docs/decisions.md, "What the second living pilot found"): rent and loan repayments are counted from each
+// agreement's own day, each landlord takes arrears up on its own day of the week, the mayor's office has a clerk.
+const STEP_1 = "ae8baeeda23cbdfef5f20ab45dbb810635c55dde1016df64ace599e6326705bc";
 
 test("with the dial absent or at 0 a town is step 1's town, to the state hash", async () => {
   const out = mkdtempSync(join(tmpdir(), "oikos-dial-"));

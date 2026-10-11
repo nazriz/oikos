@@ -31,6 +31,7 @@ the loan marks it repaid in full.
 **Following repayments:**
 - repayments arrive by the borrower's standing order and are set against their loans, oldest first;
 - a month behind is **arrears** (a `loan_arrears` notice);
+- a loan standing at the start is counted from its own repayment day where it names one (`terms.attrs.first_due`: each borrower's own, the day their bank pays on), not from the bank's first look (2026-10-11: every borrower who had not paid fell into arrears, and then default, on the same day);
 - `default_days` behind is **default** (a `loan_default` notice, and the debt recorded as a claim: the bank's right against the borrower for what's owing).
 
 What happens to a debt in default beyond that (collection, a court) is law content not yet written. Firms in default go to insolvency (phase C, stage C3).

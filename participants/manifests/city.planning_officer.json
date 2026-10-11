@@ -18,6 +18,10 @@
       "default": "",
       "source": "placeholder"
     },
+    "part": {
+      "schema": {},
+      "source": "the world gives it (no default)"
+    },
     "town": {
       "schema": {
         "type": "string"

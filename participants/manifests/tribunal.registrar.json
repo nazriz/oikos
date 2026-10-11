@@ -26,6 +26,10 @@
       "default": 0,
       "source": "placeholder"
     },
+    "part": {
+      "schema": {},
+      "source": "the world gives it (no default)"
+    },
     "warrant_days": {
       "schema": {
         "type": "integer"

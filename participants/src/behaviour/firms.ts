@@ -26,6 +26,7 @@ import { chancePpm, frictionDial, PAPER, Respondent, type RespondParams } from "
 import { swayed } from "./wants";
 import { advertisedJob, ask, Asked, because, between, Book, firstDue, PAYEE_DIED, PAYMENT_FAILED, breaches, noting, callAction, usd, cellsOf, commitmentOf, DAY, jobTerms, leaseTerms, MONTH, notice, offer, ownAccount, pay, publishedPrice, say, stoodEmpty, structureOf, withdraw, type Step } from "./common";
 import * as P from "./papers";
+import { firstDueOf } from "./openbooks";
 
 /**
  * A participant observes after every action, not just when it wakes: `absorb` takes
@@ -98,7 +99,7 @@ export const landlord: BehaviourModule = {
   name: "firm.landlord",
   issues: P.LANDLORD,
   issuesWith: (p) => ({ city: p.city }),
-  version: "0.16.0", // 0.16.0: possession under the world's law (docs/behaviour/justice.md, "Possession"): a notice to vacate, an application to the tribunal, a warrant, never putting anyone out itself; 0.15.0: everyday frictions (docs/behaviour/frictions.md): a home of ours in disrepair is repaired by the builder when we are asked or ordered and will, at its price; we answer a venue from our books; rent owed us is asked for and then taken to a body that hears arrears; 0.14.0: wants of its own (docs/behaviour/firm-wants.md), for one the world's dial gives initiative: a character from its owner's values, which answers a tenant who asks it to hold a rent or to stay on, sways its markup and its patience with arrears, and a record of its own; 0.13.4: main's 0.13.3 (the builder's answer read with the week's post; what is owed counted before building or asking) with a certified copy of a registration made on someone else's report counting as the registration
+  version: "0.16.1", // 0.16.1: rent under a lease is counted from the lease's own rent day where it names one (attrs.first_due), and arrears are taken up on the office's own day of the week for its rent book; 0.16.0: possession under the world's law (docs/behaviour/justice.md, "Possession"): a notice to vacate, an application to the tribunal, a warrant, never putting anyone out itself; 0.15.0: everyday frictions (docs/behaviour/frictions.md): a home of ours in disrepair is repaired by the builder when we are asked or ordered and will, at its price; we answer a venue from our books; rent owed us is asked for and then taken to a body that hears arrears; 0.14.0: wants of its own (docs/behaviour/firm-wants.md), for one the world's dial gives initiative: a character from its owner's values, which answers a tenant who asks it to hold a rent or to stay on, sways its markup and its patience with arrears, and a record of its own; 0.13.4: main's 0.13.3 (the builder's answer read with the week's post; what is owed counted before building or asking) with a certified copy of a registration made on someone else's report counting as the registration
   doc: "docs/behaviour/firms.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -199,6 +200,13 @@ export const landlord: BehaviourModule = {
     const renewed = new Set<string>(); // leases whose tenant we've offered a new one
     const obeys = (key: string) => ctx.rng(`comply-${key}`).below(10_000) < p.compliance_bps;
     const lateSince = new Map<string, number>(); // lease -> since when its rent has been a month or more behind
+    // The office's own day and hour of the week for going through the rent book (each landlord's, drawn once): it is
+    // then that arrears are taken up, by a letter, an application or a notice. Until 2026-10-11 they were taken up at
+    // whatever look came first, and a town's landlords, all woken by the same weekly paper, all wrote in one instant.
+    const WEEK = 7 * DAY;
+    const bookTime = ctx.rng("rent-book-day").below(7 * 24) * 3_600;
+    const sinceBooks = (t: number) => (((t - bookTime) % WEEK) + WEEK) % WEEK;
+    let booksWeek: number | undefined; // the week (counted from our own day) whose rent book we last went through
 
     const absorb = (obs: Observation) => {
       book.absorb(obs);
@@ -267,6 +275,11 @@ export const landlord: BehaviourModule = {
       const awaiting = (leases as any[]).filter((a) => !book.concluded(a.id) && t - a.at < MONTH);
       const active = (leases as any[]).filter((a: any) => book.inForce(a.id)) as any[];
       const steps: Step[] = [];
+      // (The rent book is gone through once a week of our own: at our first look in it, which is our own day and hour
+      // unless something kept us from it.)
+      const thisWeek = Math.floor((t - bookTime) / WEEK);
+      const atBooks = thisWeek !== booksWeek;
+      booksWeek = thisWeek;
       // (Our markup, as our character sways it: docs/behaviour/firm-wants.md. As the routine has it, where we have none.)
       const markupBps = org.markup(p.markup_bps);
       const offeredNow: string[] = []; // units offered this wake (they're held too)
@@ -415,17 +428,21 @@ export const landlord: BehaviourModule = {
         // (its signing; for a lease that renews one of ours, the end of that one's term, which the old lease's rent
         // covers until). Everything the tenant ever paid us, set against this lease's dues alone, would let someone
         // on a renewed lease stop paying for as long as they had paid before.
-        const since = Math.max(book.signedAt(a.id)!, 0, ...basesOf(a).map((b) => renewsAt.get(b) || 0));
+        // (And from the lease's own rent day, where it names one: `firstDueOf`. Until 2026-10-11 every lease standing at
+        // the start was counted from day 0, so every tenant who had not paid was two rents behind on the same day,
+        // and a town's landlords wrote 126 letters in one instant.)
+        const begins = Math.max(book.signedAt(a.id)!, 0, ...basesOf(a).map((b) => renewsAt.get(b) || 0));
+        const since = firstDueOf(a, begins);
         const due = t < since ? 0 : Math.floor((t - since) / MONTH) + 1;
         let owed = 0;
         for (let k = 0; k < due; k++) owed += rentAt(a, since + k * MONTH);
         const paying = payingAccount.get(tenant);
         let paid = 0;
-        for (const x of (paying && received.get(paying)) || []) if (x.t >= since) paid += x.amount;
+        for (const x of (paying && received.get(paying)) || []) if (x.t >= begins) paid += x.amount;
         // (How long we bear with arrears is our practice, and our character's: one that would keep its tenants waits
         // longer than one that would be rid of them. Someone behind with the rent is something we want settled.)
         const bears = org.patience(p.arrears_months_before_notice);
-        if (org.lively) {
+        if (org.lively && atBooks) {
           // (One want a lease: a tenant on a renewed lease has two for a while, and the one paid up must not be
           // taken for the one behind. Until 2026-10-11 the want was by tenant, and such a pair was born and met
           // turn about at every look.)
@@ -465,6 +482,8 @@ export const landlord: BehaviourModule = {
         // the tribunal's registrar. We never put anyone out ourselves.
         const e = ending.get(a.id);
         if (law && p.possession && e) {
+          // (Taken forward on our own day for the rent book, as arrears are taken up: never at whatever look comes first.)
+          if (!atBooks) continue;
           const behindNow = owed - paid;
           const gone = (book.notices.get(a.id) ?? []).some((n) => n.as === tenant);
           const orders = book.all("tribunal_order").filter((o) => o.data?.kind === "possession" && o.data?.applicant === me && o.data?.about === a.id && !e.seen.has(o.id));
@@ -527,7 +546,7 @@ export const landlord: BehaviourModule = {
           }
           continue;
         }
-        if (law && p.possession && (owed - paid) >= bears * rent && t - since >= bears * MONTH && owed - paid >= rent && !noticeGiven.has(a.id)) {
+        if (atBooks && law && p.possession && (owed - paid) >= bears * rent && t - since >= bears * MONTH && owed - paid >= rent && !noticeGiven.has(a.id)) {
           // (A date by the day: the first day to begin once the notice's days have run in full, counted from when it is on the record.)
           const by = (Math.floor(t / DAY) + 1 + law.notice_days) * DAY;
           ending.set(a.id, { stage: "noticed", by, seen: new Set(book.all("tribunal_order").filter((o) => o.data?.about === a.id).map((o) => o.id)) });
@@ -540,7 +559,7 @@ export const landlord: BehaviourModule = {
           continue;
         }
         if (noticeGiven.has(a.id)) continue;
-        if ((owed - paid) >= bears * rent && t - since >= bears * MONTH) {
+        if (atBooks && (owed - paid) >= bears * rent && t - since >= bears * MONTH) {
           noticeGiven.set(a.id, t);
           const behind = org.wants.get("arrears", a.id);
           if (behind) org.wants.tried(behind, "notice", t, a.id);
@@ -810,7 +829,8 @@ export const landlord: BehaviourModule = {
       // Asked to put something right (a home in disrepair), told of a complaint, or ordered to (docs/behaviour/frictions.md).
       steps.push(...answering.steps(book, t, acc.account, acc.balance));
       return steps;
-    }, undefined, plansToRead), { beliefs: (): Belief[] => leasesHeld() })), () => ({ homes: owned.length }));
+    // (It sleeps until its usual week is up or its next day for the rent book, whichever is sooner.)
+    }, (obs) => Math.min(obs.t + WEEK, obs.t - sinceBooks(obs.t) + WEEK), plansToRead), { beliefs: (): Belief[] => leasesHeld() })), () => ({ homes: owned.length }));
   },
 };
 
@@ -973,7 +993,7 @@ export class Staffing {
   /** `registered_bps`: of the jobs this employer fills, the share it puts on its payroll returns (10,000, or nothing
    * said: all of them). A job it does not register is paid whole: nothing is withheld from it and no report names
    * its worker (docs/behaviour/firms.md, "Jobs an employer does not register"). */
-  constructor(private readonly ctx: ParticipantContext, private readonly me: string, private readonly o: { period: number; notice_days: number; workplace?: string; role: string; industry?: string; does?: { hire?: boolean; pay?: boolean }; own?: "role" | "role_or_unnamed"; payroll?: string; notice_wait?: number; registered_bps?: number; casual_bps?: number; day_wage?: number; work_days?: number; week_days?: number; short?: { per_year_bps: number; by_bps: number } }) {}
+  constructor(private readonly ctx: ParticipantContext, private readonly me: string, private readonly o: { period: number; notice_days: number; workplace?: string; role: string; industry?: string; does?: { hire?: boolean; pay?: boolean }; own?: "role" | "role_or_unnamed"; payroll?: string; /** The line of the organisation's adopted budget this office's posts are paid from: said on its payroll notices, so that the paying office knows which line a wage is on. */ line?: string; notice_wait?: number; registered_bps?: number; casual_bps?: number; day_wage?: number; work_days?: number; week_days?: number; short?: { per_year_bps: number; by_bps: number } }) {}
   /** When we last let someone go because we could not pay them (from then we take on only with more in hand: the module asks). */
   cashLayoffAt = -Infinity;
   /** Redundancy pay (and pay in lieu of notice the agreement fell short of) owed at the end of a job we ended for redundancy: agreement -> the sum. */
@@ -1083,6 +1103,14 @@ export class Staffing {
     // (An office that keeps only its own role's staff doesn't hold its organisation's whole list: it says nothing of it.)
     if (this.o.own) return [];
     return [{ of: "held", party: this.me, template: "employment", agreements: this.staff(book, book.now).map((a) => a.id) }];
+  }
+  /** What a direction not to recruit does and does not do, in the office's words (docs/behaviour/directions.md): no
+   * post is advertised and no new offer made; an offer already out is the office's word already given, and stands
+   * if the worker signs it. Until 2026-10-11 the office wrote that it "takes nobody on", and a worker who signed an
+   * offer made two days before the direction read to a mayor and a finance officer as the office defying it. */
+  notRecruiting(book: Book, t: number): string {
+    const out = this.offered(book, t);
+    return `The office advertises no post, takes down the advertisements it has out and makes no new offer of employment.${out.length ? ` ${out.length === 1 ? "One offer" : `${out.length} offers`} it had already made ${out.length === 1 ? "is" : "are"} not yet signed by the worker (${out.map((a) => `${a.id}, to ${a.terms.parties[1]}`).join("; ")}): a direction ends no offer already made, and ${out.length === 1 ? "it stands if the worker signs it" : "each stands if the worker signs it"}.` : " It has no offer out that is not yet signed."}`;
   }
   /** Offers we've made in the last month that the worker hasn't signed yet. */
   offered(book: Book, t: number): any[] {
@@ -1208,12 +1236,16 @@ export class Staffing {
         if (!to) continue;
         this.notified.add(`starter:${a.id}`);
         const firstPay = signed + pays.period;
+        // (Which line of the budget the post is on: the hiring office took the worker on within its own line, and the
+        // office that pays must not have to guess it. Until 2026-10-11 the notice named no line: a finance seat set a
+        // hire on the environment line against the staff line, found that full, and left the worker unpaid.)
+        const onLine = this.o.line ? ` The post is one of those the ${this.o.line} line of the adopted budget pays for: the wage is on that line.` : "";
         steps.push(because(`${worker} has signed and started: sending the ${this.o.payroll} office a payroll notice (who, the post, the pay, the first pay day, the agreement), for it to set the wage up.`,
-          say("payroll_notice", `Payroll notice, new starter: ${worker}, ${post(a)}, under employment agreement ${a.id}. Pay: ${usd(pays.wage)} every ${durationWords(pays.period)} before tax, into ${to}; first pay day ${dateWords(firstPay)}, then every ${durationWords(pays.period)}. For the ${this.o.payroll} office: the wage payment is to be set up from that day.`,
-            { to: [me], visible: [me], basis: a.id, data: { notice: "starter", office: this.o.payroll, employee: worker, post: post(a), agreement: a.id, wage: String(pays.wage), period: pays.period, first_pay: firstPay, account: to } }),
+          say("payroll_notice", `Payroll notice, new starter: ${worker}, ${post(a)}, under employment agreement ${a.id}. Pay: ${usd(pays.wage)} every ${durationWords(pays.period)} before tax, into ${to}; first pay day ${dateWords(firstPay)}, then every ${durationWords(pays.period)}.${onLine} For the ${this.o.payroll} office: the wage payment is to be set up from that day.`,
+            { to: [me], visible: [me], basis: a.id, data: { notice: "starter", office: this.o.payroll, employee: worker, post: post(a), agreement: a.id, wage: String(pays.wage), period: pays.period, first_pay: firstPay, account: to, ...(this.o.line ? { line: this.o.line } : {}) } }),
           // (And put in front of the payroll office: a paper on the organisation's own file is not news to anyone in
           // it, so the notice goes to the office's post as a letter, in its own words, naming the agreement.)
-          message([this.o.payroll], `${PAYROLL_NOTE}new starter: ${worker}, ${post(a)}, under employment agreement ${a.id}. Pay: ${usd(pays.wage)} every ${durationWords(pays.period)} before tax, into ${to}; first pay day ${dateWords(firstPay)}, then every ${durationWords(pays.period)}. The notice is on the organisation's file. The wage payment is to be set up from that day: a payment from the organisation's account to ${to} every ${durationWords(pays.period)}, first on ${dateWords(firstPay)}, citing ${a.id}, of the pay less what the tax law says to withhold.`, a.id)));
+          message([this.o.payroll], `${PAYROLL_NOTE}new starter: ${worker}, ${post(a)}, under employment agreement ${a.id}. Pay: ${usd(pays.wage)} every ${durationWords(pays.period)} before tax, into ${to}; first pay day ${dateWords(firstPay)}, then every ${durationWords(pays.period)}.${onLine} The notice is on the organisation's file. The wage payment is to be set up from that day: a payment from the organisation's account to ${to} every ${durationWords(pays.period)}, first on ${dateWords(firstPay)}, citing ${a.id}, of the pay less what the tax law says to withhold.`, a.id)));
       }
       const deaths = new Set(book.all("death_registration").map((r) => r.data?.deceased as string));
       for (const a of contracts) {

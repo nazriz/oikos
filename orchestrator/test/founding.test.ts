@@ -47,7 +47,10 @@ const LIVING = "living.initiative_bps=10000";
 // factories hold their staff through a dip; a tenant behind with the rent is given a notice to vacate under the
 // town's published law; a business of one can be started; short pay's chance is over the jobs exposed. What this
 // test guards is unchanged: founding off, or on with no shape to found, moves nothing.
-const STEP_2B = "13686d37fca6cc175bb411b382869f7ddd57425ae580cdc6fd5eec500af98c82";
+// And again at the merge of the fixes after the second living pilot, the same day (13686d37... until then;
+// docs/decisions.md, "What the second living pilot found"): rent and loan repayments are counted from each
+// agreement's own day, each landlord takes arrears up on its own day of the week, the mayor's office has a clerk.
+const STEP_2B = "87f8af1b50c8599a6bf8fa11e59bd2bd4691938a1e0074ab9d3ba6909829bc14";
 
 test("with founding off a living town is step 2b's town, to the state hash; turned on with no shape to found, nobody does anything they did not do before", async () => {
   const out = mkdtempSync(join(tmpdir(), "oikos-founding-"));

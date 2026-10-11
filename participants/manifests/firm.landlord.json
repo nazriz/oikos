@@ -1,6 +1,6 @@
 {
   "name": "firm.landlord",
-  "version": "0.16.0",
+  "version": "0.16.1",
   "doc": "docs/behaviour/firms.md",
   "params": {
     "after_term": {
@@ -158,6 +158,10 @@
       "schema": {},
       "default": null,
       "source": "placeholder"
+    },
+    "part": {
+      "schema": {},
+      "source": "the world gives it (no default)"
     },
     "possession": {
       "schema": {},

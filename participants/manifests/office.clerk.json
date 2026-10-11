@@ -1,0 +1,23 @@
+{
+  "name": "office.clerk",
+  "version": "0.1.0",
+  "doc": "docs/behaviour/office-books.md",
+  "params": {
+    "of": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
+      "source": "placeholder"
+    },
+    "with": {
+      "schema": {
+        "type": "object"
+      },
+      "default": {},
+      "source": "placeholder"
+    }
+  },
+  "perceives": [],
+  "state": "none"
+}

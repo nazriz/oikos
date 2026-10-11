@@ -19,7 +19,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } fr
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { alert } from "../orchestrator/src/pilot-alerts";
-import { limitedProviders, limitWaitMs, localStamp, nextPilot, parkedPath, providersOf, runState, scanOptOuts, type Parked } from "../orchestrator/src/pilot-state";
+import { limitedProviders, limitWaitMs, localStamp, measureFailure, nextPilot, parkedPath, providersOf, runState, scanOptOuts, type Parked } from "../orchestrator/src/pilot-state";
 
 interface Pilot { name: string; world: string; sets?: string[]; model: string; translator?: string; translator_first?: string; translator_arrangement?: "then" | "beside"; until: number; budget: number; env?: { [k: string]: string }; note?: string; test?: boolean; args?: string[] }
 
@@ -80,7 +80,13 @@ for (;;) {
   if (!kept.has(p.name)) kept.set(p.name, { failures: 0, offsets: new Map(), optedOut: new Set(), notSent: 0, unanswered: 0, unansweredAt: -1 });
   const k = kept.get(p.name)!;
   const s = await runState(dir, p.until);
-  if (s.stop === "done") { say(`${p.name}: done (day ${day(s.t)})`); tell(`done: ${p.name} (day ${day(s.t)})`); report(dir); settled.add(p.name); continue; }
+  if (s.stop === "done") {
+    // (Done is the run's log reaching its until. Its measures are another thing: said apart when they are missing, so a pilot is never simply "done" with nothing measured.)
+    const noMeasures = measureFailure(dir);
+    say(`${p.name}: done (day ${day(s.t)})${noMeasures ? ` BUT ITS MEASURES FAILED: ${noMeasures}` : ""}`);
+    tell(noMeasures ? `MEASURES FAILED ${p.name}: the run is done (day ${day(s.t)}) but nothing was measured: ${noMeasures.slice(0, 200)}; the measures, the health report and the cost are not there until it is measured again (rm -r ${dir}/measure, then oikos measure ${dir})` : `done: ${p.name} (day ${day(s.t)})`);
+    report(dir); settled.add(p.name); continue;
+  }
   if (parked.delete(p.name)) { writeParked(); tell(`usage-limit wait over for ${p.name}: trying again`); }
   const models = ["--model", p.model, ...(p.translator ? ["--translator-model", p.translator] : []),
     ...(p.translator_first ? ["--translator-first", p.translator_first, ...(p.translator_arrangement ? ["--translator-arrangement", p.translator_arrangement] : [])] : []), "--budget", String(p.budget)];

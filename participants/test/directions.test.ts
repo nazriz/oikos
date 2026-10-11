@@ -44,7 +44,7 @@ test("directed by the mayor not to recruit, it advertises nothing, takes its adv
   const second = wake(m, 11 * DAY, records(advert, d), { entity: "city" });
   expect(posted(second)).toBe(0);
   expect(second.of("statement").filter((c) => c.args.withdraw === advert.id)).toHaveLength(1);
-  expect(letters(second)).toEqual(["From the works office: your direction rec.50 is received. The office advertises no post, takes down the advertisements it has out and takes nobody on. It stands until you replace or withdraw it."]);
+  expect(letters(second)).toEqual(["From the works office: your direction rec.50 is received. The office advertises no post, takes down the advertisements it has out and makes no new offer of employment. It has no offer out that is not yet signed. It stands until you replace or withdraw it."]);
   expect(second.of("message")[0]!.args.to).toEqual(["mayor-system"]);
   // While it stands: nothing, day after day, and no second letter.
   const third = wake(m, 12 * DAY, records(withdrawal("rec.51", 11 * DAY, advert.id)), { entity: "city" });

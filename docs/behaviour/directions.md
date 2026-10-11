@@ -110,3 +110,22 @@ a direction only from those its organisation's rules say may direct it, and writ
 - Should a town have a chief executive's office, so that in the two profiles whose law forbids a mayor to direct
   staff the direction comes from that officer? It is one record to change (`directions.by`); the office itself would
   be a new seat.
+
+## What a direction reaches, and what it does not end (2026-10-11)
+
+- **A direction to an office binds its staff's post too.** Where a model holds an office, its staff are a post of
+  their own (`works-staff`), and they read the office's directions as the office does. Until 2026-10-11 the staff
+  looked for forms and for the town's rule under their own post's name, found none, and followed no direction: a
+  recovery direction to the rates office (interest: no) and a collection direction to the works office changed nothing
+  their staff did. No direction to a seated office's staff took effect in any pilot before that date.
+- **A direction on how often binds the round whatever the standing order's rhythm.** A `works_collection` direction
+  that stands sets how often each address is collected from, for the staff under their order as for a code office.
+- **A direction not to recruit ends no offer already made.** The office advertises no post, takes down its
+  advertisements and makes no new offer; an offer of employment it had made before the direction, which the worker
+  then signs, is in force. Its acknowledgement says so and names any such offer ("One offer it had already made is
+  not yet signed by the worker (rec.4227, to c0863): a direction ends no offer already made, and it stands if the
+  worker signs it."). In the first living pilot (`runs/lv-01`) the mayor's direction (rec.4554, day 24) was filed on
+  the form, read, acknowledged and followed; the worker signed on day 26 an offer made on day 22, and the
+  acknowledgement's "takes nobody on" made that read as the office defying the direction. *Left out:* withdrawing an
+  offer not yet signed (nothing in the world can take an offered agreement back today; it would need the kernel to
+  refuse a signature on a withdrawn offer).

@@ -29,6 +29,8 @@ A batch folder holds:
 
 Each run's log is exported to Parquet, one file per table per run (`measure/<table>/<run>.parquet`). A batch is just a folder, and DuckDB reads every run in it together. Exporting a 2-year, 1,000-citizen log (about 720,000 entries) takes about a second.
 
+**Reading a log with a very large first line.** A log's first line is the config header, which holds the whole world: 36 MB for a 3,000-person town, 123 MB for 10,000. DuckDB's JSON reader refuses a line over its `maximum_object_size` (16 MB by default), so the export sizes that limit from the log's own first line (streamed and counted, plain or `.zst`; twice its length, rounded up to a power of two; never below the default). The header is read in place by DuckDB, not taken out and handed over separately, because nine tables unnest parts of the config. The price is time and memory in proportion to the header: a 3,000-person, 180-day all-code log (620 MB compressed) is measured in about a minute using about 5.7 GB; a tiny log with a 123 MB header takes 19 s and 2 GB. If a header ever grows past what a machine holds, read the header apart (once, into a small table of its parts) and give the tables that. A run whose measuring fails leaves `measure-failed.txt` in its folder, and the pilot queue says so instead of reporting it simply done (status log, alerts, `oikos pilot-report`, `pilot-wave status`).
+
 | Table | One row per | Columns |
 |---|---|---|
 | `runs` | run | `run_id`, `seed`, `world`, `contracts`, `config_hash`, `kernel_version`, `kernel_build`, `run_seconds`, `currency` and `minor_units` (the world's money: its code, and the decimal places of the smallest unit every amount is counted in), `end_reason`, `end_t`, `state_hash`, `entries`, `orchestrator_version` |

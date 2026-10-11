@@ -1,6 +1,6 @@
 {
   "name": "world.transfers",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "doc": "docs/behaviour/boundary.md",
   "params": {
     "account": {
@@ -25,6 +25,13 @@
       },
       "unit": "bps",
       "default": 0,
+      "source": "placeholder"
+    },
+    "part": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
       "source": "placeholder"
     },
     "processing_days": {
@@ -59,5 +66,93 @@
     }
   },
   "perceives": [],
-  "state": "none"
+  "state": "none",
+  "issues": [
+    {
+      "form": "benefit_decision",
+      "title": "Decision on a claim for support",
+      "does": "Says what is decided on a claim, to the claimant. A claim granted on it is paid by the office's staff each period from then, at the sum and for the time the decision gives, while the office's standing order for paying claims is in force; a claim refused on it is not paid. It moves no money by itself.",
+      "fields": {
+        "claim": {
+          "type": "record",
+          "required": true,
+          "description": "The claim decided."
+        },
+        "claimant": {
+          "type": "entity",
+          "required": true,
+          "description": "Who made the claim."
+        },
+        "payment": {
+          "type": "text",
+          "required": true,
+          "description": "Which payment of the support law the claim is for, as the claim names it."
+        },
+        "granted": {
+          "type": "choice",
+          "required": true,
+          "options": [
+            "yes",
+            "no"
+          ],
+          "description": "Whether it is granted."
+        },
+        "reason": {
+          "type": "text",
+          "description": "Why not, where it is refused."
+        },
+        "amount": {
+          "type": "amount",
+          "description": "Where granted: the sum paid each period."
+        },
+        "every": {
+          "type": "duration",
+          "description": "Where granted: the period it is paid by."
+        },
+        "until": {
+          "type": "date",
+          "description": "Where granted for a time: the day the payment ends."
+        }
+      },
+      "writes": {
+        "kind": "benefit_decision",
+        "text": "Claim {claim}: granted {granted}.",
+        "basis": "=claim",
+        "to": [
+          "=claimant"
+        ],
+        "visible": [
+          "=claimant",
+          "=self"
+        ],
+        "data": {
+          "claim": "=claim",
+          "payment": "=payment",
+          "granted": "?granted",
+          "reason": "=reason",
+          "amount": "#amount",
+          "every": "=every",
+          "until": "=until"
+        }
+      }
+    }
+  ],
+  "routines": [
+    {
+      "task": "pay_claims",
+      "at": "office",
+      "every": 1,
+      "what": "Each working day the office's staff decide the claims that have waited their time, the oldest first: a claim that meets the conditions the support law states for its payment is granted, in writing, and paid each period from then until the claimant asks for it to stop, dies, leaves, or its time runs out, which the staff tell them. A claim that does not meet the conditions, or that the staff could not verify, is not refused by the staff: it is put before whoever holds the office, as a note on the office's file saying what it fails on, and decided by them on the office's decision form; a claim they grant on that form is paid by the staff like any other. A request to review a refusal comes to the office-holder.",
+      "papers": [
+        {
+          "kind": "benefit_claim",
+          "how": "decided by the support law's conditions: granted and paid if it meets them, put before the office-holder if it does not or could not be verified"
+        },
+        {
+          "kind": "benefit_change",
+          "how": "a claimant's own request to stop their payment: it is stopped"
+        }
+      ]
+    }
+  ]
 }

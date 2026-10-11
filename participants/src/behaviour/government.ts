@@ -752,7 +752,7 @@ export const ratesOfficer: BehaviourModule = {
   takes: [{ form: "rates_recovery", title: "Recovery direction to the rates officer",
     fields: { interest: { type: "choice", options: ["yes", "no"], required: true, description: "Whether rates left unpaid after their due date are charged the law's penalty interest: yes, as the office does of its own accord; no, none is added." } },
     follows: "While a direction with interest no stands, the rates officer adds no penalty interest to overdue rates and writes to nobody about them. The rates themselves are still levied and still owed, and interest already recorded stays on record." }],
-  version: "0.4.1", // 0.4.1: a payment that names the rates notice pays the claim recorded with it; 0.4.0: its clerks report to the rates officer the notices sent under the standing order and when the next go out; 0.3.0: takes a written direction on penalty interest (docs/behaviour/directions.md)
+  version: "0.4.2", // 0.4.2: a direction on its recovery form reaches its staff's post; 0.4.1: a payment that names the rates notice pays the claim recorded with it; 0.4.0: its clerks report to the rates officer the notices sent under the standing order and when the next go out; 0.3.0: takes a written direction on penalty interest (docs/behaviour/directions.md)
   doc: "docs/behaviour/public-finance.md",
   cadence: () => DAY,
   create(ctx: ParticipantContext) {
@@ -884,7 +884,7 @@ export const works: BehaviourModule = {
       papers: [{ kind: "complaint", how: "a complaint of a collection missed puts the home first on the next round of collection" }] },
   ],
   issues: [P.JOB_ADVERTISEMENT, ...P.PAYROLL, ...P.WORKS],
-  issuesWith: (p) => ({ ...P.staffingOwn({ role: p.role ?? "works crew", industry: p.industry, workplace: p.workplace, notice_days: p.notice_days ?? 14 }), landfill: p.landfill, payroll_office: p.payroll_office || undefined }),
+  issuesWith: (p) => ({ ...P.staffingOwn({ role: p.role ?? "works crew", industry: p.industry, workplace: p.workplace, notice_days: p.notice_days ?? 14 }), landfill: p.landfill, payroll_office: p.payroll_office || undefined, budget_line: p.staff_line ?? "staff" }),
   staffed: (p) => ({ role: p.role ?? "works crew", own: "role_or_unnamed", posts: { budget_line: p.staff_line ?? "staff", wage: p.wage ?? 0, period: p.period ?? 14 * DAY } }),
   keeps: [{ what: "service_address", why: "The round is the works office's own: it makes an entry for each address its crew collects from, and adds to it as homes are built." }],
   takes: [
@@ -893,7 +893,7 @@ export const works: BehaviourModule = {
       fields: { every: { type: "duration", required: true, description: "How often each address on the round is to be collected from (a week, a fortnight)." } },
       follows: "While it stands, the crew collects from each address on the round once in that time, as its hours allow, homes complained about first. With no direction, the office keeps to its own round." },
   ],
-  version: "0.6.0", // 0.6.0: its staff report to the office what they did under each standing order, or why not, and who of them worked (docs/behaviour/standing-work.md, "The staff's report"); 0.5.0: sends the office that pays the town's staff a payroll notice of each new starter and each leaver (docs/behaviour/firms.md, "Payroll notices"); 0.4.0: takes written directions on its staffing and on how often it collects (docs/behaviour/directions.md); 0.3.0: collects from its own round of addresses and keeps up the town's own assets, each seen by the crew that works on it or by going to inspect; no longer shown the town
+  version: "0.6.1", // 0.6.1: a direction on its forms reaches its staff's post, and one on how often binds the round whatever the standing order's rhythm; its notice of a new starter names the budget line the post is on; told not to recruit, it says what that does of an offer already made; 0.6.0: its staff report to the office what they did under each standing order, or why not, and who of them worked (docs/behaviour/standing-work.md, "The staff's report"); 0.5.0: sends the office that pays the town's staff a payroll notice of each new starter and each leaver (docs/behaviour/firms.md, "Payroll notices"); 0.4.0: takes written directions on its staffing and on how often it collects (docs/behaviour/directions.md); 0.3.0: collects from its own round of addresses and keeps up the town's own assets, each seen by the crew that works on it or by going to inspect; no longer shown the town
   doc: "docs/behaviour/services.md",
   cadence: () => DAY,
   firstWake: (ctx) => 7 * 3600 + ctx.rng("first-wake").below(3600),
@@ -930,7 +930,7 @@ export const works: BehaviourModule = {
     const routines = new StandingWork(me, p.part, ctx.position ? new Set([ctx.position.replace(/-staff$/, "")]) : undefined);
     const staffOnly = p.part === "staff";
     const counter = new CounterWork(routines, !!p.counter);
-    const staffing = new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, workplace: p.workplace, role: p.role, ...(p.industry ? { industry: p.industry } : {}), does: { hire: true, pay: false }, own: "role_or_unnamed", ...(p.payroll_office ? { payroll: p.payroll_office } : {}) });
+    const staffing = new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, workplace: p.workplace, role: p.role, ...(p.industry ? { industry: p.industry } : {}), does: { hire: true, pay: false }, own: "role_or_unnamed", ...(p.payroll_office ? { payroll: p.payroll_office, line: p.staff_line } : {}) });
     // Each building as we last saw it: as the crew that worked on it left it, or as whoever we sent to inspect it found it.
     const known = new Map<string, SiteStructure>();
     const addresses = new Set<string>(); // the round: the addresses we collect from (buildings)
@@ -1006,7 +1006,10 @@ export const works: BehaviourModule = {
         const collectEvery = Number.isSafeInteger(collectionDir?.data?.every) && collectionDir!.data!.every >= DAY ? (collectionDir!.data!.every as number) : p.collect_every_days * DAY;
         // The routine work, and by what it is done: the whole office by its own practice; its staff by the standing
         // work order in force for each task, and not at all with none; the office-holder alone sets the orders, once.
-        const collecting = routines.does(book, p.collect_task, t, { every: collectEvery });
+        // (A direction on how often binds the staff's round while it stands, whatever rhythm their standing order
+        // gives: until 2026-10-11 the order's own days were kept and the direction changed nothing for them.)
+        const collectingBy = routines.does(book, p.collect_task, t, { every: collectEvery });
+        const collecting = collectingBy && collectionDir ? { ...collectingBy, every: collectEvery } : collectingBy;
         const maintaining = routines.does(book, p.maintain_task, t, { every: DAY });
         steps.push(...routines.set(book, [
           ...(p.collect_labour > 0 ? [{ task: p.collect_task, at: p.depot, every: p.collect_every_days * DAY, why: `Setting the crew's round: collection from every address on it every ${p.collect_every_days} days, as a standing work order.` }] : []),
@@ -1014,7 +1017,7 @@ export const works: BehaviourModule = {
           ...counter.order(p.depot),
         ]));
         if (!staffOnly) steps.push(...directions.letters(book, (d, form) => form === "works_staffing"
-          ? (staffingUnder(d).recruit ? `The office recruits up to ${Math.min(target, staffingUnder(d).posts ?? Infinity)} crew.` : "The office advertises no post, takes down the advertisements it has out and takes nobody on.")
+          ? (staffingUnder(d).recruit ? `The office recruits up to ${Math.min(target, staffingUnder(d).posts ?? Infinity)} crew.` : staffing.notRecruiting(book, t))
           : `The crew collects from each address every ${Math.round(Number(d.data?.every) / DAY)} days, as its hours allow.`));
 
         // Complaints about a home's waste: that home first, on the next round.

@@ -44,7 +44,11 @@ test("a spec without `living` generates what it generated before (byte for byte)
   // venture of a business of one with its derived chance (and the task `sell`), and the generator's version; a
   // town whose profile has `frictions` and no `living` is otherwise unchanged (docs/decisions.md, "Four faults on
   // the firm and landlord side"). What this test guards is unchanged: nothing of `living` reaches such a town.
-  expect(hash(c)).toBe("b52528bc6281ade671cfe4ecec95f8a2ab95edcdcfa354f94b4a6f3050ea88db");
+  // And again at the merge of the fixes after the second living pilot, the same day (b52528bc... until then;
+  // docs/decisions.md, "What the second living pilot found"): each lease and mortgage a town starts with names its
+  // own first due day (`attrs.first_due`), the town publishes its rule on petitions, the payments procedure says
+  // which line a wage is on, the support office has a file for what is put before it, the mayor's office a clerk.
+  expect(hash(c)).toBe("21d4a10fa970fa25d2671f9778ba72f1bad3f90a32336c0a78802db93359ddd5");
   const text = JSON.stringify(c);
   expect(text).not.toContain('"started"');
   expect(text).not.toContain("attach_mean");

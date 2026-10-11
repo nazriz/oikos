@@ -16,7 +16,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir, platform } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { lastAlerts } from "../orchestrator/src/pilot-alerts";
-import { parkedPath, runState, scanOptOuts, type Parked } from "../orchestrator/src/pilot-state";
+import { measureFailure, parkedPath, runState, scanOptOuts, type Parked } from "../orchestrator/src/pilot-state";
 import { describe, scan } from "./worktree-clean";
 import { warm } from "./worktree-warm";
 
@@ -49,6 +49,9 @@ if (args[0] === "status") {
       const st = await runState(d, p.until);
       const day = (t?: number) => Math.round((t ?? 0) / 86_400);
       let more = "";
+      // (A run that is done is not thereby measured: said when its measures are missing.)
+      const noMeasures = st.stop === "done" ? measureFailure(d) : undefined;
+      if (noMeasures) more += `; MEASURES FAILED: ${noMeasures.slice(0, 120)}`;
       if (st.log) {
         const opt = (await scanOptOuts(st.log).catch(() => ({ optOuts: [] as any[] }))).optOuts;
         if (opt.length) more += `; opted out: ${opt.map((o) => `${o.participant} day ${o.day}`).join(", ")}`;

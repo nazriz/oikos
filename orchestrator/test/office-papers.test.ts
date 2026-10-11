@@ -127,7 +127,7 @@ test("the works office's payroll notice of a new starter, on its form, is the no
   expect(letter).toStartWith('message(re=job-9, text="Payroll notice from the hiring office, new starter: c9, works crew, under employment agreement job-9. Pay: XYZ 3,000.00 every 14 days before tax, into acc-c9; first pay day year 1, day 24');
   expect(letter).toEndWith('to=["finance"])');
   expect(r[0]!.form[0]).toMatchObject({ kind: "payroll_notice", addressed_to: ["city"], visible_to: ["city"], basis: "job-9",
-    text: "Payroll notice, new starter: c9, works crew, under employment agreement job-9. Pay: XYZ 3,000.00 every 14 days before tax, into acc-c9; first pay day year 1, day 24, then every 14 days. For the finance office: the wage payment is to be set up from that day.",
+    text: "Payroll notice, new starter: c9, works crew, under employment agreement job-9. Pay: XYZ 3,000.00 every 14 days before tax, into acc-c9; first pay day year 1, day 24, then every 14 days. The post is one of those the staff line of the adopted budget pays for: the wage is on that line. For the finance office: the wage payment is to be set up from that day.",
     data: { notice: "starter", office: "finance", employee: "c9", post: "works crew", agreement: "job-9", wage: "300000", period: PERIOD, first_pay: 23 * DAY, account: "acc-c9" } });
 });
 

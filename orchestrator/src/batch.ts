@@ -24,6 +24,7 @@ import { exportLogs, MEASURE_VERSION } from "@oikos/measure";
 import { costReport } from "./cost";
 import { chooseModel } from "./models";
 import { KernelDied, KernelLogFailed, kernelBinary } from "./kernel";
+import { MEASURE_FAILED_FILE } from "./pilot-state";
 import { clearForFreshRun, compressLog, currentLogs, isLog, isStoppedLog, logsOf, realModelIn } from "./logs";
 import { logToResume, recordedCalls, prepareResume, Serving } from "./resume";
 import { ORCHESTRATOR_VERSION, runWorld, RunStuck, type RunOptions, type RunSummary } from "./run";
@@ -203,6 +204,11 @@ export async function runOne(o: { world?: string; seed?: number; town?: number; 
   return rec;
 }
 
+/** Leave a note in a run's folder that its measures failed, for whatever looks at the folder later (the pilot queue's status, alerts and report). */
+function noteMeasureFailed(out: string, why: string): void {
+  try { writeFileSync(join(out, MEASURE_FAILED_FILE), `${why}\n`); } catch { /* (the folder is out of reach: the failure is still in problems) */ }
+}
+
 /**
  * What a batch does once its runs are over, done again for a folder whose run was resumed: the folder's measures and
  * its cost report (cost.txt, cost.json) are made anew from its runs' current logs, so that they are the whole run's and
@@ -225,8 +231,10 @@ export async function afterResume(rec: RunRecord, o: { translatorModel?: string;
       writeFileSync(join(out, "cost.txt"), `${cost.text}\n`);
       writeFileSync(join(out, "cost.json"), JSON.stringify({ ...cost, text: undefined }, null, 2));
       costText = cost.text;
+      rmSync(join(out, MEASURE_FAILED_FILE), { force: true });
     } catch (e) {
       problems.push(`measuring the resumed run: ${(e as Error).message}`);
+      noteMeasureFailed(out, (e as Error).message);
     }
   }
   let logPath = rec.logPath;
@@ -493,6 +501,7 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
       await fn();
     } catch (e) {
       problems.push(`${what}: ${(e as Error).message}`);
+      if (what === "measuring the runs") noteMeasureFailed(out, (e as Error).message);
       log(`  ! ${what} failed: ${(e as Error).message}`);
     }
   };
@@ -505,6 +514,7 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
     writeFileSync(join(out, "cost.json"), JSON.stringify({ ...cost, text: undefined }, null, 2));
     result.measureDir = measureDir;
     result.costText = cost.text;
+    rmSync(join(out, MEASURE_FAILED_FILE), { force: true });
   });
   // Only the measures kept, if asked and the runs can be regenerated; else compressed once measured, if asked (about a
   // seventh the size; everything that reads logs reads these too).

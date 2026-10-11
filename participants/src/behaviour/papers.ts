@@ -45,9 +45,9 @@ export const PAYROLL: Issued[] = [
       wage: f("amount", "The wage for each pay period, before tax.", req), period: f("duration", "The pay period.", req),
       first_pay: f("date", "The first pay day (a pay period after both signed, unless the agreement says otherwise).", req), account: f("account", "The account the wage is paid into.", req),
     },
-    writes: { kind: "payroll_notice", text: "Payroll notice, new starter: {employee}, {post}, under employment agreement {agreement}. Pay: {wage} every {period} before tax, into {account}; first pay day {first_pay}, then every {period}. For the {@payroll_office} office: the wage payment is to be set up from that day.",
+    writes: { kind: "payroll_notice", text: "Payroll notice, new starter: {employee}, {post}, under employment agreement {agreement}. Pay: {wage} every {period} before tax, into {account}; first pay day {first_pay}, then every {period}. The post is one of those the {@budget_line} line of the adopted budget pays for: the wage is on that line. For the {@payroll_office} office: the wage payment is to be set up from that day.",
       basis: "=agreement", to: ["=self"], visible: ["=self"],
-      data: { notice: "starter", office: "@payroll_office", employee: "=employee", post: "=post", agreement: "=agreement", wage: "=wage", period: "=period", first_pay: "=first_pay", account: "=account" } } },
+      data: { notice: "starter", office: "@payroll_office", employee: "=employee", post: "=post", agreement: "=agreement", wage: "=wage", period: "=period", first_pay: "=first_pay", account: "=account", line: "@budget_line" } } },
   { form: "payroll_leaver", title: "Payroll notice of a leaver, to the office that pays the organisation's staff", does: "Tells the office that pays the organisation's staff that someone's employment is ending and when, so that their wage payment ends then. It ends no employment and stops no payment by itself. Write to that office too, naming the notice.",
     fields: {
       employee: f("entity", "Who is leaving.", req), post: f("text", "The post they held.", req), agreement: f("record", "The employment agreement that is ending.", req),
@@ -321,4 +321,15 @@ export const DESK: Issued[] = [
     },
     writes: { kind: "venue_decision", text: "Decision on {application}: {finding}.", basis: "=application", to: ["=applicant", "=against"], visible: ["=applicant", "=against", "=self"],
       data: { application: "=application", kind: "=matter", matter: "=matter", applicant: "=applicant", against: "=against", finding: "=finding", binding: "=binding", amount: "#amount", to: "=pay_into", due: "=due" } } },
+];
+
+// ------------------------------------------------------------------ the support office
+
+export const SUPPORT: Issued[] = [
+  { form: "benefit_decision", title: "Decision on a claim for support", does: "Says what is decided on a claim, to the claimant. A claim granted on it is paid by the office's staff each period from then, at the sum and for the time the decision gives, while the office's standing order for paying claims is in force; a claim refused on it is not paid. It moves no money by itself.",
+    fields: { claim: f("record", "The claim decided.", req), claimant: f("entity", "Who made the claim.", req), payment: f("text", "Which payment of the support law the claim is for, as the claim names it.", req),
+      granted: f("choice", "Whether it is granted.", { ...req, options: YES_NO }), reason: f("text", "Why not, where it is refused."),
+      amount: f("amount", "Where granted: the sum paid each period."), every: f("duration", "Where granted: the period it is paid by."), until: f("date", "Where granted for a time: the day the payment ends.") },
+    writes: { kind: "benefit_decision", text: "Claim {claim}: granted {granted}.", basis: "=claim", to: ["=claimant"], visible: ["=claimant", "=self"],
+      data: { claim: "=claim", payment: "=payment", granted: "?granted", reason: "=reason", amount: "#amount", every: "=every", until: "=until" } } },
 ];

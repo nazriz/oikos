@@ -10,7 +10,8 @@
 // Tables and their columns are documented in docs/measurement.md.
 
 import { DuckDBInstance, type DuckDBConnection } from "@duckdb/node-api";
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { createReadStream, existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import zlib from "node:zlib";
 import { basename, join } from "node:path";
 
 export const MEASURE_VERSION = "0.6.0";
@@ -203,13 +204,48 @@ async function connect(): Promise<DuckDBConnection> {
   return (await DuckDBInstance.create(":memory:")).connect();
 }
 
+/** The length in bytes of a log's first line (the config header), counted while streaming and never held (plain or `.zst`). */
+export async function firstLineBytes(log: string): Promise<number> {
+  const raw = createReadStream(log);
+  const input = log.endsWith(".zst") ? raw.pipe(zlib.createZstdDecompress()) : raw;
+  let n = 0;
+  try {
+    for await (const chunk of input as AsyncIterable<Buffer>) {
+      const i = chunk.indexOf(10);
+      if (i >= 0) return n + i;
+      n += chunk.length;
+    }
+    return n;
+  } finally {
+    raw.destroy();
+    if (input !== raw) (input as zlib.ZstdDecompress).destroy();
+  }
+}
+
+const DUCKDB_DEFAULT_OBJECT = 16_777_216;
+
+/**
+ * DuckDB's JSON reader refuses a line over `maximum_object_size` (16 MB by default); the header line holds the whole
+ * config, 36 MB for a 3,000-person town and 123 MB for 10,000. Chosen: raise the limit, sized from the measured first
+ * line (the longest line in a log is the header; events are small), with 2x headroom for the lines after it, rounded up
+ * to a power of two so that nearby sizes share a value; never below the default. Not chosen: reading the header outside
+ * DuckDB, because nine tables unnest the header's config (participants, entities, accounts, occupancy, structures,
+ * records...) and each would need the config handed over separately. DuckDB's per-thread buffers grow with the limit,
+ * so it is measured, not a blind constant; the header is read once per table, and the cost is time and memory, in
+ * proportion to the header (numbers in docs/measurement.md).
+ */
+export async function objectLimitFor(log: string): Promise<number> {
+  const first = await firstLineBytes(log);
+  return Math.max(DUCKDB_DEFAULT_OBJECT, 2 ** Math.ceil(Math.log2(first * 2 + 1)));
+}
+
 /** Export run logs to Parquet tables under `outDir` (`<table>/<run_id>.parquet`). Replaces a run's files if they exist. */
 export async function exportLogs(logs: string[], outDir: string): Promise<{ run: string; entries: number }[]> {
   const c = await connect();
   const done: { run: string; entries: number }[] = [];
   for (const table of TABLE_NAMES) mkdirSync(join(outDir, table), { recursive: true });
   for (const log of logs) {
-    await c.run(`create or replace temp table raw as select * from read_json(${sqlString(log)}, format = 'newline_delimited', columns = {seq: 'UBIGINT', t: 'BIGINT', kind: 'VARCHAR', body: 'JSON'})`);
+    await c.run(`create or replace temp table raw as select * from read_json(${sqlString(log)}, format = 'newline_delimited', columns = {seq: 'UBIGINT', t: 'BIGINT', kind: 'VARCHAR', body: 'JSON'}, maximum_object_size = ${await objectLimitFor(log)})`);
     const header = (await c.runAndReadAll(`select json_extract_string(body, '$.run_id') as run_id, (select count(*) from raw) as n from raw where kind = 'header'`)).getRowObjects()[0];
     if (!header) throw new Error(`${log}: no header entry`);
     const run = String(header.run_id);

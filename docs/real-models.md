@@ -32,6 +32,14 @@ oikos run worlds/town.yaml --seeds 1 --set mayor=llm --model anthropic/claude-so
 - **Recording:** every call is logged with its tokens and cost (a usage annotation) and its full exchange (a transcript). Language-model participants' observations are recorded in full too, by default (`--record-observations none` to stop it): training data.
 - **Prompt caching** (Anthropic): the tools and system prompt, and the conversation so far within a wake, are marked for the provider's cache, so the repeated part of each call costs a tenth. The answer is the same; usage records the cached tokens and they're priced as the provider prices them.
 
+## A seat's notebook
+
+A seat's only memory from one sitting to the next is its notebook: 8,000 characters, shown at the opening of every sitting with how much is used. The seat adds a line, changes a passage where it stands (a change to nothing strikes it out; several in one use), or writes it all afresh. Past 6,000 characters it is told it is nearly full, with what is left.
+
+- **Folding.** At the opening of a sitting, with the notebook at 6,000 or more, the seat is asked once, in one more model call of its own (purpose `notebook`, counted and costed like every other call; the seat's own cost in the pilot report), to write a summary in its own words of its **older entries it has not touched**. An entry is a line of the notebook; the run keeps when each line was last written or changed (a line unchanged by a rewrite keeps its age). The oldest lines are taken, by the time they stand from, until they come to half the notebook, never the newest time. They are shown to the seat, with the newer notes said to stay as they are, and a limit of a quarter of their length (at least 300 characters). The older lines become "Summary of my notes up to day N: ...", in the place of the first of them; the newer lines stay untouched. The seat is told at that sitting.
+- **Nothing dropped silently.** An answer that is empty, cannot be read, comes to no answer, or is longer than allowed changes nothing: the notebook stays as it was, the seat is told its older notes could not be folded and are all still there, and a note `notebook_fold_failed` is recorded; it is not asked again for three sittings. A fold done is a note `notebook_folded` with what was replaced (lengths, and the text), and the call's own transcript carries the same notes. Fewer than 600 characters of older notes, or all of one time, are not folded.
+- A write that would overflow is still refused as before (the seat told, `notebook_not_changed`); with folding it should be rare. The pilot report counts folds and failed folds per seat.
+
 ## The translator's test set
 
 ```bash

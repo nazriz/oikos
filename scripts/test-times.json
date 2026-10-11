@@ -31,6 +31,7 @@
  "orchestrator/test/justice.test.ts": 157.7,
  "orchestrator/test/llm.test.ts": 81.9,
  "orchestrator/test/logs.test.ts": 15.8,
+ "orchestrator/test/measure-large-header.test.ts": 3.6,
  "orchestrator/test/migration.test.ts": 260.4,
  "orchestrator/test/mini.test.ts": 9.5,
  "orchestrator/test/models.test.ts": 11,
