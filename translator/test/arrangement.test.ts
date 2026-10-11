@@ -207,3 +207,20 @@ test("every model call of both is on record with its model: usage and transcript
   expect(scripts.map((n) => [n.data.provider, n.data.ref])).toEqual([["decide", "draft.mayor-system.1"], ["mock", "draft.mayor-system.1"]]);
   expect(scripts[0].data.output[0].input).toEqual({ sure_ppm: 730_000, ms: 64, program: "none(look_first)" });
 });
+
+test("a draft the first made on fewer forms than the asker knows of, or on a form outside its training, is recorded and never offered: the one behind drafts, and the two are compared", async () => {
+  // Shown a subset: its draft is the same as the one behind's. The world gets the one behind's; the route says both.
+  const subset = two(() => ({ program: "none(unclear)", withheld: "forms_subset", wrote: PAY, forms_shown: ["form-council-proposal"], forms_of: 25 }) as Said, () => PAY);
+  const r = await subset.ask("Pay acc-9 500 from acc-city.");
+  expect(r.ok).toBe(true);
+  expect(subset.calls).toEqual({ first: ["Pay acc-9 500 from acc-city."], behind: ["Pay acc-9 500 from acc-city."] });
+  expect(r.route).toMatchObject({ used: "behind", why: "forms_subset", agree: true, first: { withheld: "forms_subset", wrote: PAY, forms_shown: ["form-council-proposal"], forms_of: 25 }, behind: { result: "draft", model: "mock/prompted" } });
+  if (r.ok) expect(r.draft.translator.model).toBe("mock/prompted");
+  // A form it was never trained on, and a draft that differs from the one behind's: recorded as a disagreement.
+  const FORM = 'form(form=council_proposal, to=city, kind=law, proposal="A park.")';
+  const unseen = two(() => ({ program: "none(unclear)", withheld: "form_unseen", wrote: 'form(form=council_proposal, to=city, kind=budget, proposal="A park.")' }), () => FORM);
+  const s = await unseen.ask('Put a proposal to the council, a law: "A park."');
+  expect(s.route).toMatchObject({ used: "behind", why: "form_unseen", agree: false, first: { withheld: "form_unseen" }, behind: { result: "draft" } });
+  // Nothing a seat reads says any of it.
+  expect(shown(r)).not.toMatch(/subset|unseen|forms shown/i);
+});

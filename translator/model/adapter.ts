@@ -170,16 +170,18 @@ export const CUT_OFF = 0.1;
 /** Why this adapter offers no draft where the model's own answer was not a refusal it is sure of: its sureness is under
  * the cut-off; the form it filled in is not one of the forms shown as shown; or its steps make no program of the call
  * language; or the request with its forms is longer than the model reads. */
-export type Withheld = "cut_off" | "form_check" | "no_program" | "too_long" | "form_not_shown";
+export type Withheld = "cut_off" | "form_check" | "no_program" | "too_long" | "form_not_shown" | "forms_subset" | "form_unseen";
 
 /** What a trained model's reader takes, as its folder says (config.json): the most it reads (`max_tokens` of its
  * encoder's tokens, or `max_pieces` where it reads pieces), and the most forms it was shown in training where the
  * folder says that (`max_forms`: no model's does yet, and the reader's length is then the only limit). */
-export function readerOf(dir: string): { most?: number; forms?: number } {
+export function readerOf(dir: string): { most?: number; forms?: number; trained?: string[] } {
   try {
     const c = JSON.parse(readFileSync(join(dir, "config.json"), "utf8"));
     const n = (x: unknown) => (typeof x === "number" && x > 0 ? x : undefined);
-    return { most: n(c.encoder ? c.max_tokens : c.max_pieces), forms: n(c.max_forms) };
+    // (`forms_trained`: the names of the forms in the model's training export, where its folder carries the list.)
+    const trained = Array.isArray(c.forms_trained) && c.forms_trained.every((x: unknown) => typeof x === "string") ? (c.forms_trained as string[]) : undefined;
+    return { most: n(c.encoder ? c.max_tokens : c.max_pieces), forms: n(c.max_forms), ...(trained ? { trained } : {}) };
   } catch {
     return {};
   }
@@ -193,7 +195,10 @@ export class DecideAdapter implements LlmAdapter {
   private queue: Promise<unknown> = Promise.resolve();
   /** Each answer's sureness and time, in the order asked (for whoever measures). */
   answers: { sure: number; ms: number; program: string; steps?: number; parts?: { choices: number; places: number; texts: number; least: number }; unsure?: object; shown?: { forms: string[]; of: number } }[] = [];
-  private reader?: { most?: number; forms?: number };
+  private reader?: { most?: number; forms?: number; trained?: string[] };
+  /** Whose forms were once more than the reader takes (by who asked): absent a list of the forms the model was
+   * trained on, any form such an asker's draft fills is taken as one the model never saw. */
+  private subsetFor = new Set<string>();
   /** Who was last asked back because the model was unsure (by the participant a draft is for): their next request is
    * drafted however unsure it is. */
   private askedBack = new Set<string>();
@@ -275,7 +280,7 @@ export class DecideAdapter implements LlmAdapter {
   }
 
   /** The program for a request and the forms known, and how sure the model is. */
-  async translate(request: string, all: string[], o: { draft?: boolean; facts?: Omit<FormFacts, "line">[] } = {}): Promise<{ program: string; sure: number; ms: number; unsure?: object; asked?: boolean; withheld?: Withheld; wrote?: string; shown?: { forms: string[]; of: number } }> {
+  async translate(request: string, all: string[], o: { draft?: boolean; facts?: Omit<FormFacts, "line">[]; who?: string } = {}): Promise<{ program: string; sure: number; ms: number; unsure?: object; asked?: boolean; withheld?: Withheld; wrote?: string; shown?: { forms: string[]; of: number } }> {
     // More forms than the reader takes (subset.ts): the request goes with as many of them as fit, the asker's own
     // office's first, then those whose words the request shares. The request itself is never cut or changed; one
     // that is too long with no form at all is asked back as before.
@@ -328,6 +333,20 @@ export class DecideAdapter implements LlmAdapter {
       program = `none(${misfit.label})`;
       unsure = misfit.label === "unclear" ? misfit.unsure : undefined;
     }
+    // A draft made on fewer forms than the asker knows of, or that fills a form the model was never trained on, is
+    // recorded and not offered (the owner's coordinator, 2026-10-12: measured on the fourth living pilot's own
+    // requests, 10 of 22 such drafts for a letting office differed from what its seat confirmed, and 2 of 9 on forms
+    // the model had never seen were right; a seat confirms nearly everything). The translator behind drafts for the
+    // world, and the two are compared on the route. Which forms are outside its training: those not in the list its
+    // folder carries (`forms_trained`); absent the list, any form of an asker whose forms were ever a subset.
+    if (shown && o.who) this.subsetFor.add(o.who);
+    if (!withheld && !/^none\(\w+\)$/.test(program)) {
+      const filled = [...program.matchAll(/\bform=([\w.-]+)/g)].map((m) => m[1]!);
+      const unseen = reader.trained ? filled.some((f) => !reader.trained!.includes(f) && !reader.trained!.includes(partsOf(forms.find((l) => partsOf(l).id === f) ?? "").name)) : filled.length > 0 && !!o.who && this.subsetFor.has(o.who);
+      if (shown) withheld = "forms_subset";
+      else if (unseen) withheld = "form_unseen";
+      if (withheld) program = "none(unclear)";
+    }
     this.answers.push({ sure: a.sure, ms: a.ms, program, steps: a.steps.length, ...(a.parts ? { parts: a.parts } : {}), ...(unsure ? { unsure } : {}), ...(shown ? { shown } : {}) });
     return { program, sure: a.sure, ms: a.ms, ...(unsure ? { unsure } : {}), ...(asked ? { asked } : {}), ...(withheld ? { withheld, ...(wrote !== program ? { wrote } : {}) } : {}), ...(shown ? { shown } : {}) };
   }
@@ -343,7 +362,7 @@ export class DecideAdapter implements LlmAdapter {
     // (What whoever asks says of each form, beside its line: whether it is the asker's own office's, and what it is
     // for. Facts behind the prompt, in the order of its forms; without them every form is anyone's.)
     const said = Array.isArray(req.context?.forms) && req.context.forms.length === forms.length ? (req.context.forms as Omit<FormFacts, "line">[]) : undefined;
-    const { program, unsure, asked, sure, ms, withheld, wrote, shown: sub } = await this.translate(request, forms, { draft: !this.o.first && !!who && this.askedBack.has(who), ...(said ? { facts: said } : {}) });
+    const { program, unsure, asked, sure, ms, withheld, wrote, shown: sub } = await this.translate(request, forms, { draft: !this.o.first && !!who && this.askedBack.has(who), ...(said ? { facts: said } : {}), ...(who ? { who } : {}) });
     if (who) asked ? this.askedBack.add(who) : this.askedBack.delete(who);
     // (With another translator behind it, its answer says how sure it was, how long it took and why it offers no
     // draft where it offers none: the arrangement routes on that, and the transcript keeps it. Whole numbers, as

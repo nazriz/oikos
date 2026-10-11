@@ -48,7 +48,11 @@ test("the adapter shows as many forms as the reader takes, says which on its ans
     const lines = o.breaks.length; // the request, then a line a form
     asked.push([String(lines)]);
     const read = 10 + 30 * Math.max(0, lines);
-    if (read > 100) return { steps: ["none:unclear", "eos"], sure: 1, ms: 0, too_long: true, read };
+    if (read > (a as any).reader.most) return { steps: ["none:unclear", "eos"], sure: 1, ms: 0, too_long: true, read };
+    if (wants === "PAY" || wants === "LISTING") {
+      const at = o.pieces.indexOf(wants === "PAY" ? "c0701" : "FILL");
+      if (wants === "PAY") return { steps: ["fn:money", "arg:to", ["id", at, at], ")", "eos"], sure: 0.9, ms: 5, read };
+    }
     // (The form's name on its line, as a run of pieces: the first piece of a line is its dash.)
     let span: [number, number] | undefined;
     for (let i = 1; i < o.pieces.length && !span; i++) for (let j = i; j < i + 4 && j < o.pieces.length; j++) if (o.pieces[i - 1] === "-" && o.pieces.slice(i, j + 1).join("") === wants) span = [i, j];
@@ -63,6 +67,11 @@ test("the adapter shows as many forms as the reader takes, says which on its ans
   // (It filled in a form it was shown; the check of the form is made against the lines shown, as ever: here the
   // stand-in model left the required fields out.)
   expect(r.input).toMatchObject({ wrote: "form(form=rent_reminder)", withheld: "form_check" });
+  // A draft that passes every check, made on a subset: recorded (`wrote`) and not offered.
+  wants = "PAY";
+  const paid = await ask("Pay c0701 what is owed.");
+  expect(paid.input).toMatchObject({ program: "none(unclear)", withheld: "forms_subset", wrote: "money(to=c0701)", forms_of: 6 });
+  wants = "rent_reminder";
   // A form of the town's that was not shown, named in the request: no draft from this model, and why.
   wants = "none";
   const s = await ask("Fill in the council proposal form: kind law, proposal \"A park.\"");
@@ -72,4 +81,31 @@ test("the adapter shows as many forms as the reader takes, says which on its ans
   wants = "rent_reminder";
   const all = await ask("Fill in the rent reminder for c0701.");
   expect(all.input.forms_shown).toBeUndefined();
+  // Shown every form now, the same asker pays someone: no form is filled, and the draft is offered.
+  wants = "PAY";
+  expect((await ask("Pay c0701 what is owed.")).input).toMatchObject({ program: "money(to=c0701)" });
+});
+
+test("a form outside the model's training: by the list its folder carries; absent the list, any form of an asker whose forms were once a subset", async () => {
+  const line = "- works_collection, to=works, id form-works-collection: fields every (duration)";
+  const content = `Request: Fill in the works collection form.\n\nForms this person knows of:\n${line}`;
+  const filled = async (o: { pieces: string[] }) => { const i = o.pieces.findIndex((x, k) => x === "works" && o.pieces[k - 1] === "-"); return { steps: ["fn:form", "arg:form", ["id", i, i + 2], ")", "eos"], sure: 0.9, ms: 5, read: 40 }; };
+  const ask = async (a: DecideAdapter, ref = "draft.works-system.1") => (await a.complete({ purpose: "translator", subject: "translator", ref, system: "", maxTokens: 10, messages: [{ role: "user", content }] })).content[0] as any;
+  // The folder's list has the form: its draft is offered.
+  const taught = new DecideAdapter("none", { first: true });
+  (taught as any).reader = { most: 1000, trained: ["works_collection"] };
+  (taught as any).ask = filled;
+  expect((await ask(taught)).input).toMatchObject({ program: "form(form=works_collection)" });
+  // The list does not have it: recorded, not offered.
+  const untaught = new DecideAdapter("none", { first: true });
+  (untaught as any).reader = { most: 1000, trained: ["council_proposal"] };
+  (untaught as any).ask = filled;
+  expect((await ask(untaught)).input).toMatchObject({ program: "none(unclear)", withheld: "form_unseen", wrote: "form(form=works_collection)" });
+  // No list: offered to an asker whose forms have always fitted; not to one whose forms were once a subset.
+  const none = new DecideAdapter("none", { first: true });
+  (none as any).reader = { most: 1000 };
+  (none as any).ask = filled;
+  expect((await ask(none)).input).toMatchObject({ program: "form(form=works_collection)" });
+  (none as any).subsetFor.add("draft.works-system");
+  expect((await ask(none, "draft.works-system.2")).input).toMatchObject({ program: "none(unclear)", withheld: "form_unseen" });
 });

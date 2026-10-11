@@ -36,12 +36,13 @@ function configOf(dir: string): any {
 const formsOf = (config: any): Map<string, any> => new Map((config.world.records as any[]).filter((r) => r.kind === "form").map((r) => [r.id, r]));
 const older = newSince ? new Set([...formsOf(configOf(newSince)).values()].map((f) => String(f.data?.form))) : undefined;
 
-const adapter = new DecideAdapter(model.slice(7), { first: true, quiet: true });
-await adapter.ready();
 
 interface Row { run: string; draft: string; seat: string; day: number; founder: boolean; forms_of: number; forms_shown: number; before: string; now: string; sure: number; program: string; final_call?: string; confirmed?: boolean; same?: "same" | "same_but_free_text" | "different"; new_form?: string; final_form?: string }
 const rows: Row[] = [];
 for (const dir of runs) {
+  // (One adapter a run, as a run has: what it remembers of whose forms were a subset is that run's alone.)
+  const adapter = new DecideAdapter(model.slice(7), { first: true, quiet: true });
+  await adapter.ready();
   const config = configOf(dir);
   const forms = formsOf(config);
   const currency = config.world.currencies?.[0];
@@ -62,22 +63,26 @@ for (const dir of runs) {
       const f = forms.get(partsOf(l).id);
       return { own: !!f && ((typeof f.data?.office === "string" && mine.has(f.data.office)) || (!!f.in_position && mine.has(f.in_position)) || f.speaks_for === entity || f.author === x.participant), about: typeof f?.text === "string" ? f.text.slice(0, 400) : "" };
     });
-    const a = await adapter.translate(request, lines, { facts });
+    const a = await adapter.translate(request, lines, { facts, who: x.participant });
+    // (A draft recorded and not offered, made on a subset of the forms or on a form outside the model's training:
+    // what it wrote is what is compared.)
+    const recorded = (a.withheld === "forms_subset" || a.withheld === "form_unseen") && a.wrote ? a.wrote : undefined;
     const ctx = { currency, forms: lines.map((l) => { const p = partsOf(l), f = forms.get(p.id); return { form: p.name, to: /, to=([^,]+),/.exec(l)?.[1] ?? "", id: p.id, fields: (f?.data?.fields ?? {}) as { [k: string]: { type: string } } }; }) };
-    const now = a.withheld ? `no draft (${a.withheld})` : /^none\((\w+)\)$/.test(a.program) ? `refusal ${a.program}` : "draft";
+    const now = recorded ? `recorded, not offered (${a.withheld})` : a.withheld ? `no draft (${a.withheld})` : /^none\((\w+)\)$/.test(a.program) ? `refusal ${a.program}` : "draft";
     const first = x.route?.first;
     const before = !first ? "(no route)" : first.result === "draft" ? "draft" : first.withheld ? `no draft (${first.withheld})` : `${first.result}${first.label ? ` ${first.label}` : ""}`;
     const finalCall: string | undefined = x.result === "drafted" ? x.call : undefined;
     let same: Row["same"];
-    if (now === "draft" && finalCall) {
-      try { same = sameMeaning(a.program, finalCall, ctx) ? "same" : sameButForFreeText(a.program, finalCall, ctx) ? "same_but_free_text" : "different"; } catch { same = a.program === finalCall ? "same" : "different"; }
+    const wrote_ = recorded ?? a.program;
+    if ((now === "draft" || recorded) && finalCall) {
+      try { same = sameMeaning(wrote_, finalCall, ctx) ? "same" : sameButForFreeText(wrote_, finalCall, ctx) ? "same_but_free_text" : "different"; } catch { same = wrote_ === finalCall ? "same" : "different"; }
     }
     const finalForm = /form=([\w-]+)/.exec(finalCall ?? "")?.[1];
     rows.push({ run: dir.split("/").filter(Boolean).at(-1)!, draft: x.draft, seat: x.as ?? x.participant, day: Math.floor(x.t / 86_400), founder: /^c\d+/.test(x.participant), forms_of: lines.length, forms_shown: a.shown?.forms.length ?? lines.length, before, now, sure: Math.round(a.sure * 1000) / 1000, program: a.program === "none(unclear)" && a.wrote ? `${a.program} [wrote: ${a.wrote}]` : a.program,
       ...(finalCall ? { final_call: finalCall, confirmed: x.signoff?.decision === "accept" } : {}), ...(same ? { same } : {}), ...(finalForm ? { final_form: finalForm } : {}), ...(older && finalForm && !older.has(finalForm) ? { new_form: finalForm } : {}) });
   }
+  adapter.close();
 }
-adapter.close();
 
 const count = (xs: Row[], f: (r: Row) => string) => { const c: { [k: string]: number } = {}; for (const r of xs) c[f(r)] = (c[f(r)] ?? 0) + 1; return Object.entries(c).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k} ${n}`).join("; "); };
 const L: string[] = [];
@@ -90,9 +95,11 @@ for (const run of [...new Set(rows.map((r) => r.run))]) {
     L.push(`  now, shown what its reader takes: ${count(xs, (r) => r.now)}`);
     const cut = xs.filter((r) => r.forms_shown < r.forms_of);
     L.push(`  shown fewer forms than the asker knows of: ${cut.length}${cut.length ? ` (of ${[...new Set(cut.map((r) => r.forms_of))].join("/")} forms, shown ${Math.min(...cut.map((r) => r.forms_shown))} to ${Math.max(...cut.map((r) => r.forms_shown))})` : ""}`);
+    const kept = xs.filter((r) => r.now.startsWith("recorded"));
+    L.push(`  recorded and not offered (the one behind drafts): ${kept.length}; of those where the seat confirmed a draft in the run (${kept.filter((r) => r.confirmed).length}): ${count(kept.filter((r) => r.confirmed), (r) => r.same ?? "?") || "none"}`);
     const drafts = xs.filter((r) => r.now === "draft");
     const against = drafts.filter((r) => r.final_call && r.confirmed);
-    L.push(`  its drafts now: ${drafts.length}; of those where the seat confirmed a draft in the run (${against.length}): ${count(against, (r) => r.same ?? "?") || "none"}`);
+    L.push(`  its drafts offered now: ${drafts.length}; of those where the seat confirmed a draft in the run (${against.length}): ${count(against, (r) => r.same ?? "?") || "none"}`);
     const declined = drafts.filter((r) => r.final_call && r.confirmed === false);
     if (declined.length) L.push(`  against a draft the seat declined (${declined.length}): ${count(declined, (r) => r.same ?? "?")}`);
     for (const seat of [...new Set(xs.map((r) => r.seat))]) {

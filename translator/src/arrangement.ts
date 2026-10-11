@@ -46,6 +46,8 @@ export type Why =
   | "unsure" // the first was under its cut-off
   | "form_check" // the first's draft is not one of the forms shown, as shown
   | "no_program" // the first's answer is no program of the call language (or the request is longer than it reads)
+  | "forms_subset" // the first was shown fewer forms than the asker knows of: its draft is recorded, never offered
+  | "form_unseen" // the first's draft fills a form outside its training: recorded, never offered
   | "form_not_shown" // the request names a form the first was not shown (more forms than its reader takes: translator/model/subset.ts)
   | "refused" // the first refused, sure of it, with a label that does not stand
   | "not_resolved" // acts could not be made of the first's call (the resolver asked, or the call was put together wrongly)
@@ -126,6 +128,7 @@ function noDraft(r: Extract<Translated, { ok: false }>, stands: readonly string[
   if (withheld === "cut_off") return "unsure";
   if (withheld === "form_check") return "form_check";
   if (withheld === "form_not_shown") return "form_not_shown";
+  if (withheld === "forms_subset" || withheld === "form_unseen") return withheld;
   if (withheld) return "no_program";
   const label = LABEL.exec(r.call ?? "")?.[1];
   // (An asking back that is not a refusal's own: a value of the call that could not be read. The call's fault.)
@@ -148,7 +151,9 @@ export function createArrangement(first: One, behind: One, o: { arrangement: Arr
   /** Drafts offered and not yet answered: whose, for what, and whether the request had gone behind for an open matter. */
   const offered = new Map<string, { who: string; proposal: string; by: "first" | "behind"; continued: boolean }>();
   const seat = (participant: string, as?: string) => `${participant}|${as ?? ""}`;
-  const agreement = (req: TranslateRequest, a: RouteSide, b: RouteSide): { agree: boolean; agree_text?: boolean } => {
+  const agreement = (req: TranslateRequest, first: RouteSide, b: RouteSide): { agree: boolean; agree_text?: boolean } => {
+    // (A draft of the first's that was recorded and not offered is still compared, as under `beside`: what it wrote.)
+    const a: RouteSide = (first.withheld === "forms_subset" || first.withheld === "form_unseen") && first.wrote ? { ...first, result: "draft", call: first.wrote } : first;
     if (a.result === "draft" && b.result === "draft") {
       const forms = req.knowledge.forms.map((f) => ({ form: String(f.data?.form), to: Knowledge.formOf(f), id: f.id, fields: (f.data?.fields ?? {}) as { [name: string]: { type: string } } }));
       const ctx = { currency: req.knowledge.currency, forms };
