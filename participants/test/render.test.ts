@@ -16,6 +16,9 @@ test("money and time read as a person would read them", () => {
 test("outcomes read as what someone will do", () => {
   expect(outcomeWords({ money: { to: "acc-landlord-1", amount: 85000, for: "rent" } }, 2592000)).toBe("pay $850.00 to acc-landlord-1 every 30 days (rent)");
   expect(outcomeWords({ occupancy: { who: "c1", in: "str.3/dwelling.2" } })).toBe("let c1 live or be in str.3/dwelling.2");
+  // Whoever commits to be somewhere themselves comes there (a worker and their place of work), and is not "let" by themselves.
+  expect(outcomeWords({ occupancy: { who: "c1", in: "town-hall/workplace.1" } }, undefined, "c1")).toBe("come to town-hall/workplace.1");
+  expect(outcomeWords({ occupancy: { who: "c1", in: "str.3/dwelling.2" } }, undefined, "landlord-1")).toBe("let c1 live or be in str.3/dwelling.2");
 });
 
 const obs = (channels: any, extra: any = {}) => ({ participant: "mayor", t: 0, status: "active", entity: "city", outcomes: [], inbox: [], drafts: [], channels, ...extra }) as any;

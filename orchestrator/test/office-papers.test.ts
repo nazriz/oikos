@@ -140,12 +140,16 @@ test("a planning decision on its form is the decision the module sends, and the 
   for (const x of r) expect(x.form).toEqual(x.module);
   expect(r.map((x) => x.turned.program).join("\n")).toContain("form(applicant=c0005, application=rec.30, decision=granted, form=permit_decision");
   expect(r.map((x) => x.turned.program).join("\n")).toContain('missing=["structure_type"]');
-  expect(r.map((x) => x.turned.program).join("\n")).toContain("claim(");
-  // The form says so of itself: a decision granted on it records no permission, and what does (wave 2c: a planning
-  // seat granted a park on this form alone, and the inspector fined the town and ordered the park down the same day).
+  // The liberty is the form's own to record (contracts: FormWrites `claim`): one form says both, and what it makes
+  // is what the module made, the liberty first and then the decision.
+  expect(r.map((x) => x.turned.program).join("\n")).not.toContain("claim(");
+  expect(r.map((x) => x.turned.program).join("\n")).toContain("form(applicant=c0005, application=rec.30, decision=granted, form=permit_decision, lot=lot-01-02, structure_type=house,");
+  expect(r.flatMap((x) => x.form).filter((b: any) => b.block === "record_claim")).toEqual([{ block: "record_claim", position: "liberty", holder: "c0005", about: { action: "build", object: "lot-01-02", structure_type: "house" }, basis: "rec.30", speaks_for: "city" }]);
+  // And the form says so of itself (wave 2c: a planning seat granted a park on a form that wrote the decision alone,
+  // and the inspector fined the town and ordered the park down the same day).
   const form = papers.find((f: any) => f.data.form === "permit_decision") as any;
-  expect(form.text).toContain("A decision is the notice of it and no more.");
-  expect(form.text).toContain("the applicant's liberty to build that kind of building on that lot, which the planning officer records beside a decision to grant");
+  expect(form.text).toContain("A decision to grant records the permission with it: the applicant's liberty to build that kind of building on that lot, which the building inspector reads.");
+  expect(form.data.writes.claim).toEqual({ when: { decision: "granted" }, position: "liberty", holder: "=applicant", about: { action: "build", object: "=lot", structure_type: "=structure_type" }, basis: "=application" });
 });
 
 test("every paper a module declares is a form the contract accepts, names fields it has, and is shown to the translator as its office's", () => {

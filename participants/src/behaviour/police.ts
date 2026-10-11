@@ -23,7 +23,7 @@ export const station: BehaviourModule = {
   issues: [P.JOB_ADVERTISEMENT, ...P.POLICE],
   staffed: (p) => ({ role: p.role ?? "police officer", posts: { establishment: p.officers ?? 0 } }),
   issuesWith: (p) => ({ ...P.staffingOwn({ role: p.role ?? "police officer", industry: p.industry ?? "public_safety", workplace: p.workplace, notice_days: p.notice_days ?? 14 }), tribunal: p.tribunal, registry: p.registry }),
-  version: "0.3.0", // 0.3.0: calls at a home when asked to (a welfare check), by going there; no longer shown the town's homes
+  version: "0.3.1", // 0.3.1: a death that someone at home outlived by more than a day is not "found" at a later call; 0.3.0: calls at a home when asked to (a welfare check), by going there; no longer shown the town's homes
   doc: "docs/behaviour/crime.md",
   cadence: () => DAY,
   firstWake: (ctx) => 10 * 3600 + ctx.rng("first-wake").below(3600),
@@ -84,6 +84,11 @@ export const station: BehaviourModule = {
           if (!called.delete(sp.space)) continue;
           for (const l of sp.left ?? []) if (l.reason === "died" && !told.has(l.occupant)) {
             told.add(l.occupant);
+            // Someone who went on living there after the death (they left the home more than a day after it) was at
+            // home with it: the death was theirs to report, long ago, and is no finding of ours. Only a death nobody
+            // at home outlived is found by a call. (Until 2026-10-11 every death the home had ever seen was "found":
+            // a registrar was sent "found dead" of people it had registered 82 and 103 days before, wave 2c's review.)
+            if ((sp.left ?? []).some((x) => x.occupant !== l.occupant && x.at > l.at + DAY)) continue;
             found.push({ who: l.occupant, space: sp.space });
           }
         }

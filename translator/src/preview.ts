@@ -451,7 +451,9 @@ export class Preview {
           // (What it cites is a field of the form where the form writes it from one: said there, and not again.)
           const cited = basesOf(b as any).every((id) => Object.values(made.fields).some((v) => v === id || (Array.isArray(v) && v.includes(id)))) ? [] : cites(b);
           return one(`You will issue a${/^[aeiou]/i.test(kind) ? "n" : ""} ${kind} (${made.form.id})${named(b)}: "${b.text}".`, [...PAPER, ...(b.offer !== undefined ? ["offer"] : [])],
-            [...this.filled(made.form.data as forms.FormData, made.fields), ...(b.offer !== undefined ? [this.offered(b.offer)] : []), ...(goes ? [goes] : seen(b)), ...cited, ...rule(b)], an(kind));
+            // (Fields the form writes only into a claim it records beside the paper are said by that claim, the
+            // act before this one: not listed here as filled in or as left empty.)
+            [...this.filled(made.form.data as forms.FormData, made.fields, forms.claimFields(made.form.data as forms.FormData).filter((n) => made.fields[n] === undefined)), ...(b.offer !== undefined ? [this.offered(b.offer)] : []), ...(goes ? [goes] : seen(b)), ...cited, ...rule(b)], an(kind));
         }
         // A form filed with whoever takes it (a proposal to the council, an application): the same two lines.
         if (onForm && filedOn) {
@@ -555,7 +557,10 @@ export class Preview {
         return one(`You will switch off ${b.participant} for good.`, ["participant"]);
       case "record_claim": {
         const pos = ({ right: "has a right", liberty: "is permitted", power: "has the power", immunity: "is immune" } as Record<string, string>)[b.position] ?? `holds a ${b.position}`;
-        return one(`You will record${named(b)} that ${this.who(b.holder)} ${pos}${b.counterparty ? ` against ${this.who(b.counterparty)}` : ""}: ${this.details(b.about) || "(no details)"}.`, ["position", "holder", "counterparty", "about", ...RECORD], [...cites(b), ...seen(b)]);
+        // (Whoever holds it, by name: for the seat itself, "you have"; for the organisation it acts for, its name.)
+        const holder = this.whom(b.holder);
+        const has = holder === "you" ? pos.replace(/^is /, "are ").replace(/^has /, "have ").replace(/^holds /, "hold ") : pos;
+        return one(`You will record${named(b)} that ${holder}${holder.endsWith("which you act for") ? "," : ""} ${has}${b.counterparty ? ` against ${this.who(b.counterparty)}` : ""}: ${this.details(b.about) || "(no details)"}.`, ["position", "holder", "counterparty", "about", ...RECORD], [...cites(b), ...seen(b)], b.position === "liberty" ? "a permission recorded" : "a claim recorded");
       }
       case "transfer_claim":
         return one(`You will record${named(b)} that claim ${b.claim} now belongs to ${this.who(b.to)}.`, ["claim", "to", ...RECORD], [...cites(b), ...seen(b)]);

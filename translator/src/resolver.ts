@@ -15,7 +15,7 @@ import { Knowledge } from "./knowledge";
 type Call = calls.Call;
 type Value = calls.Value;
 
-export const RESOLVER = { id: "resolver", version: "0.6.0" };
+export const RESOLVER = { id: "resolver", version: "0.7.0" }; // 0.7.0: a form may record a claim beside its paper (FormWrites `claim`)
 
 /** What the resolver reads from a structure type in the world's catalogue (which is public): its footprint, the terrains it can stand on, and its spaces. */
 export interface StructureTypeInfo {
@@ -821,7 +821,10 @@ class Resolver {
     if (spec.writes) {
       const me = this.id(c, "for") ?? this.me;
       const paper = this.written(() => forms.writePaper(spec as forms.FormData, data as forms.Filled, { self: me, now: this.k.t, money: (a) => this.sum(a), ...(ownWords && this.has(c, "text") ? { text: this.str(c, "text")! } : {}) }));
-      return [{ block: "publish", ...paper, text: paper.text.slice(0, 16384), speaks_for: me, ...(bind ? { ref: bind } : {}) }];
+      // A claim the form records beside its paper (a permission granted with the decision): recorded first, as an
+      // office that grants records what it grants and then says so.
+      const claim = this.written(() => forms.writeClaim(spec as forms.FormData, data as forms.Filled, { self: me, now: this.k.t }));
+      return [...(claim ? [{ block: "record_claim", ...claim, speaks_for: me } as Block] : []), { block: "publish", ...paper, text: paper.text.slice(0, 16384), speaks_for: me, ...(bind ? { ref: bind } : {}) }];
     }
     // What was filled in, in words: an amount as the world writes its money, a length of time in days.
     const words = (k: string, x: unknown): string => {

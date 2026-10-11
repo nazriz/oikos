@@ -72,6 +72,19 @@ test("a call that finds nobody dead reports nothing; a death known to be registe
   expect(known.reported).toEqual([]);
 });
 
+test("a death someone at home outlived is not found again at a later call; one nobody outlived is", () => {
+  // Ann died on day 1 with Bob at home, who lived on there and left on day 60; a neighbour asks on day 70.
+  const lived = days(75, () => [home(1, [], [{ occupant: "ann", reason: "died", at: DAY }, { occupant: "bob", reason: "left", at: 60 * DAY }])], (t) => (Math.floor(t / DAY) === 70 ? [request("ask-1", t, 1, 60 * DAY)] : []));
+  expect(lived.went.length).toBe(1);
+  expect(lived.reported).toEqual([]);
+  // Bob died there too, alone, two months after: he is found, and she is not found a second time.
+  const both = days(75, () => [home(1, [], [{ occupant: "ann", reason: "died", at: DAY }, { occupant: "bob", reason: "died", at: 60 * DAY }])], (t) => (Math.floor(t / DAY) === 70 ? [request("ask-1", t, 1, 60 * DAY)] : []));
+  expect(both.reported.map((r) => r.who)).toEqual(["bob"]);
+  // Two who died within the day of each other, nobody left to say so: both are found.
+  const together = days(12, () => [home(1, [], [{ occupant: "ann", reason: "died", at: DAY }, { occupant: "bob", reason: "died", at: DAY + 3600 }])], (t) => (Math.floor(t / DAY) === 5 ? [request("ask-1", t, 1, DAY)] : []));
+  expect(together.reported.map((r) => r.who).sort()).toEqual(["ann", "bob"]);
+});
+
 test("the profile's bands are shares that add up, in rising days", () => {
   const bands = PROFILE.values.life.found_alone_after;
   expect(bands.reduce((n, b) => n + b.bps, 0)).toBe(10_000);
