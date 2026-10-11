@@ -40,6 +40,7 @@ This does one thing: a payment.
 | A paper of the office's own, on its form | the kind of paper, the form, the paper's words | `Filled in`, `Left empty`; what it offers, in words; whom it goes to and why each, in the form's own words |
 | An offer of an agreement | to whom, what kind, for how long, whether it is signed on the offerer's side | one line a side: `You would be bound to: ...`, `c0042 would be bound to: ...`, or `... would be bound to nothing: no act of theirs is set down.`; `Its terms, in words only: "..."` and `In words only, which bind nobody to an act that can be checked: ...` for a duty that is a sentence; who may end it on what notice; for employment with no place of work, where the advertisement it is made on puts it, or that it has none |
 | A law or other paper published | its kind and its words | its details; for a law with no rule recorded, `Words only: no rule is recorded with it for acts to be checked against.`; its rule and the condition acts are checked against, where it has them |
+| A form that records a claim beside its paper (a permit granted) | two things: the claim ("You will record that c0005 is permitted: action: build; object: lot-01-02; structure type: house.") and then the paper | the fields written only into the claim are said by the claim, and are not listed under the paper as filled in or left empty |
 | A withdrawal | the paper withdrawn | what that paper is, from the participant's own papers, and what stops with it; or that no such paper is among its own |
 | A standing work order, a hold | as before (docs/behaviour/standing-work.md) | each sentence on its own line |
 | A letter | to whom, about what, its words | `A letter only: it pays, files and orders nothing.` |
@@ -90,7 +91,7 @@ the payment is right. What a seat does with a draft that is right as far as it g
 say, not the preview's: with one sentence there ("What you confirm is all that is done. Anything you asked for that
 the draft does not list among the things it does is not done: decline, or confirm and ask for the rest.") the same
 models confirm 41 and 48 of the 60 and name the missing report in 12 and 10 of 15, at the cost of about twice as many
-right drafts declined. That sentence is proposed, not in the code.
+right drafts declined. That sentence has been in a seat's standing instructions since the same day (the coordinator's decision: docs/decisions.md, "What a seat confirms is all that is done").
 
 ## Left out
 

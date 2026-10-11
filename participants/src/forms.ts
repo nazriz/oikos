@@ -32,7 +32,16 @@ export interface FormWrites {
   assertion?: unknown;
   /** Whom the form itself sends every paper to, whatever its fields say, and why, in the form's own words. */
   sends?: { to: string[]; why: string }[];
+  /** A claim recorded beside the paper (the permission a decision grants): contracts, FormWrites `claim`. */
+  claim?: FormClaim;
 }
+/** A claim a form records beside its paper: where `when` holds (each field named has that value; absent: always),
+ * the holder has `position` about `about`, citing `basis`. `holder` and `basis` name fields ("=applicant"; "=self"
+ * for whoever the paper is made for); `about` is a template like the paper's data. Every field they name is then
+ * needed: a permission that does not say what it permits is not recorded. */
+export interface FormClaim { when?: { [field: string]: string }; position: "right" | "liberty" | "power" | "immunity"; holder: string; about: unknown; basis?: string }
+/** The claim a form records, as the act that records it has it. */
+export interface WrittenClaim { position: FormClaim["position"]; holder: string; about: unknown; basis?: string }
 export interface FormData { form: string; office?: string; submit_as: string; submit_to: string[]; fields: { [name: string]: FormFieldSpec }; writes?: FormWrites }
 
 /** A field as the form reads it: an amount (a decimal string), a length of time, a date or a count (a number), a
@@ -163,6 +172,63 @@ export function writePaper(spec: FormData, fields: Filled, o: { self: string; no
     ...(offer !== undefined && offer !== ABSENT ? { offer } : {}),
     ...(assertion !== undefined && assertion !== ABSENT ? { assertion } : {}),
   };
+}
+
+/** The fields a template names, each once, in the order met ("=self" aside). */
+function named(t: unknown, into: string[] = []): string[] {
+  const p = placeholder(t);
+  if (p) { if (p.name !== "self" && !into.includes(p.name)) into.push(p.name); }
+  else if (Array.isArray(t)) for (const x of t) named(x, into);
+  else if (t && typeof t === "object") for (const x of Object.values(t)) named(x, into);
+  return into;
+}
+/** The fields a form's claim is written from (none: the form records no claim). */
+export function claimFields(spec: FormData): string[] {
+  const c = spec.writes?.claim;
+  return c ? named([c.holder, c.about, c.basis]) : [];
+}
+const CLAIM_WORD: { [position: string]: string } = { liberty: "permission", right: "right", power: "power", immunity: "immunity" };
+/** Whether a form's claim is to be written for these fields: it has one, and its `when` holds. */
+function claimDue(spec: FormData, fields: Filled): boolean {
+  const c = spec.writes?.claim;
+  return !!c && Object.entries(c.when ?? {}).every(([k, v]) => fields[k] === v);
+}
+
+/**
+ * The claim a form records beside its paper, for these fields: undefined where the form records none, or its `when`
+ * does not hold (a permit refused grants nothing). Where it is due, every field it is written from is needed, and one
+ * not given is asked for: a decision that grants and does not say what is granted records no permission, which is
+ * what a planning seat's permits did until 2026-10-11 (a park granted on the decision form was fined as unpermitted).
+ */
+export function writeClaim(spec: FormData, fields: Filled, o: { self: string; now: number }): WrittenClaim | undefined {
+  const c = spec.writes?.claim;
+  if (!c || !claimDue(spec, fields)) return undefined;
+  const missing = claimFields(spec).filter((n) => fields[n] === undefined).sort();
+  const when = Object.entries(c.when ?? {}).map(([k, v]) => `${k.replace(/_/g, " ")} ${v}`).join(" and ");
+  if (missing.length) throw new FormError(`The ${spec.form.replace(/_/g, " ")}${when ? `, with ${when},` : ""} needs: ${missing.join(", ")}. They say what the ${CLAIM_WORD[c.position] ?? c.position} it records is.`);
+  const env: Env = { fields, self: o.self, now: o.now };
+  const holder = fill(c.holder, env);
+  if (typeof holder !== "string") throw new FormError(`The ${spec.form.replace(/_/g, " ")} can't say who holds the ${CLAIM_WORD[c.position] ?? c.position} it records.`);
+  const basis = c.basis === undefined ? ABSENT : fill(c.basis, env);
+  return { position: c.position, holder, about: fill(c.about, env), ...(typeof basis === "string" ? { basis } : {}) };
+}
+
+/**
+ * The fields a form's claim would have to be written from to be exactly this claim, added to those the paper gave
+ * (`fields`); undefined if the form records no such claim for them. Checked by writing it again.
+ */
+export function claimFieldsFor(spec: FormData, claim: WrittenClaim, fields: Filled, o: { self: string; now: number }): Filled | undefined {
+  const c = spec.writes?.claim;
+  if (!c || c.position !== claim.position || !claimDue(spec, fields)) return undefined;
+  const env: Filled = { ...fields };
+  if (!unify(c.holder, claim.holder, env, spec, o.self, o.now) || !unify(c.about, claim.about, env, spec, o.self, o.now)) return undefined;
+  if (c.basis !== undefined ? !unify(c.basis, claim.basis, env, spec, o.self, o.now) : claim.basis !== undefined) return undefined;
+  try {
+    const again = writeClaim(spec, env, o);
+    return again && same(again, claim) ? env : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 // ---------------------------------------------------------------- a paper, back to the form that writes it

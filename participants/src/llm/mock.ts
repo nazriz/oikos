@@ -14,12 +14,12 @@
 
 import { amountText, call, json, parseProgram, programText, secs, text, type Value } from "../calls";
 import { slice, type LookRequest, type ParticipantAction } from "../contracts";
-import { fieldsFor, type FormData, type Paper } from "../forms";
+import { claimFieldsFor, fieldsFor, writeClaim, type FormData, type Paper } from "../forms";
 import type { Controller, ParticipantContext } from "../module";
 import { formatMoney, inCurrency, type Currency } from "../money";
 import type { ContentBlock, LlmRequest, MockPolicy } from "./adapter";
 
-export const MOCK_VERSION = "0.6.0"; // 0.6.0: back at its desk as often as its brain's own module looks in (it sat weekly whatever the office); a look the brain asks for while reading what it missed between sittings is made at the sitting (it was dropped, and the brain never asked again); 0.5.0: a paper the brain issues is asked for on the office's own form for it, where it has one; 0.4.0: a brain's looks are made through the seat's own look (asking a register, looking someone up, sending someone to a place)
+export const MOCK_VERSION = "0.6.1"; // 0.6.1: a claim its brain records beside a paper is said on the form that records both, where the office has one; 0.6.0: back at its desk as often as its brain's own module looks in (it sat weekly whatever the office); a look the brain asks for while reading what it missed between sittings is made at the sitting (it was dropped, and the brain never asked again); 0.5.0: a paper the brain issues is asked for on the office's own form for it, where it has one; 0.4.0: a brain's looks are made through the seat's own look (asking a register, looking someone up, sending someone to a place)
 
 export interface MockBrain {
   controller: Controller;
@@ -70,7 +70,10 @@ export function onOwnForms(program: string, stationery: FormData[], o: { self: s
   if ("none" in p) return { program, turned: 0, kept: [] };
   let turned = 0;
   const kept: string[] = [];
-  const lines = p.lines.map((l) => {
+  /** Lines the form says with its paper: a claim it records beside it (the permission a decision grants). */
+  const folded = new Set<number>();
+  const all = p.lines;
+  const mapped = p.lines.map((l) => {
     const a = l.call.args;
     if (l.call.fn !== "statement" || !a.kind || a.withdraw || a.hold) return l;
     const kind = String(plain(a.kind) ?? "");
@@ -88,6 +91,26 @@ export function onOwnForms(program: string, stationery: FormData[], o: { self: s
       for (const f of forms) {
         const got = fieldsFor(f, paper, { self, now: o.now, money: (x) => formatMoney(x, o.currency) });
         if (!got) continue;
+        // A form that records a claim beside its paper (contracts: FormWrites `claim`): the brain says the claim in a
+        // line of its own; a person fills in the form once, with what the claim is of. The brain's claim line is the
+        // form's own if the form, given those fields, writes exactly it; with no such line the paper is not one this
+        // form writes alone (it would ask what is permitted), and is said as the brain said it.
+        let withClaim: number | undefined;
+        if (f.writes?.claim) {
+          let due: boolean;
+          try { due = writeClaim(f, got.fields, { self, now: o.now }) !== undefined; } catch { due = true; }
+          if (due) {
+            for (let i = 0; i < all.length && withClaim === undefined; i++) {
+              const c = all[i]!.call;
+              if (c.fn !== "claim" || all[i]!.bind !== undefined || folded.has(i) || c.args.release || c.args.transfer || c.args.against || c.args.visible || (c.args.for ? String(plain(c.args.for)) : o.self) !== self) continue;
+              const basis = c.args.basis === undefined ? undefined : plain(c.args.basis);
+              if (typeof plain(c.args.holder) !== "string" || (basis !== undefined && typeof basis !== "string")) continue;
+              const more = claimFieldsFor(f, { position: String(plain(c.args.position)) as any, holder: plain(c.args.holder) as string, about: plain(c.args.about), ...(basis !== undefined ? { basis: basis as string } : {}) }, got.fields, { self, now: o.now });
+              if (more) { got.fields = more; withClaim = i; }
+            }
+            if (withClaim === undefined) continue;
+          }
+        }
         const args: { [k: string]: any } = { form: f.form, ...(f.office ? { to: f.office } : {}), ...(a.for ? { for: self } : {}) };
         let exact = true;
         for (const [name, v] of Object.entries(got.fields)) {
@@ -102,12 +125,14 @@ export function onOwnForms(program: string, stationery: FormData[], o: { self: s
         if (got.text !== undefined) args.text = text(got.text);
         if (!exact) continue;
         turned++;
+        if (withClaim !== undefined) folded.add(withClaim);
         return { ...l, call: call("form", args) };
       }
     }
     kept.push(kind);
     return l;
   });
+  const lines = mapped.filter((_, i) => !folded.has(i));
   return { program: turned ? programText({ lines }) : program, turned, kept };
 }
 

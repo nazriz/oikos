@@ -113,3 +113,30 @@ test("nothing of the world beyond the draft's own acts and the seat's own papers
     "   - No paper by that id is among your own papers as you have been shown them: check that it is the one you mean.",
   ]);
 });
+
+test("a form that records a claim beside its paper reads as two things: the permission recorded, then the decision that says so", () => {
+  const T = require("../../contracts/test/forms.json");
+  const { Knowledge } = require("../src/index");
+  const k = new Knowledge(T.currency);
+  k.absorb(T.observation);
+  const read = (program: string) => { const r = resolve(calls.parseProgram(program), k, () => undefined, "mayor"); if (!r.ok) throw new Error(r.questions.join(" ")); return new Preview(k, k.actingFor("mayor"), () => undefined, "mayor").of(r.blocks).split("\n"); };
+  expect(read('form(form=licence_decision, application=rec.70, applicant=c0100, decision=granted, premises=str.9, goods="bread")')).toEqual([
+    "This does two things, in this order: a permission recorded and a licence decision.",
+    "1. You will record that c0100 is permitted: action: trade; goods: bread; object: str.9.",
+    "   - Cites: rec.70.",
+    '2. You will issue a licence decision (form-mayor-licence-decision): "Licence granted: application rec.70.".',
+    "   - Filled in: application: rec.70; decision: granted; applicant: c0100.",
+    '   - It goes to: c0100 (applicant on the form: "Who applied.").',
+  ]);
+  // Refused, it is one thing, and what a grant would have been of is not listed as left empty.
+  expect(read("form(form=licence_decision, application=rec.70, applicant=c0100, decision=refused)")).toEqual([
+    "This does one thing: a licence decision.",
+    '1. You will issue a licence decision (form-mayor-licence-decision): "Licence refused: application rec.70.".',
+    "   - Filled in: application: rec.70; decision: refused; applicant: c0100.",
+    '   - It goes to: c0100 (applicant on the form: "Who applied.").',
+  ]);
+  // The seat's own organisation as the holder is named, never "you is".
+  const own = new Preview(k, k.actingFor("mayor"), (id: string) => (id === "city" ? "Town of Millbrook" : undefined), "mayor").of([{ block: "record_claim", position: "liberty", holder: "city", about: { action: "build", object: "lot-00-01" }, speaks_for: "city" } as any]);
+  expect(own).toContain("You will record that Millbrook (city), which you act for, is permitted: action: build; object: lot-00-01.");
+  expect(own).not.toMatch(/you is|You is/);
+});

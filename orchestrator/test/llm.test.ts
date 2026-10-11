@@ -51,7 +51,7 @@ test("a mock-LLM mayor governs through words, calls and confirmation, and every 
     const d = drafts.get(a.provenance.draft)!;
     expect(a.provenance.draft_hash).toBe(draftHash(d));
     expect(a.provenance.call).toBe(d.call);
-    expect(a.provenance.resolver).toEqual({ id: "resolver", version: "0.6.0" });
+    expect(a.provenance.resolver).toEqual({ id: "resolver", version: "0.7.0" });
     expect(canonical(a.blocks)).toBe(canonical(d.blocks));
     expect(ann.some((x) => x.annotation === "signoff" && x.draft === d.id && x.decision === "accept" && x.draft_hash === a.provenance.draft_hash)).toBe(true);
   }

@@ -36,8 +36,10 @@ const hash = (x: unknown) => new Bun.CryptoHasher("sha256").update(JSON.stringif
 
 test("a spec without `living` generates what it generated before (byte for byte)", () => {
   const c = generate(small);
-  // The generator's output for worlds/town.yaml at commit 750bc30, before starting attachment existed.
-  expect(hash(c)).toBe("404b59db6235883233d93cbace46a47686d6c2ed95e8b559497612e7ad5f3cb9");
+  // The generator's output for worlds/town.yaml on origin/main at ab23f96 (generated there and compared, 2026-10-11),
+  // which has no `living`. (At 750bc30, before starting attachment existed, it was 404b59db...; main's planning
+  // form gained two fields since, and nothing else differs: this branch gave 404b59db... before merging that.)
+  expect(hash(c)).toBe("cef691ee0dfc56d3e4dd0663e396fe9365be992394ab690ee6e817d9e8ce138f");
   const text = JSON.stringify(c);
   expect(text).not.toContain('"started"');
   expect(text).not.toContain("attach_mean");

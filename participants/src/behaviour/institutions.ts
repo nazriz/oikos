@@ -78,7 +78,7 @@ export const planningOfficer: BehaviourModule = {
   name: "city.planning_officer",
   answers: {"office": "the planning office", "acts": "What it acts on: an application for a planning permit on the permit form (permit_application), which it decides under the planning law.", "forms": [{"about": ["permit", "build", "applic", "develop"], "say": "An application to build goes on the permit form (permit_application), naming the lot and the kind of building."}], "report": true},
   issues: P.PLANNING,
-  version: "0.9.1", // 0.9.1: its decision form says what records the permission (the liberty to build, beside the decision); 0.9.0: the town's land from the town's own papers; no longer shown the land register or a survey of the town
+  version: "0.10.0", // 0.10.0: its decision form records the liberty to build beside a decision to grant (FormWrites `claim`), as the code office does; 0.9.1: its decision form says what records the permission (the liberty to build, beside the decision); 0.9.0: the town's land from the town's own papers; no longer shown the land register or a survey of the town
   doc: "docs/behaviour/institutions.md",
   cadence: () => 7 * DAY,
   create(ctx: ParticipantContext) {

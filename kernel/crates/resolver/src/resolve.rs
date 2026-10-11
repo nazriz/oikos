@@ -13,7 +13,7 @@ use crate::knowledge::Knowledge;
 use serde_json::{json, Map, Value as Json};
 use std::collections::BTreeSet;
 
-pub const RESOLVER_VERSION: &str = "0.6.0";
+pub const RESOLVER_VERSION: &str = "0.7.0";
 
 /// Fixed texts for the translator's refusal labels (section 11.1).
 pub fn label_text(label: &str) -> &'static str {
@@ -1328,7 +1328,17 @@ impl Resolver<'_> {
             if let Some(r) = bind {
                 block.insert("ref".into(), json!(r));
             }
-            return Ok(vec![Json::Object(block)]);
+            // A claim the form records beside its paper (a permission granted with the decision): recorded first.
+            let mut acts = vec![];
+            if let Some(claim) = forms::write_claim(spec, &data, &me, self.k.t).map_err(Stop::Ask)? {
+                let mut b = Map::new();
+                b.insert("block".into(), json!("record_claim"));
+                b.extend(claim);
+                b.insert("speaks_for".into(), json!(me));
+                acts.push(Json::Object(b));
+            }
+            acts.push(Json::Object(block));
+            return Ok(acts);
         }
         // What was filled in, in words: an amount as the world writes its money, a length of time in days.
         let mut said: Vec<String> = vec![];

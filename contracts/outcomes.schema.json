@@ -106,6 +106,19 @@
         "basis": { "type": "string", "pattern": "^=[a-z_][a-z0-9_]{0,31}$" },
         "offer": { "type": "object" },
         "assertion": { "type": "object" },
+        "claim": {
+          "description": "A claim the form records beside its paper, in the same act and before it: what a decision grants (a permit's liberty to build), so that a paper that says something is permitted and the record others check are made together. Where `when` holds (each field named has that value; absent: always), `holder` has `position` about `about`, citing `basis`. `holder` and `basis` each name a field (\"=applicant\"; \"=self\" for whoever the paper is made for) and `about` is a template as `data` is. Every field they name is then needed, and one not given is asked for; where `when` does not hold, no claim is recorded and those fields may be left empty. A form without it records none.",
+          "type": "object",
+          "required": ["position", "holder", "about"],
+          "additionalProperties": false,
+          "properties": {
+            "when": { "type": "object", "maxProperties": 4, "propertyNames": { "pattern": "^[a-z_][a-z0-9_]{0,31}$" }, "additionalProperties": { "type": "string", "maxLength": 64 } },
+            "position": { "enum": ["right", "liberty", "power", "immunity"] },
+            "holder": { "type": "string", "pattern": "^=[a-z_][a-z0-9_]{0,31}$" },
+            "about": {},
+            "basis": { "type": "string", "pattern": "^=[a-z_][a-z0-9_]{0,31}$" }
+          }
+        },
         "sends": {
           "description": "Whom every paper made on the form goes to whatever its fields say (those named in `to` by the form itself, not by a field), and why, in the form's own words: what whoever fills the form in is told of them, on the form and in a draft's preview. Each `to` lists them (in a module's declaration, \"@name\" for what is the office's own). It changes nothing a paper carries.",
           "type": "array",
