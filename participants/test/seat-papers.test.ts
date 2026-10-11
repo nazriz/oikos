@@ -96,7 +96,7 @@ test("a paper is read in full when it is asked for by its id; a register or a ma
   await p.step(found(9 * HOUR, "finance/files", []), ctx);
   const r = resultsOf(calls[1]!);
   // A short paper: every word of it, its notice terms too.
-  expect(r.a).toContain("## The office's files: the paper job-c0003\n- [job-c0003] employment agreement between city and c0003: city will pay $1,657.69 to acc-c0003 every 14 days (wages); c0003 will let c0003 live or be in town-hall/workplace.1");
+  expect(r.a).toContain("## The office's files: the paper job-c0003\n- [job-c0003] employment agreement between city and c0003: city will pay $1,657.69 to acc-c0003 every 14 days (wages); c0003 will come to town-hall/workplace.1");
   // The register: what it is, how many entries, the first of them, how many more and how to ask for them.
   expect(JSON.stringify(register).length).toBeGreaterThan(40_000);
   expect(r.b!.length).toBeLessThan(PAPER_MAX + 1_000);

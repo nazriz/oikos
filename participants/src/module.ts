@@ -137,7 +137,7 @@ export interface Issued {
   fields: { [name: string]: FormField };
   /** (`sends`: whom the form itself sends every paper to, whatever its fields say, and why, in the form's own words:
    * each of the office's own named in `to` ("@feeds") that no field puts there. Said on the form and in a draft's preview.) */
-  writes: { kind: string; text: string; data?: unknown; to?: unknown[]; visible?: "public" | unknown[]; basis?: string; offer?: unknown; assertion?: unknown; sends?: { to: string[]; why: string }[] };
+  writes: { kind: string; text: string; data?: unknown; to?: unknown[]; visible?: "public" | unknown[]; basis?: string; offer?: unknown; assertion?: unknown; sends?: { to: string[]; why: string }[]; claim?: { when?: { [field: string]: string }; position: "right" | "liberty" | "power" | "immunity"; holder: string; about: unknown; basis?: string } };
 }
 
 /**

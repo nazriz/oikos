@@ -1,6 +1,6 @@
 {
   "name": "city.planning_officer",
-  "version": "0.9.1",
+  "version": "0.10.0",
   "doc": "docs/behaviour/institutions.md",
   "params": {
     "compliance_bps": {
@@ -32,7 +32,7 @@
     {
       "form": "permit_decision",
       "title": "Decision on a planning permit application",
-      "does": "Decides a permit application (granted, refused, or sent back as incomplete) and tells the applicant. A decision is the notice of it and no more. The permission is the applicant's liberty to build that kind of building on that lot, which the planning officer records beside a decision to grant, citing the application: the building inspector reads that record, and fines work that has none.",
+      "does": "Decides a permit application (granted, refused, or sent back as incomplete) and tells the applicant. A decision to grant records the permission with it: the applicant's liberty to build that kind of building on that lot, which the building inspector reads. So a grant says the lot and the kind of building, as the application gives them.",
       "fields": {
         "application": {
           "type": "record",
@@ -53,6 +53,14 @@
             "incomplete"
           ],
           "description": "Granted, refused, or sent back as incomplete."
+        },
+        "lot": {
+          "type": "lot",
+          "description": "For a grant: the lot the permission is for, as the application names it."
+        },
+        "structure_type": {
+          "type": "structure_type",
+          "description": "For a grant: the kind of building permitted, as the application names it."
         },
         "law": {
           "type": "record",
@@ -75,6 +83,19 @@
           "decision": "=decision",
           "law": "=law",
           "missing": "=missing"
+        },
+        "claim": {
+          "when": {
+            "decision": "granted"
+          },
+          "position": "liberty",
+          "holder": "=applicant",
+          "about": {
+            "action": "build",
+            "object": "=lot",
+            "structure_type": "=structure_type"
+          },
+          "basis": "=application"
         }
       }
     }

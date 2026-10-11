@@ -119,7 +119,7 @@ code did, said as a seat says it). "Existing act" is a call the language had alr
 | council clerk | `council_ballot`, `council_result`, `adopted_budget` (a line each, as the town has them) | appointing the winner of an election (`position`) | **a law amended from its figures**: the amended law's words and rule are drafted from the schedule (`draftLaw`), which no form of fields can do. A seat can publish the law in words; the rule is lost |
 | councillors | | `vote` | |
 | finance | | payments, the payroll's standing payments (set up on the hiring office's payroll notice) | `withholding_report`: nobody reads its content; a statement in words serves |
-| planning | `permit_decision` | the liberty to build (`claim`) | the form writes the decision only, and says so of itself: the permission the inspector checks is the liberty, recorded beside it (2026-10-11: a seat granted on the form alone and the town was fined; a form that writes both needs a contract change, docs/decisions.md) |
+| planning | `permit_decision`, which records the liberty to build beside a decision to grant (`writes.claim`: the form's `lot` and `structure_type` say what is permitted, and a grant without them is asked about) | | until 2026-10-11 the form wrote the decision alone and the liberty was a call of its own: a seat's permit granted nothing, and the inspector fined the building (docs/decisions.md, "A permit granted on the planning office's form is a permit") |
 | inspector | `valuation_request`, `demolition_order` | the fine (`claim`); going to the site (a look) | |
 | registry | `death_registration`, `death_certificate`, `birth_registration`, `transmission_application` | | |
 | child protection | | taking a child into care (`presence`) | |

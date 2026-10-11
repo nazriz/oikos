@@ -194,12 +194,14 @@ export function ruleWords(r: { adico?: any; formal?: any }, o: { asWritten?: boo
 }
 
 /** An outcome someone commits to or is asked for (§9), in words. */
-export function outcomeWords(o: any, every?: number): string {
+export function outcomeWords(o: any, every?: number, by?: string): string {
   const rep = every ? ` every ${duration(every)}` : "";
   if (o?.goods) return `deliver ${o.goods.quantity} ${o.goods.kind} to ${o.goods.to} at ${o.goods.at}${rep}`;
   if (o?.money) return `pay ${money(o.money.amount)}${o.money.from ? ` from ${o.money.from}` : ""} to ${o.money.to}${rep}${o.money.for ? ` (${o.money.for})` : ""}`;
   if (o?.structure) return o.structure.remove ? `demolish ${o.structure.remove}` : `build a ${o.structure.type} on ${o.structure.on}`;
-  if (o?.occupancy) return o.occupancy.leave ? `have ${o.occupancy.who} leave ${o.occupancy.in}` : `let ${o.occupancy.who} live or be in ${o.occupancy.in}`;
+  // (Whoever commits to be in a place themselves comes there: a worker and their place of work read "c0009 will let
+  // c0009 live or be in town-hall/workplace.1" until 2026-10-11, and a finance seat held a wage over the "garbled" terms.)
+  if (o?.occupancy) return by !== undefined && o.occupancy.who === by ? (o.occupancy.leave ? `leave ${o.occupancy.in}` : `come to ${o.occupancy.in}`) : o.occupancy.leave ? `have ${o.occupancy.who} leave ${o.occupancy.in}` : `let ${o.occupancy.who} live or be in ${o.occupancy.in}`;
   if (o?.account) return o.account.close ? `close account ${o.account.close}` : `open an account for ${o.account.holder}`;
   return "do what the terms say";
 }
@@ -243,7 +245,7 @@ function describe(r: Record, readings?: { [id: string]: Reading }): string {
     case "claim":
       return `[${r.id}] ${r.holder} ${POSITION[r.position] ?? r.position}${r.counterparty ? ` against ${r.counterparty}` : ""}: ${details(r.about) || "(no details)"}${r.basis ? `, citing ${citedWords(r)}` : ""}${from}`;
     case "agreement": {
-      const c = r.terms.commitments.map((x) => `${x.who} will ${x.does?.outcome ? outcomeWords(x.does.outcome, x.every) : clip(JSON.stringify(x.does), 200)}`).join("; ");
+      const c = r.terms.commitments.map((x) => `${x.who} will ${x.does?.outcome ? outcomeWords(x.does.outcome, x.every, x.who) : clip(JSON.stringify(x.does), 200)}`).join("; ");
       return `[${r.id}] ${r.terms.template ? `${words(r.terms.template)} agreement` : "agreement"} between ${r.terms.parties.join(" and ")}${r.terms.term ? `, for ${duration(r.terms.term)}` : ""}: ${c || "no commitments"}${r.terms.text ? `. "${clip(r.terms.text)}"` : ""}${from}${readingWords(readings?.[r.id])}`;
     }
     case "signature":
@@ -468,7 +470,7 @@ function listLine(r: Record, readings?: { [id: string]: Reading }): string {
   let gist: string;
   switch (r.record) {
     case "statement": gist = r.kind === "request" && r.data?.outcome ? `asks ${(r.addressed_to ?? []).join(", ") || "someone"} to ${outcomeWords(r.data.outcome, r.data.every)}` : `${r.addressed_to?.length ? `to ${r.addressed_to.join(", ")}: ` : ""}"${cut(r.text)}"`; break;
-    case "agreement": gist = `between ${r.terms.parties.join(" and ")}: ${cut(r.terms.commitments.map((x) => `${x.who} will ${x.does?.outcome ? outcomeWords(x.does.outcome, x.every) : "do what its terms say"}`).join("; ") || "no commitments")}${readingWords(readings?.[r.id])}`; break;
+    case "agreement": gist = `between ${r.terms.parties.join(" and ")}: ${cut(r.terms.commitments.map((x) => `${x.who} will ${x.does?.outcome ? outcomeWords(x.does.outcome, x.every, x.who) : "do what its terms say"}`).join("; ") || "no commitments")}${readingWords(readings?.[r.id])}`; break;
     case "claim": gist = `${r.holder} ${POSITION[r.position] ?? r.position}${r.counterparty ? ` against ${r.counterparty}` : ""}${r.about?.object ? `: ${r.about.object}` : ""}`; break;
     case "signature": gist = `${r.as} signed ${r.agreement}`; break;
     case "notice": gist = `${r.as} gave notice on ${r.agreement}`; break;

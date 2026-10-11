@@ -124,11 +124,16 @@ export const COUNCIL_CLERK: Issued[] = [
 ];
 
 export const PLANNING: Issued[] = [
-  { form: "permit_decision", title: "Decision on a planning permit application", does: "Decides a permit application (granted, refused, or sent back as incomplete) and tells the applicant. A decision is the notice of it and no more. The permission is the applicant's liberty to build that kind of building on that lot, which the planning officer records beside a decision to grant, citing the application: the building inspector reads that record, and fines work that has none.",
+  // (A decision to grant records the permission with it: the applicant's liberty to build that kind of building on
+  // that lot, which is what the building inspector reads. Until 2026-10-11 the form wrote the decision alone, and a
+  // seat's permit granted nothing: a park granted on it was fined and ordered down the same day.)
+  { form: "permit_decision", title: "Decision on a planning permit application", does: "Decides a permit application (granted, refused, or sent back as incomplete) and tells the applicant. A decision to grant records the permission with it: the applicant's liberty to build that kind of building on that lot, which the building inspector reads. So a grant says the lot and the kind of building, as the application gives them.",
     fields: { application: f("record", "The application decided.", req), applicant: f("entity", "Who applied: the decision is sent to them.", req),
       decision: f("choice", "Granted, refused, or sent back as incomplete.", { ...req, options: ["granted", "refused", "incomplete"] }),
+      lot: f("lot", "For a grant: the lot the permission is for, as the application names it."), structure_type: f("structure_type", "For a grant: the kind of building permitted, as the application names it."),
       law: f("record", "The law the building would breach, if any."), missing: f("list", "For an incomplete application: what it does not say (lot, structure_type).") },
-    writes: { kind: "permit_decision", text: "Permit {decision}: application {application}.", basis: "=application", to: ["=applicant"], data: { application: "=application", decision: "=decision", law: "=law", missing: "=missing" } } },
+    writes: { kind: "permit_decision", text: "Permit {decision}: application {application}.", basis: "=application", to: ["=applicant"], data: { application: "=application", decision: "=decision", law: "=law", missing: "=missing" },
+      claim: { when: { decision: "granted" }, position: "liberty", holder: "=applicant", about: { action: "build", object: "=lot", structure_type: "=structure_type" }, basis: "=application" } } },
 ];
 
 export const INSPECTOR: Issued[] = [

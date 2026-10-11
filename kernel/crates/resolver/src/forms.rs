@@ -230,6 +230,67 @@ fn fill_text(template: &str, spec_fields: &Json, env: &Env, money: Money) -> Res
     Ok(out)
 }
 
+/// The fields a template names, each once, in the order met ("=self" aside).
+fn named<'a>(t: &'a Json, into: &mut Vec<&'a str>) {
+    if let Some((_, name)) = placeholder(t) {
+        if name != "self" && !into.contains(&name) {
+            into.push(name);
+        }
+        return;
+    }
+    match t {
+        Json::Array(items) => items.iter().for_each(|x| named(x, into)),
+        Json::Object(m) => m.values().for_each(|x| named(x, into)),
+        _ => {}
+    }
+}
+
+fn claim_word(position: &str) -> &str {
+    match position {
+        "liberty" => "permission",
+        other => other,
+    }
+}
+
+/// The claim a form records beside its paper (contracts: FormWrites `claim`), as the keys of the act that records it
+/// (without the block or the speaker): None where the form records none, or its `when` does not hold. Where it is
+/// due, every field it is written from is needed, and one not given is a question back. The twin of `writeClaim`.
+pub fn write_claim(spec: &Json, fields: &Map<String, Json>, me: &str, now: i64) -> Result<Option<Map<String, Json>>, String> {
+    let c = &spec["writes"]["claim"];
+    if !c.is_object() {
+        return Ok(None);
+    }
+    let when: Vec<(&String, &Json)> = c["when"].as_object().map(|m| m.iter().collect()).unwrap_or_default();
+    if !when.iter().all(|(k, v)| fields.get(*k) == Some(*v)) {
+        return Ok(None);
+    }
+    let form = spec["form"].as_str().unwrap_or_default().replace('_', " ");
+    let position = c["position"].as_str().unwrap_or_default();
+    let mut names = vec![];
+    named(&c["holder"], &mut names);
+    named(&c["about"], &mut names);
+    named(&c["basis"], &mut names);
+    let mut missing: Vec<&str> = names.into_iter().filter(|n| !fields.contains_key(*n)).collect();
+    missing.sort_unstable();
+    if !missing.is_empty() {
+        let said: Vec<String> = when.iter().map(|(k, v)| format!("{} {}", k.replace('_', " "), v.as_str().unwrap_or_default())).collect();
+        let with = if said.is_empty() { String::new() } else { format!(", with {},", said.join(" and ")) };
+        return Err(format!("The {form}{with} needs: {}. They say what the {} it records is.", missing.join(", "), claim_word(position)));
+    }
+    let env = Env { fields, me, now };
+    let Some(holder @ Json::String(_)) = fill(&c["holder"], &env)? else {
+        return Err(format!("The {form} can't say who holds the {} it records.", claim_word(position)));
+    };
+    let mut out = Map::new();
+    out.insert("position".into(), json!(position));
+    out.insert("holder".into(), holder);
+    out.insert("about".into(), fill(&c["about"], &env)?.unwrap_or(Json::Null));
+    if let Some(b @ Json::String(_)) = c.get("basis").filter(|x| !x.is_null()).map(|t| fill(t, &env)).transpose()?.flatten() {
+        out.insert("basis".into(), b);
+    }
+    Ok(Some(out))
+}
+
 /// What a form with `writes` makes of its fields: the paper, as the keys of the act that publishes it (without the
 /// block, the speaker or a reference). `text`: the paper's own words, where whoever fills it in gives them. An error
 /// is a question back.
