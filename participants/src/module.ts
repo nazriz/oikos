@@ -33,6 +33,52 @@ export interface ConsultAnswer { scores: { [key: string]: { mean: number; sd: nu
 export type Consult = (q: ConsultQuestion, subject: string) => Promise<ConsultAnswer | undefined>;
 
 /**
+ * What the composing model is shown for one piece (docs/design/ai-citizens.md 10e; docs/behaviour/founding.md): the
+ * entity's own record as the kernel holds it, the want and what happened, the others who share it as the entity knows
+ * them, the shape drawn and what it leaves open. Nothing of anyone else's record (docs/no-god-view.md). Whole numbers
+ * and words of the world's own; the platform puts it into prose (participants/src/llm/compose.ts).
+ */
+export interface ComposeBrief {
+  /** The idea's id: every statement of purpose has one (10h), whoever writes it. */
+  idea: string;
+  founder: string;
+  /** The founder's own record's sections (contracts/entity-record.schema.json, PersonRecord), as last written. */
+  record: { [section: string]: unknown };
+  want: { about: string; whom?: string; /** It befell someone of their household, not themselves (they hold it with them). */ befell?: "household"; days: number; tried: number; way?: string; weight: number; how: "given_up" | "withdrew"; asked?: string; venues?: number; amount?: string };
+  sharers: { who: string; how: string }[];
+  shape: string;
+  /** What the shape leaves open, as closed choices: dues a month (the world's money, in words and its smallest unit),
+   * how often it gathers, how soon the first, how long; and where (the one place it can use). */
+  open: { dues: { cents: number; words: string }[]; every_days: number[]; starts_in_days: number[]; lasts_minutes: number[]; place: string };
+  /** Money, in the world's own writing: a month's income and what is saved. */
+  means: { income: string; savings: string };
+  /** Whether the piece asked for is a dark one, by the stated rule (docs/behaviour/founding.md), and why. */
+  dark: string[];
+  /** The plain statement code writes with no model: what stands if the piece is declined or cannot be had. */
+  code: { purpose: string; name: string };
+}
+/** A piece as composed: the words, and the same choices as closed fields. `declined`: the model chose not to write it. */
+export interface ComposePiece {
+  declined: boolean;
+  why?: string;
+  purpose: string; name: string; asks: string; gathers: string;
+  choice: { dues: number; every_days: number; starts_in_days: number; lasts_minutes: number };
+  model: string;
+}
+/** The composer, where the world's dial has it on: undefined when no piece is to be had (the month's allowance is
+ * spent, the answer could not be read, the model did not answer). */
+export type Compose = (brief: ComposeBrief, subject: string) => Promise<ComposePiece | undefined>;
+
+/**
+ * Words a code participant sends through the translator (docs/behaviour/founding.md, "Words"): carried with a
+ * `propose` action as a non-enumerable property under this symbol. Nobody reads a code participant's draft, so the
+ * module says what the draft may be: `accept` is given the draft's blocks and returns the blocks to carry out (its own
+ * plumbing added: nothing a model wrote), or why it is not done. `done` hears which. In process only, like DECISIONS.
+ */
+export const WORDS = Symbol.for("oikos.words");
+export interface Words { what: string; idea?: string; accept(blocks: Block[]): Block[] | string; done(ok: boolean, why?: string): void }
+
+/**
  * What a module may know about the run itself: the clock's grain and when the run ends. Nothing about the world:
  * a module knows the world only through what it perceives and its own parameters, like any participant (P14).
  */
@@ -57,6 +103,9 @@ export interface ParticipantContext {
   /** The sparse mind (docs/design/ai-citizens.md 4): asking a model how much each option would matter to someone like
    * this. Present only when the run turns it on; a module decides without it otherwise. */
   consult?: Consult;
+  /** The composing model (docs/design/ai-citizens.md 10e): words for something an entity founds. Present only where
+   * the world's dial has the composer on; a module writes its own plain words otherwise. */
+  compose?: Compose;
   /** A deterministic stream for this participant, this moment and this purpose. */
   rng(purpose: string): Rng;
   /** A deterministic stream for a purpose alone: the same for whoever draws it. For what is a fact about a thing in the
@@ -286,6 +335,9 @@ export interface OutcomeRecord {
   need?: string;
   felt?: { emotion: string; about: string; bps: number; before: number; after: number }[];
   belief?: { host: string; before: number; after: number };
+  /** With a founding (domain `found`, kind `founded`): what a composing model would be shown for it, whether or not
+   * one was asked (docs/behaviour/founding.md): the recorded situations the composer's audits are run on. */
+  brief?: ComposeBrief;
 }
 
 export const wait = (until?: number): ParticipantAction => (until === undefined ? { type: "wait" } : { type: "wait", until });

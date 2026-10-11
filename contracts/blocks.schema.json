@@ -1391,6 +1391,10 @@
           "type": "integer",
           "minimum": 0,
           "maximum": 200
+        },
+        "dealing_with": {
+          "description": "Party to an agreement in force with this entity: its tenant, its worker, its member, its customer. Eligibility by something other than membership of anything (docs/behaviour/founding.md).",
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
         }
       }
     },

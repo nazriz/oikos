@@ -337,6 +337,48 @@
               }
             }
           }
+        },
+        "ideas": {
+          "description": "Founding and the lineage of ideas in the run (docs/design/ai-citizens.md 10h; docs/behaviour/founding.md), counted and never scored: things founded, by shape; ideas (statements of what something is for, a world's teachings), by who wrote them (the world, code for a person, the composing model and which); how often an idea passed to someone, by how (joined, left, a belief moved and by what); what the composing model was asked and answered, with the dark pieces the run asked for; and what came of each part of a composed piece sent through the translator.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "founded": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "written_by": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "passages": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "composer": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "words": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
         }
       }
     },
@@ -1730,6 +1772,225 @@
         "waited_days": {
           "type": "integer",
           "minimum": 0
+        }
+      }
+    },
+    "Founded": {
+      "description": "A row of founded.jsonl: something a person founded in the run, as they came to know it was made. `shape`: gathering, fund or cause; `org`: the organisation; `idea`: the id of its statement of purpose; `about`, `whom`: the want it came of; `sharers`: how many others the founder knew to share it; `composer`: none, declined, or the model that wrote its words; `name_by`: whether its name came through the translator or is the plain one; `dark`: how many of the stated reasons made the piece asked for a dark one; `brief`: what a composing model would be shown for it (the founder's own record and the situation), whether or not one was asked.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "run",
+        "t",
+        "seq",
+        "founder",
+        "shape",
+        "org",
+        "idea",
+        "about",
+        "sharers",
+        "composer"
+      ],
+      "properties": {
+        "run": {
+          "type": "string"
+        },
+        "t": {
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/SimTime"
+        },
+        "seq": {
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/Count"
+        },
+        "founder": {
+          "type": "string"
+        },
+        "shape": {
+          "type": "string"
+        },
+        "org": {
+          "type": "string"
+        },
+        "idea": {
+          "type": "string"
+        },
+        "about": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "whom": {
+          "type": "string"
+        },
+        "sharers": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "composer": {
+          "type": "string"
+        },
+        "name_by": {
+          "enum": [
+            "translator",
+            "code"
+          ]
+        },
+        "dark": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "brief": {
+          "type": "object"
+        }
+      }
+    },
+    "Idea": {
+      "description": "A row of ideas.jsonl: a statement of what something is for, or a teaching, as it was put out. `idea`: its id (a world's teaching: the record's; one made in a run: the id its founder's want gave it, which its later papers carry); `of`: who stands for it; `written_by`: world (whoever made the world), code (a person's own plain words, written without a model) or composer (the composing model, for the person `for`), with `model`; `via`: how its words reached the log (world, call: code wrote them; translator: they went through the translator).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "run",
+        "t",
+        "seq",
+        "idea",
+        "kind",
+        "of",
+        "written_by",
+        "via",
+        "text"
+      ],
+      "properties": {
+        "run": {
+          "type": "string"
+        },
+        "t": {
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/SimTime"
+        },
+        "seq": {
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/Count"
+        },
+        "idea": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "of": {
+          "type": "string"
+        },
+        "written_by": {
+          "enum": [
+            "world",
+            "code",
+            "composer"
+          ]
+        },
+        "model": {
+          "type": "string"
+        },
+        "for": {
+          "type": "string"
+        },
+        "via": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        }
+      }
+    },
+    "IdeaPassage": {
+      "description": "A row of idea_passages.jsonl: an idea passing to someone, as that person's own record of outcomes had it. `how`: joined, left or wound_up (membership of whoever stands for it), or the outcome that moved their belief in it (practice:attended, belief:told, belief:joined ...), with the belief `before` and `after` (basis points) and `from` whom, where someone told them.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "run",
+        "t",
+        "seq",
+        "idea",
+        "of",
+        "to",
+        "how"
+      ],
+      "properties": {
+        "run": {
+          "type": "string"
+        },
+        "t": {
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/SimTime"
+        },
+        "seq": {
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/Count"
+        },
+        "idea": {
+          "type": "string"
+        },
+        "of": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        },
+        "how": {
+          "type": "string"
+        },
+        "from": {
+          "type": "string"
+        },
+        "before": {
+          "type": "integer"
+        },
+        "after": {
+          "type": "integer"
+        }
+      }
+    },
+    "Words": {
+      "description": "A row of words.jsonl: a part of a composed piece (name, purpose, gathers, asks) sent through the translator by a code participant, and what came of it: done (the draft was what the participant's module said it may be, and its acts went ahead) or not_done, with why; `by`: which of two translators answered, where a run has two; `plumbing_added`: the acts carried something of the module's own that the draft did not (a post's channels).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "run",
+        "t",
+        "seq",
+        "participant",
+        "what",
+        "result"
+      ],
+      "properties": {
+        "run": {
+          "type": "string"
+        },
+        "t": {
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/SimTime"
+        },
+        "seq": {
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/Count"
+        },
+        "participant": {
+          "type": "string"
+        },
+        "what": {
+          "type": "string"
+        },
+        "idea": {
+          "type": "string"
+        },
+        "draft": {
+          "type": "string"
+        },
+        "result": {
+          "enum": [
+            "done",
+            "not_done"
+          ]
+        },
+        "why": {
+          "type": "string"
+        },
+        "by": {
+          "type": "string"
+        },
+        "plumbing_added": {
+          "type": "boolean"
         }
       }
     }

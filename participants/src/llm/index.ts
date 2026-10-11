@@ -11,3 +11,4 @@ export * from "./answer";
 export * from "./codex";
 export * from "./claude-code";
 export * from "./consult";
+export * from "./compose";
