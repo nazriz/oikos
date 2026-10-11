@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { compressLog } from "../src/logs";
 import { lastAlerts } from "../src/pilot-alerts";
-import { limitedProviders, localStamp, nextPilot, parkedPath, providersOf, runState, scanOptOuts } from "../src/pilot-state";
+import { limitedProviders, localStamp, measureFailure, nextPilot, parkedPath, providersOf, runState, scanOptOuts } from "../src/pilot-state";
 
 const UNTIL = 5_184_000;
 const base = realpathSync(mkdtempSync(join(tmpdir(), "oikos-pilot-queue-test-")));
@@ -104,6 +104,44 @@ test("the queue skips a finished, compressed pilot, writes PILOT.txt with its te
   expect(readFileSync(join(base, "hook.txt"), "utf8").trim().split("\n")).toEqual(alerts);
   expect(lastAlerts(runs, "wv", 1)).toEqual([alerts[1]!]);
 }, 60_000);
+
+test("a pilot that is done but whose measures failed is said so: in the status log, the alerts and the report; one measured is just done", async () => {
+  const runs = join(base, "runs-measures");
+  const bad = await folder("runs-measures/pilot-bad", { t: UNTIL, end: { reason: "aborted", detail: `stopped at ${UNTIL}` }, compress: true });
+  // (The run's own note, as a batch or a resume leaves it when its measuring throws.)
+  writeFileSync(join(bad, "measure-failed.txt"), "Invalid Input Error: maximum_object_size of 16777216 bytes exceeded\n");
+  // (A batch that measured with nothing to show for it: no tables.)
+  const none = await folder("runs-measures/pilot-none", { t: UNTIL, end: { reason: "aborted", detail: `stopped at ${UNTIL}` }, compress: true });
+  writeFileSync(join(none, "batch.json"), JSON.stringify({ measure: "0.6.0", runs: [] }));
+  const good = await folder("runs-measures/pilot-good", { t: UNTIL, end: { reason: "aborted", detail: `stopped at ${UNTIL}` }, compress: true });
+  writeFileSync(join(good, "batch.json"), JSON.stringify({ measure: "0.6.0", runs: [] }));
+  mkdirSync(join(good, "measure/runs"), { recursive: true });
+  writeFileSync(join(good, "measure/runs/town.seed4.parquet"), "x");
+  expect(measureFailure(bad)).toContain("maximum_object_size");
+  expect(measureFailure(none)).toContain("no measurement tables");
+  expect(measureFailure(good)).toBeUndefined();
+  const queue = join(base, "queue-measures.json");
+  writeFileSync(queue, JSON.stringify(["pilot-bad", "pilot-none", "pilot-good"].map((name) => ({ name, world: "worlds/town-1000.yaml", model: "mock/mock", until: UNTIL, budget: 1 }))));
+  const p = Bun.spawnSync(["bun", join(import.meta.dir, "../../scripts/pilot-queue.ts"), queue], { env: { ...process.env, OIKOS_RUNS: runs, OIKOS_WAVE: "wm", OIKOS_NO_NOTIFY: "1", OIKOS_ALERT_CMD: "" }, stdout: "pipe", stderr: "pipe" });
+  const out = p.stdout.toString();
+  expect(p.exitCode).toBe(0);
+  expect(out).toMatch(/pilot-bad: done \(day 60\) BUT ITS MEASURES FAILED: .*maximum_object_size/);
+  expect(out).toMatch(/pilot-none: done \(day 60\) BUT ITS MEASURES FAILED: no measurement tables/);
+  expect(out).toMatch(/pilot-good: done \(day 60\)\s*$/m);
+  const alerts = readFileSync(join(runs, "pilot-queues/wm.alerts.log"), "utf8");
+  expect(alerts).toMatch(/MEASURES FAILED pilot-bad: the run is done \(day 60\) but nothing was measured: .*maximum_object_size/);
+  expect(alerts).toContain("MEASURES FAILED pilot-none");
+  expect(alerts).toContain("done: pilot-good (day 60)");
+  expect(alerts).not.toContain("MEASURES FAILED pilot-good");
+  expect(JSON.parse(readFileSync(join(bad, "pilot-report.json"), "utf8")).measures_failed).toContain("maximum_object_size");
+  expect(JSON.parse(readFileSync(join(good, "pilot-report.json"), "utf8")).measures_failed).toBeUndefined();
+  // And the wave's status line for it.
+  mkdirSync(join(runs, "pilot-queues"), { recursive: true });
+  writeFileSync(join(runs, "pilot-queues/wm.commit"), `abc123\nwave wm, ref main, worktree /x\nqueues: ${queue}\nstarted now\n`);
+  const st = Bun.spawnSync(["bun", join(import.meta.dir, "../../scripts/pilot-wave.ts"), "status", "wm"], { env: { ...process.env, OIKOS_RUNS: runs }, stdout: "pipe", stderr: "pipe" }).stdout.toString();
+  expect(st).toMatch(/pilot-bad: done.*MEASURES FAILED: .*maximum_object_size/);
+  expect(st).not.toMatch(/pilot-good: .*MEASURES FAILED/);
+}, 120_000);
 
 test("an opt-out is found in a log as it grows, once, from where the last look ended; also in a compressed one", async () => {
   const log = join(base, "optout.seed1.jsonl");

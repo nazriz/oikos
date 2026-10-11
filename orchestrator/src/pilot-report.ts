@@ -9,6 +9,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import { currentLogs, logLines, runOf } from "./logs";
+import { measureFailure } from "./pilot-state";
 import { NOT_CHECKED, NOT_PUT } from "../../translator/src/index";
 
 /** The sentences a translator that asked back says (translator/src/index.ts `unsureText`): which one, which words, a
@@ -331,6 +332,9 @@ export async function pilotReport(dir: string, write = true): Promise<any> {
   if (!logs.length) throw new Error(`${dir}: no log to report on`);
   const reports = [];
   for (const log of logs) reports.push(await reportOfLog(dir, log));
+  // (A pilot whose measures are missing says so in its report, however it came to be reported on.)
+  const noMeasures = measureFailure(dir);
+  if (noMeasures) for (const r of reports) r.measures_failed = noMeasures;
   const out = reports.length === 1 ? reports[0] : { pilot: basename(resolve(dir)), runs: reports };
   if (write) writeFileSync(join(dir, "pilot-report.json"), JSON.stringify(out, null, 2) + "\n");
   return out;
@@ -340,6 +344,7 @@ export async function pilotReport(dir: string, write = true): Promise<any> {
 export function renderReport(r: any): string {
   if (r.runs) return r.runs.map(renderReport).join("\n\n");
   const L: string[] = [];
+  if (r.measures_failed) L.push(`MEASURES FAILED: ${r.measures_failed}; the run's measures, health report and cost are not there until it is measured again`);
   const kv = (o: any) => Object.entries(o ?? {}).map(([k, v]) => `${k} ${v}`).join(", ") || "none";
   if (r.not_whole) {
     const short = r.not_whole.seats.length ? `a seat sat for less than its run. ${r.not_whole.seats.map((s: any) => `${s.seat} missed ${s.sittings_missed} sitting${s.sittings_missed === 1 ? "" : "s"} (day ${s.days.join(", ")}; its model did not answer) and last sat on day ${s.last_sat_day ?? "none"}${r.until_days !== null ? ` of ${r.until_days}` : ""}`).join("; ")}` : "";
