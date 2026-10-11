@@ -697,7 +697,7 @@
     "OrganisationRecord": {
       "type": "object",
       "additionalProperties": false,
-      "description": "An organisation's own record (a firm, a landlord): its character, drawn from the values of whoever owns most of it; its wants; and the last things that happened to it. Written by the bookkeeping of the one post of the organisation that keeps it (world config: the position's keeps_record).",
+      "description": "An organisation's own record (a firm, a landlord, a group founded in a run): its character, drawn from the values of whoever owns most of it; its wants; and the last things that happened to it. Written by the bookkeeping of the one post of the organisation that keeps it (world config: the position's keeps_record).",
       "properties": {
         "character": {
           "type": "object",
@@ -882,6 +882,68 @@
             "type": "integer",
             "minimum": -9007199254740991,
             "maximum": 9007199254740991
+          }
+        },
+        "purpose": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "What the organisation is for, where it was founded in a run (docs/behaviour/founding.md): its founder's want, carried here; the words of its statement of purpose as they stand, and the idea's id (docs/design/ai-citizens.md 10h); its shape; and which way each part of its words arrived (through the translator, as a closed choice, or as the plain default code writes).",
+          "required": [
+            "idea",
+            "founder",
+            "shape",
+            "about",
+            "since",
+            "words"
+          ],
+          "properties": {
+            "idea": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "founder": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "shape": {
+              "enum": [
+                "gathering",
+                "fund",
+                "cause",
+                "business"
+              ]
+            },
+            "about": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "whom": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "since": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "words": {
+              "type": "string",
+              "maxLength": 1024
+            },
+            "arrived": {
+              "type": "object",
+              "additionalProperties": {
+                "enum": [
+                  "translator",
+                  "choice",
+                  "code"
+                ]
+              }
+            },
+            "model": {
+              "type": "string",
+              "maxLength": 128
+            }
           }
         }
       }

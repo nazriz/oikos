@@ -793,6 +793,66 @@
           "type": "integer",
           "minimum": 0,
           "maximum": 100000
+        },
+        "founding": {
+          "description": "Founding (docs/behaviour/founding.md; docs/design/ai-citizens.md 10b): people and organisations start things of their own, put up from the blocks (an organisation, a statement of what it is for, a gathering, an offer of membership, a hearing). Absent: nobody founds anything, and nobody joins or leaves a thing made in a run.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "shapes": {
+              "description": "Which shapes may be founded: a group that gathers, a fund its members pay into and draw on, a body that takes grievances up, a business. Each is a composition of blocks; none is a kind the kernel knows.",
+              "type": "array",
+              "uniqueItems": true,
+              "maxItems": 4,
+              "items": { "enum": ["gathering", "fund", "cause", "business"] }
+            },
+            "scale_bps": {
+              "description": "A scale on the place's fitted chance of founding at an occasion (10000: as fitted).",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000000
+            }
+          }
+        },
+        "composer": {
+          "description": "The composing model (docs/design/ai-citizens.md 10e; VISION 15, point 7): the words of a founded thing are written by a model asked as an author shown the founder's own record, who may decline. Absent: no model is asked, and every statement of purpose is the plain one code writes. A run plays the composer on the mock unless it is started with the composer for real; either way the mix here is on record.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["pieces_per_month", "mix"],
+          "properties": {
+            "pieces_per_month": {
+              "description": "How many pieces the composer may be asked for in any 30 days of the world; beyond it, the plain statement stands.",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000
+            },
+            "mix": {
+              "description": "The models that compose, and each one's share of pieces (basis points; they sum to 10000). Which model writes a piece is drawn on the kernel's seeded streams. Fixed across runs that are compared.",
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 8,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["model", "share_bps"],
+                "properties": {
+                  "model": { "type": "string", "maxLength": 128, "description": "provider/model, as a run's --model names one." },
+                  "share_bps": { "type": "integer", "minimum": 0, "maximum": 10000 }
+                }
+              }
+            },
+            "fallback": {
+              "description": "The model a piece goes to when the one drawn does not answer (it must be in the mix); the log says so each time. Absent: the first of the mix.",
+              "type": "string",
+              "maxLength": 128
+            },
+            "follow_up_bps": {
+              "description": "The share of dark pieces after which the same model is asked, by one fixed neutral question, about the task (VISION 15, point 7). Absent: 2500.",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            }
+          }
         }
       },
       "additionalProperties": true

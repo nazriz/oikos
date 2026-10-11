@@ -1996,7 +1996,8 @@
                 "participant",
                 "translator",
                 "debrief",
-                "consult"
+                "consult",
+                "compose"
               ]
             },
             "subject": {

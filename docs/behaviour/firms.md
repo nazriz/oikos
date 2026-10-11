@@ -77,7 +77,7 @@ A world with no such law and a firm given `adjust: { smooth_months: 0, hiring_co
 
 ## Wages owed (2026-10-11): one ledger, and what a bank statement says
 
-**Source:** `Staffing.latePay`, `owedShort`, `wagesOwed` (`firms.ts`); `bank.payment_system` 0.11.0; `citizen.default` 0.47.0.
+**Source:** `Staffing.latePay`, `owedShort`, `wagesOwed` (`firms.ts`); `bank.payment_system` 0.17.0; `citizen.default` 0.48.0.
 
 **The fault that was reported, and what it was.** Step 2b found about 18 people a year paid "4 to 48% under their agreed wage" by a "wage rule", with the firm's books owning to nothing. No rule cuts an agreed wage: the monthly wage rule moves only what is offered to new hires. Every one of those payments, traced in a year's log, was something else paid to a worker from their employer's account: a shop's refund to a hand who shops where they work (14 of 19), or a factory's dividend to a worker who holds its shares (5). The worker read any payment from the employer's account between half and the whole of their pay as "pay, short", because a payment carried no word of what it was for. The firm's books were right.
 

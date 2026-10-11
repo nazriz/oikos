@@ -90,7 +90,7 @@ export class Hearings {
    * answer, or none: a decision in default, or a paper shown), and put before the office-holder, as a note on the
    * office's file, each case the record cannot settle; "seat", the office-holder, who decides those and nothing else.
    */
-  steps(book: Book, t: number, part: "all" | "staff" | "seat" = "all"): Step[] {
+  steps(book: Book, t: number, part: "all" | "staff" | "seat" = "all", /** How many cases can be decided now, where that is not a fixed number a day (a body whose staff are its members' hours). */ canDecide?: number): Step[] {
     const steps: Step[] = [];
     if (part === "seat") {
       // The cases the staff could not settle on the record: decided here as the code office would (failure of proof,
@@ -153,7 +153,7 @@ export class Hearings {
           { to: [applicant, against], visible: [applicant, against, this.me], basis: a.id, data: { application: a.id, kind: matter, matter, applicant, against, hearing_at: c.answerBy, answer_by: c.answerBy, ...(d.about ? { about: d.about } : {}), ...(d.amount !== undefined ? { amount: d.amount } : {}), ...(d.structure ? { structure: d.structure } : {}), ...(d.seeks ? { seeks: d.seeks } : {}) } })));
     }
     // ---- deciding: those whose time to answer has run, oldest first, as far as the day's hours go ----
-    let room = Math.max(1, Math.floor(this.p.cases_per_day));
+    let room = canDecide ?? Math.max(1, Math.floor(this.p.cases_per_day));
     for (const c of [...this.cases.values()].filter((x) => t >= x.answerBy).sort((a, b) => a.answerBy - b.answerBy || (a.id < b.id ? -1 : 1))) {
       if (room-- <= 0) break;
       const can = c.hears.can ?? ["order"];

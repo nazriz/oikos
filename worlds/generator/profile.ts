@@ -132,6 +132,18 @@ export interface Profile {
     frictions?: { per_adult_bps_per_year: { landlord: number; wages: number; bill: number; benefits: number; goods: number }; put_right_on_asking_bps: { [matter: string]: number };
       pay_short_by_bps: number; bill_over_bps: number; goods_faulty_share_bps: number; repair_hours: number; support: { processing_days: number; wrong_refusal_bps: number };
       venues: { answer_days: number; tribunal_days: number; tribunal_fee_hours_of_pay: number; cases_per_day: number; uphold_without_proof_bps: number } };
+    /** Founding (docs/behaviour/founding.md), read only for a living town that turns it on: how often new associations
+     * are registered here (`registered_per_100000_per_year`, with its source; code never reads it) and how many more
+     * are never registered (`informal_multiple`, a placeholder), which together are what `chance_bps` (the chance at
+     * an occasion, for a person of the town's mean temperament and standing) is FITTED to; and the sizes: how many
+     * others must share the want; what a founder may ask in dues (minutes of ordinary pay a month, the first the
+     * plain default); how often, how soon and how long a group gathers; when a thing nobody joins lapses; when a
+     * member who no longer comes leaves; the hall's hire (hours of ordinary pay a gathering); a fund's and a
+     * grievance body's rules. Each with its source or marked a placeholder. */
+    founding?: { registered_per_100000_per_year: number; informal_multiple: number; chance_bps: number; shared_min: number; rest_days: number;
+      dues_minutes_of_pay: number[]; every_days: number[]; starts_in_days: number[]; lasts_minutes: number[]; lapse_days: number; min_members: number; leave_after_days: number;
+      hall_hire_hours_of_pay: number; fund: { qualify_days: number; draw_months: number; every_days: number }; cause: { case_hours: number; hours_per_member_month: number };
+      shape_odds?: { [about: string]: { [shape: string]: number } }; sway?: { [what: string]: number } };
     /** How people here start out in what they trust and how much control they feel (docs/behaviour/citizen.md, "The
      * record"): the share with confidence in each kind of institution (government, policing, courts, civil_service,
      * banks, press, unions, religious, companies: whichever the place's survey gives), the share who say most people

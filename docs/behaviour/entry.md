@@ -20,7 +20,7 @@
    If someone else buys the premises first, the new shop returns the capital and closes.
 5. **It trades.** It then trades like any shop (docs/behaviour/retailer.md): it starts by hiring its minimum staff, stocks up and publishes its price.
 
-## Starting a business of one (2026-10-11; citizen 0.47.0, firm.retailer 0.12.0)
+## Starting a business of one (2026-10-11; citizen 0.48.0, firm.retailer 0.12.0)
 
 **The fault.** Nobody founded a business in a year of the 1,000-person town. The only venture was a shop in premises bought from a closed firm: about $365,000 for the premises and $91,000 of capital, where nobody of working age holds a tenth of that and no firm closes in the year. The monthly chance was never reached. Real business births are mostly not that: in Australia about 65% of businesses have no employees (ABS, Counts of Australian Businesses, June 2026), and most new ones start small, from home, on their owner's savings.
 
@@ -30,6 +30,7 @@
 |---|---|
 | **Who** | Someone in the labour force, of working age, with a home to trade from and savings for the capital beside a month of housing and essentials (`found_own_buffer_months`, a placeholder). In a job or out of one: both are in the literature (Maloney 2004: workers with savings leaving jobs to work for themselves; Fields 1975: those out of work who cannot wait). |
 | **How often** | Each month, the chance `found_own_ppm` (parts per million), shifted by who they are as for any venture (the open and the achieving more; in a living town, those wanting work more). **Derived, not chosen:** the births the profile's business birth rate (`business.entry_bps_per_year`, with its source) gives on the businesses the town has (shops, factories, landlords, the builder, the paper, businesses of one), spread over the people who could start one at the start. Victoria: 16.4% a year (ABS); 61 businesses; about ten births a year. |
+| **Meant, by a founding's draw** | Where the town has founding on (docs/behaviour/founding.md), someone whose draw of what to found is "a business" starts one within 180 days as soon as they have the home and the money, the month's chance set aside. In the 200-person test town the one person who drew it had $2,974 against a capital of $24,200, and nothing came of it: that is the rule. |
 | **In a job** | Gives notice ("starting a business of my own") and starts when it has run. |
 | **Founding** | The `entity` call, as for a shop: the business opens an account, calls its capital, records its founder as its only shareholder, and trades once the capital is in. No premises are bought. |
 | **Then** | As any business of one (below): it buys when stock runs low, sells from home, and pays its owner what it holds beyond its stock money every pay period. Its owner is not out of work. |

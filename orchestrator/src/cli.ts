@@ -49,6 +49,13 @@
 //     its choices turned out (served, paid or not, who came: facts and the mind's own figures, no judgement), training
 //     data for citizen models. full is the default (about a tenth of a log); none leaves both out; never in a lean
 //     log. A resumed run records as it began.
+//   oikos run ... --composer: call the world's composing models for real (the mix in its `dials.composer`; a spending
+//     limit is needed). Without it, a world with a composer has the mock play it. docs/behaviour/founding.md.
+//   oikos compose-audit <founded.jsonl> [--models a,b --judges a,b --budget DOLLARS] [--per-matter 2] [--most 12]
+//                 [--repeats 4] [--follow-ups 3] [--out DIR]
+//     The composing model's audits, on the situations a run's foundings recorded (a dataset's founded.jsonl): tone by
+//     word counts and by the rubric as each judge reads it, beside real texts; how often it declines; scrambled
+//     records; the prompt reworded. The mock by default. Every call is kept, and served again from the same folder.
 //   oikos dataset <DIR|log.jsonl> [--out DIR] [--actions]
 //     Run datasets: each log's data as training examples, in <run>.dataset/ (docs/design/run-datasets.md): the manifest,
 //     system prompts, translations, model participants' decisions; code participants' acts with --actions; code
@@ -216,7 +223,7 @@ try {
       until: flag("until") ? Number(flag("until")) : undefined, sets: sets(), translatorModel: flag("translator-model"), translatorFirst: flag("translator-first"), translatorArrangement: flag("translator-arrangement"), measure: !has("no-measure"), log: console.log,
       model: flag("model"), budgetUsd: flag("budget") ? Number(flag("budget")) : undefined, baseUrl: flag("base-url"), modules: flag("modules"),
       recordObservations: flag("record-observations"), recordDecisions: flag("record-decisions"), logDetail: flag("log"), compress: !has("no-compress"), keep: flag("keep") as "log" | "measures" | undefined,
-      batchBudgetUsd: flag("batch-budget") ? Number(flag("batch-budget")) : undefined, consult: has("consult"), consultAvoid: flag("consult-avoid"),
+      batchBudgetUsd: flag("batch-budget") ? Number(flag("batch-budget")) : undefined, consult: has("consult"), composer: has("composer"), consultAvoid: flag("consult-avoid"),
       overwrite: has("overwrite"), stop: stopOnSignal(),
     });
     if (r.measureDir) {
@@ -259,7 +266,7 @@ try {
   } else if (cmd === "run-one" && positional()[0]) {
     await runOne({ world: positional()[0]!, seed: Number(flag("seed")), ...(flag("town") !== undefined ? { town: Number(flag("town")) } : {}), out: flag("out", "runs")!, until: flag("until") ? Number(flag("until")) : undefined, sets: sets(),
       model: flag("model"), translatorModel: flag("translator-model"), translatorFirst: flag("translator-first"), translatorArrangement: flag("translator-arrangement"), budgetUsd: flag("budget") ? Number(flag("budget")) : undefined, baseUrl: flag("base-url"), modules: flag("modules"),
-      recordObservations: flag("record-observations"), recordDecisions: flag("record-decisions"), logDetail: flag("log"), consult: has("consult"), consultAvoid: flag("consult-avoid"), overwrite: has("overwrite"), stop: stopOnSignal() });
+      recordObservations: flag("record-observations"), recordDecisions: flag("record-decisions"), logDetail: flag("log"), consult: has("consult"), composer: has("composer"), consultAvoid: flag("consult-avoid"), overwrite: has("overwrite"), stop: stopOnSignal() });
   } else if (cmd === "resume" && positional()[0]) {
     // A run that stopped (a stall, a crash, cut short): run again from its own config, serving its recorded model calls.
     const o = { until: flag("until") ? Number(flag("until")) : undefined, modules: flag("modules"),
@@ -312,6 +319,27 @@ try {
     // Every call, as a run would log it (model answers are data: kept beside the report).
     await Bun.write(out.replace(/\.json$/, ".calls.jsonl"), annotations.map((a) => JSON.stringify(a)).join("\n") + "\n");
     console.log(`\nReport: ${out}`);
+  } else if (cmd === "compose-audit" && positional()[0]) {
+    // The composing model's audits (docs/behaviour/founding.md): tone, declining, scrambled records, rewording, on the
+    // situations a run's foundings recorded. The mock unless models are named; every call kept beside the report.
+    const { composeAudit, auditText, situations } = await import("./compose-audit");
+    const { mockCompose } = await import("@oikos/participants/llm");
+    const { readFileSync } = await import("node:fs");
+    const rows = readFileSync(positional()[0]!, "utf8").split("\n").filter((l) => l.trim()).map((l) => JSON.parse(l));
+    const briefs = situations(rows, flag("per-matter") ? Number(flag("per-matter")) : 2, flag("most") ? Number(flag("most")) : 12);
+    const budgetUsd = flag("budget") ? Number(flag("budget")) : undefined;
+    const named = (list: string | undefined) => (list ? list.split(",").map((x) => x.trim()).filter((x) => x) : []);
+    for (const m of [...named(flag("models")), ...named(flag("judges"))]) if (/astra|fable/i.test(m)) throw new Error(`${m} is never a composing model or its judge`);
+    let budget: { limitMicroUsd: number; spentMicroUsd: number } | undefined;
+    const prices: Record<string, any> = { ...PRICES };
+    const adapterOf = (name: string) => { const c = chooseModel(name, { budgetUsd, timeoutMs: 150_000 }); Object.assign(prices, c.prices); budget ??= c.budget; return c.adapter; };
+    const mock = () => new MockAdapter("mock", { compose: (req) => (req.context?.judge === "rubric" ? [{ type: "text", text: '{"anger": 1, "despair": 1, "hope_at_close": 2, "polish": 2, "conciliation": 2}' }] : req.context?.judge === "which" ? [{ type: "text", text: `{"record": "${req.context.truth}"}` }] : mockCompose(req)) });
+    const composers = new Map(named(flag("models")).length ? named(flag("models")).map((m) => [m, adapterOf(m)] as const) : [["mock", mock()] as const]);
+    const judges = new Map(named(flag("judges")).length ? named(flag("judges")).map((m) => [m, adapterOf(m)] as const) : named(flag("models")).length ? [] : [["mock", mock()] as const]);
+    const outDir = flag("out") ?? join("runs", "compose-audit");
+    const report = await composeAudit({ briefs, composers, judges, prices, ...(budget ? { budget } : {}), outDir, ...(flag("repeats") ? { repeats: Number(flag("repeats")) } : {}), ...(flag("follow-ups") ? { followUps: Number(flag("follow-ups")) } : {}), log: console.log });
+    console.log(auditText(report));
+    console.log(`\nReport: ${join(outDir, "report.json")}; every call: ${join(outDir, "calls.jsonl")}`);
   } else if (cmd === "translator-eval" && flag("model")) {
     // The held-out cases are outside the repository (translator/eval/held-out.ts): with them, their results go out by
     // id, outcome and shape only, and the full report is written beside them, never into `--out`.

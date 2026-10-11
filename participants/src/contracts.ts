@@ -54,7 +54,7 @@ export type CommitmentOutcome =
 export type Does = { outcome: CommitmentOutcome } | { text: string };
 
 /** Who may take something up or take part (blocks: Eligibility): every condition given must hold. */
-export interface Eligibility { anyone?: true; members_of?: Id; holds?: Id; entities?: Id[]; min_age_years?: number }
+export interface Eligibility { anyone?: true; members_of?: Id; holds?: Id; entities?: Id[]; min_age_years?: number; /** Party to an agreement in force with this entity (its tenant, its worker, its member, its customer). */ dealing_with?: Id }
 
 /** What someone may take up, on what terms, and how (blocks: Offer; docs/design/ai-citizens.md 2a). Facts only. */
 export interface Offer {

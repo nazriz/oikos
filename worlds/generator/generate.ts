@@ -160,7 +160,13 @@ export interface TownSpec {
   living?: { initiative_bps?: number; starting_attachment?: boolean; counter?: boolean;
     /** How much goes wrong (docs/behaviour/frictions.md): a scale on the profile's rates, in basis points. Nothing
      * said: 10,000 (the rates as sourced) where the profile has `frictions`; 0: none of it. */
-    friction_bps?: number };
+    friction_bps?: number;
+    /** Founding (docs/behaviour/founding.md): people start things of their own. Off unless set: `true` (every shape,
+     * the profile's fitted chance), or which shapes and a scale on the chance. Needs the profile's `founding`. */
+    founding?: boolean | { shapes?: string[] | string; scale_bps?: number; /** How many others must share a want before founding is weighed, where a study sets it apart from the profile's. */ shared_min?: number };
+    /** The composing model (docs/behaviour/founding.md, "Words"): off unless set. `true`: the two families in equal
+     * shares, eight pieces a month; or how many pieces a month, the mix, the fallback and the follow-up sample. */
+    composer?: boolean | { pieces_per_month?: number; mix?: { model: string; share_bps: number }[]; fallback?: string; follow_up_bps?: number } };
   /** How hard a seat's model reasons, where its way in takes that (docs/real-models.md, "A seat's settings"): one word
    * for every seat ("low"), or by office id ({ finance: "low" }). Not given: the model's own default. */
   seat_effort?: string | { [seat: string]: string };
@@ -531,6 +537,17 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   const FRICTION_BPS = spec.living ? spec.living.friction_bps ?? 10_000 : 0;
   const FR = FRICTION_BPS > 0 ? V.frictions : undefined;
   const DISREPAIR_AT = 50_000;
+  // Founding (docs/behaviour/founding.md): for a living town that turns it on, from the profile's figures. The dues
+  // a founder may ask and the hire of the hall are so many minutes or hours of ordinary pay here, so no sum of money
+  // is anyone's but the place's own.
+  const FO_SPEC = spec.living?.founding === true ? {} : spec.living?.founding || undefined;
+  if (FO_SPEC && !V.founding) throw new Error(`profile ${P.id} has no founding figures: a town cannot turn founding on without them (docs/profiles.md)`);
+  const FND = FO_SPEC ? V.founding : undefined;
+  const FO_SHAPES = FO_SPEC?.shapes === undefined ? ["gathering", "fund", "cause", "business"] : typeof FO_SPEC.shapes === "string" ? FO_SPEC.shapes.split(",").map((x) => x.trim()).filter((x) => x) : FO_SPEC.shapes;
+  const CO_SPEC = spec.living?.composer === true ? {} : spec.living?.composer || undefined;
+  if (CO_SPEC && !FND) throw new Error("living.composer needs living.founding: the composer writes the words of what is founded");
+  const COMPOSER = CO_SPEC ? { pieces_per_month: CO_SPEC.pieces_per_month ?? 8, mix: CO_SPEC.mix ?? [{ model: "claude-code/claude-sonnet-5-5", share_bps: 5_000 }, { model: "codex/gpt-6.1-sol", share_bps: 5_000 }],
+    fallback: CO_SPEC.fallback ?? (CO_SPEC.mix ?? [{ model: "claude-code/claude-sonnet-5-5" }])[0]!.model, follow_up_bps: CO_SPEC.follow_up_bps ?? 2_500 } : undefined;
   const frictionRng = rng("frictions");
   const worn = () => (FR ? { variables: { disrepair: frictionRng.below(DISREPAIR_AT) } } : {});
   const UT = V.utilities && spec.utilities !== false ? V.utilities : undefined;
@@ -1894,6 +1911,8 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     K.published("gatherings", { has: ["practice"] }), K.published("teachings", { has: ["assertion"] }),
     // Whatever says it hears grievances (a desk, a tribunal's lists, a union for its members), in whatever words.
     ...(FR ? [K.published("hearings", { has: ["hears"] })] : []),
+    // What a group made in a run says joining it asks (docs/behaviour/founding.md), where founding is on.
+    ...(FND ? [K.published("memberships", ["membership"])] : []),
     // Elections and the local paper (world-expansion 3).
     ...(E ? [K.published("elections", ["election_notice", "ballot", "ballot_result", "nomination", "news"])] : []),
     // The land register (world-expansion 6.2), looked up, never shown unasked (nobody has the register by heart): the
@@ -1977,7 +1996,22 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     buffer_months: SAVINGS_KEPT_MONTHS, saving_bps: V.spending.saving_bps, wealth_effect_bps_per_year: V.spending.wealth_effect_bps_per_year, essentials: V.spending.essentials_per_month,
     retirement_age: V.retirement_age, ...(CURVE ? { stop_work_curve: CURVE } : {}),
     // Starting businesses: a placeholder monthly chance for someone able to (to calibrate against business entry rates).
-    ventures: [shopVenture, ...(foundOwnPpm > 0 ? [ownVenture] : [])], found_bps: 200, ...(foundOwnPpm > 0 ? { found_own_ppm: foundOwnPpm } : {}) });
+    ventures: [shopVenture, ...(foundOwnPpm > 0 ? [ownVenture] : [])], found_bps: 200, ...(foundOwnPpm > 0 ? { found_own_ppm: foundOwnPpm } : {}),
+    // Founding (docs/behaviour/founding.md), where the town has it on: the profile's fitted chance and sizes; the
+    // post a founder holds in what they found (what a convenor sees: its own papers and money; and the one module
+    // that runs it); the hall and its hire.
+    ...(FND ? { founding: (() => {
+      const hourly = Math.round((wages.shop * 7) / (PAY / DAY) / V.ordinary_hours_per_week);
+      return {
+        chance_bps: FND.chance_bps, shared_min: FO_SPEC!.shared_min ?? FND.shared_min, dues: FND.dues_minutes_of_pay.map((m) => Math.round((hourly * m) / 60)), every_days: FND.every_days, starts_in_days: FND.starts_in_days, lasts_minutes: FND.lasts_minutes,
+        at_seconds: 19 * HOUR, lapse_days: FND.lapse_days, min_members: FND.min_members, leave_after_days: FND.leave_after_days, rest_days: FND.rest_days,
+        ...(FND.shape_odds ? { shape_odds: FND.shape_odds } : {}), ...(FND.sway ? { sway: FND.sway } : {}),
+        hall: { space: "town-hall/hall.1", town: "city", account: "acc-city", hire: Math.round(hourly * FND.hall_hire_hours_of_pay) },
+        fund: FND.fund, cause: { ...FND.cause, answer_days: FR?.venues.answer_days ?? 14 }, bank: "bank",
+        template: { kind: "group", title: "Convenor", channels: [{ id: "books", kind: "accounts" }, mine(), K.published("gatherings", { has: ["practice"] }), ...(FR ? [K.published("hearings", { has: ["hears"] })] : [])],
+          role_module: { code: "group.founded", params: {}, keeps_record: true } },
+      };
+    })() } : {}) });
   // Who each person is: their values (docs/behaviour/citizen.md, "Upbringing"). An adult's are drawn from the
   // profile's figures; someone living with their parents has theirs from their parents' and a part of their own, so
   // that the town's spread of values is the profile's whoever was whose child. World content, as beliefs at the start are.
@@ -2215,7 +2249,8 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     contracts: "0.8",
     meta: { name: spec.name, description: `Generated town (generator ${GENERATOR_VERSION}, seed ${spec.seed}): ${everyone.length} people in ${households.length} households, ${homes.length} homes, ${jobSlots.length} jobs.${OA ? ` ${ownBusinesses.length} people working for themselves, in the kinds the town holds (${OA_HELD.map((k) => k.name).join(", ") || "none"}); of the profile's own-account workers, ${(10_000 - OA_HELD.reduce((x, k) => x + k.share_bps, 0)) / 100}% are in kinds it cannot hold yet and are drawn in jobs.` : ""}${under.applied.length ? ` Starting conditions: ${under.applied.join(", ")}.` : ""}`, canary: CANARY },
     seed: spec.seed,
-    ...(spec.living?.initiative_bps !== undefined || FR ? { dials: { ...(spec.living?.initiative_bps !== undefined ? { initiative_bps: spec.living.initiative_bps } : {}), ...(FR ? { friction_bps: FRICTION_BPS } : {}) } } : {}),
+    ...(spec.living?.initiative_bps !== undefined || FR || FND ? { dials: { ...(spec.living?.initiative_bps !== undefined ? { initiative_bps: spec.living.initiative_bps } : {}), ...(FR ? { friction_bps: FRICTION_BPS } : {}),
+      ...(FND ? { founding: { shapes: FO_SHAPES, scale_bps: FO_SPEC!.scale_bps ?? 10_000 } } : {}), ...(COMPOSER ? { composer: COMPOSER } : {}) } } : {}),
     clock: { tick_seconds: 3600, run_seconds: spec.years * 365 * DAY },
     log: { checkpoint_every: MONTH, anchor_every_entries: 1000 },
     // Amounts and quantities on the wire are decimal strings (D58); the generator counts in numbers.
@@ -2302,7 +2337,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     // (Heat makes illness likelier where the body is: docs/behaviour/weather.md.)
     ...(spec.life === false ? {} : { life: W && CL && L ? { ...life, illness: { ...(life.illness as object), fields: [...((life.illness as any).fields ?? []), { field: "heat", bps_per_unit: CL.heat_illness_bps_per_unit }] } } : life }),
     caps: { max_created_entities: 50 },
-    knowing: K.knowing(positions, { holderSearch: [], dealings: 20, ...(V.knowing ? { visit_seconds: V.knowing.visit_seconds } : {}), ...(FR ? { hearings: true } : {}) }),
+    knowing: K.knowing(positions, { holderSearch: [], dealings: 20, ...(V.knowing ? { visit_seconds: V.knowing.visit_seconds } : {}), ...(FR ? { hearings: true } : {}), ...(FND ? { founding: true } : {}) }),
     orchestration: { thinking_time: "free", act_time: ACT_TIME },
   };
 }
