@@ -126,10 +126,13 @@ export function translatorArrangement(o: { translatorFirst?: string; translatorA
 /** Run one seed in this process and write its summary next to its log. Or resume a run that stopped (`resume`: its
  * log): run again from its own config, with every model response served from that log (resume.ts, D59). `town`: the
  * town's seed (the spec's `seed` set to it, after any `sets`), named in the run's id; absent, the spec's own. */
-export async function runOne(o: { world?: string; seed?: number; town?: number; out?: string; resume?: string; overwrite?: boolean; stop?: StopSignal; until?: number; sets?: string[]; modules?: string; model?: string; translatorModel?: string; translatorFirst?: string; translatorArrangement?: string; budgetUsd?: number; baseUrl?: string; recordObservations?: string; recordDecisions?: string; logDetail?: string; consult?: boolean; consultAvoid?: string; composer?: boolean }): Promise<RunRecord> {
+export async function runOne(o: { debriefWording?: string; world?: string; seed?: number; town?: number; out?: string; resume?: string; overwrite?: boolean; stop?: StopSignal; until?: number; sets?: string[]; modules?: string; model?: string; translatorModel?: string; translatorFirst?: string; translatorArrangement?: string; budgetUsd?: number; baseUrl?: string; recordObservations?: string; recordDecisions?: string; logDetail?: string; consult?: boolean; consultAvoid?: string; composer?: boolean }): Promise<RunRecord> {
   let config: any, runId: string, out: string, serving: Serving | undefined, stoppedLog: string | undefined;
   let consult = !!o.consult;
   let composerReal = !!o.composer;
+  // (Which wording of the debrief's questions: "a" unless a rewording check asks for "b".)
+  if (o.debriefWording !== undefined && o.debriefWording !== "a" && o.debriefWording !== "b") throw new Error(`--debrief-wording is a or b, not "${o.debriefWording}"`);
+  let debriefWording = o.debriefWording as "a" | "b" | undefined;
   let recordObservations = o.recordObservations;
   let recordDecisions = o.recordDecisions;
   if (recordDecisions !== undefined && !/^[a-z_]+(,[a-z_]+)*$/.test(recordDecisions)) throw new Error(`--record-decisions is full, none or a list of areas (want,found), not "${recordDecisions}"`);
@@ -141,6 +144,7 @@ export async function runOne(o: { world?: string; seed?: number; town?: number; 
     ({ config, runId, outDir: out, stoppedLog } = r);
     consult = r.consult;
     composerReal = r.composer;
+    if (r.debriefWording) debriefWording = r.debriefWording;
     // (What the run was recording, it goes on recording: its replayed part is written again, the same.)
     recordObservations = r.recording?.observations;
     recordDecisions = r.recording?.decisions;
@@ -181,7 +185,7 @@ export async function runOne(o: { world?: string; seed?: number; town?: number; 
   const watchdog = new Watchdog({ stallMs: stallMs(), diagnosisPath, runId });
   let s: RunSummary;
   try {
-    s = await runWorld({ config, runId, outDir: out, until: o.until, watchdog, ...(o.stop ? { stop: o.stop } : {}), ...(modules ? { modules } : {}), ...(consult ? { consult, ...(consultAvoid ? { consultAvoid } : {}) } : {}), ...(recordObservations ? { recordObservations: recordWho(recordObservations) } : {}), ...(recordDecisions !== undefined && recordDecisions !== "full" ? { recordDecisions } : {}),
+    s = await runWorld({ config, runId, outDir: out, until: o.until, watchdog, ...(debriefWording ? { debriefWording } : {}), ...(o.stop ? { stop: o.stop } : {}), ...(modules ? { modules } : {}), ...(consult ? { consult, ...(consultAvoid ? { consultAvoid } : {}) } : {}), ...(recordObservations ? { recordObservations: recordWho(recordObservations) } : {}), ...(recordDecisions !== undefined && recordDecisions !== "full" ? { recordDecisions } : {}),
       ...(real ? { adapter: serve(real.adapter), prices: { ...real.prices, ...(tr?.prices ?? {}), ...(first?.prices ?? {}) }, ...(real.budget ? { budget: real.budget } : {}) } : first ? { prices: first.prices } : {}),
       ...(tr ? { translatorAdapter: serve(tr.adapter) } : {}),
       ...(first ? { translatorFirst: serve(first.adapter), translatorArrangement: arrangement } : {}),
@@ -298,6 +302,8 @@ export interface BatchOptions {
   consult?: boolean;
   /** Call the world's composing models for real (docs/behaviour/founding.md): without it the mock plays the composer. */
   composer?: boolean;
+  /** Which wording of the debrief's questions the runs use ("a" unless a rewording check asks for "b"). */
+  debriefWording?: string;
   consultAvoid?: string;
   /** Compress each log once the batch is measured (`.jsonl.zst`). */
   compress?: boolean;
@@ -427,7 +433,7 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
         limitUsd = held / 1e6;
       }
       const args = [process.execPath, CLI, "run-one", o.world, "--seed", String(seed), ...(town !== undefined ? ["--town", String(town)] : []), "--out", out, ...(o.until !== undefined ? ["--until", String(o.until)] : []), ...sets.flatMap((s) => ["--set", s]),
-        ...(o.recordObservations ? ["--record-observations", o.recordObservations] : []), ...(o.recordDecisions ? ["--record-decisions", o.recordDecisions] : []), ...(o.logDetail ? ["--log", o.logDetail] : []), ...(o.consult ? ["--consult"] : []), ...(o.composer ? ["--composer"] : []), ...(o.consultAvoid ? ["--consult-avoid", o.consultAvoid] : []), ...(o.model ? ["--model", o.model] : []), ...(o.model && o.translatorModel ? ["--translator-model", o.translatorModel] : []), ...firstFlags(o), ...(limitUsd !== undefined ? ["--budget", String(limitUsd)] : []), ...(o.baseUrl ? ["--base-url", o.baseUrl] : []),
+        ...(o.recordObservations ? ["--record-observations", o.recordObservations] : []), ...(o.recordDecisions ? ["--record-decisions", o.recordDecisions] : []), ...(o.logDetail ? ["--log", o.logDetail] : []), ...(o.consult ? ["--consult"] : []), ...(o.composer ? ["--composer"] : []), ...(o.debriefWording ? ["--debrief-wording", o.debriefWording] : []), ...(o.consultAvoid ? ["--consult-avoid", o.consultAvoid] : []), ...(o.model ? ["--model", o.model] : []), ...(o.model && o.translatorModel ? ["--translator-model", o.translatorModel] : []), ...firstFlags(o), ...(limitUsd !== undefined ? ["--budget", String(limitUsd)] : []), ...(o.baseUrl ? ["--base-url", o.baseUrl] : []),
         ...(o.modules ? ["--modules", resolve(o.modules)] : []), ...(o.overwrite ? ["--overwrite"] : [])];
       const p = Bun.spawn(args, { stdout: "pipe", stderr: "pipe", env: slotted ? insideSlot(1, { ...process.env }) : { ...process.env } }); // (the environment as it is now)
       children.add(p);
@@ -557,7 +563,7 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
 
 /** The arguments to `oikos run-one` that regenerate a batch's run of a seed (with `--out` for where). */
 export const recipeArgs = (o: BatchOptions, seed: number, town?: number) => [o.world, "--seed", String(seed), ...(town !== undefined ? ["--town", String(town)] : []), ...(o.until !== undefined ? ["--until", String(o.until)] : []), ...(o.sets ?? []).flatMap((s) => ["--set", s]),
-  ...(o.recordObservations ? ["--record-observations", o.recordObservations] : []), ...(o.recordDecisions ? ["--record-decisions", o.recordDecisions] : []), ...(o.logDetail ? ["--log", o.logDetail] : []), ...(o.consult ? ["--consult"] : []), ...(o.composer ? ["--composer"] : []), ...(o.consultAvoid ? ["--consult-avoid", o.consultAvoid] : [])];
+  ...(o.recordObservations ? ["--record-observations", o.recordObservations] : []), ...(o.recordDecisions ? ["--record-decisions", o.recordDecisions] : []), ...(o.logDetail ? ["--log", o.logDetail] : []), ...(o.consult ? ["--consult"] : []), ...(o.composer ? ["--composer"] : []), ...(o.debriefWording ? ["--debrief-wording", o.debriefWording] : []), ...(o.consultAvoid ? ["--consult-avoid", o.consultAvoid] : [])];
 
 /** Why a batch's runs couldn't be regenerated from a recipe (so their logs must be kept), or null if they can. */
 function cannotRegenerate(config: any, o: BatchOptions): string | null {

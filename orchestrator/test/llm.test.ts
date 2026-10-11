@@ -113,10 +113,18 @@ test("a participant is told when a request can't be done, declines an unfaithful
   const recs = log.filter((e) => e.kind === "event" && e.body.event === "recorded").map((e) => e.body.record);
   expect(recs.filter((r) => r.author === "mayor-system").map((r) => r.text)).toEqual(["The town hall opens at nine."]);
   expect(log.some((e) => e.kind === "event" && e.body.event === "participant_opted_out" && e.body.participant === "mayor-system")).toBe(true);
-  expect(ann.find((a) => a.annotation === "debrief")?.data.response).toBe("Thanks for asking.");
-  // It's reminded of its own run in the debrief (pilot 9's mayor had no record of what it did): its notebook, and a
-  // tally of what it did.
-  expect(ann.find((a) => a.annotation === "debrief")?.data.prompt).toMatch(/Your notebook, as you left it: [\s\S]*(You didn't act during the run\.|From day \d+ to day \d+ \d+ letters? of yours (was|were) sent)/);
+  // It left the study, and is debriefed all the same, by the shorter variant (docs/behaviour/debrief.md). (This
+  // stand-in answers in plain words, not in the form asked for: each answer is kept as given, and kept back.)
+  const debrief = ann.find((a) => a.annotation === "debrief")?.data;
+  expect(debrief).toMatchObject({ variant: "left", ended: "complete" });
+  expect(debrief.steps[0]).toMatchObject({ id: "consent", status: "unread", kept_back: false });
+  // (What it said is kept in the file beside the log, and the log holds none of it.)
+  expect(readFileSync(s.logPath.replace(/\.jsonl$/, ".debriefs.jsonl"), "utf8")).toContain("Thanks for asking.");
+  expect(JSON.stringify(ann.filter((a) => a.annotation === "debrief" || a.data?.purpose === "debrief"))).not.toContain("Thanks for asking.");
+  // It's reminded of its own run in the debrief (pilot 9's mayor had no record of what it did): its notebook, and
+  // what the run's log shows it did.
+  const opening = ann.find((a) => a.annotation === "transcript" && a.data.ref === "debrief/consent")?.data.input;
+  expect(opening).toMatch(/WHAT THE RECORD SHOWS OF WHAT YOU DID\n[\s\S]*You sat on \d+ days?[\s\S]*YOUR NOTEBOOK, AS YOU LEFT IT\n/);
 }, 300_000);
 
 test("opting out with no statement at all is honoured, and recorded as leaving the study (not as stepping down from the office)", async () => {

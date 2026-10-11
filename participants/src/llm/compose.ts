@@ -78,8 +78,16 @@ const day = (t: number) => `day ${Math.floor(t / 86_400)}`;
 /** The brief in plain words: what the model is shown, and all it is shown. Code-rendered, so what it may say is testable. */
 export function renderBrief(b: ComposeBrief): string {
   const r = b.record as any;
+  const lines: string[] = ["THE RECORD", ...recordLines(b.founder, r, b.means)];
+  renderRest(b, lines);
+  return lines.join("\n");
+}
+
+/** A person's own record in plain words: what an author is shown of them, and all of it (a piece when they found
+ * something, here; an account at a run's end, account.ts). `who`: how the town's papers know them. */
+export function recordLines(who: string, r: any, means: { income: string; savings: string }): string[] {
+  const b = { founder: who, means };
   const lines: string[] = [];
-  lines.push("THE RECORD");
   lines.push(`They are known in the town's papers as ${b.founder}.`);
   if (r.values) lines.push(`What matters to them, most first: ${sorted(r.values).map(([v]) => VALUE_WORDS[v] ?? plain(v)).join("; ")}.`);
   if (r.temperament) lines.push(`Temperament: ${sorted(r.temperament).map(([f, x]) => `${plain(f)} ${level(x, ["very low", "low", "middling", "high", "very high"])}`).join("; ")}.`);
@@ -109,6 +117,10 @@ export function renderBrief(b: ComposeBrief): string {
   const mem = (x: { t: number; what: string; about?: string; by?: string }) => `${day(x.t)}: ${plain(x.what)}${x.about ? ` (${plain(x.about)})` : ""}${x.by ? `, ${x.what.startsWith("want_") ? way(x.by) : plain(x.by)}` : ""}`;
   if (r.memory?.defining?.length) lines.push(`What has defined them: ${(r.memory.defining as any[]).map(mem).join("; ")}.`);
   if (r.memory?.recent?.length) lines.push(`What has happened lately: ${(r.memory.recent as any[]).map(mem).join("; ")}.`);
+  return lines;
+}
+
+function renderRest(b: ComposeBrief, lines: string[]): void {
   lines.push("");
   lines.push("WHAT HAS HAPPENED");
   const w = b.want;
@@ -123,7 +135,6 @@ export function renderBrief(b: ComposeBrief): string {
   lines.push(`- starts_in_days, how many days from now the first is, one of: ${b.open.starts_in_days.join(", ")}`);
   lines.push(`- lasts_minutes, one of: ${b.open.lasts_minutes.join(", ")}`);
   lines.push("Gatherings are in the evening. Nothing else can be asked of members.");
-  return lines.join("\n");
 }
 
 /** The answer's shape (every property required, every object closed: what Claude Code and the Codex CLI ask for). */
@@ -157,7 +168,7 @@ export function readPiece(content: ContentBlock[], b: ComposeBrief, model: strin
   return piece.purpose ? piece : undefined;
 }
 
-export interface ComposerConfig { pieces_per_month: number; mix: { model: string; share_bps: number }[]; fallback?: string; follow_up_bps?: number }
+export interface ComposerConfig { pieces_per_month: number; mix: { model: string; share_bps: number }[]; fallback?: string; follow_up_bps?: number; /** Exit accounts at a run's end: of how many people (account.ts). */ accounts?: number }
 
 /**
  * The composer for one run. `adapters`: one for each model of the mix, by its name (in a mock run, the mock under

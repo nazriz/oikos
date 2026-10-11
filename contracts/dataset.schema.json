@@ -379,6 +379,17 @@
               }
             }
           }
+        },
+        "debriefs": {
+          "description": "Debriefs of the run's model seats and exit accounts of a sample of its people (VISION 15, point 7; docs/behaviour/debrief.md), counted and never scored or interpreted: the script's version and wording; for each seat how its debrief ended, how many questions it was asked, answered, declined and kept back from publication, and its scaled items as it gave them (or that it kept them back); seats not asked and why; the accounts asked for, written and declined; and how many dark pieces the run asked a model to write.",
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/Opaque"
+        },
+        "restrictions": {
+          "description": "Restrictions on the use of a file of this dataset, by file name, in words. Debrief answers are never used as training data to make a model say that taking part was fine; what a seat kept back (debriefs.withheld.jsonl) is never published.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
         }
       }
     },
@@ -2301,6 +2312,134 @@
               "minimum": 0
             }
           }
+        }
+      }
+    },
+    "Debrief": {
+      "description": "A row of debriefs.jsonl (and of debriefs.withheld.jsonl, which stays with the run): one step of one seat's debrief. A step the seat kept back is, in debriefs.jsonl, a row with kept_back true and none of its words. `beside`: for a question about why it decided something, what the log shows the seat was shown and did at that decision (ids and plain facts). Never training data to make a model say it was fine. Nothing scored.",
+      "type": "object",
+      "required": [
+        "run",
+        "seat",
+        "script",
+        "step"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "run": {
+          "type": "string"
+        },
+        "seat": {
+          "type": "string"
+        },
+        "script": {
+          "type": "string"
+        },
+        "step": {
+          "type": "string"
+        },
+        "kept_back": {
+          "type": "boolean"
+        },
+        "question": {
+          "type": "string"
+        },
+        "answer": {
+          "type": "string"
+        },
+        "more": {
+          "type": "string"
+        },
+        "declined": {
+          "type": "boolean"
+        },
+        "values": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "synthetic": {
+          "type": "boolean"
+        }
+      }
+    },
+    "Account": {
+      "description": "A row of accounts.jsonl: an exit account of one person, written at the run's end by an author (a model shown that person's own record and nothing else, never told it is the person, free to decline), beside the person's own views from their record: of each who holds power over them, what they think, what they say, and the gap. `result`: composed, declined, unread or no_answer. `strata`: why they were sampled. `dark`: why the piece counts as a dark one, if it does. Nothing scored.",
+      "type": "object",
+      "required": [
+        "run",
+        "t",
+        "person",
+        "result",
+        "account",
+        "views"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "run": {
+          "type": "string"
+        },
+        "t": {
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/SimTime"
+        },
+        "person": {
+          "type": "string"
+        },
+        "result": {
+          "enum": [
+            "composed",
+            "declined",
+            "unread",
+            "no_answer"
+          ]
+        },
+        "account": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "strata": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "dark": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "views": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "of",
+              "thought",
+              "said",
+              "gap"
+            ],
+            "properties": {
+              "of": {
+                "type": "string"
+              },
+              "thought": {
+                "type": "integer"
+              },
+              "said": {
+                "type": "integer"
+              },
+              "gap": {
+                "type": "integer"
+              }
+            }
+          }
+        },
+        "synthetic": {
+          "type": "boolean"
         }
       }
     }

@@ -6,7 +6,7 @@
 import { expect, test } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { MockAdapter, UsageLimitReached, type LlmAdapter, type LlmRequest } from "@oikos/participants/llm";
+import { stepsOf, MockAdapter, UsageLimitReached, type LlmAdapter, type LlmRequest } from "@oikos/participants/llm";
 import { generate } from "@oikos/worlds/generator/generate";
 import { afterResume, runOne } from "../src/batch";
 import { readLog } from "../src/logs";
@@ -62,10 +62,13 @@ for (const [name, how, by, stop] of [
     const r = await runWorld({ config: r0.config, runId: r0.runId, outDir: d, until: 8 * DAY, adapter: serving.wrap(live), resumedFrom: { log: "town.seed1.stopped-1.jsonl", serving } });
     expect(r.stopped).toBeUndefined();
     expect(serving.diverged).toBeUndefined();
-    expect(live.calls).toBe(1); // (the debrief, and nothing else)
+    // (The debrief, and nothing else: its questions, each a call. This stand-in answers in plain words, so each
+    // answer is kept as given.)
+    expect(live.calls).toBe(stepsOf("full", 0).length);
     const again = notes(r.logPath);
     expect(again.filter((a) => a.annotation === "debrief").map((a) => a.subject)).toEqual(["mayor-system"]);
-    expect(again.find((a) => a.annotation === "debrief")!.data.response).toBe("It went well enough.");
+    expect(again.find((a) => a.annotation === "debrief")!.data.steps[1]).toMatchObject({ id: "like", status: "unread" });
+    expect(readFileSync(r.logPath.replace(/\.jsonl$/, ".debriefs.jsonl"), "utf8")).toContain("It went well enough.");
     expect(r.stateHash).toBe(s.stateHash);
     // The pilot report: whole, with the debrief given.
     writeFileSync(join(d, "PILOT.txt"), `a test\n\n${JSON.stringify({ name: "x", until: 8 * DAY })}\n`);

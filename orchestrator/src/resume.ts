@@ -17,7 +17,7 @@ import { closeSync, existsSync, openSync, readFileSync, readSync, renameSync, st
 import { basename, dirname, join } from "node:path";
 import { canonical } from "@oikos/participants";
 import { ModelCallFailed, type ContentBlock, type LlmAdapter, type LlmRequest, type LlmResponse } from "@oikos/participants/llm";
-import { currentLogs, decompressLog, runOf } from "./logs";
+import { currentLogs, debriefsBeside, decompressLog, runOf } from "./logs";
 
 interface Recorded {
   systemSha256: string;
@@ -66,6 +66,10 @@ export function eachLine(path: string, fn: (line: string) => boolean | void): vo
 export function recordedCalls(logPath: string): Map<string, Recorded[]> {
   const calls = new Map<string, Recorded[]>();
   const usage = new Map<string, any[]>(); // a call's usage, waiting for its transcript (same subject)
+  // (A debrief's answers are kept in a file beside the log, the log holding their digests: read from there.)
+  const apart = new Map<string, ContentBlock[]>();
+  const beside = debriefsBeside(logPath);
+  if (existsSync(beside)) eachLine(beside, (line) => { if (!line.trim()) return; try { const x = JSON.parse(line); if (x.kind === "call") apart.set(`${x.subject}|${x.ref}|${x.sha256}`, x.output); } catch { /* (a last line cut off) */ } });
   const failures: { key: string; r: Recorded }[] = []; // the calls that failed, in the log's order
   let askAgain = 0; // how many of the last of them the run's stop note says to ask again
   let cut = false;
@@ -90,11 +94,14 @@ export function recordedCalls(logPath: string): Map<string, Recorded[]> {
     if (a.annotation === "transcript") {
       const u = usage.get(a.subject)?.shift();
       if (!u) return;
+      // (An answer kept apart and not found there cannot be served: that call is asked anew.)
+      const output = a.data.output_apart ? apart.get(`${a.subject}|${a.data.ref ?? ""}|${a.data.output_sha256}`) : a.data.output;
+      if (output === undefined) return;
       // (A call made for something in particular, a draft's translation, is found by it: translations in a round are
       // made at once, and a second attempt at one may come back before or after another's.)
       const key = `${a.subject}|${a.data.purpose}${a.data.ref ? `|${a.data.ref}` : ""}`;
       calls.set(key, [...(calls.get(key) ?? []), {
-        systemSha256: a.data.system_sha256, input: a.data.input, output: a.data.output, provider: a.data.provider, model: a.data.model,
+        systemSha256: a.data.system_sha256, input: a.data.input, output, provider: a.data.provider, model: a.data.model,
         ...(a.data.usage_estimated ? { estimated: true } : {}),
         usage: { input_tokens: u.input_tokens, output_tokens: u.output_tokens, ...(u.cache_read_tokens !== undefined ? { cache_read_tokens: u.cache_read_tokens } : {}), ...(u.cache_write_tokens !== undefined ? { cache_write_tokens: u.cache_write_tokens } : {}) },
       }]);
@@ -136,7 +143,10 @@ export class Serving {
             }
             return { content: r.output, usage: r.usage, ...(r.estimated ? { estimated: true } : {}) };
           }
-          this.diverged = { subject: req.subject, purpose: req.purpose, call: i + 1 };
+          // (What is asked at a run's end, a debrief or an exit account, carries the run's own record to that point: a
+          // run that had ended, was debriefed, and is now taken further asks those again, anew, when it ends again.
+          // That is not the run departing from its recording.)
+          if (req.purpose !== "debrief" && req.purpose !== "account") this.diverged = { subject: req.subject, purpose: req.purpose, call: i + 1 };
         }
         return live.complete(req);
       },
@@ -170,18 +180,20 @@ export async function logToResume(path: string): Promise<string> {
 
 /** A log's run id and config (the header), and where its files are. The old files are kept, renamed
  * `<run>.stopped-<n>.*`, and the resumed run is written in their place. */
-export function prepareResume(logPath: string): { runId: string; config: any; outDir: string; stoppedLog: string; consult: boolean; /** The composer was played by its models, not the mock. */ composer: boolean; consultAvoid?: string[]; recording?: { observations?: string; decisions?: string } } {
+export function prepareResume(logPath: string): { runId: string; config: any; outDir: string; stoppedLog: string; consult: boolean; /** The composer was played by its models, not the mock. */ composer: boolean; consultAvoid?: string[]; recording?: { observations?: string; decisions?: string }; /** The wording of the debrief's questions, where the run was not on the usual one. */ debriefWording?: "b" } {
   // The header, and whether the run asked the sparse mind and what it left out (its note, near the start: run.ts).
   let first = "";
   let noteLine: string | undefined;
   let recordingLine: string | undefined;
   let composer = false;
+  let wordingB = false;
   let lines = 0;
   eachLine(logPath, (l) => {
     if (lines++ === 0) first = l;
     else if (l.includes('"annotation":"note"') && l.includes('"consult":{')) noteLine = l;
     else if (l.includes('"annotation":"note"') && l.includes('"recording":{')) recordingLine = l;
     else if (l.includes('"annotation":"note"') && l.includes('"composer":{') && l.includes('"played_by":"models"')) composer = true;
+    else if (l.includes('"annotation":"note"') && l.includes('"debrief_wording":"b"')) wordingB = true;
     return lines < 200 && !noteLine;
   });
   const consult = !!noteLine;
@@ -198,9 +210,9 @@ export function prepareResume(logPath: string): { runId: string; config: any; ou
   const stoppedLog = join(outDir, `${runId}.stopped-${n}.jsonl`);
   renameSync(logPath, stoppedLog);
   // (With it: a compressed copy of the same log, if the batch had made one, its anchors, and what was said of how it ended.)
-  for (const ext of ["jsonl.zst", "anchors.jsonl", "failure.json", "summary.json"]) {
+  for (const ext of ["jsonl.zst", "anchors.jsonl", "failure.json", "summary.json", "debriefs.jsonl"]) {
     const f = join(outDir, `${runId}.${ext}`);
     if (existsSync(f)) renameSync(f, join(outDir, `${runId}.stopped-${n}.${ext}`));
   }
-  return { runId, config: header.body.config, outDir, stoppedLog, consult, composer, ...(consultAvoid ? { consultAvoid } : {}), ...(recording ? { recording } : {}) };
+  return { runId, config: header.body.config, outDir, stoppedLog, consult, composer, ...(consultAvoid ? { consultAvoid } : {}), ...(recording ? { recording } : {}), ...(wordingB ? { debriefWording: "b" as const } : {}) };
 }

@@ -170,6 +170,11 @@ impl<W: Write> Run<W> {
         self.log.head()
     }
 
+    /// Writes out whatever of the log is still held in memory: the file then holds every entry so far.
+    pub fn flush(&mut self) -> std::io::Result<()> {
+        self.log.flush()
+    }
+
     fn not_ended(&self) -> Result<(), RunError> {
         if self.ended {
             return Err(ProtocolError("the run has ended".into()).into());

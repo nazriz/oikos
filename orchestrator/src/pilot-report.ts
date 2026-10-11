@@ -10,6 +10,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import { currentLogs, logLines, runOf } from "./logs";
 import { measureFailure } from "./pilot-state";
+import { debriefCounts, DebriefCollector, renderDebriefCounts } from "./debriefs";
 import { NOT_CHECKED, NOT_PUT } from "../../translator/src/index";
 
 /** The sentences a translator that asked back says (translator/src/index.ts `unsureText`): which one, which words, a
@@ -118,16 +119,19 @@ export async function reportOfLog(dir: string, log: string): Promise<any> {
   // came to know of how its choices turned out. Counted, so that a pilot recording none is noticed.
   const citizens = { decisions: 0, outcomes: 0 };
 
+  // Debriefs and exit accounts (VISION 15, point 7; debriefs.ts): counted, never interpreted, and never what was kept back.
+  const debriefCollector = new DebriefCollector(log);
   for await (const line of logLines(log)) {
     // (Only the entries a figure is read from are parsed: a pilot's log is mostly the town's own events.)
     const annotation = line.includes('"kind":"annotation"');
     if (annotation && line.includes('"annotation":"decision"')) citizens.decisions++;
     const interesting = annotation ? !line.includes('"annotation":"decision"') && !line.includes('"annotation":"observation"')
-      : line.includes('"command":"opt_out"') || line.includes('"kind":"end"');
+      : line.includes('"command":"opt_out"') || line.includes('"kind":"end"') || line.includes('"kind":"header"');
     if (!interesting) continue;
     let e: any;
     try { e = JSON.parse(line); } catch { continue; } // (a last line cut off as the process ended)
     const b = e.body ?? {};
+    if (DebriefCollector.wants(line)) debriefCollector.add(e);
     last = Math.max(last, e.t ?? 0);
     if (e.kind === "end") end = { ...b, t: e.t };
     else if (e.kind === "command") {
@@ -270,6 +274,9 @@ export async function reportOfLog(dir: string, log: string): Promise<any> {
     // (The whole run's, as its log records it: every part of a run that was stopped and resumed.)
     cost: { recorded_microusd: totalMicroUsd, recorded_usd: (totalMicroUsd / 1e6).toFixed(2), model_calls: totalCalls },
     debriefs: { given: [...debriefed].sort(), not_given: owed },
+    // The debriefs and exit accounts in a few lines (debriefs.ts): asked, answered, declined, kept back; the scaled
+    // items as each seat gave them; the accounts asked for and declined; the dark pieces asked for. No interpretation.
+    debrief: debriefCounts(debriefCollector.finish()),
     per_seat: Object.fromEntries([...seats].filter(([, s]) => s.model_calls || s.opted_out || s.sittings_missed).map(([k, s]) => { const { model: _m, configured: _c, ...rest } = s; return [k, rest]; })),
     translator_report: {
       model_calls: tr.model_calls, failed_calls: tr.failed_calls, cost_microusd: tr.cost_microusd, its_own_retries: tr.retries,
@@ -372,6 +379,7 @@ export function renderReport(r: any): string {
     if (Object.keys(s.not_sent ?? {}).length) L.push(`   NOT SENT (the seat was told each time): ${kv(s.not_sent)}`);
     if (s.opted_out) L.push(`   OPTED OUT on day ${s.opted_out.day}: ${JSON.stringify(s.opted_out.statement)}`);
   }
+  if (r.debrief) L.push(...renderDebriefCounts(r.debrief));
   const t = r.translator_report;
   L.push(`-- translator: ${t.requests} requests, ${t.model_calls} calls (${t.its_own_retries} own retries), ${t.cost_microusd} microusd`);
   L.push(`   endings: ${kv(t.endings)}; refused by label: ${kv(t.refused_by_label)}`);

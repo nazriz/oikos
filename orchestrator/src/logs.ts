@@ -17,7 +17,11 @@ const STOPPED = /\.stopped-\d+\.jsonl(\.zst)?$/;
 export const isStoppedLog = (file: string) => STOPPED.test(file);
 
 /** Is this file a run's current log (not its anchors, not a derived file, not what a resumed run left behind)? */
-export const isLog = (file: string) => (file.endsWith(".jsonl") || file.endsWith(".jsonl.zst")) && !/\.anchors\.jsonl(\.zst)?$/.test(file) && !/translator-corpus\.jsonl$/.test(file) && !isStoppedLog(file);
+/** The file beside a run's log that holds what its seats said in their debriefs (VISION 15, point 7): kept with the
+ * run for ever, as the log is, and never published as it stands, since it holds what seats asked to be kept back. */
+export const debriefsBeside = (log: string) => log.replace(/\.jsonl(\.zst)?$/, ".debriefs.jsonl");
+
+export const isLog = (file: string) => (file.endsWith(".jsonl") || file.endsWith(".jsonl.zst")) && !/\.debriefs\.jsonl$/.test(file) && !/\.anchors\.jsonl(\.zst)?$/.test(file) && !/translator-corpus\.jsonl$/.test(file) && !isStoppedLog(file);
 
 /** A run's id from its log file's name. */
 export const runOf = (file: string) => file.split("/").at(-1)!.replace(/\.jsonl(\.zst)?$/, "");
