@@ -4282,6 +4282,92 @@ After the first real debriefs (docs/design/ai-citizens.md, "Progress"). Behaviou
 
 **Revisit if:** the estimator design flattens people or the town where it is used (the gate's checks, run on each new slice); seats under `unstated` mostly say in their debriefs that they took the town for a test anyway (then the framing buys little); debriefs under `unstated` report distress beyond what the question needs; model-welfare research changes what is owed.
 
+## 2026-10-12 · Homes by income: a town's first tenancies follow what its households have coming in, and the payments they are owed are in payment from the first day
+
+**The fault.** A generated town opened with about a third of its leases held by households with no wage earner, in homes nobody in them could pay for; most of a first year's arrears, notices to vacate, applications and evictions were those households, and the artefact burnt off in the second year (docs/design/ai-citizens.md, "Progress", the firm-side fixes; "What the fourth living pilot found"). Working files: `runs/homes-by-income-2026-10-12/` (STATUS). No model was called.
+
+**The cause** (generator 0.48.0), four things:
+1. Homes were dealt by size alone: households sorted by the bedrooms they need, each given the smallest home that met the standard. Income was never looked at; no profile stated how its renters' rents stand to their incomes.
+2. What a household had coming in counted wages only. A pension was claimed on the first morning, decided after the office's processing days in a living town, and first paid a whole period later (14 to 61 days).
+3. Who is in the labour force is drawn person by person from the profile's shares, so whole households of working age have nobody in it and nothing coming in, ever: no profile's support law has a payment for them.
+4. Tenure followed the home: houses owned, flats let; small households got flats, so nearly every pensioner rented.
+
+Leases with no wage earner at 1,000 people (seed 1): Victoria 73 of 239 (55 with someone of pension age); Tamil Nadu 64 of 247 (22); Nakuru 53 of 248 (8), where 81 leases failed the opening caseload's own test (income under the rent, under a month's rent saved).
+
+**The change** (generator 0.49.0; docs/behaviour/generator.md, "Homes by income, and payments in force"; households.md, "Taken in"; profiles.md, "Where a town's households live as the year begins"). On a real basis each, with what it rests on:
+- **Payments in force**, by the profile's take-up for each payment (`support.take_up_bps`): claims and grants brought forward on paper; the office pays from its file, the claimant does not claim again.
+- **People with nothing coming in live with kin** (the owner's ruling on the plan, 2026-10-12: not unhoused and then gone): a household that can carry them takes them in, kin by the pattern of ages the extended households are drawn by, within the profile's share of households that hold kin (`extended_bps`, or the ceiling `households.kin_households_most_bps`). **The participation draw is untouched**: its rate and shares by age are the profile's; only who shares a household with whom changes.
+- **Owners by the head's age** where the profile states it (`ownership.owner_bps_by_age`); the number of owned houses is still the profile's share of the houses. (It is now that share of all the houses, where it had been that share of the houses a household happened to be dealt: Tamil Nadu's town has 112 owner households where it had 75.)
+- **Renters matched to homes by the rent they carry**: a share drawn from the profile's bands (`tenancy.rent_share_of_income`) of what the household had coming in when it took the home (someone out of work as the year begins took it in work, at the town's usual pay), bounded both ways by the room its occupancy standard asks for; an exact least-cost match that keeps the order. Nobody holds a home whose rent is more than everything they had coming in, unless savings cover six months (the citizen's own rule).
+- **Not done, and why:** rents are not redrawn from incomes (they are the profile's rents for real homes, and a landlord's review pulls each back to its building's); the participation draw is not made by household (the owner's ruling); nothing is set from arrears, notices or evictions.
+
+**A first trial, superseded** (`trial1/`): matched on the drawn rent alone, the best-paid couples took the largest homes, and the Victorian town ended its year with 38 overcrowded households where it had 2. The room bound is the citizen's own way of choosing a home (the bedrooms needed, then the rent), with the citizen's own bearable share; it is a change of mechanism made on seeing a consequence, and is said here as that.
+
+**What a town opens with** (six towns of 1,000, town seeds 1 to 6, a town's mean; income as the town counts it on the first day; `start-table.txt`). Rent over income, shares of leases: under 20%, 20 to 30%, 30 to 50%, 50 to 100%, over 100%, nothing coming in:
+
+| Profile | Before | After | The profile's bands |
+|---|---|---|---|
+| au-vic-2026 | 23 / 11 / 33 / 3 / 0 / **31** | 20 / 23 / 32 / 11 / 1 / **14** | 56 / 23 / 15 / 6 over a half (PLACEHOLDER around an opened mean of 20.2%) |
+| in-tn-2026 | 18 / 16 / 34 / 9 / 0 / **24** | 17 / 18 / 41 / 2 / 5 / **16** | 25 / 26 / 32 / 17 (PLACEHOLDER, borrowed) |
+| ke-nakuru-2026 | 3 / 5 / 16 / 33 / 24 / **20** | 1 / 3 / 28 / 59 / 4 / **6** | 25 / 26 / 32 / 17 (PLACEHOLDER around an opened 33.3% of expenditure) |
+| us-oh-2026 | 34 / 30 / 10 / 0 / 0 / **26** | 42 / 37 / 16 / 0 / 0 / **6** | 49 / 19 / 20 from 30 to 50 / 12 over a half (opened: the county's) |
+| de-ni-2026 | 58 / 11 / 5 / 0 / 0 / **26** | 74 / 18 / 2 / 1 / 0 / **6** | 34 / 32 / 27 / 8 (opened: the state's, of net income) |
+
+Cannot pay a rent on the first day (the opening caseload's test), a town: Victoria 2.5 to 0.5; Tamil Nadu 8.8 to 1.0; Nakuru 70.8 to 4.5. **The distribution is not reached, and is not fitted:** a town has five rents and is nearly full, so its shares are its incomes against those rents. Ohio's town is near its county's below 30% and has none of its severe tail; Lower Saxony's town pays far less than its state; Victoria's and Nakuru's pay far more (Nakuru's profile is inconsistent with itself: a two-bedroom flat is 71% of one wage; left, and recorded in docs/profiles.md). What is left with nothing coming in on the first day is mostly pensioners the take-up leaves to claim on the first morning, renting on savings.
+
+At 1,000 people (seed 1), households taken in by kin / renting on savings / without a home, and before that without a home: Victoria 13 / 28 / 41 (54 before); Tamil Nadu 27 / 34 / 19 (16); Nakuru 44 / 11 / 22 (16).
+
+**A year of the 1,000-person town, before and after** (one town run six times, means; `sum-*.txt`, `table.py`). Possession, living then plain:
+
+| living | au-vic-2026 | in-tn-2026 | ke-nakuru-2026 |
+|---|---|---|---|
+| notices to vacate | 12.0 → 3.5 | 31.7 → 9.3 | 131.0 → 38.3 |
+| applications for possession | 6.0 → 2.0 | 16.5 → 5.0 | 61.5 → 15.2 |
+| possession orders | 4.8 → 1.7 | 10.2 → 2.0 | 37.0 → 8.3 |
+| plans | 0.0 → 0.0 | 0.2 → 0.5 | 0.2 → 0.2 |
+| removals carried out | 2.0 → 1.3 | 3.2 → 0.7 | 15.3 → 2.3 |
+| removals per 1,000 renting households | 9.2 → 5.9 | 16.1 → 4.2 | 168.7 → 30.5 |
+| renting households (end) | 216.8 → 226.5 | 197.5 → 154.2 | 93.0 → 78.7 |
+
+| plain | au-vic-2026 | in-tn-2026 | ke-nakuru-2026 |
+|---|---|---|---|
+| notices to vacate | 9.8 → 3.2 | 31.2 → 8.5 | 134.3 → 44.7 |
+| applications for possession | 5.7 → 2.7 | 15.8 → 3.5 | 67.8 → 17.7 |
+| possession orders | 5.0 → 2.2 | 2.2 → 0.7 | 44.7 → 8.3 |
+| plans | 0.0 → 0.0 | 0.7 → 0.3 | 0.8 → 0.2 |
+| removals carried out | 3.5 → 2.2 | 0.7 → 0.7 | 25.2 → 4.2 |
+| removals per 1,000 renting households | 16.1 → 9.7 | 3.4 → 4.3 | 330.0 → 58.0 |
+| renting households (end) | 217.0 → 223.8 | 194.7 → 161.2 | 76.7 → 71.7 |
+
+**Beside the sources there are** (docs/behaviour/justice.md; only England's are sourced, to confirm): about 3 removals a year for each 1,000 renting households, and 5% of private renters in arrears in a year. Victoria's town: removals 9.2 to 5.9 per 1,000 (living; 16.1 to 9.7 plain), notices to vacate to 1.5% of renting households. Applications for possession 27.7 to 8.8 per 1,000, where VCAT's whole tenancy list is 71.6 per 1,000 (who applies is not in its report): the town's landlords now apply far less than that list, where they had been a third of it by themselves. Nothing was adjusted to any of these. Nakuru's town still has 38 notices a year for 79 renting households: its rents against its wages.
+
+**The second year** (three runs of two years, living; the last twelve months): Victoria's notices to vacate 5.0 before, 3.7 after; applications 4.0 to 2.7; orders 3.7 to 2.0; removals 2.7 to 1.7. Its first year was 12.0 notices before and is 3.5 now: **the first year no longer differs from the second**, which is the artefact gone. In the two poorer towns the second year is another matter, before and after alike: most of their factories fail to cover their wages in it (redundancy notices 174 and 99 a run before, 167 and 82 after; unemployment 9% before in both, 22% and 9% after), and arrears follow the lost jobs (Tamil Nadu's notices to vacate 28.0 before, 36.7 after; Nakuru's 48.3 and 38.7; removals 6.3 to 4.7 and 20.0 to 12.0). That is the firm side's fault, not the opening's.
+
+**What else moved**, each classed (living town; plain alongside where it differs):
+- *The artefact going:* departures (Victoria 105 to 93; Tamil Nadu 75 to 63; Nakuru 179 to 79), move-ins and new leases (Victoria 47.5 to 22.5), job changes (13.7% to 11.8%: fewer people leaving town and being replaced), hires.
+- *A consequence:* overcrowded households at the year's end (Victoria 2.0 to 4.5; Tamil Nadu 2.7 to 20.0; Nakuru 7.2 to 52.2): the households that took kin in, which is what doubling up is; within a home's physical room, beyond the occupancy standard. Homes with two or more bedrooms spare fall (Victoria 149 to 120). Median rent share of households with an earner at the year's end 19.6% to 23.0% in Victoria (20.2% sourced), 30.6 to 32.6 and 58.7 to 65.5 elsewhere.
+- *A consequence that makes a known fault worse:* redundancy notices in Victoria 34.0 to 42.5 (7.9% to 9.9% of those in a job; 1.8% sourced), for want of trade 24.0 to 30.5. Rent that was not being paid is paid (5.16 to 5.65 million a year, a tenth more), and shops sell about 3% less; shops were sized for the full rent bill before and after. The shops' stock rule and the absence of trade credit are the fault (the firm-side fixes' entry), and this leans on it.
+- *A sourced share moving away from its source:* support claims refused, Victoria 37.8 to 24.8 a year (the survey's share of adults with a benefits problem is 6%, about 43): a wrong refusal is a chance for each claim decided, and a payment already in force is not decided in the year. Named, not fixed.
+- *Not separable from noise with six runs, and the thing to look at first:* runs in which several factories cannot cover their wages late in the year and let most of their hands go. Tamil Nadu's town: one run of six before, two of six after (mean redundancies 49 to 82, median about 36 to 30); Victoria's two-year runs: none of three before, one of three after (unemployment 18% in that run, under 1% in the others, and its mean second-year redundancy 9.9% to 16.9% is that one run); Nakuru's plain town went the other way (101 to 63). In the poorer towns' second years it happens in most runs, before and after. The same world prices, a town selling a little less at home. Not traced further.
+- *Noise, or within it:* group participation, union applications, business births in Victoria and Tamil Nadu (Nakuru's births 8.3 to 13.7, not traced), pay come short, goods, bills.
+- *Performance:* commands in a year of the town 2.07 to 2.13 million before and after; wall time no slower (the batches ran under differing load, so no finer figure is claimed). Generating the 3,000-person town takes 1.35 s where it took 1.08 s. Generation: an exact match of renters to homes, quadratic in a town's renting households (about 60,000 steps at 1,000 people, half a million at 3,000).
+
+**The opening caseload** (`opening_caseload`, rule unchanged) in the living pilots' town (3,000 people, ke-nakuru-2026, seed 402): 14 tenancies with rent owed where there were 198; 10 under notice (5 with the date ahead); 5 before the tribunal (2 with time to answer still running: days 9 and 34; 3 with an order made: days 9, 9, 16) where there were 49. The pilots' landlord-38 has 12 tenancies, one of them behind and under notice, none before the tribunal (6, 4 and 3 of 14 before). **A seat in the tribunal has little before it again**: the option takes its counts from the town's own mechanism, and that mechanism no longer makes a quarter of tenancies fall behind. docs/behaviour/generator.md.
+
+**Tests whose town changed under them**, each with its reason beside it: the three goldens (a town's config; a town's state after 60 days, plain and living); the twin test and the founding tests (the small town's requests, decisions and occasions for founding were mostly about rent nobody could pay: one now runs longer at the dial's most, the others take one sharer and more frictions; own-venture takes another run seed); the office-books tests (three tenants are made to lose their means; a threshold of 3 cases is 2); office-work, production, deaths (who is hired, who leaves, who dies alone); and three that met a rule's edge for the first time in the town as now drawn (a wage order for someone who signed after an enterprise agreement's rise is at the wage posted; a condition treated in its last hour ends a tick later; someone going to a building under water is refused).
+
+**No whole views added** (docs/no-god-view.md): the support office is declared keeper of its own file of claims and decisions, which a town now opens with; the outside world's funding, market and weather offices, which share its organisation, were being shown every paper of that organisation and are now given their own by kind (what happens in a town is the same, event for event, over 75 days; its state hash moves, since what is shown is part of it).
+
+**Contracts:** additions only, named in `contracts/README.md` ("homes by income, and payments in force"), under the owner's blanket approval of 2026-10-11.
+
+**Two listed items taken with it.** (a) `forms_trained`: the model's own loader builds its configuration from every key of `config.json` and refuses one it does not know, so the list is written beside it, in `forms-trained.json` (917 form names from the training rows of the export `data-19`, the same 917 read two ways), by `scripts/forms-trained.ts`; `readerOf` reads `config.json` first and then that file. The weights and `config.json` are byte for byte as they were. (b) **Finance's duties falling due: not done.** The next withholding return's day is a private counter of the payroll (`Staffing.nextRemit`, `participants/src/behaviour/firms.ts`), set a month from whenever that payroll first ran and again at each return; a month with nothing owed advances it and leaves no paper. The books cannot derive it from records. A clean fix puts returns on a fixed grid of the calendar for every employer (a change of behaviour, small) and has payroll and books call one function; the sum withheld since the last return is already in the books.
+
+**Sources** (docs/research/references.md, "Where households live as a town opens"; each profile's notes): gathered by a Sonnet 5.5 subagent for each place. Rent shares are opened bands for three profiles, placeholders for six; take-up is derived from opened figures for three; owners by age are opened in full for three; the ceiling on households holding kin is opened for four. Everything else is marked.
+
+**Leaves out.** A payment reckoned from a record of contributions cannot open in payment (nobody has a record on the first day). A pensioner the take-up leaves out is placed as having nothing coming in though they claim that morning (few are affected: the retired's savings carry a rent). Kin are matched by age alone. Tenure within flats (all let). Social housing, housing payments, remittances. The savings a household in arrears for months would have.
+
+**Revisit if:** a profile's rents by quality or by tenancy are sourced (then a lease's rent can differ within a size, and the bands can be reached); the collapses for want of money prove to follow from this (run more seeds, and trace one); a seat in the tribunal needs more before it than the town makes (then the caseload wants a sourced rate of arrears, which no profile has); a profile sources its jobless households (the participation draw could then be made by household, which the owner ruled out for now); overcrowding where kin are taken in is to be held to the occupancy standard.
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Calibration, measured again after the first-year risk fix** (2026-10-05, at 0251d3a, `runs/calibration-2026-10-05` on the run server; the small town, 3 seeds × 2 years, code only, as below). Health: 4 breaches of 15 (8 measured). Recorded, not chased: Naz decides what to do with the numbers.

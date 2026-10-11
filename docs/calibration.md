@@ -45,6 +45,20 @@ Measured on `worlds/town-1000.yaml` (1,000 people, two years, one town run sever
 | **New groups founded** | about 1.5 a year in 1,000 residents: 29 newly registered associations per 100,000 a year, times a guessed 5 for groups never registered (to confirm) | Consumer Affairs Victoria 2021-22, as quoted in the 2023 Regulatory Impact Statement (opened); the multiple has no source | 1.7 (six runs of one town: 1, 3, 1, 1, 3, 1), with `living.founding` on | `town/founding` | Fitted to it (`founding.chance_bps`); only as good as the multiple. docs/behaviour/founding.md |
 | **Religious belief** | **43.9%** reported a Christian affiliation | ABS, Census 2021 (to confirm) | Held at the start by that share (members strongly, others nominally). Stated when held firmly: **11–15%** of adults, steady or rising over a year while members keep going | `town/beliefs` | Not comparable: the census counts affiliation, and code citizens state only a firm belief. Needs a stated-affiliation measure, or a practising-share target (attendance), to calibrate. |
 
+## Where households live as a town opens (2026-10-12; docs/decisions.md, "Homes by income")
+
+Each profile now states its renters' rent as a share of income as bands (`tenancy.rent_share_of_income`: opened for three profiles, placeholders for six), and a town's first tenancies are dealt by what each household has coming in. The bands are a target as well as an input: **the town's own distribution is reported beside them and never fitted to them** (a town has five rents and is nearly full). Six towns of 1,000 a profile, the first day (`runs/homes-by-income-2026-10-12/start-table.txt`):
+
+| Outcome | Target | Measured before | Measured now | Gap |
+|---|---|---|---|---|
+| **Leases with nothing coming in** on the first day | none sourced as a rate; the US county's renters with no computed share are 8.6% (ACS B25070, with those paying no cash rent) | 20 to 31% | 6% (Nakuru, Ohio, Lower Saxony), 14% (Victoria), 16% (Tamil Nadu) | What is left is mostly pensioners the take-up leaves to claim on the first morning, renting on savings |
+| **Renters paying under 30%** of income, Ohio's town | 68% (the county's, ACS B25070, opened) | 64% | 79% | Near below 30%; none of the county's 12% paying over half |
+| **Renters paying under 30%**, Lower Saxony's town | 66% of net income (Mikrozensus 2022, opened) | 69% | 92% | The town pays far less than its state: its rents against its wages |
+| **Renters paying under 30%**, Victoria's town | about 79% (a placeholder around an opened mean of 20.2%) | 34% | 43% | The town pays far more: a one-bedroom flat is a third of one award wage |
+| **Households that cannot pay one rent** on the first day (income under it, under a month's rent saved) | not a target: what the opening caseload reads | 2.5 (Victoria), 8.8 (Tamil Nadu), 70.8 (Nakuru) a town | 0.5, 1.0, 4.5 | The artefact, gone |
+| **Removals for arrears** per 1,000 renting households a year, Victoria's town | about 3 (England's, derived, to confirm); none for Victoria | 9.2 (16.1 without frictions) | 5.9 (9.7) | Not adjusted to it |
+| **Overcrowded households** at a year's end | to source (above) | 2 (Victoria), 3 (Tamil Nadu), 7 (Nakuru) | 4.5, 20, 52 | The households that took in kin with nothing coming in: up to the profile's ceiling on such households, a placeholder in Victoria and Nakuru |
+
 ## How to use this
 
 - A gap is a finding before it's a problem. It says which rule or which data is missing.
