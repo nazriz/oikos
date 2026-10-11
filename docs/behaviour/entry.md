@@ -20,6 +20,28 @@
    If someone else buys the premises first, the new shop returns the capital and closes.
 5. **It trades.** It then trades like any shop (docs/behaviour/retailer.md): it starts by hiring its minimum staff, stocks up and publishes its price.
 
+## Starting a business of one (2026-10-11; citizen 0.48.0, firm.retailer 0.12.0)
+
+**The fault.** Nobody founded a business in a year of the 1,000-person town. The only venture was a shop in premises bought from a closed firm: about $365,000 for the premises and $91,000 of capital, where nobody of working age holds a tenth of that and no firm closes in the year. The monthly chance was never reached. Real business births are mostly not that: in Australia about 65% of businesses have no employees (ABS, Counts of Australian Businesses, June 2026), and most new ones start small, from home, on their owner's savings.
+
+**The venture.** The business of one that a town may open with (below) can now be started in a run: an organisation with one position (Owner), held by its founder's own participant, running a shop's rules with `operator` set, trading from the founder's home. Its capital is a week's stock (a supplier's least order, where that is more) and the money for one more buying of it, as such a business is given at the start; nothing else. The world's catalogue has the task `sell` wherever the venture is offered.
+
+| | |
+|---|---|
+| **Who** | Someone in the labour force, of working age, with a home to trade from and savings for the capital beside a month of housing and essentials (`found_own_buffer_months`, a placeholder). In a job or out of one: both are in the literature (Maloney 2004: workers with savings leaving jobs to work for themselves; Fields 1975: those out of work who cannot wait). |
+| **How often** | Each month, the chance `found_own_ppm` (parts per million), shifted by who they are as for any venture (the open and the achieving more; in a living town, those wanting work more). **Derived, not chosen:** the births the profile's business birth rate (`business.entry_bps_per_year`, with its source) gives on the businesses the town has (shops, factories, landlords, the builder, the paper, businesses of one), spread over the people who could start one at the start. Victoria: 16.4% a year (ABS); 61 businesses; about ten births a year. |
+| **Meant, by a founding's draw** | Where the town has founding on (docs/behaviour/founding.md), someone whose draw of what to found is "a business" starts one within 180 days as soon as they have the home and the money, the month's chance set aside. In the 200-person test town the one person who drew it had $2,974 against a capital of $24,200, and nothing came of it: that is the rule. |
+| **In a job** | Gives notice ("starting a business of my own") and starts when it has run. |
+| **Founding** | The `entity` call, as for a shop: the business opens an account, calls its capital, records its founder as its only shareholder, and trades once the capital is in. No premises are bought. |
+| **Then** | As any business of one (below): it buys when stock runs low, sells from home, and pays its owner what it holds beyond its stock money every pay period. Its owner is not out of work. |
+| **Giving it up** | Monthly, from six months on (`give_up_months`): a business that has paid its owner less than half a month's essentials a month over those months (`give_up_below_bps`) is closed by them. It stops trading, refunds what it had not served, pays what it holds to its owner and says it has closed; its owner looks for work. **Placeholders**: no source for the threshold; the shape is that most businesses that close are closed by owners they do not keep (above, "Firms that close without failing"). This applies to the businesses of one a town opens with as well. |
+
+**What a business birth and death are here.** A birth: a business of one started (or a shop founded in bought premises, which still needs a closed firm's premises and a rare fortune). A death: a firm wound up (insolvent, or idle for 90 days: docs/behaviour/insolvency.md) or a business of one given up or left by its owner. `economy/businesses` counts both against the businesses there were.
+
+**Employing start-ups wait on leased premises.** A new shop or works with staff still has to buy a closed firm's building. Real ones lease. Commercial leasing (an owner of premises who lets them) is not built, so the births here are all businesses of one, and the profile's birth rate, which counts every kind, is met only by them.
+
+**Leaves out** (docs/design/ai-citizens.md, Open 5, is where each belongs): giving a business up for a job that pays more (Harris and Todaro's comparison); looking for work from it; a household deciding who does what; services and making (a business of one here trades in goods); a pitch in a market for one started in a run (from home only: a town with no market has none to give); borrowing to start; registering, and a trader's tax; a business of one taking on its first employee.
+
 ## A person working for themself (2026-10-09; profile-depth item 1, part c: the opening state)
 
 **In the real world.** An own-account worker has no employer and no employees: a stall, a kiosk at the door, a round of goods bought in the morning and sold by night. The enterprise is not separate in law from its owner (a household unincorporated enterprise, in the national accounts' words); what it clears is the owner's income. Every place has it; where formal jobs are few it is most of the work there is (docs/research/references.md: ILO; La Porta and Shleifer 2014 on such firms staying small).
@@ -53,6 +75,8 @@ Its customers find it as they find a shop: its prices are put up where it trades
 The generator then: draws that share of people in work into businesses of one; gives each its expected custom (every seller, shop or trader, the same at the start, a trader no more than one person serves; the shops are staffed and funded for the rest); a few days' stock where it trades and the money for one more buying of it (derived; no profile states it); makes its owner its only shareholder; and opens the factories with the staff the smaller employed workforce leaves them, spread evenly.
 
 **The owner** ([citizen.md](citizen.md)): is not out of work (looks at no posting, claims nothing for being out of work); counts as income what the business has paid them (before it has a record, what it was expected to); pays their share of the rent from it; and goes to their pitch in working hours.
+
+**Since 2026-10-11** a business of one can be started in a run and is given up when it pays no living (above, "Starting a business of one"). The paragraph below is what was decided on 2026-10-09 and still holds for everything else it lists.
 
 **Not here, by decision: who takes this up and when.** The standard accounts (people queue for scarce formal jobs: Harris and Todaro 1970; those who cannot wait work in an easy-entry sector and search less well from it: Fields 1975; much of it is chosen: Maloney 2004) are used for nothing but the opening allocation, which is the survey's share. Starting such a business when out of work, giving it up for a job, closing it when custom fails, a household deciding who does what: all of it is the citizen redesign's (docs/design/ai-citizens.md, Open). So in a run the number of these businesses only falls (an owner dies or leaves town), and nobody new starts one.
 

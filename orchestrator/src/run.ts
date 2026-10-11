@@ -483,7 +483,9 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     const own = chans.filter((x) => x.ch.kind === "records" && x.ch.way === "mine" && !x.ch.on_request && !standingIds.includes(x.path));
     const narrow = (m: any) => !!(m?.statement_kinds?.length || m?.records?.length || m?.has?.length);
     const trays = { kinds: new Map<string, string[] | true>(own.flatMap((x): [string, string[] | true][] => (folderKinds.has(x.path) ? [[x.path, folderKinds.get(x.path)!]] : narrow(x.ch.match) ? [[x.path, true]] : []))),
-      all: new Set(own.filter((x) => !folderKinds.has(x.path) && !narrow(x.ch.match)).map((x) => x.path)) };
+      all: new Set(own.filter((x) => !folderKinds.has(x.path) && !narrow(x.ch.match)).map((x) => x.path)),
+      // (Its organisation's only office, its own staff's post apart: what is addressed to the organisation is its post.)
+      ...(office && [...positions.values()].filter((x: any) => x.entity === office.entity && !mine.some((m) => x.id === `${m.id}-staff`)).length === 1 ? { sole: true } : {}) };
     const ownAuthors = mine.flatMap((x) => { const staff = positions.get(`${x.id}-staff`)?.holder; return staff ? [staff] : []; });
     const config = { trays, ownAuthors, ...(pp.wake_on_papers === false ? { wakeOnPapers: false } : {}), ...(typeof pp.effort === "string" && pp.effort ? { effort: pp.effort } : {}), ...(roster || tally ? { staff: { text: setOut } } : {}), whoIs, participant: p.id, entity, entityName, onRequest, kinds, ways, title: office?.title ?? p.title, role: office?.role, framing: p.framing, standing: standingIds, titles, cadenceDays: pp.cadence_days ?? 7, draftText,
       ...(pp.sessions ? { sessions: pp.sessions } : {}), ...(pp.max_actions ? { maxActions: pp.max_actions } : {}),

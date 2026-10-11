@@ -135,7 +135,9 @@ export function wholeViews(config: any): WholeView[] {
   };
 
   const participant = new Map<string, any>((config.participants ?? []).map((p: any) => [p.id, p]));
-  const moduleOf = (controller: any, role?: { code?: string }): string => role?.code ?? (controller?.type === "code" ? controller.impl : controller?.params?.mock?.brain) ?? "(none)";
+  // (An office's clerk is the office's own, shown what the office is shown and nothing more: a whole view it has is its
+  // office's, to be declared by the module that runs the office. docs/behaviour/office-books.md.)
+  const moduleOf = (controller: any, role?: { code?: string; params?: { of?: string } }): string => (role?.code === "office.clerk" && role.params?.of ? role.params.of : role?.code) ?? (controller?.type === "code" ? controller.impl : controller?.params?.mock?.brain) ?? "(none)";
   const paramsFor = (controller: any, role?: { params?: object }) => ({ ...(role?.params ?? {}), ...(controller?.type === "code" ? controller.params : controller?.params?.mock?.params) });
   for (const pos of config.positions ?? []) {
     const holder = participant.get(pos.holder);

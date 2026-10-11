@@ -44,7 +44,7 @@ const managing: BehaviourModule = {
 };
 
 test("office-holders set their staff's routine once; the staff do it; a hold stops the round and lifting it starts it again; withdrawn, it stops", async () => {
-  const config = generate({ ...spec, model_seats: ["works", "clinic-manager", "rates"] });
+  const config = generate({ ...spec, opening_orders: false, model_seats: ["works", "clinic-manager", "rates"] });
   // Each of the three has a staff post run by the office's code, and the office-holder's part is the seat's.
   for (const id of ["works", "clinic-manager", "rates"]) {
     const staff = config.participants.find((p: any) => p.id === `${id}-staff-system`);

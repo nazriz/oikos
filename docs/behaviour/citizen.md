@@ -1,4 +1,4 @@
-# `citizen.default` (v0.48.0): the AI citizen in code
+# `citizen.default` (v0.49.0): the AI citizen in code
 
 **Seat:** a townsperson (acts as themselves). **Source:** `participants/src/behaviour/citizen.ts`, with its mind in `participants/src/behaviour/mind.ts`, the richer record in `participants/src/behaviour/inner.ts` and the sparse mind in `participants/src/llm/consult.ts`. **Design:** [docs/design/ai-citizens.md](../design/ai-citizens.md). **Citations:** [docs/research/references.md](../research/references.md).
 
@@ -149,7 +149,7 @@ A want and an opening meet when the opening brings an outcome the want seeks, ca
 - **belief** in what a host teaches counts for turning to it (`belief`);
 - **those they know** who took that way (`others`, weighed again by conformity).
 Each choice is a recorded decision (area `want`); how the way turned out is learned (met: 10,000; granted or refused when asked: 10,000 or 1,000; not yet: 2,000) and moves the sense of agency as anything tried does.
-Since 0.48.0 each such decision, and each draw of whether to found, is recorded with its situation (the want, what stands behind it, every opening in typed terms with what the person knows of it, their own record, the odds the mind gave): what a model giving the odds in the mind's place would be shown (docs/design/ai-citizens.md 11a). Recording only: nothing reads it back.
+Since 0.49.0 each such decision, and each draw of whether to found, is recorded with its situation (the want, what stands behind it, every opening in typed terms with what the person knows of it, their own record, the odds the mind gave): what a model giving the odds in the mind's place would be shown (docs/design/ai-citizens.md 11a). Recording only: nothing reads it back.
 
 **When.** A want is gone after when it is born of an event (the wake the event caused), and again each time its way has had its time: `patience_days` (45) stretched by the person's patience (tradition, security, attachment to the place). At most two a week; most weeks, none: people still repeat. Nothing is added to the scheduler: a person wakes weekly and when something names them, as before.
 
@@ -189,6 +189,7 @@ What goes wrong for a person, how often, and what they can do about it is one pa
 - **Giving up on work stops the looking.** A want for work that is given up (about being let go, being unpaid, or work itself) stops the weekly look at the job board and the applications, for as long as a want given up rests (`wants.rest_days`, 180). The person notes it for themselves (`work_search`, seen by nobody else), and the economy's summary counts them out of the labour force from then until they look again or are in work, as a labour force survey counts someone not looking (measure/queries/economy/summary.sql). They still claim what they are entitled to.
 - **A need short at the start has been short for a while.** A need found below its level in a town's first week is taken to have been so for a part of the 60 days it takes to become a want, drawn for the person. Before, every clock started at day 0 and nobody wanted anything for two months of any run (the first living pilot: 73 wants in 60 days, nearly all landlords').
 - **What is told to the household is said once, until it changes** (everyone): a member's income is told to the leaseholder when the sum as it is said changes. One household in the first living pilot was sent "My pay is now 0.00" 478 times in 60 days: the figures compared were not the figures said.
+  The same rule holds for the leaseholder's message of each member's share of the rent (kept by recipient, `sharesTold`): said again only when the share changes. Read by sender and recipient, the second living pilot's 1,754 "My pay is now" (938 pairs) and 1,003 "Your share of the rent" (896 pairs) had no unchanged repeat; they were each member's first telling (137 at day 0) and real changes (about 410 wage raises of 2%, jobs lost and found, rent and earner counts changing). `orchestrator/test/household-saying.test.ts` holds it over a run.
 
 ## Founding, and what is founded (0.47.0)
 
@@ -200,6 +201,14 @@ One page: [founding.md](founding.md). In a town with the dial for it on (`living
 - **Eligibility by dealing.** An offer or a gathering may be for those party to an agreement in force with someone (`dealing_with`: their tenants, their workers), which a person checks against their own agreements.
 - **Who shares a want** is only what the person knows: their household, what those they caught up with said, who told them they were wronged, who mourns the same death, who lives in the same building.
 - With the dial off none of it is read, and the town is step 2b's to the state hash.
+
+## Pay, a home lost for arrears, and a business of one (0.48.0, 2026-10-11)
+
+Three changes on the person's side of the firm and landlord fixes (docs/decisions.md, "Four faults on the firm and landlord side"); each is described where its mechanism lives.
+
+- **What counts as pay.** Money from an employer's account is pay only if the bank's line says it was paid as wages. A refund from the shop one works at, or a dividend from the works one holds a share of, is not pay come short (docs/behaviour/firms.md, "Wages owed").
+- **Told to leave for arrears** (docs/behaviour/justice.md, "Possession"; only where the world has a law on possession). A notice to vacate: gone by its date, or staying, by a draw of the person's own at the world's share (`possession.stay_bps`). An application for possession: the tenant answers the tribunal with what the household could pay a month toward the arrears (its income less rent and essentials), if anything. A plan: they stay. An order for possession: gone by its date or not (`possession.obey_bps`). A warrant carried out: out, from that hour. Then as anyone without a home. The record keeps it as an eviction.
+- **A business of one** (docs/behaviour/entry.md, "Starting a business of one"): started with the month's chance by someone with a home to trade from and the savings (after notice, if in a job); given up after months in which it has paid them under half of essentials.
 
 ## What a citizen does
 

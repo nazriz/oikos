@@ -93,7 +93,7 @@ test("a how often that is neither, of a task no procedure speaks of: the seat is
 
 test("a rates seat that asks for its levy with no how often has an order from its first sitting, and its clerks follow it as the law's instalments fall", async () => {
   const seats = scriptedSeats({ rates: [{ day: 0, asks: () => [{ what: "The clerks send the notices at each instalment the rating law sets.", program: "work(at=rates, task=levy)" }] }, ...[4, 8, 11, 14, 20, 26, 33, 40].map((day) => ({ day, asks: () => [] }))] });
-  const s = await runWorld({ config: generate({ ...spec, model_seats: ["rates"] }), runId: "office-rhythm", outDir: mkdtempSync(join(tmpdir(), "oikos-office-rhythm-")), until: 44 * DAY, adapter: seats.adapter, recordObservations: "none", recordDecisions: "none" });
+  const s = await runWorld({ config: generate({ ...spec, opening_orders: false, model_seats: ["rates"] }), runId: "office-rhythm", outDir: mkdtempSync(join(tmpdir(), "oikos-office-rhythm-")), until: 44 * DAY, adapter: seats.adapter, recordObservations: "none", recordDecisions: "none" });
   expect(s.participantErrors).toBe(0);
   const records = readFileSync(s.logPath, "utf8").trim().split("\n").map((l) => JSON.parse(l)).filter((e) => e.kind === "event" && e.body.event === "recorded").map((e) => e.body.record);
   const order = records.find((r) => r.kind === "work_order")!;

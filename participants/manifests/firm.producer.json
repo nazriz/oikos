@@ -1,8 +1,18 @@
 {
   "name": "firm.producer",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "doc": "docs/behaviour/producer.md",
   "params": {
+    "adjust": {
+      "schema": {
+        "type": "object"
+      },
+      "default": {
+        "smooth_months": 3,
+        "hiring_cost_weeks": 8
+      },
+      "source": "placeholder"
+    },
     "builder": {
       "schema": {
         "type": "string",

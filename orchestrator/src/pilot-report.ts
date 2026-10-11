@@ -9,6 +9,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import { currentLogs, logLines, runOf } from "./logs";
+import { measureFailure } from "./pilot-state";
 import { NOT_CHECKED, NOT_PUT } from "../../translator/src/index";
 
 /** The sentences a translator that asked back says (translator/src/index.ts `unsureText`): which one, which words, a
@@ -86,7 +87,7 @@ export async function reportOfLog(dir: string, log: string): Promise<any> {
     if (!s) seats.set(name, (s = {
       model: undefined as string | undefined, model_calls: 0, failed_calls: 0, cost_microusd: 0, input_tokens: 0, output_tokens: 0, tool_uses: {} as { [k: string]: number },
       answers_without_tool_use: 0, malformed_tool_uses: {} as { [k: string]: number }, dropped_tool_uses: {} as { [k: string]: number },
-      notes: { look_each_sitting: 0, no_turn: 0, notebook_not_changed: 0 },
+      notes: { look_each_sitting: 0, no_turn: 0, notebook_not_changed: 0, notebook_folded: 0, notebook_fold_failed: 0 },
       // What a seat was shown, against the most it may be: prompts its model would not take, prompts something was left
       // out of to keep them within that, looks cut at the most one look shows; and what it sent that was not sent.
       // Sittings it missed because its model did not answer (nobody was in the seat that day), and when it last sat.
@@ -184,6 +185,8 @@ export async function reportOfLog(dir: string, log: string): Promise<any> {
       if (d.prompt_trimmed) s.prompts_trimmed++;
       if (d.look_cut) s.looks_cut++;
       if (d.not_sent) count(s.not_sent, String(d.not_sent.what ?? "?"));
+      if (d.notebook_folded) s.notes.notebook_folded++;
+      if (d.notebook_fold_failed) s.notes.notebook_fold_failed++;
       if (d.notebook_not_changed) {
         s.notes.notebook_not_changed++;
         for (const why of d.notebook_not_changed.reasons ?? []) count(s.notebook_not_changed_reasons, String(why).slice(0, 120));
@@ -331,6 +334,9 @@ export async function pilotReport(dir: string, write = true): Promise<any> {
   if (!logs.length) throw new Error(`${dir}: no log to report on`);
   const reports = [];
   for (const log of logs) reports.push(await reportOfLog(dir, log));
+  // (A pilot whose measures are missing says so in its report, however it came to be reported on.)
+  const noMeasures = measureFailure(dir);
+  if (noMeasures) for (const r of reports) r.measures_failed = noMeasures;
   const out = reports.length === 1 ? reports[0] : { pilot: basename(resolve(dir)), runs: reports };
   if (write) writeFileSync(join(dir, "pilot-report.json"), JSON.stringify(out, null, 2) + "\n");
   return out;
@@ -340,6 +346,7 @@ export async function pilotReport(dir: string, write = true): Promise<any> {
 export function renderReport(r: any): string {
   if (r.runs) return r.runs.map(renderReport).join("\n\n");
   const L: string[] = [];
+  if (r.measures_failed) L.push(`MEASURES FAILED: ${r.measures_failed}; the run's measures, health report and cost are not there until it is measured again`);
   const kv = (o: any) => Object.entries(o ?? {}).map(([k, v]) => `${k} ${v}`).join(", ") || "none";
   if (r.not_whole) {
     const short = r.not_whole.seats.length ? `a seat sat for less than its run. ${r.not_whole.seats.map((s: any) => `${s.seat} missed ${s.sittings_missed} sitting${s.sittings_missed === 1 ? "" : "s"} (day ${s.days.join(", ")}; its model did not answer) and last sat on day ${s.last_sat_day ?? "none"}${r.until_days !== null ? ` of ${r.until_days}` : ""}`).join("; ")}` : "";

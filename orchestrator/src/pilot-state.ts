@@ -2,7 +2,7 @@
 // log (plain while the run is stopped, compressed once it has finished) and the summary beside it, read through the
 // repo's own log reader, and why the run last stopped.
 
-import { closeSync, existsSync, openSync, readFileSync, readSync, statSync } from "node:fs";
+import { closeSync, existsSync, openSync, readdirSync, readFileSync, readSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { currentLogs, logLines, runOf } from "./logs";
 
@@ -223,4 +223,26 @@ export function limitWaitMs(message: string, usualMs: number, now = new Date()):
   if (!lifts) return { ms: usualMs };
   const ms = Math.min(12 * 3_600_000, Math.max(60_000, lifts.getTime() - now.getTime() + 60_000));
   return { ms, until: new Date(now.getTime() + ms) };
+}
+
+/** The file a batch or a resume leaves in a run's folder when its measuring failed (its text says what went wrong); removed when a later measuring works. */
+export const MEASURE_FAILED_FILE = "measure-failed.txt";
+
+/**
+ * Whether a finished pilot's measures are missing, and why: the note its own run left (`measure-failed.txt`), or a
+ * folder whose batch ran with measuring on and has no measurement tables. A run that is done as far as the queue
+ * goes (its log reaches its `until`) is not thereby measured: a header too large for the reader once left a pilot
+ * "done" with no measures and no word of it. Undefined where the measures are there (or the folder was never a
+ * batch's, as a test's stand-in for the CLI leaves it).
+ */
+export function measureFailure(dir: string): string | undefined {
+  const note = join(dir, MEASURE_FAILED_FILE);
+  if (existsSync(note)) { try { return readFileSync(note, "utf8").trim().slice(0, 300) || "measuring failed"; } catch { return "measuring failed"; } }
+  const runsDir = join(dir, "measure", "runs");
+  if (existsSync(join(dir, "batch.json")) && !(existsSync(runsDir) && readdirSync(runsDir).some((f) => f.endsWith(".parquet")))) {
+    let planned = true;
+    try { planned = JSON.parse(readFileSync(join(dir, "batch.json"), "utf8")).measure !== null; } catch { /* (half written: say it) */ }
+    if (planned) return "no measurement tables in the folder (measure/runs is missing or empty)";
+  }
+  return undefined;
 }

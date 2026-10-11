@@ -11,6 +11,7 @@
 
 import type { Offer, StatementRecord } from "../contracts";
 import { cents } from "../money";
+import { dateWords } from "../forms";
 import { params, type BehaviourModule, type ParticipantContext } from "../module";
 import type { Rng } from "../rng";
 import { because, Book, CounterWork, DAY, noting, say, StandingWork, type Step, usd } from "./common";
@@ -40,6 +41,9 @@ export interface HearingParams {
   within_days: number;
   /** Matters it passes to whoever must act: the office, and the kind of paper that office takes. */
   refer_to: { [matter: string]: { to: string; kind: string } };
+  /** Possession of a let home for arrears (docs/behaviour/justice.md, "Possession"), where it hears that: how long
+   * after its order the date for possession falls, and the longest plan to pay it will set (the world's law's). */
+  possession?: { days: number; plan_months: number };
 }
 export const HEARING_DEFAULTS: HearingParams = { hears: [], answer_days: 14, cases_per_day: 4, uphold_bps: { other: 5_000 }, within_days: 28, refer_to: {} };
 
@@ -163,6 +167,29 @@ export class Hearings {
         // Bringing the two together: nothing comes of it unless the other side will.
         if (x.agrees) say2(c, "settled", `${c.applicant} and ${c.against} met with us and came to an understanding.`, {}, `${c.against} agreed to meet ${c.applicant}: they came to an understanding.`, false);
         else say2(c, "dismissed", `${c.against} ${r ? "would not meet" : "did not answer"}; we can do no more.`, {}, `${c.against} ${r ? "would not meet" : "did not answer"}: mediation cannot be made to happen.`, false);
+        continue;
+      }
+      if (c.matter === "possession") {
+        // Possession of a let home for arrears. The tenant may answer with what they have paid since, and with what
+        // they can pay a month toward the rest. Paid: dismissed. A plan that clears the arrears within the longest
+        // the law allows, and that has not been tried and broken: the tenant stays, on the plan. Otherwise the
+        // landlord is to have the home on a date; a tenant still there after it is put out by whoever enforces the
+        // tribunal's warrants, never by the landlord. (A seat in the tribunal decides for itself.)
+        const P = this.p.possession ?? { days: 14, plan_months: 0 };
+        const arrears = Math.max(0, claimed - cents((x as any).paid ?? 0));
+        const offer = Math.max(0, cents((x as any).offer ?? 0));
+        const home = c.data.space ? { space: c.data.space, structure: c.data.structure, household: c.data.household } : {};
+        if (arrears <= 0) say2(c, "dismissed", "the rent owed has been paid; dismissed.", {}, `${c.against} answers that the rent owed is paid: dismissed.`);
+        else if (r && offer > 0 && !c.data.breach && P.plan_months > 0 && arrears <= offer * P.plan_months) {
+          say2(c, "plan", `${c.against} is to pay the rent as it falls due and ${usd(offer)} a month toward the ${usd(arrears)} owed, until it is paid. If the plan is not kept, ${c.applicant} may apply again for possession.`,
+            { amount: arrears, instalment: offer, ...(c.data.account ? { to: c.data.account } : {}), ...home },
+            `${c.against} is ${usd(arrears)} behind and offers ${usd(offer)} a month, which clears it within ${P.plan_months} months: a plan to pay, and no possession.`);
+        } else {
+          const date = t + P.days * DAY;
+          say2(c, "possession", `${c.applicant} is to have possession of ${c.data.space ?? "the home"} on ${dateWords(date)}: ${c.against} and their household are to leave by then. If they have not, ${c.applicant} may ask our registrar for a warrant, which is carried out by those who enforce our orders, and by nobody else.`,
+            { amount: arrears, due: date, ...home },
+            `${c.against} is ${usd(arrears)} behind with the rent${c.data.breach ? " and has not kept the plan set" : r ? (offer > 0 ? `, and what they offer (${usd(offer)} a month) would not clear it within ${P.plan_months} months` : " and offers no plan to pay") : " and did not answer"}: ordering possession by ${dateWords(date)}.`);
+        }
         continue;
       }
       // On the record: what the other side's own books say, where it answered and they can say.

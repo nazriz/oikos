@@ -100,7 +100,7 @@ test("the mayor directs the works office not to recruit: it advertises nothing w
   expect(r.crew.filter((a) => a.at <= lifted.at)).toEqual([]);
   // The office wrote to the mayor, once, to say what it would do.
   const ack = r.letters.filter((m) => m.from === "works-system" && m.re === d.id);
-  expect(ack.map((m) => m.text)).toEqual([`From the works office: your direction ${d.id} is received. The office advertises no post, takes down the advertisements it has out and takes nobody on. It stands until you replace or withdraw it.`]);
+  expect(ack.map((m) => m.text)).toEqual([`From the works office: your direction ${d.id} is received. The office advertises no post, takes down the advertisements it has out and makes no new offer of employment. It has no offer out that is not yet signed. It stands until you replace or withdraw it.`]);
   expect(ack[0]!.to).toEqual(["mayor-system"]);
 }, 600_000);
 

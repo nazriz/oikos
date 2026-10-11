@@ -70,7 +70,7 @@ export interface Matter {
 }
 
 /** What a venue found (its decision's `finding`), in the tribunal's words where it has them. */
-export type Finding = "pay" | "do" | "set_aside" | "settled" | "dismissed" | "rejected" | "referred" | "published";
+export type Finding = "pay" | "do" | "set_aside" | "settled" | "dismissed" | "rejected" | "referred" | "published" | "plan" | "possession";
 
 /** What an organisation's own books say of something complained of: what it owes, whether what was asked is done,
  * or nothing (it cannot know: goods said to be faulty). */

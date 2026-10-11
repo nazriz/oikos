@@ -91,3 +91,30 @@ test("a seat set not to be brought back by papers waits for the day it gave, and
   expect(said(on.c).description).toContain("If a kind of paper can wait for the sitting you've set, name it in hold");
   expect((said(on.c).input_schema as any).properties.hold.type).toBe("array");
 });
+
+test("a tenant's letter to a landlord (to stay on, for time, for a repair) is the letting office's post: it brings the seat back at the next working day's sitting and is set out; in a town hall of many offices a paper to the town at large is no one office's", async () => {
+  const letting = (t: number, mine: object[] = []): Observation => ({ t, channels: { "landlord-1-office/mine": { kind: "records", records: mine }, "landlord-1-office/deaths": { kind: "records", records: [] } }, outcomes: [], inbox: [], drafts: [],
+    positions: [{ position: "landlord-1-office", entity: "landlord-1", title: "Letting office" }] }) as unknown as Observation;
+  const from = (id: string, kind: string, t: number, text: string) => ({ id, record: "statement", kind, author: "c0007-self", speaks_for: "c0007", at: t, text, visible_to: ["landlord-1", "c0007"], addressed_to: ["landlord-1"] });
+  const trays = { kinds: new Map([["landlord-1-office/deaths", true as const]]), all: new Set(["landlord-1-office/mine"]) };
+  const office = { participant: "landlord-1-office-system", entity: "landlord-1", title: "Letting office", ownAuthors: ["landlord-1-office-staff-system"] };
+  const { p, calls } = harness([[use("d", "done_for_now", { days: 14 })]], { ...office, trays: { ...trays, sole: true } });
+  await p.step(letting(9 * HOUR), ctx);
+  await p.step(letting(DAY + 14 * HOUR, [from("rec.7", "variation_request", DAY + 14 * HOUR, "Request: please let us stay on at apts-1/dwelling.4."), from("rec.8", "remedy_request", DAY + 14 * HOUR, "Request: the roof leaks; please repair it.")]), ctx);
+  expect(calls.length).toBe(1);
+  await p.step(letting(2 * DAY + 9 * HOUR), ctx);
+  expect(calls.length).toBe(2);
+  expect(shown(calls[1]!)).toContain("You are back before the day you gave: papers were filed with your office (");
+  expect(shown(calls[1]!)).toContain("please let us stay on at apts-1/dwelling.4");
+  expect(shown(calls[1]!)).toContain("the roof leaks");
+  // The clerk's own paper of the books, on the same file, brings nobody back.
+  await p.step(letting(2 * DAY + 15 * HOUR, [{ id: "rec.9", record: "statement", kind: "office_books", author: "landlord-1-office-staff-system", speaks_for: "landlord-1", at: 2 * DAY + 15 * HOUR, text: "The books of the office.", visible_to: ["landlord-1"], addressed_to: ["landlord-1"], data: { office: "landlord-1-office", open: [] } }]), ctx);
+  expect(await p.step(letting(3 * DAY + 9 * HOUR), ctx)).toMatchObject({ type: "wait" });
+  expect(calls.length).toBe(2);
+  // Without `sole` (an organisation of several offices): a paper to the organisation at large waits for the sitting set.
+  const many = harness([[use("d", "done_for_now", { days: 14 })]], { ...office, trays });
+  await many.p.step(letting(9 * HOUR), ctx);
+  await many.p.step(letting(DAY + 14 * HOUR, [from("rec.7", "variation_request", DAY + 14 * HOUR, "Request: please let us stay on.")]), ctx);
+  expect(await many.p.step(letting(2 * DAY + 9 * HOUR), ctx)).toMatchObject({ type: "wait" });
+  expect(many.calls.length).toBe(1);
+});

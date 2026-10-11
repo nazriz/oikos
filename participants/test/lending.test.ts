@@ -83,3 +83,33 @@ test("the lender admits a loan of exactly its share of the price, at a price the
   expect(d["app-even"]).toEqual({ approved: true });
   expect(d["app-even-over"]!.approved).toBe(false);
 });
+
+test("a loan the office offered that is on its file and not in its head is paid out once the borrower signs (the mock in the lending seat hears no id back for its offer: 2026-10-11)", () => {
+  const ME = "bank", WHO = "ann";
+  const m = lending.create({ participant: "bank-lending-system", entity: ME, rng: (k: string) => new Randomness(1n).stream([k]), world: { tickSeconds: 3600, runEnd: 2000 * DAY }, params: { funding_from: "outside" } } as any);
+  const accounts = [{ account: "acc-bank", holder: ME, custodian: ME, currency: "AUD", balance: "100000000000" }];
+  const calls: any[] = [];
+  const wake = (t: number, records: any[], transactions: any[] = []) => {
+    let o = { t, entity: ME, woke_for: "cadence", outcomes: [], readings: {}, channels: { mine: { kind: "records", records }, bank: { kind: "accounts", accounts, transactions } } } as unknown as Observation;
+    for (let i = 0; i < 20; i++) {
+      const a: any = m.step(o, undefined as any);
+      if (a.type === "wait") break;
+      calls.push(...callsOf(a, t));
+      // (No id comes back for anything made: as for an act said through someone else's hand.)
+      o = { ...o, woke_for: "done", outcomes: [{ action: `act-${i}`, t, status: "applied" }], channels: { mine: { kind: "records", records: [] }, bank: { kind: "accounts", accounts, transactions: [] } } } as unknown as Observation;
+    }
+  };
+  wake(DAY, []);
+  const loan = { id: "rec.9", at: 2 * DAY, author: "bank-lending-system", record: "agreement", visible_to: [ME, WHO], terms: { template: "loan", parties: [ME, WHO], term: 12 * MONTH, text: "bank lends ann 1,000.00; ann repays 91.68 a month for 12 months (18% a year).",
+    commitments: [{ who: ME, does: { outcome: { money: { to: "acc-ann", amount: "100000", for: "Loan principal." } } } }, { who: WHO, does: { outcome: { money: { from: "acc-ann", to: "acc-bank", amount: "9168", for: "Loan repayment." } } }, every: MONTH }] } };
+  const sig = (as: string, at: number) => ({ id: `sig-${as}`, at, author: `${as}-x`, record: "signature", agreement: "rec.9", as, visible_to: [ME, WHO] });
+  // Offered and signed by the bank: nothing is paid until the borrower signs.
+  wake(2 * DAY, [loan, sig(ME, 2 * DAY)]);
+  expect(calls.filter((c) => c.fn === "money")).toEqual([]);
+  wake(3 * DAY, [sig(WHO, 3 * DAY)]);
+  const paid = calls.filter((c) => c.fn === "money");
+  expect(paid.map((c) => [c.args.to, c.args.settles])).toEqual([["acc-ann", "rec.9"]]);
+  // Once, and not again when the payment is seen to leave.
+  wake(4 * DAY, [], [{ t: 3 * DAY, from: "acc-bank", to: "acc-ann", amount: "100000", currency: "AUD", by: "bank", settles: "rec.9" }]);
+  expect(calls.filter((c) => c.fn === "money")).toHaveLength(1);
+});

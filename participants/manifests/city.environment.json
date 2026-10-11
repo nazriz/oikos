@@ -1,6 +1,6 @@
 {
   "name": "city.environment",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "doc": "docs/behaviour/environment.md",
   "params": {
     "decline_flag_bps": {
@@ -325,7 +325,7 @@
       },
       "writes": {
         "kind": "payroll_notice",
-        "text": "Payroll notice, new starter: {employee}, {post}, under employment agreement {agreement}. Pay: {wage} every {period} before tax, into {account}; first pay day {first_pay}, then every {period}. For the {@payroll_office} office: the wage payment is to be set up from that day.",
+        "text": "Payroll notice, new starter: {employee}, {post}, under employment agreement {agreement}. Pay: {wage} every {period} before tax, into {account}; first pay day {first_pay}, then every {period}. The post is one of those the {@budget_line} line of the adopted budget pays for: the wage is on that line. For the {@payroll_office} office: the wage payment is to be set up from that day.",
         "basis": "=agreement",
         "to": [
           "=self"
@@ -342,7 +342,8 @@
           "wage": "=wage",
           "period": "=period",
           "first_pay": "=first_pay",
-          "account": "=account"
+          "account": "=account",
+          "line": "@budget_line"
         }
       }
     },

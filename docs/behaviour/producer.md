@@ -1,5 +1,7 @@
 # `firm.producer` (v0.1.0): a factory, after Lengnick (2013)
 
+**Since 0.7.0 (2026-10-11)** the monthly rule for staff is not Lengnick's one-month rule as written below: a factory sets its staff from its trade smoothed over months, holds them through a dip, and lets the most recent hire go only when the surplus has lasted as long as ending the job and hiring again would cost. See [firms.md](firms.md), "Adjusting labour". Prices, wages offered, stock and dividends are as below.
+
 **Seat:** a factory's manager. **Source:** `participants/src/behaviour/producer.ts`.
 
 ## What it does

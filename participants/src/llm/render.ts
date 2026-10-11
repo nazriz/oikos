@@ -40,7 +40,7 @@ const MONEY_LISTS = new Set(["prices", "demolition", "goods", "lines", "amounts"
 const TIME_SPANS = new Set(["every", "period", "notice", "term"]);
 // (Dates by the names the world's office papers give them: a payroll notice's first pay day read "first pay: 6652800"
 // to the seats of 2026-10-09.)
-const MOMENTS = new Set(["at", "until", "first", "closes", "opens", "due", "first_due", "first_pay", "last_day", "last_from", "period_end"]);
+const MOMENTS = new Set(["at", "since", "until", "first", "closes", "opens", "due", "first_due", "first_pay", "last_day", "last_from", "period_end"]);
 const whole = (v: unknown): v is number | string => (typeof v === "number" && Number.isSafeInteger(v)) || (typeof v === "string" && /^-?(0|[1-9][0-9]{0,37})$/.test(v));
 const percent = (v: number, per: number) => `${String(Number(((v * 100) / per).toFixed(6)))}%`;
 /** A moment as a date, with the time of day where it is not the day's start (so that two moments never read alike). */
@@ -235,6 +235,8 @@ function describe(r: Record, readings?: { [id: string]: Reading }): string {
       const shownData = closed ? Object.fromEntries(Object.entries(r.data as object).filter(([k]) => !["closes_at", "closed", "result"].includes(k)))
         : named ? Object.fromEntries(Object.entries(r.data as object).filter(([k]) => k !== "voted_for" && k !== "voted_against"))
         // (A standing work order: when it first falls due, as its staff count, in place of how that was written.)
+        // (The office's books: the line says what has changed; the list of everything that stands open is read by opening the paper.)
+        : r.kind === "office_books" && Array.isArray(r.data?.open) && !inFull ? { stands_open: r.data.open.length, the_list: `in this paper (${r.id}), read by its id` }
         : r.kind === "work_order" && r.data?.work && whole(r.data?.every) ? { ...Object.fromEntries(Object.entries(r.data as object).filter(([k]) => k !== "first" && k !== "first_at")), first_due: firstDue(r, 0) } : r.data;
       const voters = (list: unknown) => (Array.isArray(list) && list.length ? list.map((p) => writer(String(p))).join(", ") : "nobody");
       const d = [closed ? `closed: no more votes are taken${typeof r.data.result === "string" ? `; its result is ${r.data.result}` : ""}` : "", dataWords({ kind: r.kind, data: shownData }),

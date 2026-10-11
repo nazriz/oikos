@@ -118,3 +118,23 @@ test("the finance office asks the mayor, once, for the written approval an invoi
   const approval = statement("app-1", 10 * DAY, "approval", { author: "mayor-system", in_position: "mayor", addressed_to: ["city"], basis: "inv-1", data: { invoice: "inv-1" } });
   expect(wake(m, 12 * DAY, { papers: { kind: "records", records: [approval] }, treasury }, { entity: "city" }).said.filter((c) => c.fn === "money").map((c) => c.args.settles)).toEqual(["inv-1"]);
 });
+
+test("a hiring office whose posts are on a line of the budget names the line on its notice of a new starter, in the paper and in the letter (2026-10-11: a finance seat set an environment hire against the staff line)", () => {
+  const office = new Staffing(context("environment-system", "city", {}, { position: "environment" }), "city", { period: PERIOD, notice_days: 14, role: "environmental scientist", does: { hire: true, pay: false }, own: "role", payroll: "finance", line: "environment" });
+  const a = job("job-9", 2 * DAY, "c9");
+  const out = step(office, new Book(), 4 * DAY + 3600, signed(a, 4 * DAY));
+  const notice = out.find((c) => c.args.kind === "payroll_notice")!;
+  expect(notice.args.data.line).toBe("environment");
+  expect(notice.args.text).toContain("The post is one of those the environment line of the adopted budget pays for: the wage is on that line.");
+  expect(out.find((c) => c.fn === "message")!.args.text).toContain("the environment line of the adopted budget pays for");
+});
+
+test("what a direction not to recruit does, in the office's words: no new offer; an offer already made and not yet signed is named, and stands if the worker signs", () => {
+  const office = hiring(), book = new Book();
+  expect(office.notRecruiting(book, 3 * DAY)).toBe("The office advertises no post, takes down the advertisements it has out and makes no new offer of employment. It has no offer out that is not yet signed.");
+  const a = job("job-9", 2 * DAY, "c9");
+  book.absorb(obsOf(3 * DAY, [a, signed(a, 2 * DAY)[1]]));
+  expect(office.notRecruiting(book, 3 * DAY)).toBe("The office advertises no post, takes down the advertisements it has out and makes no new offer of employment. One offer it had already made is not yet signed by the worker (job-9, to c9): a direction ends no offer already made, and it stands if the worker signs it.");
+  book.absorb(obsOf(4 * DAY, [signed(a, 4 * DAY)[2]]));
+  expect(office.notRecruiting(book, 4 * DAY)).toContain("It has no offer out that is not yet signed.");
+});

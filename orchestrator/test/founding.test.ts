@@ -41,7 +41,16 @@ const LIVING = "living.initiative_bps=10000";
 // The state of worlds/town.yaml as a living town (initiative at 10,000, frictions as sourced), seed 1, after 60 days,
 // as origin/main gave it before founding (commit 7d36367, living world step 2b; computed there on 2026-10-11). A
 // change meant to move what a living town without founding does changes this value, and says so where it is made.
-const STEP_2B = "26cf8b5e47cef729185f72639bd90a7fb3e8ef3467874d016cddd11e58f7bc6a";
+// Moved on purpose at the merge of the firm and landlord fixes, 2026-10-11 (it was 26cf8b5e..., step 2b's; docs/
+// decisions.md, "Four faults on the firm and landlord side"): a living town without founding is no longer step 2b's,
+// because firms and landlords are not behind any dial. The bank writes on each payment what it was for; shops and
+// factories hold their staff through a dip; a tenant behind with the rent is given a notice to vacate under the
+// town's published law; a business of one can be started; short pay's chance is over the jobs exposed. What this
+// test guards is unchanged: founding off, or on with no shape to found, moves nothing.
+// And again at the merge of the fixes after the second living pilot, the same day (13686d37... until then;
+// docs/decisions.md, "What the second living pilot found"): rent and loan repayments are counted from each
+// agreement's own day, each landlord takes arrears up on its own day of the week, the mayor's office has a clerk.
+const STEP_2B = "87f8af1b50c8599a6bf8fa11e59bd2bd4691938a1e0074ab9d3ba6909829bc14";
 
 test("with founding off a living town is step 2b's town, to the state hash; turned on with no shape to found, nobody does anything they did not do before", async () => {
   const out = mkdtempSync(join(tmpdir(), "oikos-founding-"));

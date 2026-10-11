@@ -1,6 +1,6 @@
 {
   "name": "tribunal.registrar",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "doc": "docs/behaviour/justice.md",
   "params": {
     "banks": {
@@ -9,6 +9,33 @@
       },
       "default": [],
       "required": true,
+      "source": "placeholder"
+    },
+    "enforcer": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
+      "source": "placeholder"
+    },
+    "eviction_notice_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 0,
+      "source": "placeholder"
+    },
+    "part": {
+      "schema": {},
+      "source": "the world gives it (no default)"
+    },
+    "warrant_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 14,
       "source": "placeholder"
     }
   },

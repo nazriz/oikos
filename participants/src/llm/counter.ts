@@ -6,7 +6,7 @@
 // (`StandingWork.order`), from what the seat already has.
 
 import type { Observation, Record } from "../contracts";
-import { Book, StandingWork, CounterWork } from "../behaviour/common";
+import { Book, StandingWork } from "../behaviour/common";
 
 export interface CounterView {
   /** Whether a paper that has come is the counter's (not the seat's): of a kind the procedure lists, while the order is
@@ -44,11 +44,14 @@ export class CounterWatch {
   /** The counter as it stands at a time: none if the office has none, or no order for it is in force. */
   view(t: number): CounterView | undefined {
     const proc = this.book.standingOf("procedure").filter((r) => r.speaks_for === this.entity && Array.isArray(r.data?.routines) && (typeof r.data?.office !== "string" || this.posts.has(r.data.office)));
+    // (Any routine whose procedure lists the papers its staff deal with, while its own standing order is in force: the
+    // counter's `answer`, and since 2026-10-11 a routine such as the support office's, whose staff decide the claims.)
     const kinds = new Map<string, string>();
     for (const r of proc) for (const x of r.data!.routines as { task?: string; papers?: { kind?: string; how?: string }[] }[]) {
-      if (x.task === CounterWork.TASK) for (const k of x.papers ?? []) if (typeof k.kind === "string") kinds.set(k.kind, String(k.how ?? ""));
+      if (typeof x.task !== "string" || !x.papers?.length || !this.work.order(this.book, x.task, t)) continue;
+      for (const k of x.papers) if (typeof k.kind === "string") kinds.set(k.kind, String(k.how ?? ""));
     }
-    if (!kinds.size || !this.work.order(this.book, CounterWork.TASK, t)) return undefined;
+    if (!kinds.size) return undefined;
     return {
       kinds,
       counters: (r) => r.record === "statement" && kinds.has(r.kind)
