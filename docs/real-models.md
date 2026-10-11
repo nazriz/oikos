@@ -147,6 +147,23 @@ oikos run worlds/town-1000.yaml --set mayor=llm --set model_seats=finance \
   five requests, four answered by the first (three confirmed, one declined: a wage less withholding drafted gross), one
   behind after the decline (confirmed); 218 ms a request for the first; 0.58 USD. The decisions log has the detail.
 
+## The composing model (2026-10-11)
+
+Where a town has `living.composer` (docs/behaviour/founding.md, "Words"), the words of what people found are written by a model asked as an author shown the founder's record, who may decline (VISION 15, point 7). It is not a seat and not the translator: it has its own purpose in the log (`compose`) and its own models.
+
+```bash
+OIKOS_CLAUDE_BIN=~/.local/bin/claude OIKOS_TRANSLATOR_MODELS=~/oikos/runs/translator-round-2-2026-10-10/models \
+oikos run worlds/town-1000.yaml --set living.initiative_bps=10000 --set living.founding=true --set living.composer=true \
+  --composer --model claude-code/claude-sonnet-5-5 --translator-first decide/pod-small-r2-s1 --budget 6
+```
+
+- **Which models** is the world's config (`dials.composer.mix`: `claude-code/claude-sonnet-5-5` and `codex/gpt-6.1-sol`, half each, unless the spec sets it), recorded at the start of every log and held fixed across runs that are compared. Which model writes a piece is drawn on a seeded stream. Never `gpt-6-astra`, never Fable: a mix that names either is refused.
+- **`--composer`** calls those models for real, under the run's one spending limit (`--budget`). Without it the mock plays the composer (as seats are the mock without `--model`), and the log's start says `played_by: "mock"`.
+- **Codex never blocks.** A Codex piece that gets no answer, or meets the subscription's limit, goes to the fallback model (the Claude one) at once, and the log says so (`compose` note, `fell_back`). Only the fallback at a usage limit stops the run to be resumed.
+- **The translator** for a piece's parts is the run's translator (`--model`, `--translator-model`, `--translator-first`), as for a seat's requests. With no `--model` it is the mock, which cannot read prose: every part then arrives as the composer's closed choice or the plain default, and the log says which.
+- **Logged** as every call is: usage and transcript (`ref: compose/<idea>`), the follow-up question's exchange (`compose-after/<idea>`), and a `compose` note a piece (model, declined or composed, dark and why). The summary and the log's end carry the counts (`composer`, `composer_pieces`), with the dark pieces asked for. `oikos resume` serves every composing call from the log and takes the same `--composer`.
+- **The audits** (`oikos compose-audit <founded.jsonl> --models ... --judges ... --budget N`): tone, declining, scrambled records and rewording on recorded situations; every call kept in `calls.jsonl` beside the report and served from there when the audit is run again, so a model whose window was shut can be added later without asking the others twice.
+
 ## How an answer is asked for and read (2026-10-08)
 
 Every seat answer is **read exactly or not at all**. What is read is only what the seat wrote as uses (`participants/src/llm/answer.ts`): nothing taken from words around them, no use filled in on the seat's behalf, no markup read as uses, no part of an answer repaired (the one thing done to a use's input is writing a raw line break inside a text as `\n`, which changes nothing). An answer that is not whole and exact comes back from the adapter as one text block marked `unread`, with why in the seat's terms. Then, in the participant loop:

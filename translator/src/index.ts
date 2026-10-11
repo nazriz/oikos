@@ -53,6 +53,9 @@ export interface TranslateRequest {
   knowledge: Knowledge;
   /** What someone is called, for the preview, where the seat's own knowledge has no name for them. */
   called?: (id: string) => string | undefined;
+  /** For a code participant's words (docs/behaviour/founding.md): the one capacity it perceives in, which the engine
+   * keeps what it knows under. Absent: a seat, which perceives all its capacities. */
+  only?: string;
 }
 
 export type Translation = { ok: true; draft: Draft; hash: string } | { ok: false; notices: string[]; call?: string; raw?: unknown; invalid?: string[]; asked_back?: true };

@@ -136,3 +136,39 @@ test("a living town where things go wrong (docs/behaviour/frictions.md): homes w
   const none = JSON.stringify(generate({ ...small, living: { friction_bps: 0 } }));
   for (const word of ["disrepair", "office.desk", "ombudsman", "short_pay", "friction_bps", "has:hears", "billing_error"]) expect(none).not.toContain(word);
 });
+
+test("founding (docs/behaviour/founding.md): only a town that turns it on has any of it; then the dial, the profile's sizes as time at ordinary pay, the post a founder holds, and the one kind it publishes; every profile states its figures with their sources", () => {
+  const off = generate({ ...small, living: {} }) as any;
+  expect(off.dials.founding).toBeUndefined();
+  expect(JSON.stringify(off)).not.toContain("group.founded");
+  const c = generate({ ...small, living: { founding: true } }) as any;
+  expect(c.dials.founding).toEqual({ shapes: ["gathering", "fund", "cause", "business"], scale_bps: 10_000 });
+  expect(c.dials.composer).toBeUndefined();
+  const F = loadProfile(small.profile!).values.founding!;
+  const person = c.participants.find((x: any) => x.controller?.impl === "citizen.default");
+  const f = person.controller.params.founding;
+  expect(f.chance_bps).toBe(F.chance_bps);
+  expect(f.dues).toHaveLength(F.dues_minutes_of_pay.length);
+  expect(f.dues[0]).toBe(0);
+  expect(f.dues.every((d: number, i: number) => Number.isInteger(d) && (i === 0 || d > f.dues[i - 1]))).toBe(true);
+  expect(f.hall).toMatchObject({ space: "town-hall/hall.1", town: "city", account: "acc-city" });
+  expect(f.hall.hire).toBeGreaterThan(f.dues.at(-1));
+  expect(f.template).toMatchObject({ kind: "group", title: "Convenor", role_module: { code: "group.founded", keeps_record: true } });
+  expect(person.channels.some((ch: any) => ch.id === "memberships" && ch.way === "published")).toBe(true);
+  expect(c.knowing.published.some((x: any) => x.what === "membership")).toBe(true);
+  // The dial's parts, and the composer's: which shapes, a scale, a study's own number of sharers; the mix and the cap.
+  const some = generate({ ...small, living: { founding: { shapes: "gathering,cause", scale_bps: 20_000, shared_min: 1 }, composer: { pieces_per_month: 3 } } }) as any;
+  expect(some.dials.founding).toEqual({ shapes: ["gathering", "cause"], scale_bps: 20_000 });
+  expect(some.participants.find((x: any) => x.controller?.impl === "citizen.default").controller.params.founding.shared_min).toBe(1);
+  expect(some.dials.composer).toEqual({ pieces_per_month: 3, mix: [{ model: "claude-code/claude-sonnet-5-5", share_bps: 5_000 }, { model: "codex/gpt-6.1-sol", share_bps: 5_000 }], fallback: "claude-code/claude-sonnet-5-5", follow_up_bps: 2_500 });
+  expect(() => generate({ ...small, living: { composer: true } })).toThrow(/needs living.founding/);
+  // Every profile: the registered rate with its source, the multiple marked a placeholder, the chance marked fitted or not.
+  for (const id of ["au-vic-2026", "gb-eng-2026", "us-oh-2026", "de-ni-2026", "jp-akita-2026", "br-mg-2026", "mx-jal-2026", "in-tn-2026", "ke-nakuru-2026"]) {
+    const p = loadProfile(id) as any;
+    expect(p.values.founding.chance_bps).toBeGreaterThan(0);
+    expect(p.values.founding.registered_per_100000_per_year).toBeGreaterThan(0);
+    for (const k of ["founding", "founding.registered_per_100000_per_year", "founding.informal_multiple", "founding.chance_bps", "founding.sizes"]) expect(typeof p.sources[k]).toBe("string");
+    expect(p.sources["founding.informal_multiple"]).toContain("PLACEHOLDER");
+    expect(p.sources["founding.chance_bps"]).toMatch(/^(FITTED|NOT FITTED)/);
+  }
+});
