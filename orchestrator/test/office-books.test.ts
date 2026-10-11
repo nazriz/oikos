@@ -28,7 +28,7 @@ async function run(seats: string[], days: number, name: string) {
   return { config, log, statements, shown };
 }
 
-test("a landlord's seat is shown who is behind with the rent before its code twin writes to them; tenants' letters reach it as post; arrears do not all appear on one day", async () => {
+test("a landlord's seat is shown who is behind with the rent before its code twin writes to them; arrears do not all appear on one day", async () => {
   const config0 = generate(living);
   const landlords: string[] = config0.positions.filter((p: any) => p.role_module?.code === "firm.landlord").map((p: any) => p.id);
   expect(landlords.length).toBeGreaterThan(2);
@@ -62,13 +62,8 @@ test("a landlord's seat is shown who is behind with the rent before its code twi
     expect(l.length).toBeLessThan(1_500);
   }
   expect(lines.some((l) => l.includes("; new: ") || l.includes("no longer open: "))).toBe(true);
-  // A tenant's letter to a landlord (to stay on, to hold a rise, to put something right) reaches the seat as post.
-  const letters = statements.filter((r) => ["variation_request", "remedy_request"].includes(r.kind) && landlords.some((id) => (r.addressed_to ?? []).includes(config.positions.find((p: any) => p.id === id)!.entity)));
-  expect(letters.length).toBeGreaterThan(0);
-  for (const r of letters) {
-    const office = landlords.find((id) => (r.addressed_to ?? []).includes(config.positions.find((p: any) => p.id === id)!.entity))!;
-    expect(shown(office).some((s) => s.input.includes(`[${r.id}]`))).toBe(true);
-  }
+  // (That what people write to a landlord reaches its seat as post is held on papers made by hand: a small town's
+  // tenants write none in a hundred days. participants/test/seat-papers-back.test.ts.)
   // Rent days differ by tenancy, and the landlord counts from each: the letters about arrears are not one day's.
   const days = new Set(asked.map((a) => Math.floor(a.at / DAY)));
   expect(days.size).toBeGreaterThan(Math.min(3, asked.length - 1));

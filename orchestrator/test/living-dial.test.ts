@@ -29,11 +29,15 @@ const TOWN = join(root, "worlds/town.yaml");
 // The state of worlds/town.yaml, seed 1, after 60 days, as origin/main gave it before wants (commit 750bc30, living
 // world step 1; computed there on 2026-10-11). A change that is meant to move what a town without the dial does
 // (a fault fixed in a module every town runs) changes this value, and says so where it is made.
-// (2026-10-11: b88dee15... until rent and loan repayments were counted from each agreement's own day, each landlord went through its rent
-// book on its own day of the week, and the mayor's
-// office was given a clerk: docs/decisions.md, "What the second living pilot found". The test holds what it held: a
-// town with no `living`, and one with every dial at 0, are the same town.)
-const STEP_1 = "4d88759c627e0db75f3ce67d989703f47cc316d8dc737dbc57b5c2845247800d";
+// Moved on purpose, 2026-10-11 (docs/decisions.md, "Four faults on the firm and landlord side"; it was b88dee15...
+// from step 1 until then): firms and landlords are not behind the dial, and four things every town runs changed. The
+// bank writes on each payment what it was for; shops and factories set staff from smoothed trade and hold them
+// through a dip; the town publishes its place's laws on ending a job and on possession, and a tenant behind with the
+// rent is given a notice to vacate, not a notice on the lease; and a business of one can be started.
+// And again at the merge of the fixes after the second living pilot, the same day (03f67a4b... until then;
+// docs/decisions.md, "What the second living pilot found"): rent and loan repayments are counted from each
+// agreement's own day, each landlord takes arrears up on its own day of the week, the mayor's office has a clerk.
+const STEP_1 = "ae8baeeda23cbdfef5f20ab45dbb810635c55dde1016df64ace599e6326705bc";
 
 test("with the dial absent or at 0 a town is step 1's town, to the state hash", async () => {
   const out = mkdtempSync(join(tmpdir(), "oikos-dial-"));

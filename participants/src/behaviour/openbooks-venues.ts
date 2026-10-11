@@ -135,10 +135,30 @@ export function tribunalMemberBooks(ctx: ParticipantContext): OfficeBooks {
         if (t >= day) due.push({ id: n.id, since: day, line: `${n.id}: ${what}, listed ${dateWords(n.at)} for hearing on ${dateWords(day)}, which has come; no order made (${said || "no respondent named"})` });
         else waiting.push({ id: n.id, since: n.at, line: `${n.id}: ${what}, listed ${dateWords(n.at)} to be heard on ${dateWords(day)} (${said || "no respondent named"})` });
       }
+      // Applications for possession of a let home (docs/behaviour/justice.md, "Possession"): each with the home, what
+      // the landlord says is owed, and whether the tenant has answered and with what (what they say they have paid
+      // since, what they offer a month toward the rest), as the tribunal's own procedure reads them.
+      const possession: OpenItem[] = [];
+      for (const [app, n] of filed.notice) {
+        const d = (n.data ?? {}) as any;
+        const a = book.records.get(app) as any;
+        if (filed.decided.has(app) || (d.matter ?? a?.data?.matter) !== "possession" || ownDay.has(app)) continue;
+        ownDay.add(app);
+        const ad = (a?.data ?? {}) as any;
+        const against = text(d.against) || text(ad.against);
+        const who = text(d.applicant) || String(a?.speaks_for ?? "someone");
+        const by = finite(d.answer_by ?? d.hearing_at);
+        const answer = book.open(TRIBUNAL_FORMS.response).filter((r) => appsOf(r).includes(app) && r.speaks_for === against).sort((x, y) => y.at - x.at)[0];
+        const said = answer ? `${against} answered ${dateWords(answer.at)} (${answer.id})${answer.data?.paid !== undefined ? `, saying ${usd(money(answer.data.paid))} has been paid since` : ""}${answer.data?.offer !== undefined ? `, and offering ${usd(money(answer.data.offer))} a month toward what is owed` : ""}` : `${against || "the tenant"} has not answered`;
+        const owed = ad.amount !== undefined ? money(ad.amount) : undefined;
+        possession.push({ id: app, since: a?.at ?? n.at, ...(owed !== undefined ? { amount: owed } : {}),
+          line: `${app}: ${who} applies for possession of ${ad.space ?? "a let home"} from ${against || "its tenant"}${ad.about ? ` (lease ${ad.about})` : ""}${owed !== undefined ? `, saying ${usd(owed)} of rent is owed` : ""}${ad.breach ? ", and that a plan the tribunal set was not kept" : ""}; taken in ${dateWords(n.at)}${by !== undefined ? `, ${t >= by ? `the tenant's time to answer ran out ${dateWords(by)}` : `the tenant has until ${dateWords(by)} to answer`}` : ""}; ${said}; not decided` });
+      }
       const lists = takenIn(book, filed, t, ownDay);
       return [
         ...heading("Applications to the tribunal, not yet listed for a hearing", notYet),
         ...heading("Cases listed whose hearing day has come, with no order made", due),
+        ...heading("Applications for possession of a let home, not decided", possession),
         ...heading("Cases listed, waiting for their day", [...waiting, ...lists.waiting]),
         ...heading("Applications on the tribunal's lists whose time to answer has run, not decided", lists.ran),
       ];
@@ -180,7 +200,21 @@ export function tribunalRegistrarBooks(ctx: ParticipantContext): OfficeBooks {
         items.push({ id: r.id, since: r.at, amount: unpaid,
           line: `${r.id}: ${r.speaks_for} asked ${dateWords(r.at)} for order ${o.id} to be enforced against ${o.data.against}, ${usd(unpaid)} unpaid; the order falls due ${dateWords(due)}${t >= due ? ", and that date has passed" : ", and that date has not come"}; not answered` });
       }
-      return heading("Requests to enforce an order, not answered", items);
+      // Requests for a warrant of possession (docs/behaviour/justice.md, "Possession"): no warrant of ours on that order
+      // since, and not declined.
+      const warrants: OpenItem[] = [];
+      const issued = new Map<string, number[]>();
+      for (const w of book.open("warrant")) if (w.speaks_for === me && typeof w.data?.order === "string") issued.set(w.data.order, [...(issued.get(w.data.order) ?? []), w.at]);
+      for (const r of book.open("warrant_request")) {
+        if (!addressed(r, me) || declined.has(r.id) || (issued.get(String(r.data?.order)) ?? []).some((at) => at >= r.at)) continue;
+        const o = book.records.get(String(r.data?.order)) as any;
+        const ours = o?.kind === "tribunal_order" && o.data?.finding === "possession" && o.data.applicant === r.speaks_for;
+        const due = Number(o?.data?.due);
+        warrants.push({ id: r.id, since: r.at, line: ours
+          ? `${r.id}: ${r.speaks_for} asked ${dateWords(r.at)} for a warrant under order ${o.id}, for possession of ${o.data.space ?? "the home"} from ${o.data.against}; the order's date is ${dateWords(due)}${t >= due ? ", which has passed" : ", which has not come"}; no warrant issued`
+          : `${r.id}: ${r.speaks_for} asked ${dateWords(r.at)} for a warrant under ${r.data?.order ?? "(no order named)"}; no order for possession to them is on file; not answered` });
+      }
+      return [...heading("Requests to enforce an order, not answered", items), ...heading("Requests for a warrant of possession, not answered", warrants)];
     },
   };
 }

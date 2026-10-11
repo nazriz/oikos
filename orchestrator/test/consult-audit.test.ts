@@ -29,10 +29,10 @@ const audit = async (adapter: LlmAdapter) => (await run(adapter)).report;
 
 test("a steady model: nothing to leave out; every call kept", async () => {
   const { report, annotations } = await run(new MockAdapter("mock", mockPolicies(new Map())));
-  expect(report.things.map((t) => t.about).sort()).toEqual(["found:shop", "join:union"]); // the world's own questions
+  expect(report.things.map((t) => t.about).sort()).toEqual(["found:own_account", "found:shop", "join:union"]); // the world's own questions (a business of one since 2026-10-11)
   for (const t of report.things) expect(t.kinds.length).toBe(4);
   expect(report.avoid).toEqual([]);
-  expect(report.calls).toBe(2 * 4 * (1 + 3 + 2)); // base, three other wordings, two others of the kind
+  expect(report.calls).toBe(3 * 4 * (1 + 3 + 2)); // base, three other wordings, two others of the kind
   expect(annotations.filter((a: any) => a.annotation === "transcript").length).toBe(report.calls);
 });
 

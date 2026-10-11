@@ -46,7 +46,9 @@ test("a seat that looks into its office's papers at every sitting is shown lists
   // No prompt of either seat is more than a few tens of thousands of characters.
   const largest = Math.max(...prompts.map((p) => p.size));
   expect(largest).toBeLessThan(60_000); // (the mayor's, most of it what is on file for the office: its laws and forms)
-  expect(Math.max(...finance.map((p) => p.size))).toBeLessThan(40_000);
+  // (45,000 since 2026-10-11, where it was 40,000: the town's law book gained its laws on ending a job and on possession,
+  // and the payments procedure says which line a wage is on; the largest finance prompt was 40,505.)
+  expect(Math.max(...finance.map((p) => p.size))).toBeLessThan(45_000);
   // The folder named for payroll holds the employment agreements, a line each; the files, everything, as a list.
   const second = finance[1]!.text;
   expect(second).toContain("## Finance officer: Payroll: what you looked up (");

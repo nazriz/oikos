@@ -39,11 +39,16 @@ test("a spec without `living` generates what it generated before (byte for byte)
   // The generator's output for worlds/town.yaml on origin/main at ab23f96 (generated there and compared, 2026-10-11),
   // which has no `living`. (At 750bc30, before starting attachment existed, it was 404b59db...; main's planning
   // form gained two fields since, and nothing else differs: this branch gave 404b59db... before merging that.)
-  // (2026-10-11, the fixes after the second living pilot: each lease and mortgage a town starts with names its own
-  // first due day (`attrs.first_due`), the town publishes its rule on petitions, the payments procedure says which
-  // line a wage is on, the support office has a file for what is put before it, and the mayor's office has a clerk.
-  // Generated before and after and compared: nothing else differs. It was cef691ee... on origin/main at 7d36367.)
-  expect(hash(c)).toBe("5c9252bb3d90799c38bfccc53ef482bddd6f3259813243dd29b03f1f5de39d30");
+  // Moved on purpose, 2026-10-11 (it was cef691ee...): every town's config gains its place's laws on ending a job
+  // and on possession, how its firms adjust their staff, where a landlord's application for possession goes, the
+  // venture of a business of one with its derived chance (and the task `sell`), and the generator's version; a
+  // town whose profile has `frictions` and no `living` is otherwise unchanged (docs/decisions.md, "Four faults on
+  // the firm and landlord side"). What this test guards is unchanged: nothing of `living` reaches such a town.
+  // And again at the merge of the fixes after the second living pilot, the same day (b52528bc... until then;
+  // docs/decisions.md, "What the second living pilot found"): each lease and mortgage a town starts with names its
+  // own first due day (`attrs.first_due`), the town publishes its rule on petitions, the payments procedure says
+  // which line a wage is on, the support office has a file for what is put before it, the mayor's office a clerk.
+  expect(hash(c)).toBe("21d4a10fa970fa25d2671f9778ba72f1bad3f90a32336c0a78802db93359ddd5");
   const text = JSON.stringify(c);
   expect(text).not.toContain('"started"');
   expect(text).not.toContain("attach_mean");
@@ -117,7 +122,7 @@ test("a living town where things go wrong (docs/behaviour/frictions.md): homes w
   expect(c.world.structures.filter((x: any) => !disrepair.types.includes(x.type)).every((x: any) => x.variables === undefined)).toBe(true);
   const module = (code: string) => c.positions.filter((x: any) => x.role_module?.code === code).map((x: any) => x.role_module.params);
   expect(module("office.desk").map((p: any) => p.hears.map((h: any) => h.about))).toEqual([["bill", "claim_refused"], ["goods"], ["disrepair"]]);
-  expect(module("tribunal.member")[0].hears.map((h: any) => h.about)).toEqual(["disrepair", "underpaid", "goods", "bill", "arrears", "claim_refused"]);
+  expect(module("tribunal.member")[0].hears.map((h: any) => h.about)).toEqual(["disrepair", "underpaid", "goods", "bill", "arrears", "claim_refused", "possession"]);
   expect(module("tribunal.member")[0].hearing_after_days).toBe(F.venues.tribunal_days);
   expect(module("union.organiser")[0].hears).toEqual([{ about: "underpaid" }]);
   expect(module("firm.retailer")[0].short_pay.by_bps).toBe(F.pay_short_by_bps);

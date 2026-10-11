@@ -9,7 +9,7 @@ import type { Observation } from "../contracts";
 import { channels } from "../contracts";
 import { need, params, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
 import { nextLook, because, Book, publishedPrice as buildingPrice, DAY, MONTH, ownAccount, Pace, pay, say, type Step, usd, withdraw, outOfTime, team } from "./common";
-import { Bargaining, Staffing, stepper, WindingUp } from "./firms";
+import { Bargaining, LabourPlan, Staffing, stepper, terminationLaw, WindingUp } from "./firms";
 import { Borrowing } from "./credit";
 import { distribute, LENGNICK, movePrice, moveWage, payOut } from "./lengnick";
 import { Committed, Deliveries, fill, goodsPrices, held, order, OrderBook, priceList } from "./trade";
@@ -27,7 +27,7 @@ export const producer: BehaviourModule = {
   name: "firm.producer",
   issues: [P.JOB_ADVERTISEMENT, ...P.TRADE],
   issuesWith: (p) => ({ ...P.staffingOwn({ role: p.role ?? "factory worker", industry: p.industry, workplace: p.workplace, notice_days: p.notice_days ?? 14 }) }),
-  version: "0.6.0", // 0.6.0: everyday frictions (docs/behaviour/frictions.md): pay that comes short, at the world's rate and its character's; asked, told or ordered to put it right; 0.5.0: wants of its own (docs/behaviour/firm-wants.md): a character from its owner's values, which answers a worker who asks for a rise, and a record of its own; 0.4.5: money promised in orders the bank has not yet paid out is not spent again by the next wake (one works placed the same order 40 times in a day); 0.4.4: 0.4.4: takes on the share of its hands the world gives by the day; 0.4.3: registers the share of its jobs the world gives for its kind
+  version: "0.7.0", // 0.7.0: adjusts its staff as firms do (docs/behaviour/firms.md, "Adjusting labour"): demand smoothed over months, people held while it makes less, let go only when the surplus has lasted what ending the job costs, redundancy pay under the world's law, no recruiting after letting someone go for want of money; 0.6.0: everyday frictions (docs/behaviour/frictions.md): pay that comes short, at the world's rate and its character's; asked, told or ordered to put it right; 0.5.0: wants of its own (docs/behaviour/firm-wants.md): a character from its owner's values, which answers a worker who asks for a rise, and a record of its own; 0.4.5: money promised in orders the bank has not yet paid out is not spent again by the next wake (one works placed the same order 40 times in a day); 0.4.4: 0.4.4: takes on the share of its hands the world gives by the day; 0.4.3: registers the share of its jobs the world gives for its kind
   doc: "docs/behaviour/producer.md",
   cadence: () => DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(24) * 3600,
@@ -48,6 +48,10 @@ export const producer: BehaviourModule = {
         wage: 150_000, // the wage it offers new hires, cents per period
         period: 14 * DAY,
         notice_days: 14,
+        // How it adjusts its staff to its trade (docs/behaviour/firms.md, "Adjusting labour"): the months it smooths
+        // demand over, and what taking someone on costs it in weeks of their pay (placeholders; a world's profile may
+        // state its own). 0 and 0: it reacts to each month's stock, as it did until 2026-10-11.
+        adjust: { smooth_months: 3, hiring_cost_weeks: 8 },
         // Of the jobs it fills, the share it puts on its payroll returns (the world's figure for employers of its kind;
         // 10,000: all). One it does not register is paid whole, and reported to nobody (docs/behaviour/firms.md).
         registered_bps: 10_000,
@@ -89,6 +93,12 @@ export const producer: BehaviourModule = {
     const me = ctx.entity;
     const book = new Book();
     const staffing = new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, registered_bps: p.registered_bps, casual_bps: p.casual_bps, day_wage: p.day_wage, work_days: p.work_days, week_days: p.look_days, workplace: p.workplace, role: p.role, ...(p.industry ? { industry: p.industry } : {}), ...(p.short_pay ? { short: p.short_pay } : {}) });
+    const labour = new LabourPlan(p.adjust);
+    // (After letting someone go because we could not pay them, we take nobody on until we hold the wages of those we
+    // would then have for as long as a surplus must last before a job is worth ending, where a month's is enough
+    // otherwise: the test to take someone on is never weaker than the test to keep them. Until 2026-10-11 a works
+    // short of money hired each month on a month's wages in hand and shed weeks later.)
+    const monthsInHand = () => (staffing.cashLayoffAt > -Infinity && (p.adjust.smooth_months > 1 || p.adjust.hiring_cost_weeks > 0) ? labour.waits(terminationLaw(book), 0, 0, p.notice_days) : 1);
     // Asked to put something right (pay kept back), told of a complaint, or ordered to: what our books say of it
     // (what we kept back we know; whether goods were faulty we cannot), and setting someone's pay right from here on.
     let payAccount = "";
@@ -200,18 +210,28 @@ export const producer: BehaviourModule = {
           const moved = movePrice(p, rng, price, stock, lastDemand, marginalCost);
           price = moved.price;
           if (moved.why) priceWhy = moved.why;
-          const low = stock * 10_000 < p.phi_low_bps * lastDemand;
-          const high = stock * 10_000 > p.phi_high_bps * lastDemand;
+          // (Staff are set against the demand we expect: the months smoothed, never one month's alone.)
+          const expected = labour.expect(lastDemand);
+          const low = stock * 10_000 < p.phi_low_bps * expected;
+          const high = stock * 10_000 > p.phi_high_bps * expected;
+          const demandWords = p.adjust.smooth_months > 1 ? `the demand we expect (${expected} a month; last month ${lastDemand})` : `last month's demand (${lastDemand})`;
           headcountWhy = why.length ? `; ${why.join("; ")}` : "";
           // Hiring and letting go (Lengnick): stock against demand decides this month's headcount.
           headcount = workers.length;
           if (low && workers.length < p.max_staff) {
+            labour.month(false, 1);
             headcount = workers.length + 1;
-            headcountWhy = `: at the month's end, stock (${stock}) was below ${p.phi_low_bps / 100}% of last month's demand (${lastDemand})${headcountWhy}`;
+            headcountWhy = `: at the month's end, stock (${stock}) was below ${p.phi_low_bps / 100}% of ${demandWords}${headcountWhy}`;
           } else if (high && workers.length > 0) {
+            // Over stock: the works already makes nothing beyond the band (its people are paid and idle: labour held
+            // through the dip). Someone is let go only once that has lasted as long as ending the job and hiring
+            // again would cost; meanwhile nobody who leaves is replaced (docs/behaviour/firms.md, "Adjusting labour").
+            const waits = labour.waits(terminationLaw(book), workers.length, staffing.lastHireYears(book, t), p.notice_days);
+            const m = labour.month(true, waits);
             headcount = workers.length - 1;
-            steps.push(...staffing.letGo(book, t, `Month's end: stock (${stock}) is above last month's demand (${lastDemand}): letting one worker go.`, "Redundancy: we're making more than we sell."));
-          }
+            if (m.letGo) steps.push(...staffing.letGo(book, t, `Month's end: stock (${stock}) is above ${demandWords}${waits > 1 ? `, as for ${waits} months now` : ""}: letting one worker go.`, "Redundancy: we're making more than we sell."));
+            else steps.push(because(`Month's end: stock (${stock}) is above ${demandWords}: making less and keeping our people for now (${m.lasted} of the ${waits} months such a surplus must last before letting someone go is worth what it costs), and replacing nobody who leaves.`));
+          } else labour.month(false, 1);
           // Out of the month's earnings, what we hold beyond the buffer goes to the shareholders: the buffer is a month's
           // wages and inputs for this month's headcount (we pay both ahead of what we sell), plus Lengnick's chi of the
           // wage bill. The capital we started with isn't paid out.
@@ -232,7 +252,7 @@ export const producer: BehaviourModule = {
         steps.push(...staffing.shortening(book, t, acc.account, acc.balance));
         steps.push(...staffing.routine(obs, book, acc.account, {
           // Only with room at the workplace (someone let go may still be there, working out their notice).
-          target: trading ? Math.min(p.max_staff, headcount) : 0, wage, canPost: trading && acc.balance >= Math.floor(((workers.length + 1) * wage * MONTH) / p.period) && roomAtWork(obs, workers.length) > 0,
+          target: trading ? Math.min(p.max_staff, headcount) : 0, wage, canPost: trading && acc.balance >= monthsInHand() * Math.floor(((workers.length + 1) * wage * MONTH) / p.period) && roomAtWork(obs, workers.length) > 0,
           why: `Short of this month's headcount (${workers.length} of ${headcount}${headcountWhy}): posting a job at ${usd(wage)} every ${p.period / DAY} days.`,
         }));
         // Can't cover the next pay period: let the most recent hire go.
@@ -262,7 +282,7 @@ export const producer: BehaviourModule = {
             steps.push(borrowing.apply(t, acc.account, amount, 12, "working capital", `We have ${usd(acc.balance)}, not enough for the next pay period (${workers.length} staff): asking our bank for ${usd(amount)} of working capital before letting anyone go.`));
           } else if (!borrowing.waiting(t)) {
             const s = staffing.letGo(book, t, `Can't cover the next pay period (${usd(acc.balance)} for ${keeping} staff), and no loan to be had: letting the most recent hire go.`, "Redundancy: we can't cover the wage bill.");
-            if (s.length) headcount = Math.min(headcount, keeping - 1);
+            if (s.length) { headcount = Math.min(headcount, keeping - 1); staffing.cashLayoffAt = t; }
             steps.push(...s);
           }
         }

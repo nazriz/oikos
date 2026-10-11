@@ -17,7 +17,8 @@ import * as C from "../calls";
 import { dateWords } from "../forms";
 import { because, Book, callAction, firstDue, Letters, message, pay, PAYEE_DIED, PAYMENT_FAILED, type Step, usd, Asked, whoWrote } from "./common";
 
-interface Payment { instruction: string; from: string; to: string; amount: number; due: number; settles?: string }
+/** `memo`: what the payer said the payment is for, as the payee's statement narrates it (a bank statement's line). */
+interface Payment { instruction: string; from: string; to: string; amount: number; due: number; settles?: string; memo?: string }
 
 /** Things kept by a time, the soonest first out (a binary heap; those of one time in no promised order). */
 class Soonest {
@@ -74,7 +75,7 @@ export const bankPaymentSystem: BehaviourModule = {
     { what: "request", why: "A bank keeps its own customers' instructions: every standing order and payment request it is asked to carry out is addressed to it." },
     { what: "accounts", why: "The ledger is the bank's own book: it keeps its customers' accounts, and pays from them as they instruct." },
   ],
-  version: "0.16.0", // 0.16.0: a withdrawal of a standing instruction, of a hold, or an instruction that replaces another, is acted on only from whoever may instruct on the paying account; anyone else is answered and the instruction stands. 0.15.0: its list of a customer's standing instructions says of each who gave it, when, and what it cites. 0.14.0: it keeps a ledger of what it has paid in and out of each account, and a letter is answered with a statement from it (until then, with the payments new at that look: nearly always none)
+  version: "0.17.0", // 0.17.0: each payment carries what its payer said it was for (the line on a statement: docs/behaviour/firms.md, "Wages owed"); 0.16.0: a withdrawal of a standing instruction, of a hold, or an instruction that replaces another, is acted on only from whoever may instruct on the paying account; anyone else is answered and the instruction stands. 0.15.0: its list of a customer's standing instructions says of each who gave it, when, and what it cites. 0.14.0: it keeps a ledger of what it has paid in and out of each account, and a letter is answered with a statement from it (until then, with the payments new at that look: nearly always none)
   doc: "docs/behaviour/bank-payment-system.md",
   cadence: () => DAY,
   firstWake: () => 0,
@@ -342,6 +343,8 @@ export const bankPaymentSystem: BehaviourModule = {
           continue;
         }
         const d = { from: m.from, to: m.to, pay: cents(m.amount), settles: m.settles, every: bulk ? undefined : ins.data.every };
+        // (What the payer said it is for goes with the money: the line on the payee's statement.)
+        const said = (x: any) => (typeof x?.for === "string" && x.for ? { memo: x.for.replace(/\.$/, "").slice(0, 120) } : {});
         const acc = custody().get(d.from);
         if (acc && dead.has(acc.holder)) continue; // the account holder has died: it pays out only to settle the estate
         if (!acc) {
@@ -377,7 +380,7 @@ export const bankPaymentSystem: BehaviourModule = {
           const until = Math.min(obs.t, lastCall.get(ins.id)?.until ?? obs.t);
           while (due <= until) {
             // (A due date under a hold is passed over: not paid then, and not made up when the hold is lifted.)
-            if (!held(ins.id, due)) out.push({ instruction: ins.id, from: d.from, to: d.to, amount: d.pay, due });
+            if (!held(ins.id, due)) out.push({ instruction: ins.id, from: d.from, to: d.to, amount: d.pay, due, ...said(m) });
             due += d.every;
           }
           nextDue.set(ins.id, due);
@@ -387,10 +390,10 @@ export const bankPaymentSystem: BehaviourModule = {
           }
         } else if (bulk && !done.has(ins.id)) {
           done.add(ins.id);
-          for (const b of bulk) out.push({ instruction: ins.id, from: d.from, to: b.to as string, amount: cents(b.amount as any), due: ins.at });
+          for (const b of bulk) out.push({ instruction: ins.id, from: d.from, to: b.to as string, amount: cents(b.amount as any), due: ins.at, ...said(b) });
         } else if (!done.has(ins.id)) {
           done.add(ins.id);
-          out.push({ instruction: ins.id, from: d.from, to: d.to, amount: d.pay, due: ins.at, ...(typeof d.settles === "string" ? { settles: d.settles } : {}) }); // the payer's reference, as given
+          out.push({ instruction: ins.id, from: d.from, to: d.to, amount: d.pay, due: ins.at, ...(typeof d.settles === "string" ? { settles: d.settles } : {}), ...said(m) }); // the payer's reference, as given
         }
       }
       // (An order that was due and wasn't gone through to its payments, its holder dead or its author not the holder's:
@@ -538,7 +541,7 @@ export const bankPaymentSystem: BehaviourModule = {
           const from = seen.get(p.from);
           const have = left.get(p.from) ?? (from ? cents(from.balance) : 0);
           if (have >= p.amount) {
-            blocks.push(pay(p.to, p.amount, { from: p.from, per_request: p.instruction, settles: p.settles }));
+            blocks.push(pay(p.to, p.amount, { from: p.from, per_request: p.instruction, settles: p.settles, for: p.memo }));
             left.set(p.from, have - p.amount);
             inFlight.push(p);
           } else {

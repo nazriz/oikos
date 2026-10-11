@@ -35,7 +35,7 @@ test("a standing order is paid on each due date (first at the request's time plu
   const so = request("so-1", 0, "c1", 100_000, { every: MONTH, first: 0 });
   const later = request("so-2", 0, "c2", 50_000, { every: MONTH }); // no `first`: due a period on
   const day0 = at(m, 0, [so, later], { c1: 500_000, c2: 500_000 });
-  expect(day0.map((c) => [c.fn, c.args])).toEqual([["money", { to: "acc-landlord", amount: "$1000.00", from: "acc-c1", per_request: "so-1" }]]);
+  expect(day0.map((c) => [c.fn, c.args])).toEqual([["money", { to: "acc-landlord", amount: "$1000.00", for: "Rent", from: "acc-c1", per_request: "so-1" }]]); // (with what the payer said it was for: the line on a statement)
   expect(at(m, DAY, [], { c1: 400_000, c2: 500_000 })).toEqual([]);
   const day30 = at(m, MONTH, [], { c1: 400_000, c2: 500_000 });
   expect(day30.map((c) => [c.args.per_request, c.args.amount])).toEqual([["so-1", "$1000.00"], ["so-2", "$500.00"]]);

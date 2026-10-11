@@ -201,6 +201,14 @@ One page: [founding.md](founding.md). In a town with the dial for it on (`living
 - **Who shares a want** is only what the person knows: their household, what those they caught up with said, who told them they were wronged, who mourns the same death, who lives in the same building.
 - With the dial off none of it is read, and the town is step 2b's to the state hash.
 
+## Pay, a home lost for arrears, and a business of one (0.48.0, 2026-10-11)
+
+Three changes on the person's side of the firm and landlord fixes (docs/decisions.md, "Four faults on the firm and landlord side"); each is described where its mechanism lives.
+
+- **What counts as pay.** Money from an employer's account is pay only if the bank's line says it was paid as wages. A refund from the shop one works at, or a dividend from the works one holds a share of, is not pay come short (docs/behaviour/firms.md, "Wages owed").
+- **Told to leave for arrears** (docs/behaviour/justice.md, "Possession"; only where the world has a law on possession). A notice to vacate: gone by its date, or staying, by a draw of the person's own at the world's share (`possession.stay_bps`). An application for possession: the tenant answers the tribunal with what the household could pay a month toward the arrears (its income less rent and essentials), if anything. A plan: they stay. An order for possession: gone by its date or not (`possession.obey_bps`). A warrant carried out: out, from that hour. Then as anyone without a home. The record keeps it as an eviction.
+- **A business of one** (docs/behaviour/entry.md, "Starting a business of one"): started with the month's chance by someone with a home to trade from and the savings (after notice, if in a job); given up after months in which it has paid them under half of essentials.
+
 ## What a citizen does
 
 | | Rule | Source |

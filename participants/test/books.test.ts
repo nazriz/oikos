@@ -135,3 +135,35 @@ test("a direction on an office's form binds its staff's post as it binds the off
     expect(d.standing(book, "works_collection")?.id).toBe("rec.20");
   }
 });
+
+// ------------------------------------------------------------------ possession (docs/behaviour/justice.md)
+
+test("a landlord's books show each tenancy being ended for arrears at the stage its papers put it at, and what the law's procedure has next; the last payment's own words are in the rent book", () => {
+  const b = landlordBooks(ctx("landlord-1"));
+  const law = st("law-possession", 0, "law", "state", { data: { tenancy: "possession", arrears_days: 14, notice_days: 14, possession_days: 14 } });
+  b.absorb(obs(0, "landlord-1", [law, lease("lease-a", "a", 100_000), ...signed("lease-a", "a")], { ...account, transactions: [{ ...rentPaid(0, "a", 100_000), memo: "rent" }] }));
+  const ending = (t: number) => head(b.open(t), "Tenancies being ended for arrears under the law on possession, and where each has got to")?.items[0];
+  expect(ending(70 * DAY)).toBeUndefined();
+  expect(head(b.open(70 * DAY), "Rent in arrears")!.items[0]!.line).toContain('the last payment from acc-a came year 1, day 1 ($1,000.00, "rent")');
+  // Notice to vacate: its date, and what follows it.
+  b.absorb(obs(70 * DAY, "landlord-1", [st("rec.20", 70 * DAY, "notice_to_vacate", "landlord-1", { addressed_to: ["a"], basis: "lease-a", data: { lease: "lease-a", reason: "arrears", by: 85 * DAY } })]));
+  expect(ending(71 * DAY)).toMatchObject({ id: "lease-a", since: 70 * DAY });
+  expect(ending(71 * DAY)!.line).toContain("notice to vacate given year 1, day 71 (rec.20), to leave by year 1, day 86; paid before then it lapses");
+  expect(ending(86 * DAY)!.line).toContain("that date has passed and the tenant has not left; by law-possession the landlord may now apply to the tribunal for possession, and may not put them out");
+  // Applied; then the tribunal's plan; then, applied again, its order; a warrant asked, issued, lapsed.
+  b.absorb(obs(87 * DAY, "landlord-1", [st("rec.21", 87 * DAY, "tribunal_application", "landlord-1", { addressed_to: ["tribunal"], basis: "lease-a", data: { kind: "possession", matter: "possession", against: "a", about: "lease-a" } })]));
+  expect(ending(88 * DAY)!.line).toContain("we applied to the tribunal for possession year 1, day 88 (rec.21); it has not decided");
+  b.absorb(obs(100 * DAY, "landlord-1", [st("rec.22", 100 * DAY, "tribunal_order", "tribunal", { basis: "rec.21", data: { kind: "possession", applicant: "landlord-1", against: "a", about: "lease-a", finding: "plan", instalment: 20_000 } })]));
+  expect(ending(101 * DAY)!.line).toContain("the tribunal set a plan to pay year 1, day 101 (rec.22): the rent as it falls due and $200.00 a month toward what is owed");
+  b.absorb(obs(140 * DAY, "landlord-1", [st("rec.23", 139 * DAY, "tribunal_application", "landlord-1", { addressed_to: ["tribunal"], basis: "lease-a", data: { kind: "possession", against: "a", about: "lease-a", breach: true } }),
+    st("rec.24", 140 * DAY, "tribunal_order", "tribunal", { basis: "rec.23", data: { kind: "possession", applicant: "landlord-1", against: "a", about: "lease-a", finding: "possession", due: 154 * DAY, space: "apts-1/dwelling.1" } })]));
+  expect(ending(141 * DAY)!.line).toContain("the tribunal ordered possession of apts-1/dwelling.1 by year 1, day 155 (rec.24); if the tenant is still there a day after that date, a warrant may be asked");
+  expect(ending(156 * DAY)!.line).toContain("that date has passed and the tenant has not left; by law-possession a warrant may be asked of the tribunal's registrar, and nobody else may put them out");
+  b.absorb(obs(156 * DAY, "landlord-1", [st("rec.25", 156 * DAY, "warrant_request", "landlord-1", { addressed_to: ["tribunal"], basis: "rec.24", data: { order: "rec.24" } })]));
+  expect(ending(157 * DAY)!.line).toContain("a warrant was asked of the tribunal's registrar year 1, day 157 (rec.25) and has not been issued");
+  b.absorb(obs(158 * DAY, "landlord-1", [st("rec.26", 158 * DAY, "warrant", "tribunal", { basis: "rec.24", data: { order: "rec.24", lease: "lease-a", until: 172 * DAY } })]));
+  expect(ending(159 * DAY)!.line).toContain("a warrant is out (rec.26), to be carried out by year 1, day 173 by those who enforce the tribunal's orders, and by nobody else");
+  // Carried out: the tenancy is out of this heading.
+  b.absorb(obs(165 * DAY, "landlord-1", [st("rec.27", 165 * DAY, "warrant_executed", "police", { data: { lease: "lease-a" } })]));
+  expect(ending(166 * DAY)).toBeUndefined();
+});

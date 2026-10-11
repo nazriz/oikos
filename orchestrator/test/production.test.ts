@@ -198,7 +198,12 @@ test("Lengnick: with too little demand a factory lets workers go and stops makin
   // (Three or more until 2026-10-09, which counted postings, and one works posting twice in a moment counted two. What
   // is meant is that the headcount sought rises: here a works with nobody seeks one, and with one seeks two. In the
   // town as now drawn it has stock enough at the end of one month not to post.)
-  expect(posts.length).toBeGreaterThanOrEqual(2);
-  const sought = posts.map((c) => Number(/\(\d+ of (\d+)/.exec(c.reasoning ?? "")?.[1] ?? 0));
-  expect(Math.max(...sought)).toBeGreaterThan(sought[0]!);
+  // (Since 2026-10-11, one: the works with nobody takes one on at the first month's end on low stock, cannot pay them
+  // three weeks on, lets them go, and then takes nobody on until it holds three months' wages, which it does not in
+  // these four months: docs/behaviour/firms.md, "Adjusting labour". Before, it would have hired again a month later
+  // on a month's wages. The other works goes on seeking a thirty-sixth hand.)
+  expect(posts.length).toBeGreaterThanOrEqual(1);
+  expect(c2.filter((c) => c.participant?.startsWith("factory-") && /Short of this month's headcount/.test(c.reasoning ?? "")).length).toBeGreaterThanOrEqual(3);
+  // (And the headcount sought is above the staff there are: a works with nobody seeks one.)
+  for (const c of posts) { const m = /\((\d+) of (\d+)/.exec(c.reasoning ?? ""); expect(Number(m?.[2])).toBeGreaterThan(Number(m?.[1])); }
 }, 300_000);

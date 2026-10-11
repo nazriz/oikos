@@ -76,12 +76,14 @@ test("finance: the budget for the year in total, against payments of invoices an
   const a = job("job-1", 2 * DAY, "c1");
   const budget = statement("bud-1", DAY, "budget", { data: { year: 1, lines: { parks: 8_000_000, staff: 2_000_000 } } });
   feed(b, "city", 40 * DAY, [budget, invoice("inv-1", 4 * DAY, 800_000), ...signed(a, 3 * DAY), standingOrder("ord-1", 4 * DAY, "city", "acc-c1", 270_000, { basis: "job-1", every: PERIOD })],
-    { transactions: [{ t: 30 * DAY, from: "acc-city", to: "acc-builder", amount: "800000", currency: "AUD", by: "fin", settles: "inv-1" }, { t: 31 * DAY, from: "acc-city", to: "acc-c1", amount: "270000", currency: "AUD", by: "fin", per_instruction: "ord-1" }] });
+    { transactions: [{ t: 30 * DAY, from: "acc-city", to: "acc-builder", amount: "800000", currency: "AUD", by: "fin", settles: "inv-1", memo: "Paying an invoice" }, { t: 31 * DAY, from: "acc-city", to: "acc-c1", amount: "270000", currency: "AUD", by: "fin", per_instruction: "ord-1", memo: "wages" }] });
   const item = find(b.open(40 * DAY), "The budget for the year, against what has been paid")[0];
   expect(item.id).toBe("bud-1");
   // 10,000,000 adopted; 800,000 on invoices + 270,000 net + 30,000 withheld = 1,100,000 paid; 8,900,000 left.
   expect(item.amount).toBe(8_900_000);
   expect(item.line).toContain("$8,000.00");
+  // (What the payments said they were for, as the bank's statement has them: the largest first.)
+  expect(item.line).toContain('No payment is marked with a line of the budget. By what the payments said they were for: "Paying an invoice" $8,000.00; "wages" $2,700.00');
   expect(lines(b.open(40 * DAY))).toBe(lines(b.open(41 * DAY)));
 });
 

@@ -75,7 +75,9 @@ export interface LlmParticipantConfig {
   /** Its office's in-trays (by channel path): its own papers of some kinds only (`true`: whatever comes there; a list:
    * those kinds, as a folder holds them), and the folders that hold every paper of its organisation's (`all`), where
    * only what is addressed to its own post, or comes from outside an organisation with no in-tray, is its to open. */
-  trays?: { kinds: Map<string, string[] | true>; all: Set<string> };
+  /** (`sole`: its office is its organisation's only one, a landlord's letting office say: a paper someone else
+   * addresses to the organisation is then this office's post, as one addressed to its post by name is.) */
+  trays?: { kinds: Map<string, string[] | true>; all: Set<string>; sole?: boolean };
   /** Whose papers are its office's own doing (itself; its staff's post): never what brings it back. */
   ownAuthors?: string[];
   /** The most one prompt may come to, in characters (the system prompt and everything shown): `PROMPT_MAX` unless set. */
@@ -585,7 +587,10 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
       for (const r of ch.records) {
         if (own.has(r.author) || counted.has(r.id)) continue;
         const toPost = r.record === "statement" && (r.addressed_to ?? []).some((x) => posts.has(x));
-        const mine = tray !== undefined ? tray === true || ofKind(r, tray) : toPost || (!anyTray && r.speaks_for !== c.entity);
+        // (An organisation with one office: what others address to the organisation is that office's post. Until
+        // 2026-10-11 a tenant's letter to a landlord was shown at the seat's next sitting and did not bring it back.)
+        const toSole = !!c.trays!.sole && r.record === "statement" && r.speaks_for !== c.entity && !!c.entity && (r.addressed_to ?? []).includes(c.entity);
+        const mine = tray !== undefined ? tray === true || ofKind(r, tray) : toPost || toSole || (!anyTray && r.speaks_for !== c.entity);
         if (!mine) continue;
         counted.add(r.id);
         if (atCounter?.counters(r)) continue; // (the counter's: its staff answer it, and the seat is told how many)

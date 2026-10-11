@@ -1,6 +1,6 @@
 {
   "name": "bank.payment_system",
-  "version": "0.16.0",
+  "version": "0.17.0",
   "doc": "docs/behaviour/bank-payment-system.md",
   "params": {
     "amount": {
@@ -41,6 +41,10 @@
       },
       "default": 32,
       "source": "placeholder"
+    },
+    "memo": {
+      "schema": {},
+      "source": "the world gives it (no default)"
     },
     "review_all": {
       "schema": {

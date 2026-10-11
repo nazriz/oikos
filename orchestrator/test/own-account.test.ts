@@ -23,7 +23,8 @@ const KINDS = [
 
 function town(share: number | undefined, kinds: object[] = KINDS) {
   const P = structuredClone(loadProfile(PLACE));
-  if (share !== undefined) P.values.employment = { own_account: { share_bps: share, kinds } } as any;
+  // (Beside what the profile says of employment otherwise: its law on ending a job, how its firms adjust.)
+  if (share !== undefined) P.values.employment = { ...(P.values.employment ?? {}), own_account: { share_bps: share, kinds } } as any;
   return generateFrom({ ...base, profile: PLACE }, P);
 }
 
@@ -93,6 +94,8 @@ test("the town starts with the stated share in businesses of one, each run by it
 
 test("they sell to households by their own hours, draw what the business clears, and look for no job", async () => {
   const config = town(5_000);
+  // (About the businesses the town opens with: nobody starts another in these 90 days. Starting one is orchestrator/test/own-venture.test.ts.)
+  for (const p of config.participants) if (p.controller?.impl === "citizen.default") p.controller = { ...p.controller, params: { ...p.controller.params, found_own_ppm: 0 } };
   const { ev, recs, log, out } = await run("town", config, 90 * DAY);
   const firms = new Map<string, string>(config.world.entities.filter((e: any) => e.kind === "own_account").map((e: any) => [e.id, e.id.replace("own-", "")]));
   const placeOf = new Map<string, string>(config.positions.filter((x: any) => firms.has(x.entity)).map((x: any) => [x.entity, x.role_module.params.premises]));

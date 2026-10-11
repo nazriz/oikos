@@ -35,6 +35,8 @@ class Paid {
   readonly settling: { id: string; t: number; amount: number }[] = [];
   /** Each payment seen made under a standing payment of the office's: which, when, and how much (after what was withheld). */
   readonly byOrder: { t: number; order: string; amount: number }[] = [];
+  /** What has left the account, by what each payment said it was for (the bank's statement line, `memo`): when and how much. */
+  readonly saidFor: { t: number; memo: string; amount: number }[] = [];
   account: string | undefined;
   absorb(obs: Observation): void {
     const acc = ownAccount(obs);
@@ -42,6 +44,7 @@ class Paid {
     this.account = acc.account;
     for (const tx of channels.transactions(obs)) {
       if (tx.from !== acc.account) continue;
+      if (tx.memo) this.saidFor.push({ t: tx.t, memo: tx.memo, amount: cents(tx.amount) });
       if (tx.settles) {
         this.settled.add(tx.settles);
         this.settling.push({ id: tx.settles, t: tx.t, amount: cents(tx.amount) });
@@ -141,12 +144,18 @@ export function financeBooks(ctx: ParticipantContext): OfficeBooks {
       const adopted = budgetFor(book, year);
       const last = adopted ?? book.open("budget").filter((b) => typeof b.data?.year === "number" && b.data.year < year).sort((a, b) => b.data.year - a.data.year || b.at - a.at)[0];
       const budget: OpenItem[] = [];
+      // (What the year's payments said they were for, as the bank's statement has them: the nearest the office's papers
+      // come to telling one kind of spending from another. The five largest, and the rest together.)
+      const forWhat = new Map<string, number>();
+      for (const x of money.saidFor) if (x.t >= from && x.t < to) forWhat.set(x.memo, (forWhat.get(x.memo) ?? 0) + x.amount);
+      const byMemo = [...forWhat].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1));
+      const saidWords = byMemo.length ? `. By what the payments said they were for: ${byMemo.slice(0, 5).map(([m, n]) => `"${m}" ${usd(n)}`).join("; ")}${byMemo.length > 5 ? `; ${byMemo.length - 5} other kinds ${usd(byMemo.slice(5).reduce((n, x) => n + x[1], 0))}` : ""}` : "";
       if (adopted) {
         const lines = (adopted.data?.lines ?? {}) as { [k: string]: number };
         const total = Object.values(lines).reduce((n, v) => n + cents(v), 0);
         const spent = invoicesPaid + wages;
         budget.push({ id: adopted.id, running: true, since: adopted.at, amount: total - spent,
-          line: `${adopted.id}: the budget adopted for year ${year} (${yearInDays(year)}) is ${usd(total)} in all (${linesWords(lines)}); paid so far this year ${usd(spent)} (${usd(invoicesPaid)} on invoices, ${usd(wages)} in wages, the wages counted before tax withheld); ${usd(total - spent)} is left. Payments are kept in total, not by line` });
+          line: `${adopted.id}: the budget adopted for year ${year} (${yearInDays(year)}) is ${usd(total)} in all (${linesWords(lines)}); paid so far this year ${usd(spent)} (${usd(invoicesPaid)} on invoices, ${usd(wages)} in wages, the wages counted before tax withheld); ${usd(total - spent)} is left. No payment is marked with a line of the budget${saidWords}` });
       } else {
         const lines = (last?.data?.lines ?? {}) as { [k: string]: number };
         const total = Object.values(lines).reduce((n, v) => n + cents(v), 0);

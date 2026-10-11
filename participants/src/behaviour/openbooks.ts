@@ -24,7 +24,8 @@ export const firstDueOf = (a: any, begins: number): number => begins + (Number.i
 /** What an organisation has seen leave and come into its own account: what settled which paper, and each receipt by payer. */
 export class Money {
   readonly settled = new Set<string>();
-  readonly received = new Map<string, { t: number; amount: number }[]>();
+  /** Each receipt by paying account, with what the payer said it was for where the bank's statement says (`memo`). */
+  readonly received = new Map<string, { t: number; amount: number; memo?: string }[]>();
   account: string | undefined;
   balance = 0;
   absorb(obs: Observation): void {
@@ -34,7 +35,7 @@ export class Money {
     this.balance = acc.balance;
     for (const tx of channels.transactions(obs)) {
       if (tx.from === acc.account && tx.settles) this.settled.add(tx.settles);
-      if (tx.to === acc.account && tx.from !== acc.account) this.received.set(tx.from, [...(this.received.get(tx.from) ?? []), { t: tx.t, amount: cents(tx.amount) }]);
+      if (tx.to === acc.account && tx.from !== acc.account) this.received.set(tx.from, [...(this.received.get(tx.from) ?? []), { t: tx.t, amount: cents(tx.amount), ...(tx.memo ? { memo: tx.memo } : {}) }]);
     }
   }
 }
@@ -108,6 +109,13 @@ export function landlordBooks(ctx: ParticipantContext): OfficeBooks {
       const noticed = (a: any) => (book.notices.get(a.id) ?? []).length > 0;
       // ---- the rent book ----
       const arrears: OpenItem[] = [];
+      const asked = new Map<string, number>(); // a lease -> when we last wrote to ask for the rent owed under it
+      for (const r of book.all(PAPER.request)) if (r.speaks_for === me && r.data?.matter === "arrears" && typeof r.data?.about === "string") asked.set(r.data.about, r.at);
+      // ---- tenancies being ended for arrears under the law on possession (docs/behaviour/justice.md, "Possession"):
+      // where each has got to, by the papers on file, and what the law's procedure has next. ----
+      const law = book.open("law").filter((r) => r.data?.tenancy === "possession").sort((x, y) => y.at - x.at)[0];
+      const ending: OpenItem[] = [];
+      const behindUnder = new Map<string, number>();
       for (const a of active) {
         const tenant = tenantOf(a);
         // (A lease that renews one of ours: its rent runs from the end of that one's term.)
@@ -118,7 +126,9 @@ export function landlordBooks(ctx: ParticipantContext): OfficeBooks {
         let owed = 0;
         for (let k = 0; k < due; k++) owed += cents(rentAt(a, since + k * MONTH));
         const account = payingAccount.get(tenant);
-        const paid = ((account && money.received.get(account)) || []).filter((x) => x.t >= begins).reduce((n, x) => n + x.amount, 0);
+        const receipts = ((account && money.received.get(account)) || []).filter((x) => x.t >= begins);
+        const paid = receipts.reduce((n, x) => n + x.amount, 0);
+        const last = receipts.at(-1);
         const rent = cents(rentAt(a, t));
         const behind = owed - paid;
         if (rent <= 0 || behind < rent) continue;
@@ -126,15 +136,52 @@ export function landlordBooks(ctx: ParticipantContext): OfficeBooks {
         const rents = Math.floor(behind / rent);
         const oldest = since + (due - rents) * MONTH;
         if (t - oldest < 7 * DAY) continue;
-        arrears.push({ id: a.id, since: oldest, amount: behind, line: `${a.id}: ${tenant}${leaseTerms(a, tenant).space ? `, ${leaseTerms(a, tenant).space}` : ""}, is ${usd(behind)} behind with the rent (${rents} rent${rents === 1 ? "" : "s"} of ${usd(rent)}), since ${dateWords(oldest)}${noticed(a) ? "; notice has been given on the lease" : ""}` });
+        behindUnder.set(a.id, behind);
+        arrears.push({ id: a.id, since: oldest, amount: behind, line: `${a.id}: ${tenant}${leaseTerms(a, tenant).space ? `, ${leaseTerms(a, tenant).space}` : ""}, is ${usd(behind)} behind with the rent (${rents} rent${rents === 1 ? "" : "s"} of ${usd(rent)}), since ${dateWords(oldest)}; ${last ? `the last payment from ${account} came ${dateWords(last.t)} (${usd(last.amount)}${last.memo ? `, "${last.memo}"` : ""})` : "nothing has come from the tenant's account under this lease"}${asked.has(a.id) ? `; we wrote to ask for it ${dateWords(asked.get(a.id)!)}` : ""}${noticed(a) ? "; notice has been given on the lease" : ""}` });
+      }
+      if (law) for (const a of leases) {
+        const tenant = tenantOf(a);
+        if (book.all("warrant_executed").some((w) => w.data?.lease === a.id)) continue; // (carried out: over)
+        const left = (book.notices.get(a.id) ?? []).some((n) => n.as === tenant);
+        const vacate = book.open("notice_to_vacate").filter((r) => r.speaks_for === me && r.data?.lease === a.id).sort((x, y) => y.at - x.at)[0];
+        const applied = book.all("tribunal_application").filter((r) => r.speaks_for === me && r.data?.kind === "possession" && r.data?.about === a.id).sort((x, y) => y.at - x.at)[0];
+        const order = book.all("tribunal_order").filter((o) => o.data?.kind === "possession" && o.data?.applicant === me && o.data?.about === a.id).sort((x, y) => y.at - x.at)[0];
+        if ((!vacate && !applied && !order) || left || !book.inForce(a.id) && !order) continue;
+        const now = behindUnder.get(a.id);
+        const owes = now !== undefined ? `${tenant} is ${usd(now)} behind now` : `${tenant} is less than a rent behind now`;
+        const home = leaseTerms(a, tenant).space ?? "the home";
+        let stage: string, since: number;
+        const decided = order && (!applied || order.at >= applied.at) ? order : undefined;
+        if (decided?.data?.finding === "possession") {
+          const due = Number(decided.data.due);
+          const asked = book.all("warrant_request").filter((r) => r.speaks_for === me && r.data?.order === decided.id).sort((x, y) => y.at - x.at)[0];
+          const warrant = book.all("warrant").filter((w) => w.data?.order === decided.id).sort((x, y) => y.at - x.at)[0];
+          const lapsed = warrant && book.all("warrant_lapsed").some((w) => w.data?.lease === a.id && w.at >= warrant.at);
+          since = decided.at;
+          stage = `the tribunal ordered possession of ${home} by ${dateWords(due)} (${decided.id})` + (lapsed ? `; the warrant ${warrant!.id} ran out without being carried out; by ${law.id} another may be asked of the tribunal's registrar`
+            : warrant ? `; a warrant is out (${warrant.id}), to be carried out by ${dateWords(Number(warrant.data?.until))} by those who enforce the tribunal's orders, and by nobody else`
+            : asked ? `; a warrant was asked of the tribunal's registrar ${dateWords(asked.at)} (${asked.id}) and has not been issued`
+            : t >= due + DAY ? `; that date has passed and the tenant has not left; by ${law.id} a warrant may be asked of the tribunal's registrar, and nobody else may put them out`
+            : `; if the tenant is still there a day after that date, a warrant may be asked of the tribunal's registrar`);
+        } else if (decided?.data?.finding === "plan") {
+          since = decided.at;
+          stage = `the tribunal set a plan to pay ${dateWords(decided.at)} (${decided.id}): the rent as it falls due and ${usd(cents(decided.data.instalment ?? 0))} a month toward what is owed; if it is not kept, the landlord may apply again for possession`;
+        } else if (decided) continue; // (dismissed: it begins again only if they fall behind)
+        else if (applied) { since = applied.at; stage = `we applied to the tribunal for possession ${dateWords(applied.at)} (${applied.id}); it has not decided`; }
+        else {
+          const by = Number(vacate!.data?.by);
+          since = vacate!.at;
+          stage = `notice to vacate given ${dateWords(vacate!.at)} (${vacate!.id}), to leave by ${dateWords(by)}; ${now === undefined ? `the arrears are paid, so by ${law.id} the notice lapses` : t >= by ? `that date has passed and the tenant has not left; by ${law.id} the landlord may now apply to the tribunal for possession, and may not put them out` : `paid before then it lapses; still there and behind after it, the landlord may apply to the tribunal for possession`}`;
+        }
+        ending.push({ id: a.id, since, ...(now !== undefined ? { amount: now } : {}), line: `${a.id}: ${home}; ${owes}; ${stage}` });
       }
       // ---- tenancies near their end ----
-      const ending: OpenItem[] = [];
+      const closing: OpenItem[] = [];
       for (const a of active) {
         const ends = book.endsAt(a.id);
         if (a.terms.then === "periodic" || ends === undefined || ends - t > noticeDays * DAY || noticed(a)) continue;
         if (leases.some((x) => x.id !== a.id && cites(x, a.id) && tenantOf(x) === tenantOf(a))) continue;
-        ending.push({ id: a.id, since: ends, line: `${a.id}: the tenancy of ${tenantOf(a)}${leaseTerms(a, tenantOf(a)).space ? ` at ${leaseTerms(a, tenantOf(a)).space}` : ""} ends ${dateWords(ends)}; no new lease has been offered and no notice given` });
+        closing.push({ id: a.id, since: ends, line: `${a.id}: the tenancy of ${tenantOf(a)}${leaseTerms(a, tenantOf(a)).space ? ` at ${leaseTerms(a, tenantOf(a)).space}` : ""} ends ${dateWords(ends)}; no new lease has been offered and no notice given` });
       }
       // ---- homes to let ----
       const listings = book.open("rental_listing").filter((l) => l.speaks_for === me);
@@ -154,7 +201,8 @@ export function landlordBooks(ctx: ParticipantContext): OfficeBooks {
       const estates = active.filter((a) => dead.has(tenantOf(a)) && !noticed(a)).map((a): OpenItem => ({ id: a.id, since: a.at, line: `${a.id}: the tenant ${tenantOf(a)} is registered as having died; the lease still stands` }));
       return [
         ...heading("Rent in arrears", arrears),
-        ...heading("Tenancies ending with nothing offered", ending),
+        ...heading("Tenancies being ended for arrears under the law on possession, and where each has got to", ending),
+        ...heading("Tenancies ending with nothing offered", closing),
         ...heading("Applications for a home, not answered", applications),
         ...heading("Tenants' requests to vary something, not answered", variations),
         ...askedOfUs(book, me, money, [{ notice: "hearing_notice", response: "tribunal_response", decision: "tribunal_order" }]),

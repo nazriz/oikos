@@ -267,3 +267,37 @@ test("lending: a payout figure asked for stands until it is given", () => {
   b.absorb(obs(t0 + DAY, "bank", [st("rec.2", t0 + DAY, "loan_payout", "bank", { basis: "rec.1", data: { loan: "agr.1", amount: 90_000 } })], { accounts }));
   expect(b.open(t0 + DAY)).toEqual([]);
 });
+
+// ------------------------------------------------------------------ possession (docs/behaviour/justice.md)
+
+test("the tribunal's books show an application for possession with the home, what is said to be owed, and whether the tenant has answered and with what; the registrar's show a warrant asked for and not issued", () => {
+  const b = tribunalMemberBooks(ctx("tribunal", { hears: [{ about: "possession" }] }));
+  const t0 = 90 * DAY, by = t0 + 21 * DAY;
+  const app = st("rec.1", t0, "tribunal_application", "landlord-1", { addressed_to: ["tribunal"], data: { kind: "possession", matter: "possession", against: "ann", about: "lease-a", amount: 260_000, space: "apts-1/dwelling.1" } });
+  const notice = st("rec.2", t0, "hearing_notice", "tribunal", { addressed_to: ["landlord-1", "ann"], basis: "rec.1", data: { application: "rec.1", kind: "possession", matter: "possession", applicant: "landlord-1", against: "ann", answer_by: by, hearing_at: by } });
+  b.absorb(obs(t0, "tribunal", [app, notice]));
+  const H = "Applications for possession of a let home, not decided";
+  let item = heading(b.open(t0 + DAY), H)!.items[0]!;
+  expect(item).toMatchObject({ id: "rec.1", since: t0, amount: 260_000 });
+  expect(item.line).toContain("landlord-1 applies for possession of apts-1/dwelling.1 from ann (lease lease-a)");
+  expect(item.line).toContain("ann has not answered");
+  same(b, t0 + DAY);
+  // (It is under that heading and no other.)
+  expect(b.open(t0 + DAY).map((h) => h.what)).toEqual([H]);
+  b.absorb(obs(t0 + 5 * DAY, "tribunal", [st("rec.3", t0 + 5 * DAY, "tribunal_response", "ann", { basis: "rec.1", addressed_to: ["tribunal"], data: { application: "rec.1", paid: 60_000, offer: 30_000 } })]));
+  item = heading(b.open(by + DAY), H)!.items[0]!;
+  expect(item.line).toContain("ann answered");
+  expect(item.line).toContain("has been paid since, and offering");
+  expect(item.line).toContain("the tenant's time to answer ran out");
+  const order = st("rec.4", by + DAY, "tribunal_order", "tribunal", { basis: "rec.1", data: { application: "rec.1", kind: "possession", applicant: "landlord-1", against: "ann", about: "lease-a", finding: "possession", due: by + 15 * DAY, space: "apts-1/dwelling.1" } });
+  b.absorb(obs(by + DAY, "tribunal", [order]));
+  expect(b.open(by + 2 * DAY)).toEqual([]);
+  // The registrar: a warrant asked for on that order, until one is issued.
+  const r = tribunalRegistrarBooks(ctx("tribunal"));
+  r.absorb(obs(by + 16 * DAY, "tribunal", [order, st("rec.5", by + 16 * DAY, "warrant_request", "landlord-1", { addressed_to: ["tribunal"], basis: "rec.4", data: { order: "rec.4" } })]));
+  const W = "Requests for a warrant of possession, not answered";
+  expect(heading(r.open(by + 17 * DAY), W)!.items[0]!.line).toContain("for possession of apts-1/dwelling.1 from ann");
+  expect(heading(r.open(by + 17 * DAY), W)!.items[0]!.line).toContain("which has passed; no warrant issued");
+  r.absorb(obs(by + 18 * DAY, "tribunal", [st("rec.6", by + 18 * DAY, "warrant", "tribunal", { basis: "rec.4", data: { order: "rec.4", lease: "lease-a" } })]));
+  expect(heading(r.open(by + 19 * DAY), W)).toBeUndefined();
+});

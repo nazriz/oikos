@@ -65,7 +65,19 @@ export interface Profile {
      * `casual_bps`: of the jobs at employers of a kind, the share that is work by the day: taken on and paid by the
      * day, for the days worked, with no notice and no standing wage; `day_wage`: a day's pay for it, by kind (needed
      * for each kind that has a share). */
+    /** Businesses born in a year, as a share of the businesses there are (the place's business demography, with its
+     * source): what the chance of someone starting a business of their own is derived from, with the town's own
+     * counts (docs/behaviour/entry.md, "Starting a business of one"). Left out: nobody starts one. */
+    business?: { entry_bps_per_year: number };
     employment?: { registered_bps?: { shop?: number; factory?: number; construction?: number };
+      /** The place's law on ending a job for redundancy (docs/behaviour/firms.md, "Adjusting labour"), published in
+       * the town as a law its employers read: the least notice and the redundancy pay owed, each by length of
+       * service, in days of pay, a week being seven (`from_years`: from that many years' service on); and the number of employees below
+       * which an employer owes no redundancy pay, where the law has one. Left out: no such law in the town. */
+      termination?: { notice: { from_years: number; days: number }[]; redundancy_pay: { from_years: number; days: number }[]; small_employer_under?: number };
+      /** How employers here adjust their staff to their trade: the months a firm smooths its trade over, and what
+       * taking someone on costs it, in weeks of their pay. Left out: the modules' own (placeholders). */
+      adjustment?: { smooth_months?: number; hiring_cost_weeks?: number };
       casual_bps?: { shop?: number; factory?: number; construction?: number }; day_wage?: { shop?: number; factory?: number; construction?: number };
       /** People who work for themselves, alone (docs/behaviour/entry.md, "A person working for themself"): of people
        * in work, the share who do (`share_bps`), and what they do, as the place's survey divides them (`kinds`, their
@@ -98,7 +110,15 @@ export interface Profile {
     labour_force_share_by_age?: { from: number; bps: number }[];
     /** Tenancy law. A place with no rule on how often a rent may rise or on what notice leaves both figures out (no
      * such law is written); landlords then review rents as often as `rent_review_practice_months` says, if it's given. */
-    tenancy: { end_notice_days?: number; tenant_notice_days?: number; rent_review_months?: number; rent_increase_notice_days?: number; rent_review_practice_months?: number; after_fixed_term?: "periodic" };
+    tenancy: {
+      /** The place's law on possession of a let home for arrears (docs/behaviour/justice.md, "Possession"), published
+       * in the town as a law: the days rent must be owed before a notice to vacate, the notice's days, the days from
+       * the tribunal's order to its date for possession, the longest plan to pay it sets, in months, and the days
+       * the police have to carry out a warrant. And two figures of how tenants answer: of those given a notice to
+       * vacate they cannot pay off, the share who stay past its date; of those ordered out, the share gone by the
+       * tribunal's date. Left out: a notice for arrears ends the lease and the tenant leaves, as before. */
+      possession?: { arrears_days: number; notice_days: number; possession_days: number; plan_months: number; warrant_days: number; /** The notice of the day the enforcer must give the tenant before carrying a warrant out. */ eviction_notice_days: number; stay_past_notice_bps: number; leave_on_order_bps: number };
+      end_notice_days?: number; tenant_notice_days?: number; rent_review_months?: number; rent_increase_notice_days?: number; rent_review_practice_months?: number; after_fixed_term?: "periodic" };
     values: { [value: string]: { mean_bps: number; sd_bps: number } };
     /** What holds someone in a job they have (docs/behaviour/citizen.md, "Moving to another job"), read only for a living town: how much more another job must pay, and how much more again for each year they have been where they are. */
     job_move?: { premium_bps: number; per_year_bps: number; cap_years: number; other_trade_bps?: number };
