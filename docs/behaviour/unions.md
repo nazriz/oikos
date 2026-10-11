@@ -49,6 +49,7 @@ Measurement reads the logs; the platform doesn't judge. Profile targets:
 
 - **Bargaining with the town:** the town's crew are members, at the public sector's rate, but the union doesn't bargain with the town yet. That would be a steward's decision: a mayor facing a claim.
 - Multi-year agreements, bargaining orders and the tribunal's intervention (an intractable bargaining declaration).
+- (Since 0.6.0, in a town where things go wrong, the union takes up a member's short pay with their employer: it says so in a public notice only members may apply on, puts the matter to the employer, and says what should be paid. Its word is a recommendation: docs/behaviour/frictions.md, "Venues".)
 - Lockouts, and employer response action.
 - Strike pay from the union.
 - Members moving jobs: before 0.3.0 the union knew where a member worked only from its register and their application to join. A member who moved could be balloted and called out at an employer they'd left, and the union bargained on with a closed shop (five years: one dispute ran to 78 stoppages over nearly three years at a shop that had closed). Now members say where they work, and vote only in ballots about their own workplace.

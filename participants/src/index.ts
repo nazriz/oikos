@@ -39,6 +39,7 @@ import { newspaper } from "./behaviour/news";
 import { principal } from "./behaviour/school";
 import { practice } from "./behaviour/health";
 import { member, registrar } from "./behaviour/tribunal";
+import { desk } from "./behaviour/desk";
 import { energy, water } from "./behaviour/utilities";
 import { station } from "./behaviour/police";
 import { retirementFund } from "./behaviour/fund";
@@ -86,6 +87,7 @@ export const modules: { [name: string]: BehaviourModule & { source: string } } =
       [practice, "behaviour/health.ts"],
       [member, "behaviour/tribunal.ts"],
       [registrar, "behaviour/tribunal.ts"],
+      [desk, "behaviour/desk.ts"],
       [water, "behaviour/utilities.ts"],
       [energy, "behaviour/utilities.ts"],
       [station, "behaviour/police.ts"],

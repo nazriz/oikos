@@ -12,6 +12,7 @@ import type { StatementRecord } from "../contracts";
 import { params, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
 import { moneyNow } from "../money";
 import { because, Book, breaches, noting, DAY, MONTH, offer, pay, say, type Step } from "./common";
+import { hearingOffer, Hearings, HEARING_DEFAULTS, type Hears } from "./desk";
 import { stepper } from "./firms";
 import * as P from "./papers";
 
@@ -33,7 +34,7 @@ export const organiser: BehaviourModule = {
   name: "union.organiser",
   answers: {"office": "the union's office", "acts": "What it acts on: an application to join; its members' votes on its ballots; and an employer's answer to a claim it has made."},
   issues: P.UNION,
-  version: "0.5.0",
+  version: "0.6.0", // 0.6.0: takes up a member's grievance with their employer, where the world says it hears such (docs/behaviour/frictions.md)
   doc: "docs/behaviour/unions.md",
   cadence: () => DAY,
   firstWake: (ctx) => 9 * 3600 + ctx.rng("first-wake").below(3600),
@@ -62,6 +63,11 @@ export const organiser: BehaviourModule = {
         dues: 0, // a month, in the smallest unit (the world's profile)
         resignation_notice_days: 0, // a member's notice of resigning, written into each membership (the world's profile; 0: none written)
         dues_account: "",
+        // What it takes up for a member with their employer (docs/behaviour/frictions.md, "Venues": pay come
+        // short), and how many such cases its office gets through in a day. None: it takes up nothing of the kind.
+        hears: [] as Hears[],
+        cases_per_day: 2,
+        answer_days: 14,
       },
       ctx.params,
     );
@@ -73,6 +79,10 @@ export const organiser: BehaviourModule = {
     const industryAt = new Map<string, string>(); // employer -> its industry, as a member there has said
     const prices: { t: number; mean: number }[] = []; // the mean shop price, monthly
     const handled = new Set<string>();
+    // A member's grievance taken up with their employer: put to the employer, and what the union then says should
+    // be done is a recommendation with the union behind it, not an order.
+    const cases = p.hears.length ? new Hearings(me, ctx.rng, { ...HEARING_DEFAULTS, hears: p.hears.map((h) => ({ ...h, can: ["represent"] as Hears["can"] })), answer_days: p.answer_days, cases_per_day: p.cases_per_day }) : undefined;
+    let saidHears = false;
     // When each workplace's first claim is due: those known at our first plan are spread over `first_claim_days`; one
     // we learn of later (a member starts there, or joins from there), from then.
     const stagger = new Map<string, number>();
@@ -88,6 +98,14 @@ export const organiser: BehaviourModule = {
       (obs) => {
         const t = obs.t;
         const steps: Step[] = [];
+        if (cases) {
+          if (!saidHears) {
+            saidHears = true;
+            if (!book.open("hearing").some((r) => r.speaks_for === me)) steps.push(because("Saying what the union takes up for its members, so that a member with such a matter can bring it.",
+              say("hearing", `The union takes up for its members: ${p.hears.map((h) => h.about.replace(/_/g, " ")).join(", ")}. Members apply in writing; there is no fee.`, { visible: "public", offer: hearingOffer(me, p.hears.map((h) => ({ ...h, can: ["represent"] as Hears["can"] })), { members_of: me }), data: { hears: p.hears.map((h) => h.about) } })));
+          }
+          steps.push(...cases.steps(book, obs.t));
+        }
         // What joining is, for anyone who might (docs/design/ai-citizens.md 2a): published once, and kept up.
         if (!offered && p.dues > 0 && p.dues_account) {
           offered = book.open("membership_offer").some((r) => r.speaks_for === me);

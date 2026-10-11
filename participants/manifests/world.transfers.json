@@ -1,6 +1,6 @@
 {
   "name": "world.transfers",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "doc": "docs/behaviour/boundary.md",
   "params": {
     "account": {
@@ -12,12 +12,42 @@
       "required": true,
       "source": "the account it pays from where a payment names none (the world must say)"
     },
+    "capacity_per_day": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 0,
+      "source": "placeholder"
+    },
+    "error_bps": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "bps",
+      "default": 0,
+      "source": "placeholder"
+    },
+    "processing_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 0,
+      "source": "placeholder"
+    },
     "publish_every_days": {
       "schema": {
         "type": "integer"
       },
       "unit": "days",
       "default": 0,
+      "source": "placeholder"
+    },
+    "respond": {
+      "schema": {
+        "type": "object"
+      },
+      "default": {},
       "source": "placeholder"
     },
     "year": {

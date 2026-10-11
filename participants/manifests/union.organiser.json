@@ -1,6 +1,6 @@
 {
   "name": "union.organiser",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "doc": "docs/behaviour/unions.md",
   "params": {
     "accept_share_bps": {
@@ -11,6 +11,14 @@
       "unit": "bps",
       "default": 5000,
       "source": "an offer of at least this share of the claim is accepted (placeholder)"
+    },
+    "answer_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 14,
+      "source": "placeholder"
     },
     "ballot_days": {
       "schema": {
@@ -53,6 +61,13 @@
       },
       "unit": "days",
       "default": 7,
+      "source": "placeholder"
+    },
+    "cases_per_day": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 2,
       "source": "placeholder"
     },
     "claim_margin_bps": {
@@ -104,6 +119,13 @@
       "unit": "days",
       "default": 60,
       "source": "its first claims, spread over this long (placeholder)"
+    },
+    "hears": {
+      "schema": {
+        "type": "array"
+      },
+      "default": [],
+      "source": "placeholder"
     },
     "industries": {
       "schema": {

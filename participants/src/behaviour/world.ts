@@ -13,6 +13,7 @@ import { drawHousehold, drawSavings, type HouseholdSpec } from "./household";
 import { yearsOfSchooling, type SchoolingSpec } from "./school";
 import { forAge, supportLaw, type Declared, type PaymentRule } from "./payments";
 import { incomeTaxLaw, withholding } from "./tax";
+import { frictionDial, Respondent } from "./frictions";
 
 export const exportDemand: BehaviourModule = {
   name: "world.export_demand",
@@ -233,7 +234,7 @@ export const trade: BehaviourModule = {
 export const transfers: BehaviourModule = {
   name: "world.transfers",
   answers: {"office": "the support office", "acts": "What it acts on: a claim for a payment under the support law, made by the person it is for."},
-  version: "0.3.0",
+  version: "0.4.0", // 0.4.0: a claim may wait to be decided (processing_days), the staff decide so many a day (capacity_per_day), and some qualifying claims are wrongly refused, more while a backlog stands (error_bps, at the friction dial); asked to review a refusal found wrong, the office decides the next claim on its facts
   doc: "docs/behaviour/boundary.md",
   cadence: () => DAY,
   firstWake: () => 0,
@@ -243,6 +244,13 @@ export const transfers: BehaviourModule = {
         account: "", // the account it pays from where a payment names none (the world must say)
         year: 365 * DAY,
         publish_every_days: 0,
+        // Under load (docs/behaviour/boundary.md, "Under load"): a claim is decided this many days after it is made (0:
+        // the day it is seen); the staff decide this many a day (0: no limit); of the claims that qualify, this share (basis
+        // points) is wrongly refused at the friction dial, twice as many while more claims wait than a day's capacity.
+        processing_days: 0,
+        capacity_per_day: 0,
+        error_bps: 0,
+        respond: {} as object,
       },
       ctx.params,
     );
@@ -251,6 +259,11 @@ export const transfers: BehaviourModule = {
     const me = ctx.entity;
     const book = new Book();
     const decided = new Set<string>();
+    const dial = frictionDial(ctx.world);
+    const wronglyRefused = new Set<string>(); // claims refused though the claimant qualified
+    const reviewed = new Set<string>(); // person|payment: a refusal reviewed and found wrong, so the next claim is decided on its facts
+    let decidedDay = -1;
+    let decidedToday = 0;
     type Paying = { person: string; account: string; payment: string; from: string; amount: number; every: number; next: number; until?: number; then?: string };
     const paying = new Map<string, Paying>(); // claim -> what we pay under it
     /** The payments we pay: the published law's, where we are the payer (no law: none). */
@@ -301,20 +314,53 @@ export const transfers: BehaviourModule = {
       const until = Math.min(...ends);
       return { ok: true, amount, ...(until < Infinity ? { until } : {}) };
     };
+    // What the office's own books say of a refusal asked about: whether the claim was refused though the claimant qualified.
+    const resp = new Respondent(ctx.rng, me, null, {
+      params: p.respond,
+      truth: (m, from, bk) => {
+        if (m.matter !== "claim_refused" || !m.about) return undefined;
+        const d = bk.records.get(m.about) as any;
+        if (!d || d.speaks_for !== me || d.kind !== "benefit_decision" || !(d.addressed_to ?? []).includes(from) || typeof d.data?.claim !== "string") return undefined;
+        return { wrong: wronglyRefused.has(d.data.claim) };
+      },
+      // (A review puts nothing in the claimant's account: they claim again, and the claim is decided on its facts.)
+      remedy: (m, from) => {
+        const d = m.about ? (book.records.get(m.about) as any) : undefined;
+        if (d && typeof d.data?.payment === "string") reviewed.add(`${from}|${d.data.payment}`);
+        return [];
+      },
+    });
     return stepper(
       (obs) => book.absorb(obs),
       (obs) => {
         const t = obs.t;
         const steps: Step[] = [];
         const ours = rules();
-        // Claims: granted if the claimant fits the payment's rule; the first payment one period on.
-        for (const c of book.open("benefit_claim").filter((r) => (r.addressed_to ?? []).includes(me) && !decided.has(r.id)).sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : 1))) {
+        // Claims: granted if the claimant fits the payment's rule; the first payment one period on. A claim waits its
+        // processing time; the staff decide the oldest first, so many a day; more waiting than a day's capacity is a
+        // backlog, and hurried staff make more mistakes.
+        const day = Math.floor(t / DAY);
+        if (day !== decidedDay) { decidedDay = day; decidedToday = 0; }
+        const waiting = book.open("benefit_claim").filter((r) => (r.addressed_to ?? []).includes(me) && !decided.has(r.id) && t >= r.at + p.processing_days * DAY).sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : 1));
+        const backlog = p.capacity_per_day > 0 && waiting.length > p.capacity_per_day;
+        for (const c of waiting) {
+          if (p.capacity_per_day > 0 && decidedToday >= p.capacity_per_day) break;
+          decidedToday++;
           decided.add(c.id);
           const who = c.speaks_for!;
           const payment = String(c.data?.payment);
           const rule = ours.find((r) => r.id === payment);
           const age = Number.isInteger(c.data?.born_at) ? Math.floor((t - (c.data!.born_at as number)) / p.year) : -1;
-          const d = decide(rule, c, t);
+          let d = decide(rule, c, t);
+          // A claim that qualifies may be wrongly refused (a record not matched, a form read wrongly), unless the refusal of
+          // this person's claim for this payment has already been reviewed and found wrong.
+          if (d.ok && dial > 0 && p.error_bps > 0 && !reviewed.has(`${who}|${payment}`)) {
+            const share = Math.min(10_000, p.error_bps * (backlog ? 2 : 1));
+            if (ctx.rng(`claim-error-${c.id}`).below(10_000) < Math.floor((share * dial) / 10_000)) {
+              d = { ok: false, why: "the claim could not be verified" };
+              wronglyRefused.add(c.id);
+            }
+          }
           // One payment of a kind a person: a new claim replaces the old.
           for (const [id, x] of paying) if (x.person === who && x.payment === payment) paying.delete(id);
           if (d.ok) paying.set(c.id, { person: who, account: c.data!.account as string, payment, from: rule!.account || p.account, amount: d.amount, every: rule!.every_days * DAY, next: t + rule!.every_days * DAY, ...(d.until !== undefined ? { until: d.until } : {}), ...(rule!.lasts?.then ? { then: rule!.lasts.then } : {}) });
@@ -322,9 +368,11 @@ export const transfers: BehaviourModule = {
           const why = !d.ok && d.why ? `: ${d.why}` : "";
           steps.push(because(d.ok ? `A claim for ${payment} support from someone it's for (aged ${age}): granted, at ${usd(d.amount)} every ${rule!.every_days} days${lasting}.` : `A claim for ${payment} support that doesn't qualify${why}: refused.`,
             say("benefit_decision", d.ok ? `Claim ${c.id} granted: ${usd(d.amount)} every ${rule!.every_days} days${lasting}.` : `Claim ${c.id} refused${why}.`, {
-              to: [who], visible: [who, me], basis: c.id, data: { claim: c.id, payment, granted: d.ok, ...(d.ok ? { amount: d.amount, every: rule!.every_days * DAY, ...(d.until !== undefined ? { until: d.until } : {}) } : d.why ? { reason: d.why } : {}) },
+              to: [who], visible: [who, me], basis: c.id, data: { claim: c.id, payment, granted: d.ok, ...(p.processing_days > 0 || p.capacity_per_day > 0 ? { waited_days: Math.floor((t - c.at) / DAY) } : {}), ...(d.ok ? { amount: d.amount, every: rule!.every_days * DAY, ...(d.until !== undefined ? { until: d.until } : {}) } : d.why ? { reason: d.why } : {}) },
             })));
         }
+        // Asked to review a refusal (the claimant's request): answered from the office's own books.
+        steps.push(...resp.steps(book, t, p.account, 1e15));
         // Stopping: the claimant asked, died or left.
         const gone = new Set([...book.all("death_registration").map((r) => r.data?.deceased as string), ...book.all("departure").map((r) => r.speaks_for!)]);
         for (const r of book.all("benefit_change")) if (r.data?.stop) paying.delete(r.data.claim);

@@ -40,6 +40,9 @@ test("with the dial absent or at 0 a town is step 1's town, to the state hash", 
     expect(absent.stateHash).toBe(STEP_1);
     const zero = await runWorld({ config: { ...lean(plain), dials: { initiative_bps: 0 } }, runId: "zero", outDir: out, until: 60 * DAY, recordObservations: "none" });
     expect(zero.stateHash).toBe(STEP_1);
+    // (And with the dial for how much goes wrong at 0 beside it: frictions belong to a living town.)
+    const both = await runWorld({ config: { ...lean(plain), dials: { initiative_bps: 0, friction_bps: 0 } }, runId: "both", outDir: out, until: 60 * DAY, recordObservations: "none" });
+    expect(both.stateHash).toBe(STEP_1);
   } finally {
     rmSync(out, { recursive: true, force: true });
   }
@@ -50,7 +53,8 @@ test("with the dial on, people and organisations hold wants in their own records
   try {
     const world = async () => (await loadWorld(TOWN, ["living.initiative_bps=10000"])).config;
     const config = await world();
-    expect(config.dials).toEqual({ initiative_bps: 10_000 });
+    // (What goes wrong goes wrong at the profile's rates unless the spec says: docs/behaviour/frictions.md.)
+    expect(config.dials).toEqual({ initiative_bps: 10_000, friction_bps: 10_000 });
     // The generator's part: firms' and landlords' posts keep their organisation's record; people start attached.
     expect(config.positions.filter((x: any) => x.keeps_record).length).toBeGreaterThan(10);
     expect(config.participants.filter((x: any) => x.controller?.params?.started?.place_days > 0).length).toBeGreaterThan(50);
@@ -84,6 +88,17 @@ test("with the dial on, people and organisations hold wants in their own records
     expect(manifest.wants!.people.born).toBeDefined();
     expect(Object.values(manifest.wants!.people.born!).reduce((x: number, y: any) => x + y, 0)).toBe(wants.filter((w) => !w.organisation && w.event === "born").length);
     expect(manifest.wants!.acts.by_people).toBeGreaterThan(manifest.wants!.acts.on_initiative);
+    // Everyday frictions: what arose and how it ended, from people's records; the papers it travelled on.
+    const frictions = rows(join(dir, "frictions.jsonl")), papers = rows(join(dir, "venues.jsonl"));
+    for (const f of frictions) check("dataset#/$defs/Friction", f);
+    for (const v of papers) check("dataset#/$defs/VenuePaper", v);
+    expect(frictions.filter((f) => f.event === "arose").length).toBeGreaterThan(0);
+    expect(Object.values(manifest.frictions!.arose).reduce((x: number, y: any) => x + y, 0)).toBe(frictions.filter((f) => f.event === "arose").length);
+    // The friction dial at 0 is a living town with nothing going wrong: no such paper, no such row, and another town.
+    const calm = await runWorld({ config: lean((await loadWorld(TOWN, ["living.initiative_bps=10000", "living.friction_bps=0"])).config), runId: "calm", outDir: out, until: 120 * DAY, recordObservations: "none" });
+    expect(calm.stateHash).not.toBe(a.stateHash);
+    const quiet = await exportDataset(calm.logPath, join(out, "calm.dataset"));
+    expect(quiet.frictions?.arose ?? {}).toEqual({});
   } finally {
     rmSync(out, { recursive: true, force: true });
   }

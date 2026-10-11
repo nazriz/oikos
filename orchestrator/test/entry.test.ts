@@ -57,3 +57,29 @@ test("a failed shop's premises are bought by someone who founds a new shop there
   expect(ev.some((e) => e.event === "occupied" && e.space === "shop-1-premises/workplace.1" && e.t > sold.at)).toBe(true);
   expect(ev.some((e) => e.event === "worked" && e.task === "serve" && e.at === "shop-1-premises" && e.t > sold.at)).toBe(true);
 }, 600_000);
+
+test("in a living town a shop founded in the run keeps a record of its own, by its founder's post, with its founder's values as its character", async () => {
+  const config = generate({ ...base, living: { initiative_bps: 10_000, friction_bps: 0 } });
+  config.world.accounts.find((a: any) => a.id === "acc-shop-1").balance = "0";
+  config.world.holdings = config.world.holdings.filter((h: any) => h.holder !== "shop-1");
+  const shop1 = config.positions.find((p: any) => p.id === "shop-1-manager").role_module.params;
+  Object.assign(shop1, { short_days: 10, wind_up_days: 10, idle_days: 30, lender: "", max_staff: 0 });
+  for (const p of config.participants) if (p.controller?.impl === "citizen.default") p.controller.params.found_bps = 10_000;
+  const age = (id: string) => -config.world.entities.find((e: any) => e.id === id).born_at / (365 * DAY);
+  const young = config.participants.find((p: any) => p.controller?.impl === "citizen.default" && p.controller.params.in_labour_force !== false &&
+    age(p.person) >= 25 && age(p.person) < 50 && config.world.accounts.some((a: any) => a.id === `acc-${p.person}`))!;
+  config.world.accounts.find((a: any) => a.id === `acc-${young.person}`).balance = "60000000";
+  const out = join(root, "runs", "test-entry-living");
+  rmSync(out, { recursive: true, force: true });
+  const s = await runWorld({ config: { ...config, log: { ...config.log, detail: "lean" } }, runId: "entry-living", outDir: out, until: 300 * DAY, recordObservations: "none" });
+  const ev = readFileSync(s.logPath, "utf8").trim().split("\n").filter((l) => l.includes('"event"')).map((l) => JSON.parse(l)).filter((e) => e.kind === "event").map((e) => ({ t: e.t, ...e.body }));
+  // The post made with the new shop says it keeps the shop's record, and names the module that does.
+  const post = ev.find((e) => e.event === "position_created" && e.role_module?.keeps_record === true);
+  expect(post).toBeDefined();
+  expect(post.role_module.code).toBe("firm.retailer");
+  // The kernel took the shop's record from that post's bookkeeping.
+  const kept = ev.filter((e) => e.event === "entity_recorded" && e.entity === post.entity);
+  expect(kept.length).toBeGreaterThan(0);
+  expect(kept[0].keeper).toBe("firm.retailer");
+  rmSync(out, { recursive: true, force: true });
+}, 600_000);

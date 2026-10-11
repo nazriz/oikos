@@ -1,4 +1,4 @@
-# `citizen.default` (v0.45.0): the AI citizen in code
+# `citizen.default` (v0.46.0): the AI citizen in code
 
 **Seat:** a townsperson (acts as themselves). **Source:** `participants/src/behaviour/citizen.ts`, with its mind in `participants/src/behaviour/mind.ts`, the richer record in `participants/src/behaviour/inner.ts` and the sparse mind in `participants/src/llm/consult.ts`. **Design:** [docs/design/ai-citizens.md](../design/ai-citizens.md). **Citations:** [docs/research/references.md](../research/references.md).
 
@@ -179,6 +179,15 @@ Each moves a cited rate symmetrically about the town's mean (`swayed`: the rate 
 **Parameters** (`wants`; placeholders unless a source is named above): `kept` 6, `unmet_bps`, `unmet_days` 60, `met_margin_bps` 500, `patience_days` 45, `tries` 3, `grow_bps` 2500, `grows` 2, `rest_days` 180, `event_bps` 6000, `need_bps` 6000, `copy_from` 2, `choice` (`expect` 5000, `trust` 1500, `fear` 3000, `agency` 1500, `belief` 3000, `others` 500, `own` 500), `sway` (`trust` 0.3, `agency` 0.3, `attachment` 0.3, `found` 1), `ask_again_days` 365, `rise_bps` 500, `answer_days` 14. The person's: `initiative`, `started`, `attach_mean`; `tribunal.hears`.
 
 **Not built.** Retraining or learning (no offer of it exists in a generated town, so nothing a person sees would bring it about: such a want waits). Helping, lending to or taking in someone one is tied to. Leaving a group out of a grievance. A want about a person (to be reconciled with, or even with, someone): the shape holds it (`whom`), nothing gives birth to one yet beyond a death. An appeal against a refused claim. Asking the bank for time. A founded business has its founder's character and no record of its own (a post made in a run keeps none). Composing anything new: step 3.
+
+## Things that go wrong, and what follows (0.46.0)
+
+What goes wrong for a person, how often, and what they can do about it is one page: [frictions.md](frictions.md). In a town with the dial for it on, a person sees a home fallen into disrepair, pay that comes short, a bill well over the usual, a refused claim, goods that are faulty; each is a grievance about whoever did it and, for someone who takes initiative, a want. Four things changed beside it, each for those who take initiative unless said:
+
+- **Moving to another job.** Before, any posting that paid more than the job held was worth taking, and about a fifth of the employed changed employer in a year against the 7.7 to 9.6% the place's survey gives. Now another job must pay `job_move.premium_bps` more, and `per_year_bps` more again for each year in the job held (up to `cap_years`; the years before the world began count for the job a person began with: `started.trade_days`). The profile gives the three figures, fitted to the survey's rate (docs/decisions.md, "Everyday frictions"); with none given, as before. The basis for the shape: those who move gain about a tenth in pay over those who stay, and the chance of leaving falls steeply with tenure (docs/research/references.md; both to confirm).
+- **Giving up on work stops the looking.** A want for work that is given up (about being let go, being unpaid, or work itself) stops the weekly look at the job board and the applications, for as long as a want given up rests (`wants.rest_days`, 180). The person notes it for themselves (`work_search`, seen by nobody else), and the economy's summary counts them out of the labour force from then until they look again or are in work, as a labour force survey counts someone not looking (measure/queries/economy/summary.sql). They still claim what they are entitled to.
+- **A need short at the start has been short for a while.** A need found below its level in a town's first week is taken to have been so for a part of the 60 days it takes to become a want, drawn for the person. Before, every clock started at day 0 and nobody wanted anything for two months of any run (the first living pilot: 73 wants in 60 days, nearly all landlords').
+- **What is told to the household is said once, until it changes** (everyone): a member's income is told to the leaseholder when the sum as it is said changes. One household in the first living pilot was sent "My pay is now 0.00" 478 times in 60 days: the figures compared were not the figures said.
 
 ## What a citizen does
 

@@ -65,6 +65,13 @@ The standing queries live in `measure/queries/`, one SQL file each, with a one-l
 
 From TypeScript: `exportLogs`, `open`, `query`, `runQuery` and `table` in `@oikos/measure`.
 
+## Frictions, venues and job mobility (2026-10-11)
+
+- **`town/frictions`:** the papers grievances travelled on in the last 12 months, by paper and matter, as a count and for every 1,000 adults: requests to the other side, its answers (yes or no), applications by venue, decisions by venue and finding, enforcement asked, repairs ordered and done, and support claims granted and refused (docs/behaviour/frictions.md). What arose and how each ended is in people's records, so in `oikos dataset` (`frictions.jsonl`, `venues.jsonl`, the manifest's `frictions`), from lean logs too. Nothing is scored.
+- **`economy/job-mobility`:** of people in a job at the end, the share who were in a job with another employer at some time in the last 12 months (a labour force survey's job mobility: whoever ended the old job).
+- **`economy/summary`'s labour force** now leaves out whoever last noted that they are no longer looking for work (`work_search`, a person's own note in a living town), as a survey counts someone not looking.
+- **`scripts/record-sizes.ts LOG`:** the sizes of people's and organisations' records at each year's end against the cap.
+
 ## Employment (2026-10-09)
 
 **The definition.** `economy/summary` counts as employed what a labour force survey counts: someone of 18 or more, in town at the run's end, who in the reference week (the run's last seven days) did at least an hour of work for pay or profit, or has a job they were not at work in. That is the ILO's: "all those of working age who, during a short reference period, were engaged in any activity to produce goods or provide services for pay or profit", being "at work, i.e. who worked in a job for at least one hour" or "not at work due to temporary absence from a job" (19th ICLS resolution, 2013, as reprinted in the 21st ICLS amending resolution; docs/research/references.md). Read from the log as:

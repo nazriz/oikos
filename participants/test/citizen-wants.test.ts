@@ -60,14 +60,14 @@ test("a tenant who takes initiative and trusts the landlord asks them to hold a 
   // No new rent order yet: the notice waits on the answer.
   expect(orders(said)).toEqual([]);
   // The want is in the record: what it is about, whom it concerns, the paper in its way, what it seeks, the way taken.
-  expect(kept.record.wants).toMatchObject([{ about: "rent_increase", whom: "landlord-1", against: { record: "inc-1", kind: "rent_increase", by: "landlord-1" }, seeks: [{ money: { from: "me" } }], from: "event", tried: 1, way: "ask:landlord-1" }]);
-  expect(kept.decisions.filter((d) => d.domain === "want").map((d) => d.choice)).toEqual(["ask"]);
-  expect(kept.outcomes.filter((o) => o.domain === "want").map((o) => `${o.kind}:${o.option}`)).toEqual(["born:rent_increase", "pursued:rent_increase"]);
+  expect(kept.record.wants.filter((w: any) => w.about === "rent_increase")).toMatchObject([{ about: "rent_increase", whom: "landlord-1", against: { record: "inc-1", kind: "rent_increase", by: "landlord-1" }, seeks: [{ money: { from: "me" } }], from: "event", tried: 1, way: "ask:landlord-1" }]);
+  expect(kept.decisions.filter((d) => d.domain === "want" && d.options.some((o: any) => o.key === "ask")).map((d) => d.choice)).toEqual(["ask"]);
+  expect(kept.outcomes.filter((o) => o.domain === "want" && o.option !== "social").map((o) => `${o.kind}:${o.option}`)).toEqual(["born:rent_increase", "pursued:rent_increase"]);
   // Granted: the notice is withdrawn. Nothing is paid differently; the want is met; what last passed with the landlord is that they granted it.
   const after = await p.wake(47 * DAY, { records: [answer("ans-1", 46 * DAY, "inc-1", true), withdrawal("w-1", 46 * DAY, "inc-1")], transactions: wages(47 * DAY) });
   expect(orders(after)).toEqual([]);
-  expect(kept.record.wants).toEqual([]);
-  expect(kept.outcomes.filter((o) => o.domain === "want").at(-1)).toMatchObject({ kind: "met", option: "rent_increase", facts: { by: "ask", why: "withdrawn" } });
+  expect(kept.record.wants.filter((w: any) => w.about !== "social")).toEqual([]);
+  expect(kept.outcomes.filter((o) => o.domain === "want" && o.option !== "social").at(-1)).toMatchObject({ kind: "met", option: "rent_increase", facts: { by: "ask", why: "withdrawn" } });
   expect(kept.outcomes.find((o) => o.domain === "way" && o.kind === "granted")).toMatchObject({ option: "ask", learned: { payoff: 10_000 } });
   expect(kept.record.ties.close.find((x: any) => x.who === "landlord-1")).toMatchObject({ last: { what: "granted" } });
   expect(kept.because.map((b) => b.what)).toEqual(expect.arrayContaining(["want_born", "want_pursued", "want_met"]));
@@ -81,7 +81,7 @@ test("refused, the rise is dealt with as it stands (paid, where it can be borne)
   expect(orders(said).map((c) => c.args.amount)).toEqual(["$1050.00"]);
   expect(refused.kept.outcomes.find((o) => o.domain === "way" && o.kind === "refused")).toMatchObject({ option: "ask", learned: { payoff: 1_000 } });
   // The want is still held: the rise stands.
-  expect(refused.kept.record.wants.map((w: any) => w.about)).toEqual(["rent_increase"]);
+  expect(refused.kept.record.wants.map((w: any) => w.about).filter((a: string) => a !== "social")).toEqual(["rent_increase"]);
 
   const silent = await tenant(true);
   expect(orders(await silent.p.wake(47 * DAY, { transactions: wages(47 * DAY) }))).toEqual([]);
@@ -96,7 +96,7 @@ test("someone who does not trust the landlord does not ask them; someone who tak
   expect(orders(said).map((c) => c.args.amount)).toEqual(["$1050.00"]);
   const trustOf = (x: { kept: any }) => x.kept.record.trust.in.find((t: any) => t.in === "landlord-1").bps;
   expect(trustOf(wary)).toBeLessThan(trustOf(await tenant(true)));
-  expect(wary.kept.record.wants.map((w: any) => w.about)).toEqual(["rent_increase"]);
+  expect(wary.kept.record.wants.map((w: any) => w.about).filter((a: string) => a !== "social")).toEqual(["rent_increase"]);
 
   const plain = watched({});
   await plain.p.wake(DAY, { records: tenancy(), readings: READ, balance: 5_000_000, transactions: wages(DAY) });

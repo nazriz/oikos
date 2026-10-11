@@ -30,7 +30,7 @@ import { basesOf, channels, cites } from "../contracts";
 import { DECISIONS, OUTCOMES, RECORD, params, wait, type Belief, type BehaviourModule, type ConsultAnswer, type DecisionRecord, type OutcomeRecord, type ParticipantContext, type RecordChange } from "../module";
 import type { Rng } from "../rng";
 import * as C from "../calls";
-import { ask, Asked, because, Book, firstDue, breaches, noted, callAction, commitmentOf, DAY, nextLook, usd, jobTerms, record, leaseTerms, message, MONTH, moveIn, moveOut, notice, pay, PAYMENT_FAILED, petitionSignatures, publishedCount, say, sign, stoodEmpty, structureOf, variableToday, vote, withdraw, type Step, ownBanked } from "./common";
+import { advertisedJob, ask, Asked, because, Book, firstDue, breaches, noted, callAction, commitmentOf, DAY, nextLook, usd, jobTerms, record, leaseTerms, message, MONTH, moveIn, moveOut, notice, pay, PAYMENT_FAILED, petitionSignatures, publishedCount, say, sign, stoodEmpty, structureOf, variableToday, vote, withdraw, type Step, ownBanked } from "./common";
 import { ADULT_YEARS, ageAt, bedroomsNeeded, hear, householdOf, SAYING, type Heard, type HouseholdData, type Member, type OccupancyStandard } from "./household";
 import { Deliveries, goodsPrices, offerOf as shopOffer, order } from "./trade";
 import { dayPayPeriod, incomeTaxLaw, withholding } from "./tax";
@@ -38,6 +38,7 @@ import { declarationFor, forHousehold, forOutOfWork, stopsWorkAt, supportLaw, ty
 import { Borrowing, loanFor } from "./credit";
 import { Inner, innerParams, UPBRINGING, type InnerParams, type Outlook } from "./inner";
 import { VALUES as VALUES_OF_MIND, NEEDS as NEEDS_OF_MIND } from "./mind";
+import { chancePpm, frictionDial, PAPER, tendered } from "./frictions";
 import { bringsOf, meets, swayed, SEEKS_OF_NEED, Wants, wantParams, type Opening, type SeekKey, type Want as Wanted, type WantParams } from "./wants";
 import { factsOf, Feelings, Mind, MIND_DEFAULTS, MIND_VERSION, Pursuit, satisfaction, Ties, type Circumstances, type Facts, type MindParams, type NeedLevels, type PopulationValues, type Value } from "./mind";
 
@@ -96,6 +97,15 @@ export const CATCHING_UP = {
   nothing: "Much the same.",
 };
 /** Telling those we are close to that someone of our household has died (a code citizen's phrasing, and its reading). */
+/** Telling someone we know that someone has done wrong by us (docs/behaviour/frictions.md): in our own phrasing, and
+ * what is heard of it by one who knows that phrasing. */
+export const WRONGED = {
+  say: (matter: string, by: string) => `${by} has done wrong by me (${matter.replace(/_/g, " ")}).`,
+  heard: (text: string): { by: string; matter: string } | undefined => {
+    const m = /^(\S+) has done wrong by me \(([a-z ]+)\)\.$/.exec(text);
+    return m ? { by: m[1]!, matter: m[2]!.replace(/ /g, "_") } : undefined;
+  },
+};
 export const MOURNING = {
   tell: (who: string) => `I have sad news: ${who} has died.`,
   heard: (text: string): string | undefined => /^I have sad news: ([^\s;]+) has died\.$/.exec(text)?.[1],
@@ -150,11 +160,11 @@ interface Home {
   /** Rent orders replaced by a new rent's, to stop once their last payment is made (when). */
   retiring?: { order: string; at: number }[];
 }
-interface Job { agreement: string; employer: string; wage: number; period: number; workplace?: string; since: number; /** When we walked out (unpaid), whatever the terms say. */ leftAt?: number; paidAt?: number; claimed?: boolean }
+interface Job { /** The account our pay has come from, as we have seen it come. */ paidFrom?: string; /** What our pay has come short of what was agreed, in all, and not yet put right. */ short?: number; agreement: string; employer: string; wage: number; period: number; workplace?: string; since: number; /** When we walked out (unpaid), whatever the terms say. */ leftAt?: number; paidAt?: number; claimed?: boolean }
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.45.0", // 0.45.0: wants and initiative (docs/design/ai-citizens.md 10a, 10b), for those the world's dial gives it to: wants born of needs, events and those one copies, met with openings by what they bring in typed outcomes, the way chosen by the mind; trust, agency and attachment read; starting attachment from the world; nothing changes with the dial at 0; 0.44.0: the richer record (docs/design/ai-citizens.md 10c, 10d): belonging and meaning as needs, trust in particular institutions, a sense of agency, attachments, what is thought and what is said, values that drift and are shocked, bounded ties, where the hours go; held by the kernel as the person's own record; 0.43.2: offered a job that names no place of work, on an advertisement, goes to work where the advertisement says; 0.43.1: tells their own business when they move home; 0.43.0: someone who works for themself (own_work): not out of work, their income what the business pays them, at their pitch in working hours; 0.42.1: work by the day (a day's pay known as pay; no claim for a day not worked); 0.42.0: reads the support law, stops work at an age of its own (0.41.0 on its branch), with main's 0.41.1
+  version: "0.46.0", // 0.46.0: everyday frictions (docs/behaviour/frictions.md), with the world's dial: a home in disrepair, pay come short (no longer taken for no pay), a bill well over the usual, a claim refused, goods found faulty; each a grievance about whoever did it, asked of them, taken to any body that says it hears such things, or told to those one knows; what comes back moves trust and the sense of agency; a job is left only for one that pays enough more, the more so the longer held (where the world says); giving up on work stops the looking; a need short at the start has been short for a while; pay told to the household once until it changes; 0.45.0: wants and initiative (docs/design/ai-citizens.md 10a, 10b), for those the world's dial gives it to: wants born of needs, events and those one copies, met with openings by what they bring in typed outcomes, the way chosen by the mind; trust, agency and attachment read; starting attachment from the world; nothing changes with the dial at 0; 0.44.0: the richer record (docs/design/ai-citizens.md 10c, 10d): belonging and meaning as needs, trust in particular institutions, a sense of agency, attachments, what is thought and what is said, values that drift and are shocked, bounded ties, where the hours go; held by the kernel as the person's own record; 0.43.2: offered a job that names no place of work, on an advertisement, goes to work where the advertisement says; 0.43.1: tells their own business when they move home; 0.43.0: someone who works for themself (own_work): not out of work, their income what the business pays them, at their pitch in working hours; 0.42.1: work by the day (a day's pay known as pay; no claim for a day not worked); 0.42.0: reads the support law, stops work at an age of its own (0.41.0 on its branch), with main's 0.41.1
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -234,6 +244,16 @@ export const citizen: BehaviourModule = {
       // dial (`dials.initiative_bps`; 0 or absent: nobody does, and the town is the one it was before wants).
       initiative: null as boolean | null,
       wants: {} as Partial<WantParams>,
+      // What holds someone in a job they have (docs/behaviour/citizen.md, "Moving to another job"): another must pay
+      // this much more before it is worth the move (`premium_bps`), and more for each year they have been where
+      // they are (`per_year_bps`, up to `cap_years`): what is known there, and being the last in somewhere new.
+      // The world's, for one who takes initiative (none: any posting that pays more is worth it, as before).
+      job_move: null as { premium_bps: number; per_year_bps: number; cap_years: number; /** More again for a job in another line of work than ours (starting over). */ other_trade_bps?: number } | null,
+      // Everyday frictions (docs/behaviour/frictions.md), as far as they are a person's to notice: the variable of a
+      // home that says how far it has fallen into disrepair, and the level at which whoever lives there finds it
+      // needs repair; how far over our usual a bill must be before we look at it twice; how long the other side is
+      // given to answer, and to do what it said it would. None of it arises unless the world's dial is on.
+      frictions: {} as { disrepair?: { variable: string; at: number }; bill_over_bps?: number; answer_days?: number; promise_days?: number; faulty_bps_per_year?: number; faulty_share_bps?: number },
       // How long this person had lived here, worked at their trade and belonged to their group when the world began
       // (days; the world's, from its profile's figures: docs/profiles.md). None: attached to nothing at the start.
       started: null as { place_days?: number; trade_days?: number; group_days?: number } | null,
@@ -404,6 +424,28 @@ export const citizen: BehaviourModule = {
     let joinNow = false;
     const applyDebtNow = new Set<string>();
     let complainNow = false;
+    // Everyday frictions (docs/behaviour/frictions.md): what has gone wrong for us and is not yet put right, each
+    // with the other side, what we asked of them and what they said, and the venues we took it to. A grievance is a
+    // want about them (for one who takes initiative); whatever becomes of it is recorded for everyone.
+    const fdial = frictionDial(ctx.world);
+    interface Grievance { key: string; matter: string; party: string; since: number; about?: string; amount?: number; structure?: string; seeks?: string; evidence?: unknown;
+      asked?: { t: number }; answer?: "granted" | "refused" | "ignored"; promised?: number; applied: Map<string, { t: number; finding?: string }>; ordered?: { id: string; by: string; binding: boolean; due: number; amount: number; enforced?: boolean }; told?: boolean }
+    const grievances = new Map<string, Grievance>();
+    const gkey = (matter: string, party: string, about?: string) => `${matter}:${about ?? party}`;
+    const billed = new Map<string, number>(); // a service -> what its last bill came to a day
+    const billSeen = new Set<string>();
+    let spoiled = 0; // goods found faulty, to be thrown out
+    let faultSeen = 0; // when goods last came home
+    let discouragedUntil = 0; // not looking for work until then, having given up on it (0: looking)
+    /** How much more another job must pay before it is worth leaving ours (basis points; 0: anything more), for one
+     * who takes initiative where the world says what holds people: a premium, more for each year in the job (the
+     * years before the world began count for the job we began with), and more again for another line of work. */
+    const heldIn = (t: number, industry?: unknown): number => {
+      const m = p.job_move;
+      if (!job || !initiative || !m) return 0;
+      const years = Math.min(m.cap_years, (t - job.since + (job.since < 7 * DAY ? (p.started?.trade_days ?? 0) * DAY : 0)) / p.year);
+      return m.premium_bps + Math.round(m.per_year_bps * years) + (typeof industry === "string" && industryOf.get(job.employer) !== industry ? m.other_trade_bps ?? 0 : 0);
+    };
     const signNow = new Set<string>();
     const standNow = new Set<string>();
     const shortSince = new Map<string, number>(); // a need -> since when it has been short
@@ -540,6 +582,26 @@ export const citizen: BehaviourModule = {
       if (!initiative) return undefined;
       return wants.born({ about, seeks, weight: Math.round((wants.p.event_bps * Math.max(0.1, Math.min(1.5, size)) * mind.person.weights[need]) / 15_000), since: t, from: o.from ?? "event",
         ...(o.whom ? { whom: o.whom } : {}), ...(o.against ? { against: o.against } : {}), ...(o.with ? { with: o.with } : {}) }, t);
+    };
+    /** Something has gone wrong for us at someone's hands (docs/behaviour/frictions.md): held until it is put right or
+     * let go, and, for one who takes initiative, a want about them. */
+    const grieve = (t: number, matter: string, party: string, o: { about?: string; amount?: number; structure?: string; seeks?: string; evidence?: unknown; size?: number; need?: keyof NeedLevels; cause?: string } = {}): Grievance => {
+      const key = gkey(matter, party, o.about);
+      const held = grievances.get(key);
+      if (held) {
+        if (o.amount !== undefined) held.amount = o.amount;
+        return held;
+      }
+      const { size, need, cause, ...rest } = o;
+      const g: Grievance = { key, matter, party, since: t, ...rest, applied: new Map() };
+      grievances.set(key, g);
+      outcome({ t, domain: "friction", option: matter, kind: "arose", way: "mine", from: party, facts: { ...(o.amount !== undefined ? { amount: o.amount } : {}), ...(cause ? { cause } : {}), ...(o.structure ? { structure: o.structure } : {}) } });
+      inner.experience(party, kindOf(party), false, t);
+      inner.doneTo(0.5);
+      // (Into the record's reasons, so that a lean log has it: what arose, and against whom.)
+      inner.note({ t, what: "friction_arose", about: matter, size: Math.min(10_000, Math.max(0, Math.round((o.amount ?? 0) / 100))), by: party });
+      wantBorn(t, matter, o.amount ? ["money.to"] : [], size ?? 0.6, need ?? "security", { whom: party, ...(o.about ? { against: { record: o.about, kind: matter, by: party } } : {}) });
+      return g;
     };
     /** Something that befell our household, to tell its other adults (once each). */
     let troubleToTell: { what: "let_go" | "notice" | "rent_increase"; by: string }[] = [];
@@ -816,6 +878,7 @@ export const citizen: BehaviourModule = {
     // Rent (or our share of it) the bank told us it couldn't pay: still owed, and paid as soon as we can.
     const missed: { instruction: string; to: string; amount: number; what: string }[] = [];
     let payTold = -1;
+    let payToldAs = "";
     // Deaths in the household: those we've seen (in our own home, someone leaving because they died).
     const mourned = new Set<string>();
     let wasLeaseholder: boolean | null = null;
@@ -1017,8 +1080,22 @@ export const citizen: BehaviourModule = {
         if (job && (cents(tx.amount) === job.wage || cents(tx.amount) === job.wage - withholding(incomeTaxLaw(book), job.wage, job.period === DAY ? dayPayPeriod(p.round?.work_days ?? 5) : job.period))) {
           const since = tx.t - (job.paidAt ?? job.since);
           job.paidAt = tx.t;
+          job.paidFrom = tx.from;
           // an employer that pays, as agreed
           learn("job", job.employer, 10_000, { t: obs.t, kind: "paid", way: "mine", facts: { amount: cents(tx.amount), agreed: job.wage, paid_at: tx.t, days_since_last: Math.floor(since / DAY), period_days: Math.round(job.period / DAY) } });
+        } else if (job && fdial > 0 && job.period > DAY) {
+          // Pay that comes short of what was agreed (docs/behaviour/frictions.md): from our employer's account, less
+          // than the wage after what the law withholds, and not so little that it is something else. It is pay, and
+          // it is short: the difference is owed us.
+          const from = job.paidFrom ?? (commitmentOf(book.records.get(job.agreement), job.employer).outcome as any)?.money?.from;
+          const net = job.wage - withholding(incomeTaxLaw(book), job.wage, job.period);
+          // (Only what a standing wage order pays: a part pay at the return from a stoppage, or any other single
+          // payment from our employer, is not our wage come short.)
+          if (from && tx.from === from && tx.per_instruction && cents(tx.amount) < net && cents(tx.amount) * 2 >= net) {
+            job.paidAt = tx.t;
+            job.short = (job.short ?? 0) + net - cents(tx.amount);
+            learn("job", job.employer, 6_000, { t: obs.t, kind: "short", way: "mine", facts: { amount: cents(tx.amount), agreed: net, short: net - cents(tx.amount), paid_at: tx.t } });
+          }
         }
       }
       while (inflows.length && inflows[0]!.t < obs.t - p.income_window_days * DAY) inflows.shift();
@@ -1063,6 +1140,13 @@ export const citizen: BehaviourModule = {
           continue;
         }
         const person = m.from_entity ?? book.participantPerson.get(m.from) ?? m.from; // who wrote (the directory names their person)
+        // Someone we know says who did wrong by them: we think the less of whoever it was, a little (word of mouth).
+        const wronged = WRONGED.heard(m.text);
+        if (wronged) {
+          inner.experience(wronged.by, kindOf(wronged.by), false, obs.t, { weight: 0.3, heard: true });
+          outcome({ t: obs.t, domain: "friction", option: wronged.matter, kind: "told", way: "mine", from: person, facts: { by: wronged.by } }, false);
+          continue;
+        }
         // A child of ours come of age asks what matters to us; or a parent of ours answers.
         if (m.text === UPBRINGING_WORDS.ask) {
           askedWhatMatters.push(m.from);
@@ -1357,8 +1441,12 @@ export const citizen: BehaviourModule = {
         if (!acc) return withoutAccount(steps);
         // The leaseholder budgets with what we earn: we tell them when it changes.
         const lh = household!.members.find((m) => m.person === household!.leaseholder);
-        if (lh && payTold !== monthlyIncome()) {
-          payTold = monthlyIncome();
+        // (Said once, until it changes: what is told is the sum as it is said, so an income that moves by less than
+        // can be said, or is not a number at all, is not told again. A household in the first living pilot was
+        // sent "My pay is now 0.00" 478 times in 60 days.)
+        if (lh && SAYING.pay(Math.round(monthlyIncome()) || 0) !== payToldAs) {
+          payToldAs = SAYING.pay(Math.round(monthlyIncome()) || 0);
+          payTold = Math.round(monthlyIncome()) || 0;
           steps.push(because("Telling the leaseholder what we now earn, for the household's budget.", message([reach(lh)], SAYING.pay(payTold))));
         }
       } else {
@@ -1729,6 +1817,50 @@ export const citizen: BehaviourModule = {
           if (stoodFor.has(n.id) || t >= Number(n.data?.nominations_close_at ?? 0)) continue;
           out.push({ key: `stand:${n.id}`, kind: "stand", id: n.id, brings: [], bears: [p.electoral_town, ...(p.complain_to ? [p.complain_to] : [])], adj: ag + Math.round((K.own * (zValue("achievement") + zValue("power"))) / 2) - 4 * K.own, others: 0, act: () => { standNow.add(n.id); return n.id; } });
         }
+        // Something gone wrong at someone's hands (docs/behaviour/frictions.md): asking them to put it right; any
+        // body that says it hears such a matter (an offer's `hears`: found by what it says, never by its name);
+        // and telling those we know.
+        const g = grievances.get(gkey(w.about, w.whom ?? "", w.against?.record));
+        if (g && acc) {
+          const account = acc.account;
+          const words = g.matter.replace(/_/g, " ");
+          const data = () => ({ matter: g.matter, against: g.party, ...(g.about ? { about: g.about } : {}), ...(g.amount !== undefined ? { amount: g.amount, account } : {}), ...(g.structure ? { structure: g.structure } : {}), ...(g.seeks ? { seeks: g.seeks } : {}) });
+          if (!g.asked) out.push({ key: `ask:${g.party}`, kind: "ask", by: g.party, brings: [], bears: [g.party], adj: trustOf(g.party) - fearOf(g.party) + ag, others: after("ask"),
+            act: () => {
+              g.asked = { t };
+              steps.push(because(`Asking ${g.party} to put it right (${words}${g.amount ? `, ${usd(g.amount)}` : ""}).`,
+                say(PAPER.request, `Request: please put this right (${words}${g.amount ? `: ${usd(g.amount)} is owed to us` : ""}${g.structure ? ` at ${g.structure}` : ""}).`, { to: [g.party], visible: [me, g.party], ...(g.about ? { basis: g.about } : {}), data: data() })));
+              return g.about;
+            } });
+          // (A venue is for what asking did not settle: one goes there after the other side has said no, said
+          // nothing, or said yes and not done it. It is a bother, in forms and waiting, whatever it costs in money.)
+          for (const h of g.answer && g.answer !== "granted" ? book.hearings() : []) {
+            const venue = h.speaks_for ?? h.author;
+            const entry = h.offer?.hears?.find((x) => x.about === g.matter);
+            if (!entry || venue === g.party || venue === me || g.applied.has(venue)) continue;
+            if (h.offer?.to?.members_of && !memberOf(h.offer.to.members_of)) continue;
+            // (What applying costs, where its terms say: paid with the application, by one who has it.)
+            const fee = (h.offer?.terms?.commitments ?? []).filter((c) => c.who === "taker").map((c) => (c.does as any)?.outcome?.money).find((m) => m?.to);
+            const cost = fee ? cents(fee.amount) : 0;
+            if (cost > acc.balance) continue;
+            out.push({ key: `desk:${venue}`, kind: "desk", id: h.id, by: venue, brings: [], bears: [g.party], adj: trustOf(venue) + ag - K.venue - Math.round((K.own * Math.min(4, cost / Math.max(1, p.essentials / 10)))), others: after("desk"),
+              act: () => {
+                g.applied.set(venue, { t });
+                steps.push(because(`Taking it to ${venue}, which hears such things (${words} against ${g.party})${cost ? `, with its fee of ${usd(cost)}` : ""}.`,
+                  say(entry.form ?? PAPER.application, `Application: ${words} against ${g.party}${g.amount ? `; ${usd(g.amount)} is owed to us` : ""}${g.structure ? `; at ${g.structure}` : ""}${g.asked ? `; we asked them ${Math.floor((t - g.asked.t) / DAY)} days ago${g.answer === "refused" ? " and they refused" : g.answer === "ignored" ? " and had no answer" : ""}` : ""}.`,
+                    { to: [venue], visible: [me, venue, g.party], basis: h.id, data: { kind: g.matter, ...data(), ...(g.asked ? { request: `asked on day ${Math.floor(g.asked.t / DAY)}` } : {}), ...(g.evidence !== undefined ? { evidence: g.evidence } : {}) } }),
+                  ...(cost > 0 ? [pay(String(fee.to), cost, { from: account, for: "Application fee." })] : [])));
+                return h.id;
+              } });
+          }
+          if (contacts.size && !g.told) out.push({ key: "tell", kind: "tell", brings: [], bears: [g.party], adj: Math.round(K.own * zValue("benevolence")) - K.own, others: 0,
+            act: () => {
+              g.told = true;
+              const whom = ties.closest(3, t).map((x) => x.who).filter((x) => contacts.has(x));
+              if (whom.length) steps.push(because(`Telling those we know what ${g.party} did.`, message(whom, WRONGED.say(g.matter, g.party))));
+              return undefined;
+            } });
+        }
         // Our own conduct (spending less), and those we know (their company; what they know of).
         out.push({ key: "self", kind: "self", brings: ["money.from"], adj: K.own + Math.round((K.own * (zValue("security") + zValue("conformity"))) / 2), others: after("self"), act: () => undefined });
         if (contacts.size) out.push({ key: "ties", kind: "ties", brings: ["attend"], adj: K.own + Math.round(K.own * zValue("benevolence")), others: 0, act: () => undefined });
@@ -1766,6 +1898,12 @@ export const citizen: BehaviourModule = {
       /** What has become of our wants since we last said: into the record's reasons, and the record of outcomes. */
       const tellWants = () => {
         for (const e of wants.take()) {
+          // Giving up on work stops the looking (the want rests for as long as any want given up does).
+          if (e.kind === "given_up" && !job && !ownWork && !retired && p.in_labour_force && discouragedUntil === 0 && (e.want.about === "let_go" || e.want.about === "unpaid" || (e.want.seeks.includes("work") && e.want.from !== "other"))) {
+            discouragedUntil = e.t + wants.p.rest_days * DAY;
+            steps.push(because("We have given up on finding work, for now: no longer looking.", say("work_search", "No longer looking for work.", { visible: [me], data: { looking: false } })));
+            outcome({ t: e.t, domain: "job", option: "search", kind: "gave_up", way: "mine", facts: { about: e.want.about, days: Math.floor((e.t - e.want.since) / DAY) } });
+          }
           inner.note({ t: e.t, what: `want_${e.kind}`, about: e.want.about, size: Math.round(e.want.weight), ...(e.kind === "pursued" ? { by: kindOfWay(e.way ?? "wait") } : {}) });
           outcome({ t: e.t, domain: "want", option: e.want.about, kind: e.kind, way: "mine", facts: { weight: Math.round(e.want.weight), from: e.want.from, tried: e.want.tried,
             ...(e.way ? { by: kindOfWay(e.way) } : {}), ...(e.want.whom ? { whom: e.want.whom } : {}), ...(e.want.with ? { with: e.want.with } : {}), ...(e.why ? { why: e.why } : {}), days: Math.floor((e.t - e.want.since) / DAY) } });
@@ -1797,7 +1935,9 @@ export const citizen: BehaviourModule = {
               wants.born({ about: n, seeks: SEEKS_OF_NEED[n], weight: Math.round((W.need_bps * 0.3 * mind.person.weights[n]) / 15_000), since: t, from: "other" }, t);
             continue;
           }
-          if (!shortSince.has(n)) shortSince.set(n, t);
+          // (A need found short in a town's first week has been short for some time already: the clock starts at
+          // day 0 and lives do not. Without this nobody wanted anything for the first two months of any run.)
+          if (!shortSince.has(n)) shortSince.set(n, t < 7 * DAY ? t - ctx.rng(`short-before-${n}`).below(W.unmet_days + 1) * DAY : t);
           if (!held && t - shortSince.get(n)! >= W.unmet_days * DAY)
             wants.born({ about: n, seeks: SEEKS_OF_NEED[n], weight: Math.round((W.need_bps * (0.5 + 0.5 * (1 - level / Math.max(1, short))) * mind.person.weights[n]) / 15_000), since: t, from: "need",
               ...((n === "security" || n === "shelter") && household && household.members.length > 1 ? { with: household.leaseholder } : {}) }, t);
@@ -1891,6 +2031,10 @@ export const citizen: BehaviourModule = {
           // new one when the notice is worked out.
           const terms = jobTerms(r, me, book);
           if (terms.wage * job.period <= job.wage * terms.period) continue;
+          // (And, for one who takes initiative where the world says what holds people, only if it pays enough more:
+          // an offer that comes of an application made while out of work is weighed against the job since found.)
+          const hold = heldIn(t, advertisedJob(book, r)?.data?.industry);
+          if (hold > 0 && terms.wage * job.period * 10_000 <= job.wage * terms.period * (10_000 + hold)) continue;
           switching = { offer: r.id, wage: terms.wage };
           steps.push(because(`Offered a better-paid job (${usd(terms.wage)} every ${Math.round(terms.period / DAY)} days, against our ${usd(job.wage)} every ${Math.round(job.period / DAY)}): taking it, and giving our employer the notice our contract asks.`,
             notice(job.agreement, "Resigning: moving to another job.")));
@@ -1999,6 +2143,131 @@ export const citizen: BehaviourModule = {
         if (askedOf.delete(about) && !ok) upheld.push(about);
         const w = wants.all().find((x) => x.on === about);
         if (w && ok) wantMet(w, "granted");
+      }
+      // ---- everyday frictions (docs/behaviour/frictions.md): what the other side answered, what a venue decided,
+      // and what became of each thing gone wrong. What happens feeds trust in whoever it was, and the sense that
+      // what we do counts; the next thing tried, if any, is the mind's.
+      const wantOf = (g: Grievance) => wants.get(g.matter, g.about ?? g.party);
+      const ended = (g: Grievance, how: string, good: boolean) => {
+        grievances.delete(g.key);
+        inner.note({ t, what: "friction_ended", about: g.matter, size: Math.min(10_000, Math.floor((t - g.since) / DAY)), by: `${how}${g.asked ? `; asked: ${g.answer ?? "no answer yet"}` : ""}${g.applied.size ? `; venues: ${g.applied.size}` : ""}` });
+        outcome({ t, domain: "friction", option: g.matter, kind: "ended", way: "mine", from: g.party, facts: { how, put_right: good, days: Math.floor((t - g.since) / DAY), asked: !!g.asked, ...(g.answer ? { answer: g.answer } : {}), venues: g.applied.size, ...(g.amount !== undefined ? { amount: g.amount } : {}) } });
+        const w = wantOf(g);
+        if (w && good) wantMet(w, how);
+        else if (w) wants.giveUp(w, t, how);
+      };
+      const again = (g: Grievance) => {
+        const w = wantOf(g);
+        if (w && initiative) pursue(w);
+      };
+      const civil = (who: string) => (kindOf(who) === "other" ? "civil_service" : kindOf(who));
+      for (const r of fresh) {
+        if (r.record !== "statement" || !(r.addressed_to ?? []).includes(me)) continue;
+        const by = r.speaks_for ?? r.author;
+        if (r.kind === PAPER.answer) {
+          const g = [...grievances.values()].find((x) => x.matter === r.data?.matter && x.party === by && x.asked && !x.answer);
+          if (!g) continue;
+          const ok = !!r.data?.granted;
+          g.answer = ok ? "granted" : "refused";
+          learn("way", "ask", ok ? 10_000 : 1_000, { t, kind: ok ? "granted" : "refused", way: "mine", from: by, facts: { about: g.matter } });
+          inner.tried(ok);
+          inner.experience(by, kindOf(by), ok, t, { weight: ok ? 2 : 1 });
+          ties.add(by, ok ? 1_000 : -1_000, t, ok ? "granted" : "refused");
+          if (ok && g.amount !== undefined) {
+            if (g.matter === "underpaid" && job && job.agreement === g.about) job.short = 0;
+            ended(g, "put right on asking", true);
+          } else if (ok) {
+            g.promised = t;
+            // (A refusal set aside: the claim is ours to make again.)
+            if (g.matter === "claim_refused" && g.seeks) { refusedAt.delete(g.seeks); refusedOn.delete(g.seeks); }
+          } else again(g);
+        } else if ((r.kind === PAPER.decision || r.kind === "tribunal_order") && r.data?.applicant === me && typeof r.data?.matter === "string") {
+          const g = [...grievances.values()].find((x) => x.matter === r.data!.matter && x.party === r.data!.against && x.applied.has(by));
+          if (!g) continue;
+          const f = String(r.data.finding);
+          g.applied.get(by)!.finding = f;
+          const won = f === "pay" || f === "do" || f === "set_aside" || f === "settled";
+          learn("way", "desk", won ? 10_000 : f === "referred" ? 5_000 : 500, { t, kind: f, way: "mine", from: by, facts: { about: g.matter, days: Math.floor((t - g.applied.get(by)!.t) / DAY), binding: r.data.binding !== false } });
+          if (f !== "referred") {
+            inner.tried(won);
+            inner.experience(by, civil(by), won, t, { weight: 2 });
+          }
+          if (f === "settled") ended(g, "settled", true);
+          else if (won) {
+            g.ordered = { id: r.id, by, binding: r.data.binding !== false, due: Number(r.data.due ?? t + 28 * DAY), amount: f === "pay" ? cents(r.data.amount ?? 0) : 0 };
+            if (f === "set_aside" && g.matter === "claim_refused" && g.seeks) { refusedAt.delete(g.seeks); refusedOn.delete(g.seeks); }
+          } else if (f !== "referred") again(g);
+        }
+      }
+      // Ordered to pay someone (rent in arrears, by a tribunal that heard it): paid, if it can be and leave the
+      // month's essentials; if not, it is theirs to have enforced.
+      for (const r of fresh) {
+        if (r.record !== "statement" || (r.kind !== "tribunal_order" && r.kind !== PAPER.decision) || r.data?.against !== me || r.data?.finding !== "pay" || typeof r.data?.matter !== "string") continue;
+        const amount = cents(r.data.amount ?? 0);
+        const pays = !!acc && typeof r.data.to === "string" && amount > 0 && acc.balance >= amount + p.essentials;
+        outcome({ t, domain: "friction", option: String(r.data.matter), kind: "ordered_to_pay", way: "mine", from: String(r.data.applicant ?? ""), facts: { amount, paid: pays, binding: r.data.binding !== false } });
+        inner.doneTo();
+        if (pays) {
+          acc!.balance -= amount;
+          steps.push(because(`${r.speaks_for} orders us to pay ${r.data.applicant} ${usd(amount)}: paying it.`, pay(String(r.data.to), amount, { from: acc!.account, for: `Under ${r.id}.`, settles: r.id })));
+        }
+      }
+      for (const g of [...grievances.values()]) {
+        if (g.asked && !g.answer && t - g.asked.t >= (p.frictions.answer_days ?? 14) * DAY) {
+          // No answer in the time anyone would give: ignored.
+          g.answer = "ignored";
+          learn("way", "ask", 0, { t, kind: "ignored", way: "mine", from: g.party, facts: { about: g.matter } });
+          inner.tried(false);
+          inner.experience(g.party, kindOf(g.party), false, t);
+          again(g);
+        }
+        if (g.promised !== undefined && t - g.promised >= (p.frictions.promise_days ?? 45) * DAY) {
+          // Said yes, and it is not done: worse than a no.
+          g.promised = undefined;
+          g.answer = "refused";
+          inner.experience(g.party, kindOf(g.party), false, t, { weight: 2 });
+          inner.tried(false);
+          again(g);
+        }
+        const o = g.ordered;
+        if (o && o.amount > 0 && (settledToUs.get(o.id) ?? 0) >= o.amount) {
+          if (g.matter === "underpaid" && job && job.agreement === g.about) job.short = 0;
+          ended(g, o.binding ? "paid under an order" : "paid on a recommendation", true);
+          continue;
+        }
+        if (o && t >= o.due + DAY && !o.enforced) {
+          o.enforced = true;
+          if (o.amount > 0 && o.binding && p.tribunal && o.by === p.tribunal.entity) {
+            steps.push(because(`${o.by} ordered ${g.party} to pay us ${usd(o.amount)} by day ${Math.floor(o.due / DAY)} and it is unpaid: asking for the order to be enforced.`,
+              say("enforcement_request", `Request to enforce order ${o.id}: ${usd(o.amount)} unpaid.`, { to: [o.by], visible: [me, o.by], basis: o.id, data: { order: o.id, unpaid: o.amount } })));
+          } else {
+            // Ordered or recommended, and not done: this venue's word did not carry.
+            inner.experience(o.by, civil(o.by), false, t);
+            inner.tried(false);
+            g.ordered = undefined;
+            again(g);
+          }
+        }
+        // Long enough with nothing in train: let go (it stays in the record as given up).
+        if (t - g.since >= 365 * DAY && g.promised === undefined && (!g.ordered || t >= g.ordered.due + 90 * DAY)) ended(g, "let go", false);
+      }
+      // Pay come short: owed us by our employer, for as long as it is not put right.
+      if (fdial > 0 && job?.short) grieve(t, "underpaid", job.employer, { about: job.agreement, amount: job.short, evidence: tendered(book.records.get(job.agreement)), cause: "short pay", size: 0.8 });
+      // A home fallen into disrepair, as whoever lives there sees it: the landlord's to put right. Put right, or
+      // left behind, it is over.
+      {
+        const D = p.frictions.disrepair;
+        if (fdial > 0 && D && home && !home.owned && isLeaseholder() && homeSite?.structure === home.structure) {
+          const level = variableToday(homeSite.variables?.[D.variable], t) ?? 0;
+          const g0 = grievances.get(gkey("disrepair", home.landlord));
+          if (level >= D.at && !g0) grieve(t, "disrepair", home.landlord, { structure: home.structure, seeks: "repair", need: "shelter", size: Math.min(1.2, 0.5 + (level - D.at) / (2 * Math.max(1, D.at))), cause: "wear" });
+          else if (g0 && g0.structure === home.structure && level < D.at) {
+            inner.experience(home.landlord, kindOf(home.landlord), true, t, { weight: g0.asked ? 2 : 1 });
+            if (g0.asked) inner.tried(true);
+            ended(g0, "repaired", true);
+          }
+        }
+        for (const g of [...grievances.values()]) if (g.matter === "disrepair" && (!home || home.structure !== g.structure)) ended(g, "left", false);
       }
       for (const [paper, a] of [...askedOf]) if (book.withdrawn.has(paper) || t - a.t >= wants.p.answer_days * DAY) {
         askedOf.delete(paper);
@@ -2376,16 +2645,38 @@ export const citizen: BehaviourModule = {
         if (r.kind !== "benefit_decision" || !claiming.has(payment)) continue;
         const rule = rules.find((x) => x.id === payment);
         if (r.data?.granted) benefits.set(payment, { claim: r.data.claim, payment, payer: rule?.payer ?? r.speaks_for!, amount: r.data.amount, every: r.data.every, lasting: !!rule && !forOutOfWork(rule) });
-        else { refusedAt.set(payment, age); refusedOn.set(payment, t); }
+        else {
+          refusedAt.set(payment, age);
+          refusedOn.set(payment, t);
+          // (Refused: to one who believes they qualify, a wrong of the office's, to be looked at again.)
+          if (fdial > 0 && r.speaks_for && !r.data?.reviewed) grieve(t, "claim_refused", r.speaks_for, { about: r.id, seeks: payment, evidence: tendered(r), size: 1, cause: String(r.data?.reason ?? "refused") });
+        }
+        if (r.data?.granted) for (const g of [...grievances.values()]) if (g.matter === "claim_refused" && g.seeks === payment) {
+          grievances.delete(g.key);
+          inner.note({ t, what: "friction_ended", about: g.matter, size: Math.min(10_000, Math.floor((t - g.since) / DAY)), by: `granted on review${g.asked ? `; asked: ${g.answer ?? "no answer yet"}` : ""}${g.applied.size ? `; venues: ${g.applied.size}` : ""}` });
+          outcome({ t, domain: "friction", option: g.matter, kind: "ended", way: "mine", from: g.party, facts: { how: "granted on review", put_right: true, days: Math.floor((t - g.since) / DAY), asked: !!g.asked, venues: g.applied.size } });
+          const w = wants.get(g.matter, g.about ?? g.party);
+          if (w) wants.met(w, t, "granted on review");
+        }
         // (A claim answered: what we asked for came, or did not; and the office that decides is trusted more, or less.)
         inner.tried(!!r.data?.granted);
         if (r.speaks_for) inner.experience(r.speaks_for, kindOf(r.speaks_for) === "other" ? "civil_service" : kindOf(r.speaks_for), !!r.data?.granted, t);
         claiming.delete(payment);
       }
       // Looking for work: where someone told us about first, then the best-paid posting.
-      if ((!job || (searchingWork && !switching)) && !ownWork && !retired && p.in_labour_force) {
+      // (Someone who has given up on finding work is not looking, for as long as that lasts: they are out of the
+      // labour force, as a survey would count them, and say so for their own record when it changes.)
+      if (initiative && (job || ownWork) && discouragedUntil > 0) discouragedUntil = t;
+      if (initiative && discouragedUntil > 0 && t >= discouragedUntil) {
+        discouragedUntil = 0;
+        steps.push(because(job || ownWork ? "In work again." : "Looking for work again.", say("work_search", "Looking for work again.", { visible: [me], data: { looking: true } })));
+      }
+      if ((!job || (searchingWork && !switching)) && !ownWork && !retired && p.in_labour_force && t >= discouragedUntil) {
         // In work, only postings that pay better than ours, elsewhere.
-        const better = (j: StatementRecord) => !job || (j.speaks_for !== job.employer && (j.data?.wage ?? 0) * job.period > job.wage * (j.data?.period ?? job.period));
+        // (For one who takes initiative, where the world says what holds people: only if it pays enough more, and
+        // more the longer we have been where we are; the years before the world began count for the job we began with.)
+        const held = heldIn(t);
+        const better = (j: StatementRecord) => !job || (j.speaks_for !== job.employer && (j.data?.wage ?? 0) * job.period > job.wage * (j.data?.period ?? job.period) && (held === 0 || (j.data?.wage ?? 0) * job.period * 10_000 > job.wage * (j.data?.period ?? job.period) * (10_000 + heldIn(t, j.data?.industry))));
         const told = job ? [] : leadFound.jobs.filter((j) => !applied.has(j.id));
         const posts = [...told, ...found.jobs.filter((j) => !told.includes(j))].filter((j) => !applied.has(j.id) && better(j) && j.speaks_for);
         searchingWork = false;
@@ -2505,6 +2796,14 @@ export const citizen: BehaviourModule = {
       for (const inv of book.open("invoice").filter((r) => (r.addressed_to ?? []).includes(me) && r.data?.service && !billsPaid.has(r.id))) {
         const m = inv.data?.outcome?.money;
         const amount = cents(m?.amount ?? 0);
+        // A bill well over what the last one came to a day is looked at twice (docs/behaviour/frictions.md): the
+        // difference is what we say we were overcharged. It is paid all the same.
+        if (fdial > 0 && amount > 0 && !billSeen.has(inv.id) && inv.speaks_for && Number(inv.data?.days) > 0) {
+          billSeen.add(inv.id);
+          const service = String(inv.data!.service), perDay = Math.round(amount / Number(inv.data!.days)), usual = billed.get(service);
+          if (usual !== undefined && perDay * 10_000 > usual * (10_000 + (p.frictions.bill_over_bps ?? 1_500))) grieve(t, "bill", inv.speaks_for, { about: inv.id, amount: amount - usual * Number(inv.data!.days), evidence: tendered(inv), size: 0.5, cause: "over the usual" });
+          else billed.set(service, perDay);
+        }
         if (!m?.to || amount <= 0 || acc.balance < amount) continue;
         billsPaid.add(inv.id);
         bills.push({ at: t, amount });
@@ -2564,6 +2863,17 @@ export const citizen: BehaviourModule = {
           const served = Math.round((d.delivered * 10_000) / d.ordered);
           learn("shop", d.seller, served, { t, kind: "served", way: "mine", facts: { ordered: d.ordered, delivered: d.delivered, ...(d.refund > 0 ? { refund: d.refund } : {}), ...(d.order ? { order: d.order } : {}) } });
           if (d.seller === favourite) lastServed = served;
+          // What was bought and is faulty (docs/behaviour/frictions.md): found at home, of no use, and paid for.
+          // (The chance is for the days since goods last came home: a second delivery on one trip adds none.)
+          const since = Math.max(0, Math.min(p.shop_every_days, Math.floor((t - faultSeen) / DAY)));
+          faultSeen = t;
+          if (fdial > 0 && d.delivered > 0 && ctx.rng(`faulty-${d.order}`).below(1_000_000) < chancePpm(p.frictions.faulty_bps_per_year ?? 0, since, fdial)) {
+            const bad = Math.max(1, Math.round((d.delivered * (p.frictions.faulty_share_bps ?? 2_500)) / 10_000));
+            const price = priceAt(d.seller)?.price ?? 0;
+            spoiled += bad;
+            mind.learn("shop", d.seller, Math.round((served * (d.delivered - bad)) / d.delivered));
+            if (price > 0) grieve(t, "goods", d.seller, { about: d.order, amount: bad * price, evidence: { order: d.order, delivered: d.delivered, faulty: bad }, size: 0.4, need: "subsistence", cause: "faulty" });
+          }
           if (short <= 0) continue;
           // Tried elsewhere now, if this trip can: another shop we know, by what we've learned of each, weighted, not the
           // town's cheapest (everyone short going there at once overwhelms it) and not one that's failed us. If not,
@@ -2633,7 +2943,10 @@ export const citizen: BehaviourModule = {
         const lines: C.Call[] = [];
         if (homeAt) {
           for (const h of had) if (h.at !== homeAt) lines.push(C.call("goods", { kind: p.goods, quantity: C.text(h.quantity), to: me, at: homeAt, from_at: h.at }));
-          lines.push(C.call("work", { task: "consume", units: C.text(String(Math.ceil(total / weeks))), at: homeAt }));
+          // (What was faulty is thrown out with what is used: it is gone, and the week is shorter for it.)
+          const out = Math.min(total, Math.ceil(total / weeks) + spoiled);
+          spoiled = 0;
+          lines.push(C.call("work", { task: "consume", units: C.text(String(out)), at: homeAt }));
         } else {
           let use = Math.ceil(total / weeks);
           for (const h of had) {

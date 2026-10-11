@@ -1511,6 +1511,54 @@
         "practice": {
           "description": "The practice it's for (take_up: attend or join).",
           "$ref": "urn:oikos:contracts:0.8:common#/$defs/IdOrRef"
+        },
+        "hears": {
+          "description": "What the offerer hears (take_up: apply): the matters a desk, a list, a tribunal or a group takes up, so that someone with a grievance of that kind can find it by what it says and not by its name (docs/behaviour/frictions.md). Facts only: it has no power; nothing is heard unless someone applies, and nothing follows unless the offerer acts and whoever it names obeys.",
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "required": [
+              "about"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "about": {
+                "description": "The matter: a kind of paper (a notice, a bill, a decision) or of thing gone wrong, in the world's own labels.",
+                "$ref": "urn:oikos:contracts:0.8:common#/$defs/Label"
+              },
+              "can": {
+                "description": "What it may do about one: order (binding words, if obeyed or enforced), recommend, mediate (bring the two together), refer (pass it to whoever must act), represent (take it up with the other side for the applicant), publish (make it known).",
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 6,
+                "uniqueItems": true,
+                "items": {
+                  "enum": [
+                    "order",
+                    "recommend",
+                    "mediate",
+                    "refer",
+                    "represent",
+                    "publish"
+                  ]
+                }
+              },
+              "undoes": {
+                "description": "It may set a paper of this kind aside.",
+                "type": "boolean"
+              },
+              "form": {
+                "description": "The kind of statement an application is made on (none: `application`).",
+                "$ref": "urn:oikos:contracts:0.8:common#/$defs/Label"
+              },
+              "within": {
+                "description": "How long it says it takes to answer.",
+                "$ref": "urn:oikos:contracts:0.8:common#/$defs/Duration"
+              }
+            }
+          }
         }
       }
     },

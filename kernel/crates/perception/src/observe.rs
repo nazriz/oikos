@@ -284,6 +284,8 @@ fn matches(st: &State, rec: &Record, f: &RecordFilter, want: Option<&Want>, news
                     "registry" => registry.is_some(),
                     "adico" => adico.is_some(),
                     "formal" => formal.is_some(),
+                    // (An offer that says what its offerer hears: a desk, a list, a group that takes up grievances.)
+                    "hears" => offer.as_ref().is_some_and(|o| o.get("hears").is_some()),
                     _ => false,
                 }) => {}
             _ => return false,
@@ -468,7 +470,7 @@ impl RecordIndex {
             self.by_record.entry(rec.body.kind_name()).or_default().push(seq);
             if let crate::blocks::RecordBody::Statement { kind, offer, practice, assertion, registry, adico, formal, .. } = &rec.body {
                 self.by_kind.entry(kind.clone()).or_default().push(seq);
-                let carries = [("offer", offer.is_some()), ("practice", practice.is_some()), ("assertion", assertion.is_some()), ("registry", registry.is_some()), ("adico", adico.is_some()), ("formal", formal.is_some())];
+                let carries = [("offer", offer.is_some()), ("practice", practice.is_some()), ("assertion", assertion.is_some()), ("registry", registry.is_some()), ("adico", adico.is_some()), ("formal", formal.is_some()), ("hears", offer.as_ref().is_some_and(|o| o.get("hears").is_some()))];
                 for (field, _) in carries.into_iter().filter(|(_, x)| *x) {
                     self.by_has.entry(field).or_default().push(seq);
                 }
@@ -501,7 +503,7 @@ impl RecordIndex {
                         set.remove(&target.seq);
                     }
                     self.by_kind.entry(kind.clone()).or_default().push(seq);
-                    let carries = [("offer", offer.is_some()), ("practice", practice.is_some()), ("assertion", assertion.is_some()), ("registry", registry.is_some()), ("adico", adico.is_some()), ("formal", formal.is_some())];
+                    let carries = [("offer", offer.is_some()), ("practice", practice.is_some()), ("assertion", assertion.is_some()), ("registry", registry.is_some()), ("adico", adico.is_some()), ("formal", formal.is_some()), ("hears", offer.as_ref().is_some_and(|o| o.get("hears").is_some()))];
                     for (field, _) in carries.into_iter().filter(|(_, x)| *x) {
                         self.by_has.entry(field).or_default().push(seq);
                     }

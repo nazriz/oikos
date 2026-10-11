@@ -289,7 +289,18 @@ impl World {
                     completes_at: None,
                     labour_done: 0,
                     demolition: None,
-                    variables: crate::exec::init_variables(&s, &x.structure_type, 0),
+                    variables: {
+                        // (As old and as worn as the world says: a variable given for it starts there, within its bounds.)
+                        let mut v = crate::exec::init_variables(&s, &x.structure_type, 0);
+                        if let Some(given) = &x.variables {
+                            for cfg in crate::exec::vars_for(&s, &x.structure_type) {
+                                if let Some(g) = given.get(&cfg.id) {
+                                    v.insert(cfg.id.clone(), ((*g).clamp(cfg.min, cfg.max), 0));
+                                }
+                            }
+                        }
+                        v
+                    },
                 });
         }
         for o in &w.occupancy {
@@ -670,7 +681,17 @@ impl World {
                     return perr(format!("{org} is a person: only its own participant's bookkeeping sets a person's record"));
                 }
                 let keeping = self.s.config.positions.iter().find(|x| x.entity == org && x.keeps_record);
-                let Some(keeping) = keeping else { return perr(format!("{org} has no bookkeeping named for its record: nothing can set it")) };
+                let Some(keeping) = keeping else {
+                    // An organisation founded in a run: the one post of it whose role module says it keeps the
+                    // organisation's record (`role_module.keeps_record`, with its `code`), held now by this participant.
+                    let mut made = self.state.positions.values().filter(|x| x.entity == org && x.role_module.as_ref().and_then(|m| m.get("keeps_record")).and_then(Value::as_bool) == Some(true));
+                    let (Some(pos), None) = (made.next(), made.next()) else { return perr(format!("{org} has no bookkeeping named for its record: nothing can set it")) };
+                    let Some(keeper) = pos.role_module.as_ref().and_then(|m| m.get("code")).and_then(Value::as_str) else { return perr(format!("{org} has no bookkeeping named for its record: nothing can set it")) };
+                    if pos.holder.as_deref() != Some(participant) {
+                        return perr(format!("{participant} does not hold the post that keeps the record of {org}"));
+                    }
+                    return Ok((org.to_string(), keeper.to_string()));
+                };
                 let Some(keeper) = keeping.record_keeper_name() else { return perr(format!("{org} has no bookkeeping named for its record: nothing can set it")) };
                 let holds = self.state.positions.get(&keeping.id).is_some_and(|x| x.holder.as_deref() == Some(participant));
                 if !holds {

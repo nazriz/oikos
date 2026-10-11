@@ -22,6 +22,8 @@ import { params, wait, type Belief, type BehaviourModule, type ParticipantContex
 import { distribute } from "./lengnick";
 import { dayPayPeriod, incomeTaxLaw, withheld, type Charge } from "./tax";
 import { message } from "./common";
+import { chancePpm, frictionDial, PAPER, Respondent, type RespondParams } from "./frictions";
+import { swayed } from "./wants";
 import { advertisedJob, ask, Asked, because, between, Book, firstDue, PAYEE_DIED, breaches, noting, callAction, usd, cellsOf, commitmentOf, DAY, jobTerms, leaseTerms, MONTH, notice, offer, ownAccount, pay, publishedPrice, say, stoodEmpty, structureOf, withdraw, type Step } from "./common";
 import * as P from "./papers";
 
@@ -96,7 +98,7 @@ export const landlord: BehaviourModule = {
   name: "firm.landlord",
   issues: P.LANDLORD,
   issuesWith: (p) => ({ city: p.city }),
-  version: "0.14.0", // 0.14.0: wants of its own (docs/behaviour/firm-wants.md), for one the world's dial gives initiative: a character from its owner's values, which answers a tenant who asks it to hold a rent or to stay on, sways its markup and its patience with arrears, and a record of its own; 0.13.4: main's 0.13.3 (the builder's answer read with the week's post; what is owed counted before building or asking) with a certified copy of a registration made on someone else's report counting as the registration
+  version: "0.15.0", // 0.15.0: everyday frictions (docs/behaviour/frictions.md): a home of ours in disrepair is repaired by the builder when we are asked or ordered and will, at its price; we answer a venue from our books; rent owed us is asked for and then taken to a body that hears arrears; 0.14.0: wants of its own (docs/behaviour/firm-wants.md), for one the world's dial gives initiative: a character from its owner's values, which answers a tenant who asks it to hold a rent or to stay on, sways its markup and its patience with arrears, and a record of its own; 0.13.4: main's 0.13.3 (the builder's answer read with the week's post; what is owed counted before building or asking) with a certified copy of a registration made on someone else's report counting as the registration
   doc: "docs/behaviour/firms.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -144,6 +146,11 @@ export const landlord: BehaviourModule = {
       owner_values: null as { [value: string]: number } | null,
       values: {} as { [value: string]: { mean_bps: number; sd_bps: number } },
       org: {} as Partial<OrgParams>,
+      // Everyday frictions (docs/behaviour/frictions.md): a home of ours fallen into disrepair is put right by the
+      // builder, at its price for a job of so many units, paid with the order (the world's; none: we order nothing);
+      // and how we answer when asked to, told of a complaint, or ordered (the world's rates; our character sways them).
+      repair: null as { builder: string; account: string; units: number; price: number } | null,
+      respond: {} as Partial<RespondParams>,
     },
     ctx.params,
   );
@@ -204,10 +211,35 @@ export const landlord: BehaviourModule = {
     // The leases we hold in force, as we have them (truth audits).
     const leasesHeld = (): Belief[] => [{ of: "held", party: me, template: "lease",
       agreements: book.ofType("agreement").filter((r) => r.record === "agreement" && r.terms.template === "lease" && r.terms.parties[0] === me && book.inForce(r.id)).map((r) => r.id) }];
+    // Repairs: those we have ordered and not yet heard are done, and when each building of ours was last repaired.
+    const askedFor = new Map<string, number>(); // a lease -> when we last wrote to ask for the rent owed under it
+    const repairing = new Map<string, number>();
+    const repaired = new Map<string, number>();
+    let payFrom = "";
+    const answering = new Respondent(ctx.rng, me, org, { params: p.respond, forms: [{ notice: "hearing_notice", response: "tribunal_response", decision: "tribunal_order" }],
+      // (What our books say of a home said to need repair: done, if the builder has told us so lately; else not.)
+      truth: (m, _from, _book, t) => (m.matter === "disrepair" && m.structure ? { done: t - (repaired.get(m.structure) ?? -Infinity) < 90 * DAY } : undefined),
+      cost: (m) => (m.matter === "disrepair" && p.repair && m.structure && !repairing.has(m.structure) ? p.repair.units * p.repair.price : 0),
+      remedy: (m, _from, t, why) => {
+        const r = p.repair;
+        if (m.matter !== "disrepair" || !r || !m.structure || !payFrom || repairing.has(m.structure)) return undefined;
+        repairing.set(m.structure, t);
+        org.remember(t, "ordered_repair", m.structure);
+        return [because(`${why} Ordering the repair of ${m.structure} from ${r.builder}, and paying its price of ${usd(r.units * r.price)}.`,
+          say("repair_order", `Order: the repair of ${m.structure} (${r.units} units of work), paid with this order.`, { to: [r.builder], visible: [me, r.builder], data: { structure: m.structure, units: r.units, account: payFrom } }),
+          pay(r.account, r.units * r.price, { from: payFrom, for: `Repair of ${m.structure}.` }))];
+      } });
     return keeping(org, noting(book, Object.assign(stepper(absorb, (obs) => {
       const t = obs.t;
       const acc = ownAccount(obs);
       if (!acc) return [];
+      payFrom = acc.account;
+      for (const r of [...book.open("repair_done"), ...book.open("repair_declined")]) {
+        const st = String(r.data?.structure ?? "");
+        if (!(r.addressed_to ?? []).includes(me) || !repairing.has(st) || r.at < repairing.get(st)!) continue;
+        repairing.delete(st);
+        if (r.kind === "repair_done") repaired.set(st, t);
+      }
       // What we own: the lots our ownership records name, the cells they cover (seen through our own sites),
       // and the homes (dwelling units) in finished buildings on them, including anything we've since built.
       const ownLots = ownLotsNow();
@@ -387,15 +419,40 @@ export const landlord: BehaviourModule = {
         // longer than one that would be rid of them. Someone behind with the rent is something we want settled.)
         const bears = org.patience(p.arrears_months_before_notice);
         if (org.lively) {
-          const behind = org.wants.get("arrears", tenant);
+          // (One want a lease: a tenant on a renewed lease has two for a while, and the one paid up must not be
+          // taken for the one behind. Until 2026-10-11 the want was by tenant, and such a pair was born and met
+          // turn about at every look.)
+          const behind = org.wants.get("arrears", a.id);
           // (Behind by as much as our routine calls arrears, at two looks a week apart: a payment a few days late is not.)
           if (owed - paid >= p.arrears_months_before_notice * rent) { if (!lateSince.has(a.id)) lateSince.set(a.id, t); } else lateSince.delete(a.id);
-          if (owed - paid >= p.arrears_months_before_notice * rent && t - lateSince.get(a.id)! >= 7 * DAY && !behind) org.wants.born({ about: "arrears", whom: tenant, seeks: ["money.to"], weight: Math.round(5_000 + 1_000 * (org.character.be_rid - org.character.keep)), since: t, from: "event" }, t);
+          if (owed - paid >= p.arrears_months_before_notice * rent && t - lateSince.get(a.id)! >= 7 * DAY && !behind) org.wants.born({ about: "arrears", whom: tenant, against: { record: a.id, kind: "arrears", by: tenant }, seeks: ["money.to"], weight: Math.round(5_000 + 1_000 * (org.character.be_rid - org.character.keep)), since: t, from: "event" }, t);
           else if (behind && owed - paid < p.arrears_months_before_notice * rent) org.wants.met(behind, t, "paid");
+          // Going after it (docs/behaviour/firm-wants.md), as a person goes after a want: first by asking (a letter
+          // saying what is owed); then, when that has had its time, by taking it to a body that says it hears
+          // arrears, if we can see one and would sooner have the money than be rid of the tenant; the notice our
+          // routine gives comes when our patience runs out, as before.
+          const held = org.wants.get("arrears", a.id);
+          if (held && held.tried === 0 && t - (askedFor.get(a.id) ?? -Infinity) >= 30 * DAY) {
+            askedFor.set(a.id, t);
+            org.wants.tried(held, "ask", t, a.id);
+            steps.push(because(`${tenant} is ${usd(owed - paid)} behind with the rent: writing to ask for it.`,
+              say(PAPER.request, `Request: the rent for your home is ${usd(owed - paid)} in arrears. Please pay it.`, { to: [tenant], visible: [me, tenant], basis: a.id, data: { matter: "arrears", against: tenant, about: a.id, amount: owed - paid, account: acc.account } })));
+          } else if (held && held.way === "ask" && t - (held.triedAt ?? t) >= 30 * DAY && org.character.keep >= org.character.be_rid) {
+            const venue = book.hearings().find((h) => h.offer?.hears?.some((x) => x.about === "arrears") && (h.speaks_for ?? h.author) !== me);
+            const entry = venue?.offer?.hears?.find((x) => x.about === "arrears");
+            const fee = (venue?.offer?.terms?.commitments ?? []).filter((c) => c.who === "taker").map((c) => (c.does as any)?.outcome?.money).find((m) => m?.to);
+            if (venue && entry && (!fee || acc.balance >= cents(fee.amount))) {
+              const v = venue.speaks_for ?? venue.author;
+              org.wants.tried(held, `desk:${v}`, t, venue.id);
+              steps.push(because(`${tenant} is still ${usd(owed - paid)} behind a month after we asked: applying to ${v} for an order to pay.`,
+                say(entry.form ?? PAPER.application, `Application: ${tenant} owes us ${usd(owed - paid)} in rent under ${a.id}.`, { to: [v], visible: [me, v, tenant], basis: venue.id, data: { kind: "arrears", matter: "arrears", against: tenant, about: a.id, amount: owed - paid, account: acc.account, evidence: { id: a.id, record: "agreement" } } }),
+                ...(fee ? [pay(String(fee.to), cents(fee.amount), { from: acc.account, for: "Application fee." })] : [])));
+            }
+          }
         }
         if ((owed - paid) >= bears * rent && t - since >= bears * MONTH) {
           noticeGiven.set(a.id, t);
-          const behind = org.wants.get("arrears", tenant);
+          const behind = org.wants.get("arrears", a.id);
           if (behind) org.wants.tried(behind, "notice", t, a.id);
           org.remember(t, "gave_notice", tenant, 3_000);
           steps.push(because(`Rent is ${bears} or more months in arrears: giving notice.`, notice(a.id, "Notice: rent is in arrears.")));
@@ -660,6 +717,8 @@ export const landlord: BehaviourModule = {
         rentChanges.set(n.data?.lease, changes.filter((c) => !(c.from === Number(n.data?.from) && c.rent === cents(n.data?.rent))));
         steps.push(because(`The tribunal has found our notice of rent increase ${n.id} invalid: withdrawing it; the rent stays as it was.`, withdraw(n.id, `Withdrawn: found invalid by the tribunal (${o.id}).`)));
       }
+      // Asked to put something right (a home in disrepair), told of a complaint, or ordered to (docs/behaviour/frictions.md).
+      steps.push(...answering.steps(book, t, acc.account, acc.balance));
       return steps;
     }, undefined, plansToRead), { beliefs: (): Belief[] => leasesHeld() })), () => ({ homes: owned.length }));
   },
@@ -748,7 +807,7 @@ export class Staffing {
   /** `registered_bps`: of the jobs this employer fills, the share it puts on its payroll returns (10,000, or nothing
    * said: all of them). A job it does not register is paid whole: nothing is withheld from it and no report names
    * its worker (docs/behaviour/firms.md, "Jobs an employer does not register"). */
-  constructor(private readonly ctx: ParticipantContext, private readonly me: string, private readonly o: { period: number; notice_days: number; workplace?: string; role: string; industry?: string; does?: { hire?: boolean; pay?: boolean }; own?: "role" | "role_or_unnamed"; payroll?: string; notice_wait?: number; registered_bps?: number; casual_bps?: number; day_wage?: number; work_days?: number; week_days?: number }) {}
+  constructor(private readonly ctx: ParticipantContext, private readonly me: string, private readonly o: { period: number; notice_days: number; workplace?: string; role: string; industry?: string; does?: { hire?: boolean; pay?: boolean }; own?: "role" | "role_or_unnamed"; payroll?: string; notice_wait?: number; registered_bps?: number; casual_bps?: number; day_wage?: number; work_days?: number; week_days?: number; short?: { per_year_bps: number; by_bps: number } }) {}
   // Work by the day (`casual_bps`: of the jobs this employer fills, the share it fills by the day; `day_wage`: what it
   // pays for a day, at the wage it began with; `work_days`: the days of the week it works; `week_days`: the working days of the world's week, over which a day's
   // pay is reckoned as a year's for what the law withholds). Whom we have paid for
@@ -832,6 +891,8 @@ export class Staffing {
       const w = this.withholds.get(tx.per_instruction) ?? NOTHING_WITHHELD;
       if (!this.offBooks.has(ours.get(tx.per_instruction)!)) this.owe(this.lawId, w, ours.get(tx.per_instruction), cents(tx.amount) + w.total);
       this.wagesPaid += cents(tx.amount) + w.total;
+      const short = this.skim.get(ours.get(tx.per_instruction)!);
+      if (short) this.kept.set(ours.get(tx.per_instruction)!, (this.kept.get(ours.get(tx.per_instruction)!) ?? 0) + short);
     }
   }
 
@@ -1177,7 +1238,7 @@ export class Staffing {
    * A rise for everyone we employ (an enterprise agreement, docs/behaviour/unions.md): each wage order is replaced by
    * one at the new wage (net of the tax withheld), from the next pay day on.
    */
-  raise(book: Book, t: number, account: string, riseBps: number, why: string, one?: { agreement: string; wage: number }): Step[] {
+  raise(book: Book, t: number, account: string, riseBps: number, why: string, one?: { agreement: string; wage: number; /** Paid this much less than that, each pay (pay come short: above). */ short?: number }): Step[] {
     const law = incomeTaxLaw(book);
     const lines: C.Call[] = [];
     const refs: [string, string, Withheld][] = [];
@@ -1185,13 +1246,14 @@ export class Staffing {
       if (one && a.id !== one.agreement) continue; // (a rise for one of us, at the wage asked)
       const wage = one ? one.wage : Math.floor((this.wageOf(a) * (10_000 + riseBps)) / 10_000);
       this.gross.set(a.id, wage);
+      if (one?.short) this.skim.set(a.id, one.short); else this.skim.delete(a.id); // (a wage set afresh is paid as set)
       const order = this.orders.get(a.id);
       const to = this.payee(book, a);
       if (!order || !to || this.stopped.has(a.id)) continue;
       const period = jobTerms(a, a.terms.parties[1]).period;
       const tax = this.offBooks.has(a.id) ? NOTHING_WITHHELD : withheld(law, wage, period);
       const ref = `wo${this.n++}`;
-      lines.push(withdraw(order, "Superseded: a new wage."), [ref, pay(to, wage - tax.total, { from: account, every: period, first: Math.max(DAY, this.nextDue(book, order, t) - t), basis: a.id, for: `Wages for ${a.terms.parties[1]}.` })] as any);
+      lines.push(withdraw(order, "Superseded: a new wage."), [ref, pay(to, wage - tax.total - (one?.short ?? 0), { from: account, every: period, first: Math.max(DAY, this.nextDue(book, order, t) - t), basis: a.id, for: `Wages for ${a.terms.parties[1]}.` })] as any);
       refs.push([ref, a.id, tax]);
       this.orders.delete(a.id);
     }
@@ -1206,6 +1268,46 @@ export class Staffing {
 
   /** The organisation's wants, where the post that runs it has them (docs/behaviour/firm-wants.md). */
   org?: Org;
+
+  // Pay that comes short (docs/behaviour/frictions.md, "Pay"): each year, of the people an employer pays, the share
+  // it begins to pay less than it agreed (`short.per_year_bps`: the world's, at the world's dial), by `short.by_bps`
+  // of the pay; more often the more its character would pay less, and twice as often while it has less in the bank
+  // than two pay periods' wages. What it has kept back from each, pay by pay, is on its own books: it knows what
+  // it owes, and says so truthfully to a venue that asks; what it may do is not pay.
+  private readonly skim = new Map<string, number>(); // agreement -> what each pay is short by
+  private readonly kept = new Map<string, number>(); // agreement -> what we have kept back in all, not yet made good
+  private shortWeek = -1;
+  /** The week's look at whom we begin to pay short (at most once a week, each on their own draw). */
+  shortening(book: Book, t: number, account: string, balance: number): Step[] {
+    const s = this.o.short, dial = frictionDial(this.ctx.world), week = Math.floor(t / (7 * DAY));
+    if (!s || !(s.per_year_bps > 0) || !(s.by_bps > 0) || dial <= 0 || week === this.shortWeek) return [];
+    this.shortWeek = week;
+    const staff = this.staff(book, t).filter((a) => this.orders.has(a.id) && !this.skim.has(a.id) && !this.stopped.has(a.id) && !this.noticed.has(a.id) && !byTheDay(a));
+    const bill = staff.reduce((x, a) => x + this.wageOf(a), 0);
+    const rate = swayed(s.per_year_bps, this.org?.lively ? this.org.character.pay_less : 0, 1) * (balance < 2 * bill ? 2 : 1);
+    const law = incomeTaxLaw(book);
+    const steps: Step[] = [];
+    for (const a of staff) {
+      if (this.ctx.rng(`short-pay-${a.id}-${week}`).below(1_000_000) >= chancePpm(rate, 7, dial)) continue;
+      const wage = this.wageOf(a), period = jobTerms(a, a.terms.parties[1]).period;
+      const net = wage - (this.offBooks.has(a.id) ? 0 : withheld(law, wage, period).total);
+      const short = Math.floor((net * s.by_bps) / 10_000);
+      if (short > 0) steps.push(...this.raise(book, t, account, 0, `Paying ${a.terms.parties[1]} ${usd(short)} a pay less than we agreed, from the next pay day.`, { agreement: a.id, wage, short }));
+    }
+    return steps;
+  }
+  /** What our books say we have kept back from someone's pay under an agreement. */
+  owedShort(agreement: string): number {
+    return this.kept.get(agreement) ?? 0;
+  }
+  /** Putting short pay right from here on: their wage order replaced by one at the wage agreed. (What was kept back
+   * is paid by whoever answers for us.) */
+  payInFull(book: Book, t: number, account: string, agreement: string, why: string): Step[] {
+    this.kept.delete(agreement);
+    if (!this.skim.delete(agreement)) return [];
+    const a = this.staff(book, t).find((x) => x.id === agreement);
+    return a ? this.raise(book, t, account, 0, why, { agreement, wage: this.wageOf(a) }) : [];
+  }
   private readonly askedAnswered = new Set<string>();
   /**
    * Asked by one of ours for a rise (docs/behaviour/firm-wants.md): answered in writing, yes or no, by our character

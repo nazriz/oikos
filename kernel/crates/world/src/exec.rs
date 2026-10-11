@@ -155,7 +155,7 @@ pub fn day_of(t: i64) -> i64 {
 }
 
 /// The state variables that apply to a structure type (phase B).
-fn vars_for<'a>(s: &'a Statics, ty: &'a str) -> impl Iterator<Item = &'a crate::config::VariableCfg> + 'a {
+pub fn vars_for<'a>(s: &'a Statics, ty: &'a str) -> impl Iterator<Item = &'a crate::config::VariableCfg> + 'a {
     s.config.catalogue.variables.iter().filter(move |v| v.types.as_ref().is_none_or(|ts| ts.iter().any(|x| x == ty)))
 }
 

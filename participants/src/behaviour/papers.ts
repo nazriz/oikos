@@ -299,3 +299,26 @@ export const TRADE: Issued[] = [
     fields: { kind: f("text", "What was taken.", req), quantity: f("count", "How many.", req), at: f("structure", "Where from.", req), value: f("amount", "What it was worth.", req), account: f("account", "The account to be paid into if it is recovered.", req) },
     writes: { sends: [{ to: ["@police"], why: "The police investigate what is reported to them." }], kind: "crime_report", text: "Report: {quantity} {kind} taken from {at}.", to: ["@police"], visible: ["=self", "@police"], data: { kind: "=kind", quantity: "=quantity", at: "=at", value: "#value", account: "=account" } } },
 ];
+
+// ------------------------------------------------------------------ a body that hears grievances (desk.ts)
+
+/** A desk's, an ombudsman's or a mediation service's papers (docs/behaviour/frictions.md, "Venues"). */
+export const DESK: Issued[] = [
+  { form: "complaint_notice", title: "Notice of an application to the one it is against", does: "Tells the one an application is against what is said of them, and by when they may answer. It decides nothing.",
+    fields: {
+      application: f("record", "The application.", req), matter: f("text", "What it is about, in the word the application uses.", req),
+      applicant: f("entity", "Who applied.", req), against: f("entity", "Whom it is against.", req), answer_by: f("date", "The day they may answer by.", req),
+    },
+    writes: { kind: "complaint_notice", text: "{applicant} has applied to us about {matter} (application {application}). You may answer by {answer_by}.", basis: "=application", to: ["=applicant", "=against"], visible: ["=applicant", "=against", "=self"],
+      data: { application: "=application", kind: "=matter", matter: "=matter", applicant: "=applicant", against: "=against", answer_by: "=answer_by", hearing_at: "=answer_by" } } },
+  { form: "venue_decision", title: "Decision on an application", does: "Says what is decided on an application, to both sides. It moves no money and does nothing by itself: an order or a recommendation is words, which the other side follows or does not.",
+    fields: {
+      application: f("record", "The application decided.", req), matter: f("text", "What it was about, in the word the application uses.", req),
+      applicant: f("entity", "Who applied.", req), against: f("entity", "Whom it was against."),
+      finding: f("choice", "What is decided: pay (money to the applicant), do (put it right), set_aside (a paper), settled (the two agreed), dismissed, rejected (not something heard here), referred (passed to whoever must act).", { ...req, options: ["pay", "do", "set_aside", "settled", "dismissed", "rejected", "referred"] }),
+      binding: f("choice", "Whether it is an order (yes) or a recommendation (no).", { ...req, options: YES_NO }),
+      amount: f("amount", "For pay: how much."), pay_into: f("account", "For pay: the account it is paid into."), due: f("date", "For pay or do: the day it is due by."),
+    },
+    writes: { kind: "venue_decision", text: "Decision on {application}: {finding}.", basis: "=application", to: ["=applicant", "=against"], visible: ["=applicant", "=against", "=self"],
+      data: { application: "=application", kind: "=matter", matter: "=matter", applicant: "=applicant", against: "=against", finding: "=finding", binding: "=binding", amount: "#amount", to: "=pay_into", due: "=due" } } },
+];

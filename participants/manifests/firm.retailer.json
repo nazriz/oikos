@@ -1,6 +1,6 @@
 {
   "name": "firm.retailer",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "doc": "docs/behaviour/retailer.md",
   "params": {
     "bank": {
@@ -303,6 +303,13 @@
       "default": 30,
       "source": "closed, our premises unsold this long: the asking price comes down (placeholder)"
     },
+    "respond": {
+      "schema": {
+        "type": "object"
+      },
+      "default": {},
+      "source": "placeholder"
+    },
     "role": {
       "schema": {
         "type": "string"
@@ -362,6 +369,11 @@
       },
       "unit": "days",
       "default": 60,
+      "source": "placeholder"
+    },
+    "short_pay": {
+      "schema": {},
+      "default": null,
       "source": "placeholder"
     },
     "sold_board": {

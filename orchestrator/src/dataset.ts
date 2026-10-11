@@ -9,7 +9,8 @@ import { logLines, runOf } from "./logs";
 import { takeRoute, takeTurn, type CorpusExample } from "./corpus";
 import { periodRow, Records } from "./records";
 
-export const DATASET_VERSION = "0.5.0";
+const sortedCounts = (c: { [k: string]: number }) => Object.fromEntries(Object.entries(c).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
+export const DATASET_VERSION = "0.6.0";
 
 interface Command { seq: number; command: string; as?: string; blocks?: unknown[]; looks?: unknown[]; provenance?: unknown; reasoning?: string; applied?: boolean; refusal?: unknown; created?: string[] }
 /** Something a seat was shown that names what an earlier act of its own made: the record or letter made (`of`), the
@@ -129,6 +130,15 @@ export async function exportDataset(logPath: string, outDir: string, o: DatasetO
   const wantRows = lines(join(outDir, "wants.jsonl"));
   const wantCounts = { people: {} as { [event: string]: { [what: string]: number } }, organisations: {} as { [event: string]: { [what: string]: number } } };
   const wantsOf = { people: new Set<string>(), organisations: new Map<string, { [event: string]: number }>() };
+  // Everyday frictions and the venues that hear them (docs/behaviour/frictions.md, "What a log can show"): a row
+  // each time something went wrong for a person or stopped being so (from their record's reasons, so lean logs have
+  // them), and a row for each paper a grievance travelled on (asked, answered, applied, told, decided). Counted in
+  // the manifest by kind; nothing is scored.
+  const frictionRows = lines(join(outDir, "frictions.jsonl"));
+  const venueRows = lines(join(outDir, "venues.jsonl"));
+  const frictionCounts = { arose: {} as { [k: string]: number }, ended: {} as { [k: string]: number }, papers: {} as { [k: string]: number }, findings: {} as { [k: string]: number } };
+  const PAPERS: { [kind: string]: string } = { remedy_request: "request", remedy_answer: "answer", application: "application", tribunal_application: "application", complaint_notice: "notice", hearing_notice: "notice",
+    complaint_response: "response", tribunal_response: "response", venue_decision: "decision", tribunal_order: "decision", enforcement_request: "enforcement", repair_order: "repair_order", repair_done: "repair_done" };
   const persons = new Set<string>(); // participants whose own record is a person's
   let actsByPeople = 0, actsOnInitiative = 0;
   const records = new Records();
@@ -274,6 +284,14 @@ export async function exportDataset(logPath: string, outDir: string, o: DatasetO
       largestRecord = Math.max(largestRecord, r.bytes);
       citizenRecords.write({ run: run(), t: recordSet.t, seq: recordSet.seq, participant: recordSet.participant, entity: b.entity, n: b.n, set: recordSet.set, ...(recordSet.because ? { because: recordSet.because } : {}), chain: b.chain });
       for (const x of (recordSet.because ?? []) as any[]) {
+        if (typeof x?.what === "string" && x.what.startsWith("friction_")) {
+          const event = x.what.slice(9) as "arose" | "ended";
+          const how = event === "ended" ? String(x.by ?? "").split(";")[0]! : "";
+          frictionRows.write({ run: run(), t: x.t ?? recordSet.t, seq: recordSet.seq, entity: b.entity, event, matter: x.about ?? "", ...(event === "arose" ? { against: String(x.by ?? ""), size: x.size ?? 0 } : { how: String(x.by ?? ""), days: x.size ?? 0 }) });
+          const key = event === "arose" ? String(x.about ?? "") : `${x.about ?? ""}: ${how}`;
+          frictionCounts[event][key] = (frictionCounts[event][key] ?? 0) + 1;
+          continue;
+        }
         if (typeof x?.what !== "string" || !x.what.startsWith("want_")) continue;
         const event = x.what.slice(5);
         const org = !!recordSet.organisation;
@@ -296,6 +314,19 @@ export async function exportDataset(logPath: string, outDir: string, o: DatasetO
     } else if (e.kind === "command") {
       const who = b.participant;
       if (b.command === "act" && !b.as && persons.has(who)) actsByPeople++;
+      if (b.command === "act") for (const blk of (b.blocks ?? []) as any[]) {
+        const paper = blk?.block === "publish" ? PAPERS[String(blk.kind)] : undefined;
+        const d = blk?.data ?? {};
+        const matter = String(d.matter ?? d.kind ?? (paper === "enforcement" || paper?.startsWith("repair") ? paper : ""));
+        // (A tribunal's older lists, a rent increase, a debt and a charge, travel on the same forms: they are venue rows too.)
+        if (!paper || !matter) continue;
+        venueRows.write({ run: run(), t: e.t, seq: e.seq, paper, kind: String(blk.kind), by: String(blk.speaks_for ?? who), ...(Array.isArray(blk.addressed_to) ? { to: blk.addressed_to.map(String) } : {}), matter,
+          ...(d.against ? { against: String(d.against) } : {}), ...(d.applicant ? { applicant: String(d.applicant) } : {}), ...(d.finding ? { finding: String(d.finding) } : {}), ...(d.binding !== undefined ? { binding: d.binding !== false } : {}),
+          ...(d.granted !== undefined ? { granted: !!d.granted } : {}), ...(Number.isFinite(Number(d.amount)) && d.amount !== undefined ? { amount: Math.round(Number(d.amount)) } : {}), ...(Number.isInteger(d.waited_days) ? { waited_days: d.waited_days } : {}) });
+        const key = `${paper}: ${matter}`;
+        frictionCounts.papers[key] = (frictionCounts.papers[key] ?? 0) + 1;
+        if (paper === "decision" && d.finding) { const f = `${String(blk.speaks_for ?? who)}: ${matter}: ${d.finding}`; frictionCounts.findings[f] = (frictionCounts.findings[f] ?? 0) + 1; }
+      }
       if (b.command === "act" && b.provenance?.via === "translator" && b.provenance.draft) {
         bySeqDraft.set(e.seq, b.provenance.draft);
         tr(b.provenance.draft, e.t, who).executed = { seq: e.seq, applied: true };
@@ -383,6 +414,12 @@ export async function exportDataset(logPath: string, outDir: string, o: DatasetO
   const wr = await wantRows.close();
   if (wr.rows) files["wants.jsonl"] = wr;
   else await Bun.file(join(outDir, "wants.jsonl")).delete();
+  const fr = await frictionRows.close();
+  if (fr.rows) files["frictions.jsonl"] = fr;
+  else await Bun.file(join(outDir, "frictions.jsonl")).delete();
+  const vr = await venueRows.close();
+  if (vr.rows) files["venues.jsonl"] = vr;
+  else await Bun.file(join(outDir, "venues.jsonl")).delete();
   const obs = await observations.close();
   if (obs.rows) files["observations.jsonl"] = obs;
   else await Bun.file(join(outDir, "observations.jsonl")).delete();
@@ -413,6 +450,9 @@ export async function exportDataset(logPath: string, outDir: string, o: DatasetO
     // routine). Counted, never scored.
     ...(wr.rows ? { wants: { people: { holders: wantsOf.people.size, ...sorted(wantCounts.people) }, organisations: { holders: wantsOf.organisations.size, ...sorted(wantCounts.organisations) },
       acts: { by_people: actsByPeople, on_initiative: actsOnInitiative } } } : {}),
+    // Everyday frictions (docs/behaviour/frictions.md): what arose, by matter; how each ended, by matter and how;
+    // the papers grievances travelled on, by paper and matter; and what venues found, by venue, matter and finding.
+    ...(fr.rows || vr.rows ? { frictions: { arose: sortedCounts(frictionCounts.arose), ended: sortedCounts(frictionCounts.ended), papers: sortedCounts(frictionCounts.papers), findings: sortedCounts(frictionCounts.findings) } } : {}),
     files,
   };
   await Bun.write(join(outDir, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);

@@ -305,7 +305,8 @@
               "adico",
               "formal",
               "assertion",
-              "registry"
+              "registry",
+              "hears"
             ]
           },
           "maxItems": 8

@@ -1312,9 +1312,50 @@
       "survey_hours_per_ha": 1,
       "survey_staff": 1,
       "spin_up_years": 10
+    },
+    "frictions": {
+      "per_adult_bps_per_year": {
+        "landlord": 45,
+        "wages": 70,
+        "bill": 735,
+        "benefits": 80,
+        "goods": 230
+      },
+      "put_right_on_asking_bps": {
+        "disrepair": 5650,
+        "underpaid": 5650,
+        "bill": 5650,
+        "claim_refused": 5650,
+        "goods": 5650,
+        "other": 5650
+      },
+      "pay_short_by_bps": 500,
+      "bill_over_bps": 3000,
+      "goods_faulty_share_bps": 2500,
+      "repair_hours": 16,
+      "support": {
+        "processing_days": 14,
+        "wrong_refusal_bps": 93
+      },
+      "venues": {
+        "answer_days": 14,
+        "tribunal_days": 42,
+        "tribunal_fee_hours_of_pay": 3,
+        "cases_per_day": 4,
+        "uphold_without_proof_bps": 5000
+      }
     }
   },
   "sources": {
+    "frictions": "Everyday frictions (docs/behaviour/frictions.md): what goes wrong, how often, and how the bodies that hear it work. Read by the generator only for a town whose spec has `living`.",
+    "frictions.per_adult_bps_per_year": "Of adults, the share who had each kind of problem, a year: half the share who had it in the last two years in World Justice Project, Global Insights on Access to Justice 2019 (General Population Poll 2017-18, about 1,000 respondents a country; the summary statistics workbook was opened; national, and for Brazil and Mexico the three largest cities only). landlord: a problem with a landlord over agreements, payments, repairs, deposits or eviction (0.9% in two years; all of it is given to disrepair here, which overstates repairs: the town has no other landlord problem of the kind yet). wages: difficulty obtaining wages or employment benefits agreed in advance (1.4%). bill: major disruption of a utility's supply or incorrect billing (14.7%; all of it is given to wrong bills). benefits: difficulty obtaining public benefits or government assistance (1.6%). goods: a consumer problem (19.3%) less the utility share, since the survey's consumer problems include it (derived; poor professional services are in it too). The generator turns each into a rate for those exposed (a let dwelling, a job, a customer, a claim) with the town's own counts. Halving a two-year share understates a yearly one where people have a problem in both years (to confirm against a yearly survey).",
+    "frictions.put_right_on_asking_bps": "Asked to put it right, how often the other side does. PLACEHOLDERS, every one: each stands at the share of people with any problem who say it is done and fully resolved (56.5%: World Justice Project, Global Insights on Access to Justice 2019 (General Population Poll 2017-18, about 1,000 respondents a country; the summary statistics workbook was opened; national, and for Brazil and Mexico the three largest cities only)), which is an outcome of everything people tried, not the rate at which the other side agrees when asked: to replace with a figure by kind of problem.",
+    "frictions.pay_short_by_bps": "PLACEHOLDER: by how much pay that comes short is short (5%). No figure was found for this place.",
+    "frictions.bill_over_bps": "PLACEHOLDER: by how much a wrong bill overstates what was used (30%). No figure was found.",
+    "frictions.goods_faulty_share_bps": "PLACEHOLDER: of a shopping trip's goods, the share that is faulty when some are (a quarter). No figure was found.",
+    "frictions.repair_hours": "PLACEHOLDER: the hours of a builder's hand a repair takes (two days' work). No figure was found for a typical rental repair.",
+    "frictions.support": "processing_days: PLACEHOLDER (a fortnight); no figure was opened for this place. wrong_refusal_bps: of claims that qualify, the share wrongly refused. FITTED in the 1,000-person town of the first profile (7% of qualifying claims gives about as many refusals a year as 6% of adults, its survey share with difficulty obtaining public benefits, counting the refusals that are right), and for every other place scaled by its own survey share against that one: a stand-in until a place's own rate of decisions changed on review is found.",
+    "frictions.venues": "tribunal_days: PLACEHOLDER (six weeks); no median time to disposal was found for this place. answer_days (the time the other side is given to answer a desk), tribunal_fee_hours_of_pay (the fee as hours of a shop worker's pay), cases_per_day (cases a desk's staff decide in a day) and uphold_without_proof_bps (how often a desk finds for someone with nothing to show, where the other side cannot say from its records): PLACEHOLDERS; no figure was opened.",
     "outlook": "How people start out in what they trust (docs/behaviour/citizen.md, 'The record'). National figures for Mexico, not the region's: none by region was found. trust: the share with 'a great deal' or 'quite a lot' of confidence in each kind of institution (`government`, `policing`: the police, `courts`, the civil service, banks, the press, labour unions, churches or religious organisations, major companies); people_bps: the share who say most people can be trusted. World Values Survey and European Values Study, joint wave 7 (fieldwork 2017 to 2022), as Our World in Data publishes it (ourworldindata.org/grapher/trust-state-institutions-wvs, trust-organizations-wvs, self-reported-trust-attitudes), opened 2026-10-11 through a tool that returns a page's figures in summary: to confirm against the survey's own tables. The share is read as the mean level of trust a person starts with, which is a simplification (a share above a threshold is not a mean). Not stated, so the citizen's own placeholders apply (to source: the survey's question on freedom of choice and control over one's life, its mean and spread, needs the microdata): how much control over their lives people feel (outlook.agency).",
     "outlook.residence": "PLACEHOLDER: no figure for how long people have lived at their address was found for Mexico on a page opened. Borrowed from Australia's (the only place whose figures were opened), for lack of any: ABS, 2021 Census, 'Population movement in Australia' (released 8 November 2022; abs.gov.au/articles/population-movement-australia), opened 2026-10-11: 53.1% of the population lived at the same address five years before the Census; 14.3% changed address within Australia in the year before; 0.7% had lived overseas a year before. Bands here: under 1 year = 14.3 + 0.7 = 15.0%; 1 to under 5 = the rest (31.9%); 5 and over = 53.1%. They are built from the one-year and five-year mobility rates, so the 1 to under 5 band is the remainder, and the 5-and-over share is the share at the same address five years earlier (population aged 5 and over, not adults only). National figures, not Victoria's: the Victoria figures were not found on an opened page. The open band is read as 5 to 15 years by the generator. Mexico's own are probably different (to source: Census or housing-survey tables of years since moving in).",
     "outlook.job_tenure": "How long employed people have been with their current employer (starting attachment to the trade). OECD, 'Employment by job tenure intervals' (dataset OECD.ELS.SAE DSD_TENURE@DF_TENURE_FREQ, measure TENURE_EMP, share of employment by time with the current employer; both sexes, all ages), national figures for Mexico, 2025; read from the OECD SDMX API (sdmx.oecd.org/public/rest/data/OECD.ELS.SAE,DSD_TENURE@DF_TENURE_FREQ) on 2026-10-11, the response opened and the figures copied: under 1 year, 1 to under 3, 3 to under 5, 5 to under 10, 10 and over. National, not the region's: none by region was found. It covers the employed (employees and the self-employed), where a person's tenure is the time in the present job. The open band (10 and over) is read as 10 to 30 years by the generator. The shares sum to 99.9 to 100 in the source and are scaled to 10000.",

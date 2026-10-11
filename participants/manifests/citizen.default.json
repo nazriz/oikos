@@ -1,6 +1,6 @@
 {
   "name": "citizen.default",
-  "version": "0.45.0",
+  "version": "0.46.0",
   "doc": "docs/behaviour/citizen.md",
   "params": {
     "accept_fewer_bedrooms_after_days": {
@@ -262,6 +262,13 @@
       "default": 0,
       "source": "placeholder"
     },
+    "frictions": {
+      "schema": {
+        "type": "object"
+      },
+      "default": {},
+      "source": "placeholder"
+    },
     "gestation": {
       "schema": {
         "type": "integer",
@@ -326,6 +333,11 @@
         "type": "object"
       },
       "default": {},
+      "source": "placeholder"
+    },
+    "job_move": {
+      "schema": {},
+      "default": null,
       "source": "placeholder"
     },
     "leave_after_homeless_days": {
@@ -494,6 +506,11 @@
       "unit": "bps",
       "default": 3300,
       "source": "BoE: renters bid 33% of income"
+    },
+    "rest_days": {
+      "schema": {},
+      "unit": "days",
+      "source": "the world gives it (no default)"
     },
     "retirement_age": {
       "schema": {},

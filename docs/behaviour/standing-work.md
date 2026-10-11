@@ -158,6 +158,7 @@ Townspeople write, apply and complain more in a living town (docs/design/ai-citi
 |---|---|
 | works | `complaint`: a complaint of a collection missed puts the home first on the next round |
 | registry | `death_notification` and `birth_notification`: entered in the register from the notification, and those entitled are told of the entry |
+| a body that hears grievances (`office.desk`: the town's complaints desk, an ombudsman, a consumer desk; [frictions.md](frictions.md)) | `application`: taken in, the one it is against told and given time to answer, and decided when that time has run if the record settles it (the other side's own answer, no answer at all, or a paper the applicant shows); `complaint_response`: filed with its application. A case the record cannot settle (the other side cannot say, the applicant has nothing to show) is put before the office-holder as a note on the office's file (`case_for_decision`), and decided by them on the decision form |
 
 Left without one, because their business is not post sorted by rule: the tribunal's registrar (`enforcement_request`: a clerk's decision on a request, and the tribunal's judge reads the same state), the union (`membership_application`, `membership_update`: the same record of members feeds its bargaining, which a staff part could not share) and the electoral office (`enrolment`: the roll is read whole by the same code that runs the poll). Each would need its module split in parts before it could have a counter.
 

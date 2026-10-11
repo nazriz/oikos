@@ -46,6 +46,16 @@ Three things a profile may state under `employment`, each from its place's labou
 
 Stated by four profiles (ke-nakuru-2026, in-tn-2026, br-mg-2026, mx-jal-2026), each note saying what was opened; work by the day by in-tn-2026 alone. Known to be rough, for their authors: each uses one registered share for all three kinds of employer (the sources divide employees by status, not by employer); the kinds of own-account work are national, outside agriculture; the split of traders between a pitch and home is a placeholder; farming and unpaid family workers are left out everywhere. The other five profiles state nothing: their own-account work is 10 to 15% of employment and nearly all registered (to source, per profile).
 
+## What goes wrong in a place, and what holds people there (2026-10-11)
+
+Three things a profile may state for a living town (a spec with `living`); each is read only then, and left out, the town has none of it. The mechanisms are in docs/behaviour/frictions.md and citizen.md ("Things that go wrong, and what follows").
+
+- **`frictions`**: `per_adult_bps_per_year`, of adults, the share who have each kind of problem in a year (`landlord`, `wages`, `bill`, `benefits`, `goods`); `put_right_on_asking_bps`, by matter, how often the other side puts a thing right when asked; the sizes (`pay_short_by_bps`, `bill_over_bps`, `goods_faulty_share_bps`, `repair_hours`); `support` (`processing_days`, `wrong_refusal_bps`); `venues` (`answer_days`, `tribunal_days`, `tribunal_fee_hours_of_pay`, `cases_per_day`, `uphold_without_proof_bps`). All nine profiles state the yearly shares from one survey (the World Justice Project's, halved from two years; national), so that places can be compared; each note says which of the rest is opened, which is a placeholder and which is fitted. **State a share of adults, not a rate for those exposed:** the generator turns it into a rate for a let home, a job, a customer or a claim with the town's own counts.
+- **`job_move`**: `premium_bps`, `per_year_bps`, `cap_years`, `other_trade_bps`: how much more another job must pay before someone leaves theirs. Stated by au-vic-2026 alone, fitted (its note says to what, and that the fit does not reach the survey's rate, and why).
+- **`belief.living_fade_bps_per_month`**: how fast a belief not kept up fades in a living town, fitted to the place's trend in stated affiliation. Stated by au-vic-2026 alone.
+
+**Keep a figure that only a living town reads out of `outlook`:** everything under `outlook` is given to every person of every town, so a new key there moves every town's state (found on 2026-10-11; `orchestrator/test/living-dial.test.ts` catches it).
+
 ## What a profile states, and what the generator derives
 
 A profile states what can be observed in a place: wages, rents, prices of real things, rates, shares, ages, how its institutions work. The generator derives the rest by formulas that are the same everywhere. An author never picks a scale.
