@@ -9,10 +9,10 @@ export const DOMAIN_ENTITY_RECORD = "oikos.entity_record.v1\n";
 
 /** One change to a record, as the log has it: the command (when, by whom, what was set, why) and the kernel's event
  * (whose record, its count, the chain and the digest of the record after it). */
-export interface RecordChangeEntry { seq: number; t: number; participant: string; entity: string; n: number; set: { [section: string]: unknown }; because?: unknown[]; chain: string; digest: string }
+export interface RecordChangeEntry { seq: number; t: number; participant: string; entity: string; n: number; set: { [section: string]: unknown }; because?: unknown[]; chain: string; digest: string; keeper?: string }
 
 /** A record as rebuilt, and whether every link held. */
-export interface Rebuilt { entity: string; participant: string; n: number; at: number; chain: string; sections: { [section: string]: unknown }; bytes: number; faults: string[] }
+export interface Rebuilt { entity: string; participant: string; n: number; at: number; chain: string; keeper?: string; sections: { [section: string]: unknown }; bytes: number; faults: string[] }
 
 /** The link a change makes over the chain before it, and the digest of the sections after it: as the kernel computes them. */
 export const linkOf = (prev: string, t: number, set: unknown, because: unknown) => hashWithDomain(DOMAIN_ENTITY_RECORD, prev + canonical({ t, set, because: because ?? null }));
@@ -27,6 +27,7 @@ export class Records {
     if (!r) this.of.set(c.entity, (r = { entity: c.entity, participant: c.participant, n: 0, at: 0, chain: "", sections: {}, bytes: 0, faults: [] }));
     const chain = linkOf(r.chain, c.t, c.set, c.because);
     Object.assign(r.sections, c.set);
+    if (c.keeper) r.keeper = c.keeper;
     r.n += 1;
     r.at = c.t;
     r.chain = chain;
@@ -39,7 +40,7 @@ export class Records {
   }
 }
 
-/** Every change to a record in a log, in order (each command joined to the event it caused). `only`: one entity or
+/** Every change to a record in a log, in order (each command joined to the event it caused; a person's or an organisation's). `only`: one entity or
  * participant; `until`: no later than this time. */
 export async function* recordChanges(log: string, o: { only?: string; until?: number } = {}): AsyncGenerator<RecordChangeEntry> {
   let pending: { seq: number; t: number; participant: string; set: any; because?: unknown[] } | undefined;
@@ -49,7 +50,7 @@ export async function* recordChanges(log: string, o: { only?: string; until?: nu
     if (o.until !== undefined && e.t > o.until) break;
     if (e.kind === "command" && e.body?.command === "entity_record") pending = { seq: e.seq, t: e.t, participant: e.body.participant, set: e.body.set, ...(e.body.because ? { because: e.body.because } : {}) };
     else if (e.kind === "event" && e.body?.event === "entity_recorded" && pending && e.body.cause === pending.seq) {
-      const c: RecordChangeEntry = { ...pending, entity: e.body.entity, n: e.body.n, chain: e.body.chain, digest: e.body.digest };
+      const c: RecordChangeEntry = { ...pending, entity: e.body.entity, n: e.body.n, chain: e.body.chain, digest: e.body.digest, ...(e.body.keeper ? { keeper: e.body.keeper } : {}) };
       pending = undefined;
       if (!o.only || o.only === c.entity || o.only === c.participant) yield c;
     }

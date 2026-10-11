@@ -5,6 +5,25 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Charge, Currency, HouseholdSpec, PaymentRule } from "@oikos/participants";
 
+/** Shares of people by years of residence, job tenure or membership: bands in basis points summing to 10000, each but the last under a number of years. */
+export interface TenureBands { bands: { under_years?: number; bps: number }[]; placeholder?: boolean }
+
+/** The problems with a set of bands (empty: well formed): sums to 10000, `under_years` strictly increasing and positive, the last band open. */
+export function tenureBandProblems(b: TenureBands | undefined): string[] {
+  if (!b || !Array.isArray(b.bands) || b.bands.length < 1) return ["no bands"];
+  const out: string[] = [];
+  let last = 0, sum = 0;
+  b.bands.forEach((x, i) => {
+    if (!Number.isInteger(x.bps) || x.bps < 0) out.push(`band ${i}: bps must be a non-negative integer`);
+    sum += x.bps;
+    const open = i === b.bands.length - 1;
+    if (open && x.under_years !== undefined) out.push("the last band must be open (no under_years)");
+    if (!open) { if (!(typeof x.under_years === "number" && x.under_years > last)) out.push(`band ${i}: under_years must be a number above ${last}`); else last = x.under_years; }
+  });
+  if (sum !== 10_000) out.push(`bands sum to ${sum}, not 10000`);
+  return out;
+}
+
 export interface Profile {
   id: string;
   place: string;
@@ -86,7 +105,14 @@ export interface Profile {
      * banks, press, unions, religious, companies: whichever the place's survey gives), the share who say most people
      * can be trusted, and the mean and spread of how much control over their lives people feel. Whatever is left out
      * starts from the citizen's own placeholder. */
-    outlook?: { trust?: { [kind: string]: number }; people_bps?: number; agency?: { mean_bps: number; sd_bps: number } };
+    outlook?: { trust?: { [kind: string]: number }; people_bps?: number; agency?: { mean_bps: number; sd_bps: number };
+      /** Of those who asked for something, the share who got it: a pay rise from an employer (docs/behaviour/firm-wants.md). */
+      asked?: { rise_granted_bps?: number };
+      /** How long adults have lived at their address, how long the employed have been in their job, and (if a source exists) how long
+       * people have belonged to a group they take part in: bands of shares of adults, in basis points summing to 10000, each with
+       * `under_years` (strictly increasing), the last open (no `under_years`). `placeholder: true` marks a borrowed figure
+       * (its source text begins "PLACEHOLDER:"). They set what attachment people start with (docs/profiles.md). */
+      residence?: TenureBands; job_tenure?: TenureBands; group_years?: TenureBands };
     /** The law on industrial action. A place that requires no ballot leaves both ballot figures out; one that requires
      * no notice either leaves that out too (and no such law is written). */
     industrial_action: { ballot_turnout_bps?: number; ballot_pass_bps?: number; notice_days?: number; paid_during_action: boolean };

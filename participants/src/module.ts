@@ -41,6 +41,8 @@ export interface WorldInfo {
   runEnd: number;
   /** How the world's money is written (its config's first currency): what amounts in words are read and written in. */
   currency: Currency;
+  /** Dials of a living world (docs/design/ai-citizens.md 10j), as the world's config sets them. Absent: every dial is off. */
+  dials?: { [name: string]: unknown };
 }
 
 /**
@@ -158,6 +160,11 @@ export interface Routine {
    * parameter that names the paper, with the paper where none is given. A standing order may name it in place of
    * how often, or say nothing. */
   follows?: [param: string, otherwise: string];
+  /** For the task `answer` (the office's counter): the kinds of incoming paper its counter staff sort and answer under
+   * the office's procedure, and how, in plain words. Offered only where the town's description has `living` (and not
+   * `counter: false`); the office-holder is not brought back for these, and sees a count and a sample. Anything
+   * addressed to the office-holder's own post, or resting on a paper of theirs, reaches them whatever its kind. */
+  papers?: { kind: string; how: string }[];
 }
 
 /**
@@ -246,12 +253,13 @@ export interface DecisionRecord {
  * A change to a person's own record (docs/design/ai-citizens.md 10d), carried with a code participant's action as a
  * non-enumerable property under this symbol: the bookkeeping of a code mind, never part of the action and never
  * anything a participant can ask for (the participant API has no such act). The orchestrator hands it to the kernel,
- * which holds the record and is its only writer, for participants run by code and for no other.
+ * which holds the record and is its only writer, when it comes from the bookkeeping the world's config names as the
+ * keeper of that entity's record (a person's: its own module; an organisation's: the module of its keeping post).
  */
 export const RECORD = Symbol.for("oikos.record");
 /** `set`: the sections that changed, each whole (contracts/entity-record.schema.json); `because`: what happened since
  * the last change, in the mind's own short terms. Whole numbers throughout. */
-export interface RecordChange { set: { [section: string]: unknown }; because?: { t: number; what: string; about?: string; size: number }[] }
+export interface RecordChange { set: { [section: string]: unknown }; because?: { t: number; what: string; about?: string; size: number; by?: string }[] }
 export const OUTCOMES = Symbol.for("oikos.outcomes");
 /**
  * One thing a citizen learned of how something went, when and as it came to know it: never more than it knew. Facts,

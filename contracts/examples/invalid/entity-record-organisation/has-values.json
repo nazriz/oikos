@@ -1,0 +1,44 @@
+{
+  "character": {
+    "keep_trading": 5400,
+    "grow": 4100,
+    "keep": 6800,
+    "be_rid": 3900,
+    "pay_less": 3600,
+    "standing": 6500
+  },
+  "wants": [
+    {
+      "about": "arrears",
+      "whom": "c0220",
+      "seeks": [
+        {
+          "money": {
+            "to": "me"
+          }
+        }
+      ],
+      "weight": 4200,
+      "since": 7776000,
+      "from": "event",
+      "tried": 1,
+      "way": "notice"
+    }
+  ],
+  "memory": {
+    "recent": [
+      {
+        "t": 6912000,
+        "what": "held_rent",
+        "about": "c0113",
+        "size": 2000
+      }
+    ]
+  },
+  "circumstances": {
+    "granted": 1,
+    "homes": 14,
+    "refused": 2
+  },
+  "values": {}
+}

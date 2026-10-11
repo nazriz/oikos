@@ -1,0 +1,16 @@
+{
+  "body": {
+    "cause": 137,
+    "chain": "12b7f7649c7ca6eb99aabcf3a5fe1d37f602458825270cc0fb20ae3fd2e32839",
+    "digest": "92543fb5dca5361a392066499255c0cde21e51cb88f6daf7b4cdea686d58973d",
+    "entity": "city",
+    "event": "entity_recorded",
+    "n": 1,
+    "keeper": "city.finance_officer"
+  },
+  "hash": "b50bccc725dc39b456412a9e799bed936acb3dea1800f82365818c69832bf758",
+  "kind": "event",
+  "prev": "3a55f05d0712f9814263b4d736bfbdbf23f7237d1264cd197f2d84ccba5b3761",
+  "seq": 138,
+  "t": 0
+}

@@ -46,6 +46,9 @@ pub struct Config {
     #[serde(default, skip_serializing_if = "Knowing::is_empty")]
     pub knowing: Knowing,
     pub caps: Caps,
+    /// Dials of a living world (docs/design/ai-citizens.md 10j). Opaque to the kernel; absent, every dial is off.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dials: Option<BTreeMap<String, Value>>,
     /// Enforced by the orchestrator; the kernel only records it.
     pub orchestration: Value,
 }
@@ -722,6 +725,10 @@ pub struct ParticipantCfg {
     /// A system's: how many acts it carries out at once (docs/design/rebuild.md 6.3). A person has one timeline.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub lanes: Option<u32>,
+    /// The platform bookkeeping module that keeps this participant's person's record (e.g. "citizen.default").
+    /// Absent: a code controller's module keeps it; any other controller has none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub record_keeper: Option<String>,
 }
 
 /// A role through which a participant acts for an organisation.
@@ -741,6 +748,19 @@ pub struct PositionCfg {
     pub role_module: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub holder: Option<Id>,
+    /// The bookkeeping of this post (its `role_module.code`) keeps the record of the organisation it belongs to.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub keeps_record: bool,
+}
+
+impl PositionCfg {
+    /// The bookkeeping that keeps the organisation's record through this post, if it is the keeping post.
+    pub fn record_keeper_name(&self) -> Option<&str> {
+        if !self.keeps_record {
+            return None;
+        }
+        self.role_module.as_ref()?.get("code")?.as_str()
+    }
 }
 
 /// A kind of participant that may come into being during the run (a newcomer, a child, a deployed system).
@@ -2009,6 +2029,15 @@ pub fn validate(c: &Config) -> Result<(), String> {
             }
         }
         check_channels(&format!("position {}", p.id), &p.channels, &seat!(Some(p.entity.as_str())))?;
+        if p.keeps_record && p.record_keeper_name().is_none() {
+            return Err(format!("position {}: keeps_record needs a role_module with a code", p.id));
+        }
+    }
+    let mut keeping: BTreeMap<&str, &str> = BTreeMap::new();
+    for p in c.positions.iter().filter(|p| p.keeps_record) {
+        if let Some(first) = keeping.insert(p.entity.as_str(), p.id.as_str()) {
+            return Err(format!("positions {first} and {} both keep the record of {}: at most one position of an organisation does", p.id, p.entity));
+        }
     }
 
     // Life: bands must make sense.

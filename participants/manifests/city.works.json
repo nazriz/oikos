@@ -32,6 +32,13 @@
       "default": "collect",
       "source": "placeholder"
     },
+    "counter": {
+      "schema": {
+        "type": "boolean"
+      },
+      "default": false,
+      "source": "placeholder"
+    },
     "depot": {
       "schema": {
         "type": "string",
@@ -529,6 +536,18 @@
       "at": "depot",
       "every": 1,
       "what": "With the hours the round leaves, the crew keeps up the most worn of the town's own assets, and someone is sent to inspect an asset nobody has seen."
+    },
+    {
+      "task": "answer",
+      "at": "depot",
+      "every": 1,
+      "what": "The office's counter staff sort the day's post that is routine under this procedure and answer it, each working day, so that the works manager is not brought back for it.",
+      "papers": [
+        {
+          "kind": "complaint",
+          "how": "a complaint of a collection missed puts the home first on the next round of collection"
+        }
+      ]
     }
   ]
 }

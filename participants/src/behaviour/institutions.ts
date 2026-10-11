@@ -11,7 +11,7 @@ import type { LookRequest, Observation, SiteStructure, StatementRecord } from ".
 import { channels } from "../contracts";
 import { standingClaims } from "../law";
 import { need, params, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
-import { ask, Asked, Directions, goSee, ownerLooks, visited, VISIT_MAX, nextLook, because, Book, prohibitions, holdsOf, noting, cellsOf, commitmentOf, DAY, Letters, lotOf, ownAccount, record, say, sign, type Step, usd, withdraw, outOfTime, team } from "./common";
+import { ask, Asked, Directions, goSee, ownerLooks, visited, VISIT_MAX, nextLook, because, Book, prohibitions, holdsOf, noting, cellsOf, commitmentOf, DAY, Letters, lotOf, ownAccount, record, say, sign, type Step, usd, withdraw, outOfTime, team, StandingWork, CounterWork } from "./common";
 import { Deliveries, goodsPrices, held, order } from "./trade";
 import { Bargaining, Staffing, stepper, WindingUp } from "./firms";
 import * as P from "./papers";
@@ -742,6 +742,11 @@ export const landRegistry: BehaviourModule = {
 export const registry: BehaviourModule = {
   name: "city.registry",
   answers: {"office": "the registry of births, deaths and marriages", "acts": "What it acts on: a notification of a death or of a birth, which it enters in its register; it sends the entry to whoever reported it and to those the notification names.", "report": true},
+  routines: [{ task: "answer", at: "office", every: 1, what: "The office's counter staff enter in the register each notification of a death or of a birth that comes to the office, and those entitled are told, each working day, so that the registrar is not brought back for it.",
+    papers: [
+      { kind: "death_notification", how: "entered in the register from the notification, and those entitled are told of the entry" },
+      { kind: "birth_notification", how: "entered in the register from the notification, and those entitled are told of the entry" },
+    ] }],
   issues: P.REGISTRY,
   issuesWith: (p) => ({ feeds: p.feeds ?? [], land_registry: p.land_registry }),
   version: "0.7.0", // 0.7.0: keeps no register of land: it applies to the land registry for a dead owner's titles to pass; 0.6.0: registers births
@@ -758,6 +763,12 @@ export const registry: BehaviourModule = {
         estate_tells: [] as string[],
         // The land registry: where it applies for a dead owner's land to pass to their heir (none: land is left as it is).
         land_registry: "",
+        // Which part of the office this is (docs/behaviour/standing-work.md): "" the whole office, as code runs one;
+        // "seat" the registrar alone; "staff" the counter staff, who enter notifications under a standing order.
+        part: "" as "" | "seat" | "staff", office: "",
+        // Whether the town gives the office a counter (its `answer` routine): then its staff enter notifications, only
+        // while a standing order for it is in force. Not given: whoever runs the office does, as ever.
+        counter: false,
       },
       ctx.params,
     );
@@ -766,19 +777,25 @@ export const registry: BehaviourModule = {
     const read = new Set<string>(); // notifications dealt with
     const born = new Set<string>();
     const letters = new Letters(registry.answers);
+    const routines = new StandingWork(ctx.entity, p.part, ctx.position ? new Set([ctx.position.replace(/-staff$/, "")]) : undefined);
+    const counter = new CounterWork(routines, !!p.counter);
     return stepper(
       (obs) => {
         book.absorb(obs);
-        letters.take(obs, book);
+        if (p.part !== "staff") letters.take(obs, book);
       },
       (obs) => {
         const me = obs.entity;
         const steps: Step[] = [];
+        steps.push(...routines.set(book, counter.order(p.office || ctx.position || "office")));
         for (const r of book.all("death_registration")) registered.add(r.data?.deceased);
-        for (const n of book.open("death_notification")) {
+        // (At the counter, where the town gives the office one: its staff, under a standing order for it.)
+        const counting = counter.works(book, obs.t);
+        for (const n of counting ? book.open("death_notification") : []) {
           const who = n.data?.deceased;
           if (!who || read.has(n.id) || !(n.addressed_to ?? []).includes(me)) continue;
           read.add(n.id);
+          counter.answered("death_notification");
           // Already registered, and reported again by someone who was not sent the entry (a landlord who has found a
           // tenant the police reported): they are given a certified copy, as a later informant is told it is done.
           if (registered.has(who)) {
@@ -807,16 +824,23 @@ export const registry: BehaviourModule = {
             say("transmission_application", `Transmission on death: whatever land ${who} held passes to ${heir}.`, { to: [p.land_registry], basis: n.id, data: { deceased: who, heir } })));
         }
         // A birth reported to us: registered, and the entry sent to whoever reported it and to those sent every entry.
-        for (const n of book.open("birth_notification")) {
+        for (const n of counting ? book.open("birth_notification") : []) {
           const child = n.data?.child;
           if (typeof child !== "string" || born.has(child) || !(n.addressed_to ?? []).includes(me)) continue;
           born.add(child);
+          counter.answered("birth_notification");
           const told = [...new Set([n.speaks_for, ...p.feeds].filter((x): x is string => typeof x === "string" && x !== me))];
           steps.push(because(`A birth is reported to us (${child}, by ${n.speaks_for}): registering it.`, say("birth_registration", `Birth registered: ${child}.`, {
             basis: n.id, to: told, visible: [me, ...told], data: { child, born_at: n.data?.born_at, mother: n.data?.mother },
           })));
         }
-        steps.push(...letters.answer(() => `Report from the registrar: ${born.size ? `${born.size} births and ` : ""}${registered.size} deaths registered${registered.size ? ` (${[...registered].sort().join(", ")})` : ""}.`));
+        if (counting) counter.flush(obs.t);
+        if (p.part === "staff" && counter.offered) {
+          const report = routines.report(book, obs.t, { office: (ctx.position ?? "").replace(/-staff$/, ""), from: "the registry's counter staff", tasks: { ...counter.tasks } });
+          counter.reported(report);
+          steps.push(...report);
+        }
+        if (p.part !== "staff") steps.push(...letters.answer(() => `Report from the registrar: ${born.size ? `${born.size} births and ` : ""}${registered.size} deaths registered${registered.size ? ` (${[...registered].sort().join(", ")})` : ""}.`));
         return steps;
       },
     );

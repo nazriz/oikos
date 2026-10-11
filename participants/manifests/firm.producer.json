@@ -1,6 +1,6 @@
 {
   "name": "firm.producer",
-  "version": "0.4.4",
+  "version": "0.5.0",
   "doc": "docs/behaviour/producer.md",
   "params": {
     "builder": {
@@ -67,6 +67,11 @@
       "default": "",
       "source": "placeholder"
     },
+    "initiative": {
+      "schema": {},
+      "default": null,
+      "source": "placeholder"
+    },
     "labour_per_unit": {
       "schema": {
         "type": "integer",
@@ -124,11 +129,23 @@
       "default": 14,
       "source": "placeholder"
     },
+    "org": {
+      "schema": {
+        "type": "object"
+      },
+      "default": {},
+      "source": "placeholder"
+    },
     "output": {
       "schema": {
         "type": "string"
       },
       "default": "goods",
+      "source": "placeholder"
+    },
+    "owner_values": {
+      "schema": {},
+      "default": null,
       "source": "placeholder"
     },
     "per_unit": {
@@ -260,6 +277,13 @@
       },
       "unit": "bps",
       "default": 7500,
+      "source": "placeholder"
+    },
+    "values": {
+      "schema": {
+        "type": "object"
+      },
+      "default": {},
       "source": "placeholder"
     },
     "vartheta_bps": {

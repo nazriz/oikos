@@ -412,6 +412,10 @@ pub enum EventBody {
         n: u64,
         chain: String,
         digest: String,
+        /// Who keeps this entity's record under the config (the bookkeeping module's name): by whose bookkeeping
+        /// the change was made. Absent in logs written before it was named.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        keeper: Option<String>,
     },
 }
 

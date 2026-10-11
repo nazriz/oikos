@@ -1,0 +1,10 @@
+{
+  "run": "town-1000.seed1",
+  "t": 3456000,
+  "seq": 812345,
+  "entity": "c0113",
+  "event": "pursued",
+  "about": "rent_increase",
+  "weight": 2370,
+  "by": "ask"
+}

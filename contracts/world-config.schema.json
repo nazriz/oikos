@@ -779,6 +779,18 @@
         }
       }
     },
+    "dials": {
+      "description": "Dials of a living world (docs/design/ai-citizens.md 10j). Opaque to the kernel; absent, every dial is off and the world is as before.",
+      "type": "object",
+      "properties": {
+        "initiative_bps": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        }
+      },
+      "additionalProperties": true
+    },
     "orchestration": {
       "description": "Recorded so the run is fully described; enforced by the orchestrator, not the kernel.",
       "type": "object",
@@ -2464,6 +2476,11 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 100000
+        },
+        "record_keeper": {
+          "description": "The name of the platform bookkeeping module that keeps this participant's person's record (e.g. \"citizen.default\"). Absent: a participant whose controller is {type: code, impl: M} has keeper M; any other controller has none, and nothing can set its person's record (docs/design/ai-citizens.md 10d).",
+          "type": "string",
+          "minLength": 1
         }
       }
     },
@@ -2501,6 +2518,10 @@
         },
         "holder": {
           "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId"
+        },
+        "keeps_record": {
+          "description": "The bookkeeping of this post (its role_module.code) keeps the record of the organisation the post belongs to (default false). At most one position of an organisation has it, and it needs a role_module with a code. Whoever holds it may set that record through the entity_record command's `entity`.",
+          "type": "boolean"
         }
       }
     },

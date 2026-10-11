@@ -1,0 +1,11 @@
+{
+  "run": "town-1000.seed1",
+  "t": 3456000,
+  "seq": 812345,
+  "entity": "landlord-3",
+  "event": "born",
+  "about": "arrears",
+  "weight": 2370,
+  "by": "ask",
+  "organisation": true
+}

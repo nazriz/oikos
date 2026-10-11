@@ -182,6 +182,8 @@ interface Pos {
   channels: any[];
   role_module?: any;
   holder?: string;
+  /** The bookkeeping of this post keeps the record of its organisation (the world's config: `keeps_record`). */
+  keeps_record?: boolean;
 }
 
 /** One scheduled unit: a code participant's capacity, or a language-model participant. */
@@ -344,7 +346,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     parts.set(p.id, { id: p.id, kind: p.kind, person: p.person, owner: p.owner, title: p.title, controller: p.controller, framing: p.framing, on_opt_out: p.on_opt_out, traits: p.traits, ended: false });
     if (p.person) participantOf.set(p.person, p.id);
   }
-  for (const x of cfg.positions) positions.set(x.id, { id: x.id, entity: x.entity, title: x.title, role: x.role, channels: x.channels ?? [], role_module: x.role_module, holder: x.holder });
+  for (const x of cfg.positions) positions.set(x.id, { id: x.id, entity: x.entity, title: x.title, role: x.role, channels: x.channels ?? [], role_module: x.role_module, holder: x.holder, ...(x.keeps_record ? { keeps_record: true } : {}) });
   const personalChannels = (p: Part) => (cfg.participants.find((x: any) => x.id === p.id)?.channels ?? templates.get((p as any).template)?.channels ?? []) as any[];
 
   const units = new Units();
@@ -363,7 +365,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     ...(cap === "self" ? {} : { position: cap }),
     rng: (purpose) => randomness.stream(["participant", pid, cap, String(Math.floor(t / tick) * tick), purpose]),
     chance: (purpose) => randomness.stream(["chance", purpose]),
-    world: { tickSeconds: tick, runEnd, currency },
+    world: { tickSeconds: tick, runEnd, currency, ...(cfg.dials ? { dials: cfg.dials } : {}) },
     ...(consult ? { consult } : {}),
     // Keys sorted: the log keeps the config in canonical form, so a resumed run must see its parameters exactly as the
     // original did, whatever order the world's author wrote them in.
@@ -1095,8 +1097,8 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
           if (outcomes?.length && !lean && o.recordDecisions !== "none") await k.request({ op: "annotate", annotation: { annotation: "outcome", subject: x.u.participant, data: { outcomes } } });
           // A code mind's change to its own record (docs/design/ai-citizens.md 10d): the kernel holds it and is its
           // only writer. It is state, so it is written in every run, whatever the log keeps.
-          const change = recordChangeOf(x.u, r.value);
-          if (change) await command({ command: "entity_record", participant: x.u.participant, set: change.set, ...(change.because?.length ? { because: change.because } : {}) });
+          const change = recordChangeOf(x.u, r.value, positions);
+          if (change) await command({ command: "entity_record", participant: x.u.participant, ...(change.entity ? { entity: change.entity } : {}), set: change.set, ...(change.because?.length ? { because: change.because } : {}) });
           if (thinkingCosts) {
             // Its thinking: a model's by the tokens it just used (logged, so a replay is exact), code's a fixed time.
             const used = (notes.get(x.u.participant) ?? []).filter((a: any) => a.annotation === "usage" && a.purpose === "participant") as any[];
@@ -1197,14 +1199,23 @@ function sortedKeys(v: unknown): unknown {
 }
 
 /**
- * The change to its own record that a code participant's action carries, if this is one whose record is its own
- * bookkeeping to keep (docs/design/ai-citizens.md 10d): a participant run by code, acting as itself. Whatever a model
- * returns, and whatever the code behind a model seat returns (a mock's brain, a stand-in), sets nothing: a model has
- * no way to write who it is. The participant API has no act for it, and a symbol cannot come out of a model's JSON;
- * this is the second lock, and the kernel's refusal of the command for a participant not run by code the third.
+ * The change to a record that an action carries, and whose record it is (`entity`, absent: the participant's own
+ * person's), if it comes from the platform's bookkeeping for that entity (docs/design/ai-citizens.md 10d). A record is
+ * written by the platform's bookkeeping for that entity, named in the world's config, and by nothing a model can reach:
+ * - a code module acting as itself sets its own person's record;
+ * - a code role module acting in a post sets the record of the post's organisation if and only if the world says that
+ *   post keeps it (`keeps_record`) and the module is the one the post names; otherwise the change is dropped.
+ * Whatever a model returns, and whatever the code behind a model seat returns (a mock's brain, a stand-in), sets nothing.
+ * Three locks: (a) the participant API has no act for it, and a symbol cannot come out of a model's JSON; (b) only the
+ * named keeper's own output is taken, here; (c) the kernel refuses the command for an entity with no keeper named in
+ * the config, and for an organisation unless the participant now holds the keeping post.
  */
-export function recordChangeOf(u: { llm?: unknown; capacity?: string }, action: unknown): RecordChange | undefined {
-  if (u.llm || u.capacity !== "self" || !action || typeof action !== "object") return undefined;
+export function recordChangeOf(u: { llm?: unknown; capacity?: string; participant?: string; module?: { name: string } }, action: unknown, positions?: Map<string, Pos>): (RecordChange & { entity?: string }) | undefined {
+  if (u.llm || !u.capacity || !action || typeof action !== "object") return undefined;
   const c = (action as any)[RECORD] as RecordChange | undefined;
-  return c && c.set && Object.keys(c.set).length ? c : undefined;
+  if (!c || !c.set || !Object.keys(c.set).length) return undefined;
+  if (u.capacity === "self") return (c as { entity?: string }).entity === undefined ? c : { set: c.set, ...(c.because ? { because: c.because } : {}) };
+  const post = positions?.get(u.capacity);
+  if (!post?.keeps_record || !post.role_module?.code || post.role_module.code !== u.module?.name || post.holder !== u.participant) return undefined;
+  return { ...c, entity: post.entity };
 }

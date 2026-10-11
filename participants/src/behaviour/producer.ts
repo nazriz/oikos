@@ -1,6 +1,7 @@
 // firm.producer: a factory, after Lengnick (2013), with inputs, wholesale and exports (phase B). Documented in
 // docs/behaviour/producer.md, with sources.
 
+import { keeping, Org, type OrgParams } from "./orgwants";
 import * as C from "../calls";
 import { cents } from "../money";
 import type { Observation } from "../contracts";
@@ -10,7 +11,7 @@ import { nextLook, because, Book, publishedPrice as buildingPrice, DAY, MONTH, o
 import { Bargaining, Staffing, stepper, WindingUp } from "./firms";
 import { Borrowing } from "./credit";
 import { distribute, LENGNICK, movePrice, moveWage, payOut } from "./lengnick";
-import { Deliveries, fill, goodsPrices, held, order, OrderBook, priceList } from "./trade";
+import { Committed, Deliveries, fill, goodsPrices, held, order, OrderBook, priceList } from "./trade";
 import * as P from "./papers";
 
 /**
@@ -25,7 +26,7 @@ export const producer: BehaviourModule = {
   name: "firm.producer",
   issues: [P.JOB_ADVERTISEMENT, ...P.TRADE],
   issuesWith: (p) => ({ ...P.staffingOwn({ role: p.role ?? "factory worker", industry: p.industry, workplace: p.workplace, notice_days: p.notice_days ?? 14 }) }),
-  version: "0.4.4", // 0.4.4: takes on the share of its hands the world gives by the day; 0.4.3: registers the share of its jobs the world gives for its kind
+  version: "0.5.0", // 0.5.0: wants of its own (docs/behaviour/firm-wants.md): a character from its owner's values, which answers a worker who asks for a rise, and a record of its own; 0.4.5: money promised in orders the bank has not yet paid out is not spent again by the next wake (one works placed the same order 40 times in a day); 0.4.4: 0.4.4: takes on the share of its hands the world gives by the day; 0.4.3: registers the share of its jobs the world gives for its kind
   doc: "docs/behaviour/producer.md",
   cadence: () => DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(24) * 3600,
@@ -66,10 +67,18 @@ export const producer: BehaviourModule = {
         reprice_bps: 1000, // by this much (placeholder)
         builder: "", // whose published prices say what our premises are worth (none: closed, they're not sold)
         premises_sale_bps: 5000, // closed, our premises are offered at this share of what building them new costs (placeholder)
+        // Wants of its own (docs/behaviour/firm-wants.md): whether it takes initiative (none given: its own draw
+        // against the world's dial), the values of whoever owns most of it and the town's figures they are read
+        // against (the world's), and the sizes (`org`: placeholders).
+        initiative: null as boolean | null,
+        owner_values: null as { [value: string]: number } | null,
+        values: {} as { [value: string]: { mean_bps: number; sd_bps: number } },
+        org: {} as Partial<OrgParams>,
         ...LENGNICK, // Lengnick (2013), Table 1
       },
       ctx.params,
     );
+    const org = new Org(ctx, { initiative: p.initiative, owner_values: p.owner_values, values: p.values, org: p.org });
     need(p, ["supplier", "market"], "firm.producer");
     const me = ctx.entity;
     const book = new Book();
@@ -85,6 +94,7 @@ export const producer: BehaviourModule = {
 
     const orders = new OrderBook(me);
     const deliveries = new Deliveries();
+    const committed = new Committed(); // inputs paid for with orders whose payment the bank has not yet made
     const onOrder = new Map<string, number>(); // inputs ordered, not yet delivered
     const orderQty = new Map<string, { kind: string; quantity: number }>();
     const used = new Map<string, number>(); // worker -> seconds worked today
@@ -114,12 +124,14 @@ export const producer: BehaviourModule = {
     };
     const hourly = () => Math.ceil((wage * 3600) / ((p.period / DAY) * (p.work_days / 7) * p.working_day));
 
-    return Object.assign(stepper(
+    staffing.org = org;
+    return keeping(org, Object.assign(stepper(
       (obs) => {
         book.absorb(obs);
         staffing.absorb(obs);
         winding.absorb(obs, ownAccount(obs)?.account);
         orders.take(obs, ownAccount(obs)?.account);
+        committed.take(obs, ownAccount(obs)?.account);
         for (const d of deliveries.take(book, me)) {
           const o = orderQty.get(d.order);
           if (!o) continue;
@@ -202,6 +214,7 @@ export const producer: BehaviourModule = {
         // ---- staff: this month's headcount (hiring for it, or replacing someone who's left) ----
         // Bargaining with a union (docs/behaviour/unions.md): a claim answered, an agreement's rise, a strike.
         steps.push(...bargaining.steps(book, t, staffing, acc.account, acc.balance, (rise) => { wage = Math.floor((wage * (10_000 + rise)) / 10_000); }));
+        steps.push(...staffing.asked(book, t, acc.account, acc.balance));
         steps.push(...staffing.routine(obs, book, acc.account, {
           // Only with room at the workplace (someone let go may still be there, working out their notice).
           target: trading ? Math.min(p.max_staff, headcount) : 0, wage, canPost: trading && acc.balance >= Math.floor(((workers.length + 1) * wage * MONTH) / p.period) && roomAtWork(obs, workers.length) > 0,
@@ -253,7 +266,7 @@ export const producer: BehaviourModule = {
         // wages fall due within the fortnight. (Until 2026-10-08 the whole balance went on an order: a works holding a
         // month's inputs spent its payroll on the next half month's, and gave its staff notice for want of the payroll.)
         const plan = monthlyUnits(workers.length);
-        let spare = acc.balance - Math.max(workers.length, headcount) * wage;
+        let spare = acc.balance - committed.owed - Math.max(workers.length, headcount) * wage;
         for (const [kind, per] of Object.entries(p.per_unit).sort(([a], [b]) => (a < b ? -1 : 1))) {
           if (winding.state !== "trading") break; // winding up: no more buying
           const have = held(obs, p.works, kind) + (onOrder.get(kind) ?? 0);
@@ -266,13 +279,17 @@ export const producer: BehaviourModule = {
           const q = Math.min(want, Math.floor(spare / unit));
           if (q < least || q <= 0) continue;
           spare -= q * unit;
+          committed.add(supply.account, q * unit, t);
           onOrder.set(kind, (onOrder.get(kind) ?? 0) + q);
           const st = order({ me, seller: p.supplier, sellerAccount: supply.account, kind, quantity: q, unitPrice: unit, at: p.works, from: acc.account,
             why: `Our ${kind} (${have} with what's on order) are below a month's production (${s}): ordering ${q}, ${q < want ? `as many as we can pay for with the next pay period's wages kept aside (${want} would take us up to a month and a half's)` : "up to a month and a half's"}.` });
           st.then = (out) => {
             const id = out.created?.order;
             if (id) orderQty.set(id, { kind, quantity: q });
-            else onOrder.set(kind, Math.max(0, (onOrder.get(kind) ?? 0) - q));
+            else {
+              onOrder.set(kind, Math.max(0, (onOrder.get(kind) ?? 0) - q));
+              committed.undo(supply.account!, q * unit);
+            }
           };
           steps.push(st);
         }
@@ -354,6 +371,6 @@ export const producer: BehaviourModule = {
         return steps;
       },
       p.look_at ? (obs) => nextLook(obs.t, p.look_at, p.look_days) : undefined,
-    ), { beliefs: (): Belief[] => staffing.beliefs(book) });
+    ), { beliefs: (): Belief[] => staffing.beliefs(book) }));
   },
 };

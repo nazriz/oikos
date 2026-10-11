@@ -1201,11 +1201,19 @@ export interface WorkOrder { id: string; task: string; at?: string; on?: string[
  */
 export class StandingWork {
   private readonly made = new Set<string>();
-  constructor(private readonly me: string, readonly part: "" | "seat" | "staff") {}
+  /** `offices`: the posts whose orders are ours, where more than one office speaks for the same organisation (the town's
+   * works office and its registry both do, and both have a standing order for `answer`): an order made in another post is
+   * not ours. Not given: every order of the organisation's is. */
+  constructor(private readonly me: string, readonly part: "" | "seat" | "staff", private readonly offices?: ReadonlySet<string>) {}
+
+  /** The organisation's standing work orders that are ours (made by it, in one of our posts, where those are named). */
+  private orders(book: Book): StatementRecord[] {
+    return book.standingOf("work_order").filter((x) => x.speaks_for === this.me && (!this.offices || x.in_position === undefined || this.offices.has(x.in_position)));
+  }
 
   /** The standing order in force for a task: our latest one standing for it, begun, not ended, and not on hold. */
   order(book: Book, task: string, t: number): WorkOrder | undefined {
-    const r = book.standingOf("work_order").filter((x) => x.speaks_for === this.me && x.data?.work?.task === task).reduce<StatementRecord | undefined>((a, b) => (!a || b.at >= a.at ? b : a), undefined);
+    const r = this.orders(book).filter((x) => x.data?.work?.task === task).reduce<StatementRecord | undefined>((a, b) => (!a || b.at >= a.at ? b : a), undefined);
     if (!r) return undefined;
     const d = r.data ?? {};
     const from = firstDue(r, 0);
@@ -1246,7 +1254,7 @@ export class StandingWork {
 
   /** The standing orders of ours that stand, in words, for a report. */
   words(book: Book, t: number): string {
-    const all = book.standingOf("work_order").filter((x) => x.speaks_for === this.me);
+    const all = this.orders(book);
     return all.length ? all.map((x) => `${x.id} (${x.data?.work?.task} ${typeof x.data?.schedule === "string" ? `as ${x.data.schedule} sets` : `every ${Math.round(Number(x.data?.every) / DAY)} days`}${this.order(book, String(x.data?.work?.task), t)?.id === x.id ? "" : ", not in force"})`).join(", ") : "none";
   }
 
@@ -1297,7 +1305,7 @@ export class StandingWork {
     if (this.part !== "staff" || (o.inPost && !o.inPost.length)) return [];
     const dated = (x: number) => `year ${Math.floor(x / (365 * DAY)) + 1}, day ${Math.floor((x % (365 * DAY)) / DAY) + 1}`;
     const named = Object.keys(o.tasks);
-    const all = book.standingOf("work_order").filter((x) => x.speaks_for === this.me && (x.in_position === o.office || named.includes(String(x.data?.work?.task)))).sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : 1));
+    const all = this.orders(book).filter((x) => x.in_position === o.office || named.includes(String(x.data?.work?.task))).sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : 1));
     // A routine of theirs with no standing order on file: they are not doing it, and they say so (from their second
     // working day: an office opens with its orders still to make). Until 2026-10-11 the staff reported only on orders
     // that existed, so an office-holder who made none heard nothing: a clerk's drafters wrote no amendment into law
@@ -1340,6 +1348,57 @@ export class StandingWork {
     const text = `Report of ${o.from}, ${dated(t)}, on the work under the office's standing work orders${since !== undefined ? ` since ${dated(since)}` : ""}. ${orders.map((x) => (x.order === undefined ? `${x.task}: ${x.words}` : `${x.task} (${x.order}, ${"schedule" in x && x.schedule ? `as ${x.schedule} sets` : `every ${Math.round(x.every / DAY) || "?"} day${Math.round(x.every / DAY) === 1 ? "" : "s"}`}): ${x.words}`)).join(". ")}.${people}`;
     return [because(`Reporting to the office on the work under its standing orders${last && key !== last.key ? ": how an order stands has changed" : ""}.`,
       say("staff_report", text, { to: [this.me], visible: [this.me], data: { office: o.office, ...(since !== undefined ? { since } : {}), orders: orders.map(({ words, ...x }) => ({ ...x, says: words })), ...(staff.length ? { staff } : {}) } }))];
+  }
+}
+
+/**
+ * An office's counter (docs/behaviour/standing-work.md, "The counter"): the routine post its staff sort and answer under
+ * the office's procedure, so that the office-holder is not brought back for it. `offered`: the town gives the office a
+ * counter (its module's `answer` routine, which a world offers only to a living town); where it is not offered every part
+ * does this work as it always did. Offered: the whole office does it as ever; the office-holder never; the staff only
+ * while a standing work order for `answer` is in force. They count what they answer by kind, for their report.
+ */
+export class CounterWork {
+  static readonly TASK = "answer";
+  private readonly tally = new Map<string, number>(); // kind -> answered since the staff last reported
+  private today = 0;
+  constructor(private readonly routines: StandingWork, readonly offered: boolean) {}
+
+  /** Whether this part answers the counter's papers now. */
+  works(book: Book, t: number): boolean {
+    if (!this.offered || this.routines.part === "") return true;
+    return this.routines.part === "staff" && !!this.routines.order(book, CounterWork.TASK, t);
+  }
+
+  /** One paper of a kind answered at the counter. */
+  answered(kind: string): void {
+    if (!this.offered || this.routines.part !== "staff") return;
+    this.tally.set(kind, (this.tally.get(kind) ?? 0) + 1);
+    this.today++;
+  }
+
+  /** The day's counter work done: counted under the order, and what was answered, by kind, said in their report. */
+  flush(t: number): void {
+    if (!this.offered || this.routines.part !== "staff") return;
+    if (this.today) this.routines.did(CounterWork.TASK, t, { units: this.today });
+    this.today = 0;
+    const kinds = [...this.tally].sort(([x], [y]) => (x < y ? -1 : 1)).map(([k, n]) => `${n} ${k.replace(/_/g, " ")}${n === 1 ? "" : "s"}`);
+    this.routines.note(CounterWork.TASK, kinds.length ? `answered at the counter: ${kinds.join(", ")}` : undefined);
+  }
+
+  /** The staff's report went out: the count starts again. */
+  reported(steps: Step[]): void {
+    if (steps.length) { this.tally.clear(); this.routines.note(CounterWork.TASK, undefined); }
+  }
+
+  /** The routine the staff report on (its label for the count), where a counter is offered. */
+  get tasks(): { [task: string]: [string, string?] } {
+    return this.offered ? { [CounterWork.TASK]: ["days of counter work", "papers answered"] } : {};
+  }
+
+  /** The seat sets its standing order for the counter, once (with its other orders). */
+  order(at: string): { task: string; at: string; every: number; why: string }[] {
+    return this.offered ? [{ task: CounterWork.TASK, at, every: DAY, why: "Setting the counter: the routine post the office's procedure lists is answered by the staff, as a standing work order." }] : [];
   }
 }
 

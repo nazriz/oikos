@@ -43,6 +43,8 @@ const TARGETS: Record<string, string> = {
   "dataset-citizen-record": `${NS}:dataset#/$defs/CitizenRecord`,
   "dataset-citizen-period": `${NS}:dataset#/$defs/CitizenPeriod`,
   "entity-record": `${NS}:entity-record#/$defs/PersonRecord`,
+  "entity-record-organisation": `${NS}:entity-record#/$defs/OrganisationRecord`,
+  "dataset-want": `${NS}:dataset#/$defs/Want`,
 };
 
 const readJson = (path: string) => JSON.parse(readFileSync(path, "utf8"));

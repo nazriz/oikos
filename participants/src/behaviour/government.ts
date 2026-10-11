@@ -11,7 +11,7 @@ import { dateWords } from "../forms";
 import type { SiteStructure, StatementRecord } from "../contracts";
 import { basesOf, channels, cites } from "../contracts";
 import { need, params, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
-import { nextLook, because, Book, cellsOf, DAY, draftLaw, figureGiven, figureWords, heldValue, jobTerms, Letters, lotOf, message, MONTH, ownAccount, pay, publishedCount, publishedPrice, record, say, type LawFigure, type LawSchedule, type Step, usd, variableToday, vote, withdraw, outOfTime, team, lookUp, goSee, visited, VISIT_MAX, Directions, StandingWork } from "./common";
+import { nextLook, because, Book, cellsOf, DAY, draftLaw, figureGiven, figureWords, heldValue, jobTerms, Letters, lotOf, message, MONTH, ownAccount, pay, publishedCount, publishedPrice, record, say, type LawFigure, type LawSchedule, type Step, usd, variableToday, vote, withdraw, outOfTime, team, lookUp, goSee, visited, VISIT_MAX, Directions, StandingWork, CounterWork } from "./common";
 import { Staffing, staffingForm, staffingUnder, stepper } from "./firms";
 import { incomeTaxLaw, withholding } from "./tax";
 import { ownLand } from "./institutions";
@@ -880,6 +880,8 @@ export const works: BehaviourModule = {
   routines: [
     { task: "collect", at: "depot", every: ["collect_every_days", 7], what: "The crew at the depot collects waste from each address on the round as often as the order says, homes complained about first, as far as its hours go, and takes what it has collected to the landfill each week with a docket." },
     { task: "maintain", at: "depot", every: 1, what: "With the hours the round leaves, the crew keeps up the most worn of the town's own assets, and someone is sent to inspect an asset nobody has seen." },
+    { task: "answer", at: "depot", every: 1, what: "The office's counter staff sort the day's post that is routine under this procedure and answer it, each working day, so that the works manager is not brought back for it.",
+      papers: [{ kind: "complaint", how: "a complaint of a collection missed puts the home first on the next round of collection" }] },
   ],
   issues: [P.JOB_ADVERTISEMENT, ...P.PAYROLL, ...P.WORKS],
   issuesWith: (p) => ({ ...P.staffingOwn({ role: p.role ?? "works crew", industry: p.industry, workplace: p.workplace, notice_days: p.notice_days ?? 14 }), landfill: p.landfill, payroll_office: p.payroll_office || undefined }),
@@ -916,14 +918,18 @@ export const works: BehaviourModule = {
       // Which part of the office this is (docs/behaviour/standing-work.md): "" the whole office, as code runs one;
       // "seat" the works manager alone, who sets the standing work orders; "staff" the crew, who follow them.
       part: "" as "" | "seat" | "staff",
+      // Whether the town gives the office a counter (its `answer` routine): then its staff answer the complaints, only
+      // while a standing order for it is in force. Not given: whoever runs the office answers them, as ever.
+      counter: false,
     }, ctx.params);
     need(p, ["depot", "workplace", "landfill"], "city.works");
     const me = ctx.entity;
     const book = new Book();
     const letters = new Letters(works.answers);
     const directions = new Directions(ctx, { under: p.directed_under, compliance_bps: p.direction_compliance_bps, office_words: "the works office" });
-    const routines = new StandingWork(me, p.part);
+    const routines = new StandingWork(me, p.part, ctx.position ? new Set([ctx.position.replace(/-staff$/, "")]) : undefined);
     const staffOnly = p.part === "staff";
+    const counter = new CounterWork(routines, !!p.counter);
     const staffing = new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, workplace: p.workplace, role: p.role, ...(p.industry ? { industry: p.industry } : {}), does: { hire: true, pay: false }, own: "role_or_unnamed", ...(p.payroll_office ? { payroll: p.payroll_office } : {}) });
     // Each building as we last saw it: as the crew that worked on it left it, or as whoever we sent to inspect it found it.
     const known = new Map<string, SiteStructure>();
@@ -1005,16 +1011,22 @@ export const works: BehaviourModule = {
         steps.push(...routines.set(book, [
           ...(p.collect_labour > 0 ? [{ task: p.collect_task, at: p.depot, every: p.collect_every_days * DAY, why: `Setting the crew's round: collection from every address on it every ${p.collect_every_days} days, as a standing work order.` }] : []),
           ...(p.maintain_labour > 0 ? [{ task: p.maintain_task, at: p.depot, every: DAY, why: "Setting the crew's upkeep of the town's assets, each working day with the hours the round leaves, as a standing work order." }] : []),
+          ...counter.order(p.depot),
         ]));
         if (!staffOnly) steps.push(...directions.letters(book, (d, form) => form === "works_staffing"
           ? (staffingUnder(d).recruit ? `The office recruits up to ${Math.min(target, staffingUnder(d).posts ?? Infinity)} crew.` : "The office advertises no post, takes down the advertisements it has out and takes nobody on.")
           : `The crew collects from each address every ${Math.round(Number(d.data?.every) / DAY)} days, as its hours allow.`));
 
         // Complaints about a home's waste: that home first, on the next round.
-        for (const c of book.open("complaint")) {
-          if (handled.has(c.id) || !(c.addressed_to ?? []).includes(me)) continue;
-          handled.add(c.id);
-          if (typeof c.data?.structure === "string") complained.add(c.data.structure);
+        // (At the counter, where the town gives the office one: its staff, under a standing order for it.)
+        if (counter.works(book, t)) {
+          for (const c of book.open("complaint")) {
+            if (handled.has(c.id) || !(c.addressed_to ?? []).includes(me)) continue;
+            handled.add(c.id);
+            if (typeof c.data?.structure === "string") complained.add(c.data.structure);
+            counter.answered("complaint");
+          }
+          counter.flush(t);
         }
 
         // ---- weekly: what's been collected, to the landfill ----
@@ -1154,8 +1166,10 @@ export const works: BehaviourModule = {
         // order, or why not, and who of the crew was at work (docs/behaviour/standing-work.md, "The staff's report").
         if (settingOut) {
           const noPlace = staffing.staff(book, t).filter((a: any) => !jobTerms(a, a.terms.parties[1], book).workplace).map((a: any) => String(a.terms.parties[1]));
-          steps.push(...routines.report(book, t, { office: (ctx.position ?? "").replace(/-staff$/, ""), from: `the ${p.role}`, inPost: workers, noPlace,
-            tasks: { [p.collect_task]: ["calls at addresses", "loads"], [p.maintain_task]: ["upkeep jobs", "units of upkeep"] } }));
+          const reportSteps = routines.report(book, t, { office: (ctx.position ?? "").replace(/-staff$/, ""), from: `the ${p.role}`, inPost: workers, noPlace,
+            tasks: { [p.collect_task]: ["calls at addresses", "loads"], [p.maintain_task]: ["upkeep jobs", "units of upkeep"], ...counter.tasks } });
+          counter.reported(reportSteps);
+          steps.push(...reportSteps);
         }
         // (The office-holder, with the crew a post of its own, reports what is its to know: the crew, the budget, the
         // directions it follows and the standing orders it has set. The round is the crew's.)

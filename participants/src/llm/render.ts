@@ -696,6 +696,8 @@ export interface RenderOptions {
   folders?: Map<string, string[]>;
   /** Who someone is in the world, by any id of theirs (a letter's writer, a paper's author). */
   whoIs?: WhoIs;
+  /** The office's counter (llm/counter.ts): papers that are its staff's to answer are set out as a count and a sample. */
+  counter?: { counters(r: Record): boolean };
   /** Told of each look cut short at the most one look shows (`LOOK_CHARS_MAX`). */
   onCut?: (cut: { report: string; characters: number; limit: number }) => void;
 }
@@ -787,11 +789,22 @@ export function renderObservation(obs: Observation, o: RenderOptions = {}): stri
       }
       // (A paper that reaches it under two of its headings is set out once, under the narrower: a complaint in the
       // folder for complaints, not again among everything of the organisation's.)
-      const here = fresh.filter((r) => (under.get(r.id) ?? id) === id);
-      if (!here.length) continue;
+      const hereAll = fresh.filter((r) => (under.get(r.id) ?? id) === id);
+      if (!hereAll.length) continue;
+      // The counter's papers (answered by the office's staff under its standing order) are told as a count and a
+      // sample, not line by line; what reaches the office-holder is listed as it always was.
+      const atCounter = o.counter ? hereAll.filter((r) => o.counter!.counters(r)) : [];
+      const here = atCounter.length ? hereAll.filter((r) => !o.counter!.counters(r)) : hereAll;
       const before = cuts;
       const lines = recordLines(here, obs.readings);
-      out.push("", `## ${title(id)} (${lines.length} new)`);
+      out.push("", `## ${title(id)} (${lines.length + atCounter.length} new)`);
+      if (atCounter.length) {
+        const byKind = new Map<string, number>();
+        for (const r of atCounter) byKind.set(paperKind(r), (byKind.get(paperKind(r)) ?? 0) + 1);
+        out.push(`Answered at your counter under your standing order (${num(atCounter.length)}): ${[...byKind].sort(([x], [y]) => (x < y ? -1 : 1)).map(([k, n]) => `${num(n)} ${k}${n === 1 ? "" : "s"}`).join(", ")}. A sample:`,
+          ...recordLines(atCounter.slice(-3), obs.readings, true).map((l) => `- ${l}`));
+        if (here.length) out.push(`For you (${num(here.length)}):`);
+      }
       // What has come, by kind, where there is more than a line or two: a heading names a folder, not what is in it.
       const by = new Map<string, number>();
       for (const r of here) by.set(paperKind(r), (by.get(paperKind(r)) ?? 0) + 1);

@@ -1,0 +1,27 @@
+{
+  "wants": [
+    {
+      "about": "rent_increase",
+      "whom": "landlord-3",
+      "seeks": [
+        {
+          "money": {
+            "from": "me"
+          }
+        }
+      ],
+      "against": {
+        "record": "rec.4411",
+        "kind": "rent_increase",
+        "by": "landlord-3"
+      },
+      "weight": 2370,
+      "since": 3456000,
+      "from": "event",
+      "with": "c0113",
+      "tried": 1,
+      "way": "ask:landlord-3",
+      "verb": "complain"
+    }
+  ]
+}

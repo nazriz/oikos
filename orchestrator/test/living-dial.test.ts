@@ -1,0 +1,90 @@
+// The dial of a living world (docs/design/ai-citizens.md 10j; world config `dials.initiative_bps`): the share of
+// entities that take initiative. At 0, or absent, a town is the town it was before wants, to the state hash, so twins
+// can be run; with it on, people and organisations hold wants in records of their own, the same for the same seed,
+// and `oikos dataset` writes what became of them. No model is called anywhere here.
+
+import { expect, test } from "bun:test";
+import Ajv2020 from "ajv/dist/2020";
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { loadWorld } from "../src/batch";
+import { exportDataset } from "../src/dataset";
+import { recordChanges, Records } from "../src/records";
+import { runWorld } from "../src/run";
+
+const root = join(import.meta.dir, "../..");
+const DAY = 86_400;
+const NS = "urn:oikos:contracts:0.8";
+const ajv = new Ajv2020({ strict: true, strictRequired: false, allErrors: true });
+for (const f of readdirSync(join(root, "contracts")).filter((f) => f.endsWith(".schema.json"))) ajv.addSchema(JSON.parse(readFileSync(join(root, "contracts", f), "utf8")));
+const check = (ref: string, row: unknown) => {
+  const v = ajv.getSchema(`${NS}:${ref}`)!;
+  if (!v(row)) throw new Error(`${ref}: ${JSON.stringify(v.errors).slice(0, 800)} in ${JSON.stringify(row).slice(0, 600)}`);
+};
+const rows = (path: string) => readFileSync(path, "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l));
+const lean = (config: any) => ({ ...config, seed: 1, log: { ...config.log, detail: "lean" } });
+const TOWN = join(root, "worlds/town.yaml");
+
+// The state of worlds/town.yaml, seed 1, after 60 days, as origin/main gave it before wants (commit 750bc30, living
+// world step 1; computed there on 2026-10-11). A change that is meant to move what a town without the dial does
+// (a fault fixed in a module every town runs) changes this value, and says so where it is made.
+const STEP_1 = "b88dee151868eda10f39537d92844d236131b0ae13eec037b1037e8be69da177";
+
+test("with the dial absent or at 0 a town is step 1's town, to the state hash", async () => {
+  const out = mkdtempSync(join(tmpdir(), "oikos-dial-"));
+  try {
+    const plain = (await loadWorld(TOWN)).config;
+    expect(plain.dials).toBeUndefined();
+    const absent = await runWorld({ config: lean(plain), runId: "absent", outDir: out, until: 60 * DAY, recordObservations: "none" });
+    expect(absent.stateHash).toBe(STEP_1);
+    const zero = await runWorld({ config: { ...lean(plain), dials: { initiative_bps: 0 } }, runId: "zero", outDir: out, until: 60 * DAY, recordObservations: "none" });
+    expect(zero.stateHash).toBe(STEP_1);
+  } finally {
+    rmSync(out, { recursive: true, force: true });
+  }
+}, 300_000);
+
+test("with the dial on, people and organisations hold wants in their own records, the same for the same seed; the dataset says what became of them", async () => {
+  const out = mkdtempSync(join(tmpdir(), "oikos-dial-"));
+  try {
+    const world = async () => (await loadWorld(TOWN, ["living.initiative_bps=10000"])).config;
+    const config = await world();
+    expect(config.dials).toEqual({ initiative_bps: 10_000 });
+    // The generator's part: firms' and landlords' posts keep their organisation's record; people start attached.
+    expect(config.positions.filter((x: any) => x.keeps_record).length).toBeGreaterThan(10);
+    expect(config.participants.filter((x: any) => x.controller?.params?.started?.place_days > 0).length).toBeGreaterThan(50);
+    const a = await runWorld({ config: lean(config), runId: "a", outDir: out, until: 120 * DAY, recordObservations: "none" });
+    const b = await runWorld({ config: lean(await world()), runId: "b", outDir: out, until: 120 * DAY, recordObservations: "none" });
+    expect(b.stateHash).toBe(a.stateHash);
+    expect(a.stateHash).not.toBe(STEP_1);
+    // Every record, a person's or an organisation's, rebuilds from the log with its chain whole and fits its shape.
+    const built = new Records();
+    const wanted = new Set<string>();
+    for await (const c of recordChanges(a.logPath)) {
+      const r = built.apply(c);
+      if (!r.sections.character && (r.sections.wants as any[])?.length) wanted.add(c.entity);
+    }
+    let people = 0, orgs = 0;
+    for (const r of built.of.values()) {
+      expect(r.faults).toEqual([]);
+      if (r.sections.character) { orgs++; expect(r.keeper).toMatch(/^firm\./); check("entity-record#/$defs/OrganisationRecord", r.sections); }
+      else { people++; check("entity-record#/$defs/PersonRecord", r.sections); }
+    }
+    const wanting = wanted.size;
+    expect(people).toBeGreaterThan(150);
+    expect(orgs).toBeGreaterThan(10);
+    expect(wanting).toBeGreaterThan(0);
+    // The dataset: a row each time something became of a want, and the counts (nothing scored).
+    const dir = join(out, "a.dataset");
+    const manifest = await exportDataset(a.logPath, dir);
+    check("dataset#/$defs/Manifest", manifest);
+    const wants = rows(join(dir, "wants.jsonl"));
+    for (const w of wants.slice(0, 200)) check("dataset#/$defs/Want", w);
+    expect(manifest.wants!.people.born).toBeDefined();
+    expect(Object.values(manifest.wants!.people.born!).reduce((x: number, y: any) => x + y, 0)).toBe(wants.filter((w) => !w.organisation && w.event === "born").length);
+    expect(manifest.wants!.acts.by_people).toBeGreaterThan(manifest.wants!.acts.on_initiative);
+  } finally {
+    rmSync(out, { recursive: true, force: true });
+  }
+}, 600_000);
