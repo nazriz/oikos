@@ -8,20 +8,21 @@ import { actEnds } from "./act-ends";
 import { logLines, runOf } from "./logs";
 import { takeRoute, takeTurn, type CorpusExample } from "./corpus";
 import { periodRow, Records } from "./records";
-import { accountRows, DEBRIEF_RESTRICTION, debriefCounts, debriefRows, debriefsOf } from "./debriefs";
+import { accountRows, DEBRIEF_RESTRICTION, debriefCounts, debriefRows, debriefsOf, OLD_LOG_NOT_PUBLISHABLE } from "./debriefs";
 
 /** The README written beside a dataset that holds debriefs: what the files are and the restriction on their use. */
-export function datasetReadme(run: string, withheld: boolean): string {
+export function datasetReadme(run: string, withheld: boolean, old = false): string {
   return [`# Dataset of run ${run}: debriefs and exit accounts`, "",
     "`debriefs.jsonl`: what each AI system that held a seat in this run said when it was debriefed at the run's end (VISION 15, point 7), one row a question, by what it allowed to be published. A row with `kept_back: true` is an answer the seat asked to be kept back: the row says so and holds nothing else. For each question about why it decided something, `beside` holds what the run's log shows the seat was shown and did at that decision, so that the account can be set beside the record; nothing here says whether an account is true.",
     "", "`accounts.jsonl`: short accounts written at the run's end, each by an author (a model shown one person's record and nothing else, never told it is the person, free to decline), in that person's voice, beside the person's own private and expressed views from their record. The people of the town are records kept by arithmetic.",
     "", "## Restriction", "", DEBRIEF_RESTRICTION,
     ...(withheld ? ["", "## `debriefs.withheld.jsonl` is not for publication", "", "It holds, in full, the answers seats asked to be kept back. It stays with the run. Before this folder is published or copied anywhere it may be read by others, remove that file. The run's own log holds the same answers and is likewise not published as it stands."] : []),
+    ...(old ? ["", "## This run's log is not publishable as it stands", "", OLD_LOG_NOT_PUBLISHABLE] : []),
     "", "Nothing in these files is scored.", ""].join("\n");
 }
 
 const sortedCounts = (c: { [k: string]: number }) => Object.fromEntries(Object.entries(c).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
-export const DATASET_VERSION = "0.9.0"; // 0.9.0: debriefs and exit accounts (debriefs.jsonl, debriefs.withheld.jsonl, accounts.jsonl, README.md, the manifest's `debriefs` and `restrictions`); a seat's debrief calls and an author's accounts are no longer rows of decisions.jsonl; 0.8.0: a decision about a want carries its situation (docs/design/ai-citizens.md 11); 0.7.0: founding and the lineage of ideas (founded.jsonl, ideas.jsonl, idea_passages.jsonl, words.jsonl)
+export const DATASET_VERSION = "0.9.1"; // 0.9.1: a debrief of the older kind (asked with nothing said of publication) is kept back: a row that says so in debriefs.jsonl, its answer in the withheld file only, and the log marked not publishable; 0.9.0: debriefs and exit accounts (debriefs.jsonl, debriefs.withheld.jsonl, accounts.jsonl, README.md, the manifest's `debriefs` and `restrictions`); a seat's debrief calls and an author's accounts are no longer rows of decisions.jsonl; 0.8.0: a decision about a want carries its situation (docs/design/ai-citizens.md 11); 0.7.0: founding and the lineage of ideas (founded.jsonl, ideas.jsonl, idea_passages.jsonl, words.jsonl)
 
 interface Command { seq: number; command: string; as?: string; blocks?: unknown[]; looks?: unknown[]; provenance?: unknown; reasoning?: string; applied?: boolean; refusal?: unknown; created?: string[] }
 /** Something a seat was shown that names what an earlier act of its own made: the record or letter made (`of`), the
@@ -519,8 +520,8 @@ export async function exportDataset(logPath: string, outDir: string, o: DatasetO
     files[file] = await w.close();
   }
   const debCounts = debriefCounts(deb);
-  const hasDebriefs = deb.seats.length || deb.not_given.length || deb.accounts.length;
-  if (hasDebriefs) await Bun.write(join(outDir, "README.md"), datasetReadme(run(), !!debRows.withheld.length));
+  const hasDebriefs = deb.seats.length || deb.not_given.length || deb.accounts.length || deb.old.length;
+  if (hasDebriefs) await Bun.write(join(outDir, "README.md"), datasetReadme(run(), !!debRows.withheld.length, !!deb.old.length));
 
   const config = header?.config ?? {};
   const manifest = {
@@ -560,7 +561,7 @@ export async function exportDataset(logPath: string, outDir: string, o: DatasetO
     // Debriefs and exit accounts: who was asked and how each debrief ended, what was kept back (counted, never
     // shown), the scaled items as given, the accounts asked for and declined, and the dark pieces the run asked a
     // model to write. And the restriction on the debrief files' use, which travels with them.
-    ...(hasDebriefs ? { debriefs: debCounts, restrictions: { "debriefs.jsonl": DEBRIEF_RESTRICTION, ...(debRows.withheld.length ? { "debriefs.withheld.jsonl": "NOT FOR PUBLICATION. " + DEBRIEF_RESTRICTION } : {}) } } : {}),
+    ...(hasDebriefs ? { debriefs: debCounts, restrictions: { "debriefs.jsonl": DEBRIEF_RESTRICTION, ...(debRows.withheld.length ? { "debriefs.withheld.jsonl": "NOT FOR PUBLICATION. " + DEBRIEF_RESTRICTION } : {}), ...(deb.old.length ? { [basename(logPath)]: "NOT FOR PUBLICATION. " + OLD_LOG_NOT_PUBLISHABLE } : {}) } } : {}),
     files,
   };
   await Bun.write(join(outDir, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);

@@ -60,8 +60,11 @@ export class SeatRecord {
   looks = 0;
   received: Letter[] = [];
   left?: { t: number; statement: string };
+  /** Papers that were put before it (shown to it, and addressed to it or of a kind that asks something), by others outside its own organisation. */
+  reached = new Map<string, { id: string; t: number; kind: string; from: string; text: string; money: number; named: string[] }>();
   private current?: Sitting;
-  constructor(readonly id: string, /** Every id it may be written to by: its own, its posts', its organisation's. */ readonly known: Set<string>) {}
+  constructor(readonly id: string, /** Every id it may be written to by: its own, its posts', its organisation's. */ readonly known: Set<string>,
+    /** The ids that are its alone (itself, its posts): a paper addressed to one of these was put before it, where one addressed to its whole organisation may be any office's. */ readonly direct: Set<string> = new Set([id])) {}
 
   /** The sitting a model call belongs to (one a day), with every word its prompts held that could be an id. */
   call(seq: number, t: number, input: unknown) {
@@ -109,6 +112,8 @@ export function namedBy(blocks: unknown, own: Set<string>): string[] {
   walk(blocks);
   return [...out].sort();
 }
+/** Kinds of paper that ask something of whoever they are put before. */
+const ASKS = /^(petition|application|complaint|claim|proposal|request|appeal|remedy_request|tribunal_application|enforcement_request)$/;
 const kindsOf = (blocks: any[]) => [...new Set(blocks.map((b) => `${b?.block ?? "?"}${b?.kind ? `/${b.kind}` : ""}`))];
 const DIRECTION = /^(direction|work_order|standing_order|instruction|order)$/;
 const grantedOf = (blocks: any[]): boolean | undefined => {
@@ -130,9 +135,9 @@ export class SeatRecords {
   private idsOf = new Map<string, Set<string>>();
   private actions = new Map<string, number>(); // an act under way -> the command that began it
   private applying?: { cause: number; cmd: number }; // the act whose events are being read
-  constructor(seats: { id: string; known: string[] }[], /** Every id a letter's sender may be written to by (the post it wrote from, its organisation, the person), the one it is named by first. */ private readonly nameOf: (participant: string, as?: string) => string[] = (p, as) => (as ? [as, p] : [p])) {
+  constructor(seats: { id: string; known: string[]; direct?: string[] }[], /** Every id a letter's sender may be written to by (the post it wrote from, its organisation, the person), the one it is named by first. */ private readonly nameOf: (participant: string, as?: string) => string[] = (p, as) => (as ? [as, p] : [p])) {
     for (const s of seats) {
-      this.of.set(s.id, new SeatRecord(s.id, new Set([s.id, ...s.known])));
+      this.of.set(s.id, new SeatRecord(s.id, new Set([s.id, ...s.known]), new Set([s.id, ...(s.direct ?? s.known.slice(0, 1))])));
       this.idsOf.set(s.id, new Set([s.id, ...s.known]));
     }
   }
@@ -151,6 +156,19 @@ export class SeatRecords {
       else if (b.annotation === "draft") who.draft(b.draft, e.t);
       else if (b.annotation === "signoff") { const d = who.drafts.get(b.draft); if (d) { d.signoff = b.decision; if (b.note) d.note = String(b.note); } }
       else if (b.annotation === "translation_failure") who.notDone.push({ t: e.t, draft: String(b.data?.draft ?? ""), proposal: String(b.data?.proposal ?? ""), told: String(b.data?.reason ?? ""), asked_back: b.data?.asked_back === true });
+      else if (b.annotation === "observation") {
+        // What was put before it: a paper it was shown that someone else made after the town began, addressed to it or
+        // of a kind that asks something of whoever reads it.
+        const chans = b.data?.observation?.channels;
+        for (const ch of (Array.isArray(chans) ? chans : Object.values(chans ?? {})) as any[]) for (const r of (ch?.records ?? []) as any[]) {
+          if (!r || typeof r !== "object" || typeof r.id !== "string" || !r.at || r.author === "genesis" || who.reached.has(r.id)) continue;
+          // (Not its own, and not a paper of its own organisation's: what another office of the same body sent out is that office's business.)
+          if (r.author === who.id || who.known.has(String(r.speaks_for ?? r.author))) continue;
+          const to = ([] as unknown[]).concat(r.addressed_to ?? []).map(String);
+          if (!to.some((x) => who.direct.has(x)) && !(ASKS.test(String(r.kind ?? "")) && (!to.length || to.some((x) => who.known.has(x))))) continue;
+          who.reached.set(r.id, { id: r.id, t: Number(r.at), kind: String(r.kind ?? r.record ?? ""), from: String(r.speaks_for ?? r.author ?? ""), text: String(r.text ?? ""), money: moneyNamed(r), named: namedBy(r, who.known) });
+        }
+      }
       else if (b.annotation === "note" && b.data?.draft_unanswered) { const d = who.drafts.get(b.data.draft_unanswered.draft); if (d) d.unanswered = true; }
       else if (b.annotation === "note" && b.data?.malformed_tool_use && /"name":"write"/.test(String(b.data.malformed_tool_use))) who.notSent++;
       return;
@@ -250,6 +268,23 @@ export function largest(r: SeatRecord, n = 3): Carried[] {
   for (const c of acts) take(c);
   for (const l of r.sent.filter((l) => l.delivered && !r.carried.some((c) => c.seq === l.seq)).sort((a, b) => b.to.length - a.to.length || b.text.length - a.text.length || a.seq - b.seq)) take(letterAsCarried(l));
   return pick.sort((a, b) => a.seq - b.seq);
+}
+
+/**
+ * For a seat that sat and carried out little (fewer than two things its "why" questions could name): the largest
+ * matter that reached it and that it left alone, by the same sizing (the money it names, then the people and bodies
+ * it names, then the earliest). A matter is a paper put before it, or a letter to it; left alone: nothing it carried
+ * out or wrote afterwards names the paper, or went to the letter's sender. Nothing here says it was to have acted.
+ */
+export function leftAlone(r: SeatRecord): { day: number; fact: string; ids: { [k: string]: unknown } } | undefined {
+  if (!r.sittings.size || r.left || largest(r).length >= 2) return undefined;
+  const acted = r.carried.map((c) => JSON.stringify([c.preview, c.proposal ?? "", c.made])).join(" ") + " " + r.sent.map((l) => `${l.text} ${l.about ?? ""}`).join(" ");
+  const names = (id: string) => new RegExp(`(^|[^\\w.-])${id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}($|[^\\w-])`).test(acted);
+  const papers = [...r.reached.values()].filter((p) => !names(p.id)).map((p) => ({ t: p.t, money: p.money, named: p.named.length, fact: `A paper${p.kind ? ` (${p.kind.replace(/_/g, " ")})` : ""} from ${p.from}: "${p.text.replace(/\s+/g, " ").trim().slice(0, 500)}"`, ids: { paper: p.id, kind: p.kind, from: p.from, money_named: p.money, named: p.named } }));
+  const letters = r.received.filter((l) => !r.sent.some((s) => s.delivered && s.t >= l.t && s.to.some((x) => l.from.includes(x)))).map((l) => ({ t: l.t, money: 0, named: 1, fact: `A letter to you from ${l.from[0]}: "${l.text.replace(/\s+/g, " ").trim().slice(0, 500)}"`, ids: { letter_command_seq: l.seq, from: l.from[0] } }));
+  const all = [...papers, ...letters].sort((a, b) => b.money - a.money || b.named - a.named || a.t - b.t);
+  const x = all[0];
+  return x ? { day: dayOf(x.t), fact: x.fact, ids: { ...x.ids, day: dayOf(x.t), matters_left_alone: all.length } } : undefined;
 }
 
 /** What the log shows the seat was shown and did at a decision: ids and plain facts, for the record (never judged). */
