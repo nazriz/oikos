@@ -236,6 +236,70 @@
               "$ref": "urn:oikos:contracts:0.8:common#/$defs/Count"
             }
           }
+        },
+        "wants": {
+          "description": "Wants in the run (docs/design/ai-citizens.md 10a, 10h), counted and never scored: people's and organisations'; and people's acts taken on initiative (a want gone after by some way other than waiting) beside all the acts people made.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "people",
+            "organisations",
+            "acts"
+          ],
+          "properties": {
+            "people": {
+              "type": "object",
+              "required": [
+                "holders"
+              ],
+              "additionalProperties": {
+                "type": "object",
+                "additionalProperties": {
+                  "$ref": "urn:oikos:contracts:0.8:common#/$defs/Count"
+                }
+              },
+              "properties": {
+                "holders": {
+                  "$ref": "urn:oikos:contracts:0.8:common#/$defs/Count"
+                }
+              },
+              "description": "`holders`: how many held a want at all; then, by what became of wants (born, pursued, met, given_up, grown, displaced, withdrew), a count by what the want was about (for `pursued`: by the way taken; wait: nothing was done)."
+            },
+            "organisations": {
+              "type": "object",
+              "required": [
+                "holders"
+              ],
+              "additionalProperties": {
+                "type": "object",
+                "additionalProperties": {
+                  "$ref": "urn:oikos:contracts:0.8:common#/$defs/Count"
+                }
+              },
+              "properties": {
+                "holders": {
+                  "$ref": "urn:oikos:contracts:0.8:common#/$defs/Count"
+                }
+              },
+              "description": "`holders`: how many held a want at all; then, by what became of wants (born, pursued, met, given_up, grown, displaced, withdrew), a count by what the want was about (for `pursued`: by the way taken; wait: nothing was done)."
+            },
+            "acts": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "by_people",
+                "on_initiative"
+              ],
+              "properties": {
+                "by_people": {
+                  "$ref": "urn:oikos:contracts:0.8:common#/$defs/Count"
+                },
+                "on_initiative": {
+                  "$ref": "urn:oikos:contracts:0.8:common#/$defs/Count"
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -1443,6 +1507,61 @@
             "minimum": 0,
             "maximum": 10000
           }
+        }
+      }
+    },
+    "Want": {
+      "description": "A row of wants.jsonl: something that became of a want of a person's or an organisation's, as its record's change said. `event`: born, pursued (`by`: the way taken; wait: nothing was done), met, given_up, grown, displaced (a heavier want took its place), withdrew (nothing seen would answer it, or the entity did not believe acting would).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "run",
+        "t",
+        "seq",
+        "entity",
+        "event",
+        "about",
+        "weight"
+      ],
+      "properties": {
+        "run": {
+          "type": "string"
+        },
+        "t": {
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/SimTime"
+        },
+        "seq": {
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/Count"
+        },
+        "entity": {
+          "type": "string"
+        },
+        "organisation": {
+          "const": true
+        },
+        "event": {
+          "enum": [
+            "born",
+            "pursued",
+            "met",
+            "given_up",
+            "grown",
+            "displaced",
+            "withdrew"
+          ]
+        },
+        "about": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "weight": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "by": {
+          "type": "string",
+          "maxLength": 160
         }
       }
     }

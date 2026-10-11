@@ -16,6 +16,7 @@ import type { Observation, ParticipantAction } from "../contracts";
 import type { ParticipantContext } from "../module";
 import { inCurrency } from "../money";
 import type { ContentBlock, LlmMessage, ToolSpec } from "./adapter";
+import { CounterWatch } from "./counter";
 import { callModel, ModelCallFailed, promptTooLong, type LlmIO } from "./call";
 import { kindSaid, LOOK_CHARS_MAX, ofKind, paperKind, NOTHING_FOUND, NOTHING_NEW, renderObservation, renderStanding, when, type Looked, type WhoIs } from "./render";
 
@@ -518,6 +519,9 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
   let papersAt: number | undefined;
   let hold = new Set<string>();
   const own = new Set([c.participant, ...(c.ownAuthors ?? [])]);
+  // The office's counter, as its procedure and the seat's standing order for it stand (llm/counter.ts): routine post
+  // its staff answer does not bring the seat back, and is set out as a count and a sample.
+  const counter = new CounterWatch(c.entity, c.participant, standingIds);
   const posts = new Set<string>();
   const counted = new Set<string>();
   /** Take in what an observation brings of papers filed with the office: each once, by the kind a list names it by. */
@@ -525,6 +529,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
     if (!papersBack) return;
     for (const p of obs.positions ?? []) posts.add(p.position);
     const anyTray = c.trays!.kinds.size > 0;
+    const atCounter = counter.view(obs.t);
     for (const [id, ch] of Object.entries(obs.channels)) {
       if (ch.kind !== "records" || ch.search || standingIds.has(id)) continue;
       const tray = c.trays!.kinds.get(id);
@@ -535,6 +540,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
         const mine = tray !== undefined ? tray === true || ofKind(r, tray) : toPost || (!anyTray && r.speaks_for !== c.entity);
         if (!mine) continue;
         counted.add(r.id);
+        if (atCounter?.counters(r)) continue; // (the counter's: its staff answer it, and the seat is told how many)
         const kind = paperKind(r);
         if (hold.has(kindSaid(kind))) continue;
         papersIn.set(kind, (papersIn.get(kind) ?? 0) + 1);
@@ -810,7 +816,9 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
       // (What stands now, as this report's standing documents show it: nothing, once the last of them is withdrawn. A
       // report that brings none of those documents leaves what's on file as it was.)
       if (standing || Object.entries(obs.channels).some(([id, ch]) => standingIds.has(id) && ch.kind === "records" && ch.records.length)) standingText = standing;
-      let body = renderObservation(obs, { ...(c.whoIs ? { whoIs: c.whoIs } : {}), standing: standingIds, titles: c.titles, lastAction, draftText: c.draftText, lookable: canLook, ...(lastLooked ? { looked: lastLooked } : {}), ...(c.folders ? { folders: c.folders } : {}), onCut: (cut) => void cutLooks.push(cut) });
+      counter.absorb(obs);
+      const atCounter = counter.view(obs.t);
+      let body = renderObservation(obs, { ...(c.whoIs ? { whoIs: c.whoIs } : {}), ...(atCounter ? { counter: atCounter } : {}), standing: standingIds, titles: c.titles, lastAction, draftText: c.draftText, lookable: canLook, ...(lastLooked ? { looked: lastLooked } : {}), ...(c.folders ? { folders: c.folders } : {}), onCut: (cut) => void cutLooks.push(cut) });
       for (const cut of cutLooks.splice(0)) await note({ look_cut: cut });
       body = inWorld(body);
       lastAction = undefined;

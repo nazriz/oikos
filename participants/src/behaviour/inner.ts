@@ -168,7 +168,7 @@ function z(rng: Rng): number {
 }
 
 /** Something that happened, as the record remembers it: when, what (a word of the mind's own), about whom, how large. */
-export interface Remembered { t: number; what: string; about?: string; size: number }
+export interface Remembered { t: number; what: string; about?: string; size: number; /** For what became of a want: the way taken. */ by?: string }
 
 export interface Attachment { to: string; bps: number; since: number }
 
@@ -401,6 +401,25 @@ export class Inner {
     this.shock(what, c);
     const size = Math.round(o.size ?? Math.max(dents?.belonging ?? 0, dents?.meaning ?? 0, this.p.values.shocks[what] ? this.p.memory.defining_bps : 1_000) * c);
     this.remember({ t, what, ...(o.about !== undefined ? { about: o.about } : {}), size });
+  }
+
+  /** Something for a change's `because` only (what became of a want): said once with the record's next change, and
+   * not among the things remembered. */
+  note(r: Remembered): void {
+    this.since.push(r);
+    if (this.since.length > 16) this.since.shift();
+  }
+
+  /** How far the sense of agency sits from the town's mean, in standard deviations (docs/behaviour/citizen.md, "Readers"). */
+  zAgency(): number {
+    const a = this.outlook.agency ?? { mean_bps: this.p.agency.mean_bps, sd_bps: this.p.agency.sd_bps };
+    return Math.max(-3, Math.min(3, (this.agency - a.mean_bps) / Math.max(1, a.sd_bps)));
+  }
+  /** How far trust in this institution sits from the town's figure for its kind, in standard deviations of the
+   * personal lean. */
+  zTrust(who: string, kind: TrustKind, t: number): number {
+    const start = this.outlook.trust?.[kind] ?? this.p.trust.start_bps;
+    return Math.max(-3, Math.min(3, (this.entry(who, kind, t).bps - start) / Math.max(1, this.p.trust.spread_bps)));
   }
 
   /** Kept: among the last few, and, if large, among the few that defined us (the largest, kept for good). */

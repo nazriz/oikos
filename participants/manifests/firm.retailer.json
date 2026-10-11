@@ -1,6 +1,6 @@
 {
   "name": "firm.retailer",
-  "version": "0.9.1",
+  "version": "0.10.0",
   "doc": "docs/behaviour/retailer.md",
   "params": {
     "bank": {
@@ -104,6 +104,11 @@
       "default": "",
       "source": "what the work is (its postings say; the world's vocabulary, e.g. its profile's industries)"
     },
+    "initiative": {
+      "schema": {},
+      "default": null,
+      "source": "placeholder"
+    },
     "kind": {
       "schema": {
         "type": "string"
@@ -177,6 +182,18 @@
       "source": "placeholder"
     },
     "operator": {
+      "schema": {},
+      "default": null,
+      "source": "placeholder"
+    },
+    "org": {
+      "schema": {
+        "type": "object"
+      },
+      "default": {},
+      "source": "placeholder"
+    },
+    "owner_values": {
       "schema": {},
       "default": null,
       "source": "placeholder"
@@ -408,6 +425,13 @@
       },
       "unit": "bps",
       "default": 8000,
+      "source": "placeholder"
+    },
+    "values": {
+      "schema": {
+        "type": "object"
+      },
+      "default": {},
       "source": "placeholder"
     },
     "vartheta_bps": {

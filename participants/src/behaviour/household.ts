@@ -102,6 +102,8 @@ export const SAYING = {
   share: (cents: number, account: string) => `Your share of the rent is ${sum(cents)} a month, paid to ${account}.`,
   pay: (cents: number) => `My pay is now ${sum(cents)} a month.`,
   died: (person: string, space: string) => `${person} has died at home, ${space}.`,
+  /** Something that has befallen the household, told by the member it happened to (docs/design/ai-citizens.md 10a). */
+  trouble: (what: "let_go" | "notice" | "rent_increase", by: string) => `Trouble for us: ${by} ${what === "let_go" ? "has let me go" : what === "notice" ? "has given us notice to leave" : "is raising our rent"}.`,
 };
 
 export type Heard =
@@ -110,7 +112,8 @@ export type Heard =
   | { kind: "leaving" }
   | { kind: "share"; cents: number; account: string }
   | { kind: "pay"; cents: number }
-  | { kind: "died"; person: string; space: string };
+  | { kind: "died"; person: string; space: string }
+  | { kind: "trouble"; what: "let_go" | "notice" | "rent_increase"; by: string };
 
 /** An amount heard, if it's written as we write one. */
 function heardSum(s: string): number | undefined {
@@ -128,6 +131,7 @@ export function hear(text: string): Heard | undefined {
   if ((m = /^We've got (\S+)\. Time to move in\.$/.exec(text))) return { kind: "moveIn", space: m[1]! };
   if ((m = /^Our tenancy at (\S+) has ended\. Time to move out\.$/.exec(text))) return { kind: "moveOut", from: m[1]! };
   if (text === SAYING.leaving()) return { kind: "leaving" };
+  if ((m = /^Trouble for us: (\S+) (has let me go|has given us notice to leave|is raising our rent)\.$/.exec(text))) return { kind: "trouble", by: m[1]!, what: m[2] === "has let me go" ? "let_go" : m[2] === "has given us notice to leave" ? "notice" : "rent_increase" };
   if ((m = /^(\S+) has died at home, (\S+)\.$/.exec(text))) return { kind: "died", person: m[1]!, space: m[2]! };
   let n: number | undefined;
   if ((m = /^Your share of the rent is (.+) a month, paid to (\S+)\.$/.exec(text)) && (n = heardSum(m[1]!)) !== undefined) return { kind: "share", cents: n, account: m[2]! };

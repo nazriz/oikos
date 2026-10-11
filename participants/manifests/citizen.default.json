@@ -1,6 +1,6 @@
 {
   "name": "citizen.default",
-  "version": "0.44.0",
+  "version": "0.45.0",
   "doc": "docs/behaviour/citizen.md",
   "params": {
     "accept_fewer_bedrooms_after_days": {
@@ -27,6 +27,11 @@
       "unit": "bps",
       "default": 2000,
       "source": "anger with the landlord at which a tenant is aggrieved (placeholder: the anger at a notice to go lasts about 95 days)"
+    },
+    "answer_days": {
+      "schema": {},
+      "unit": "days",
+      "source": "the world gives it (no default)"
     },
     "ask_again_days": {
       "schema": {
@@ -59,6 +64,11 @@
       "schema": {},
       "unit": "bps",
       "source": "the world gives it (no default)"
+    },
+    "attach_mean": {
+      "schema": {},
+      "default": null,
+      "source": "placeholder"
     },
     "ballot_turnout_bps": {
       "schema": {
@@ -151,6 +161,10 @@
       "default": "",
       "source": "placeholder"
     },
+    "choice": {
+      "schema": {},
+      "source": "the world gives it (no default)"
+    },
     "civic": {
       "schema": {
         "type": "object"
@@ -228,6 +242,11 @@
       "default": 10,
       "source": "goods a household uses in a fortnight, for how well subsistence is met (placeholder)"
     },
+    "event_bps": {
+      "schema": {},
+      "unit": "bps",
+      "source": "the world gives it (no default)"
+    },
     "fertility_per_10000": {
       "schema": {
         "type": "array"
@@ -288,6 +307,11 @@
       },
       "unit": "days",
       "default": 90,
+      "source": "placeholder"
+    },
+    "initiative": {
+      "schema": {},
+      "default": null,
       "source": "placeholder"
     },
     "inner": {
@@ -476,6 +500,11 @@
       "default": null,
       "source": "placeholder"
     },
+    "rise_bps": {
+      "schema": {},
+      "unit": "bps",
+      "source": "the world gives it (no default)"
+    },
     "round": {
       "schema": {},
       "default": null,
@@ -547,6 +576,11 @@
       },
       "default": 7,
       "source": "Lengnick 2013, Table 1: sellers a household deals with (7): how many it looks up, knowing none"
+    },
+    "started": {
+      "schema": {},
+      "default": null,
+      "source": "placeholder"
     },
     "stop_work_curve": {
       "schema": {},
@@ -622,6 +656,10 @@
       "default": null,
       "source": "placeholder"
     },
+    "tries": {
+      "schema": {},
+      "source": "the world gives it (no default)"
+    },
     "trust": {
       "schema": {},
       "source": "the world gives it (no default)"
@@ -658,6 +696,13 @@
         "type": "array"
       },
       "default": [],
+      "source": "placeholder"
+    },
+    "wants": {
+      "schema": {
+        "type": "object"
+      },
+      "default": {},
       "source": "placeholder"
     },
     "wealth_effect_bps_per_year": {

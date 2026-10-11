@@ -1,5 +1,6 @@
 //! An entity's own record (docs/design/ai-citizens.md 10d): held by the kernel, written only by it, bounded, chained,
-//! shown to nobody but the entity, and never set by a participant a model runs.
+//! shown to nobody but the entity, and set only by the platform's bookkeeping for that entity, named in the world's
+//! config (never by anything a model can reach).
 
 mod common;
 
@@ -13,12 +14,27 @@ use serde_json::{json, Value};
 use std::collections::BTreeMap;
 
 fn set(participant: &str, sections: Value, because: Option<Value>) -> Command {
-    Command::EntityRecord { participant: participant.into(), set: serde_json::from_value::<BTreeMap<String, Value>>(sections).unwrap(), because }
+    Command::EntityRecord { participant: participant.into(), entity: None, set: serde_json::from_value::<BTreeMap<String, Value>>(sections).unwrap(), because }
+}
+
+fn set_of(participant: &str, entity: &str, sections: Value) -> Command {
+    Command::EntityRecord { participant: participant.into(), entity: Some(entity.into()), set: serde_json::from_value::<BTreeMap<String, Value>>(sections).unwrap(), because: None }
+}
+
+fn position_mut<'a>(cfg: &'a mut Value, id: &str) -> &'a mut Value {
+    cfg["positions"].as_array_mut().unwrap().iter_mut().find(|p| p["id"] == id).unwrap()
+}
+
+fn keeper_of(r: &oikos_kernel::run::Response) -> Option<String> {
+    match &r.events[0].body {
+        EventBody::EntityRecorded { keeper, .. } => keeper.clone(),
+        other => panic!("expected entity_recorded, got {other:?}"),
+    }
 }
 
 fn recorded(r: &oikos_kernel::run::Response) -> (String, u64, String, String) {
     match &r.events[0].body {
-        EventBody::EntityRecorded { entity, n, chain, digest } => (entity.clone(), *n, chain.clone(), digest.clone()),
+        EventBody::EntityRecorded { entity, n, chain, digest, .. } => (entity.clone(), *n, chain.clone(), digest.clone()),
         other => panic!("expected entity_recorded, got {other:?}"),
     }
 }
@@ -73,7 +89,7 @@ fn a_record_never_grows_past_its_cap() {
     assert_eq!(run.kernel().state().entity_records, before);
     // More sections than a record has.
     let many: BTreeMap<String, Value> = (0..30).map(|i| (format!("s{i}"), json!(1))).collect();
-    assert!(run.command(&Command::EntityRecord { participant: "alice-self".into(), set: many, because: None }).is_err());
+    assert!(run.command(&Command::EntityRecord { participant: "alice-self".into(), entity: None, set: many, because: None }).is_err());
     // Whole numbers only, as all opaque data.
     assert!(run.command(&set("alice-self", json!({"a": 1.5}), None)).is_err());
 }
@@ -83,7 +99,7 @@ fn only_a_code_mind_sets_a_record_and_only_its_own() {
     let mut run = Run::start(riverbend(), "record-who", Vec::new(), None).unwrap();
     // A participant a model runs has no way to write who it is.
     let e = run.command(&set("mayor-system", json!({"agency": {"now": 10000}}), None)).unwrap_err();
-    assert!(e.to_string().contains("not run by code"), "{e}");
+    assert!(e.to_string().contains("not a person"), "{e}");
     // A system has no record of its own.
     assert!(run.command(&set("finance-system", json!({"agency": {"now": 1}}), None)).is_err());
     // The same holds of a person a model runs.
@@ -91,7 +107,8 @@ fn only_a_code_mind_sets_a_record_and_only_its_own() {
     let alice = cfg["participants"].as_array_mut().unwrap().iter_mut().find(|p| p["id"] == "alice-self").unwrap();
     alice["controller"] = json!({"type": "llm", "impl": "mock", "model": "mock"});
     let mut run2 = Run::start(cfg, "record-llm", Vec::new(), None).unwrap();
-    assert!(run2.command(&set("alice-self", json!({"agency": {"now": 10000}}), None)).is_err());
+    let e = run2.command(&set("alice-self", json!({"agency": {"now": 10000}}), None)).unwrap_err();
+    assert!(e.to_string().contains("alice has no bookkeeping named for its record: nothing can set it"), "{e}");
     // The command names no entity: bob's sets bob's, and alice's is untouched.
     run.command(&set("bob-self", json!({"agency": {"now": 1}}), None)).unwrap();
     assert!(run.kernel().state().entity_records.contains_key("bob"));
@@ -124,4 +141,80 @@ fn only_the_entity_is_shown_its_record() {
         let obs = serde_json::to_string(&look(&mut run, who)).unwrap();
         assert!(!obs.contains("\"agency\""), "{who} was shown another's record");
     }
+}
+
+#[test]
+fn a_model_beside_its_bookkeeping_may_have_its_record_kept() {
+    // A participant a model runs, with a bookkeeping named for its person: accepted, and the event says whose.
+    let mut cfg = riverbend();
+    let alice = cfg["participants"].as_array_mut().unwrap().iter_mut().find(|p| p["id"] == "alice-self").unwrap();
+    alice["controller"] = json!({"type": "llm", "impl": "mock", "model": "mock"});
+    alice["record_keeper"] = json!("citizen.default");
+    let mut run = Run::start(cfg, "record-model-kept", Vec::new(), None).unwrap();
+    let r = run.command(&set("alice-self", json!({"agency": {"now": 10000}}), None)).unwrap();
+    assert_eq!(keeper_of(&r).as_deref(), Some("citizen.default"));
+    // A code citizen's keeper is its own module, unless the world names another.
+    let mut run = Run::start(riverbend(), "record-code-kept", Vec::new(), None).unwrap();
+    let r = run.command(&set("bob-self", json!({"agency": {"now": 1}}), None)).unwrap();
+    assert_eq!(keeper_of(&r).as_deref(), Some("citizen.default"));
+}
+
+#[test]
+fn an_organisations_record_is_kept_through_its_keeping_post() {
+    let mut cfg = riverbend();
+    position_mut(&mut cfg, "finance")["keeps_record"] = json!(true);
+    let mut run = Run::start(cfg, "record-org", Vec::new(), None).unwrap();
+    // Through the keeping post: accepted, and the log names the bookkeeping.
+    let r = run.command(&set_of("finance-system", "city", json!({"books": {"open": 3}}))).unwrap();
+    let (entity, n, ..) = recorded(&r);
+    assert_eq!((entity.as_str(), n), ("city", 1));
+    assert_eq!(keeper_of(&r).as_deref(), Some("city.finance_officer"));
+    assert_eq!(serde_json::to_value(&run.kernel().state().entity_records["city"].sections).unwrap(), json!({"books": {"open": 3}}));
+    let before = run.kernel().state().entity_records.clone();
+    let seq = run.command(&Command::Observe { participant: "alice-self".into(), only: None }).unwrap().seq;
+    // Through another post of the same organisation: refused.
+    assert!(run.command(&set_of("planning-system", "city", json!({"books": {"open": 4}}))).is_err());
+    // By one who holds no post of it: refused.
+    assert!(run.command(&set_of("bank-payments-system", "city", json!({"books": {"open": 4}}))).is_err());
+    assert!(run.command(&set_of("alice-self", "city", json!({"books": {"open": 4}}))).is_err());
+    // Naming a person other than oneself: refused, whoever asks; so is one's own through the other way round.
+    assert!(run.command(&set_of("finance-system", "alice", json!({"agency": {"now": 1}}))).is_err());
+    assert!(run.command(&set_of("alice-self", "bob", json!({"agency": {"now": 1}}))).is_err());
+    // An organisation none of whose posts keeps its record, and a thing that is no entity.
+    let e = run.command(&set_of("bank-payments-system", "bank", json!({"books": {"open": 1}}))).unwrap_err();
+    assert!(e.to_string().contains("bank has no bookkeeping named for its record: nothing can set it"), "{e}");
+    assert!(run.command(&set_of("finance-system", "nowhere", json!({"books": {"open": 1}}))).is_err());
+    // Nothing refused changed the world, and nothing refused was logged.
+    assert_eq!(run.kernel().state().entity_records["city"], before["city"]);
+    let seq2 = run.command(&Command::Observe { participant: "alice-self".into(), only: None }).unwrap().seq;
+    assert_eq!(seq2, seq + 2, "the refusals left no entry in the log");
+    // Naming one's own person is the same as naming none.
+    assert!(run.command(&set_of("alice-self", "alice", json!({"agency": {"now": 1}}))).is_ok());
+    run.finish("completed", None).unwrap();
+}
+
+#[test]
+fn an_organisation_has_at_most_one_keeping_post_and_it_needs_a_module() {
+    let mut cfg = riverbend();
+    position_mut(&mut cfg, "finance")["keeps_record"] = json!(true);
+    position_mut(&mut cfg, "planning")["keeps_record"] = json!(true);
+    let e = Run::start(cfg, "record-two", Vec::new(), None).err().expect("two keeping posts are refused at load");
+    assert!(e.to_string().contains("both keep the record of city"), "{e}");
+    let mut cfg = riverbend();
+    position_mut(&mut cfg, "mayor")["keeps_record"] = json!(true);
+    let e = Run::start(cfg, "record-no-module", Vec::new(), None).err().expect("a keeping post needs a module");
+    assert!(e.to_string().contains("keeps_record needs a role_module with a code"), "{e}");
+}
+
+#[test]
+fn a_config_with_none_of_the_new_fields_stands_as_before() {
+    // The initial state hash of this fixture, computed by the code before record_keeper, keeps_record and dials existed.
+    let run = Run::start(riverbend(), "record", Vec::new(), None).unwrap();
+    assert_eq!(run.kernel().state_hash().unwrap(), "96ac081ad9d1d5283cb6f7deace0b8290e118d8d66b840414e988cd343fb1fbe");
+    // The new fields change nothing the kernel hashes of the world, and dials are opaque to it.
+    let mut cfg = riverbend();
+    cfg["dials"] = json!({"initiative_bps": 2500, "other": [1, 2]});
+    position_mut(&mut cfg, "finance")["keeps_record"] = json!(true);
+    let run2 = Run::start(cfg, "record", Vec::new(), None).unwrap();
+    assert_eq!(run2.kernel().state_hash().unwrap(), "96ac081ad9d1d5283cb6f7deace0b8290e118d8d66b840414e988cd343fb1fbe");
 }

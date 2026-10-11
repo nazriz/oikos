@@ -281,7 +281,7 @@
           }
         },
         {
-          "description": "A person's own record, set (docs/design/ai-citizens.md 10d). The bookkeeping of a code mind, never an act in the world: it takes no time and names nobody, so only the participant's own person's record can be set. The kernel refuses it for a participant not run by code (whatever a model decides, it cannot write who it is), and refuses a record that would hold more than the world's caps.entity_record_bytes: a record never grows. Logged in every log, lean ones too: it is state.",
+          "description": "An entity's record, set (docs/design/ai-citizens.md 10d). The platform's bookkeeping for that entity, named in the world's config, never an act in the world: it takes no time. With no `entity`, the participant's own person's record; with one, an organisation whose keeping post (`keeps_record`) the participant now holds. The kernel refuses it (never logged) for an entity with no bookkeeping named for its record (a participant's `record_keeper`, a code controller's module, or the keeping post's role module), so whatever a model decides, it cannot write who it is; and it refuses a record that would hold more than the world's caps.entity_record_bytes: a record never grows. Logged in every log, lean ones too: it is state.",
           "type": "object",
           "required": [
             "command",
@@ -294,6 +294,10 @@
               "const": "entity_record"
             },
             "participant": {
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+            },
+            "entity": {
+              "description": "The organisation whose record is set, when it is not the participant's own person's: one for which the participant now holds a position whose definition has keeps_record. Absent: the participant's own person's record. Anything else is refused and never logged.",
               "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
             },
             "set": {
@@ -1844,6 +1848,11 @@
             },
             "digest": {
               "$ref": "urn:oikos:contracts:0.8:common#/$defs/Hash"
+            },
+            "keeper": {
+              "description": "Who keeps this entity's record under the world's config (the name of the bookkeeping module): by whose bookkeeping the change was made. Not part of chain or digest. Absent in logs written before it was named.",
+              "type": "string",
+              "minLength": 1
             }
           }
         }

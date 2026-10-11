@@ -77,7 +77,7 @@ export class Roster {
    */
   orders(t: number): { order: string; task: string; every: number; schedule?: string; says: string }[] {
     const tasks = this.routines;
-    const mine = this.book.standingOf("work_order").filter((r) => r.speaks_for === this.entity && (r.in_position === this.office || tasks.includes(String(r.data?.work?.task)))).sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : 1));
+    const mine = this.book.standingOf("work_order").filter((r) => r.speaks_for === this.entity && (r.in_position === this.office || (tasks.includes(String(r.data?.work?.task)) && (r.in_position === undefined || r.in_position === this.office)))).sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : 1));
     const report = this.report();
     const told = new Map<string, string>(((report?.data?.orders ?? []) as { order: string; says: string }[]).map((x) => [x.order, x.says]));
     const n = this.count(t);

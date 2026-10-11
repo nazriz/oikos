@@ -15,6 +15,7 @@
 import * as C from "../calls";
 import type { Observation, Offer, StatementRecord } from "../contracts";
 import { channels } from "../contracts";
+import { cents } from "../money";
 import { because, type Book, DAY, Latest, pay, say, type Step, usd } from "./common";
 import { receipts } from "./firms";
 
@@ -69,6 +70,39 @@ export function order(o: { me: string; seller: string; sellerAccount: string; ki
     })],
     pay(o.sellerAccount, total, { from: o.from, for: `Order: ${o.quantity} ${o.kind}.` }),
   );
+}
+
+/**
+ * Money promised to the bank in orders it has not yet paid out. An order is paid with a request to our bank, which pays
+ * in its own batch (hours later); until then the balance we read has not fallen. A buyer that woke again meanwhile (it
+ * wakes after each act) and spent "what's left" spent the same money again. `owed` is what such requests still hold;
+ * `take` clears them as payments out of our account to the seller are seen (new transactions each observation), and
+ * drops any older than `forDays` (a payment we never saw: don't hold money for ever).
+ */
+export class Committed {
+  private readonly open: { to: string; amount: number; at: number }[] = [];
+  constructor(private readonly forDays = 3) {}
+  add(to: string, amount: number, at: number) {
+    this.open.push({ to, amount, at });
+  }
+  /** Take back an order that was not made. */
+  undo(to: string, amount: number) {
+    const i = this.open.findIndex((x) => x.to === to && x.amount === amount);
+    if (i >= 0) this.open.splice(i, 1);
+  }
+  take(obs: Observation, account: string | undefined) {
+    if (account) {
+      for (const tx of channels.transactions(obs)) {
+        if (tx.from !== account) continue;
+        const i = this.open.findIndex((x) => x.to === tx.to && x.amount === cents(tx.amount));
+        if (i >= 0) this.open.splice(i, 1);
+      }
+    }
+    for (let i = this.open.length - 1; i >= 0; i--) if (obs.t - this.open[i]!.at >= this.forDays * DAY) this.open.splice(i, 1);
+  }
+  get owed() {
+    return this.open.reduce((x, o) => x + o.amount, 0);
+  }
 }
 
 /** Delivery notes addressed to us (the answers to our orders), not yet read: which order, how much came, what was refunded. */

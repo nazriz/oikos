@@ -148,6 +148,33 @@ The rates notices keep the rating law's instalments: the order says that they ar
 | council clerk | `enact` | each amendment the council has passed and the clerk has declared is written into the law by its schedule, published in place of the law in force, which is withdrawn (docs/behaviour/government.md, "A council in the hands of seats") |
 | rates | `levy` | the notices sent to every owner at each instalment the rating law sets, and penalty interest added monthly to what is overdue (the law says when; the order says that it is done) |
 
+## The counter: routine post answered by the staff
+
+Townspeople write, apply and complain more in a living town (docs/design/ai-citizens.md, 10j). A real office does not put each letter in front of the person who holds it. Counter staff sort the day's post, answer what is routine under the office's own procedure, take a day's papers together, and bring the office-holder what needs a decision, with a count and a sample of the rest. Real basis: the front-counter and registry staff of a local authority or a registry office, who act on complaints and notifications under written procedures and refer to the officer only what the procedure does not cover (to confirm; no source opened).
+
+**The counter is a routine like any other.** A module that has post it can answer by fixed rule declares a routine whose task is `answer`, with `papers`: the kinds of incoming paper its counter staff answer, and in plain words how (`routines[].papers[]`, `kind` and `how`, in `contracts/module.schema.json`). What is routine is what the office's own procedure says is routine, never a guess of the platform's. The offices that have one:
+
+| Office | Papers its counter answers |
+|---|---|
+| works | `complaint`: a complaint of a collection missed puts the home first on the next round |
+| registry | `death_notification` and `birth_notification`: entered in the register from the notification, and those entitled are told of the entry |
+
+Left without one, because their business is not post sorted by rule: the tribunal's registrar (`enforcement_request`: a clerk's decision on a request, and the tribunal's judge reads the same state), the union (`membership_application`, `membership_update`: the same record of members feeds its bargaining, which a staff part could not share) and the electoral office (`enrolment`: the roll is read whole by the same code that runs the poll). Each would need its module split in parts before it could have a counter.
+
+**It is offered only to a living town.** A town whose description has `living` (and not `counter: false`) is given the counter: the office's procedure (`proc-<office>-routines`) says which papers its counter staff answer and how, and carries them in its data (`routines[].papers`), and the office has a staff post if it had none (the registry). Without `living`, or with `counter: false`, there is no counter: no line in the procedure, no staff post for a counter alone, and every part of the office does as it did.
+
+**Who does what.** The whole office (a code office, `part: ""`) answers the post as ever. The office-holder (`part: "seat"`) does not, and makes one standing order for `answer`, once, like its others. The staff do it each working day, only while a standing work order for `answer` is in force (not ended, not on hold), exactly as the code office does it; no acknowledgement is invented. They count what they answered by kind and say so in their weekly report: "answered at the counter: 12 complaints".
+
+**Two offices of one organisation each have their own order.** The works office and the registry both speak for the town, and both have a standing order for `answer`. An order is made in a post (`in_position`), and the staff, the roster and the seat read the orders of their own post only (the procedure says which office it is: `data.office`); a registry order for `answer` does not replace the works office's.
+
+**What the seat is told.** A seat reads two papers it is already shown on its standing file: the procedure and its own order for `answer`. While the order is in force and not on hold:
+- a paper of a kind the procedure lists does not bring the seat back before the day it gave (docs/real-models.md, "A seat's settings");
+- the folder shows one block, not a line for each: `Answered at your counter under your standing order (12): 12 complaints. A sample:` and the latest three, each as any paper is shown.
+
+**What always reaches the office-holder, whatever its kind:** anything addressed to the office-holder's own post by name, and anything whose basis is a paper the office-holder made themself. Papers made by the staff never bring the seat back, as before.
+
+A seat that is shown the same papers in another office of the same organisation (the mayor's in-tray holds the complaints the works counter answers) is shown them line by line as before: it has no standing file for the works office's procedure, and none is given it.
+
 ## Which offices can be seats now
 
 Measured on a 100-day mock run of a 300-person town with six of them as seats (each seat's brain the office's own

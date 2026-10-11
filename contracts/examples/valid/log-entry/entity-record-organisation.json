@@ -1,7 +1,7 @@
 {
   "body": {
     "command": "entity_record",
-    "participant": "c0038-self",
+    "participant": "finance-system",
     "set": {
       "agency": {
         "now": 1618,
@@ -53,7 +53,7 @@
       "views": [],
       "wants": []
     },
-    "entity": "c0002"
+    "entity": "city"
   },
   "hash": "3a55f05d0712f9814263b4d736bfbdbf23f7237d1264cd197f2d84ccba5b3761",
   "kind": "command",

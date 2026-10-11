@@ -11,7 +11,7 @@ import { RECORD } from "@oikos/participants";
 import { loadWorld } from "../src/batch";
 import { exportDataset } from "../src/dataset";
 import { logLines } from "../src/logs";
-import { rebuild, recordChanges, Records } from "../src/records";
+import { digestOf, linkOf, rebuild, recordChanges, Records } from "../src/records";
 import { recordChangeOf, runWorld } from "../src/run";
 
 const root = join(import.meta.dir, "../..");
@@ -61,7 +61,10 @@ test("a record never grows: three years of the 120-person town, every record wit
     // It does not grow: the largest record of the third year is no larger than the largest of the first two (a digit
     // more in a time apart). (One person's record fills as their life does, a tie or a defining event more, up to
     // the bounds the contract gives every list: which is why the largest of all stops growing.)
-    expect(largest[2]!).toBeLessThanOrEqual(Math.max(largest[0]!, largest[1]!) * 1.03);
+    // (Within a twentieth: which person's record is the largest, and by how many bytes of names and digits, differs
+    // from one run of a town to another. It was 3% until the factories stopped ordering the same inputs over and
+    // over (2026-10-11), which changed this town's three years: 3,027 bytes in the third against 2,929 before.)
+    expect(largest[2]!).toBeLessThanOrEqual(Math.max(largest[0]!, largest[1]!) * 1.05);
     expect([...sizes.values()].filter((s) => s.every((x) => x > 0)).length).toBeGreaterThan(60);
     // Things happened to people, and were remembered (what, about whom): jobs lost at least, in three years.
     expect(because.get("hired") ?? 0).toBeGreaterThan(0);
@@ -157,4 +160,72 @@ test("only a code mind's bookkeeping sets a record: nothing a model returns, and
   const api = JSON.parse(readFileSync(join(root, "contracts/participant-api.schema.json"), "utf8"));
   const types = api.$defs.ParticipantAction.oneOf.map((x: any) => x.properties.type.const).sort();
   expect(types).toEqual(["act", "call", "look", "message", "opt_out", "propose", "sign", "wait"]);
+});
+
+test("an organisation's record is taken only from the module its keeping post names, held by the one who produced it", () => {
+  const change = { set: { books: { open: 3 } } };
+  const carrying = () => Object.defineProperty({ type: "wait" }, RECORD, { value: change, enumerable: false });
+  const post = (o: object) => ({ id: "finance", entity: "city", channels: [], role_module: { code: "city.finance_officer" }, holder: "finance-system", keeps_record: true, ...o });
+  const positions = (p: any) => new Map<string, any>([["finance", p]]);
+  const unit = (o: object = {}) => ({ capacity: "finance", participant: "finance-system", module: { name: "city.finance_officer" }, ...o });
+  // The keeping post's own module, held by its producer: the change goes to the organisation's record.
+  expect(recordChangeOf(unit(), carrying(), positions(post({})))).toEqual({ ...change, entity: "city" });
+  // A post that does not keep the record (or says nothing of it): dropped.
+  expect(recordChangeOf(unit(), carrying(), positions(post({ keeps_record: false })))).toBeUndefined();
+  expect(recordChangeOf(unit(), carrying(), positions(post({ keeps_record: undefined })))).toBeUndefined();
+  expect(recordChangeOf(unit(), carrying())).toBeUndefined();
+  // Another module than the one the post names; a producer that no longer holds the post: dropped.
+  expect(recordChangeOf(unit({ module: { name: "city.inspector" } }), carrying(), positions(post({})))).toBeUndefined();
+  expect(recordChangeOf(unit(), carrying(), positions(post({ holder: "planning-system" })))).toBeUndefined();
+  // A model seat, whatever is behind it, sets nothing for an organisation either.
+  expect(recordChangeOf(unit({ llm: {} }), carrying(), positions(post({})))).toBeUndefined();
+  // A module acting as itself names no organisation, even if it asks to: its change is its own person's.
+  expect(recordChangeOf({ capacity: "self" }, Object.defineProperty({ type: "wait" }, RECORD, { value: { ...change, entity: "city" }, enumerable: false }))).toEqual(change);
+});
+
+test("the participant API has no way to an entity_record command", () => {
+  // No schema a participant or a model meets names it, and the only place the orchestrator sends it is the one that
+  // takes a change from a keeper's own output.
+  for (const f of ["participant-api.schema.json", "calls.schema.json", "common.schema.json"]) {
+    const path = join(root, "contracts", f);
+    if (!readdirSync(join(root, "contracts")).includes(f)) continue;
+    const text = readFileSync(path, "utf8");
+    for (const word of ["entity_record", "record_keeper", "keeps_record"]) expect(text.includes(word)).toBe(false);
+  }
+  const resolver = join(root, "kernel/crates/resolver/src");
+  for (const f of readdirSync(resolver)) expect(readFileSync(join(resolver, f), "utf8").includes("entity_record")).toBe(false);
+  const sends = readdirSync(join(root, "orchestrator/src")).filter((f) => f.endsWith(".ts") && readFileSync(join(root, "orchestrator/src", f), "utf8").includes('command: "entity_record"'));
+  expect(sends).toEqual(["run.ts"]);
+  expect((readFileSync(join(root, "orchestrator/src/run.ts"), "utf8").match(/command: "entity_record"/g) ?? []).length).toBe(1);
+});
+
+test("an organisation's record is rebuilt from a log and checked like a person's, by the organisation or by the participant that kept it", async () => {
+  const out = mkdtempSync(join(tmpdir(), "oikos-org-record-"));
+  try {
+    const log = join(out, "run.jsonl");
+    const lines: string[] = [];
+    let seq = 0, chain = "";
+    const sections: { [k: string]: unknown } = {};
+    for (const [t, set] of [[0, { books: { open: 3 } }], [DAY, { books: { open: 4 }, stance: { n: 1 } }]] as [number, { [k: string]: unknown }][]) {
+      lines.push(JSON.stringify({ seq: ++seq, t, kind: "command", body: { command: "entity_record", participant: "finance-system", entity: "city", set } }));
+      chain = linkOf(chain, t, set, null);
+      Object.assign(sections, set);
+      lines.push(JSON.stringify({ seq: ++seq, t, kind: "event", body: { event: "entity_recorded", cause: seq - 1, entity: "city", n: seq / 2, chain, digest: digestOf(sections), keeper: "city.finance_officer" } }));
+    }
+    writeFileSync(log, lines.join("\n") + "\n");
+    for (const who of ["city", "finance-system"]) {
+      const r = await rebuild(log, who);
+      expect(r?.faults).toEqual([]);
+      expect([r?.entity, r?.n, r?.keeper, r?.sections]).toEqual(["city", 2, "city.finance_officer", { books: { open: 4 }, stance: { n: 1 } }]);
+    }
+    // A log written before the keeper was named rebuilds as well.
+    writeFileSync(log, lines.map((l) => l.replace(',"keeper":"city.finance_officer"', "")).join("\n") + "\n");
+    const old = await rebuild(log, "city");
+    expect([old?.faults, old?.keeper]).toEqual([[], undefined]);
+    // A change tampered with is a fault.
+    writeFileSync(log, lines.join("\n").replace('"open":4', '"open":5') + "\n");
+    expect((await rebuild(log, "city"))?.faults.length).toBeGreaterThan(0);
+  } finally {
+    rmSync(out, { recursive: true, force: true });
+  }
 });

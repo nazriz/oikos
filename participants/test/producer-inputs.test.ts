@@ -46,3 +46,41 @@ test("with no more than the next pay period's wages, it orders nothing", () => {
   expect(ordered(STAFF * WAGE, MONTH_INPUTS - 1)).toBe(0);
   expect(ordered(STAFF * WAGE - 50_000, 0)).toBe(0);
 });
+
+// Found in the 1,000-person town's log (seed 1, day 72): a works placed the same order for 203 inputs 40 times in one
+// day, once for each wake. An order is paid with a request to the bank, which pays in its own batch hours later, so the
+// balance the works read had not yet fallen; each wake spent "what's left" again, and the works ended short of wages.
+function twoWakes(secondTransactions: any[] = [], secondAt = 10 * DAY + 2) {
+  const m = producer.create(context(AS.participant, ME, { works: ME, workplace: `${ME}/workplace.1`, max_staff: 10, wage: WAGE, per_unit: { inputs: PER_UNIT }, labour_per_unit: LABOUR, price: 10_000, supplier: "outside", market: "outside" }, { position: AS.position }));
+  const staff = Array.from({ length: STAFF }, (_, i) => signed(employment(`job-${i + 1}`, i + 1, ME, `worker-${i + 1}`, WAGE))).flat();
+  const list = statement("list-outside", 0, "price_list", { speaks_for: "outside", data: { goods: { inputs: PRICE }, account: "acc-outside" } });
+  const balance = STAFF * WAGE + 1000 * PRICE + 99; // pays for 1000 inputs beyond the wages
+  const channelsOf = (records: any[], transactions: any[]) => ({
+    books: { kind: "accounts", accounts: [{ account: "acc-works", holder: ME, custodian: "bank", currency: "AUD", balance: String(balance) }], transactions },
+    mine: { kind: "records", records },
+    stock: { kind: "holdings", holdings: [{ holder: ME, at: ME, kind: "inputs", quantity: String(MONTH_INPUTS - 5000) }] },
+  });
+  const ids = { n: 0 };
+  const first = wake(m, 10 * DAY, channelsOf([...staff, list], []), { entity: ME, as: AS, ids }).of("statement", "order");
+  const second = wake(m, secondAt, channelsOf([], secondTransactions), { entity: ME, as: AS, ids }).of("statement", "order");
+  return { first, second };
+}
+
+test("a works does not spend again the money of an order its bank has not yet paid out", () => {
+  const { first, second } = twoWakes();
+  expect(first.length).toBe(1);
+  expect(first[0]!.args.data.quantity).toBe(1000);
+  expect(second.length).toBe(0);
+});
+
+test("once the bank has paid the order out, the works orders again from what is then left", () => {
+  const paid = [{ t: 10 * DAY + 1, from: "acc-works", to: "acc-outside", amount: String(1000 * PRICE), currency: "AUD", by: "bank-payments-system" }];
+  const { second } = twoWakes(paid);
+  // (The balance shown is unchanged in this test, so the same money is there to spend: what matters is that it is no longer held.)
+  expect(second.length).toBe(1);
+});
+
+test("an order's money is not held for ever if its payment is never seen", () => {
+  const { second } = twoWakes([], 10 * DAY + 4 * DAY);
+  expect(second.length).toBe(1);
+});

@@ -12,6 +12,7 @@
 // through its bank, pays suppliers (the outside world) a share of its
 // revenue, and lays off when it can't cover a pay period.
 
+import { keeping, Org, type OrgParams } from "./orgwants";
 import { cents, moneyNow } from "../money";
 import * as C from "../calls";
 import { dateWords, durationWords } from "../forms";
@@ -95,7 +96,7 @@ export const landlord: BehaviourModule = {
   name: "firm.landlord",
   issues: P.LANDLORD,
   issuesWith: (p) => ({ city: p.city }),
-  version: "0.13.4", // 0.13.4: main's 0.13.3 (the builder's answer read with the week's post; what is owed counted before building or asking) with a certified copy of a registration made on someone else's report counting as the registration
+  version: "0.14.0", // 0.14.0: wants of its own (docs/behaviour/firm-wants.md), for one the world's dial gives initiative: a character from its owner's values, which answers a tenant who asks it to hold a rent or to stay on, sways its markup and its patience with arrears, and a record of its own; 0.13.4: main's 0.13.3 (the builder's answer read with the week's post; what is owed counted before building or asking) with a certified copy of a registration made on someone else's report counting as the registration
   doc: "docs/behaviour/firms.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -136,11 +137,19 @@ export const landlord: BehaviourModule = {
       // The land register, where this world keeps one to look things up in: our channel onto its plans of lots. (None:
       // whatever plans we know are those we're shown.)
       register: null as { lots: string } | null,
+      // Wants of its own (docs/behaviour/firm-wants.md): whether it takes initiative (none given: its own draw
+      // against the world's dial), the values of whoever owns most of it and the town's figures they are read
+      // against (the world's), and the sizes (`org`: placeholders).
+      initiative: null as boolean | null,
+      owner_values: null as { [value: string]: number } | null,
+      values: {} as { [value: string]: { mean_bps: number; sd_bps: number } },
+      org: {} as Partial<OrgParams>,
     },
     ctx.params,
   );
     const me = ctx.entity;
     const book = new Book();
+    const org = new Org(ctx, { initiative: p.initiative, owner_values: p.owner_values, values: p.values, org: p.org });
     // Our titles are our own papers; the plan of each lot is looked up in the register, once.
     const planAsked = new Asked();
     const ownLotsNow = () => book.ofType("claim").flatMap((r) => (r.record === "claim" && r.holder === me && r.about?.kind === "ownership" ? [r.about.object as string] : [])).sort();
@@ -178,6 +187,7 @@ export const landlord: BehaviourModule = {
     const lastReview = new Map<string, number>(); // lease -> when its rent was last reviewed
     const renewed = new Set<string>(); // leases whose tenant we've offered a new one
     const obeys = (key: string) => ctx.rng(`comply-${key}`).below(10_000) < p.compliance_bps;
+    const lateSince = new Map<string, number>(); // lease -> since when its rent has been a month or more behind
 
     const absorb = (obs: Observation) => {
       book.absorb(obs);
@@ -194,7 +204,7 @@ export const landlord: BehaviourModule = {
     // The leases we hold in force, as we have them (truth audits).
     const leasesHeld = (): Belief[] => [{ of: "held", party: me, template: "lease",
       agreements: book.ofType("agreement").filter((r) => r.record === "agreement" && r.terms.template === "lease" && r.terms.parties[0] === me && book.inForce(r.id)).map((r) => r.id) }];
-    return noting(book, Object.assign(stepper(absorb, (obs) => {
+    return keeping(org, noting(book, Object.assign(stepper(absorb, (obs) => {
       const t = obs.t;
       const acc = ownAccount(obs);
       if (!acc) return [];
@@ -219,6 +229,8 @@ export const landlord: BehaviourModule = {
       const awaiting = (leases as any[]).filter((a) => !book.concluded(a.id) && t - a.at < MONTH);
       const active = (leases as any[]).filter((a: any) => book.inForce(a.id)) as any[];
       const steps: Step[] = [];
+      // (Our markup, as our character sways it: docs/behaviour/firm-wants.md. As the routine has it, where we have none.)
+      const markupBps = org.markup(p.markup_bps);
       const offeredNow: string[] = []; // units offered this wake (they're held too)
       const tenantOf = (a: any) => a.terms.parties.find((x: string) => x !== me);
       // A lease's rent at a time: as agreed, or as we've since raised it.
@@ -316,7 +328,7 @@ export const landlord: BehaviourModule = {
           const baseRent = typeof base === "number" ? base : (base?.find((b) => b.bedrooms === o.bedrooms)?.rent ?? 100_000);
           const ref = going.length ? Math.floor(going.reduce((x, y) => x + y, 0) / going.length) : baseRent;
           const noise = 9_750 + ctx.rng(`price-${o.space}`).below(501); // +/-2.5%
-          steps.push(because(`Listing a vacant home at ${p.markup_bps / 100}% over ${going.length ? `what similar homes in the building let for (${usd(ref)})` : `the base rent for its size (${usd(ref)})`}.`, listing(o, Math.floor((((ref * (10_000 + p.markup_bps)) / 10_000) * noise) / 10_000))));
+          steps.push(because(`Listing a vacant home at ${markupBps / 100}% over ${going.length ? `what similar homes in the building let for (${usd(ref)})` : `the base rent for its size (${usd(ref)})`}.`, listing(o, Math.floor((((ref * (10_000 + markupBps)) / 10_000) * noise) / 10_000))));
         }
         // Unlet for a month: cut the asking rent (BoE: 5% a month).
         for (const l of listed) {
@@ -371,9 +383,22 @@ export const landlord: BehaviourModule = {
         const paying = payingAccount.get(tenant);
         let paid = 0;
         for (const x of (paying && received.get(paying)) || []) if (x.t >= since) paid += x.amount;
-        if ((owed - paid) >= p.arrears_months_before_notice * rent && t - since >= p.arrears_months_before_notice * MONTH) {
+        // (How long we bear with arrears is our practice, and our character's: one that would keep its tenants waits
+        // longer than one that would be rid of them. Someone behind with the rent is something we want settled.)
+        const bears = org.patience(p.arrears_months_before_notice);
+        if (org.lively) {
+          const behind = org.wants.get("arrears", tenant);
+          // (Behind by as much as our routine calls arrears, at two looks a week apart: a payment a few days late is not.)
+          if (owed - paid >= p.arrears_months_before_notice * rent) { if (!lateSince.has(a.id)) lateSince.set(a.id, t); } else lateSince.delete(a.id);
+          if (owed - paid >= p.arrears_months_before_notice * rent && t - lateSince.get(a.id)! >= 7 * DAY && !behind) org.wants.born({ about: "arrears", whom: tenant, seeks: ["money.to"], weight: Math.round(5_000 + 1_000 * (org.character.be_rid - org.character.keep)), since: t, from: "event" }, t);
+          else if (behind && owed - paid < p.arrears_months_before_notice * rent) org.wants.met(behind, t, "paid");
+        }
+        if ((owed - paid) >= bears * rent && t - since >= bears * MONTH) {
           noticeGiven.set(a.id, t);
-          steps.push(because(`Rent is ${p.arrears_months_before_notice} or more months in arrears: giving notice.`, notice(a.id, "Notice: rent is in arrears.")));
+          const behind = org.wants.get("arrears", tenant);
+          if (behind) org.wants.tried(behind, "notice", t, a.id);
+          org.remember(t, "gave_notice", tenant, 3_000);
+          steps.push(because(`Rent is ${bears} or more months in arrears: giving notice.`, notice(a.id, "Notice: rent is in arrears.")));
         }
       }
 
@@ -395,7 +420,7 @@ export const landlord: BehaviourModule = {
         const base = p.base_rent[unit.type];
         const baseRent = typeof base === "number" ? base : (base?.find((b) => b.bedrooms === unit.bedrooms)?.rent ?? now);
         const ref = others.length ? Math.floor(others.reduce((x, y) => x + y, 0) / others.length) : Math.max(now, baseRent);
-        const market = Math.floor((ref * (10_000 + p.markup_bps)) / 10_000);
+        const market = Math.floor((ref * (10_000 + markupBps)) / 10_000);
         if (market <= now) {
           lastReview.set(a.id, t);
           continue;
@@ -423,7 +448,7 @@ export const landlord: BehaviourModule = {
         rentChanges.set(a.id, [...(rentChanges.get(a.id) ?? []), change]);
         const give = (at: number): Step => {
           change.from = startsOn(at, lead);
-          return Object.assign(because(`A rent review (every ${reviewMonths} months): what we'd ask for ${unit.space} now is ${usd(market)} a month (${p.markup_bps / 100}% over ${others.length ? "what similar homes in the building let for" : "the base rent"}), above the ${usd(now)} it lets for: raising it, with ${Math.round(lead / DAY)} days' notice${why}.`,
+          return Object.assign(because(`A rent review (every ${reviewMonths} months): what we'd ask for ${unit.space} now is ${usd(market)} a month (${markupBps / 100}% over ${others.length ? "what similar homes in the building let for" : "the base rent"}), above the ${usd(now)} it lets for: raising it, with ${Math.round(lead / DAY)} days' notice${why}.`,
             say("rent_increase", `Notice of rent increase for ${unit.space}: ${usd(market)} a month from ${Math.floor(change.from / DAY)} (day), up from ${usd(now)}; it last changed on day ${Math.floor(lastFrom / DAY)}.`, { to: [tenant], visible: [me, tenant], basis: a.id, data: notice(change.from) })), { redo: give });
         };
         steps.push(give(t));
@@ -582,6 +607,48 @@ export const landlord: BehaviourModule = {
           if (obeys(`order-${r.id}`)) steps.push(because("Obeying a demolition order: commissioning the builder to demolish it.", C.call("structure", { remove: r.data?.structure, by: p.builder, price: C.amountText(price), from: acc.account, basis: r.id })));
         }
       }
+      // Asked by a tenant to vary what stands between us (docs/behaviour/firm-wants.md): to hold a rent we have given
+      // notice of raising, or to let them stay on under a notice of ours. We answer in writing, yes or no, by our
+      // character (keeping a tenant and being thought well of, against growing or being rid of them) and by what the
+      // tenant is worth to us (one who has paid as agreed, more); and, saying yes, we do it: the notice of increase is
+      // withdrawn, or a new lease is offered from when the old one ends. One with no wants of its own answers nothing.
+      if (org.lively) for (const r of book.open("variation_request")) {
+        if (answered.has(r.id) || !(r.addressed_to ?? []).includes(me)) continue;
+        answered.add(r.id);
+        const a = active.find((x) => x.id === r.data?.agreement);
+        const tenant = a ? tenantOf(a) : undefined;
+        if (!a || !tenant || r.speaks_for !== tenant) continue;
+        const about = String(r.data?.about ?? "");
+        const paper = book.records.get(about) as any;
+        const paidUp = !org.wants.get("arrears", tenant);
+        const reply = (granted: boolean, words: string) => say("variation_answer", words, { to: [tenant], visible: [me, tenant], basis: r.id, data: { about, granted } });
+        if (paper?.record === "statement" && paper.kind === "rent_increase" && paper.speaks_for === me && !book.withdrawn.has(paper.id)) {
+          const g = org.grants("hold", ctx.rng(`vary-${r.id}`), paidUp ? 0.5 : -1);
+          org.remember(t, g.granted ? "held_rent" : "refused_hold", tenant, 2_000);
+          if (g.granted) {
+            const changes = rentChanges.get(a.id) ?? [];
+            rentChanges.set(a.id, changes.filter((c) => !(c.from === Number(paper.data?.from) && c.rent === cents(paper.data?.rent))));
+            steps.push(because(`${tenant} asks us to hold the rent: we would sooner keep them (for us, ${g.chance / 100}% of such requests): withdrawing the notice; the rent stays as it was.`,
+              withdraw(paper.id, "Withdrawn at the tenant's request."), reply(true, "Granted: the notice of rent increase is withdrawn; your rent stays as it was.")));
+          } else steps.push(because(`${tenant} asks us to hold the rent: no (for us, ${g.chance / 100}% of such requests are granted).`, reply(false, "Not granted: the rent increase stands.")));
+        } else if (r.data?.would?.does?.outcome?.occupancy && noticeGiven.has(a.id) && !renewed.has(a.id)) {
+          const ends = book.endsAt(a.id);
+          const lt = leaseTerms(a, tenant);
+          const g = org.grants("stay", ctx.rng(`vary-${r.id}`), paidUp ? 0.5 : -1);
+          org.remember(t, g.granted ? "let_stay" : "refused_stay", tenant, 2_000);
+          if (g.granted && ends !== undefined && lt.space) {
+            renewed.add(a.id);
+            renewsAt.set(a.id, ends);
+            const rent = rentAt(a, ends);
+            const months = between(p.min_term_months, p.max_term_months, ctx.rng(`renew-${a.id}`).below(1_000_000) / 1_000_000);
+            steps.push(because(`${tenant} asks to stay on: we would sooner keep them: offering a new lease at ${usd(rent)} a month from when the old one ends.`,
+              ["lease", offer(tenant, { template: "lease", term: ends - t + months * MONTH, ...(p.after_term ? { then: p.after_term } : {}), ourNotice: p.landlord_notice_days * DAY, theirNotice: p.tenant_notice_days * DAY,
+                we: C.call("occupancy", { who: tenant, in: lt.space }), they: pay(acc.account, rent, { every: MONTH, for: "rent" }),
+                text: `${tenant} rents home ${lt.space} from ${me} for ${moneyNow(rent)} a month, renewing their lease (${a.id}) for ${months} months from day ${Math.floor(ends / DAY)}.`, basis: a.id })],
+              reply(true, "Granted: a new lease is offered you from when yours ends.")));
+          } else steps.push(because(`${tenant} asks to stay on: no.`, reply(false, "Not granted: the notice stands.")));
+        } else steps.push(because(`${tenant} asks something of us that is not ours to vary as asked.`, reply(false, "Not granted.")));
+      }
       // A tribunal's order that a notice of rent increase of ours is invalid (docs/behaviour/justice.md): obeying it (as
       // often as we obey the law), we withdraw the notice and the rent stays as it was.
       for (const o of book.open("tribunal_order")) {
@@ -594,7 +661,7 @@ export const landlord: BehaviourModule = {
         steps.push(because(`The tribunal has found our notice of rent increase ${n.id} invalid: withdrawing it; the rent stays as it was.`, withdraw(n.id, `Withdrawn: found invalid by the tribunal (${o.id}).`)));
       }
       return steps;
-    }, undefined, plansToRead), { beliefs: (): Belief[] => leasesHeld() }));
+    }, undefined, plansToRead), { beliefs: (): Belief[] => leasesHeld() })), () => ({ homes: owned.length }));
   },
 };
 
@@ -1110,12 +1177,13 @@ export class Staffing {
    * A rise for everyone we employ (an enterprise agreement, docs/behaviour/unions.md): each wage order is replaced by
    * one at the new wage (net of the tax withheld), from the next pay day on.
    */
-  raise(book: Book, t: number, account: string, riseBps: number, why: string): Step[] {
+  raise(book: Book, t: number, account: string, riseBps: number, why: string, one?: { agreement: string; wage: number }): Step[] {
     const law = incomeTaxLaw(book);
     const lines: C.Call[] = [];
     const refs: [string, string, Withheld][] = [];
     for (const a of this.staff(book, t)) {
-      const wage = Math.floor((this.wageOf(a) * (10_000 + riseBps)) / 10_000);
+      if (one && a.id !== one.agreement) continue; // (a rise for one of us, at the wage asked)
+      const wage = one ? one.wage : Math.floor((this.wageOf(a) * (10_000 + riseBps)) / 10_000);
       this.gross.set(a.id, wage);
       const order = this.orders.get(a.id);
       const to = this.payee(book, a);
@@ -1134,6 +1202,40 @@ export class Staffing {
     const out: Step[] = [];
     for (let i = 0; i < lines.length; i += 30) out.push(because(why, ...lines.slice(i, i + 30)));
     return out;
+  }
+
+  /** The organisation's wants, where the post that runs it has them (docs/behaviour/firm-wants.md). */
+  org?: Org;
+  private readonly askedAnswered = new Set<string>();
+  /**
+   * Asked by one of ours for a rise (docs/behaviour/firm-wants.md): answered in writing, yes or no, by our character
+   * (keeping a worker and being thought well of, against paying less), by how long they have been with us, and only
+   * where what we have in the bank covers the new wage bill for a few pay periods; saying yes, their wage order is
+   * replaced by one at the wage asked, from the next pay day. An employer with no wants of its own answers nothing.
+   */
+  asked(book: Book, t: number, account: string, balance: number): Step[] {
+    const org = this.org;
+    if (!org?.lively) return [];
+    const steps: Step[] = [];
+    for (const r of book.open("variation_request")) {
+      if (this.askedAnswered.has(r.id) || !(r.addressed_to ?? []).includes(this.me)) continue;
+      this.askedAnswered.add(r.id);
+      const a = this.staff(book, t).find((x) => x.id === r.data?.agreement);
+      const worker = a?.terms.parties[1];
+      if (!a || r.speaks_for !== worker) continue;
+      const wage = Math.floor(Number(r.data?.would?.does?.outcome?.money?.amount));
+      const now = this.wageOf(a);
+      const reply = (granted: boolean, words: string) => say("variation_answer", words, { to: [worker], visible: [this.me, worker], basis: r.id, data: { about: a.id, granted, ...(granted ? { wage } : {}) } });
+      const bill = this.staff(book, t).reduce((x, s) => x + this.wageOf(s), 0);
+      const can = Number.isSafeInteger(wage) && wage > now && wage <= now * 2 && balance >= org.p.rise_cover_periods * (bill + wage - now);
+      const years = (t - (book.signedAt(a.id) ?? t)) / (365 * DAY);
+      const g = can ? org.grants("rise", this.ctx.rng(`rise-${r.id}`), Math.max(-1, Math.min(1, years - 1))) : { granted: false, chance: 0 };
+      org.remember(t, g.granted ? "gave_rise" : "refused_rise", worker, 2_000);
+      if (g.granted) steps.push(...this.raise(book, t, account, 0, `${worker} asks for a rise, to ${usd(wage)}: we would sooner keep them (for us, ${g.chance / 100}% of such requests): their wage is ${usd(wage)} from the next pay day.`, { agreement: a.id, wage }),
+        because(`Telling ${worker} their rise is granted.`, reply(true, `Granted: your pay is ${usd(wage)} from the next pay day.`)));
+      else steps.push(because(can ? `${worker} asks for a rise: no (for us, ${g.chance / 100}% of such requests are granted).` : `${worker} asks for a rise we cannot give.`, reply(false, "Not granted: your pay stays as it is.")));
+    }
+    return steps;
   }
 
   /** Pay stopped for these workers (on strike: no pay for time on strike). */

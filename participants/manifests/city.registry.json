@@ -3,6 +3,13 @@
   "version": "0.7.0",
   "doc": "docs/behaviour/institutions.md",
   "params": {
+    "counter": {
+      "schema": {
+        "type": "boolean"
+      },
+      "default": false,
+      "source": "placeholder"
+    },
     "estate_tells": {
       "schema": {
         "type": "array"
@@ -18,6 +25,20 @@
       "source": "placeholder"
     },
     "land_registry": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
+      "source": "placeholder"
+    },
+    "office": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
+      "source": "placeholder"
+    },
+    "part": {
       "schema": {
         "type": "string"
       },
@@ -235,6 +256,24 @@
           "heir": "=heir"
         }
       }
+    }
+  ],
+  "routines": [
+    {
+      "task": "answer",
+      "at": "office",
+      "every": 1,
+      "what": "The office's counter staff enter in the register each notification of a death or of a birth that comes to the office, and those entitled are told, each working day, so that the registrar is not brought back for it.",
+      "papers": [
+        {
+          "kind": "death_notification",
+          "how": "entered in the register from the notification, and those entitled are told of the entry"
+        },
+        {
+          "kind": "birth_notification",
+          "how": "entered in the register from the notification, and those entitled are told of the entry"
+        }
+      ]
     }
   ]
 }

@@ -1,6 +1,6 @@
 {
   "name": "firm.landlord",
-  "version": "0.13.4",
+  "version": "0.14.0",
   "doc": "docs/behaviour/firms.md",
   "params": {
     "after_term": {
@@ -94,6 +94,11 @@
       "unit": "days",
       "source": "the world gives it (no default)"
     },
+    "initiative": {
+      "schema": {},
+      "default": null,
+      "source": "placeholder"
+    },
     "landlord_notice_days": {
       "schema": {
         "type": "integer"
@@ -134,9 +139,21 @@
       "default": 12,
       "source": "BoE/ARLA: 12-24 months, uniform"
     },
+    "org": {
+      "schema": {
+        "type": "object"
+      },
+      "default": {},
+      "source": "placeholder"
+    },
     "outside_account": {
       "schema": {},
       "source": "the world gives it (no default)"
+    },
+    "owner_values": {
+      "schema": {},
+      "default": null,
+      "source": "placeholder"
     },
     "register": {
       "schema": {},
@@ -172,6 +189,10 @@
     "reprice_days": {
       "schema": {},
       "unit": "days",
+      "source": "the world gives it (no default)"
+    },
+    "rise_cover_periods": {
+      "schema": {},
       "source": "the world gives it (no default)"
     },
     "shop_accounts": {
@@ -216,6 +237,13 @@
       },
       "unit": "bps",
       "default": 2000,
+      "source": "placeholder"
+    },
+    "values": {
+      "schema": {
+        "type": "object"
+      },
+      "default": {},
       "source": "placeholder"
     },
     "wind_up_days": {

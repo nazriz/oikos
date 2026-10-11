@@ -9,7 +9,7 @@ import { logLines, runOf } from "./logs";
 import { takeRoute, takeTurn, type CorpusExample } from "./corpus";
 import { periodRow, Records } from "./records";
 
-export const DATASET_VERSION = "0.4.0";
+export const DATASET_VERSION = "0.5.0";
 
 interface Command { seq: number; command: string; as?: string; blocks?: unknown[]; looks?: unknown[]; provenance?: unknown; reasoning?: string; applied?: boolean; refusal?: unknown; created?: string[] }
 /** Something a seat was shown that names what an earlier act of its own made: the record or letter made (`of`), the
@@ -122,8 +122,17 @@ export async function exportDataset(logPath: string, outDir: string, o: DatasetO
   // from the record rebuilt as the log is read, a row a person a period of what a log can show of them.
   const citizenRecords = lines(join(outDir, "citizen_records.jsonl"));
   const citizenPeriods = lines(join(outDir, "citizen_periods.jsonl"));
+  // What became of wants (docs/design/ai-citizens.md 10a, 10h), people's and organisations': a row each time one was
+  // born, gone after (and by what way; "wait": nothing was done), met, given up, grew, gave way to a heavier one, or
+  // was withdrawn from. Read from the reasons recorded with each change to a record, so lean logs have them too.
+  // Nothing here is scored.
+  const wantRows = lines(join(outDir, "wants.jsonl"));
+  const wantCounts = { people: {} as { [event: string]: { [what: string]: number } }, organisations: {} as { [event: string]: { [what: string]: number } } };
+  const wantsOf = { people: new Set<string>(), organisations: new Map<string, { [event: string]: number }>() };
+  const persons = new Set<string>(); // participants whose own record is a person's
+  let actsByPeople = 0, actsOnInitiative = 0;
   const records = new Records();
-  let recordSet: { seq: number; t: number; participant: string; set: any; because?: unknown[] } | undefined;
+  let recordSet: { seq: number; t: number; participant: string; set: any; because?: unknown[]; organisation?: boolean } | undefined;
   let recordFaults = 0;
   let largestRecord = 0;
   const decisionSeqs: number[] = []; // each decision row's place in the log, in the order written
@@ -264,15 +273,29 @@ export async function exportDataset(logPath: string, outDir: string, o: DatasetO
       recordFaults += r.faults.length - before;
       largestRecord = Math.max(largestRecord, r.bytes);
       citizenRecords.write({ run: run(), t: recordSet.t, seq: recordSet.seq, participant: recordSet.participant, entity: b.entity, n: b.n, set: recordSet.set, ...(recordSet.because ? { because: recordSet.because } : {}), chain: b.chain });
+      for (const x of (recordSet.because ?? []) as any[]) {
+        if (typeof x?.what !== "string" || !x.what.startsWith("want_")) continue;
+        const event = x.what.slice(5);
+        const org = !!recordSet.organisation;
+        wantRows.write({ run: run(), t: x.t ?? recordSet.t, seq: recordSet.seq, entity: b.entity, ...(org ? { organisation: true } : {}), event, about: x.about ?? "", weight: x.size ?? 0, ...(x.by ? { by: x.by } : {}) });
+        const counts = org ? wantCounts.organisations : wantCounts.people;
+        const key = event === "pursued" ? String(x.by ?? "") : String(x.about ?? "");
+        (counts[event] ??= {})[key] = (counts[event]![key] ?? 0) + 1;
+        if (org) { const o = wantsOf.organisations.get(b.entity) ?? {}; o[event] = (o[event] ?? 0) + 1; wantsOf.organisations.set(b.entity, o); }
+        else wantsOf.people.add(b.entity);
+        if (!org && event === "pursued" && x.by !== "wait") actsOnInitiative++;
+      }
+      if (!recordSet.organisation) persons.add(recordSet.participant);
       if (recordSet.set.hours) {
         const row = periodRow(r, recordSet.t);
         if (row) citizenPeriods.write({ run: run(), ...row });
       }
       recordSet = undefined;
     } else if (e.kind === "command" && b.command === "entity_record") {
-      recordSet = { seq: e.seq, t: e.t, participant: b.participant, set: b.set, ...(b.because ? { because: b.because } : {}) };
+      recordSet = { seq: e.seq, t: e.t, participant: b.participant, set: b.set, ...(b.because ? { because: b.because } : {}), ...(b.entity !== undefined ? { organisation: true } : {}) };
     } else if (e.kind === "command") {
       const who = b.participant;
+      if (b.command === "act" && !b.as && persons.has(who)) actsByPeople++;
       if (b.command === "act" && b.provenance?.via === "translator" && b.provenance.draft) {
         bySeqDraft.set(e.seq, b.provenance.draft);
         tr(b.provenance.draft, e.t, who).executed = { seq: e.seq, applied: true };
@@ -357,6 +380,9 @@ export async function exportDataset(logPath: string, outDir: string, o: DatasetO
     if (x.rows) files[name] = x;
     else await Bun.file(join(outDir, name)).delete();
   }
+  const wr = await wantRows.close();
+  if (wr.rows) files["wants.jsonl"] = wr;
+  else await Bun.file(join(outDir, "wants.jsonl")).delete();
   const obs = await observations.close();
   if (obs.rows) files["observations.jsonl"] = obs;
   else await Bun.file(join(outDir, "observations.jsonl")).delete();
@@ -381,11 +407,19 @@ export async function exportDataset(logPath: string, outDir: string, o: DatasetO
     // People's own records: how many people have one, the changes to them, the most any record ever held (bytes: it
     // never grows past the world's cap), and how many links of their chains did not hold when rebuilt (0, or a fault).
     ...(records.of.size ? { records: { entities: records.of.size, changes: [...records.of.values()].reduce((x, r) => x + r.n, 0), largest_bytes: largestRecord, chain_faults: recordFaults } } : {}),
+    // Wants (docs/design/ai-citizens.md 10h): how many were born, met, given up, withdrawn from, by what they were
+    // about; how often each way was taken; for people and for organisations; and people's acts taken on initiative
+    // (a want gone after by some way other than waiting) beside all their acts (the rest answer the world, or are
+    // routine). Counted, never scored.
+    ...(wr.rows ? { wants: { people: { holders: wantsOf.people.size, ...sorted(wantCounts.people) }, organisations: { holders: wantsOf.organisations.size, ...sorted(wantCounts.organisations) },
+      acts: { by_people: actsByPeople, on_initiative: actsOnInitiative } } } : {}),
     files,
   };
   await Bun.write(join(outDir, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
   return manifest;
 }
+
+const sorted = (c: { [event: string]: { [what: string]: number } }) => Object.fromEntries(Object.keys(c).sort().map((e) => [e, Object.fromEntries(Object.keys(c[e]!).sort().map((k) => [k, c[e]![k]!]))]));
 
 /** The dataset folder for a log: next to it, `<run>.dataset/` (or under `outRoot`). */
 export function datasetDirFor(logPath: string, outRoot?: string): string {

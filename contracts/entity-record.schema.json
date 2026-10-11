@@ -447,19 +447,61 @@
           }
         },
         "wants": {
-          "description": "What the person is trying to bring about (docs/design/ai-citizens.md 10a): what it is about, of what kind, how much it matters, since when. A want held together with one's household names the household's record (`with`): each member holds it in their own record, with their own weight. Empty until wants are built (the step after the record).",
+          "description": "What the entity is trying to bring about (docs/design/ai-citizens.md 10a): what it is about and whom it concerns, what would satisfy it in the world's typed outcomes, the paper in its way, how much it matters, since when, where it came from, and what has been tried. Heaviest first. Empty for an entity that takes no initiative.",
           "type": "array",
           "maxItems": 6,
           "items": {
             "type": "object",
             "additionalProperties": false,
+            "required": [
+              "about",
+              "seeks",
+              "weight",
+              "since",
+              "from",
+              "tried"
+            ],
             "properties": {
               "about": {
                 "type": "string",
-                "maxLength": 128
+                "maxLength": 128,
+                "description": "What it is about, in a word of the mind's own: a need (security, shelter, belonging ...) or what happened (rent_increase, notice, let_go, unpaid, loss, slight, service ...)."
               },
-              "kind": {
-                "$ref": "urn:oikos:contracts:0.8:common#/$defs/Label"
+              "whom": {
+                "type": "string",
+                "maxLength": 128,
+                "description": "Whom it concerns, where it is about someone: a person, an organisation or a post (a grievance against this landlord, this employer, this council; someone lost). A want may seek nothing typed and be about someone only."
+              },
+              "seeks": {
+                "type": "array",
+                "maxItems": 6,
+                "description": "What would satisfy it, as typed outcomes of the blocks' vocabulary (money, occupancy, work, attend, goods), with \"me\" where the entity itself stands: any one of them would. Empty: nothing typed (a grievance).",
+                "items": {
+                  "$ref": "urn:oikos:contracts:0.8:common#/$defs/OpaqueObject"
+                }
+              },
+              "against": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "record",
+                  "kind",
+                  "by"
+                ],
+                "description": "The paper that stands in its way (a notice, a rise, a debt): which, of what kind, and who made it.",
+                "properties": {
+                  "record": {
+                    "type": "string",
+                    "maxLength": 128
+                  },
+                  "kind": {
+                    "$ref": "urn:oikos:contracts:0.8:common#/$defs/Label"
+                  },
+                  "by": {
+                    "type": "string",
+                    "maxLength": 128
+                  }
+                }
               },
               "weight": {
                 "type": "integer",
@@ -469,16 +511,31 @@
               "since": {
                 "$ref": "urn:oikos:contracts:0.8:common#/$defs/SimTime"
               },
+              "from": {
+                "enum": [
+                  "need",
+                  "event",
+                  "other"
+                ],
+                "description": "Born of a need as values weigh it, of something that happened, or of what someone the entity copies is after."
+              },
               "with": {
-                "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+                "type": "string",
+                "maxLength": 128,
+                "description": "The household it is held with, where it is a household's: each member holds it in their own record, with their own weight."
+              },
+              "tried": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000,
+                "description": "How often something was tried for it (waiting counts)."
+              },
+              "way": {
+                "type": "string",
+                "maxLength": 160,
+                "description": "The way last taken: an opening by how it is taken up and of what or whom (offer:employment, offer:lease, practice:<host>, join:<host>, ask:<party>, desk:<office>, petition:<id>, stand:<notice>, self, ties), or wait."
               }
-            },
-            "required": [
-              "about",
-              "kind",
-              "weight",
-              "since"
-            ]
+            }
           }
         },
         "memory": {
@@ -636,6 +693,198 @@
         }
       },
       "description": "A person's record: every section optional (a record is set section by section), every list bounded."
+    },
+    "OrganisationRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "An organisation's own record (a firm, a landlord): its character, drawn from the values of whoever owns most of it; its wants; and the last things that happened to it. Written by the bookkeeping of the one post of the organisation that keeps it (world config: the position's keeps_record).",
+      "properties": {
+        "character": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "How much each of an organisation's standing wants weighs with it (basis points; 5000: as the town's mean owner would have it): to keep trading, to grow, to keep a customer, tenant or worker, to be rid of one, to pay less, to be thought well of.",
+          "required": [
+            "keep_trading",
+            "grow",
+            "keep",
+            "be_rid",
+            "pay_less",
+            "standing"
+          ],
+          "properties": {
+            "keep_trading": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            "grow": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            "keep": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            "be_rid": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            "pay_less": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            "standing": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            }
+          }
+        },
+        "wants": {
+          "description": "What the entity is trying to bring about (docs/design/ai-citizens.md 10a): what it is about and whom it concerns, what would satisfy it in the world's typed outcomes, the paper in its way, how much it matters, since when, where it came from, and what has been tried. Heaviest first. Empty for an entity that takes no initiative.",
+          "type": "array",
+          "maxItems": 6,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "about",
+              "seeks",
+              "weight",
+              "since",
+              "from",
+              "tried"
+            ],
+            "properties": {
+              "about": {
+                "type": "string",
+                "maxLength": 128,
+                "description": "What it is about, in a word of the mind's own: a need (security, shelter, belonging ...) or what happened (rent_increase, notice, let_go, unpaid, loss, slight, service ...)."
+              },
+              "whom": {
+                "type": "string",
+                "maxLength": 128,
+                "description": "Whom it concerns, where it is about someone: a person, an organisation or a post (a grievance against this landlord, this employer, this council; someone lost). A want may seek nothing typed and be about someone only."
+              },
+              "seeks": {
+                "type": "array",
+                "maxItems": 6,
+                "description": "What would satisfy it, as typed outcomes of the blocks' vocabulary (money, occupancy, work, attend, goods), with \"me\" where the entity itself stands: any one of them would. Empty: nothing typed (a grievance).",
+                "items": {
+                  "$ref": "urn:oikos:contracts:0.8:common#/$defs/OpaqueObject"
+                }
+              },
+              "against": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "record",
+                  "kind",
+                  "by"
+                ],
+                "description": "The paper that stands in its way (a notice, a rise, a debt): which, of what kind, and who made it.",
+                "properties": {
+                  "record": {
+                    "type": "string",
+                    "maxLength": 128
+                  },
+                  "kind": {
+                    "$ref": "urn:oikos:contracts:0.8:common#/$defs/Label"
+                  },
+                  "by": {
+                    "type": "string",
+                    "maxLength": 128
+                  }
+                }
+              },
+              "weight": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
+              },
+              "since": {
+                "$ref": "urn:oikos:contracts:0.8:common#/$defs/SimTime"
+              },
+              "from": {
+                "enum": [
+                  "need",
+                  "event",
+                  "other"
+                ],
+                "description": "Born of a need as values weigh it, of something that happened, or of what someone the entity copies is after."
+              },
+              "with": {
+                "type": "string",
+                "maxLength": 128,
+                "description": "The household it is held with, where it is a household's: each member holds it in their own record, with their own weight."
+              },
+              "tried": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000,
+                "description": "How often something was tried for it (waiting counts)."
+              },
+              "way": {
+                "type": "string",
+                "maxLength": 160,
+                "description": "The way last taken: an opening by how it is taken up and of what or whom (offer:employment, offer:lease, practice:<host>, join:<host>, ask:<party>, desk:<office>, petition:<id>, stand:<notice>, self, ties), or wait."
+              }
+            }
+          }
+        },
+        "memory": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "recent": {
+              "type": "array",
+              "maxItems": 8,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "t": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "what": {
+                    "$ref": "urn:oikos:contracts:0.8:common#/$defs/Label"
+                  },
+                  "about": {
+                    "type": "string",
+                    "maxLength": 128
+                  },
+                  "size": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10000
+                  }
+                },
+                "required": [
+                  "t",
+                  "what",
+                  "size"
+                ],
+                "description": "Something that happened: when, what (a word of the mind's own: hired, bereaved, evicted, job_lost, ruined, child, ...), about whom, and how large it was to them."
+              }
+            }
+          }
+        },
+        "circumstances": {
+          "type": "object",
+          "description": "How things stand, in whole numbers (what it lets, whom it employs, what it has been asked and granted).",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        }
+      }
     }
   }
 }

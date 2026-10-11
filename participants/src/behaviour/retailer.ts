@@ -1,6 +1,7 @@
 // firm.retailer: a shop, after Lengnick (2013), with wholesale buying and serving (phase B). Documented in
 // docs/behaviour/retailer.md, with sources.
 
+import { keeping, Org, type OrgParams } from "./orgwants";
 import * as C from "../calls";
 import { cents } from "../money";
 import type { LookRequest, Observation, StatementRecord } from "../contracts";
@@ -25,7 +26,7 @@ export const retailer: BehaviourModule = {
   name: "firm.retailer",
   issues: [P.JOB_ADVERTISEMENT, ...P.TRADE],
   issuesWith: (p) => ({ ...P.staffingOwn({ role: p.role ?? "shop assistant", industry: p.industry, workplace: p.workplace, notice_days: p.notice_days ?? 14 }), police: p.police }),
-  version: "0.9.1", // 0.9.1: a business of one buys stock when it runs low (daily), keeps its stock money at today's price, follows its owner's home, and closes when its owner has gone; 0.9.0: a business run by its owner alone (operator), stocked for a few days and drawn on by its owner; 0.8.4: takes on the share of its hands the world gives by the day; 0.8.3: registers the share of its jobs the world gives for shops (firms.md, "Jobs an employer does not register")
+  version: "0.10.0", // 0.10.0: wants of its own (docs/behaviour/firm-wants.md): a character from its owner's values, which answers a worker who asks for a rise, and a record of its own; 0.9.1: a business of one buys stock when it runs low (daily), keeps its stock money at today's price, follows its owner's home, and closes when its owner has gone; 0.9.0: a business run by its owner alone (operator), stocked for a few days and drawn on by its owner; 0.8.4: takes on the share of its hands the world gives by the day; 0.8.3: registers the share of its jobs the world gives for shops (firms.md, "Jobs an employer does not register")
   doc: "docs/behaviour/retailer.md",
   cadence: () => DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(24) * 3600,
@@ -95,10 +96,18 @@ export const retailer: BehaviourModule = {
         capital: 0,
         listing: null as string | null,
         bank: "", // a shop just founded opens its account here (the world must say, for one); closed, our premises are offered at this share of what building them new costs (placeholder)
+        // Wants of its own (docs/behaviour/firm-wants.md): whether it takes initiative (none given: its own draw
+        // against the world's dial), the values of whoever owns most of it and the town's figures they are read
+        // against (the world's), and the sizes (`org`: placeholders).
+        initiative: null as boolean | null,
+        owner_values: null as { [value: string]: number } | null,
+        values: {} as { [value: string]: { mean_bps: number; sd_bps: number } },
+        org: {} as Partial<OrgParams>,
         ...LENGNICK, // Lengnick (2013), Table 1
       },
       ctx.params,
     );
+    const org = new Org(ctx, { initiative: p.initiative, owner_values: p.owner_values, values: p.values, org: p.org });
     if (p.founder) need(p, ["bank"], "firm.retailer");
     const me = ctx.entity;
     const book = new Book();
@@ -213,7 +222,8 @@ export const retailer: BehaviourModule = {
       return steps;
     }
 
-    return Object.assign(stepper(
+    staffing.org = org;
+    return keeping(org, Object.assign(stepper(
       (obs) => {
         book.absorb(obs);
         staffing.absorb(obs);
@@ -332,6 +342,7 @@ export const retailer: BehaviourModule = {
         // ---- staff ----
         // Bargaining with a union (docs/behaviour/unions.md): a claim answered, an agreement's rise, a strike.
         steps.push(...bargaining.steps(book, t, staffing, acc.account, acc.balance, (rise) => { wage = Math.floor((wage * (10_000 + rise)) / 10_000); }));
+        steps.push(...staffing.asked(book, t, acc.account, acc.balance));
         steps.push(...staffing.routine(obs, book, acc.account, {
           // Only with room at the workplace (someone let go may still be there, working out their notice).
           target: trading && !p.operator ? Math.min(p.max_staff, headcount) : 0, wage, canPost: trading && !p.operator && acc.balance >= Math.floor(((workers.length + 1) * wage * MONTH) / p.period) && roomAtWork(obs, workers.length) > 0,
@@ -543,6 +554,6 @@ export const retailer: BehaviourModule = {
         }
         return looks;
       },
-    ), { beliefs: (): Belief[] => staffing.beliefs(book) });
+    ), { beliefs: (): Belief[] => staffing.beliefs(book) }));
   },
 };
