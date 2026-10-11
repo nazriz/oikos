@@ -40,7 +40,7 @@ and it is then that it takes arrears up: the letter asking for the rent, the app
 the notice. Until then every lease standing at the start was counted from day 0 and every landlord acted at whatever
 look came first, which was the same weekly moment for all of them (they are all woken by the same published paper):
 126 letters in one instant on day 37 of a 3,000-person town, 21 applications on day 72 and 21 orders on day 114. The
-same town now: letters on 14 days and more, never more than a few tens in one; applications on six days. **Real-world
+same town now: 128 letters over 43 days, 8 the most in one; 20 applications over 16 days. **Real-world
 basis:** rent is due on the date the tenancy agreement states, which differs by tenancy; a letting office works its
 arrears list on a regular day. (To confirm: common practice; no source opened.)
 

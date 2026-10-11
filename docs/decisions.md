@@ -4057,7 +4057,24 @@ Step 2b of the living world (docs/design/ai-citizens.md 10k). Behaviour: docs/be
 - **A seat's notebook (the review's note on growth).** Folded, not left to fill: at 6,000 of 8,000 characters the seat is asked once, in one counted call (purpose `notebook`), to summarise its older untouched entries; nothing is dropped silently (docs/real-models.md). 17 extra calls in 400 sittings of a seat that never prunes.
 - **`oikos measure` on larger towns (fault 1).** The reader's limit is sized from the log's own first line; the queue says "done, BUT ITS MEASURES FAILED" (docs/measurement.md). *Chosen over* reading the header outside DuckDB: nine tables unnest the header. *Would revisit:* a header that outgrows memory.
 - **The works office and the mayor's direction (lv-01, fault 3 there).** The direction was filed on the form, read, acknowledged and followed; the worker signed an offer made two days before it. The acknowledgement's "takes nobody on" was untrue of an offer already out, and now says what a direction does and names such an offer. **Found on the way, and a fault of the platform:** an office's staff post never read a direction (it looked under its own post's name). It does now. No direction to a seated office's staff took effect before this date: in wave 2 that is the rates office's recovery direction and the works office's collection direction, where one was given to an office a model held; staffing directions were the office-holder's to follow and were not affected. *Not done:* withdrawing an offer not yet signed (needs the kernel).
-- **Prompt sizes and sittings** (mock, the pilot's own 3,000-person town, 120 days, twelve seats; `runs/living-pilot-fixes-2026-10-11`): SIZES_TABLE
+- **Prompt sizes and sittings** (mock, the pilot's own 3,000-person town, 120 days, twelve seats; `runs/living-pilot-fixes-2026-10-11`): before (origin/main 7d36367) and after, one run each of the same description; the two are different trajectories of the town (rent is counted differently), and a mock seat sits by its code brain's rhythm, so sittings say little of a model's.
+
+  | Seat | Sittings | Model calls | First prompt of a sitting, mean characters | Largest | Input tokens, whole run | Standing instructions, characters |
+  |---|---|---|---|---|---|---|
+  | Mayor | 19 to 21 | 31 to 33 | 6,502 to 5,269 | 14,726 to 14,288 | 432k to 459k | 39,342 to 40,591 |
+  | Finance | 39 to 39 | 51 to 51 | 921 to 1,167 | 6,638 to 6,638 | 259k to 266k | 10,194 to 10,194 |
+  | Landlord 38 | 18 to 19 | 347 to 390 | 9,326 to 9,779 | 12,622 to 14,178 | 11.4M to 13.7M | 24,947 to 24,947 |
+  | Support office | 86 to 86 | 234 to 86 | 1,032 to 1,299 | 6,351 to 8,535 | 1.62M to 0.51M | 8,912 to 13,569 |
+  | Works | 86 to 86 | 92 to 86 | 2,073 to 1,934 | 18,441 to 18,871 | 820k to 772k | 22,618 to 24,332 |
+  | Planning | 21 to 20 | 27 to 24 | 1,260 to 1,345 | 8,570 to 8,570 | 210k to 185k | 20,002 to 20,002 |
+  | Tribunal member | 86 to 86 | 180 to 130 | 293 to 518 | 8,455 to 3,965 | 1.66M to 0.71M | 10,674 to 10,674 |
+  | Complaints desk | 86 to 86 | 90 to 88 | 1,179 to 855 | 11,463 to 10,434 | 877k to 884k | 28,752 to 30,466 |
+  | Ombudsman | 86 to 86 | 90 to 88 | 293 to 378 | 664 to 3,200 | 516k to 513k | 13,963 to 14,289 |
+  | Consumer desk | 86 to 86 | 90 to 88 | 317 to 317 | 1,173 to 741 | 517k to 512k | 13,994 to 14,318 |
+  | Union | 86 to 86 | 354 to 344 | 782 to 1,622 | 5,483 to 5,483 | 2.26M to 2.34M | 13,172 to 13,172 |
+  | Bank lending | 86 to 86 | 2,761 to 2,739 | 129,154 to 130,392 | 135,665 to 136,503 | 119M to 120M | 3,670 to 3,670 |
+
+  No seat's prompt grew by more than about a thousand characters a sitting; the support office's calls fell by two thirds (its staff pay). The landlord's seat was shown its first tenant in arrears on day 11 and each one after as it fell behind. **Seen, not caused here:** the lending seat's first prompt is 130,000 characters before and after (it is shown the bank's whole ledger and every instruction at each sitting), and the mock in that seat pays out no loan it approves: both for whoever next seats the bank. The same run's arrears letters: 128 on one day of 6 before, 128 over 43 days after (8 the most in a day); applications to the tribunal 23 on one day, then 20 over 16 days. `oikos measure` and `oikos cost` ran on the after run's log (a 36 MB header).
 - **Limits.** Each office's reader restates what its module works out, from the same papers: a change to a module must be made in its reader (the landlord's and the support office's are held to their code twins in a run; the others by tests on papers made by hand, and not yet by a run with their office seated and busy). A mock seat's brain is the office's code, which does not read the books: what a model does with them is for the next pilot to show. The landlord's and the tribunal's readers were written before the possession procedure of the firm-side fixes landed.
 
 ## Open (to decide at the Stage 2 checkpoint or before)
