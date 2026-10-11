@@ -57,6 +57,35 @@ In a town where things go wrong the tribunal also hears, on the same forms: a ho
 
 **Leaves out.** Staying with those one is tied to. An order to pay the arrears with the possession order (the landlord's own application for the money is the other list). Possession for anything but arrears (the end of a fixed term, sale, damage: a landlord's ordinary notice still ends a lease as before). A tenant's defence (the notice was wrong, the home was in disrepair), an adjournment, a hearing the tenant does not attend counted apart. Hardship stays. The bond. A landlord who changes the locks (unlawful, and real). Distress for rent. Costs. A bailiff or sheriff as an office of its own (the police stand for whoever enforces).
 
+### A home given up (2026-10-12; citizen 0.51.0, firm.landlord 0.17.0, tribunal.member 0.6.0)
+
+**What the fourth living pilot showed.** Two tenants went on the day their notice to vacate ran out, minutes after the landlord's seat had applied for possession (each party's first look after a weekend; the landlord's came first). Then: the tenant was back in the same dwelling two hours later; the landlord's rent book went on counting a rent a month against them and said nothing of their going; and the tribunal gave someone who had left six weeks to answer.
+
+- **A person does not go back to a home they have given up.** The daily round took anyone with no home back to the dwelling their body was last in. A home whose tenancy has ended for us, or that our household has moved out of, is no longer where we belong; a home leased again is.
+- **The tenancy is over from the day the tenant goes.** A tenant who goes on a notice to vacate gives notice on the lease as they go (as before). On the record the lease then runs out by its own notice period; in the landlord's books the tenancy is over that day, no rent is counted after it, and what was owed then is what is owed.
+- **An application for possession of a home already given up.** The law gives possession where the tenant has not left. A landlord run by code withdraws such an application when it ends the tenancy on the record; a seat is shown that it stands, and may withdraw it as any paper of its own (its procedure says so). The tenant, told of the application, answers the tribunal that they have left and when. The tribunal's code dismisses on that answer ("there is nothing left to order"), and decides nothing on an application withdrawn; a seat reads the same in its books and decides for itself.
+- **Not changed:** that a tenant who cannot pay goes at the notice's date as often as `1 − stay_past_notice_bps` says (a placeholder, 50%, in every profile). The coincidence of the two papers on one morning is two parties each acting on a date that has come: nothing makes it happen and nothing prevents it.
+
+### The profiles' figures for possession, and how long a pilot needs (2026-10-12)
+
+A possession order cannot come sooner than: the landlord's patience (two rents behind for two months, its own practice), the law's notice, the tribunal's time to a hearing. The tribunal's time in a living town is the profile's `frictions.venues.tribunal_days`; in a town without frictions, `justice.hearing_after_days`. Nothing here is shortened to make a pilot lively. What each profile publishes, and whether it is sourced:
+
+| Profile | Arrears before notice / notice / order to its day / warrant runs (days) | Source of those | Tribunal's time, living town (`tribunal_days`) | Source | Its neighbour (`justice.hearing_after_days`) | First order no sooner than about |
+|---|---|---|---|---|---|---|
+| au-vic-2026 | 14 / 14 / 14 / 14 | 14 days' arrears and that paying ends the notice: **opened** (Consumer Affairs Victoria); the 14-day notice to confirm; the rest placeholders | 49 | **Opened**: VCAT annual report 2023-24, residential tenancies list, median 7 weeks to finalise | 21, placeholder | day 131 |
+| gb-eng-2026 | 56 / 28 / 14 / 42 | Housing Act 1988 s 8, ground 8: recalled, to confirm; plan and warrant days placeholders (median claim to repossession 26.4 weeks: **opened**, Ministry of Justice) | 42 | Placeholder (six weeks) | 21, placeholder carried over; real waits known to be longer | day 138 |
+| us-oh-2026 | 1 / 3 / 7 / 10 | Ohio Revised Code 1923.04: recalled, to confirm | 42 | Placeholder | 21, placeholder (hearings 5 to 15 days after service for an eviction: recalled) | day 113 |
+| de-ni-2026 | 60 / 14 / 30 / 21 | BGB ss 543, 569: recalled, to confirm | 42 | Placeholder | 14 (conciliation hearing within two weeks: a statute's words, to confirm) | day 124 |
+| br-mg-2026 | 30 / 30 / 15 / 15 | Lei 8.245/1991: recalled, to confirm; the days placeholders | 42 | Placeholder | 45 | day 140 |
+| in-tn-2026 | 60 / 30 / 30 / 30 | Placeholders (the 2017 Act: recalled) | 42 | Placeholder | 120, placeholder (four months to a first hearing) | day 140 |
+| jp-akita-2026 | 90 / 14 / 30 / 30 | Placeholders (case law: recalled) | 42 | Placeholder | 30 | day 124 |
+| ke-nakuru-2026 | 30 / 30 / 30 / 14 | **Placeholders, all**: the Rent Restriction Act gives the tribunal the power; no period was retrieved | 42 | Placeholder (six weeks) | 30, placeholder; beside it a **secondary** figure: the Judiciary's median of 53 days to hear and conclude a small claim (to May 2023) | day 140 |
+| mx-jal-2026 | 60 / 30 / 30 / 30 | Placeholders (Código Civil de Jalisco: recalled) | 42 | Placeholder | 60, placeholder | day 140 |
+
+"First order no sooner than" is for a landlord run by code: a first rent missed in the first week, 60 days of the landlord's patience (two rents behind for two months, its practice), the notice and a day, and the tribunal's time (in the fourth living pilot the code landlords' first applications came on day 98 and their hearings would have fallen on day 140; the seated landlord, who gave notice as soon as the law allowed, had its first hearing on day 119). The order's own day is its days after that, and a warrant a day after that. **Sourced possession figures: one profile (au-vic-2026: the days of arrears, and the tribunal's median time). Every other possession figure in every profile is recalled and to confirm, or a placeholder.** In every profile `stay_past_notice_bps` (5,000: whether a tenant who cannot pay stays past the notice) is a **placeholder**, and `leave_on_order_bps` (5,900) is England's, from one quarter's flows, used everywhere.
+
+So a 120-day pilot of a town that opens with every rent book at nought shows no possession order in any profile, whoever sits. Two honest ways to see one: a longer run (170 days for a first order and what follows; 200 for several), or a town that opens in the middle of things (docs/behaviour/generator.md, "An ordinary day's caseload").
+
 ## The registry lists; the member decides (2026-10-12; tribunal.member 0.5.0)
 
 **Source:** `tribunal.ts` (`routines`, `part`); `Hearings` in `desk.ts` (the parts `list` and `decide`); the generator's staff post and standing order; `orchestrator/test/seat-acts.test.ts`. Decision: docs/decisions.md, "What the third living pilot found".

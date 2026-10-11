@@ -76,3 +76,47 @@ test("a tenant who cannot pay and will not go is put out by the police on the tr
   expect(ev.some((e) => e.event === "transfer" && e.from === `acc-${tenant}` && e.to === `acc-${landlord}` && e.t > done.at + 3 * DAY)).toBe(false);
   expect(recs.some((r) => r.record === "notice" && r.agreement === alone.id && r.as === tenant && r.at >= done.at)).toBe(true);
 }, 900_000);
+
+test("a tenant who cannot pay and goes on the notice gives the home up: they are not back in it, no rent is counted after, and nobody applies for possession of a home already left", async () => {
+  const config = generate(base) as any;
+  const leases = config.world.records.filter((r: any) => r.record === "agreement" && r.terms.template === "lease");
+  const age = (id: string) => -config.world.entities.find((e: any) => e.id === id).born_at / (365 * DAY);
+  const alone = leases.find((l: any) => !/with their household/.test(l.terms.text) && age(l.terms.parties[1]) >= 25 && age(l.terms.parties[1]) < 55)!;
+  const tenant = alone.terms.parties[1] as string, landlord = alone.terms.parties[0] as string;
+  const job = config.world.records.find((r: any) => r.record === "agreement" && r.terms.template === "employment" && r.terms.parties[1] === tenant);
+  if (job) config.world.records = config.world.records.filter((r: any) => r.id !== job.id && r.agreement !== job.id && r.basis !== job.id);
+  config.world.accounts.find((a: any) => a.id === `acc-${tenant}`).balance = "0";
+  const who = config.participants.find((p: any) => p.person === tenant);
+  // (For the test: it goes at the notice's date, and does not leave town for want of a home.)
+  who.controller = { ...who.controller, params: { ...who.controller.params, in_labour_force: false, possession: { stay_bps: 0, obey_bps: 10_000 }, leave_after_homeless_days: 9_999 } };
+  const out = join(root, "runs", "test-possession-goes");
+  rmSync(out, { recursive: true, force: true });
+  const s = await runWorld({ config: { ...config, log: { ...config.log, detail: "lean" } }, runId: "possession-goes", outDir: out, until: 150 * DAY, recordObservations: "none" });
+  const ev = readFileSync(s.logPath, "utf8").trim().split("\n").filter((l) => l.includes('"event"')).map((l) => JSON.parse(l)).filter((e) => e.kind === "event").map((e) => ({ t: e.t, ...e.body }));
+  const recs = ev.filter((e) => e.event === "recorded").map((e) => e.record);
+  const ntv = recs.find((r) => r.kind === "notice_to_vacate" && r.data?.lease === alone.id);
+  expect(ntv).toBeDefined();
+  // At the notice's date the tenant gives notice on the lease and leaves.
+  const went = recs.find((r) => r.record === "notice" && r.agreement === alone.id && r.as === tenant);
+  expect(went.at).toBeGreaterThanOrEqual(ntv.data.by);
+  expect(went.at).toBeLessThan(ntv.data.by + 8 * DAY); // (at their first look after the date: within the week)
+  const space = ev.find((e) => e.event === "vacated" && e.occupant === tenant && e.t >= went.at)?.space;
+  expect(space).toBeDefined();
+  // They are not back in the home they gave up: not that day, not later. (Until 2026-10-12 the daily round took a
+  // person with no home back to the dwelling they had last been in.)
+  expect(ev.filter((e) => e.event === "occupied" && e.occupant === tenant && e.space === space && e.t > went.at)).toEqual([]);
+  // The landlord ends the tenancy on the record. It applies for nothing once the tenant has gone; an application it
+  // made in the days between the notice's date and the tenant's going is withdrawn, or dismissed on the tenant's
+  // answer that they have left: nobody orders possession of a home already given up.
+  expect(recs.some((r) => r.record === "notice" && r.agreement === alone.id && r.as === landlord && r.at >= went.at)).toBe(true);
+  const apps = recs.filter((r) => r.kind === "tribunal_application" && r.data?.kind === "possession" && r.data.about === alone.id);
+  expect(apps.filter((a) => a.at > went.at + DAY)).toEqual([]);
+  for (const a of apps) {
+    const withdrawn = recs.some((r) => r.record === "withdrawal" && r.withdraws === a.id);
+    const orders = recs.filter((r) => r.kind === "tribunal_order" && r.data?.application === a.id);
+    expect(withdrawn || orders.some((o) => o.data.finding === "dismissed")).toBe(true);
+    expect(orders.filter((o) => o.data.finding === "possession")).toEqual([]);
+  }
+  console.log(`a tenant who goes on the notice: notice's date day ${Math.floor(ntv.data.by / DAY)}, gone day ${Math.floor(went.at / DAY)}; applications for possession ${apps.length} (each withdrawn or dismissed)`);
+  rmSync(out, { recursive: true, force: true });
+}, 900_000);

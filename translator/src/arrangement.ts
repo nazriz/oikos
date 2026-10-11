@@ -46,6 +46,7 @@ export type Why =
   | "unsure" // the first was under its cut-off
   | "form_check" // the first's draft is not one of the forms shown, as shown
   | "no_program" // the first's answer is no program of the call language (or the request is longer than it reads)
+  | "form_not_shown" // the request names a form the first was not shown (more forms than its reader takes: translator/model/subset.ts)
   | "refused" // the first refused, sure of it, with a label that does not stand
   | "not_resolved" // acts could not be made of the first's call (the resolver asked, or the call was put together wrongly)
   | "check_failed" // the check of the first's acts failed
@@ -69,6 +70,10 @@ export interface RouteSide {
   ms?: number;
   withheld?: string;
   wrote?: string;
+  /** Where the first was shown only some of the forms the asker knows of (more than its reader takes): which, by
+   * their records' ids, and of how many. Absent where it was shown them all. */
+  forms_shown?: string[];
+  forms_of?: number;
   /** Attempts beyond its first (the prompt-driven translator is asked again with what went wrong). */
   retries?: number;
   error?: string;
@@ -108,7 +113,7 @@ export function muchTheSame(a: string, b: string): boolean {
 function sideOf(id: TranslatorId, r: Translated | undefined, error?: string): RouteSide {
   if (!r) return { model: id.model, result: "failed", ...(error ? { error: error.slice(0, 500) } : {}) };
   const a = r.answered;
-  const more = { ...(a ? { sure_ppm: a.sure_ppm, ...(a.ms !== undefined ? { ms: a.ms } : {}), ...(a.withheld ? { withheld: a.withheld } : {}), ...(a.wrote !== undefined ? { wrote: a.wrote } : {}) } : {}), ...(r.retries?.length ? { retries: r.retries.length } : {}) };
+  const more = { ...(a ? { sure_ppm: a.sure_ppm, ...(a.ms !== undefined ? { ms: a.ms } : {}), ...(a.withheld ? { withheld: a.withheld } : {}), ...(a.wrote !== undefined ? { wrote: a.wrote } : {}), ...(a.forms_shown ? { forms_shown: a.forms_shown, forms_of: a.forms_of } : {}) } : {}), ...(r.retries?.length ? { retries: r.retries.length } : {}) };
   if (r.ok) return { model: id.model, result: "draft", call: r.draft.call, draft_hash: r.hash, ...more };
   const label = LABEL.exec(r.call ?? "")?.[1];
   const result = r.asked_back ? "asked_back" : label ? "refusal" : r.call && !r.invalid?.length && r.notices[0] !== NOT_CHECKED ? "question" : "failed";
@@ -120,6 +125,7 @@ function noDraft(r: Extract<Translated, { ok: false }>, stands: readonly string[
   const withheld = r.answered?.withheld;
   if (withheld === "cut_off") return "unsure";
   if (withheld === "form_check") return "form_check";
+  if (withheld === "form_not_shown") return "form_not_shown";
   if (withheld) return "no_program";
   const label = LABEL.exec(r.call ?? "")?.[1];
   // (An asking back that is not a refusal's own: a value of the call that could not be read. The call's fault.)

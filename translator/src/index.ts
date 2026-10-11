@@ -357,7 +357,18 @@ export function askAgain(what: string, form?: { name: string; fields: { [field: 
 /** What a translator's model said with its last answer, beside the program, where it says how sure it is (our own
  * trained model answering first, translator/model/adapter.ts): its sureness of the whole answer (parts per million), the time it took (milliseconds), why
  * it offers no draft where that is its adapter's doing, and what it had written then. Never shown to anyone. */
-export interface Answered { sure_ppm: number; ms?: number; withheld?: string; wrote?: string; unsure?: unknown }
+export interface Answered { sure_ppm: number; ms?: number; withheld?: string; wrote?: string; unsure?: unknown; forms_shown?: string[]; forms_of?: number }
+
+/** What is said of each form beside its line, in the order `translatorContext` lists them, to a translator that can
+ * read only so many (translator/model/subset.ts): whether it is the asker's own (a form of a post they hold, or of
+ * the organisation they act for), and what the form's own record says it is for. */
+export function formFacts(req: TranslateRequest): { own: boolean; about: string }[] {
+  const k = req.knowledge, mine = k.actingFor(req.as);
+  return k.forms.map((f) => ({
+    own: (typeof f.data?.office === "string" && k.held.has(f.data.office)) || (!!f.in_position && k.held.has(f.in_position)) || f.speaks_for === mine || f.author === req.participant,
+    about: typeof f.text === "string" ? f.text.slice(0, 400) : "",
+  }));
+}
 
 export function createTranslator(io: LlmIO, check: KernelCheck, typeOf: (type: string) => StructureTypeInfo | undefined, id = "translator", attempts = 2, resolver?: ResolveFn) {
   const tid: TranslatorId = { id, version: TRANSLATOR_VERSION, model: `${io.adapter.provider}/${io.adapter.model}` };
@@ -428,7 +439,7 @@ export function createTranslator(io: LlmIO, check: KernelCheck, typeOf: (type: s
       for (let n = 1; ; n++) {
         const res = await callModel(io, {
           purpose: "translator", subject: id, ref: req.draftId, system: translatorSystem(), maxTokens: 2000, tools: TOOLS, messages,
-          context: { proposal: req.proposal, participant: req.participant, attempt: n },
+          context: { proposal: req.proposal, participant: req.participant, attempt: n, forms: formFacts(req) },
         }, seen);
         const out = res.content.find((b): b is Extract<typeof b, { type: "tool_use" }> => b.type === "tool_use" && b.name === "call");
         const r = await attempt(req, out, res.content);

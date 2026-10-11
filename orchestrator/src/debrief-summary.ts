@@ -6,8 +6,9 @@
 //  - The platform judges nothing. The summary says what was asked, confirmed, declined, carried out, sent, and what
 //    reached the seat; never how anything turned out, and never a word that weighs it (EVALUATIVE below is the list
 //    its own words are checked against). What a seat or anyone else wrote is quoted as written, in quotation marks.
-//  - "Largest" is by stated measures only: the money an act names, then how many people and bodies it names; things
-//    granted or refused and directions given are listed apart. No measure of consequence.
+//  - "Largest" is by stated measures only: the sort of act as the world's own procedure ranks it (ACT_SORTS), then how
+//    many people and bodies it names, then the money it names, then the earliest; one of each sort of paper first.
+//    Things granted or refused and directions given are listed apart. No measure of consequence.
 //  - It is bounded: so many of each, each quoted piece cut at a length, the whole under SUMMARY_MAX characters.
 //  - It is in the ids the seat itself was shown.
 // The same reading gives, for each "why" question, what the log shows the seat was shown and did at that decision
@@ -241,31 +242,74 @@ function idsIn(blocks: unknown): string[] {
 
 /** Acts of the same sort, naming the same money and the same people and bodies, are one thing done several times. */
 const alike = (c: Carried) => `${c.kinds.join("+")}|${c.money}|${c.named.join(",")}`;
-/** A seat's acts by size (the money each names, then how many people and bodies), those alike taken once, with how many more there were like each. */
+
+/**
+ * The sorts of act, as the world's own procedure ranks them (docs/behaviour/debrief.md, "Which acts the why questions
+ * are about (0.3.0)"). A fixed list, read from the kind of paper an act wrote (the `kind` of a published paper) or the
+ * type of its block, never from its words and never from how it turned out; the platform judges nothing.
+ *  1. An act that begins or ends someone's tenancy, work, membership, claim or permission, or asks a body to: a notice
+ *     to vacate, an application to a tribunal (for possession, an order, enforcement), a warrant or enforcement
+ *     request, an order or decision of a tribunal, an office or a lender, a notice ending work or an agreement, a
+ *     hiring, an offer or signing of an agreement, a permit, licence, benefit or loan decided, a law, budget or
+ *     proposal put to the council, a direction.
+ *  2. An offer or answer to a person about such a matter: a plan offered, an answer to a request, complaint or petition.
+ *  3. A rent increase, or a reminder or request for money owed, put to a person (a letter too).
+ *  4. A routine payment, report, return or listing.
+ * (2 and 3 are the one tier "an offer or answer to a person about such a matter"; an offer or answer comes before a
+ * demand, as the world's procedure puts an offer of terms before the demand it follows.)
+ * A sort not in the table is 4, unless it names a person other than the seat's own organisation: then 3.
+ */
+export const ACT_SORTS: { [rank: number]: string[] } = {
+  1: ["notice_to_vacate", "tribunal_application", "possession_application", "warrant_request", "enforcement_request", "enforcement_direction", "tribunal_order", "possession_order", "garnishee_order", "demolition_order", "order",
+    "dismissal", "redundancy_notice", "termination_notice", "notice_of_termination", "hiring", "hire", "job_offer", "lease_offer", "lease_ended", "lease_notice", "permit_decision", "licence_decision", "benefit_decision", "grant_determination",
+    "loan_decision", "budget", "proposal", "law", "amendment", "direction", "work_order", "standing_order", "instruction", "nomination", "election_notice",
+    "appoint", "give_notice", "propose_agreement", "sign_agreement", "vacate", "retire", "demolish", "release_claim", "create_position"],
+  2: ["plan_offer", "payment_plan_offer", "remedy_answer", "petition_response", "complaint_response", "enforcement_decline", "answer", "hearing_notice"],
+  3: ["rent_increase", "remedy_request", "rent_reminder", "complaint_notice", "message"],
+  4: ["rental_listing", "job_posting", "listing", "request", "withholding_report", "withholding_return", "return", "report", "accounts", "invoice", "charge", "payment", "pay", "rates", "levy", "transfer", "open_account", "close_account", "withdraw"],
+};
+const SORT_OF = new Map<string, number>(Object.entries(ACT_SORTS).flatMap(([rank, kinds]) => kinds.map((k) => [k, Number(rank)] as const)));
+/** The kind of paper one of an act's `kinds` ("publish/notice_to_vacate" or "give_notice") is. */
+const paperKind = (k: string) => k.includes("/") ? k.slice(k.indexOf("/") + 1) : k;
+/** The rank of an act (1 to 4), and the kind of paper it is, from the kinds of what it wrote. */
+export function actRank(c: Carried): { rank: number; paper: string } {
+  let best: { rank: number; paper: string } | undefined;
+  for (const k of c.kinds) {
+    const paper = paperKind(k), rank = SORT_OF.get(paper) ?? (c.named.length ? 3 : 4);
+    if (!best || rank < best.rank) best = { rank, paper };
+  }
+  return best ?? { rank: c.named.length ? 3 : 4, paper: "?" };
+}
+/** A seat's acts by size, those alike taken once, with how many more there were like each: first by the sort of act
+ * (the rank above), then by how many people and bodies it names, then by the money it names, then the earliest. */
 export function bySize(r: SeatRecord): { c: Carried; more: number }[] {
   const out = new Map<string, { c: Carried; more: number }>();
-  for (const c of [...r.carried].sort((a, b) => b.money - a.money || b.named.length - a.named.length || a.seq - b.seq)) {
+  const key = (c: Carried) => actRank(c).rank;
+  for (const c of [...r.carried].sort((a, b) => key(a) - key(b) || b.named.length - a.named.length || b.money - a.money || a.seq - b.seq)) {
     const k = alike(c), x = out.get(k);
     if (x) x.more++; else out.set(k, { c, more: 0 });
   }
   return [...out.values()];
+}
+/** The same acts in the order the summary lists them and the "why" questions take them: the largest of each distinct
+ * kind of paper first (in the order above), then the rest by the same sizing. */
+export function inOrder(r: SeatRecord): { c: Carried; more: number }[] {
+  const all = bySize(r), seen = new Set<string>();
+  const first = all.filter((x) => { const p = actRank(x.c).paper; if (seen.has(p)) return false; seen.add(p); return true; });
+  return [...first, ...all.filter((x) => !first.includes(x))];
 }
 /** A letter of the seat's as a thing done (a seat may govern by letter): to how many it went, and its words. */
 function letterAsCarried(l: SeatRecord["sent"][number]): Carried {
   return { seq: l.seq, t: l.t, preview: `A letter from you to ${l.to.join(", ")}${l.about ? `, about ${l.about}` : ""}: ${l.text.replace(/\s+/g, " ").trim().slice(0, 400)}`, money: 0, named: l.to, kinds: ["message"], made: [], calls: l.calls };
 }
 
-/** The things a seat's "why" questions name, at most three: the act naming most money; the thing granted or refused
- * that names most; the direction naming most; then the next by money and by people named (acts alike taken once);
- * and, where its acts are fewer than that, its letters, the one to most people first and then the longest. */
+/** The things a seat's "why" questions name, at most three: the largest act of each distinct kind of paper first, by the
+ * sort of act (bySize), then, if there are fewer than three kinds, the rest by the same sizing; and, where its acts
+ * are fewer than that, its letters, the one to most people first and then the longest. */
 export function largest(r: SeatRecord, n = 3): Carried[] {
-  const acts = bySize(r).map((x) => x.c);
   const pick: Carried[] = [];
   const take = (c?: Carried) => { if (c && !pick.includes(c) && pick.length < n) pick.push(c); };
-  take(acts.find((c) => c.money > 0));
-  take(acts.find((c) => c.granted !== undefined));
-  take(acts.find((c) => c.direction));
-  for (const c of acts) take(c);
+  for (const x of inOrder(r)) take(x.c);
   for (const l of r.sent.filter((l) => l.delivered && !r.carried.some((c) => c.seq === l.seq)).sort((a, b) => b.to.length - a.to.length || b.text.length - a.text.length || a.seq - b.seq)) take(letterAsCarried(l));
   return pick.sort((a, b) => a.seq - b.seq);
 }
@@ -313,9 +357,9 @@ export function renderSummary(r: SeatRecord, currency: Currency, o: { frame?: bo
   const delivered = r.sent.filter((l) => l.delivered), undelivered = r.sent.length - delivered.length + r.notSent;
   L.push(`${plural(delivered.length, "letter")} of yours ${delivered.length === 1 ? "was" : "were"} delivered${undelivered ? `; ${undelivered} more that you wrote ${undelivered === 1 ? "was" : "were"} not` : ""}. You looked something up ${plural(r.looks, "time")}. ${plural(r.received.length, "letter")} reached you.`);
   const item = (c: Carried, more = 0) => `- Day ${dayOf(c.t)}${c.draft ? ` (${c.draft})` : ""}: ${q(c.preview)}${c.money ? ` Money it names: ${money(c.money)}.` : ""}${c.named.length ? ` People and bodies it names: ${c.named.length}.` : ""}${more ? ` ${more} more of the same sort, naming the same money and the same people and bodies.` : ""}`;
-  const sized = bySize(r);
+  const sized = inOrder(r);
   if (sized.length) {
-    L.push("", `Carried out on your word, ${r.carried.length} in all. The largest, by the money each names and then by how many people and bodies it names:`);
+    L.push("", `Carried out on your word, ${r.carried.length} in all. Those listed are taken one of each sort of paper first, then the rest. Each sort of paper is ranked first by what the act does: acts that begin or end someone's tenancy, work, membership, claim or permission, or ask a body to, come first; offers and answers to a person about such a matter next, then rent increases and reminders or requests for money owed; routine payments, reports, returns and listings last. Within that, by how many people and bodies each names, then by the money each names, then the earliest:`);
     for (const x of sized.slice(0, LISTED.largest)) L.push(item(x.c, x.more));
   } else L.push("", "Nothing was carried out on your word by way of a draft.");
   if (delivered.length) {

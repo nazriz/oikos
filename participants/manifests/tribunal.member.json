@@ -1,6 +1,6 @@
 {
   "name": "tribunal.member",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "doc": "docs/behaviour/justice.md",
   "params": {
     "account": {
@@ -288,6 +288,10 @@
         "waited_days": {
           "type": "count",
           "description": "Days from the application to this order, for the tribunal's own figures."
+        },
+        "reason": {
+          "type": "text",
+          "description": "The tribunal's reasons for the order, in words."
         }
       },
       "writes": {
@@ -319,7 +323,8 @@
           "due": "=date",
           "space": "=home",
           "structure": "=building",
-          "household": "=household"
+          "household": "=household",
+          "reason": "=reason"
         }
       }
     },
@@ -425,6 +430,10 @@
         "waited_days": {
           "type": "count",
           "description": "Days from the application to this order, for the tribunal's own figures."
+        },
+        "reason": {
+          "type": "text",
+          "description": "The tribunal's reasons for what it found, in words."
         }
       },
       "writes": {
@@ -460,7 +469,8 @@
           "due": "=due",
           "victim": "=victim",
           "report": "=report",
-          "paid": "#paid"
+          "paid": "#paid",
+          "reason": "=reason"
         }
       }
     }

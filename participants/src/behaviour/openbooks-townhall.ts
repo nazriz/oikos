@@ -414,7 +414,7 @@ export function clerkBooks(ctx: ParticipantContext): OfficeBooks {
         line: `${r.id}: ${r.speaks_for ?? r.author} put a proposal to the council on ${dateWords(r.at)} (${String(r.text ?? "").slice(0, 120)}); no ballot has been opened` }));
       const closed = ballots.filter((b) => b.data?.electorate === "council" && (b.data?.closed === true || t >= (b.data?.closes_at ?? Infinity)) && !results.has(b.id))
         .map((b): OpenItem => ({ id: b.id, since: Number.isFinite(b.data?.closes_at) ? b.data.closes_at : b.at, line: `${b.id}: the ballot on ${b.data?.proposal} ${Number.isFinite(b.data?.closes_at) ? `closed ${dateWords(b.data.closes_at)}` : "has closed"}; no result has been declared` }));
-      return [...heading("Proposals to the council with no ballot opened", proposals), ...heading("Ballots closed with no result declared", closed)];
+      return [...heading("Proposals to the council with no ballot opened", proposals), ...heading("Ballots closed with no result declared", closed).map((h) => ({ ...h, always: true as const }))];
     },
   };
 }

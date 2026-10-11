@@ -31,7 +31,7 @@ const quoted = (s: string) => s.replace(/\s+/g, " ").replace(/"/g, "'").trim();
 
 export const founded: BehaviourModule = {
   name: "group.founded",
-  version: "0.1.0", // 0.1.0: what a founder's post does for a group, a fund or a body that takes grievances up (docs/behaviour/founding.md)
+  version: "0.2.0", // 0.2.0: a fund states its rule with its offer of membership (who may draw, how much, how often), in words and figures, and says it again when it refuses; 0.1.0: what a founder's post does for a group, a fund or a body that takes grievances up (docs/behaviour/founding.md)
   doc: "docs/behaviour/founding.md",
   cadence: (ctx) => (ctx.params.shape === "cause" ? DAY : 7 * DAY),
   firstWake: () => 0,
@@ -107,9 +107,16 @@ export const founded: BehaviourModule = {
     const gatherText = () => `${p.name} gathers at ${place} every ${every / DAY} days at ${Math.floor(p.at_seconds / 3600)}:00, for ${lasts / 60} minutes. All welcome.`;
     const sayGathering = (way: Way, at = place, first = firstAt): Step => because(`Putting up our gathering (${way === "choice" ? "as chosen" : "as is usual"}).`,
       say("notice", c && way === "choice" ? c.gathers : gatherText(), { visible: "public", practice: { at, every, first, lasts, roles: [{ role: "member", open: true }] }, data: { idea: p.idea, words: way } }));
-    const memberText = () => `Anyone may join ${p.name}.${dues > 0 ? ` Members pay ${usd(dues)} a month.` : " Nothing is asked but to come."}${draws > 0 ? ` A member who is short may draw up to ${usd(draws)} from the fund.` : ""}`;
+    // A fund's rule, stated with its offer of membership, in words and as figures: who may draw, how much, how often,
+    // and that it pays while it has the money. It pays and refuses by this and nothing else. (Until 2026-10-12 the
+    // offer said only "a member who is short may draw": in the fourth living pilot 154 members of a fund 45 days old
+    // asked for 167 draws, and every one was refused for a qualifying period the offer never stated.)
+    const rule = draws > 0 ? { draw: draws, qualify_days: p.fund.qualify_days, every_days: p.fund.every_days } : undefined;
+    const ruleText = () => (rule ? ` The fund's rule: a member of ${rule.qualify_days} days or more who is short may draw up to ${usd(rule.draw)}, once in ${rule.every_days} days, while the fund has it.` : "");
+    const memberText = () => `Anyone may join ${p.name}.${dues > 0 ? ` Members pay ${usd(dues)} a month.` : " Nothing is asked but to come."}${ruleText()}`;
+    // (Where the founder's own words are the offer, the rule follows them, written by code: a rule is figures.)
     const sayMembership = (way: Way, account?: string): Step => because(`Offering membership (${way === "choice" ? "as chosen" : "as is usual"}).`,
-      say("membership", c && way === "choice" ? c.asks : memberText(), { visible: "public", offer: membershipOffer(me, dues, account, noticeSecs, draws), data: { idea: p.idea, words: way, dues } }));
+      say("membership", c && way === "choice" ? `${c.asks}${ruleText()}` : memberText(), { visible: "public", offer: membershipOffer(me, dues, account, noticeSecs, draws), data: { idea: p.idea, words: way, dues, ...(rule ? { fund: rule } : {}) } }));
 
     const plan = (obs: Observation): Item[] => {
       const t = obs.t;
@@ -183,7 +190,7 @@ export const founded: BehaviourModule = {
         count(why ? "draws_refused" : "draws_paid");
         if (!why) { drew.set(who, t); remember(t, "fund_drawn", who, want); acc.balance = String(balance - want) as any; }
         out.push(because(why ? `${who} asks to draw on the fund: ${why}.` : `${who} is short and asks to draw on the fund: paying ${usd(want)}.`,
-          say("fund_decision", why ? `We cannot pay a draw now: ${why}.` : `A draw of ${usd(want)} from the fund, paid.`, { to: [who], visible: [me, who], basis: r.id, data: { granted: !why, ...(why ? { why } : { amount: want }) } }),
+          say("fund_decision", why ? `We cannot pay a draw now: ${why}.${ruleText()}` : `A draw of ${usd(want)} from the fund, paid.`, { to: [who], visible: [me, who], basis: r.id, data: { granted: !why, ...(why ? { why } : { amount: want }) } }),
           ...(why ? [] : [pay(String(r.data.account), want, { from: acc.account, for: "A draw on the fund." })])));
       }
 

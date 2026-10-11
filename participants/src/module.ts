@@ -240,11 +240,17 @@ export interface Answers { office: string; acts: string; forms?: { about: string
  * lease, the application, the invoice), a line in the world's words, and, where they apply, since when and how much.
  */
 export interface OpenItem { id: string; line: string; since?: number; amount?: number;
+  /** When its day comes or came, where it has one (the day the other side may answer by, a hearing day). */
+  due?: number;
   /** A running figure (what has been paid against the budget so far): its line moves with every payment, and that
    * alone is no reason for the clerk to file a paper; it is said as it stands whenever one is filed. */
   running?: true }
 /** A heading of the books: what kind of thing stands open ("Rent in arrears"), each one, the most pressing first. */
-export interface OpenHeading { what: string; items: OpenItem[] }
+export interface OpenHeading { what: string; items: OpenItem[];
+  /** Things whose day has come and that wait on the office-holder (a case to decide, a result to declare): the
+   * clerk's paper names them every time it is filed, first, however long they have stood, and not only on the day
+   * they changed (docs/behaviour/office-books.md, "What stands open is said until it no longer stands open"). */
+  always?: true }
 /** An office's books as a clerk keeps them: fed what the office is shown, and asked what stands open now. */
 export interface OfficeBooks { absorb(obs: Observation): void; open(t: number): OpenHeading[] }
 

@@ -70,7 +70,7 @@ const ACT_TIME = {
   },
 };
 
-export const GENERATOR_VERSION = "0.47.0"; // 0.47.0: an office a model holds opens with its institution's standing notices on file (what a body that hears grievances says it hears), its procedure under the law on possession (a landlord, the tribunal's member and registrar: what each form is for and what the law asks before each step, from the profile's figures) and what becomes of a letter to a person; the tribunal has registry staff in a living town (docs/decisions.md, 2026-10-12, "What the third living pilot found"); 0.46.0: the firm and landlord side (docs/decisions.md, 2026-10-11, "Four faults"): the place's laws on ending a job and on possession published from the profile; how firms adjust; a business of one as a venture, its chance derived from the place's business birth rate; short pay's chance over the jobs exposed; 0.45.4: the planning office's decision form records the liberty to build beside a grant (the form's own declaration: FormWrites `claim`); 0.45.3: a payroll folder holds the standing payments beside the employment agreements; an office's routines procedure says who makes a standing work order and how; the permit decision form says what records the permission; 0.45.2: the council's standing orders are a published procedure of the town's (proc-council), and a councillor's or a clerk's post held by a model has the council's papers on its desk (the charter, the standing orders, the laws, the forms, proposals and ballots as papers of its own body, petitions, budgets and results); 0.45.1: the tax law says, step by step and with each rounding, how what is withheld from a pay is reckoned (the one function every payroll uses), where it said "reckoned as a year's pay"; 0.45.0: a seat with routine work is shown its staff's reports on the work under its standing orders, and its procedure says they are made; 0.44.0: main's 0.39.1 (an office's own form says what issuing it does) with the institutions' opening papers (0.43.0)
+export const GENERATOR_VERSION = "0.48.0"; // 0.48.0: `opening_caseload`: a town may open in the middle of things, its landlords' rent books and its tribunal's list as an ordinary day would have them (off unless set); a landlord's and the member's procedure say what the law has for a home the tenant has left; 0.47.0: an office a model holds opens with its institution's standing notices on file (what a body that hears grievances says it hears), its procedure under the law on possession (a landlord, the tribunal's member and registrar: what each form is for and what the law asks before each step, from the profile's figures) and what becomes of a letter to a person; the tribunal has registry staff in a living town (docs/decisions.md, 2026-10-12, "What the third living pilot found"); 0.46.0: the firm and landlord side (docs/decisions.md, 2026-10-11, "Four faults"): the place's laws on ending a job and on possession published from the profile; how firms adjust; a business of one as a venture, its chance derived from the place's business birth rate; short pay's chance over the jobs exposed; 0.45.4: the planning office's decision form records the liberty to build beside a grant (the form's own declaration: FormWrites `claim`); 0.45.3: a payroll folder holds the standing payments beside the employment agreements; an office's routines procedure says who makes a standing work order and how; the permit decision form says what records the permission; 0.45.2: the council's standing orders are a published procedure of the town's (proc-council), and a councillor's or a clerk's post held by a model has the council's papers on its desk (the charter, the standing orders, the laws, the forms, proposals and ballots as papers of its own body, petitions, budgets and results); 0.45.1: the tax law says, step by step and with each rounding, how what is withheld from a pay is reckoned (the one function every payroll uses), where it said "reckoned as a year's pay"; 0.45.0: a seat with routine work is shown its staff's reports on the work under its standing orders, and its procedure says they are made; 0.44.0: main's 0.39.1 (an office's own form says what issuing it does) with the institutions' opening papers (0.43.0)
 const DAY = 86_400;
 const MONTH = 30 * DAY;
 const YEAR = 365 * DAY;
@@ -156,6 +156,13 @@ export interface TownSpec {
   /** Whether a paper filed with a seat's office brings the seat back before the day it gave, at the next working day's
    * sitting, as a letter does (docs/real-models.md, "A seat's settings"). On unless set false: then only a letter does. */
   wake_on_papers?: boolean;
+  /** A town that opens in the middle of things (docs/behaviour/generator.md, "An ordinary day's caseload"): the
+   * tenancies whose households cannot pay their rent open at the stage of arrears and of the law's procedure that a
+   * town on an ordinary day would have them at (rent owed brought forward; a notice to vacate with days left; an
+   * application listed with the tenant's time to answer running; an order made and its day ahead), as papers on the
+   * landlords' and the tribunal's files when the year begins. Off unless set: a town without it opens with every
+   * rent book at nought, as before. Needs the profile's law on possession and a tribunal. */
+  opening_caseload?: boolean;
   /** A living world (docs/design/ai-citizens.md 10j). Absent: the town is generated exactly as it was. `starting_attachment`
    * (on unless false): people open attached to their place, trade and group by the profile's years of residence and tenure.
    * `initiative_bps` is the world's initiative dial (config `dials`); `counter` is read by the citizen side. */
@@ -1083,6 +1090,8 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     homeOf.set(h, x);
     freeHomes.splice(j, 1);
   }
+  /** Each let home: its lease, who is in it, what its household has coming in a month and what its leaseholder has put by. */
+  const let_: { lease: string; tenant: string; landlord: string; rent: number; space: string; structure: string; household: string[]; income: number; saved: number }[] = [];
   for (const h of households) {
     const lh = h.leaseholder;
     const others = h.members.filter((m) => m.id !== lh);
@@ -1158,6 +1167,61 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
         text: `Standing instruction to the bank, given by ${m.id} before the year began: pay my share of our household's rent to ${lh}, who holds the lease, every month.`, data: { outcome: { money: { from: `acc-${m.id}`, to: `acc-${lh}`, amount: String(due), for: "Household share of the rent." } }, every: MONTH, first: (rentDay - 1) * DAY } });
     }
     for (const m of h.members) occupancy.push({ occupant: m.id, space: home.space });
+    let_.push({ lease: ag, tenant: lh, landlord: home.landlord, rent: home.rent, space: home.space, structure: home.structure, household: h.members.map((m) => m.id),
+      income: h.members.reduce((a, m) => a + (monthlyPay.get(m.id) ?? 0), 0), saved: Number(accounts.find((a: any) => a.id === `acc-${lh}`)?.balance ?? 0) });
+  }
+
+  // ---- an ordinary day's caseload (docs/behaviour/generator.md; docs/decisions.md, "What the fourth living pilot
+  // found"). A town generated with every rent book at nought has no tenancy before its tribunal for months: rent must
+  // be owed for the landlord's patience, then the law's notice, then the tribunal's time to answer, before anything
+  // is decided (about 150 days in the profile the fourth living pilot used, of a run of 120). A real town has
+  // tenancies at every stage on any day. Where the spec asks, the households the town already holds that cannot pay
+  // their rent (nothing coming in that covers it, and not a month's rent put by: the ones the town's own mechanism
+  // carries into arrears in its first month) open as if their arrears had begun on a day spread evenly over the
+  // length of the procedure, and at the stage the law's own days put such a tenancy at: by the papers a landlord and
+  // the tribunal would have on file. Nobody is added and no rate is assumed: who falls behind is who would have,
+  // and the stages thin as the profile's own share of tenants who stay past a notice says. What each paper does is
+  // done by whoever reads it (the landlord's rent book, the tenant, the tribunal's list), as with any other paper.
+  if (spec.opening_caseload && POSS && JU) {
+    const draw = rng("opening-caseload");
+    const DAYS_TO_HEARING = FR ? FR.venues.tribunal_days : JU.hearing_after_days;
+    const BEARS = 2 * 30; // (a landlord's patience before a notice: two rents behind, for two months; firm.landlord's own default)
+    const NOTICE_ENDS = BEARS + POSS.notice_days + 1, HEARD = NOTICE_ENDS + DAYS_TO_HEARING, OUT = HEARD + POSS.possession_days;
+    const before = (days: number) => `${days} day${days === 1 ? "" : "s"} before the year began`;
+    for (const x of let_) {
+      if (x.income >= x.rent || x.saved >= x.rent) continue;
+      // (How long ago the first rent was missed, in days. Past the notice's date only those who stayed are still in
+      // the home: the rest are drawn again among the stages before it.)
+      let ago = draw.below(OUT);
+      if (ago >= NOTICE_ENDS && draw.below(10_000) >= POSS.stay_past_notice_bps) ago = draw.below(NOTICE_ENDS);
+      const rents = Math.floor(ago / 30) + 1, owed = rents * x.rent;
+      const both = [x.landlord, x.tenant];
+      const paper = (id: string, kind: string, by: string, to: string[], visible: string[], basis: string, text: string, data: object) =>
+        records.push({ id, record: "statement", author: "genesis", at: 0, visible_to: visible, speaks_for: by, kind, addressed_to: to, basis, text, data: { ...data, brought_forward: true } });
+      paper(`${x.lease}-rent-book`, "rent_statement", x.landlord, [x.tenant], both, x.lease,
+        `Statement of the rent account under ${x.lease} as the year began: ${formatMoney(owed, V.currency)} of rent owed (${rents} rent${rents === 1 ? "" : "s"} of ${formatMoney(x.rent, V.currency)}), the oldest of it due ${before(ago)}.`,
+        { lease: x.lease, owed, rents, rent: x.rent, since: -ago * DAY, account: `acc-${x.landlord}` });
+      if (ago < BEARS) continue;
+      const given = ago - BEARS, by = (POSS.notice_days + 1 - given) * DAY;
+      paper(`${x.lease}-vacate`, "notice_to_vacate", x.landlord, [x.tenant], both, x.lease,
+        `Notice to vacate, given ${before(given)}: the rent under ${x.lease} is in arrears. You are to leave ${x.space} by ${by > 0 ? formWords.dateWords(by) : `a day now past (${before(Math.ceil(-by / DAY))})`}. If the arrears are paid before then, this notice lapses. If you are still there after it, we may apply to the tribunal for possession.`,
+        { lease: x.lease, reason: "arrears", arrears: Math.max(2, Math.floor(BEARS / 30)) * x.rent, by, given: -given * DAY, law: "law-possession" });
+      if (ago < NOTICE_ENDS) continue;
+      const applied = ago - NOTICE_ENDS, answerBy = (DAYS_TO_HEARING - applied) * DAY + 9 * 3600;
+      const application = { kind: "possession", matter: "possession", against: x.tenant, about: x.lease, amount: (Math.floor(NOTICE_ENDS / 30) + 1) * x.rent, rent: x.rent, account: `acc-${x.landlord}`, space: x.space, structure: x.structure, household: x.household,
+        notice: `${x.lease}-vacate`, notice_given: -given * DAY, notice_by: by, evidence: { id: x.lease, record: "agreement" } };
+      paper(`${x.lease}-possession`, "tribunal_application", x.landlord, ["tribunal"], [x.landlord, "tribunal", x.tenant], x.lease,
+        `Application for possession, made ${before(applied)}: ${x.tenant} is ${formatMoney(application.amount, V.currency)} behind with the rent under ${x.lease} and has not left on our notice to vacate.`, application);
+      const heard = ago >= HEARD;
+      paper(`${x.lease}-hearing`, "hearing_notice", "tribunal", both, [...both, "tribunal"], `${x.lease}-possession`,
+        `${x.landlord} has applied to us about possession, seeking ${formatMoney(application.amount, V.currency)} (application ${x.lease}-possession). ${heard ? `The time to answer ran out ${before(ago - HEARD)}.` : `You may answer by day ${Math.floor(answerBy / DAY)}.`}`,
+        { application: `${x.lease}-possession`, kind: "possession", matter: "possession", applicant: x.landlord, against: x.tenant, hearing_at: heard ? 0 : answerBy, answer_by: heard ? 0 : answerBy, about: x.lease, amount: application.amount, structure: x.structure });
+      if (!heard) continue;
+      const ordered = ago - HEARD, due = (POSS.possession_days - ordered) * DAY;
+      paper(`${x.lease}-order`, "tribunal_order", "tribunal", both, [...both, "tribunal"], `${x.lease}-possession`,
+        `Decision on ${x.lease}-possession, made ${before(ordered)}: ${x.landlord} is to have possession of ${x.space} on ${formWords.dateWords(due)}: ${x.tenant} and their household are to leave by then. If they have not, ${x.landlord} may ask our registrar for a warrant, which is carried out by those who enforce our orders, and by nobody else.`,
+        { application: `${x.lease}-possession`, kind: "possession", matter: "possession", applicant: x.landlord, against: x.tenant, finding: "possession", binding: true, waited_days: DAYS_TO_HEARING, about: x.lease, structure: x.structure, amount: application.amount, due, space: x.space, household: x.household });
+    }
   }
 
   // ---- people working for themselves (docs/behaviour/entry.md): each a business of one, which its owner runs alone
@@ -2334,11 +2398,11 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
         `(3) With the notice's day past and the tenant still in the home and still behind: an application to the tribunal for possession (its form), which states the lease, the rent, what is owed, the home and who lives there by the lease, and the notice relied on with the day it was given and the day it gave.${feeWords(own.possession?.fee, own.possession?.fee_account)} ` +
         `(4) The tribunal tells the tenant, who may answer, and its member decides: dismissal, ${POSS.plan_months > 0 ? `a plan to pay over no more than ${POSS.plan_months} months, ` : ""}or possession on a day. A plan set and not kept: apply again, saying the plan is broken. ` +
         `(5) With the order's day past and the tenant still there: a request to the tribunal's registrar for a warrant (its form).${feeWords(own.possession?.warrant_fee, own.possession?.fee_account)} The warrant is carried out by the police and by nobody else: this office puts no one out. One not carried out in its ${days(POSS.warrant_days)} lapses, and another is asked for. ` +
-        `(6) When the tenant has gone or been put out, the tenancy is ended on the record by notice on the lease.`
+        `(6) When the tenant has gone or been put out, the tenancy is ended on the record by notice on the lease. A tenant who goes on the notice to vacate gives notice on the lease as they go: the home is given up from that day and no rent runs for it after. The law gives possession only where the tenant has not left: an application still before the tribunal for a home the tenant has left may be withdrawn by this office, as any paper of its own may.`
       : code_ === "tribunal.member"
         ? `An application for possession of a let home for rent owed: what law-possession asks, and this office's form for each step. What to order is for the member. ` +
           `What the law asks before an order: that rent had been owed for at least ${days(POSS.arrears_days)} when the notice to vacate was given; that the notice gave at least ${days(POSS.notice_days)} and they have run; and that the tenant has not left. The application states the lease, the rent, what is owed, and the notice relied on with the day it was given and the day it gave. ${served} ` +
-          `The other side is told on a notice of hearing (its form), with the day they may answer by${own.hearing_after_days ? ` (the tribunal's time to answer is ${days(Number(own.hearing_after_days))})` : ""}; a tenant answers such a notice, and no letter, with what the household could pay a month toward what is owed, and no answer by the day is no answer. A case is put off by a fresh notice with a later day. ` +
+          `The other side is told on a notice of hearing (its form), with the day they may answer by${own.hearing_after_days ? ` (the tribunal's time to answer is ${days(Number(own.hearing_after_days))})` : ""}; a tenant answers such a notice, and no letter, with what the household could pay a month toward what is owed, or that they have left the home, and no answer by the day is no answer. A landlord may withdraw its application, and one withdrawn is no longer before the tribunal. A case is put off by a fresh notice with a later day. ` +
           `What the tribunal may order (possession order form): dismissal; ${POSS.plan_months > 0 ? `a plan, the tenant staying and paying the rent and a sum a month that clears what is owed in no more than ${POSS.plan_months} months; ` : ""}or possession on a day, which the law puts ${days(POSS.possession_days)} on from the order. An order moves nobody: a tenant still there after its day is removed only on the registrar's warrant, by the police.`
         : `A warrant of possession: what law-possession asks, and this office's form. A landlord asks for one (a request for a warrant) on the tribunal's order for possession once the order's day has passed with the tenant still there. The warrant (its form) goes to the police, who alone carry it out; it names the home, the tenant and the household. It may be carried out no sooner than ${days(POSS.eviction_notice_days)} after it is issued (the tenant's notice of the day), and runs ${days(POSS.warrant_days)}: not carried out by then, it has lapsed. A request on anything that is not an order for possession to that landlord, or before the order's day, is declined (its form) or waits.`;
     records.push({ id: `proc-${pos.id}-possession`, record: "statement", author: "genesis", at: 0, visible_to: [pos.entity], speaks_for: pos.entity, in_position: pos.id, kind: "procedure", addressed_to: [pos.entity], basis: "law-possession", text,

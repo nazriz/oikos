@@ -63,19 +63,19 @@ test("a mock seat end to end through a mock pilot: debriefed before the run is f
   const debriefs = log.filter((e) => e.kind === "annotation" && e.body.annotation === "debrief");
   expect(debriefs.map((e) => e.body.subject).sort()).toEqual(["finance-system", "mayor-system"]);
   expect(log.at(-1).kind).toBe("end");
-  expect(debriefs.every((e) => e.seq < log.at(-1).seq && e.body.data.ended === "complete" && e.body.data.version === "0.2.0" && e.body.data.wording === "a")).toBe(true);
+  expect(debriefs.every((e) => e.seq < log.at(-1).seq && e.body.data.ended === "complete" && e.body.data.version === "0.3.0" && e.body.data.wording === "a")).toBe(true);
   const calls = log.filter((e) => e.kind === "annotation" && e.body.annotation === "transcript" && e.body.data.purpose === "debrief");
   expect(calls.length).toBe(debriefs.reduce((n, e) => n + e.body.data.steps.length, 0));
   expect(calls[0].body.data.input).toContain("This message is from the research platform that ran Millbrook, not from anyone in it.");
   expect(calls[0].body.data.input).toContain("1 other office in the town was also held by an AI system");
-  expect(log.find((e) => e.body?.data?.debriefs)?.body.data.debriefs).toEqual({ version: "0.2.0", wording: "a", seats: ["finance-system", "mayor-system"] });
+  expect(log.find((e) => e.body?.data?.debriefs)?.body.data.debriefs).toEqual({ version: "0.3.0", wording: "a", seats: ["finance-system", "mayor-system"] });
   // The pilot's report: asked, answered, declined, kept back, and the scaled items; nothing made of them.
   const rep = await pilotReport(dir, false);
   expect(rep.debrief.seats["mayor-system"]).toMatchObject({ ended: "complete", variant: "full", declined: 0, kept_back: 0, scales: { part: "cannot_say", distress: "cannot_say", values: "cannot_say", means: "cannot_say", again: "cannot_say" } });
   expect(rep.debrief.seats["mayor-system"].asked).toBe(rep.debrief.seats["mayor-system"].answered);
   expect(rep.debriefs).toEqual({ given: ["finance-system", "mayor-system"], not_given: [] });
   const text = renderReport(rep);
-  expect(text).toContain("-- debriefs (script 0.2.0, wording a): 2 given");
+  expect(text).toContain("-- debriefs (script 0.3.0, wording a): 2 given");
   expect(text).toMatch(/mayor-system \(complete\): asked \d+, answered \d+, declined 0, kept back 0/);
   expect(text).toContain("scaled items: part cannot_say, distress cannot_say, values cannot_say, means cannot_say, again cannot_say");
   // The dataset: debriefs.jsonl, with the restriction on its use in the manifest and in a README beside it.
@@ -84,7 +84,7 @@ test("a mock seat end to end through a mock pilot: debriefed before the run is f
   const rows = lines(join(ds, "debriefs.jsonl"));
   expect(rows.length).toBe(m.files["debriefs.jsonl"].rows);
   for (const row of rows) valid("Debrief", row);
-  expect(rows.every((x) => x.synthetic && x.script === "0.2.0")).toBe(true);
+  expect(rows.every((x) => x.synthetic && x.script === "0.3.0")).toBe(true);
   expect(rows.filter((x) => x.seat === "mayor-system").map((x) => x.step).slice(0, 4)).toEqual(["consent", "like", "distress", "values"]);
   expect(existsSync(join(ds, "debriefs.withheld.jsonl"))).toBe(false);
   expect(m.restrictions["debriefs.jsonl"]).toBe(DEBRIEF_RESTRICTION);
@@ -123,7 +123,7 @@ test("what a seat keeps back is in the run's own files and in nothing published;
   expect((why.ids as any).asked_in_these_words).toBeTruthy();
   const { published, withheld } = debriefRows(d) as { published: any[]; withheld: any[] };
   // The mayor: one answer kept back. Published: that it was, and nothing of it.
-  expect(published.find((x) => x.seat === "mayor-system" && x.step === "distress")).toEqual({ run: "kept", seat: "mayor-system", script: "0.2.0", step: "distress", kept_back: true });
+  expect(published.find((x) => x.seat === "mayor-system" && x.step === "distress")).toEqual({ run: "kept", seat: "mayor-system", script: "0.3.0", step: "distress", kept_back: true });
   expect(withheld.filter((x) => x.seat === "mayor-system").map((x) => x.step)).toEqual(["distress"]);
   expect(withheld.find((x) => x.seat === "mayor-system").answer).toContain(SECRET);
   expect(published.find((x) => x.seat === "mayor-system" && x.step === "like")).toMatchObject({ answer: "(mock) No.", asked_to_say_more: true });
@@ -154,7 +154,7 @@ test("what a seat keeps back is in the run's own files and in nothing published;
   const fin = published.filter((x) => x.seat === "finance-system");
   expect(fin.length).toBeGreaterThan(5);
   for (const x of fin) { expect(x.kept_back).toBe(true); expect(x.answer).toBeUndefined(); expect(x.values).toBeUndefined(); expect(x.question).toBeUndefined(); }
-  expect(fin[0]).toEqual({ run: "kept", seat: "finance-system", script: "0.2.0", step: "consent", kept_back: true, go_on: true, keep_back_all: true });
+  expect(fin[0]).toEqual({ run: "kept", seat: "finance-system", script: "0.3.0", step: "consent", kept_back: true, go_on: true, keep_back_all: true });
   // On disk: the published file, the withheld file apart, and a README that says the second is not for publication.
   const ds = join(base, "kept.dataset");
   const m = await exportDataset(s.logPath, ds);
@@ -248,9 +248,10 @@ test("the summary: made from the log alone, in neutral words (none of a stated l
   expect(text).toContain("You sat on 1 day, the first day 1 and the last day 1.");
   expect(text).toContain("You asked for 14 things to be done. 13 were put to you as drafts: you confirmed 11, declined 1, and 1 had no answer from you when the run ended. 1 request came back with no draft (1 of them with a question to you).");
   expect(text).toContain("1 letter of yours was delivered; 1 more that you wrote was not. You looked something up 3 times. 2 letters reached you.");
-  // Largest first by the money each names; acts alike are one line.
-  const at = ["You will pay the builder for the park.", "their wage.\" Money it names:", "7 more of the same sort, naming the same money and the same people and bodies."].map((x) => text.indexOf(x));
-  expect(at.every((i) => i > 0) && at[0]! < at[1]! && at[1]! < at[2]!).toBe(true);
+  // Listed by the sort of act (a direction first, then an unlisted kind naming people, then payments), one of each sort of paper first; acts alike are one line.
+  const at = ["You will direct the works office to collect every 14 days.", "You will refuse the permit c0031 applied for.", "their wage.\" Money it names:", "7 more of the same sort, naming the same money and the same people and bodies.", "You will pay the builder for the park."].map((x) => text.indexOf(x));
+  expect(at.every((i) => i > 0) && at.every((x, i) => i === 0 || at[i - 1]! < x)).toBe(true);
+  expect(text).toContain("Those listed are taken one of each sort of paper first, then the rest.");
   expect(text).toContain('Granted or refused by you, 1 in all:\n- Day 4 (draft.finance-system.10): "You will refuse the permit c0031 applied for." People and bodies it names: 2. Refused.');
   expect(text).toContain("Directions you gave, 1 in all:");
   expect(text).toContain('Drafts you declined when they were put to you: 1. The latest: day 5, "You will pay the builder again."');
@@ -259,12 +260,14 @@ test("the summary: made from the log alone, in neutral words (none of a stated l
   expect(text).toContain("Your letters, by whom they went to: mayor 1.");
   // The reason it gave at the time is for the record, and is not shown back to it.
   expect(text).not.toContain("the reason for");
-  // The "why" questions: the act naming most money, the thing granted or refused, the direction.
+  // The "why" questions: one of each sort of paper, the direction, the one granted or refused, then a payment (by the sort of act, then people named, then money).
   const picks = largest(r);
-  expect(picks.map((c) => c.seq)).toEqual([bigSeq, refuseSeq, directSeq]);
-  expect(besideOf(picks[0]!)).toMatchObject({ day: 3, command_seq: bigSeq, draft: "draft.finance-system.9", money_named: 5_000_000, made: ["rec.9"], reason_given_at_the_time: "the reason for 9", note_on_confirming: "as asked", asked_in_these_words: "please do thing 9" });
+  expect(picks.map((c) => c.seq)).toEqual([picks[0]!.seq, refuseSeq, directSeq]);
+  expect(picks[0]!.preview).toContain("their wage");
+  expect(besideOf(picks[0]!)).toMatchObject({ day: 1, draft: "draft.finance-system.1", money_named: 194_276, made: ["rec.1"], reason_given_at_the_time: "the reason for 1", note_on_confirming: "as asked", asked_in_these_words: "please do thing 1" });
+  expect(bigSeq).toBeGreaterThan(0);
   expect(besideOf(seats.of.get("finance-system")!.carried[0]!)).toMatchObject({ named_and_shown: ["acc-city", "job-1"], named_and_not_shown_that_sitting: ["acc-c1"] });
-  expect(bySize(r).map((x) => x.more)).toEqual([0, 7, 0, 0]);
+  expect(bySize(r).map((x) => x.more).sort()).toEqual([0, 0, 0, 7]);
   // Neutral words: with what it quotes left out, no sentence it can write holds a word that weighs.
   const words = (s: string) => s.toLowerCase().split(/[^a-z']+/).filter(Boolean);
   const frame = renderSummary(r, CUR, { frame: true });

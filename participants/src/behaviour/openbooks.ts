@@ -8,7 +8,7 @@ import { basesOf, channels, cites, type Observation, type StatementRecord } from
 import { dateWords } from "../forms";
 import type { OfficeBooks, OpenHeading, OpenItem, ParticipantContext } from "../module";
 import { cents } from "../money";
-import { Book, DAY, leaseTerms, MONTH, ownAccount, usd } from "./common";
+import { Book, broughtForward, DAY, leaseTerms, MONTH, ownAccount, usd, whenWords } from "./common";
 import { PAPER } from "./frictions";
 
 const addressed = (r: StatementRecord, me: string) => (r.addressed_to ?? []).includes(me);
@@ -116,14 +116,28 @@ export function landlordBooks(ctx: ParticipantContext): OfficeBooks {
       const law = book.open("law").filter((r) => r.data?.tenancy === "possession").sort((x, y) => y.at - x.at)[0];
       const ending: OpenItem[] = [];
       const behindUnder = new Map<string, number>();
-      for (const a of active) {
+      // (A tenant given notice to vacate who has gone gives notice on the lease as they go: the home is given up from
+      // that day, whatever the lease's own notice period then says of when it ends on the record. The rent book
+      // stops there: what was owed on the day they left is what is owed. Until 2026-10-12 the book went on counting a
+      // rent a month against someone who had left, and nothing in it said they had: docs/decisions.md, "What the
+      // fourth living pilot found".)
+      const vacated = new Map<string, number>();
+      for (const a of leases) {
+        const went = (book.notices.get(a.id) ?? []).filter((n) => n.as === tenantOf(a)).sort((x, y) => x.at - y.at)[0];
+        if (went && book.all("notice_to_vacate").some((r) => r.speaks_for === me && r.data?.lease === a.id && r.at <= went.at)) vacated.set(a.id, went.at);
+      }
+      const gone: OpenItem[] = [];
+      for (const a of leases.filter((x) => book.inForce(x.id) || vacated.has(x.id))) {
         const tenant = tenantOf(a);
         // (A lease that renews one of ours: its rent runs from the end of that one's term.)
         const begins = Math.max(book.signedAt(a.id) ?? a.at, 0, ...basesOf(a).filter((b) => leases.some((x) => x.id === b)).map((b) => book.endsAt(b) ?? 0));
         const since = firstDueOf(a, begins);
-        if (t < since) continue;
-        const due = Math.floor((t - since) / MONTH) + 1;
-        let owed = 0;
+        // (Rent owed when the year began, by our statement of the rent account: owed with the rest, and the oldest.)
+        const carried = broughtForward(book, me, a.id);
+        if (t < since && !carried) continue;
+        const leftAt = vacated.get(a.id);
+        const due = t < since ? 0 : Math.floor((Math.min(t, leftAt ?? t) - since) / MONTH) + 1;
+        let owed = carried?.owed ?? 0;
         for (let k = 0; k < due; k++) owed += cents(rentAt(a, since + k * MONTH));
         const account = payingAccount.get(tenant);
         const receipts = ((account && money.received.get(account)) || []).filter((x) => x.t >= begins);
@@ -131,13 +145,24 @@ export function landlordBooks(ctx: ParticipantContext): OfficeBooks {
         const last = receipts.at(-1);
         const rent = cents(rentAt(a, t));
         const behind = owed - paid;
+        if (leftAt !== undefined) {
+          const applied = book.open("tribunal_application").filter((r) => r.speaks_for === me && r.data?.kind === "possession" && r.data?.about === a.id).sort((x, y) => y.at - x.at)[0];
+          const decided = applied && book.all("tribunal_order").some((o) => o.data?.application === applied.id);
+          const ends = book.endsAt(a.id);
+          // (It stands in the book while the lease is still on the record, or an application about it is undecided.)
+          if (!book.inForce(a.id) && !(applied && !decided)) continue;
+          gone.push({ id: a.id, since: leftAt, ...(behind > 0 ? { amount: behind } : {}),
+            line: `${a.id}: ${tenant} gave notice on the lease ${dateWords(leftAt)}, after our notice to vacate, and has given up ${leaseTerms(a, tenant).space ?? "the home"}: the tenancy is over${ends !== undefined && ends > t ? ` (on the record the lease runs out ${dateWords(ends)})` : ""}; ${behind > 0 ? `${usd(behind)} of rent was owed under it when they left, and is still owed` : "no rent is owed under it"}${applied && !decided ? `; our application for possession ${applied.id} (${dateWords(applied.at)}) still stands at the tribunal, undecided${law ? `: ${law.id} gives possession only where the tenant has not left` : ""}` : ""}` });
+          continue;
+        }
         if (rent <= 0 || behind < rent) continue;
         // (The day the oldest rent not yet paid fell due; a rent less than a week late is not yet in the book as arrears.)
         const rents = Math.floor(behind / rent);
-        const oldest = since + (due - rents) * MONTH;
+        // (What was owed as the year began is the oldest, while any of it stands.)
+        const oldest = carried && paid < carried.owed ? carried.since + Math.floor(paid / rent) * MONTH : since + (due - rents) * MONTH;
         if (t - oldest < 7 * DAY) continue;
         behindUnder.set(a.id, behind);
-        arrears.push({ id: a.id, since: oldest, amount: behind, line: `${a.id}: ${tenant}${leaseTerms(a, tenant).space ? `, ${leaseTerms(a, tenant).space}` : ""}, is ${usd(behind)} behind with the rent (${rents} rent${rents === 1 ? "" : "s"} of ${usd(rent)}), since ${dateWords(oldest)}; ${last ? `the last payment from ${account} came ${dateWords(last.t)} (${usd(last.amount)}${last.memo ? `, "${last.memo}"` : ""})` : "nothing has come from the tenant's account under this lease"}${asked.has(a.id) ? `; we wrote to ask for it ${dateWords(asked.get(a.id)!)}` : ""}${noticed(a) ? "; notice has been given on the lease" : ""}` });
+        arrears.push({ id: a.id, since: oldest, amount: behind, line: `${a.id}: ${tenant}${leaseTerms(a, tenant).space ? `, ${leaseTerms(a, tenant).space}` : ""}, is ${usd(behind)} behind with the rent (${rents} rent${rents === 1 ? "" : "s"} of ${usd(rent)}), since ${whenWords(oldest)}${carried && paid < carried.owed ? ` (${usd(carried.owed)} of it stood on the rent account as the year began: ${carried.id})` : ""}; ${last ? `the last payment from ${account} came ${dateWords(last.t)} (${usd(last.amount)}${last.memo ? `, "${last.memo}"` : ""})` : "nothing has come from the tenant's account under this lease"}${asked.has(a.id) ? `; we wrote to ask for it ${dateWords(asked.get(a.id)!)}` : ""}${noticed(a) ? "; notice has been given on the lease" : ""}` });
       }
       if (law) for (const a of leases) {
         const tenant = tenantOf(a);
@@ -167,11 +192,11 @@ export function landlordBooks(ctx: ParticipantContext): OfficeBooks {
           since = decided.at;
           stage = `the tribunal set a plan to pay ${dateWords(decided.at)} (${decided.id}): the rent as it falls due and ${usd(cents(decided.data.instalment ?? 0))} a month toward what is owed; if it is not kept, the landlord may apply again for possession`;
         } else if (decided) continue; // (dismissed: it begins again only if they fall behind)
-        else if (applied) { since = applied.at; stage = `we applied to the tribunal for possession ${dateWords(applied.at)} (${applied.id}); it has not decided`; }
+        else if (applied) { since = applied.at; stage = `we applied to the tribunal for possession ${applied.data?.brought_forward ? "before the year began" : dateWords(applied.at)} (${applied.id}); it has not decided`; }
         else {
           const by = Number(vacate!.data?.by);
           since = vacate!.at;
-          stage = `notice to vacate given ${dateWords(vacate!.at)} (${vacate!.id}), to leave by ${dateWords(by)}; ${now === undefined ? `the arrears are paid, so by ${law.id} the notice lapses` : t >= by ? `that date has passed and the tenant has not left; by ${law.id} the landlord may now apply to the tribunal for possession, and may not put them out` : `paid before then it lapses; still there and behind after it, the landlord may apply to the tribunal for possession`}`;
+          stage = `notice to vacate given ${whenWords(Number(vacate!.data?.given ?? vacate!.at))} (${vacate!.id}), to leave by ${whenWords(by)}; ${now === undefined ? `the arrears are paid, so by ${law.id} the notice lapses` : t >= by ? `that date has passed and the tenant has not left; by ${law.id} the landlord may now apply to the tribunal for possession, and may not put them out` : `paid before then it lapses; still there and behind after it, the landlord may apply to the tribunal for possession`}`;
         }
         ending.push({ id: a.id, since, ...(now !== undefined ? { amount: now } : {}), line: `${a.id}: ${home}; ${owes}; ${stage}` });
       }
@@ -201,6 +226,7 @@ export function landlordBooks(ctx: ParticipantContext): OfficeBooks {
       const estates = active.filter((a) => dead.has(tenantOf(a)) && !noticed(a)).map((a): OpenItem => ({ id: a.id, since: a.at, line: `${a.id}: the tenant ${tenantOf(a)} is registered as having died; the lease still stands` }));
       return [
         ...heading("Rent in arrears", arrears),
+        ...heading("Tenants who have left on our notice to vacate: tenancies over", gone),
         ...heading("Tenancies being ended for arrears under the law on possession, and where each has got to", ending),
         ...heading("Tenancies ending with nothing offered", closing),
         ...heading("Applications for a home, not answered", applications),

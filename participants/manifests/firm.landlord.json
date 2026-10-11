@@ -1,6 +1,6 @@
 {
   "name": "firm.landlord",
-  "version": "0.16.2",
+  "version": "0.17.0",
   "doc": "docs/behaviour/firms.md",
   "params": {
     "after_term": {
@@ -920,6 +920,10 @@
             "no"
           ],
           "description": "Whether it is agreed."
+        },
+        "reason": {
+          "type": "text",
+          "description": "What else is said to the tenant: on what terms it is agreed, or why not."
         }
       },
       "writes": {
@@ -935,7 +939,8 @@
         ],
         "data": {
           "about": "=about",
-          "granted": "?granted"
+          "granted": "?granted",
+          "reason": "=reason"
         }
       }
     },
@@ -1044,6 +1049,10 @@
             "no"
           ],
           "description": "For a paper complained of: whether it was wrong."
+        },
+        "statement": {
+          "type": "text",
+          "description": "What the office says in answer, in its own words, where these do not say it (what it disputes, and why)."
         }
       },
       "writes": {
@@ -1063,7 +1072,8 @@
           "owed": "#owed",
           "done": "?done",
           "wrong": "?wrong",
-          "known": "?known"
+          "known": "?known",
+          "statement": "=statement"
         }
       }
     },
@@ -1114,6 +1124,10 @@
             "no"
           ],
           "description": "For a paper complained of: whether it was wrong."
+        },
+        "statement": {
+          "type": "text",
+          "description": "What the office says in answer, in its own words, where these do not say it (what it disputes, and why)."
         }
       },
       "writes": {
@@ -1133,7 +1147,8 @@
           "owed": "#owed",
           "done": "?done",
           "wrong": "?wrong",
-          "known": "?known"
+          "known": "?known",
+          "statement": "=statement"
         }
       }
     }

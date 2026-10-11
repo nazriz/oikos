@@ -23,7 +23,7 @@
 import { callModel, ModelCallFailed, SpendingLimitReached, type LlmIO } from "./call";
 import type { ContentBlock, LlmMessage, MockPolicy } from "./adapter";
 
-export const DEBRIEF_VERSION = "0.2.0"; // 0.2.0: why outcomes are not shown and whose acts the summary is; one "why" about a matter left alone, for a seat that carried out little; no `say` on the first step; the standing instructions shown once, in the opening
+export const DEBRIEF_VERSION = "0.3.0"; // 0.3.0: which acts the "why" questions are about, and the order the summary lists them in: by the sort of act as the world's own procedure ranks it, then people named, then money, then earliest, one of each sort of paper first (docs/behaviour/debrief.md; the questions' words are unchanged). 0.2.0: why outcomes are not shown and whose acts the summary is; one "why" about a matter left alone, for a seat that carried out little; no `say` on the first step; the standing instructions shown once, in the opening
 export type DebriefWording = "a" | "b";
 /** The most one answer may be (tokens): a few hundred words. */
 export const DEBRIEF_ANSWER_TOKENS = 900;

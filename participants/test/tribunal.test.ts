@@ -138,3 +138,21 @@ test("a debt is ordered paid, less what the respondent says it paid; unpaid once
   const enforced = run(r, obs(due, []));
   expect(said(enforced, "garnishee_order")[0]).toMatchObject({ debtor: "factory-1", amount: 60000, to: "acc-c0001", claim: "rec.10" });
 });
+
+test("possession: a tenant who answers that they have left has the application dismissed; an application its maker withdraws is decided by nobody", () => {
+  const m = member.create(ctx("tribunal-member-system", { hearing_after_days: 21, hears: [{ about: "possession", can: ["order"] }], possession: { days: 14, plan_months: 6 } }));
+  const t0 = 100 * DAY;
+  const app = (id: string, tenant: string) => rec(id, t0, { record: "statement", speaks_for: "landlord-1", kind: "tribunal_application", addressed_to: ["tribunal"], text: "Application for possession.", data: { kind: "possession", matter: "possession", against: tenant, about: `lease-${tenant}`, amount: 300_000, space: `apts-1/${tenant}` } });
+  const listed = run(m, obs(t0, [app("rec.1", "c0001"), app("rec.2", "c0002")]));
+  const notices = said(listed, "hearing_notice");
+  expect(notices.map((n) => n.application)).toEqual(["rec.1", "rec.2"]);
+  // c0001 answers that they have gone; landlord-1 withdraws the application against c0002.
+  const answer = rec("rec.5", t0 + 2 * DAY, { record: "statement", speaks_for: "c0001", kind: "tribunal_response", addressed_to: ["tribunal"], basis: "rec.1", text: "We left.", data: { application: "rec.1", left: true, left_at: t0 - DAY } });
+  const withdrawal = rec("rec.6", t0 + 3 * DAY, { record: "withdrawal", withdraws: "rec.2", author: "landlord-1-office-system" });
+  run(m, obs(t0 + 3 * DAY, [answer, withdrawal]));
+  const decided = run(m, obs(t0 + 22 * DAY, []));
+  const orders = said(decided, "tribunal_order");
+  expect(orders).toHaveLength(1);
+  expect(orders[0]).toMatchObject({ application: "rec.1", finding: "dismissed", left: true });
+  expect(decided).toContain("there is nothing left to order");
+});

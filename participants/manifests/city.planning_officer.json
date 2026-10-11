@@ -73,6 +73,10 @@
         "missing": {
           "type": "list",
           "description": "For an incomplete application: what it does not say (lot, structure_type)."
+        },
+        "reason": {
+          "type": "text",
+          "description": "Why it is decided so, in words, where the law named does not say it (a refusal, or what to send in)."
         }
       },
       "writes": {
@@ -86,7 +90,8 @@
           "application": "=application",
           "decision": "=decision",
           "law": "=law",
-          "missing": "=missing"
+          "missing": "=missing",
+          "reason": "=reason"
         },
         "claim": {
           "when": {

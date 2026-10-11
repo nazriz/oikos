@@ -277,6 +277,10 @@
             "no"
           ],
           "description": "For a paper complained of: whether it was wrong."
+        },
+        "statement": {
+          "type": "text",
+          "description": "What the office says in answer, in its own words, where these do not say it (what it disputes, and why)."
         }
       },
       "writes": {
@@ -296,7 +300,8 @@
           "owed": "#owed",
           "done": "?done",
           "wrong": "?wrong",
-          "known": "?known"
+          "known": "?known",
+          "statement": "=statement"
         }
       }
     },
@@ -347,6 +352,10 @@
             "no"
           ],
           "description": "For a paper complained of: whether it was wrong."
+        },
+        "statement": {
+          "type": "text",
+          "description": "What the office says in answer, in its own words, where these do not say it (what it disputes, and why)."
         }
       },
       "writes": {
@@ -366,7 +375,8 @@
           "owed": "#owed",
           "done": "?done",
           "wrong": "?wrong",
-          "known": "?known"
+          "known": "?known",
+          "statement": "=statement"
         }
       }
     }
