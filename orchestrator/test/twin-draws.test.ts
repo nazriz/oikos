@@ -20,7 +20,10 @@ const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
 const spec = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")) as any;
 // (Frictions at several times the sourced rate, so that a small town has requests enough in a short run.)
-const living = { ...spec, citizens: 300, profile: "ke-nakuru-2026", living: { initiative_bps: 10_000, friction_bps: Number(process.env.TWIN_FRICTION ?? 80_000) } };
+const living = { ...spec, citizens: 300, profile: "ke-nakuru-2026", living: { initiative_bps: 10_000, friction_bps: Number(process.env.TWIN_FRICTION ?? 100_000) } };
+// (2026-10-12, homes by income: until then most of this town's requests and decisions were about rent nobody in the
+// home could pay, the opening-day artefact. Without them 75 days at eight times the rate gave 6; the dial's most and
+// 120 days give 11, and the least expected below is 8 where it was 12.)
 
 /** An office doing its job as its module does it, and filing besides, each time it has nothing else to do, an entry
  * on its organisation's own file: a paper of no effect on anyone, which takes a number in the world's file. */
@@ -52,7 +55,7 @@ async function run(name: string, more: object, scribe?: string) {
       part.controller = { ...part.controller, impl: wrapped.name };
       modules = { [wrapped.name]: wrapped };
     }
-    const s = await runWorld({ config, runId: name, outDir: dir, until: Number(process.env.TWIN_DAYS ?? 75) * DAY, logDetail: "lean", recordObservations: "none", ...(modules ? { modules } : {}) } as any);
+    const s = await runWorld({ config, runId: name, outDir: dir, until: Number(process.env.TWIN_DAYS ?? 120) * DAY, logDetail: "lean", recordObservations: "none", ...(modules ? { modules } : {}) } as any);
     expect(s.participantErrors).toBe(0);
     const records: any[] = [];
     for (const l of readFileSync(s.logPath, "utf8").split("\n")) if (l.includes('"event":"recorded"')) { const r = JSON.parse(l).body.record; if (r?.record === "statement") records.push(r); }
@@ -100,7 +103,7 @@ test("papers of no effect, filed by an office that deals with nobody, change no 
   expect(idsOf(pilot)).not.toBe(idsOf(twin));
   const a = answers(twin, new Set()), b = answers(pilot, new Set());
   console.log(`twin draws: ${extra} papers of no effect; ${a.size} requests and decisions in the twin, ${b.size} beside them`);
-  expect(a.size).toBeGreaterThan(12);
+  expect(a.size).toBeGreaterThan(8);
   // The same requests, at the same hours, with the same answers: the whole of it, not a part.
   expect([...b.entries()].sort()).toEqual([...a.entries()].sort());
   // And the town beside them is the same town: every paper but the entries, in the same order, with the same words.

@@ -93,7 +93,9 @@ test("children are taught, the ill stay home and are seen at the clinic", async 
   // Seen: the condition lasts a fifth less of what was left of it.
   for (const x of treated) {
     const b = began.find((e) => e.condition === x.condition)!;
-    expect(x.until).toBeLessThan(b.until);
+    // (Or it ends a tick from being seen, the least the kernel leaves a treated condition: someone seen in the last
+    // hour of an illness. First met on 2026-10-12, in the town as drawn with homes by income: 979 seconds over.)
+    expect(x.until < b.until || x.until - x.t <= 3_600).toBe(true);
   }
   // Too ill to work: workers out of their workplace while it lasts, and back after.
   // (Each tells their employer; once better, they're back at work.)

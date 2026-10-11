@@ -62,7 +62,12 @@ test("a crew taken on by offers of the pay alone, made on the office's advertise
   expect(preview).toMatch(new RegExp(`It names no place of work: it is made on the job advertisement rec\\.\\d+, so the work is where that advertisement says \\(${depot.replace(/[.\/]/g, "\\$&")}\\)\\.`));
   // The crew comes in, and the round is collected by them.
   const came = new Set(events.filter((e) => e.event === "occupied" && e.space === depot).map((e) => e.occupant));
-  expect(hired.filter((w) => came.has(w)).length).toBe(hired.length);
+  // (All but someone working out their notice at the job they are leaving for this one: with homes dealt by income,
+  // 2026-10-12, fewer of this town's people are out of work and without a home on the day the posts are advertised,
+  // two apply at first, and one of them is in a shop, gives a fortnight's notice there and comes after this run ends.)
+  const leaving = new Set(records.filter((r) => r.record === "notice" && typeof r.as === "string" && hired.includes(r.as)).map((r) => r.as as string));
+  expect(hired.filter((w) => came.has(w) || leaving.has(w)).length).toBe(hired.length);
+  expect(hired.filter((w) => came.has(w)).length).toBeGreaterThan(0);
   const collected = events.filter((e) => e.event === "worked" && e.by === "works-staff-system" && e.task === "collect");
   expect(collected.length).toBeGreaterThan(20);
   for (const c of collected) expect(c.performers.every((w: string) => hired.includes(w))).toBe(true);
@@ -86,7 +91,10 @@ test("offers that cite no advertisement: the preview says there is no place of w
   const { seats, events, records, hired, depot, shown } = await worksSeat(false);
   expect(hired.length).toBeGreaterThan(0);
   expect(seats.previews.find((p) => p.text.includes("You will offer"))!.text).toContain("It names no place of work and cites no job advertisement that does: whoever signs it is paid and has nowhere to come to work.");
-  expect(events.filter((e) => e.event === "occupied" && e.space === depot && hired.includes(e.occupant))).toEqual([]);
+  // (Nobody comes for this job. One of those taken on now holds another job of the town's at the same address, taken
+  // from the environment office the day before, and comes for that: left out.)
+  const elsewhere = new Set(records.filter((r) => r.record === "agreement" && r.terms.template === "employment" && r.in_position !== "works" && r.terms.commitments.some((c: any) => c.does?.outcome?.occupancy?.in === depot)).map((r) => String(r.terms.parties[1])));
+  expect(events.filter((e) => e.event === "occupied" && e.space === depot && hired.includes(e.occupant) && !elsewhere.has(e.occupant))).toEqual([]);
   expect(events.filter((e) => e.event === "worked" && e.by === "works-staff-system")).toEqual([]);
   const reports = records.filter((r) => r.kind === "staff_report");
   expect(reports.length).toBeGreaterThanOrEqual(1);
@@ -179,7 +187,9 @@ test("bills go out one period after a standing billing order is made; the staff 
   expect(of("water-operations").some((r) => r.data.orders.some((o: any) => o.task === "bill" && o.state === "followed" && o.times === bills.length))).toBe(true);
   // The rates clerks, the doctors and the teachers report too, each to their own office.
   expect(of("rates")[0]!.text).toMatch(/^Report of the rates clerks, year 1, day \d+, on the work under the office's standing work orders\. levy \(rec\.\d+, every 91 days\): in force; nothing fell due; (no property has been valued yet|the next notices go out on year 1, day \d+)/);
-  expect(of("clinic-manager")[0]!.text).toMatch(/^Report of the clinic's doctors, .*treat \(rec\.\d+, every 1 day\): (carried out: \d+ patients seen|in force; nothing fell due).* In post \d+: c\d+ /);
+  // (Some report of theirs, not the first: the town's one doctor is now someone whose first working day is the
+  // fourth, and the first report says, rightly, that nobody was at the clinic when it opened.)
+  expect(of("clinic-manager").some((r) => /^Report of the clinic's doctors, .*treat \(rec\.\d+, every 1 day\): (carried out: \d+ patients seen|in force; nothing fell due).* In post \d+: c\d+ /.test(r.text))).toBe(true);
   expect(of("principal")[0]!.text).toMatch(/^Report of the school's teachers, .*teach \(rec\.\d+, every 1 day\): carried out: \d+ lessons.* In post \d+: c\d+ last worked year 1, day \d+ \(teach\)/);
   // And the seats that have a roster see it there: when each last worked, and each order as reported.
   const roster = seats.shown.filter((x) => x.seat === "principal" && x.text.includes("Staff of your office")).at(-1)!.text;

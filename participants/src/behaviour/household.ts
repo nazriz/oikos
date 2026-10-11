@@ -179,6 +179,10 @@ export interface HouseholdSpec {
   extensions?: Extension[];
   /** The occupancy standard households here judge a home by. None: `OCCUPANCY`. */
   occupancy?: OccupancyStandard;
+  /** Where the profile states no `extended_bps`: the most households, of all, that have kin living with them (a
+   * generator's ceiling when it places people with nothing coming in with a household that can carry them; nothing is
+   * drawn from it). */
+  kin_households_most_bps?: number;
 }
 
 /**

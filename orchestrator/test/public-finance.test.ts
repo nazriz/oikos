@@ -46,7 +46,11 @@ test("wages are paid net of the tax withheld, which is paid over; rates are levi
     const m = a.terms.commitments.find((c: any) => c.who === a.terms.parties[0]).does.outcome.money;
     const every = a.terms.commitments.find((c: any) => c.who === a.terms.parties[0]).every;
     let gross = Number(m.amount);
-    for (const ea of eas.filter((x) => x.data.employer === a.terms.parties[0] && x.at <= o.at && x.at >= a.at)) gross = Math.floor((gross * (10_000 + ea.data.rise_bps)) / 10_000);
+    // (A rise is for the staff there are when it is agreed: someone who signs afterwards, on a posting made before
+    // it, is paid what the posting said. So a job counts from the day its worker signed, not the day it was posted:
+    // found on 2026-10-12, when the town as now drawn first had such a hire; the employer's order was right.)
+    const signed = [...config.world.records, ...recs].filter((r: any) => r.record === "signature" && r.agreement === a.id && r.as === a.terms.parties[1]).map((r: any) => r.at as number).sort((x, y) => x - y)[0] ?? a.at;
+    for (const ea of eas.filter((x) => x.data.employer === a.terms.parties[0] && x.at <= o.at && x.at >= signed)) gross = Math.floor((gross * (10_000 + ea.data.rise_bps)) / 10_000);
     expect(Number(o.data.outcome.money.amount)).toBe(gross - withholding(law, gross, every));
   }
   // What's withheld is paid over monthly, with a report (a firm short of money pays what it has, and owes the rest).

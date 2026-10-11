@@ -203,7 +203,10 @@ test("Lengnick: with too little demand a factory lets workers go and stops makin
   // these four months: docs/behaviour/firms.md, "Adjusting labour". Before, it would have hired again a month later
   // on a month's wages. The other works goes on seeking a thirty-sixth hand.)
   expect(posts.length).toBeGreaterThanOrEqual(1);
-  expect(c2.filter((c) => c.participant?.startsWith("factory-") && /Short of this month's headcount/.test(c.reasoning ?? "")).length).toBeGreaterThanOrEqual(3);
+  expect(c2.filter((c) => c.participant?.startsWith("factory-") && /Short of this month's headcount/.test(c.reasoning ?? "")).length).toBeGreaterThanOrEqual(1);
+  // (One or more where it was three or more: with homes dealt by income, 2026-10-12, the other works is full, 36 of
+  // 36, and stays so. Its two further postings were for the place of a hand who had left it twice in the first month,
+  // people of households that opened without a home they could pay for; traced before and after.)
   // (And the headcount sought is above the staff there are: a works with nobody seeks one.)
   for (const c of posts) { const m = /\((\d+) of (\d+)/.exec(c.reasoning ?? ""); expect(Number(m?.[2])).toBeGreaterThan(Number(m?.[1])); }
 }, 300_000);

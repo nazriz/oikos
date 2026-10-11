@@ -28,7 +28,7 @@
         "crores": 10000000
       }
     },
-    "households": {
+    "households": {"kin_households_most_bps": 1072,
       "lone_bps": 466,
       "group_bps": 3134,
       "couple_bps": 1000,
@@ -586,7 +586,7 @@
       22500000,
       52500000
     ],
-    "support": {
+    "support": {"take_up_bps": {"pension": 3000},
       "payments": [
         {
           "id": "pension",
@@ -748,7 +748,7 @@
       }
     ],
     "labour_force_participation_bps": 6120,
-    "tenancy": {
+    "tenancy": {"rent_share_of_income": {"of": "expenditure", "bands": [{"under_bps": 2000, "bps": 2500}, {"under_bps": 3000, "bps": 2600}, {"under_bps": 5000, "bps": 3200}, {"bps": 1700}], "placeholder": true},
       "possession": {"arrears_days": 60, "notice_days": 30, "possession_days": 30, "plan_months": 3, "warrant_days": 30, "eviction_notice_days": 7, "stay_past_notice_bps": 5000, "leave_on_order_bps": 5900},
       "end_notice_days": 60,
       "tenant_notice_days": 30,
@@ -1381,6 +1381,9 @@
     }
   },
   "sources": {
+    "tenancy.rent_share_of_income": "PLACEHOLDER: nothing was found. India surveys no household income, and the consumption survey (MoSPI, HCES 2023-24) gives rent only as a share of all urban households' non-food spending, not for renting households and not by band. The bands are borrowed from ke-nakuru-2026's, themselves a placeholder around Nakuru's opened mean of 33.3% of expenditure. To source: NSS 76th round (housing condition), rent of renting households against their monthly consumer expenditure. HOW IT IS USED (docs/behaviour/generator.md, \"Homes by income\"): each renting household of a new town draws its share from these bands (evenly within a band; the open band from its lower bound to twice it, at most everything), which gives the rent it carries; households and let homes are matched by it. A target as well: the town's own distribution at the start is reported beside it and is not fitted to it.",
+    "support.take_up_bps": "pension 30%: TO CONFIRM: a secondary report says about 30% of eligible elderly people in Tamil Nadu receive the old-age pension, the survey behind it unnamed; 34.9 lakh people drew one of twelve state pension schemes in March 2024 against about 1.04 crore people aged 60 and over in 2021, an upper bound of about a third (IMPRI, Tamil Nadu's Old Age Pension Scheme, https://www.impriindia.com/?p=75882, opened 2026-10-12; the population from a search summary). The real pension is for the poor only; the profile's is paid to everyone of its age who claims (its own note says so), so those not drawing it here claim it on the first day and are granted. HOW IT IS USED (docs/behaviour/generator.md, \"Payments in force\"): of those the payment's rule already entitles as the year begins, this share open with it in payment; the rest claim it when they first look, as before.",
+    "households.kin_households_most_bps": "10.72%: a PROXY: urban Tamil Nadu households with two or more married couples (Census of India 2011, table HH-5, households by number of married couples, https://censusindia.gov.in/nada/index.php/catalog/8376, opened 2026-10-12). It leaves out extended households of one couple with a parent or other relative, so it is low. The profile states no extended households (its group_bps stands for them). HOW IT IS USED (docs/behaviour/households.md, \"Taken in\"): a ceiling and nothing else: no more households than this hold kin when people with nothing coming in are placed with a household that can carry them.",
     "tenancy.possession": "PLACEHOLDERS: the Tamil Nadu Regulation of Rights and Responsibilities of Landlords and Tenants Act 2017 lets a landlord apply to the Rent Court for eviction where rent is unpaid for two months after a notice (recalled, to confirm); no figure was opened. The two shares of how tenants answer are the same in every profile: stay_past_notice_bps 5000 is a PLACEHOLDER (no figure was found for the share of tenants who stay past a notice for arrears); leave_on_order_bps 5900 is England's, used everywhere: of 16,848 landlord possession orders in January to March 2026, 6,888 repossessions were by county court bailiffs, 41%, so about 59% of those ordered out were gone without one (Ministry of Justice, Mortgage and Landlord Possession Statistics, January to March 2026: opened by a research agent for this work, 2026-10-11; a ratio of one quarter's flows, not of one cohort). eviction_notice_days: the notice of the day that whoever carries out a warrant gives the tenant; England's county court bailiffs give 14 days' notice of an eviction (Civil Procedure Rules 83.8A: to confirm, recalled), Germany's Gerichtsvollzieher about three weeks (to confirm); every other place's figure is a PLACEHOLDER (7 days; Ohio 3, within its ten). HOW IT IS USED (docs/behaviour/justice.md, \"Possession\"): published in the town as a law; a landlord gives a notice to vacate under it, applies to the tribunal if the tenant stays, and asks for a warrant if they stay past its order; the tribunal sets a plan or a date by it; the police carry the warrant out.",
     "business.entry_bps_per_year": "PLACEHOLDER: no figure for business births in Tamil Nadu or India was found (the research agent's search, 2026-10-11). 10% a year stands in, between the other profiles' figures. HOW IT IS USED (docs/behaviour/entry.md, \"Starting a business of one\"): the generator turns it into a monthly chance for those who could start a business of one (in the labour force, of working age, with the savings for its stock), from the businesses the town has: births a year at this rate, over those people. Most real births are businesses with no employees, which is the only kind that can be started here without premises.",
     "employment.adjustment": "PLACEHOLDERS, the same in every profile, with a sourced shape (docs/behaviour/firms.md, \"Adjusting labour\"; docs/research/references.md). smooth_months 3: firms plan production and workforce on smoothed, forecast trade and not on the last period's (Holt, Modigliani, Muth and Simon 1960); no figure for the horizon of a small employer here was found. hiring_cost_weeks 8: what recruiting and training a new worker costs, in weeks of their pay; estimates run from under two weeks to over sixteen (Silva and Toledo 2009; Manning 2011; Blatter, Muehlemann and Schenker 2012; Muehlemann and Leiser 2018: all to confirm, none opened), and none is for this place.",

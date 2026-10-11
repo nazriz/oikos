@@ -172,6 +172,16 @@ export const CUT_OFF = 0.1;
  * language; or the request with its forms is longer than the model reads. */
 export type Withheld = "cut_off" | "form_check" | "no_program" | "too_long" | "form_not_shown" | "forms_subset" | "form_unseen";
 
+/** The list of forms a model was taught, from forms-trained.json beside its config.json; none if missing or malformed. */
+function sidecarList(dir: string): string[] | undefined {
+  try {
+    const x = JSON.parse(readFileSync(join(dir, "forms-trained.json"), "utf8")).forms_trained;
+    return Array.isArray(x) && x.every((y: unknown) => typeof y === "string") ? (x as string[]) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /** What a trained model's reader takes, as its folder says (config.json): the most it reads (`max_tokens` of its
  * encoder's tokens, or `max_pieces` where it reads pieces), and the most forms it was shown in training where the
  * folder says that (`max_forms`: no model's does yet, and the reader's length is then the only limit). */
@@ -179,8 +189,11 @@ export function readerOf(dir: string): { most?: number; forms?: number; trained?
   try {
     const c = JSON.parse(readFileSync(join(dir, "config.json"), "utf8"));
     const n = (x: unknown) => (typeof x === "number" && x > 0 ? x : undefined);
-    // (`forms_trained`: the names of the forms in the model's training export, where its folder carries the list.)
-    const trained = Array.isArray(c.forms_trained) && c.forms_trained.every((x: unknown) => typeof x === "string") ? (c.forms_trained as string[]) : undefined;
+    // (`forms_trained`: the names of the forms in the model's training export, where its folder carries the list: in
+    // config.json, which wins, or in forms-trained.json beside it (scripts/forms-trained.ts; the Python loader takes
+    // config.json's keys as they are, so the list is kept apart).)
+    const names = (x: unknown) => (Array.isArray(x) && x.every((y: unknown) => typeof y === "string") ? (x as string[]) : undefined);
+    const trained = names(c.forms_trained) ?? sidecarList(dir);
     return { most: n(c.encoder ? c.max_tokens : c.max_pieces), forms: n(c.max_forms), ...(trained ? { trained } : {}) };
   } catch {
     return {};
@@ -338,7 +351,7 @@ export class DecideAdapter implements LlmAdapter {
     // requests, 10 of 22 such drafts for a letting office differed from what its seat confirmed, and 2 of 9 on forms
     // the model had never seen were right; a seat confirms nearly everything). The translator behind drafts for the
     // world, and the two are compared on the route. Which forms are outside its training: those not in the list its
-    // folder carries (`forms_trained`); absent the list, any form of an asker whose forms were ever a subset.
+    // folder carries (`forms_trained`, in config.json or forms-trained.json); absent the list, any form of an asker whose forms were ever a subset.
     if (shown && o.who) this.subsetFor.add(o.who);
     if (!withheld && !/^none\(\w+\)$/.test(program)) {
       const filled = [...program.matchAll(/\bform=([\w.-]+)/g)].map((m) => m[1]!);
