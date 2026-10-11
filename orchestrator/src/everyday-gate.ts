@@ -17,7 +17,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { canonical, Randomness } from "@oikos/participants";
 import { callModel, ModelCallFailed, SpendingLimitReached, type Budget, type ContentBlock, type LlmAdapter, type LlmResponse, type Price } from "@oikos/participants/llm";
-import { answerSchema, ask, baseLine, byClass, codeOdds, codeOddsFor, edited, editable, EDIT_FIELDS, EDIT_MOVES, optionsOf, readAnswer, scrambled, stageOf, TEACHER_VERSION, tv, zAgency, type Design, type EditField, type Harvested } from "./everyday";
+import { answerSchema, shiftSchema, ask, baseLine, byClass, codeOdds, codeOddsFor, edited, editable, EDIT_FIELDS, EDIT_MOVES, optionsOf, readAnswer, scrambled, stageOf, TEACHER_VERSION, tv, zAgency, type Design, type EditField, type Harvested } from "./everyday";
 
 export const GATE_VERSION = "0.1.0";
 
@@ -126,7 +126,7 @@ export async function gate(o: GateOptions) {
       out = before.failed ? undefined : before.output;
     } else if (!stop) {
       const notes: any[] = [];
-      const schema = answerSchema(a.labels);
+      const schema = a.shiftFrom ? shiftSchema(a.labels) : answerSchema(a.labels);
       try {
         const res = await callModel({ adapter, annotate: async (x) => void notes.push(x), now: () => 0, prices: o.prices, ...(o.budget ? { budget: o.budget } : {}) },
           { purpose: "consult", subject: "everyday-gate", ref: q.key, system: a.system, messages: [{ role: "user", content: a.user }], maxTokens: 700, answer: { name: "estimate", schema }, tools: [{ name: "estimate", description: "The estimate, or that you decline it.", input_schema: schema }], context: { everyday: { asked: a, shown: q.shown, variant: q.variant } } }, seen);

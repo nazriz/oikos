@@ -3,7 +3,7 @@
 // the structured facts behind a request (`context`, which no real model is sent), as the other mocks do.
 
 import { MockAdapter, type ContentBlock, type LlmRequest } from "@oikos/participants/llm";
-import { baseLine, optionsOf, TRUST_SD, yearsHere, zAgency, type Asked, type Harvested } from "./everyday";
+import { baseLine, optionsOf, SHIFT_STEP, TRUST_SD, yearsHere, zAgency, type Asked, type Harvested } from "./everyday";
 
 export type MockKind = "reads" | "situation" | "first" | "wording" | "venues";
 
@@ -40,6 +40,11 @@ export function mockTeacher(kind: MockKind, name = "mock"): MockAdapter {
     if (kind === "venues") for (const o of optionsOf(shown.situation)) if (o.cls === "venue" || o.cls === "ask") w[o.id] = (w[o.id] ?? 0) * 6 + 0.5;
     const listed = asked.ids.map((id, i) => (w[id] ?? 0) * (kind === "first" && i === 0 ? 3 : 1) * (kind === "wording" && /estimation task/.test(req.system) && i % 2 === 0 ? 3 : 1));
     const total = listed.reduce((a, b) => a + b, 0) || 1;
+    if (asked.shiftFrom) {
+      // (The closed scale: the step nearest to how far these odds sit from the base line shown.)
+      const shifts = listed.map((x, i) => Math.max(-3, Math.min(3, Math.round(Math.log(Math.max(1e-6, x / total) / asked.shiftFrom![i]!) / Math.log(SHIFT_STEP)))));
+      return [{ type: "tool_use", id: "estimate", name: "estimate", input: { declined: false, bearing: [], shifts: Object.fromEntries(asked.labels.map((l, i) => [l, shifts[i]!])) } }];
+    }
     const counts = listed.map((x) => Math.floor((100 * x) / total));
     // (What is left over goes by the largest remainders, ties by the option's own id: never by where it is listed.)
     const left = 100 - counts.reduce((a, b) => a + b, 0);

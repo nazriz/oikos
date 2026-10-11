@@ -59,7 +59,7 @@
 //   oikos everyday-harvest <DIR> [--held-profiles a,b] [--dev 24] [--held 36] [--out DIR]
 //     The everyday model's recorded situations (docs/design/ai-citizens.md 11): the decisions about a secure home in
 //     the datasets under DIR (a folder a profile), with a development and a held-back sample. No model is called.
-//   oikos everyday-gate <sample.jsonl> --pool <pool.jsonl> [--models a,b] [--design plain|bearing] [--edits N] [--jobs N]
+//   oikos everyday-gate <sample.jsonl> --pool <pool.jsonl> [--models a,b] [--design plain|bearing|shift] [--edits N] [--jobs N]
 //                 [--skip repeat,reversed,reworded,scrambled] [--budget DOLLARS] [--out DIR]
 //     The teachers' gate: scrambled records, one-thing edits, option order, rewording, the town's totals, agreement.
 //     The mock by default. Every call is kept, and served again from the same folder.
@@ -371,7 +371,7 @@ try {
     console.log(JSON.stringify(manifest, null, 2));
   } else if (cmd === "everyday-gate" && positional()[0]) {
     // The teachers' gate (docs/design/ai-citizens.md 11): oikos everyday-gate <sample.jsonl> --pool <pool.jsonl>
-    //   --models a,b --design plain|bearing [--edits N] [--jobs N] [--skip repeat,reworded] [--budget DOLLARS] --out DIR
+    //   --models a,b --design plain|bearing|shift [--edits N] [--jobs N] [--skip repeat,reworded] [--budget DOLLARS] --out DIR
     // The mock (which reads the person, by construction) unless models are named. Every call is kept beside the report.
     const { gate, gateText } = await import("./everyday-gate");
     const { mockTeacher } = await import("./everyday-mock");
@@ -385,7 +385,7 @@ try {
     const adapterOf = (name: string) => { const c = chooseModel(name, { budgetUsd, timeoutMs: 180_000 }); Object.assign(prices, c.prices); budget ??= c.budget; return c.adapter; };
     const teachers = new Map(named.length ? named.map((m) => [m, adapterOf(m)] as const) : [["mock", mockTeacher("reads")] as const]);
     const outDir = flag("out") ?? join("runs", "everyday-gate");
-    const report = await gate({ sample: read(positional()[0]!), pool: read(flag("pool") ?? positional()[0]!), teachers, design: (flag("design") ?? "bearing") as "plain" | "bearing", prices, ...(budget ? { budget } : {}), outDir,
+    const report = await gate({ sample: read(positional()[0]!), pool: read(flag("pool") ?? positional()[0]!), teachers, design: (flag("design") ?? "shift") as "plain" | "bearing" | "shift", prices, ...(budget ? { budget } : {}), outDir,
       edits: Number(flag("edits", "12")), jobs: Number(flag("jobs", "3")), skip: (flag("skip") ?? "").split(",").filter((x) => x), log: console.log });
     console.log(gateText(report));
     console.log(`\nReport: ${join(outDir, "report.json")}; every call: ${join(outDir, "calls.jsonl")}`);

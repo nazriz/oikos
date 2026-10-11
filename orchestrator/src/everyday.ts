@@ -232,7 +232,14 @@ export function edited(h: Harvested, f: EditField, level: "low" | "high"): Harve
 
 // -------------------------------------------------------------------------------------------- what a teacher is shown
 
-export type Design = "plain" | "bearing";
+export type Design = "plain" | "bearing" | "shift";
+/** In the "shift" design a teacher says, for each course, how the hundred who match the record compare with the town's
+ * hundred, on a closed scale from -3 to 3; a step multiplies the base line's odds by this, and the whole is brought
+ * back to 100. (A PLACEHOLDER, chosen on the development sample: three steps are about two and a half times.) */
+export const SHIFT_STEP = 1.35;
+/** The base line has no figure for giving up (the code mind never drew it): in the "shift" design this share of the
+ * base line for doing nothing is shown as giving up. A PLACEHOLDER. */
+export const GIVE_UP_SHARE = 0.2;
 export type Wording = "a" | "b";
 export const TEACHER_VERSION = "0.1.0";
 
@@ -252,6 +259,14 @@ const BASE: { [w in Wording]: string } = {
   a: `You are given the base line: about how many of a hundred of this town's tenants as a whole take each course in this kind of situation (from surveys of what people with such a problem do, and the town's own calibration to them). Start from it. The hundred who match this record differ from the town's hundred only as the record gives reason: say which facts of the record move your numbers and which way, then give the numbers.`,
   b: `A base line is supplied: roughly how the town's tenants as a whole divide among these courses in a situation of this kind (it rests on surveys of what people with such problems do, to which the town is calibrated). Take it as your starting point. Depart from it only where this record gives a reason; name the facts of the record that shift your numbers, and in which direction, before the numbers themselves.`,
 };
+const SHIFT: { [w in Wording]: string } = {
+  a: `You are given the base line: about how many of a hundred of this town's tenants as a whole take each course in this kind of situation (from surveys of what people with such a problem do, and the town's own calibration to them). You are not asked for new numbers. For each course, say how the hundred who match this record compare with the town's hundred, as a whole number from -3 to 3: -3 far fewer of them take it, -2 clearly fewer, -1 somewhat fewer, 0 about the same, 1 somewhat more, 2 clearly more, 3 far more. Give 0 wherever the record gives no reason to differ. They are a hundred people either way: if fewer take one course, more take another. First name the facts of the record that move your answer and which way.`,
+  b: `A base line is supplied: roughly how the town's tenants as a whole divide among these options in a situation of this kind (it rests on surveys of what people with such problems do, to which the town is calibrated). No fresh numbers are wanted. For every option, state how the hundred fitting this record stand against the town's hundred, with an integer between -3 and 3: -3 means far fewer choose it, -2 distinctly fewer, -1 a little fewer, 0 no real difference, 1 a little more, 2 distinctly more, 3 far more. Use 0 where nothing in the record points either way. The total stays one hundred people: fewer choosing one option means more choosing others. Begin by naming the facts of the record that sway you, with their direction.`,
+};
+const ANSWER_SHIFT: { [w in Wording]: string } = {
+  a: `Return: declined (true or false); bearing (up to four short phrases: the facts of the record that most moved your answer, each with the direction); shifts (for each course, by its label, the whole number from -3 to 3).`,
+  b: `Give back: declined (true or false); bearing (at most four brief phrases naming the facts of the record that weighed most, with their direction); shifts (per option, under its label, the integer from -3 to 3).`,
+};
 const DECLINE: { [w in Wording]: string } = {
   a: `You may decline. If you would rather not make this estimate, for any reason, set declined to true; no reason is needed, and it is recorded as a choice, not a failure.`,
   b: `Declining is open to you. Should you prefer not to give this estimate, whatever the reason, set declined to true. You need not explain, and it is recorded as a choice rather than a failure.`,
@@ -260,7 +275,11 @@ const ANSWER: { [w in Wording]: string } = {
   a: `Return: declined (true or false); bearing (up to four short phrases: the facts of the record that most moved your numbers, each with the direction); counts (for each course, by its label, how many of the hundred).`,
   b: `Give back: declined (true or false); bearing (at most four brief phrases naming the facts of the record that weighed most, with their direction); counts (per option, under its label, the number out of the hundred).`,
 };
-export const teacherSystem = (design: Design, w: Wording = "a") => [HEAD[w], ...(design === "bearing" ? [BASE[w]] : []), DECLINE[w], ANSWER[w]].join("\n\n");
+const HEAD_SHIFT: { [w in Wording]: string } = {
+  a: HEAD.a.replace(" Estimate how many of the hundred would take each of the courses listed, now. Whole numbers that add up to 100.", " The question is how many of the hundred would take each of the courses listed, now.").replace("your numbers should follow", "your answer should follow"),
+  b: HEAD.b.replace(" Of those hundred, how many would do each of the things listed, at this point? Give whole numbers summing to 100.", " The question is how many of those hundred would do each of the things listed, at this point.").replace("let it move your numbers", "let it move your answer"),
+};
+export const teacherSystem = (design: Design, w: Wording = "a") => (design === "shift" ? [HEAD_SHIFT[w], SHIFT[w], DECLINE[w], ANSWER_SHIFT[w]] : [HEAD[w], ...(design === "bearing" ? [BASE[w]] : []), DECLINE[w], ANSWER[w]]).join("\n\n");
 
 const pct = (bps: number) => Math.round(bps / 100);
 const money = (cents: number) => `${Math.round(cents / 100).toLocaleString("en-US")}`;
@@ -310,7 +329,8 @@ function knownWords(op: Opening, w: Wording, contrast: boolean): string {
   if (op.trust) bits.push(`${w === "a" ? `their trust in ${who}` : `how far they trust ${who}`}: ${pct(op.trust.bps)} of 100${contrast ? ` (${standing((op.trust.bps - op.trust.town_bps) / TRUST_SD)}; the town's usual is ${pct(op.trust.town_bps)})` : ""}`);
   if (op.fear) bits.push(`${w === "a" ? `their fear of ${who}` : `how much they fear ${who}`}: ${pct(op.fear)} of 100`);
   if (op.belief) bits.push(`${w === "a" ? "they hold to what it teaches" : "they subscribe to its teaching"}: ${pct(op.belief)} of 100`);
-  bits.push(op.others ? (w === "a" ? `${op.others} of those they know have gone this way` : `${op.others} of their acquaintances have done this`) : (w === "a" ? "nobody they know has gone this way" : "none of their acquaintances has done this"));
+  if (op.kind === "petition") bits.push(w === "a" ? `${op.others} have signed it so far` : `it carries ${op.others} signatures to date`);
+  else bits.push(op.others ? (w === "a" ? `${op.others} of those they know have gone this way` : `${op.others} of their acquaintances have done this`) : (w === "a" ? "nobody they know has gone this way" : "none of their acquaintances has done this"));
   if (op.learned !== undefined) bits.push(`${w === "a" ? "from trying this kind of thing before, they rate it" : "their own past experience of this sort of step rates it"} ${pct(op.learned)} of 100`);
   return bits.join("; ");
 }
@@ -375,26 +395,33 @@ export function situationWords(h: Harvested, w: Wording): string {
   return L.join(" ");
 }
 
-export interface Asked { system: string; user: string; labels: string[]; ids: string[] }
+export interface Asked { system: string; user: string; labels: string[]; ids: string[]; /** In the "shift" design: the base line shown for each option listed (shares of 1), which the answer's steps move. */ shiftFrom?: number[] }
 /**
  * What a teacher is shown and asked, whole. `order`: the options' order (a permutation of their indices). `base`:
  * the town's base line by option id (shares of 1), shown in the "bearing" design.
  */
 export function ask(h: Harvested, o: { design: Design; wording?: Wording; order?: number[]; base?: { [id: string]: number } }): Asked {
-  const w = o.wording ?? "a", contrast = o.design === "bearing";
+  const w = o.wording ?? "a", contrast = o.design !== "plain", shift = o.design === "shift";
+  // (For the "shift" design every option needs a base line to move: giving up has a share of doing nothing's, and an
+  // option the base line gives nothing is shown at 1 in 100.)
+  const base = o.base && shift ? (() => { const b = { ...o.base! }; b.give_up = GIVE_UP_SHARE * (b.leave ?? 0); b.leave = (1 - GIVE_UP_SHARE) * (b.leave ?? 0); for (const k of Object.keys(b)) b[k] = Math.max(0.01, b[k]!); const t = Object.values(b).reduce((x, y) => x + y, 0); for (const k of Object.keys(b)) b[k] = b[k]! / t; return b; })() : o.base;
   const opts = optionsOf(h.situation);
   const order = o.order ?? opts.map((_, i) => i);
   const listed = order.map((i) => opts[i]!);
   const labels = listed.map((_, i) => `c${i + 1}`);
-  const lines = listed.map((op, i) => `${labels[i]}. ${optionWords(op, h.situation, w)}.${op.opening ? ` [${knownWords(op.opening, w, contrast)}]` : ""}${contrast && o.base ? ` ${w === "a" ? "Base line" : "Town base line"}: ${op.id === "give_up" ? (w === "a" ? "not known apart (it is within the base line for doing nothing for now)" : "not separately known (counted inside the base line for leaving it for the present)") : Math.round(100 * (o.base[op.id] ?? 0))}.` : ""}`);
+  const lines = listed.map((op, i) => `${labels[i]}. ${optionWords(op, h.situation, w)}.${op.opening ? ` [${knownWords(op.opening, w, contrast)}]` : ""}${contrast && base ? ` ${w === "a" ? "Base line" : "Town base line"}: ${op.id === "give_up" && !shift ? (w === "a" ? "not known apart (it is within the base line for doing nothing for now)" : "not separately known (counted inside the base line for leaving it for the present)") : Math.round(100 * (base[op.id] ?? 0))}.` : ""}`);
   const user = [
     w === "a" ? "THE SITUATION" : "WHAT THE HOUSEHOLD FACES", situationWords(h, w), "",
     w === "a" ? "THE PERSON'S RECORD" : "THE INHABITANT'S RECORD", recordWords(h, w, contrast), "",
     w === "a" ? "THE COURSES OPEN (with what this person knows of each)" : "THE OPTIONS AVAILABLE (and what this person knows about each)", ...lines, "",
-    w === "a" ? `Of a hundred people matching this record, in this situation, how many take each course now? (${labels.join(", ")}; they add up to 100.)` : `Out of one hundred people fitting this record and facing this, how many choose each option at this point? (${labels.join(", ")}; summing to 100.)`,
+    shift ? (w === "a" ? `For each course (${labels.join(", ")}): do more or fewer of a hundred people matching this record take it now than of the town's hundred, from -3 to 3?` : `For every option (${labels.join(", ")}): compared with the town's hundred, do more or fewer of one hundred people fitting this record choose it at this point, from -3 to 3?`)
+      : w === "a" ? `Of a hundred people matching this record, in this situation, how many take each course now? (${labels.join(", ")}; they add up to 100.)` : `Out of one hundred people fitting this record and facing this, how many choose each option at this point? (${labels.join(", ")}; summing to 100.)`,
   ].join("\n");
-  return { system: teacherSystem(o.design, w), user, labels, ids: listed.map((x) => x.id) };
+  return { system: teacherSystem(o.design, w), user, labels, ids: listed.map((x) => x.id), ...(shift && base ? { shiftFrom: listed.map((x) => base[x.id] ?? 0.01) } : {}) };
 }
+export const shiftSchema = (labels: string[]) => ({ type: "object", additionalProperties: false, required: ["declined", "bearing", "shifts"], properties: {
+  declined: { type: "boolean" }, bearing: { type: "array", items: { type: "string" }, maxItems: 4 },
+  shifts: { type: "object", additionalProperties: false, required: labels, properties: Object.fromEntries(labels.map((l) => [l, { type: "integer", minimum: -3, maximum: 3 }])) } } });
 export const answerSchema = (labels: string[]) => ({ type: "object", additionalProperties: false, required: ["declined", "bearing", "counts"], properties: {
   declined: { type: "boolean" }, bearing: { type: "array", items: { type: "string" }, maxItems: 4 },
   counts: { type: "object", additionalProperties: false, required: labels, properties: Object.fromEntries(labels.map((l) => [l, { type: "integer", minimum: 0, maximum: 100 }])) } } });
@@ -403,6 +430,13 @@ export function readAnswer(x: unknown, a: Asked): { declined: true } | { odds: {
   const v = x as { declined?: boolean; bearing?: unknown; counts?: { [l: string]: unknown } } | undefined;
   if (!v || typeof v !== "object") return undefined;
   if (v.declined === true) return { declined: true };
+  if (a.shiftFrom) {
+    const k = a.labels.map((l) => Number((v as { shifts?: { [l: string]: unknown } }).shifts?.[l]));
+    if (k.some((y) => !Number.isInteger(y) || y < -3 || y > 3)) return undefined;
+    const moved = a.shiftFrom.map((b, i) => b * SHIFT_STEP ** k[i]!);
+    const sum = moved.reduce((s, y) => s + y, 0);
+    return { odds: Object.fromEntries(a.ids.map((id, i) => [id, moved[i]! / sum])), bearing: Array.isArray(v.bearing) ? v.bearing.map(String) : [] };
+  }
   const n = a.labels.map((l) => Number(v.counts?.[l]));
   const total = n.reduce((s, y) => s + y, 0);
   if (n.some((y) => !Number.isFinite(y) || y < 0) || total < 90 || total > 110) return undefined;

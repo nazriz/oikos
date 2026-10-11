@@ -122,6 +122,15 @@ test("the gate passes a teacher that reads the person and catches each fault", a
     expect((await run("first")).pass.order).toBe(false);
     expect((await run("wording")).pass.reworded).toBe(false);
     expect((await run("venues")).pass.town).toBe(false);
+    // The closed scale (the "shift" design): the mock that reads the person still passes, the one that ignores them does not.
+    const shift = async (kind: MockKind) => (await gate({ sample: s.dev, pool: s.pool.dev, teachers: new Map([[kind, mockTeacher(kind)]]), design: "shift", prices: PRICES, outDir: join(out, `shift-${kind}`), edits: 12, jobs: 4 })).teachers[0]!;
+    expect((await shift("reads")).passed).toBe(true);
+    expect((await shift("situation")).pass.scrambled).toBe(false);
+    const a = ask(s.dev[0]!, { design: "shift", base: baseLine(s.dev[0]!, s.pool.dev) });
+    expect(a.shiftFrom!.reduce((x, y) => x + y, 0)).toBeCloseTo(1, 5);
+    const flat = readAnswer({ declined: false, bearing: [], shifts: Object.fromEntries(a.labels.map((l) => [l, 0])) }, a) as { odds: { [id: string]: number } };
+    expect(a.ids.every((id, i) => Math.abs(flat.odds[id]! - a.shiftFrom![i]!) < 1e-9)).toBe(true); // nothing shifted: the base line itself
+    expect(readAnswer({ declined: false, bearing: [], shifts: Object.fromEntries(a.labels.map((l) => [l, 4])) }, a)).toBeUndefined();
     // Asked again over the same folder, nothing is asked: every call is served from what was kept.
     const again = (await gate({ sample: s.dev, pool: s.pool.dev, teachers: new Map([["reads", mockTeacher("reads")]]), design: "bearing", prices: PRICES, outDir: join(out, "reads"), edits: 12 })).teachers[0]!;
     expect(again.calls.asked).toBe(0);
