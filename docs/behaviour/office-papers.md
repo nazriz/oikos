@@ -183,7 +183,7 @@ The table above was written when the forms were. The third living pilot showed w
 | Registrar | orders a bank to pay; issues a warrant; declines | forms `garnishee_order`, `warrant` (new), `enforcement_decline` (new) |
 | Finance | pays, sets up wages | as before |
 | | reports tax withheld | form `withholding_return` (new), in totals; its books count from the last return |
-| Mayor | answers a petition | form `petition_response` (new); the rest as before |
+| Mayor | answers a petition | form `petition_response` (new), with a required `answer`: the whole of what is answered is the paper's text and `data.answer`; the rest as before |
 | Support office | answers a request to review, a body's notice | forms `remedy_answer`, `complaint_answer`, `tribunal_answer` (new) |
 | Desks | tell the other side; decide | forms `complaint_notice`, `venue_decision`, widened to carry the paper, the sum and the building the application names; `binding` is yes or no |
 | | say what they hear | on file when the seat arrives |
@@ -219,6 +219,21 @@ Each resolves (`orchestrator/test/office-papers.test.ts`). **A caution the form 
 asked in yearly pay because its own report gave the wage by the year. The form asks for the wage of a pay period and
 the pay period; filled in with "$78,214" and "per year" it advertises a job paid once a year. The form's words say
 what each field is; whether a seat reads them is for the first pilot to show.
+
+## A form that says something carries what is said
+
+A form whose act in the world is to say something to someone (an answer, a decision, an order's reasons) has a field
+for the words, and its paper carries them whole (no cap short of the record's 16,384 characters; the draft a seat
+confirms shows the paper's text in full). The fourth living pilot's mayor had to answer a petition by a free letter that
+no code person reads, because `petition_response` had no such field. Audit of the forms (2026-10-12):
+
+- `petition_response.answer` (required): in the paper's text and `data.answer`.
+- Added as optional text fields, written into the paper's data (a template has no way to leave a field out of the text
+  when it is not given, and the platform keeps one template grammar): `reason` on `variation_answer`, `permit_decision`,
+  `possession_order`, `tribunal_order` and `venue_decision`, and `statement` on `complaint_answer` and
+  `tribunal_answer`. `remedy_answer`, `loan_decision`, `benefit_decision` and `wage_offer` already had one.
+- Left as they are, their paper being fully determined by its figures or its fixed words: payments, returns, listings,
+  notices of hearing, rent notices, warrants, the union's calls, orders to a supplier, and the like.
 
 ## Leaves out
 

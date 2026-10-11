@@ -65,6 +65,9 @@ interface Case { id: string; matter: string; applicant: string; against: string;
 export class Hearings {
   private readonly cases = new Map<string, Case>();
   private readonly seen = new Set<string>();
+  /** Cases we have decided ourselves: never taken up again from the file, where our own decision may not yet show
+   * (a member deciding several cases at one sitting decided some of them two and three times over, until 2026-10-12). */
+  private readonly closed = new Set<string>();
   /** Which case each application is to us: by who against whom about what, not by its number on file. */
   private readonly nth = new Occurrences();
   /** What it did, for whoever counts: applications, by finding; days from application to decision. */
@@ -119,6 +122,7 @@ export class Hearings {
     }
     const say2 = (c: Case, finding: Finding, text: string, data: object, why: string, binding = true) => {
       this.cases.delete(c.id);
+      this.closed.add(c.id);
       this.count(finding);
       this.waits.push(Math.floor((t - c.at) / DAY));
       if (this.waits.length > 512) this.waits.shift();
@@ -131,10 +135,27 @@ export class Hearings {
       for (const n of book.all(this.forms.notice).filter((r) => r.speaks_for === this.me && typeof r.data?.matter === "string").sort((x, y) => x.at - y.at || (x.id < y.id ? -1 : 1))) {
         const id = String(n.data?.application ?? "");
         const a = book.records.get(id) as StatementRecord | undefined;
-        if (!a || decided.has(id) || this.leave.includes(String(n.data?.matter))) { this.cases.delete(id); continue; }
+        if (!a || decided.has(id) || this.closed.has(id) || book.withdrawn.has(id) || this.leave.includes(String(n.data?.matter))) { this.cases.delete(id); continue; }
         const d = (a.data ?? {}) as Matter & { kind?: string };
         const matter = String(d.matter ?? d.kind ?? n.data?.matter);
         // (The latest notice gives the day: a case put off is decided when its new day has come.)
+        this.cases.set(id, { id, matter, applicant: a.speaks_for!, against: String(d.against ?? n.data?.against ?? ""), at: a.at, answerBy: Number(n.data?.answer_by ?? n.data?.hearing_at ?? t), data: d, hears: this.p.hears.find((h) => h.about === matter) ?? { about: matter } });
+      }
+    }
+    // ---- cases our own file says are already listed, that we did not list ourselves (a venue that opens with its
+    // list part-way through: docs/behaviour/generator.md, "An ordinary day's caseload"): taken as they stand, with
+    // the day their notice gave; never listed again. In a venue that listed everything itself there are none. ----
+    if (part !== "decide") {
+      const decidedOnFile = new Set(book.all(this.forms.decision).filter((r) => r.speaks_for === this.me).map((r) => String(r.data?.application ?? "")));
+      for (const n of book.all(this.forms.notice).filter((r) => r.speaks_for === this.me && typeof r.data?.matter === "string").sort((x, y) => x.at - y.at || (x.id < y.id ? -1 : 1))) {
+        const id = String(n.data?.application ?? "");
+        if (this.seen.has(id)) continue;
+        const a = book.records.get(id) as StatementRecord | undefined;
+        if (!a) continue;
+        this.seen.add(id);
+        const d = (a.data ?? {}) as Matter & { kind?: string };
+        const matter = String(d.matter ?? d.kind ?? n.data?.matter);
+        if (decidedOnFile.has(id) || this.closed.has(id) || book.withdrawn.has(id) || this.leave.includes(matter) || part === "list") continue;
         this.cases.set(id, { id, matter, applicant: a.speaks_for!, against: String(d.against ?? n.data?.against ?? ""), at: a.at, answerBy: Number(n.data?.answer_by ?? n.data?.hearing_at ?? t), data: d, hears: this.p.hears.find((h) => h.about === matter) ?? { about: matter } });
       }
     }
@@ -173,6 +194,8 @@ export class Hearings {
     }
     if (part === "list") return steps;
     // ---- deciding: those whose time to answer has run, oldest first, as far as the day's hours go ----
+    // (An application its maker has withdrawn is no longer a case: nothing is decided on it.)
+    for (const c of [...this.cases.values()]) if (book.withdrawn.has(c.id)) { this.cases.delete(c.id); this.count("withdrawn"); }
     let room = canDecide ?? Math.max(1, Math.floor(this.p.cases_per_day));
     for (const c of [...this.cases.values()].filter((x) => t >= x.answerBy).sort((a, b) => a.answerBy - b.answerBy || (a.id < b.id ? -1 : 1))) {
       if (room-- <= 0) break;
@@ -199,7 +222,10 @@ export class Hearings {
         const arrears = Math.max(0, claimed - cents((x as any).paid ?? 0));
         const offer = Math.max(0, cents((x as any).offer ?? 0));
         const home = c.data.space ? { space: c.data.space, structure: c.data.structure, household: c.data.household } : {};
-        if (arrears <= 0) say2(c, "dismissed", "the rent owed has been paid; dismissed.", {}, `${c.against} answers that the rent owed is paid: dismissed.`);
+        // (The law gives possession against a tenant who has not left. One who answers that they have gone has
+        // given the home up: there is nothing for an order to give.)
+        if ((x as any).left) say2(c, "dismissed", `${c.against} has left ${c.data.space ?? "the home"}; there is nothing left to order. Dismissed.`, { left: true }, `${c.against} answers that they have left the home: nothing to order; dismissed.`);
+        else if (arrears <= 0) say2(c, "dismissed", "the rent owed has been paid; dismissed.", {}, `${c.against} answers that the rent owed is paid: dismissed.`);
         else if (r && offer > 0 && !c.data.breach && P.plan_months > 0 && arrears <= offer * P.plan_months) {
           say2(c, "plan", `${c.against} is to pay the rent as it falls due and ${usd(offer)} a month toward the ${usd(arrears)} owed, until it is paid. If the plan is not kept, ${c.applicant} may apply again for possession.`,
             { amount: arrears, instalment: offer, ...(c.data.account ? { to: c.data.account } : {}), ...home },
@@ -266,7 +292,7 @@ export const desk: BehaviourModule = {
     ] }],
   answers: { office: "the desk", acts: "What it acts on: an application made to it about something it has said it hears, which it puts to the other side and decides by its procedure." },
   issues: P.DESK,
-  version: "0.1.1", // 0.1.1: what the record cannot settle is drawn by who applied against whom about what, not by the application's number on file; its notice of what it hears is on file when a seat arrives; 0.1.0: a body that hears grievances (docs/behaviour/frictions.md)
+  version: "0.1.2", // 0.1.2: as the tribunal: a withdrawn application is no case, and cases already listed on its own file are taken as they stand; 0.1.1: what the record cannot settle is drawn by who applied against whom about what, not by the application's number on file; its notice of what it hears is on file when a seat arrives; 0.1.0: a body that hears grievances (docs/behaviour/frictions.md)
   doc: "docs/behaviour/frictions.md",
   cadence: () => DAY,
   firstWake: (ctx) => 9 * 3600 + ctx.rng("first-wake").below(3600),

@@ -1340,7 +1340,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
         const p = people.find((x) => x.person === who.person)!;
         const c = p.record.circumstances ?? {};
         const brief: AccountBrief = { person: who.person, record: p.record, means: { income: formatMoney(Number(c.income ?? 0), currency), savings: formatMoney(Number(c.savings ?? 0), currency) }, days: day,
-          names: Object.fromEntries([...entityNames].filter(([id, name]) => name && name !== id)), strata: who.strata, dark: darkAccount(p.record, Number.isFinite(Number(p.record.agency?.now)) ? (Number(p.record.agency.now) - mean) / sd : 0) };
+          names: Object.fromEntries([...entityNames, ...atEnd.founded].filter(([id, name]) => name && name !== id)), strata: who.strata, dark: darkAccount(p.record, Number.isFinite(Number(p.record.agency?.now)) ? (Number(p.record.agency.now) - mean) / sd : 0) };
         try {
           const piece = await writeAccount(io, composerCfg, composerAdapters!, (purpose) => randomness.stream(["accounts", purpose]), brief, p.participant, accountCounts, seen);
           await k.request({ op: "annotate", annotation: { annotation: "note", subject: p.participant, data: { account: { version: ACCOUNT_VERSION, played_by: o.composerAdapters ? "models" : "mock", person: who.person, strata: who.strata, dark: brief.dark, days: day, ...piece,

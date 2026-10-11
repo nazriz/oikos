@@ -25,6 +25,8 @@ export const BOOKS = "office_books";
 /** How old the clerk's last paper may be before a running figure that has moved is filed for its own sake (days). */
 export const RUNNING_EVERY_DAYS = 7;
 const NAMED = 4;
+/** The most entries of a heading whose day has come that a paper's words name each time (the rest are in its list). */
+const ALWAYS_NAMED = 12;
 const LISTED = 200;
 
 /** Whose staff a post is: the office itself, by the post's own id (`works-staff` is the staff of `works`). */
@@ -34,14 +36,29 @@ export const officeOf = (position: string | undefined): string => String(positio
 export function booksPaper(office: string, t: number, open: OpenHeading[], before: Map<string, Map<string, string>> | undefined): { text: string; data: unknown; key: string } {
   const parts: string[] = [];
   const key = JSON.stringify(open.map((h) => [h.what, h.items.map((x) => [x.id, x.running ? "" : x.line])]));
-  const whats = [...new Set([...open.map((h) => h.what), ...(before?.keys() ?? [])])];
+  // (What waits on the office-holder with its day come is said first, and in every paper: a list is a standing list,
+  // not a feed of what is new. Until 2026-10-12 a paper named only what had changed since the last one, and a case
+  // whose day came between two sittings was one line among fifty, a day late: docs/decisions.md, "What the fourth
+  // living pilot found".)
+  const always = new Set(open.filter((h) => h.always).map((h) => h.what));
+  const whats = [...new Set([...open.filter((h) => h.always).map((h) => h.what), ...open.map((h) => h.what), ...(before?.keys() ?? [])])];
+  // (Something that has moved from one heading to another still stands open: it is new under its heading, and is
+  // not said to be "no longer open" under the one it left.)
+  const standing = new Set(open.flatMap((h) => h.items.map((x) => x.id)));
   for (const what of whats) {
     const items = open.find((h) => h.what === what)?.items ?? [];
+    if (always.has(what)) {
+      const was = before?.get(what) ?? new Map<string, string>();
+      const fresh = items.filter((x) => !was.has(x.id)).length;
+      const done = [...was.keys()].filter((id) => !items.some((x) => x.id === id) && !standing.has(id));
+      parts.push(`${what}: ${items.length} in all${before !== undefined && fresh ? ` (${fresh} since the last paper)` : ""}: ${items.slice(0, ALWAYS_NAMED).map((x) => x.line).join("; ")}${items.length > ALWAYS_NAMED ? `; and ${items.length - ALWAYS_NAMED} more, in this paper's list` : ""}${done.length ? `; no longer open: ${done.slice(0, NAMED * 2).join(", ")}${done.length > NAMED * 2 ? ` and ${done.length - NAMED * 2} more` : ""}` : ""}.`);
+      continue;
+    }
     const was = before?.get(what) ?? new Map<string, string>();
     const fresh = items.filter((x) => !was.has(x.id));
     const changed = items.filter((x) => was.has(x.id) && was.get(x.id) !== x.line);
     const moved = changed.every((x) => x.running);
-    const gone = [...was.keys()].filter((id) => !items.some((x) => x.id === id));
+    const gone = [...was.keys()].filter((id) => !items.some((x) => x.id === id) && !standing.has(id));
     if (!items.length && !gone.length) continue;
     const name = (xs: { line: string }[]) => `${xs.slice(0, NAMED).map((x) => x.line).join("; ")}${xs.length > NAMED ? `; and ${xs.length - NAMED} more, in this paper's list` : ""}`;
     const said = [
@@ -55,7 +72,11 @@ export function booksPaper(office: string, t: number, open: OpenHeading[], befor
   }
   const text = `The books of the office, ${dateWords(t)}, as its clerk keeps them from the office's own papers and accounts. ${parts.length ? parts.join(" ") : "Nothing stands open."}${before !== undefined ? " (What is said here is what has changed since the clerk's last paper; the list in this paper is everything that stands open.)" : ""}`;
   // (One list, each thing that stands open an entry: a long one is read a part at a time, as any long paper is.)
-  const data = { office, at: t, open: open.flatMap((h) => h.items.slice(0, LISTED).map((x) => ({ what: h.what, about: x.id, says: x.line, ...(x.since !== undefined ? { since: x.since } : {}), ...(x.amount !== undefined ? { amount: x.amount } : {}) }))) };
+  // (Those whose day has come lead the list too. A heading longer than the list holds says how many it leaves out:
+  // nothing drops off a list without the list saying so.)
+  const ordered = [...open.filter((h) => h.always), ...open.filter((h) => !h.always)];
+  const over = ordered.filter((h) => h.items.length > LISTED).map((h) => ({ what: h.what, not_listed: h.items.length - LISTED }));
+  const data = { office, at: t, open: ordered.flatMap((h) => h.items.slice(0, LISTED).map((x) => ({ what: h.what, about: x.id, says: x.line, ...(x.since !== undefined ? { since: x.since } : {}), ...(x.amount !== undefined ? { amount: x.amount } : {}), ...(x.due !== undefined ? { due: x.due } : {}) }))), ...(over.length ? { over } : {}) };
   return { text, data, key };
 }
 
@@ -105,7 +126,7 @@ export const keepers = new Map<string, BehaviourModule>();
  */
 export const clerk: BehaviourModule = {
   name: "office.clerk",
-  version: "0.1.1", // 0.1.1: a running figure that has moved is filed once the last paper is a week old; 0.1.0: keeps the books of an office a model holds, and files what has changed
+  version: "0.2.0", // 0.2.0: what waits on the office-holder with its day come is named first in every paper, however long it has stood; what moves heading is not said to be closed; a list too long says what it leaves out; 0.1.1: a running figure that has moved is filed once the last paper is a week old; 0.1.0: keeps the books of an office a model holds, and files what has changed
   doc: "docs/behaviour/office-books.md",
   cadence: () => DAY,
   firstWake: (ctx) => 6 * 3_600 + ctx.rng("first-wake").below(3 * 3_600),

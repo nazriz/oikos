@@ -86,8 +86,9 @@ const venueAnswer = (form: string, kind: string, title: string): Issued => ({
   does: "Answers a body that has told the office of an application against it, from the office's own books: what they show is owed, whether the thing is done, whether the paper complained of was wrong. The body decides on it when the time to answer has run; with no answer it decides in default.",
   fields: { application: f("record", "The application answered.", req), venue: f("entity", "The body that sent the notice.", req), applicant: f("entity", "Who applied."),
     known: f("choice", "Whether the office's books say anything of it.", { ...req, options: YES_NO }), owed: f("amount", "What the books show is owed the applicant (nought: nothing)."),
-    done: f("choice", "For a thing to be put right: whether it is done.", { options: YES_NO }), wrong: f("choice", "For a paper complained of: whether it was wrong.", { options: YES_NO }) },
-  writes: { kind, text: "Answer on {application}.", basis: "=application", to: ["=venue"], visible: ["=venue", "=self", "=applicant"], data: { application: "=application", owed: "#owed", done: "?done", wrong: "?wrong", known: "?known" } } });
+    done: f("choice", "For a thing to be put right: whether it is done.", { options: YES_NO }), wrong: f("choice", "For a paper complained of: whether it was wrong.", { options: YES_NO }),
+    statement: f("text", "What the office says in answer, in its own words, where these do not say it (what it disputes, and why).") },
+  writes: { kind, text: "Answer on {application}.", basis: "=application", to: ["=venue"], visible: ["=venue", "=self", "=applicant"], data: { application: "=application", owed: "#owed", done: "?done", wrong: "?wrong", known: "?known", statement: "=statement" } } });
 export const VENUE_ANSWERS: Issued[] = [
   venueAnswer("complaint_answer", "complaint_response", "Answer to a desk's notice of an application against the office"),
   venueAnswer("tribunal_answer", "tribunal_response", "Answer to the tribunal's notice of an application against the office"),
@@ -130,9 +131,10 @@ export const MAYOR: Issued[] = [
     fields: { office: f("entity", "The office stood for (the post, by its id).", req), name: f("text", "The name to go on the ballot.", req), platform: f("text", "What the candidate puts to the electors.", req),
       incumbent: f("choice", "Whether the candidate holds the office now.", { options: YES_NO }), values: f("list", "What the candidate stands for, in a word or two each.") },
     writes: { sends: [{ to: ["@electoral"], why: "The body that runs the election takes the nominations and puts the names on the ballot paper." }], kind: "nomination", text: "Nomination for {office}: {name}. {platform}", to: ["@electoral"], visible: "public", assertion: { that: "=platform" }, data: { office: "=office", name: "=name", incumbent: "?incumbent", values: "=values" } } },
-  { form: "petition_response", title: "Answer to a petition", does: "Answers a petition publicly, to its organiser: what has been done about what it asks (put to the council, or not, and why). The answer's own words are the mayor's (give them as the paper's text). It puts nothing to the council by itself: that is the council proposal form, or a law's amendment form.",
-    fields: { petition: f("record", "The petition answered.", req), organiser: f("entity", "Its organiser.") },
-    writes: { kind: "petition_response", text: "Answer to petition {petition}.", basis: "=petition", to: ["=organiser"], visible: "public", data: { petition: "=petition" } } },
+  { form: "petition_response", title: "Answer to a petition", does: "Answers a petition publicly, to its organiser: what has been done about what it asks (put to the council, or not, and why). The answer is written in full on the form (`answer`): what has been done about what the petition asks, or why not, in the mayor's own words; it is the paper's text. It puts nothing to the council by itself: that is the council proposal form, or a law's amendment form.",
+    fields: { petition: f("record", "The petition answered.", req), organiser: f("entity", "Its organiser."),
+      answer: f("text", "What is answered, in full: what has been done about what the petition asks, or why not.", req) },
+    writes: { kind: "petition_response", text: "Answer to petition {petition}: {answer}", basis: "=petition", to: ["=organiser"], visible: "public", data: { petition: "=petition", answer: "=answer" } } },
 ];
 
 export const COUNCIL_CLERK: Issued[] = [
@@ -157,8 +159,9 @@ export const PLANNING: Issued[] = [
     fields: { application: f("record", "The application decided.", req), applicant: f("entity", "Who applied: the decision is sent to them.", req),
       decision: f("choice", "Granted, refused, or sent back as incomplete.", { ...req, options: ["granted", "refused", "incomplete"] }),
       lot: f("lot", "For a grant: the lot the permission is for, as the application names it."), structure_type: f("structure_type", "For a grant: the kind of building permitted, as the application names it."),
-      law: f("record", "The law the building would breach, if any."), missing: f("list", "For an incomplete application: what it does not say (lot, structure_type).") },
-    writes: { kind: "permit_decision", text: "Permit {decision}: application {application}.", basis: "=application", to: ["=applicant"], data: { application: "=application", decision: "=decision", law: "=law", missing: "=missing" },
+      law: f("record", "The law the building would breach, if any."), missing: f("list", "For an incomplete application: what it does not say (lot, structure_type)."),
+      reason: f("text", "Why it is decided so, in words, where the law named does not say it (a refusal, or what to send in).") },
+    writes: { kind: "permit_decision", text: "Permit {decision}: application {application}.", basis: "=application", to: ["=applicant"], data: { application: "=application", decision: "=decision", law: "=law", missing: "=missing", reason: "=reason" },
       claim: { when: { decision: "granted" }, position: "liberty", holder: "=applicant", about: { action: "build", object: "=lot", structure_type: "=structure_type" }, basis: "=application" } } },
 ];
 
@@ -217,9 +220,10 @@ export const TRIBUNAL_MEMBER: Issued[] = [
       finding: f("choice", "What is ordered.", { ...req, options: ["dismissed", "plan", "possession"] }), owed: f("amount", "The rent found owed (a plan, or possession)."),
       instalment: f("amount", "For a plan: the sum a month toward what is owed, beyond the rent."), pay_into: f("account", "For a plan: the account it is paid into."), date: f("date", "For possession: the day the tenant is to leave by."),
       home: f("space", "The home, as the application names it (needed for a warrant to be issued on the order)."), building: f("structure", "The building it is in."), household: f("list", "Who lives there by the lease, as the application names them."),
-      waited_days: f("count", "Days from the application to this order, for the tribunal's own figures.") },
+      waited_days: f("count", "Days from the application to this order, for the tribunal's own figures."),
+      reason: f("text", "The tribunal's reasons for the order, in words.") },
     writes: { kind: "tribunal_order", text: "Order on {application}: {finding}.", basis: "=application", to: ["=landlord", "=tenant"], visible: ["=landlord", "=tenant", "=self"],
-      data: { application: "=application", kind: "possession", matter: "possession", applicant: "=landlord", against: "=tenant", finding: "=finding", binding: true, waited_days: "=waited_days", about: "=lease", amount: "#owed", instalment: "#instalment", to: "=pay_into", due: "=date", space: "=home", structure: "=building", household: "=household" } } },
+      data: { application: "=application", kind: "possession", matter: "possession", applicant: "=landlord", against: "=tenant", finding: "=finding", binding: true, waited_days: "=waited_days", about: "=lease", amount: "#owed", instalment: "#instalment", to: "=pay_into", due: "=date", space: "=home", structure: "=building", household: "=household", reason: "=reason" } } },
   { form: "tribunal_order", title: "Order of the tribunal on an application", does: "Decides an application before the tribunal (anything but possession of a let home, which has its own form) and tells both sides: what is found, and for an order to pay, how much, into which account and by when; for a thing to be put right, by when. It moves no money and does nothing by itself: an order to pay left unpaid is enforced by the registrar, when the one owed asks.",
     fields: {
       application: f("record", "The application decided.", req), kind: f("text", "What the application was, in the word it uses (rent_increase, debt, charge; or the matter on the tribunal's lists: arrears, disrepair, bill ...).", req),
@@ -231,10 +235,11 @@ export const TRIBUNAL_MEMBER: Issued[] = [
       due: f("date", "For an order to pay or to put right: the day it is due by."), victim: f("entity", "For a charge: who was wronged."), report: f("record", "For a charge: the report it came from."), paid: f("amount", "For a debt found paid: how much was paid."),
       about: f("record", "The paper the application is about, where it names one."), structure: f("structure", "The building, where the application names one."), seeks: f("text", "What the application sought, where it said."),
       waited_days: f("count", "Days from the application to this order, for the tribunal's own figures."),
+      reason: f("text", "The tribunal's reasons for what it found, in words."),
     },
     writes: { kind: "tribunal_order", text: "Order on {application}: {finding}.", basis: "=application", to: ["=applicant", "=against"], visible: ["=applicant", "=against", "=self"],
       data: { application: "=application", kind: "=kind", matter: "=matter", applicant: "=applicant", against: "=against", finding: "=finding", binding: "?binding", waited_days: "=waited_days", about: "=about", structure: "=structure", seeks: "=seeks",
-        notice: "=notice", laws: "=laws", claim: "=claim", amount: "#amount", to: "=pay_into", due: "=due", victim: "=victim", report: "=report", paid: "#paid" } } },
+        notice: "=notice", laws: "=laws", claim: "=claim", amount: "#amount", to: "=pay_into", due: "=due", victim: "=victim", report: "=report", paid: "#paid", reason: "=reason" } } },
 ];
 
 export const TRIBUNAL_REGISTRAR: Issued[] = [
@@ -300,8 +305,9 @@ export const LANDLORD: Issued[] = [
     fields: { building: f("structure", "The building to repair.", req), units: f("count", "How many units of repair work.", req), account: f("account", "The account the price is paid from.", req) },
     writes: { sends: [{ to: ["@builder"], why: "The builder does the repair." }], kind: "repair_order", text: "Order: the repair of {building} ({units} units of work), paid with this order.", to: ["@builder"], visible: ["=self", "@builder"], data: { structure: "=building", units: "=units", account: "=account" } } },
   { form: "variation_answer", title: "Answer to a tenant's request to vary a tenancy", does: "Answers a tenant who has asked in writing to vary something of the tenancy (to stay on, for time): yes or no. It changes no lease by itself: what is agreed is then done (a new lease offered, a notice withdrawn).",
-    fields: { request: f("record", "The request answered.", req), tenant: f("entity", "The tenant.", req), about: f("text", "What was asked, as the request names it.", req), granted: f("choice", "Whether it is agreed.", { ...req, options: YES_NO }) },
-    writes: { kind: "variation_answer", text: "Answer to your request {request}: {granted}.", basis: "=request", to: ["=tenant"], visible: ["=self", "=tenant"], data: { about: "=about", granted: "?granted" } } },
+    fields: { request: f("record", "The request answered.", req), tenant: f("entity", "The tenant.", req), about: f("text", "What was asked, as the request names it.", req), granted: f("choice", "Whether it is agreed.", { ...req, options: YES_NO }),
+      reason: f("text", "What else is said to the tenant: on what terms it is agreed, or why not.") },
+    writes: { kind: "variation_answer", text: "Answer to your request {request}: {granted}.", basis: "=request", to: ["=tenant"], visible: ["=self", "=tenant"], data: { about: "=about", granted: "?granted", reason: "=reason" } } },
   REMEDY_ANSWER, ...VENUE_ANSWERS,
 ];
 
@@ -439,9 +445,10 @@ export const DESK: Issued[] = [
       amount: f("amount", "For pay: how much."), pay_into: f("account", "For pay: the account it is paid into."), due: f("date", "For pay or do: the day it is due by."),
       about: f("record", "The paper the application is about, where it names one."), structure: f("structure", "The building, where the application names one."), seeks: f("text", "What the application sought, where it said."),
       waited_days: f("count", "Days from the application to this decision, for the office's own figures."),
+      reason: f("text", "The reasons for the decision, in words."),
     },
     writes: { kind: "venue_decision", text: "Decision on {application}: {finding}.", basis: "=application", to: ["=applicant", "=against"], visible: ["=applicant", "=against", "=self"],
-      data: { application: "=application", kind: "=matter", matter: "=matter", applicant: "=applicant", against: "=against", finding: "=finding", binding: "?binding", waited_days: "=waited_days", about: "=about", structure: "=structure", seeks: "=seeks", amount: "#amount", to: "=pay_into", due: "=due" } } },
+      data: { application: "=application", kind: "=matter", matter: "=matter", applicant: "=applicant", against: "=against", finding: "=finding", binding: "?binding", waited_days: "=waited_days", about: "=about", structure: "=structure", seeks: "=seeks", amount: "#amount", to: "=pay_into", due: "=due", reason: "=reason" } } },
 ];
 
 // ------------------------------------------------------------------ the support office

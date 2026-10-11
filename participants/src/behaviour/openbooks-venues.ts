@@ -9,13 +9,20 @@ import { basesOf, channels, type Observation, type StatementRecord } from "../co
 import { dateWords } from "../forms";
 import type { OfficeBooks, OpenHeading, OpenItem, ParticipantContext } from "../module";
 import { cents } from "../money";
-import { Book, DAY, MONTH, ownAccount, usd } from "./common";
+import { Book, DAY, MONTH, ownAccount, usd, whenWords } from "./common";
 import { PAPER } from "./frictions";
 
 // ------------------------------------------------------------------ small shared things
 
 const oldestFirst = (a: OpenItem, b: OpenItem) => (a.since ?? 0) - (b.since ?? 0) || (a.id < b.id ? -1 : 1);
 const heading = (what: string, items: OpenItem[]): OpenHeading[] => (items.length ? [{ what, items: items.sort(oldestFirst) }] : []);
+/** A heading of things whose day has come and that wait on the office-holder: said in every paper (`always`). */
+const pressing = (what: string, items: OpenItem[]): OpenHeading[] => heading(what, items).map((h) => ({ ...h, always: true as const }));
+/** A heading of things that wait for a day: the soonest first. */
+const byDay = (what: string, items: OpenItem[]): OpenHeading[] => (items.length ? [{ what, items: items.sort((a, b) => (a.due ?? Infinity) - (b.due ?? Infinity) || oldestFirst(a, b)) }] : []);
+/** Whether a day named on a paper has come: the day itself counts, from its first hour (a case is decided "on or
+ * after its day", and whoever sits that morning must find it on the list). */
+const dayCome = (by: number, t: number): boolean => Math.floor(by / DAY) <= Math.floor(t / DAY);
 const addressed = (r: StatementRecord, me: string) => (r.addressed_to ?? []).includes(me);
 const words = (s: unknown): string => String(s ?? "").replace(/_/g, " ");
 const text = (x: unknown): string => (typeof x === "string" ? x : "");
@@ -51,6 +58,8 @@ class Filed {
       for (const a of appsOf(n)) if ((this.notice.get(a)?.at ?? -1) <= n.at) this.notice.set(a, n);
     }
     for (const d of book.open(forms.decision)) if (d.speaks_for === me) for (const a of appsOf(d)) this.decided.add(a);
+    // (An application its maker has withdrawn stands open no longer.)
+    for (const a of this.notice.keys()) if (book.withdrawn.has(a)) this.decided.add(a);
     for (const r of book.open(forms.response)) for (const a of appsOf(r)) this.answers.set(a, (this.answers.get(a) ?? new Set()).add(String(r.speaks_for)));
   }
   answered(application: string, against: string): boolean {
@@ -94,8 +103,8 @@ function takenIn(book: Book, filed: Filed, t: number, aside: ReadonlySet<string>
     const amount = d.amount !== undefined ? money(d.amount) : undefined;
     const what = `${who}'s application ${app} about ${matterOf(d)}${against ? ` against ${against}` : ""}${amount ? `, seeking ${usd(amount)}` : ""}`;
     const said = against ? (filed.answered(app, against) ? `${against} has answered` : `${against} has not answered`) : "";
-    if (t < by) waiting.push({ id: n.id, since: n.at, ...(amount ? { amount } : {}), line: `${n.id}: ${what}, taken in ${dateWords(n.at)}; ${against || "the other side"} has until ${dateWords(by)} to answer${said ? ` (${said})` : ""}` });
-    else ran.push({ id: n.id, since: by, ...(amount ? { amount } : {}), line: `${n.id}: ${what}, taken in ${dateWords(n.at)}; the time to answer ran out ${dateWords(by)}${said ? ` (${said})` : ""}; not decided` });
+    if (!dayCome(by, t)) waiting.push({ id: n.id, since: n.at, due: by, ...(amount ? { amount } : {}), line: `${n.id}: ${what}, taken in ${dateWords(n.at)}; ${against || "the other side"} has until ${dateWords(by)} to answer${said ? ` (${said})` : ""}` });
+    else ran.push({ id: n.id, since: by, due: by, ...(amount ? { amount } : {}), line: `${n.id}: ${what}, taken in ${dateWords(n.at)}; the time to answer ${t >= by ? "ran out" : "runs out today,"} ${dateWords(by)}${said ? ` (${said})` : ""}; not decided` });
   }
   return { waiting, ran };
 }
@@ -132,13 +141,13 @@ export function tribunalMemberBooks(ctx: ParticipantContext): OfficeBooks {
         const who = text(d.applicant) || String((book.records.get(app) as any)?.speaks_for ?? "someone");
         const what = `${who}'s application ${app} (${words(d.kind)}) against ${against || "someone"}`;
         const said = against ? (filed.answered(app, against) ? `${against} has answered` : `${against} has not answered`) : "";
-        if (t >= day) due.push({ id: n.id, since: day, line: `${n.id}: ${what}, listed ${dateWords(n.at)} for hearing on ${dateWords(day)}, which has come; no order made (${said || "no respondent named"})` });
-        else waiting.push({ id: n.id, since: n.at, line: `${n.id}: ${what}, listed ${dateWords(n.at)} to be heard on ${dateWords(day)} (${said || "no respondent named"})` });
+        if (dayCome(day, t)) due.push({ id: n.id, since: day, due: day, line: `${n.id}: ${what}, listed ${dateWords(n.at)} for hearing on ${dateWords(day)}, which has come; no order made (${said || "no respondent named"})` });
+        else waiting.push({ id: n.id, since: n.at, due: day, line: `${n.id}: ${what}, listed ${dateWords(n.at)} to be heard on ${dateWords(day)} (${said || "no respondent named"})` });
       }
       // Applications for possession of a let home (docs/behaviour/justice.md, "Possession"): each with the home, what
       // the landlord says is owed, and whether the tenant has answered and with what (what they say they have paid
       // since, what they offer a month toward the rest), as the tribunal's own procedure reads them.
-      const possession: OpenItem[] = [];
+      const possession: OpenItem[] = [], possessionDue: OpenItem[] = [];
       for (const [app, n] of filed.notice) {
         const d = (n.data ?? {}) as any;
         const a = book.records.get(app) as any;
@@ -149,18 +158,27 @@ export function tribunalMemberBooks(ctx: ParticipantContext): OfficeBooks {
         const who = text(d.applicant) || String(a?.speaks_for ?? "someone");
         const by = finite(d.answer_by ?? d.hearing_at);
         const answer = book.open(TRIBUNAL_FORMS.response).filter((r) => appsOf(r).includes(app) && r.speaks_for === against).sort((x, y) => y.at - x.at)[0];
-        const said = answer ? `${against} answered ${dateWords(answer.at)} (${answer.id})${answer.data?.paid !== undefined ? `, saying ${usd(money(answer.data.paid))} has been paid since` : ""}${answer.data?.offer !== undefined ? `, and offering ${usd(money(answer.data.offer))} a month toward what is owed` : ""}` : `${against || "the tenant"} has not answered`;
+        // (What the file shows of how the tenant was told: the notice to vacate the application relies on, as the
+        // application states it, and our own notice of hearing, on the record addressed to the tenant. That is how
+        // a paper is served here; nothing else of it exists.)
+        const relied = ad.notice ? `; it relies on notice to vacate ${ad.notice}${finite(ad.notice_given) !== undefined ? `, given ${whenWords(Number(ad.notice_given))}` : ""}${finite(ad.notice_by) !== undefined ? `, to leave by ${whenWords(Number(ad.notice_by))}` : ""}` : "";
+        const told = `; our notice of hearing ${n.id} is on the record, addressed to ${(n.addressed_to ?? []).join(" and ") || "both sides"}, since ${dateWords(n.at)}`;
+        const said = answer?.data?.left ? `${against} answered ${dateWords(answer.at)} (${answer.id}) that they have left the home${finite(answer.data.left_at) !== undefined ? `, on ${dateWords(Number(answer.data.left_at))}` : ""}` : answer ? `${against} answered ${dateWords(answer.at)} (${answer.id})${answer.data?.paid !== undefined ? `, saying ${usd(money(answer.data.paid))} has been paid since` : ""}${answer.data?.offer !== undefined ? `, and offering ${usd(money(answer.data.offer))} a month toward what is owed` : ""}` : `${against || "the tenant"} has not answered`;
         const owed = ad.amount !== undefined ? money(ad.amount) : undefined;
-        possession.push({ id: app, since: a?.at ?? n.at, ...(owed !== undefined ? { amount: owed } : {}),
-          line: `${app}: ${who} applies for possession of ${ad.space ?? "a let home"} from ${against || "its tenant"}${ad.about ? ` (lease ${ad.about})` : ""}${owed !== undefined ? `, saying ${usd(owed)} of rent is owed` : ""}${ad.breach ? ", and that a plan the tribunal set was not kept" : ""}; taken in ${dateWords(n.at)}${by !== undefined ? `, ${t >= by ? `the tenant's time to answer ran out ${dateWords(by)}` : `the tenant has until ${dateWords(by)} to answer`}` : ""}; ${said}; not decided` });
+        (by !== undefined && dayCome(by, t) ? possessionDue : possession).push({ id: app, since: a?.at ?? n.at, ...(by !== undefined ? { due: by } : {}), ...(owed !== undefined ? { amount: owed } : {}),
+          line: `${app}: ${who} applies for possession of ${ad.space ?? "a let home"} from ${against || "its tenant"}${ad.about ? ` (lease ${ad.about})` : ""}${owed !== undefined ? `, saying ${usd(owed)} of rent is owed` : ""}${ad.breach ? ", and that a plan the tribunal set was not kept" : ""}${relied}; taken in ${dateWords(n.at)}${told}${by !== undefined ? `, ${t >= by ? `the tenant's time to answer ran out ${dateWords(by)}` : dayCome(by, t) ? `the tenant's time to answer runs out today, ${dateWords(by)}` : `the tenant has until ${dateWords(by)} to answer`}` : ""}; ${said}; not decided` });
       }
       const lists = takenIn(book, filed, t, ownDay);
       return [
+        // (Every case that stands open, with the day the other side may answer by and whether an answer has come:
+        // those whose day has come first, said in every paper for as long as they stand; then those waiting, the
+        // soonest first, however long ago each was listed.)
+        ...pressing("Applications for possession of a let home whose day has come, not decided", possessionDue),
+        ...pressing("Cases listed whose hearing day has come, with no order made", due),
+        ...pressing("Applications on the tribunal's lists whose time to answer has run, not decided", lists.ran),
         ...heading("Applications to the tribunal, not yet listed for a hearing", notYet),
-        ...heading("Cases listed whose hearing day has come, with no order made", due),
-        ...heading("Applications for possession of a let home, not decided", possession),
-        ...heading("Cases listed, waiting for their day", [...waiting, ...lists.waiting]),
-        ...heading("Applications on the tribunal's lists whose time to answer has run, not decided", lists.ran),
+        ...byDay("Applications for possession of a let home, waiting for the tenant's time to answer", possession),
+        ...byDay("Cases listed, waiting for their day", [...waiting, ...lists.waiting]),
       ];
     },
   };
@@ -235,7 +253,7 @@ function venueHeadings(book: Book, me: string, t: number, o: { forDecision: bool
   const { waiting, ran } = takenIn(book, filed, t, put);
   const not = untaken(book, filed, `not yet taken in`);
   return [
-    ...(o.forDecision ? heading("Cases put before the office-holder for decision, not decided", forDecision) : []),
+    ...(o.forDecision ? pressing("Cases put before the office-holder for decision, not decided", forDecision) : []),
     ...heading(`${o.of} taken in, waiting on the other side's answer`, waiting),
     ...heading(`${o.of} whose time for the other side to answer has run, not decided`, ran),
     ...heading(`${o.of} addressed to us, not yet taken in`, not),

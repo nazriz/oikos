@@ -6,6 +6,7 @@ import * as C from "../calls";
 import type { Assertion, LookRequest, Observation, Offer, Outcome as ActOutcome, Practice, Reading, Record, ParticipantAction, Registry, StatementRecord, SiteCell } from "../contracts";
 import { basesOf, channels, firstDue } from "../contracts";
 import { cents, moneyNow } from "../money";
+import { dateWords } from "../forms";
 import { evaluate } from "../law";
 import type { Answers, BehaviourModule, ParticipantContext } from "../module";
 
@@ -192,6 +193,21 @@ class Seen {
   *values(): IterableIterator<Record> {
     for (const part of this.parts) for (const r of part.pages.list) if (!part.skipped?.has(r.id)) yield r;
   }
+}
+
+/** A moment in the world's words, also one before the year began (a paper brought forward names such days). */
+export const whenWords = (t: number): string => (t < 0 ? `${Math.ceil(-t / DAY)} day${Math.ceil(-t / DAY) === 1 ? "" : "s"} before the year began` : dateWords(t));
+
+/**
+ * Rent owed under a lease when the year began, as the landlord's statement of the rent account has it (a
+ * `rent_statement` on the landlord's file, sent to the tenant: docs/behaviour/generator.md, "An ordinary day's
+ * caseload"): how much, and when the oldest of it fell due (before the year: a negative time). The landlord's rent
+ * book, its clerk and the tenant all read the same paper. None: nothing was owed.
+ */
+export function broughtForward(book: Book, landlord: string, lease: string): { owed: number; since: number; id: string } | undefined {
+  const r = book.open("rent_statement").filter((x) => x.speaks_for === landlord && x.data?.lease === lease && x.data?.brought_forward).sort((a, b) => b.at - a.at)[0];
+  const owed = Number(r?.data?.owed ?? 0);
+  return r && owed > 0 ? { owed, since: Number(r.data?.since ?? 0), id: r.id } : undefined;
 }
 
 /**

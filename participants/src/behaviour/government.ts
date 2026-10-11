@@ -60,7 +60,7 @@ export const mayorCode: BehaviourModule = {
   answers: {"office": "the mayor's office", "acts": "What it acts on: a petition once its organiser's published count reaches the town's threshold; an invoice for work this office commissioned, which it approves in writing; and each year's budget, which it puts to the council. It gives no direction by letter.", "forms": [{"about": ["direction", "direct ", "staff", "recruit", "hire", "hiring", "crew", "vacanc", "posts"], "say": "If your letter asks for a direction: this office has given none on the matter, and an office needs none to act within its own powers and its budget line."}]},
   issues: P.MAYOR,
   issuesWith: (p) => ({ electoral: p.electoral }),
-  version: "0.12.0", // 0.12.0: tables the next year's budget before the year begins (budget_lead_days), and each paper says its lines as the town writes its money; builds by the budget of the year it is in
+  version: "0.12.1", // 0.12.1: its answer to a petition carries what is answered, in the paper's words and data, as the form now does; 0.12.0: tables the next year's budget before the year begins (budget_lead_days), and each paper says its lines as the town writes its money; builds by the budget of the year it is in
   doc: "docs/behaviour/government.md",
   cadence: () => 7 * DAY,
   create(ctx: ParticipantContext) {
@@ -238,9 +238,10 @@ export const mayorCode: BehaviourModule = {
           const asked = Object.entries((d.amend?.figures ?? {}) as { [k: string]: number }).filter(([k, v]) => form?.data?.fields?.[k] && Number.isSafeInteger(v));
           if (form && asked.length) {
             const law = book.open("law").filter((l) => l.speaks_for === me && l.data?.schedule === d.amend.schedule).sort((a, b) => a.at - b.at).at(-1);
-            const answer = (text: string) => say("petition_response", text, { to: pet.speaks_for ? [pet.speaks_for] : undefined, visible: "public", basis: pet.id, data: { petition: pet.id } });
+            // (The paper is the petition's answer in full, as its form writes it: "Answer to petition X: ..." and the words again as data.answer.)
+            const answer = (words: string) => say("petition_response", `Answer to petition ${pet.id}: ${words}`, { to: pet.speaks_for ? [pet.speaks_for] : undefined, visible: "public", basis: pet.id, data: { petition: pet.id, answer: words } });
             if (law && asked.every(([k, v]) => law.data?.figures?.[k]?.value === v)) {
-              steps.push(because("A petition asking for what the law in force already says: answering so.", answer(`On petition ${pet.id}: the law in force (${law.id}) already says what it asks.`)));
+              steps.push(because("A petition asking for what the law in force already says: answering so.", answer(`the law in force (${law.id}) already says what it asks.`)));
               continue;
             }
             // (The form's fields take a duration as such, and a count in the field's own unit.)
@@ -248,7 +249,7 @@ export const mayorCode: BehaviourModule = {
             const affects = (d.tags ?? []).includes("tenant_protection") ? "tenants" : (d.tags ?? []).includes("development") ? "development" : "neither";
             steps.push(because(`A petition passed ${p.petition_threshold_bps / 100}% of the town: putting what it asks that the ${String(form.data.form).replace(/_/g, " ")} form covers (${asked.map(([k]) => k).join(", ")}) to the council on that form (we respond to ${p.responsiveness_bps / 100}% of such petitions).`,
               C.call("form", { to: me, form: form.data.form, ...fields, affects }),
-              answer(`On petition ${pet.id}: what it asks that the law in force covers (${asked.map(([k]) => k.replace(/_/g, " ")).join(", ")}) has been put to the council as an amendment of that law. The rest of what it asks hasn't been put.`)));
+              answer(`what it asks that the law in force covers (${asked.map(([k]) => k.replace(/_/g, " ")).join(", ")}) has been put to the council as an amendment of that law. The rest of what it asks hasn't been put.`)));
             continue;
           }
           steps.push(because(`A petition passed ${p.petition_threshold_bps / 100}% of the town: putting its demand to the council (we respond to ${p.responsiveness_bps / 100}% of such petitions).`, say("proposal", `Proposal (from petition ${pet.id}): ${d.text}`, { to: [me], basis: pet.id,

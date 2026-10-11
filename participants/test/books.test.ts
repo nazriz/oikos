@@ -184,3 +184,53 @@ test("a landlord's books show each tenancy being ended for arrears at the stage 
   b.absorb(obs(165 * DAY, "landlord-1", [st("rec.27", 165 * DAY, "warrant_executed", "police", { data: { lease: "lease-a" } })]));
   expect(ending(166 * DAY)).toBeUndefined();
 });
+
+test("what waits on the office-holder with its day come is named first in every paper, however long it has stood; a thing that moves heading is not said to be closed; a list too long says what it leaves out", () => {
+  const waiting = (n: number): OpenHeading => ({ what: "Cases listed, waiting for their day", items: Array.from({ length: n }, (_, i) => ({ id: `rec.${100 + i}`, line: `rec.${100 + i}: waiting`, due: (50 + i) * DAY })) });
+  const ripe = (ids: number[]): OpenHeading => ({ what: "Cases whose day has come, not decided", always: true, items: ids.map((i) => ({ id: `rec.${i}`, line: `rec.${i}: its day has come`, due: 40 * DAY })) });
+  const was = (hs: OpenHeading[]) => new Map(hs.map((h) => [h.what, new Map(h.items.map((x) => [x.id, x.line]))]));
+  // Day 1: rec.100 waits among thirty. Day 2: its day has come.
+  const first = [waiting(30)];
+  const second = [{ ...waiting(30), items: waiting(30).items.slice(1) }, ripe([100])];
+  const p2 = booksPaper("tribunal-member", 41 * DAY, second, was(first));
+  expect(p2.text).toContain("Cases whose day has come, not decided: 1 in all (1 since the last paper): rec.100: its day has come.");
+  expect(p2.text.indexOf("Cases whose day has come")).toBeLessThan(p2.text.indexOf("Cases listed, waiting"));
+  expect(p2.text).not.toContain("no longer open");
+  expect((p2.data as any).open[0]).toMatchObject({ what: "Cases whose day has come, not decided", about: "rec.100", due: 40 * DAY });
+  // Forty days on, nothing about it changed and something else did: it is still named, first.
+  const third = [{ ...waiting(31), items: waiting(31).items.slice(1) }, ripe([100])];
+  const p3 = booksPaper("tribunal-member", 81 * DAY, third, was(second));
+  expect(p3.text).toContain("Cases whose day has come, not decided: 1 in all: rec.100: its day has come.");
+  expect(p3.key).not.toBe(p2.key);
+  // Decided: now it is no longer open, and said so.
+  const p4 = booksPaper("tribunal-member", 82 * DAY, [third[0]!], was(third));
+  expect(p4.text).toContain("Cases whose day has come, not decided: none now; no longer open: rec.100.");
+  // More than the list holds: the list says how many it leaves out.
+  const long = booksPaper("tribunal-member", 82 * DAY, [waiting(230)], undefined);
+  expect((long.data as any).open.length).toBe(200);
+  expect((long.data as any).over).toEqual([{ what: "Cases listed, waiting for their day", not_listed: 30 }]);
+});
+
+test("a tenant who goes on the notice to vacate: the tenancy is over in the landlord's books, the rent stops counting from that day, and an application still undecided is said to stand", () => {
+  const b = landlordBooks(ctx("landlord-1"));
+  const law = st("law-possession", 0, "law", "state", { data: { tenancy: "possession", arrears_days: 14, notice_days: 14, possession_days: 14 } });
+  b.absorb(obs(0, "landlord-1", [law, lease("lease-a", "a", 100_000), ...signed("lease-a", "a")], { ...account, transactions: [rentPaid(0, "a", 100_000)] }));
+  b.absorb(obs(70 * DAY, "landlord-1", [st("rec.20", 70 * DAY, "notice_to_vacate", "landlord-1", { addressed_to: ["a"], basis: "lease-a", data: { lease: "lease-a", reason: "arrears", by: 85 * DAY } })]));
+  // Day 85: the landlord applies; minutes later the tenant gives notice on the lease and goes.
+  b.absorb(obs(85 * DAY, "landlord-1", [st("rec.21", 85 * DAY, "tribunal_application", "landlord-1", { addressed_to: ["tribunal"], basis: "lease-a", data: { kind: "possession", matter: "possession", against: "a", about: "lease-a" } }),
+    { id: "rec.22", at: 85 * DAY + 600, record: "notice", agreement: "lease-a", as: "a", author: "a-self", visible_to: ["landlord-1", "a"], text: "Leaving: told to vacate for arrears." }]));
+  const GONE = "Tenants who have left on our notice to vacate: tenancies over";
+  const at = (t: number) => b.open(t);
+  const item = head(at(86 * DAY), GONE)!.items[0]!;
+  expect(item).toMatchObject({ id: "lease-a", since: 85 * DAY + 600, amount: 200_000 });
+  expect(item.line).toContain("a gave notice on the lease year 1, day 86, after our notice to vacate, and has given up");
+  expect(item.line).toContain("$2,000.00 of rent was owed under it when they left, and is still owed");
+  expect(item.line).toContain("our application for possession rec.21 (year 1, day 86) still stands at the tribunal, undecided: law-possession gives possession only where the tenant has not left");
+  // It is no longer rent in arrears, nor a tenancy being ended; and a month on, no further rent has been counted.
+  expect(head(at(86 * DAY), "Rent in arrears")).toBeUndefined();
+  expect(head(at(86 * DAY), "Tenancies being ended for arrears under the law on possession, and where each has got to")).toBeUndefined();
+  expect(head(at(125 * DAY), GONE)!.items[0]).toMatchObject({ amount: 200_000 });
+  // The application withdrawn: the line no longer says it stands.
+  b.absorb(obs(126 * DAY, "landlord-1", [{ id: "rec.30", at: 126 * DAY, record: "withdrawal", withdraws: "rec.21", author: "landlord-1-office-system", visible_to: ["landlord-1", "tribunal"] }]));
+  expect(head(at(127 * DAY), GONE)!.items[0]!.line).not.toContain("still stands at the tribunal");
+});

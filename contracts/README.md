@@ -420,6 +420,22 @@ All additions but one loosened limit; a world with no model in an office is as i
 - **Position parameters:** `tribunal.member` takes `part`, `office`, `counter`, as `office.desk` does. A living town with a model in the member's chair has a post `tribunal-member-staff` run by `tribunal.member` with `part: "staff"`.
 - **Draws** (no schema; docs/decisions.md, "A draw is named for what it is about"): the purpose a participant's random stream is keyed on no longer contains a record's number. Every run's state hash differs from one made before this at the same seed.
 
+## Changes since v0.8 closed (2026-10-12: what the fourth living pilot found; docs/decisions.md of the day; under the owner's blanket approval of contract changes of 2026-10-11)
+
+Additions only; no schema file changed, nothing renamed or removed. A log made before them is a valid log.
+
+- **A translation's route** (the run's `translation_route` note; `translator/src/arrangement.ts`): `first.forms_shown` (record ids of the forms the first translator was shown) and `first.forms_of` (of how many), present only where it was shown fewer than the asker knows of; `first.withheld` and `why` may be `form_not_shown`, `forms_subset` or `form_unseen` (the last two: the first's draft is recorded in `first.wrote` and not offered, and `agree` compares it with the draft of the one behind); a trained model's `config.json` may carry `forms_trained` and `max_forms` (docs/real-models.md, "More forms than the reader takes").
+- **An office's books** (a statement of kind `office_books`): each entry of `data.open` may carry `due` (the moment its day comes or came); `data.over` (`[{ what, not_listed }]`) where a heading is longer than the list holds. `OpenItem.due` and `OpenHeading.always` in `participants/src/module.ts` (docs/behaviour/office-books.md, point 7).
+- **Statements, new kinds and fields** (kinds are free text; these are what code reads):
+  - `rent_statement`, a landlord's to a tenant: `data.lease`, `owed`, `rents`, `rent`, `since` (a time before the year began: negative), `account`, `brought_forward: true`;
+  - `data.brought_forward: true` on a `notice_to_vacate` (with `given`, the time it was given, negative), a `tribunal_application`, a `hearing_notice` and a `tribunal_order` written by the generator for a town that opens in the middle of things (docs/behaviour/generator.md, "An ordinary day's caseload");
+  - `tribunal_response`: `data.left` (true) and `left_at` where a tenant answers that they have left the home; a `tribunal_order` dismissing on it carries `left: true`;
+  - `membership` (a founded fund's offer): `data.fund` = `{ draw, qualify_days, every_days }`, the fund's stated rule.
+- **Forms** (`participants/src/behaviour/papers.ts`; fields added, none removed or renamed): `petition_response.answer` (text, required; carried in the paper's text and data); optional `reason` on `variation_answer`, `permit_decision`, `possession_order`, `tribunal_order` and a venue's decision; optional `statement` on `complaint_answer` and `tribunal_answer` (carried in the paper's data).
+- **A town's description** (`TownSpec`, `worlds/generator/generate.ts`): `opening_caseload` (boolean; off unless set).
+- **Outcome records of a person** (kinds are free text): `membership` / `draw_paid`, `draw_refused` (`why`, `foretold`); a `found` decision's situation may carry `occasion.answered_by`.
+- **The debrief** is script 0.3.0 and exit accounts 0.2.1 (docs/behaviour/debrief.md): no field changed.
+
 ## Versioning
 
 `contracts: "0.8"`. Pre-1.0, every change bumps the minor version and is proposed explicitly. A draft version collects agreed changes until it's closed. Older logs remain valid logs of their own version and replay only on a kernel build of that version (D6).

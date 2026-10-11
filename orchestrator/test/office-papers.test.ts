@@ -209,3 +209,65 @@ test("what pilot 12's works manager and registrar asked for and could not say (1
   // Said without it, the form asks for what it needs, in its own words.
   expect(acts(registry, "registry", "form(form=death_registration, deceased=c0228, notification=rec.26147)")).toEqual(["The death registration needs: reported_by."]);
 });
+
+// ---- the fourth living pilot: a mayor's answer to a petition was "Answer to petition rec.X." and nothing more. A form
+// whose act in the world is to say something must carry what is said.
+
+test("the mayor's answer to a petition carries the answer in full: required, in the paper's text, and shown whole in the draft the seat confirms", () => {
+  const papers = stationery("city.mayor_code", "mayor", "city", {});
+  const spec = papers.find((p: any) => p.data.form === "petition_response")!.data as forms.FormData;
+  expect(spec.fields.answer).toMatchObject({ type: "text", required: true });
+  const k = seat("mayor", "city", 40 * DAY, papers);
+  // Without the answer the form asks for it.
+  const bare = resolve(calls.parseProgram("form(form=petition_response, petition=rec.40, organiser=c0007)"), k, () => undefined, "mayor");
+  expect(bare.ok ? [] : bare.questions.join(" ")).toContain("needs: answer");
+  // A long answer (well past a sentence or two) is kept whole in the paper, in its text and its data.
+  const long = Array.from({ length: 40 }, (_, i) => `Point ${i + 1}: the council has had the petition put to it and will take it up at its next sitting.`).join(" ");
+  expect(long.length).toBeGreaterThan(3000);
+  const r = resolve(calls.parseProgram(`form(form=petition_response, petition=rec.40, organiser=c0007, answer="${long}")`), k, () => undefined, "mayor");
+  expect(r.ok).toBe(true);
+  const block: any = r.ok ? r.blocks[0] : undefined;
+  expect(block).toMatchObject({ block: "publish", kind: "petition_response", basis: "rec.40", addressed_to: ["c0007"], visible_to: "public", text: `Answer to petition rec.40: ${long}`, data: { petition: "rec.40", answer: long } });
+  // The draft shows the words, whole.
+  const shown = new Preview(k, "city").of(r.ok ? r.blocks : []);
+  expect(shown).toContain(`Answer to petition rec.40: ${long}`);
+  // And the paper reads back as the form's, answer and all (what the mock seat's turning relies on).
+  const o = { self: "city", now: 40 * DAY, money: (a: string) => a };
+  expect(forms.fieldsFor(spec, { kind: "petition_response", text: block.text, basis: "rec.40", addressed_to: ["c0007"], visible_to: "public", data: block.data }, o)?.fields).toMatchObject({ petition: "rec.40", answer: long });
+});
+
+test("a form that says something to someone can carry what it says: each of these has a text field that reaches the paper it writes", () => {
+  // (Per form: the text field, and where it lands. Only the mayor's answer is required, and lands in the paper's words: the
+  // others say a decision's reasons, which a form's template has no way to leave out when empty, so they are in the paper's data.)
+  const SAYING: { [form: string]: { field: string; in: "text" | "data"; required?: boolean } } = {
+    petition_response: { field: "answer", in: "text", required: true },
+    nomination: { field: "platform", in: "text", required: true },
+    remedy_answer: { field: "reason", in: "data" },
+    variation_answer: { field: "reason", in: "data" },
+    complaint_answer: { field: "statement", in: "data" },
+    tribunal_answer: { field: "statement", in: "data" },
+    permit_decision: { field: "reason", in: "data" },
+    possession_order: { field: "reason", in: "data" },
+    tribunal_order: { field: "reason", in: "data" },
+    venue_decision: { field: "reason", in: "data" },
+    loan_decision: { field: "reason", in: "data" },
+    benefit_decision: { field: "reason", in: "data" },
+    wage_offer: { field: "why", in: "data" },
+  };
+  const all = new Map<string, forms.FormData>();
+  for (const m of Object.values(modules)) for (const x of m.issues ?? []) all.set(x.form, stationeryForm("office", "org", x, m.issuesWith?.({}) ?? {}).data as forms.FormData);
+  for (const [form, how] of Object.entries(SAYING)) {
+    const spec = all.get(form);
+    expect({ form, has: !!spec }).toEqual({ form, has: true });
+    const field = spec!.fields[how.field];
+    expect({ form, field: how.field, type: field?.type }).toEqual({ form, field: how.field, type: "text" });
+    expect({ form, required: !!field!.required }).toEqual({ form, required: !!how.required });
+    // Filled in with a long, distinctive set of words, the paper written carries them whole.
+    const words = `${form} words: ${"the reasons, at length; ".repeat(60)}`;
+    const given: forms.Filled = {};
+    for (const [name, fd] of Object.entries(spec!.fields)) if (fd.required) given[name] = fd.type === "choice" ? fd.options![0]! : fd.type === "count" ? 1 : fd.type === "list" ? ["c0001"] : fd.type === "date" ? 100 * DAY : fd.type === "duration" ? DAY : fd.type === "amount" ? "100" : "x1";
+    given[how.field] = words;
+    const paper = forms.writePaper(spec!, given, { self: "org", now: 100 * DAY, money: (a) => a });
+    expect({ form, carried: JSON.stringify(how.in === "text" ? paper.text : paper.data).includes(words) }).toEqual({ form, carried: true });
+  }
+});

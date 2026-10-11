@@ -1,6 +1,6 @@
 {
   "name": "office.desk",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "doc": "docs/behaviour/frictions.md",
   "params": {
     "account": {
@@ -255,6 +255,10 @@
         "waited_days": {
           "type": "count",
           "description": "Days from the application to this decision, for the office's own figures."
+        },
+        "reason": {
+          "type": "text",
+          "description": "The reasons for the decision, in words."
         }
       },
       "writes": {
@@ -284,7 +288,8 @@
           "seeks": "=seeks",
           "amount": "#amount",
           "to": "=pay_into",
-          "due": "=due"
+          "due": "=due",
+          "reason": "=reason"
         }
       }
     }

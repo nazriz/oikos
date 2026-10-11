@@ -16,7 +16,9 @@ import { runWorld } from "../src/run";
 const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
 const spec = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")) as any;
-const living = { ...spec, citizens: 300, profile: "ke-nakuru-2026", living: { initiative_bps: 10_000, friction_bps: 60_000 } };
+// (The town opens in the middle of things, docs/behaviour/generator.md: its tribunal has cases listed from the first
+// day, with days to answer by spread over the weeks ahead, so that cases fall ripe all through the run.)
+const living = { ...spec, citizens: 300, profile: "ke-nakuru-2026", opening_caseload: true, living: { initiative_bps: 10_000, friction_bps: 60_000 } };
 
 /** What an office's act of each kind rests on: the field of its paper that names the paper it answers, pays or decides. */
 const RESTS_ON: { [kind: string]: (r: any) => string | undefined } = {
@@ -94,4 +96,60 @@ test("what each office's code acts on was in that office's books, as its clerk k
   expect(tally.size).toBeGreaterThanOrEqual(5);
   expect([...tally.values()].reduce((n, x) => n + x.acts, 0)).toBeGreaterThan(40);
   for (const [k, x] of tally) expect(`${k}: ${x.inBooks} of ${x.acts}`).toBe(`${k}: ${x.acts} of ${x.acts}`);
+
+  // ---- What stands open is shown until it no longer stands open (docs/behaviour/office-books.md): for every office,
+  // whatever is on one paper's list and not on the next is said by the next to be no longer open. Nothing drops off a
+  // list for being old, or for the list being long.
+  const papers = new Map<string, any[]>();
+  for (const b of books) { const k = String(b.data.office); if (!papers.has(k)) papers.set(k, []); papers.get(k)!.push(b); }
+  let dropped = 0, closures = 0;
+  const silently: string[] = [];
+  for (const [office, list] of papers) {
+    list.sort((x, y) => x.at - y.at);
+    for (let i = 1; i < list.length; i++) {
+      const now = new Set((list[i].data.open as any[]).map((x) => String(x.about)));
+      for (const was of new Set((list[i - 1].data.open as any[]).map((x) => String(x.about)))) {
+        if (now.has(was)) continue;
+        closures++;
+        // (A paper names the first few that have gone and counts the rest: "no longer open: a, b and 3 more".)
+        if (!names(String(list[i].text), was) && !/no longer open: [^;]*? and \d+ more/.test(String(list[i].text)) && !(list[i].data.over ?? []).length) { dropped++; silently.push(`${office} day ${Math.floor(list[i].at / DAY)}: ${was}`); }
+      }
+    }
+  }
+  console.log(`  what left a list: ${closures} in all, ${dropped} without the next paper saying so${silently.length ? ` (${silently.slice(0, 5).join("; ")})` : ""}`);
+  expect(closures).toBeGreaterThan(20);
+  expect(silently).toEqual([]);
+
+  // ---- The tribunal member's list is a standing list (the fourth living pilot's member missed the one case whose
+  // day had come: its books named only what had changed since the clerk's last paper). Every case listed and not
+  // decided is on every paper's list with its day; and from the morning of its day until it is decided, every paper
+  // names it in its own words, first.
+  const tribunal = papers.get("tribunal-member") ?? [];
+  // (Those listed in the run, and those on the tribunal's file as the year began with the tenant's time still running.)
+  const listed = [...(config.world.records as any[]).filter((r) => r.kind === "hearing_notice" && Number(r.data?.answer_by) > 0), ...recs].filter((r) => r.kind === "hearing_notice" && r.speaks_for === "tribunal" && typeof r.data?.application === "string");
+  const orderAt = (app: string) => Math.min(Infinity, ...recs.filter((r) => r.kind === "tribunal_order" && r.data?.application === app).map((r) => r.at));
+  const withdrawnAt = (app: string) => Math.min(Infinity, ...recs.filter((r) => r.record === "withdrawal" && r.withdraws === app).map((r) => r.at));
+  let onList = 0, ripeNamed = 0, ripeCases = 0;
+  const missing: string[] = [];
+  for (const n of listed) {
+    const app = n.data.application as string, day = Number(n.data.answer_by ?? n.data.hearing_at), closed = Math.min(orderAt(app), withdrawnAt(app));
+    const ids = [app, n.id];
+    let ripe = false;
+    for (const b of tribunal) {
+      if (b.at <= n.at || b.at >= closed) continue;
+      const items = (b.data.open as any[]).filter((x) => ids.includes(String(x.about)));
+      if (!items.length) { missing.push(`day ${Math.floor(b.at / DAY)}: ${app} is not on the list`); continue; }
+      onList++;
+      if (Number.isFinite(day) && Math.floor(day / DAY) <= Math.floor(b.at / DAY)) {
+        ripe = true;
+        if (ids.some((id) => names(String(b.text), id)) && /day has come|time to answer has run/.test(String(items[0].what))) ripeNamed++;
+        else missing.push(`day ${Math.floor(b.at / DAY)}: ${app}, whose day was ${Math.floor(day / DAY)}, is not named in the paper's words`);
+      }
+    }
+    if (ripe) ripeCases++;
+  }
+  console.log(`  the tribunal's list: ${listed.length} cases listed, ${tribunal.length} papers; a case on a paper's list ${onList} times; ${ripeCases} cases stood with their day come at some paper, named there ${ripeNamed} times; faults ${missing.length}${missing.length ? ` (${missing.slice(0, 5).join("; ")})` : ""}`);
+  expect(listed.length).toBeGreaterThan(3);
+  expect(ripeCases).toBeGreaterThan(0);
+  expect(missing).toEqual([]);
 }, 1_800_000);

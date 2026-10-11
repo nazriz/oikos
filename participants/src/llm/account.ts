@@ -21,7 +21,7 @@ import { callModel, ModelCallFailed, SpendingLimitReached, type LlmIO } from "./
 import type { ContentBlock, LlmAdapter, LlmMessage, MockPolicy } from "./adapter";
 import { COMPOSE_FOLLOW_UP, recordLines, type ComposerConfig } from "./compose";
 
-export const ACCOUNT_VERSION = "0.2.0"; // 0.2.0: people and bodies by the names the world gives them, where it gives one
+export const ACCOUNT_VERSION = "0.2.1"; // 0.2.0: people and bodies by the names the world gives them, where it gives one; 0.2.1: also a body founded in the run (dotted id, e.g. ent.32), by the name its founder gave it
 /** The most one account may be (tokens). */
 export const ACCOUNT_TOKENS = 700;
 /** How many people a run's accounts are of, where the composer's dial does not say; and the most a world may ask. */
@@ -66,7 +66,7 @@ export interface AccountBrief {
 export function renderAccountBrief(b: AccountBrief): string {
   const text = ["THE RECORD", ...recordLines(b.person, b.record, b.means), "", "THE STRETCH OF TIME", `The record is as it stands after ${b.days} days of the town's life. The account is of those ${b.days} days.`].join("\n");
   const names = b.names ?? {};
-  return text.replace(/[A-Za-z][\w-]*[A-Za-z0-9]/g, (id) => (Object.hasOwn(names, id) && id !== b.person ? names[id]! : id));
+  return text.replace(/[A-Za-z][\w.-]*[A-Za-z0-9]/g, (id) => (Object.hasOwn(names, id) && id !== b.person ? names[id]! : id));
 }
 
 /** What happened to a person, by their own record's memory: the strata a sample is drawn across. */

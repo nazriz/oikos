@@ -276,7 +276,7 @@ test("the tribunal's books show an application for possession with the home, wha
   const app = st("rec.1", t0, "tribunal_application", "landlord-1", { addressed_to: ["tribunal"], data: { kind: "possession", matter: "possession", against: "ann", about: "lease-a", amount: 260_000, space: "apts-1/dwelling.1" } });
   const notice = st("rec.2", t0, "hearing_notice", "tribunal", { addressed_to: ["landlord-1", "ann"], basis: "rec.1", data: { application: "rec.1", kind: "possession", matter: "possession", applicant: "landlord-1", against: "ann", answer_by: by, hearing_at: by } });
   b.absorb(obs(t0, "tribunal", [app, notice]));
-  const H = "Applications for possession of a let home, not decided";
+  const H = "Applications for possession of a let home, waiting for the tenant's time to answer", RIPE = "Applications for possession of a let home whose day has come, not decided";
   let item = heading(b.open(t0 + DAY), H)!.items[0]!;
   expect(item).toMatchObject({ id: "rec.1", since: t0, amount: 260_000 });
   expect(item.line).toContain("landlord-1 applies for possession of apts-1/dwelling.1 from ann (lease lease-a)");
@@ -285,7 +285,13 @@ test("the tribunal's books show an application for possession with the home, wha
   // (It is under that heading and no other.)
   expect(b.open(t0 + DAY).map((h) => h.what)).toEqual([H]);
   b.absorb(obs(t0 + 5 * DAY, "tribunal", [st("rec.3", t0 + 5 * DAY, "tribunal_response", "ann", { basis: "rec.1", addressed_to: ["tribunal"], data: { application: "rec.1", paid: 60_000, offer: 30_000 } })]));
-  item = heading(b.open(by + DAY), H)!.items[0]!;
+  // The day the tenant may answer by: from its first hour the case is among those whose day has come, said in every
+  // paper of the clerk's (`always`), and no longer among those waiting.
+  expect(b.open(by - DAY).map((h) => h.what)).toEqual([H]);
+  expect(heading(b.open(by - DAY), H)!.items[0]).toMatchObject({ due: by });
+  const morning = Math.floor(by / DAY) * DAY + 3600;
+  expect(b.open(morning).map((h) => [h.what, h.always])).toEqual([[RIPE, true]]);
+  item = heading(b.open(by + DAY), RIPE)!.items[0]!;
   expect(item.line).toContain("ann answered");
   expect(item.line).toContain("has been paid since, and offering");
   expect(item.line).toContain("the tenant's time to answer ran out");

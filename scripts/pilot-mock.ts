@@ -13,8 +13,9 @@ import { cpus, homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { loadWorld } from "../orchestrator/src/batch";
 import { currentLogs, logLines, realModelIn } from "../orchestrator/src/logs";
+import { formatDry, judgeDry, readDryFacts, type DryOptions, type Finding } from "../orchestrator/src/dry-check";
 
-export interface MockResult { pilot: string; generated: boolean; ranToEnd: boolean; reason?: string; line: string }
+export interface MockResult { pilot: string; generated: boolean; ranToEnd: boolean; reason?: string; line: string; /** What the run showed, did not show, and could not yet show (orchestrator/src/dry-check.ts). */ dry?: Finding[] }
 
 const DAY = 86_400;
 const root = resolve(import.meta.dir, "..");
@@ -37,7 +38,7 @@ async function notMock(log: string): Promise<string | undefined> {
   return undefined;
 }
 
-export async function mockPilot(p: any, outRoot: string, days: number): Promise<MockResult> {
+export async function mockPilot(p: any, outRoot: string, days: number, dryOptions: DryOptions = {}): Promise<MockResult> {
   const done = (r: Omit<MockResult, "pilot" | "line">): MockResult => ({ pilot: p.name, ...r, line: `${p.name}: ${r.generated ? "generated" : "NOT generated"}; ${r.generated ? (r.ranToEnd ? "ran to the end" : "did NOT run to the end") : "did not run"}${r.reason ? ` (${r.reason})` : ""}` });
   for (const k of ["name", "world", "until"]) if (p[k] === undefined) return done({ generated: false, ranToEnd: false, reason: `the entry has no ${k}` });
   const sets: string[] = p.sets ?? [];
@@ -69,29 +70,45 @@ export async function mockPilot(p: any, outRoot: string, days: number): Promise<
   if (bad) return done({ generated: true, ranToEnd: false, reason: `NOT THE MOCK: ${bad}` });
   const sp = log.replace(/\.jsonl(\.zst)?$/, ".summary.json");
   const s = existsSync(sp) ? JSON.parse(readFileSync(sp, "utf8")) : undefined;
-  if (s && s.t >= until && code === 0) return done({ generated: true, ranToEnd: true, reason: until < p.until ? `to day ${Math.round(until / DAY)} of ${Math.round(p.until / DAY)}` : undefined });
+  if (s && s.t >= until && code === 0) {
+    // (What the run showed, and what it was too short to show: said, never passed over. A fault in it is the entry's to look into.)
+    const dry = judgeDry(await readDryFacts(log, until >= p.until), dryOptions);
+    return done({ generated: true, ranToEnd: true, reason: until < p.until ? `to day ${Math.round(until / DAY)} of ${Math.round(p.until / DAY)}` : undefined, dry });
+  }
   return done({ generated: true, ranToEnd: false, reason: `stopped on day ${s ? Math.round(s.t / DAY) : "?"} (exit ${code}): ${String(s?.end?.detail ?? (err || text).trim().split("\n").slice(-2).join(" | ")).slice(0, 400)}` });
 }
 
 /** Every pilot of the queue files, a few at a time; the results come out in queue order. */
-export async function mockWave(queues: string[], outRoot: string, days: number, jobs = Math.max(1, Math.min(4, Math.floor(cpus().length / 2)))): Promise<MockResult[]> {
+export async function mockWave(queues: string[], outRoot: string, days: number, jobs = Math.max(1, Math.min(4, Math.floor(cpus().length / 2))), dryOptions: DryOptions = {}): Promise<MockResult[]> {
   const pilots: any[] = queues.flatMap((q) => { const v = JSON.parse(readFileSync(q, "utf8")); if (!Array.isArray(v)) throw new Error(`${q}: a queue is a list of pilots`); return v; });
   const results: MockResult[] = new Array(pilots.length);
   let next = 0;
-  await Promise.all(Array.from({ length: Math.min(jobs, pilots.length) }, async () => { for (;;) { const i = next++; if (i >= pilots.length) return; results[i] = await mockPilot(pilots[i], outRoot, days); } }));
+  await Promise.all(Array.from({ length: Math.min(jobs, pilots.length) }, async () => { for (;;) { const i = next++; if (i >= pilots.length) return; results[i] = await mockPilot(pilots[i], outRoot, days, dryOptions); } }));
   return results;
 }
 
 if (import.meta.main) {
   const args = process.argv.slice(2);
   const flag = (n: string) => { const i = args.indexOf(`--${n}`); return i >= 0 ? args.splice(i, 2)[1] : undefined; };
+  const bare = (n: string) => { const i = args.indexOf(`--${n}`); if (i >= 0) args.splice(i, 1); return i >= 0; };
   const days = Number(flag("days") ?? 30), jobs = flag("jobs");
+  const booksBy = flag("books-by"), whenOpen = flag("books-when-open");
+  const dryOptions: DryOptions = { ...(booksBy ? { booksBy: Number(booksBy) } : {}), ...(whenOpen ? { booksWhenOpen: whenOpen.split(",") } : {}) };
+  // `--check <log> [--full]`: say what an existing mock run's log showed, did not show and could not yet show (--full: it was the pilot's whole length).
+  const checkLog = flag("check"), full = bare("full");
+  if (checkLog) {
+    const lines = formatDry(judgeDry(await readDryFacts(resolve(checkLog), full), dryOptions));
+    console.log(lines.join("\n"));
+    process.exit(lines.some((l) => l.includes("[not shown]")) ? 1 : 0);
+  }
   const [wave, ...queues] = args;
-  if (!wave || !queues.length) throw new Error("usage: bun scripts/pilot-mock.ts <wave> <queue.json>... [--days 30] [--jobs N]");
+  if (!wave || !queues.length) throw new Error("usage: bun scripts/pilot-mock.ts <wave> <queue.json>... [--days 30] [--jobs N] [--books-by D] [--books-when-open seat,...] | --check <log> [--full]");
   const runs = process.env.OIKOS_RUNS ?? join(homedir(), "oikos/runs");
-  const results = await mockWave(queues.map((q) => resolve(q)), join(runs, "pilot-queues", `${wave}.mock`), days, jobs ? Number(jobs) : undefined);
-  for (const r of results) console.log(r.line);
+  const results = await mockWave(queues.map((q) => resolve(q)), join(runs, "pilot-queues", `${wave}.mock`), days, jobs ? Number(jobs) : undefined, dryOptions);
+  for (const r of results) { console.log(r.line); if (r.dry) console.log(formatDry(r.dry).join("\n")); }
   const bad = results.filter((r) => !r.generated || !r.ranToEnd);
-  console.log(`${results.length - bad.length} of ${results.length} would run${bad.length ? `; ${bad.length} would not: ${bad.map((r) => r.pilot).join(", ")}` : ""}`);
-  process.exit(bad.length ? 1 : 0);
+  // (A thing the run should have shown and did not is a fault of the entry too; a thing it was too short to show is not, and is not passed either.)
+  const unshown = results.filter((r) => r.dry?.some((x) => x.outcome === "not shown"));
+  console.log(`${results.length - bad.length} of ${results.length} would run${bad.length ? `; ${bad.length} would not: ${bad.map((r) => r.pilot).join(", ")}` : ""}${unshown.length ? `; ${unshown.length} did not show what it should have: ${unshown.map((r) => r.pilot).join(", ")}` : ""}`);
+  process.exit(bad.length || unshown.length ? 1 : 0);
 }

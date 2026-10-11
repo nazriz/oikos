@@ -51,7 +51,11 @@ test("a spec without `living` generates what it generated before (byte for byte)
   // And again on 2026-10-12 (21d4a10f... until then; docs/decisions.md, "What the third living pilot found"): the
   // generator's version, in the town's description; and, only where a model holds an office, that office's forms,
   // notices and procedures. Nothing of `living` reaches a town without it.
-  expect(hash(c)).toBe("e14634d0bbdc183e0028c9aed62c0d643b57af4f3023510e95bac50917bafad0");
+  // And again the same day (e14634d0... until then; docs/decisions.md, "What the fourth living pilot found"): the
+  // generator's version; the petition response form's `answer` and the words added to six other forms; a
+  // landlord's and the member's procedure on a home the tenant has left (only where a model holds the office).
+  // `opening_caseload` is off unless a description sets it, and nothing of it reaches a town without it.
+  expect(hash(c)).toBe("245ca46c94a76e23068207361084ba24fabfc0af8977bf54eacc51ff67b2020f");
   const text = JSON.stringify(c);
   expect(text).not.toContain('"started"');
   expect(text).not.toContain("attach_mean");

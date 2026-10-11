@@ -1,6 +1,6 @@
 {
   "name": "city.mayor_code",
-  "version": "0.12.0",
+  "version": "0.12.1",
   "doc": "docs/behaviour/government.md",
   "params": {
     "budget_lead_days": {
@@ -215,7 +215,7 @@
     {
       "form": "petition_response",
       "title": "Answer to a petition",
-      "does": "Answers a petition publicly, to its organiser: what has been done about what it asks (put to the council, or not, and why). The answer's own words are the mayor's (give them as the paper's text). It puts nothing to the council by itself: that is the council proposal form, or a law's amendment form.",
+      "does": "Answers a petition publicly, to its organiser: what has been done about what it asks (put to the council, or not, and why). The answer is written in full on the form (`answer`): what has been done about what the petition asks, or why not, in the mayor's own words; it is the paper's text. It puts nothing to the council by itself: that is the council proposal form, or a law's amendment form.",
       "fields": {
         "petition": {
           "type": "record",
@@ -225,18 +225,24 @@
         "organiser": {
           "type": "entity",
           "description": "Its organiser."
+        },
+        "answer": {
+          "type": "text",
+          "required": true,
+          "description": "What is answered, in full: what has been done about what the petition asks, or why not."
         }
       },
       "writes": {
         "kind": "petition_response",
-        "text": "Answer to petition {petition}.",
+        "text": "Answer to petition {petition}: {answer}",
         "basis": "=petition",
         "to": [
           "=organiser"
         ],
         "visible": "public",
         "data": {
-          "petition": "=petition"
+          "petition": "=petition",
+          "answer": "=answer"
         }
       }
     }

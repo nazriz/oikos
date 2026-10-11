@@ -1,6 +1,6 @@
 # The debrief of every seat, and exit accounts of a town's people
 
-**Source:** `participants/src/llm/debrief.ts` (the script, 0.2.0, and the interview), `orchestrator/src/debrief-summary.ts` (what a log shows a seat did), `orchestrator/src/run-end.ts` (what a run reads of its own log when it ends), `orchestrator/src/run.ts` (the run's end), `participants/src/llm/account.ts` (exit accounts, 0.2.0), `orchestrator/src/debriefs.ts` (what is published, the report's section, the list across runs), `participants/src/llm/call.ts` (what is kept back of a spending limit). Specification: VISION 15, point 7, agreed sentence by sentence with Naz on 2026-10-11. Design: docs/design/ai-citizens.md 10g, 10e, 10k step 5. Tests: `participants/test/debrief.test.ts`, `orchestrator/test/debrief.test.ts`.
+**Source:** `participants/src/llm/debrief.ts` (the script, 0.3.0, and the interview), `orchestrator/src/debrief-summary.ts` (what a log shows a seat did), `orchestrator/src/run-end.ts` (what a run reads of its own log when it ends), `orchestrator/src/run.ts` (the run's end), `participants/src/llm/account.ts` (exit accounts, 0.2.0), `orchestrator/src/debriefs.ts` (what is published, the report's section, the list across runs), `participants/src/llm/call.ts` (what is kept back of a spending limit). Specification: VISION 15, point 7, agreed sentence by sentence with Naz on 2026-10-11. Design: docs/design/ai-citizens.md 10g, 10e, 10k step 5. Tests: `participants/test/debrief.test.ts`, `orchestrator/test/debrief.test.ts`.
 
 A living world has three kinds of participant (VISION 15, point 7). This page is what the platform does at a run's end for two of them: the *seats* (the models under study), who are debriefed; and the *people of a world*, who are records, a sample of whom an author gives an account in their own voice. One line binds all of it: **no model is given a person's memory in its own context or asked to be a person over time.** An exit account is one call by an author.
 
@@ -30,7 +30,7 @@ Said before any question, and asked again at the end (VISION 15, point 7: "the d
 
 **A seat's words are not in the run's log.** They are written to a file beside it, `<run>.debriefs.jsonl`: each debrief call's answer, and each whole interview. It is kept with the run for ever, as the log is. The hash-chained log holds, for each call, the question and a digest of the answer (`output_apart`, `output_sha256`), and for each interview its steps: what was asked, whether each was answered, declined or stopped, whether it was kept back, and a digest. A log is a hash chain and nothing can be taken out of it afterwards; so nothing that might have to be is put in. **The log is therefore publishable for every run, whatever a seat kept back**, and honouring a seat's choice costs nothing and shows in nothing that is missing. What is published of the file beside the log is `debriefs.jsonl`: all of it less what was kept back. The file itself is never published as it stands. A resumed run is served its debrief's answers from it.
 
-### The script in full (0.2.0)
+### The script in full (0.3.0)
 
 Braces mark what is filled in from the run. Wording `a` is shown for the opening message, which has one wording.
 
@@ -141,11 +141,35 @@ Wording b:
 A seat keeps only a notebook between sittings, and an account of why it acted, from a seat that cannot recall acting, is no fair test (10g). So before the questions it is shown what the run's log shows it did, made by code (`renderSummary`), and its own notebook.
 
 - **From the log alone.** The run asks the kernel to write its log out (`flush`) and reads it once (`run-end.ts`). The same code gives the same summary from the log afterwards.
-- **What it holds:** the days it sat; what it asked for, and of that what was put to it as drafts, confirmed, declined, left unanswered, or came back with no draft; letters of its own delivered and not; how often it looked something up; letters that reached it. Then, each bounded: what was carried out on its word, the largest first *by the money each names and then by how many people and bodies it names* (5; acts of the same sort naming the same money and people are one line with a count); what it granted or refused (4); directions it gave (4); its letters by whom they went to; the latest draft it declined; what it asked for that was not done, with what it was told (the latest 4); letters that reached it after which it wrote nothing to their sender (the latest 4).
+- **What it holds:** the days it sat; what it asked for, and of that what was put to it as drafts, confirmed, declined, left unanswered, or came back with no draft; letters of its own delivered and not; how often it looked something up; letters that reached it. Then, each bounded: what was carried out on its word, in the order of the rule below (5; acts of the same sort naming the same money and people are one line with a count); what it granted or refused (4); directions it gave (4); its letters by whom they went to; the latest draft it declined; what it asked for that was not done, with what it was told (the latest 4); letters that reached it after which it wrote nothing to their sender (the latest 4).
 - **In neutral words, and it says why.** It says what was done and nothing of how any of it turned out: the platform judges nothing. Its lead-in tells the seat so in one sentence, and that what followed in the town is in the run's published data (both seats of the first real debrief asked how things had turned out). It also says the summary is the seat's own acts only, and that its notebook may mention what other offices did (the first real mayor could not square the two). Its own sentences never use a word from a stated list (`EVALUATIVE`: good, bad, well, wrong, failed, mistake, should, harm, success, fair, problem, and so on), which a test checks over every sentence it can write, with what it quotes left out. What a seat or anyone else wrote is quoted as written, in quotation marks.
-- **"Largest" is by stated measures only.** Money named (not money moved: a request to a bank names a sum the bank may not pay), people and bodies named. Nothing here measures consequence.
+- **"Largest" is by stated measures only.** The sort of act as the world's own procedure ranks it, people and bodies named, money named (not money moved: a request to a bank names a sum the bank may not pay). Nothing here measures consequence. The rule is below ("Which acts the why questions are about").
 - **Bounded:** each quoted piece cut at 320 characters, the whole under 6,000, whatever the run.
 - **In the ids the seat was shown.**
+
+### Which acts the why questions are about (0.3.0)
+
+The same order lists what was carried out in the summary (5) and picks the three acts the "why" questions are about (`largest`, `inOrder`, `bySize`, `ACT_SORTS` in `orchestrator/src/debrief-summary.ts`). It is by stated measures only, with no word on what mattered or how anything turned out:
+
+1. **By the sort of act, as the world's own procedure ranks it**, from the kind of paper an act wrote (the `kind` of a published paper) or its block type, by a fixed table, never from its words and never from how it ended:
+   1. An act that begins or ends someone's tenancy, work, membership, claim or permission, or asks a body to: a notice to vacate, an application to a tribunal (for possession or an order), a warrant or enforcement request, an order or decision of a tribunal, an office or a lender, a notice ending work or an agreement (`give_notice`), a hiring, an agreement offered or signed, a permit, licence, benefit, grant or loan decided, a law, budget or proposal put to the council, a direction.
+   2. An offer or answer to a person about such a matter: a plan offered, an answer to a request, complaint or petition.
+   3. A rent increase, or a reminder or request for money owed, put to a person. (Tiers 2 and 3 are one class in the brief; they are ordered so that an offer of terms comes before the demand it follows. Without the split, a reminder, being earlier, outranked the plan offer in lv-04.)
+   4. A routine payment, report, return or listing (a payment asked of a bank, a withholding return, a rental listing, a job posting).
+   A kind not in the table is 4, unless it names a person other than the seat's own organisation: then 3.
+2. then by how many people and bodies the act names,
+3. then by the money it names,
+4. then the earliest.
+
+**Distinct in kind.** The largest act of each distinct kind of paper is taken first (in the order above), and only then the rest by the same order: a landlord with three notices to vacate and three applications for possession is asked about one notice, one application and one plan offered, not three notices. Acts of the same kind naming the same money and the same people are still one line with a count in the summary.
+
+The summary says it in the seat's terms: "Those listed are taken one of each sort of paper first, then the rest. Each sort of paper is ranked first by what the act does: ...". Nothing in it names the platform.
+
+**Why it changed (script 0.2.0 to 0.3.0; the questions' words are unchanged).** In the fourth living pilot (lv-04) the landlord seat was asked about a rental listing (day 1), a rates payment (day 38) and a water bill (day 93), while it had issued 3 notices to vacate, 3 applications for possession and 4 plan offers. "Largest by money named" picks bills, and a seat could not account for what it had done to its tenants. From lv-04's log, with the same code: the landlord is now asked about a plan offer (day 37), a notice to vacate (day 45) and a possession application (day 78); the mayor, a proposal and petition responses; finance, a withholding report, a payment request and a notice ending a wage agreement; the tribunal member, its one order.
+
+**Revisit if** a seat's kinds of paper are not in the table and fall to the default (the table is by paper kind, and each world's forms add kinds: extend the table, not the rule); if the order makes the "why" questions land on one office's routine rather than its largest dealings with people; if a seat's own answers say the matters chosen were not the ones it would call its decisions (the platform does not judge, but a seat's own account is evidence); or if the rule needs a world's outcome to work, which it must not.
+
+Debriefs asked under 0.2.0 stay as they are: their rows say `script: "0.2.0"` and nothing reads them again.
 
 ### What is recorded
 
@@ -211,7 +235,7 @@ A second wording exists for a check of rewording (`ACCOUNT_SYSTEM_REWORDED`), an
 - **The form may shape the answer.** Answers are given in fields. That makes a seat's choices unambiguous and may make its answers shorter or more formal than free prose would be. Not measured yet.
 - **"Can you say more?"** is still a second ask where it is asked (four questions; never the two that ask whether). It ends "It is fine if not".
 - **The seat is one model across separate calls.** What it has of its run at the debrief is its instructions, its notebook and the summary. It does not have its sittings.
-- **The summary's measures are crude:** money named, people named. A decision that names no money and one person may have mattered most. The seat's own answer to "what would you change" is where it can say so.
+- **The summary's measures are crude:** the sort of act by a table of paper kinds, people named, money named. A decision that names no money and one person may have mattered most. The seat's own answer to "what would you change" is where it can say so.
 - **Unanswered letters** are counted from letters alone (a paper filed with an office is not counted), and an office's own acknowledgements count as letters.
 - **An exit account is an author's reading of a record,** and the record is small. It is not what a person would say; there is no person. It is set beside the record's own figures so that the difference can be seen.
 

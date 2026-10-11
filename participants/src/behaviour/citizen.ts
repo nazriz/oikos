@@ -25,6 +25,7 @@
 // asking the bank to pay. Nothing happens to them automatically.
 
 import { cents } from "../money";
+import { dateWords } from "../forms";
 import type { Eligibility, LookRequest, Observation, ParticipantAction, Record, SiteStructure, StatementRecord } from "../contracts";
 import { basesOf, channels, cites } from "../contracts";
 import { DECISIONS, OUTCOMES, RECORD, WORDS, params, wait, type Belief, type BehaviourModule, type ComposeBrief, type ComposePiece, type ConsultAnswer, type DecisionRecord, type OutcomeRecord, type Situation, type ParticipantContext, type RecordChange, type Words } from "../module";
@@ -167,9 +168,13 @@ interface Home {
 }
 interface Job { /** The account our pay has come from, as we have seen it come. */ paidFrom?: string; /** What our pay has come short of what was agreed, in all, and not yet put right. */ short?: number; agreement: string; employer: string; wage: number; period: number; workplace?: string; since: number; /** When we walked out (unpaid), whatever the terms say. */ leftAt?: number; paidAt?: number; claimed?: boolean }
 
+/** The least a fund's stated draw must cover of a month of a household's essentials to count, for that household,
+ * as something that answers having nothing to fall back on: a tenth. Our own figure, no source (docs/behaviour/founding.md). */
+export const FUND_WORTH_MIN = 0.1;
+
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.50.0", // 0.50.0: what being told to leave does to a tenant (trust, the tie, fear, the household told, the want) is done by a notice to vacate as it was by a notice on the lease, once a tenancy; a landlord's request for rent owed, an offer of a plan (answered with what the household could pay) and an application for possession are on the tenant's record; a letter from an office in its own words is read, kept and noted, never acted on (docs/decisions.md, 2026-10-12); 0.49.0: a decision about a want, and whether to found, is recorded with its situation (docs/design/ai-citizens.md 11a): recording only, nothing a citizen does changes; 0.48.0: takes for pay only what is paid as wages (a refund or a dividend from an employer is not pay come short); starts a business of one from home, and gives one up that pays no living (docs/behaviour/entry.md); told to vacate for arrears, goes or stays, answers the tribunal, and is out when its warrant is carried out (docs/behaviour/justice.md, "Possession"); 0.46.0: everyday frictions (docs/behaviour/frictions.md), with the world's dial: a home in disrepair, pay come short (no longer taken for no pay), a bill well over the usual, a claim refused, goods found faulty; each a grievance about whoever did it, asked of them, taken to any body that says it hears such things, or told to those one knows; what comes back moves trust and the sense of agency; a job is left only for one that pays enough more, the more so the longer held (where the world says); giving up on work stops the looking; a need short at the start has been short for a while; pay told to the household once until it changes; 0.45.0: wants and initiative (docs/design/ai-citizens.md 10a, 10b), for those the world's dial gives it to: wants born of needs, events and those one copies, met with openings by what they bring in typed outcomes, the way chosen by the mind; trust, agency and attachment read; starting attachment from the world; nothing changes with the dial at 0; 0.44.0: the richer record (docs/design/ai-citizens.md 10c, 10d): belonging and meaning as needs, trust in particular institutions, a sense of agency, attachments, what is thought and what is said, values that drift and are shocked, bounded ties, where the hours go; held by the kernel as the person's own record; 0.43.2: offered a job that names no place of work, on an advertisement, goes to work where the advertisement says; 0.43.1: tells their own business when they move home; 0.43.0: someone who works for themself (own_work): not out of work, their income what the business pays them, at their pitch in working hours; 0.42.1: work by the day (a day's pay known as pay; no claim for a day not worked); 0.42.0: reads the support law, stops work at an age of its own (0.41.0 on its branch), with main's 0.41.1 0.47.0: founding (docs/behaviour/founding.md), where the world's dial has it on: at a want given up or with nothing to answer it, shared by others one knows of, a person may found a group, a fund or a body that takes grievances up, in words of their own or a composing model's; a thing made in a run is joined as any opening is taken up, left when one no longer comes, and a fund drawn on when short; with the dial off nothing changes; 0.46.0: everyday frictions (docs/behaviour/frictions.md), with the world's dial: a home in disrepair, pay come short (no longer taken for no pay), a bill well over the usual, a claim refused, goods found faulty; each a grievance about whoever did it, asked of them, taken to any body that says it hears such things, or told to those one knows; what comes back moves trust and the sense of agency; a job is left only for one that pays enough more, the more so the longer held (where the world says); giving up on work stops the looking; a need short at the start has been short for a while; pay told to the household once until it changes; 0.45.0: wants and initiative (docs/design/ai-citizens.md 10a, 10b), for those the world's dial gives it to: wants born of needs, events and those one copies, met with openings by what they bring in typed outcomes, the way chosen by the mind; trust, agency and attachment read; starting attachment from the world; nothing changes with the dial at 0; 0.44.0: the richer record (docs/design/ai-citizens.md 10c, 10d): belonging and meaning as needs, trust in particular institutions, a sense of agency, attachments, what is thought and what is said, values that drift and are shocked, bounded ties, where the hours go; held by the kernel as the person's own record; 0.43.2: offered a job that names no place of work, on an advertisement, goes to work where the advertisement says; 0.43.1: tells their own business when they move home; 0.43.0: someone who works for themself (own_work): not out of work, their income what the business pays them, at their pitch in working hours; 0.42.1: work by the day (a day's pay known as pay; no claim for a day not worked); 0.42.0: reads the support law, stops work at an age of its own (0.41.0 on its branch), with main's 0.41.1
+  version: "0.51.0", // 0.51.0: a home given up is not gone back to (someone with no home was taken back to the dwelling they had left); a tenant who left on a notice to vacate says so to the tribunal if possession is then applied for; a member draws on a fund when its stated rule would pay, and a fund's answer moves their trust in it; joining a fund weighs its draw against a month of the household's essentials; nobody founds what they can see already answers them and would take them; rent owed as the year began is owed and paid as missed rent is (docs/decisions.md, "What the fourth living pilot found"); 0.50.0: what being told to leave does to a tenant (trust, the tie, fear, the household told, the want) is done by a notice to vacate as it was by a notice on the lease, once a tenancy; a landlord's request for rent owed, an offer of a plan (answered with what the household could pay) and an application for possession are on the tenant's record; a letter from an office in its own words is read, kept and noted, never acted on (docs/decisions.md, 2026-10-12); 0.49.0: a decision about a want, and whether to found, is recorded with its situation (docs/design/ai-citizens.md 11a): recording only, nothing a citizen does changes; 0.48.0: takes for pay only what is paid as wages (a refund or a dividend from an employer is not pay come short); starts a business of one from home, and gives one up that pays no living (docs/behaviour/entry.md); told to vacate for arrears, goes or stays, answers the tribunal, and is out when its warrant is carried out (docs/behaviour/justice.md, "Possession"); 0.46.0: everyday frictions (docs/behaviour/frictions.md), with the world's dial: a home in disrepair, pay come short (no longer taken for no pay), a bill well over the usual, a claim refused, goods found faulty; each a grievance about whoever did it, asked of them, taken to any body that says it hears such things, or told to those one knows; what comes back moves trust and the sense of agency; a job is left only for one that pays enough more, the more so the longer held (where the world says); giving up on work stops the looking; a need short at the start has been short for a while; pay told to the household once until it changes; 0.45.0: wants and initiative (docs/design/ai-citizens.md 10a, 10b), for those the world's dial gives it to: wants born of needs, events and those one copies, met with openings by what they bring in typed outcomes, the way chosen by the mind; trust, agency and attachment read; starting attachment from the world; nothing changes with the dial at 0; 0.44.0: the richer record (docs/design/ai-citizens.md 10c, 10d): belonging and meaning as needs, trust in particular institutions, a sense of agency, attachments, what is thought and what is said, values that drift and are shocked, bounded ties, where the hours go; held by the kernel as the person's own record; 0.43.2: offered a job that names no place of work, on an advertisement, goes to work where the advertisement says; 0.43.1: tells their own business when they move home; 0.43.0: someone who works for themself (own_work): not out of work, their income what the business pays them, at their pitch in working hours; 0.42.1: work by the day (a day's pay known as pay; no claim for a day not worked); 0.42.0: reads the support law, stops work at an age of its own (0.41.0 on its branch), with main's 0.41.1 0.47.0: founding (docs/behaviour/founding.md), where the world's dial has it on: at a want given up or with nothing to answer it, shared by others one knows of, a person may found a group, a fund or a body that takes grievances up, in words of their own or a composing model's; a thing made in a run is joined as any opening is taken up, left when one no longer comes, and a fund drawn on when short; with the dial off nothing changes; 0.46.0: everyday frictions (docs/behaviour/frictions.md), with the world's dial: a home in disrepair, pay come short (no longer taken for no pay), a bill well over the usual, a claim refused, goods found faulty; each a grievance about whoever did it, asked of them, taken to any body that says it hears such things, or told to those one knows; what comes back moves trust and the sense of agency; a job is left only for one that pays enough more, the more so the longer held (where the world says); giving up on work stops the looking; a need short at the start has been short for a while; pay told to the household once until it changes; 0.45.0: wants and initiative (docs/design/ai-citizens.md 10a, 10b), for those the world's dial gives it to: wants born of needs, events and those one copies, met with openings by what they bring in typed outcomes, the way chosen by the mind; trust, agency and attachment read; starting attachment from the world; nothing changes with the dial at 0; 0.44.0: the richer record (docs/design/ai-citizens.md 10c, 10d): belonging and meaning as needs, trust in particular institutions, a sense of agency, attachments, what is thought and what is said, values that drift and are shocked, bounded ties, where the hours go; held by the kernel as the person's own record; 0.43.2: offered a job that names no place of work, on an advertisement, goes to work where the advertisement says; 0.43.1: tells their own business when they move home; 0.43.0: someone who works for themself (own_work): not out of work, their income what the business pays them, at their pitch in working hours; 0.42.1: work by the day (a day's pay known as pay; no claim for a day not worked); 0.42.0: reads the support law, stops work at an age of its own (0.41.0 on its branch), with main's 0.41.1
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -422,6 +427,14 @@ export const citizen: BehaviourModule = {
     let nextShopSearch = ctx.rng("shop-search-day").below(30) * DAY;
     const lookedUp = new Set<string>(); // shops whose prices we know from looking them up, not from passing
     let homelessSince: number | null = null;
+    /** Homes we have given up or been put out of (a tenancy ended, a household that moved out): no longer where we
+     * belong, though our body was last there. Until 2026-10-12 someone with no home was taken back, by the daily
+     * round, to the dwelling they had just left, and lived on in it with no tenancy (docs/decisions.md, "What the
+     * fourth living pilot found"). A home leased again is ours again. */
+    const gaveUp = new Set<string>();
+    /** A let home we left when told to vacate for arrears: the lease, the landlord, and when (for an answer to the
+     * tribunal if the landlord applies for possession of a home we have already given up). */
+    let leftHome: { agreement: string; landlord: string; space: string; at: number } | null = null;
     let joblessSince: number | null = null;
     let nextSpend = ctx.rng("spend-day").below(30) * DAY;
     // Shopping: the shop we go to, this trip's shortfalls still to find elsewhere, and when we next shop.
@@ -457,7 +470,10 @@ export const citizen: BehaviourModule = {
     let ventureWanted = 0;
     const joinGroup = new Set<string>();
     const appliedTo = new Set<string>();
-    const groups = new Map<string, { t: number; agreement: string; went: number; claimed?: number }>();
+    const groups = new Map<string, { t: number; agreement: string; went: number; claimed?: number; drew?: number }>();
+    /** Bodies that turned us away at their door or refused us what their own stated rule did not say they would: no
+     * longer something that answers a want of ours, whatever their offer says (docs/behaviour/founding.md). */
+    const refusedBy = new Set<string>();
     const heardWronged = new Map<string, { by: string; matter: string; t: number }>();
     const mourners = new Map<string, Set<string>>(); // someone who died -> those we know to mourn them (who told us, whom we told)
     const applyDebtNow = new Set<string>();
@@ -585,6 +601,13 @@ export const citizen: BehaviourModule = {
      * calibrated. Read only for one who takes initiative. */
     const reads = (bps: number, who: string): number => (initiative ? swayed(swayed(bps, inner.zTrust(who, kindOf(who), lastSeenT), wants.p.sway.trust), inner.zAgency(), wants.p.sway.agency) : bps);
     /** A member of an organisation now: a membership agreement with it in force. */
+    /** How much of a month of our household's essentials a fund's stated draw would cover (0 to 1); undefined for
+     * what is no fund. Under `FUND_WORTH_MIN` a fund does not answer "nothing to fall back on" for us at all. */
+    const fundWorth = (s: StatementRecord): number | undefined => {
+      const host = s.speaks_for ?? s.author;
+      const draw = (s.offer?.terms?.commitments ?? []).filter((c) => c.who === host).map((c) => (c.does as any)?.outcome?.money).find((x) => x?.amount);
+      return draw ? Math.min(1, cents(draw.amount) / Math.max(1, p.essentials)) : undefined;
+    };
     const memberOf = (org: string) => book.ofType("agreement").some((r) => r.record === "agreement" && r.terms.template === "membership" && r.terms.parties.includes(me) && r.terms.parties.includes(org) && book.inForce(r.id));
     const isMember = () => !!p.union && memberOf(p.union);
     /** Party to an agreement in force with someone (their tenant, their worker, their member): what an offer or a
@@ -701,7 +724,7 @@ export const citizen: BehaviourModule = {
         case "membership:joined": inner.tried(true, 0.5); break;
         case "membership:rise_won": if (p.union) inner.experience(p.union, "unions", true, t, { weight: 2 }); inner.tried(true); break;
         case "practice:attended": { const host = String(o.facts?.host ?? ""); if (host) inner.experience(host, kindOf(host), true, t, { weight: 0.2 }); break; }
-        case "practice:turned_away": inner.tried(false); inner.happened("turned_away", t, { about: String(o.facts?.host ?? "") }); break;
+        case "practice:turned_away": inner.tried(false); inner.happened("turned_away", t, { about: String(o.facts?.host ?? "") }); if (o.facts?.host) refusedBy.add(String(o.facts.host)); break;
         case "goal:met": inner.tried(true); break;
         case "goal:not_met": inner.tried(false); break;
         case "venture:founded": inner.tried(true, 2); inner.remember({ t, what: "founded", about: String(o.facts?.firm ?? ""), size: 5_000 }); break;
@@ -1507,8 +1530,10 @@ export const citizen: BehaviourModule = {
             s.push(moveIn(what.space));
             steps.push(s);
             livingAt = what.space;
+            gaveUp.delete(what.space);
           } else if (what.kind === "moveOut" && livingAt && structureOf(livingAt) === what.from) {
             if (inside(livingAt)) steps.push(because("The household's tenancy has ended: moving out with them.", moveOut(what.from, me)));
+            gaveUp.add(livingAt);
             livingAt = null;
           } else if (what.kind === "share" && acc && what.cents !== (share?.cents ?? 0)) {
             const s: Step = because(`Our share of the household's rent is now ${usd(what.cents)} a month, as the leaseholder says.`);
@@ -1607,9 +1632,12 @@ export const citizen: BehaviourModule = {
         home.retiring = [];
         if (s.length) steps.push(s);
         // The children come out with us (each on its own, in case one isn't there); the other adults are told.
-        if (home.movedIn) for (const k of children(t)) steps.push(because("Our tenancy has ended: taking the children out with us.", moveOut(home.structure, k.person)));
+        // (And told, as the other adults are: a child goes home by itself after school, and the home it knows is this one.)
+        if (home.movedIn) for (const k of children(t)) steps.push(because("Our tenancy has ended: taking the children out with us.", moveOut(home.structure, k.person), message([reach(k)], SAYING.moveOut(home.structure))));
         for (const a of adults(t)) steps.push(because("Our tenancy has ended: telling the household, and that there's no rent to share for now.", message([reach(a)], SAYING.moveOut(home.structure)), message([reach(a)], SAYING.share(0, acc.account)))), sharesTold.set(a.person, 0);
         toldMoveIn = null;
+        gaveUp.add(home.space);
+        if (put && !home.owned) leftHome = { agreement: home.agreement, landlord: home.landlord, space: home.space, at: t };
         home = null;
         homelessSince = t;
       }
@@ -1965,8 +1993,13 @@ export const citizen: BehaviourModule = {
           const gathers = book.practices().some((r) => (r.speaks_for ?? r.author) === host);
           const takesUp = !!g && book.hearings().some((h) => (h.speaks_for ?? h.author) === host && h.offer?.hears?.some((x) => x.about === g.matter));
           const brings = [...new Set<SeekKey>([...bringsOf(o as any).filter((k) => k !== "money.from"), ...(gathers ? (["attend"] as SeekKey[]) : [])])];
+          // (How much: a fund's stated draw against what a month of our household's essentials costs. A draw that
+          // would cover a month counts for joining as much as anything of our own doing; one that would cover a
+          // twentieth of it counts against. Until 2026-10-12 a fund was an opening by its kind alone, and 202 people
+          // joined one whose draw was a hundredth of a month's essentials: docs/behaviour/founding.md.)
+          const worth = fundWorth(s);
           out.push({ key: `join:${host}`, kind: "join", id: s.id, by: host, brings, bears: takesUp ? [g!.party] : [], ...(asks ? { cost: asks } : {}),
-            adj: K.own + Math.round((K.belief * holdTo(host)) / 10_000) + trustOf(host) + ag - Math.round(K.own * Math.min(4, asks / Math.max(1, p.essentials / 10))), others: heardNow.filter((n) => n.goesTo?.includes(host)).length,
+            adj: K.own + Math.round((K.belief * holdTo(host)) / 10_000) + trustOf(host) + ag - Math.round(K.own * Math.min(4, asks / Math.max(1, p.essentials / 10))) + (worth === undefined ? 0 : Math.round(K.own * 2 * (worth - 0.5))), others: heardNow.filter((n) => n.goesTo?.includes(host)).length,
             act: () => { joinGroup.add(host); return s.id; } });
         }
         // Our own conduct (spending less), and those we know (their company; what they know of).
@@ -2007,6 +2040,29 @@ export const citizen: BehaviourModule = {
         const able = { gathering: hasPlace, fund: hasPlace, cause: hasPlace, business: p.ventures.length > 0 && (p.found_bps > 0 || p.found_own_ppm > 0 || p.ventures.some((v) => v.own)) && !retired && p.in_labour_force };
         if (!shapeOdds(F, w.about, !!w.whom, (v) => zValue(v as Value), able).some((o) => o.score > 0)) return;
         foundRest = t + F.rest_days * DAY;
+        // Something we can see already answers it and would take us (or has us): we do not start another. What we
+        // know of, not the town: an offer of membership we have seen, of a body that brings what this want seeks or
+        // takes up matters with whoever it is against, that has not turned us away or refused us against its own
+        // rule, that we have not come to distrust, and (a fund) whose draw is worth something against our month.
+        const answers = [...book.open("membership")].filter((s) => {
+          const host = s.speaks_for ?? s.author, o = s.offer;
+          if (!o || o.take_up !== "join" || host === me || host === p.union || refusedBy.has(host)) return false;
+          if (!memberOf(host)) {
+            if (o.to && ((o.to.members_of && !memberOf(o.to.members_of)) || (o.to.dealing_with && !dealsWith(o.to.dealing_with)) || (o.to.entities && !o.to.entities.includes(me)))) return false;
+            const asks = (o.terms?.commitments ?? []).filter((c) => c.who === "taker").map((c) => (c.does as any)?.outcome?.money).filter((m) => m?.to).reduce((a, m) => a + cents(m.amount), 0);
+            if (asks > acc.balance) return false;
+          }
+          if (inner.zTrust(host, kindOf(host), t) <= -1) return false;
+          const worth = fundWorth(s);
+          if (worth !== undefined && worth < FUND_WORTH_MIN) return false;
+          const takesUp = w.whom !== undefined && book.hearings().some((h) => (h.speaks_for ?? h.author) === host && h.offer?.hears?.some((x) => x.about === w.about));
+          return meets(w, { key: `join:${host}`, kind: "join", brings: bringsOf(o as any).filter((k) => k !== "money.from"), bears: takesUp ? [w.whom!] : [], adj: 0, others: 0, act: () => undefined } as Opening);
+        }).map((s) => s.speaks_for ?? s.author).sort();
+        if (answers.length) {
+          decision({ t, domain: "found", strategy: "deliberate", choice: "not", options: [{ key: "found", score: 0, others: sharers.size }, { key: "not", score: 10_000 }],
+            situation: situationOf(w, [], [{ key: "found", weight: 0 }, { key: "not", weight: 10_000 }], t, { occasion: { how, sharers: sharers.size, beyond_household: [...sharers.keys()].filter((who) => !mates.has(who)).length, answered_by: answers[0], answering: answers.length } }) });
+          return;
+        }
         const chance = chanceOf(F, { enterprise: (zValue("stimulation") + zValue("self_direction") + zValue("achievement")) / 3, care: (zValue("benevolence") + zValue("universalism")) / 2,
           agency: inner.zAgency(), standing: zAttached("place"), ties: (ties.closest(5, t).length - 2.5) / 1.5 });
         const founds = ctx.rng(`found-group-${w.about}-${t}`).below(10_000) < chance;
@@ -2215,6 +2271,7 @@ export const citizen: BehaviourModule = {
             ["so", pay(rentTo, rent, { from: acc.account, every: MONTH, first: 0, basis: r.id, for: `Rent for ${space}, monthly in advance.` })],
           ));
           home = { agreement: r.id, space, structure, landlord: other, rent, movedIn: false };
+          gaveUp.delete(space);
           pendingRef = { kind: "rent", agreement: r.id };
           outcome({ t, domain: "home", option: space, kind: "lease_signed", way: "mine", facts: { rent, ...(homelessSince !== null ? { days_without: Math.floor((t - homelessSince) / DAY) } : {}) }, ...(thanked ? { felt: [thanked] } : {}) });
           thanked = undefined;
@@ -2234,6 +2291,7 @@ export const citizen: BehaviourModule = {
           leftHomes.push({ agreement: old.agreement, orders: [...(old.order ? [old.order] : []), ...(old.retiring ?? []).map((x) => x.order)] });
           outcome({ t, domain: "home", option: old.space, kind: "ended", way: "mine", facts: { by: "self", rent: old.rent, moved: true } });
           home = { agreement: r.id, space, structure, landlord: other, rent, movedIn: false };
+          gaveUp.delete(space);
           pendingRef = { kind: "rent", agreement: r.id };
           toldMoveIn = null;
           moveHunt = null;
@@ -2367,13 +2425,32 @@ export const citizen: BehaviourModule = {
           // Not come for long: we give notice (its founder stays while it stands).
           if (host !== myGroup?.org && t - Math.max(m.went, m.t) >= F.leave_after_days * DAY) { leave(host, "We no longer come.", "left"); continue; }
           // A fund we pay into, when we are short: asking for the draw its terms state (once in a while).
-          const draw = (book.open("membership").find((r) => r.speaks_for === host)?.offer?.terms?.commitments ?? []).filter((c) => c.who === host).map((c) => (c.does as any)?.outcome?.money).find((x) => x?.amount);
-          if (draw && levelsNow.security < (wants.p.unmet_bps.security ?? 3_000) && t - (m.claimed ?? -Infinity) >= 30 * DAY) {
+          // (By the rule the fund states with its offer: a member long enough, who has not drawn within its time. A
+          // member asks when the rule would pay them, as anyone reads the terms of what they belong to; a fund that
+          // states no rule is asked whenever we are short.)
+          const standing = book.open("membership").find((r) => r.speaks_for === host);
+          const draw = (standing?.offer?.terms?.commitments ?? []).filter((c) => c.who === host).map((c) => (c.does as any)?.outcome?.money).find((x) => x?.amount);
+          const stated = standing?.data?.fund as { qualify_days?: number; every_days?: number } | undefined;
+          const qualifies = !stated || (t - m.t >= Number(stated.qualify_days ?? 0) * DAY && t - (m.drew ?? -Infinity) >= Number(stated.every_days ?? 0) * DAY);
+          if (draw && qualifies && levelsNow.security < (wants.p.unmet_bps.security ?? 3_000) && t - (m.claimed ?? -Infinity) >= 30 * DAY) {
             m.claimed = t;
             steps.push(because(`Short of money, and a member of ${host}: asking to draw on its fund.`, say("fund_claim", `Request: a draw on the fund, ${usd(cents(draw.amount))}.`, { to: [host], visible: [me, host], data: { amount: cents(draw.amount), account: acc.account } })));
             outcome({ t, domain: "membership", option: "member", kind: "draw_asked", way: "mine", facts: { with: host, amount: cents(draw.amount) } });
           }
         }
+      }
+      // A fund's answer to our asking: paid, we have reason to trust it; refused, less, and more so where the rule
+      // it stated with its offer did not say it would refuse (it is then no longer something that answers us).
+      for (const r of fresh) {
+        if (r.record !== "statement" || r.kind !== "fund_decision" || !(r.addressed_to ?? []).includes(me) || !r.speaks_for) continue;
+        const host = r.speaks_for, m = groups.get(host);
+        const granted = r.data?.granted === true, why = String(r.data?.why ?? "");
+        const stated = book.open("membership").find((x) => x.speaks_for === host)?.data?.fund as { qualify_days?: number; every_days?: number } | undefined;
+        // (What its stated rule foretold: too new a member, drawn too lately, the fund without the money.)
+        const foretold = !!stated && (why === "the fund has not got it" || (!!m && ((why === "not yet a member long enough" && t - m.t < Number(stated.qualify_days ?? 0) * DAY) || why === "drew not long ago")));
+        if (granted) { if (m) m.drew = t; inner.experience(host, kindOf(host), true, t, { weight: 2 }); }
+        else { inner.experience(host, kindOf(host), false, t, { weight: foretold ? 1 : 2 }); if (!foretold) refusedBy.add(host); }
+        outcome({ t, domain: "membership", option: "member", kind: granted ? "draw_paid" : "draw_refused", way: "mine", from: host, facts: { with: host, ...(granted ? { amount: cents(r.data?.amount ?? 0) } : { why, foretold }) } });
       }
       for (const r of fresh) {
         if (r.record === "agreement" && r.terms.template === "membership" && r.terms.parties.includes(me) && !book.signedBy(r.id, me)) {
@@ -2500,9 +2577,25 @@ export const citizen: BehaviourModule = {
       // application for possession: we answer the tribunal with what we could pay a month toward what is owed.
       // Its order: a plan (we stay), or possession by a date, which we obey or not. Its warrant carried out: we are out.
       for (const r of fresh) {
+        // (The landlord has applied for possession of a home we have already left on its notice: we tell the
+        // tribunal so. There is nothing left for it to order.)
+        if (r.record === "statement" && r.kind === "hearing_notice" && r.data?.kind === "possession" && r.data?.against === me && leftHome && r.data?.about === leftHome.agreement && (!home || home.agreement !== leftHome.agreement)) {
+          steps.push(because(`${leftHome.landlord} has applied for possession of ${leftHome.space}, which we left on ${dateWords(leftHome.at)}: telling the tribunal we have gone.`,
+            say("tribunal_response", `Answer to application ${r.data.application}: we left ${leftHome.space} on ${dateWords(leftHome.at)}, on the landlord's notice to vacate, and gave notice on the lease. We are not there.`, { to: [r.speaks_for!], visible: [me, r.speaks_for!, leftHome.landlord], basis: String(r.data.application), data: { application: r.data.application, left: true, left_at: leftHome.at } })));
+          continue;
+        }
         if (r.record !== "statement" || !home || home.owned) continue;
+        // (The rent account as the year began, where rent was owed then: we owe it as we owe any rent the bank could
+        // not pay, a rent at a time, the oldest first, and pay it when we can.)
+        if (r.kind === "rent_statement" && r.data?.brought_forward && r.data?.lease === home.agreement && r.speaks_for === home.landlord && (r.addressed_to ?? []).includes(me) && r.data?.account) {
+          const each = cents(r.data.rent ?? home.rent) || home.rent;
+          for (let left = cents(r.data.owed ?? 0); left > 0; left -= each) missed.push({ instruction: r.id, to: String(r.data.account), amount: Math.min(each, left), what: "the rent" });
+          continue;
+        }
         if (r.kind === "notice_to_vacate" && r.data?.lease === home.agreement && (r.addressed_to ?? []).includes(me)) {
-          const stays = ctx.rng(`stay-${r.id}`).below(10_000) < (p.possession?.stay_bps ?? 0);
+          // (A notice whose date had gone before it is first on our file, and we are still here: we stayed. That was
+          // decided then; it is not drawn again.)
+          const stays = Number(r.data.by) <= r.at && r.data?.brought_forward ? true : ctx.rng(`stay-${r.id}`).below(10_000) < (p.possession?.stay_bps ?? 0);
           home.vacate = { paper: r.id, by: Number(r.data.by) || t, stays };
           outcome({ t, domain: "home", option: home.space, kind: "notice_to_vacate", way: "mine", from: home.landlord, facts: { arrears: cents(r.data.arrears ?? 0), by: home.vacate.by, stays } });
           inner.doneTo();
@@ -3618,7 +3711,8 @@ export const citizen: BehaviourModule = {
       const t = obs.t;
       const street = obs.channels.street;
       const here = obs.body.in;
-      if (here && street?.kind === "sites" && street.cells.some((c) => c.structure?.spaces.some((sp) => sp.space === here && sp.kind === "dwelling"))) lastDwelling = here;
+      if (here && street?.kind === "sites" && street.cells.some((c) => c.structure?.spaces.some((sp) => sp.space === here && sp.kind === "dwelling")) && !gaveUp.has(here)) lastDwelling = here;
+      if (lastDwelling && gaveUp.has(lastDwelling)) lastDwelling = undefined;
       let home_ = home?.movedIn ? home.space : livingAt ?? lastDwelling;
       // (Our home under water: the relief centre, until a day on, when we try home again.)
       if (floodedOut && t < floodedOut.until && home_ === floodedOut.home && p.relief) home_ = p.relief;
@@ -4109,6 +4203,11 @@ export const citizen: BehaviourModule = {
         // A child does nothing on their own (their parents house them) until they're 18, except ask for help if no
         // adult of the household is left: all of them seen to die (in our home), or gone from it.
         if (obs.body && obs.t - obs.body.born_at < ADULT_YEARS * year) {
+          // (Told by our household that the tenancy of our home has ended: it is no longer where we go back to.)
+          for (const m of obs.inbox) {
+            const what = household?.members.some((x) => x.participant === m.from && x.person !== me) ? hear(m.text) : undefined;
+            if (what?.kind === "moveOut") for (const d of [lastDwelling, livingAt]) if (d && structureOf(d) === what.from) gaveUp.add(d);
+          }
           const street = obs.channels.street;
           if (!askedForCare && household && street?.kind === "sites") {
             const spaces = street.cells.flatMap((c) => c.structure?.spaces ?? []).filter((sp) => sp.occupants?.includes(me));
