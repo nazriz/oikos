@@ -4,6 +4,7 @@
   "as_of": "2026-09",
   "about": "Every place-specific figure the town generator uses, with its source. A world for another place and time is another profile; the platform's code holds none of these (docs/profiles.md).",
   "values": {
+    "outlook": {"trust": {"government": 3020, "policing": 8010, "courts": 5890, "civil_service": 4820, "banks": 3460, "press": 1740, "unions": 2900, "religious": 3130, "companies": 3580}, "people_bps": 4850},
     "knowing": { "visit_seconds": 1800, "meter_read_seconds": 120, "title_search_fee": 810, "index_search_fee": 923 },
     "currency": {
       "code": "AUD",
@@ -891,6 +892,7 @@
     }
   },
   "sources": {
+    "outlook": "How people start out in what they trust (docs/behaviour/citizen.md, 'The record'). National figures for Australia, not the region's: none by region was found. trust: the share with 'a great deal' or 'quite a lot' of confidence in each kind of institution (`government`, `policing`: the police, `courts`, the civil service, banks, the press, labour unions, churches or religious organisations, major companies); people_bps: the share who say most people can be trusted. World Values Survey and European Values Study, joint wave 7 (fieldwork 2017 to 2022), as Our World in Data publishes it (ourworldindata.org/grapher/trust-state-institutions-wvs, trust-organizations-wvs, self-reported-trust-attitudes), opened 2026-10-11 through a tool that returns a page's figures in summary: to confirm against the survey's own tables. The share is read as the mean level of trust a person starts with, which is a simplification (a share above a threshold is not a mean). Not stated, so the citizen's own placeholders apply (to source: the survey's question on freedom of choice and control over one's life, its mean and spread, needs the microdata): how much control over their lives people feel (outlook.agency).",
     "knowing.visit_seconds": "How long looking at one place takes someone who has gone there (an inspection at a notified stage, a valuer's external look, a welfare check at the door), beside the way there and back. Half an hour: a placeholder. No source was found for any of the three (docs/behaviour/knowing.md, section 3).",
     "knowing.meter_read_seconds": "How long reading one water meter takes a reader who has gone to it. Two minutes: a placeholder. No source was found (docs/behaviour/utilities.md, 'Who knows what').",
     "knowing.title_search_fee": "What a search of one title costs online: 8.10 (LANDATA service charges 2025-2026, Land Use Victoria, read 2026-10-08 in the Internet Archive's copy of 2026-02-05: 'Folio Search 9.70 20.50 8.10'; the 2026-27 schedule was not reachable). Recorded, not charged: nobody pays for a search yet (docs/behaviour/knowing.md, 'Leaves out').",

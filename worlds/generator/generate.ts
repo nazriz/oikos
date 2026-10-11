@@ -6,7 +6,7 @@
 // support payments, industry shares...) comes from the spec's profile (worlds/profiles/, docs/profiles.md), and what
 // isn't there is derived from it here by general formulas, or is a placeholder of the town's own shape.
 
-import { adultAgeBands, bedroomsNeeded, drawHousehold, drawSavings, formatMoney, forms as formWords, modules, votedWords, Randomness, chargesInWords, dayPayPeriod, forAge, forOutOfWork, linesInWords, paymentsInWords, tabledLines, yearInDays, stopsWorkAt, withholding, withholdingInWords, yearsOfSchooling, draftLaw, type HouseholdSpec, type IncomeTaxLaw, type Issued, type LawSchedule, type PaymentRule, type Taken } from "@oikos/participants";
+import { drawValues, raisedValues, UPBRINGING, adultAgeBands, bedroomsNeeded, drawHousehold, drawSavings, formatMoney, forms as formWords, modules, votedWords, Randomness, chargesInWords, dayPayPeriod, forAge, forOutOfWork, linesInWords, paymentsInWords, tabledLines, yearInDays, stopsWorkAt, withholding, withholdingInWords, yearsOfSchooling, draftLaw, type HouseholdSpec, type IncomeTaxLaw, type Issued, type LawSchedule, type PaymentRule, type Taken } from "@oikos/participants";
 import law from "../law/basic.json";
 import schedules from "../law/schedules.json";
 import { loadProfile, type Profile } from "./profile";
@@ -935,6 +935,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   // What people believe at the start (docs/design/ai-citizens.md 5): person -> teaching -> how strongly (basis points).
   // Their minds', not the world's: given to each person's participant.
   const beliefs = new Map<string, { [teaching: string]: number }>();
+  const taught: { [entity: string]: string } = {}; // groups that teach something to be held -> the kind of institution they are to a person
   const believe = (who: string, teaching: string, bps: number) => beliefs.set(who, { ...(beliefs.get(who) ?? {}), [teaching]: Math.max(bps, beliefs.get(who)?.[teaching] ?? 0) });
   if (U.teaching) {
     records.push({ id: "union-teaching", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "union", kind: "teaching", text: U.teaching, assertion: { that: U.teaching } });
@@ -968,6 +969,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
         termination: [{ party: c.id, notice: Math.max(1, G.leave_notice_days * DAY) }] } });
       for (const party of [g.id, c.id]) records.push({ id: `${mem}-sig-${party}`, record: "signature", author: "genesis", at: 0, visible_to: [g.id, c.id], speaks_for: party, agreement: mem, as: party });
       if (g.teaching) believe(c.id, g.teaching, 8_000); // a member holds it strongly
+      if (g.teaching) taught[g.id] = "religious"; // (a group that teaches something to be held: a congregation, to those who weigh their trust in it)
     }
     // A teaching held by more than its members at the start (the profile's share of everyone, members included): the
     // rest, less strongly.
@@ -1849,18 +1851,41 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     ...(records.some((r) => r.kind === "law" && r.data?.schedule === "schedule-tenancy") ? { tenancy_schedule: "schedule-tenancy" } : {}),
     participation_bps: V.labour_force_participation_bps, child_template_outside_lf: "child-outside-lf",
     values: { values: V.values }, // (people's values, for their minds: docs/design/ai-citizens.md 3a)
+    // (How people here start out in what they trust: the profile's survey figures. And which of the town's offices is
+    // which kind of institution to them, for those a person does not know by a parameter of their own.)
+    ...(V.outlook ? { outlook: V.outlook } : {}),
+    ...(Object.keys(taught).length ? { institutions: taught } : {}),
     year: life.year, births: spec.life !== false, gestation: life.birth.gestation, fertility_per_10000: V.fertility_per_10000,
     buffer_months: SAVINGS_KEPT_MONTHS, saving_bps: V.spending.saving_bps, wealth_effect_bps_per_year: V.spending.wealth_effect_bps_per_year, essentials: V.spending.essentials_per_month,
     retirement_age: V.retirement_age, ...(CURVE ? { stop_work_curve: CURVE } : {}),
     // Starting businesses: a placeholder monthly chance for someone able to (to calibrate against business entry rates).
     ventures: [shopVenture], found_bps: 200 });
+  // Who each person is: their values (docs/behaviour/citizen.md, "Upbringing"). An adult's are drawn from the
+  // profile's figures; someone living with their parents has theirs from their parents' and a part of their own, so
+  // that the town's spread of values is the profile's whoever was whose child. World content, as beliefs at the start are.
+  const valuesOf = new Map<string, { [v: string]: number }>();
+  {
+    const vr = rng("values");
+    for (const h of households) {
+      const todo = [...h.members];
+      for (let pass = 0; todo.length && pass < 4; pass++) {
+        for (const m of [...todo]) {
+          const parents = (m.parents ?? []).filter((x) => h.members.some((y) => y.id === x));
+          if (parents.some((x) => !valuesOf.has(x)) && pass < 3) continue;
+          const raised = parents.flatMap((x) => (valuesOf.has(x) ? [valuesOf.get(x)! as any] : []));
+          valuesOf.set(m.id, raised.length ? raisedValues(vr, V.values, raised, UPBRINGING.share_bps) : drawValues(vr, { values: V.values }));
+          todo.splice(todo.indexOf(m), 1);
+        }
+      }
+    }
+  }
   // Those outside the labour force don't look for work (their own controller settings).
   const outsideLabourForce = { ...citizenController, params: { ...citizenController.params, in_labour_force: false } };
   for (const m of everyone) {
     const controller = outOfLabourForce.has(m.id) ? outsideLabourForce : citizenController;
     const held = beliefs.get(m.id);
     // (Their own beliefs; and, where people here stop work at ages of their own, theirs.)
-    const own = { ...(held ? { beliefs: held } : {}), ...(stopsAt.has(m.id) ? { stops_work_at: stopsAt.get(m.id) } : {}), ...(ownWorkOf.has(m.id) ? { own_work: ownWorkOf.get(m.id) } : {}) };
+    const own = { own_values: valuesOf.get(m.id)!, ...(held ? { beliefs: held } : {}), ...(stopsAt.has(m.id) ? { stops_work_at: stopsAt.get(m.id) } : {}), ...(ownWorkOf.has(m.id) ? { own_work: ownWorkOf.get(m.id) } : {}) };
     participants.push({ id: `${m.id}-self`, kind: "person", person: m.id, channels: citizenChannels, controller: Object.keys(own).length ? { ...controller, params: { ...controller.params, ...own } } : controller, framing: unstated });
   }
   // People who may come later: newcomers from elsewhere, and children born here.

@@ -31,6 +31,11 @@ One exception is not a channel and is declared where it is defined: **a boundary
 edge** (`boundary` on the module): what the world market is handed of a scenario's scripted shocks, and what the
 weather bureau is handed of the weather to come (docs/behaviour/boundary.md, weather.md).
 
+**A person's own record is theirs and nobody else's** (docs/design/ai-citizens.md 10d): who they are, what they trust,
+what they think of whoever holds power over them. The one channel that shows a record (`own_record`) has no field that
+could name anyone, the kernel shows through it only the looker's own, and no keeper keeps records: there is no
+register of minds. What others know of a person is what that person says and does.
+
 ## How it is enforced
 
 **It cannot be written.** A `records`, `sites` or `directory` channel says which way it is (`way`), and each way

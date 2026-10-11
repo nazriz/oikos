@@ -119,3 +119,29 @@ test("the backstop catches what it is for", () => {
   const ground = Array.from({ length: town.world.ground.w * town.world.ground.h }, (_, i) => `cell.${i % town.world.ground.w}.${Math.floor(i / town.world.ground.w)}`);
   expect(office("city", [{ id: "estate", kind: "sites", way: "here", area: { premises: ground.slice(0, Math.ceil(ground.length / 2)) } }])).toEqual(["map"]);
 });
+
+test("nobody is shown anyone's own record but their own: the only channel that shows a record names nobody, and no office has one", () => {
+  // (docs/design/ai-citizens.md 10d. That the kernel shows through it only the looker's own, and refuses a record set
+  // by anyone a model runs: kernel/tests/entity_record.rs.)
+  const schema = JSON.parse(readFileSync(join(root, "contracts/world-config.schema.json"), "utf8"));
+  const own = schema.$defs.Channel.oneOf.filter((c: any) => c.properties.kind.const === "own_record");
+  expect(own.length).toBe(1);
+  // It can say how often and whether on request, and nothing about whose.
+  expect(Object.keys(own[0].properties).sort()).toEqual(["every", "id", "kind", "on_request", "title"]);
+  expect(own[0].additionalProperties).toBe(false);
+  // No other kind of channel has anything to do with records of this kind: what a records channel matches is the
+  // world's papers (claims, agreements, statements ...), a closed list.
+  const kinds = schema.$defs.Channel.oneOf.find((c: any) => c.properties.kind.const === "records" && c.properties.way.const === "mine").properties.match.properties.records.items.enum;
+  expect(kinds.some((k: string) => k.includes("entity_record") || k.includes("own_record"))).toBe(false);
+  for (const town of towns()) {
+    // In the generated town nobody is handed one yet (a code mind wrote its record and needs no telling); and no
+    // position ever could be: an office's channels pass to its next holder, and a record is a person's.
+    for (const p of town.positions) expect((p.channels ?? []).some((c: any) => c.kind === "own_record")).toBe(false);
+    for (const p of town.participants) for (const c of p.channels ?? []) if (c.kind === "own_record") expect(p.kind).toBe("person");
+    // And no parameter hands a module anyone's values, trust or views but the person's own.
+    for (const p of town.participants) {
+      const params = JSON.stringify(p.controller?.params ?? {});
+      if (p.kind !== "person") expect(params.includes("own_values")).toBe(false);
+    }
+  }
+});

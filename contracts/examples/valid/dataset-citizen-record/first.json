@@ -1,0 +1,64 @@
+{
+  "run": "town-300.seed1",
+  "t": 600,
+  "seq": 1427,
+  "participant": "c0043-self",
+  "entity": "c0043",
+  "n": 1,
+  "set": {
+    "agency": {
+      "now": 3546,
+      "own": 3546
+    },
+    "attached": {},
+    "beliefs": [],
+    "circumstances": {
+      "housed": 0,
+      "household": 5,
+      "retired": 0,
+      "working": 0
+    },
+    "memory": {
+      "defining": [],
+      "recent": []
+    },
+    "temperament": {
+      "conformity": 4647,
+      "openness": 5489,
+      "prestige": 3851
+    },
+    "ties": {
+      "close": [
+        {
+          "affinity": 300,
+          "last": {
+            "t": 600,
+            "what": "talked"
+          },
+          "trust": 4850,
+          "who": "c0046"
+        }
+      ],
+      "resented": []
+    },
+    "trust": {
+      "in": [],
+      "people": 4850
+    },
+    "values": {
+      "achievement": 5186,
+      "benevolence": 9036,
+      "conformity": 5104,
+      "hedonism": 3344,
+      "power": 2516,
+      "security": 7721,
+      "self_direction": 5131,
+      "stimulation": 5847,
+      "tradition": 4189,
+      "universalism": 5969
+    },
+    "views": [],
+    "wants": []
+  },
+  "chain": "61d29bb6c9a752023c14ff94121ecf408c8066131b3679a904c1fedde6d65163"
+}

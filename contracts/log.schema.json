@@ -279,6 +279,44 @@
               "$ref": "urn:oikos:contracts:0.8:common#/$defs/Text"
             }
           }
+        },
+        {
+          "description": "A person's own record, set (docs/design/ai-citizens.md 10d). The bookkeeping of a code mind, never an act in the world: it takes no time and names nobody, so only the participant's own person's record can be set. The kernel refuses it for a participant not run by code (whatever a model decides, it cannot write who it is), and refuses a record that would hold more than the world's caps.entity_record_bytes: a record never grows. Logged in every log, lean ones too: it is state.",
+          "type": "object",
+          "required": [
+            "command",
+            "participant",
+            "set"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "command": {
+              "const": "entity_record"
+            },
+            "participant": {
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+            },
+            "set": {
+              "description": "Sections of the record, by name: each given replaces the section of that name whole; the rest stand. The kernel reads none of them (whole numbers only, as all opaque data). What a person's sections are: entity-record.schema.json.",
+              "type": "object",
+              "minProperties": 1,
+              "maxProperties": 24,
+              "propertyNames": {
+                "$ref": "urn:oikos:contracts:0.8:common#/$defs/Label"
+              },
+              "additionalProperties": {
+                "$ref": "urn:oikos:contracts:0.8:common#/$defs/Opaque"
+              }
+            },
+            "because": {
+              "description": "What moved it, in the mind's own short terms: a list of happenings (what, about whom, how much). Logged and chained with the change; never read by the kernel.",
+              "type": "array",
+              "maxItems": 16,
+              "items": {
+                "$ref": "urn:oikos:contracts:0.8:common#/$defs/OpaqueObject"
+              }
+            }
+          }
         }
       ]
     },
@@ -1774,6 +1812,40 @@
               "maxItems": 16
             }
           }
+        },
+        {
+          "description": "An entity's own record was set: its n-th change; `chain`, the hash of this change (t, set, because, in canonical JSON) over the chain before it ('oikos.entity_record.v1\\n' + previous chain + change; the first has no previous); `digest`, the hash of the record's sections as they now stand. With these the record can be rebuilt from the log and checked (`oikos record`).",
+          "type": "object",
+          "required": [
+            "event",
+            "cause",
+            "entity",
+            "n",
+            "chain",
+            "digest"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "event": {
+              "const": "entity_recorded"
+            },
+            "cause": {
+              "description": "seq of the command entry that caused this event.",
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/Count"
+            },
+            "entity": {
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+            },
+            "n": {
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/Count"
+            },
+            "chain": {
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/Hash"
+            },
+            "digest": {
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/Hash"
+            }
+          }
         }
       ]
     },
@@ -1816,7 +1888,8 @@
         "flooded",
         "flood_receded",
         "visit_started",
-        "visited"
+        "visited",
+        "entity_recorded"
       ]
     },
     "RefusalCode": {

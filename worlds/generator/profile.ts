@@ -81,6 +81,12 @@ export interface Profile {
      * such law is written); landlords then review rents as often as `rent_review_practice_months` says, if it's given. */
     tenancy: { end_notice_days?: number; tenant_notice_days?: number; rent_review_months?: number; rent_increase_notice_days?: number; rent_review_practice_months?: number; after_fixed_term?: "periodic" };
     values: { [value: string]: { mean_bps: number; sd_bps: number } };
+    /** How people here start out in what they trust and how much control they feel (docs/behaviour/citizen.md, "The
+     * record"): the share with confidence in each kind of institution (government, policing, courts, civil_service,
+     * banks, press, unions, religious, companies: whichever the place's survey gives), the share who say most people
+     * can be trusted, and the mean and spread of how much control over their lives people feel. Whatever is left out
+     * starts from the citizen's own placeholder. */
+    outlook?: { trust?: { [kind: string]: number }; people_bps?: number; agency?: { mean_bps: number; sd_bps: number } };
     /** The law on industrial action. A place that requires no ballot leaves both ballot figures out; one that requires
      * no notice either leaves that out too (and no such law is written). */
     industrial_action: { ballot_turnout_bps?: number; ballot_pass_bps?: number; notice_days?: number; paid_during_action: boolean };

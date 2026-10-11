@@ -99,11 +99,24 @@ pub struct HeldPosition {
     pub role: Option<String>,
 }
 
+/// An entity's own record as it is shown to it: how many times it has been set, when last, and what it holds.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OwnRecord {
+    pub n: u64,
+    pub at: i64,
+    pub sections: std::collections::BTreeMap<String, serde_json::Value>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ChannelData {
     Accounts { accounts: Vec<AccountItem>, transactions: Vec<Transaction> },
     Holdings { holdings: Vec<HoldingItem> },
+    /// The entity's own record, when it has changed since the last look (or in the full picture); absent otherwise.
+    OwnRecord {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        record: Option<OwnRecord>,
+    },
     Records {
         /// (The state's own records, shared: a record is immutable once made, and one is shown to many.)
         records: Vec<Arc<Record>>,
@@ -934,6 +947,8 @@ fn build(s: &Statics, st: &State, index: &RecordIndex, participant: &str, mode: 
                         .collect();
                     ChannelData::Holdings { holdings }
                 }
+                // Its own record, and nobody else's: the channel names no one, and `me` is the capacity's own entity.
+                ChannelKind::OwnRecord => ChannelData::OwnRecord { record: st.entity_records.get(&me).filter(|r| changed(r.changed)).map(|r| OwnRecord { n: r.n, at: r.at, sections: r.sections.clone() }) },
                 ChannelKind::Records { way, filter, from: publishers, .. } => {
                     let from = after.unwrap_or(0);
                     let want = Want::of(*way, publishers.as_ref(), &me);

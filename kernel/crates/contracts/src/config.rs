@@ -928,6 +928,9 @@ pub enum ChannelKind {
     Directory {
         way: Way,
     },
+    /// It is theirs: the record of the seat's own entity (who they are and how things stand with them, as their
+    /// mind keeps it: docs/design/ai-citizens.md 10d). It names nobody, so it can show nobody else's.
+    OwnRecord,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -1024,6 +1027,9 @@ pub enum AllMarker {
 #[serde(deny_unknown_fields)]
 pub struct Caps {
     pub max_created_entities: u64,
+    /// The most an entity's own record may hold, in canonical bytes (absent: 8192). A record never grows past it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub entity_record_bytes: Option<u64>,
 }
 
 /// A config the kernel has parsed and checked. `canonical` is the exact JSON
@@ -1159,7 +1165,7 @@ pub fn check_channels(owner: &str, channels: &[Channel], seat: &Seat) -> Result<
         }
         let no = |why: String| Err(format!("{owner} channel {}: {why}", ch.id));
         let (way, area) = match &ch.kind {
-            ChannelKind::Accounts | ChannelKind::Holdings => continue,
+            ChannelKind::Accounts | ChannelKind::Holdings | ChannelKind::OwnRecord => continue,
             ChannelKind::Records { way, area, .. } | ChannelKind::Sites { way, area, .. } => (*way, area.as_ref()),
             ChannelKind::Directory { way } => (*way, None),
         };
@@ -1209,7 +1215,7 @@ pub fn check_channels(owner: &str, channels: &[Channel], seat: &Seat) -> Result<
             }
         };
         match &ch.kind {
-            ChannelKind::Accounts | ChannelKind::Holdings => {}
+            ChannelKind::Accounts | ChannelKind::Holdings | ChannelKind::OwnRecord => {}
             ChannelKind::Directory { .. } => {
                 if way != Way::Ask {
                     return no("a directory is looked up (`way: ask`), never shown".into());

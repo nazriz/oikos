@@ -1,0 +1,641 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:oikos:contracts:0.8:entity-record",
+  "title": "Oikos entity record: a person's sections",
+  "description": "An entity's own record (docs/design/ai-citizens.md 10d): who they are and how things stand with them, as their mind keeps it. The kernel holds one per entity, is its only writer (the log's entity_record command), reads none of it, and refuses a change that would take it past the world's caps.entity_record_bytes: it never grows. This schema is the shape a person's record has as the code citizen writes it: every list is bounded here, so the most a record can hold can be read from this file. Whole numbers only; levels are basis points (0 to 10000), views and affinities -10000 to 10000. Nothing in it says whether anything is good or bad. Only the entity is ever shown its record (world-config Channel kind own_record).",
+  "$defs": {
+    "PersonRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "values": {
+          "description": "Schwartz's ten basic values: what the person believes in. They drift slowly and are shocked by what happens (a death, a child, ruin, losing a home).",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "self_direction",
+            "stimulation",
+            "hedonism",
+            "achievement",
+            "power",
+            "security",
+            "conformity",
+            "tradition",
+            "benevolence",
+            "universalism"
+          ],
+          "properties": {
+            "self_direction": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            "stimulation": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            "hedonism": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            "achievement": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            "power": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            "security": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            "conformity": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            "tradition": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            "benevolence": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            "universalism": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            }
+          }
+        },
+        "temperament": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "openness": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            "conformity": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            "prestige": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            }
+          },
+          "required": [
+            "openness",
+            "conformity",
+            "prestige"
+          ],
+          "description": "How the person acts, apart from what they believe. Hardly ever moves."
+        },
+        "needs": {
+          "description": "How well each need is met now, as the person judges their own life. Absent for a child.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "subsistence": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            "shelter": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            "security": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            "social": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            "status": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            "belonging": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            "meaning": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            }
+          }
+        },
+        "agency": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "now": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            "own": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            }
+          },
+          "required": [
+            "now",
+            "own"
+          ],
+          "description": "Sense of agency: how far the person believes that what they do makes a difference, now; and their own level, which it returns to."
+        },
+        "trust": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "people": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            "in": {
+              "type": "array",
+              "maxItems": 12,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "in": {
+                    "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+                  },
+                  "kind": {
+                    "$ref": "urn:oikos:contracts:0.8:common#/$defs/Label"
+                  },
+                  "bps": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10000
+                  }
+                },
+                "required": [
+                  "in",
+                  "kind",
+                  "bps"
+                ]
+              }
+            }
+          },
+          "required": [
+            "in"
+          ],
+          "description": "Trust in particular institutions and bodies (this bank, this council, this landlord), each with the kind of institution it is to the person; and in people in general."
+        },
+        "attached": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "place": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "to": {
+                  "type": "string",
+                  "maxLength": 128
+                },
+                "bps": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10000
+                },
+                "since": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "to",
+                "bps",
+                "since"
+              ]
+            },
+            "trade": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "to": {
+                  "type": "string",
+                  "maxLength": 128
+                },
+                "bps": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10000
+                },
+                "since": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "to",
+                "bps",
+                "since"
+              ]
+            },
+            "group": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "to": {
+                  "type": "string",
+                  "maxLength": 128
+                },
+                "bps": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10000
+                },
+                "since": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "to",
+                "bps",
+                "since"
+              ]
+            }
+          },
+          "description": "Attachments: to a place, a trade, a group; how strongly, and since when."
+        },
+        "views": {
+          "description": "Of each who holds power over the person (who governs, houses or employs them): what they think (`private`) and what they say (`expressed`). The gap depends on trust and fear.",
+          "type": "array",
+          "maxItems": 4,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "of": {
+                "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+              },
+              "private": {
+                "type": "integer",
+                "minimum": -10000,
+                "maximum": 10000
+              },
+              "expressed": {
+                "type": "integer",
+                "minimum": -10000,
+                "maximum": 10000
+              }
+            },
+            "required": [
+              "of",
+              "private",
+              "expressed"
+            ]
+          }
+        },
+        "ties": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "close": {
+              "type": "array",
+              "maxItems": 5,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "who": {
+                    "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+                  },
+                  "affinity": {
+                    "type": "integer",
+                    "minimum": -10000,
+                    "maximum": 10000
+                  },
+                  "trust": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10000
+                  },
+                  "last": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "what": {
+                        "$ref": "urn:oikos:contracts:0.8:common#/$defs/Label"
+                      },
+                      "t": {
+                        "$ref": "urn:oikos:contracts:0.8:common#/$defs/SimTime"
+                      }
+                    },
+                    "required": [
+                      "what",
+                      "t"
+                    ],
+                    "description": "What last passed between them, and when."
+                  }
+                },
+                "required": [
+                  "who",
+                  "affinity",
+                  "trust"
+                ]
+              }
+            },
+            "resented": {
+              "type": "array",
+              "maxItems": 3,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "who": {
+                    "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+                  },
+                  "affinity": {
+                    "type": "integer",
+                    "minimum": -10000,
+                    "maximum": 10000
+                  },
+                  "trust": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10000
+                  },
+                  "last": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "what": {
+                        "$ref": "urn:oikos:contracts:0.8:common#/$defs/Label"
+                      },
+                      "t": {
+                        "$ref": "urn:oikos:contracts:0.8:common#/$defs/SimTime"
+                      }
+                    },
+                    "required": [
+                      "what",
+                      "t"
+                    ],
+                    "description": "What last passed between them, and when."
+                  }
+                },
+                "required": [
+                  "who",
+                  "affinity",
+                  "trust"
+                ]
+              }
+            }
+          },
+          "required": [
+            "close",
+            "resented"
+          ],
+          "description": "The closest few ties and the few most resented: affinity, trust, and what last passed between them."
+        },
+        "beliefs": {
+          "description": "Teachings held: how strongly, and whose they are.",
+          "type": "array",
+          "maxItems": 6,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "teaching": {
+                "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+              },
+              "bps": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
+              },
+              "from": {
+                "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+              }
+            },
+            "required": [
+              "teaching",
+              "bps"
+            ]
+          }
+        },
+        "wants": {
+          "description": "What the person is trying to bring about (docs/design/ai-citizens.md 10a): what it is about, of what kind, how much it matters, since when. A want held together with one's household names the household's record (`with`): each member holds it in their own record, with their own weight. Empty until wants are built (the step after the record).",
+          "type": "array",
+          "maxItems": 6,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "about": {
+                "type": "string",
+                "maxLength": 128
+              },
+              "kind": {
+                "$ref": "urn:oikos:contracts:0.8:common#/$defs/Label"
+              },
+              "weight": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
+              },
+              "since": {
+                "$ref": "urn:oikos:contracts:0.8:common#/$defs/SimTime"
+              },
+              "with": {
+                "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+              }
+            },
+            "required": [
+              "about",
+              "kind",
+              "weight",
+              "since"
+            ]
+          }
+        },
+        "memory": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "recent": {
+              "type": "array",
+              "maxItems": 8,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "t": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "what": {
+                    "$ref": "urn:oikos:contracts:0.8:common#/$defs/Label"
+                  },
+                  "about": {
+                    "type": "string",
+                    "maxLength": 128
+                  },
+                  "size": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10000
+                  }
+                },
+                "required": [
+                  "t",
+                  "what",
+                  "size"
+                ],
+                "description": "Something that happened: when, what (a word of the mind's own: hired, bereaved, evicted, job_lost, ruined, child, ...), about whom, and how large it was to them."
+              }
+            },
+            "defining": {
+              "type": "array",
+              "maxItems": 4,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "t": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "what": {
+                    "$ref": "urn:oikos:contracts:0.8:common#/$defs/Label"
+                  },
+                  "about": {
+                    "type": "string",
+                    "maxLength": 128
+                  },
+                  "size": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10000
+                  }
+                },
+                "required": [
+                  "t",
+                  "what",
+                  "size"
+                ],
+                "description": "Something that happened: when, what (a word of the mind's own: hired, bereaved, evicted, job_lost, ruined, child, ...), about whom, and how large it was to them."
+              }
+            }
+          },
+          "required": [
+            "recent",
+            "defining"
+          ],
+          "description": "Bounded memory: the last few things that happened, and the few that defined the person, kept for good."
+        },
+        "hours": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "from": {
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/SimTime"
+            },
+            "to": {
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/SimTime"
+            },
+            "seconds": {
+              "type": "object",
+              "maxProperties": 10,
+              "propertyNames": {
+                "$ref": "urn:oikos:contracts:0.8:common#/$defs/Label"
+              },
+              "additionalProperties": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 31536000
+              }
+            }
+          },
+          "required": [
+            "from",
+            "to",
+            "seconds"
+          ],
+          "description": "Where the hours of the last period went: seconds by what the person was at (work, learning, gathering, care, home, away)."
+        },
+        "circumstances": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "household": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000
+            },
+            "housed": {
+              "enum": [
+                0,
+                1
+              ]
+            },
+            "working": {
+              "enum": [
+                0,
+                1
+              ]
+            },
+            "retired": {
+              "enum": [
+                0,
+                1
+              ]
+            },
+            "income": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "savings": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "household",
+            "housed",
+            "working",
+            "retired"
+          ],
+          "description": "How things stand: the household's size, whether housed, in work, stopped work; a month's income and the money in hand, in the world's smallest unit of money (written again when they move by a twentieth)."
+        }
+      },
+      "description": "A person's record: every section optional (a record is set section by section), every list bounded."
+    }
+  }
+}

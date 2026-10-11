@@ -770,6 +770,12 @@
         "max_created_entities": {
           "description": "Researcher's experimental control on how many entities participants may declare in a run.",
           "$ref": "urn:oikos:contracts:0.8:common#/$defs/Count"
+        },
+        "entity_record_bytes": {
+          "description": "The most an entity's own record may hold, in canonical bytes of its sections (absent: 8192). The kernel refuses a change that would take a record past it: a record never grows (docs/design/ai-citizens.md 10d).",
+          "type": "integer",
+          "minimum": 256,
+          "maximum": 65536
         }
       }
     },
@@ -1075,15 +1081,34 @@
               },
               "decimal_mark": {
                 "description": "The mark its place writes before the decimals: a point or a comma. Absent: a point, unless group_mark is a point (then a comma). Presentation only: amounts are shown with it, and read by it where a mark alone could mean two numbers (with a comma, 1.234 is one thousand two hundred and thirty-four, and 1,234 has three decimals).",
-                "enum": [".", ","]
+                "enum": [
+                  ".",
+                  ","
+                ]
               },
               "group_mark": {
                 "description": "The mark its place writes between groups of digits: a comma, a point, a space (plain, no-break or narrow no-break; all read as one), or an apostrophe (straight or curly). Absent: a comma, or a point where decimal_mark is a comma. Presentation only. Not the decimal mark.",
-                "enum": [",", ".", " ", "\u00a0", "\u202f", "'", "\u2019"]
+                "enum": [
+                  ",",
+                  ".",
+                  " ",
+                  " ",
+                  " ",
+                  "'",
+                  "’"
+                ]
               },
               "grouping": {
                 "description": "How its place groups digits: [3] in threes; [3, 2] the last three, then twos (1,23,45,678). Absent: threes when written; when read, threes, and twos too where the group mark is a comma.",
-                "enum": [[3], [3, 2]]
+                "enum": [
+                  [
+                    3
+                  ],
+                  [
+                    3,
+                    2
+                  ]
+                ]
               },
               "symbol_after": {
                 "description": "Its sign (or code) is written after the digits. Absent or false: before.",
@@ -1096,14 +1121,46 @@
               "number_words": {
                 "description": "The words its place writes for large numbers, with their values (in lower case; the general ones, thousand and million, k and m, are read in any currency and need not be listed). A number followed by one is that many times its value; they are read, never written.",
                 "type": "object",
-                "propertyNames": { "$ref": "#/$defs/CurrencyWord" },
-                "additionalProperties": { "type": "integer", "minimum": 10, "maximum": 1000000000000 }
+                "propertyNames": {
+                  "$ref": "#/$defs/CurrencyWord"
+                },
+                "additionalProperties": {
+                  "type": "integer",
+                  "minimum": 10,
+                  "maximum": 1000000000000
+                }
               }
             },
             "not": {
               "anyOf": [
-                { "required": ["decimal_mark", "group_mark"], "properties": { "decimal_mark": { "const": "," }, "group_mark": { "const": "," } } },
-                { "required": ["decimal_mark", "group_mark"], "properties": { "decimal_mark": { "const": "." }, "group_mark": { "const": "." } } }
+                {
+                  "required": [
+                    "decimal_mark",
+                    "group_mark"
+                  ],
+                  "properties": {
+                    "decimal_mark": {
+                      "const": ","
+                    },
+                    "group_mark": {
+                      "const": ","
+                    }
+                  }
+                },
+                {
+                  "required": [
+                    "decimal_mark",
+                    "group_mark"
+                  ],
+                  "properties": {
+                    "decimal_mark": {
+                      "const": "."
+                    },
+                    "group_mark": {
+                      "const": "."
+                    }
+                  }
+                }
               ]
             }
           }
@@ -2233,6 +2290,36 @@
             "way": {
               "description": "They asked: who exists and who holds which office, looked up one at a time. A look must say whom (`who`); nothing is ever shown unasked, and no look returns everyone.",
               "const": "ask"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "id",
+            "kind"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId"
+            },
+            "title": {
+              "description": "What the participant's reports call this channel (e.g. 'Treasury', 'Council business'). Presentation only; the kernel ignores it.",
+              "type": "string",
+              "maxLength": 200
+            },
+            "every": {
+              "description": "How often the participant looks through this channel. Between looks, changes accumulate; the next look delivers them. Default: at every observation. Coverage and frequency are experimental variables.",
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/Duration"
+            },
+            "on_request": {
+              "description": "Perceived only when the participant asks (a look), never at ordinary observations: attention. A look through a records channel can be a search.",
+              "type": "boolean"
+            },
+            "kind": {
+              "const": "own_record",
+              "description": "It is theirs: the record of the seat's own entity (who they are and how things stand with them, as their mind keeps it: docs/design/ai-citizens.md 10d), when it has changed. The channel names nobody, so nobody else's record can be shown through it: no other channel shows a record at all."
             }
           }
         }

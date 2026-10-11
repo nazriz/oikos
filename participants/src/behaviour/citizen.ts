@@ -27,7 +27,7 @@
 import { cents } from "../money";
 import type { Eligibility, LookRequest, Observation, ParticipantAction, Record, SiteStructure, StatementRecord } from "../contracts";
 import { basesOf, channels, cites } from "../contracts";
-import { DECISIONS, OUTCOMES, params, wait, type Belief, type BehaviourModule, type ConsultAnswer, type DecisionRecord, type OutcomeRecord, type ParticipantContext } from "../module";
+import { DECISIONS, OUTCOMES, RECORD, params, wait, type Belief, type BehaviourModule, type ConsultAnswer, type DecisionRecord, type OutcomeRecord, type ParticipantContext, type RecordChange } from "../module";
 import type { Rng } from "../rng";
 import * as C from "../calls";
 import { ask, Asked, because, Book, firstDue, breaches, noted, callAction, commitmentOf, DAY, nextLook, usd, jobTerms, record, leaseTerms, message, MONTH, moveIn, moveOut, notice, pay, PAYMENT_FAILED, petitionSignatures, publishedCount, say, sign, stoodEmpty, structureOf, variableToday, vote, withdraw, type Step, ownBanked } from "./common";
@@ -36,6 +36,8 @@ import { Deliveries, goodsPrices, offerOf as shopOffer, order } from "./trade";
 import { dayPayPeriod, incomeTaxLaw, withholding } from "./tax";
 import { declarationFor, forHousehold, forOutOfWork, stopsWorkAt, supportLaw, type PaymentRule } from "./payments";
 import { Borrowing, loanFor } from "./credit";
+import { Inner, innerParams, UPBRINGING, type InnerParams, type Outlook } from "./inner";
+import { VALUES as VALUES_OF_MIND } from "./mind";
 import { factsOf, Feelings, Mind, MIND_DEFAULTS, MIND_VERSION, Pursuit, satisfaction, Ties, type Circumstances, type Facts, type MindParams, type NeedLevels, type PopulationValues, type Value } from "./mind";
 
 /** How belief changes (docs/behaviour/citizen.md "Belief"; placeholders): a month's fading; how much of the way to
@@ -81,9 +83,31 @@ export const CATCHING_UP = {
   goes: (host: string) => `I go to ${host}'s gatherings.`,
   holds: (host: string) => `I hold to what ${host} teaches.`,
   leans: (host: string) => `I lean towards what ${host} teaches.`,
+  // (Since the richer record, docs/design/ai-citizens.md 10c: what was done to us lately, and what we say of how the
+  // town is run: what we say, which is not always what we think.)
+  lostWork: (employer: string) => `${employer} let me go.`,
+  noticed: (landlord: string) => `${landlord} has given me notice to leave my home.`,
+  town: (view: number) => `I'd say the town is run ${view >= 2_000 ? "well" : view <= -2_000 ? "badly" : "well enough"}.`,
   nothing: "Much the same.",
 };
-export interface News { shop?: string; served?: number; employer?: string; paid?: boolean; member?: boolean; goesTo?: string[]; holdsTo?: string[]; leansTo?: string[] }
+/** Telling those we are close to that someone of our household has died (a code citizen's phrasing, and its reading). */
+export const MOURNING = {
+  tell: (who: string) => `I have sad news: ${who} has died.`,
+  heard: (text: string): string | undefined => /^I have sad news: ([^\s;]+) has died\.$/.exec(text)?.[1],
+};
+/** Coming of age, someone born or brought here as a child asks the parents they live with what matters to them, and
+ * is told in words (docs/behaviour/citizen.md, "Upbringing"): the three values a parent holds most, and the three least. */
+export const UPBRINGING_WORDS = {
+  ask: "What matters most to you in life?",
+  say: (most: string[], least: string[]) => `What matters most to me: ${most.join(", ")}. Least: ${least.join(", ")}.`,
+  heard: (text: string): { most: string[]; least: string[] } | undefined => {
+    const m = /^What matters most to me: ([a-z_, ]+)\. Least: ([a-z_, ]+)\.$/.exec(text);
+    return m ? { most: m[1]!.split(", "), least: m[2]!.split(", ") } : undefined;
+  },
+};
+export interface News { shop?: string; served?: number; employer?: string; paid?: boolean; member?: boolean; goesTo?: string[]; holdsTo?: string[]; leansTo?: string[];
+  /** Who let them go, who gave them notice to leave their home; and what they say of how the town is run (1 well, 0 well enough, -1 badly). */
+  letGoBy?: string; noticedBy?: string; town?: number }
 /** What someone's answer tells us, if it's in our phrasing (how well a shop serves: the middle of what the words say). */
 export function heardNews(text: string): News | undefined {
   const n: News = {};
@@ -103,6 +127,9 @@ export function heardNews(text: string): News | undefined {
   if (holds.length) n.holdsTo = holds;
   const leans = [...text.matchAll(/I lean towards what ([^\s;']+) teaches\./g)].map((x) => x[1]!);
   if (leans.length) n.leansTo = leans;
+  if ((m = /([^\s;]+) let me go\./.exec(text))) n.letGoBy = m[1]!;
+  if ((m = /([^\s;]+) has given me notice to leave my home\./.exec(text))) n.noticedBy = m[1]!;
+  if ((m = /I'd say the town is run (well enough|well|badly)\./.exec(text))) n.town = m[1] === "well" ? 1 : m[1] === "badly" ? -1 : 0;
   return Object.keys(n).length ? n : undefined;
 }
 
@@ -118,7 +145,7 @@ interface Job { agreement: string; employer: string; wage: number; period: numbe
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.43.2", // 0.43.2: offered a job that names no place of work, on an advertisement, goes to work where the advertisement says; 0.43.1: tells their own business when they move home; 0.43.0: someone who works for themself (own_work): not out of work, their income what the business pays them, at their pitch in working hours; 0.42.1: work by the day (a day's pay known as pay; no claim for a day not worked); 0.42.0: reads the support law, stops work at an age of its own (0.41.0 on its branch), with main's 0.41.1
+  version: "0.44.0", // 0.44.0: the richer record (docs/design/ai-citizens.md 10c, 10d): belonging and meaning as needs, trust in particular institutions, a sense of agency, attachments, what is thought and what is said, values that drift and are shocked, bounded ties, where the hours go; held by the kernel as the person's own record; 0.43.2: offered a job that names no place of work, on an advertisement, goes to work where the advertisement says; 0.43.1: tells their own business when they move home; 0.43.0: someone who works for themself (own_work): not out of work, their income what the business pays them, at their pitch in working hours; 0.42.1: work by the day (a day's pay known as pay; no claim for a day not worked); 0.42.0: reads the support law, stops work at an age of its own (0.41.0 on its branch), with main's 0.41.1
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -180,6 +207,18 @@ export const citizen: BehaviourModule = {
       sale_board: "",
       // The mind (docs/design/ai-citizens.md 3): the world's figures for drawing people's values, and its thresholds.
       values: { values: {} } as PopulationValues,
+      // This person's own values, where the world gave them (who lives in a town is the town's; a child's come from
+      // the adults who raise them: docs/behaviour/citizen.md "Upbringing"). None: drawn from the world's figures.
+      own_values: null as { [value: string]: number } | null,
+      // How people here start out (the world's profile: docs/behaviour/citizen.md "The record"): the share with
+      // confidence in each kind of institution, the share who say most people can be trusted, how much control over
+      // their lives people feel. None given: the record's own placeholders (`inner`).
+      outlook: {} as Outlook,
+      // The record's arithmetic (docs/behaviour/citizen.md "The record"): every size a placeholder unless sourced there.
+      inner: {} as Partial<InnerParams>,
+      // Which of the world's offices is which kind of institution (the kinds a place's survey gives confidence in),
+      // for those the module does not know by a parameter of its own (the world says; none: by parameter only).
+      institutions: {} as { [entity: string]: string },
       essentials_units: 10, // goods a household uses in a fortnight, for how well subsistence is met (placeholder)
       mind: {} as Partial<MindParams>,
       sway: SWAY, // how far a person's values sway the cited rates (above)
@@ -325,7 +364,92 @@ export const citizen: BehaviourModule = {
     let favourite: string | undefined;
     // The mind: a person drawn once from the world's figures, and what it learns (docs/design/ai-citizens.md 3).
     // (A shop not yet tried is expected to serve most of what's asked: one that serves nothing then counts against it.)
-    const mind = new Mind(ctx.rng("person"), p.values, { ...MIND_DEFAULTS, ...p.mind, ewa: { ...MIND_DEFAULTS.ewa, ...(p.mind.ewa ?? {}) } }, { shop: 8_000, job: 5_000, practice: 4_000 });
+    const mind = new Mind(ctx.rng("person"), p.values, { ...MIND_DEFAULTS, ...p.mind, ewa: { ...MIND_DEFAULTS.ewa, ...(p.mind.ewa ?? {}) } }, { shop: 8_000, job: 5_000, practice: 4_000 }, p.own_values ?? undefined);
+    // The richer record (docs/design/ai-citizens.md 10c): trust, agency, attachments, views, dents, memory, hours.
+    const inner = new Inner(ctx.rng("inner"), mind.person.values, p.values.values, p.outlook, innerParams(p.inner));
+    /** What kind of institution someone is to us (the kinds a place's survey gives confidence in). */
+    const kindOf = (who: string): string =>
+      p.institutions[who] ?? (who === p.bank ? "banks" : who === p.union ? "unions" : who === p.complain_to || who === p.electoral_town ? "government"
+        : who === p.tribunal?.entity ? "courts" : who === p.welfare?.police ? "policing" : who === p.paper ? "press"
+        : who === p.care?.entity || who === p.school?.entity ? "civil_service" : employers.has(who) ? "companies" : "other");
+    const employers = new Set<string>(); // those we have worked for (an employer is a company to us)
+    // What was done to us lately, that we tell those who ask how we are (for `news_days`).
+    let letGo: { by: string; t: number } | null = null;
+    let noticedBy: { by: string; t: number } | null = null;
+    // The record as last written (each section's JSON), and the change waiting to go with our next action.
+    const written = new Map<string, string>();
+    let recordChange: RecordChange | null = null;
+    let lastSeenT = 0; // when we last woke
+    // Upbringing (docs/behaviour/citizen.md): someone the world gave no values of their own (born here, or come as a
+    // child) has, until they come of age, those drawn for them; then they ask the parents they live with, and theirs settle.
+    const upbringing = { settled: !!p.own_values, askedAt: null as number | null, told: [] as { most: string[]; least: string[] }[] };
+    let askedWhatMatters: string[] = [];
+    /** What we were at since we last woke, by where our body is (where the hours go: docs/design/ai-citizens.md 10b,
+     * 10h): work, learning, a gathering, care, home (our own, or any dwelling: a child knows theirs only by being in
+     * it), or away (anywhere else, or nowhere). The way there is not told apart. */
+    const whereAt = (space: string | undefined): string =>
+      !space ? "away" : space === attending?.space ? "gathering" : space === job?.workplace || (ownWork?.at !== undefined && space === ownWork.at) ? "work"
+        : p.school && structureOf(space) === p.school.building ? "learning" : p.care && space === p.care.waiting ? "care"
+        : space === home?.space || space === livingAt || /\/dwelling\.\d+$/.test(space) ? "home" : "away";
+    /** Whether a section has moved enough to be written again: any change of shape or words, or a number by more
+     * than the section's grain. (The record is a summary to read, not the mind's own working figures: writing every
+     * week's fading of every tie would be most of a log.) */
+    const moved = (a: unknown, b: unknown, grain: number): boolean => {
+      if (typeof a === "number" && typeof b === "number") return Math.abs(a - b) > grain;
+      if (a === null || b === null || typeof a !== "object" || typeof b !== "object") return a !== b;
+      const ka = Object.keys(a as object), kb = Object.keys(b as object);
+      if (ka.length !== kb.length || Array.isArray(a) !== Array.isArray(b)) return true;
+      return ka.some((k) => !(k in (b as object)) || moved((a as any)[k], (b as any)[k], grain));
+    };
+    // How far a number in each section must move before the section is written again (basis points; money by a
+    // twentieth of itself, below). Needs, values and what is remembered are written whenever they change.
+    const GRAIN: { [section: string]: number } = { agency: 50, trust: 100, attached: 200, views: 200, ties: 500, beliefs: 100 };
+    let hoursAt = 0;
+    /** The record as it stands, for the kernel to hold (contracts/entity-record.schema.json): the sections that have
+     * moved since they were last written, to go with our next action. `adult`: needs and the rest are judged. */
+    const writeRecord = (t: number, adult: boolean, means?: { income: number; savings: number }) => {
+      const sec = inner.sections();
+      const whole = (x: number) => Math.round(x);
+      const tie = (x: { who: string; affinity: number; trust: number; last?: { what: string; t: number } }) => ({ who: x.who, affinity: whole(x.affinity), trust: whole(x.trust), ...(x.last ? { last: x.last } : {}) });
+      const all: { [section: string]: unknown } = {
+        values: { ...mind.person.values },
+        temperament: { ...mind.person.temperament },
+        ...(adult ? { needs: { ...levelsNow } } : {}),
+        agency: sec.agency,
+        trust: { people: whole(p.outlook.people_bps ?? inner.p.trust.start_bps), in: sec.trust },
+        attached: sec.attached,
+        views: sec.views,
+        ties: { close: ties.closest(5, t).map(tie), resented: ties.resented(3, t).map(tie) },
+        beliefs: [...beliefs].filter(([, b]) => b > 0).sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1)).slice(0, 6).map(([teaching, bps]) => {
+          const r = book.records.get(teaching);
+          const from = r?.record === "statement" ? r.speaks_for ?? r.author : undefined;
+          return { teaching, bps: whole(bps), ...(from ? { from } : {}) };
+        }),
+        // (Wants are the next step's: docs/design/ai-citizens.md 10a. A want held with one's household names its record.)
+        wants: [],
+        memory: sec.memory,
+        circumstances: { household: household?.members.length ?? 1, housed: home || livingAt ? 1 : 0, working: job || ownWork ? 1 : 0, retired: retired ? 1 : 0,
+          ...(means ? { income: whole(means.income), savings: whole(means.savings) } : {}) },
+      };
+      // Where the hours went: a week's at a time.
+      if (t - hoursAt >= 7 * DAY) {
+        hoursAt = t;
+        all.hours = inner.takeHours(t);
+      }
+      const set: { [section: string]: unknown } = { ...(recordChange?.set ?? {}) };
+      for (const [k, v] of Object.entries(all)) {
+        const before = written.get(k);
+        const was = before === undefined ? undefined : JSON.parse(before);
+        const changed = was === undefined ? true
+          : k === "circumstances" ? moved({ ...(v as any), income: 0, savings: 0 }, { ...was, income: 0, savings: 0 }, 0) || ["income", "savings"].some((m) => Math.abs(((v as any)[m] ?? 0) - (was[m] ?? 0)) * 20 > Math.max(1, Math.abs(was[m] ?? 0)))
+          : moved(v, was, GRAIN[k] ?? 0);
+        if (!changed) continue;
+        written.set(k, JSON.stringify(v));
+        set[k] = v;
+      }
+      const because = [...(recordChange?.because ?? []), ...inner.takeSince()].slice(-16);
+      if (Object.keys(set).length) recordChange = { set, ...(because.length ? { because } : {}) };
+    };
     // How far this person's value sits from their world's (standardised, -3..3): a person's rates follow their values,
     // the town's stay as calibrated (docs/design/ai-citizens.md 3a).
     const zValue = (v: Value) => {
@@ -355,6 +479,62 @@ export const citizen: BehaviourModule = {
     const outcome = (o: OutcomeRecord, own = true) => {
       const of = own ? chose.get(`${o.domain}:${o.option}`) : undefined;
       outcomes.push({ ...o, ...(of !== undefined ? { of } : {}) });
+      appraised(o, own);
+    };
+    /**
+     * What a thing that happened does to trust, agency and the rest of the record (docs/behaviour/citizen.md "The
+     * record"): every outcome the citizen comes to know passes here once, so nothing is appraised that it did not
+     * know, and nothing twice. `own`: ours; else someone else's, told to us.
+     */
+    const appraised = (o: OutcomeRecord, own: boolean) => {
+      const t = o.t;
+      const who = o.option;
+      switch (`${o.domain}:${o.kind}`) {
+        case "job:hired": employers.add(who); inner.tried(true); inner.experience(who, "companies", true, t); inner.remember({ t, what: "hired", about: who, size: 2_000 }); break;
+        case "job:paid": inner.experience(who, kindOf(who), true, t, { weight: 0.2 }); break;
+        case "job:rise": inner.experience(who, kindOf(who), true, t); break;
+        case "job:unpaid": inner.experience(who, kindOf(who), false, t, { weight: 2 }); inner.doneTo(); ties.add(who, -3_000, t, "unpaid"); feelings.feel("fear", who, 3_000, t); inner.remember({ t, what: "unpaid", about: who, size: 4_000 }); break;
+        case "job:no_work": inner.experience(who, kindOf(who), false, t); inner.doneTo(0.5); break;
+        case "job:ended":
+          if (o.facts?.by !== "self") {
+            // Let go: more than income is lost, the more so the more the trade was ours (docs/design/ai-citizens.md 10c).
+            inner.experience(who, kindOf(who), false, t);
+            inner.doneTo();
+            ties.add(who, -1_000, t, "let_go");
+            inner.happened("job_lost", t, { about: who, closeness: 0.5 + inner.attachedTo("trade") / 20_000 });
+            letGo = { by: who, t };
+          }
+          break;
+        case "job:told":
+          if (!own && (inner.trusted(who) !== undefined || job?.employer === who)) inner.experience(who, kindOf(who), o.facts?.paid !== false, t, { heard: true });
+          break;
+        case "home:lease_signed": inner.tried(true); inner.remember({ t, what: "housed", about: who, size: 2_000 }); break;
+        case "home:moved_in": inner.tried(true, 0.5); break;
+        case "home:renewed": if (home) inner.experience(home.landlord, kindOf(home.landlord), true, t); break;
+        case "home:rent_increase":
+          if (home && Number(o.facts?.rent) > Number(o.facts?.was)) { inner.experience(home.landlord, kindOf(home.landlord), false, t); inner.doneTo(0.5); ties.add(home.landlord, -1_000, t, "rent_rise"); feelings.feel("fear", home.landlord, 2_000, t); }
+          break;
+        case "home:notice_received": {
+          const by = String(o.facts?.from ?? "");
+          if (!by) break;
+          inner.experience(by, kindOf(by), false, t, { weight: 2 });
+          inner.doneTo();
+          ties.add(by, -3_000, t, "notice");
+          feelings.feel("fear", by, 5_000, t);
+          inner.happened("evicted", t, { about: by });
+          noticedBy = { by, t };
+          break;
+        }
+        case "membership:joined": inner.tried(true, 0.5); break;
+        case "membership:rise_won": if (p.union) inner.experience(p.union, "unions", true, t, { weight: 2 }); inner.tried(true); break;
+        case "practice:attended": { const host = String(o.facts?.host ?? ""); if (host) inner.experience(host, kindOf(host), true, t, { weight: 0.2 }); break; }
+        case "practice:turned_away": inner.tried(false); inner.happened("turned_away", t, { about: String(o.facts?.host ?? "") }); break;
+        case "goal:met": inner.tried(true); break;
+        case "goal:not_met": inner.tried(false); break;
+        case "venture:founded": inner.tried(true, 2); inner.remember({ t, what: "founded", about: String(o.facts?.firm ?? ""), size: 5_000 }); break;
+        case "venture:refused": inner.tried(false); break;
+        default:
+      }
     };
     /** What the mind has learned of an option, for the record: before an update (what it expected of one never tried or
      * heard of, marked `first`), and now. */
@@ -395,7 +575,9 @@ export const citizen: BehaviourModule = {
       ...(f.company !== undefined ? { company: Math.round(f.company) } : {}), ...(f.time_hours_per_month !== undefined ? { time_hours_per_month: Math.round(f.time_hours_per_month) } : {}) });
     // Feelings, about people and things (docs/design/ai-citizens.md 3d), and ties with the people we know.
     const feelings = new Feelings();
-    const ties = new Ties();
+    // (Kept: as many as we keep contacts, and the few we resent. How far a tie is trusted starts from how far people
+    // here say most people can be trusted, where the world says.)
+    const ties = new Ties(180, p.max_contacts + 3, p.outlook.people_bps ?? 5_000);
     const leadFrom = new Map<string, string>(); // a building someone told us to look at -> who told us
     // Goals: what we're pursuing, by which method; since when each need has gone unmet; when we may try again after
     // giving up; and, looking for a cheaper home, the rent to beat (for the first month of the hunt).
@@ -458,7 +640,7 @@ export const citizen: BehaviourModule = {
           ...(emotion ? { emotion } : {}), ...(Object.keys(held).length ? { beliefs: held } : {}), ...(goal ? { goal: { goal: goal.goal, method: goal.method! } } : {}) } });
       return d;
     };
-    let levelsNow: NeedLevels = { subsistence: 10_000, shelter: 10_000, security: 10_000, social: 10_000, status: 10_000 }; // as last judged
+    let levelsNow: NeedLevels = { subsistence: 10_000, shelter: 10_000, security: 10_000, social: 10_000, status: 10_000, belonging: 10_000, meaning: 10_000 }; // as last judged
     let nextShop = ctx.rng("shop-day").below(p.shop_every_days) * DAY;
     let lastShop: number | null = null; // when the last trip was
     let trip: { at: number; tried: Set<string> } | null = null;
@@ -803,10 +985,33 @@ export const citizen: BehaviourModule = {
           continue;
         }
         const person = m.from_entity ?? book.participantPerson.get(m.from) ?? m.from; // who wrote (the directory names their person)
+        // A child of ours come of age asks what matters to us; or a parent of ours answers.
+        if (m.text === UPBRINGING_WORDS.ask) {
+          askedWhatMatters.push(m.from);
+          continue;
+        }
+        const matters = UPBRINGING_WORDS.heard(m.text);
+        if (matters) {
+          if (upbringing.askedAt !== null && !upbringing.settled) upbringing.told.push(matters);
+          continue;
+        }
+        // Someone we know tells us that one of theirs has died: felt by how close the one who died was to us; and
+        // they are no longer anyone we can turn to.
+        const gone = MOURNING.heard(m.text);
+        if (gone) {
+          const close = ties.affinity(gone, obs.t);
+          if (close > 0) inner.happened("bereaved", obs.t, { about: gone, closeness: close / 10_000 });
+          else inner.remember({ t: obs.t, what: "death_told", about: gone, size: 1_000 });
+          ties.drop(gone);
+          contacts.delete(gone);
+          toldUs.delete(gone);
+          ties.add(person, 500, obs.t, "mourned");
+          continue;
+        }
         if (m.text === CATCHING_UP.ask) {
           askedHow.push(m.from);
           talked.set(person, obs.t);
-          ties.add(person, 300, obs.t);
+          ties.add(person, 300, obs.t, "talked");
           continue;
         }
         const told = heardNews(m.text);
@@ -814,7 +1019,11 @@ export const citizen: BehaviourModule = {
           // What they do, and how it goes for them: counted as others doing it, and learned from as others' payoffs.
           toldUs.set(person, { ...told, t: obs.t });
           talked.set(person, obs.t);
-          ties.add(person, 300, obs.t);
+          ties.add(person, 300, obs.t, "talked");
+          ties.trusted(person, true, 200); // (they answered: a little surer of them)
+          // What was done to someone we know, by someone we deal with too: it counts against them, as hearsay.
+          if (told.letGoBy && (inner.trusted(told.letGoBy) !== undefined || job?.employer === told.letGoBy)) inner.experience(told.letGoBy, kindOf(told.letGoBy), false, obs.t, { heard: true });
+          if (told.noticedBy && (inner.trusted(told.noticedBy) !== undefined || home?.landlord === told.noticedBy)) inner.experience(told.noticedBy, kindOf(told.noticedBy), false, obs.t, { heard: true });
           if (told.shop && told.served !== undefined) hearOf("shop", told.shop, told.served, { t: obs.t, kind: "told", way: "mine", from: person, facts: { served_bps: told.served } });
           if (told.employer && told.paid !== undefined) hearOf("job", told.employer, told.paid ? 10_000 : 0, { t: obs.t, kind: "told", way: "mine", from: person, facts: { paid: told.paid } });
           // Someone who keeps going somewhere finds it worth it (a placeholder for how much).
@@ -954,6 +1163,15 @@ export const citizen: BehaviourModule = {
           if (mourned.has(d.occupant) || !hh.members.some((m) => m.person === d.occupant)) continue;
           mourned.add(d.occupant);
           const dead = hh.members.find((m) => m.person === d.occupant)!;
+          // A death in the household: ours (docs/design/ai-citizens.md 10c). And told to those we are closest to, who
+          // may have known them: how a bereavement becomes a circle's.
+          inner.happened("bereaved", t, { about: dead.person });
+          ties.drop(dead.person);
+          contacts.delete(dead.person);
+          {
+            const close = ties.closest(5, t).map((x) => x.who).filter((w) => !hh.members.some((m) => m.person === w));
+            if (close.length) steps.push(because(`${dead.person}, of our household, has died: telling those we are closest to.`, message(close, MOURNING.tell(dead.person))));
+          }
           const heldLease = hh.leaseholder === dead.person;
           const survivors = hh.members.filter((m) => m.person !== d.occupant && !mourned.has(m.person));
           const grown = survivors.filter((m) => ageAt(m, t, year) >= ADULT_YEARS);
@@ -1099,6 +1317,7 @@ export const citizen: BehaviourModule = {
           const rate = [...(p.fertility_per_10000 as { from: number; rate: number }[])].reverse().find((r) => age >= r.from)?.rate ?? 0;
           if (rate > 0 && ctx.rng(`conceive-${t}`).below(120_000) < rate) {
             expectingUntil = t + p.gestation + MONTH;
+            if (together) inner.happened("child", t);
             if (together) steps.push(because(`Having a child: at ${age}, the chance this month is ${rate} in 120,000 (${rate} births per 10,000 women a year at this age).`,
               C.call("birth", { name: C.text(`baby of ${me}`), template: childTemplate(), ...(man ? { with: man.person } : {}) })));
           }
@@ -1198,9 +1417,70 @@ export const citizen: BehaviourModule = {
           // Company: living with others, and the people we've talked with this past month (up to three count).
           social: (household && household.members.length > 1 ? 5_000 : 2_000) + 1_000 * Math.min(3, [...talked.values()].filter((x) => t - x <= MONTH).length),
           status: job ? 7_000 : retired ? 6_000 : 3_000,
+          // Belonging: being part of something (a household, a group one takes part in, a few close ties, a place),
+          // less what a loss has taken. Meaning: what one holds to, work that is one's own, children to raise, taking
+          // part; less the same. Placeholders for how each is read from a life, as the five above are, with their
+          // floors set so that in an ordinary life the two are about as well met as the other five (in a town of 300
+          // over 90 days the five averaged 7,080 and these 7,350 and 7,100): adding them does not of itself make a
+          // town less satisfied; what happens to people does.
+          belonging: Math.max(0, Math.min(10_000, 3_200 + (household && household.members.length > 1 ? 3_000 : 0) + 1_000 * Math.min(3, ties.closest(5, t).filter((x) => x.affinity >= 1_000).length)
+            + Math.round(inner.attachedTo("group") / 5) + Math.round(inner.attachedTo("place") / 10) - inner.dent("belonging", t))),
+          meaning: Math.max(0, Math.min(10_000, 3_700 + Math.round(Math.max(0, ...beliefs.values()) * 0.3) + (job || ownWork ? 1_500 + Math.round(inner.attachedTo("trade") / 10) : retired ? 1_000 : 0)
+            + (children(t).length ? 2_000 : 0) + Math.round(inner.attachedTo("group") / 10) - inner.dent("meaning", t))),
         };
       };
+      // Asked by a child of ours what matters to us: said, as it is (at home nobody shades it).
+      if (askedWhatMatters.length) {
+        const ranked = [...VALUES_OF_MIND].sort((a, b) => mind.person.values[b] - mind.person.values[a] || (a < b ? -1 : 1));
+        steps.push(because("Asked by one of ours what matters to us: telling them.", message([...new Set(askedWhatMatters)].sort(), UPBRINGING_WORDS.say(ranked.slice(0, 3), ranked.slice(-3).reverse()))));
+        askedWhatMatters = [];
+      }
+      // Come of age without values the world gave us: we ask the parents we live with, once; a fortnight on (or as
+      // soon as all have answered) what we were told settles ours: toward each parent's most, away from their least,
+      // by the share upbringing counts for, the rest our own.
+      if (!upbringing.settled) {
+        const parents = (household?.members ?? []).filter((m) => m.person !== me && (obs.body?.parents ?? []).includes(m.person) && ageAt(m, t, year) >= ADULT_YEARS);
+        if (upbringing.askedAt === null) {
+          if (!parents.length) upbringing.settled = true;
+          else {
+            upbringing.askedAt = t;
+            steps.push(because("Come of age: asking our parents what matters to them.", message(parents.map(reach).sort(), UPBRINGING_WORDS.ask)));
+          }
+        } else if (upbringing.told.length >= parents.length || t - upbringing.askedAt >= 14 * DAY) {
+          upbringing.settled = true;
+          if (upbringing.told.length) {
+            const a = UPBRINGING.share_bps / 10_000;
+            for (const v of VALUES_OF_MIND) {
+              const d = p.values.values[v] ?? { mean_bps: 5_000, sd_bps: 1_500 };
+              const lean = upbringing.told.reduce((x, said) => x + (said.most.includes(v) ? 1 : said.least.includes(v) ? -1 : 0), 0) / upbringing.told.length;
+              mind.person.values[v] = Math.max(0, Math.min(10_000, Math.round(d.mean_bps + a * lean * d.sd_bps + Math.sqrt(1 - (a * a * 0.6) / upbringing.told.length) * (mind.person.values[v] - d.mean_bps))));
+            }
+            mind.reweigh();
+            inner.remember({ t, what: "came_of_age", size: 5_000 });
+          }
+        }
+      }
+      // Attachments grow with time (docs/design/ai-citizens.md 10c): to the place lived in, the trade worked at, the
+      // group taken part in; and what was lost fades. Trust and agency drift back toward the person's own.
+      inner.attach("place", home || livingAt ? "town" : undefined, t);
+      inner.attach("trade", job ? industryOf.get(job.employer) ?? job.employer : ownWork ? ownWork.firm : undefined, t);
+      inner.attach("group", [...wentLast].sort().map((id) => { const r = book.records.get(id); return r?.record === "statement" ? r.speaks_for ?? r.author : undefined; }).find((x) => x) ?? (inner.attached.group && memberOf(inner.attached.group.to) ? inner.attached.group.to : undefined), t);
+      inner.settle(t);
+      // Values drift, slowly (docs/behaviour/citizen.md "Values move"); what they weigh follows.
+      if (inner.drift(ctx.rng, t)) mind.reweigh();
       levelsNow = needLevels();
+      // What we think of those who hold power over us, and what we say of them (docs/design/ai-citizens.md 10c): the
+      // landlord who houses us and the employer who pays us could each cost us a great deal (a placeholder for how
+      // much). What we think follows how far we trust them, less our anger with them.
+      for (const who of [home && !home.owned ? home.landlord : undefined, job?.employer]) {
+        if (!who) continue;
+        if (who === job?.employer) employers.add(who);
+        const tr = inner.trustIn(who, kindOf(who), t);
+        inner.view(who, 2 * (tr - 5_000) - feelings.level("anger", who, t), { dependence: 8_000, fear: Math.max(feelings.level("fear", who, t), feelings.level("fear", "money", t)), trust: tr });
+      }
+      // (Those we deal with as a matter of course are known to us from the start: our bank, and our union if we belong.)
+      if (p.bank) inner.trustIn(p.bank, "banks", t);
+      if (p.union && isMember()) inner.trustIn(p.union, "unions", t);
       // Afraid for our money when it's running short (the security need well below met).
       if (levelsNow.security < 5_000) feelings.feel("fear", "money", (5_000 - levelsNow.security) * 2, t);
       // Goals (HTN, lite): a need long unmet becomes a goal, pursued by one method, then another, in the order our values
@@ -1240,6 +1520,8 @@ export const citizen: BehaviourModule = {
             const next = pur.next(t);
             record(next, w.methods.filter(([m]) => pur.methods.includes(m)));
             if (!next) {
+              // Nothing left to try for making ends meet: ruin (docs/design/ai-citizens.md 10c).
+              if (goal === "make ends meet") inner.happened("ruined", t);
               pursuits.delete(goal);
               restUntil.set(goal, t + G.rest_days * DAY);
             }
@@ -1538,7 +1820,7 @@ export const citizen: BehaviourModule = {
             companyAt.set(attending.practice, others.length);
             for (const o of others) {
               talked.set(o, t);
-              ties.add(o, 100, t);
+              ties.add(o, 100, t, "met");
             }
           }
           attending = null;
@@ -1615,7 +1897,12 @@ export const citizen: BehaviourModule = {
         const now = variableToday(v, t) ?? 0;
         if (binSeen.structure !== home.structure) Object.assign(binSeen, { structure: home.structure, value: now, emptiedAt: t });
         const days = Math.floor((t - binSeen.emptiedAt) / DAY);
-        if (complainedOf === home.structure && days < 7) complainedOf = null;
+        if (complainedOf === home.structure && days < 7) {
+          // Collected after we wrote: writing made a difference, and the town did its part.
+          complainedOf = null;
+          inner.tried(true);
+          inner.experience(p.complain_to, kindOf(p.complain_to), true, t);
+        }
         // Angry with whoever should collect it, the more so the longer it's been (half-way at `complain_after_days`);
         // we write once our anger passes our own threshold (the conformist bears it longer), with the week's chance.
         if (now > 0) feelings.feel("anger", p.complain_to, Math.min(10_000, Math.floor(((t - binSeen.emptiedAt) * 5_000) / (DAY * p.complain_after_days))), t);
@@ -1623,6 +1910,7 @@ export const citizen: BehaviourModule = {
         // (And only while it's still there, a week or more on.)
         if (now > 0 && days >= 7 && feelings.level("anger", p.complain_to, t) >= bearing && complainedOf !== home.structure && ctx.rng(`complain-${t}`).below(10_000) < p.complain_bps) {
           complainedOf = home.structure;
+          inner.experience(p.complain_to, kindOf(p.complain_to), false, t);
           steps.push(because(`Our ${p.complain_about} hasn't been collected for about ${days} days: writing to the town.`,
             say("complaint", `Our ${p.complain_about} at ${home.structure} hasn't been collected for about ${days} days.`, { to: [p.complain_to], visible: [me, p.complain_to], data: { structure: home.structure, about: p.complain_about, days } })));
         }
@@ -1725,6 +2013,9 @@ export const citizen: BehaviourModule = {
         const rule = rules.find((x) => x.id === payment);
         if (r.data?.granted) benefits.set(payment, { claim: r.data.claim, payment, payer: rule?.payer ?? r.speaks_for!, amount: r.data.amount, every: r.data.every, lasting: !!rule && !forOutOfWork(rule) });
         else { refusedAt.set(payment, age); refusedOn.set(payment, t); }
+        // (A claim answered: what we asked for came, or did not; and the office that decides is trusted more, or less.)
+        inner.tried(!!r.data?.granted);
+        if (r.speaks_for) inner.experience(r.speaks_for, kindOf(r.speaks_for) === "other" ? "civil_service" : kindOf(r.speaks_for), !!r.data?.granted, t);
         claiming.delete(payment);
       }
       // Looking for work: where someone told us about first, then the best-paid posting.
@@ -2000,7 +2291,8 @@ export const citizen: BehaviourModule = {
       if (!who) return "";
       leadFrom.delete(structure!);
       thanked = felt("add", "gratitude", who, 6_000, t);
-      ties.add(who, 2_000, t);
+      ties.add(who, 2_000, t, "tip");
+      ties.trusted(who, true, 2_000); // (what they told us was so)
       return ` (${who} told us to look there: we're grateful)`;
     };
     /** What we'd tell someone who asks how we are. */
@@ -2012,6 +2304,10 @@ export const citizen: BehaviourModule = {
       ...[...new Set(book.assertions().filter((r) => (beliefs.get(r.id) ?? 0) >= p.belief.tell_at_bps).map((r) => r.speaks_for ?? r.author))].sort().map(CATCHING_UP.holds),
       // (Held less firmly, but still one's own, as someone would answer a census: said, without urging it on anyone.)
       ...[...new Set(book.assertions().filter((r) => { const b = beliefs.get(r.id) ?? 0; return b >= p.belief.affiliate_bps && b < p.belief.tell_at_bps; }).map((r) => r.speaks_for ?? r.author))].sort().map(CATCHING_UP.leans),
+      letGo && lastSeenT - letGo.t <= p.news_days * DAY && !job ? CATCHING_UP.lostWork(letGo.by) : "",
+      noticedBy && lastSeenT - noticedBy.t <= p.news_days * DAY ? CATCHING_UP.noticed(noticedBy.by) : "",
+      // (What we say of the town: the expressed view, once we have one.)
+      p.electoral_town && inner.viewOf(p.electoral_town) ? CATCHING_UP.town(inner.viewOf(p.electoral_town)!.expressed) : "",
     ].filter(Boolean).join(" ") || CATCHING_UP.nothing;
     const wordOfMouth = (obs: Observation, t: number, steps: Step[]) => {
       // The buildings around us; in our own we see who's there (they're the people we know).
@@ -2542,6 +2838,11 @@ export const citizen: BehaviourModule = {
         approvedAt = t;
         const signal = Math.max(-10_000, Math.min(10_000, 2 * (satisfaction(mind.person, levelsNow) - 5_000) - feelings.level("anger", town, t)));
         approval = Math.round(approval + (signal - approval) / Math.max(1, p.civic.approval_memory_weeks));
+        // What we think of how the town is run, and what we say (docs/design/ai-citizens.md 10c): the town governs us,
+        // which is some hold over us (a placeholder for how much); what those we know say of it is what is safe to say.
+        const said = newsNow(t).flatMap((n) => (n.town !== undefined ? [n.town] : []));
+        inner.view(town, approval, { dependence: 3_000, fear: Math.max(feelings.level("fear", town, t), feelings.level("fear", "money", t)), trust: inner.trustIn(town, "government", t),
+          ...(said.length ? { norm: Math.round((said.reduce((a, b) => a + b, 0) * 6_000) / said.length) } : {}) });
       }
       // The paper's news (docs/behaviour/news.md): what's published in the paper's name, and nobody else's statement of
       // the kind; about the government; each item once. Its tone as the paper gives it, -1 to 1: one beyond that counts
@@ -2633,6 +2934,7 @@ export const citizen: BehaviourModule = {
       return [...(isLeaseholder() ? childrenNow.map((k) => because(why, C.call("presence", { who: k.person, leave: "yes" }))) : []), s];
     };
     let childrenNow: Member[] = [];
+    let childRecordAt = 0;
 
     return {
       /** Our job and home, as we have them (truth audits). */
@@ -2649,6 +2951,10 @@ export const citizen: BehaviourModule = {
         const carry = (action: ParticipantAction): ParticipantAction => {
           if (decided.length) Object.defineProperty(action, DECISIONS, { value: decided.splice(0), enumerable: false });
           if (outcomes.length) Object.defineProperty(action, OUTCOMES, { value: outcomes.splice(0), enumerable: false });
+          if (recordChange) {
+            Object.defineProperty(action, RECORD, { value: recordChange, enumerable: false });
+            recordChange = null;
+          }
           return action;
         };
         const action = wake(obs);
@@ -2659,6 +2965,9 @@ export const citizen: BehaviourModule = {
       {
         if (leaving && obs.body && !obs.body.present) departed = true; // gone from the world: nothing more is ours to do
         if (departed) return wait(ctx.world.runEnd + DAY);
+        // Where the hours since we last woke went, by where we are.
+        if (obs.body?.present) inner.spent(whereAt(obs.body.in), obs.t - lastSeenT);
+        lastSeenT = obs.t;
         absorb(obs);
         // (Taken out of the world with our household, or gone from it: nothing more here.)
         if (obs.body && !obs.body.present) return wait(ctx.world.runEnd + DAY);
@@ -2698,6 +3007,12 @@ export const citizen: BehaviourModule = {
           if (cared.length) return callAction(cared[0]!);
           const learn = schooling(obs);
           if (learn) return callAction(learn);
+          // (A child's record: who they are, whom they are tied to, where their hours go; written when it has moved, a
+          // month at a time.)
+          if (written.size === 0 || obs.t - childRecordAt >= MONTH) {
+            childRecordAt = obs.t;
+            writeRecord(obs.t, false);
+          }
           const go = goWhereWeBelong(obs);
           if (go) return sendGo(go);
           return wait(Math.min(obs.t + MONTH, ctx.world.runEnd + DAY, p.round ? nextChange(obs.t) : Infinity));
@@ -2801,6 +3116,8 @@ export const citizen: BehaviourModule = {
           // (What the last wake didn't get to comes first: our state already counts on it.)
           todo = [...todo, ...plan(obs).filter((s) => s.length)]; // (a step with nothing to do isn't sent: as the stepper)
           plannedAt = obs.t;
+          // The record, as the week leaves it: what has moved goes to the kernel with our next action.
+          writeRecord(obs.t, true, { income: householdIncome(), savings: acc?.balance ?? 0 });
           if (p.round) {
             nextPlanAt = obs.t + 7 * DAY;
             // (Unless a step of the plan already takes us there: going to the clinic, say.)

@@ -1,0 +1,48 @@
+{
+  "run": "town-300.seed1",
+  "t": 604800,
+  "participant": "c0019-self",
+  "entity": "c0019",
+  "from": 0,
+  "to": 604800,
+  "hours": {
+    "away": 32400,
+    "work": 572400
+  },
+  "agency": 4331,
+  "agency_own": 4331,
+  "views": [
+    {
+      "of": "city",
+      "thought": -51,
+      "said": -51,
+      "gap": 0
+    },
+    {
+      "of": "shop-1",
+      "thought": -2290,
+      "said": -2290,
+      "gap": 0
+    }
+  ],
+  "trust": {
+    "bank": 3735,
+    "city": 3295,
+    "shop-1": 3855
+  },
+  "trust_kinds": {
+    "bank": "banks",
+    "city": "government",
+    "shop-1": "companies"
+  },
+  "needs": {
+    "belonging": 3000,
+    "meaning": 7404,
+    "security": 10000,
+    "shelter": 0,
+    "social": 2000,
+    "status": 7000,
+    "subsistence": 0
+  },
+  "good": true
+}

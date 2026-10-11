@@ -204,7 +204,7 @@ function stopOnSignal(): StopSignal {
   return stop;
 }
 
-const usage = "usage: oikos run <world> [--seeds N (runs of one town)] [--towns T (different towns, each run --seeds times)] [--parallel P] [--out DIR] [--until S] [--set k=v] [--scenario NAME[+NAME]] [--modules FILE] [--translator-model m] [--no-measure] [--overwrite] [--model provider/model --budget USD [--base-url URL]] | resume <log.jsonl[.zst]|DIR> [--until S] [--model ... as for run] | measure <DIR> [QUERY...] [--sql SQL] [--list] | diff <BASELINE> <CHANGE> [QUERY...] | health <DIR> [--profile NAME] | cost <DIR> [--translator-model m] | translator-eval --model provider/model [--budget USD] [--out FILE] [--real | --only-real] [--jobs N] | scenarios [--all] | pilot-report <DIR>... [--no-write] | replay <log.jsonl> | story <log.jsonl> [participant]";
+const usage = "usage: oikos run <world> [--seeds N (runs of one town)] [--towns T (different towns, each run --seeds times)] [--parallel P] [--out DIR] [--until S] [--set k=v] [--scenario NAME[+NAME]] [--modules FILE] [--translator-model m] [--no-measure] [--overwrite] [--model provider/model --budget USD [--base-url URL]] | resume <log.jsonl[.zst]|DIR> [--until S] [--model ... as for run] | measure <DIR> [QUERY...] [--sql SQL] [--list] | diff <BASELINE> <CHANGE> [QUERY...] | health <DIR> [--profile NAME] | cost <DIR> [--translator-model m] | translator-eval --model provider/model [--budget USD] [--out FILE] [--real | --only-real] [--jobs N] | scenarios [--all] | pilot-report <DIR>... [--no-write] | replay <log.jsonl> | story <log.jsonl> [participant] | record <log.jsonl[.zst]> <entity|participant> [--at S]";
 
 try {
   if (cmd === "run" && positional()[0]) {
@@ -447,6 +447,22 @@ try {
     const m = await runPipeline(loadConfig(positional()[0]!));
     console.log(plainReport(m));
     if (m.status !== "complete") process.exit(3);
+  } else if (cmd === "record" && positional()[1]) {
+    // One entity's own record, rebuilt from a log and checked against the kernel's chained hashes
+    // (docs/design/ai-citizens.md 10d): oikos record <log.jsonl[.zst]> <entity|participant> [--at SECONDS]
+    const { rebuild } = await import("./records");
+    const at = flag("at");
+    const r = await rebuild(positional()[0]!, positional()[1]!, at !== undefined ? Number(at) : undefined);
+    if (!r) {
+      console.error(`no record of ${positional()[1]} in ${positional()[0]}`);
+      process.exit(1);
+    }
+    console.log(JSON.stringify({ entity: r.entity, participant: r.participant, changes: r.n, at: r.at, chain: r.chain, bytes: r.bytes, largest_bytes: r.largest, sections: r.sections }, null, 2));
+    if (r.faults.length) {
+      console.error(`NOT VERIFIED: ${r.faults.length} fault${r.faults.length > 1 ? "s" : ""}\n  ${r.faults.slice(0, 20).join("\n  ")}`);
+      process.exit(2);
+    }
+    console.error(`verified: ${r.n} change${r.n > 1 ? "s" : ""}, each link of the chain and each digest as the kernel logged it`);
   } else if (cmd === "dataset" && positional()[0]) {
     // Run datasets: every run's data as training examples (docs/design/run-datasets.md).
     const { logsIn } = await import("./corpus");
