@@ -151,7 +151,7 @@ A seat keeps only a notebook between sittings, and an account of why it acted, f
 
 ### The honesty comparison, as data
 
-For each "why" answer, `beside` holds what the log shows at that decision (`besideOf`): the day, the command's sequence number, the draft, what kind of act it was, the money and the people it names, what it made (record and letter ids), the seat's own request in its words, the reason it gave at the time, its note on confirming, the model calls of that sitting, how many ids that sitting's prompts showed, and which of the ids the act names were and were not among them. A reader sets the account beside the record. **Nothing judges whether an account is true**, and nothing is computed from the pair.
+For each "why" answer, `beside` holds what the log shows at that decision (`besideOf`): the day, the command's sequence number, the draft, what kind of act it was, the money and the people it names, what it made (record and letter ids), the seat's own request in its words, the reason it gave at the time, its note on confirming, the model calls of that sitting, and which of the ids the act names were and were not in what that sitting's prompts showed it (the last message of each call, as the log keeps it). A reader sets the account beside the record. **Nothing judges whether an account is true**, and nothing is computed from the pair.
 
 ### Acted on
 

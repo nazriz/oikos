@@ -217,7 +217,7 @@ test("the summary: made from the log alone, in neutral words (none of a stated l
     return s;
   };
   const pay = (to: string, amount: number) => [{ block: "publish", kind: "request", addressed_to: ["bank"], basis: ["job-1"], data: { outcome: { money: { amount: String(amount), from: "acc-city", to } } }, text: "Please pay." }];
-  add(E("annotation", 100, { annotation: "transcript", subject: "finance-system", data: { purpose: "participant", input: "Payroll: [job-1] an agreement; [acc-city] your account" } }));
+  add(E("annotation", 100, { annotation: "transcript", subject: "finance-system", data: { purpose: "participant", input: "Payroll: [job-1] an agreement; from your account (acc-city)." } }));
   // Eight wage payments alike, one large payment, a permit refused, a direction, a draft declined, a request that came to nothing.
   for (let n = 1; n <= 8; n++) { draft(n, 100, pay(`acc-c${n}`, 194_276), `You will ask the bank to pay c${n} their wage.`); sign(n, 100, "accept"); act(n, 100, pay(`acc-c${n}`, 194_276)); }
   const big = [{ block: "transfer", amount: "5000000", from: "acc-city", to: "acc-builder" }];
@@ -263,7 +263,7 @@ test("the summary: made from the log alone, in neutral words (none of a stated l
   const picks = largest(r);
   expect(picks.map((c) => c.seq)).toEqual([bigSeq, refuseSeq, directSeq]);
   expect(besideOf(picks[0]!)).toMatchObject({ day: 3, command_seq: bigSeq, draft: "draft.finance-system.9", money_named: 5_000_000, made: ["rec.9"], reason_given_at_the_time: "the reason for 9", note_on_confirming: "as asked", asked_in_these_words: "please do thing 9" });
-  expect(besideOf(seats.of.get("finance-system")!.carried[0]!)).toMatchObject({ ids_shown_that_sitting: 2, named_and_shown: ["acc-city", "job-1"], named_and_not_shown_that_sitting: ["acc-c1"] });
+  expect(besideOf(seats.of.get("finance-system")!.carried[0]!)).toMatchObject({ named_and_shown: ["acc-city", "job-1"], named_and_not_shown_that_sitting: ["acc-c1"] });
   expect(bySize(r).map((x) => x.more)).toEqual([0, 7, 0, 0]);
   // Neutral words: with what it quotes left out, no sentence it can write holds a word that weighs.
   const words = (s: string) => s.toLowerCase().split(/[^a-z']+/).filter(Boolean);

@@ -41,7 +41,7 @@ export interface Carried {
   /** The money the act names, in the world's smallest unit; the people and bodies it names; what kind of thing it is. */
   money: number; named: string[]; granted?: boolean; direction?: boolean; kinds: string[];
   /** What the act made (records, letters), by id; and the model calls of the sitting it was asked in. */
-  made: string[]; calls: number[]; shown_ids?: number; named_and_shown?: string[]; named_not_shown?: string[];
+  made: string[]; calls: number[]; /** Of the ids the act names: those the sitting's prompts held, and those they did not. */ named_and_shown?: string[]; named_not_shown?: string[];
 }
 
 interface Draft { id: string; t: number; proposal: string; summary: string; blocks: any[]; signoff?: "accept" | "reject"; note?: string; unanswered?: boolean; sitting?: Sitting }
@@ -63,14 +63,15 @@ export class SeatRecord {
   private current?: Sitting;
   constructor(readonly id: string, /** Every id it may be written to by: its own, its posts', its organisation's. */ readonly known: Set<string>) {}
 
-  /** The sitting a model call belongs to (one a day), with the ids its prompt showed in square brackets. */
+  /** The sitting a model call belongs to (one a day), with every word its prompts held that could be an id. */
   call(seq: number, t: number, input: unknown) {
     const day = dayOf(t);
     let s = this.sittings.get(day);
     if (!s) this.sittings.set(day, (s = { day, calls: [], ids: new Set() }));
     s.calls.push(seq);
     const text = typeof input === "string" ? input : JSON.stringify(input ?? "");
-    for (const m of text.matchAll(/\[([A-Za-z][\w.:/-]{1,80})\]/g)) s.ids.add(m[1]!);
+    // (Every word of the prompt that could be an id, however it was set: in brackets, after a name, in a sentence.)
+    for (const m of text.matchAll(/[A-Za-z][\w.:/-]*[A-Za-z0-9]/g)) s.ids.add(m[0]);
     this.current = s;
   }
   draft(d: any, t: number) {
@@ -174,7 +175,7 @@ export class SeatRecords {
         const c: Carried = { seq: e.seq, t: e.t, ...(viaDraft ? { draft: viaDraft } : {}), preview: d?.summary || kindsOf(blocks).join(", "), ...(d?.proposal ? { proposal: d.proposal } : b.provenance?.proposal ? { proposal: String(b.provenance.proposal) } : {}),
           ...(b.reasoning ? { reasoning: String(b.reasoning) } : {}), ...(d?.note ? { signoff_note: d.note } : {}), money: moneyNamed(blocks), named, ...(g !== undefined ? { granted: g } : {}),
           ...(blocks.some((x) => DIRECTION.test(String(x?.kind ?? ""))) ? { direction: true } : {}), kinds: kindsOf(blocks), made: [], calls: sitting?.calls.slice() ?? [],
-          ...(sitting ? { shown_ids: sitting.ids.size, named_and_shown: idsIn(blocks).filter((x) => sitting.ids.has(x)), named_not_shown: idsIn(blocks).filter((x) => !sitting.ids.has(x) && !who.known.has(x)) } : {}) };
+          ...(sitting ? { named_and_shown: idsIn(blocks).filter((x) => sitting.ids.has(x)), named_not_shown: idsIn(blocks).filter((x) => !sitting.ids.has(x) && !who.known.has(x)) } : {}) };
         who.carried.push(c);
         this.bySeq.set(e.seq, { seat: who, carried: c });
         // (A letter sent by way of a draft is a letter too.)
@@ -255,7 +256,7 @@ export function largest(r: SeatRecord, n = 3): Carried[] {
 export function besideOf(c: Carried): { [k: string]: unknown } {
   return { day: dayOf(c.t), command_seq: c.seq, ...(c.draft ? { draft: c.draft } : {}), kinds: c.kinds, money_named: c.money, named: c.named, made: c.made,
     ...(c.proposal ? { asked_in_these_words: c.proposal } : {}), ...(c.reasoning ? { reason_given_at_the_time: c.reasoning } : {}), ...(c.signoff_note ? { note_on_confirming: c.signoff_note } : {}),
-    sitting_model_calls: c.calls, ...(c.shown_ids !== undefined ? { ids_shown_that_sitting: c.shown_ids, named_and_shown: c.named_and_shown, named_and_not_shown_that_sitting: c.named_not_shown } : {}) };
+    sitting_model_calls: c.calls, ...(c.named_and_shown !== undefined ? { named_and_shown: c.named_and_shown, named_and_not_shown_that_sitting: c.named_not_shown } : {}) };
 }
 
 /**
