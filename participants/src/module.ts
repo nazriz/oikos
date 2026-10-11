@@ -172,6 +172,13 @@ export interface Taken {
   follows: string;
 }
 
+/** A paper an office has on file when a new holder arrives (docs/behaviour/office-papers.md, "On file at the start"):
+ * a standing notice of the institution's own, which the office's code publishes at its first look (what a body that
+ * hears grievances says it hears, with what applying costs). Where a model holds the office the world opens with it
+ * published, as it opens with the office's standing work orders in force: nobody can bring a matter to a body that
+ * has not said it hears it. */
+export interface Opening { kind: string; text: string; data?: unknown; offer?: unknown }
+
 /**
  * A paper an office issues, as a form of its own stationery (docs/behaviour/office-papers.md): the form's fields, and
  * how they are written into the statement the rest of the world reads (`writes`: forms.ts). Where a model holds the
@@ -247,6 +254,8 @@ export interface BehaviourModule {
   answers?: Answers;
   /** The routine tasks its office's staff do by standing work order (docs/behaviour/standing-work.md). */
   routines?: Routine[];
+  /** The standing notices the office has on file when a new holder arrives, from its parameters (`Opening`). */
+  opens?: (params: { [k: string]: any }, entity: string) => Opening[];
   /** The papers it issues, each as a form of the office's own stationery (docs/behaviour/office-papers.md). */
   issues?: Issued[];
   /** What of the office's own the forms it issues carry, from its parameters: the values of each "@name" in `issues`. */

@@ -210,6 +210,12 @@ Three changes on the person's side of the firm and landlord fixes (docs/decision
 - **Told to leave for arrears** (docs/behaviour/justice.md, "Possession"; only where the world has a law on possession). A notice to vacate: gone by its date, or staying, by a draw of the person's own at the world's share (`possession.stay_bps`). An application for possession: the tenant answers the tribunal with what the household could pay a month toward the arrears (its income less rent and essentials), if anything. A plan: they stay. An order for possession: gone by its date or not (`possession.obey_bps`). A warrant carried out: out, from that hour. Then as anyone without a home. The record keeps it as an eviction.
 - **A business of one** (docs/behaviour/entry.md, "Starting a business of one"): started with the month's chance by someone with a home to trade from and the savings (after notice, if in a job); given up after months in which it has paid them under half of essentials.
 
+## Told to leave, asked for rent, written to (0.50.0, 2026-10-12)
+
+- **A notice to vacate does what a notice on the lease did**, once a tenancy: trust in the landlord falls at double weight, the tie falls by 3,000, fear of them rises by 5,000, the household's other adults are told, and (with initiative) the want about it is born, which is met when the notice lapses, the tribunal dismisses or sets a plan, or the household is housed elsewhere. Under a law on possession the lease's own notice comes only after an order, so until this version a tenant told to go felt none of it, from a seat's landlord or a code one. Being put out, or leaving at an order's date, is still the defining event; the notice is not.
+- **On the record and nothing more:** a landlord's request for rent owed (`rent_asked`), an application for possession, when the notice of hearing comes (`possession_applied`), and an offer of a plan (`plan_offered`), which is answered with what the household could pay a month beyond its rent and essentials. Whether these should move trust or agency has no source here, so they do not.
+- **A letter from an office in its own words** is read, kept and noted (docs/behaviour/letters.md, "A letter to a person").
+
 ## What a citizen does
 
 | | Rule | Source |

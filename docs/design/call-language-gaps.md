@@ -400,6 +400,25 @@ language on this evidence. Revisit if it appears in two more pilots or with anot
 
 Seats ask for one payment to be made on a day to come ("On day 29, pay … once", "pay the wage due on year 1, day 22: one payment, not a standing one"). `first=` is when something done again and again starts, and the prompt (0.9.4, ruling H) gives a single payment none; a payment with no `every=` is made when it is confirmed. So such a request cannot be written as asked: written without the date it pays at once, and written with `first=` it borrows an argument whose meaning on a single payment nothing defines. Nothing was invented for it. Counted in the round's data (2026-10-10, `runs/translator-round-2-2026-10-10/`): 16 requests of 2,753 from the wave's training pilots (3 had trained with `first=` on a single payment, 13 were among the readers' disagreements). They are set aside from training and from scoring (`set-aside-single-dated-payment.jsonl` beside the joined set). What would settle it: whether the bank module keeps a single dated instruction (then `first=` alone, with no `every=`, could mean "once, on that day", and the contract would say so), or whether the asker is to come back on the day (then it is `look_first`'s neighbour and needs its own answer).
 
+## D. Acts an office's code takes that a seat still cannot, after the audit of 2026-10-12
+
+The audit (docs/behaviour/office-papers.md, "Act by act"; docs/decisions.md, "What the third living pilot found") gave a form to every typed paper a mock seat made off one in 120 days of the third living pilot's town, and to those found by reading each module. What is left, and why it was not done in that pass:
+
+| Office | What its code does that a seat cannot do the same | Why not now |
+|---|---|---|
+| Police | carries out a warrant, investigates: the code finds an officer in at the station at the hour it looks | a seat that sits at another hour finds nobody in, and the warrant lapses (seen with the mock: two warrants lapsed in 200 days). The papers have forms; the work wants to be the station's staff's routine under a standing order, as the tribunal's listing now is. Too large for this pass: it touches the roster and officers' hours |
+| Electoral office | the roll, the ballot paper, the count | lists of hundreds: staff work, as office-papers.md says |
+| Council clerk | a law amended from its figures | drafted from the schedule by code (its staff do it since 2026-10-11) |
+| Landlord, any firm | an application for an order to pay to a body that is not a tribunal | the form writes a tribunal's application; a desk's is another kind of paper. No desk hears rent owed in any profile today |
+| Landlord, any firm | a dividend as one instruction listing every payment | a table; a seat pays each holder |
+| Finance, any employer | a return of tax withheld with a line for each charge | a table; the seat's form gives the totals, which is what the books and the collector read |
+| Lender, union | terms published with an offer whose terms are a structure | published once, before a seat arrives in most towns |
+| Environment | the survey report by species | a table; in words |
+| Tribunal member | an order that puts a case off | done by a fresh notice of hearing: an order of any other finding on a possession application is read by landlord and tenant as the tenant staying |
+| Any office | being answered when it writes to a person in its own words | a person's code reads no words (docs/behaviour/letters.md, "A letter to a person"); whether a model should is the owner's decision |
+
+Also found, and not a missing act: a seat's office with many forms has a longer prompt (a landlord's has fifteen forms where it had four).
+
 ## C. Order
 
 1. **Now, with no contract change and no retraining.** The bank's letter lists the customer's standing instructions

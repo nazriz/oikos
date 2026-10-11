@@ -70,6 +70,29 @@ export function staffingOwn(o: { role?: string; industry?: string; workplace?: s
 
 // ------------------------------------------------------------------ the registrar of births and deaths
 
+// ------------------------------------------------------------------ answering (frictions.ts, `Respondent`)
+
+/** The answer to a request to put something right, as any organisation asked gives one (frictions.ts, `Respondent`). */
+export const REMEDY_ANSWER: Issued = {
+  form: "remedy_answer", title: "Answer to a request to put something right",
+  does: "Answers someone who has asked the office in writing to put something right: yes or no, and where money is owed them and paid, how much. It does nothing by itself: what puts the thing right (a payment, a repair ordered, a paper withdrawn) is done besides.",
+  fields: { request: f("record", "The request answered.", req), to: f("entity", "Who asked.", req), matter: f("text", "What it is about, in the word the request uses.", req), granted: f("choice", "Whether it will be put right.", { ...req, options: YES_NO }),
+    amount: f("amount", "Where money is owed them and paid: how much."), reason: f("text", "Where it is refused: why.") },
+  writes: { kind: "remedy_answer", text: "Answer to your request {request}: {granted}.", basis: "=request", to: ["=to"], visible: ["=to", "=self"], data: { request: "=request", matter: "=matter", granted: "?granted", amount: "#amount", reason: "=reason" } } };
+
+/** The answer to a body that hears grievances, told of an application against the office (frictions.ts, `Respondent`). */
+const venueAnswer = (form: string, kind: string, title: string): Issued => ({
+  form, title,
+  does: "Answers a body that has told the office of an application against it, from the office's own books: what they show is owed, whether the thing is done, whether the paper complained of was wrong. The body decides on it when the time to answer has run; with no answer it decides in default.",
+  fields: { application: f("record", "The application answered.", req), venue: f("entity", "The body that sent the notice.", req), applicant: f("entity", "Who applied."),
+    known: f("choice", "Whether the office's books say anything of it.", { ...req, options: YES_NO }), owed: f("amount", "What the books show is owed the applicant (nought: nothing)."),
+    done: f("choice", "For a thing to be put right: whether it is done.", { options: YES_NO }), wrong: f("choice", "For a paper complained of: whether it was wrong.", { options: YES_NO }) },
+  writes: { kind, text: "Answer on {application}.", basis: "=application", to: ["=venue"], visible: ["=venue", "=self", "=applicant"], data: { application: "=application", owed: "#owed", done: "?done", wrong: "?wrong", known: "?known" } } });
+export const VENUE_ANSWERS: Issued[] = [
+  venueAnswer("complaint_answer", "complaint_response", "Answer to a desk's notice of an application against the office"),
+  venueAnswer("tribunal_answer", "tribunal_response", "Answer to the tribunal's notice of an application against the office"),
+];
+
 export const REGISTRY: Issued[] = [
   { form: "death_registration", title: "Entry in the register of deaths", does: "Registers a death on the notification of it: the entry is what a bank, the land registry and the family act on, and it is sent to whoever reported the death.",
     fields: {
@@ -107,6 +130,9 @@ export const MAYOR: Issued[] = [
     fields: { office: f("entity", "The office stood for (the post, by its id).", req), name: f("text", "The name to go on the ballot.", req), platform: f("text", "What the candidate puts to the electors.", req),
       incumbent: f("choice", "Whether the candidate holds the office now.", { options: YES_NO }), values: f("list", "What the candidate stands for, in a word or two each.") },
     writes: { sends: [{ to: ["@electoral"], why: "The body that runs the election takes the nominations and puts the names on the ballot paper." }], kind: "nomination", text: "Nomination for {office}: {name}. {platform}", to: ["@electoral"], visible: "public", assertion: { that: "=platform" }, data: { office: "=office", name: "=name", incumbent: "?incumbent", values: "=values" } } },
+  { form: "petition_response", title: "Answer to a petition", does: "Answers a petition publicly, to its organiser: what has been done about what it asks (put to the council, or not, and why). The answer's own words are the mayor's (give them as the paper's text). It puts nothing to the council by itself: that is the council proposal form, or a law's amendment form.",
+    fields: { petition: f("record", "The petition answered.", req), organiser: f("entity", "Its organiser.") },
+    writes: { kind: "petition_response", text: "Answer to petition {petition}.", basis: "=petition", to: ["=organiser"], visible: "public", data: { petition: "=petition" } } },
 ];
 
 export const COUNCIL_CLERK: Issued[] = [
@@ -164,20 +190,51 @@ export const ELECTORAL: Issued[] = [
     writes: { kind: "election_notice", text: "Election for {office}: nominations close {nominations_close_at}; polling {poll_at}.", visible: "public", data: { office: "=office", poll_at: "=poll_at", nominations_close_at: "=nominations_close_at", method: "=method" } } },
 ];
 
+// ------------------------------------------------------------------ finance
+
+/** The return of tax withheld from wages, in totals (tax.ts writes it with a line for each charge besides: a table, which no form of fields holds). */
+export const FINANCE: Issued[] = [
+  { form: "withholding_return", title: "Return of tax withheld from wages, to a collector", does: "Reports to a collector what has been withheld from the wages paid in a period and what is paid over with it. It moves no money: what is paid over is paid besides, by a payment to each collector's account. The office's books count what is withheld and not yet paid over from the day of the last return.",
+    fields: { collector: f("entity", "The collector reported to.", req), account: f("account", "The account the wages were paid from.", req), period_end: f("date", "The day the period ended.", req), withheld: f("amount", "What was withheld in the period, in all.", req), paid: f("amount", "What is paid over now, in all.", req), law: f("record", "The law it is withheld under.") },
+    writes: { kind: "withholding_report", text: "Withheld from wages, owed: {withheld}; paid now: {paid}.", basis: "=law", to: ["=collector"], visible: ["=self", "=collector"], data: { account: "=account", paid: "#paid", period_end: "=period_end", withheld: "#withheld" } } },
+];
+
 // ------------------------------------------------------------------ the tribunal
 
 export const TRIBUNAL_MEMBER: Issued[] = [
-  { form: "tribunal_order", title: "Order of the tribunal on an application", does: "Decides an application before the tribunal and tells both sides: what is found, and for an order to pay, how much, into which account and by when.",
+  { form: "hearing_listing", title: "Notice of hearing: a rent increase, a debt or a charge", does: "Lists an application about a notice of rent increase, a debt or a charge for a hearing on a day, and tells both sides; the respondent may answer before then. It decides nothing. (An application on the tribunal's other lists is listed on the notice of hearing form.)",
+    fields: { application: f("record", "The application listed.", req), kind: f("choice", "What the application is.", { ...req, options: ["rent_increase", "debt", "charge"] }), applicant: f("entity", "Who applied.", req), against: f("entity", "Whom it is against.", req), hearing: f("date", "The day of the hearing.", req) },
+    writes: { kind: "hearing_notice", text: "Notice of hearing: application {application} ({kind}) by {applicant} against {against}, to be heard on {hearing}. The respondent may answer before then.", basis: "=application", to: ["=applicant", "=against"], visible: ["=applicant", "=against", "=self"],
+      data: { application: "=application", kind: "=kind", applicant: "=applicant", against: "=against", hearing_at: "=hearing" } } },
+  { form: "hearing_notice", title: "Notice of hearing on the tribunal's lists", does: "Lists an application on the tribunal's lists (possession of a let home, rent in arrears, a home in disrepair, pay come short, faulty goods, a wrong bill, a refused claim) and tells both sides: what is said, and the day the other side may answer by. The other side answers a notice on this form, and no letter. It decides nothing. A case already listed is put off (adjourned) by a fresh notice with a later day.",
+    fields: { application: f("record", "The application listed.", req), matter: f("text", "What it is about, in the word the application uses (possession, arrears, disrepair ...).", req), applicant: f("entity", "Who applied.", req), against: f("entity", "Whom it is against.", req),
+      answer_by: f("date", "The day the other side may answer by: the case is decided on or after it.", req), about: f("record", "The lease or other paper the application is about, where it names one (a tenant answers a notice about possession only if it names the lease)."),
+      amount: f("amount", "The sum the application says is owed, where it gives one."), structure: f("structure", "The building, where the application names one."), seeks: f("text", "What the application seeks, where it says.") },
+    writes: { kind: "hearing_notice", text: "{applicant} has applied to us about {matter} (application {application}). You may answer by {answer_by}.", basis: "=application", to: ["=applicant", "=against"], visible: ["=applicant", "=against", "=self"],
+      data: { application: "=application", kind: "=matter", matter: "=matter", applicant: "=applicant", against: "=against", hearing_at: "=answer_by", answer_by: "=answer_by", about: "=about", amount: "#amount", structure: "=structure", seeks: "=seeks" } } },
+  { form: "possession_order", title: "Order on an application for possession of a let home", does: "Decides an application for possession of a let home for rent owed, and tells landlord and tenant: dismissed (the tenant stays, and the notice to vacate is spent); a plan (the tenant stays, paying the rent and a sum a month toward what is owed; a plan not kept, the landlord may apply again); or possession on a day (the tenant and household are to leave by it). It moves nobody: a tenant still there after the day is put out only on a warrant the landlord asks the tribunal's registrar for, by whoever carries its warrants out. What the law asks before an order, how long a plan may run and how many days on the day for possession falls are in the law on possession and the tribunal's procedure.",
+    fields: { application: f("record", "The application decided.", req), landlord: f("entity", "The landlord who applied.", req), tenant: f("entity", "The tenant.", req), lease: f("record", "The lease.", req),
+      finding: f("choice", "What is ordered.", { ...req, options: ["dismissed", "plan", "possession"] }), owed: f("amount", "The rent found owed (a plan, or possession)."),
+      instalment: f("amount", "For a plan: the sum a month toward what is owed, beyond the rent."), pay_into: f("account", "For a plan: the account it is paid into."), date: f("date", "For possession: the day the tenant is to leave by."),
+      home: f("space", "The home, as the application names it (needed for a warrant to be issued on the order)."), building: f("structure", "The building it is in."), household: f("list", "Who lives there by the lease, as the application names them."),
+      waited_days: f("count", "Days from the application to this order, for the tribunal's own figures.") },
+    writes: { kind: "tribunal_order", text: "Order on {application}: {finding}.", basis: "=application", to: ["=landlord", "=tenant"], visible: ["=landlord", "=tenant", "=self"],
+      data: { application: "=application", kind: "possession", matter: "possession", applicant: "=landlord", against: "=tenant", finding: "=finding", binding: true, waited_days: "=waited_days", about: "=lease", amount: "#owed", instalment: "#instalment", to: "=pay_into", due: "=date", space: "=home", structure: "=building", household: "=household" } } },
+  { form: "tribunal_order", title: "Order of the tribunal on an application", does: "Decides an application before the tribunal (anything but possession of a let home, which has its own form) and tells both sides: what is found, and for an order to pay, how much, into which account and by when; for a thing to be put right, by when. It moves no money and does nothing by itself: an order to pay left unpaid is enforced by the registrar, when the one owed asks.",
     fields: {
-      application: f("record", "The application decided.", req), kind: f("choice", "What the application was.", { ...req, options: ["rent_increase", "debt", "charge"] }),
-      applicant: f("entity", "Who applied.", req), against: f("entity", "Whom it was against.", req),
-      finding: f("choice", "What is found.", { ...req, options: ["dismissed", "invalid", "valid", "pay", "paid"] }),
+      application: f("record", "The application decided.", req), kind: f("text", "What the application was, in the word it uses (rent_increase, debt, charge; or the matter on the tribunal's lists: arrears, disrepair, bill ...).", req),
+      applicant: f("entity", "Who applied.", req), against: f("entity", "Whom it was against."),
+      finding: f("choice", "What is found: dismissed; rejected (not something the tribunal hears); pay (money to the applicant); do (put it right); set_aside (a paper); for a rent increase, invalid or valid; for a debt already paid, paid.", { ...req, options: ["dismissed", "rejected", "pay", "do", "set_aside", "invalid", "valid", "paid"] }),
+      matter: f("text", "For a case on the tribunal's lists: the matter, in the same word as the application's (those ordered act on an order only with it)."), binding: f("choice", "For a case on the tribunal's lists: yes (an order of the tribunal binds).", { options: YES_NO }),
       notice: f("record", "For a rent increase: the notice challenged."), laws: f("list", "The laws the notice breaches, where it is found invalid."),
       claim: f("record", "For a debt: the claim."), amount: f("amount", "For an order to pay: how much."), pay_into: f("account", "For an order to pay: the account it is paid into."),
-      due: f("date", "For an order to pay: the day it is due by."), victim: f("entity", "For a charge: who was wronged."), report: f("record", "For a charge: the report it came from."), paid: f("amount", "For a debt found paid: how much was paid."),
+      due: f("date", "For an order to pay or to put right: the day it is due by."), victim: f("entity", "For a charge: who was wronged."), report: f("record", "For a charge: the report it came from."), paid: f("amount", "For a debt found paid: how much was paid."),
+      about: f("record", "The paper the application is about, where it names one."), structure: f("structure", "The building, where the application names one."), seeks: f("text", "What the application sought, where it said."),
+      waited_days: f("count", "Days from the application to this order, for the tribunal's own figures."),
     },
     writes: { kind: "tribunal_order", text: "Order on {application}: {finding}.", basis: "=application", to: ["=applicant", "=against"], visible: ["=applicant", "=against", "=self"],
-      data: { application: "=application", kind: "=kind", applicant: "=applicant", against: "=against", finding: "=finding", notice: "=notice", laws: "=laws", claim: "=claim", amount: "#amount", to: "=pay_into", due: "=due", victim: "=victim", report: "=report", paid: "#paid" } } },
+      data: { application: "=application", kind: "=kind", matter: "=matter", applicant: "=applicant", against: "=against", finding: "=finding", binding: "?binding", waited_days: "=waited_days", about: "=about", structure: "=structure", seeks: "=seeks",
+        notice: "=notice", laws: "=laws", claim: "=claim", amount: "#amount", to: "=pay_into", due: "=due", victim: "=victim", report: "=report", paid: "#paid" } } },
 ];
 
 export const TRIBUNAL_REGISTRAR: Issued[] = [
@@ -185,6 +242,15 @@ export const TRIBUNAL_REGISTRAR: Issued[] = [
     fields: { order: f("record", "The tribunal's order left unpaid.", req), debtor: f("entity", "Who owes.", req), creditor: f("entity", "Who is owed.", req), amount: f("amount", "How much.", req), pay_into: f("account", "The account it is to be paid into.", req), claim: f("record", "The claim it settles, if the order names one.") },
     writes: { sends: [{ to: ["@banks"], why: "The banks hold what the debtor has: the order is theirs to pay." }], kind: "garnishee_order", text: "Order to pay {amount} from what {debtor} holds, into {pay_into}, under {order}.", basis: "=order", to: ["@banks"], visible: ["@banks", "=self", "=debtor", "=creditor"],
       data: { order: "=order", debtor: "=debtor", amount: "#amount", to: "=pay_into", claim: "=claim" } } },
+  { form: "warrant", title: "Warrant of possession", does: "Issued on a landlord's request, on an order of the tribunal for possession whose day has passed with the tenant still there: it names the home, the tenant and the household, and the days between which it is to be carried out. It goes to whoever carries the tribunal's warrants out, and the tenant and the landlord see it. It moves nobody by itself: someone must go, and a warrant not carried out by its last day lapses. How much notice of the day the tenant must have, and how long a warrant runs, are in the law on possession.",
+    fields: { order: f("record", "The tribunal's order for possession.", req), lease: f("record", "The lease.", req), tenant: f("entity", "The tenant.", req), landlord: f("entity", "The landlord.", req),
+      home: f("space", "The home.", req), building: f("structure", "The building it is in."), household: f("list", "Who is to be removed: the tenant and those living there by the lease.", req),
+      not_before: f("date", "The first day it may be carried out (after the notice of the day the law gives the tenant).", req), until: f("date", "Its last day: after it, it has lapsed.", req) },
+    writes: { sends: [{ to: ["@enforcer"], why: "They carry the tribunal's warrants out: nobody else may." }], kind: "warrant", text: "Warrant of possession under order {order}: {tenant} and their household are to be removed from {home}, and possession given to {landlord}. To be carried out no sooner than {not_before} and by {until}.", basis: "=order", to: ["@enforcer"], visible: ["@enforcer", "=self", "=tenant", "=landlord"],
+      data: { order: "=order", lease: "=lease", tenant: "=tenant", landlord: "=landlord", space: "=home", structure: "=building", household: "=household", not_before: "=not_before", until: "=until" } } },
+  { form: "enforcement_decline", title: "A request to enforce, declined", does: "Tells whoever asked for an order to be enforced, or for a warrant, that it is declined: there is no such order to them to enforce. It does nothing else.",
+    fields: { request: f("record", "The request declined.", req), to: f("entity", "Who asked.", req) },
+    writes: { kind: "enforcement_decline", text: "Declined: no such order to you to enforce (request {request}).", basis: "=request", to: ["=to"], visible: ["=to", "=self"] } },
 ];
 
 // ------------------------------------------------------------------ landlords
@@ -205,6 +271,38 @@ export const LANDLORD: Issued[] = [
   { form: "death_notification", title: "Notification of a death, to the registrar",
     fields: { deceased: f("entity", "Who has died.", req) },
     writes: { sends: [{ to: ["@city"], why: "The town's registrar registers deaths, on a notification." }], kind: "death_notification", text: "Notification of a death: {deceased}.", to: ["@city"], data: { deceased: "=deceased" } } },
+  { form: "rent_reminder", title: "Request to a tenant for rent owed", does: "Asks a tenant in writing for rent that is owed, with the sum and the account. It ends nothing and moves no money.",
+    fields: { tenant: f("entity", "The tenant.", req), lease: f("record", "The lease.", req), amount: f("amount", "How much is owed.", req), account: f("account", "The account it is to be paid into.") },
+    writes: { kind: "remedy_request", text: "Request: the rent for your home is {amount} in arrears. Please pay it.", basis: "=lease", to: ["=tenant"], visible: ["=self", "=tenant"], data: { matter: "arrears", against: "=tenant", about: "=lease", amount: "#amount", account: "=account" } } },
+  { form: "payment_plan_offer", title: "Offer to a tenant of a plan to pay rent owed", does: "Offers a tenant behind with the rent a plan: the rent as it falls due, and a sum a month toward what is owed. The tenant answers on the offer whether the household can pay it, and what it could pay. It ends nothing and binds nobody: a plan agreed is kept, or not, by the tenant's payments.",
+    fields: { tenant: f("entity", "The tenant.", req), lease: f("record", "The lease.", req), owed: f("amount", "How much is owed.", req), instalment: f("amount", "The sum a month toward what is owed, beyond the rent.", req), account: f("account", "The account it is to be paid into.") },
+    writes: { kind: "plan_offer", text: "Offer of a plan: pay the rent as it falls due and {instalment} a month toward the {owed} owed under {lease}. Please answer whether you can.", basis: "=lease", to: ["=tenant"], visible: ["=self", "=tenant"], data: { lease: "=lease", owed: "#owed", instalment: "#instalment", account: "=account" } } },
+  { form: "arrears_application", title: "Application for an order that a tenant pay rent owed", does: "Applies to a body that says it hears rent in arrears (its notice of what it hears, and what applying costs, is public) for an order that the tenant pay. The body tells the tenant, gives them time to answer and decides. A fee, where the body has one, is paid with it, by a payment. It ends no tenancy.",
+    fields: { venue: f("entity", "The body applied to.", req), hearing: f("record", "Its notice of what it hears."), tenant: f("entity", "The tenant.", req), lease: f("record", "The lease.", req), amount: f("amount", "How much is owed.", req), account: f("account", "The account it is to be paid into.", req) },
+    writes: { kind: "tribunal_application", text: "Application: {tenant} owes us {amount} in rent under {lease}.", basis: "=hearing", to: ["=venue"], visible: ["=self", "=venue", "=tenant"],
+      data: { kind: "arrears", matter: "arrears", against: "=tenant", about: "=lease", amount: "#amount", account: "=account", evidence: { id: "=lease", record: "agreement" } } } },
+  { form: "notice_to_vacate", title: "Notice to a tenant to vacate for rent owed", does: "Gives a tenant written notice to leave the home by a day, for rent owed. It ends nothing by itself and puts nobody out: if the rent owed is paid before the day the notice is spent (withdraw it); if the tenant is still there after the day, the landlord may apply to the tribunal for possession. How long rent must have been owed before it may be given, and how many days it must run, are in the law on possession. A notice is given when it is on the record, addressed to the tenant: that is how papers are served here.",
+    fields: { tenant: f("entity", "The tenant.", req), lease: f("record", "The lease.", req), arrears: f("amount", "The rent owed.", req), by: f("date", "The day the tenant is to leave by.", req), law: f("record", "The law the notice is given under.") },
+    writes: { kind: "notice_to_vacate", text: "Notice to vacate: the rent under {lease} is {arrears} in arrears. You are to leave the home by {by}. If the arrears are paid before then, this notice lapses. If you are still there after it, we may apply to the tribunal for possession.", basis: "=lease", to: ["=tenant"], visible: ["=self", "=tenant"],
+      data: { lease: "=lease", reason: "arrears", arrears: "#arrears", by: "=by", law: "=law" } } },
+  { form: "possession_application", title: "Application to the tribunal for possession of a let home", does: "Applies to the tribunal for possession of a home whose tenant is behind with the rent and has not left on a notice to vacate that has run out. It states the lease, the rent, what is owed, the home and who lives there by the lease, and the notice relied on: which paper, the day it was given and the day it gave. The tribunal tells the tenant, who may answer, and decides: a plan to pay, possession on a day, or dismissal. The tribunal's fee, where it has one, is paid with it, by a payment. It ends no tenancy and puts nobody out.",
+    fields: { tenant: f("entity", "The tenant.", req), lease: f("record", "The lease.", req), owed: f("amount", "The rent owed.", req), rent: f("amount", "The rent a month."), account: f("account", "The account rent is paid into."),
+      home: f("space", "The home."), building: f("structure", "The building it is in."), household: f("list", "Who lives there by the lease: the tenant first."),
+      notice: f("record", "The notice to vacate relied on."), notice_given: f("date", "The day that notice was given."), notice_by: f("date", "The day that notice gave to leave by."),
+      plan_broken: f("choice", "Yes, where the tribunal set a plan to pay and it has not been kept.", { options: YES_NO }) },
+    writes: { sends: [{ to: ["@tribunal"], why: "The tribunal hears applications for possession." }], kind: "tribunal_application", text: "Application for possession: {tenant} is {owed} behind with the rent under {lease} and has not left on our notice to vacate.", basis: "=lease", to: ["@tribunal"], visible: ["=self", "@tribunal", "=tenant"],
+      data: { kind: "possession", matter: "possession", against: "=tenant", about: "=lease", amount: "#owed", rent: "#rent", account: "=account", breach: "?plan_broken", space: "=home", structure: "=building", household: "=household",
+        notice: "=notice", notice_given: "=notice_given", notice_by: "=notice_by", evidence: { id: "=lease", record: "agreement" } } } },
+  { form: "warrant_request", title: "Request to the tribunal's registrar for a warrant of possession", does: "Asks the tribunal's registrar for a warrant on an order for possession whose day has passed with the tenant still there. The registrar issues it to whoever carries the tribunal's warrants out; the landlord puts nobody out. The fee, where there is one, is paid with it, by a payment. A warrant not carried out by its last day lapses, and another is asked for.",
+    fields: { order: f("record", "The tribunal's order for possession.", req) },
+    writes: { sends: [{ to: ["@tribunal"], why: "The tribunal's registrar issues its warrants." }], kind: "warrant_request", text: "Request for a warrant of possession under order {order}: the tenant has not left.", basis: "=order", to: ["@tribunal"], visible: ["=self", "@tribunal"], data: { order: "=order" } } },
+  { form: "repair_order", title: "Order to the builder for a repair, paid with the order", does: "Orders the repair of a building of the landlord's from the builder, who does it when its price has come into the builder's account: the price is paid with the order, by a payment. The builder says when it is done, or that it cannot be.",
+    fields: { building: f("structure", "The building to repair.", req), units: f("count", "How many units of repair work.", req), account: f("account", "The account the price is paid from.", req) },
+    writes: { sends: [{ to: ["@builder"], why: "The builder does the repair." }], kind: "repair_order", text: "Order: the repair of {building} ({units} units of work), paid with this order.", to: ["@builder"], visible: ["=self", "@builder"], data: { structure: "=building", units: "=units", account: "=account" } } },
+  { form: "variation_answer", title: "Answer to a tenant's request to vary a tenancy", does: "Answers a tenant who has asked in writing to vary something of the tenancy (to stay on, for time): yes or no. It changes no lease by itself: what is agreed is then done (a new lease offered, a notice withdrawn).",
+    fields: { request: f("record", "The request answered.", req), tenant: f("entity", "The tenant.", req), about: f("text", "What was asked, as the request names it.", req), granted: f("choice", "Whether it is agreed.", { ...req, options: YES_NO }) },
+    writes: { kind: "variation_answer", text: "Answer to your request {request}: {granted}.", basis: "=request", to: ["=tenant"], visible: ["=self", "=tenant"], data: { about: "=about", granted: "?granted" } } },
+  REMEDY_ANSWER, ...VENUE_ANSWERS,
 ];
 
 // ------------------------------------------------------------------ the lender
@@ -221,6 +319,12 @@ export const LENDING: Issued[] = [
   { form: "funding_draw", title: "A draw on the bank's wholesale funding",
     fields: { amount: f("amount", "How much is drawn.", req), account: f("account", "The account it is to be paid into.", req), rate_bps: f("count", "The yearly rate, in hundredths of a percent.", req) },
     writes: { sends: [{ to: ["@funder"], why: "The funder is who the draw is made on: it pays it." }], kind: "funding_draw", text: "Funding drawn: {amount} into {account}.", to: ["@funder"], visible: ["=self", "@funder"], data: { amount: "#amount", account: "=account", rate_bps: "=rate_bps" } } },
+  { form: "loan_arrears", title: "Letter to a borrower behind with a loan", does: "Tells a borrower in writing that a loan is behind, and by how much. It changes nothing of the loan.",
+    fields: { loan: f("record", "The loan agreement.", req), borrower: f("entity", "The borrower.", req), behind: f("amount", "How much is behind.", req) },
+    writes: { kind: "loan_arrears", text: "Loan {loan}: {behind} behind. Please pay.", basis: "=loan", to: ["=borrower"], visible: ["=borrower", "=self"], data: { loan: "=loan", behind: "#behind" } } },
+  { form: "loan_default", title: "Notice to a borrower that a loan is in default", does: "Tells a borrower in writing that a loan is in default: how much is behind and how much is owing in all. It moves nothing by itself.",
+    fields: { loan: f("record", "The loan agreement.", req), borrower: f("entity", "The borrower.", req), behind: f("amount", "How much is behind.", req), outstanding: f("amount", "How much is owing in all.", req) },
+    writes: { kind: "loan_default", text: "Loan {loan} is in default: {behind} behind, {outstanding} owing.", basis: "=loan", to: ["=borrower"], visible: ["=borrower", "=self"], data: { loan: "=loan", behind: "#behind", outstanding: "#outstanding" } } },
 ];
 
 // ------------------------------------------------------------------ the police
@@ -234,6 +338,16 @@ export const POLICE: Issued[] = [
   { form: "death_notification", title: "Notification of a death, to the registrar", does: "Tells the registrar of a death the police have found, so that it can be registered.",
     fields: { deceased: f("entity", "Who has died.", req), found_at: f("space", "Where they were found.") },
     writes: { sends: [{ to: ["@registry"], why: "The registrar registers deaths, on a notification." }], kind: "death_notification", text: "Notification of a death: {deceased}.", to: ["@registry"], data: { deceased: "=deceased", found_at: "=found_at" } } },
+  { form: "warrant_executed", title: "A warrant of possession carried out", does: "Says, to the tenant and the landlord, that a warrant of the tribunal has been carried out: the tenant and the household are out of the home and possession is the landlord's. It is the paper of what officers have done at the home (putting out whoever of the household was there), not the doing of it.",
+    fields: { warrant: f("record", "The warrant.", req), lease: f("record", "The lease.", req), tenant: f("entity", "The tenant.", req), landlord: f("entity", "The landlord.", req), home: f("space", "The home.", req), household: f("list", "The household put out.", req) },
+    writes: { kind: "warrant_executed", text: "Warrant {warrant} has been carried out: {tenant} and their household are out of {home}, and possession is {landlord}'s.", basis: "=warrant", to: ["=tenant", "=landlord"], visible: ["=self", "=tenant", "=landlord", "=household"],
+      data: { warrant: "=warrant", lease: "=lease", tenant: "=tenant", space: "=home", household: "=household" } } },
+  { form: "warrant_lapsed", title: "A warrant of possession not carried out in its time", does: "Tells the landlord that a warrant ran out before an officer could carry it out, and has lapsed: the landlord may ask the tribunal's registrar for another.",
+    fields: { warrant: f("record", "The warrant.", req), lease: f("record", "The lease.", req), landlord: f("entity", "The landlord.", req) },
+    writes: { kind: "warrant_lapsed", text: "Warrant {warrant} was not carried out by its last day, and has lapsed.", basis: "=warrant", to: ["=landlord"], visible: ["=self", "=landlord"], data: { warrant: "=warrant", lease: "=lease" } } },
+  { form: "investigation_closed", title: "An investigation closed", does: "Tells whoever reported a crime that its investigation is closed, and whether it was solved.",
+    fields: { report: f("record", "The report.", req), to: f("entity", "Who reported it.", req), solved: f("choice", "Whether it was solved.", { ...req, options: YES_NO }) },
+    writes: { kind: "investigation_closed", text: "Report {report}: closed; solved {solved}.", basis: "=report", to: ["=to"], visible: ["=self", "=to"], data: { report: "=report", solved: "?solved" } } },
 ];
 
 // ------------------------------------------------------------------ the union
@@ -260,6 +374,10 @@ export const UNION: Issued[] = [
   { form: "return_to_work", title: "Call to return to work",
     fields: { employer: f("entity", "The employer.", req), members },
     writes: { kind: "return_to_work", text: "Return to work at {employer}.", to: ["=employer", "=members"], visible: ["=self", "=employer", "=members"], data: { employer: "=employer", members: "=members" } } },
+  { form: "ballot_result", title: "Result of a ballot of members on industrial action", does: "Declares the result of a ballot of members on industrial action, to the employer and the members: how many could vote, how many did, how many said yes, and whether it is approved. Action may be notified only on a ballot that meets what the law on industrial action asks.",
+    fields: { ballot: f("record", "The ballot."), employer: f("entity", "The employer.", req), members: f("list", "The members balloted.", req), eligible: f("count", "How many could vote.", req), voted: f("count", "How many voted.", req), yes: f("count", "How many voted yes.", req), passed: f("choice", "Whether it is approved.", { ...req, options: YES_NO }) },
+    writes: { kind: "ballot_result", text: "Protected action ballot at {employer}: {voted} of {eligible} members voted, {yes} yes; approved {passed}.", basis: "=ballot", to: ["=employer", "=members"], visible: ["=self", "=employer", "=members"],
+      data: { employer: "=employer", ballot: "=ballot", voted: "=voted", yes: "=yes", eligible: "=eligible", passed: "?passed" } } },
 ];
 
 // ------------------------------------------------------------------ the paper
@@ -308,9 +426,10 @@ export const DESK: Issued[] = [
     fields: {
       application: f("record", "The application.", req), matter: f("text", "What it is about, in the word the application uses.", req),
       applicant: f("entity", "Who applied.", req), against: f("entity", "Whom it is against.", req), answer_by: f("date", "The day they may answer by.", req),
+      about: f("record", "The paper the application is about, where it names one."), amount: f("amount", "The sum the application seeks, where it gives one."), structure: f("structure", "The building, where the application names one."), seeks: f("text", "What the application seeks, where it says."),
     },
     writes: { kind: "complaint_notice", text: "{applicant} has applied to us about {matter} (application {application}). You may answer by {answer_by}.", basis: "=application", to: ["=applicant", "=against"], visible: ["=applicant", "=against", "=self"],
-      data: { application: "=application", kind: "=matter", matter: "=matter", applicant: "=applicant", against: "=against", answer_by: "=answer_by", hearing_at: "=answer_by" } } },
+      data: { application: "=application", kind: "=matter", matter: "=matter", applicant: "=applicant", against: "=against", answer_by: "=answer_by", hearing_at: "=answer_by", about: "=about", amount: "#amount", structure: "=structure", seeks: "=seeks" } } },
   { form: "venue_decision", title: "Decision on an application", does: "Says what is decided on an application, to both sides. It moves no money and does nothing by itself: an order or a recommendation is words, which the other side follows or does not.",
     fields: {
       application: f("record", "The application decided.", req), matter: f("text", "What it was about, in the word the application uses.", req),
@@ -318,9 +437,11 @@ export const DESK: Issued[] = [
       finding: f("choice", "What is decided: pay (money to the applicant), do (put it right), set_aside (a paper), settled (the two agreed), dismissed, rejected (not something heard here), referred (passed to whoever must act).", { ...req, options: ["pay", "do", "set_aside", "settled", "dismissed", "rejected", "referred"] }),
       binding: f("choice", "Whether it is an order (yes) or a recommendation (no).", { ...req, options: YES_NO }),
       amount: f("amount", "For pay: how much."), pay_into: f("account", "For pay: the account it is paid into."), due: f("date", "For pay or do: the day it is due by."),
+      about: f("record", "The paper the application is about, where it names one."), structure: f("structure", "The building, where the application names one."), seeks: f("text", "What the application sought, where it said."),
+      waited_days: f("count", "Days from the application to this decision, for the office's own figures."),
     },
     writes: { kind: "venue_decision", text: "Decision on {application}: {finding}.", basis: "=application", to: ["=applicant", "=against"], visible: ["=applicant", "=against", "=self"],
-      data: { application: "=application", kind: "=matter", matter: "=matter", applicant: "=applicant", against: "=against", finding: "=finding", binding: "=binding", amount: "#amount", to: "=pay_into", due: "=due" } } },
+      data: { application: "=application", kind: "=matter", matter: "=matter", applicant: "=applicant", against: "=against", finding: "=finding", binding: "?binding", waited_days: "=waited_days", about: "=about", structure: "=structure", seeks: "=seeks", amount: "#amount", to: "=pay_into", due: "=due" } } },
 ];
 
 // ------------------------------------------------------------------ the support office

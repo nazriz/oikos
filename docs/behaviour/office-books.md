@@ -38,7 +38,9 @@ correspondence register; a council's aged creditors report.)
    seen by it alone. Its words say what has changed since the clerk's last paper (what is new, what has changed, what
    is no longer open) and how many stand under each heading; its list (`data.open`) holds everything that stands
    open, an entry each. A figure that moves with every payment (what has been paid against the budget) is marked
-   `running`: its moving alone is no reason for a paper, and it is said as it stands whenever one is filed.
+   `running`: its moving alone is no reason for a paper, and it is said as it stands whenever one is filed. Where one
+   has moved and the clerk's last paper is a week old, a paper is filed for it (2026-10-12: finance's tax withheld
+   stood at its day-9 figure until day 93 of the third living pilot, since nothing else in its books changed).
 4. **What the seat sees.** The paper comes into the office's folder like any paper of its own, as one line: the
    words, and "stands open: N; the list: in this paper, read by its id". The list is read by opening the paper, a part
    at a time where it is long, as any long paper is. A paper of its own staff never brings a seat back early: it is
@@ -84,6 +86,17 @@ theirs was found that a seat is not shown).
 - **A seat that never opens the paper** sees the words and the count, not the list.
 - **The mock.** A mock seat's brain is the office's code, which does not read the books; a mock run shows what a
   model would have been shown, not what it would have done with it.
+- **Held to the code in a run** (2026-10-12; `orchestrator/test/office-books-walk.test.ts`): a living town of 300 for
+  150 days with sixteen offices in mock seats that sit every third day. For every paper a brain acts on that had
+  stood open through a whole day of the clerk's, the clerk had it in that office's books. Seen so in the test's town:
+  the lender's decisions (100), landlords' requests, notices and applications (47), the tribunal member's orders
+  (5), the council clerk's result (1). Not seen there, for want of such acts: finance, the support office, the
+  union, the desks, the registrar; their readers are still held on hand-made papers alone. What came the day the
+  brain acted, or the day before, is the seat's post and is left out: the clerk looks in once a day, often at the
+  seat's own hour.
+- **The mayor's petitions.** A proposal or an answer of the mayor's that names a petition in its words counts as
+  acting on it, as one that cites it does (a seat's proposals on the council's form cite nothing, and its books
+  listed four petitions as open for 45 days after it had dealt with them). An answer on the petition form cites it.
 - **Readers restate the code.** Each reader is a second reading of the same papers, not the module's own state: a
   change to what a module acts on must be made in its reader too. `orchestrator/test/office-books.test.ts` holds the
   landlord's and the support office's to their code twins in a run; the others are held by tests on papers made by

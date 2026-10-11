@@ -12,7 +12,7 @@ import type { StatementRecord } from "../contracts";
 import { params, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
 import { moneyNow } from "../money";
 import { because, Book, breaches, noting, DAY, MONTH, offer, pay, say, type Step } from "./common";
-import { hearingOffer, Hearings, HEARING_DEFAULTS, type Hears } from "./desk";
+import { hearingNotice, hearingOffer, Hearings, HEARING_DEFAULTS, type Hears } from "./desk";
 import { stepper } from "./firms";
 import * as P from "./papers";
 
@@ -30,10 +30,14 @@ interface Dispute {
   members: string[];
 }
 
+/** What the union says it takes up for its members: its public notice. */
+const unionHears = (me: string, hears: Hears[]) => hearingNotice(me, "The union takes up for its members", hears.map((h) => ({ ...h, can: ["represent"] as Hears["can"] })), { members_of: me, members_apply: true });
+
 export const organiser: BehaviourModule = {
   name: "union.organiser",
   answers: {"office": "the union's office", "acts": "What it acts on: an application to join; its members' votes on its ballots; and an employer's answer to a claim it has made."},
   issues: P.UNION,
+  opens: (p, me) => ((p.hears ?? []).length ? [unionHears(me, p.hears)] : []),
   version: "0.6.0", // 0.6.0: takes up a member's grievance with their employer, where the world says it hears such (docs/behaviour/frictions.md)
   doc: "docs/behaviour/unions.md",
   cadence: () => DAY,
@@ -101,8 +105,10 @@ export const organiser: BehaviourModule = {
         if (cases) {
           if (!saidHears) {
             saidHears = true;
-            if (!book.open("hearing").some((r) => r.speaks_for === me)) steps.push(because("Saying what the union takes up for its members, so that a member with such a matter can bring it.",
-              say("hearing", `The union takes up for its members: ${p.hears.map((h) => h.about.replace(/_/g, " ")).join(", ")}. Members apply in writing; there is no fee.`, { visible: "public", offer: hearingOffer(me, p.hears.map((h) => ({ ...h, can: ["represent"] as Hears["can"] })), { members_of: me }), data: { hears: p.hears.map((h) => h.about) } })));
+            if (!book.open("hearing").some((r) => r.speaks_for === me)) {
+              const n = unionHears(me, p.hears);
+              steps.push(because("Saying what the union takes up for its members, so that a member with such a matter can bring it.", say(n.kind, n.text, { visible: "public", offer: n.offer, data: n.data as object })));
+            }
           }
           steps.push(...cases.steps(book, obs.t));
         }

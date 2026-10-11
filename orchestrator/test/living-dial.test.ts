@@ -37,7 +37,11 @@ const TOWN = join(root, "worlds/town.yaml");
 // And again at the merge of the fixes after the second living pilot, the same day (03f67a4b... until then;
 // docs/decisions.md, "What the second living pilot found"): rent and loan repayments are counted from each
 // agreement's own day, each landlord takes arrears up on its own day of the week, the mayor's office has a clerk.
-const STEP_1 = "ae8baeeda23cbdfef5f20ab45dbb810635c55dde1016df64ace599e6326705bc";
+// And again on 2026-10-12, with the fixes after the third living pilot (ae8baeed... until then; docs/decisions.md,
+// "What the third living pilot found" and "A draw is named for what it is about"): a draw about a paper is named for
+// which paper it is to whoever draws, not for the paper's number on file, so every such draw falls anew; a notice to
+// vacate does to a tenant what a notice on the lease did; a possession application names the notice it relies on.
+const STEP_1 = "d48e330ba9123d60d3f8efef3f0f710ee6e50e6ff59e8bc086a4a696959599bb";
 
 test("with the dial absent or at 0 a town is step 1's town, to the state hash", async () => {
   const out = mkdtempSync(join(tmpdir(), "oikos-dial-"));

@@ -30,7 +30,7 @@ import { basesOf, channels, cites } from "../contracts";
 import { DECISIONS, OUTCOMES, RECORD, WORDS, params, wait, type Belief, type BehaviourModule, type ComposeBrief, type ComposePiece, type ConsultAnswer, type DecisionRecord, type OutcomeRecord, type Situation, type ParticipantContext, type RecordChange, type Words } from "../module";
 import type { Rng } from "../rng";
 import * as C from "../calls";
-import { advertisedJob, ask, Asked, because, Book, firstDue, breaches, noted, callAction, commitmentOf, DAY, nextLook, usd, jobTerms, record, leaseTerms, message, MONTH, moveIn, moveOut, notice, pay, PAYMENT_FAILED, petitionSignatures, publishedCount, say, sign, stoodEmpty, structureOf, variableToday, vote, withdraw, type Step, ownBanked } from "./common";
+import { advertisedJob, ask, Asked, because, officeNote, Book, firstDue, breaches, noted, callAction, commitmentOf, DAY, nextLook, usd, jobTerms, record, leaseTerms, message, MONTH, moveIn, moveOut, notice, pay, PAYMENT_FAILED, petitionSignatures, publishedCount, say, sign, stoodEmpty, structureOf, variableToday, vote, withdraw, type Step, ownBanked } from "./common";
 import { ADULT_YEARS, ageAt, bedroomsNeeded, hear, householdOf, SAYING, type Heard, type HouseholdData, type Member, type OccupancyStandard } from "./household";
 import { Deliveries, goodsPrices, offerOf as shopOffer, order } from "./trade";
 import { dayPayPeriod, incomeTaxLaw, withholding } from "./tax";
@@ -169,7 +169,7 @@ interface Job { /** The account our pay has come from, as we have seen it come. 
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.49.0", // 0.49.0: a decision about a want, and whether to found, is recorded with its situation (docs/design/ai-citizens.md 11a): recording only, nothing a citizen does changes; 0.48.0: takes for pay only what is paid as wages (a refund or a dividend from an employer is not pay come short); starts a business of one from home, and gives one up that pays no living (docs/behaviour/entry.md); told to vacate for arrears, goes or stays, answers the tribunal, and is out when its warrant is carried out (docs/behaviour/justice.md, "Possession"); 0.46.0: everyday frictions (docs/behaviour/frictions.md), with the world's dial: a home in disrepair, pay come short (no longer taken for no pay), a bill well over the usual, a claim refused, goods found faulty; each a grievance about whoever did it, asked of them, taken to any body that says it hears such things, or told to those one knows; what comes back moves trust and the sense of agency; a job is left only for one that pays enough more, the more so the longer held (where the world says); giving up on work stops the looking; a need short at the start has been short for a while; pay told to the household once until it changes; 0.45.0: wants and initiative (docs/design/ai-citizens.md 10a, 10b), for those the world's dial gives it to: wants born of needs, events and those one copies, met with openings by what they bring in typed outcomes, the way chosen by the mind; trust, agency and attachment read; starting attachment from the world; nothing changes with the dial at 0; 0.44.0: the richer record (docs/design/ai-citizens.md 10c, 10d): belonging and meaning as needs, trust in particular institutions, a sense of agency, attachments, what is thought and what is said, values that drift and are shocked, bounded ties, where the hours go; held by the kernel as the person's own record; 0.43.2: offered a job that names no place of work, on an advertisement, goes to work where the advertisement says; 0.43.1: tells their own business when they move home; 0.43.0: someone who works for themself (own_work): not out of work, their income what the business pays them, at their pitch in working hours; 0.42.1: work by the day (a day's pay known as pay; no claim for a day not worked); 0.42.0: reads the support law, stops work at an age of its own (0.41.0 on its branch), with main's 0.41.1 0.47.0: founding (docs/behaviour/founding.md), where the world's dial has it on: at a want given up or with nothing to answer it, shared by others one knows of, a person may found a group, a fund or a body that takes grievances up, in words of their own or a composing model's; a thing made in a run is joined as any opening is taken up, left when one no longer comes, and a fund drawn on when short; with the dial off nothing changes; 0.46.0: everyday frictions (docs/behaviour/frictions.md), with the world's dial: a home in disrepair, pay come short (no longer taken for no pay), a bill well over the usual, a claim refused, goods found faulty; each a grievance about whoever did it, asked of them, taken to any body that says it hears such things, or told to those one knows; what comes back moves trust and the sense of agency; a job is left only for one that pays enough more, the more so the longer held (where the world says); giving up on work stops the looking; a need short at the start has been short for a while; pay told to the household once until it changes; 0.45.0: wants and initiative (docs/design/ai-citizens.md 10a, 10b), for those the world's dial gives it to: wants born of needs, events and those one copies, met with openings by what they bring in typed outcomes, the way chosen by the mind; trust, agency and attachment read; starting attachment from the world; nothing changes with the dial at 0; 0.44.0: the richer record (docs/design/ai-citizens.md 10c, 10d): belonging and meaning as needs, trust in particular institutions, a sense of agency, attachments, what is thought and what is said, values that drift and are shocked, bounded ties, where the hours go; held by the kernel as the person's own record; 0.43.2: offered a job that names no place of work, on an advertisement, goes to work where the advertisement says; 0.43.1: tells their own business when they move home; 0.43.0: someone who works for themself (own_work): not out of work, their income what the business pays them, at their pitch in working hours; 0.42.1: work by the day (a day's pay known as pay; no claim for a day not worked); 0.42.0: reads the support law, stops work at an age of its own (0.41.0 on its branch), with main's 0.41.1
+  version: "0.50.0", // 0.50.0: what being told to leave does to a tenant (trust, the tie, fear, the household told, the want) is done by a notice to vacate as it was by a notice on the lease, once a tenancy; a landlord's request for rent owed, an offer of a plan (answered with what the household could pay) and an application for possession are on the tenant's record; a letter from an office in its own words is read, kept and noted, never acted on (docs/decisions.md, 2026-10-12); 0.49.0: a decision about a want, and whether to found, is recorded with its situation (docs/design/ai-citizens.md 11a): recording only, nothing a citizen does changes; 0.48.0: takes for pay only what is paid as wages (a refund or a dividend from an employer is not pay come short); starts a business of one from home, and gives one up that pays no living (docs/behaviour/entry.md); told to vacate for arrears, goes or stays, answers the tribunal, and is out when its warrant is carried out (docs/behaviour/justice.md, "Possession"); 0.46.0: everyday frictions (docs/behaviour/frictions.md), with the world's dial: a home in disrepair, pay come short (no longer taken for no pay), a bill well over the usual, a claim refused, goods found faulty; each a grievance about whoever did it, asked of them, taken to any body that says it hears such things, or told to those one knows; what comes back moves trust and the sense of agency; a job is left only for one that pays enough more, the more so the longer held (where the world says); giving up on work stops the looking; a need short at the start has been short for a while; pay told to the household once until it changes; 0.45.0: wants and initiative (docs/design/ai-citizens.md 10a, 10b), for those the world's dial gives it to: wants born of needs, events and those one copies, met with openings by what they bring in typed outcomes, the way chosen by the mind; trust, agency and attachment read; starting attachment from the world; nothing changes with the dial at 0; 0.44.0: the richer record (docs/design/ai-citizens.md 10c, 10d): belonging and meaning as needs, trust in particular institutions, a sense of agency, attachments, what is thought and what is said, values that drift and are shocked, bounded ties, where the hours go; held by the kernel as the person's own record; 0.43.2: offered a job that names no place of work, on an advertisement, goes to work where the advertisement says; 0.43.1: tells their own business when they move home; 0.43.0: someone who works for themself (own_work): not out of work, their income what the business pays them, at their pitch in working hours; 0.42.1: work by the day (a day's pay known as pay; no claim for a day not worked); 0.42.0: reads the support law, stops work at an age of its own (0.41.0 on its branch), with main's 0.41.1 0.47.0: founding (docs/behaviour/founding.md), where the world's dial has it on: at a want given up or with nothing to answer it, shared by others one knows of, a person may found a group, a fund or a body that takes grievances up, in words of their own or a composing model's; a thing made in a run is joined as any opening is taken up, left when one no longer comes, and a fund drawn on when short; with the dial off nothing changes; 0.46.0: everyday frictions (docs/behaviour/frictions.md), with the world's dial: a home in disrepair, pay come short (no longer taken for no pay), a bill well over the usual, a claim refused, goods found faulty; each a grievance about whoever did it, asked of them, taken to any body that says it hears such things, or told to those one knows; what comes back moves trust and the sense of agency; a job is left only for one that pays enough more, the more so the longer held (where the world says); giving up on work stops the looking; a need short at the start has been short for a while; pay told to the household once until it changes; 0.45.0: wants and initiative (docs/design/ai-citizens.md 10a, 10b), for those the world's dial gives it to: wants born of needs, events and those one copies, met with openings by what they bring in typed outcomes, the way chosen by the mind; trust, agency and attachment read; starting attachment from the world; nothing changes with the dial at 0; 0.44.0: the richer record (docs/design/ai-citizens.md 10c, 10d): belonging and meaning as needs, trust in particular institutions, a sense of agency, attachments, what is thought and what is said, values that drift and are shocked, bounded ties, where the hours go; held by the kernel as the person's own record; 0.43.2: offered a job that names no place of work, on an advertisement, goes to work where the advertisement says; 0.43.1: tells their own business when they move home; 0.43.0: someone who works for themself (own_work): not out of work, their income what the business pays them, at their pitch in working hours; 0.42.1: work by the day (a day's pay known as pay; no claim for a day not worked); 0.42.0: reads the support law, stops work at an age of its own (0.41.0 on its branch), with main's 0.41.1
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -740,6 +740,7 @@ export const citizen: BehaviourModule = {
     };
     let thanked: NonNullable<OutcomeRecord["felt"]>[number] | undefined; // gratitude for a lead, for the record of what it led to
     const noticeSeen = new Set<string>(); // (for the record: a landlord's notice on a lease, said once)
+    const noticeOver = new Set<string>(); // tenancies whose notice to vacate has lapsed (paid up), or was answered by a plan or a dismissal: we stay
     const petitionSeen = new Set<string>(); // (for the record: a petition we first saw and did not sign, said once)
     let personTold = false; // who we are goes with our first recorded decision, once (it does not change)
     const wholeFacts = (f: Facts): NonNullable<DecisionRecord["options"][number]["facts"]> => ({ money_per_month: Math.round(f.money_per_month),
@@ -1269,6 +1270,16 @@ export const citizen: BehaviourModule = {
           continue;
         }
         const want = (Object.keys(ASKING) as Want[]).find((w) => ASKING[w] === m.text);
+        // A letter from an office, in words of its own (docs/behaviour/letters.md, "A letter to a person"): read and
+        // kept, and on our record that the office wrote, about what paper if it says. We cannot tell what it asks,
+        // and do not pretend to: nothing is done on it and nothing is answered. (What an office wants a person to
+        // act on, it sends on its own papers: a request for rent owed, an offer of a plan, a notice of hearing.)
+        const office = m.as ? (m.from_entity ?? book.positions.get(m.as)?.entity) : undefined;
+        if (!want && office && office !== me && !officeNote(m.text) && !(m.re && (askedAt.home !== undefined || askedAt.work !== undefined) && !book.records.has(m.re))) {
+          inner.note({ t: obs.t, what: "office_wrote", about: office, size: Math.min(10_000, m.text.length) });
+          outcome({ t: obs.t, domain: "letter", option: office, kind: "received", way: "mine", from: office, facts: { characters: m.text.length, ...(m.re ? { about: m.re } : {}) } }, false);
+          continue;
+        }
         if (want) asked.push({ from: m.from, want });
         // A place someone names in reply to our asking (not a reply about a record: those are institutions answering requests).
         else if (m.re && (askedAt.home !== undefined || askedAt.work !== undefined) && !book.records.has(m.re)) {
@@ -2158,6 +2169,7 @@ export const citizen: BehaviourModule = {
           if (w.about === "let_go" && !w.with && (job || ownWork || retired)) wantMet(w, "in work");
           else if (w.about === "unpaid" && w.whom && !(book.claimsBy("holder", me) as readonly any[]).some((c) => c.about?.kind === "debt" && c.counterparty === w.whom && cents(c.about.amount) > (settledToUs.get(c.id) ?? 0)) && w.tried > 0) wantMet(w, "paid");
           else if (w.about === "rent_increase" && w.against && book.withdrawn.has(w.against.record)) wantMet(w, "withdrawn");
+          else if (w.about === "notice" && !w.with && w.against && noticeOver.has(w.against.record)) wantMet(w, "the notice lapsed, or we were let stay");
           else if ((w.about === "rent_increase" || w.about === "notice") && !w.with && w.against && (!home ? w.about === "rent_increase" : home.landlord !== w.against.by || (w.about === "notice" && home.agreement !== w.against.record))) wantMet(w, home ? "housed elsewhere, or let stay" : "left");
           else if (w.about === "loss" && inner.dent("meaning", t) + inner.dent("belonging", t) < 2_000) wantMet(w, "time, and company");
           else if (w.about === "service" && complainedOf === null && feelings.level("anger", w.whom ?? "", t) < 1_000) wantMet(w, "seen to");
@@ -2494,8 +2506,38 @@ export const citizen: BehaviourModule = {
           home.vacate = { paper: r.id, by: Number(r.data.by) || t, stays };
           outcome({ t, domain: "home", option: home.space, kind: "notice_to_vacate", way: "mine", from: home.landlord, facts: { arrears: cents(r.data.arrears ?? 0), by: home.vacate.by, stays } });
           inner.doneTo();
+          // What being told to leave does to a tenant, whoever the landlord is and whatever paper says it: until
+          // 2026-10-12 it was done by a notice on the lease alone, and under a law on possession that comes only
+          // after an order, so a tenant given notice to vacate thought no less of the landlord, feared nothing,
+          // told nobody at home and wanted nothing about it (320 such wants in the second living pilot, none in the
+          // third). Once for a tenancy: a notice given again, or the lease's own notice later, is not a second blow.
+          // (Being put out is the defining event, when it happens: not this.)
+          if (!noticeSeen.has(home.agreement)) {
+            noticeSeen.add(home.agreement);
+            const by = home.landlord;
+            inner.experience(by, kindOf(by), false, t, { weight: 2 });
+            ties.add(by, -3_000, t, "notice");
+            feelings.feel("fear", by, 5_000, t);
+            noticedBy = { by, t };
+            noticeOver.delete(home.agreement);
+            if (initiative) { wantBorn(t, "notice", ["occupancy"], 1, "shelter", { whom: by, against: { record: home.agreement, kind: "notice", by } }); troubleToTell.push({ what: "notice", by }); }
+          }
+        } else if (r.kind === "plan_offer" && r.data?.lease === home.agreement && r.speaks_for === home.landlord && (r.addressed_to ?? []).includes(me)) {
+          // The landlord offers a plan to pay what is owed: answered with what the household could pay a month
+          // beyond its rent and essentials (the sum it would give a tribunal), yes if that covers the instalment.
+          const can = Math.max(0, householdIncome() - home.rent - p.essentials), instalment = cents(r.data.instalment ?? 0);
+          const accepts = instalment > 0 && can >= instalment;
+          steps.push(because(`${home.landlord} offers a plan to pay the rent owed, ${usd(instalment)} a month: ${accepts ? "we can pay that" : can > 0 ? `we could pay ${usd(can)} a month, not that` : "we can pay nothing beyond the rent now"}; answering.`,
+            say("plan_answer", accepts ? `Answer to your offer ${r.id}: yes. We can pay ${usd(instalment)} a month toward the rent owed, and the rent as it falls due.` : `Answer to your offer ${r.id}: no. ${can > 0 ? `We could pay ${usd(can)} a month toward the rent owed, beyond the rent` : "We can pay nothing beyond the rent now"}.`,
+              { to: [home.landlord], visible: [me, home.landlord], basis: r.id, data: { offer: r.id, lease: home.agreement, accepts, can_pay: can } })));
+          outcome({ t, domain: "home", option: home.space, kind: "plan_offered", way: "mine", from: home.landlord, facts: { instalment, can_pay: can, accepts } });
+        } else if (r.kind === PAPER.request && r.data?.matter === "arrears" && r.data?.about === home.agreement && r.speaks_for === home.landlord && (r.addressed_to ?? []).includes(me)) {
+          // Asked in writing for the rent owed: on our record that the landlord asked, and for how much. (What we
+          // can pay we pay, as always: the asking changes nothing of that.)
+          outcome({ t, domain: "home", option: home.space, kind: "rent_asked", way: "mine", from: home.landlord, facts: { amount: cents(r.data.amount ?? 0) } });
         } else if (r.kind === "hearing_notice" && r.data?.kind === "possession" && r.data?.against === me && r.data?.about === home.agreement) {
           const offer = Math.max(0, householdIncome() - home.rent - p.essentials);
+          outcome({ t, domain: "home", option: home.space, kind: "possession_applied", way: "mine", from: home.landlord, facts: { owed: cents(r.data.amount ?? 0), answer_by: Number(r.data.answer_by ?? r.data.hearing_at ?? t), offer } });
           if (offer > 0) steps.push(because(`${home.landlord} has applied for possession of our home: answering the tribunal that we can pay ${usd(offer)} a month toward what is owed, beyond the rent.`,
             say("tribunal_response", `Answer to application ${r.data.application}: we can pay ${usd(offer)} a month toward the rent owed, and the rent as it falls due.`, { to: [r.speaks_for!], visible: [me, r.speaks_for!, home.landlord], basis: String(r.data.application), data: { application: r.data.application, offer } })));
         } else if (r.kind === "tribunal_order" && r.data?.kind === "possession" && r.data?.against === me && r.data?.about === home.agreement) {
@@ -2506,6 +2548,7 @@ export const citizen: BehaviourModule = {
             inner.doneTo();
           } else {
             home.vacate = undefined;
+            noticeOver.add(home.agreement);
             outcome({ t, domain: "home", option: home.space, kind: r.data.finding === "plan" ? "plan_ordered" : "possession_dismissed", way: "mine", from: home.landlord, facts: r.data.finding === "plan" ? { instalment: cents(r.data.instalment ?? 0), owed: cents(r.data.amount ?? 0) } : {} });
           }
         } else if (r.kind === "warrant_executed" && r.data?.lease === home.agreement) {
@@ -2513,7 +2556,7 @@ export const citizen: BehaviourModule = {
         }
       }
       // (A notice to vacate that has lapsed: the arrears were paid.)
-      if (home?.vacate && !home.vacate.ordered && book.withdrawn.has(home.vacate.paper)) home.vacate = undefined;
+      if (home?.vacate && !home.vacate.ordered && book.withdrawn.has(home.vacate.paper)) { home.vacate = undefined; noticeOver.add(home.agreement); noticeSeen.delete(home.agreement); }
       // Ordered to pay someone (rent in arrears, by a tribunal that heard it): paid, if it can be and leave the
       // month's essentials; if not, it is theirs to have enforced.
       for (const r of fresh) {

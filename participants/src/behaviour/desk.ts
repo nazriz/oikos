@@ -14,7 +14,7 @@ import { cents } from "../money";
 import { dateWords } from "../forms";
 import { params, type BehaviourModule, type ParticipantContext } from "../module";
 import type { Rng } from "../rng";
-import { because, Book, CounterWork, DAY, noting, say, StandingWork, type Step, usd } from "./common";
+import { because, Book, CounterWork, DAY, noting, Occurrences, say, StandingWork, type Step, usd } from "./common";
 import { stepper } from "./firms";
 import { PAPER, responseTo, type Finding, type Matter } from "./frictions";
 import * as P from "./papers";
@@ -65,6 +65,8 @@ interface Case { id: string; matter: string; applicant: string; against: string;
 export class Hearings {
   private readonly cases = new Map<string, Case>();
   private readonly seen = new Set<string>();
+  /** Which case each application is to us: by who against whom about what, not by its number on file. */
+  private readonly nth = new Occurrences();
   /** What it did, for whoever counts: applications, by finding; days from application to decision. */
   readonly counts: { [what: string]: number } = {};
   readonly waits: number[] = [];
@@ -89,8 +91,12 @@ export class Hearings {
    * counter staff, who take them in, tell the other side and decide what the record settles (the other side's own
    * answer, or none: a decision in default, or a paper shown), and put before the office-holder, as a note on the
    * office's file, each case the record cannot settle; "seat", the office-holder, who decides those and nothing else.
+   * A tribunal's two parts (docs/behaviour/justice.md, "The registry lists; the member decides"): "list", its registry
+   * staff, who take applications in and tell both sides, and decide nothing; "decide", its member, who decides every
+   * case listed (by anyone: the notices of hearing on the tribunal's file say which cases stand, and until when the
+   * other side may answer) and takes none in.
    */
-  steps(book: Book, t: number, part: "all" | "staff" | "seat" = "all", /** How many cases can be decided now, where that is not a fixed number a day (a body whose staff are its members' hours). */ canDecide?: number): Step[] {
+  steps(book: Book, t: number, part: "all" | "staff" | "seat" | "list" | "decide" = "all", /** How many cases can be decided now, where that is not a fixed number a day (a body whose staff are its members' hours). */ canDecide?: number): Step[] {
     const steps: Step[] = [];
     if (part === "seat") {
       // The cases the staff could not settle on the record: decided here as the code office would (failure of proof,
@@ -100,7 +106,7 @@ export class Hearings {
         const c = n.data?.case as Case | undefined;
         if (!c) continue;
         const claimed = c.data.amount !== undefined ? cents(c.data.amount) : 0;
-        const upheld = this.rng(`uphold-${c.id}`).below(10_000) < (this.p.uphold_bps[c.matter] ?? this.p.uphold_bps.other ?? 5_000);
+        const upheld = this.rng(`uphold-${this.nth.key(c.id, c.applicant, c.against, c.matter)}`).below(10_000) < (this.p.uphold_bps[c.matter] ?? this.p.uphold_bps.other ?? 5_000);
         const binding = (c.hears.can ?? ["order"]).includes("order"), due = t + this.p.within_days * DAY;
         const finding: Finding = !upheld ? "dismissed" : claimed > 0 ? "pay" : c.hears.undoes && c.data.about ? "set_aside" : "do";
         this.count(finding);
@@ -119,8 +125,21 @@ export class Hearings {
       steps.push(because(why, say(this.forms.decision, `Decision on ${c.id}: ${text}`, { to: [c.applicant, c.against].filter((x) => x), visible: [c.applicant, c.against, this.me].filter((x) => x), basis: c.id,
         data: { application: c.id, kind: c.matter, matter: c.matter, applicant: c.applicant, against: c.against, finding, binding, waited_days: Math.floor((t - c.at) / DAY), ...(c.data.about ? { about: c.data.about } : {}), ...(c.data.structure ? { structure: c.data.structure } : {}), ...(c.data.seeks ? { seeks: c.data.seeks } : {}), ...data } })));
     };
+    // ---- the member's part: the cases the tribunal's file says are listed, as its notices of hearing have them ----
+    if (part === "decide") {
+      const decided = new Set(book.all(this.forms.decision).filter((r) => r.speaks_for === this.me).map((r) => String(r.data?.application ?? "")));
+      for (const n of book.all(this.forms.notice).filter((r) => r.speaks_for === this.me && typeof r.data?.matter === "string").sort((x, y) => x.at - y.at || (x.id < y.id ? -1 : 1))) {
+        const id = String(n.data?.application ?? "");
+        const a = book.records.get(id) as StatementRecord | undefined;
+        if (!a || decided.has(id) || this.leave.includes(String(n.data?.matter))) { this.cases.delete(id); continue; }
+        const d = (a.data ?? {}) as Matter & { kind?: string };
+        const matter = String(d.matter ?? d.kind ?? n.data?.matter);
+        // (The latest notice gives the day: a case put off is decided when its new day has come.)
+        this.cases.set(id, { id, matter, applicant: a.speaks_for!, against: String(d.against ?? n.data?.against ?? ""), at: a.at, answerBy: Number(n.data?.answer_by ?? n.data?.hearing_at ?? t), data: d, hears: this.p.hears.find((h) => h.about === matter) ?? { about: matter } });
+      }
+    }
     // ---- applications: taken, and the other side told ----
-    for (const kind of this.forms.application) for (const a of book.open(kind).filter((x) => (x.addressed_to ?? []).includes(this.me) && !this.seen.has(x.id)).sort((x, y) => x.at - y.at || (x.id < y.id ? -1 : 1))) {
+    if (part !== "decide") for (const kind of this.forms.application) for (const a of book.open(kind).filter((x) => (x.addressed_to ?? []).includes(this.me) && !this.seen.has(x.id)).sort((x, y) => x.at - y.at || (x.id < y.id ? -1 : 1))) {
       const d = (a.data ?? {}) as Matter & { kind?: string };
       const matter = String(d.matter ?? d.kind ?? "");
       if (this.leave.includes(matter)) continue;
@@ -152,6 +171,7 @@ export class Hearings {
         say(this.forms.notice, `${applicant} has applied to us about ${matter.replace(/_/g, " ")}${d.amount ? `, seeking ${usd(cents(d.amount))}` : ""} (application ${a.id}). You may answer by day ${Math.floor(c.answerBy / DAY)}${can.includes("mediate") ? ", and say whether you will meet them with us" : ""}.`,
           { to: [applicant, against], visible: [applicant, against, this.me], basis: a.id, data: { application: a.id, kind: matter, matter, applicant, against, hearing_at: c.answerBy, answer_by: c.answerBy, ...(d.about ? { about: d.about } : {}), ...(d.amount !== undefined ? { amount: d.amount } : {}), ...(d.structure ? { structure: d.structure } : {}), ...(d.seeks ? { seeks: d.seeks } : {}) } })));
     }
+    if (part === "list") return steps;
     // ---- deciding: those whose time to answer has run, oldest first, as far as the day's hours go ----
     let room = canDecide ?? Math.max(1, Math.floor(this.p.cases_per_day));
     for (const c of [...this.cases.values()].filter((x) => t >= x.answerBy).sort((a, b) => a.answerBy - b.answerBy || (a.id < b.id ? -1 : 1))) {
@@ -214,7 +234,7 @@ export class Hearings {
               { to: [this.me], visible: [this.me], basis: c.id, data: { application: c.id, matter: c.matter, applicant: c.applicant, against: c.against, case: c } })));
           continue;
         }
-        const upheld = !r || shown || this.rng(`uphold-${c.id}`).below(10_000) < (this.p.uphold_bps[c.matter] ?? this.p.uphold_bps.other ?? 5_000);
+        const upheld = !r || shown || this.rng(`uphold-${this.nth.key(c.id, c.applicant, c.against, c.matter)}`).below(10_000) < (this.p.uphold_bps[c.matter] ?? this.p.uphold_bps.other ?? 5_000);
         finding = !upheld ? "dismissed" : claimed > 0 ? "pay" : c.hears.undoes && c.data.about ? "set_aside" : "do";
         amount = upheld ? claimed : 0;
         why = r ? `${c.against} cannot say from its records; ${shown ? "the applicant has shown a paper for it" : upheld ? "on what both say, the applicant's account is made out" : "the applicant has nothing to show for it, and it is not made out"}` : `${c.against} did not answer: the applicant's account stands`;
@@ -228,8 +248,16 @@ export class Hearings {
   }
 }
 
+/** What a body that hears grievances says it hears: its public notice, with the offer whoever has such a matter takes up. */
+export function hearingNotice(me: string, words: string, hears: Hears[], o: { fee?: number; account?: string; members_of?: string; members_apply?: boolean } = {}): { kind: string; text: string; data: unknown; offer: Offer } {
+  const fee = o.fee ?? 0;
+  return { kind: "hearing", text: `${words}: ${hears.map((h) => h.about.replace(/_/g, " ")).join(", ")}. ${o.members_apply ? "Members apply" : "Apply"} in writing${fee > 0 ? `; the fee is ${usd(fee)}` : "; there is no fee"}.`,
+    offer: hearingOffer(me, hears, { fee: o.fee, account: o.account, members_of: o.members_of }), data: { hears: hears.map((h) => h.about), ...(fee > 0 ? { fee } : {}) } };
+}
+
 export const desk: BehaviourModule = {
   name: "office.desk",
+  opens: (p, me) => ((p.hears ?? []).length && p.part !== "staff" ? [hearingNotice(me, `The ${p.title ?? "desk"} hears`, p.hears, { fee: p.fee, account: p.account, members_of: p.members_of })] : []),
   // (Its counter: docs/behaviour/standing-work.md. What is routine is what the procedure settles on the record.)
   routines: [{ task: "answer", at: "office", every: 1, what: "The desk's staff take in each application, tell the one it is against and give them time to answer, and decide what the record settles: the other side's own answer, no answer at all, or a paper the applicant can show. A case the record cannot settle is put before the office-holder.",
     papers: [
@@ -238,7 +266,7 @@ export const desk: BehaviourModule = {
     ] }],
   answers: { office: "the desk", acts: "What it acts on: an application made to it about something it has said it hears, which it puts to the other side and decides by its procedure." },
   issues: P.DESK,
-  version: "0.1.0", // 0.1.0: a body that hears grievances (docs/behaviour/frictions.md)
+  version: "0.1.1", // 0.1.1: what the record cannot settle is drawn by who applied against whom about what, not by the application's number on file; its notice of what it hears is on file when a seat arrives; 0.1.0: a body that hears grievances (docs/behaviour/frictions.md)
   doc: "docs/behaviour/frictions.md",
   cadence: () => DAY,
   firstWake: (ctx) => 9 * 3600 + ctx.rng("first-wake").below(3600),
@@ -273,9 +301,10 @@ export const desk: BehaviourModule = {
         if (!said && p.part !== "staff") {
           said = true;
           const standing = book.open("hearing").find((r: StatementRecord) => r.speaks_for === me && r.offer?.hears);
-          if (!standing && p.hears.length) steps.push(because("Saying what we hear, so that whoever has such a matter can bring it.",
-            say("hearing", `The ${p.title} hears: ${p.hears.map((h) => h.about.replace(/_/g, " ")).join(", ")}. Apply in writing${p.fee > 0 ? `; the fee is ${usd(p.fee)}` : "; there is no fee"}.`,
-              { visible: "public", offer: hearingOffer(me, p.hears, { fee: p.fee, account: p.account, members_of: p.members_of }), data: { hears: p.hears.map((h) => h.about), ...(p.fee > 0 ? { fee: p.fee } : {}) } })));
+          if (!standing && p.hears.length) {
+            const n = hearingNotice(me, `The ${p.title} hears`, p.hears, { fee: p.fee, account: p.account, members_of: p.members_of });
+            steps.push(because("Saying what we hear, so that whoever has such a matter can bring it.", say(n.kind, n.text, { visible: "public", offer: n.offer, data: n.data as object })));
+          }
         }
         // (With a counter, and someone in the office: the staff do what the record settles, while their standing
         // order stands; the office-holder decides the rest. Without one, whoever runs the office does it all.)

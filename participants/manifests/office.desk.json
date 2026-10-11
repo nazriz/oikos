@@ -1,6 +1,6 @@
 {
   "name": "office.desk",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "doc": "docs/behaviour/frictions.md",
   "params": {
     "account": {
@@ -135,6 +135,22 @@
           "type": "date",
           "required": true,
           "description": "The day they may answer by."
+        },
+        "about": {
+          "type": "record",
+          "description": "The paper the application is about, where it names one."
+        },
+        "amount": {
+          "type": "amount",
+          "description": "The sum the application seeks, where it gives one."
+        },
+        "structure": {
+          "type": "structure",
+          "description": "The building, where the application names one."
+        },
+        "seeks": {
+          "type": "text",
+          "description": "What the application seeks, where it says."
         }
       },
       "writes": {
@@ -157,7 +173,11 @@
           "applicant": "=applicant",
           "against": "=against",
           "answer_by": "=answer_by",
-          "hearing_at": "=answer_by"
+          "hearing_at": "=answer_by",
+          "about": "=about",
+          "amount": "#amount",
+          "structure": "=structure",
+          "seeks": "=seeks"
         }
       }
     },
@@ -219,6 +239,22 @@
         "due": {
           "type": "date",
           "description": "For pay or do: the day it is due by."
+        },
+        "about": {
+          "type": "record",
+          "description": "The paper the application is about, where it names one."
+        },
+        "structure": {
+          "type": "structure",
+          "description": "The building, where the application names one."
+        },
+        "seeks": {
+          "type": "text",
+          "description": "What the application sought, where it said."
+        },
+        "waited_days": {
+          "type": "count",
+          "description": "Days from the application to this decision, for the office's own figures."
         }
       },
       "writes": {
@@ -241,7 +277,11 @@
           "applicant": "=applicant",
           "against": "=against",
           "finding": "=finding",
-          "binding": "=binding",
+          "binding": "?binding",
+          "waited_days": "=waited_days",
+          "about": "=about",
+          "structure": "=structure",
+          "seeks": "=seeks",
           "amount": "#amount",
           "to": "=pay_into",
           "due": "=due"

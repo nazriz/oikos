@@ -171,6 +171,204 @@
           "for_days": "=for_days"
         }
       }
+    },
+    {
+      "form": "remedy_answer",
+      "title": "Answer to a request to put something right",
+      "does": "Answers someone who has asked the office in writing to put something right: yes or no, and where money is owed them and paid, how much. It does nothing by itself: what puts the thing right (a payment, a repair ordered, a paper withdrawn) is done besides.",
+      "fields": {
+        "request": {
+          "type": "record",
+          "required": true,
+          "description": "The request answered."
+        },
+        "to": {
+          "type": "entity",
+          "required": true,
+          "description": "Who asked."
+        },
+        "matter": {
+          "type": "text",
+          "required": true,
+          "description": "What it is about, in the word the request uses."
+        },
+        "granted": {
+          "type": "choice",
+          "required": true,
+          "options": [
+            "yes",
+            "no"
+          ],
+          "description": "Whether it will be put right."
+        },
+        "amount": {
+          "type": "amount",
+          "description": "Where money is owed them and paid: how much."
+        },
+        "reason": {
+          "type": "text",
+          "description": "Where it is refused: why."
+        }
+      },
+      "writes": {
+        "kind": "remedy_answer",
+        "text": "Answer to your request {request}: {granted}.",
+        "basis": "=request",
+        "to": [
+          "=to"
+        ],
+        "visible": [
+          "=to",
+          "=self"
+        ],
+        "data": {
+          "request": "=request",
+          "matter": "=matter",
+          "granted": "?granted",
+          "amount": "#amount",
+          "reason": "=reason"
+        }
+      }
+    },
+    {
+      "form": "complaint_answer",
+      "title": "Answer to a desk's notice of an application against the office",
+      "does": "Answers a body that has told the office of an application against it, from the office's own books: what they show is owed, whether the thing is done, whether the paper complained of was wrong. The body decides on it when the time to answer has run; with no answer it decides in default.",
+      "fields": {
+        "application": {
+          "type": "record",
+          "required": true,
+          "description": "The application answered."
+        },
+        "venue": {
+          "type": "entity",
+          "required": true,
+          "description": "The body that sent the notice."
+        },
+        "applicant": {
+          "type": "entity",
+          "description": "Who applied."
+        },
+        "known": {
+          "type": "choice",
+          "required": true,
+          "options": [
+            "yes",
+            "no"
+          ],
+          "description": "Whether the office's books say anything of it."
+        },
+        "owed": {
+          "type": "amount",
+          "description": "What the books show is owed the applicant (nought: nothing)."
+        },
+        "done": {
+          "type": "choice",
+          "options": [
+            "yes",
+            "no"
+          ],
+          "description": "For a thing to be put right: whether it is done."
+        },
+        "wrong": {
+          "type": "choice",
+          "options": [
+            "yes",
+            "no"
+          ],
+          "description": "For a paper complained of: whether it was wrong."
+        }
+      },
+      "writes": {
+        "kind": "complaint_response",
+        "text": "Answer on {application}.",
+        "basis": "=application",
+        "to": [
+          "=venue"
+        ],
+        "visible": [
+          "=venue",
+          "=self",
+          "=applicant"
+        ],
+        "data": {
+          "application": "=application",
+          "owed": "#owed",
+          "done": "?done",
+          "wrong": "?wrong",
+          "known": "?known"
+        }
+      }
+    },
+    {
+      "form": "tribunal_answer",
+      "title": "Answer to the tribunal's notice of an application against the office",
+      "does": "Answers a body that has told the office of an application against it, from the office's own books: what they show is owed, whether the thing is done, whether the paper complained of was wrong. The body decides on it when the time to answer has run; with no answer it decides in default.",
+      "fields": {
+        "application": {
+          "type": "record",
+          "required": true,
+          "description": "The application answered."
+        },
+        "venue": {
+          "type": "entity",
+          "required": true,
+          "description": "The body that sent the notice."
+        },
+        "applicant": {
+          "type": "entity",
+          "description": "Who applied."
+        },
+        "known": {
+          "type": "choice",
+          "required": true,
+          "options": [
+            "yes",
+            "no"
+          ],
+          "description": "Whether the office's books say anything of it."
+        },
+        "owed": {
+          "type": "amount",
+          "description": "What the books show is owed the applicant (nought: nothing)."
+        },
+        "done": {
+          "type": "choice",
+          "options": [
+            "yes",
+            "no"
+          ],
+          "description": "For a thing to be put right: whether it is done."
+        },
+        "wrong": {
+          "type": "choice",
+          "options": [
+            "yes",
+            "no"
+          ],
+          "description": "For a paper complained of: whether it was wrong."
+        }
+      },
+      "writes": {
+        "kind": "tribunal_response",
+        "text": "Answer on {application}.",
+        "basis": "=application",
+        "to": [
+          "=venue"
+        ],
+        "visible": [
+          "=venue",
+          "=self",
+          "=applicant"
+        ],
+        "data": {
+          "application": "=application",
+          "owed": "#owed",
+          "done": "?done",
+          "wrong": "?wrong",
+          "known": "?known"
+        }
+      }
     }
   ],
   "routines": [

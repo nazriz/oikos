@@ -48,7 +48,10 @@ test("a spec without `living` generates what it generated before (byte for byte)
   // docs/decisions.md, "What the second living pilot found"): each lease and mortgage a town starts with names its
   // own first due day (`attrs.first_due`), the town publishes its rule on petitions, the payments procedure says
   // which line a wage is on, the support office has a file for what is put before it, the mayor's office a clerk.
-  expect(hash(c)).toBe("21d4a10fa970fa25d2671f9778ba72f1bad3f90a32336c0a78802db93359ddd5");
+  // And again on 2026-10-12 (21d4a10f... until then; docs/decisions.md, "What the third living pilot found"): the
+  // generator's version, in the town's description; and, only where a model holds an office, that office's forms,
+  // notices and procedures. Nothing of `living` reaches a town without it.
+  expect(hash(c)).toBe("e14634d0bbdc183e0028c9aed62c0d643b57af4f3023510e95bac50917bafad0");
   const text = JSON.stringify(c);
   expect(text).not.toContain('"started"');
   expect(text).not.toContain("attach_mean");

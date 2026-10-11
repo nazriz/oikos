@@ -55,6 +55,23 @@ test("the clerk's paper: the first lists what stands open; a later one says what
   expect(clerk.due(8 * DAY)).toBeUndefined();
 });
 
+test("a running figure that has moved is filed once the clerk's last paper is a week old, and not before; one that has not moved files nothing", () => {
+  // (Finance's "tax withheld and not yet paid over" stood at its day-9 figure until day 93 of the third living pilot:
+  // nothing else in its books changed, and a running figure alone was never a reason for a paper.)
+  let open: OpenHeading[] = [{ what: "Tax withheld from wages and not yet paid over", items: [{ id: "withheld", line: "100 withheld so far", running: true }] }];
+  const clerk = new Clerk("city", "finance", { absorb() {}, open: () => open });
+  const said = (t: number) => { const a: any = clerk.due(t); return a ? String(a.calls?.[0]?.args?.text ?? JSON.stringify(a)) : undefined; };
+  expect(said(9 * DAY)).toContain("100 withheld so far");
+  open = [{ what: "Tax withheld from wages and not yet paid over", items: [{ id: "withheld", line: "900 withheld so far", running: true }] }];
+  for (let d = 10; d < 16; d++) expect(clerk.due(d * DAY)).toBeUndefined();
+  const week = said(16 * DAY)!;
+  expect(week).toContain("now: 900 withheld so far");
+  // Not moved since: nothing, however long.
+  for (let d = 17; d < 60; d++) expect(clerk.due(d * DAY)).toBeUndefined();
+  open = [{ what: "Tax withheld from wages and not yet paid over", items: [{ id: "withheld", line: "1,700 withheld so far", running: true }] }];
+  expect(said(60 * DAY)).toContain("now: 1,700 withheld so far");
+});
+
 test("the paper's list is one flat list, an entry each thing that stands open, capped; its words name a few and count the rest", () => {
   const items = Array.from({ length: 300 }, (_, i) => ({ id: `rec.${i}`, line: `rec.${i}: something`, since: i, amount: 100 }));
   const p = booksPaper("office", 10 * DAY, [{ what: "Invoices not paid", items }], undefined);

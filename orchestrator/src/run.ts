@@ -375,11 +375,26 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     used[module.name] = { version: module.version, ...(src ? { sha256: new Bun.CryptoHasher("sha256").update(await Bun.file(src).text()).digest("hex") } : {}) };
   };
   const held = (pid: string) => [...positions.values()].filter((x) => x.holder === pid);
+  // A draw named for a paper is named for which paper it is to whoever draws, never for the paper's number in the
+  // world's file (docs/reliability.md, "Draws and the order papers were filed in"). A record made in a run is
+  // numbered in the order every record of the town was made, so one more paper filed by anyone moves every later
+  // number; a draw keyed on the number then falls differently for people that paper had nothing to do with, and a
+  // pilot and its twin part from the first paper a seat files (the third living pilot: a landlord nobody had dealt
+  // with refused a repair in the pilot and granted it in the twin). So in a draw's purpose a record's number stands
+  // as "the nth such paper this participant has drawn on for this purpose", counted by the participant itself.
+  const drawnOn = new Map<string, Map<string, number>>();
+  const stablePurpose = (who: string, purpose: string): string => {
+    if (!purpose.includes("rec.")) return purpose;
+    const what = `${who}\n${purpose.replace(/rec\.[0-9]+/g, "rec")}`;
+    let seen = drawnOn.get(what);
+    if (!seen) drawnOn.set(what, (seen = new Map()));
+    return purpose.replace(/rec\.[0-9]+/g, (id) => { if (!seen!.has(id)) seen!.set(id, seen!.size + 1); return `paper#${seen!.get(id)}`; });
+  };
   const ctxFor = (pid: string, cap: string, entity: string, params: any): ParticipantContext => ({
     participant: pid,
     entity,
     ...(cap === "self" ? {} : { position: cap }),
-    rng: (purpose) => randomness.stream(["participant", pid, cap, String(Math.floor(t / tick) * tick), purpose]),
+    rng: (purpose) => randomness.stream(["participant", pid, cap, String(Math.floor(t / tick) * tick), stablePurpose(`${pid}/${cap}`, purpose)]),
     chance: (purpose) => randomness.stream(["chance", purpose]),
     world: { tickSeconds: tick, runEnd, currency, ...(cfg.dials ? { dials: cfg.dials } : {}) },
     ...(consult ? { consult } : {}),

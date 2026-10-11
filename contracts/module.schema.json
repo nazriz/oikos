@@ -138,9 +138,9 @@
         },
         "does": {
           "type": "string",
-          "description": "What issuing the paper does, in a sentence, for whoever holds the office: said on the form with its name.",
+          "description": "What issuing the paper does, for whoever holds the office: said on the form with its name. A sentence; or, for a paper that is a step of a procedure a law sets (a notice to vacate, an order for possession), a few: what it does, what it does not do by itself, and where what the law asks before it is written.",
           "minLength": 5,
-          "maxLength": 400
+          "maxLength": 1000
         },
         "fields": {
           "type": "object",

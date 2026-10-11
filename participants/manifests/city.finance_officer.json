@@ -70,5 +70,61 @@
     }
   },
   "perceives": [],
-  "state": "none"
+  "state": "none",
+  "issues": [
+    {
+      "form": "withholding_return",
+      "title": "Return of tax withheld from wages, to a collector",
+      "does": "Reports to a collector what has been withheld from the wages paid in a period and what is paid over with it. It moves no money: what is paid over is paid besides, by a payment to each collector's account. The office's books count what is withheld and not yet paid over from the day of the last return.",
+      "fields": {
+        "collector": {
+          "type": "entity",
+          "required": true,
+          "description": "The collector reported to."
+        },
+        "account": {
+          "type": "account",
+          "required": true,
+          "description": "The account the wages were paid from."
+        },
+        "period_end": {
+          "type": "date",
+          "required": true,
+          "description": "The day the period ended."
+        },
+        "withheld": {
+          "type": "amount",
+          "required": true,
+          "description": "What was withheld in the period, in all."
+        },
+        "paid": {
+          "type": "amount",
+          "required": true,
+          "description": "What is paid over now, in all."
+        },
+        "law": {
+          "type": "record",
+          "description": "The law it is withheld under."
+        }
+      },
+      "writes": {
+        "kind": "withholding_report",
+        "text": "Withheld from wages, owed: {withheld}; paid now: {paid}.",
+        "basis": "=law",
+        "to": [
+          "=collector"
+        ],
+        "visible": [
+          "=self",
+          "=collector"
+        ],
+        "data": {
+          "account": "=account",
+          "paid": "#paid",
+          "period_end": "=period_end",
+          "withheld": "#withheld"
+        }
+      }
+    }
+  ]
 }

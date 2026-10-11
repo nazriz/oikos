@@ -17,7 +17,7 @@ import { cites } from "../contracts";
 import type { StatementRecord } from "../contracts";
 import { cents } from "../money";
 import type { Rng } from "../rng";
-import { because, type Book, DAY, pay, say, type Step, usd } from "./common";
+import { because, type Book, DAY, Occurrences, pay, say, type Step, usd } from "./common";
 import type { Org } from "./orgwants";
 import { swayed } from "./wants";
 
@@ -105,6 +105,8 @@ export const respondParams = (given: Partial<RespondParams> | undefined): Respon
  */
 export class Respondent {
   private readonly handled = new Set<string>();
+  /** Which request, notice or decision each paper is to us: by who and what about, not by its number on file. */
+  private readonly nth = new Occurrences();
   readonly p: RespondParams;
   /** What it did, for whoever counts (nothing reads it back). */
   readonly counts: { [what: string]: number } = {};
@@ -150,9 +152,10 @@ export class Respondent {
       // (What our books say is owed, where they say; what is asked, where they cannot say; nothing, where they say none is.)
       const owed = truth?.owed !== undefined ? truth.owed : m.amount !== undefined && truth?.wrong !== false ? cents(m.amount) : 0;
       const nothing = truth !== undefined && (truth.wrong === false || truth.done === true || (truth.owed !== undefined && truth.owed <= 0 && truth.wrong !== true && truth.done !== false));
+      const which = this.nth.key(r.id, from, m.matter, m.structure ?? m.about);
       const rate = this.p.grant_bps[m.matter] ?? this.p.grant_bps.other ?? 5_000;
       const cost = Math.max(0, owed) + (this.o.cost?.(m) ?? 0);
-      const granted = !nothing && this.draw(`remedy-${r.id}`, rate) && (cost <= 0 || (account !== undefined && left >= cost));
+      const granted = !nothing && this.draw(`remedy-${which}`, rate) && (cost <= 0 || (account !== undefined && left >= cost));
       if (granted) {
         const how = this.o.remedy?.(m, from, t, `Asked by ${from} to put right ${m.matter.replace(/_/g, " ")}: doing it.`, r.id) ?? [];
         steps.push(because(`Asked by ${from} to put something right (${m.matter.replace(/_/g, " ")}${owed > 0 ? `, ${usd(owed)}` : ""}): we will.`,
@@ -162,7 +165,7 @@ export class Respondent {
         left -= cost;
         this.count("remedy_granted");
         this.org?.remember(t, "remedy_granted", from);
-      } else if (nothing || this.draw(`answers-${r.id}`, this.p.answers_bps)) {
+      } else if (nothing || this.draw(`answers-${which}`, this.p.answers_bps)) {
         steps.push(because(`Asked by ${from} to put something right (${m.matter.replace(/_/g, " ")}): ${nothing ? "our books show nothing to put right" : "we will not"}; saying so.`,
           say(PAPER.answer, `Answer to your request ${r.id}: no${nothing ? ": our records show nothing owed" : ""}.`, { to: [from], visible: [from, this.me], basis: r.id, data: { request: r.id, matter: m.matter, granted: false, ...(nothing ? { reason: "nothing owed on our records" } : {}) } })));
         this.count("remedy_refused");
@@ -176,7 +179,7 @@ export class Respondent {
         const m = (n.data ?? {}) as Matter & { application?: string; applicant?: string };
         if (typeof m.matter !== "string" || m.against !== this.me || !m.application) continue; // (a tribunal's notices of other kinds are the module's own)
         this.handled.add(n.id);
-        if (!this.draw(`responds-${n.id}`, this.p.responds_bps, this.org?.lively ? this.org.character.standing : 0)) { this.count("complaint_unanswered"); continue; }
+        if (!this.draw(`responds-${this.nth.key(n.id, n.speaks_for, String(m.applicant ?? ""), m.matter, m.structure ?? m.about)}`, this.p.responds_bps, this.org?.lively ? this.org.character.standing : 0)) { this.count("complaint_unanswered"); continue; }
         const truth = this.o.truth(m, String(m.applicant ?? ""), book, t);
         const venue = n.speaks_for!;
         steps.push(because(`${venue} tells us of a complaint by ${m.applicant} (${m.matter.replace(/_/g, " ")}): answering from our books.`,
@@ -190,7 +193,7 @@ export class Respondent {
         const x = d.data as any;
         const binding = x.binding !== false;
         const amount = (x.finding === "pay" ? cents(x.amount ?? 0) : 0) + (x.finding === "do" ? this.o.cost?.({ matter: x.matter, structure: x.structure }) ?? 0 : 0);
-        const will = this.draw(`complies-${d.id}`, binding ? this.p.comply_bps : this.p.heed_bps, this.org?.lively ? this.org.character.standing - this.org.character.pay_less / 2 : 0) && (amount <= 0 || (account !== undefined && left >= amount));
+        const will = this.draw(`complies-${this.nth.key(d.id, d.speaks_for, String(x.applicant ?? ""), String(x.matter), x.structure ?? x.about)}`, binding ? this.p.comply_bps : this.p.heed_bps, this.org?.lively ? this.org.character.standing - this.org.character.pay_less / 2 : 0) && (amount <= 0 || (account !== undefined && left >= amount));
         if (!will) { this.count(binding ? "order_defied" : "recommendation_unheeded"); this.org?.remember(t, binding ? "order_defied" : "recommendation_unheeded", String(x.applicant ?? "")); continue; }
         const m: Matter = { matter: x.matter, against: this.me, ...(x.about ? { about: x.about } : {}), ...(x.structure ? { structure: x.structure } : {}), ...(x.seeks ? { seeks: x.seeks } : {}) };
         const why = `${d.speaks_for} ${binding ? "orders" : "recommends"} that we ${x.finding === "pay" ? `pay ${x.applicant} ${usd(amount)}` : x.finding === "do" ? `put right ${String(x.matter).replace(/_/g, " ")}` : "withdraw the paper"}: doing so.`;

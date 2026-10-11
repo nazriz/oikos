@@ -322,6 +322,145 @@
           "found_at": "=found_at"
         }
       }
+    },
+    {
+      "form": "warrant_executed",
+      "title": "A warrant of possession carried out",
+      "does": "Says, to the tenant and the landlord, that a warrant of the tribunal has been carried out: the tenant and the household are out of the home and possession is the landlord's. It is the paper of what officers have done at the home (putting out whoever of the household was there), not the doing of it.",
+      "fields": {
+        "warrant": {
+          "type": "record",
+          "required": true,
+          "description": "The warrant."
+        },
+        "lease": {
+          "type": "record",
+          "required": true,
+          "description": "The lease."
+        },
+        "tenant": {
+          "type": "entity",
+          "required": true,
+          "description": "The tenant."
+        },
+        "landlord": {
+          "type": "entity",
+          "required": true,
+          "description": "The landlord."
+        },
+        "home": {
+          "type": "space",
+          "required": true,
+          "description": "The home."
+        },
+        "household": {
+          "type": "list",
+          "required": true,
+          "description": "The household put out."
+        }
+      },
+      "writes": {
+        "kind": "warrant_executed",
+        "text": "Warrant {warrant} has been carried out: {tenant} and their household are out of {home}, and possession is {landlord}'s.",
+        "basis": "=warrant",
+        "to": [
+          "=tenant",
+          "=landlord"
+        ],
+        "visible": [
+          "=self",
+          "=tenant",
+          "=landlord",
+          "=household"
+        ],
+        "data": {
+          "warrant": "=warrant",
+          "lease": "=lease",
+          "tenant": "=tenant",
+          "space": "=home",
+          "household": "=household"
+        }
+      }
+    },
+    {
+      "form": "warrant_lapsed",
+      "title": "A warrant of possession not carried out in its time",
+      "does": "Tells the landlord that a warrant ran out before an officer could carry it out, and has lapsed: the landlord may ask the tribunal's registrar for another.",
+      "fields": {
+        "warrant": {
+          "type": "record",
+          "required": true,
+          "description": "The warrant."
+        },
+        "lease": {
+          "type": "record",
+          "required": true,
+          "description": "The lease."
+        },
+        "landlord": {
+          "type": "entity",
+          "required": true,
+          "description": "The landlord."
+        }
+      },
+      "writes": {
+        "kind": "warrant_lapsed",
+        "text": "Warrant {warrant} was not carried out by its last day, and has lapsed.",
+        "basis": "=warrant",
+        "to": [
+          "=landlord"
+        ],
+        "visible": [
+          "=self",
+          "=landlord"
+        ],
+        "data": {
+          "warrant": "=warrant",
+          "lease": "=lease"
+        }
+      }
+    },
+    {
+      "form": "investigation_closed",
+      "title": "An investigation closed",
+      "does": "Tells whoever reported a crime that its investigation is closed, and whether it was solved.",
+      "fields": {
+        "report": {
+          "type": "record",
+          "required": true,
+          "description": "The report."
+        },
+        "to": {
+          "type": "entity",
+          "required": true,
+          "description": "Who reported it."
+        },
+        "solved": {
+          "type": "choice",
+          "required": true,
+          "options": [
+            "yes",
+            "no"
+          ],
+          "description": "Whether it was solved."
+        }
+      },
+      "writes": {
+        "kind": "investigation_closed",
+        "text": "Report {report}: closed; solved {solved}.",
+        "basis": "=report",
+        "to": [
+          "=to"
+        ],
+        "visible": [
+          "=self",
+          "=to"
+        ],
+        "data": {
+          "report": "=report",
+          "solved": "?solved"
+        }
+      }
     }
   ]
 }

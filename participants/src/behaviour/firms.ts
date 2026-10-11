@@ -98,8 +98,8 @@ export function receipts(obs: Observation, account: string): Map<string, number>
 export const landlord: BehaviourModule = {
   name: "firm.landlord",
   issues: P.LANDLORD,
-  issuesWith: (p) => ({ city: p.city }),
-  version: "0.16.1", // 0.16.1: rent under a lease is counted from the lease's own rent day where it names one (attrs.first_due), and arrears are taken up on the office's own day of the week for its rent book; 0.16.0: possession under the world's law (docs/behaviour/justice.md, "Possession"): a notice to vacate, an application to the tribunal, a warrant, never putting anyone out itself; 0.15.0: everyday frictions (docs/behaviour/frictions.md): a home of ours in disrepair is repaired by the builder when we are asked or ordered and will, at its price; we answer a venue from our books; rent owed us is asked for and then taken to a body that hears arrears; 0.14.0: wants of its own (docs/behaviour/firm-wants.md), for one the world's dial gives initiative: a character from its owner's values, which answers a tenant who asks it to hold a rent or to stay on, sways its markup and its patience with arrears, and a record of its own; 0.13.4: main's 0.13.3 (the builder's answer read with the week's post; what is owed counted before building or asking) with a certified copy of a registration made on someone else's report counting as the registration
+  issuesWith: (p) => ({ city: p.city, tribunal: p.possession?.tribunal, builder: p.repair?.builder }),
+  version: "0.16.2", // 0.16.2: an application for possession names the notice to vacate it relies on, the day it was given and the day it gave; its answers to requests, notices and decisions are drawn by who asked and what about, not by a paper's number on file (docs/decisions.md, 2026-10-12); 0.16.1: rent under a lease is counted from the lease's own rent day where it names one (attrs.first_due), and arrears are taken up on the office's own day of the week for its rent book; 0.16.0: possession under the world's law (docs/behaviour/justice.md, "Possession"): a notice to vacate, an application to the tribunal, a warrant, never putting anyone out itself; 0.15.0: everyday frictions (docs/behaviour/frictions.md): a home of ours in disrepair is repaired by the builder when we are asked or ordered and will, at its price; we answer a venue from our books; rent owed us is asked for and then taken to a body that hears arrears; 0.14.0: wants of its own (docs/behaviour/firm-wants.md), for one the world's dial gives initiative: a character from its owner's values, which answers a tenant who asks it to hold a rent or to stay on, sways its markup and its patience with arrears, and a record of its own; 0.13.4: main's 0.13.3 (the builder's answer read with the week's post; what is owed counted before building or asking) with a certified copy of a registration made on someone else's report counting as the registration
   doc: "docs/behaviour/firms.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -481,6 +481,12 @@ export const landlord: BehaviourModule = {
         // possession by a date; a tenant still there after it is removed by the police, on a warrant we buy from
         // the tribunal's registrar. We never put anyone out ourselves.
         const e = ending.get(a.id);
+        // (The notice to vacate an application relies on: which paper, the day it was given and the day it gave. The
+        // tribunal cannot see what passed between landlord and tenant, so the application says it.)
+        const noticeRelied = (lease: string) => {
+          const n = book.all("notice_to_vacate").filter((r) => r.speaks_for === me && r.data?.lease === lease).sort((x, y) => y.at - x.at)[0];
+          return n ? { notice: n.id, notice_given: n.at, notice_by: Number(n.data?.by) } : {};
+        };
         if (law && p.possession && e) {
           // (Taken forward on our own day for the rent book, as arrears are taken up: never at whatever look comes first.)
           if (!atBooks) continue;
@@ -504,7 +510,7 @@ export const landlord: BehaviourModule = {
               const home = leaseTerms(a, tenant);
               steps.push(because(`Our notice to vacate has run out and ${tenant} is still in ${home.space ?? "the home"}, ${usd(behindNow)} behind: applying to the tribunal for possession.`,
                 say("tribunal_application", `Application for possession: ${tenant} is ${usd(behindNow)} behind with the rent under ${a.id} and has not left on our notice to vacate.`, { to: [p.possession.tribunal], visible: [me, p.possession.tribunal, tenant], basis: a.id,
-                  data: { kind: "possession", matter: "possession", against: tenant, about: a.id, amount: behindNow, rent, account: acc.account, ...(home.space ? { space: home.space, structure: home.structure } : {}), household: householdNamed(a, tenant), evidence: { id: a.id, record: "agreement" } } }),
+                  data: { kind: "possession", matter: "possession", against: tenant, about: a.id, amount: behindNow, rent, account: acc.account, ...(home.space ? { space: home.space, structure: home.structure } : {}), household: householdNamed(a, tenant), ...noticeRelied(a.id), evidence: { id: a.id, record: "agreement" } } }),
                 ...(fee > 0 && p.possession.fee_account ? [pay(p.possession.fee_account, fee, { from: acc.account, for: "Application fee." })] : [])));
             }
           } else if ((e.stage === "applied" || e.stage === "plan") && orders.length) {
@@ -530,7 +536,7 @@ export const landlord: BehaviourModule = {
               const home = leaseTerms(a, tenant), fee = p.possession.fee ?? 0;
               steps.push(because(`${tenant} has not kept the plan the tribunal set (${usd(behindNow)} behind, where the plan would have it under ${usd(Math.max(0, e.plan.owed - months * e.plan.instalment))}): applying again for possession.`,
                 say("tribunal_application", `Application for possession: ${tenant} has not kept the payment plan ordered, and is ${usd(behindNow)} behind with the rent under ${a.id}.`, { to: [p.possession.tribunal], visible: [me, p.possession.tribunal, tenant], basis: a.id,
-                  data: { kind: "possession", matter: "possession", against: tenant, about: a.id, amount: behindNow, rent, account: acc.account, breach: true, ...(home.space ? { space: home.space, structure: home.structure } : {}), household: householdNamed(a, tenant), evidence: { id: a.id, record: "agreement" } } }),
+                  data: { kind: "possession", matter: "possession", against: tenant, about: a.id, amount: behindNow, rent, account: acc.account, breach: true, ...(home.space ? { space: home.space, structure: home.structure } : {}), household: householdNamed(a, tenant), ...noticeRelied(a.id), evidence: { id: a.id, record: "agreement" } } }),
                 ...(fee > 0 && p.possession.fee_account ? [pay(p.possession.fee_account, fee, { from: acc.account, for: "Application fee." })] : [])));
             }
           } else if (e.stage === "ordered" && t >= e.by + DAY && acc.balance >= (p.possession.warrant_fee ?? 0)) {
@@ -1502,7 +1508,7 @@ export class Staffing {
     const law = incomeTaxLaw(book);
     const steps: Step[] = [];
     for (const a of staff) {
-      if (this.ctx.rng(`short-pay-${a.id}-${week}`).below(1_000_000) >= chancePpm(rate, 7, dial)) continue;
+      if (this.ctx.rng(`short-pay-${a.terms.parties[1]}-${week}`).below(1_000_000) >= chancePpm(rate, 7, dial)) continue;
       const wage = this.wageOf(a), period = jobTerms(a, a.terms.parties[1]).period;
       const net = wage - (this.offBooks.has(a.id) ? 0 : withheld(law, wage, period).total);
       const short = Math.floor((net * s.by_bps) / 10_000);

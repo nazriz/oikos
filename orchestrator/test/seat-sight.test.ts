@@ -45,10 +45,12 @@ test("a seat that looks into its office's papers at every sitting is shown lists
   expect(finance.length).toBeGreaterThan(8);
   // No prompt of either seat is more than a few tens of thousands of characters.
   const largest = Math.max(...prompts.map((p) => p.size));
-  expect(largest).toBeLessThan(60_000); // (the mayor's, most of it what is on file for the office: its laws and forms)
+  expect(largest).toBeLessThan(62_000); // (the mayor's, most of it what is on file for the office: its laws and forms; 62,000 since 2026-10-12, where it was 60,000: the form for answering a petition, 60,803)
   // (45,000 since 2026-10-11, where it was 40,000: the town's law book gained its laws on ending a job and on possession,
   // and the payments procedure says which line a wage is on; the largest finance prompt was 40,505.)
-  expect(Math.max(...finance.map((p) => p.size))).toBeLessThan(45_000);
+  // (50,000 since 2026-10-12, where it was 45,000: finance has a form of its own, the return of tax withheld, and so a
+  // folder of forms, which holds the town's public forms too: 49,371. The cost is recorded in docs/behaviour/office-papers.md.)
+  expect(Math.max(...finance.map((p) => p.size))).toBeLessThan(50_000);
   // The folder named for payroll holds the employment agreements, a line each; the files, everything, as a list.
   const second = finance[1]!.text;
   expect(second).toContain("## Finance officer: Payroll: what you looked up (");

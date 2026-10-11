@@ -50,7 +50,10 @@ const LIVING = "living.initiative_bps=10000";
 // And again at the merge of the fixes after the second living pilot, the same day (13686d37... until then;
 // docs/decisions.md, "What the second living pilot found"): rent and loan repayments are counted from each
 // agreement's own day, each landlord takes arrears up on its own day of the week, the mayor's office has a clerk.
-const STEP_2B = "87f8af1b50c8599a6bf8fa11e59bd2bd4691938a1e0074ab9d3ba6909829bc14";
+// And again on 2026-10-12, with the fixes after the third living pilot (87f8af1b... until then; docs/decisions.md,
+// "What the third living pilot found" and "A draw is named for what it is about"): draws about a paper no longer
+// turn on the paper's number on file; a notice to vacate does to a tenant what a notice on the lease did.
+const STEP_2B = "0adec141c211e5b7814681ae9e559ec7c5cc3d19cace61bf1c284a6a58d1ec6c";
 
 test("with founding off a living town is step 2b's town, to the state hash; turned on with no shape to found, nobody does anything they did not do before", async () => {
   const out = mkdtempSync(join(tmpdir(), "oikos-founding-"));

@@ -391,6 +391,21 @@ All additions: a world that uses none of them is as it was, and a living town wi
 - **Attention** (D43): `on_request` channels; the `look` seat action and log command; searches (`Query`); `search` on records channel data.
 - **Opting out:** `resign` becomes `opt_out` (seat action and command); the event is `seat_opted_out` and the status `opted_out`. Each seat gains `on_opt_out`.
 
+## Changes since v0.8 closed (2026-10-12: what the third living pilot found; docs/decisions.md of the day; under the owner's blanket approval of contract changes of 2026-10-11, to look over)
+
+All additions but one loosened limit; a world with no model in an office is as it was, except where said.
+
+- **`module.schema.json`: a form's `does` may be 1,000 characters** (it was 400). A paper that is a step of a procedure a law sets says what it does, what it does not do by itself, and where what the law asks before it is written. Nothing else in the manifest's schema moved. (The module interface in `participants/src/module.ts` gains `opens`: the standing notices an office has on file when a new holder arrives. It is code, not manifest.)
+- **Statement kinds and their data, not schemas** (listed for whoever reads a world's records):
+  - `plan_offer` (a landlord to a tenant: `lease`, `owed`, `instalment`, `account`) and `plan_answer` (the tenant's: `offer`, `lease`, `accepts`, `can_pay`).
+  - A `tribunal_application` of kind `possession` gains `notice`, `notice_given`, `notice_by`: the notice to vacate it relies on, the day it was given and the day it gave. Written by code landlords and by a seat's form alike.
+  - A `procedure` on an office's own file: `proc-<office>-possession` (where the world has a law on possession, for a landlord, the tribunal's member and its registrar in a seat) and a `letters_practice` paper, `practice-<organisation>-letters`, in a folder of its own (every seat). A `hearing` notice of a seated tribunal, desk or union is in the world's opening records (`notice-<office>-hearing`), where the office's code would have published it at its first look.
+- **Forms** (world content, made from each module's `issues` where a model holds the office): 27 new or widened; docs/behaviour/office-papers.md, "Act by act". A desk's `venue_decision` now writes `binding` as yes or no (it wrote the word).
+- **Citizens' outcomes** (`contracts/dataset.schema.json`, `domain` and `kind` are open strings; the description of `domain` names the new one): in the area `home`, the kinds `rent_asked`, `plan_offered`, `possession_applied`; the area `letter` with the kind `received` (an office wrote in its own words: who, how many characters, about what paper).
+- **A record's reasons** gain `office_wrote` (in a person's `because`).
+- **Position parameters:** `tribunal.member` takes `part`, `office`, `counter`, as `office.desk` does. A living town with a model in the member's chair has a post `tribunal-member-staff` run by `tribunal.member` with `part: "staff"`.
+- **Draws** (no schema; docs/decisions.md, "A draw is named for what it is about"): the purpose a participant's random stream is keyed on no longer contains a record's number. Every run's state hash differs from one made before this at the same seed.
+
 ## Versioning
 
 `contracts: "0.8"`. Pre-1.0, every change bumps the minor version and is proposed explicitly. A draft version collects agreed changes until it's closed. Older logs remain valid logs of their own version and replay only on a kernel build of that version (D6).
