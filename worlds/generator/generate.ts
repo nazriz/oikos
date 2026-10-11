@@ -1925,7 +1925,9 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     if (!living || living.starting_attachment === false || !m.adult || !O) return {};
     const days = -m.born_at / DAY, started: { [k: string]: number } = {};
     const hh = homeHouseholdOf.get(m.id);
-    if (O.residence && hh && homeOf.has(hh)) started.place_days = drawTenureDays(livingRng, O.residence, days);
+    // (Everyone who lives in the town has lived in it, housed just now or not: found 2026-10-11, when those without a
+    // home at the start were given none, read as newly arrived, and left town after half the time.)
+    if (O.residence) started.place_days = drawTenureDays(livingRng, O.residence, days);
     if (O.job_tenure && inTrade.has(m.id)) started.trade_days = drawTenureDays(livingRng, O.job_tenure, days - 15 * 365);
     if (O.group_years && inGroup.has(m.id)) started.group_days = drawTenureDays(livingRng, O.group_years, days);
     return Object.keys(started).length ? { started } : {};

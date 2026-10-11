@@ -82,6 +82,20 @@ test("a want is due when never tried, then when its way has had its time (the pa
   expect(v.take().map((e) => e.kind)).toEqual(["born", "pursued", "pursued", "pursued", "given_up", "born"]);
 });
 
+test("a want taken up from others, once met, is not taken up from them again for a while", () => {
+  const w = new Wants();
+  const a = w.born({ about: "social", seeks: ["attend"], weight: 1_000, since: 0, from: "other" }, 0)!;
+  w.met(a, 7 * DAY);
+  expect(w.born({ about: "social", seeks: ["attend"], weight: 1_000, since: 0, from: "other" }, 14 * DAY)).toBeUndefined();
+  expect(w.born({ about: "social", seeks: ["attend"], weight: 1_000, since: 0, from: "other" }, (7 + WANT_DEFAULTS.rest_days) * DAY)).toBeDefined();
+  // (But the need itself, short for long, makes it their own want whenever that comes.)
+  expect(w.born({ about: "social", seeks: ["attend"], weight: 2_000, since: 0, from: "need" }, 14 * DAY)).toBeDefined();
+  // One's own, met, may come back as soon as the need does.
+  const b = w.born({ about: "security", seeks: ["money.to"], weight: 1_000, since: 0, from: "need" }, 0)!;
+  w.met(b, 7 * DAY);
+  expect(w.born({ about: "security", seeks: ["money.to"], weight: 1_000, since: 0, from: "need" }, 14 * DAY)).toBeDefined();
+});
+
 test("a sway is symmetric about the town's mean: as far up for one above it as down for one below, and nothing at the mean", () => {
   expect(swayed(3_000, 0, 0.3)).toBe(3_000);
   expect(swayed(3_000, 1, 0.3) - 3_000).toBe(3_000 - swayed(3_000, -1, 0.3));

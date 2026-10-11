@@ -30,7 +30,7 @@ Rules every module follows (so re-runs are reproducible):
 | `bank.lending` | a bank's lending office: decides loans on serviceability from the account it keeps, pays out, follows arrears and default, draws funding | [credit.md](credit.md) |
 | `world.export_demand` | the outside world's purchases as money on a schedule (worlds without goods) | [boundary.md](boundary.md) |
 | `citizen.default` | a townsperson: housing, work, shopping and using goods up, leaving town | [citizen.md](citizen.md) |
-| `firm.landlord` | a landlord's letting office | [firms.md](firms.md) |
+| `firm.landlord` | a landlord's letting office | [firms.md](firms.md); its wants, in a living town: [firm-wants.md](firm-wants.md) |
 | `firm.employer` | a manager with a fixed headcount at a fixed wage (not used by the generated town) | [firms.md](firms.md) |
 | `firm.retailer` | a shop (Lengnick 2013): buys from the cheapest supplier, serves customers with its staff's hours, sets prices, sizes its staff to sales, pays dividends | [retailer.md](retailer.md) |
 | `firm.producer` | a factory (Lengnick 2013): makes goods from inputs with its workers' hours, sells wholesale, exports; hires, sets wages and prices, pays dividends | [producer.md](producer.md) |

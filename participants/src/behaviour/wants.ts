@@ -214,6 +214,7 @@ export interface WantEvent { t: number; kind: "born" | "pursued" | "met" | "give
 export class Wants {
   private list: Want[] = [];
   private readonly rested = new Map<string, number>();
+  private readonly copied = new Map<string, number>(); // a want taken up from others and met -> not taken up from them again before
   private events: WantEvent[] = [];
   constructor(readonly p: WantParams = WANT_DEFAULTS) {}
 
@@ -239,7 +240,7 @@ export class Wants {
    * same want rests after being given up. */
   born(w: Omit<Want, "tried" | "grown">, t: number): Want | undefined {
     const id = idOf(w);
-    if (t < (this.rested.get(id) ?? 0)) return undefined;
+    if (t < (this.rested.get(id) ?? 0) || (w.from === "other" && t < (this.copied.get(id) ?? 0))) return undefined;
     const held = this.list.find((x) => idOf(x) === id);
     if (held) {
       held.weight = Math.max(held.weight, Math.round(w.weight));
@@ -275,6 +276,9 @@ export class Wants {
 
   met(w: Want, t: number, why?: string): void {
     this.drop(w);
+    // (A want taken up from others, once met, is not taken up from them again for a while: it would otherwise be
+    // born and met week after week by someone who is merely near their aspiration.)
+    if (w.from === "other") this.copied.set(idOf(w), t + this.p.rest_days * 86_400);
     this.events.push({ t, kind: "met", want: { ...w }, ...(w.way ? { way: w.way } : {}), ...(why ? { why } : {}) });
   }
 

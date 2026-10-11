@@ -1296,7 +1296,7 @@ export const citizen: BehaviourModule = {
       if (!home) findOwnHome(obs);
       // How long we had lived, worked and belonged here when the world began (the world's figures, from its profile).
       if (plannedAt === -1 && p.started) {
-        if (p.started.place_days && (home || obs.body?.in)) inner.startAttached("place", "town", p.started.place_days, obs.t);
+        if (p.started.place_days) inner.startAttached("place", "town", p.started.place_days, obs.t);
         const trade = job ? industryOf.get(job.employer) ?? job.employer : ownWork ? ownWork.firm : undefined;
         if (p.started.trade_days && trade) inner.startAttached("trade", trade, p.started.trade_days, obs.t);
         const group = p.started.group_days ? book.ofType("agreement").flatMap((a) => (a.record === "agreement" && a.terms.template === "membership" && a.terms.parties.includes(me) && book.inForce(a.id) && a.terms.commitments.some((c: any) => c.who === me && c.does?.outcome?.attend) ? [a.terms.parties.find((x) => x !== me)!] : [])).sort()[0] : undefined;
@@ -1644,8 +1644,10 @@ export const citizen: BehaviourModule = {
         const out: Way[] = [];
         // The job board: what its offers bring (as the postings we last saw there say; none seen: pay for work).
         if (!retired && p.in_labour_force && !ownWork) {
-          const brings = bringsOf(found.jobs[0]?.offer as any);
-          out.push({ key: "offer:employment", kind: "offer:employment", brings: brings.length ? brings : ["money.to", "work"], bears: job ? [job.employer] : [],
+          // (To someone in work a posting brings more money, if it pays more; work they already have.)
+          const offered = bringsOf(found.jobs[0]?.offer as any);
+          const brings = (offered.length ? offered : (["money.to", "work"] as SeekKey[])).filter((k) => !job || k !== "work");
+          out.push({ key: "offer:employment", kind: "offer:employment", brings, bears: job ? [job.employer] : [],
             adj: K.own + ag - (job ? Math.round(K.own * 2 * wants.p.sway.attachment * zAttached("trade")) : 0), others: after("offer:employment"),
             act: () => { searchForced = true; return undefined; } });
         }
@@ -1786,7 +1788,9 @@ export const citizen: BehaviourModule = {
           const held = wants.all().find((w) => w.about === n);
           if (level >= short) {
             shortSince.delete(n);
-            if (held && level >= short + W.met_margin_bps) wantMet(held, "need met");
+            // (One taken up from others is met when life is back to what the person aspires to; one of their own,
+            // when the need is clear of the level it fell under.)
+            if (held && level >= (held.from === "other" ? mind.p.aspiration_bps : short + W.met_margin_bps)) wantMet(held, "need met");
             // What those we know are after, we take up too if we are short of it ourselves (the conformist sooner: 3b).
             const copied = heardNow.filter((x) => x.after?.some((a) => a.about === n)).length;
             if (!held && level < mind.p.aspiration_bps && copied >= Math.max(1, W.copy_from - (mind.person.temperament.conformity >= 6_000 ? 1 : 0)))
