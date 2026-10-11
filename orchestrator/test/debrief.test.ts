@@ -423,7 +423,7 @@ test("a matter left alone: the largest paper or letter that reached a seat that 
   let seq = 0;
   const E = (kind: string, t: number, body: object) => ({ kind, t, seq: ++seq, body });
   const seats = new SeatRecords([{ id: "mayor-system", known: ["mayor", "city"] }]);
-  const shown = (t: number, records: object[]) => seats.add(E("annotation", t, { annotation: "observation", subject: "mayor-system", data: { observation: { channels: [{ kind: "records", path: "mayor/papers", records }] } } }));
+  const shown = (t: number, records: unknown[]) => seats.add(E("annotation", t, { annotation: "observation", subject: "mayor-system", data: { observation: { channels: [{ kind: "records", path: "mayor/papers", records }] } } }));
   seats.add(E("annotation", 100, { annotation: "transcript", subject: "mayor-system", data: { purpose: "participant", input: "x" } }));
   shown(100, [
     { id: "law-1", at: 0, author: "genesis", kind: "law", text: "A law the town began with." }, // (what the town began with is not a matter)
@@ -431,12 +431,15 @@ test("a matter left alone: the largest paper or letter that reached a seat that 
     { id: "rec.575", at: 6 * DAY, author: "c0189-self", speaks_for: "c0189", kind: "petition", text: "Petition: 90 days' notice.", visible_to: "public" },
     { id: "rec.600", at: 7 * DAY, author: "c0200-self", speaks_for: "c0200", kind: "application", addressed_to: ["city"], data: { outcome: { money: { amount: "50000", to: "acc-c0200" } } }, text: "An application for a grant of $500." },
     { id: "rec.601", at: 8 * DAY, author: "c0201-self", speaks_for: "c0201", kind: "note", addressed_to: ["mayor"], text: "A note to the mayor." },
+    { id: "rec.700", at: 8 * DAY, author: "finance-system", speaks_for: "city", in_position: "finance", kind: "request", addressed_to: ["bank"], data: { outcome: { money: { amount: "9999999", to: "acc-x" } } }, text: "Please pay." }, // (its own organisation's paper, by another office: not a matter put before it)
     "rec.575", // (a paper it has been handed before comes as its id)
   ]);
   const r = seats.of.get("mayor-system")!;
+  // (A petition is put before whoever it is shown to; an application to the town is the town's to take up; a note to
+  // the mayor's own post is the mayor's. An application to the whole town with no asking kind would be any office's.)
   expect([...r.reached.keys()]).toEqual(["rec.575", "rec.600", "rec.601"]);
   // The largest by the money it names.
-  expect(leftAlone(r)).toEqual({ day: 8, fact: 'A application from c0200: "An application for a grant of $500."', ids: { paper: "rec.600", kind: "application", from: "c0200", money_named: 50_000, named: [], day: 8, matters_left_alone: 3 } });
+  expect(leftAlone(r)).toEqual({ day: 8, fact: 'A paper (application) from c0200: "An application for a grant of $500."', ids: { paper: "rec.600", kind: "application", from: "c0200", money_named: 50_000, named: [], day: 8, matters_left_alone: 3 } });
   // A letter of its own that names that paper: it was not left alone, and the next is asked about.
   const s = seats.add.bind(seats);
   const cmd = E("command", 9 * DAY, { command: "act", participant: "mayor-system", as: "mayor", blocks: [{ block: "message", to: ["c0200"], text: "About rec.600: the council will hear it.", re: "rec.600" }], provenance: { via: "direct" } });

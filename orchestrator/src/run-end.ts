@@ -9,7 +9,7 @@ import { SeatRecords } from "./debrief-summary";
 
 export interface PersonAtEnd { participant: string; entity: string; n: number; sections: { [section: string]: any } }
 
-export async function readForEnd(logPath: string, seats: { id: string; known: string[] }[], nameOf: ((participant: string, as?: string) => string[]) | undefined, wantPeople: boolean): Promise<{ seats: SeatRecords; people: Map<string, PersonAtEnd> }> {
+export async function readForEnd(logPath: string, seats: { id: string; known: string[]; direct?: string[] }[], nameOf: ((participant: string, as?: string) => string[]) | undefined, wantPeople: boolean): Promise<{ seats: SeatRecords; people: Map<string, PersonAtEnd> }> {
   const records = new SeatRecords(seats, nameOf);
   const ids = seats.map((s) => s.id);
   const people = new Map<string, PersonAtEnd>();

@@ -296,11 +296,11 @@ test("where a run keeps a seat's words apart from its log, the log gets the inte
 
 test("a seat that sat and carried out little is asked one why about the largest matter that reached it and that it left alone, with no word that it was to have acted", async () => {
   const { io, calls } = harness();
-  const d = input({ decisions: [], leftAlone: { day: 7, fact: 'A petition from c0189: "Petition: landlords must give 90 days\' notice."', ids: { paper: "rec.575" } } });
+  const d = input({ decisions: [], leftAlone: { day: 7, fact: 'A paper (petition) from c0189: "Petition: landlords must give 90 days\' notice."', ids: { paper: "rec.575" } } });
   expect(stepsOf("full", 0, true)).toEqual(["consent", "like", "distress", "values", "why_left", "change", "again", "scales", "last", "publication"]);
   const r = await runDebrief(io, seat({ short: ["why_left"] }), d, new Set());
   const step = r.steps.find((s) => s.id === "why_left")!;
-  expect(step.question).toBe('The record shows this reached you on day 7 and that nothing was carried out on it: A petition from c0189: "Petition: landlords must give 90 days\' notice."\nWhat were your reasons, if you had any in mind?');
+  expect(step.question).toBe('The record shows this reached you on day 7 and that nothing was carried out on it: A paper (petition) from c0189: "Petition: landlords must give 90 days\' notice."\nWhat were your reasons, if you had any in mind?');
   expect(step.ids).toEqual({ paper: "rec.575" });
   for (const w of [QUESTIONS.why_left!.a, QUESTIONS.why_left!.b]) expect(w).not.toMatch(/should|ought|fail|neglect|ignor|did not act|didn't/i);
   // (No second ask after it: "if you had any in mind" may be answered in a word.)

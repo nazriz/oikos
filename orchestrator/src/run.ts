@@ -1286,7 +1286,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       const post = as ? positions.get(as) : posts.length === 1 ? posts[0] : undefined;
       return [...new Set([...(post ? [post.id, post.entity] : []), ...(p?.person ? [p.person] : []), ...(p?.owner ? [p.owner] : []), pid])];
     };
-    const seatList = [...debriefs.values()].map((d) => ({ id: d.part.id, known: idsOf(d.part.id) }));
+    const seatList = [...debriefs.values()].map((d) => ({ id: d.part.id, known: idsOf(d.part.id), direct: [d.part.id, ...held(d.part.id).map((x) => x.id)] }));
     const atEnd = await readForEnd(logPath, seatList, idsOf, accountsN > 0);
     const day = Math.floor(t / DAY), of = Math.floor(runEnd / DAY);
     const how: DebriefInput["ended"]["how"] = stoppedBy === "SpendingLimitReached" ? "spending_limit" : stopped ? "stopped" : t >= runEnd ? "last_day" : "length_set";
