@@ -4,7 +4,8 @@
 
 import { expect, test } from "bun:test";
 import type { ContentBlock, LlmRequest } from "../src/llm/adapter";
-import { callModel, endReserveMicroUsd, SpendingLimitReached } from "../src/llm/call";
+import { readFileSync } from "node:fs";
+import { callModel, endNeedMicroUsd, endReserveMicroUsd, keptBackFor, reckonedEndMicroUsd, SpendingLimitReached, UsageLimitReached, type EndCosts } from "../src/llm/call";
 import { DEBRIEF_SYSTEM, DEBRIEF_VERSION, INSTRUCTIONS_LEFT_OUT, keptBack, mockDebrief, preamble, QUESTIONS, questionText, runDebrief, SAY_MORE, SCALES, stepsOf, type DebriefInput, type DebriefSeat, type MockDebrief } from "../src/llm/debrief";
 import { ACCOUNT_SYSTEM, ACCOUNT_SYSTEM_REWORDED, darkAccount, mockAccount, renderAccountBrief, sampleAccounts, strataOf, writeAccount, type AccountBrief } from "../src/llm/account";
 import { COMPOSE_FOLLOW_UP } from "../src/llm/compose";
@@ -176,15 +177,20 @@ test("the reserve: part of a run's limit is kept back for its end, sized from wh
   await callModel(h.io, { ...req, purpose: "debrief", context: {} }, new Set());
   await callModel(h.io, { ...req, purpose: "account", context: {} }, new Set());
   expect(h.calls.length).toBe(2);
-  // The limit reached part-way through an interview: what was answered is written, with why it ended. Reached before
-  // the first question: nothing is written, and the caller records that the debrief was not given.
+  // The end is never cut off by the limit (a run never ends without the means to debrief every seat): a limit as small as
+  // 4,000 still gets every question asked, and what went past it is the platform's overrun, by seat.
   const part = harness(mockDebrief, { limitMicroUsd: 4_000, spentMicroUsd: 0 }, 1_000_000);
   const r = await runDebrief(part.io, seat(), input(), new Set());
-  expect(r.ended).toBe("spending_limit");
-  expect(r.steps.length).toBeGreaterThan(0);
-  expect(r.steps.length).toBeLessThan(11);
+  expect(r.ended).toBe("complete");
+  expect(r.steps.length).toBe(11);
   expect(part.annotations.filter((a) => a.annotation === "debrief").length).toBe(1);
-  await expect(runDebrief(harness(mockDebrief, { limitMicroUsd: 10, spentMicroUsd: 0 }, 1_000_000).io, seat(), input(), new Set())).rejects.toBeInstanceOf(SpendingLimitReached);
+  const over = part.io.budget!.platformOverrun!;
+  expect(over.microusd).toBe(part.io.budget!.spentMicroUsd - 4_000);
+  expect(Object.keys(over.by_subject)).toEqual(["mayor-system"]);
+  expect(over.by_subject["mayor-system"]).toBe(over.microusd);
+  // A provider's own limit (a subclass the adapter throws) still stops it, as before.
+  const stops = harness(async () => { throw new UsageLimitReached("the usage limit"); }, { limitMicroUsd: 10_000_000, spentMicroUsd: 0 });
+  await expect(runDebrief(stops.io, seat(), input(), new Set())).rejects.toBeInstanceOf(SpendingLimitReached);
 });
 
 // ---------------------------------------------------------------------------------------------- exit accounts
@@ -322,4 +328,39 @@ test("an exit account's brief names people and bodies as the world names them, w
   expect(text).toContain("c0044 (");
   expect(text).toContain("known in the town's papers as c0007");
   expect(text).not.toMatch(/\blandlord-2\b/);
+});
+
+// The reserve, sized from what debriefs have cost (orchestrator/debrief-costs.json, measured by scripts/debrief-costs.ts).
+const COSTS: EndCosts = JSON.parse(readFileSync(new URL("../../orchestrator/debrief-costs.json", import.meta.url), "utf8"));
+const SONNET = "claude-code/claude-sonnet-5-5";
+
+test("the reserve covers what debriefs have cost: lv-05's four seats and six accounts, on the model that was used, were 1.666 USD and about 0.06 USD", () => {
+  // lv-05 spent 0.388, 0.503, 0.376 and 0.399 on its four seats' debriefs (1.666), and the old reckoning kept back 1.116 for them and six accounts.
+  const need = endNeedMicroUsd(COSTS, { seats: 4, seatModel: SONNET, seatReckoned: 0, accounts: 6, accountModel: SONNET, accountReckoned: 0 });
+  expect(need.seat.basis).toBe("measured");
+  expect(need.microusd).toBeGreaterThanOrEqual(1_666_000 + 6 * 21_197);
+  expect(need.microusd).toBeGreaterThan(1_116_000);
+  // Each figure is the largest measured times the margin, nothing else.
+  expect(need.seat.each).toBe(Math.ceil(COSTS.seat[SONNET]!.microusd * COSTS.margin_percent / 100));
+  // With a limit that leaves room, that is what is kept back; with one that does not, half of it, and the shortfall is said.
+  expect(keptBackFor(40_000_000, need.microusd)).toEqual({ microusd: need.microusd, short_microusd: 0 });
+  expect(keptBackFor(2_000_000, need.microusd)).toEqual({ microusd: 1_000_000, short_microusd: need.microusd - 1_000_000 });
+  expect(keptBackFor(100_000_000, 1)).toEqual({ microusd: 5_000_000, short_microusd: 0 });
+});
+
+test("a model nobody has measured gets the floor: the greater of the old reckoning and the largest measured figure, times the margin", () => {
+  const price = { input: 2_000_000, output: 10_000_000 };
+  const reckoned = reckonedEndMicroUsd({ seats: 1, seatPrice: price, calls: 15, promptChars: 26_000, answerTokens: 450 });
+  const largest = Math.max(...Object.values(COSTS.seat).map((x) => x.microusd));
+  const need = endNeedMicroUsd(COSTS, { seats: 3, seatModel: "somewhere/unmeasured", seatReckoned: reckoned, accounts: 2, accountModel: "somewhere/unmeasured", accountReckoned: 5_000 });
+  expect(need.seat).toEqual({ each: Math.ceil(Math.max(reckoned, largest) * COSTS.margin_percent / 100), basis: "floor" });
+  expect(need.seat.each).toBeGreaterThanOrEqual(largest);
+  expect(need.account!.basis).toBe("floor");
+  expect(need.account!.each).toBe(Math.ceil(Math.max(5_000, Math.max(...Object.values(COSTS.account).map((x) => x.microusd))) * COSTS.margin_percent / 100));
+  expect(need.microusd).toBe(3 * need.seat.each + 2 * need.account!.each);
+  // A dearer model's own reckoning wins over the largest measured, where it is the greater.
+  const dear = endNeedMicroUsd(COSTS, { seats: 1, seatModel: "somewhere/dear", seatReckoned: 10 * largest });
+  expect(dear.seat.each).toBe(Math.ceil(10 * largest * COSTS.margin_percent / 100));
+  // An account is not sized where there are none.
+  expect(endNeedMicroUsd(COSTS, { seats: 1, seatModel: SONNET, seatReckoned: 0 }).account).toBeUndefined();
 });
