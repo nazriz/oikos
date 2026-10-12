@@ -89,11 +89,15 @@ test("a founding's draw of the shape \"business\" reaches the business of one: s
   }
   // (The run's seed is 2 since 2026-10-12, homes by income: in the town as now drawn the run from seed 1 has no
   // occasion that draws a business in 330 days; seeds 2, 3 and 4 have one to three. Nothing else is changed.)
-  // (And 4 since the fifth living pilot's fixes, the same day: tenants who answer and households taken in move who
+  // (And 6 since the leftovers of the firm-side work, the same day: with a dividend and the tax withheld no longer sent back to the
+  // firms that paid them, and shops closing their months on days of their own, who is out of work and when moved again. Someone who has
+  // meant a business starts one only when out of work (citizen.ts, `venturing ? !job`), so a run needs one such occasion; of seeds 1 to
+  // 6 the runs from 1 to 5 have none in 330 days and the run from 6 has one.)
+  // (Before that 4 since the fifth living pilot's fixes, the same day: tenants who answer and households taken in move who
   // gives a want up and when; of seeds 1 to 5 the runs from 1 and 4 have such an occasion, those from 2, 3 and 5 none.)
   const out = join(root, "runs", "test-own-venture-meant");
   rmSync(out, { recursive: true, force: true });
-  const s = await runWorld({ config: { ...config, seed: 4 }, runId: "meant", outDir: out, until: 330 * DAY, recordObservations: "none" });
+  const s = await runWorld({ config: { ...config, seed: 6 }, runId: "meant", outDir: out, until: 330 * DAY, recordObservations: "none" });
   const log = readFileSync(s.logPath, "utf8").trim().split("\n").filter((l) => l.includes("found_shape") || l.includes('"own_account"') || l.includes("found_own")).map((l) => JSON.parse(l));
   const meant = log.filter((e) => e.kind === "annotation" && e.body.data?.domain === "found_shape" && e.body.data?.choice === "business").map((e) => ({ t: e.t, who: e.body.subject as string }));
   expect(meant.length).toBeGreaterThan(0);

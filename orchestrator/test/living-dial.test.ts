@@ -53,7 +53,11 @@ const TOWN = join(root, "worlds/town.yaml");
 // And again on 2026-10-12, with trade credit, inputs bought to what can be sold, no dividend while wages are owed, and a second loan
 // (b34efd5e... until then; docs/decisions.md, "Firms respond to a shock"): in a 60-day run the factories buy their inputs on the world
 // market's terms and the shops their stock on the factories', paying after the goods are in, so the accounts and orders move from the first week.
-const STEP_1 = "5a2a360eb1fbe546fea6b2e6e575b560f342f6658782c18880f83d2fedd42ccd";
+// And again on 2026-10-12, with the leftovers of the firm-side work (5a2a360e... until then; docs/decisions.md, "The leftovers of
+// the firm-side work"): a shop closes its month on a day of its own and first reviews once it has traded a whole month, expecting
+// at first the trade it was staffed for, so its month-end rules (price, wage, staff, stock) move; and a payment that says it is
+// a dividend or tax withheld is no longer sent back by the outside world's order book.
+const STEP_1 = "43f2bf771fc619e9c9f17dec8a6c6ecdcc2597abcfa40e979f8723fd4200ee47";
 
 test("with the dial absent or at 0 a town is step 1's town, to the state hash", async () => {
   const out = mkdtempSync(join(tmpdir(), "oikos-dial-"));

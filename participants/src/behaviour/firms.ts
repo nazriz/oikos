@@ -976,9 +976,11 @@ export const weeksAt = (steps: { from_years: number; days: number }[], years: nu
  */
 export interface AdjustParams { smooth_months: number; hiring_cost_weeks: number }
 export class LabourPlan {
-  private level = -1;
+  private level: number;
   private surplus = 0; // months in a row with more staff than the trade expected needs
-  constructor(private readonly p: AdjustParams) {}
+  /** `opening`: the trade the firm expected when it took its staff on (a month's items), where it has one: its first
+   * month's figure then moves that expectation like any other month's, and is not taken for the whole of it. */
+  constructor(private readonly p: AdjustParams, opening?: number) { this.level = opening !== undefined && opening > 0 ? opening : -1; }
   /** The trade expected, after another month's figure: an average weighted to the recent months over the horizon. */
   expect(month: number): number {
     const h = Math.max(0, this.p.smooth_months);

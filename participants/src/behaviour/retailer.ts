@@ -27,7 +27,7 @@ export const retailer: BehaviourModule = {
   name: "firm.retailer",
   issues: [P.JOB_ADVERTISEMENT, ...P.TRADE, P.REMEDY_ANSWER, ...P.VENUE_ANSWERS],
   issuesWith: (p) => ({ ...P.staffingOwn({ role: p.role ?? "shop assistant", industry: p.industry, workplace: p.workplace, notice_days: p.notice_days ?? 14 }), police: p.police }),
-  version: "0.13.0", // 0.13.0: buys its stock on the supplier's terms where it states them (docs/behaviour/trade.md, "Trade credit"), so stock no longer competes with the wage bill in the week it is bought; borrows again as its bank allows; no dividend while wages are owed or anyone is under notice (docs/behaviour/firms.md, "Before a dividend"); 0.12.1: returns of tax withheld are filed on the days the law states (docs/behaviour/firms.md, "Returns on the law's days"); 0.12.0: 0.12.0: adjusts its staff as firms do (docs/behaviour/firms.md, "Adjusting labour"): sales smoothed over months, staff held through a dip and let go only when the surplus has lasted what ending the job costs, redundancy pay under the world's law; a business of one can be founded in a run and is closed when its owner gives it up (docs/behaviour/entry.md); 0.11.0: everyday frictions (docs/behaviour/frictions.md): pay that comes short, at the world's rate and its character's; asked, told or ordered to put right short pay or goods said to be faulty; 0.10.0: wants of its own (docs/behaviour/firm-wants.md): a character from its owner's values, which answers a worker who asks for a rise, and a record of its own; 0.9.1: a business of one buys stock when it runs low (daily), keeps its stock money at today's price, follows its owner's home, and closes when its owner has gone; 0.9.0: a business run by its owner alone (operator), stocked for a few days and drawn on by its owner; 0.8.4: takes on the share of its hands the world gives by the day; 0.8.3: registers the share of its jobs the world gives for shops (firms.md, "Jobs an employer does not register")
+  version: "0.14.0", // 0.14.0: reviews its staff and closes its month on a day of its own, not on one every shop shares, and expects at first the trade it was staffed for, not its first month's sales alone (docs/behaviour/firms.md, "When a shop reviews its staff"); 0.13.0: buys its stock on the supplier's terms where it states them (docs/behaviour/trade.md, "Trade credit"), so stock no longer competes with the wage bill in the week it is bought; borrows again as its bank allows; no dividend while wages are owed or anyone is under notice (docs/behaviour/firms.md, "Before a dividend"); 0.12.1: returns of tax withheld are filed on the days the law states (docs/behaviour/firms.md, "Returns on the law's days"); 0.12.0: 0.12.0: adjusts its staff as firms do (docs/behaviour/firms.md, "Adjusting labour"): sales smoothed over months, staff held through a dip and let go only when the surplus has lasted what ending the job costs, redundancy pay under the world's law; a business of one can be founded in a run and is closed when its owner gives it up (docs/behaviour/entry.md); 0.11.0: everyday frictions (docs/behaviour/frictions.md): pay that comes short, at the world's rate and its character's; asked, told or ordered to put right short pay or goods said to be faulty; 0.10.0: wants of its own (docs/behaviour/firm-wants.md): a character from its owner's values, which answers a worker who asks for a rise, and a record of its own; 0.9.1: a business of one buys stock when it runs low (daily), keeps its stock money at today's price, follows its owner's home, and closes when its owner has gone; 0.9.0: a business run by its owner alone (operator), stocked for a few days and drawn on by its owner; 0.8.4: takes on the share of its hands the world gives by the day; 0.8.3: registers the share of its jobs the world gives for shops (firms.md, "Jobs an employer does not register")
   doc: "docs/behaviour/retailer.md",
   cadence: () => DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(24) * 3600,
@@ -127,7 +127,7 @@ export const retailer: BehaviourModule = {
     const me = ctx.entity;
     const book = new Book();
     const staffing = new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, registered_bps: p.registered_bps, casual_bps: p.casual_bps, day_wage: p.day_wage, work_days: p.work_days, week_days: p.look_days, workplace: p.workplace, role: p.role, ...(p.industry ? { industry: p.industry } : {}), ...(p.short_pay ? { short: p.short_pay } : {}) });
-    const labour = new LabourPlan(p.adjust);
+    const labour = new LabourPlan(p.adjust, p.demand);
     // (After letting someone go because we could not pay them, we take nobody on until we hold the wages of those we
     // would then have for as long as a surplus must last before a job is worth ending, where a month's is enough
     // otherwise: the test to take someone on is never weaker than the test to keep them. Until 2026-10-11 a works
@@ -171,7 +171,13 @@ export const retailer: BehaviourModule = {
     let price = p.price;
     let publishedPrice = -1;
     let priceWhy = "";
-    let month = -1;
+    // (Its month is its own: it closes its books, and reviews its staff, on a day it has, not on one every shop has. It
+    // first reviews once it has traded a whole month, at its next boundary, so the first review has a month's trade or
+    // more to look at, scaled to a month: docs/behaviour/firms.md, "When a shop reviews its staff".)
+    const reviewDay = ctx.rng("review-day").below(30 * 24) * 3_600;
+    let month = Number.NaN;
+    let openedAt = -1;
+    let reviewed = false;
     let sold = 0; // this month: items customers ordered and paid for (served or not): what they wanted
     const queue: { o: Order; served: number; since: number }[] = []; // paid orders being served, oldest first
     let lastDemand: number = p.demand;
@@ -339,11 +345,14 @@ export const retailer: BehaviourModule = {
         const marginalCost = unitCost + Math.ceil((hourly() * p.serve_labour) / 3600);
 
         // ---- the month's end: Lengnick's rules ----
-        const m = Math.floor(t / MONTH);
-        if (month < 0) month = m;
-        if (m !== month && trading) {
+        const m = Math.floor((t - reviewDay) / MONTH);
+        if (trading && Number.isNaN(month)) { month = m; openedAt = t; }
+        if (m !== month && trading && t - openedAt < MONTH) month = m; // (a month's boundary before it has traded a whole month: it only starts counting)
+        else if (m !== month && trading) {
           month = m;
-          lastDemand = sold;
+          // (The first review looks at all the trade since opening, which is a month and some days, as a month's.)
+          lastDemand = !reviewed && t - openedAt > MONTH ? Math.round((sold * MONTH) / (t - openedAt)) : sold;
+          reviewed = true;
           sold = 0;
           const rng = ctx.rng(`month-${m}`);
           const why: string[] = [];

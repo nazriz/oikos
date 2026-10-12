@@ -98,6 +98,15 @@ export function formatDry(findings: Finding[]): string[] {
   return [...findings.map((x) => `  [${x.outcome}] ${x.what}: ${x.detail}`), `  dry-run conditions: ${n("shown")} shown, ${n("not shown")} not shown${n("not shown") ? " (FAULT)" : ""}, ${n("could not yet be seen")} could not yet be seen`];
 }
 
+/** Whether an event's body is an organisation founded by a person's want (a group: the kind the founding template makes),
+ * the one occasion the composer is asked about. Not a business of one a person begins trading as (`own_account`), nor a
+ * shop bought and opened: those are existing ways of starting a business, and ask no composer
+ * (docs/behaviour/founding.md, "A business"). Until 2026-10-12 every entity created in the run was counted, so a pilot
+ * town's businesses of one made the check fail with the composer "never asked". */
+export function foundedBody(b: any): boolean {
+  return b?.event === "entity_created" && /^ent\./.test(String(b.entity)) && b.kind === "group";
+}
+
 /** Read a mock run's log for what the check needs. `fullRun`: the run went the whole of the pilot's length. */
 export async function readDryFacts(log: string, fullRun: boolean): Promise<DryFacts> {
   let config: any, seatIds: string[] = [], lastT = 0;
@@ -124,7 +133,7 @@ export async function readDryFacts(log: string, fullRun: boolean): Promise<DryFa
       if (r.kind === "office_books" && !books.has(r.author)) books.set(r.author, day);
       if (r.kind === "office_books" && Array.isArray(r.data?.open) && r.data.open.length && !booksOpen.has(r.author)) booksOpen.set(r.author, day);
       if (r.kind === "hearing_notice") { const l = listed.get(r.author) ?? { first: day, n: 0 }; l.n++; listed.set(r.author, l); }
-    } else if (e.kind === "event" && b.event === "entity_created" && /^ent\./.test(String(b.entity))) { founded.count++; founded.firstDay ??= day; }
+    } else if (e.kind === "event" && foundedBody(b)) { founded.count++; founded.firstDay ??= day; }
     else if (b.annotation === "usage" && b.purpose === "compose") { composed.count++; composed.firstDay ??= day; }
   }
   const positions: any[] = config?.positions ?? [];

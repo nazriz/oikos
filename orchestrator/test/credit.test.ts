@@ -51,10 +51,12 @@ test("loans follow applications on the bank's rules, are paid out once signed an
       expect(recs.some((r) => r.kind === "request" && r.speaks_for === borrower && r.basis === l.id && r.data?.every === MONTH)).toBe(true);
     }
   }
-  // One loan at a time: a borrower's loans don't overlap.
+  // A firm may borrow again a month after a loan was granted, and the bank decides on what it already repays (docs/behaviour/credit.md,
+  // "More than one loan", 2026-10-12); a household borrows one loan at a time. (Until 2026-10-12 this asserted one loan at a time
+  // for everyone: it held in this run only because no shop here borrowed twice, and a shop that did, 118 days after its first, failed it.)
   const byBorrower = new Map<string, any[]>();
   for (const l of loans) byBorrower.set(l.terms.parties[1], [...(byBorrower.get(l.terms.parties[1]) ?? []), l]);
-  for (const [, ls] of byBorrower) for (let i = 1; i < ls.length; i++) expect(ls[i].at - ls[i - 1].at).toBeGreaterThanOrEqual(ls[i - 1].terms.term);
+  for (const [who, ls] of byBorrower) for (let i = 1; i < ls.length; i++) expect(ls[i].at - ls[i - 1].at).toBeGreaterThanOrEqual(/^shop-|^factory-/.test(who) ? 30 * DAY : ls[i - 1].terms.term);
   // Default only after arrears, and a debt recorded; a borrower in default is refused afterwards.
   for (const d of recs.filter((r) => r.kind === "loan_default")) {
     expect(recs.some((r) => r.kind === "loan_arrears" && r.data.loan === d.data.loan && r.at < d.at)).toBe(true);

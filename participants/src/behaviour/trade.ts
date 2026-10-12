@@ -142,6 +142,7 @@ export interface SellingTerms { days: number; stop_after_days: number; claim_aft
 export interface Receivable { order: string; account: string; buyer: string; kind: string; quantity: number; amount: number; since: number; days: number }
 
 const INVOICE = /^Invoice (\S+?):/;
+const OTHER_ROLE = /^(Dividend|Income tax|Tax\b)/i; // (what a payment to the world's account says when it is paid to its shareholder or its collector)
 
 export class OrderBook {
   private readonly credit = new Map<string, number>(); // paying account -> money received not yet set against an order
@@ -173,6 +174,14 @@ export class OrderBook {
         this.invoiced.set(inv[1]!, (this.invoiced.get(inv[1]!) ?? 0) + x);
         continue;
       }
+      // A payment that says it is a dividend or a tax is not money for an order, and is not sent back as a mistake. Until
+      // 2026-10-12 every payment into a seller's account that no invoice named was counted as a payment for an order, and
+      // an account that had ordered and had none waiting had it returned: dividends to the outside world and the tax a
+      // factory withheld were returned to the factory (docs/decisions.md, "The leftovers of the firm-side work"). The
+      // world's account is a market, a shareholder and a collector of tax at once; a payment that names one of the other
+      // two is that, whoever else the payer has dealt with. (A payment that says something else, or nothing, is judged as
+      // before: a payment with no order is returned.)
+      if (OTHER_ROLE.test(tx.memo ?? "")) continue;
       this.credit.set(tx.from, (this.credit.get(tx.from) ?? 0) + x);
     }
   }
