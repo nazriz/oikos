@@ -13,6 +13,7 @@ import { cpus, homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { loadWorld } from "../orchestrator/src/batch";
 import { currentLogs, logLines, realModelIn } from "../orchestrator/src/logs";
+import { framingSets, readWorldFile } from "../orchestrator/src/pilot-state";
 import { formatDry, judgeDry, readDryFacts, type DryOptions, type Finding } from "../orchestrator/src/dry-check";
 
 export interface MockResult { pilot: string; generated: boolean; ranToEnd: boolean; reason?: string; line: string; /** What the run showed, did not show, and could not yet show (orchestrator/src/dry-check.ts). */ dry?: Finding[] }
@@ -41,7 +42,8 @@ async function notMock(log: string): Promise<string | undefined> {
 export async function mockPilot(p: any, outRoot: string, days: number, dryOptions: DryOptions = {}): Promise<MockResult> {
   const done = (r: Omit<MockResult, "pilot" | "line">): MockResult => ({ pilot: p.name, ...r, line: `${p.name}: ${r.generated ? "generated" : "NOT generated"}; ${r.generated ? (r.ranToEnd ? "ran to the end" : "did NOT run to the end") : "did not run"}${r.reason ? ` (${r.reason})` : ""}` });
   for (const k of ["name", "world", "until"]) if (p[k] === undefined) return done({ generated: false, ranToEnd: false, reason: `the entry has no ${k}` });
-  const sets: string[] = p.sets ?? [];
+  // (With the entry's framing, as the queue gives it to the run: a dry run is under the framing the pilot will be.)
+  const sets: string[] = [...(p.sets ?? []), ...(typeof p.world === "string" ? framingSets(p, readWorldFile(resolve(root, p.world))).sets : [])];
   const world = resolve(root, p.world);
   if (!existsSync(world)) return done({ generated: false, ranToEnd: false, reason: `no such world file: ${p.world}` });
   try {

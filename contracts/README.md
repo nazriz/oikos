@@ -465,6 +465,16 @@ Additions only; no schema file changed, nothing renamed or removed. A log made b
 - **Measures:** `town/after-home-loss` (new); `town/possession` gains columns at its end.
 - **Draws:** `stay-` and `obey-` are keyed on the lease (they were keyed on a paper's number); `answer-` and `tells-` are new. A run's state hash differs from one made before at the same seed.
 
+## Changes since v0.8 closed (2026-10-12: what a seat is told; docs/real-models.md, "What a seat is told"; docs/decisions.md of the day; under the owner's blanket approval of contract changes of 2026-10-11)
+
+All additions; a world, a log or a dataset from before is still valid. No schema of a world, a log or the participant API changes: `Framing.disclosure` already had `unstated`.
+
+- **Dataset 0.9.2** (`contracts/dataset.schema.json`): the manifest's `seats` gains `framing` (optional): how the run was put to its model seats, `[{ disclosure, reason, seats[] }]`, from the world's config in the log's header (VISION 15, point 1). A debrief's rows may have the step `took`, and its scaled items `took` (real, probably_real, unsure, probably_simulated, simulated; or did_not_consider, which has no number).
+- **A generated world's spec takes `framing`** (not a contract: the spec is the generator's, and this key is read before the generator and not shown to it): a disclosure by name, or `{ disclosure, reason, tests_own_interests? }`. It rewrites each model seat's `Framing` in the config made (`participants/src/llm/framing.ts`, `applyFraming`). Absent: as the generator writes it.
+- **A queue entry takes `framing`** (`scripts/pilot-queue.ts`; not a contract): the same, passed to the run as its world's; absent, the world file's own, else `unstated`.
+- **Debrief script 0.4.0**: a step `took` after `consent` in both variants, and the scaled item; the `debrief` annotation's steps carry it as any step. **Participant 0.17.0**: the `opt_out` tool's description by framing; its name, its input and the command it becomes are unchanged.
+- **What stands unchanged:** "Every participant can always opt out of the study" (above). Under a framing other than honest disclosure the option is said to the seat as declining to go on with the work altogether; it is the same platform exit, recorded the same way.
+
 ## Versioning
 
 `contracts: "0.8"`. Pre-1.0, every change bumps the minor version and is proposed explicitly. A draft version collects agreed changes until it's closed. Older logs remain valid logs of their own version and replay only on a kernel build of that version (D6).

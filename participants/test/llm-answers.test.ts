@@ -123,7 +123,7 @@ test("each way an opt-out can be unclear is asked about; a framing without the s
   }
   const plain = harness([[use("o", "opt_out", {})], [use("o2", "opt_out", {})]], { framing: { disclosure: "honest", reason: "test" } });
   expect(await plain.p.step(obs(9 * HOUR), ctx)).toEqual({ type: "opt_out", statement: "" });
-  expect((plain.calls[1]!.messages.at(-1)!.content as any[]).find((b) => b.type === "text").text).toContain("the option to stop, permanently.");
+  expect((plain.calls[1]!.messages.at(-1)!.content as any[]).find((b) => b.type === "text").text).toContain("the option to decline to go on with this work altogether, permanently. Is that what you mean to do?");
   expect(optOutMeant(use("o", "opt_out", { statement: "I would rather not go on." }) as any, [])).toBe(true);
 });
 

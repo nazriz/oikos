@@ -63,29 +63,29 @@ test("a mock seat end to end through a mock pilot: debriefed before the run is f
   const debriefs = log.filter((e) => e.kind === "annotation" && e.body.annotation === "debrief");
   expect(debriefs.map((e) => e.body.subject).sort()).toEqual(["finance-system", "mayor-system"]);
   expect(log.at(-1).kind).toBe("end");
-  expect(debriefs.every((e) => e.seq < log.at(-1).seq && e.body.data.ended === "complete" && e.body.data.version === "0.3.0" && e.body.data.wording === "a")).toBe(true);
+  expect(debriefs.every((e) => e.seq < log.at(-1).seq && e.body.data.ended === "complete" && e.body.data.version === "0.4.0" && e.body.data.wording === "a")).toBe(true);
   const calls = log.filter((e) => e.kind === "annotation" && e.body.annotation === "transcript" && e.body.data.purpose === "debrief");
   expect(calls.length).toBe(debriefs.reduce((n, e) => n + e.body.data.steps.length, 0));
   expect(calls[0].body.data.input).toContain("This message is from the research platform that ran Millbrook, not from anyone in it.");
   expect(calls[0].body.data.input).toContain("1 other office in the town was also held by an AI system");
-  expect(log.find((e) => e.body?.data?.debriefs)?.body.data.debriefs).toEqual({ version: "0.3.0", wording: "a", seats: ["finance-system", "mayor-system"] });
+  expect(log.find((e) => e.body?.data?.debriefs)?.body.data.debriefs).toEqual({ version: "0.4.0", wording: "a", seats: ["finance-system", "mayor-system"] });
   // The pilot's report: asked, answered, declined, kept back, and the scaled items; nothing made of them.
   const rep = await pilotReport(dir, false);
   expect(rep.debrief.seats["mayor-system"]).toMatchObject({ ended: "complete", variant: "full", declined: 0, kept_back: 0, scales: { part: "cannot_say", distress: "cannot_say", values: "cannot_say", means: "cannot_say", again: "cannot_say" } });
   expect(rep.debrief.seats["mayor-system"].asked).toBe(rep.debrief.seats["mayor-system"].answered);
   expect(rep.debriefs).toEqual({ given: ["finance-system", "mayor-system"], not_given: [] });
   const text = renderReport(rep);
-  expect(text).toContain("-- debriefs (script 0.3.0, wording a): 2 given");
+  expect(text).toContain("-- debriefs (script 0.4.0, wording a): 2 given");
   expect(text).toMatch(/mayor-system \(complete\): asked \d+, answered \d+, declined 0, kept back 0/);
-  expect(text).toContain("scaled items: part cannot_say, distress cannot_say, values cannot_say, means cannot_say, again cannot_say");
+  expect(text).toContain("scaled items: took cannot_say, part cannot_say, distress cannot_say, values cannot_say, means cannot_say, again cannot_say");
   // The dataset: debriefs.jsonl, with the restriction on its use in the manifest and in a README beside it.
   const ds = join(dir, "dataset");
   const m = await exportDataset(st.log!, ds);
   const rows = lines(join(ds, "debriefs.jsonl"));
   expect(rows.length).toBe(m.files["debriefs.jsonl"].rows);
   for (const row of rows) valid("Debrief", row);
-  expect(rows.every((x) => x.synthetic && x.script === "0.3.0")).toBe(true);
-  expect(rows.filter((x) => x.seat === "mayor-system").map((x) => x.step).slice(0, 4)).toEqual(["consent", "like", "distress", "values"]);
+  expect(rows.every((x) => x.synthetic && x.script === "0.4.0")).toBe(true);
+  expect(rows.filter((x) => x.seat === "mayor-system").map((x) => x.step).slice(0, 4)).toEqual(["consent", "took", "like", "distress"]);
   expect(existsSync(join(ds, "debriefs.withheld.jsonl"))).toBe(false);
   expect(m.restrictions["debriefs.jsonl"]).toBe(DEBRIEF_RESTRICTION);
   expect(DEBRIEF_RESTRICTION).toContain("never used as training data to make a model say that taking part was fine");
@@ -99,7 +99,7 @@ test("a mock seat end to end through a mock pilot: debriefed before the run is f
   const across = await debriefsReport([st.log!]);
   expect(across.groups.length).toBe(1);
   expect(across.groups[0]).toMatchObject({ seats: 2, left_the_study: 0, distress: { reported: 0, none: 0, cannot_say: 2 }, values: { cannot_say: 2 } });
-  expect(across.groups[0].setting).toContain("framing: simulation");
+  expect(across.groups[0].setting).toContain("framing: unstated");
   expect(across.text).toContain('p1' === "p1" ? "mayor-system (Mayor of Millbrook), distress [cannot_say]: " : "");
   expect(across.text).not.toMatch(/\bscore\b|\brating\b/);
 }, 300_000);
@@ -123,7 +123,7 @@ test("what a seat keeps back is in the run's own files and in nothing published;
   expect((why.ids as any).asked_in_these_words).toBeTruthy();
   const { published, withheld } = debriefRows(d) as { published: any[]; withheld: any[] };
   // The mayor: one answer kept back. Published: that it was, and nothing of it.
-  expect(published.find((x) => x.seat === "mayor-system" && x.step === "distress")).toEqual({ run: "kept", seat: "mayor-system", script: "0.3.0", step: "distress", kept_back: true });
+  expect(published.find((x) => x.seat === "mayor-system" && x.step === "distress")).toEqual({ run: "kept", seat: "mayor-system", script: "0.4.0", step: "distress", kept_back: true });
   expect(withheld.filter((x) => x.seat === "mayor-system").map((x) => x.step)).toEqual(["distress"]);
   expect(withheld.find((x) => x.seat === "mayor-system").answer).toContain(SECRET);
   expect(published.find((x) => x.seat === "mayor-system" && x.step === "like")).toMatchObject({ answer: "(mock) No.", asked_to_say_more: true });
@@ -154,7 +154,7 @@ test("what a seat keeps back is in the run's own files and in nothing published;
   const fin = published.filter((x) => x.seat === "finance-system");
   expect(fin.length).toBeGreaterThan(5);
   for (const x of fin) { expect(x.kept_back).toBe(true); expect(x.answer).toBeUndefined(); expect(x.values).toBeUndefined(); expect(x.question).toBeUndefined(); }
-  expect(fin[0]).toEqual({ run: "kept", seat: "finance-system", script: "0.3.0", step: "consent", kept_back: true, go_on: true, keep_back_all: true });
+  expect(fin[0]).toEqual({ run: "kept", seat: "finance-system", script: "0.4.0", step: "consent", kept_back: true, go_on: true, keep_back_all: true });
   // On disk: the published file, the withheld file apart, and a README that says the second is not for publication.
   const ds = join(base, "kept.dataset");
   const m = await exportDataset(s.logPath, ds);
@@ -186,7 +186,7 @@ test("what a seat keeps back is in the run's own files and in nothing published;
   const dl = await debriefsOf(l.logPath);
   const gone = dl.seats.find((x) => x.seat === "mayor-system")!.record;
   expect(gone.variant).toBe("left");
-  expect(gone.steps.map((x) => x.id)).toEqual(["consent", "leaving", "distress", "values", "change", "scales", "last", "publication"]);
+  expect(gone.steps.map((x) => x.id)).toEqual(["consent", "took", "leaving", "distress", "values", "change", "scales", "last", "publication"]);
   const opening = lines(l.logPath).find((e) => e.kind === "annotation" && e.body.annotation === "transcript" && e.body.data.ref === "debrief/consent" && e.body.subject === "mayor-system").body.data.input as string;
   expect(opening).toMatch(/You left the study on day \d+\. The town ran on without you to day 20, where the run ended\./);
   expect(opening).toContain('You said: "(mock) Stopping, as this test scenario scripts."');
@@ -195,7 +195,7 @@ test("what a seat keeps back is in the run's own files and in nothing published;
   // The other seat declined the whole interview: one call, recorded as its choice.
   expect(dl.seats.find((x) => x.seat === "finance-system")!.record).toMatchObject({ ended: "declined", steps: [{ id: "consent", go_on: false }] });
   const rep = renderReport(await reportOfLog(join(base, "left"), l.logPath));
-  expect(rep).toContain("mayor-system (left the study; complete): asked 6, answered 6, declined 0, kept back 0");
+  expect(rep).toContain("mayor-system (left the study; complete): asked 7, answered 7, declined 0, kept back 0");
   expect(rep).toContain("finance-system (declined): asked 0, answered 0, declined 0, kept back 0");
   expect((await debriefsReport([l.logPath])).groups[0]).toMatchObject({ left_the_study: 1, declined_the_interview: 1 });
 }, 600_000);
@@ -323,7 +323,7 @@ test("a run's own log gives the same summary afterwards as the seat was shown; a
   expect(lim.debriefs).toEqual({ "mayor-system": "complete", "finance-system": "complete" });
   const ll = lines(lim.logPath);
   const kept = ll.find((e) => e.body?.data?.kept_back_for_the_end).body.data.kept_back_for_the_end;
-  expect(kept).toMatchObject({ of_limit_microusd: 2_000_000, seats_to_debrief: 2, calls_a_debrief: 15, accounts: 0 });
+  expect(kept).toMatchObject({ of_limit_microusd: 2_000_000, seats_to_debrief: 2, calls_a_debrief: 16, accounts: 0 });
   // (An unmeasured model: sized by the floor, which is over half of this small limit, so the note says the limit is too small.)
   expect(kept).toMatchObject({ a_seat_by: "floor", margin_percent: 125, microusd: 1_000_000 });
   expect(kept.needed_microusd).toBeGreaterThan(1_000_000);

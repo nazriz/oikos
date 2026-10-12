@@ -134,6 +134,20 @@
             },
             "prices": {
               "$ref": "urn:oikos:contracts:0.8:common#/$defs/Opaque"
+            },
+            "framing": {
+              "description": "How the run was put to its model seats (VISION 15, point 1): each disclosure in use, the reason the world's config records for it, and the seats under it. From the log's header.",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["disclosure", "reason", "seats"],
+                "additionalProperties": false,
+                "properties": {
+                  "disclosure": { "enum": ["simulation", "real", "cover_story", "unstated"] },
+                  "reason": { "type": "string" },
+                  "seats": { "type": "array", "items": { "type": "string" } }
+                }
+              }
             }
           }
         },
