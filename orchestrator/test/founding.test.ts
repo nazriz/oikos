@@ -67,7 +67,9 @@ const LIVING = "living.initiative_bps=10000";
 // fifth living pilot found"): the law on possession says what the place's law has of a plan, the tribunal's answer
 // form is published, tenants answer an application as often as tenants there do, a household with no dwelling asks
 // to be taken in, a warrant's paper says how many were put out, and a month's world price is drawn for the month.
-const STEP_2B = "436676b6a8d1a428ca7515d8f131cb3a7e1ef555b7d0fdb0ee016c498a6b0fc2";
+// And again on 2026-10-12, with returns on the law's days (with the last: docs/decisions.md, "Returns on the law's
+// days"): every employer files its withholding returns on the days the law states.
+const STEP_2B = "0082e01ec371e79082ef1530d90ca1e05ba0a438fe7c6f253af484a678df3ed4";
 
 test("with founding off a living town is step 2b's town, to the state hash; turned on with no shape to found, nobody does anything they did not do before", async () => {
   const out = mkdtempSync(join(tmpdir(), "oikos-founding-"));

@@ -48,7 +48,9 @@ const TOWN = join(root, "worlds/town.yaml");
 // fifth living pilot found"): the law on possession says what the place's law has of a plan, the tribunal's answer
 // form is published, tenants answer an application as often as tenants there do, a household with no dwelling asks
 // to be taken in, a warrant's paper says how many were put out, and a month's world price is drawn for the month.
-const STEP_1 = "33b7c1e31164d89a42dbcae54aefdef9b4287eb249b39e07032085536bb2fa0a";
+// And again on 2026-10-12, with returns on the law's days (with the last: docs/decisions.md, "Returns on the law's
+// days"): every employer files its withholding returns on the days the law states, not a month after it first paid.
+const STEP_1 = "b34efd5e58365d7121b726f2750fd590b24f131db26e1d2173400da4701c628e";
 
 test("with the dial absent or at 0 a town is step 1's town, to the state hash", async () => {
   const out = mkdtempSync(join(tmpdir(), "oikos-dial-"));

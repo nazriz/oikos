@@ -747,6 +747,7 @@
           }
         ]
       },
+      "returns": [{"id": "payg", "name": "PAYG withholding, on the activity statement (Taxation Administration Act 1953, Schedule 1; Medicare Levy Act 1986)", "charges": ["income-tax", "medicare-levy"], "day": 21}],
       "grants_per_resident_per_year": 8768,
       "rates_per_resident_per_year": 113100,
       "rates_instalments": 4,
@@ -1026,6 +1027,7 @@
     "town_finance.parks_per_year": "Placeholder: the town's yearly parks line, $150,000 (a park a year at about what the builder charges).",
     "town_finance.payment_approval_over": "Placeholder: the town's payments procedure needs the mayor's written approval for any payment over $50,000 (a council's financial delegation; to source).",
     "public_finance.income_tax": "ATO, individual income tax rates for residents, 2025-26: nil to $18,200; 16% to $45,000; 30% to $135,000; 37% to $190,000; 45% above. The Medicare levy, 2% (ATO), from the singles low-income threshold, $27,222 for 2024-25 (to confirm for 2025-26; the phase-in above it is left out). Employers withhold on each pay reckoned as a year's income (the ATO's tax tables round to dollars, so differ slightly). SHAPE (2026-10-08, track E of docs/design/profile-depth.md): the law is now a list of charges, each with what it is charged on, its schedule, its reliefs and whom it is paid to (docs/behaviour/public-finance.md). Two charges, the same figures: the resident rates on a year's pay, and the levy on the whole of a pay from its threshold. Nothing is changed; both are paid to the general government.",
+    "public_finance.returns": "[RECALLED, to confirm] ATO: a medium withholder (AUD 25,001 to 1 million a year, per business.gov.au, opened) reports and pays PAYG withholding monthly on the activity statement, due the 21st of the following month; a small withholder (AUD 25,000 or less) does so quarterly (28 Oct, 28 Feb, 28 Apr, 28 Jul), not used here; the Medicare levy is withheld within the PAYG amount. The ATO's own page (paying-and-reporting-payg-withholding-amounts-for-small-and-medium-withholders) returned an access error, so the days are recalled, not read.",
     "public_finance.grants_per_resident_per_year": "Derived: Victoria's 2025-26 general purpose financial assistance grants, $612.0M (Victorian Local Government Grants Commission, 2025-26 annual allocation report, tabled September 2025), over Victoria's population, about 6.98 million (ABS, National, state and territory population, 2025; to confirm). Local roads grants ($218.3M) are left out: the town has no roads yet.",
     "public_finance.rates_per_resident_per_year": "Derived: Victorian councils' rates and charges, 51% of $15.3B revenue in 2024-25 (VAGO, Results of 2024-25 Audits: Local Government), over about 6.9 million residents: about $1,131 a resident a year (to confirm). Sets the town's opening rate in the dollar.",
     "public_finance.rates_instalments": "Local Government Act 1989 (Vic), s 167: rates are payable in four instalments (or as a lump sum).",

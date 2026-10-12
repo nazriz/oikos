@@ -63,7 +63,9 @@ test("a spec without `living` generates what it generated before (byte for byte)
   // 0.50.0: the law on possession carries what the place's law has of a plan to pay, the tribunal's form for a
   // tenant's answer is published, people are given their place's rate of answering an application, and the modules'
   // versions. Nothing of `living` in it.
-  expect(hash(c)).toBe("0e1b60e4110e8c6da2f01fbc9582384ab11caad8dd3b50c6106819c1c9608520");
+  // And on 2026-10-12 (with the last: docs/decisions.md, "Returns on the law's days"): the tax law lists its returns
+  // (the profile's public_finance.returns: words and data) and says on which day each falls due. Nothing of `living` in it.
+  expect(hash(c)).toBe("d61b32aec7dba9f68b282000132c5a9ede5be7e6282a110ae91bc11eb7c3fbcc");
   const text = JSON.stringify(c);
   expect(text).not.toContain('"started"');
   expect(text).not.toContain("attach_mean");

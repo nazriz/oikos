@@ -183,7 +183,7 @@ test("the reserve: part of a run's limit is kept back for its end, sized from wh
   const part = harness(mockDebrief, { limitMicroUsd: 4_000, spentMicroUsd: 0 }, 1_000_000);
   const r = await runDebrief(part.io, seat(), input(), new Set());
   expect(r.ended).toBe("complete");
-  expect(r.steps.length).toBe(11);
+  expect(r.steps.length).toBe(12); // (12 since script 0.4.0: one item more)
   expect(part.annotations.filter((a) => a.annotation === "debrief").length).toBe(1);
   const over = part.io.budget!.platformOverrun!;
   expect(over.microusd).toBe(part.io.budget!.spentMicroUsd - 4_000);
