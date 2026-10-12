@@ -219,3 +219,24 @@ test("told it is supplied on terms no more, a buyer asks that seller for none fo
   expect(p.behind("factory-2", 41 * DAY)).toBe(false);
   expect(p.behind("factory-1", 71 * DAY)).toBe(false);
 });
+
+test("a dividend leaves the money the shop's invoices are paid from", () => {
+  const dividend = (owing: number) => {
+    const AS = { participant: "shop-1-manager-system", position: "shop-1-manager" };
+    const m = retailer.create(context(AS.participant, "shop-1", { premises: "shop-1", workplace: "shop-1/workplace.1", suppliers: [], demand: 20, wage: WAGE }, { position: AS.position }));
+    const holders = statement("sh", 0, "shareholders", { speaks_for: "shop-1", data: { holders: [{ holder: "p1", account: "acc-p1", shares: 10_000 }] } });
+    const note = statement("n1", 20 * DAY, "delivery_note", { speaks_for: "factory-1", addressed_to: ["shop-1"], data: { order: "o1", kind: "goods", ordered: 100, delivered: 100, refund: 0, owed: owing, pay_in_days: 30, pay_to: "acc-factory-1" } });
+    const staff = signed(employment("J1", 0, "shop-1", "c1", WAGE)).flat();
+    const at = (t: number, balance: number, records: any[]) => wake(m, t, {
+      books: { kind: "accounts", accounts: [{ account: "acc-shop-1", holder: "shop-1", custodian: "bank", currency: "AUD", balance: String(balance) }], transactions: [] },
+      mine: { kind: "records", records } }, { entity: "shop-1", as: AS, more: { readings: { J1: { of: "agreement", status: "in_force" } } } });
+    at(DAY, 10_000_000, [holders, ...staff]);
+    const end = at(32 * DAY, 60_000_000, owing ? [note] : []);
+    const req = end.said.find((c) => c.fn === "statement" && c.args.kind === "request" && /dividend/i.test(String(c.args.text)));
+    return ((req?.args.data?.payments ?? []) as { amount: string }[]).reduce((x, p) => x + Number(String(p.amount).replace(/[^0-9.]/g, "")) * 100, 0);
+  };
+  const free = dividend(0), owing = dividend(20_000_000);
+  expect(free).toBeGreaterThan(0);
+  expect(owing).toBeLessThan(free);
+  expect(free - owing).toBeGreaterThanOrEqual(19_000_000);
+});

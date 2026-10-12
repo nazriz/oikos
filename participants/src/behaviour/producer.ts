@@ -265,7 +265,8 @@ export const producer: BehaviourModule = {
           // wage bill. The capital we started with isn't paid out.
           const staffFor = Math.max(workers.length, headcount);
           const bill = Math.floor((staffFor * wage * MONTH) / p.period);
-          const buffer = bill + monthlyUnits(staffFor) * inputCost + Math.floor((bill * p.chi_bps) / 10_000);
+          // (And what we owe our supplier for inputs delivered on its terms: a dividend must not take the money its invoices are paid from.)
+          const buffer = bill + monthlyUnits(staffFor) * inputCost + Math.floor((bill * p.chi_bps) / 10_000) + payables.owing;
           // (Nothing is paid out while wages are owed or anyone is under notice: docs/behaviour/firms.md, "Before a dividend".)
           const out = staffing.strained(book, t) ? { steps: [because(`Month's end: ${staffing.strained(book, t)}, so nothing is paid out to our shareholders.`)], paid: 0 } : payOut(book, me, acc, acc.balance, buffer, monthStart < 0 ? 0 : acc.balance - monthStart, `a month's wages and inputs, and ${p.chi_bps / 100}% of the wage bill`);
           monthStart = acc.balance - out.paid;

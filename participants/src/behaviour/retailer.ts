@@ -378,7 +378,8 @@ export const retailer: BehaviourModule = {
           // Out of the month's earnings, what we hold beyond the buffer goes to the shareholders: a month's wages, a
           // month's stock at cost, and Lengnick's chi of the wage bill.
           const bill = Math.floor((Math.max(workers.length, headcount) * wage * MONTH) / p.period);
-          const buffer = bill + stockFor(lastDemand) * unitCost + Math.floor((bill * p.chi_bps) / 10_000);
+          // (And what we owe our suppliers for stock delivered on their terms: a dividend must not take the money its invoices are paid from.)
+          const buffer = bill + stockFor(lastDemand) * unitCost + Math.floor((bill * p.chi_bps) / 10_000) + payables.owing;
           // (Nothing is paid out while wages are owed or anyone is under notice: docs/behaviour/firms.md, "Before a dividend".)
           const out = p.draw_days > 0 ? { steps: [], paid: 0 } : staffing.strained(book, t) ? { steps: [because(`Month's end: ${staffing.strained(book, t)}, so nothing is paid out to our shareholders.`)], paid: 0 } : payOut(book, me, acc, acc.balance, buffer, acc.balance - monthStart, `a month's wages and stock, and ${p.chi_bps / 100}% of the wage bill`);
           monthStart = acc.balance - out.paid;
@@ -496,7 +497,7 @@ export const retailer: BehaviourModule = {
             nextDraw = t + p.draw_days * DAY;
             // (At what its supplier charges now, and a tenth over: kept to the last unit, a rise in the price left it
             // one item short of the least order, and it never bought again.)
-            const keep = Math.ceil((Math.max(Math.ceil((p.phi_high_bps * stockFor(lastDemand)) / 10_000), offers[0]?.min ?? 0) * Math.max(unitCost, offers[0]?.unit ?? 0) * 11) / 10);
+            const keep = Math.ceil((Math.max(Math.ceil((p.phi_high_bps * stockFor(lastDemand)) / 10_000), offers[0]?.min ?? 0) * Math.max(unitCost, offers[0]?.unit ?? 0) * 11) / 10) + payables.owing;
             if (acc.balance > keep) steps.push(...distribute(book, me, acc, acc.balance - keep, `We hold ${usd(acc.balance)} and keep ${usd(keep)} for stock: the rest is our owner's`).steps);
           }
         }
