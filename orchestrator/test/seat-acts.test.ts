@@ -150,7 +150,8 @@ test("in a living town the tribunal's registry staff list the cases and the memb
   expect(listed.at - app.at).toBeLessThan(2 * DAY);
   const order = recs.find((r) => r.kind === "tribunal_order" && r.data?.application === app.id);
   expect(order.author).toBe("tribunal-member-system");
-  expect(order.at).toBeGreaterThanOrEqual(listed.data.answer_by);
+  // (On or after its day: a member who sits in the morning decides what that day's list has, 2026-10-12.)
+  expect(Math.floor(order.at / DAY)).toBeGreaterThanOrEqual(Math.floor(listed.data.answer_by / DAY));
   expect(order.data.finding).toBe("possession");
   const member = did(acts, "tribunal-member");
   expect(member.forms.has("hearing_notice")).toBe(false);

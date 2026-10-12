@@ -4392,7 +4392,7 @@ At 1,000 people (seed 1), households taken in by kin / renting on savings / with
 
 **A newcomer's hours.** Someone who comes to town in the run counted every day since the year began as hours "away" in their first record; one arriving after a year broke the record's own bound (a test that samples every 97th change met it for the first time). Their hours now begin when they do.
 
-**Measured:** in the entry that follows this one's merges ("What was measured").
+**Measured:** in the entry "What the fifth living pilot found: what was measured", below.
 
 **Contracts:** additions only, named in `contracts/README.md` ("what the fifth living pilot found"), under the owner's blanket approval of 2026-10-11. `stay-` and `obey-` draws are keyed on the lease where they were keyed on a paper's number, so a run's state hash differs from one made before.
 
@@ -4505,6 +4505,60 @@ Building Naz's decision of the same day (the entry above; VISION 15, point 1 as 
 **Leaves out.** Weekends and holidays (a "working day" rule is approximated; a due day on a weekend is filed on the next look); semiweekly depositors, quarterly and half-yearly returns of small employers, annual reconciliations (no profile uses them); IMSS, EPF and ESI (not charges in those profiles); a payroll that files before its day because it wakes weekly leaves the pay of the days between to the next return; the tax month of the UK.
 
 **Revisit if:** a profile needs a rule the days of one month cannot say (semiweekly deposits, a due day that moves with the weekday); the world gets a calendar of names (then `returns.ts`'s mapping is the one place to change); the Kenyan redundancy movement reproduces with more seeds and wants a closer look; the recalled days are opened (Australia, Brazil, India, Mexico, Kenya's SHIF).
+
+## 2026-10-12 · What the fifth living pilot found: what was measured, and what the other items came to
+
+**The branch as merged** (`lv5-fixes`: the entry above, with the day's other entries: the debrief's reserve, the member's day list, returns on the law's days, reviews of payments in force not built, and `origin/main` with the unstated framing). No model was called. Working files: `runs/lv5-fixes-2026-10-12/` on the run server.
+
+**A year of the 1,000-person living town, six runs of one town, means; before is `origin/main` at the homes-by-income merge** (`runs/homes-by-income-2026-10-12/after-living-*`), after is this branch (`after-living-*`; `sum-*.txt`, `diff-*.txt`). The after side carries every change of the day, returns on the law's days among them, so a movement here is not this entry's alone.
+
+| | ke-nakuru-2026 | au-vic-2026 |
+|---|---|---|
+| renting households (end) | 78.7 → 81.2 | 226.5 → 225.3 |
+| notices to vacate | 38.3 → 39.8 | 3.5 → 3.5 |
+| applications for possession | 15.2 → 15.7 | 2.0 → 2.2 |
+| tenants' answers (of them: "we have left") | 3.3 (2.8) → 7.3 (3.5) | 0.0 → 0.5 (0.2) |
+| answers offering a sum | 0.5 → 0.5 | 0.0 → 0.0 |
+| landlords' replies | 0 → 1.0 | 0 → 0.2 |
+| applications withdrawn | 2.8 → 4.8 | 0.0 → 0.2 |
+| possession orders / plans / dismissed | 8.3 / 0.2 / 0 → 7.5 / 0 / 0 | 1.7 / 0 / 0 → 1.8 / 0 / 0 |
+| warrants issued / withdrawn | 3.0 / 0 → 4.0 / 0.7 | 1.5 / 0 → 1.5 / 0 |
+| carried out, of which after the tenant had left | 2.3, 0.7 → 3.0, 0 | 1.3, 0 → 1.3, 0 |
+| **removals** (carried out, tenant not already gone) | 1.7 → 3.0 | 1.3 → 1.3 |
+| removals per 1,000 renting households | 21 → 37 | 5.9 → 5.9 |
+| carried out with nobody at home that hour | not recorded → 0.7 | not recorded → 1.2 |
+
+**Read plainly.** Tenants still in the home answered about a third of applications in Nakuru's town (3.8 of 12.2; its rate is the 40% placeholder, read against who they are) and one in four of Victoria's few. **Almost none of them had anything to offer: the code member set no plan in twelve runs.** A household that is behind in these towns is one that has lost its income, and what it tells the tribunal is that it can pay nothing, since when it has been out of work, who lives there and that it has nowhere to go. That is what a seat in the chair will now be shown; whether it orders anything but possession on such papers is the question a pilot can now ask, and the code twin's answer is known (possession, by its rule). A set of pilots that wants cases with an offer in them needs a town whose arrears come from something other than lost income (a rent raised, pay come short), or more seeds: one answer in fourteen offered a sum. Of the warrants carried out before, 4 of 14 were at homes the tenant had already left (the pilot's two fifths); now none of 18, and 4 were withdrawn on the landlord's word. Nothing was adjusted to any figure.
+
+**Beside the sources there are** (docs/behaviour/justice.md): England about 3 removals a year for each 1,000 renting households (to confirm; one quarter of 2025 annualised gives about 6, secondary); Cleveland about 42 eviction orders for each 1,000 renter households (opened; orders, not removals). Victoria's town 5.9; Nakuru's 37, its rents against its wages (median rent share 61% of income) and no source of its own.
+
+**Where households that lost a home for arrears were at the year's end** (`town/after-home-loss`):
+
+| | ke-nakuru-2026 | au-vic-2026 |
+|---|---|---|
+| lost a home | 17.2 → 16.7 | 1.0 → 0.7 |
+| in a home of their own again | 0.5 → 0.5 | 0 → 0 |
+| staying with someone | 0 → 5.3 | 0 → 0.5 |
+| gone from town | 7.5 → 6.2 | 0 → 0 |
+| no dwelling | 9.2 → 4.7 | 1.0 → 0.2 |
+| asked someone; people asked, each | 0 → all; about 11 | 0 → all; about 5 |
+
+A third of Nakuru's households that lose a home are under someone's roof at the year's end, taken in the day they asked (median 0 days); a quarter still have no dwelling (a median 45 days by then); a third have gone; almost none rent again, since what lost them the home still holds. **Everyone without a home asks, not only those put out:** households with none as the year begins, newcomers, people between homes. In Nakuru's town 39 households a run asked and 8 homes said yes (334 noes: the home not theirs to open and no will of their own, not close enough, no means, no room); in Victoria's, 81 asked and 244 homes said yes at some time, each asker having several. The difference is the two towns' own: Victoria's households have the room and the means the rule asks, Nakuru's mostly do not. In the pilots' own town (3,000 people, 90 days, on the mock) nobody was taken in at all: 397 asked, none close enough yet. **The willingness threshold is an assumption and the first thing to look at** if these look wrong beside a source.
+
+**The standing measures** (`oikos diff`, 57 measures): Victoria, one beyond the noise between runs (a congregation's opening share, 34.6% → 35.2%; not traced, and not plausibly ours); new leases 9.7 → 6.8 and unhoused households at the end 6.3 → 4.7 (people staying with someone); unemployment 1.0% → 0.2% (returns on the law's days: its own entry). Nakuru: move-ins 48.8 → 61.2 (the one beyond noise: guests moving in), unhoused at the end 12.7 → 8.2, departures 78.8 → 72.3.
+
+**The pilots' town on the mock** (3,000 people, ke-nakuru-2026, seed 402, 90 days; mayor, finance, landlord-38 and the tribunal's member in mock seats; `runs/pilot-queues/lv5-fixes.mock/`). With `opening_caseload`: ran to the end, every seat debriefed; 3 applications before the member, 5 answers (three saying they can pay nothing, with since when they have been out of work, who lives there and that they have nowhere to go; two that they have left), 3 orders, all possession, 2 applications withdrawn, 4 warrants, 2 carried out (3 and 2 people put out). Without it: ran to the end; no application reached the tribunal in 90 days (the law's days allow one from about day 60; one had on `origin/main`). The dry run's check "the composer asked" fails in both, as it does not on the fifth pilot's own dry run: the bodies it counts as founded are businesses of one, and no founding was drawn in either run; **not traced further, and worth a look before a pilot that turns on founding.**
+
+**The other items.**
+- **5, the debrief's reserve** (its own entry): sized from 16 debriefs on file (0.50 USD the largest a seat, times 1.25), a floor for a model not measured; lv-05's would have been 2.67 USD against 1.73 spent; the end is never cut by the limit, and what goes past it is recorded as the platform's.
+- **6, the member's day** (its own entry): the clerk's list of cases whose day has come is one paper, in full, and it brings the seat. On a mock with 53 cases in 90 days: a seat that keeps its own days of return, 31 sittings and 115 calls → 31 and 109; a seat that comes back weekly, 28 of 53 cases decided more than a working day late → 1. An estimate of about 5.5 → 3.9 USD at lv-05's price a call. Sittings cannot fall far below the days with something ripe. With it here: a member decides what the day's list has (a case ripe at nine was left four days by a sitting at eight).
+- **7, returns on the law's days** (its own entry): every employer, from each profile's `public_finance.returns`; finance's books show the next. Six of nine rules are recalled and to confirm.
+- **9, reviews of payments in force: not built** (its own entry): no place publishes a rate of wrong stops per review, and the survey's share already counts them; re-fitting the wrong-refusal rate to 43 would be calibrating an outcome.
+- **10, names and dates:** a plan, `docs/design/names-and-dates.md`, awaiting the owner; nothing built. Its first step (dates shown and read as the place writes them) touches the resolver in the kernel and the translator's prompt, so it is not the small step it looked.
+
+**Leaves out, of this pass:** a pilot with a real model in the chair (none was run); a town with offers to weigh; attendance in person; anything for a household nobody takes in; the checks named above as not traced.
+
+**Revisit if:** a pilot's member still orders possession in every case with these papers before it (then the question is the seat's, which is the point; compare with the twin by tenant); no tenant in a pilot's town ever has a sum to offer (then the caseload wants households behind for other reasons, which needs a sourced rate of arrears by cause that no profile has); taking in at these rates is contradicted by a source.
 
 ## Open (to decide at the Stage 2 checkpoint or before)
 
