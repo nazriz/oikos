@@ -213,6 +213,8 @@ export class Inner {
   private since: Remembered[] = [];
   private settledAt = 0;
   private driftedAt: number | null = null;
+  /** How many months' steps this person's values have drifted: a step is named for it, not for the moment it was made. */
+  private drifts = 0;
   /** Where the hours went since they were last read: seconds by what the person was at. */
   private hours: { [category: string]: number } = {};
   private hoursFrom = 0;
@@ -367,7 +369,7 @@ export class Inner {
     let moved = false;
     while (t - this.driftedAt >= MONTH) {
       this.driftedAt += MONTH;
-      const r = rng(`values-drift-${this.driftedAt}`);
+      const r = rng(`values-drift-${++this.drifts}`);
       // An Ornstein-Uhlenbeck step: keep = stability ^ (a month / stability_days); the step's spread makes up the rest.
       const keep = Math.pow(this.p.values.stability_bps / 10_000, MONTH / (this.p.values.stability_days * DAY));
       for (const v of VALUES) {

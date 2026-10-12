@@ -38,7 +38,7 @@ export const organiser: BehaviourModule = {
   answers: {"office": "the union's office", "acts": "What it acts on: an application to join; its members' votes on its ballots; and an employer's answer to a claim it has made."},
   issues: P.UNION,
   opens: (p, me) => ((p.hears ?? []).length ? [unionHears(me, p.hears)] : []),
-  version: "0.6.0", // 0.6.0: takes up a member's grievance with their employer, where the world says it hears such (docs/behaviour/frictions.md)
+  version: "0.6.1", // 0.6.1: draws are named for the day and which time that is, never the hour or the moment (docs/reliability.md, "Draws and the moment"); 0.6.0: takes up a member's grievance with their employer, where the world says it hears such (docs/behaviour/frictions.md)
   doc: "docs/behaviour/unions.md",
   cadence: () => DAY,
   firstWake: (ctx) => 9 * 3600 + ctx.rng("first-wake").below(3600),
@@ -260,7 +260,7 @@ export const organiser: BehaviourModule = {
             let lead = p.notice_days * DAY;
             let broken = breaches(book, act(startsOn(t, lead)), me, t);
             while (broken.length && lead < (p.notice_days + 30) * DAY) broken = breaches(book, act(startsOn(t, (lead += DAY))), me, t);
-            if (broken.length && ctx.rng(`comply-${employer}-${t}`).below(10_000) < p.compliance_bps) {
+            if (broken.length && ctx.rng(`comply-${employer}`).below(10_000) < p.compliance_bps) {
               steps.push(because(`Action at ${employer} would breach ${broken.map((l) => l.id).join(", ")}: no action. We'll claim again in three months.`));
               disputes.delete(employer);
               agreedAt.set(employer, t - p.bargain_every_days * DAY + 90 * DAY);

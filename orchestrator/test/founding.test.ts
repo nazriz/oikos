@@ -78,7 +78,9 @@ const LIVING = "living.initiative_bps=10000";
 // Moved on 2026-10-12 by payments that carry a budget line (19c27253... until then; docs/decisions.md, "Opening caseloads of the other
 // offices ... payments that carry a budget line"): the town's opening wage orders name the staff line, and the finance office has two
 // parameters more. The same reason as living-dial.test.ts's step 1.
-const STEP_2B = "636309369e8e87b43f2959ee9515bd5af274868dadbd4d2f0546175a17fdc1dc";
+// Moved again on 2026-10-12 by draws named for the day or the matter, not the hour (63630936... until then; docs/decisions.md, "Draws and
+// the moment"): the same reason as living-dial.test.ts's step 1 (4e4868c3... for the first version, which counted hours).
+const STEP_2B = "21464c873055f7f4d10391339c1ad8cfd649451475ca85ef5379eff0cfa89409";
 
 test("with founding off a living town is step 2b's town, to the state hash; turned on with no shape to found, nobody does anything they did not do before", async () => {
   const out = mkdtempSync(join(tmpdir(), "oikos-founding-"));
@@ -114,7 +116,8 @@ test("founding in code: with the composer off no model is called; a founded thin
     expect(citizen.hall.hire).toBeGreaterThan(0);
     expect(citizen.dues[0]).toBe(0);
     expect(config.knowing.published.some((x: any) => x.what === "membership")).toBe(true);
-    const s = await runWorld({ config: { ...config, seed: 1 }, runId: "code", outDir: out, until: 205 * DAY, recordObservations: "none" });
+    // (Seed 2, 2026-10-12, draws named for the day or the matter: in seed 1 only one person shared the want that founds; seeds 2 and 5 have two or more, 3 and 4 do not.)
+    const s = await runWorld({ config: { ...config, seed: 2 }, runId: "code", outDir: out, until: 205 * DAY, recordObservations: "none" });
     expect(s.composer).toBeUndefined();
     const log = readFileSync(s.logPath, "utf8");
     // No model anywhere: not a usage entry, not a transcript.

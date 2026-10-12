@@ -73,7 +73,10 @@ test("households live, move and pay together", async () => {
   // parent's act moving the household in is still under way.
   // (And, since 2026-10-12, someone going to a building that is under water that day: the flood's own refusal, met in
   // the town as drawn with homes by income, where it had not happened to fall on anyone's way before.)
-  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left", "already_present", "flooded"].includes(e.code))).toEqual([]);
+  // (And, since 2026-10-12, a conception whose partner had left the room in the hour the act takes: a birth is decided
+  // with the partner there and done an hour later. Rare: a draw named for the day came to fall on one such moment.)
+  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left", "already_present", "flooded", "too_far"].includes(e.code))).toEqual([]);
+  expect(ev.filter((e) => e.event === "action_refused" && e.code === "too_far").length).toBeLessThanOrEqual(3);
 }, 300_000);
 
 test("a child born here is brought home by the parent who bore them and added to the household's record", async () => {

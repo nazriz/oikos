@@ -23,6 +23,8 @@ const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
 const spec = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")) as any;
 
+// (The run's seed is pinned to one in which, in the 20 days, enough of those who apply are out of work and come to the depot to
+// show the crew at work. With draws named for the day, 2026-10-12, the generated seed's applicants came after the run ended.)
 async function worksSeat(citing: boolean) {
   const config = generate({ ...spec, opening_orders: false, model_seats: ["works"], works_crew_at_start: 0 });
   const own = config.participants.find((p: any) => p.id === "works-staff-system").controller.params;
@@ -43,7 +45,7 @@ async function worksSeat(citing: boolean) {
     ...[6, 9, 12, 15, 18].map((day) => ({ day, asks: () => [] })),
   ];
   const seats = scriptedSeats({ works });
-  const s = await runWorld({ config, runId: "office-work", outDir: mkdtempSync(join(tmpdir(), "oikos-office-work-")), until: 20 * DAY, adapter: seats.adapter, recordObservations: "none", recordDecisions: "none" });
+  const s = await runWorld({ config: { ...config, seed: 4 }, runId: "office-work", outDir: mkdtempSync(join(tmpdir(), "oikos-office-work-")), until: 20 * DAY, adapter: seats.adapter, recordObservations: "none", recordDecisions: "none" });
   expect(s.participantErrors).toBe(0);
   const log = readFileSync(s.logPath, "utf8").trim().split("\n").map((l) => JSON.parse(l));
   const events = log.filter((e) => e.kind === "event").map((e) => ({ t: e.t, ...e.body }));

@@ -35,7 +35,7 @@ import { Kernel } from "./kernel";
 import { divergences } from "./truth";
 import type { Watchdog } from "./watchdog";
 
-export const ORCHESTRATOR_VERSION = "0.8.0";
+export const ORCHESTRATOR_VERSION = "0.9.0";
 
 export interface RunOptions {
   config: any;
@@ -47,6 +47,8 @@ export interface RunOptions {
   until?: number;
   modules?: { [name: string]: BehaviourModule & { source?: string } };
   kernel?: Kernel;
+  /** Told the key of every stream a participant draws (tests: what two towns draw alike, docs/reliability.md). */
+  drawTrace?: (key: readonly string[]) => void;
   log?: (msg: string) => void;
   /** The model behind every language-model participant and the translator. Default: the mock. */
   adapter?: LlmAdapter;
@@ -408,11 +410,38 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     if (!seen) drawnOn.set(what, (seen = new Map()));
     return purpose.replace(/rec\.[0-9]+/g, (id) => { if (!seen!.has(id)) seen!.set(id, seen!.size + 1); return `paper#${seen!.get(id)}`; });
   };
+  // A participant's stream is named for who draws (and in what capacity), what it is for, and which time that is: never
+  // the hour it woke at (docs/reliability.md, "Draws and the moment"). A seat acts at other hours than its code twin,
+  // and every person its acts touch wakes at other hours too; a stream keyed on the hour then falls differently for
+  // all of them, and a pilot parts from its twin by noise no steward caused.
+  //  - A draw that names its matter (a paper, a lease: "the nth such paper", a count after #; an event's own time) is
+  //    that matter's: the nth time this participant has drawn for it.
+  //  - Any other draw (a shop, a job, whether to complain) is for the calendar day, and the nth time that day.
+  // The nth is counted by moments (the second, as the world's clock has it): drawing again in the same moment (a second
+  // look of the same wake) is the same occurrence and draws the same; the next moment is the next occurrence, so two
+  // wakes in one hour are two draws, as they were when the moment was in the name. So a wake at 9 and one at 15 in one town,
+  // and one at 11 and one at 16 in its twin, draw alike.
+  const dayOccurrences = new Map<string, { at: number; n: number }>();
+  const matterOccurrences = new Map<string, { at: number; n: number }>();
+  let occurrencesDay = -1;
+  const drawFor = (pid: string, cap: string, purpose: string) => {
+    const day = Math.floor(t / DAY);
+    if (day !== occurrencesDay) { dayOccurrences.clear(); occurrencesDay = day; }
+    const matter = /#[0-9]|[0-9]{5}/.test(purpose);
+    const seen = matter ? matterOccurrences : dayOccurrences;
+    const what = `${pid}\n${cap}\n${purpose}`;
+    let occ = seen.get(what);
+    if (!occ) seen.set(what, (occ = { at: t, n: 1 }));
+    else if (occ.at !== t) { occ.at = t; occ.n++; }
+    const key = matter ? ["participant", pid, cap, "", purpose, String(occ.n)] : ["participant", pid, cap, String(day), purpose, String(occ.n)];
+    o.drawTrace?.(key);
+    return randomness.stream(key);
+  };
   const ctxFor = (pid: string, cap: string, entity: string, params: any): ParticipantContext => ({
     participant: pid,
     entity,
     ...(cap === "self" ? {} : { position: cap }),
-    rng: (purpose) => randomness.stream(["participant", pid, cap, String(Math.floor(t / tick) * tick), stablePurpose(`${pid}/${cap}`, purpose)]),
+    rng: (purpose) => drawFor(pid, cap, stablePurpose(`${pid}/${cap}`, purpose)),
     chance: (purpose) => randomness.stream(["chance", purpose]),
     world: { tickSeconds: tick, runEnd, currency, ...(cfg.dials ? { dials: cfg.dials } : {}) },
     ...(consult ? { consult } : {}),

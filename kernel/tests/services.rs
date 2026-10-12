@@ -218,8 +218,9 @@ fn goods_are_taken_and_investigation_finds_the_taker_with_its_chance() {
     assert_eq!(act(&mut run, "carol-self", None, json!([{"block": "work", "task": "mend", "units": 1, "at": "s-shop", "performers": ["carol"], "investigate": {"from": "alice", "at": "s-house", "kind": "goods"}}])), Err(RefusalCode::BadInvestigation));
 }
 
-/// Two investigations in one action are two tries, each with its own draw: keyed by the block as well as the action,
-/// as harm is. (Until 2026-10-05 they shared the action's one draw: both found the taker, or neither.)
+/// Two investigations in one action are two tries, each with its own draw: keyed by the block as well as who asked, what
+/// about and the day. (Until 2026-10-05 they shared the action's one draw: both found the taker, or neither. Until
+/// 2026-10-12 the key was the action's number, which moves with every act anyone makes.)
 #[test]
 fn two_investigations_in_one_action_draw_independently() {
     let mut w = services_world();
@@ -238,7 +239,8 @@ fn two_investigations_in_one_action_draw_independently() {
         let outcome = o["outcomes"].as_array().unwrap().last().unwrap().clone();
         let action = outcome["action"].as_str().unwrap();
         // Each block's own draw: the taker is found with the task's chance, 5,000 in 10,000.
-        let finds = |index: &str| run.kernel().statics().randomness.stream(&["investigate", action, index]).below(10_000) < 5_000;
+        let day = (run.kernel().state().t / DAY).to_string();
+        let finds = |index: &str| run.kernel().statics().randomness.stream(&["investigate", "carol-self", "alice", "s-house", "goods", &day, index]).below(10_000) < 5_000;
         let (first, second) = (finds("0"), finds("1"));
         // The outcome carries the action's last investigation: the second block's.
         assert_eq!(outcome["investigated"]["taker"], if second { json!("bob") } else { json!(null) }, "day {day}, {action}");

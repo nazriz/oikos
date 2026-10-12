@@ -256,7 +256,8 @@ fn a_flooded_building_brought_down_is_no_longer_among_the_flooded() {
 }
 
 /// Two surveys of the same thing in one action are two looks, each with its own draws: keyed by the block as well as
-/// the action. (Until 2026-10-05 they shared the action's draws, so the second found exactly what the first did.)
+/// who looked and the day. (Until 2026-10-05 they shared the action's draws, so the second found exactly what the first
+/// did. Until 2026-10-12 the key was the action's number, which moves with every act anyone makes.)
 #[test]
 fn two_surveys_in_one_action_draw_independently() {
     let mut run = start(&nature_world());
@@ -270,7 +271,8 @@ fn two_surveys_in_one_action_draw_independently() {
     let outcome = o.outcomes.iter().find(|x| x.surveyed.is_some()).unwrap();
     // What each block's own draws find (a frog is found with the species' chance, 5,000 in 10,000; cell by cell).
     let by_block = |index: &str| -> Vec<i64> {
-        let mut rng = run.kernel().statics().randomness.stream(&["survey", &outcome.action, index, "frog"]);
+        let day = (run.kernel().state().t / DAY).to_string();
+        let mut rng = run.kernel().statics().randomness.stream(&["survey", "developer-system", "frog", &day, index]);
         counts.iter().map(|n| (0..*n).filter(|_| rng.below(10_000) < 5_000).count() as i64).collect()
     };
     let (first, second) = (by_block("0"), by_block("1"));

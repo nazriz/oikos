@@ -1,6 +1,6 @@
 {
   "name": "union.organiser",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "doc": "docs/behaviour/unions.md",
   "params": {
     "accept_share_bps": {
