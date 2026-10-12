@@ -23,13 +23,13 @@
 // call goes to the mock adapter.
 
 import { AsyncLocalStorage } from "node:async_hooks";
-import { appendFileSync, mkdirSync, rmSync } from "node:fs";
+import { appendFileSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { debriefsBeside } from "./logs";
 import { join } from "node:path";
 import { besideOf, largest, leftAlone, renderSummary, SUMMARY_MAX } from "./debrief-summary";
 import { readForEnd } from "./run-end";
 import { calls, canonical, DECISIONS, OUTCOMES, RECORD, WORDS, type Words, inCurrency, paramErrors, modules as builtin, Randomness, Roster, slice, Tally, View, type BehaviourModule, type Controller, type Currency, type DecisionRecord, type OutcomeRecord, type RecordChange, formatMoney, type LookRequest, type Observation, type ParticipantAction, type ParticipantContext } from "@oikos/participants";
-import { ACCOUNT_TOKENS, ACCOUNT_VERSION, ACCOUNTS_DEFAULT, ACCOUNTS_MOST, darkAccount, DEBRIEF_ANSWER_TOKENS, DEBRIEF_VERSION, endReserveMicroUsd, mockAccount, sampleAccounts, stepsOf, writeAccount, type AccountBrief, type AccountCounts, type DebriefInput, type DebriefWording, COMPOSE_VERSION, createCompose, mockCompose, type ComposerConfig, CONSULT_VERSION, createConsult, createLlmParticipant, LLM_PARTICIPANT_VERSION, MOCK_VERSION, MockAdapter, mockPolicies, PRICES, ModelCallFailed, ModelUnreachable, SpendingLimitReached, type Budget, type LlmAdapter, type LlmController, type LlmIO, type MockBrain, type Price } from "@oikos/participants/llm";
+import { ACCOUNT_TOKENS, ACCOUNT_VERSION, ACCOUNTS_DEFAULT, ACCOUNTS_MOST, darkAccount, DEBRIEF_ANSWER_TOKENS, DEBRIEF_VERSION, endNeedMicroUsd, keptBackFor, reckonedEndMicroUsd, type EndCosts, mockAccount, sampleAccounts, stepsOf, writeAccount, type AccountBrief, type AccountCounts, type DebriefInput, type DebriefWording, COMPOSE_VERSION, createCompose, mockCompose, type ComposerConfig, CONSULT_VERSION, createConsult, createLlmParticipant, LLM_PARTICIPANT_VERSION, MOCK_VERSION, MockAdapter, mockPolicies, PRICES, ModelCallFailed, ModelUnreachable, SpendingLimitReached, type Budget, type LlmAdapter, type LlmController, type LlmIO, type MockBrain, type Price } from "@oikos/participants/llm";
 import { createArrangement, createTranslator, draftText, Knowledge, RESOLVER, resolve, TRANSLATOR_VERSION, type Draft, type Resolution, type Route, NOT_CHECKED } from "@oikos/translator";
 import { Kernel } from "./kernel";
 import { divergences } from "./truth";
@@ -171,6 +171,9 @@ export interface RunSummary {
     requests?: { [op: string]: { n: number; encode: number; engine: number; decode: number } } };
   /** What the run spent on models, where it had a spending limit (micro-USD; the log's usage annotations say the same). */
   spentMicroUsd?: number;
+  /** What the run's end (debriefs, exit accounts) spent beyond the limit, by whom the calls were for: the platform's
+   * overrun, not the run reaching its limit and not any seat's own spending. Absent: none. */
+  platformOverrun?: { microusd: number; by_subject: { [subject: string]: number } };
   /** Failures to decide that were recovered in place (a module that threw, a model call that failed; D59). */
   participantErrors: number;
   /** Resolver shadow checks (OIKOS_RESOLVER=shadow): calls resolved both ways, and how many the engine's resolved
@@ -252,6 +255,8 @@ const DAY = 86_400;
 // (The standing instructions are shown once, in the first call: spread over the calls they are little of each.)
 const DEBRIEF_PROMPT_CHARS = 2_000 + 4_000 + SUMMARY_MAX + 8_000 + 6_000;
 const ACCOUNT_PROMPT_CHARS = 8_000;
+/** What debriefs and exit accounts have cost, measured, as data (orchestrator/debrief-costs.json). */
+const endCosts = (): EndCosts => JSON.parse(readFileSync(join(import.meta.dir, "../debrief-costs.json"), "utf8"));
 
 export async function runWorld(o: RunOptions): Promise<RunSummary> {
   const k = o.kernel ?? new Kernel();
@@ -606,12 +611,23 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   // limit can still debrief. Sized from who is to be asked (call.ts, `endReserveMicroUsd`), and said at the start.
   if (o.budget) {
     const seats = Object.keys(bindings).length;
-    const mixPrices = o.composerAdapters ? (composerCfg?.mix ?? []).map((m) => io.prices![m.model]).filter((x): x is NonNullable<typeof x> => !!x) : [];
-    const accountPrice = mixPrices.sort((a, b) => b.input + b.output - (a.input + a.output))[0];
+    const seatModel = `${io.adapter.provider}/${io.adapter.model}`;
+    const mixModels = o.composerAdapters ? (composerCfg?.mix ?? []).map((m) => m.model).filter((m) => io.prices![m]) : [];
+    const accountModel = mixModels.sort((a, b) => io.prices![b]!.input + io.prices![b]!.output - io.prices![a]!.input - io.prices![a]!.output)[0];
+    const accountPrice = accountModel ? io.prices![accountModel] : undefined;
     const calls = stepsOf("full", 3, true).length + 2;
-    o.budget.keptBackMicroUsd = endReserveMicroUsd(o.budget.limitMicroUsd, { seats, seatPrice: io.prices![`${io.adapter.provider}/${io.adapter.model}`], calls, promptChars: DEBRIEF_PROMPT_CHARS, answerTokens: Math.round(DEBRIEF_ANSWER_TOKENS / 2),
-      accounts: accountPrice ? accountsN : 0, accountPrice, accountChars: ACCOUNT_PROMPT_CHARS, accountTokens: ACCOUNT_TOKENS });
-    await k.request({ op: "annotate", annotation: { annotation: "note", subject: "orchestrator", data: { kept_back_for_the_end: { microusd: o.budget.keptBackMicroUsd, of_limit_microusd: o.budget.limitMicroUsd, seats_to_debrief: seats, calls_a_debrief: calls, accounts: accountPrice ? accountsN : 0 } } } });
+    const n = accountPrice ? accountsN : 0;
+    const costs = endCosts();
+    const need = endNeedMicroUsd(costs, { seats, seatModel, seatReckoned: reckonedEndMicroUsd({ seats: 1, seatPrice: io.prices![seatModel], calls, promptChars: DEBRIEF_PROMPT_CHARS, answerTokens: Math.round(DEBRIEF_ANSWER_TOKENS / 2) }),
+      accounts: n, accountModel, accountReckoned: reckonedEndMicroUsd({ seats: 0, calls: 0, promptChars: 0, answerTokens: 0, accounts: 1, accountPrice, accountChars: ACCOUNT_PROMPT_CHARS, accountTokens: ACCOUNT_TOKENS }) });
+    const kept = keptBackFor(o.budget.limitMicroUsd, need.microusd);
+    o.budget.keptBackMicroUsd = kept.microusd;
+    // Said where whoever set the limit will see it: a limit too small to keep back what the end needs. The reserve is
+    // not shrunk in silence, and not grown past half the limit (a run must be able to start); the end then runs over
+    // the limit, and that overrun is recorded as the platform's.
+    await k.request({ op: "annotate", annotation: { annotation: "note", subject: "orchestrator", data: { kept_back_for_the_end: { microusd: kept.microusd, of_limit_microusd: o.budget.limitMicroUsd, seats_to_debrief: seats, calls_a_debrief: calls, accounts: n,
+      needed_microusd: need.microusd, a_seat_microusd: need.seat.each, a_seat_by: need.seat.basis, ...(need.account ? { an_account_microusd: need.account.each, an_account_by: need.account.basis } : {}), margin_percent: costs.margin_percent,
+      ...(kept.short_microusd ? { short_microusd: kept.short_microusd, limit_too_small: `the limit is too small to keep back what the end of this run is expected to need (${(need.microusd / 1e6).toFixed(2)} USD, of a limit of ${(o.budget.limitMicroUsd / 1e6).toFixed(2)}): half of it is kept back, and any debrief or account beyond it is run over the limit, as the platform's overrun` } : {}) } } } });
   }
   // The composer, if the world has one: said at the start, with its mix and whether models or the mock play it.
   if (composerCfg) await k.request({ op: "annotate", annotation: { annotation: "note", subject: "orchestrator", data: { composer: { version: COMPOSE_VERSION, ...composerCfg, played_by: o.composerAdapters ? "models" : "mock" } } } });
@@ -1357,6 +1373,10 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       await k.request({ op: "annotate", annotation: { annotation: "note", subject: "orchestrator", data: { account_pieces: { ...accountCounts, sampled: sample.length, wanted: accountsN, version: ACCOUNT_VERSION } } } });
     }
   }
+  // What the end spent beyond the limit, where what was kept back was not enough: the platform's overrun of the limit,
+  // never the run having hit it (that is `stopped`), and never any seat's own spending.
+  const overrun = o.budget?.platformOverrun;
+  if (overrun?.microusd) await k.request({ op: "annotate", annotation: { annotation: "note", subject: "orchestrator", data: { platform_overrun_of_limit: { microusd: overrun.microusd, of_limit_microusd: o.budget!.limitMicroUsd, spent_microusd: o.budget!.spentMicroUsd, by_subject: overrun.by_subject, why: "the debriefs and exit accounts at the run's end cost more than was kept back for them, and are never cut off by the limit; this is the platform's overrun of the limit, not the pilot reaching it" } } } });
   // A resumed run says so at the end (not the start, so that up to where the old run stopped, the two logs are the same).
   if (o.resumedFrom) await k.request({ op: "annotate", annotation: { annotation: "note", subject: "orchestrator", data: { resumed_from: { log: o.resumedFrom.log, model_calls_served: o.resumedFrom.serving.served, ...(o.resumedFrom.serving.diverged ? { serving_stopped_at: o.resumedFrom.serving.diverged } : {}) } } } });
   const completed = !stopped && until === runEnd;
@@ -1369,7 +1389,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     health: { backlog: { ...backlog }, repeats: { ...repeats }, refused: { ...refusedBy } },
     profile: { modules: Object.fromEntries(Object.entries(profModules).map(([k, v]) => [k, { ms: Math.round(v.ms), steps: v.steps }])), kernel: Object.fromEntries(Object.entries(profKernel).map(([k, v]) => [k, { ms: Math.round(v.ms), n: v.n }])),
       requests: Object.fromEntries(Object.entries(k.profile).map(([op, v]) => [op, { n: v.n, encode: Math.round(v.encode), engine: Math.round(v.engine), decode: Math.round(v.decode) }])) },
-    ...(o.budget ? { spentMicroUsd: o.budget.spentMicroUsd } : {}) };
+    ...(o.budget ? { spentMicroUsd: o.budget.spentMicroUsd } : {}), ...(overrun?.microusd ? { platformOverrun: { microusd: overrun.microusd, by_subject: { ...overrun.by_subject } } } : {}) };
 }
 
 /** The units a run has, by key, and by participant. (When each wakes is the engine's: kernel/src/schedule.rs.) */

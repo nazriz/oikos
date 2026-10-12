@@ -214,6 +214,22 @@ function noteMeasureFailed(out: string, why: string): void {
 }
 
 /**
+ * The cost report with the platform's overrun of the limit in it, where the end of a run (its debriefs and exit accounts,
+ * never cut off by the limit) spent beyond it: how much, and for which seats. A line in cost.txt and a field of cost.json.
+ * It is not the run reaching its limit (that is its `stopped`) and not any seat's own spending.
+ */
+export function withPlatformOverrun<T extends { text: string }>(cost: T, runs: { runId: string; platformOverrun?: { microusd: number; by_subject: { [subject: string]: number } } }[]): { text: string; json: Omit<T, "text"> & { text: undefined; platform_overrun_of_limit?: { microusd: number; by_subject: { [subject: string]: number }; runs: { [runId: string]: number } } } } {
+  const over = runs.filter((r) => r.platformOverrun?.microusd);
+  const { text } = cost;
+  if (!over.length) return { text, json: { ...cost, text: undefined } };
+  const by: { [subject: string]: number } = {};
+  for (const r of over) for (const [k, v] of Object.entries(r.platformOverrun!.by_subject)) by[k] = (by[k] ?? 0) + v;
+  const microusd = over.reduce((a, r) => a + r.platformOverrun!.microusd, 0);
+  const line = `Platform overrun of the spending limit: ${(microusd / 1e6).toFixed(3)} USD, spent by the run's end (debriefs, exit accounts) beyond the limit, for ${Object.entries(by).map(([k, v]) => `${k} ${(v / 1e6).toFixed(3)}`).join(", ")}. The platform's, not the pilot reaching its limit and not any seat's own spending.`;
+  return { text: `${text}\n\n${line}`, json: { ...cost, text: undefined, platform_overrun_of_limit: { microusd, by_subject: by, runs: Object.fromEntries(over.map((r) => [r.runId, r.platformOverrun!.microusd])) } } };
+}
+
+/**
  * What a batch does once its runs are over, done again for a folder whose run was resumed: the folder's measures and
  * its cost report (cost.txt, cost.json) are made anew from its runs' current logs, so that they are the whole run's and
  * not what it had cost at its first stop; and a run that got to its end has its log compressed, as a finished run's is.
@@ -232,9 +248,10 @@ export async function afterResume(rec: RunRecord, o: { translatorModel?: string;
       rmSync(measureDir, { recursive: true, force: true });
       await exportLogs(logs, measureDir);
       const cost = await costReport(measureDir, { translatorModel: o.translatorModel });
-      writeFileSync(join(out, "cost.txt"), `${cost.text}\n`);
-      writeFileSync(join(out, "cost.json"), JSON.stringify({ ...cost, text: undefined }, null, 2));
-      costText = cost.text;
+      const shown = withPlatformOverrun(cost, [rec]);
+      writeFileSync(join(out, "cost.txt"), `${shown.text}\n`);
+      writeFileSync(join(out, "cost.json"), JSON.stringify(shown.json, null, 2));
+      costText = shown.text;
       rmSync(join(out, MEASURE_FAILED_FILE), { force: true });
     } catch (e) {
       problems.push(`measuring the resumed run: ${(e as Error).message}`);
@@ -516,10 +533,11 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
     rmSync(measureDir, { recursive: true, force: true });
     await exportLogs(runs.map((r) => r.logPath), measureDir);
     const cost = await costReport(measureDir, { translatorModel: o.translatorModel });
-    writeFileSync(join(out, "cost.txt"), `${cost.text}\n`);
-    writeFileSync(join(out, "cost.json"), JSON.stringify({ ...cost, text: undefined }, null, 2));
+    const shown = withPlatformOverrun(cost, runs);
+    writeFileSync(join(out, "cost.txt"), `${shown.text}\n`);
+    writeFileSync(join(out, "cost.json"), JSON.stringify(shown.json, null, 2));
     result.measureDir = measureDir;
-    result.costText = cost.text;
+    result.costText = shown.text;
     rmSync(join(out, MEASURE_FAILED_FILE), { force: true });
   });
   // Only the measures kept, if asked and the runs can be regenerated; else compressed once measured, if asked (about a
