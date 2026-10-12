@@ -42,6 +42,10 @@ Cash with order is still how a seller trades unless its world gives it terms (be
 
 **Not here.** Early-payment discounts ("2/10 net 30"); interest on late invoices; a limit set by the seller; a supplier that sells only against letters of credit; a buyer's invoices to a seat that is not code; the invoices of the builder and landlords (materials remain cash with order).
 
+## Payments that say what they are for (2026-10-12)
+
+The world's order book (and a shop's and a factory's) treated every payment into the account that no invoice named as a payment for an order, and sent it back, as a mistaken payment, when the payer had ordered before and had no order waiting. The outside world's account is a market, a shareholder and the collector of the tax employers withhold; a dividend to it and the tax a factory withheld, each with a memo saying what it was, came back like a payment made in error. In a year of the 1,000-person Victorian town: about 200 such refunds a run, 11.4M of the currency's units, 6.1M of it tax withheld and the rest dividends. **Now** a payment whose memo says it is a dividend or a tax (`Dividend`, `Income tax`, `Tax`) is left alone: the money stays where it was sent. One that says something else or nothing is judged as before: a payment for goods nobody ordered is still returned. After: about 3 refunds a run, 0.4M (the factories' and the shops' own refunds to a buyer whose order they could not meet). A real receivables clerk matches a payment to an invoice by its reference and queries what it cannot match; money from a company to its shareholder is not unallocated cash. Not here: any other role for the world's account (a fee, a levy) named by its memo; the list is the two found.
+
 ## Parameters
 
 - `OrderBook(me, unpaid_days = 7)`: how long an order waits for its payment.

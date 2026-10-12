@@ -251,3 +251,14 @@ test("a firm closing or winding up pays every invoice it owes, due or not, oldes
   expect(p.owing).toBe(100_000);
   expect(JSON.stringify(r.steps)).toContain("Invoice o1");
 });
+
+test("a payment that says it is a dividend, or tax withheld, is not an order's payment and is not sent back; one that says nothing, 'Order' or something else still is", () => {
+  const book = bookOf(order("o1", 0, "factory-9", "outside", {}));
+  const mk = () => { const o = new OrderBook("outside"); o.due(book, 8 * DAY); return o; }; // (factory-9 has ordered: a customer)
+  const paid = (memo: string) => { const o = mk(); o.take(obsOf(9 * DAY, "outside", { account: "acc-outside", transactions: [tx(9 * DAY, "acc-factory-9", "acc-outside", 500_000, memo)] }), "acc-outside"); return o.unclaimed(bookOf()); };
+  expect(paid("Dividend")).toEqual([]);
+  expect(paid("Income tax withheld from wages")).toEqual([]);
+  expect(paid("Order: 5 goods.")).toEqual([["acc-factory-9", 500_000]]);
+  expect(paid("")).toEqual([["acc-factory-9", 500_000]]);
+  expect(paid("700 energy")).toEqual([["acc-factory-9", 500_000]]); // (a payment for goods nobody ordered is still a mistake)
+});

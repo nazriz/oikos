@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { earliestApplicationDay, formatDry, judgeDry, type DryFacts, type SeatFacts } from "../src/dry-check";
+import { earliestApplicationDay, formatDry, foundedBody, judgeDry, type DryFacts, type SeatFacts } from "../src/dry-check";
 
 const seat = (o: Partial<SeatFacts>): SeatFacts => ({ seat: "s-system", position: "s", module: "city.finance_officer", forms: 1, listed: 0, ...o });
 const facts = (o: Partial<DryFacts>): DryFacts => ({ daysRun: 60, fullRun: false, seats: [], founding: false, composer: false, founded: { count: 0 }, composed: { count: 0 }, ...o });
@@ -63,4 +63,12 @@ test("the report says each outcome and counts them; it never reports a pass on w
   const lines = formatDry(judgeDry(facts({ daysRun: 30, law: { arrears_days: 30, notice_days: 30 }, seats: [seat({ booksDay: 1 }), seat({ seat: "t-system", position: "t", module: "tribunal.member" })] })));
   expect(lines.join("\n")).toContain("could not yet be seen in 30 days");
   expect(lines.at(-1)).toBe("  dry-run conditions: 3 shown, 0 not shown, 2 could not yet be seen");
+});
+
+test("only a group founded by a want counts as a body founded: a business of one begun, or a shop opened, asks no composer", () => {
+  const made = (kind: string) => ({ event: "entity_created", entity: "ent.5", kind, name: "x" });
+  expect(foundedBody(made("group"))).toBe(true);
+  expect(foundedBody(made("own_account"))).toBe(false);
+  expect(foundedBody(made("shop"))).toBe(false);
+  expect(foundedBody({ event: "recorded", entity: "ent.5", kind: "group" })).toBe(false);
 });

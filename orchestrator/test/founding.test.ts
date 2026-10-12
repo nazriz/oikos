@@ -72,7 +72,10 @@ const LIVING = "living.initiative_bps=10000";
 // And again on 2026-10-12, with trade credit, inputs bought to what can be sold, no dividend while wages are owed, and a second loan
 // (0082e01e... until then; docs/decisions.md, "Firms respond to a shock"): in a 60-day run the factories buy their inputs on the world
 // market's terms and the shops their stock on the factories', paying after the goods are in, so the accounts and orders move from the first week.
-const STEP_2B = "fb6725b2fb06787fd167d6c329027a44f2a0ce159f9056c2e03d9d886704953d";
+// And again on 2026-10-12, with the leftovers of the firm-side work (fb6725b2... until then; docs/decisions.md, "The leftovers of
+// the firm-side work"): a shop's month and first review are on a day of its own and begin from the trade it was staffed for, and the
+// outside world's order book no longer returns a dividend or tax withheld paid into its account.
+const STEP_2B = "19c27253020330872004aacda7ac97693b5e6f33bad9eca2ad683413b1730d8a";
 
 test("with founding off a living town is step 2b's town, to the state hash; turned on with no shape to found, nobody does anything they did not do before", async () => {
   const out = mkdtempSync(join(tmpdir(), "oikos-founding-"));
