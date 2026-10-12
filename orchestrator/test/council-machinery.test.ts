@@ -61,7 +61,9 @@ test("a mock council: a motion, a ballot, five votes counted, the result declare
     { day: 0, asks: () => [{ what: "The drafters write passed amendments into the law.", program: "work(at=council-clerk, task=enact)" }] },
     { day: 1, asks: (seen) => { const m = motion(seen); return m ? [{ what: `Put ${m.id} to a ballot of the council, open for 8 days.`, program: `form(form=council_ballot, open_for="8 days", proposal=${m.id}, tags=["tenant_protection"], to=council-clerk)` }] : undefined; } },
     // The count, read from what the clerk is shown at this sitting, and declared as read.
-    { day: 11, asks: (seen) => {
+    // (Day 10 since 2026-10-12: the ballot closed on day 9 and the clerk's day list of ballots closed with no result declared brings
+    // the clerk to its desk the day after it is filed, where it had been called by nothing but the votes and came on day 11.)
+    { day: 10, asks: (seen) => {
       const b = ballotOn(seen);
       const shown = seats.shown.filter((x) => x.seat === "council-clerk").at(-1)!.text;
       const line = shown.split("\n").find((l) => l.startsWith(`- ${b.id} `) && l.includes("have voted"));

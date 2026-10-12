@@ -110,6 +110,11 @@ function signed(id: string): string {
   return `${w?.name && w.name !== me ? `${w.name} (${me})` : me}${w?.of ? `, ${org?.name && org.name !== w.of ? `${org.name} (${w.of})` : w.of}` : ""}`;
 }
 let inFull = false;
+/** The books papers (an office's clerk's) set out in full among a list: the newest of each office's, whose words are the
+ * day's list of cases to decide. Earlier ones are a line each, as they were. */
+let booksWhole = new Set<string>();
+/** The most of an office's books paper (its words) that is set out: a day's list of cases is not cut at a line or two. */
+const BOOKS_WORDS_MAX = 60_000;
 let cuts = 0;
 const clip = (s: string, max = 400) => (inFull || s.length <= max ? s : (cuts++, s.slice(0, max) + "…"));
 const words = (label: string) => label.replace(/_/g, " ");
@@ -242,7 +247,7 @@ function describe(r: Record, readings?: { [id: string]: Reading }): string {
       const d = [closed ? `closed: no more votes are taken${typeof r.data.result === "string" ? `; its result is ${r.data.result}` : ""}` : "", dataWords({ kind: r.kind, data: shownData }),
         named ? `voted for: ${voters(r.data.voted_for)}; voted against: ${voters(r.data.voted_against)}` : ""].filter(Boolean).join("; ");
       const rule = ruleWords(r);
-      return `[${r.id}] ${words(r.kind)} from ${who}${r.place ? `, put up on ${r.place}` : ""}${r.addressed_to ? `, to ${r.addressed_to.join(", ")}` : ""}${from}: "${clip(r.text, 1000)}"${d ? ` (${d})` : ""}${r.basis ? `, citing ${citedWords(r)}` : ""}${rule ? `. ${rule}` : ""}`;
+      return `[${r.id}] ${words(r.kind)} from ${who}${r.place ? `, put up on ${r.place}` : ""}${r.addressed_to ? `, to ${r.addressed_to.join(", ")}` : ""}${from}: "${clip(r.text, booksWhole.has(r.id) ? BOOKS_WORDS_MAX : 1000)}"${d ? ` (${d})` : ""}${r.basis ? `, citing ${citedWords(r)}` : ""}${rule ? `. ${rule}` : ""}`;
     }
     case "claim":
       return `[${r.id}] ${r.holder} ${POSITION[r.position] ?? r.position}${r.counterparty ? ` against ${r.counterparty}` : ""}: ${details(r.about) || "(no details)"}${r.basis ? `, citing ${citedWords(r)}` : ""}${from}`;
@@ -274,6 +279,14 @@ function describe(r: Record, readings?: { [id: string]: Reading }): string {
  * be told them; everything else is listed one by one, in order.
  */
 function recordLines(records: Record[], readings?: { [id: string]: Reading }, oneByOne = false): string[] {
+  // (An office's books: the newest paper of each clerk is set out whole, since it is the day's list; the earlier ones
+  // in the same list say what changed then, in a line each, as before.)
+  const newest = new Map<string, string>();
+  for (const r of records) if (r.record === "statement" && r.kind === "office_books") newest.set(String(r.speaks_for ?? r.author), r.id);
+  booksWhole = oneByOne ? new Set(records.filter((r) => r.record === "statement" && r.kind === "office_books").map((r) => r.id)) : new Set(newest.values());
+  try { return recordLinesOf(records, readings, oneByOne); } finally { booksWhole = new Set(); }
+}
+function recordLinesOf(records: Record[], readings?: { [id: string]: Reading }, oneByOne = false): string[] {
   const describeRecord = (r: Record) => describe(r, readings);
   // What was looked up is listed one by one: it was asked for.
   if (oneByOne) return records.map(describeRecord);
@@ -529,8 +542,11 @@ function paperInFull(r: Record, asked: Looked, readings?: { [id: string]: Readin
   const lists: [string, unknown[]][] = r.record === "statement" && r.data !== null && typeof r.data === "object" ? Object.entries(r.data as object).filter((e): e is [string, unknown[]] => Array.isArray(e[1]) && e[1].length > 1) : [];
   if (all.length <= PAPER_MAX && !(narrowed && lists.length)) return [`- ${all}`];
   if (r.record !== "statement" || !lists.length) return [`- ${all.slice(0, PAPER_MAX)}…`, `(Cut short at ${num(PAPER_MAX)} of its ${num(all.length)} characters.)`];
-  const out = [`- [${r.id}] ${paperKind(r)} from ${r.speaks_for ?? writer(r.author)}${r.author === "genesis" ? "" : ` (${when(r.at)})`}: "${r.text.length > 2000 ? `${r.text.slice(0, 2000)}…` : r.text}"`];
-  let room = PAPER_MAX - out[0]!.length;
+  // (An office's books paper: its words are the day's list of cases, set out whole; the list below takes its own room.)
+  const books = r.record === "statement" && r.kind === "office_books";
+  const wordsMax = books ? BOOKS_WORDS_MAX : 2000;
+  const out = [`- [${r.id}] ${paperKind(r)} from ${r.speaks_for ?? writer(r.author)}${r.author === "genesis" ? "" : ` (${when(r.at)})`}: "${r.text.length > wordsMax ? `${r.text.slice(0, wordsMax)}…` : r.text}"`];
+  let room = books ? PAPER_MAX : PAPER_MAX - out[0]!.length;
   for (const [k, v] of Object.entries(r.data as object)) {
     if (lists.some(([name]) => name === k)) continue;
     const said = `  ${cap(k)}: ${v !== null && typeof v === "object" ? details(v, 1500) : String(v)}`;
@@ -544,7 +560,9 @@ function paperInFull(r: Record, asked: Looked, readings?: { [id: string]: Readin
     out.push(`  ${cap(k)}: ${num(entries.length)} entries${asked.words !== undefined ? `, ${num(picked.length)} of them with "${asked.words}"` : ""}.`);
     let last = 0, shown = 0;
     for (const [n, e] of rest) {
-      const line = `  ${n}. ${entryWords(e)}`;
+      // (An entry of the books whose line the paper's words have set out whole is not set out twice.)
+      const said = books && e !== null && typeof e === "object" && typeof (e as any).says === "string" && (e as any).says.length > 40 && r.text.includes((e as any).says);
+      const line = said ? `  ${n}. ${(e as any).about}: set out above, in the day's list` : `  ${n}. ${entryWords(e)}`;
       if (line.length + 1 > room && shown > 0) break;
       out.push(line);
       room -= line.length + 1;

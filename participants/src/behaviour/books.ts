@@ -25,8 +25,10 @@ export const BOOKS = "office_books";
 /** How old the clerk's last paper may be before a running figure that has moved is filed for its own sake (days). */
 export const RUNNING_EVERY_DAYS = 7;
 const NAMED = 4;
-/** The most entries of a heading whose day has come that a paper's words name each time (the rest are in its list). */
-const ALWAYS_NAMED = 12;
+/** The most entries of a heading whose day has come that a paper's words set out in full each time (the rest are in its list).
+ * It was twelve until 2026-10-12, when the tribunal member's day had more than that and a seat opened the list a part
+ * at a time for the rest; now it is the most a day's list can be, and is meant never to bind. */
+const ALWAYS_NAMED = 60;
 const LISTED = 200;
 
 /** Whose staff a post is: the office itself, by the post's own id (`works-staff` is the staff of `works`). */
@@ -45,6 +47,11 @@ export function booksPaper(office: string, t: number, open: OpenHeading[], befor
   // (Something that has moved from one heading to another still stands open: it is new under its heading, and is
   // not said to be "no longer open" under the one it left.)
   const standing = new Set(open.flatMap((h) => h.items.map((x) => x.id)));
+  // (The day's list: everything under the headings of what waits on the office-holder with its day come, and how much of
+  // it is on a paper's list for the first time. A case that stays on it, undecided, is not new: it is said in every
+  // paper, and it is the paper that brings it a seat that has not yet decided it only when something new is on it.)
+  const listed = open.filter((h) => h.always).reduce((n, h) => n + h.items.length, 0);
+  const onList = open.filter((h) => h.always).reduce((n, h) => n + h.items.filter((x) => !before?.get(h.what)?.has(x.id)).length, 0);
   for (const what of whats) {
     const items = open.find((h) => h.what === what)?.items ?? [];
     if (always.has(what)) {
@@ -70,13 +77,15 @@ export function booksPaper(office: string, t: number, open: OpenHeading[], befor
     ].filter(Boolean).join("; ");
     parts.push(`${what}: ${items.length ? `${items.length} in all` : "none now"}${said ? `${before === undefined ? ":" : ";"} ${said}` : ""}.`);
   }
-  const text = `The books of the office, ${dateWords(t)}, as its clerk keeps them from the office's own papers and accounts. ${parts.length ? parts.join(" ") : "Nothing stands open."}${before !== undefined ? " (What is said here is what has changed since the clerk's last paper; the list in this paper is everything that stands open.)" : ""}`;
+  const wide = open.some((h) => h.always && h.items.length > ALWAYS_NAMED);
+  const day = listed ? ` The day's list: ${listed} ${listed === 1 ? "matter waits" : "matters wait"} on the office-holder with ${listed === 1 ? "its day" : "their day"} come, ${wide ? `${ALWAYS_NAMED} to a heading set out above in full and the rest in this paper's list` : "each set out above in full"}${onList ? `; ${onList} ${onList === 1 ? "is" : "are"} on the list for the first time` : "; none is new on the list"}. The clerk files the list once a working day. A matter that comes onto it for the first time brings the office-holder to the desk the next working day, so no day need be set for coming back to a matter's day.` : "";
+  const text = `The books of the office, ${dateWords(t)}, as its clerk keeps them from the office's own papers and accounts. ${parts.length ? parts.join(" ") : "Nothing stands open."}${day}${before !== undefined ? " (What is said here is what has changed since the clerk's last paper; the list in this paper is everything that stands open.)" : ""}`;
   // (One list, each thing that stands open an entry: a long one is read a part at a time, as any long paper is.)
   // (Those whose day has come lead the list too. A heading longer than the list holds says how many it leaves out:
   // nothing drops off a list without the list saying so.)
   const ordered = [...open.filter((h) => h.always), ...open.filter((h) => !h.always)];
   const over = ordered.filter((h) => h.items.length > LISTED).map((h) => ({ what: h.what, not_listed: h.items.length - LISTED }));
-  const data = { office, at: t, open: ordered.flatMap((h) => h.items.slice(0, LISTED).map((x) => ({ what: h.what, about: x.id, says: x.line, ...(x.since !== undefined ? { since: x.since } : {}), ...(x.amount !== undefined ? { amount: x.amount } : {}), ...(x.due !== undefined ? { due: x.due } : {}) }))), ...(over.length ? { over } : {}) };
+  const data = { office, at: t, ...(listed ? { list: { ripe: listed, new: onList } } : {}), open: ordered.flatMap((h) => h.items.slice(0, LISTED).map((x) => ({ what: h.what, about: x.id, says: x.line, ...(x.since !== undefined ? { since: x.since } : {}), ...(x.amount !== undefined ? { amount: x.amount } : {}), ...(x.due !== undefined ? { due: x.due } : {}) }))), ...(over.length ? { over } : {}) };
   return { text, data, key };
 }
 
@@ -126,7 +135,7 @@ export const keepers = new Map<string, BehaviourModule>();
  */
 export const clerk: BehaviourModule = {
   name: "office.clerk",
-  version: "0.2.0", // 0.2.0: what waits on the office-holder with its day come is named first in every paper, however long it has stood; what moves heading is not said to be closed; a list too long says what it leaves out; 0.1.1: a running figure that has moved is filed once the last paper is a week old; 0.1.0: keeps the books of an office a model holds, and files what has changed
+  version: "0.3.0", // 0.3.0: the paper's words set out every case whose day has come in full (up to sixty; twelve before), and say how many are on the day's list for the first time (`data.list`: `ripe`, `new`), which is what brings a seat back; 0.2.0: what waits on the office-holder with its day come is named first in every paper, however long it has stood; what moves heading is not said to be closed; a list too long says what it leaves out; 0.1.1: a running figure that has moved is filed once the last paper is a week old; 0.1.0: keeps the books of an office a model holds, and files what has changed
   doc: "docs/behaviour/office-books.md",
   cadence: () => DAY,
   firstWake: (ctx) => 6 * 3_600 + ctx.rng("first-wake").below(3 * 3_600),

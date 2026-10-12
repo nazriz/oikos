@@ -80,6 +80,10 @@ being told each time. **(to confirm: common practice; no source opened. Candidat
 collection schedule and service standards; a hospital or clinic rostering policy; a school timetable policy; a water
 retailer's billing cycle in its customer charter.)**
 
+## A day's list is a clerk's routine (2026-10-12)
+
+An office with a daily list (a tribunal's cases whose day has come, a desk's cases put before the office-holder, a council's ballots closed with no result declared) has it from its own clerk, not from a mechanism a seat can see: the clerk files the day's list on the organisation's file once a working day (docs/behaviour/office-books.md, point 8), as the staff's report comes, and the office-holder is called to the desk for it as for any paper filed with the office. Like the staff's report it is the organisation's own paper; unlike it, the list calls the seat back (when a case is on it for the first time), because a day's list is what the office-holder is there to work through. It needs no standing order: it is the clerk's, as the books are.
+
 ## The staff's report: what was done under each order, or why not
 
 **Source:** `did`, `heldUp`, `note` and `report` on `StandingWork` (`participants/src/behaviour/common.ts`); each staff
