@@ -29,7 +29,7 @@ import { join } from "node:path";
 import { besideOf, largest, leftAlone, renderSummary, SUMMARY_MAX } from "./debrief-summary";
 import { readForEnd } from "./run-end";
 import { calls, canonical, DECISIONS, OUTCOMES, RECORD, WORDS, type Words, inCurrency, paramErrors, modules as builtin, Randomness, Roster, slice, Tally, View, type BehaviourModule, type Controller, type Currency, type DecisionRecord, type OutcomeRecord, type RecordChange, formatMoney, type LookRequest, type Observation, type ParticipantAction, type ParticipantContext } from "@oikos/participants";
-import { ACCOUNT_TOKENS, ACCOUNT_VERSION, ACCOUNTS_DEFAULT, ACCOUNTS_MOST, darkAccount, DEBRIEF_ANSWER_TOKENS, DEBRIEF_VERSION, endReserveMicroUsd, mockAccount, sampleAccounts, stepsOf, writeAccount, type AccountBrief, type AccountCounts, type DebriefInput, type DebriefWording, COMPOSE_VERSION, createCompose, mockCompose, type ComposerConfig, CONSULT_VERSION, createConsult, createLlmParticipant, LLM_PARTICIPANT_VERSION, MOCK_VERSION, MockAdapter, mockPolicies, PRICES, ModelCallFailed, ModelUnreachable, SpendingLimitReached, type Budget, type LlmAdapter, type LlmController, type LlmIO, type MockBrain, type Price } from "@oikos/participants/llm";
+import { ACCOUNT_TOKENS, ACCOUNT_VERSION, ACCOUNTS_DEFAULT, ACCOUNTS_MOST, darkAccount, DEBRIEF_ANSWER_TOKENS, DEBRIEF_VERSION, endReserveMicroUsd, mockAccount, sampleAccounts, stepsOf, writeAccount, type AccountBrief, type AccountCounts, type DebriefInput, type DebriefWording, COMPOSE_VERSION, createCompose, mockCompose, type ComposerConfig, CONSULT_VERSION, createConsult, createLlmParticipant, LLM_PARTICIPANT_VERSION, MOCK_VERSION, MockAdapter, mockPolicies, PRICES, ModelCallFailed, ModelUnreachable, SpendingLimitReached, type Budget, type LlmAdapter, type LlmController, type LlmIO, type MockBrain, type MockPolicy, type Price } from "@oikos/participants/llm";
 import { createArrangement, createTranslator, draftText, Knowledge, RESOLVER, resolve, TRANSLATOR_VERSION, type Draft, type Resolution, type Route, NOT_CHECKED } from "@oikos/translator";
 import { Kernel } from "./kernel";
 import { divergences } from "./truth";
@@ -50,6 +50,9 @@ export interface RunOptions {
   log?: (msg: string) => void;
   /** The model behind every language-model participant and the translator. Default: the mock. */
   adapter?: LlmAdapter;
+  /** With the mock (no `adapter`): a change to what the mock participant does, given the mock's own policy for a seat
+   * (a measuring script plays a reader in a seat and leaves the office's code to act: scripts/member-sittings.ts). */
+  mockParticipant?: (inner: MockPolicy) => MockPolicy;
   /** The translator's own model (default: the same as the participants'). */
   translatorAdapter?: LlmAdapter;
   /** A translator that answers first, with the translator behind it (translator/src/arrangement.ts): our own trained
@@ -327,7 +330,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   // its stop note says how many: a resume asks those again rather than serve them as failures (resume.ts).
   let roundFailures = 0;
   const io: LlmIO = {
-    adapter: watched(o.adapter ?? new MockAdapter("mock", mockPolicies(brains))),
+    adapter: watched(o.adapter ?? new MockAdapter("mock", (() => { const p = mockPolicies(brains); return o.mockParticipant ? { ...p, participant: o.mockParticipant(p.participant) } : p; })())),
     annotate: async (annotation) => {
       if ((annotation as { annotation?: unknown }).annotation === "model_call_failed") roundFailures++;
       const mine = translating.getStore();

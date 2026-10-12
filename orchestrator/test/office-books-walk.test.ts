@@ -53,10 +53,11 @@ test("what each office's code acts on was in that office's books, as its clerk k
   for (const p of config.participants) if (p.controller?.type === "llm") p.controller.params.mock = { ...p.controller.params.mock, back_days: 3 };
   const out = mkdtempSync(join(tmpdir(), "oikos-books-walk-"));
   let recs: any[] = [];
+  const withdrawals: any[] = []; // (a withdrawal is a record of its own, not a statement: `withdrawnAt` below looked among statements and could never find one, until the day a landlord withdrew a case the member had listed, 2026-10-12)
   try {
     const s = await runWorld({ config: { ...config, log: { ...config.log, detail: "lean" } }, runId: "books-walk", outDir: out, until: Number(process.env.WALK_DAYS ?? 150) * DAY, recordObservations: "none" });
     expect(s.participantErrors).toBe(0);
-    for (const l of readFileSync(s.logPath, "utf8").split("\n")) if (l.includes('"event":"recorded"')) { const r = JSON.parse(l).body.record; if (r?.record === "statement") recs.push(r); }
+    for (const l of readFileSync(s.logPath, "utf8").split("\n")) if (l.includes('"event":"recorded"')) { const r = JSON.parse(l).body.record; if (r?.record === "statement") recs.push(r); else if (r?.record === "withdrawal") withdrawals.push(r); }
   } finally { rmSync(out, { recursive: true, force: true }); }
   const seatOf = new Map<string, string>(["mayor", ...seats].map((id) => [`${id}-system`, id]));
   const books = recs.filter((r) => r.kind === "office_books");
@@ -128,7 +129,7 @@ test("what each office's code acts on was in that office's books, as its clerk k
   // (Those listed in the run, and those on the tribunal's file as the year began with the tenant's time still running.)
   const listed = [...(config.world.records as any[]).filter((r) => r.kind === "hearing_notice" && Number(r.data?.answer_by) > 0), ...recs].filter((r) => r.kind === "hearing_notice" && r.speaks_for === "tribunal" && typeof r.data?.application === "string");
   const orderAt = (app: string) => Math.min(Infinity, ...recs.filter((r) => r.kind === "tribunal_order" && r.data?.application === app).map((r) => r.at));
-  const withdrawnAt = (app: string) => Math.min(Infinity, ...recs.filter((r) => r.record === "withdrawal" && r.withdraws === app).map((r) => r.at));
+  const withdrawnAt = (app: string) => Math.min(Infinity, ...withdrawals.filter((r) => r.withdraws === app).map((r) => r.at));
   let onList = 0, ripeNamed = 0, ripeCases = 0;
   const missing: string[] = [];
   for (const n of listed) {
