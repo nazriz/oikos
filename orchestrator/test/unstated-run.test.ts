@@ -53,8 +53,9 @@ test("a mock pilot under unstated: nothing its seats are shown says what the tow
     if (said.length) throw new Error(`${e.body.subject}, day ${Math.floor(e.t / DAY) + 1}: shown what unstated leaves unsaid (${said.slice(0, 5).map((x) => `"${x.found}": ${x.what}: …${text.slice(Math.max(0, x.at - 80), x.at + 80).replace(/\s+/g, " ")}…`).join(" | ")})`);
   }
   expect(scanned).toBeGreaterThan(100_000); // (the scan read the town's laws, forms, procedures and the opening caseload)
-  // The tribunal's member had cases before it from its first sitting (the town opens in the middle of things).
-  expect(shown.some((e) => e.body.subject === "tribunal-member-system" && /tribunal application/.test(flat(e.body.data.input)))).toBe(true);
+  // (This town once opened with possession cases before the tribunal's member; since households are placed in homes they
+  // can carry (2026-10-12) a town this small may open with none, so what the member was shown is scanned whatever it held.)
+  expect(shown.some((e) => e.body.subject === "tribunal-member-system")).toBe(true);
   // Its standing instructions: its office and nothing of what the town is.
   const system = shown.find((e) => e.body.subject === "tribunal-member-system" && e.body.data.system).body.data.system as string;
   expect(system.startsWith("You are the tribunal member of Civil and Administrative Tribunal, in Millbrook.\n\nYou are Tribunal member, acting for Civil and Administrative Tribunal (tribunal).")).toBe(true);
