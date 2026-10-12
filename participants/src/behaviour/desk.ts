@@ -201,7 +201,10 @@ export class Hearings {
     // (An application its maker has withdrawn is no longer a case: nothing is decided on it.)
     for (const c of [...this.cases.values()]) if (book.withdrawn.has(c.id)) { this.cases.delete(c.id); this.count("withdrawn"); }
     let room = canDecide ?? Math.max(1, Math.floor(this.p.cases_per_day));
-    for (const c of [...this.cases.values()].filter((x) => t >= x.answerBy).sort((a, b) => a.answerBy - b.answerBy || (a.id < b.id ? -1 : 1))) {
+    // (The member decides a case on or after its day, and its books count the day from its first hour: a member who
+    // sits in the morning decides what that day's list has. A whole office run by code decides at the hour, as before.)
+    const ripe = (x: Case) => (part === "decide" ? Math.floor(x.answerBy / DAY) <= Math.floor(t / DAY) : t >= x.answerBy);
+    for (const c of [...this.cases.values()].filter(ripe).sort((a, b) => a.answerBy - b.answerBy || (a.id < b.id ? -1 : 1))) {
       if (room-- <= 0) break;
       const can = c.hears.can ?? ["order"];
       const binding = can.includes("order");

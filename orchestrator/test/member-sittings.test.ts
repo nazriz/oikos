@@ -31,15 +31,18 @@ async function walk(seated: boolean) {
   const prompts: { day: number; text: string }[] = [];
   const out = mkdtempSync(join(tmpdir(), "oikos-member-sittings-"));
   const recs: any[] = [];
+  // (An application its landlord withdrew, the rent owed having been paid, is no longer a case: nothing is decided on it.)
+  const withdrawn = new Set<string>();
   try {
     const watch = (inner: any) => (req: any) => { if (req.subject === "tribunal-member-system" && req.messages.length === 1 && req.purpose === "participant") prompts.push({ day: Math.floor(req.context.observation.t / DAY), text: String(req.messages[0].content) }); return inner(req); };
     const s = await runWorld({ config: { ...config, log: { ...config.log, detail: "lean" } }, runId: "member-sittings", outDir: out, until: DAYS * DAY, recordObservations: "none", ...(seated ? { mockParticipant: (inner: any) => watch(readerOf({ reader: "plain", returns: "list" }, tally)(inner)) } : {}) });
     expect(s.participantErrors).toBe(0);
-    for (const l of readFileSync(s.logPath, "utf8").split("\n")) if (l.includes('"event":"recorded"')) { const r = JSON.parse(l).body.record; if (r?.record === "statement") recs.push(r); }
+    for (const l of readFileSync(s.logPath, "utf8").split("\n")) if (l.includes('"event":"recorded"')) { const r = JSON.parse(l).body.record; if (r?.record === "statement") recs.push(r); else if (r?.record === "withdrawal") withdrawn.add(String(r.withdraws)); }
   } finally { rmSync(out, { recursive: true, force: true }); }
   const answerBy = new Map<string, number>();
   for (const r of config.world.records as any[]) if (r.kind === "hearing_notice" && r.data?.application && r.data.answer_by > 0) answerBy.set(r.data.application, r.data.answer_by);
   for (const r of recs) if (r.kind === "hearing_notice" && r.data?.application && r.data.answer_by !== undefined && !answerBy.has(r.data.application)) answerBy.set(r.data.application, r.data.answer_by);
+  for (const app of withdrawn) answerBy.delete(app);
   const orders = new Map<string, number>();
   for (const r of recs) if (r.kind === "tribunal_order" && String(r.author).startsWith("tribunal-member") && r.data?.application) orders.set(r.data.application, r.at);
   return { recs, tally, prompts, answerBy, orders };
