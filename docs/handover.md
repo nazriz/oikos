@@ -58,8 +58,8 @@ line: what, the doc, the dial (a dial off gives the earlier town).
 - **Twins.** A pilot is compared with its code twin (same town, seed and sets, no seats) in totals, and case by case
   only among those a seat did not deal with. Draws are named for who, what for and the matter or the day, never the
   hour or a paper's number. `docs/reliability.md` ("Draws and the moment"); `orchestrator/test/twin-draws.test.ts`.
-  The newest of this (draws by day, not hour) is on branch `mech-moments`, **not yet on main**: check
-  `git log origin/main..mech-moments` before relying on it; it moves every town's state hash.
+  The newest of this (draws by day, not hour) landed on main on 2026-10-13 (`ea49bff`); it moved every town's
+  state hash.
 - **The translator and its arrangement.** Our own trained translator answers first, the prompt-driven one
   (`claude-code/claude-sonnet-5-5`, prompt 0.9.4) behind. `docs/real-models.md` "Our own translator first";
   `docs/translator-pipeline.md`. Queue entry key `translator_first`; `--translator-arrangement beside` measures
@@ -208,7 +208,7 @@ Costs and counts are in the reviews. The wave-2 plan is `docs/waves/wave-2/plan.
   (decisions 2026-10-11 "Four faults on the firm and landlord side" and 2026-10-12 "Firms respond to a shock").
 - **An unexplained shift** in one measure after the twin-draws change: the share of those asked in the first quarter
   who hold to the union's teaching moved in one profile (decisions, the entry for the draws change on
-  `mech-moments`). Its author could not find the cause and said he was least sure of it.
+  `mech-moments`). Its author could not find the cause and was least sure of it.
 - **Twins** hold in totals and for those a seat did not deal with, not case by case for a seat that redirects other
   offices: its people part from the twin's by timing, then by chance (`reliability.md`, "Not made stable").
 - **State hashes move** with most changes and the pinned hashes in old notes are stale; re-take a golden one at a
