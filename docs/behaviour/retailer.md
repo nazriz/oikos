@@ -49,7 +49,13 @@ Lengnick (2013) is the model: its firms sell to households who visit them, and i
 - **Headcount follows serving need, not stock.** A shop's staff are there to serve, so staff follow the hours sales need. Stock follows Lengnick's band.
 - **Buying from the cheapest supplier** is Lengnick's household rule applied to shops as buyers (they compare prices and switch).
 
+## Stock on the supplier's terms (2026-10-12)
+
+Weekly, the shop works out how much it can order as before, but where its supplier states terms ([trade.md](trade.md), "Trade credit") and it is not behind with that supplier, it orders **on them**: nothing is paid with the order, the factory's invoice falls due `terms_days` after delivery and is paid then, after the wages. What it may order is what it can pay for in cash beyond a pay period's wages, **plus what it expects to take in over the terms at cost** (last month's items sold, at what a supplier charges), less what it already owes. Stock no longer competes with the wage bill in the week it is bought. `credit: false` turns it off.
+
 ## Parameters
+
+- `credit` (take a supplier's terms), `borrow_again_days` (30: another loan this long after the last, as the bank allows: [credit.md](credit.md)).
 
 - `premises`, `workplace`, `max_staff` and `min_staff`.
 - `police` and `stocktake_days`: the monthly stocktake. What's there against the books (last count, deliveries in, goods served out); short, a report to the police with its value (docs/behaviour/crime.md).

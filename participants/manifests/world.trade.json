@@ -1,6 +1,6 @@
 {
   "name": "world.trade",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "doc": "docs/behaviour/boundary.md",
   "params": {
     "account": {
@@ -47,6 +47,30 @@
         "type": "array"
       },
       "default": [],
+      "source": "placeholder"
+    },
+    "terms_claim_after_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 30,
+      "source": "placeholder"
+    },
+    "terms_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 0,
+      "source": "placeholder"
+    },
+    "terms_stop_after_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 7,
       "source": "placeholder"
     },
     "wait_days": {

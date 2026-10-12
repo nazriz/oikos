@@ -8,6 +8,7 @@ A debt is a claim recorded against a firm: the holder's right to be paid (`claim
 - **when a loan goes into default:** the bank records what's owing (docs/behaviour/credit.md);
 - **when wages go unpaid:** a worker whose pay hasn't come for a pay period plus five days resigns and records the wages owed (citizen 0.12.0). Unpaid workers are creditors, as they are in law.
 
+- **when a supplier has delivered goods on its terms and not been paid** (docs/behaviour/trade.md, "Trade credit"): a month after the day it was to be paid, the supplier records the sum as a debt against the buyer;
 - **in the firm's own books:** a pay its account could not cover on its day, and redundancy pay owed under the world's law, stand in its wage ledger and are paid late when it can (docs/behaviour/firms.md, "Wages owed"). They are not recorded debts: a worker who leaves and records the wages as a debt turns the ledger's line into one.
 
 A trading firm pays the debts recorded against it, oldest first, while it can do so and keep the next pay period's wages. If it owes more than it has, it asks its bank for the difference.

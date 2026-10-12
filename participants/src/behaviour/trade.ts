@@ -14,15 +14,16 @@
 
 import * as C from "../calls";
 import type { Observation, Offer, StatementRecord } from "../contracts";
-import { channels } from "../contracts";
+import { basesOf, channels } from "../contracts";
 import { cents } from "../money";
-import { because, type Book, DAY, Latest, pay, say, type Step, usd } from "./common";
-import { receipts } from "./firms";
+import { because, type Book, DAY, Latest, pay, record, say, type Step, usd } from "./common";
 
 /** An order, as the seller reads it. */
 export interface Order { id: string; seller: string; buyer: string; kind: string; quantity: number; unitPrice: number; to: string; at: string; account: string; placed: number;
   /** The days the order is for, as the buyer says (a fortnight's shopping): served over that time. */
-  forDays?: number }
+  forDays?: number;
+  /** Bought on the seller's terms: the days after delivery it is to be paid within (the order carries no payment). */
+  terms?: number }
 
 const goodsLists = new Latest("price_list", (r) => r.data?.goods);
 /** A seller's standing offer, if its latest price list that is one makes one (a list of one kind of goods). */
@@ -31,9 +32,10 @@ export const offerOf = (book: Book, seller: string) => offerLists.of(book, selle
 
 /** A seller's current prices for goods (its latest standing price list), the account it's paid into, the least it
  * sells in one order (a wholesaler's minimum), and where it is (a shop's premises, for collection). */
-export function goodsPrices(book: Book, seller: string): { prices: { [kind: string]: number }; account?: string; min_order?: number; at?: string } {
+export function goodsPrices(book: Book, seller: string): { prices: { [kind: string]: number }; account?: string; min_order?: number; at?: string; terms_days?: number } {
   const list = goodsLists.of(book, seller);
-  return { prices: (list?.data?.goods as { [kind: string]: number }) ?? {}, account: list?.data?.account, min_order: list?.data?.min_order, at: list?.data?.at };
+  const terms = Number(list?.data?.terms_days);
+  return { prices: (list?.data?.goods as { [kind: string]: number }) ?? {}, account: list?.data?.account, min_order: list?.data?.min_order, at: list?.data?.at, ...(Number.isInteger(terms) && terms > 0 ? { terms_days: terms } : {}) };
 }
 
 /** What the entity holds of a kind at a place (its holdings channel), as a number. */
@@ -60,9 +62,16 @@ export function priceList(prices: { [kind: string]: number }, account: string, t
  * An order for goods, paid with the order in the same act. `from` is the buyer's paying account; `sellerAccount`
  * the one the seller's price list names.
  */
-export function order(o: { me: string; seller: string; sellerAccount: string; kind: string; quantity: number; unitPrice: number; to?: string; at: string; from: string; why: string; ref?: string; retryOf?: string; forDays?: number }): Step {
+export function order(o: { me: string; seller: string; sellerAccount: string; kind: string; quantity: number; unitPrice: number; to?: string; at: string; from: string; why: string; ref?: string; retryOf?: string; forDays?: number;
+  /** On the seller's terms (docs/behaviour/trade.md, "Trade credit"): to be paid this many days after delivery, and nothing paid with the order. */
+  terms?: number }): Step {
   const to = o.to ?? o.me;
   const total = o.quantity * o.unitPrice;
+  if (o.terms) return because(o.why,
+    [o.ref ?? "order", say("order", `Order: ${o.quantity} ${o.kind} at ${usd(o.unitPrice)} each (${usd(total)}), delivered to ${to} at ${o.at}. To be paid within ${o.terms} days of delivery, on your terms.`, {
+      to: [o.seller], visible: [o.me, o.seller],
+      data: { kind: o.kind, quantity: o.quantity, unit_price: o.unitPrice, deliver_to: to, at: o.at, account: o.from, pay_in_days: o.terms, ...(o.retryOf ? { retry_of: o.retryOf } : {}) },
+    })]);
   return because(o.why,
     [o.ref ?? "order", say("order", `Order: ${o.quantity} ${o.kind} at ${usd(o.unitPrice)} each (${usd(total)}), delivered to ${to} at ${o.at}. Paid with this order.`, {
       to: [o.seller], visible: [o.me, o.seller],
@@ -125,16 +134,83 @@ export class Deliveries {
  * A seller's order book. `take` reads each observation (orders addressed to us, payments into our account); `due`
  * says which orders are now paid in full (oldest first) and which have waited too long unpaid.
  */
+/** What a seller that sells on terms (docs/behaviour/trade.md, "Trade credit") says of them: the days it gives to pay,
+ * how long after the day an unpaid buyer is supplied no more on terms, and how long after it the debt is recorded. */
+export interface SellingTerms { days: number; stop_after_days: number; claim_after_days: number }
+
+/** What a seller is owed for goods delivered on its terms and not yet paid for. */
+export interface Receivable { order: string; account: string; buyer: string; kind: string; quantity: number; amount: number; since: number; days: number }
+
+const INVOICE = /^Invoice (\S+?):/;
+
 export class OrderBook {
   private readonly credit = new Map<string, number>(); // paying account -> money received not yet set against an order
+  private readonly invoiced = new Map<string, number>(); // order -> paid against its invoice (the payment's memo names the order)
+  private receivables: Receivable[] = [];
+  private readonly claimed = new Map<string, string>(); // a debt we recorded (its claim) -> the buyer's account, until it is paid
+  private readonly claimedAccounts = new Map<string, number>(); // buyer's account -> debts of ours it has not paid
   private readonly settled = new Set<string>();
   private readonly customers = new Set<string>(); // accounts that have ordered from us
   private readonly waiting = new Map<string, Order>(); // orders to us not yet settled
   private cursor = 0; // how far through the orders seen we've read (only new ones are read: no rescanning)
-  constructor(private readonly me: string, private readonly unpaidDays = 7) {}
+  constructor(private readonly me: string, private readonly unpaidDays = 7, private readonly sells: SellingTerms | null = null) {}
 
   take(obs: Observation, account: string | undefined) {
-    if (account) for (const [from, amount] of receipts(obs, account)) this.credit.set(from, (this.credit.get(from) ?? 0) + amount);
+    if (!account) return;
+    for (const tx of channels.transactions(obs)) {
+      if (tx.to !== account || tx.from === account) continue;
+      const x = cents(tx.amount);
+      // Payment of a debt we recorded: it settles that claim, and is no order's payment.
+      if (tx.settles && this.claimed.has(tx.settles)) {
+        const from = this.claimed.get(tx.settles)!;
+        this.claimed.delete(tx.settles);
+        this.claimedAccounts.set(from, Math.max(0, (this.claimedAccounts.get(from) ?? 1) - 1));
+        continue;
+      }
+      // Payment of an invoice (goods delivered on our terms): the memo names the order.
+      const inv = INVOICE.exec(tx.memo ?? "");
+      if (inv && this.receivables.some((r) => r.order === inv[1])) {
+        this.invoiced.set(inv[1]!, (this.invoiced.get(inv[1]!) ?? 0) + x);
+        continue;
+      }
+      this.credit.set(tx.from, (this.credit.get(tx.from) ?? 0) + x);
+    }
+  }
+
+  /** Goods delivered on terms: what we are now owed, and from when. */
+  bill(o: Order, quantity: number, t: number) {
+    if (!o.terms || quantity <= 0) return;
+    this.receivables.push({ order: o.id, account: o.account, buyer: o.buyer, kind: o.kind, quantity, amount: quantity * o.unitPrice, since: t, days: o.terms });
+  }
+
+  /** What we are owed and has not been paid, and what is past its day. */
+  owedTo(): Receivable[] {
+    this.receivables = this.receivables.filter((r) => (this.invoiced.get(r.order) ?? 0) < r.amount);
+    return this.receivables;
+  }
+
+  /** Whether a buyer's account is one we supply no more on terms: it has not paid what it owed by `stop_after_days` after the day, or has a debt of ours unpaid. */
+  stopped(account: string, t: number): boolean {
+    if (!this.sells) return false;
+    return (this.claimedAccounts.get(account) ?? 0) > 0 || this.owedTo().some((r) => r.account === account && t > r.since + (r.days + this.sells!.stop_after_days) * DAY);
+  }
+
+  /** A buyer who has not paid `claim_after_days` after the day: the debt recorded against it (a claim, as a lender's on a default is), to be
+   * paid as any debt recorded against a firm is (docs/behaviour/insolvency.md). */
+  collect(t: number, sellerAccount: string): Step[] {
+    if (!this.sells) return [];
+    const steps: Step[] = [];
+    for (const r of [...this.owedTo()]) {
+      if (t <= r.since + (r.days + this.sells.claim_after_days) * DAY) continue;
+      this.receivables = this.receivables.filter((x) => x !== r);
+      const owing = r.amount - (this.invoiced.get(r.order) ?? 0);
+      this.claimedAccounts.set(r.account, (this.claimedAccounts.get(r.account) ?? 0) + 1);
+      const st = because(`${r.buyer} has not paid for the ${r.quantity} ${r.kind} we delivered on terms (order ${r.order}, ${usd(owing)}), ${Math.floor((t - r.since) / DAY - r.days)} days past the day: recording the debt against them.`,
+        record("right", this.me, { kind: "debt", amount: owing, account: sellerAccount, for: `${r.quantity} ${r.kind} delivered on terms, order ${r.order}: unpaid.` }, { against: r.buyer, basis: r.order }));
+      st.then = (out) => { const id = out.created?.claim; if (id) this.claimed.set(id, r.account); };
+      steps.push(st);
+    }
+    return steps;
   }
 
   /** Open orders to us, oldest first, as orders. */
@@ -147,6 +223,7 @@ export class OrderBook {
         id: r.id, seller: this.me, buyer: r.speaks_for!, kind: String(r.data?.kind), quantity: Math.max(0, Math.floor(Number(r.data?.quantity) || 0)), unitPrice: Math.max(0, Math.floor(Number(r.data?.unit_price) || 0)),
         to: String(r.data?.deliver_to ?? r.speaks_for), at: String(r.data?.at), account: String(r.data?.account), placed: r.at,
         ...(Number.isInteger(r.data?.for_days) && Number(r.data?.for_days) > 0 ? { forDays: Number(r.data!.for_days) } : {}),
+        ...(Number.isInteger(r.data?.pay_in_days) && Number(r.data?.pay_in_days) > 0 ? { terms: Number(r.data!.pay_in_days) } : {}),
       });
     }
     for (const id of this.waiting.keys()) if (this.settled.has(id) || book.withdrawn.has(id)) this.waiting.delete(id);
@@ -158,15 +235,21 @@ export class OrderBook {
    * `accept` says whether we can take an order on now (a shop's hands for the day): the first paid order it turns down
    * waits, and so do the paid orders after it (first come, first served).
    */
-  due(book: Book, t: number, accept: (o: Order) => boolean = () => true): { paid: Order[]; unpaid: Order[] } {
+  due(book: Book, t: number, accept: (o: Order) => boolean = () => true): { paid: Order[]; unpaid: Order[]; stopped: Order[] } {
     const paid: Order[] = [];
     const unpaid: Order[] = [];
+    const stopped: Order[] = [];
     let full = false;
     for (const o of this.open(book)) {
       const total = o.quantity * o.unitPrice;
       const have = this.credit.get(o.account) ?? 0;
       this.customers.add(o.account);
-      if (total > 0 && have >= total) {
+      // On our terms (if we sell on any): supplied against its promise, unless it has not paid what it owed us.
+      if (o.terms && this.sells && total > 0) {
+        this.settled.add(o.id);
+        (this.stopped(o.account, t) ? stopped : paid).push(o);
+        continue;
+      }      if (total > 0 && have >= total) {
         if (full || !accept(o)) {
           full = true;
           continue;
@@ -179,7 +262,7 @@ export class OrderBook {
         unpaid.push(o);
       }
     }
-    return { paid, unpaid };
+    return { paid, unpaid, stopped };
   }
 
   /** Money from a customer (an account that has ordered from us) that no order of theirs is waiting for: paid twice,
@@ -219,15 +302,17 @@ export function fill(o: Order, quantity: number, fromAt: string, payFrom: string
 }
 
 function fillAs(o: Order, quantity: number, fromAt: string, payFrom: string, why: string): Step {
-  const refund = (o.quantity - quantity) * o.unitPrice;
+  // (On terms nothing was paid, so nothing is refunded: the invoice is for what was delivered.)
+  const refund = o.terms ? 0 : (o.quantity - quantity) * o.unitPrice;
   const s: Step = because(why);
   if (quantity > 0) s.push(C.call("goods", { kind: o.kind, quantity: C.text(String(quantity)), to: o.to, at: o.at, from_at: fromAt }));
   if (refund > 0) s.push(pay(o.account, refund, { from: payFrom, for: `Refund: ${o.quantity - quantity} ${o.kind} we couldn't deliver.` }));
-  s.push(say("delivery_note", quantity === o.quantity
+  s.push(say("delivery_note", (quantity === o.quantity
     ? `Delivered: ${quantity} ${o.kind} to ${o.to} at ${o.at}.`
-    : `Delivered ${quantity} of the ${o.quantity} ${o.kind} ordered${refund ? `; ${usd(refund)} refunded` : ""}.`, {
+    : `Delivered ${quantity} of the ${o.quantity} ${o.kind} ordered${refund ? `; ${usd(refund)} refunded` : ""}.`) + (o.terms && quantity > 0 ? ` Invoice: ${usd(quantity * o.unitPrice)}, to be paid within ${o.terms} days, into ${payFrom}, naming the order (${o.id}).` : ""), {
     to: [o.buyer], visible: [o.buyer, o.seller], basis: o.id,
-    data: { order: o.id, kind: o.kind, ordered: o.quantity, delivered: quantity, refund },
+    data: { order: o.id, kind: o.kind, ordered: o.quantity, delivered: quantity, refund,
+      ...(o.terms && quantity > 0 ? { owed: quantity * o.unitPrice, pay_in_days: o.terms, pay_to: payFrom } : {}) },
   }));
   return s;
 }
@@ -235,4 +320,73 @@ function fillAs(o: Order, quantity: number, fromAt: string, payFrom: string, why
 /** An order declined unpaid: a note saying so. */
 export function decline(o: Order, why: string): Step {
   return because(why, say("delivery_note", `Order ${o.id} declined: not paid.`, { to: [o.buyer], visible: [o.buyer, o.seller], basis: o.id, data: { order: o.id, kind: o.kind, ordered: o.quantity, delivered: 0, refund: 0, declined: "unpaid" } }));
+}
+
+/** A seller's note that it will not supply an order on terms: the buyer has not paid what it owed. */
+export function declineOnTerms(o: Order, me: string, why: string): Step {
+  return because(why, say("delivery_note", `Order ${o.id} declined: ${o.buyer} has not paid what it owed on our terms.`, { to: [o.buyer], visible: [o.buyer, me], basis: o.id, data: { order: o.id, kind: o.kind, ordered: o.quantity, delivered: 0, refund: 0, declined: "overdue" } }));
+}
+
+/**
+ * A buyer's side of trade on terms: what it owes suppliers for goods delivered and invoiced (the delivery note says what,
+ * how long to pay and where), paid on the day, wages first. A buyer that is behind with a supplier buys from it on terms no
+ * more (the supplier will not supply it), and one the supplier has recorded a debt against pays that debt, not the invoice.
+ */
+export class Payables {
+  private cursor = 0;
+  private open: { order: string; seller: string; account: string; kind: string; quantity: number; amount: number; due: number }[] = [];
+  private readonly refused = new Map<string, number>(); // seller -> when it last told us it would supply us on terms no more
+  private sent: { t: number; amount: number }[] = []; // payments we have asked our bank for, which has not yet paid them out (its batch is hours later)
+  constructor(private readonly me: string) {}
+
+  /** What invoices we asked our bank to pay in the last few days come to: the balance we read has not yet fallen by it. */
+  pending(t: number): number {
+    this.sent = this.sent.filter((x) => t - x.t < 3 * DAY);
+    return this.sent.reduce((x, y) => x + y.amount, 0);
+  }
+
+  /** Invoices on the delivery notes addressed to us (only new ones are read); debts recorded against us for an order ours are paid as debts. */
+  take(book: Book) {
+    const notes = book.all("delivery_note");
+    for (; this.cursor < notes.length; this.cursor++) {
+      const n = notes[this.cursor]!;
+      if (!(n.addressed_to ?? []).includes(this.me)) continue;
+      // Told it is supplied on terms no more (it has not paid what it owed): it asks for none from that seller for a while.
+      if (n.data?.declined === "overdue" && n.speaks_for) this.refused.set(n.speaks_for, n.at);
+      const owed = Number(n.data?.owed), days = Number(n.data?.pay_in_days);
+      if (!(owed > 0) || !(days > 0) || typeof n.data?.pay_to !== "string") continue;
+      this.open.push({ order: String(n.data?.order), seller: n.speaks_for!, account: n.data.pay_to as string, kind: String(n.data?.kind), quantity: Number(n.data?.delivered) || 0, amount: owed, due: n.at + days * DAY });
+    }
+    if (this.open.length) {
+      const claimed = new Set((book.ofType("claim") as any[]).filter((c) => c.counterparty === this.me && c.about?.kind === "debt").flatMap((c) => basesOf(c)));
+      this.open = this.open.filter((x) => !claimed.has(x.order));
+    }
+  }
+
+  /** What we owe suppliers, in all. */
+  get owing(): number {
+    return this.open.reduce((x, o) => x + o.amount, 0);
+  }
+
+  /** Whether we are behind with a supplier (an invoice past its day), or it has lately told us it supplies us on terms no more
+   * (`retry_days` after which we try again). */
+  behind(seller: string, t: number, retry_days = 30): boolean {
+    return this.open.some((o) => o.seller === seller && t > o.due) || t - (this.refused.get(seller) ?? -Infinity) < retry_days * DAY;
+  }
+
+  /** Invoices that have fallen due, oldest first, paid while we can and keep `keep` in hand (the next pay day's wages come first). */
+  pay(t: number, from: string, balance: number, keep: number, committed?: Committed): Step[] {
+    const lines: Step[] = [];
+    let left = balance - keep - this.pending(t);
+    for (const o of [...this.open].sort((a, b) => a.due - b.due || (a.order < b.order ? -1 : 1))) {
+      if (o.due > t || o.amount > left) continue;
+      left -= o.amount;
+      this.open = this.open.filter((x) => x !== o);
+      this.sent.push({ t, amount: o.amount });
+      committed?.add(o.account, o.amount, t);
+      lines.push(because(`Our invoice for ${o.quantity} ${o.kind} from ${o.seller} (order ${o.order}) falls due: paying ${usd(o.amount)}${t - o.due >= DAY ? `, ${Math.floor((t - o.due) / DAY)} days late` : ""}.`,
+        pay(o.account, o.amount, { from, for: `Invoice ${o.order}: ${o.quantity} ${o.kind}.` })));
+    }
+    return lines;
+  }
 }

@@ -1597,6 +1597,14 @@ export class Staffing {
   wagesOwed(): number {
     return this.unpaid.reduce((x, u) => x + u.amount, 0);
   }
+  /** Whether we are in no state to pay out to our owners (docs/behaviour/firms.md, "Before a dividend"): wages are owed in our books, or someone
+   * of our staff is under notice (a notice we gave because we could not cover the wage bill, or for want of trade). In words, or "" if neither. */
+  strained(book: Book, t: number): string {
+    const owed = this.wagesOwed();
+    if (owed > 0) return `wages are owed in our books (${usd(owed)})`;
+    const going = this.staff(book, t).filter((a) => this.noticed.has(a.id)).length;
+    return going ? `${going} of our staff ${going === 1 ? "is" : "are"} under notice` : "";
+  }
   /** Missed pays entered in the ledger, and those the account now covers paid late (keeping `keep` for the next pay day). */
   private latePay(book: Book, t: number, account: string, balance: number | undefined, keep: number): Step[] {
     const byOrder = new Map([...this.orders].map(([agreement, order]) => [order, agreement]));

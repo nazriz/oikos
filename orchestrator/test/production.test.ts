@@ -62,7 +62,7 @@ test("goods are made from inputs by workers' hours, exported within each factory
     perDay.set(k, (perDay.get(k) ?? 0) + Math.ceil(w.labour / w.performers.length));
   }
   expect(Math.max(...perDay.values())).toBeLessThanOrEqual(config.catalogue.working_day);
-  // Inputs come from outside at the world price the world market lists when they're ordered, paid with the order.
+  // Inputs come from outside at the world price the world market lists when they're ordered, paid with the order (or on its terms).
   const inputs = ev.filter((e) => e.event === "goods_moved" && e.kind === "inputs");
   expect(inputs.length).toBeGreaterThan(0);
   const lists = recs.filter((r) => r.kind === "price_list" && r.speaks_for === "outside");
@@ -73,8 +73,13 @@ test("goods are made from inputs by workers' hours, exported within each factory
     expect(inForce).toContain(o.data.unit_price);
     // Paid with the order; or, if the bank couldn't pay it (other payments went first), declined unpaid.
     const paid = ev.some((e) => e.event === "transfer" && e.to === "acc-outside" && e.from === `acc-${o.speaks_for}` && e.amount === String(o.data.quantity * o.data.unit_price) && e.t >= o.at);
-    const declined = recs.some((r) => r.kind === "delivery_note" && r.data.order === o.id && r.data.declined === "unpaid");
-    expect(paid || declined || o.at > 290 * DAY).toBe(true);
+    const declined = recs.some((r) => r.kind === "delivery_note" && r.data.order === o.id && (r.data.declined === "unpaid" || r.data.declined === "overdue"));
+    // (2026-10-12, "Trade credit": on the world's terms an order is paid with nothing, and its invoice is paid within the days it gives
+    // or, wages first, later, when the world records the sum as a debt against the factory. Those orders are held to that.)
+    // (An order the world did not fill, as at a price it had moved from, is delivered nothing and invoiced nothing.)
+    const onTerms = o.data.pay_in_days > 0 && (recs.some((r) => r.kind === "delivery_note" && r.data.order === o.id && r.data.delivered === 0) || ev.some((e) => e.event === "transfer" && e.to === "acc-outside" && e.from === `acc-${o.speaks_for}` && String(e.memo ?? "").startsWith(`Invoice ${o.id}:`))
+      || recs.some((r) => r.record === "claim" && r.basis === o.id) || o.at + (o.data.pay_in_days + 40) * DAY > 300 * DAY);
+    expect(paid || declined || onTerms || o.at > 290 * DAY).toBe(true);
   }
   // Exports: paid for at the month's offer price (world prices move), never beyond a factory's share of that month's demand.
   const offersBy = recs.filter((r) => r.kind === "buying_offer" && r.speaks_for === "outside");

@@ -65,7 +65,9 @@ test("a spec without `living` generates what it generated before (byte for byte)
   // versions. Nothing of `living` in it.
   // And on 2026-10-12 (with the last: docs/decisions.md, "Returns on the law's days"): the tax law lists its returns
   // (the profile's public_finance.returns: words and data) and says on which day each falls due. Nothing of `living` in it.
-  expect(hash(c)).toBe("d61b32aec7dba9f68b282000132c5a9ede5be7e6282a110ae91bc11eb7c3fbcc");
+  // And on 2026-10-12 (d61b32ae... until then; docs/decisions.md, "Firms respond to a shock"): generator 0.52.0, the producer's, retailer's and world market's versions and params:
+  // a place's trade credit days (the profile's business.trade_credit_days) reach the factories and the world market as `terms_days`. Nothing of `living` in it.
+  expect(hash(c)).toBe("8f41e1af39a387e3e9b19fe69c55403533c962db0736e00fb1886b96a6c42e92");
   const text = JSON.stringify(c);
   expect(text).not.toContain('"started"');
   expect(text).not.toContain("attach_mean");

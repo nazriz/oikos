@@ -1,6 +1,6 @@
 {
   "name": "firm.retailer",
-  "version": "0.12.1",
+  "version": "0.13.0",
   "doc": "docs/behaviour/retailer.md",
   "params": {
     "adjust": {
@@ -21,6 +21,14 @@
       "default": "",
       "required": true,
       "source": "a shop just founded opens its account here (the world must say, for one); closed, our premises are offered at this share of what building them new costs (placeholder)"
+    },
+    "borrow_again_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 30,
+      "source": "placeholder"
     },
     "builder": {
       "schema": {
@@ -51,6 +59,13 @@
       },
       "unit": "bps",
       "default": 1000,
+      "source": "placeholder"
+    },
+    "credit": {
+      "schema": {
+        "type": "boolean"
+      },
+      "default": true,
       "source": "placeholder"
     },
     "day_wage": {
