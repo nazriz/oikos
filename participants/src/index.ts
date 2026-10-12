@@ -14,7 +14,8 @@ export { Inner, innerParams, INNER_DEFAULTS, raisedValues, UPBRINGING, type Inne
 export { MOURNING } from "./behaviour/citizen";
 export { repayment } from "./behaviour/credit";
 export { draftLaw, figureGiven, figureWords, heldIn, heldValue, type LawFigure, type LawFigures, type LawSchedule } from "./behaviour/common";
-export { annualTax, chargesInWords, chargesOn, dayPayPeriod, taxLawOf, withheld, withholding, withholdingInWords, type Band, type Charge, type IncomeTaxLaw } from "./behaviour/tax";
+export { annualTax, chargesInWords, chargesOn, dayPayPeriod, returnsInWords, taxLawOf, withheld, withholding, withholdingInWords, type Band, type Charge, type IncomeTaxLaw } from "./behaviour/tax";
+export { dueFrom, nextReturn, returnDayWords, returnRuleInWords, returnRulesOf, returnsOf, MONTH_WORDS, type ReturnDue, type ReturnRule } from "./behaviour/returns";
 export { declarationFor, forAge, forHousehold, forOutOfWork, paymentsInWords, stopsWorkAt, supportLaw, type Declared, type PaymentRule } from "./behaviour/payments";
 export { adultAgeBands, drawHousehold, drawSavings, bedroomsNeeded, OCCUPANCY, type DrawnHousehold, type Extension, type HouseholdSpec, type OccupancyStandard } from "./behaviour/household";
 export { yearsOfSchooling, type SchoolingSpec } from "./behaviour/school";

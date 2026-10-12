@@ -63,7 +63,9 @@ const LIVING = "living.initiative_bps=10000";
 // And again on 2026-10-12, with homes dealt by income (0adec141... until then; docs/decisions.md, "Homes by income"):
 // every town opens differently (payments in force, people with nothing coming in living with kin, owners by the
 // head's age, tenancies by income).
-const STEP_2B = "c23648b8d9e07522cdfd4a6c82ab0429b8f234dff188ff287ff5ff5bf8784ce2";
+// And again on 2026-10-12, with returns on the law's days (c23648b8... until then; docs/decisions.md, "Returns on the law's
+// days"): every employer files its withholding returns on the days the law states.
+const STEP_2B = "a615b80d61207ff049655c10bcef66c83d26ee5ff6a46fc3c1f7751a5680c802";
 
 test("with founding off a living town is step 2b's town, to the state hash; turned on with no shape to found, nobody does anything they did not do before", async () => {
   const out = mkdtempSync(join(tmpdir(), "oikos-founding-"));

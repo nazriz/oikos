@@ -1,0 +1,20 @@
+{
+  "about": "The day the next return of a rule falls due, and the period it reports, in days from the world's start (the world's months are 30 days from the year's first day, the twelfth taking the last five; participants/src/behaviour/returns.ts). `after` is a moment in days (the due day is the first strictly after it). Shared by participants/test/returns.test.ts.",
+  "cases": [
+    { "rule": { "id": "m9", "day": 9 }, "after": 0, "due": 38, "from": 0, "to": 30 },
+    { "rule": { "id": "m9", "day": 9 }, "after": 37, "due": 38, "from": 0, "to": 30 },
+    { "rule": { "id": "m9", "day": 9 }, "after": 38, "due": 68, "from": 30, "to": 60 },
+    { "rule": { "id": "m9", "day": 9 }, "after": 330, "due": 338, "from": 300, "to": 330 },
+    { "rule": { "id": "m9", "day": 9 }, "after": 338, "due": 373, "from": 330, "to": 365 },
+    { "rule": { "id": "m9", "day": 9 }, "after": 373, "due": 403, "from": 365, "to": 395 },
+    { "rule": { "id": "m1", "day": 1 }, "after": 5, "due": 30, "from": 0, "to": 30 },
+    { "rule": { "id": "m30", "day": 30 }, "after": 5, "due": 59, "from": 0, "to": 30 },
+    { "rule": { "id": "same26", "day": 26, "in": "same" }, "after": 0, "due": 25, "from": 0, "to": 30 },
+    { "rule": { "id": "same26", "day": 26, "in": "same" }, "after": 25, "due": 55, "from": 30, "to": 60 },
+    { "rule": { "id": "same26", "day": 26, "in": "same" }, "after": 330, "due": 355, "from": 330, "to": 365 },
+    { "rule": { "id": "q28", "day": 28, "every_months": 3 }, "after": 0, "due": 117, "from": 0, "to": 90 },
+    { "rule": { "id": "q28", "day": 28, "every_months": 3 }, "after": 117, "due": 207, "from": 90, "to": 180 },
+    { "rule": { "id": "q28", "day": 28, "every_months": 3 }, "after": 300, "due": 392, "from": 270, "to": 365 },
+    { "rule": { "id": "h", "day": 10, "every_months": 6 }, "after": 0, "due": 189, "from": 0, "to": 180 }
+  ]
+}

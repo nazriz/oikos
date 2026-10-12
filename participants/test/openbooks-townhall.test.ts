@@ -99,6 +99,26 @@ test("finance: tax withheld since the last report is listed, and a shortfall the
   expect(tax.find((i) => i.id === "withheld-since-last-report")).toMatchObject({ amount: 30_000 });
 });
 
+test("finance: the returns the law lists, which falls due next and when, under which law, for what period, and what has been withheld since the last", () => {
+  const b = financeBooks(context("fin", "city", {}, { position: "finance" }));
+  const a = job("job-1", 2 * DAY, "c1");
+  const law = statement("law-income-tax", 0, "law", { speaks_for: "outside", visible_to: "public", data: { tax: "income",
+    charges: [{ id: "income-tax", name: "Income tax", schedule: [{ from: 0, rate_bps: 1000 }], collector: "outside", account: "acc-outside" }, { id: "nssf", name: "NSSF contribution", schedule: [{ from: 0, rate_bps: 600 }], collector: "nssf", account: "acc-outside-nssf" }],
+    returns: [{ id: "paye", name: "PAYE return", charges: ["income-tax"], day: 9 }, { id: "nssf", name: "NSSF contribution", charges: ["nssf"], day: 12 }] } });
+  feed(b, "city", 40 * DAY, [law, ...signed(a, 3 * DAY), standingOrder("ord-1", 4 * DAY, "city", "acc-c1", 270_000, { basis: "job-1", every: PERIOD }),
+    statement("wr-1", 38 * DAY, "withholding_report", { addressed_to: ["outside"], speaks_for: "city", data: { withheld: 10_000, paid: 10_000, period_end: 38 * DAY, return: "paye" } })],
+  { transactions: [{ t: 35 * DAY, from: "acc-city", to: "acc-c1", amount: "270000", currency: "AUD", by: "fin", per_instruction: "ord-1" }, { t: 39 * DAY, from: "acc-city", to: "acc-c1", amount: "270000", currency: "AUD", by: "fin", per_instruction: "ord-1" }] });
+  const due = find(b.open(40 * DAY), "Returns of tax withheld from wages falling due, and the day each is due by");
+  expect(due.map((i) => i.id)).toEqual([`nssf-${41 * DAY}`, `paye-${68 * DAY}`]);
+  const paye = due.find((i) => i.id.startsWith("paye"))!;
+  expect(paye.line).toContain("PAYE return (Income tax), under law-income-tax: the next falls due on year 1, day 69 (in 28 days), for pay from year 1, day 31 to year 1, day 60; the last was made on year 1, day 39");
+  expect(paye.amount).toBeGreaterThan(0); // (the pay of day 39 only, after the return of day 38)
+  const nssf = due.find((i) => i.id.startsWith("nssf"))!;
+  expect(nssf.line).toContain("the next falls due on year 1, day 42 (tomorrow), for pay from year 1, day 1 to year 1, day 30; the last was none yet");
+  // The day itself it is "today"; the day after, the next month's.
+  expect(find(b.open(41 * DAY + 100), "Returns of tax withheld from wages falling due, and the day each is due by").find((i) => i.id.startsWith("nssf"))!.line).toContain("(today)");
+});
+
 // ---------------------------------------------------------------- mayor
 
 const petition = (id: string, at: number) => statement(id, at, "petition", { speaks_for: "org", author: "org-x", addressed_to: ["city"], data: { demand: { text: "Fix the rent rules" } } });

@@ -44,7 +44,9 @@ const TOWN = join(root, "worlds/town.yaml");
 // And again on 2026-10-12, with homes dealt by income (d48e330b... until then; docs/decisions.md, "Homes by income"):
 // every town opens differently: payments in force from the first day, people with nothing coming in living with
 // kin, owners by the head's age, tenancies by what each household has coming in.
-const STEP_1 = "611b0834cbc1e1e0fd3d9e458219afc9fb0816de95c78e1a35c32e6453737d9b";
+// And again on 2026-10-12, with returns on the law's days (611b0834... until then; docs/decisions.md, "Returns on the law's
+// days"): every employer files its withholding returns on the days the law states, not a month after it first paid.
+const STEP_1 = "db4f9cf9362b71749103c3cd2df9eb0339cd669ccc2ffd4a81f59d24949c4ebb";
 
 test("with the dial absent or at 0 a town is step 1's town, to the state hash", async () => {
   const out = mkdtempSync(join(tmpdir(), "oikos-dial-"));

@@ -59,7 +59,9 @@ test("a spec without `living` generates what it generated before (byte for byte)
   // the profile's payments in force from the first day, people with nothing coming in living with kin, owners by the
   // head's age, and the first tenancies dealt by income (generator 0.49.0); and the outside world's funding, market
   // and weather offices are given their own papers by kind, no longer the support office's file. Nothing of `living` in it.
-  expect(hash(c)).toBe("5cb516d4dcf3aaad948ff932dd04b842d1d9efdcae927d4fb455363d97951d2d");
+  // And on 2026-10-12 (5cb516d4... until then; docs/decisions.md, "Returns on the law's days"): the tax law lists its returns
+  // (the profile's public_finance.returns: words and data) and says on which day each falls due. Nothing of `living` in it.
+  expect(hash(c)).toBe("86f6f21684b2bc8b38eb2bc7227bfec66552793d36de1efbb130ffe6863453ca");
   const text = JSON.stringify(c);
   expect(text).not.toContain('"started"');
   expect(text).not.toContain("attach_mean");

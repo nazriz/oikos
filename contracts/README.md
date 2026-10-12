@@ -445,6 +445,7 @@ Additions only; no schema file changed, nothing renamed or removed. A log made b
 - **A town's description** (`TownSpec`, `worlds/generator/generate.ts`): `opening_caseload` (boolean; off unless set).
 - **Outcome records of a person** (kinds are free text): `membership` / `draw_paid`, `draw_refused` (`why`, `foretold`); a `found` decision's situation may carry `occasion.answered_by`.
 - **The debrief** is script 0.3.0 and exit accounts 0.2.1 (docs/behaviour/debrief.md): no field changed.
+- **The tax law's returns** (2026-10-12, docs/decisions.md, "Returns on the law's days"; additions): `law-income-tax`'s `data.returns` (list of `{ id, name?, charges?, every_months?, day, in? }`, optional; none: every charge monthly on the first day of the month after); a profile's `public_finance.returns` (the same, optional); a `withholding_report`'s `data.return`, `due`, `period_from`, `period_to` (optional); the finance office's books a heading of returns falling due. The `withholding_return` form's text only is clearer; no field changed.
 
 ## Versioning
 

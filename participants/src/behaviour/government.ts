@@ -541,7 +541,7 @@ export const financeOfficer: BehaviourModule = {
   name: "city.finance_officer",
   issues: P.FINANCE,
   answers: {"office": "the finance office", "acts": "What it acts on: an invoice addressed to the town, paid within the adopted budget (over the payments procedure's figure, once the mayor's written approval is on file); a payroll notice from an office that has taken someone on or is losing someone; and the tax withheld from wages, paid over each month. It does not start, stop or change a payment on a letter.", "forms": [{"about": ["approv"], "say": "An approval of an invoice is the mayor's to give, in writing, naming the invoice."}], "report": true},
-  version: "0.10.0", // 0.10.0: sets a new starter's wage up on the hiring office's payroll notice, from the first pay day it gives (with none after payroll_wait_days, from the agreement on file); asks the mayor, once, for the written approval an invoice over the procedure's figure needs. 0.9.0: pays within the adopted budget of the year it is in; while the year has none, under the budget last adopted at a twelfth a month (the charter's interim rule); spending is reckoned by the year
+  version: "0.10.1", // 0.10.1: returns of tax withheld are filed on the days the law states (docs/behaviour/firms.md, "Returns on the law's days"); 0.10.0: 0.10.0: sets a new starter's wage up on the hiring office's payroll notice, from the first pay day it gives (with none after payroll_wait_days, from the agreement on file); asks the mayor, once, for the written approval an invoice over the procedure's figure needs. 0.9.0: pays within the adopted budget of the year it is in; while the year has none, under the budget last adopted at a twelfth a month (the charter's interim rule); spending is reckoned by the year
   doc: "docs/behaviour/government.md",
   cadence: () => 3 * DAY,
   create(ctx: ParticipantContext) {
@@ -555,7 +555,7 @@ export const financeOfficer: BehaviourModule = {
     let budgetYear = -1;
     // The town's payroll (docs/behaviour/services.md): wages for those the town employs (its works office hires them),
     // net of the income tax withheld, which is paid over monthly. They count against the adopted budget.
-    const payroll = new Staffing(ctx, ctx.entity, { period: p.period, notice_days: p.notice_days, role: "staff", does: { hire: false, pay: true }, notice_wait: p.payroll_wait_days * DAY });
+    const payroll = new Staffing(ctx, ctx.entity, { period: p.period, notice_days: p.notice_days, role: "staff", does: { hire: false, pay: true }, notice_wait: p.payroll_wait_days * DAY, wakes: 3 * DAY });
     const approvalAsked = new Set<string>(); // invoices it has asked the mayor to approve
     let wagesAtYear = 0;
     const letters = new Letters(financeOfficer.answers);
@@ -895,7 +895,7 @@ export const works: BehaviourModule = {
       fields: { every: { type: "duration", required: true, description: "How often each address on the round is to be collected from (a week, a fortnight)." } },
       follows: "While it stands, the crew collects from each address on the round once in that time, as its hours allow, homes complained about first. With no direction, the office keeps to its own round." },
   ],
-  version: "0.6.1", // 0.6.1: a direction on its forms reaches its staff's post, and one on how often binds the round whatever the standing order's rhythm; its notice of a new starter names the budget line the post is on; told not to recruit, it says what that does of an offer already made; 0.6.0: its staff report to the office what they did under each standing order, or why not, and who of them worked (docs/behaviour/standing-work.md, "The staff's report"); 0.5.0: sends the office that pays the town's staff a payroll notice of each new starter and each leaver (docs/behaviour/firms.md, "Payroll notices"); 0.4.0: takes written directions on its staffing and on how often it collects (docs/behaviour/directions.md); 0.3.0: collects from its own round of addresses and keeps up the town's own assets, each seen by the crew that works on it or by going to inspect; no longer shown the town
+  version: "0.6.2", // 0.6.2: returns of tax withheld are filed on the days the law states (docs/behaviour/firms.md, "Returns on the law's days"); 0.6.1: 0.6.1: a direction on its forms reaches its staff's post, and one on how often binds the round whatever the standing order's rhythm; its notice of a new starter names the budget line the post is on; told not to recruit, it says what that does of an offer already made; 0.6.0: its staff report to the office what they did under each standing order, or why not, and who of them worked (docs/behaviour/standing-work.md, "The staff's report"); 0.5.0: sends the office that pays the town's staff a payroll notice of each new starter and each leaver (docs/behaviour/firms.md, "Payroll notices"); 0.4.0: takes written directions on its staffing and on how often it collects (docs/behaviour/directions.md); 0.3.0: collects from its own round of addresses and keeps up the town's own assets, each seen by the crew that works on it or by going to inspect; no longer shown the town
   doc: "docs/behaviour/services.md",
   cadence: () => DAY,
   firstWake: (ctx) => 7 * 3600 + ctx.rng("first-wake").below(3600),

@@ -3,7 +3,7 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Charge, Currency, HouseholdSpec, PaymentRule } from "@oikos/participants";
+import type { Charge, Currency, HouseholdSpec, PaymentRule, ReturnRule } from "@oikos/participants";
 
 /** Shares of people by years of residence, job tenure or membership: bands in basis points summing to 10000, each but the last under a number of years. */
 export interface TenureBands { bands: { under_years?: number; bps: number }[]; placeholder?: boolean }
@@ -218,6 +218,13 @@ export interface Profile {
        * its schedule, its reliefs, and whom it is paid to (`paid_to`: one of `funds`, or "town" for a local tax paid to
        * the town; left out: the general government). Yearly sums. */
       income_tax: { charges: (Omit<Charge, "collector" | "account"> & { paid_to?: string })[] };
+      /** When employers report what they withheld and pay it over (docs/behaviour/firms.md, "Returns on the law's days"):
+       * each return names the charges it reports (left out: those no other return reports), how many months a period is
+       * (`every_months`, default 1), and the day it falls due by: `day`, counted from the first day of the month after
+       * the period (`in: "following"`, the default) or of the period's last month (`"same"`). The world's months are
+       * 30 days from the year's first day (the twelfth takes the last five). Left out: every charge monthly, on the first
+       * day of the month after (a neutral stand-in). */
+      returns?: ReturnRule[];
       grants_per_resident_per_year: number;
       rates_per_resident_per_year: number;
       rates_instalments: number;
