@@ -101,7 +101,7 @@ A world with no such law and a firm given `adjust: { smooth_months: 0, hiring_co
 
 **What does not change.** The three-month wait, the smoothing, the cost of a job: all as above. A shop whose trade really is a third of the average still sheds, now over the days 90 to 120 and not on one.
 
-**Real-world basis.** Firms close their books and review on their own dates, not one date together; the first part is ours (no source sought), a model choice that stops the opening state lining shops up. Not here: a staggered start for factories, the builder, or any firm other than a shop (their month is still the calendar month: `firm.producer` reads a month's demand and stock and has no such first-month ramp in its expectation, and a shop-sized cohort was not seen there).
+**Real-world basis.** Firms close their books and review on their own dates, not one date together; the first part is ours (no source sought), a model choice that stops the opening state lining shops up. Not here: a month of its own for factories, the builder or any firm other than a shop (their month is still the calendar month; factories gave 1.3 redundancy notices a run in the same year, no cohort).
 
 ## Before a dividend (2026-10-12): none while wages are owed or anyone is under notice
 

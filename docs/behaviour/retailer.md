@@ -62,7 +62,7 @@ Weekly, the shop works out how much it can order as before, but where its suppli
 - `serve_task` and `serve_labour`: the time a sale takes, as the shop plans with it at first. Where workers differ in skill, it learns each worker's pace (`Pace`, common.ts), a crew's being its members' mean (what a unit takes is linear in a crew's mean skill). Refused for lack of time, each in that crew is as much slower as the world's figure says. After work done, each a little quicker (2%) once a week, until a plan doesn't fit. So a slow crew is learned at once and a quick one over weeks, at about one refusal a crew a week (2026-10-01: without it, a slower crew's plan was refused again and again, and a quicker one did less than it could).
 - `suppliers`.
 - `wage` and `period`; `working_day` and `work_days` (6).
-- `price` (its opening price) and `demand` (what it expects to sell in its first month).
+- `price` (its opening price) and `demand` (what it expects to sell in its first month, and what its expectation of trade begins at: retailer 0.14.0; docs/behaviour/firms.md, "When a shop reviews its staff").
 - `unpaid_days` (7) and `serve_within_days` (3).
 - Credit and closing: `lender`; `short_days` and `wind_up_days` (60 each), `idle_days` (90), `builder`, `premises_sale_bps` (5000), `reprice_days` (30) and `reprice_bps` (1000), as in [insolvency.md](insolvency.md).
 - A shop just founded: `founder`, `capital`, `listing` and `bank` ([entry.md](entry.md)).
