@@ -63,7 +63,10 @@ export class Borrowing {
   private readonly taken = new Set<string>();
   private repayingUntil = -Infinity; // a loan we're repaying (or have been offered): no other till it's done
   impaired = false; // we've defaulted: the lender won't lend to us again
-  constructor(private readonly me: string, private readonly lender: string, private readonly o: { retry_days?: number } = {}) {}
+  /** `retry_days`: after a refusal. `again_days`: a firm that is repaying a loan may apply for another this long after the last was granted, and the
+   * bank decides it on its rule (it counts what the borrower already repays); without it, one loan at a time until it is repaid
+   * (docs/behaviour/credit.md, "More than one loan"). */
+  constructor(private readonly me: string, private readonly lender: string, private readonly o: { retry_days?: number; again_days?: number } = {}) {}
 
   /** Waiting on an application (so don't act as if the money won't come, for a few days), or on the money of a loan
    * granted: the lender pays it out once it has seen our signature, at its next look, not in the moment we sign (a day
@@ -74,7 +77,7 @@ export class Borrowing {
 
   /** Whether we'd apply now: not waiting, not refused lately, not in default. */
   canApply(t: number): boolean {
-    return !!this.lender && !this.waiting(t) && !this.impaired && t >= this.repayingUntil && t - this.refusedAt >= (this.o.retry_days ?? 60) * DAY;
+    return !!this.lender && !this.waiting(t) && !this.impaired && (this.o.again_days !== undefined ? t - this.grantedAt >= this.o.again_days * DAY : t >= this.repayingUntil) && t - this.refusedAt >= (this.o.retry_days ?? 60) * DAY;
   }
 
   /** Applying: how much, over how long, from and to which account, and why (the lender reads the account itself). */

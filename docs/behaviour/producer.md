@@ -41,6 +41,17 @@ A factory whose workers' hours turn inputs into goods, which it sells wholesale 
   Marginal cost is the inputs at its supplier's prices plus the hours at the hourly wage it offers.
 - **Profits.** Out of the month's earnings (what it took in beyond what it paid out that month), what it holds beyond a buffer is paid to its shareholders, in proportion to their shares, from the `shareholders` register (a statement it keeps). The buffer is a month's wages for this month's headcount, plus a month's inputs, plus χ = 10% of the wage bill.
 
+## Inputs bought to what can be sold (2026-10-12)
+
+**The fault.** Inputs were bought for the month the staff *could* make (an (s, S) rule on capacity), not for what could be *sold*: production already stopped at the top of the band of demand, so a works with stock enough bought a month and a half of inputs for nobody. And when the world's input price rose and its goods price fell until a unit lost money before any wage was paid (the fifth pilot's factories: 52 a good before wages, then -9), the works went on buying inputs it sold at a loss, then ran out of cash and shed everyone.
+
+**Now.**
+- **A month's making is what the trade expects:** the demand smoothed over months (as for staff), plus what it takes to bring stock to the top of its band, never more than the staff can make. Inputs are bought to that (the (s, S) rule is unchanged, on this month's making).
+- **A unit that loses money on its inputs is not made.** Each way a works sells is looked at on its own: orders at home (last month's, at its price) and what the world market would take at its standing offer's price, each against what a unit's inputs cost at the supplier's list now. A channel whose price is under that cost is left out of what the works makes for: it buys inputs only for the rest (the month's making is scaled to the share of its trade that covers its inputs), and with no channel that covers them it buys none, makes from what it holds, takes nobody on for want of stock, and says so once a month. It keeps its people as the labour rule says (they are not let go for a dip in margin any sooner than for a dip in trade). A unit that covers its inputs and not its wages is still made: the wage is owed whatever is made, so the short-run test is price against variable cost.
+- Its purchases are on the supplier's terms where it states them ([trade.md](trade.md), "Trade credit"), and it pays the invoice before buying, wages first.
+
+**Where it comes from.** Planning production on a smoothed forecast, not capacity: Holt, Modigliani, Muth and Simon (1960). Producing only while price covers variable cost, the short-run shutdown condition (the textbook theory of the firm; no source sought). **Ours:** that "what a unit fetches" is the weighted mean of what its customers pay at home and abroad on last month's trade.
+
 ## Where the rules come from
 
 Lengnick, M. (2013), *Agent-based macroeconomics: a baseline model*, **Journal of Economic Behavior & Organization** 86, 102–120. It's a minimal, well-cited model with individual trading relationships and no auctioneer. The rules above are its firm rules, at its Table 1 calibration.
@@ -62,6 +73,7 @@ Lengnick, M. (2013), *Agent-based macroeconomics: a baseline model*, **Journal o
 - `supplier` and `market`: whom it buys inputs from, and whose buying offer it exports under.
 - `wage` and `period`: the wage offered, per pay period. `price`: its opening wholesale price.
 - `working_day` and `work_days`.
+- Trade credit and loans: `terms_days` (the days it gives a shop to pay; 0: cash with order), `terms_stop_after_days` (7) and `terms_claim_after_days` (30), `credit` (whether it takes a supplier's terms), `borrow_again_days` (30).
 - Credit and closing: `lender`, `min_order`; `short_days` and `wind_up_days` (60 each), `idle_days` (90), `builder`, `premises_sale_bps` (5000), `reprice_days` (30) and `reprice_bps` (1000), as in [insolvency.md](insolvency.md).
 - Lengnick's parameters, as basis points: `phi_low_bps`, `phi_high_bps`, `delta_bps`, `gamma_months`, `price_up_bound_bps`, `price_down_bound_bps`, `theta_bps`, `vartheta_bps`, `chi_bps`.
 

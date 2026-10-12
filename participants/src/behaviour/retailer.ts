@@ -12,7 +12,7 @@ import { ask, nextLook, because, Book, publishedPrice as buildingPrice, DAY, MON
 import { Bargaining, LabourPlan, Staffing, stepper, terminationLaw, WindingUp } from "./firms";
 import { Borrowing } from "./credit";
 import { distribute, LENGNICK, movePrice, moveWage, payOut } from "./lengnick";
-import { Deliveries, goodsPrices, held, order, OrderBook, priceList, UNDELIVERABLE, type Order } from "./trade";
+import { Deliveries, goodsPrices, held, order, OrderBook, Payables, priceList, UNDELIVERABLE, type Order } from "./trade";
 import * as P from "./papers";
 
 /**
@@ -27,7 +27,7 @@ export const retailer: BehaviourModule = {
   name: "firm.retailer",
   issues: [P.JOB_ADVERTISEMENT, ...P.TRADE, P.REMEDY_ANSWER, ...P.VENUE_ANSWERS],
   issuesWith: (p) => ({ ...P.staffingOwn({ role: p.role ?? "shop assistant", industry: p.industry, workplace: p.workplace, notice_days: p.notice_days ?? 14 }), police: p.police }),
-  version: "0.12.1", // 0.12.1: returns of tax withheld are filed on the days the law states (docs/behaviour/firms.md, "Returns on the law's days"); 0.12.0: 0.12.0: adjusts its staff as firms do (docs/behaviour/firms.md, "Adjusting labour"): sales smoothed over months, staff held through a dip and let go only when the surplus has lasted what ending the job costs, redundancy pay under the world's law; a business of one can be founded in a run and is closed when its owner gives it up (docs/behaviour/entry.md); 0.11.0: everyday frictions (docs/behaviour/frictions.md): pay that comes short, at the world's rate and its character's; asked, told or ordered to put right short pay or goods said to be faulty; 0.10.0: wants of its own (docs/behaviour/firm-wants.md): a character from its owner's values, which answers a worker who asks for a rise, and a record of its own; 0.9.1: a business of one buys stock when it runs low (daily), keeps its stock money at today's price, follows its owner's home, and closes when its owner has gone; 0.9.0: a business run by its owner alone (operator), stocked for a few days and drawn on by its owner; 0.8.4: takes on the share of its hands the world gives by the day; 0.8.3: registers the share of its jobs the world gives for shops (firms.md, "Jobs an employer does not register")
+  version: "0.13.0", // 0.13.0: buys its stock on the supplier's terms where it states them (docs/behaviour/trade.md, "Trade credit"), so stock no longer competes with the wage bill in the week it is bought; borrows again as its bank allows; no dividend while wages are owed or anyone is under notice (docs/behaviour/firms.md, "Before a dividend"); 0.12.1: returns of tax withheld are filed on the days the law states (docs/behaviour/firms.md, "Returns on the law's days"); 0.12.0: 0.12.0: adjusts its staff as firms do (docs/behaviour/firms.md, "Adjusting labour"): sales smoothed over months, staff held through a dip and let go only when the surplus has lasted what ending the job costs, redundancy pay under the world's law; a business of one can be founded in a run and is closed when its owner gives it up (docs/behaviour/entry.md); 0.11.0: everyday frictions (docs/behaviour/frictions.md): pay that comes short, at the world's rate and its character's; asked, told or ordered to put right short pay or goods said to be faulty; 0.10.0: wants of its own (docs/behaviour/firm-wants.md): a character from its owner's values, which answers a worker who asks for a rise, and a record of its own; 0.9.1: a business of one buys stock when it runs low (daily), keeps its stock money at today's price, follows its owner's home, and closes when its owner has gone; 0.9.0: a business run by its owner alone (operator), stocked for a few days and drawn on by its owner; 0.8.4: takes on the share of its hands the world gives by the day; 0.8.3: registers the share of its jobs the world gives for shops (firms.md, "Jobs an employer does not register")
   doc: "docs/behaviour/retailer.md",
   cadence: () => DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(24) * 3600,
@@ -69,6 +69,11 @@ export const retailer: BehaviourModule = {
         // may state its own). 0 and 0: it reacts to each month's sales, as it did until 2026-10-11.
         adjust: { smooth_months: 3, hiring_cost_weeks: 8 },
         lender: "", // whom it borrows from (none: it doesn't)
+        // More than one loan (docs/behaviour/credit.md, "More than one loan"): after a loan is granted it may apply again this many
+        // days later, and the bank decides on its rule, counting what it already repays (placeholder). -1: one loan at a time.
+        borrow_again_days: 30,
+        // Whether it buys on the terms a supplier states (docs/behaviour/trade.md, "Trade credit"): paid for after the goods are in.
+        credit: true,
         // Insolvency (docs/behaviour/insolvency.md; placeholders): short of wages this long with no credit, or in default on
         // a loan, and it winds up over this long.
         short_days: 60,
@@ -134,7 +139,8 @@ export const retailer: BehaviourModule = {
     const answering = new Respondent(ctx.rng, me, org, { params: p.respond, forms: [{ notice: "hearing_notice", response: "tribunal_response", decision: "tribunal_order" }],
       truth: (m) => (m.matter === "underpaid" && m.about ? { owed: staffing.owedShort(m.about) } : undefined),
       remedy: (m, _from, t, why) => (m.matter === "underpaid" && m.about && payAccount ? staffing.payInFull(book, t, payAccount, m.about, why) : undefined) });
-    const borrowing = new Borrowing(me, p.lender);
+    const borrowing = new Borrowing(me, p.lender, p.borrow_again_days >= 0 ? { again_days: p.borrow_again_days } : {});
+    const payables = new Payables(me); // what we owe suppliers for stock delivered on their terms
     const bargaining = new Bargaining(me);
     const winding = new WindingUp(me, { short_days: p.short_days, wind_up_days: p.wind_up_days, idle_days: p.idle_days, reprice_days: p.reprice_days, reprice_bps: p.reprice_bps });
     // Our premises, as the sites we see show them (for selling them if we close).
@@ -266,6 +272,7 @@ export const retailer: BehaviourModule = {
         const mine = ownAccount(obs)?.account;
         if (!setup.ready && setup.capitalCalled && !setup.founderAccount && mine) for (const tx of channels.transactions(obs)) if (tx.to === mine && tx.from !== mine) setup.founderAccount = tx.from;
         orders.take(obs, ownAccount(obs)?.account);
+        payables.take(book);
         for (const d of deliveries.take(book, me)) {
           const o = ours.get(d.order);
           if (!o) continue;
@@ -287,7 +294,11 @@ export const retailer: BehaviourModule = {
         // A shop just founded sets itself up before it trades.
         if (!setup.ready) return settingUp(obs, acc);
         if (!acc) return steps;
-        if (winding.due(t)) return winding.finish(t, book, acc.account, acc.balance, (x) => distribute(book, me, acc, x, "Wound up: what's left, to our shareholders by their shares").steps);
+        if (winding.due(t)) {
+          // (What we owe our suppliers for goods delivered on their terms is paid first, as the debts recorded against us are.)
+          const owed = payables.settle(t, acc.account, acc.balance);
+          return [...owed.steps, ...winding.finish(t, book, acc.account, acc.balance - owed.paid, (x) => distribute(book, me, acc, x, "Wound up: what's left, to our shareholders by their shares").steps)];
+        }
         const trading = winding.state === "trading";
         const workers = staffing.workers(book, t);
         if (headcount < 0) headcount = p.operator ? 0 : Math.max(workers.length, p.min_staff); // (a new shop starts by hiring its minimum)
@@ -322,7 +333,7 @@ export const retailer: BehaviourModule = {
         }
         // Our suppliers' prices, cheapest first (those that came up short in the last week, last; at one price, in our own order).
         const offers = [...suppliers].sort().map((s) => ({ seller: s, ...goodsPrices(book, s) })).filter((x) => x.prices[p.kind] !== undefined && x.account)
-          .map((x) => ({ seller: x.seller, account: x.account!, unit: x.prices[p.kind]!, min: x.min_order ?? 1 }))
+          .map((x) => ({ seller: x.seller, account: x.account!, unit: x.prices[p.kind]!, min: x.min_order ?? 1, terms: x.terms_days ?? 0 }))
           .sort((a, b) => Number(t - (shortAt.get(a.seller) ?? -Infinity) < 7 * DAY) - Number(t - (shortAt.get(b.seller) ?? -Infinity) < 7 * DAY) || a.unit - b.unit || standingOf(a.seller) - standingOf(b.seller) || (a.seller < b.seller ? -1 : 1));
         if (!unitCost && offers.length) unitCost = offers[0]!.unit;
         const marginalCost = unitCost + Math.ceil((hourly() * p.serve_labour) / 3600);
@@ -371,8 +382,10 @@ export const retailer: BehaviourModule = {
           // Out of the month's earnings, what we hold beyond the buffer goes to the shareholders: a month's wages, a
           // month's stock at cost, and Lengnick's chi of the wage bill.
           const bill = Math.floor((Math.max(workers.length, headcount) * wage * MONTH) / p.period);
-          const buffer = bill + stockFor(lastDemand) * unitCost + Math.floor((bill * p.chi_bps) / 10_000);
-          const out = p.draw_days > 0 ? { steps: [], paid: 0 } : payOut(book, me, acc, acc.balance, buffer, acc.balance - monthStart, `a month's wages and stock, and ${p.chi_bps / 100}% of the wage bill`);
+          // (And what we owe our suppliers for stock delivered on their terms: a dividend must not take the money its invoices are paid from.)
+          const buffer = bill + stockFor(lastDemand) * unitCost + Math.floor((bill * p.chi_bps) / 10_000) + payables.owing;
+          // (Nothing is paid out while wages are owed or anyone is under notice: docs/behaviour/firms.md, "Before a dividend".)
+          const out = p.draw_days > 0 ? { steps: [], paid: 0 } : staffing.strained(book, t) ? { steps: [because(`Month's end: ${staffing.strained(book, t)}, so nothing is paid out to our shareholders.`)], paid: 0 } : payOut(book, me, acc, acc.balance, buffer, acc.balance - monthStart, `a month's wages and stock, and ${p.chi_bps / 100}% of the wage bill`);
           monthStart = acc.balance - out.paid;
           steps.push(...out.steps);
         }
@@ -431,8 +444,10 @@ export const retailer: BehaviourModule = {
           for (const o of orders.due(book, t).paid) steps.push(fillWith(o, 0, 0, [], "We are not trading: refunding the order."));
           if (at.gone && !at.closed) {
             at.closed = true;
-            const out = distribute(book, me, acc, acc.balance, at.givenUp ? "Our owner has given the business up: what it holds is theirs" : "Our owner has gone from the town: what the business holds is theirs");
-            steps.push(...out.steps, because(at.givenUp ? "Closed: our owner has given the business up." : "Closed: our owner has gone.", say("closure", `${me} has closed: its owner has ${at.givenUp ? "given it up" : "gone"}.`, { visible: "public", data: { firm: me, to_creditors: 0, to_shareholders: out.paid, ...(at.givenUp ? { given_up: true } : {}) } })));
+            // (A business that closes pays its suppliers what it owes them first, out of what it holds; the rest is its owner's.)
+            const owed = payables.settle(t, acc.account, acc.balance);
+            const out = distribute(book, me, acc, acc.balance - owed.paid, at.givenUp ? "Our owner has given the business up: what it holds is theirs" : "Our owner has gone from the town: what the business holds is theirs");
+            steps.push(...owed.steps, ...out.steps, because(at.givenUp ? "Closed: our owner has given the business up." : "Closed: our owner has gone.", say("closure", `${me} has closed: its owner has ${at.givenUp ? "given it up" : "gone"}.`, { visible: "public", data: { firm: me, to_creditors: 0, to_shareholders: out.paid, ...(at.givenUp ? { given_up: true } : {}) } })));
           }
           return steps;
         }
@@ -443,6 +458,9 @@ export const retailer: BehaviourModule = {
             priceList({ [p.kind]: price }, acc.account, `${p.kind} at ${usd(price)} each, at ${at.premises}: delivered to your home, or kept here for you. Order and pay with the order.`, { at: at.premises }, me, p.shopfront ? premisesOf(obs)?.cell ?? (at.cell || undefined) : undefined)));
         }
 
+        // ---- what we owe our suppliers for stock delivered on their terms: paid on the day (daily, not with the week's order), wages first ----
+        if (trading) steps.push(...payables.pay(t, acc.account, acc.balance, Math.max(workers.length, headcount) * wage));
+
         // ---- restocking, weekly: below the middle of Lengnick's band of last month's sales, up to its top ----
         if (t >= nextRestock && offers.length && winding.state === "trading") {
           nextRestock = t + (p.operator ? 1 : 7) * DAY; // (someone trading alone on a few days' stock buys when it runs low, not once a week)
@@ -452,13 +470,19 @@ export const retailer: BehaviourModule = {
           const best = offers[0]!;
           // As much as we can pay for, keeping the next pay period's wages aside (and at least the supplier's minimum).
           // (Keeping the next pay period's wages for the staff we have or are hiring to: this month's headcount.)
-          const affordable = Math.floor((acc.balance - Math.max(workers.length, headcount) * wage) / best.unit);
+          // On the supplier's terms (if it states any, and we are not behind with it), what we can order is what we can pay for out of what
+          // we expect to sell in the time it gives, less what we already owe it: stock no longer comes out of the wage bill in the week
+          // it is bought (docs/behaviour/trade.md, "Trade credit").
+          const keepForWages = Math.max(workers.length, headcount) * wage;
+          const terms = p.credit && best.terms && !payables.behind(best.seller, t) ? best.terms : 0;
+          const room = terms ? Math.max(0, Math.floor((lastDemand * best.unit * terms) / 30) - payables.owing) : 0;
+          const affordable = Math.floor((acc.balance - payables.pending(t) - keepForWages + room) / best.unit);
           if (have < mid) {
             const q = Math.min(Math.max(best.min, top - have), affordable);
             if (q >= best.min) {
               onOrder += q;
-              const st = order({ me, seller: best.seller, sellerAccount: best.account, kind: p.kind, quantity: q, unitPrice: best.unit, at: at.premises, from: acc.account,
-                why: `Restocking: ${stock} in stock and ${onOrder - q} on order, below ${mid} (the middle of our band of last month's sales, ${lastDemand}): ordering ${q}${q < top - have ? `, as many as we can pay for (up to ${top} would fill our band)` : ""} from ${best.seller}, the cheapest of our suppliers at ${usd(best.unit)}.` });
+              const st = order({ me, seller: best.seller, sellerAccount: best.account, kind: p.kind, quantity: q, unitPrice: best.unit, at: at.premises, from: acc.account, ...(terms ? { terms } : {}),
+                why: `Restocking: ${stock} in stock and ${onOrder - q} on order, below ${mid} (the middle of our band of last month's sales, ${lastDemand}): ordering ${q}${q < top - have ? `, as many as we can pay for (up to ${top} would fill our band)` : ""} from ${best.seller}, the cheapest of our suppliers at ${usd(best.unit)}${terms ? `, on its terms (to pay within ${terms} days of delivery)` : ""}.` });
               st.then = (out) => {
                 const id = out.created?.order;
                 if (id) {
@@ -479,7 +503,7 @@ export const retailer: BehaviourModule = {
             nextDraw = t + p.draw_days * DAY;
             // (At what its supplier charges now, and a tenth over: kept to the last unit, a rise in the price left it
             // one item short of the least order, and it never bought again.)
-            const keep = Math.ceil((Math.max(Math.ceil((p.phi_high_bps * stockFor(lastDemand)) / 10_000), offers[0]?.min ?? 0) * Math.max(unitCost, offers[0]?.unit ?? 0) * 11) / 10);
+            const keep = Math.ceil((Math.max(Math.ceil((p.phi_high_bps * stockFor(lastDemand)) / 10_000), offers[0]?.min ?? 0) * Math.max(unitCost, offers[0]?.unit ?? 0) * 11) / 10) + payables.owing;
             if (acc.balance > keep) steps.push(...distribute(book, me, acc, acc.balance - keep, `We hold ${usd(acc.balance)} and keep ${usd(keep)} for stock: the rest is our owner's`).steps);
           }
         }

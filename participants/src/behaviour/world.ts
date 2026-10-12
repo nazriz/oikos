@@ -9,7 +9,7 @@ import { cents } from "../money";
 import { ask, because, Book, callAction, MONTH, Occurrences, pay, publishedPrice, say, StandingWork, usd, withdraw, type Step, Asked, lookUp, LOOKS_MAX } from "./common";
 import * as P from "./papers";
 import { stepper } from "./firms";
-import { fill, held, OrderBook, priceList } from "./trade";
+import { declineOnTerms, fill, held, OrderBook, priceList } from "./trade";
 import { drawHousehold, drawSavings, type HouseholdSpec } from "./household";
 import { yearsOfSchooling, type SchoolingSpec } from "./school";
 import { forAge, supportLaw, type Declared, type PaymentRule } from "./payments";
@@ -62,7 +62,7 @@ export const trade: BehaviourModule = {
     { what: "future", why: "A researcher's scripted shocks to world prices and demand are a scenario's boundary condition: this module is the world market and applies each from its day, publishing nothing of one before it comes." },
     { what: "every:factory", why: "The outside world's demand for the town's goods is a boundary condition, split when the world is made among the factories that export." },
   ],
-  version: "0.2.1", // 0.2.1: a month's world price is drawn for the good and the month from the seed, never for the hour this office wakes in (a town and its twin see the same prices);
+  version: "0.3.0", // 0.3.0: sells to a factory on terms (pay within some days of delivery) where its world gives them, stops supplying one that has not paid, and records the debt against it later (docs/behaviour/trade.md, "Trade credit"); 0.2.1: a month's world price is drawn for the good and the month from the seed, never for the hour this office wakes in (a town and its twin see the same prices);
   doc: "docs/behaviour/boundary.md",
   cadence: () => DAY,
   firstWake: () => 0,
@@ -74,6 +74,10 @@ export const trade: BehaviourModule = {
         buys: {} as { [kind: string]: { unit_price: number; per_month: number; from?: { [seller: string]: number } } },
         wait_days: 14, // how long an invoice waits for its goods before it's declined
         min_order: 100, // the least it sells in one order (it sells wholesale)
+        // Trade credit (docs/behaviour/trade.md, "Trade credit"): the days it gives a buyer to pay after delivery, for a buyer who orders
+        // on terms (0: cash with order only); how long after the day it supplies an unpaid buyer on terms no more; how long after it the
+        // debt is recorded against the buyer (the last two placeholders).
+        terms_days: 0, terms_stop_after_days: 7, terms_claim_after_days: 30,
         // How a kind's world price moves each month: a random step (sd, basis points of its starting price) and how much of
         // its distance from the start it keeps (persistence, basis points). None: it doesn't move.
         price_process: {} as { [kind: string]: { sd_bps: number; persistence_bps: number } },
@@ -84,7 +88,7 @@ export const trade: BehaviourModule = {
     need(p, ["account"], "world.trade");
     const me = ctx.entity;
     const book = new Book();
-    const orders = new OrderBook(me);
+    const orders = new OrderBook(me, undefined, p.terms_days > 0 ? { days: p.terms_days, stop_after_days: p.terms_stop_after_days, claim_after_days: p.terms_claim_after_days } : null);
     let publishedKey = "";
     let listId: string | undefined;
     const level = new Map<string, number>(); // kind -> its price level, basis points of its starting price
@@ -137,19 +141,21 @@ export const trade: BehaviourModule = {
           const list = Object.entries(sells).sort(([a], [b]) => (a < b ? -1 : 1)).map(([k, x]) => `${k} ${usd(x)}`).join("; ");
           const st = because(first ? "The world market's prices, for anyone in the town who buys from outside." : "World prices have moved: republishing ours.",
             ...(listId ? [withdraw(listId, "Superseded: world prices have moved.")] : []),
-            ["list", priceList(sells, p.account, `Sold from outside, delivered, at world prices (each): ${list}; at least ${p.min_order} to an order. Order and pay with the order.`, { min_order: p.min_order })]);
+            ["list", priceList(sells, p.account, `Sold from outside, delivered, at world prices (each): ${list}; at least ${p.min_order} to an order. Order and pay with the order${p.terms_days > 0 ? `, or order on terms and pay within ${p.terms_days} days of delivery` : ""}.`, { min_order: p.min_order, ...(p.terms_days > 0 ? { terms_days: p.terms_days } : {}) })]);
           st.then = (out) => { if (out.created?.list) listId = out.created.list; };
           steps.push(st);
         }
         // Orders paid in full: deliver from outside. An order below the world price, or for something not sold, is refunded.
-        const { paid, unpaid } = orders.due(book, t);
+        const { paid, unpaid, stopped } = orders.due(book, t);
+        for (const o of stopped) steps.push(declineOnTerms(o, me, `An order on our terms from ${o.buyer}, which has not paid what it owed us: declining it.`));
+        steps.push(...orders.collect(t, p.account));
         for (const o of paid) {
           const price = sells[o.kind];
           const ok = price !== undefined && o.unitPrice >= price && o.quantity >= p.min_order;
           const step = fill(o, ok ? o.quantity : 0, me, p.account, ok ? `An order paid in full: delivering ${o.quantity} ${o.kind} from outside.` : `An order ${price === undefined ? `for ${o.kind}, which isn't sold from outside` : o.quantity < p.min_order ? `for fewer than ${p.min_order}` : "below the world price"}: refunding it.`);
           const refundIfRefused = step.then;
           if (ok) step.then = (out) => {
-            if (out.status === "applied") sent.set(o.kind, (sent.get(o.kind) ?? 0) + o.quantity);
+            if (out.status === "applied") { sent.set(o.kind, (sent.get(o.kind) ?? 0) + o.quantity); orders.bill(o, o.quantity, t); }
             return refundIfRefused?.(out);
           };
           steps.push(step);

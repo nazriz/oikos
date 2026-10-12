@@ -68,7 +68,10 @@ export interface Profile {
     /** Businesses born in a year, as a share of the businesses there are (the place's business demography, with its
      * source): what the chance of someone starting a business of their own is derived from, with the town's own
      * counts (docs/behaviour/entry.md, "Starting a business of one"). Left out: nobody starts one. */
-    business?: { entry_bps_per_year: number };
+    business?: { entry_bps_per_year: number;
+      /** The days a supplier ordinarily gives a business to pay for goods it has delivered (docs/behaviour/trade.md, "Trade credit"): a
+       * factory gives them to the shops that buy from it, and the outside world to the factories that buy inputs. Left out: cash with order. */
+      trade_credit_days?: number };
     employment?: { registered_bps?: { shop?: number; factory?: number; construction?: number };
       /** The place's law on ending a job for redundancy (docs/behaviour/firms.md, "Adjusting labour"), published in
        * the town as a law its employers read: the least notice and the redundancy pay owed, each by length of

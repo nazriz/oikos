@@ -184,3 +184,36 @@ test("what the law gives someone let go for redundancy: redundancy pay by servic
   expect(staffing.redundancyOwed(withLaw, 100 * DAY, job[0], 20).sum).toBe(Math.floor(100_000 * Math.max(0, 7 * DAY - agreed) / (7 * DAY)));
   expect(staffing.redundancyOwed(without, 2 * YEAR + DAY, job[0], 20).sum).toBe(0);
 });
+
+// Before a dividend (docs/behaviour/firms.md): none while wages are owed in the books or anyone is under notice. Found in the
+// fifth living pilot's trace: a factory paid a dividend twenty days after it had given its whole staff notice.
+test("nothing is paid to the shareholders while wages are owed; with none owed, the month's earnings above the buffer are", () => {
+  const run = (owed: boolean) => {
+    const id = "shop-1";
+    const ctx: any = context(`${id}-manager-system`, id, { premises: id, workplace: `${id}/workplace.1`, suppliers: [], demand: 20, wage: 200_000 }, { position: `${id}-manager` });
+    const m = retailer.create(ctx);
+    const ids = { n: 0 };
+    const own: any[] = [];
+    const as = { participant: `${id}-manager-system`, position: `${id}-manager` };
+    const holders = statement("sh", 0, "shareholders", { speaks_for: id, data: { holders: [{ holder: "p1", account: "acc-p1", shares: 10_000 }] } });
+    const at = (t: number, balance: number, records: any[] = [], inbox: any[] = []) => {
+      const books = { kind: "accounts", accounts: [{ account: `acc-${id}`, holder: id, custodian: "bank", currency: "AUD", balance: String(balance) }], transactions: [] };
+      const before = ids.n;
+      const w = wake(m, t, { books, mine: { kind: "records", records: [...own.splice(0), ...records] } }, { entity: id, as, ids, inbox, more: { readings: { J1: { of: "agreement", status: "in_force" } } } });
+      own.push(...w.made);
+      return { ...w, idOf: (c: any) => `made.${before + w.said.indexOf(c) + 1}` };
+    };
+    const first = at(DAY, 10_000_000, [holders, ...signed(employment("J1", 0, id, "c1", 200_000))]);
+    if (owed) {
+      const orderId = first.idOf(first.said.find((c) => c.fn === "money" && c.args.every && String(c.args.for).startsWith("Wages"))!);
+      const asRecord = { id: orderId, at: DAY, record: "statement", kind: "request", author: as.participant, speaks_for: id, addressed_to: ["bank"], visible_to: [id, "bank"], basis: "J1",
+        data: { outcome: { money: { from: `acc-${id}`, to: "acc-c1", amount: "200000", for: "Wages for c1." } }, every: 14 * DAY } };
+      at(15 * DAY, 10_000, [asRecord], [{ from: "bank", re: orderId, text: PAYMENT_FAILED.note("$2,000.00", "acc-c1", orderId) }]);
+    }
+    // A month on, the shop holds far more than it did: the month's earnings.
+    const end = at(32 * DAY, 60_000_000);
+    return end.said.filter((c) => c.fn === "statement" && c.args.kind === "request" && /dividend/i.test(String(c.args.text)));
+  };
+  expect(run(false).length).toBe(1);
+  expect(run(true)).toEqual([]);
+});

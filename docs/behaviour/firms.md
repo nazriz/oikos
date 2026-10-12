@@ -85,7 +85,15 @@ The labour-market literature (the Dosi et al. "Schumpeter meeting Keynes" labour
 
 A world with no such law and a firm given `adjust: { smooth_months: 0, hiring_cost_weeks: 0 }` behave as before 2026-10-11. The builder's crew already follows the work in hand over a horizon of days; it now owes redundancy pay like anyone.
 
-**What is not here.** Hours cut before heads as a change of pay (short-time work, stand-downs: a wage here is a sum a fortnight whatever the hours); a firm that asks for volunteers, or picks whom to let go by anything but last in, first out; an employer asking a trade of those it hires (which is why a shop's hand still moves to a factory for half as much again: docs/design/ai-citizens.md, "Progress"); a worker claiming redundancy pay that is not paid (it stands in the firm's books and is paid when it can be, or lost when the firm is wound up short); Japan's case law, which makes dismissal for redundancy rare there and is no figure.
+**What is not here.** Hours cut before heads as a change of pay (short-time work, stand-downs: a wage here is a sum a fortnight whatever the hours; still not here on 2026-10-12: it needs an hours term in the agreement, a law in the profile on when an employer may cut them, and a worker who reads a cut that was agreed as agreed and not as pay come short: docs/decisions.md, "Firms respond to a shock"); a firm that asks for volunteers, or picks whom to let go by anything but last in, first out; an employer asking a trade of those it hires (which is why a shop's hand still moves to a factory for half as much again: docs/design/ai-citizens.md, "Progress"); a worker claiming redundancy pay that is not paid (it stands in the firm's books and is paid when it can be, or lost when the firm is wound up short); Japan's case law, which makes dismissal for redundancy rare there and is no figure.
+
+## Before a dividend (2026-10-12): none while wages are owed or anyone is under notice
+
+**The fault.** In the fifth pilot's trace a factory paid its owners a dividend twenty days after it had given its whole staff notice because it could not cover the wage bill. Paying out was tested against the month's earnings and a buffer, never against what was owed to the staff.
+
+**Now.** At the month's end a shop or factory pays nothing to its shareholders while wages are owed in its books (a pay missed for want of money, or redundancy pay not yet paid: "Wages owed", below) or anyone of its staff is under notice (`Staffing.strained`); it says so, and the month's earnings stay in the account. A firm in good order pays as before.
+
+**Where it comes from.** A company may pay a dividend only if doing so does not materially prejudice its ability to pay its creditors (Corporations Act 2001 (Cth) s 254T **(to confirm; recalled, not opened)**); staff owed wages are creditors. The same idea in company law generally (distributions limited by solvency). **Not here:** a general solvency test (assets over liabilities) before every dividend; directors' liability for a dividend paid while insolvent.
 
 ## Wages owed (2026-10-11): one ledger, and what a bank statement says
 

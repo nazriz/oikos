@@ -12,7 +12,7 @@ import { nextLook, because, Book, publishedPrice as buildingPrice, DAY, MONTH, o
 import { Bargaining, LabourPlan, Staffing, stepper, terminationLaw, WindingUp } from "./firms";
 import { Borrowing } from "./credit";
 import { distribute, LENGNICK, movePrice, moveWage, payOut } from "./lengnick";
-import { Committed, Deliveries, fill, goodsPrices, held, order, OrderBook, priceList } from "./trade";
+import { Committed, declineOnTerms, Deliveries, fill, goodsPrices, held, order, OrderBook, Payables, priceList } from "./trade";
 import * as P from "./papers";
 
 /**
@@ -27,7 +27,7 @@ export const producer: BehaviourModule = {
   name: "firm.producer",
   issues: [P.JOB_ADVERTISEMENT, ...P.TRADE, P.REMEDY_ANSWER, ...P.VENUE_ANSWERS],
   issuesWith: (p) => ({ ...P.staffingOwn({ role: p.role ?? "factory worker", industry: p.industry, workplace: p.workplace, notice_days: p.notice_days ?? 14 }) }),
-  version: "0.7.1", // 0.7.1: returns of tax withheld are filed on the days the law states (docs/behaviour/firms.md, "Returns on the law's days"); 0.7.0: 0.7.0: adjusts its staff as firms do (docs/behaviour/firms.md, "Adjusting labour"): demand smoothed over months, people held while it makes less, let go only when the surplus has lasted what ending the job costs, redundancy pay under the world's law, no recruiting after letting someone go for want of money; 0.6.0: everyday frictions (docs/behaviour/frictions.md): pay that comes short, at the world's rate and its character's; asked, told or ordered to put it right; 0.5.0: wants of its own (docs/behaviour/firm-wants.md): a character from its owner's values, which answers a worker who asks for a rise, and a record of its own; 0.4.5: money promised in orders the bank has not yet paid out is not spent again by the next wake (one works placed the same order 40 times in a day); 0.4.4: 0.4.4: takes on the share of its hands the world gives by the day; 0.4.3: registers the share of its jobs the world gives for its kind
+  version: "0.8.0", // 0.8.0: buys its inputs on the supplier's terms where it states them, and sells to shops on terms of its own where its world gives them (docs/behaviour/trade.md, "Trade credit"); makes and buys to what it can sell, and none while a unit loses money before wages (docs/behaviour/producer.md, "Inputs bought to what can be sold"); borrows again as its bank allows; no dividend while wages are owed or anyone is under notice (docs/behaviour/firms.md, "Before a dividend"); 0.7.1: returns of tax withheld are filed on the days the law states (docs/behaviour/firms.md, "Returns on the law's days"); 0.7.0: 0.7.0: adjusts its staff as firms do (docs/behaviour/firms.md, "Adjusting labour"): demand smoothed over months, people held while it makes less, let go only when the surplus has lasted what ending the job costs, redundancy pay under the world's law, no recruiting after letting someone go for want of money; 0.6.0: everyday frictions (docs/behaviour/frictions.md): pay that comes short, at the world's rate and its character's; asked, told or ordered to put it right; 0.5.0: wants of its own (docs/behaviour/firm-wants.md): a character from its owner's values, which answers a worker who asks for a rise, and a record of its own; 0.4.5: money promised in orders the bank has not yet paid out is not spent again by the next wake (one works placed the same order 40 times in a day); 0.4.4: 0.4.4: takes on the share of its hands the world gives by the day; 0.4.3: registers the share of its jobs the world gives for its kind
   doc: "docs/behaviour/producer.md",
   cadence: () => DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(24) * 3600,
@@ -63,6 +63,15 @@ export const producer: BehaviourModule = {
         price: 6000, // its wholesale price, cents each
         min_order: 50, // the least it sells in one order (it sells wholesale)
         lender: "", // whom it borrows from (none: it doesn't)
+        // More than one loan (docs/behaviour/credit.md, "More than one loan"): after a loan is granted it may apply again this many
+        // days later, and the bank decides on its rule, counting what it already repays (placeholder). -1: one loan at a time.
+        borrow_again_days: 30,
+        // Trade credit (docs/behaviour/trade.md, "Trade credit"). Selling: the terms it gives a customer who orders them
+        // (`days` to pay after delivery; 0: cash with order, as it was), how long after the day it supplies an unpaid customer
+        // on terms no more, and how long after it the debt is recorded against it (placeholders). Buying: whether it buys on
+        // the terms a supplier states.
+        terms_days: 0, terms_stop_after_days: 7, terms_claim_after_days: 30,
+        credit: true,
         // Insolvency (docs/behaviour/insolvency.md; placeholders): short of wages this long with no credit, or in default on
         // a loan, and it winds up over this long.
         short_days: 60,
@@ -105,7 +114,7 @@ export const producer: BehaviourModule = {
     const answering = new Respondent(ctx.rng, me, org, { params: p.respond, forms: [{ notice: "hearing_notice", response: "tribunal_response", decision: "tribunal_order" }],
       truth: (m) => (m.matter === "underpaid" && m.about ? { owed: staffing.owedShort(m.about) } : undefined),
       remedy: (m, _from, t, why) => (m.matter === "underpaid" && m.about && payAccount ? staffing.payInFull(book, t, payAccount, m.about, why) : undefined) });
-    const borrowing = new Borrowing(me, p.lender);
+    const borrowing = new Borrowing(me, p.lender, p.borrow_again_days >= 0 ? { again_days: p.borrow_again_days } : {});
     const bargaining = new Bargaining(me);
     const winding = new WindingUp(me, { short_days: p.short_days, wind_up_days: p.wind_up_days, idle_days: p.idle_days, reprice_days: p.reprice_days, reprice_bps: p.reprice_bps });
     // Our premises, as the sites we see show them (for selling them if we close).
@@ -114,7 +123,8 @@ export const producer: BehaviourModule = {
       return c?.structure ? { structure: c.structure.structure, type: c.structure.type, cell: c.cell } : undefined;
     };
 
-    const orders = new OrderBook(me);
+    const orders = new OrderBook(me, undefined, p.terms_days > 0 ? { days: p.terms_days, stop_after_days: p.terms_stop_after_days, claim_after_days: p.terms_claim_after_days } : null);
+    const payables = new Payables(me); // what we owe our supplier for inputs delivered on its terms
     const deliveries = new Deliveries();
     const committed = new Committed(); // inputs paid for with orders whose payment the bank has not yet made
     const onOrder = new Map<string, number>(); // inputs ordered, not yet delivered
@@ -135,6 +145,7 @@ export const producer: BehaviourModule = {
     let headcount = -1; // this month's staff target (set at each month's end; at first, the staff we have)
     let headcountWhy = "";
     let priceWhy = "";
+    let nextLosingNote = 0;
     let exported = 0; // shipped under this month's offer
     let nextShipment = 0;
     const workDay = (t: number) => Math.floor(t / DAY) % 7 < p.work_days;
@@ -144,6 +155,8 @@ export const producer: BehaviourModule = {
       const sp = channels.cells(obs).find((c) => c.structure?.structure === p.works)?.structure?.spaces.find((x) => x.kind === "workplace");
       return sp ? sp.capacity - Math.max(sp.count, staff) : p.max_staff;
     };
+    /** The world market's standing offer for what we make, if one is open. */
+    const exportOffer = (t: number) => book.open("buying_offer").filter((r) => r.speaks_for === p.market && r.data?.kind === p.output && (r.data?.until ?? Infinity) > t).sort((a, b) => b.at - a.at)[0];
     const hourly = () => Math.ceil((wage * 3600) / ((p.period / DAY) * (p.work_days / 7) * p.working_day));
 
     staffing.org = org;
@@ -154,6 +167,7 @@ export const producer: BehaviourModule = {
         winding.absorb(obs, ownAccount(obs)?.account);
         orders.take(obs, ownAccount(obs)?.account);
         committed.take(obs, ownAccount(obs)?.account);
+        payables.take(book);
         for (const d of deliveries.take(book, me)) {
           const o = orderQty.get(d.order);
           if (!o) continue;
@@ -171,7 +185,11 @@ export const producer: BehaviourModule = {
           return winding.sell(obs, book, acc.account, acc.balance, where, worth ? Math.floor((worth * p.premises_sale_bps) / 10_000) : undefined, (x) => distribute(book, me, acc, x, "The proceeds of our premises: to our shareholders by their shares").steps);
         }
         if (!acc) return steps;
-        if (winding.due(t)) return winding.finish(t, book, acc.account, acc.balance, (x) => distribute(book, me, acc, x, "Wound up: what's left, to our shareholders by their shares").steps);
+        if (winding.due(t)) {
+          // (What we owe our supplier for inputs delivered on its terms is paid first, as the debts recorded against us are.)
+          const owed = payables.settle(t, acc.account, acc.balance);
+          return [...owed.steps, ...winding.finish(t, book, acc.account, acc.balance - owed.paid, (x) => distribute(book, me, acc, x, "Wound up: what's left, to our shareholders by their shares").steps)];
+        }
         const trading = winding.state === "trading";
         const workers = staffing.workers(book, t);
         // Before a month's history: what our export customers want (our share of the market's offer), or failing that
@@ -187,6 +205,20 @@ export const producer: BehaviourModule = {
         const inputCost = Object.entries(p.per_unit).reduce((x, [k, q]) => x + q * (supply.prices[k] ?? 0), 0);
         const marginalCost = inputCost + Math.ceil((hourly() * p.labour_per_unit) / 3600);
         const stock = held(obs, p.works, p.output);
+        // What a unit fetches on the trade we have (last month's orders at our price, what the world market would take at its),
+        // against what its inputs cost now. Under it, a unit made loses money before a wage is paid: we buy no inputs for it,
+        // and take nobody on to make it (docs/behaviour/producer.md, "Inputs bought to what can be sold").
+        const offerNow = exportOffer(t);
+        const exportUnit = offerNow ? Number(offerNow.data!.unit_price) || 0 : 0;
+        const exportShare = offerNow ? (Number((offerNow.data?.quantities as { [s: string]: number } | undefined)?.[me] ?? offerNow.data?.quantity) || 0) : 0;
+        // (Each channel on its own: orders at home are made for if our price covers the inputs, the world market's if its does.)
+        const known = lastDomestic + exportShare;
+        const homeOk = price >= inputCost, abroadOk = exportUnit >= inputCost;
+        const sellable = (homeOk ? lastDomestic : 0) + (abroadOk ? exportShare : 0);
+        const tradeUnits = known > 0 ? sellable : Math.max(0, lastDemand);
+        const fetches = sellable > 0 ? Math.floor(((homeOk ? lastDomestic * price : 0) + (abroadOk ? exportShare * exportUnit : 0)) / sellable) : price;
+        const losing = inputCost > 0 && known > 0 && sellable === 0;
+        const sellableShare = known > 0 ? sellable / known : 1;
 
         // ---- the month's end: Lengnick's rules ----
         const m = Math.floor(t / MONTH);
@@ -218,7 +250,7 @@ export const producer: BehaviourModule = {
           headcountWhy = why.length ? `; ${why.join("; ")}` : "";
           // Hiring and letting go (Lengnick): stock against demand decides this month's headcount.
           headcount = workers.length;
-          if (low && workers.length < p.max_staff) {
+          if (low && workers.length < p.max_staff && !losing) {
             labour.month(false, 1);
             headcount = workers.length + 1;
             headcountWhy = `: at the month's end, stock (${stock}) was below ${p.phi_low_bps / 100}% of ${demandWords}${headcountWhy}`;
@@ -237,8 +269,10 @@ export const producer: BehaviourModule = {
           // wage bill. The capital we started with isn't paid out.
           const staffFor = Math.max(workers.length, headcount);
           const bill = Math.floor((staffFor * wage * MONTH) / p.period);
-          const buffer = bill + monthlyUnits(staffFor) * inputCost + Math.floor((bill * p.chi_bps) / 10_000);
-          const out = payOut(book, me, acc, acc.balance, buffer, monthStart < 0 ? 0 : acc.balance - monthStart, `a month's wages and inputs, and ${p.chi_bps / 100}% of the wage bill`);
+          // (And what we owe our supplier for inputs delivered on its terms: a dividend must not take the money its invoices are paid from.)
+          const buffer = bill + monthlyUnits(staffFor) * inputCost + Math.floor((bill * p.chi_bps) / 10_000) + payables.owing;
+          // (Nothing is paid out while wages are owed or anyone is under notice: docs/behaviour/firms.md, "Before a dividend".)
+          const out = staffing.strained(book, t) ? { steps: [because(`Month's end: ${staffing.strained(book, t)}, so nothing is paid out to our shareholders.`)], paid: 0 } : payOut(book, me, acc, acc.balance, buffer, monthStart < 0 ? 0 : acc.balance - monthStart, `a month's wages and inputs, and ${p.chi_bps / 100}% of the wage bill`);
           monthStart = acc.balance - out.paid;
           steps.push(...out.steps);
         }
@@ -292,7 +326,7 @@ export const producer: BehaviourModule = {
           const old = book.open("price_list").filter((r) => r.speaks_for === me);
           publishedPrice = price;
           steps.push(because(old.length ? priceWhy || `Our wholesale price is now ${usd(price)}.` : "Publishing our wholesale price.", ...old.map((r) => withdraw(r.id, "Superseded.")),
-            priceList({ [p.output]: price }, acc.account, `Wholesale ${p.output} from ${me}: ${usd(price)} each, at least ${p.min_order} to an order, delivered. Order and pay with the order.`, { min_order: p.min_order }, me)));
+            priceList({ [p.output]: price }, acc.account, `Wholesale ${p.output} from ${me}: ${usd(price)} each, at least ${p.min_order} to an order, delivered. Order and pay with the order${p.terms_days > 0 ? `, or order on terms and pay within ${p.terms_days} days of delivery` : ""}.`, { min_order: p.min_order, ...(p.terms_days > 0 ? { terms_days: p.terms_days } : {}) }, me)));
         }
 
         // ---- inputs: (s, S): below a month's use (with what's on order), order up to a month and a half's ----
@@ -300,8 +334,15 @@ export const producer: BehaviourModule = {
         // shop does when it restocks (docs/behaviour/retailer.md): inputs are bought a month ahead of their use, and
         // wages fall due within the fortnight. (Until 2026-10-08 the whole balance went on an order: a works holding a
         // month's inputs spent its payroll on the next half month's, and gave its staff notice for want of the payroll.)
-        const plan = monthlyUnits(workers.length);
-        let spare = acc.balance - committed.owed - Math.max(workers.length, headcount) * wage;
+        // What a month's making is for: the trade we expect (the months smoothed) and what it takes to bring stock to the top of
+        // its band, never more than our staff can make; nothing while a unit loses money before wages (above).
+        const expectedUnits = Math.max(0, Math.floor((labour.expected >= 0 ? labour.expected : lastDemand) * sellableShare));
+        const topOfBand = Math.ceil((p.phi_high_bps * expectedUnits) / 10_000);
+        const plan = losing ? 0 : Math.min(monthlyUnits(workers.length), expectedUnits + Math.max(0, topOfBand - stock));
+        // Paying what has fallen due to the supplier (wages first), before this week's buying.
+        if (trading) steps.push(...payables.pay(t, acc.account, acc.balance - committed.owed, Math.max(workers.length, headcount) * wage));
+        let spare = acc.balance - committed.owed - payables.pending(t) - Math.max(workers.length, headcount) * wage;
+        let onTerms = 0; // ordered on terms this wake (not yet in what we owe)
         for (const [kind, per] of Object.entries(p.per_unit).sort(([a], [b]) => (a < b ? -1 : 1))) {
           if (winding.state !== "trading") break; // winding up: no more buying
           const have = held(obs, p.works, kind) + (onOrder.get(kind) ?? 0);
@@ -311,22 +352,31 @@ export const producer: BehaviourModule = {
           if (have >= s || unit === undefined || !supply.account) continue;
           const least = supply.min_order ?? 1; // at least what the supplier sells in one order
           const want = Math.max(up - have, least);
-          const q = Math.min(want, Math.floor(spare / unit));
+          // On the supplier's terms (if it states any, and we are not behind with it): paid for after the goods are in, out of what we
+          // sell in the time it gives, so inputs no longer come out of the wage bill in the week they are bought. The room is what the
+          // trade we expect brings in over that time, less what we already owe it.
+          const terms = p.credit && supply.terms_days && !payables.behind(p.supplier, t) ? supply.terms_days : 0;
+          const room = terms ? Math.max(0, Math.floor((tradeUnits * fetches * terms) / 30) - payables.owing - onTerms) : 0;
+          const q = Math.min(want, Math.floor((terms ? spare + room : spare) / unit));
           if (q < least || q <= 0) continue;
-          spare -= q * unit;
-          committed.add(supply.account, q * unit, t);
+          if (terms) onTerms += q * unit; // (the order costs no cash now: it uses the room)
+          else { spare -= q * unit; committed.add(supply.account, q * unit, t); }
           onOrder.set(kind, (onOrder.get(kind) ?? 0) + q);
-          const st = order({ me, seller: p.supplier, sellerAccount: supply.account, kind, quantity: q, unitPrice: unit, at: p.works, from: acc.account,
-            why: `Our ${kind} (${have} with what's on order) are below a month's production (${s}): ordering ${q}, ${q < want ? `as many as we can pay for with the next pay period's wages kept aside (${want} would take us up to a month and a half's)` : "up to a month and a half's"}.` });
+          const st = order({ me, seller: p.supplier, sellerAccount: supply.account, kind, quantity: q, unitPrice: unit, at: p.works, from: acc.account, ...(terms ? { terms } : {}),
+            why: `Our ${kind} (${have} with what's on order) are below a month's production (${s}, for the ${expectedUnits} ${p.output} we expect to sell${plan < monthlyUnits(workers.length) ? "" : ", as many as our staff can make"}): ordering ${q}${terms ? `, on ${p.supplier}'s terms (to pay within ${terms} days of delivery)` : ""}${q < want ? `, as many as ${terms ? "the trade we expect lets us pay for in that time" : "we can pay for with the next pay period's wages kept aside"} (${want} would take us up to a month and a half's)` : ", up to a month and a half's"}.` });
           st.then = (out) => {
             const id = out.created?.order;
             if (id) orderQty.set(id, { kind, quantity: q });
             else {
               onOrder.set(kind, Math.max(0, (onOrder.get(kind) ?? 0) - q));
-              committed.undo(supply.account!, q * unit);
+              if (!terms) committed.undo(supply.account!, q * unit);
             }
           };
           steps.push(st);
+        }
+        if (losing && winding.state === "trading" && t >= nextLosingNote) {
+          nextLosingNote = t + MONTH;
+          steps.push(because(`A ${p.output} fetches ${usd(fetches)} on the trade we have, and its inputs cost ${usd(inputCost)}: buying none, and making only from what we hold.`));
         }
 
         // ---- the day's work: everyone of ours at the works, as much as the inputs allow ----
@@ -366,13 +416,18 @@ export const producer: BehaviourModule = {
 
         // ---- wholesale: fill paid orders from stock ----
         let left = stock;
-        const { paid, unpaid } = orders.due(book, t);
+        const { paid, unpaid, stopped } = orders.due(book, t);
+        for (const o of stopped) steps.push(declineOnTerms(o, me, `An order on our terms from ${o.buyer}, which has not paid what it owed us: declining it (cash with order, if it wants the goods).`));
+        steps.push(...orders.collect(t, acc.account));
         for (const o of paid) {
           const ok = o.kind === p.output && o.unitPrice >= price && o.quantity >= p.min_order;
           const q = ok ? Math.min(o.quantity, left) : 0;
           left -= q;
           domestic += o.quantity;
-          steps.push(fill(o, q, p.works, acc.account, !ok ? `An order ${o.kind !== p.output ? `for ${o.kind}, which we don't sell` : o.quantity < p.min_order ? `for fewer than ${p.min_order}` : "below our price"}: refunding it.` : q === o.quantity ? `An order paid in full: delivering ${q} ${o.kind}.` : `An order paid in full: we have ${q} of the ${o.quantity}; delivering them and refunding the rest.`));
+          const filled = fill(o, q, p.works, acc.account, !ok ? `An order ${o.kind !== p.output ? `for ${o.kind}, which we don't sell` : o.quantity < p.min_order ? `for fewer than ${p.min_order}` : "below our price"}: refunding it.` : q === o.quantity ? `An order paid in full: delivering ${q} ${o.kind}.` : `An order paid in full: we have ${q} of the ${o.quantity}; delivering them and refunding the rest.`);
+          // (On terms, what is delivered is billed once the goods have gone.)
+          if (o.terms && q > 0) { const was = filled.then; filled.then = (out) => { if (out.status === "applied") orders.bill(o, q, t); return was?.(out); }; }
+          steps.push(filled);
         }
         for (const o of unpaid) steps.push(because("An order unpaid for a week: declining it.", say("delivery_note", `Order ${o.id} declined: not paid.`, { to: [o.buyer], visible: [o.buyer, me], basis: o.id, data: { order: o.id, kind: o.kind, ordered: o.quantity, delivered: 0, refund: 0, declined: "unpaid" } })));
         for (const [a, x] of orders.unclaimed(book)) {
