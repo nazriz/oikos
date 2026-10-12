@@ -568,6 +568,8 @@ pub struct Transaction {
     pub per_instruction: Option<Id>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub memo: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub line: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

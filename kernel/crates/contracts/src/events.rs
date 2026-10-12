@@ -168,6 +168,8 @@ pub enum EventBody {
         per_instruction: Option<Id>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         memo: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        line: Option<String>,
     },
     /// Work done (phase B): units of a task at a structure, by performers, taking `labour` seconds of their time.
     Worked {

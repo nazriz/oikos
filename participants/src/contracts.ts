@@ -150,7 +150,7 @@ export interface Outcome {
 export interface Message { id: Id; t: number; from: Id; as?: Id; from_entity?: Id; to: Id[]; text: string; re?: Id }
 
 /** Amounts and balances are decimal-string integers in the currency's smallest unit (D58); `cents` (money.ts) reads them. */
-export interface Transaction { t: number; from: Id; to: Id; amount: string; currency: string; by: Id; settles?: Id; per_instruction?: Id; memo?: string }
+export interface Transaction { t: number; from: Id; to: Id; amount: string; currency: string; by: Id; settles?: Id; per_instruction?: Id; memo?: string; line?: string }
 
 /** A space in a building: its kind and attributes (the world's vocabulary), how many bodies it holds at most, how many
  * are in it, and who (in the capacity's own buildings, or where its channel shows names). */

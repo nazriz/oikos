@@ -23,7 +23,8 @@
             "to": { "$ref": "#/$defs/Id" },
             "amount": { "$ref": "#/$defs/Amount" },
             "for": { "type": "string", "maxLength": 500 },
-            "settles": { "$ref": "#/$defs/Id" }
+            "settles": { "$ref": "#/$defs/Id" },
+            "line": { "description": "The line of the payer's adopted budget the payment is drawn on, a label the payer gives (a payment with none is not refused).", "$ref": "#/$defs/Id" }
           }
         },
         "goods": {

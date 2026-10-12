@@ -52,7 +52,7 @@ Rules every module follows (so re-runs are reproducible):
 | (home ownership) | owner-occupiers at the start, mortgages the bank takes on, owners' rates, titles passed to heirs | [ownership.md](ownership.md) |
 | `utility.water` | a water corporation: draws the town's use from the river each day (restrictions when it can't), bills owners quarterly | [utilities.md](utilities.md) |
 | `utility.energy` | an energy retailer: buys from the grid, supplies its customers (emitting the grid's greenhouse gas), bills them monthly | [utilities.md](utilities.md) |
-| `police.station` | the police: officers by establishment, reports investigated (finding who with a chance), charges to the tribunal | [crime.md](crime.md) |
+| `police.station` | the police: officers by establishment, reports investigated (finding who with a chance), charges to the tribunal; warrants carried out; in the officers' hands under standing orders when a model holds the office | [crime.md](crime.md), [standing-work.md](standing-work.md) |
 | (a death made known) | those who share a home report a death there; someone with nobody at home is found by their landlord or the police; in the citizen's, the landlord's and the police's modules | [deaths.md](deaths.md) |
 | (floods) | the river over its banks, buildings flooded and their people to the relief centre | [floods.md](floods.md) |
 | `tribunal.member` | a tribunal's member: lists applications, tells both sides, and on the day decides on the record under the laws in force (a rent increase invalid or valid; a debt ordered paid) | [justice.md](justice.md) |
@@ -67,6 +67,7 @@ Rules every module follows (so re-runs are reproducible):
 | `world.valuer` | the outside world's valuer: values every private property yearly (land, plus the builder's price for its buildings) | [public-finance.md](public-finance.md) |
 | `world.grants` | the outside world's grants to the town: quarterly, per resident | [public-finance.md](public-finance.md) |
 | (payroll) | employers withhold income tax under the published law and pay it over monthly, in `Staffing` | [public-finance.md](public-finance.md) |
+| (an offer taken back) | whoever made an offer withdraws it before it is signed; it can then not be signed, and a signature after the withdrawal concludes nothing | [offers.md](offers.md) |
 | `idle` | does nothing (placeholder, and a control condition) | this page |
 
 Trade in goods (price lists, orders paid with the order, delivery notes) is shared by every module that buys or sells: [trade.md](trade.md). What buildings take (materials, hours of work) is in [building.md](building.md).

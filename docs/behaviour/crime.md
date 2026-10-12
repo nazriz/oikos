@@ -45,3 +45,7 @@ a handful found at shops' stocktakes, each investigated, about one in five charg
 second was under way, and was read only at the next plan): those reports were never charged or closed. Findings are
 now kept as they come (police.station 0.1.1). And taking is only from an employer that sells goods (citizen 0.33.0):
 a builder's labourer had tried the yard, which holds materials.
+
+## When a model holds the station (2026-10-12)
+
+The officers' routine (warrants carried out on their day, reports looked into, homes called at) is theirs under standing work orders in force at the start, and the office-holder hires and makes the orders: docs/behaviour/standing-work.md, "The police station".

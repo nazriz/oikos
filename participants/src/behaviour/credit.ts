@@ -104,7 +104,7 @@ export class Borrowing {
     for (const r of book.all("loan_default")) if ((r.addressed_to ?? []).includes(this.me)) this.impaired = true;
     if (!account) return steps;
     for (const r of book.ofType("agreement")) {
-      if (r.record !== "agreement" || r.terms.template !== "loan" || !r.terms.parties.includes(this.me) || r.terms.parties[0] !== this.lender || this.taken.has(r.id) || book.signedBy(r.id, this.me)) continue;
+      if (r.record !== "agreement" || r.terms.template !== "loan" || !r.terms.parties.includes(this.me) || r.terms.parties[0] !== this.lender || this.taken.has(r.id) || book.signedBy(r.id, this.me) || book.takenBack(r.id)) continue;
       this.taken.add(r.id);
       this.applied = null;
       const owe = commitmentOf(r, this.me);
@@ -148,7 +148,7 @@ export const lending: BehaviourModule = {
     { what: "request", why: "The bank's own files: its customers' instructions, among them the repayments of the loans this office made." },
     { what: "accounts", why: "The bank's own ledger: it keeps its customers' accounts, and a lending office reads what an applicant holds with it." },
   ],
-  version: "0.4.3", // 0.4.3: a loan it offered is read from its own file where it is not in its head, so whoever holds the office pays out what was approved; 0.4.2: a loan standing at the start is counted from its own repayment day where it names one (attrs.first_due), not from the bank's first look; 0.4.1: main's 0.3.1 with this branch's 0.4.0 (an applicant is looked up)
+  version: "0.4.4", // 0.4.4: repayments missed before the year began, by the bank's statement of the loan account on file (an opening caseload), are counted as due and none repaid, and a letter of arrears already on file is not sent again; 0.4.3: a loan it offered is read from its own file where it is not in its head, so whoever holds the office pays out what was approved; 0.4.2: a loan standing at the start is counted from its own repayment day where it names one (attrs.first_due), not from the bank's first look; 0.4.1: main's 0.3.1 with this branch's 0.4.0 (an applicant is looked up)
   doc: "docs/behaviour/credit.md",
   cadence: () => DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(24) * 3600,
@@ -245,7 +245,12 @@ export const lending: BehaviourModule = {
             // 2026-10-11 every loan standing at the start was counted from the bank's first look, so every borrower
             // who had not paid fell into arrears, and then into default, on the same day.)
             const firstDue = Number.isSafeInteger((r.terms as any).attrs?.first_due) && (r.terms as any).attrs.first_due > 0 ? ((r.terms as any).attrs.first_due as number) : undefined;
-            loans.set(r.id, { agreement: r.id, borrower: who, account: repay.from, principal: payment * months, payment, months, start: firstDue !== undefined ? r.at + firstDue - MONTH : t, ...(rateOf ? { rate_bps: Math.round(Number(rateOf[1]) * 100) } : {}) });
+            // (Repayments missed before the year began, by our statement of the loan account: counted as due, none repaid; a
+            // letter of arrears already on file is not sent again.)
+            const carried = book.open("loan_statement").filter((x) => x.speaks_for === me && x.data?.loan === r.id && x.data?.brought_forward).sort((a, b) => b.at - a.at)[0];
+            const missed = carried ? Math.max(0, Math.floor(Number(carried.data?.payments) || 0)) : 0;
+            const lettered = book.open("loan_arrears").some((x) => x.speaks_for === me && x.data?.loan === r.id && x.data?.brought_forward);
+            loans.set(r.id, { agreement: r.id, borrower: who, account: repay.from, principal: payment * months, payment, months, start: (firstDue !== undefined ? r.at + firstDue - MONTH : t) - missed * MONTH, ...(lettered ? { arrearsNoticeAt: t } : {}), ...(rateOf ? { rate_bps: Math.round(Number(rateOf[1]) * 100) } : {}) });
           }
         }
         // What borrowing from us is, for anyone who might (docs/design/ai-citizens.md 2a): published once.

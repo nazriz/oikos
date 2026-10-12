@@ -13,17 +13,24 @@ import * as C from "../calls";
 import type { SiteStructure } from "../contracts";
 import type { ParticipantAction, Observation } from "../contracts";
 import { need, params, type BehaviourModule, type ParticipantContext } from "../module";
-import { because, Book, DAY, goSee, nextLook, outOfTime, say, type Step, usd, visited, VISIT_MAX } from "./common";
+import { because, Book, DAY, goSee, nextLook, outOfTime, say, StandingWork, type Step, usd, visited, VISIT_MAX } from "./common";
 import { Staffing, stepper } from "./firms";
 import * as P from "./papers";
 
 export const station: BehaviourModule = {
   name: "police.station",
   answers: {"office": "the police station", "acts": "What it acts on: a report of a crime, which it investigates; and a request to call at a home where nobody has been seen."},
+  // The station's routine, where a model holds the office (docs/behaviour/standing-work.md, "The police station"): its
+  // officers do these by standing work order; whoever holds the office hires and stands down officers and makes the orders.
+  routines: [
+    { task: "carry_out_warrants", at: "workplace", every: 1, what: "On each working day an officer at the station carries out the tribunal's warrants of possession that have come to it, in the order they came and once the day each gives has come: the officer goes to the home and puts out whoever of the household is there, and the tenant and the landlord are told it is done and how many were there. A warrant its registrar has withdrawn is not gone on; one not carried out by its last day lapses and the landlord is told, and must ask again." },
+    { task: "look_into_reports", at: "workplace", every: 1, what: "Each working day the officers at the station look into the reports of goods taken that have been made to it, in the order they came, as many as their hours allow (four hours each). Where they find who took them, they lay a charge before the tribunal with what they found as evidence; where they do not, the report is closed unsolved and the person who made it is told." },
+    { task: "call_at_homes", at: "workplace", every: 1, what: "Each working day an officer goes to each home the station has been asked to call at, where a neighbour has seen nobody come out; if someone is found dead there who is not yet registered as dead, the death is reported to the registry." },
+  ],
   issues: [P.JOB_ADVERTISEMENT, ...P.POLICE],
   staffed: (p) => ({ role: p.role ?? "police officer", posts: { establishment: p.officers ?? 0 } }),
   issuesWith: (p) => ({ ...P.staffingOwn({ role: p.role ?? "police officer", industry: p.industry ?? "public_safety", workplace: p.workplace, notice_days: p.notice_days ?? 14 }), tribunal: p.tribunal, registry: p.registry }),
-  version: "0.5.1", // 0.5.1: returns of tax withheld are filed on the days the law states (docs/behaviour/firms.md, "Returns on the law's days"); 0.5.0: a warrant carried out says how many of the household were there and were put out (none, where nobody was: possession is given all the same); one its registrar has withdrawn is not gone on; 0.4.0: carries out a tribunal's warrant of possession, in an officer's hours (docs/behaviour/justice.md, "Possession"); 0.3.1: a death that someone at home outlived by more than a day is not "found" at a later call; 0.3.0: calls at a home when asked to (a welfare check), by going there; no longer shown the town's homes
+  version: "0.6.0", // 0.6.0: run in parts where a model holds the office (part): the officers carry out warrants, look into reports and call at homes under standing work orders in force at the start, and report what they did; the office-holder hires and stands down officers and makes the orders; a station run by code is unchanged; 0.5.1: returns of tax withheld are filed on the days the law states (docs/behaviour/firms.md, "Returns on the law's days"); 0.5.0: a warrant carried out says how many of the household were there and were put out (none, where nobody was: possession is given all the same); one its registrar has withdrawn is not gone on; 0.4.0: carries out a tribunal's warrant of possession, in an officer's hours (docs/behaviour/justice.md, "Possession"); 0.3.1: a death that someone at home outlived by more than a day is not "found" at a later call; 0.3.0: calls at a home when asked to (a welfare check), by going there; no longer shown the town's homes
   doc: "docs/behaviour/crime.md",
   cadence: () => DAY,
   firstWake: (ctx) => 10 * 3600 + ctx.rng("first-wake").below(3600),
@@ -40,11 +47,17 @@ export const station: BehaviourModule = {
       // Welfare checks (docs/behaviour/deaths.md): the channel its officers go to a home through when asked to call
       // there (none: no calls are made), and where a death found is reported.
       calls_channel: "", registry: "",
+      // Which part of the office this is (docs/behaviour/standing-work.md): "" the whole office, as code runs it; "seat"
+      // whoever holds it; "staff" its officers, who do the routine while a standing work order for it is in force.
+      part: "" as "" | "seat" | "staff",
     }, ctx.params);
     need(p, ["building", "workplace", "account", "tribunal"], "police.station");
     const me = ctx.entity;
     const book = new Book();
     const staffing = new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, workplace: p.workplace, role: p.role, industry: p.industry });
+    const routines = new StandingWork(me, p.part);
+    const TASKS = { warrants: "carry_out_warrants", reports: "look_into_reports", calls: "call_at_homes" } as const;
+    let callingNow = p.part === ""; // (whether the calls we are asked for are ours to make now: the plan says)
     let view: SiteStructure | undefined;
     const queue: { report: string; from: string; at: string; kind: string; value: number; account?: string }[] = [];
     const taken = new Set<string>();
@@ -73,7 +86,7 @@ export const station: BehaviourModule = {
         const ch = obs.channels[p.channel];
         if (ch?.kind === "sites") for (const c of ch.cells) if (c.structure?.structure === p.building) view = c.structure;
         // Asked to call at a home, taken as it comes in so that an officer sets out at this wake (once for each home and each silence: several neighbours may ask).
-        for (const r of book.open("welfare_check_request").filter((x) => (x.addressed_to ?? []).includes(me) && !takenCalls.has(x.id))) {
+        for (const r of routines.does(book, TASKS.calls, obs.t, { every: DAY }) ? book.open("welfare_check_request").filter((x) => (x.addressed_to ?? []).includes(me) && !takenCalls.has(x.id)) : []) {
           takenCalls.add(r.id);
           // (To the ground the home stands on, where the request says it: a building may be gone, its ground is there.)
           const space = String(r.data?.space ?? ""), structure = String(r.data?.at ?? r.data?.structure ?? "");
@@ -99,10 +112,16 @@ export const station: BehaviourModule = {
       (obs) => {
         const t = obs.t;
         const steps: Step[] = [];
-        steps.push(...staffing.routine(obs, book, p.account, { target: p.officers, wage: p.wage, canPost: staffing.workers(book, t).length < p.officers,
+        steps.push(...routines.set(book, [
+          { task: TASKS.warrants, at: p.workplace, every: DAY, why: "Setting the officers' work: the tribunal's warrants of possession carried out on their day, as a standing work order." },
+          { task: TASKS.reports, at: p.workplace, every: DAY, why: "Setting the officers' work: reports of goods taken looked into, as a standing work order." },
+          { task: TASKS.calls, at: p.workplace, every: DAY, why: "Setting the officers' work: homes the station is asked to call at, as a standing work order." }]));
+        const carrying = !!routines.does(book, TASKS.warrants, t, { every: DAY }), looking = !!routines.does(book, TASKS.reports, t, { every: DAY }), calling = !!routines.does(book, TASKS.calls, t, { every: DAY });
+        callingNow = calling;
+        if (p.part !== "staff") steps.push(...staffing.routine(obs, book, p.account, { target: p.officers, wage: p.wage, canPost: staffing.workers(book, t).length < p.officers,
           why: `The station's establishment is ${p.officers} officers; we have ${staffing.workers(book, t).length}: posting a job.` }));
         // Reports of goods taken, in the order they came.
-        for (const r of book.open("crime_report").filter((x) => (x.addressed_to ?? []).includes(me) && !taken.has(x.id))) {
+        for (const r of looking ? book.open("crime_report").filter((x) => (x.addressed_to ?? []).includes(me) && !taken.has(x.id)) : []) {
           taken.add(r.id);
           queue.push({ report: r.id, from: r.speaks_for!, at: String(r.data?.at), kind: String(r.data?.kind), value: Number(r.data?.value ?? 0), account: r.data?.account as string | undefined });
         }
@@ -128,7 +147,7 @@ export const station: BehaviourModule = {
         const here = [...new Set(view?.spaces.find((sp) => sp.space === p.workplace)?.occupants ?? [])].filter((w) => mine.has(w)).sort();
         // Found dead at a home we called at: reported to the registry, unless we have been told it is registered.
         const registered = new Set(book.all("death_registration").map((r) => r.data?.deceased as string));
-        for (const f of found.splice(0)) {
+        for (const f of calling ? found.splice(0) : []) {
           if (registered.has(f.who) || !p.registry) continue;
           steps.push(because(`Called at ${f.space}, as we were asked to: ${f.who} was found dead there. Reporting the death to the registry.`,
             say("death_notification", `${f.who} was found dead at ${f.space}.`, { to: [p.registry], data: { deceased: f.who, found_at: f.space } })));
@@ -137,14 +156,16 @@ export const station: BehaviourModule = {
         // hours for it goes to the home on a working day and puts out
         // whoever of the household is there; the tenant and the landlord are told it is done. With no officer free
         // it waits for one; one not carried out by its last day lapses, and the landlord must ask again.
-        for (const w of book.open("warrant").filter((x) => (x.addressed_to ?? []).includes(me) && !takenWarrants.has(x.id))) {
+        for (const w of carrying ? book.open("warrant").filter((x) => (x.addressed_to ?? []).includes(me) && !takenWarrants.has(x.id)) : []) {
           takenWarrants.add(w.id);
           const d = w.data ?? {};
           if (typeof d.structure !== "string" || typeof d.tenant !== "string") continue;
           warrants.push({ id: w.id, lease: String(d.lease ?? ""), tenant: d.tenant, landlord: String(d.landlord ?? ""), structure: d.structure, space: String(d.space ?? ""), household: Array.isArray(d.household) ? (d.household as string[]) : [d.tenant], notBefore: Number(d.not_before) || 0, until: Number(d.until) || Infinity });
         }
         // (In the order they came; one whose day has not come waits, and those behind it with it: the list is short.)
-        while (warrants.length && day % 7 < p.look_days) {
+        const due = warrants.filter((w) => t >= w.notBefore).length;
+        let carried = 0;
+        while (carrying && warrants.length && day % 7 < p.look_days) {
           const w = warrants[0]!;
           if (t < w.notBefore) break;
           if (t > w.until + DAY) {
@@ -157,6 +178,8 @@ export const station: BehaviourModule = {
           const officer = here.find((x) => p.working_day - (used.get(x) ?? 0) >= p.task_seconds);
           if (!officer) break;
           warrants.shift();
+          carried++;
+          routines.did(TASKS.warrants, t, { units: 1, by: [officer] });
           used.set(officer, (used.get(officer) ?? 0) + p.task_seconds);
           // (Each on their own: someone not at home is not there to be put out, and comes back to a home that is no
           // longer theirs. The warrant gives the landlord possession whoever is there; what the officer says is what
@@ -178,28 +201,40 @@ export const station: BehaviourModule = {
             steps.push(st);
           });
         }
-        while (queue.length) {
+        // (What the officers say of the warrants: those whose day has come that no officer at the station had the hours for.)
+        if (carrying && due > carried && warrants.length) routines.heldUp(TASKS.warrants, `${warrants.length} warrant${warrants.length === 1 ? "" : "s"} waiting, ${here.length ? "and none of the officers at the station had the hours for it" : `and none of the ${staffing.workers(book, t).length} in post was at the station (${p.workplace}) when the day's work was set out`}`);
+        routines.note(TASKS.warrants, warrants.length ? `${warrants.length} still waiting, the oldest ${warrants[0]!.id}` : undefined);
+        let looked = 0;
+        while (looking && queue.length) {
           const officer = here.find((w) => p.working_day - (used.get(w) ?? 0) >= p.task_seconds);
           if (!officer) break;
           const q = queue.shift()!;
+          looked++;
+          routines.did(TASKS.reports, t, { units: 1, by: [officer] });
           used.set(officer, (used.get(officer) ?? 0) + p.task_seconds);
           const st = because(`Investigating report ${q.report}: ${q.kind} taken from ${q.from} at ${q.at}.`,
             C.call("work", { task: p.task, units: "1", at: p.building, by: C.json([officer]), investigate: q.from, taken_at: q.at, kind: q.kind }));
           st.then = (out) => {
             if (out.status === "applied") return void asked.set(out.action, q);
             queue.unshift(q);
+            routines.undid(TASKS.reports, { units: 1 });
             const short = outOfTime(out);
             if (short?.who) used.set(short.who, p.working_day - short.left);
           };
           steps.push(st);
         }
+        if (looking && queue.length) routines.note(TASKS.reports, `${queue.length} report${queue.length === 1 ? "" : "s"} waiting for an officer's hours`);
+        else routines.note(TASKS.reports, undefined);
+        if (calling && calls.length) routines.note(TASKS.calls, `${calls.length} home${calls.length === 1 ? "" : "s"} still to call at`);
+        if (p.part === "staff" && t >= DAY / 2) steps.push(...routines.report(book, t, { office: (ctx.position ?? "").replace(/-staff$/, ""), from: "the station's officers",
+          tasks: { [TASKS.warrants]: ["days' work", "warrants carried out"], [TASKS.reports]: ["days' work", "reports looked into"], [TASKS.calls]: ["days' work", "homes called at"] }, inPost: staffing.workers(book, t) }));
         return steps;
       },
       p.look_at ? (obs) => nextLook(obs.t, p.look_at, p.look_days) : undefined,
       // Going to the homes we are asked to call at (an officer's going: it takes the station's time; what is found
       // comes when they are back).
       () => {
-        if (!p.calls_channel || !calls.length) return [];
+        if (!p.calls_channel || !calls.length || !callingNow) return [];
         const go = calls.splice(0, VISIT_MAX);
         for (const c of go) called.add(c.space);
         return [goSee(p.calls_channel, [...new Set(go.map((c) => c.structure))])];

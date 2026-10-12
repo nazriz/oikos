@@ -199,6 +199,12 @@ class Seen {
 export const whenWords = (t: number): string => (t < 0 ? `${Math.ceil(-t / DAY)} day${Math.ceil(-t / DAY) === 1 ? "" : "s"} before the year began` : dateWords(t));
 
 /**
+ * When a paper was made, for a paper brought forward from before the year (an opening caseload: `data.brought_forward`,
+ * `data.since` the moment, a negative time): that moment; for any other, the time it was filed.
+ */
+export const madeAt = (r: { at: number; data?: any }): number => (r.data?.brought_forward && Number.isFinite(Number(r.data?.since)) && Number(r.data.since) < 0 ? Number(r.data.since) : r.at);
+
+/**
  * Rent owed under a lease when the year began, as the landlord's statement of the rent account has it (a
  * `rent_statement` on the landlord's file, sent to the tenant: docs/behaviour/generator.md, "An ordinary day's
  * caseload"): how much, and when the oldest of it fell due (before the year: a negative time). The landlord's rent
@@ -230,6 +236,7 @@ export class Book {
   readonly signatures = new Map<string, Set<string>>(); // agreement -> parties who signed
   readonly notices = new Map<string, { as: string; at: number }[]>(); // agreement -> notices
   readonly signedTimes = new Map<string, number[]>(); // agreement -> signature times
+  private readonly signedAt_ = new Map<string, Map<string, number>>(); // agreement -> party -> when they signed
   // Kept so asking never rescans the whole history (docs/reliability.md, performance). Lists put together from more
   // than one part, by statement kind and by record type: for those asked for, and again only when they have grown.
   private readonly kindsJoined = new Map<string, Joined<StatementRecord>>();
@@ -444,6 +451,9 @@ export class Book {
       s.add(r.as);
       this.signatures.set(r.agreement, s);
       this.signedTimes.set(r.agreement, [...(this.signedTimes.get(r.agreement) ?? []), r.at]);
+      const by = this.signedAt_.get(r.agreement) ?? new Map<string, number>();
+      if (!by.has(r.as)) by.set(r.as, r.at);
+      this.signedAt_.set(r.agreement, by);
     }
     if (r.record === "statement" && !this.withdrawn.has(r.id)) {
       if (r.practice) this.withPractice.set(r.id, r);
@@ -599,15 +609,29 @@ export class Book {
     return this.signatures.get(agreement)?.has(party) ?? false;
   }
 
-  /** Concluded: signed by every party (whether or not it has since ended). */
+  /**
+   * An offer taken back by whoever made it before every party had signed it (docs/behaviour/offers.md): it can no longer
+   * be signed, and a signature made after it was withdrawn concludes nothing. An agreement every party had signed when
+   * its paper was withdrawn is concluded all the same: withdrawing the paper ends nothing, a notice does.
+   */
+  takenBack(agreement: string): boolean {
+    const at = this.withdrawnAt.get(agreement);
+    const a = this.records.get(agreement);
+    if (at === undefined || a?.record !== "agreement") return false;
+    const by = this.signedAt_.get(agreement);
+    return !a.terms.parties.every((p) => (by?.get(p) ?? Infinity) <= at);
+  }
+
+  /** Concluded: signed by every party (whether or not it has since ended), the offer not taken back before the last signed. */
   concluded(agreement: string): boolean {
     const a = this.records.get(agreement);
-    return a?.record === "agreement" && a.terms.parties.every((p) => this.signedBy(agreement, p));
+    return a?.record === "agreement" && a.terms.parties.every((p) => this.signedBy(agreement, p)) && !this.takenBack(agreement);
   }
 
   /** In force now: by its reading, if one came with it (concluded, and not yet ended by its term or by notice under its
    * terms); otherwise, concluded. */
   inForce(agreement: string): boolean {
+    if (this.takenBack(agreement)) return false;
     const r = this.readings.get(agreement);
     if (r) return (r.status === "in_force" || r.status === "ending") && (r.ends_at === undefined || this.now < r.ends_at);
     return this.concluded(agreement);
@@ -1479,10 +1503,10 @@ export const PAYEE_DIED = {
 export const usd = moneyNow;
 
 /** Money to an account: a one-off or repeating payment. */
-export function pay(to: string, amount: number, o: { from?: string; for?: string; settles?: string; every?: number; first?: number; basis?: string; per_request?: string } = {}): C.Call {
+export function pay(to: string, amount: number, o: { from?: string; for?: string; settles?: string; every?: number; first?: number; basis?: string; per_request?: string; line?: string } = {}): C.Call {
   return C.call("money", {
     to, amount: C.amountText(amount), from: o.from, for: o.for ? C.text(o.for) : undefined, settles: o.settles,
-    every: o.every ? C.secs(o.every) : undefined, first: o.first !== undefined ? C.secs(o.first) : undefined, basis: o.basis, per_request: o.per_request,
+    every: o.every ? C.secs(o.every) : undefined, first: o.first !== undefined ? C.secs(o.first) : undefined, basis: o.basis, per_request: o.per_request, line: o.line,
   });
 }
 

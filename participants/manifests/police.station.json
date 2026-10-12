@@ -1,6 +1,6 @@
 {
   "name": "police.station",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "doc": "docs/behaviour/crime.md",
   "params": {
     "account": {
@@ -71,6 +71,13 @@
         "description": "the establishment (its funder's)"
       },
       "default": 0,
+      "source": "placeholder"
+    },
+    "part": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
       "source": "placeholder"
     },
     "period": {
@@ -467,6 +474,26 @@
           "solved": "?solved"
         }
       }
+    }
+  ],
+  "routines": [
+    {
+      "task": "carry_out_warrants",
+      "at": "workplace",
+      "every": 1,
+      "what": "On each working day an officer at the station carries out the tribunal's warrants of possession that have come to it, in the order they came and once the day each gives has come: the officer goes to the home and puts out whoever of the household is there, and the tenant and the landlord are told it is done and how many were there. A warrant its registrar has withdrawn is not gone on; one not carried out by its last day lapses and the landlord is told, and must ask again."
+    },
+    {
+      "task": "look_into_reports",
+      "at": "workplace",
+      "every": 1,
+      "what": "Each working day the officers at the station look into the reports of goods taken that have been made to it, in the order they came, as many as their hours allow (four hours each). Where they find who took them, they lay a charge before the tribunal with what they found as evidence; where they do not, the report is closed unsolved and the person who made it is told."
+    },
+    {
+      "task": "call_at_homes",
+      "at": "workplace",
+      "every": 1,
+      "what": "Each working day an officer goes to each home the station has been asked to call at, where a neighbour has seen nobody come out; if someone is found dead there who is not yet registered as dead, the death is reported to the registry."
     }
   ]
 }

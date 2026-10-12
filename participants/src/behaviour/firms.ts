@@ -1278,11 +1278,11 @@ export class Staffing {
       const on = this.o.notice_wait === undefined ? "A new hire has signed" : told ? `Payroll notice ${told.id}: a new starter, first pay day ${dateWords(firstPay!)}` : `A new starter's agreement (${a.id}) is on file and no payroll notice has come for it: setting the wage up from the agreement, first pay day ${dateWords(firstPay!)}`;
       if (reg.off) {
         steps.push(because(`${on}: starting their wages by standing order, whole. This job is not going on our payroll returns.`,
-          [ref, pay(to, pays.wage, { from: account, every: pays.period, first, basis: a.id, for: `Wages for ${worker}.` })], ...(reg.note ? [reg.note] : [])));
+          [ref, pay(to, pays.wage, { from: account, every: pays.period, first, basis: a.id, for: `Wages for ${worker}.`, ...(typeof told?.data?.line === "string" ? { line: told.data.line } : {}) })], ...(reg.note ? [reg.note] : [])));
         continue;
       }
       steps.push(because(tax > 0 ? `${on}: starting their wages by standing order, ${usd(pays.wage - tax)} after the ${usd(tax)} of income tax the law says to withhold.` : `${on}: starting their wages by standing order.`,
-        [ref, pay(to, pays.wage - tax, { from: account, every: pays.period, first, basis: a.id, for: `Wages for ${worker}.` })]));
+        [ref, pay(to, pays.wage - tax, { from: account, every: pays.period, first, basis: a.id, for: `Wages for ${worker}.`, ...(typeof told?.data?.line === "string" ? { line: told.data.line } : {}) })]));
     }
     // An office that hires and does not pay tells the office that does (docs/behaviour/firms.md, "Payroll notices"): of each new
     // starter once both have signed (who, the post, the pay, the pay period, the first pay day, the account, the

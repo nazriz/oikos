@@ -18,7 +18,7 @@ import { dateWords } from "../forms";
 import { because, Book, callAction, firstDue, Letters, message, pay, PAYEE_DIED, PAYMENT_FAILED, type Step, usd, Asked, whoWrote } from "./common";
 
 /** `memo`: what the payer said the payment is for, as the payee's statement narrates it (a bank statement's line). */
-interface Payment { instruction: string; from: string; to: string; amount: number; due: number; settles?: string; memo?: string }
+interface Payment { instruction: string; from: string; to: string; amount: number; due: number; settles?: string; memo?: string; line?: string }
 
 /** Things kept by a time, the soonest first out (a binary heap; those of one time in no promised order). */
 class Soonest {
@@ -344,7 +344,7 @@ export const bankPaymentSystem: BehaviourModule = {
         }
         const d = { from: m.from, to: m.to, pay: cents(m.amount), settles: m.settles, every: bulk ? undefined : ins.data.every };
         // (What the payer said it is for goes with the money: the line on the payee's statement.)
-        const said = (x: any) => (typeof x?.for === "string" && x.for ? { memo: x.for.replace(/\.$/, "").slice(0, 120) } : {});
+        const said = (x: any) => ({ ...(typeof x?.for === "string" && x.for ? { memo: x.for.replace(/\.$/, "").slice(0, 120) } : {}), ...(typeof x?.line === "string" && x.line ? { line: x.line } : {}) });
         const acc = custody().get(d.from);
         if (acc && dead.has(acc.holder)) continue; // the account holder has died: it pays out only to settle the estate
         if (!acc) {
@@ -541,7 +541,7 @@ export const bankPaymentSystem: BehaviourModule = {
           const from = seen.get(p.from);
           const have = left.get(p.from) ?? (from ? cents(from.balance) : 0);
           if (have >= p.amount) {
-            blocks.push(pay(p.to, p.amount, { from: p.from, per_request: p.instruction, settles: p.settles, for: p.memo }));
+            blocks.push(pay(p.to, p.amount, { from: p.from, per_request: p.instruction, settles: p.settles, for: p.memo, line: p.line }));
             left.set(p.from, have - p.amount);
             inFlight.push(p);
           } else {

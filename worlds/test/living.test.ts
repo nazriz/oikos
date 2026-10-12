@@ -67,7 +67,10 @@ test("a spec without `living` generates what it generated before (byte for byte)
   // (the profile's public_finance.returns: words and data) and says on which day each falls due. Nothing of `living` in it.
   // And on 2026-10-12 (d61b32ae... until then; docs/decisions.md, "Firms respond to a shock"): generator 0.52.0, the producer's, retailer's and world market's versions and params:
   // a place's trade credit days (the profile's business.trade_credit_days) reach the factories and the world market as `terms_days`. Nothing of `living` in it.
-  expect(hash(c)).toBe("8f41e1af39a387e3e9b19fe69c55403533c962db0736e00fb1886b96a6c42e92");
+  // And on 2026-10-12 (8f41e1af... until then; docs/decisions.md, "Opening caseloads of the other offices"): generator 0.53.0 and the support office's, the bank's
+  // lending office's and the citizen's versions. The opening caseload's own test holds the world's hash, apart from the budget line of the next item.
+  // And again the same day (b794ef5b... until then): the town's opening wage orders name the staff line and the finance office has two parameters more (payments that carry a budget line).
+  expect(hash(c)).toBe("a465b4e3230d38cb2ac862931764b4bf16d6a93750c9b31c1df471d36fa561cf");
   const text = JSON.stringify(c);
   expect(text).not.toContain('"started"');
   expect(text).not.toContain("attach_mean");

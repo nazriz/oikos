@@ -57,7 +57,11 @@ const TOWN = join(root, "worlds/town.yaml");
 // the firm-side work"): a shop closes its month on a day of its own and first reviews once it has traded a whole month, expecting
 // at first the trade it was staffed for, so its month-end rules (price, wage, staff, stock) move; and a payment that says it is
 // a dividend or tax withheld is no longer sent back by the outside world's order book.
-const STEP_1 = "43f2bf771fc619e9c9f17dec8a6c6ecdcc2597abcfa40e979f8723fd4200ee47";
+// And again on 2026-10-12, with payments that carry a budget line (43f2bf77... until then; docs/decisions.md, "Opening caseloads of the
+// other offices ... payments that carry a budget line"): the town's opening wage orders name the staff line, and the finance office's
+// brief says which line pays for what (two parameters of its own). Nothing else of this branch moves a town without the option: tested
+// by taking the lines and the parameters out, which gives 43f2bf77... again.
+const STEP_1 = "9665fd1dfeceeea682943229d3ab5cbf884948eb48b0bd9507c0bbc5d8f325af";
 
 test("with the dial absent or at 0 a town is step 1's town, to the state hash", async () => {
   const out = mkdtempSync(join(tmpdir(), "oikos-dial-"));

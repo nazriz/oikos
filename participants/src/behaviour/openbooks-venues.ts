@@ -10,7 +10,7 @@ import { basesOf, channels, type Observation, type StatementRecord } from "../co
 import { dateWords } from "../forms";
 import type { OfficeBooks, OpenHeading, OpenItem, ParticipantContext } from "../module";
 import { cents } from "../money";
-import { Book, DAY, MONTH, ownAccount, usd, whenWords } from "./common";
+import { Book, DAY, madeAt, MONTH, ownAccount, usd, whenWords } from "./common";
 import { PAPER } from "./frictions";
 
 // ------------------------------------------------------------------ small shared things
@@ -104,8 +104,8 @@ function takenIn(book: Book, filed: Filed, t: number, aside: ReadonlySet<string>
     const amount = d.amount !== undefined ? money(d.amount) : undefined;
     const what = `${who}'s application ${app} about ${matterOf(d)}${against ? ` against ${against}` : ""}${amount ? `, seeking ${usd(amount)}` : ""}`;
     const said = against ? (filed.answered(app, against) ? `${against} has answered` : `${against} has not answered`) : "";
-    if (!dayCome(by, t)) waiting.push({ id: n.id, since: n.at, due: by, ...(amount ? { amount } : {}), line: `${n.id}: ${what}, taken in ${dateWords(n.at)}; ${against || "the other side"} has until ${dateWords(by)} to answer${said ? ` (${said})` : ""}` });
-    else ran.push({ id: n.id, since: by, due: by, ...(amount ? { amount } : {}), line: `${n.id}: ${what}, taken in ${dateWords(n.at)}; the time to answer ${t >= by ? "ran out" : "runs out today,"} ${dateWords(by)}${said ? ` (${said})` : ""}; not decided` });
+    if (!dayCome(by, t)) waiting.push({ id: n.id, since: madeAt(n), due: by, ...(amount ? { amount } : {}), line: `${n.id}: ${what}, taken in ${whenWords(madeAt(n))}; ${against || "the other side"} has until ${dateWords(by)} to answer${said ? ` (${said})` : ""}` });
+    else ran.push({ id: n.id, since: by, due: by, ...(amount ? { amount } : {}), line: `${n.id}: ${what}, taken in ${whenWords(madeAt(n))}; the time to answer ${t >= by ? "ran out" : "runs out today,"} ${dateWords(by)}${said ? ` (${said})` : ""}; not decided` });
   }
   return { waiting, ran };
 }
@@ -453,7 +453,12 @@ export function lendingBooks(ctx: ParticipantContext): OfficeBooks {
     l.start = at;
     byAccount.set(l.account, [...(byAccount.get(l.account) ?? []), l]);
   };
-  const firstDueAt = (l: Loan): number | undefined => (l.start === undefined ? undefined : l.firstDue !== undefined ? begins(l.id) + l.firstDue : l.start + MONTH);
+  // (Repayments missed before the year began, as the bank's statement of the loan account on file says.)
+  const missedOf = (l: Loan): number => {
+    const x = book.open("loan_statement").filter((r) => r.speaks_for === me && r.data?.loan === l.id && r.data?.brought_forward).sort((a, b) => b.at - a.at)[0];
+    return x ? Math.max(0, Math.floor(Number(x.data?.payments) || 0)) : 0;
+  };
+  const firstDueAt = (l: Loan): number | undefined => (l.start === undefined ? undefined : (l.firstDue !== undefined ? begins(l.id) + l.firstDue : l.start + MONTH) - missedOf(l) * MONTH);
   const countedFrom = (l: Loan): number => (l.firstDue !== undefined ? begins(l.id) : l.start!);
   return {
     absorb(obs: Observation) {

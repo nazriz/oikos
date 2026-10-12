@@ -8,7 +8,7 @@ import { basesOf, channels, cites, type Observation, type StatementRecord } from
 import { dateWords } from "../forms";
 import type { OfficeBooks, OpenHeading, OpenItem, ParticipantContext } from "../module";
 import { cents } from "../money";
-import { Book, broughtForward, DAY, leaseTerms, MONTH, ownAccount, usd, whenWords } from "./common";
+import { Book, broughtForward, DAY, leaseTerms, madeAt, MONTH, ownAccount, usd, whenWords } from "./common";
 import { PAPER } from "./frictions";
 
 const addressed = (r: StatementRecord, me: string) => (r.addressed_to ?? []).includes(me);
@@ -48,8 +48,8 @@ export class Money {
 export function askedOfUs(book: Book, me: string, money: Money, forms: { notice: string; response: string; decision: string }[] = []): OpenHeading[] {
   const answers = book.all(PAPER.answer).filter((r) => r.speaks_for === me);
   const requests = book.open(PAPER.request).filter((r) => addressed(r, me) && !answers.some((a) => cites(a, r.id) || a.data?.request === r.id))
-    .map((r): OpenItem => ({ id: r.id, since: r.at, ...(r.data?.amount !== undefined ? { amount: cents(r.data.amount) } : {}),
-      line: `${r.id}: ${r.speaks_for} asks us to put right ${String(r.data?.matter ?? "something").replace(/_/g, " ")}${r.data?.structure ? ` at ${r.data.structure}` : ""}${r.data?.about ? ` (about ${r.data.about})` : ""}${r.data?.amount !== undefined ? `, ${usd(cents(r.data.amount))}` : ""}, asked ${dateWords(r.at)}, not answered` }));
+    .map((r): OpenItem => ({ id: r.id, since: madeAt(r), ...(r.data?.amount !== undefined ? { amount: cents(r.data.amount) } : {}),
+      line: `${r.id}: ${r.speaks_for} asks us to put right ${String(r.data?.matter ?? "something").replace(/_/g, " ")}${r.data?.structure ? ` at ${r.data.structure}` : ""}${r.data?.about ? ` (about ${r.data.about})` : ""}${r.data?.amount !== undefined ? `, ${usd(cents(r.data.amount))}` : ""}, asked ${whenWords(madeAt(r))}, not answered` }));
   const all = [{ notice: PAPER.notice, response: PAPER.response, decision: PAPER.decision }, ...forms];
   const notices: OpenItem[] = [], decisions: OpenItem[] = [];
   for (const f of all) {
@@ -59,7 +59,7 @@ export function askedOfUs(book: Book, me: string, money: Money, forms: { notice:
       if (!addressed(n, me) || d.against !== me || typeof d.application !== "string" || ours.some((r) => cites(r, d.application) || r.data?.application === d.application)) continue;
       if (book.all(f.decision).some((x) => x.data?.application === d.application || cites(x, d.application))) continue;
       const by = Number(d.answer_by ?? d.hearing_at);
-      notices.push({ id: n.id, since: n.at, line: `${n.id}: ${n.speaks_for} tells us of ${d.applicant ?? "someone"}'s complaint (${String(d.matter ?? "").replace(/_/g, " ")}, application ${d.application})${Number.isFinite(by) ? `, to be answered by ${dateWords(by)}` : ""}, not answered` });
+      notices.push({ id: n.id, since: madeAt(n), line: `${n.id}: ${n.speaks_for} tells us of ${d.applicant ?? "someone"}'s complaint (${String(d.matter ?? "").replace(/_/g, " ")}, application ${d.application})${Number.isFinite(by) ? `, to be answered by ${dateWords(by)}` : ""}, not answered` });
     }
     for (const x of book.open(f.decision)) {
       const d = x.data ?? {};
@@ -73,7 +73,7 @@ export function askedOfUs(book: Book, me: string, money: Money, forms: { notice:
 /** Invoices addressed to us and sums recorded against us (a fine, rates) that we have not been seen to pay. */
 export function owedByUs(book: Book, me: string, money: Money): OpenHeading[] {
   const invoices = book.open("invoice").filter((r) => addressed(r, me) && r.data?.outcome?.money && !money.settled.has(r.id))
-    .map((r): OpenItem => ({ id: r.id, since: r.at, amount: cents(r.data!.outcome.money.amount), line: `${r.id}: invoice from ${r.speaks_for ?? r.author} for ${usd(cents(r.data!.outcome.money.amount))}, dated ${dateWords(r.at)}, not paid` }));
+    .map((r): OpenItem => ({ id: r.id, since: madeAt(r), amount: cents(r.data!.outcome.money.amount), line: `${r.id}: invoice from ${r.speaks_for ?? r.author} for ${usd(cents(r.data!.outcome.money.amount))}, dated ${whenWords(madeAt(r))}, not paid` }));
   const sums = book.ofType("claim").filter((r: any) => r.record === "claim" && r.position === "right" && r.counterparty === me && ["fine", "tax_penalty", "rates", "rates_interest"].includes(r.about?.kind) && !money.settled.has(r.id) && !book.released.has(r.id))
     .map((r: any): OpenItem => ({ id: r.id, since: r.at, amount: cents(r.about.amount), line: `${r.id}: ${String(r.about.kind).replace(/_/g, " ")} of ${usd(cents(r.about.amount))} recorded against us by ${r.holder}${Number.isFinite(Number(r.about?.due)) ? `, due ${dateWords(Number(r.about.due))}` : ""}, not paid` }));
   return [...heading("Invoices addressed to us, not paid", invoices), ...heading("Sums recorded against us (rates, fines), not paid", sums)];

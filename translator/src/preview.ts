@@ -273,6 +273,11 @@ export class Preview {
     const p = this.k.papers.get(id);
     if (!p) return " No paper by that id is among your own papers as you have been shown them: check that it is the one you mean.";
     if (this.k.withdrawn.has(id)) return " It has been withdrawn already.";
+    if (p.agreement) {
+      const signed = this.k.signatures.get(id) ?? new Set<string>();
+      const waiting = p.agreement.parties.filter((x) => !signed.has(x));
+      if (signed.size > 0 && waiting.length) return ` It is your offer of ${p.agreement.template ? `${/^[aeiou]/i.test(p.agreement.template) ? "an" : "a"} ${p.agreement.template.replace(/_/g, " ")} agreement` : "an agreement"} to ${waiting.map((x) => this.who(x)).join(" and ")}, who ${waiting.length > 1 ? "have" : "has"} not signed it as far as you have been shown. Withdrawing it takes it back: it can no longer be signed. If they have signed already, it is an agreement in force, and withdrawing the paper ends nothing (to end one, give notice).`;
+    }
     if (p.agreement) return ` It is the ${p.agreement.template ? `${p.agreement.template.replace(/_/g, " ")} ` : ""}agreement itself, between ${p.agreement.parties.map((x) => this.who(x)).join(" and ")}: not a payment or an order made under it. Anything standing under it is a paper of its own, and goes on until that paper is withdrawn.`;
     const to = p.to?.length ? ` to ${p.to.map((x) => this.whom(x)).join(", ")}` : "";
     const words = `: "${p.text}"`;
@@ -287,7 +292,7 @@ export class Preview {
     const rep = every ? ` every ${span(every)}` : "";
     // (Whatever a sentence leaves out of its outcome follows it in brackets, by name.)
     const more = (x: any, said: string[]) => this.also(x, said, " (").replace(/\.$/, ")");
-    if (o?.money) return `pay ${this.sum(o.money.amount)}${o.money.from ? ` from ${this.acct(o.money.from)}` : ""} to ${this.who(o.money.to)}${rep}${o.money.for ? `, for ${o.money.for}` : ""}${o.money.settles ? `, settling ${o.money.settles}` : ""}${more(o.money, ["amount", "from", "to", "for", "settles"])}`;
+    if (o?.money) return `pay ${this.sum(o.money.amount)}${o.money.from ? ` from ${this.acct(o.money.from)}` : ""} to ${this.who(o.money.to)}${rep}${o.money.for ? `, for ${o.money.for}` : ""}${o.money.settles ? `, settling ${o.money.settles}` : ""}${o.money.line ? `, on the ${o.money.line} line of the budget` : ""}${more(o.money, ["amount", "from", "to", "for", "settles", "line"])}`;
     if (o?.goods) return `deliver ${o.goods.quantity} ${o.goods.kind}${o.goods.from ? ` from ${o.goods.from}` : ""} to ${this.who(o.goods.to)} at ${o.goods.at}${rep}${more(o.goods, ["quantity", "kind", "from", "to", "at"])}`;
     if (o?.structure) return `${o.structure.remove ? `demolish ${o.structure.remove}` : `build a ${o.structure.type} on ${o.structure.on}`}${rep}${more(o.structure, o.structure.remove ? ["remove"] : ["type", "on"])}`;
     // (Someone who commits to be in a place themselves: they come there. An employment agreement's worker and their
@@ -497,6 +502,7 @@ export class Preview {
         if (words.length) lines.push(`In words only, which bind nobody to an act that can be checked: ${words.join("; ")}.`);
         if (t.text) lines.push(`Its terms, in words only: "${t.text}"`);
         for (const x of t.termination ?? []) lines.push(`${cap(this.who(x.party))} may end it on ${span(x.notice)}' notice${this.also(x, ["party", "notice"], " (").replace(/\.$/, ")")}.`);
+        if (signs && others.length) lines.push("Until they sign it you can take it back: withdraw it, and it can no longer be signed.");
         // An offer of employment that says nothing of where the work is: made on an advertisement, it is on the
         // advertisement's terms; made on none, whoever signs it has nowhere to come to work (2026-10-09: a crew of
         // five was taken on by offers of the pay alone, and none of them ever came to the depot).
@@ -515,8 +521,8 @@ export class Preview {
       case "give_notice":
         return one(`You will give notice on agreement ${b.agreement} for ${this.who(b.as)}${b.text ? `: "${b.text}"` : ""}.`, ["agreement", "as", "text"]);
       case "transfer":
-        return one(`You will move ${this.sum(b.amount)} from ${this.acct(b.from)} to ${this.acct(b.to)} now${b.settles ? `, settling ${b.settles}` : ""}${b.per_instruction ? `, as ${b.per_instruction} asked` : ""}.`, ["amount", "from", "to", "memo", "settles", "per_instruction"],
-          b.memo ? [`For, in words only: "${b.memo}"`] : []);
+        return one(`You will move ${this.sum(b.amount)} from ${this.acct(b.from)} to ${this.acct(b.to)} now${b.settles ? `, settling ${b.settles}` : ""}${b.per_instruction ? `, as ${b.per_instruction} asked` : ""}.`, ["amount", "from", "to", "memo", "line", "settles", "per_instruction"],
+          [...(b.line ? [`Drawn on the ${b.line} line of your budget.`] : []), ...(b.memo ? [`For, in words only: "${b.memo}"`] : [])]);
       case "open_account":
         return one(`You will open an account for ${this.who(b.holder)}, kept by you.`, ["holder"]);
       case "close_account":

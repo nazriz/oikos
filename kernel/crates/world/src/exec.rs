@@ -1245,6 +1245,7 @@ impl<'a> Exec<'a> {
         settles: Option<Id>,
         per_instruction: Option<Id>,
         memo: Option<String>,
+        line: Option<String>,
     ) -> R<()> {
         let src = self.account(from)?.clone();
         let dst = self.account(to)?.clone();
@@ -1285,6 +1286,7 @@ impl<'a> Exec<'a> {
             settles: settles.clone(),
             per_instruction: per_instruction.clone(),
             memo: memo.clone(),
+            line: line.clone(),
         };
         // Everyone who acts for an entity concerned hears of it, through that entity's accounts.
         let concerned: BTreeSet<&str> = [src.holder.as_str(), src.custodian.as_str(), dst.holder.as_str(), dst.custodian.as_str()].into();
@@ -1313,6 +1315,7 @@ impl<'a> Exec<'a> {
             settles,
             per_instruction,
             memo,
+            line,
         });
         Ok(())
     }
@@ -1418,7 +1421,7 @@ impl<'a> Exec<'a> {
     pub fn block(&mut self, b: &Block, index: usize) -> R<()> {
         match b {
             // ---------------- physical ----------------
-            Block::Transfer { from, to, amount, settles, per_instruction, memo } => {
+            Block::Transfer { from, to, amount, settles, per_instruction, memo, line } => {
                 let (from, to) = (self.r(from)?, self.r(to)?);
                 let custodian = self.account(&from)?.custodian.clone();
                 if custodian != self.entity {
@@ -1431,7 +1434,7 @@ impl<'a> Exec<'a> {
                 for rec in settles.iter().chain(per_instruction.iter()) {
                     self.record_of_kind(rec, "any")?;
                 }
-                self.move_money(&from, &to, *amount, TransferReason::Payment, settles, per_instruction, memo.clone())
+                self.move_money(&from, &to, *amount, TransferReason::Payment, settles, per_instruction, memo.clone(), line.clone())
             }
 
             // Taking (world-expansion 7.3): goods another holds where the taker is, moved to the taker there; no consent.
@@ -1733,7 +1736,7 @@ impl<'a> Exec<'a> {
                     self.st.accounts.insert(acc.clone(), Arc::new(Account { holder: id.clone(), custodian: id.clone(), currency: currency.clone(), balance: 0, changed: c }));
                     self.emit(EventBody::AccountOpened { account: acc.clone(), holder: id.clone(), custodian: id.clone(), currency, by: self.participant.into() });
                     let boundary = self.s.boundary_account(&self.entity).to_string();
-                    self.move_money(&boundary, &acc, *amount, TransferReason::Carried, None, None, None)?;
+                    self.move_money(&boundary, &acc, *amount, TransferReason::Carried, None, None, None, None)?;
                 }
                 self.bind(bind, &id)
             }

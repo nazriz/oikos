@@ -120,6 +120,8 @@ export class Knowledge {
 
   /** Agreements the participant has seen under which someone pays money: who pays what, to whom and how often. What
    * a payment that cites one is set against in its draft's preview (a wage against the pay agreed). */
+  /** Who has signed each agreement it has seen signed (the maker's own signature on an offer included). */
+  readonly signatures = new Map<string, Set<string>>();
   readonly agreements = new Map<string, { template?: string; parties: string[]; pays: { who: string; to?: string; amount: string; every?: number }[] }>();
 
   private readonly routineFacts = new Map<string, { procedure: string; every?: number; schedule?: string }>();
@@ -159,6 +161,7 @@ export class Knowledge {
       });
       if (pays.length) this.agreements.set(r.id, { ...(r.terms.template ? { template: r.terms.template } : {}), parties: r.terms.parties ?? [], pays });
     }
+    if (r.record === "signature") this.signatures.set(r.agreement, new Set([...(this.signatures.get(r.agreement) ?? []), r.as]));
     if (r.record === "withdrawal") {
       this.withdrawn.add(r.withdraws);
       this.lots.delete(r.withdraws);

@@ -441,12 +441,13 @@ class Resolver {
     const to = this.payee(this.need(c, "to", "Paid to whom?"), commitment);
     const purpose = this.str(c, "for");
     const settles = this.id(c, "settles");
-    return { money: { ...(from ? { from } : {}), to, amount, ...(purpose ? { for: purpose } : {}), ...(settles ? { settles } : {}) } };
+    const line = this.id(c, "line");
+    return { money: { ...(from ? { from } : {}), to, amount, ...(purpose ? { for: purpose } : {}), ...(settles ? { settles } : {}), ...(line ? { line } : {}) } };
   }
 
   private money(c: Call, bind?: string): Block[] {
     const from = this.payer(c, "the payment");
-    const out = this.moneyOutcome(c, from).money as { to: string; amount: string; for?: string; settles?: string };
+    const out = this.moneyOutcome(c, from).money as { to: string; amount: string; for?: string; settles?: string; line?: string };
     const every = this.seconds(c, "every");
     const first = this.when(c, "first");
     // (When it starts is said of a payment made again and again: one asked for once is made when it is asked.)
@@ -460,7 +461,7 @@ class Resolver {
     if (keeper === this.me) {
       // The participant's own entity keeps the money (a bank, or someone keeping their own): it moves it itself.
       if (every) throw new Ask("You keep this money yourself, so a repeating payment means paying each time. Say when to pay this one.");
-      return [{ block: "transfer", from, to: out.to, amount: out.amount, ...(out.settles ? { settles: out.settles } : {}), ...(per ? { per_instruction: per } : {}), ...(out.for ? { memo: out.for.slice(0, 500) } : {}) }];
+      return [{ block: "transfer", from, to: out.to, amount: out.amount, ...(out.settles ? { settles: out.settles } : {}), ...(per ? { per_instruction: per } : {}), ...(out.for ? { memo: out.for.slice(0, 500) } : {}), ...(out.line ? { line: out.line } : {}) }];
     }
     // Someone else keeps it: the only physical option is to ask them. They decide.
     return [{
@@ -677,6 +678,7 @@ class Resolver {
 
   private agreement(c: Call, bind?: string): Block[] {
     const sign = this.id(c, "sign");
+    if (sign && this.k.withdrawn.has(sign)) throw new Ask(`${sign} has been withdrawn: if it was an offer, whoever made it has taken it back, and there is nothing to sign.`);
     if (sign) return [{ block: "sign_agreement", agreement: sign, as: this.id(c, "for") ?? this.me, ...(bind ? { ref: bind } : {}) }];
     const notice = this.id(c, "notice");
     if (notice) return [{ block: "give_notice", agreement: notice, as: this.id(c, "for") ?? this.me, ...(this.str(c, "text") ? { text: this.str(c, "text") } : {}) }];

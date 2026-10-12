@@ -448,6 +448,7 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
                     settles: None,
                     per_instruction: flag.then(|| "so-bob".into()),
                     memo: None,
+                    line: None,
                 }])
             }
             1 => {
@@ -489,6 +490,7 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
                     settles: None,
                     per_instruction: None,
                     memo: None,
+                    line: None,
                 }])
             }
             4 => {
@@ -503,6 +505,7 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
                         settles: None,
                         per_instruction: None,
                         memo: None,
+                        line: None,
                     }])
                 } else {
                     direct("developer-system", Some("developer"), vec![Block::Demolish { structure: pick(&structures, *a)? }])
@@ -623,7 +626,7 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
                         places.push(me.clone());
                         Block::MoveGoods { kind: kinds[*kind as usize % 3].into(), quantity: *quantity, from_at: pick(&places, *from_at).unwrap(), to: e(*to), to_at: pick(&places, *to_at).unwrap() }
                     }
-                    B::Transfer { from, to, amount } => Block::Transfer { from: my(*from), to: pick(&accounts, *to).unwrap(), amount: *amount, settles: None, per_instruction: None, memo: None },
+                    B::Transfer { from, to, amount } => Block::Transfer { from: my(*from), to: pick(&accounts, *to).unwrap(), amount: *amount, settles: None, per_instruction: None, memo: None, line: None },
                     B::OpenAccount { holder, to_new } => Block::OpenAccount { holder: if *to_new && bound { "$new".into() } else { e(*holder) }, currency: None, bind: None },
                     B::CloseAccount { account } => Block::CloseAccount { account: my(*account) },
                     B::Construct { cell, ty, from } => Block::Construct {

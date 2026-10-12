@@ -30,6 +30,9 @@ pub enum Block {
         per_instruction: Option<IdOrRef>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         memo: Option<String>,
+        /// The line of a budget the payer says it is drawn on (a label the payer gives; the kernel reads nothing into it).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        line: Option<String>,
     },
     /// The holder moves some of its holding of a resource to someone's holding at a place (its own, or another's: a
     /// delivery, a handover, a shipment out of the world to an edge). Phase B.

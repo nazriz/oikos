@@ -75,7 +75,10 @@ const LIVING = "living.initiative_bps=10000";
 // And again on 2026-10-12, with the leftovers of the firm-side work (fb6725b2... until then; docs/decisions.md, "The leftovers of
 // the firm-side work"): a shop's month and first review are on a day of its own and begin from the trade it was staffed for, and the
 // outside world's order book no longer returns a dividend or tax withheld paid into its account.
-const STEP_2B = "19c27253020330872004aacda7ac97693b5e6f33bad9eca2ad683413b1730d8a";
+// Moved on 2026-10-12 by payments that carry a budget line (19c27253... until then; docs/decisions.md, "Opening caseloads of the other
+// offices ... payments that carry a budget line"): the town's opening wage orders name the staff line, and the finance office has two
+// parameters more. The same reason as living-dial.test.ts's step 1.
+const STEP_2B = "636309369e8e87b43f2959ee9515bd5af274868dadbd4d2f0546175a17fdc1dc";
 
 test("with founding off a living town is step 2b's town, to the state hash; turned on with no shape to found, nobody does anything they did not do before", async () => {
   const out = mkdtempSync(join(tmpdir(), "oikos-founding-"));
