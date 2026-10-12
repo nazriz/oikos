@@ -78,6 +78,7 @@ test("an agreement says what it would bind each side to, and that a duty in word
     "   - You would be bound to: pay $5,127.38 to acc-c0042 every 30 days.",
     "   - Dana Reyes (c0042) would be bound to nothing: no act of theirs is set down.",
     '   - Its terms, in words only: "works crew at town-hall/workplace.1"',
+    "   - Until they sign it you can take it back: withdraw it, and it can no longer be signed.",
     "   - It names no place of work: it is made on the job advertisement rec.1094, so the work is where that advertisement says (town-hall/workplace.1).",
     "   - Cites: rec.1094.",
   ]);

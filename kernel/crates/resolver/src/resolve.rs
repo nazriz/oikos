@@ -636,7 +636,8 @@ impl Resolver<'_> {
         let to = self.payee(&self.need(c, "to", "Paid to whom?")?, commitment)?;
         let purpose = Self::str_(c, "for")?.filter(|p| !p.is_empty());
         let settles = self.id(c, "settles")?;
-        Ok(obj(vec![("from", from.map(Json::from)), ("to", some(to)), ("amount", some(amount)), ("for", purpose.map(Json::from)), ("settles", settles.map(Json::from))]))
+        let line = self.id(c, "line")?;
+        Ok(obj(vec![("from", from.map(Json::from)), ("to", some(to)), ("amount", some(amount)), ("for", purpose.map(Json::from)), ("settles", settles.map(Json::from)), ("line", line.map(Json::from))]))
     }
 
     fn money(&self, c: &Call, bind: Option<&str>) -> R<Vec<Json>> {
@@ -674,6 +675,7 @@ impl Resolver<'_> {
                 ("settles", out.get("settles").cloned()),
                 ("per_instruction", per.map(Json::from)),
                 ("memo", purpose.map(|p| json!(slice16(&p, 500)))),
+                ("line", out.get("line").cloned()),
             ])]);
         }
         // Someone else keeps it: the only physical option is to ask them. They decide.
@@ -1014,6 +1016,9 @@ impl Resolver<'_> {
 
     fn agreement(&mut self, c: &Call, bind: Option<&str>) -> R<Vec<Json>> {
         if let Some(sign) = self.id(c, "sign")? {
+            if self.k.withdrawn.contains(&sign) {
+                return ask(format!("{sign} has been withdrawn: if it was an offer, whoever made it has taken it back, and there is nothing to sign."));
+            }
             let as_ = self.id(c, "for")?.unwrap_or_else(|| self.me.clone());
             return Ok(vec![obj(vec![("block", some("sign_agreement")), ("agreement", some(sign)), ("as", some(as_)), ("ref", bind.map(Json::from))])]);
         }

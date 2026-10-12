@@ -8,7 +8,7 @@ import { basesOf, channels, type Observation, type StatementRecord } from "../co
 import { dateWords, durationWords } from "../forms";
 import type { OfficeBooks, OpenHeading, OpenItem, ParticipantContext } from "../module";
 import { cents } from "../money";
-import { Book, commitmentOf, DAY, Directions, jobTerms, ownAccount, usd } from "./common";
+import { Book, commitmentOf, DAY, Directions, jobTerms, madeAt, ownAccount, usd, whenWords } from "./common";
 import { Staffing, staffingUnder } from "./firms";
 import { dueFrom, returnsOf } from "./returns";
 import { incomeTaxLaw, withheld } from "./tax";
@@ -34,9 +34,9 @@ const dead = (book: Book): Map<string, number> => {
 class Paid {
   readonly settled = new Set<string>();
   /** Each payment seen to settle a paper: which, when, and how much. */
-  readonly settling: { id: string; t: number; amount: number }[] = [];
+  readonly settling: { id: string; t: number; amount: number; line?: string }[] = [];
   /** Each payment seen made under a standing payment of the office's: which, when, and how much (after what was withheld). */
-  readonly byOrder: { t: number; order: string; amount: number }[] = [];
+  readonly byOrder: { t: number; order: string; amount: number; line?: string }[] = [];
   /** What has left the account, by what each payment said it was for (the bank's statement line, `memo`): when and how much. */
   readonly saidFor: { t: number; memo: string; amount: number }[] = [];
   account: string | undefined;
@@ -49,9 +49,9 @@ class Paid {
       if (tx.memo) this.saidFor.push({ t: tx.t, memo: tx.memo, amount: cents(tx.amount) });
       if (tx.settles) {
         this.settled.add(tx.settles);
-        this.settling.push({ id: tx.settles, t: tx.t, amount: cents(tx.amount) });
+        this.settling.push({ id: tx.settles, t: tx.t, amount: cents(tx.amount), ...(tx.line ? { line: tx.line } : {}) });
       }
-      if (tx.per_instruction) this.byOrder.push({ t: tx.t, order: tx.per_instruction, amount: cents(tx.amount) });
+      if (tx.per_instruction) this.byOrder.push({ t: tx.t, order: tx.per_instruction, amount: cents(tx.amount), ...(tx.line ? { line: tx.line } : {}) });
     }
   }
 }
@@ -82,7 +82,7 @@ export function financeBooks(ctx: ParticipantContext): OfficeBooks {
       const invoices = book.open("invoice").filter((r) => addressed(r, me) && r.data?.outcome?.money && !money.settled.has(r.id)).map((r): OpenItem => {
         const amount = cents(r.data!.outcome.money.amount);
         const over = approvalRule && amount > cents(p.approval_over);
-        return { id: r.id, since: r.at, amount, line: `${r.id}: invoice from ${r.speaks_for ?? r.author} for ${usd(amount)}, dated ${dateWords(r.at)}, not paid${over ? `; it is over the payments procedure's figure of ${usd(cents(p.approval_over))} and ${approved.has(r.id) ? "the mayor's written approval is on file" : "the mayor's written approval is not on file"}` : ""}` };
+        return { id: r.id, since: madeAt(r), amount, line: `${r.id}: invoice from ${r.speaks_for ?? r.author} for ${usd(amount)}, dated ${whenWords(madeAt(r))}, not paid${over ? `; it is over the payments procedure's figure of ${usd(cents(p.approval_over))} and ${approved.has(r.id) ? "the mayor's written approval is on file" : "the mayor's written approval is not on file"}` : ""}` };
       });
       // ---- wages: the standing payments on file, by the agreement each rests on ----
       const orders = new Map<string, StatementRecord[]>(); // agreement -> its standing payments, not withdrawn
@@ -124,6 +124,11 @@ export function financeBooks(ctx: ParticipantContext): OfficeBooks {
       const from = (year - 1) * YEAR, to = year * YEAR;
       const invoiceIds = new Set(book.all("invoice").map((r) => r.id));
       const invoicesPaid = money.settling.filter((x) => x.t >= from && x.t < to && invoiceIds.has(x.id)).reduce((n, x) => n + x.amount, 0);
+      // (What each payment drawn on the budget says line it is drawn on: an invoice paid, a wage paid with what was
+      // withheld from it. A payment that names none is unallocated: shown so, never refused.)
+      const spentOn = new Map<string, number>();
+      const draw = (line: string | undefined, n: number) => spentOn.set(line ?? "", (spentOn.get(line ?? "") ?? 0) + n);
+      for (const x of money.settling) if (x.t >= from && x.t < to && invoiceIds.has(x.id)) draw(x.line, x.amount);
       const perPay = (order: string): number => {
         const r = book.records.get(order);
         if (r?.record !== "statement") return 0;
@@ -140,7 +145,7 @@ export function financeBooks(ctx: ParticipantContext): OfficeBooks {
       const lastReportEnd = reports.reduce((m, r) => Math.max(m, Number(r.data?.period_end ?? r.at)), -1);
       for (const x of money.byOrder) {
         if (!held.has(x.order)) held.set(x.order, perPay(x.order));
-        if (x.t >= from && x.t < to) wages += x.amount + held.get(x.order)!;
+        if (x.t >= from && x.t < to) { wages += x.amount + held.get(x.order)!; draw(x.line, x.amount + held.get(x.order)!); }
         if (x.t > lastReportEnd) withheldSince += held.get(x.order)!;
       }
       const adopted = budgetFor(book, year);
@@ -152,17 +157,25 @@ export function financeBooks(ctx: ParticipantContext): OfficeBooks {
       for (const x of money.saidFor) if (x.t >= from && x.t < to) forWhat.set(x.memo, (forWhat.get(x.memo) ?? 0) + x.amount);
       const byMemo = [...forWhat].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1));
       const saidWords = byMemo.length ? `. By what the payments said they were for: ${byMemo.slice(0, 5).map(([m, n]) => `"${m}" ${usd(n)}`).join("; ")}${byMemo.length > 5 ? `; ${byMemo.length - 5} other kinds ${usd(byMemo.slice(5).reduce((n, x) => n + x[1], 0))}` : ""}` : "";
+      // Room left by line: each line of the adopted budget, what has been drawn on it and what is left; and what no line was
+      // named for. Lines the payments name that the budget does not have are said too.
+      const byLine = (lines: { [k: string]: number }): string => {
+        const names = [...new Set([...Object.keys(lines), ...[...spentOn.keys()].filter((k) => k)])].sort();
+        const each = names.map((k) => lines[k] === undefined ? `${k} (not a line of the budget) ${usd(spentOn.get(k) ?? 0)} drawn` : `${k} ${usd(spentOn.get(k) ?? 0)} drawn of ${usd(cents(lines[k]!))}, ${usd(cents(lines[k]!) - (spentOn.get(k) ?? 0))} left`);
+        const none = spentOn.get("") ?? 0;
+        return `${each.join("; ")}; ${none ? `${usd(none)} unallocated (payments that name no line)` : "nothing unallocated"}`;
+      };
       if (adopted) {
         const lines = (adopted.data?.lines ?? {}) as { [k: string]: number };
         const total = Object.values(lines).reduce((n, v) => n + cents(v), 0);
         const spent = invoicesPaid + wages;
         budget.push({ id: adopted.id, running: true, since: adopted.at, amount: total - spent,
-          line: `${adopted.id}: the budget adopted for year ${year} (${yearInDays(year)}) is ${usd(total)} in all (${linesWords(lines)}); paid so far this year ${usd(spent)} (${usd(invoicesPaid)} on invoices, ${usd(wages)} in wages, the wages counted before tax withheld); ${usd(total - spent)} is left. No payment is marked with a line of the budget${saidWords}` });
+          line: `${adopted.id}: the budget adopted for year ${year} (${yearInDays(year)}) is ${usd(total)} in all (${linesWords(lines)}); paid so far this year ${usd(spent)} (${usd(invoicesPaid)} on invoices, ${usd(wages)} in wages, the wages counted before tax withheld); ${usd(total - spent)} is left. By line: ${byLine(lines)}${saidWords}` });
       } else {
         const lines = (last?.data?.lines ?? {}) as { [k: string]: number };
         const total = Object.values(lines).reduce((n, v) => n + cents(v), 0);
         budget.push({ id: `budget-year-${year}`, running: true, since: from,
-          line: last ? `no budget is adopted for year ${year} (${yearInDays(year)}); under the budget last adopted (${last.id}, year ${last.data?.year}: ${linesWords(lines)}; ${usd(total)} in all) and at no more each month than a twelfth of it; paid so far this year ${usd(invoicesPaid + wages)} (${usd(invoicesPaid)} on invoices, ${usd(wages)} in wages)` : `no budget has been adopted for year ${year} (${yearInDays(year)}), and none before it; paid so far this year ${usd(invoicesPaid + wages)}` });
+          line: last ? `no budget is adopted for year ${year} (${yearInDays(year)}); under the budget last adopted (${last.id}, year ${last.data?.year}: ${linesWords(lines)}; ${usd(total)} in all) and at no more each month than a twelfth of it; paid so far this year ${usd(invoicesPaid + wages)} (${usd(invoicesPaid)} on invoices, ${usd(wages)} in wages; ${byLine(lines)})` : `no budget has been adopted for year ${year} (${yearInDays(year)}), and none before it; paid so far this year ${usd(invoicesPaid + wages)}` });
       }
       // ---- tax withheld from wages, not yet paid over ----
       const latest = new Map<string, StatementRecord>(); // collector -> its latest report
@@ -418,8 +431,8 @@ export function planningBooks(ctx: ParticipantContext): OfficeBooks {
         if (typeof d.data?.application === "string") decided.add(d.data.application);
         for (const b of basesOf(d)) decided.add(b);
       }
-      const items = book.open("permit_application").filter((a) => addressed(a, me) && !decided.has(a.id)).map((a): OpenItem => ({ id: a.id, since: a.at,
-        line: `${a.id}: ${a.speaks_for ?? a.author} applied ${dateWords(a.at)} for a permit to build ${a.data?.structure_type ?? "(the kind of building is not said)"} on ${a.data?.lot ?? "(no lot is named)"}; no decision has been made` }));
+      const items = book.open("permit_application").filter((a) => addressed(a, me) && !decided.has(a.id)).map((a): OpenItem => ({ id: a.id, since: madeAt(a),
+        line: `${a.id}: ${a.speaks_for ?? a.author} applied ${whenWords(madeAt(a))} for a permit to build ${a.data?.structure_type ?? "(the kind of building is not said)"} on ${a.data?.lot ?? "(no lot is named)"}; no decision has been made` }));
       return heading("Permit applications, not decided", items);
     },
   };

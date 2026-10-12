@@ -83,8 +83,26 @@ test("finance: the budget for the year in total, against payments of invoices an
   expect(item.amount).toBe(8_900_000);
   expect(item.line).toContain("$8,000.00");
   // (What the payments said they were for, as the bank's statement has them: the largest first.)
-  expect(item.line).toContain('No payment is marked with a line of the budget. By what the payments said they were for: "Paying an invoice" $8,000.00; "wages" $2,700.00');
+  // (Neither payment names a line: all of it is unallocated, and shown so; nothing is refused.)
+  expect(item.line).toContain("By line: parks $0.00 drawn of $80,000.00, $80,000.00 left; staff $0.00 drawn of $20,000.00, $20,000.00 left; $11,000.00 unallocated (payments that name no line). By what the payments said they were for: \"Paying an invoice\" $8,000.00; \"wages\" $2,700.00");
   expect(lines(b.open(40 * DAY))).toBe(lines(b.open(41 * DAY)));
+});
+
+test("finance: room left by line from the lines the payments name; a payment with no line is unallocated; a line the budget does not have is said", () => {
+  const b = financeBooks(context("fin", "city", {}, { position: "finance" }));
+  const a = job("job-1", 2 * DAY, "c1");
+  const budget = statement("bud-1", DAY, "budget", { data: { year: 1, lines: { parks: 8_000_000, staff: 2_000_000 } } });
+  const tx = (t: number, amount: string, o: object) => ({ t, from: "acc-city", to: "acc-x", amount, currency: "AUD", by: "fin", ...o });
+  feed(b, "city", 40 * DAY, [budget, invoice("inv-1", 4 * DAY, 800_000), invoice("inv-2", 4 * DAY, 300_000), invoice("inv-3", 4 * DAY, 100_000), ...signed(a, 3 * DAY), standingOrder("ord-1", 4 * DAY, "city", "acc-c1", 270_000, { basis: "job-1", every: PERIOD })],
+    { transactions: [tx(30 * DAY, "800000", { settles: "inv-1", line: "parks" }), tx(30 * DAY, "300000", { settles: "inv-2" }), tx(30 * DAY, "100000", { settles: "inv-3", line: "fountains" }), tx(31 * DAY, "270000", { per_instruction: "ord-1", line: "staff" })] });
+  const item = find(b.open(40 * DAY), "The budget for the year, against what has been paid")[0];
+  // 10,000,000 adopted; 1,200,000 on invoices + 270,000 net + 30,000 withheld = 1,500,000 paid.
+  expect(item.amount).toBe(8_500_000);
+  expect(item.line).toContain("By line: fountains (not a line of the budget) $1,000.00 drawn; parks $8,000.00 drawn of $80,000.00, $72,000.00 left; staff $3,000.00 drawn of $20,000.00, $17,000.00 left; $3,000.00 unallocated (payments that name no line)");
+  // (None unallocated once every payment names its line.)
+  const c = financeBooks(context("fin", "city", {}, { position: "finance" }));
+  feed(c, "city", 40 * DAY, [budget, invoice("inv-1", 4 * DAY, 800_000)], { transactions: [tx(30 * DAY, "800000", { settles: "inv-1", line: "parks" })] });
+  expect(find(c.open(40 * DAY), "The budget for the year, against what has been paid")[0]!.line).toContain("nothing unallocated");
 });
 
 test("finance: tax withheld since the last report is listed, and a shortfall the last report owed", () => {

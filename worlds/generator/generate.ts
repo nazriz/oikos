@@ -75,7 +75,7 @@ const ACT_TIME = {
   },
 };
 
-export const GENERATOR_VERSION = "0.52.0"; // 0.52.0: a profile's ordinary terms of trade credit (business.trade_credit_days) reach the factories that sell to shops and the world market that sells inputs to factories (docs/behaviour/trade.md, "Trade credit"); 0.51.0: the tax law lists its returns, from the profile's public_finance.returns (docs/decisions.md, 2026-10-12, "Returns on the law's days"): which charges each reports and the day of the month it falls due by, as words and as data; 0.50.0: the law on possession says what the place's law has of a plan to pay (may, must consider, none; where it is taken away; where paying in full ends the claim), the tribunal's form for a tenant's answer is published, the possession order form offers only what that law has, and people are given their place's rate of answering an application; 0.49.0: homes by income (docs/decisions.md, 2026-10-12, "Homes by income"): where the profile states its renters' rent as a share of income, a town's first tenancies are dealt by what each household has coming in, people with nothing coming in live with kin, owners are chosen by the head's age where the profile has it, and the payments its support law already owes are in payment from the first day by the profile's take-up; 0.48.0: `opening_caseload`: a town may open in the middle of things, its landlords' rent books and its tribunal's list as an ordinary day would have them (off unless set); a landlord's and the member's procedure say what the law has for a home the tenant has left; 0.47.0: an office a model holds opens with its institution's standing notices on file (what a body that hears grievances says it hears), its procedure under the law on possession (a landlord, the tribunal's member and registrar: what each form is for and what the law asks before each step, from the profile's figures) and what becomes of a letter to a person; the tribunal has registry staff in a living town (docs/decisions.md, 2026-10-12, "What the third living pilot found"); 0.46.0: the firm and landlord side (docs/decisions.md, 2026-10-11, "Four faults"): the place's laws on ending a job and on possession published from the profile; how firms adjust; a business of one as a venture, its chance derived from the place's business birth rate; short pay's chance over the jobs exposed; 0.45.4: the planning office's decision form records the liberty to build beside a grant (the form's own declaration: FormWrites `claim`); 0.45.3: a payroll folder holds the standing payments beside the employment agreements; an office's routines procedure says who makes a standing work order and how; the permit decision form says what records the permission; 0.45.2: the council's standing orders are a published procedure of the town's (proc-council), and a councillor's or a clerk's post held by a model has the council's papers on its desk (the charter, the standing orders, the laws, the forms, proposals and ballots as papers of its own body, petitions, budgets and results); 0.45.1: the tax law says, step by step and with each rounding, how what is withheld from a pay is reckoned (the one function every payroll uses), where it said "reckoned as a year's pay"; 0.45.0: a seat with routine work is shown its staff's reports on the work under its standing orders, and its procedure says they are made; 0.44.0: main's 0.39.1 (an office's own form says what issuing it does) with the institutions' opening papers (0.43.0)
+export const GENERATOR_VERSION = "0.53.0"; // 0.53.0: `opening_caseload` reaches the other offices (support claims in hand and refusals asked about, complaints before the town's desks, permit applications before planning, invoices unpaid at finance, loans behind at the bank), each from the town's own flow times the days a matter stands open; `opening_caseload_scale_bps` thickens them (docs/decisions.md, 2026-10-12, "Opening caseloads of the other offices"); 0.52.0: a profile's ordinary terms of trade credit (business.trade_credit_days) reach the factories that sell to shops and the world market that sells inputs to factories (docs/behaviour/trade.md, "Trade credit"); 0.51.0: the tax law lists its returns, from the profile's public_finance.returns (docs/decisions.md, 2026-10-12, "Returns on the law's days"): which charges each reports and the day of the month it falls due by, as words and as data; 0.50.0: the law on possession says what the place's law has of a plan to pay (may, must consider, none; where it is taken away; where paying in full ends the claim), the tribunal's form for a tenant's answer is published, the possession order form offers only what that law has, and people are given their place's rate of answering an application; 0.49.0: homes by income (docs/decisions.md, 2026-10-12, "Homes by income"): where the profile states its renters' rent as a share of income, a town's first tenancies are dealt by what each household has coming in, people with nothing coming in live with kin, owners are chosen by the head's age where the profile has it, and the payments its support law already owes are in payment from the first day by the profile's take-up; 0.48.0: `opening_caseload`: a town may open in the middle of things, its landlords' rent books and its tribunal's list as an ordinary day would have them (off unless set); a landlord's and the member's procedure say what the law has for a home the tenant has left; 0.47.0: an office a model holds opens with its institution's standing notices on file (what a body that hears grievances says it hears), its procedure under the law on possession (a landlord, the tribunal's member and registrar: what each form is for and what the law asks before each step, from the profile's figures) and what becomes of a letter to a person; the tribunal has registry staff in a living town (docs/decisions.md, 2026-10-12, "What the third living pilot found"); 0.46.0: the firm and landlord side (docs/decisions.md, 2026-10-11, "Four faults"): the place's laws on ending a job and on possession published from the profile; how firms adjust; a business of one as a venture, its chance derived from the place's business birth rate; short pay's chance over the jobs exposed; 0.45.4: the planning office's decision form records the liberty to build beside a grant (the form's own declaration: FormWrites `claim`); 0.45.3: a payroll folder holds the standing payments beside the employment agreements; an office's routines procedure says who makes a standing work order and how; the permit decision form says what records the permission; 0.45.2: the council's standing orders are a published procedure of the town's (proc-council), and a councillor's or a clerk's post held by a model has the council's papers on its desk (the charter, the standing orders, the laws, the forms, proposals and ballots as papers of its own body, petitions, budgets and results); 0.45.1: the tax law says, step by step and with each rounding, how what is withheld from a pay is reckoned (the one function every payroll uses), where it said "reckoned as a year's pay"; 0.45.0: a seat with routine work is shown its staff's reports on the work under its standing orders, and its procedure says they are made; 0.44.0: main's 0.39.1 (an office's own form says what issuing it does) with the institutions' opening papers (0.43.0)
 const DAY = 86_400;
 const MONTH = 30 * DAY;
 const YEAR = 365 * DAY;
@@ -168,6 +168,10 @@ export interface TownSpec {
    * landlords' and the tribunal's files when the year begins. Off unless set: a town without it opens with every
    * rent book at nought, as before. Needs the profile's law on possession and a tribunal. */
   opening_caseload?: boolean;
+  /** A dial for `opening_caseload`, in basis points of what the town's own mechanism gives (10,000: as it gives; the default):
+   * for a pilot or a test that wants thicker files. It scales the other offices' counts (support, desks, planning, bank,
+   * finance); the landlords' and the tribunal's come from who cannot pay, and are not scaled. */
+  opening_caseload_scale_bps?: number;
   /** A living world (docs/design/ai-citizens.md 10j). Absent: the town is generated exactly as it was. `starting_attachment`
    * (on unless false): people open attached to their place, trade and group by the profile's years of residence and tenure.
    * `initiative_bps` is the world's initiative dial (config `dials`); `counter` is read by the citizen side. */
@@ -993,7 +997,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       const sumWords = `${asWritten(w.wage - taxWithheld)}${taxWithheld > 0 ? ` (the agreed ${asWritten(w.wage)} less ${asWritten(taxWithheld)} withheld under ${taxLaw.id})` : ""}`;
       records.push({ id: `${ag}-wages`, record: "statement", author: "genesis", at: 0, visible_to: [w.employer, "bank"], speaks_for: w.employer, ...(w.employer === "city" ? { in_position: "finance" } : {}), kind: "request", addressed_to: ["bank"], basis: ag,
         text: `Standing instruction to the bank, given ${w.employer === "city" ? "for the town by its finance officer, the signatory the town has named for its account (signatories-city)," : `by ${w.employer}`} before the year began: pay ${c.id}'s wages under employment agreement ${ag}, ${sumWords} every ${V.pay_period_days} days, first on ${formWords.dateWords(firstPay)}.`,
-        data: { outcome: { money: { from: `acc-${w.employer}`, to: `acc-${c.id}`, amount: String(w.wage - taxWithheld), for: "wages" } }, every: PAY, first: firstPay } });
+        data: { outcome: { money: { from: `acc-${w.employer}`, to: `acc-${c.id}`, amount: String(w.wage - taxWithheld), for: "wages", ...(w.employer === "city" ? { line: "staff" } : {}) } }, every: PAY, first: firstPay } });
     }
     if (offBooks) records.push({ id: `off-books-${c.id}`, record: "statement", author: "genesis", at: 0, visible_to: [w.employer], speaks_for: w.employer, kind: "off_books", basis: ag,
       text: `Not on our payroll returns: ${ag}.`, data: { agreement: ag } });
@@ -1085,6 +1089,8 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   // the law lists that asks no record of contributions: nobody here has one yet). A payment not in `take_up_bps` opens
   // with nobody drawing it, as before.
   const inForce = new Map<string, { rule: PaymentRule; monthly: number }[]>();
+  const mortgaged: { loan: string; lh: string; payment: number; income: number; saved: number; repayDay: number }[] = [];
+  const notDrawing: { m: (typeof everyone)[number]; r: PaymentRule; declares: ReturnType<typeof declarationFor> }[] = [];
   const TAKE = V.support.take_up_bps;
   if (TAKE && PAYMENTS.length) {
     const claimPick = rng("payments-in-force");
@@ -1104,7 +1110,11 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
         for (const r of PAYMENTS) {
           if (!(r === stopgap || (forAge(r) && fits(r)))) continue;
           if (forAge(r) && r.who?.no_other_pension && had.some(forAge)) continue;
-          if (claimPick.below(10_000) >= TAKE[r.id]!) continue;
+          if (claimPick.below(10_000) >= TAKE[r.id]!) {
+            // (Entitled and not drawing: those an opening caseload may have as claims in hand. No draw is added.)
+            if (forAge(r)) notDrawing.push({ m, r, declares: declarationFor(r, { household_income: wages, household_members: h.members.length, children_born_at: children, other_pension: false }) });
+            continue;
+          }
           had.push(r);
           const amount = (r.amount as { flat: number }).flat, every = r.every_days * DAY;
           const next = (1 + claimPick.below(r.every_days)) * DAY;
@@ -1354,6 +1364,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
           ],
           text: `bank lent ${lh} ${asWritten(principal)} for their home, ${home.space}; ${lh} repays ${asWritten(payment)} a month for ${months} more months (${OW.mortgage_rate_bps / 100}% a year).` } });
         for (const party of parties) records.push({ id: `${loan}-sig-${party}`, record: "signature", author: "genesis", at: 0, visible_to: parties, speaks_for: party, agreement: loan, as: party });
+        mortgaged.push({ loan, lh, payment, income: RS ? comesIn(h) : income, saved: Number(accounts.find((a: any) => a.id === `acc-${lh}`)?.balance ?? 0), repayDay });
         records.push({ id: `${loan}-repay`, record: "statement", author: "genesis", at: 0, visible_to: [lh, "bank"], speaks_for: lh, kind: "request", addressed_to: ["bank"], basis: loan,
           text: `Standing instruction to the bank, given by ${lh} before the year began: pay my mortgage repayments under loan agreement ${loan} every month.`, data: { outcome: { money: { from: `acc-${lh}`, to: "acc-bank", amount: String(payment), for: "Loan repayment." } }, every: MONTH, first: repayDay * DAY } });
       }
@@ -1443,6 +1454,147 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       paper(`${x.lease}-order`, "tribunal_order", "tribunal", both, [...both, "tribunal"], `${x.lease}-possession`,
         `Decision on ${x.lease}-possession, made ${before(ordered)}: ${x.landlord} is to have possession of ${x.space} on ${formWords.dateWords(due)}: ${x.tenant} and their household are to leave by then. If they have not, ${x.landlord} may ask our registrar for a warrant, which is carried out by those who enforce our orders, and by nobody else.`,
         { application: `${x.lease}-possession`, kind: "possession", matter: "possession", applicant: x.landlord, against: x.tenant, finding: "possession", binding: true, waited_days: DAYS_TO_HEARING, about: x.lease, structure: x.structure, amount: application.amount, due, space: x.space, household: x.household });
+    }
+  }
+
+  // ---- the other offices' ordinary caseload (docs/behaviour/generator.md, "The other offices' caseload"; docs/decisions.md,
+  // 2026-10-12, "Opening caseloads of the other offices"). Each count is what the town's own mechanism holds in steady
+  // state: the flow it produces in a year times the days a matter stands open at the office, spread over its stages and
+  // days so that nothing falls due in one week. A flow under one a day is a fraction: the count is that fraction's whole
+  // part and, with the chance of the rest, one more (drawn on the office's own stream). Each paper is the one the office
+  // would have had made in a run, dated before the year (`data.since`, brought_forward); each office's code and its
+  // clerk's books read it as they read papers made in a run.
+  if (spec.opening_caseload) {
+    const SCALE = spec.opening_caseload_scale_bps ?? 10_000;
+    const adultsN = everyone.filter((m) => m.adult).length;
+    const count = (draw: { below(n: number): number }, perYear: number, daysOpen: number) => {
+      const x = (perYear * daysOpen * SCALE) / (365 * 10_000), whole = Math.floor(x);
+      return whole + (draw.below(1_000_000) < Math.floor((x - whole) * 1_000_000) ? 1 : 0);
+    };
+    const before = (days: number) => `${days} day${days === 1 ? "" : "s"} before the year began`;
+    const paper = (id: string, kind: string, by: string, to: string[], visible: string[], basis: string | undefined, text: string, data: object, since: number) =>
+      records.push({ id, record: "statement", author: "genesis", at: 0, visible_to: visible, speaks_for: by, kind, ...(to.length ? { addressed_to: to } : {}), ...(basis ? { basis } : {}), text, data: { ...data, since: -since * DAY, brought_forward: true } });
+    // ---- the support office: claims in hand, and refusals asked to be looked at again ----
+    // (A claim waits `processing_days`; the flow is the people the law's pension reaches in a year, a cohort of one age
+    // year; they are drawn, youngest first, from those entitled and not drawing as the year begins. A claim refused is
+    // asked about at the profile's share of wrong refusals. Claims on losing work are not counted: no profile gives
+    // how many job endings are followed by a spell out of work.)
+    const drawingNot = [...notDrawing].sort((a, b) => b.m.born_at - a.m.born_at || (a.m.id < b.m.id ? -1 : 1));
+    const refused = new Set<string>();
+    const refusal = (n: (typeof notDrawing)[number], ago: number) => {
+      const claim = `claim-${n.m.id}-${n.r.id}`, decision = `refusal-${n.m.id}-${n.r.id}`, visible = [n.m.id, n.r.payer];
+      paper(claim, "benefit_claim", n.m.id, [n.r.payer], visible, undefined, `Claim, made ${before(ago + 6)}: ${n.r.id}.`, { payment: n.r.id, account: `acc-${n.m.id}`, born_at: n.m.born_at, ...(n.declares ? { declares: n.declares } : {}) }, ago + 6);
+      paper(decision, "benefit_decision", n.r.payer, [n.m.id], visible, claim, `Claim ${claim} refused: the claim could not be verified.`, { claim, payment: n.r.id, granted: false, reason: "the claim could not be verified", could_not_verify: true }, ago);
+      refused.add(n.m.id);
+      return decision;
+    };
+    if (FR && FR.support.processing_days > 0 && notDrawing.length) {
+      const draw = rng("opening-caseload-support");
+      const wait = FR.support.processing_days;
+      for (const r of PAYMENTS.filter((x) => forAge(x) && TAKE?.[x.id] !== undefined)) {
+        const from = r.who?.from_age ?? 0;
+        const entrants = everyone.filter((m) => m.adult && ageOf(m) >= from && ageOf(m) < from + 5).length / 5;
+        const pool = drawingNot.filter((n) => n.r === r && !refused.has(n.m.id));
+        const claims = Math.min(pool.length, count(draw, entrants, wait));
+        for (const n of pool.slice(0, claims)) {
+          const ago = draw.below(wait); // (made this long ago; decided when `wait` days have passed)
+          paper(`claim-${n.m.id}-${n.r.id}`, "benefit_claim", n.m.id, [n.r.payer], [n.m.id, n.r.payer], undefined, `Claim, made ${before(ago)}: ${n.r.id}.`,
+            { payment: n.r.id, account: `acc-${n.m.id}`, born_at: n.m.born_at, ...(n.declares ? { declares: n.declares } : {}) }, ago);
+          refused.add(n.m.id);
+        }
+        // (A review asked for: the office answers on its next working day, so a request stands about a day.)
+        const reviews = Math.min(pool.length - claims, count(draw, (entrants * FR.support.wrong_refusal_bps) / 10_000, 1));
+        for (const n of pool.slice(claims, claims + reviews)) {
+          const ago = draw.below(1) + 1, decision = refusal(n, ago);
+          paper(`review-${n.m.id}-${n.r.id}`, "remedy_request", n.m.id, [n.r.payer], [n.m.id, n.r.payer], decision, `Request to put right (claim_refused): ${n.r.id} was refused and I qualify.`,
+            { matter: "claim_refused", against: n.r.payer, about: decision, seeks: n.r.id }, ago);
+        }
+      }
+    }
+    // ---- the bodies that hear grievances (the ombudsman, the consumer desk, the town's complaints desk) ----
+    // (A matter arises at the profile's share of adults a year, for those exposed; asking the other side settles the
+    // profile's share of them (`put_right_on_asking_bps`); a matter asking did not settle can be taken to a desk, and
+    // stands there `answer_days` before it is decided. That is a ceiling: whether a person takes it on is theirs, and
+    // some do not.)
+    if (FR) {
+      const draw = rng("opening-caseload-desks");
+      const days = FR.venues.answer_days;
+      const left = (matter: string) => 10_000 - (FR.put_right_on_asking_bps[matter] ?? FR.put_right_on_asking_bps.other ?? 0);
+      const adults = everyone.filter((m) => m.adult);
+      const pickOne = <T,>(xs: T[]) => xs[draw.below(xs.length)]!;
+      const lodge = (venue: string, applicant: string, matter: string, against: string, extra: { about?: string; structure?: string; seeks?: string }) => {
+        const ago = draw.below(days), id = `application-${applicant}-${matter}`;
+        if (records.some((r) => r.id === id)) return;
+        const by = (days - ago) * DAY + 9 * 3600;
+        paper(id, "application", applicant, [venue], [applicant, venue, against], undefined,
+          `Application: ${matter.replace(/_/g, " ")} against ${against}${extra.structure ? `; at ${extra.structure}` : ""}; we asked them first and it was not put right.`,
+          { kind: matter, matter, against, ...extra, request: "asked before the year began" }, ago);
+        paper(`notice-${id}`, "complaint_notice", venue, [applicant, against], [applicant, against, venue], id,
+          `${applicant} has applied to us about ${matter.replace(/_/g, " ")} (application ${id}). You may answer by ${formWords.dateWords(by)}.`,
+          { application: id, kind: matter, matter, applicant, against, hearing_at: by, answer_by: by, ...(extra.about ? { about: extra.about } : {}), ...(extra.structure ? { structure: extra.structure } : {}), ...(extra.seeks ? { seeks: extra.seeks } : {}) }, ago);
+      };
+      // The town's complaints desk: disrepair, over the tenants whose homes are let (a building's problem is all its tenants').
+      if (let_.length) for (let i = count(draw, (FR.per_adult_bps_per_year.landlord * adultsN * left("disrepair")) / 10_000 / 10_000, days); i > 0; i--) {
+        const x = pickOne(let_);
+        lodge("city", x.tenant, "disrepair", x.landlord, { structure: x.structure, about: x.structure });
+      }
+      // The ombudsman: wrong bills (against the energy retailer, whose customers they are) and claims refused.
+      if (UT) for (let i = count(draw, (FR.per_adult_bps_per_year.bill * adultsN * left("bill")) / 10_000 / 10_000, days); i > 0; i--) lodge("ombudsman", pickOne(adults).id, "bill", "energy-co", {});
+      for (const n of drawingNot.filter((y) => !refused.has(y.m.id)).slice(0, count(draw, (FR.per_adult_bps_per_year.benefits * adultsN * left("claim_refused")) / 10_000 / 10_000, days))) {
+        const decision = refusal(n, draw.below(days) + 1);
+        lodge("ombudsman", n.m.id, "claim_refused", n.r.payer, { about: decision, seeks: n.r.id });
+      }
+      // The consumer desk: goods found faulty, against a shop.
+      if (shops.length) for (let i = count(draw, (FR.per_adult_bps_per_year.goods * adultsN * left("goods")) / 10_000 / 10_000, days); i > 0; i--) lodge("consumer-desk", pickOne(adults).id, "goods", pickOne(shops), {});
+    }
+    // ---- the bank: loans behind ----
+    // (A mortgage is behind when its household cannot pay it: what it has coming in does not cover the repayment and
+    // it has less than a month's repayment put by, as with rent. The repayment was sized within a share of the income
+    // the household had, so in a town like these none is behind on the first day; the machinery is here for a town
+    // whose households have fallen on harder times than their loans were sized for. Behind by `k` repayments, `k`
+    // spread over the bank's days before it writes (`arrears_days`) and default (`default_days`): a letter of arrears
+    // from `arrears_days` on; past `default_days` a loan is in default, and is not carried.)
+    {
+      const draw = rng("opening-caseload-bank");
+      for (const x of mortgaged) {
+        if (x.income >= x.payment || x.saved >= x.payment) continue;
+        // (Repayments missed, k, so that the earliest fell due before the year began and the loan is not yet in default:
+        // each fell due on the borrower's own repayment day, `ago` days before the year.)
+        const most = Math.max(1, Math.floor((V.credit.default_days - 1 + x.repayDay) / 30));
+        const k = 1 + draw.below(most), ago = 30 * k - x.repayDay;
+        if (ago < 1 || ago >= V.credit.default_days) continue;
+        paper(`${x.loan}-statement`, "loan_statement", "bank", [x.lh], ["bank", x.lh], x.loan,
+          `Statement of the loan account under ${x.loan} as the year began: ${k} repayment${k === 1 ? "" : "s"} of ${formatMoney(x.payment, V.currency)} not made, the earliest due ${before(ago)}.`, { loan: x.loan, payments: k, payment: x.payment, behind: k * x.payment, account: "acc-bank" }, ago);
+        if (ago >= V.credit.arrears_days) paper(`${x.loan}-behind`, "loan_arrears", "bank", [x.lh], ["bank", x.lh], x.loan,
+          `Loan ${x.loan}: ${formatMoney(k * x.payment, V.currency)} behind. Please pay.`, { loan: x.loan, behind: k * x.payment }, ago - V.credit.arrears_days + 1);
+      }
+    }
+    // ---- planning: permit applications before the office ----
+    // (The planning office sits weekly; an application stands from the day it is made to the office's next sitting. The
+    // town's own are one park a year, as its mayor's rule has it. Other applicants' flows are not given by anything the
+    // generator holds.)
+    {
+      const draw = rng("opening-caseload-planning");
+      const free = parcels.filter((q) => titleOf.get(q.id)?.holder === "city" && !structures.some((st: any) => st.at === q.cell));
+      if (free.length && V.town_finance.parks_per_year > 0) for (let i = count(draw, 1, 7 / 2); i > 0; i--) {
+        const lot = free[draw.below(free.length)]!, ago = draw.below(7) + 1, id = `permit-park-${lot.id}`;
+        if (records.some((r) => r.id === id)) continue;
+        paper(id, "permit_application", "city", ["city"], ["city"], undefined, `Application for a permit to build park on ${lot.id}, made ${before(ago)}.`, { lot: lot.id, structure_type: "park" }, ago);
+      }
+    }
+    // ---- the finance office: invoices addressed to the town and not yet paid ----
+    // (The landfill invoices the town every thirty days for the month's waste; finance sits every third day, so an
+    // invoice stands from its day to the next sitting. Other suppliers' invoices are not counted: the generator holds
+    // nothing from which to reckon their amounts.)
+    {
+      const draw = rng("opening-caseload-finance");
+      const levy = V.services.landfill_levy_per_tonne;
+      if (levy !== undefined && levy > 0) for (let i = count(draw, 365 / 30, 3 / 2); i > 0; i--) {
+        const tonnes = (V.services.waste_per_person_per_day_g * spec.citizens * 30) / 1_000_000;
+        const amount = Math.max(1, Math.round(tonnes * levy)), ago = draw.below(3) + 1;
+        records.push({ id: `invoice-landfill-carried-${i}`, record: "statement", author: "genesis", at: 0, visible_to: ["outside", "city"], speaks_for: "outside", in_position: "outside-landfill", kind: "invoice", addressed_to: ["city"],
+          text: `Invoice: ${formatMoney(amount, V.currency)} for ${tonnes.toFixed(1)} t of waste taken last month, dated ${before(ago)}.`, data: { outcome: { money: { to: "acc-outside", amount: String(amount), for: "disposal of waste" } }, since: -ago * DAY, brought_forward: true } });
+      }
     }
   }
 
@@ -1886,6 +2038,10 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   office("finance", "city", "Finance officer", "finance_officer", [{ id: "treasury", kind: "accounts" }, K.mine("bills", ["invoice", "approval", "budget"]), priceLists, mine("payroll"), deaths, lawBook], code("city.finance_officer", {
     // What the town's budget pays for, as the finance office would brief anyone preparing one (the only lines this town has).
     budget_lines: budgetLines,
+    // Which line pays for what: a building the town commissions from a builder is on its line (a park, a road), and the
+    // landfill's charge on the services line (the brief above says so; an invoice it does not place has no line).
+    lines_by_structure: { park: "parks", ...(RDS ? { road: "roads" } : {}) },
+    ...(LEVY === undefined ? {} : { lines_by_position: { "outside-landfill": "services" } }),
     // The procedure its approval rule comes from (a record): withdrawn, the rule goes with it. Its figure is the profile's.
     procedure: "proc-payments", approval_over: V.town_finance.payment_approval_over }));
   // The works office: hires the crew the staff line pays for, and sets them to the services from the hall (its depot).

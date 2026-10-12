@@ -262,3 +262,15 @@ lists record how each member voted; an amended act is engrossed by the clerk's o
 of the votes by what they cite still finds nothing, since a vote names its ballot and cites nothing: the count is
 where to read them. Who has not voted is not listed (the seat knows its council's members from who's who, not from
 the votes).
+
+## Payments carry their budget line (finance 0.10.2, 2026-10-12)
+
+**The fault.** The finance office's books gave the year's budget in total only: "no payment is marked with a line of the budget". A payment said what it was for in words (the bank statement's memo) and nothing the code could read said which line of the adopted budget it was drawn on, so a finance seat could not see that the parks line was spent and the roads line was not (docs/decisions.md, "The fourth living pilot found", item 9: "spent by line").
+
+**What it is now.** A payment may name the line of the payer's adopted budget it is drawn on: `money(..., line=parks)`. The line is a label the payer gives, carried on the payment and on the transaction both sides' statements show (`Transaction.line`), and on a standing payment's request and each payment made under it. The kernel reads nothing into it, checks nothing against any budget, and **a payment with no line is not refused**.
+- **Wages:** the payroll notice already names the line a post is on; the standing payment of the wage set up from it carries that line (the staff line for the works crew, environment for the environment office). The town's crew the year opens with are on the staff line, in the orders it opens with.
+- **Invoices:** the office's brief says which line pays for what: an invoice for a building the town commissioned is on that building's line (a park on `parks`, a road on `roads`: the builder's invoice says the kind of building it is for), the landfill's invoice on `services`. The generator gives the finance office that brief (`lines_by_structure`, `lines_by_position`). An invoice the brief does not place is paid with no line.
+- **The books** (office-books.md): the budget's item says, for each line of the adopted budget, what has been drawn on it and what is left; what no line was named for as **unallocated**; and any line the payments name that the budget does not have ("not a line of the budget"). The code office's own check is still the budget in total (as the charter has it); the lines are what a seat reads.
+- **A seat paying an invoice** says the line in the payment (`money(..., settles=<invoice>, line=parks)`).
+
+**Revisit if** the council's lines should bind (a payment over its line held for the council's word): that is a rule of the town's, not of the books. If lines are redrawn in the year (a budget amended), payments keep the label they were made with.

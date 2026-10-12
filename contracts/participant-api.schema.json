@@ -822,6 +822,9 @@
                   "memo": {
                     "type": "string",
                     "maxLength": 500
+                  },
+                  "line": {
+                    "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
                   }
                 }
               }

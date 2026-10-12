@@ -31,6 +31,7 @@
       "asks": ["You don't know of a standing paper called rec.900 that someone acts on. Look it up and name it by its id, or say who is to hold it."] },
     { "name": "a notice addressed to nobody has nobody to hold it", "as": "finance", "program": "statement(hold=rec.50)",
       "asks": ["You don't know of a standing paper called rec.50 that someone acts on. Look it up and name it by its id, or say who is to hold it."] },
+    { "name": "an offer its maker has taken back cannot be signed", "as": "finance", "program": "agreement(sign=rec.48)", "asks": ["rec.48 has been withdrawn: if it was an offer, whoever made it has taken it back, and there is nothing to sign."] },
     { "name": "something withdrawn is not held", "as": "finance", "program": "statement(hold=rec.48)",
       "asks": ["rec.48 has been withdrawn: there is nothing to hold."] },
     { "name": "what is addressed to one's own organisation is held on its own file, where its own people read it", "as": "finance", "program": "statement(hold=rec.47)",

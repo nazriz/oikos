@@ -199,7 +199,8 @@
                     "for",
                     "settles",
                     "basis",
-                    "per_request"
+                    "per_request",
+                    "line"
                   ]
                 }
               }

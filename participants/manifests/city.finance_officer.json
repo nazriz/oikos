@@ -25,6 +25,20 @@
       "default": 10000,
       "source": "placeholder"
     },
+    "lines_by_position": {
+      "schema": {
+        "type": "object"
+      },
+      "default": {},
+      "source": "placeholder"
+    },
+    "lines_by_structure": {
+      "schema": {
+        "type": "object"
+      },
+      "default": {},
+      "source": "placeholder"
+    },
     "mayor_position": {
       "schema": {
         "type": "string"

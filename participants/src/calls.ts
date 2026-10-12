@@ -158,11 +158,21 @@ export function parseProgram(text: string): Program {
 
 // ---------------------------------------------------------------- the contract's argument table (P12)
 
-/** Per function: the arguments it takes (undefined: any, as with a form's fields) and the ones it needs. Read from contracts/calls.schema.json, so it can't drift from the contract. */
+/**
+ * Arguments the contract allows that only code writes, and that no one asking in words or a model writing a program is
+ * offered: `money(..., line=parks)` names the line of a body's adopted budget a payment is drawn on (contracts/calls.md;
+ * docs/behaviour/government.md, "Payments carry their budget line"). They are in the contract, and a program that carries
+ * one is valid; they are not in `ARGS`, which is what a translator is taught and shown, so that adding one changes nothing
+ * a trained model has learned.
+ */
+export const CODE_ARGS: { [fn: string]: Set<string> } = { money: new Set(["line"]) };
+
+/** Per function: the arguments it takes (undefined: any, as with a form's fields) and the ones it needs. Read from contracts/calls.schema.json, so it can't drift from the contract. Not the arguments only code writes (`CODE_ARGS`). */
 export const ARGS: { [fn: string]: { allowed?: Set<string>; required: string[] } } = Object.fromEntries(
   (CALLS_SCHEMA as any).$defs.Call.allOf.map((rule: any) => {
     const args = rule.then.properties.args;
-    return [rule.if.properties.fn.const, { allowed: args.propertyNames ? new Set<string>(args.propertyNames.enum) : undefined, required: args.required ?? [] }];
+    const fn = rule.if.properties.fn.const;
+    return [fn, { allowed: args.propertyNames ? new Set<string>((args.propertyNames.enum as string[]).filter((k) => !CODE_ARGS[fn]?.has(k))) : undefined, required: args.required ?? [] }];
   }),
 );
 
@@ -173,7 +183,7 @@ export function contractErrors(p: Program): string[] {
   const check = (c: Call, where: string) => {
     const a = ARGS[c.fn];
     if (!a) return void out.push(`${where}: unknown function ${c.fn}`);
-    for (const k of Object.keys(c.args)) if (a.allowed && !a.allowed.has(k)) out.push(`${where}: ${c.fn} takes no argument ${k}`);
+    for (const k of Object.keys(c.args)) if (a.allowed && !a.allowed.has(k) && !CODE_ARGS[c.fn]?.has(k)) out.push(`${where}: ${c.fn} takes no argument ${k}`);
     for (const k of a.required) if (!(k in c.args)) out.push(`${where}: ${c.fn} needs ${k}`);
     for (const [k, v] of Object.entries(c.args)) if ("call" in v) check(v.call, `${where}.${k}`);
   };

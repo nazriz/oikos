@@ -157,7 +157,22 @@ The rates notices keep the rating law's instalments: the order says that they ar
 | energy | `bill` | every customer billed; how often is the order's |
 | council clerk | `enact` | each amendment the council has passed and the clerk has declared is written into the law by its schedule, published in place of the law in force, which is withdrawn (docs/behaviour/government.md, "A council in the hands of seats") |
 | rates | `levy` | the notices sent to every owner at each instalment the rating law sets, and penalty interest added monthly to what is overdue (the law says when; the order says that it is done) |
+| police | `carry_out_warrants` | on each working day an officer at the station carries out the tribunal's warrants of possession that have come to it, once the day each gives has come: goes to the home and puts out whoever of the household is there, and tells the tenant and landlord how many were; a warrant withdrawn is not gone on; one not carried out by its last day lapses |
+| police | `look_into_reports` | each working day the officers look into the reports of goods taken, in the order made and as far as their hours go; a charge to the tribunal where they find who, the report closed unsolved where not |
+| police | `call_at_homes` | each working day an officer calls at the homes the station has been asked to call at; a death found there that is not registered is reported to the registry |
 | the support office | `pay_claims` | each working day the claims that have waited their time are decided, the oldest first: one that meets the conditions the support law states is granted in writing and paid each period until it ends; one that does not, or that the staff could not verify, is put before the office-holder (`case_for_decision`) and never refused by the staff; a claimant's own request to stop is followed; the period's figures are published (see "The support office" below) |
+
+## The police station: warrants and reports are the officers' (2026-10-12)
+
+**Source:** `police.station` in `participants/src/behaviour/police.ts` (`part`, the routines `carry_out_warrants`, `look_into_reports`, `call_at_homes`).
+
+A seated station did not carry out warrants: its code finds an officer in at the station at the hour it looks, and a seat sits when it does, not when the officers are in (two warrants lapsed in 200 days of a mock seat in the third living pilot's town: docs/design/call-language-gaps.md, section D). A real station's officer in charge does not carry out a warrant; the officers on duty do, on the day it gives, and the officer in charge hears how it went.
+
+- **The officers** (`part: "staff"`, while the standing order for the task is in force): carry out each warrant on its day in their own hours, look into the reports of goods taken and call at the homes asked for. The same code, the same hours, the same acts as the whole office's; they hire nobody.
+- **The office-holder** (`part: "seat"`): hires officers and stands them down to the establishment, makes the standing orders once if none stands, and is told by the officers' report what was done (warrants carried out and the days' work, reports looked into, homes called at, what waits and why: "none of the N in post was at the station"). **Nothing is left to judgement in the routine itself**: the published procedure says what a warrant bids, and the office-holder's judgement is the establishment and the orders (to hold one, to withdraw it).
+- **In force at the start**, as the registry's listing and the support office's claims are: `order-police-oic-<task>`, at the procedure's own rhythm (every day), made in the office's post before the year; whoever holds the office may hold, withdraw or replace them. With none in force, or one on hold, nothing is carried out, and the officers' report says so (tested: `orchestrator/test/police-station-seat.test.ts`).
+- **A code station** (`part: ""`) is as it was.
+- **Measured, a mock seat in the station over 200 days** (the 300-person `ke-nakuru-2026` town, seed 3, `opening_caseload`): the same two warrants carried out as in the code twin, on the same days (31 and 105); no warrant lapsed; the officers' 29 weekly reports. How many of a household were at home when the officer came differs between the runs (it is the hour's), and is not held equal.
 
 ## The counter: routine post answered by the staff
 

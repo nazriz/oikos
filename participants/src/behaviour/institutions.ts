@@ -490,7 +490,7 @@ export const builder: BehaviourModule = {
           const job = commitmentOf(r, me).outcome?.structure;
           const agreed = commitmentOf(r, client).outcome?.money?.amount;
           if (r.terms.template !== "construction" && !(job && agreed !== undefined)) continue;
-          if (!book.signedBy(r.id, client)) continue;
+          if (!book.signedBy(r.id, client) || book.takenBack(r.id)) continue; // (an offer its maker has taken back is not taken on)
           // (Not before our foreman has been to the lot, or to what is to come down, since the contract was made.)
           // (A lot the register has no plan of can't be gone to: the job is taken as it was, and fails where it would have.)
           if (job?.on && !job.remove && p.sites) {
@@ -524,7 +524,7 @@ export const builder: BehaviourModule = {
           }
           waiting.push({ agreement: r.id, client, type: job?.type, on: job?.on, remove: job?.remove, price: agreed === undefined ? undefined : amount(cents(agreed)) });
           if (job?.type && job.on) ourLots.add(job.on);
-          if (!book.signedBy(r.id, me)) steps.push(because("A client has signed a construction contract: taking it on.", sign(r.id)));
+          if (!book.signedBy(r.id, me) && !book.takenBack(r.id)) steps.push(because("A client has signed a construction contract: taking it on.", sign(r.id)));
         }
 
         // Materials: what the waiting jobs need, oldest first, as far as we can pay for them, against what's in the yard
@@ -556,7 +556,7 @@ export const builder: BehaviourModule = {
         const inYard = new Map<string, number>();
         const stock = (k: string) => inYard.get(k) ?? held(obs, p.yard, k);
         for (const w of [...waiting]) {
-          const invoice = w.price ? [say("invoice", `Invoice: ${moneyNow(w.price)} for ${w.remove ? `demolishing ${w.remove}` : `building a ${w.type} on ${w.on}`}.`, { to: [w.client], basis: w.agreement, data: { outcome: { money: { to: acc.account, amount: w.price, for: w.remove ? `demolishing ${w.remove}` : `building a ${w.type} on ${w.on}` } }, agreement: w.agreement } })] : [];
+          const invoice = w.price ? [say("invoice", `Invoice: ${moneyNow(w.price)} for ${w.remove ? `demolishing ${w.remove}` : `building a ${w.type} on ${w.on}`}.`, { to: [w.client], basis: w.agreement, data: { outcome: { money: { to: acc.account, amount: w.price, for: w.remove ? `demolishing ${w.remove}` : `building a ${w.type} on ${w.on}` } }, agreement: w.agreement, ...(w.remove ? {} : { type: w.type }) } })] : [];
           if (w.remove) {
             // We need to know what it is (how long it takes to bring down): once we've seen it, we start.
             const type = typeOf.get(w.remove);

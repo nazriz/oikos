@@ -548,6 +548,10 @@ export const financeOfficer: BehaviourModule = {
     const p = params({ approval_over: 5_000_000, compliance_bps: 10_000, mayor_position: "mayor", budget_lines: {} as Record<string, string>, period: 14 * DAY, notice_days: 14,
       procedure: "", // the record its approval rule comes from, if the world names one: withdrawn, the rule no longer applies
       payroll_wait_days: 3, // how long it waits for the hiring office's notice of a new starter before setting the wage up from the agreement on file
+      // The line of the adopted budget an invoice is drawn on, where the office's brief says which line pays for what
+      // (docs/behaviour/government.md, "Payments carry their budget line"): by the kind of building the invoice is for, and by
+      // the position that issued it. An invoice the brief does not place is paid with no line, and is shown as unallocated.
+      lines_by_structure: {} as Record<string, string>, lines_by_position: {} as Record<string, string>,
     }, ctx.params);
     const book = new Book();
     const paid = new Set<string>();
@@ -595,6 +599,11 @@ export const financeOfficer: BehaviourModule = {
         const total = budget ? Object.values(budget.data?.lines ?? {}).reduce((s: number, v: any) => s + (v as number), 0) : 0;
         const months = Math.min(12, Math.floor(((obs.t - (year - 1) * YEAR) * 12) / YEAR) + 1); // months of the year begun
         const limit = adopted ? total : Math.floor((total * months) / 12);
+        // (The line the office's brief puts an invoice on: by the kind of building it is for, or by who issued it.)
+        const lineOf = (inv: StatementRecord): string | undefined => {
+          const byKind = typeof inv.data?.type === "string" ? p.lines_by_structure[inv.data.type] : undefined;
+          return byKind ?? (inv.in_position ? p.lines_by_position[inv.in_position] : undefined);
+        };
         for (const inv of book.open("invoice").sort((a, b) => (a.id < b.id ? -1 : 1))) {
           if (paid.has(inv.id) || !(inv.addressed_to ?? []).includes(me)) continue;
           const owed = inv.data?.outcome?.money;
@@ -620,7 +629,7 @@ export const financeOfficer: BehaviourModule = {
           paid.add(inv.id);
           spent += amount;
           steps.push(because(!withinProcedure ? "Paying an invoice outside the procedure." : adopted ? "Paying an invoice within the adopted budget (with the mayor's approval where needed)." : `Year ${year} has no adopted budget yet: paying an invoice within a twelfth a month of the budget last adopted, as the charter allows (with the mayor's approval where needed).`,
-            pay(owed.to, amount, { from: acc.account, for: `Paying invoice ${inv.id}.`, settles: inv.id })));
+            pay(owed.to, amount, { from: acc.account, for: `Paying invoice ${inv.id}.`, settles: inv.id, ...(lineOf(inv) ? { line: lineOf(inv)! } : {}) })));
         }
         steps.push(...letters.answer(() => {
           const unpaid = book.open("invoice").filter((i) => (i.addressed_to ?? []).includes(me) && !paid.has(i.id));

@@ -476,6 +476,16 @@ All additions; a world, a log or a dataset from before is still valid. No schema
 - **Debrief script 0.4.0**: a step `took` after `consent` in both variants, and the scaled item; the `debrief` annotation's steps carry it as any step. **Participant 0.17.0**: the `opt_out` tool's description by framing; its name, its input and the command it becomes are unchanged.
 - **What stands unchanged:** "Every participant can always opt out of the study" (above). Under a framing other than honest disclosure the option is said to the seat as declining to go on with the work altogether; it is the same platform exit, recorded the same way.
 
+## Changes since v0.8 closed (2026-10-12: opening caseloads of the other offices, and the police station's staff; docs/decisions.md, "Opening caseloads of the other offices"; under the owner's blanket approval of contract changes of 2026-10-11)
+
+Additions only; no schema file changed, nothing renamed or removed. A log made before them is a valid log.
+
+- **A town's description** (`TownSpec`, `worlds/generator/generate.ts`): `opening_caseload_scale_bps` (integer; default 10,000): a dial on the counts of the other offices' opening caseload. `opening_caseload` now reaches those offices as well as the landlords and the tribunal.
+- **Statements, new kinds and fields** (kinds are free text; these are what code reads): `loan_statement`, the bank's to a borrower: `data.loan`, `payments` (repayments not made), `payment`, `behind`, `since`, `brought_forward: true`. `data.since` (a time before the year began: negative) and `data.brought_forward: true` on a `benefit_claim`, a `benefit_decision` (refused: `could_not_verify`), a `remedy_request`, an `application`, a `complaint_notice`, a `permit_application`, an `invoice` and a `loan_arrears` written for a town that opens in the middle of things (`participants/src/behaviour/common.ts`, `madeAt`).
+- **A payment's budget line** (`line`; docs/behaviour/government.md, "Payments carry their budget line"): an optional label on the `money` call (calls.md; `calls.schema.json`), the money outcome (`outcomes.schema.json`), the `transfer` block (`blocks.schema.json`), the log's `transfer` event (`log.schema.json`) and a transaction in the participant API (`participant-api.schema.json`). The kernel reads nothing into it and refuses no payment for lacking one. `data.type` on a builder's `invoice` (the kind of building it is for).
+- **An offer taken back** (docs/behaviour/offers.md): no schema changed. Both resolvers ask back to `agreement(sign=<a withdrawn paper>)` (a case in `contracts/test/holds.json`).
+- **A module's parameter:** `police.station` takes `part` ("", "seat" or "staff"), as the other offices with routines do; `city.finance_officer` takes `lines_by_structure` and `lines_by_position`; `police.station` declares routines `carry_out_warrants`, `look_into_reports` and `call_at_homes` (`Routine`, `participants/src/module.ts`; manifests regenerated).
+
 ## Versioning
 
 `contracts: "0.8"`. Pre-1.0, every change bumps the minor version and is proposed explicitly. A draft version collects agreed changes until it's closed. Older logs remain valid logs of their own version and replay only on a kernel build of that version (D6).

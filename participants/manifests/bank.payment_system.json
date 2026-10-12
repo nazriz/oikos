@@ -35,6 +35,10 @@
       "default": 40,
       "source": "placeholder"
     },
+    "line": {
+      "schema": {},
+      "source": "the world gives it (no default)"
+    },
     "max_batch": {
       "schema": {
         "type": "integer"

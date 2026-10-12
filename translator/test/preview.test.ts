@@ -28,7 +28,7 @@ const commitments = [
 
 /** One act of each kind, with every field it can carry (several where an act reads differently by what it holds). */
 const SAMPLES: any[] = [
-  { block: "transfer", from: "acc-city", to: "acc-builder", amount: "50000", settles: "rec.88", per_instruction: "rec.89", memo: "the works" },
+  { block: "transfer", from: "acc-city", to: "acc-builder", amount: "50000", settles: "rec.88", per_instruction: "rec.89", memo: "the works", line: "parks" },
   { block: "open_account", holder: "c0042", currency: "local", ref: "a" },
   { block: "close_account", account: "acc-old" },
   { block: "construct", at: "cell.3.4", structure_type: "park", materials_at: "str.2", ref: "s" },
