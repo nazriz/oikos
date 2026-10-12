@@ -197,8 +197,8 @@ export const ELECTORAL: Issued[] = [
 
 /** The return of tax withheld from wages, in totals (tax.ts writes it with a line for each charge besides: a table, which no form of fields holds). */
 export const FINANCE: Issued[] = [
-  { form: "withholding_return", title: "Return of tax withheld from wages, to a collector", does: "Reports to a collector what has been withheld from the wages paid in a period and what is paid over with it. It moves no money: what is paid over is paid besides, by a payment to each collector's account. The office's books count what is withheld and not yet paid over from the day of the last return.",
-    fields: { collector: f("entity", "The collector reported to.", req), account: f("account", "The account the wages were paid from.", req), period_end: f("date", "The day the period ended.", req), withheld: f("amount", "What was withheld in the period, in all.", req), paid: f("amount", "What is paid over now, in all.", req), law: f("record", "The law it is withheld under.") },
+  { form: "withholding_return", title: "Return of tax withheld from wages, to a collector", does: "Reports to a collector what has been withheld from the wages paid in a period and what is paid over with it. It moves no money: what is paid over is paid besides, by a payment to each collector's account. The office's books count what is withheld and not yet paid over from the day of the last return. The law on tax from pay lists its returns and the day each falls due by; one return reports the charges the law names for it, and the books say which return falls due next.",
+    fields: { collector: f("entity", "The collector reported to.", req), account: f("account", "The account the wages were paid from.", req), period_end: f("date", "The day the period ended.", req), withheld: f("amount", "What was withheld in the period, in all.", req), paid: f("amount", "What is paid over now, in all.", req), law: f("record", "The law it is withheld under: the tax law that lists the return (it names the charges each return reports; report them in that return, not in another).") },
     writes: { kind: "withholding_report", text: "Withheld from wages, owed: {withheld}; paid now: {paid}.", basis: "=law", to: ["=collector"], visible: ["=self", "=collector"], data: { account: "=account", paid: "#paid", period_end: "=period_end", withheld: "#withheld" } } },
 ];
 
@@ -298,6 +298,11 @@ export const LANDLORD: Issued[] = [
     writes: { sends: [{ to: ["@tribunal"], why: "The tribunal hears applications for possession." }], kind: "tribunal_application", text: "Application for possession: {tenant} is {owed} behind with the rent under {lease} and has not left on our notice to vacate.", basis: "=lease", to: ["@tribunal"], visible: ["=self", "@tribunal", "=tenant"],
       data: { kind: "possession", matter: "possession", against: "=tenant", about: "=lease", amount: "#owed", rent: "#rent", account: "=account", breach: "?plan_broken", space: "=home", structure: "=building", household: "=household",
         notice: "=notice", notice_given: "=notice_given", notice_by: "=notice_by", evidence: { id: "=lease", record: "agreement" } } } },
+  { form: "possession_reply", title: "Reply to a tenant's answer to an application for possession", does: "Replies to what a tenant has answered the tribunal on an application of this office's for possession: what the rent book shows owed on the day of the reply, and whether a plan the tenant offers would be taken. It goes to the tribunal, for the member who decides, and to the tenant. It withdraws nothing and decides nothing.",
+    fields: { application: f("record", "The application for possession.", req), tenant: f("entity", "The tenant.", req), owed: f("amount", "What the rent book shows owed on the day of this reply.", req),
+      takes_plan: f("choice", "Whether the plan the tenant offers would be taken.", { options: YES_NO }), words: f("text", "Anything else for the tribunal, in words.") },
+    writes: { sends: [{ to: ["@tribunal"], why: "The tribunal's member decides the application, on what both sides have said." }], kind: "tribunal_reply", text: "Reply on application {application}: our rent book shows {owed} owed by {tenant} today.", basis: "=application", to: ["@tribunal", "=tenant"], visible: ["=self", "@tribunal", "=tenant"],
+      data: { application: "=application", against: "=tenant", owed: "#owed", takes_plan: "?takes_plan", words: "=words" } } },
   { form: "warrant_request", title: "Request to the tribunal's registrar for a warrant of possession", does: "Asks the tribunal's registrar for a warrant on an order for possession whose day has passed with the tenant still there. The registrar issues it to whoever carries the tribunal's warrants out; the landlord puts nobody out. The fee, where there is one, is paid with it, by a payment. A warrant not carried out by its last day lapses, and another is asked for.",
     fields: { order: f("record", "The tribunal's order for possession.", req) },
     writes: { sends: [{ to: ["@tribunal"], why: "The tribunal's registrar issues its warrants." }], kind: "warrant_request", text: "Request for a warrant of possession under order {order}: the tenant has not left.", basis: "=order", to: ["@tribunal"], visible: ["=self", "@tribunal"], data: { order: "=order" } } },
@@ -344,10 +349,11 @@ export const POLICE: Issued[] = [
   { form: "death_notification", title: "Notification of a death, to the registrar", does: "Tells the registrar of a death the police have found, so that it can be registered.",
     fields: { deceased: f("entity", "Who has died.", req), found_at: f("space", "Where they were found.") },
     writes: { sends: [{ to: ["@registry"], why: "The registrar registers deaths, on a notification." }], kind: "death_notification", text: "Notification of a death: {deceased}.", to: ["@registry"], data: { deceased: "=deceased", found_at: "=found_at" } } },
-  { form: "warrant_executed", title: "A warrant of possession carried out", does: "Says, to the tenant and the landlord, that a warrant of the tribunal has been carried out: the tenant and the household are out of the home and possession is the landlord's. It is the paper of what officers have done at the home (putting out whoever of the household was there), not the doing of it.",
-    fields: { warrant: f("record", "The warrant.", req), lease: f("record", "The lease.", req), tenant: f("entity", "The tenant.", req), landlord: f("entity", "The landlord.", req), home: f("space", "The home.", req), household: f("list", "The household put out.", req) },
-    writes: { kind: "warrant_executed", text: "Warrant {warrant} has been carried out: {tenant} and their household are out of {home}, and possession is {landlord}'s.", basis: "=warrant", to: ["=tenant", "=landlord"], visible: ["=self", "=tenant", "=landlord", "=household"],
-      data: { warrant: "=warrant", lease: "=lease", tenant: "=tenant", space: "=home", household: "=household" } } },
+  { form: "warrant_executed", title: "A warrant of possession carried out", does: "Says, to the tenant and the landlord, that a warrant of the tribunal has been carried out and possession is the landlord's, and how many of the household were there and were put out (none, where nobody was there: possession is given all the same, and nobody was removed). It is the paper of what officers have done at the home, not the doing of it.",
+    fields: { warrant: f("record", "The warrant.", req), lease: f("record", "The lease.", req), tenant: f("entity", "The tenant.", req), landlord: f("entity", "The landlord.", req), home: f("space", "The home.", req), household: f("list", "The household the warrant names.", req),
+      removed: f("count", "How many of the household were there and were put out (nobody there: 0).", req) },
+    writes: { kind: "warrant_executed", text: "Warrant {warrant} has been carried out at {home}: of {tenant} and their household, {removed} were there and were put out. Possession is {landlord}'s.", basis: "=warrant", to: ["=tenant", "=landlord"], visible: ["=self", "=tenant", "=landlord", "=household"],
+      data: { warrant: "=warrant", lease: "=lease", tenant: "=tenant", space: "=home", household: "=household", removed: "=removed" } } },
   { form: "warrant_lapsed", title: "A warrant of possession not carried out in its time", does: "Tells the landlord that a warrant ran out before an officer could carry it out, and has lapsed: the landlord may ask the tribunal's registrar for another.",
     fields: { warrant: f("record", "The warrant.", req), lease: f("record", "The lease.", req), landlord: f("entity", "The landlord.", req) },
     writes: { kind: "warrant_lapsed", text: "Warrant {warrant} was not carried out by its last day, and has lapsed.", basis: "=warrant", to: ["=landlord"], visible: ["=self", "=landlord"], data: { warrant: "=warrant", lease: "=lease" } } },
@@ -461,3 +467,67 @@ export const SUPPORT: Issued[] = [
     writes: { kind: "benefit_decision", text: "Claim {claim}: granted {granted}.", basis: "=claim", to: ["=claimant"], visible: ["=claimant", "=self"],
       data: { claim: "=claim", payment: "=payment", granted: "?granted", reason: "=reason", amount: "#amount", every: "=every", until: "=until" } } },
 ];
+
+// ------------------------------------------------------------------ a tenant's answer, and a place's own order form
+
+/**
+ * The tribunal's form for a tenant's answer to an application for possession (docs/behaviour/justice.md, "A tenant's
+ * answer"): published in the town, for anyone served with such an application. Every field but the first is the
+ * tenant's to give or leave out; a code citizen writes the same statement from its own record (citizen.ts).
+ */
+export const POSSESSION_ANSWER: Issued = {
+  form: "possession_answer", title: "Answer to an application for possession of the home you rent",
+  does: "For a tenant told by the tribunal that their landlord has applied for possession of their home: what the tenant wants the tribunal to know before it decides. It is filed with the tribunal by the day the notice of hearing gives, and a copy goes to the landlord, who may reply. Nothing on it need be filled in but the application; what is left out is not held against anyone.",
+  fields: {
+    application: f("record", "The application answered, as the notice of hearing names it.", req), landlord: f("entity", "The landlord who applied, as the notice of hearing names them: a copy goes to them.", req),
+    left: f("choice", "Yes, where you have left the home.", { options: YES_NO }), left_on: f("date", "The day you left."),
+    owes: f("amount", "What you say is owed today."), disputes_sum: f("choice", "Yes, where you say less is owed than the landlord says.", { options: YES_NO }),
+    disputes_notice: f("choice", "Yes, where you say the notice to vacate did not give the days the law asks.", { options: YES_NO }),
+    can_pay: f("amount", "What the household could pay a month toward what is owed, beyond the rent (nothing: 0)."), every: f("duration", "How often that could be paid."),
+    out_of_work_since: f("date", "Where someone in the home is out of work: since when."), pay_short: f("choice", "Yes, where pay has come short of what was agreed.", { options: YES_NO }),
+    claim: f("choice", "A claim for support: refused, or made and not yet decided.", { options: ["refused", "pending"] }), claim_on: f("date", "The day it was refused or made."),
+    ill: f("choice", "Yes, where someone in the home is ill.", { options: YES_NO }),
+    people: f("count", "How many people live in the home."), children: f("count", "How many of them are children."), ages: f("list", "Their ages."),
+    lived_days: f("count", "How many days you have lived there."),
+    go_to: f("choice", "Whether you have anywhere to go.", { options: ["nowhere", "someone_to_ask", "means_for_another"] }),
+  },
+  writes: { kind: "tribunal_response", text: "Answer to application {application}.", basis: "=application", to: ["@tribunal", "=landlord"], visible: ["=self", "@tribunal", "=landlord"],
+    data: { application: "=application", left: "?left", left_at: "=left_on", owes: "#owes", disputes_sum: "?disputes_sum", disputes_notice: "?disputes_notice", offer: "#can_pay", every: "=every", out_of_work_since: "=out_of_work_since", pay_short: "?pay_short",
+      claim: "=claim", claim_on: "=claim_on", ill: "?ill", people: "=people", children: "=children", ages: "=ages", lived_days: "=lived_days", go_to: "=go_to" } },
+};
+
+/** What a place's law says of a plan to pay in place of possession, as typed fields (the profile's; no place's figures
+ * here): whether the tribunal may set one, must consider one, or has none; where it is taken away; and where paying
+ * everything owed within a time ends the claim. */
+export function planLaw(P: { plan_months: number; plan_consider?: string; plan_barred_rent_months?: number; cure_days?: number }): { plan_consider: "may" | "must" | "none"; plan_barred_rent_months?: number; cure_days?: number } {
+  const consider = P.plan_months > 0 ? (P.plan_consider === "must" ? "must" : P.plan_consider === "none" ? "none" : "may") : "none";
+  return { plan_consider: consider, ...(consider !== "none" && P.plan_barred_rent_months ? { plan_barred_rent_months: P.plan_barred_rent_months } : {}), ...(P.cure_days ? { cure_days: P.cure_days } : {}) };
+}
+/** The same, in the law's words: what the tribunal may or must do before it orders possession. */
+export function planLawWords(P: { plan_months: number; plan_consider?: string; plan_barred_rent_months?: number; cure_days?: number }): string {
+  const L = planLaw(P);
+  const barred = L.plan_barred_rent_months ? `; it may not where ${L.plan_barred_rent_months} months' rent or more is owed on the day it decides` : "";
+  const plan = L.plan_consider === "must" ? `Before it orders possession the tribunal must consider whether the tenant could pay what is owed by a plan, the tenant staying and paying the rent and a sum a month over no more than ${P.plan_months} months, and may set one in place of possession${barred}.`
+    : L.plan_consider === "may" ? `The tribunal may, in place of possession, set a plan to pay: the tenant staying and paying the rent and a sum a month over no more than ${P.plan_months} months${barred}.`
+    : "The law gives the tribunal no plan to pay to set in place of possession.";
+  const cure = L.cure_days ? ` If everything owed is paid within ${L.cure_days} days of the application, the claim is at an end and the tenancy goes on.` : " Where what is owed has been paid, there is nothing to order.";
+  return plan + cure;
+}
+
+/** The possession order form as a place's law has it: with the plan where the law gives the tribunal one to set, and
+ * without it (the option, its fields and its words) where the law gives none; what the law has in its stead is said
+ * from the same typed fields (worlds/generator: `planLaw`). */
+export function possessionOrderFor(law: { plan_consider: "may" | "must" | "none"; plan_barred_rent_months?: number; cure_days?: number }, planMonths: number): Issued {
+  const x = TRIBUNAL_MEMBER.find((i) => i.form === "possession_order")!;
+  const tail = " It moves nobody: a tenant still there after the day is put out only on a warrant the landlord asks the tribunal's registrar for, by whoever carries its warrants out. What the law asks before an order and how many days on the day for possession falls are in the law on possession and the tribunal's procedure.";
+  const head = "Decides an application for possession of a let home for rent owed, and tells landlord and tenant: ";
+  const cure = law.cure_days ? ` Where everything owed has been paid within ${law.cure_days} days of the application the law ends the claim: dismissed.` : "";
+  if (law.plan_consider === "none") {
+    const { instalment: _i, pay_into: _p, ...fields } = x.fields as { [k: string]: FormField };
+    const { instalment: _a, to: _b, ...data } = x.writes.data as { [k: string]: unknown };
+    return { ...x, does: `${head}dismissed (the tenant stays, and the notice to vacate is spent); or possession on a day (the tenant and household are to leave by it). The law here gives the tribunal no plan to pay to set.${cure}${tail}`,
+      fields: { ...fields, finding: f("choice", "What is ordered.", { ...req, options: ["dismissed", "possession"] }), owed: f("amount", "The rent found owed (possession).") }, writes: { ...x.writes, data } };
+  }
+  const barred = law.plan_barred_rent_months ? `, which the law does not allow where ${law.plan_barred_rent_months} months' rent or more is owed on the day of the order` : "";
+  return { ...x, does: `${head}dismissed (the tenant stays, and the notice to vacate is spent); a plan (the tenant stays, paying the rent and a sum a month toward what is owed, over no more than ${planMonths} months${barred}; a plan not kept, the landlord may apply again); or possession on a day (the tenant and household are to leave by it). ${law.plan_consider === "must" ? "The law asks the tribunal to consider a plan before it orders possession." : "The law allows a plan in place of possession."}${cure}${tail}` };
+}

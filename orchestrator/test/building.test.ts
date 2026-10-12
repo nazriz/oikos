@@ -53,7 +53,8 @@ test("the builder buys materials from outside, and its crew's hours finish each 
     expect(ev.some((e) => e.event === "transfer" && e.from === "acc-builder" && e.to === "acc-outside" && e.amount === String(o.data.quantity * o.data.unit_price) && e.t >= o.at)).toBe(true);
   }
   void price;
-  expect(recs.filter((r) => r.kind === "delivery_note" && r.speaks_for === "outside" && r.addressed_to.includes("builder")).length).toBe(bought.length);
+  // (A note that delivers nothing and refunds the order moves no goods: the world market had none to send that day, as in the town 2026-10-12, "Returns on the law's days", where the first order was refunded and bought again.)
+  expect(recs.filter((r) => r.kind === "delivery_note" && r.speaks_for === "outside" && r.addressed_to.includes("builder") && r.data.delivered > 0).length).toBe(bought.length);
   // Every building finished took exactly its hours of the crew's work (and no more), from the yard.
   const started = new Map(ev.filter((e) => e.event === "structure_started").map((e) => [e.structure, e]));
   const done = ev.filter((e) => e.event === "structure_completed" && started.has(e.structure));

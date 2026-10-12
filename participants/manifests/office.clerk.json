@@ -1,6 +1,6 @@
 {
   "name": "office.clerk",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "doc": "docs/behaviour/office-books.md",
   "params": {
     "of": {

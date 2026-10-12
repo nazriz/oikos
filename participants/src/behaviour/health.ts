@@ -20,7 +20,7 @@ export const practice: BehaviourModule = {
   issues: [P.JOB_ADVERTISEMENT],
   staffed: (p) => ({ role: p.role ?? "doctor", posts: { establishment: p.doctors ?? 0 } }),
   issuesWith: (p) => P.staffingOwn({ role: p.role ?? "doctor", industry: p.industry ?? "health_care", workplace: p.workplace, notice_days: p.notice_days ?? 14 }),
-  version: "0.3.0", // 0.3.0: its doctors report to the manager who was seen under the standing order, or why nobody was
+  version: "0.3.1", // 0.3.1: returns of tax withheld are filed on the days the law states (docs/behaviour/firms.md, "Returns on the law's days"); 0.3.0: 0.3.0: its doctors report to the manager who was seen under the standing order, or why nobody was
   doc: "docs/behaviour/health.md",
   // (When it opens each working day, and whenever a patient asks: someone who comes in and asks is seen then, if it's
   // open.)

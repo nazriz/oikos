@@ -169,7 +169,8 @@ export function landlordBooks(ctx: ParticipantContext): OfficeBooks {
         if (book.all("warrant_executed").some((w) => w.data?.lease === a.id)) continue; // (carried out: over)
         const left = (book.notices.get(a.id) ?? []).some((n) => n.as === tenant);
         const vacate = book.open("notice_to_vacate").filter((r) => r.speaks_for === me && r.data?.lease === a.id).sort((x, y) => y.at - x.at)[0];
-        const applied = book.all("tribunal_application").filter((r) => r.speaks_for === me && r.data?.kind === "possession" && r.data?.about === a.id).sort((x, y) => y.at - x.at)[0];
+        // (An application we have withdrawn is no longer before the tribunal: it is not shown as waiting.)
+        const applied = book.all("tribunal_application").filter((r) => r.speaks_for === me && r.data?.kind === "possession" && r.data?.about === a.id && !book.withdrawn.has(r.id)).sort((x, y) => y.at - x.at)[0];
         const order = book.all("tribunal_order").filter((o) => o.data?.kind === "possession" && o.data?.applicant === me && o.data?.about === a.id).sort((x, y) => y.at - x.at)[0];
         if ((!vacate && !applied && !order) || left || !book.inForce(a.id) && !order) continue;
         const now = behindUnder.get(a.id);
@@ -192,7 +193,28 @@ export function landlordBooks(ctx: ParticipantContext): OfficeBooks {
           since = decided.at;
           stage = `the tribunal set a plan to pay ${dateWords(decided.at)} (${decided.id}): the rent as it falls due and ${usd(cents(decided.data.instalment ?? 0))} a month toward what is owed; if it is not kept, the landlord may apply again for possession`;
         } else if (decided) continue; // (dismissed: it begins again only if they fall behind)
-        else if (applied) { since = applied.at; stage = `we applied to the tribunal for possession ${applied.data?.brought_forward ? "before the year began" : dateWords(applied.at)} (${applied.id}); it has not decided`; }
+        else if (applied) {
+          // What has changed since the application, as this office's own papers and rent book show it: what is
+          // owed now beside what the application said; what the tenant has answered the tribunal, and whether we
+          // have replied; terms we have come to with the tenant since. And what is ordinarily done where the
+          // arrears are cleared: said as the practice it is, never as what to do. (The fifth living pilot's seat
+          // kept an application before the tribunal after the tenant had paid in full, and another after granting
+          // a stay: nothing in its books set the application beside either.)
+          since = applied.at;
+          const said = applied.data?.amount !== undefined ? cents(applied.data.amount) : undefined;
+          const changed: string[] = [];
+          if (now === undefined) changed.push(`${said !== undefined ? `the application said ${usd(said)} was owed; ` : ""}the rent book shows less than a rent owed now`);
+          else if (said !== undefined && now !== said) changed.push(`the application said ${usd(said)} was owed; the rent book shows ${usd(now)} now`);
+          const answer = book.all("tribunal_response").filter((r) => r.speaks_for === tenant && String(r.data?.application ?? "") === applied.id).sort((x, y) => y.at - x.at)[0];
+          if (answer) {
+            const replied = book.all("tribunal_reply").some((r) => r.speaks_for === me && String(r.data?.application ?? "") === applied.id && r.at >= answer.at);
+            changed.push(`${tenant} answered the tribunal ${dateWords(answer.at)} (${answer.id})${answer.data?.left ? ", saying they have left" : answer.data?.offer !== undefined ? (cents(answer.data.offer) > 0 ? `, offering ${usd(cents(answer.data.offer))} a month toward what is owed` : ", saying they can pay nothing toward what is owed") : ""}; ${replied ? "we have replied" : "we have not replied (reply to a tenant's answer form)"}`);
+          }
+          const terms = [...book.all("plan_answer").filter((r) => r.speaks_for === tenant && r.data?.lease === a.id && r.data?.accepts === true && r.at >= applied.at).map((r) => `${tenant} accepted our offer of a plan ${dateWords(r.at)} (${r.id})`),
+            ...book.all("variation_answer").filter((r) => r.speaks_for === me && addressed(r, tenant) && r.data?.granted === true && r.at >= applied.at).map((r) => `we granted ${tenant}'s request ${dateWords(r.at)} (${r.id})`)];
+          if (terms.length) changed.push(`since the application ${terms.join(", and ")}`);
+          stage = `we applied to the tribunal for possession ${applied.data?.brought_forward ? "before the year began" : dateWords(applied.at)} (${applied.id}); it has not decided${changed.length ? `. Since the application: ${changed.join("; ")}` : ""}${now === undefined || terms.length ? ". An application stands until it is decided or withdrawn; where the rent owed has been paid or terms agreed, landlords ordinarily withdraw it" : ""}`;
+        }
         else {
           const by = Number(vacate!.data?.by);
           since = vacate!.at;

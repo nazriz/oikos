@@ -71,7 +71,7 @@ export function renderAccountBrief(b: AccountBrief): string {
 
 /** What happened to a person, by their own record's memory: the strata a sample is drawn across. */
 export const STRATA = ["evicted", "bereaved", "let_go", "refused", "little"] as const;
-const IN: { [s: string]: RegExp } = { evicted: /^(evicted|notice)$/, bereaved: /^(bereaved|death_told)$/, let_go: /^let_go$/, refused: /refus|turned_away|slight/ };
+const IN: { [s: string]: RegExp } = { evicted: /^(evicted|notice|ordered_out|put_out)$/, bereaved: /^(bereaved|death_told)$/, let_go: /^let_go$/, refused: /refus|turned_away|slight/ };
 export function strataOf(record: { [section: string]: any }): string[] {
   const mem = [...(record.memory?.defining ?? []), ...(record.memory?.recent ?? [])] as { what?: string; about?: string }[];
   const wants = (record.wants ?? []) as { about?: string }[];

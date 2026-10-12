@@ -62,6 +62,15 @@ A participant's random stream is keyed on the seed, the participant, the capacit
 - `orchestrator/test/twin-draws.test.ts` holds it: a town with an office filing two papers of no effect a day is, apart from those papers, the same town to the word.
 - **Not covered:** a seat's acts land at other moments than its code twin's, and draws people make are named for the moment. Two towns that truly differ go on to differ by chance. Compare a pilot with its twin in totals against the spread between runs, and case by case only among those the seats did not deal with, in runs made at or after this change.
 
+### The world's prices, and what is still named for the moment (2026-10-12)
+
+A participant's own stream (`ctx.rng`) is keyed on the hour it draws in. That is right for a draw that is about the moment and wrong for one that is not. Two kinds were moved off it, onto the run's stream that has no hour in it (`ctx.chance`), each named for what it is about:
+
+- **A month's world price** (`world.trade` 0.2.1): for the good and the month. It had been drawn on the outside market's own stream, so anything that moved that office's first look of a month gave the town another year of prices. Twelve runs of one town before and after an unrelated change had inputs 16% and 21% dearer in the "same" run, and whether its factories failed turned on that (docs/decisions.md, 2026-10-12, "What the fifth living pilot found", item 8). `orchestrator/test/twin-draws.test.ts` holds that a town and its twin with an office in a mock seat see the same world prices month by month over a year.
+- **A tenant's draws about a tenancy** (citizen 0.53.0): whether they stay past a notice, obey an order, answer an application, and what of their answer they tell; each for the person and the lease (and which application on it).
+
+**Still named for the moment** (through `ctx.rng`, so the same in a town and its twin only while that participant draws in the same hour): every other draw of a person (which shop, whom to ask, a job taken or left, a child conceived, a claim made, signing, voting, standing, taking goods, founding, word passed on); every draw of an office or a firm (a wrong refusal, a bill that errs, pay that comes short, a repair, hiring, a landlord's choice among applicants, a venue's finding where the record cannot settle it, which is named for the case but drawn in its hour); migration into the town (`come-` and `households-`, named for the very tick); deaths and illness, births' sex and weather are the kernel's own and are not participants' draws. Moving any of these is a change to every run's state; each should be moved when a comparison turns on it, as these two did.
+
 ## Limits (as of 2026-09-28)
 
 - **A hang stops the whole run**, not only the module that hung. That's consistent with the split: a hang is a timing failure. Isolating each module in its own thread, so one could be stopped alone, isn't built.

@@ -22,6 +22,10 @@ export interface Budget {
    * point 7), so that a run that stops at its limit can still debrief: no other call may take spending past the
    * limit less this. Set by the run from who is to be asked (`endReserveMicroUsd`); absent: a twentieth of the limit. */
   keptBackMicroUsd?: number;
+  /** What the run's end spent beyond the limit, where what was kept back was not enough (debriefs and exit accounts are
+   * never cut off by the limit: a seat is always debriefed). It is the platform's overrun, not the run's spending on its
+   * work, and it is counted apart: by whom the calls were for, so no seat's own spending is charged with it. */
+  platformOverrun?: { microusd: number; by_subject: { [subject: string]: number } };
 }
 
 /** The purposes that may spend what is kept back for a run's end. */
@@ -34,10 +38,50 @@ const AT_THE_END = new Set(["debrief", "account"]);
  * re-reads), never less than a twentieth of the limit and never more than half of it.
  */
 export function endReserveMicroUsd(limitMicroUsd: number, o: { seats: number; seatPrice?: Price; calls: number; promptChars: number; answerTokens: number; accounts?: number; accountPrice?: Price; accountChars?: number; accountTokens?: number }): number {
+  return Math.min(Math.floor(limitMicroUsd / 2), Math.max(Math.floor(limitMicroUsd / 20), reckonedEndMicroUsd(o)));
+}
+
+/** The old reckoning, with no clamp: calls a seat, each a whole prompt read afresh, at the model's price. It is the floor's
+ * first part for a model nobody has measured (below). */
+export function reckonedEndMicroUsd(o: { seats: number; seatPrice?: Price; calls: number; promptChars: number; answerTokens: number; accounts?: number; accountPrice?: Price; accountChars?: number; accountTokens?: number }): number {
   const one = (price: Price | undefined, chars: number, out: number) => (price ? costMicroUsd(price, { input_tokens: Math.ceil(chars / 4), output_tokens: out })! : 0);
-  const debriefs = o.seats * o.calls * one(o.seatPrice, o.promptChars, o.answerTokens);
-  const accounts = (o.accounts ?? 0) * one(o.accountPrice, o.accountChars ?? 0, o.accountTokens ?? 0);
-  return Math.min(Math.floor(limitMicroUsd / 2), Math.max(Math.floor(limitMicroUsd / 20), debriefs + accounts));
+  return o.seats * o.calls * one(o.seatPrice, o.promptChars, o.answerTokens) + (o.accounts ?? 0) * one(o.accountPrice, o.accountChars ?? 0, o.accountTokens ?? 0);
+}
+
+/** What debriefs and exit accounts have cost, measured, kept as data (orchestrator/debrief-costs.json): per model, per
+ * seat and per account, the figure used (the largest measured), and how many it is of. */
+export interface EndCosts {
+  /** What the figures are multiplied by (room for a seat that says more than any measured). */
+  margin_percent: number;
+  seat: { [model: string]: { microusd: number; n?: number } };
+  account: { [model: string]: { microusd: number; n?: number } };
+}
+
+/** One figure sized from the table: the model's measured figure, or for a model nobody has measured the floor, the
+ * greater of the old reckoning and the largest measured figure; times the margin. */
+function sized(table: EndCosts["seat"], model: string | undefined, reckoned: number, margin_percent: number): { each: number; basis: "measured" | "floor" } {
+  const m = model ? table[model] : undefined;
+  if (m) return { each: Math.ceil(m.microusd * margin_percent / 100), basis: "measured" };
+  const largest = Math.max(0, ...Object.values(table).map((x) => x.microusd));
+  return { each: Math.ceil(Math.max(reckoned, largest) * margin_percent / 100), basis: "floor" };
+}
+
+/**
+ * What a run's end is expected to cost, in micro-USD, before any clamp: each seat's debrief by its model's measured
+ * figure and each exit account likewise, times the margin. `reckoned` is the old reckoning for one seat (and one
+ * account) at the model's price, used only as the floor of a model with no measurement.
+ */
+export function endNeedMicroUsd(costs: EndCosts, o: { seats: number; seatModel?: string; seatReckoned: number; accounts?: number; accountModel?: string; accountReckoned?: number }): { microusd: number; seat: { each: number; basis: "measured" | "floor" }; account?: { each: number; basis: "measured" | "floor" } } {
+  const seat = sized(costs.seat, o.seatModel, o.seatReckoned, costs.margin_percent);
+  const account = o.accounts ? sized(costs.account, o.accountModel, o.accountReckoned ?? 0, costs.margin_percent) : undefined;
+  return { microusd: o.seats * seat.each + (o.accounts ?? 0) * (account?.each ?? 0), seat, ...(account ? { account } : {}) };
+}
+
+/** What is kept back of the limit for a need: never under a twentieth of the limit, never over half of it (a run must be
+ * able to start). Where the need is over the half, `short` says so by how much: the run says it at its start. */
+export function keptBackFor(limitMicroUsd: number, need: number): { microusd: number; short_microusd: number } {
+  const microusd = Math.min(Math.floor(limitMicroUsd / 2), Math.max(Math.floor(limitMicroUsd / 20), need));
+  return { microusd, short_microusd: Math.max(0, need - microusd) };
 }
 
 /** Thrown instead of making a call that could exceed the run's spending limit. The run stops, and says why. */
@@ -99,10 +143,13 @@ export async function callModel(io: LlmIO, req: LlmRequest, seenSystems: Set<str
     // The worst case for this call: the prompt (estimated generously: characters / 3) and every output token allowed.
     worst = costMicroUsd(price, { input_tokens: Math.ceil(estimateTokens(requestText(req)) * 4 / 3), output_tokens: req.maxTokens })!;
     // Part of the limit is kept back for the run's end (debriefs and exit accounts: VISION 15, point 7): the run stops
-    // before it is touched. How much: what the run set from who is to be asked, or a twentieth of the limit.
-    const limit = AT_THE_END.has(req.purpose) ? io.budget.limitMicroUsd : io.budget.limitMicroUsd - (io.budget.keptBackMicroUsd ?? Math.ceil(io.budget.limitMicroUsd * 0.05));
+    // before it is touched. How much: what the run set from who is to be asked, or a twentieth of the limit. The end's
+    // own calls are not held to the limit at all: a run never ends without the means to debrief every seat. What they
+    // spend beyond it is counted apart (`platformOverrun`), below.
+    const atTheEnd = AT_THE_END.has(req.purpose);
+    const limit = io.budget.limitMicroUsd - (io.budget.keptBackMicroUsd ?? Math.ceil(io.budget.limitMicroUsd * 0.05));
     const reserved = io.budget.reservedMicroUsd ?? 0;
-    if (io.budget.spentMicroUsd + reserved + worst > limit)
+    if (!atTheEnd && io.budget.spentMicroUsd + reserved + worst > limit)
       throw new SpendingLimitReached(`spending limit reached: $${(io.budget.spentMicroUsd / 1e6).toFixed(4)} spent of $${(io.budget.limitMicroUsd / 1e6).toFixed(2)}${reserved ? ` (up to $${(reserved / 1e6).toFixed(4)} more in calls under way)` : ""}; the next call could cost up to $${(worst / 1e6).toFixed(4)}`);
     io.budget.reservedMicroUsd = reserved + worst;
   }
@@ -127,7 +174,17 @@ export async function callModel(io: LlmIO, req: LlmRequest, seenSystems: Set<str
     if (io.budget) io.budget.reservedMicroUsd = (io.budget.reservedMicroUsd ?? 0) - worst;
   }
   const cost = Math.max(costMicroUsd(price, res.usage)!, Math.ceil(res.usage.reported_cost_microusd ?? 0));
-  if (io.budget) io.budget.spentMicroUsd += cost;
+  if (io.budget) {
+    const before = io.budget.spentMicroUsd;
+    io.budget.spentMicroUsd += cost;
+    // The part of an end's call that is beyond the limit is the platform's overrun, never the seat's own spending.
+    const over = AT_THE_END.has(req.purpose) ? Math.max(0, io.budget.spentMicroUsd - Math.max(before, io.budget.limitMicroUsd)) : 0;
+    if (over) {
+      const o = (io.budget.platformOverrun ??= { microusd: 0, by_subject: {} });
+      o.microusd += over;
+      o.by_subject[req.subject] = (o.by_subject[req.subject] ?? 0) + over;
+    }
+  }
   await io.annotate({
     annotation: "usage", purpose: req.purpose, subject: req.subject, provider: adapter.provider, model: adapter.model,
     input_tokens: res.usage.input_tokens, output_tokens: res.usage.output_tokens,

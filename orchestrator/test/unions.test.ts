@@ -52,7 +52,10 @@ test("claims are answered by offers; those accepted become enterprise agreements
     }
   }
   // Nobody resigns over unpaid wages because their pay changed.
-  expect(recs.filter((r) => r.record === "claim" && r.about?.kind === "debt" && /Unpaid wages/.test(r.about?.for ?? "")).length).toBe(0);
+  // (A shop short of money on a pay day owes the wages it could not pay, with or without a rise; seen 2026-10-12, "Returns on the
+  // law's days", when a changed course put one pay day beside a return and a stock order. What the claim must not be is a pay
+  // that changed: no unpaid wages at an employer within the fortnight after it made an agreement.)
+  expect(recs.filter((r) => r.record === "claim" && r.about?.kind === "debt" && /Unpaid wages/.test(r.about?.for ?? "") && eas.some((ea) => ea.data.employer === r.counterparty && r.at >= ea.at && r.at <= ea.at + 14 * DAY)).length).toBe(0);
 }, 600_000);
 
 test("an offer too low: a ballot, notice, stoppages without pay, then an agreement", async () => {

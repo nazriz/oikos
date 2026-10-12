@@ -44,7 +44,7 @@ export const principal: BehaviourModule = {
     { what: "school_enrolment", why: "A school keeps its own roll: every pupil's enrolment is made with it." },
     { what: "school_place", why: "The places it has given, each to a pupil on its own roll." },
   ],
-  version: "0.3.0", // 0.3.0: its teachers report to the principal the lessons taught under the standing order, or why none were
+  version: "0.3.1", // 0.3.1: returns of tax withheld are filed on the days the law states (docs/behaviour/firms.md, "Returns on the law's days"); 0.3.0: 0.3.0: its teachers report to the principal the lessons taught under the standing order, or why none were
   doc: "docs/behaviour/education.md",
   cadence: () => DAY,
   firstWake: (ctx) => 8 * 3600 + ctx.rng("first-wake").below(1800),

@@ -21,6 +21,7 @@ import { basesOf, channels } from "../contracts";
 import { params, wait, type Belief, type BehaviourModule, type ParticipantContext, type Taken } from "../module";
 import { distribute } from "./lengnick";
 import { dayPayPeriod, incomeTaxLaw, withheld, type Charge } from "./tax";
+import { nextReturn, returnsOf, type ReturnRule } from "./returns";
 import { message, broughtForward } from "./common";
 import { chancePpm, frictionDial, PAPER, Respondent, type RespondParams } from "./frictions";
 import { swayed } from "./wants";
@@ -99,7 +100,7 @@ export const landlord: BehaviourModule = {
   name: "firm.landlord",
   issues: P.LANDLORD,
   issuesWith: (p) => ({ city: p.city, tribunal: p.possession?.tribunal, builder: p.repair?.builder }),
-  version: "0.17.0", // 0.17.0: an application for possession of a home the tenant has since left is withdrawn; rent owed as the year began (its statement of the rent account) is owed with the rest; tenancies already under notice or before the tribunal when its files are first opened are taken up where their papers put them; 0.16.2: an application for possession names the notice to vacate it relies on, the day it was given and the day it gave; its answers to requests, notices and decisions are drawn by who asked and what about, not by a paper's number on file (docs/decisions.md, 2026-10-12); 0.16.1: rent under a lease is counted from the lease's own rent day where it names one (attrs.first_due), and arrears are taken up on the office's own day of the week for its rent book; 0.16.0: possession under the world's law (docs/behaviour/justice.md, "Possession"): a notice to vacate, an application to the tribunal, a warrant, never putting anyone out itself; 0.15.0: everyday frictions (docs/behaviour/frictions.md): a home of ours in disrepair is repaired by the builder when we are asked or ordered and will, at its price; we answer a venue from our books; rent owed us is asked for and then taken to a body that hears arrears; 0.14.0: wants of its own (docs/behaviour/firm-wants.md), for one the world's dial gives initiative: a character from its owner's values, which answers a tenant who asks it to hold a rent or to stay on, sways its markup and its patience with arrears, and a record of its own; 0.13.4: main's 0.13.3 (the builder's answer read with the week's post; what is owed counted before building or asking) with a certified copy of a registration made on someone else's report counting as the registration
+  version: "0.18.0", // 0.18.0: replies to a tenant's answer to its application with what its rent book shows owed; withdraws an application once the rent owed is paid; withdraws its request for a warrant when the tenant has gone; 0.17.0: an application for possession of a home the tenant has since left is withdrawn; rent owed as the year began (its statement of the rent account) is owed with the rest; tenancies already under notice or before the tribunal when its files are first opened are taken up where their papers put them; 0.16.2: an application for possession names the notice to vacate it relies on, the day it was given and the day it gave; its answers to requests, notices and decisions are drawn by who asked and what about, not by a paper's number on file (docs/decisions.md, 2026-10-12); 0.16.1: rent under a lease is counted from the lease's own rent day where it names one (attrs.first_due), and arrears are taken up on the office's own day of the week for its rent book; 0.16.0: possession under the world's law (docs/behaviour/justice.md, "Possession"): a notice to vacate, an application to the tribunal, a warrant, never putting anyone out itself; 0.15.0: everyday frictions (docs/behaviour/frictions.md): a home of ours in disrepair is repaired by the builder when we are asked or ordered and will, at its price; we answer a venue from our books; rent owed us is asked for and then taken to a body that hears arrears; 0.14.0: wants of its own (docs/behaviour/firm-wants.md), for one the world's dial gives initiative: a character from its owner's values, which answers a tenant who asks it to hold a rent or to stay on, sways its markup and its patience with arrears, and a record of its own; 0.13.4: main's 0.13.3 (the builder's answer read with the week's post; what is owed counted before building or asking) with a certified copy of a registration made on someone else's report counting as the registration
   doc: "docs/behaviour/firms.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -506,6 +507,14 @@ export const landlord: BehaviourModule = {
           return n ? { notice: n.id, notice_given: Number(n.data?.given ?? n.at), notice_by: Number(n.data?.by) } : {};
         };
         if (law && p.possession && e) {
+          // (A warrant asked for, and the tenant's notice that they have gone has come: the registrar is told at once,
+          // by our request withdrawn, so that nobody is sent to put out someone who has left. In the fifth living
+          // pilot 11 of 23 warrants were carried out at homes the household had left inside the notice of the day.)
+          if (e.stage === "warrant" && !e.seen.has("warrant-withdrawn") && (book.notices.get(a.id) ?? []).some((n) => n.as === tenant) && !book.all("warrant_executed").some((w) => w.data?.lease === a.id)) {
+            e.seen.add("warrant-withdrawn");
+            for (const w of book.open("warrant_request").filter((r) => r.speaks_for === me && r.data?.order === e.notice))
+              steps.push(because(`${tenant} has left ${leaseTerms(a, tenant).space ?? "the home"} since we asked for a warrant: telling the tribunal's registrar there is nobody to remove.`, withdraw(w.id, "Withdrawn: the tenant has left the home.")));
+          }
           // (Taken forward on our own day for the rent book, as arrears are taken up: never at whatever look comes first.)
           if (!atBooks) continue;
           const behindNow = owed - paid;
@@ -535,6 +544,25 @@ export const landlord: BehaviourModule = {
                 say("tribunal_application", `Application for possession: ${tenant} is ${usd(behindNow)} behind with the rent under ${a.id} and has not left on our notice to vacate.`, { to: [p.possession.tribunal], visible: [me, p.possession.tribunal, tenant], basis: a.id,
                   data: { kind: "possession", matter: "possession", against: tenant, about: a.id, amount: behindNow, rent, account: acc.account, ...(home.space ? { space: home.space, structure: home.structure } : {}), household: householdNamed(a, tenant), ...noticeRelied(a.id), evidence: { id: a.id, record: "agreement" } } }),
                 ...(fee > 0 && p.possession.fee_account ? [pay(p.possession.fee_account, fee, { from: acc.account, for: "Application fee." })] : [])));
+            }
+          } else if (e.stage === "applied" && !orders.length && behindNow <= 0) {
+            // (Paid up while the application stands: there is nothing left to ask the tribunal for. Withdrawn.)
+            for (const app of book.open("tribunal_application").filter((r) => r.speaks_for === me && r.data?.kind === "possession" && r.data?.about === a.id))
+              steps.push(because(`${tenant} has paid the rent that was owed since we applied: withdrawing our application for possession (${app.id}).`, withdraw(app.id, "Withdrawn: the rent owed has been paid.")));
+            org.remember(t, "arrears_paid", tenant, 1_000);
+            ending.delete(a.id);
+          } else if (e.stage === "applied" && !orders.length && book.all("tribunal_response").some((r) => r.speaks_for === tenant && !e.seen.has(r.id) && !r.data?.left && book.open("tribunal_application").some((x) => x.speaks_for === me && x.id === String(r.data?.application ?? "")))) {
+            // The tenant has answered the tribunal: we reply with what our rent book shows owed today, and whether we
+            // would take the plan they offer (one that clears what is owed within the law's longest), where their sum
+            // differs from ours or they offer something. The member decides on what both have said.
+            for (const r of book.all("tribunal_response").filter((x) => x.speaks_for === tenant && !e.seen.has(x.id))) {
+              e.seen.add(r.id);
+              const app = String(r.data?.application ?? ""), offer = cents(r.data?.offer ?? 0), theirs = r.data?.owes !== undefined ? cents(r.data.owes) : undefined;
+              if (!book.open("tribunal_application").some((x) => x.speaks_for === me && x.id === app) || (offer <= 0 && (theirs === undefined || theirs === behindNow))) continue;
+              const takes = offer > 0 ? law.plan_months > 0 && behindNow <= offer * law.plan_months : undefined;
+              steps.push(because(`${tenant} has answered the tribunal on our application ${app}: replying with what our rent book shows.`,
+                say("tribunal_reply", `Reply on application ${app}: our rent book shows ${usd(behindNow)} owed by ${tenant} today.${takes === undefined ? "" : takes ? ` We would take the plan offered (${usd(offer)} a month).` : ` We would not take the plan offered (${usd(offer)} a month).`}`,
+                  { to: [p.possession.tribunal, tenant], visible: [me, p.possession.tribunal, tenant], basis: app, data: { application: app, against: tenant, owed: behindNow, ...(takes !== undefined ? { takes_plan: takes } : {}) } })));
             }
           } else if ((e.stage === "applied" || e.stage === "plan") && orders.length) {
             const o = orders.sort((x, y) => y.at - x.at)[0]!;
@@ -990,15 +1018,20 @@ export class Staffing {
   private readonly withholds = new Map<string, Withheld>(); // wage standing order -> withheld each pay
   private readonly pendingWithhold = new Map<string, Withheld>(); // step marker -> withheld each pay
   private readonly owed = new Map<string, { charge: Charge; law: string; amount: number }>(); // charge -> withheld, not yet paid over
-  private readonly paidSince = new Map<string, number>(); // agreement -> gross wages paid since our last report
-  private nextRemit = -1;
+  private readonly paidSince = new Map<string, Map<string, number>>(); // return -> agreement -> gross wages paid since our last report under it
+  private readonly returnDay = new Map<string, number>(); // return -> the day it next falls due (the law's calendar: returns.ts; this only remembers which we have made)
+  private rules: ReturnRule[] = returnsOf(undefined); // the returns of the law we last read
   private lawId: string | undefined; // the tax law we last read
   private owe(law: string | undefined, w: Withheld, agreement?: string, gross = 0) {
     for (const x of w.parts) {
       const o = this.owed.get(x.charge.id) ?? { charge: x.charge, law: law ?? "", amount: 0 };
       this.owed.set(x.charge.id, { charge: x.charge, law: law ?? o.law, amount: o.amount + x.amount });
     }
-    if (agreement && gross > 0) this.paidSince.set(agreement, (this.paidSince.get(agreement) ?? 0) + gross);
+    if (agreement && gross > 0) for (const r of this.rules) if (r.charges === undefined || w.parts.some((x) => r.charges!.includes(x.charge.id))) {
+      const m = this.paidSince.get(r.id) ?? new Map<string, number>();
+      m.set(agreement, (m.get(agreement) ?? 0) + gross);
+      this.paidSince.set(r.id, m);
+    }
   }
 
   /** Wages our orders have paid, gross (what they paid, and what they withheld), since we began. */
@@ -1022,7 +1055,7 @@ export class Staffing {
   /** `registered_bps`: of the jobs this employer fills, the share it puts on its payroll returns (10,000, or nothing
    * said: all of them). A job it does not register is paid whole: nothing is withheld from it and no report names
    * its worker (docs/behaviour/firms.md, "Jobs an employer does not register"). */
-  constructor(private readonly ctx: ParticipantContext, private readonly me: string, private readonly o: { period: number; notice_days: number; workplace?: string; role: string; industry?: string; does?: { hire?: boolean; pay?: boolean }; own?: "role" | "role_or_unnamed"; payroll?: string; /** The line of the organisation's adopted budget this office's posts are paid from: said on its payroll notices, so that the paying office knows which line a wage is on. */ line?: string; notice_wait?: number; registered_bps?: number; casual_bps?: number; day_wage?: number; work_days?: number; week_days?: number; short?: { per_year_bps: number; by_bps: number } }) {}
+  constructor(private readonly ctx: ParticipantContext, private readonly me: string, private readonly o: { period: number; notice_days: number; workplace?: string; role: string; industry?: string; does?: { hire?: boolean; pay?: boolean }; own?: "role" | "role_or_unnamed"; payroll?: string; /** The line of the organisation's adopted budget this office's posts are paid from: said on its payroll notices, so that the paying office knows which line a wage is on. */ line?: string; notice_wait?: number; registered_bps?: number; casual_bps?: number; day_wage?: number; work_days?: number; week_days?: number; short?: { per_year_bps: number; by_bps: number }; /** How often the office wakes (seconds; absent: daily): a return falling due before its next look is filed at this one. */ wakes?: number }) {}
   /** When we last let someone go because we could not pay them (from then we take on only with more in hand: the module asks). */
   cashLayoffAt = -Infinity;
   /** Redundancy pay (and pay in lieu of notice the agreement fell short of) owed at the end of a job we ended for redundancy: agreement -> the sum. */
@@ -1396,20 +1429,30 @@ export class Staffing {
       offersNow++;
     }
 
-    // Monthly: what we've withheld, paid over to the tax's collector, with a report of it. Short of money, we pay what
-    // we can, keeping the next pay period's wages, and what's left is still owed (carried to next month).
-    if (this.nextRemit < 0) this.nextRemit = t + MONTH;
-    if (doesPay && t >= this.nextRemit) {
-      this.nextRemit = t + MONTH;
+    // On the law's days: what we've withheld, paid over to the tax's collector, with a return of it. The law lists its
+    // returns (which charges each reports, how often, the day of the month it falls due by: returns.ts); we file each on
+    // its day, for every employer alike. A period with nothing withheld files nothing; its day is still the calendar's.
+    // Short of money, we pay what we can, keeping the next pay period's wages, and what's left is still owed (carried
+    // to the next return).
+    this.rules = returnsOf(law);
+    const early = Math.max(0, (this.o.wakes ?? DAY) - DAY); // (an office that looks in weekly files by the day, not after it)
+    for (const rule of this.rules) {
+      if (!this.returnDay.has(rule.id)) this.returnDay.set(rule.id, nextReturn(rule, t).due);
+      const falls = this.returnDay.get(rule.id)!;
+      if (!doesPay || t + early < falls) continue;
+      this.returnDay.set(rule.id, nextReturn(rule, falls).due);
+      const period = nextReturn(rule, falls - 1);
       const balance = channels.accounts(obs).find((a) => a.account === account)?.balance;
-      const due = [...this.owed.values()].filter((x) => x.amount > 0 && x.charge.account && x.charge.collector);
+      const due = [...this.owed.values()].filter((x) => x.amount > 0 && x.charge.account && x.charge.collector && (rule.charges === undefined || rule.charges.includes(x.charge.id)));
       if (due.length && balance !== undefined) {
         // (Keeping the next pay period's wages aside: they go first.)
         const keep = staff.reduce((x, a) => x + jobTerms(a, a.terms.parties[1]).wage, 0);
         let left = Math.max(0, cents(balance) - keep);
         // Who was paid what since we last reported, for a charge whose report names each worker.
-        const lines = [...this.paidSince].filter(([agreement]) => !this.offBooks.has(agreement)).map(([agreement, gross]) => ({ worker: (book.records.get(agreement) as any)?.terms?.parties?.[1] as string | undefined, gross }))
+        const lines = [...(this.paidSince.get(rule.id) ?? [])].filter(([agreement]) => !this.offBooks.has(agreement)).map(([agreement, gross]) => ({ worker: (book.records.get(agreement) as any)?.terms?.parties?.[1] as string | undefined, gross }))
           .filter((x): x is { worker: string; gross: number } => !!x.worker).sort((a, b) => (a.worker < b.worker ? -1 : a.worker > b.worker ? 1 : 0));
+        const label = rule.name ?? "Return of tax withheld from wages";
+        const mark = { return: rule.id, due: falls, period_from: period.from, period_to: period.to };
         // One report to each collector, in the law's order, with what is paid into each of its accounts.
         for (const collector of [...new Set(due.map((x) => x.charge.collector))]) {
           const parts = due.filter((x) => x.charge.collector === collector).map((x) => {
@@ -1425,22 +1468,22 @@ export class Staffing {
           // (A law whose charges all go to one account, none reported worker by worker: one sum, as it has always been said.)
           const oneAccount = !law || (new Set(law.charges.map((c) => c.account)).size === 1 && !law.charges.some((c) => c.itemised));
           if (oneAccount && accounts.length === 1 && !itemised) {
-            steps.push(because(paid === owed ? `Monthly: paying over the ${usd(owed)} of income tax we withheld from wages.` : `Monthly: we owe ${usd(owed)} of income tax withheld from wages and have ${usd(paid)}: paying that, and still owing the rest.`,
-              say("withholding_report", `Income tax withheld from wages, owed: ${usd(owed)}; paid now: ${usd(paid)}.`, { to: [collector], visible: [me, collector], ...(basis ? { basis } : {}), data: { withheld: owed, paid, period_end: t, account } }),
+            steps.push(because(paid === owed ? `${label}, due ${dateWords(falls)}: paying over the ${usd(owed)} of income tax we withheld from wages.` : `${label}, due ${dateWords(falls)}: we owe ${usd(owed)} of income tax withheld from wages and have ${usd(paid)}: paying that, and still owing the rest.`,
+              say("withholding_report", `Income tax withheld from wages, owed: ${usd(owed)}; paid now: ${usd(paid)}.`, { to: [collector], visible: [me, collector], ...(basis ? { basis } : {}), data: { withheld: owed, paid, period_end: t, account, ...mark } }),
               ...(paid > 0 ? [pay(accounts[0]!, paid, { from: account, for: "Income tax withheld from wages." })] : [])));
             continue;
           }
           // Several accounts, or a charge reported worker by worker: the report says what is owed and paid under each
           // charge, and (where a charge asks it) each worker's pay in the period.
           const named = (c: Charge) => c.name ?? c.id;
-          steps.push(because(paid === owed ? `Monthly: paying over the ${usd(owed)} we withheld from wages (${parts.map((c) => `${named(c.charge)} ${usd(c.owed)}`).join(", ")}).` : `Monthly: we owe ${usd(owed)} withheld from wages and have ${usd(paid)}: paying that, and still owing the rest.`,
+          steps.push(because(paid === owed ? `${label}, due ${dateWords(falls)}: paying over the ${usd(owed)} we withheld from wages (${parts.map((c) => `${named(c.charge)} ${usd(c.owed)}`).join(", ")}).` : `${label}, due ${dateWords(falls)}: we owe ${usd(owed)} withheld from wages and have ${usd(paid)}: paying that, and still owing the rest.`,
             say("withholding_report", `Withheld from wages, owed: ${usd(owed)}; paid now: ${usd(paid)}. ${parts.map((c) => `${named(c.charge)}: owed ${usd(c.owed)}, paid ${usd(c.paid)}`).join("; ")}.`, { to: [collector], visible: [me, collector], ...(basis ? { basis } : {}),
-              data: { withheld: owed, paid, period_end: t, account, charges: parts.map((c) => ({ charge: c.charge.id, to: c.charge.account, withheld: c.owed, paid: c.paid })), ...(itemised ? { staff: lines } : {}) } }),
+              data: { withheld: owed, paid, period_end: t, account, ...mark, charges: parts.map((c) => ({ charge: c.charge.id, to: c.charge.account, withheld: c.owed, paid: c.paid })), ...(itemised ? { staff: lines } : {}) } }),
             ...accounts.map((to) => ({ to, sum: parts.filter((c) => c.charge.account === to).reduce((x, c) => x + c.paid, 0), what: parts.filter((c) => c.charge.account === to).map((c) => named(c.charge)).join(", ") }))
               .filter((x) => x.sum > 0).map((x) => pay(x.to, x.sum, { from: account, for: `Withheld from wages: ${x.what}.` }))));
         }
       }
-      this.paidSince.clear();
+      this.paidSince.delete(rule.id);
     }
 
     // A posting unfilled at an old wage (ours has moved since): published again at the wage we offer now.
@@ -2006,7 +2049,7 @@ function creditorAccount(book: Book, holder: string): string | undefined {
 
 export const employer: BehaviourModule = {
   name: "firm.employer",
-  version: "0.6.3",
+  version: "0.6.4", // 0.6.4: returns of tax withheld are filed on the days the law states (docs/behaviour/firms.md, "Returns on the law's days")
   doc: "docs/behaviour/firms.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -2024,7 +2067,7 @@ export const employer: BehaviourModule = {
   );
     const me = ctx.entity;
     const book = new Book();
-    const staffing = new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, workplace: p.workplace, role: p.role ?? "staff" });
+    const staffing = new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, workplace: p.workplace, role: p.role ?? "staff", wakes: 7 * DAY });
     let revenue = 0;
     let nextSuppliers = MONTH;
 

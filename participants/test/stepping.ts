@@ -38,7 +38,7 @@ export const context = (participant: string, entity: string, params: object, o: 
  * it publishes becomes a record (made in that position, for that entity), returned in `made` for the test to show it
  * again, as the world would.
  */
-export function wake(m: { step: (o: Observation, ctx: any) => any }, t: number, channels: { [id: string]: any }, o: { entity: string; inbox?: any[]; as?: { participant: string; position?: string }; ids?: { n: number }; woke_for?: string; more?: object } = { entity: "city" }) {
+export function wake(m: { step: (o: Observation, ctx: any) => any }, t: number, channels: { [id: string]: any }, o: { entity: string; inbox?: any[]; as?: { participant: string; position?: string }; ids?: { n: number }; woke_for?: string; more?: object; /** An act the world refuses (as `not_present`), where the test says so. */ refuse?: (c: Said) => boolean } = { entity: "city" }) {
   const said: Said[] = [];
   const made: any[] = [];
   const looks: any[] = [];
@@ -58,7 +58,7 @@ export function wake(m: { step: (o: Observation, ctx: any) => any }, t: number, 
         visible_to: c.args.visible === "public" ? "public" : c.args.visible ?? [o.entity], kind: c.args.kind, text: c.args.text, ...(c.args.data !== undefined ? { data: c.args.data } : {}), ...(c.args.to ? { addressed_to: c.args.to } : {}), ...(c.args.basis ? { basis: c.args.basis } : {}) });
     }
     // (What it has been shown, it has seen: only the outcome of its act is new at its next step.)
-    obs = { ...obs, woke_for: "done", outcomes: [{ action: `act.${i}`, t, status: "applied", ...(Object.keys(created).length ? { created } : {}) }], inbox: [],
+    obs = { ...obs, woke_for: "done", outcomes: [o.refuse && calls.some(o.refuse) ? { action: `act.${i}`, t, status: "refused", refusal: { code: "not_present", detail: "not there" } } : { action: `act.${i}`, t, status: "applied", ...(Object.keys(created).length ? { created } : {}) }], inbox: [],
       channels: Object.fromEntries(Object.entries(obs.channels).map(([k, c]: [string, any]) => [k, c.kind === "records" ? { ...c, records: [] } : c.kind === "accounts" ? { ...c, transactions: [] } : c])) } as unknown as Observation;
   }
   return { said, made, looks, of: (fn: string, kind?: string) => said.filter((c) => c.fn === fn && (kind === undefined || c.args.kind === kind)) };

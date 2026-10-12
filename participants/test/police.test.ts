@@ -85,6 +85,32 @@ test("a death someone at home outlived is not found again at a later call; one n
   expect(together.reported.map((r) => r.who).sort()).toEqual(["ann", "bob"]);
 });
 
+test("a warrant of possession: carried out, it says how many of the household were there and were put out; nobody there, nobody is said to have been removed; one withdrawn is not gone on", () => {
+  // (docs/behaviour/justice.md, "A warrant, and a home already left": 11 of 23 warrants in the fifth living pilot were
+  // said to have put a household out of a home it had left; every call to put someone out had been refused.)
+  const warrant = (id: string, tenant: string, household: string[], n: number) => statement(id, 0, "warrant", { speaks_for: "tribunal", addressed_to: [ME], visible_to: [ME, "tribunal", tenant, "landlord-1"],
+    data: { order: `order-${id}`, lease: `lease-${tenant}`, tenant, landlord: "landlord-1", space: `house-${n}/dwelling.1`, structure: `house-${n}`, household, not_before: DAY, until: 20 * DAY } });
+  const go = (records: any[], gone: Set<string>) => {
+    const m = station.create(context(AS.participant, ME, PARAMS, { position: AS.position }));
+    wake(m, 10 * 3600, { books, mine: { kind: "records", records: [...genesis, ...records] }, premises }, { entity: ME, as: AS });
+    return wake(m, 2 * DAY + 10 * 3600, { books, mine: { kind: "records", records: [] }, premises }, { entity: ME, as: AS, refuse: (c) => c.fn === "occupancy" && gone.has(String(c.args.who)) });
+  };
+  // Two of three were not there: the one there is put out, and the paper says one.
+  const some = go([warrant("w1", "t1", ["t1", "t2", "t3"], 1)], new Set(["t2", "t3"]));
+  expect(some.of("occupancy").map((c) => c.args.who)).toEqual(["t1", "t2", "t3"]);
+  expect(some.of("statement", "warrant_executed").map((c) => c.args.data)).toMatchObject([{ warrant: "w1", removed: 1 }]);
+  // Nobody was there: possession is given all the same, both are told, and the paper says nobody was put out.
+  const none = go([warrant("w2", "t4", ["t4", "t5"], 2)], new Set(["t4", "t5"]));
+  const done = none.of("statement", "warrant_executed");
+  expect(done.map((c) => c.args.data)).toMatchObject([{ warrant: "w2", removed: 0, tenant: "t4" }]);
+  expect(done[0]!.args.text).toContain("0 were there and were put out");
+  expect(done[0]!.args.to).toEqual(["t4", "landlord-1"]);
+  // Withdrawn by the registrar before its day (the landlord said the tenant had gone): no officer goes.
+  const off = go([warrant("w3", "t6", ["t6"], 3), { id: "wd-1", at: 0, record: "withdrawal", author: "tribunal-registrar-system", speaks_for: "tribunal", withdraws: "w3", visible_to: [ME, "tribunal"] }], new Set());
+  expect(off.of("occupancy")).toEqual([]);
+  expect(off.of("statement", "warrant_executed")).toEqual([]);
+});
+
 test("the profile's bands are shares that add up, in rising days", () => {
   const bands = PROFILE.values.life.found_alone_after;
   expect(bands.reduce((n, b) => n + b.bps, 0)).toBe(10_000);

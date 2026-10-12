@@ -5,6 +5,7 @@
 // read that the office's code is not shown. (Where the code keeps a fact only in its memory, the reader derives it
 // from the papers the code's acts left on file; each reader says below what it cannot.)
 
+import { planLawWords } from "./papers";
 import { basesOf, channels, type Observation, type StatementRecord } from "../contracts";
 import { dateWords } from "../forms";
 import type { OfficeBooks, OpenHeading, OpenItem, ParticipantContext } from "../module";
@@ -163,17 +164,21 @@ export function tribunalMemberBooks(ctx: ParticipantContext): OfficeBooks {
         // a paper is served here; nothing else of it exists.)
         const relied = ad.notice ? `; it relies on notice to vacate ${ad.notice}${finite(ad.notice_given) !== undefined ? `, given ${whenWords(Number(ad.notice_given))}` : ""}${finite(ad.notice_by) !== undefined ? `, to leave by ${whenWords(Number(ad.notice_by))}` : ""}` : "";
         const told = `; our notice of hearing ${n.id} is on the record, addressed to ${(n.addressed_to ?? []).join(" and ") || "both sides"}, since ${dateWords(n.at)}`;
-        const said = answer?.data?.left ? `${against} answered ${dateWords(answer.at)} (${answer.id}) that they have left the home${finite(answer.data.left_at) !== undefined ? `, on ${dateWords(Number(answer.data.left_at))}` : ""}` : answer ? `${against} answered ${dateWords(answer.at)} (${answer.id})${answer.data?.paid !== undefined ? `, saying ${usd(money(answer.data.paid))} has been paid since` : ""}${answer.data?.offer !== undefined ? `, and offering ${usd(money(answer.data.offer))} a month toward what is owed` : ""}` : `${against || "the tenant"} has not answered`;
+        // (The tenant's answer as the tenant gave it, each thing they told and nothing for what they left out; and
+        // the landlord's reply to it, where there is one.)
+        const said = answer ? answerWords(against, answer) : `${against || "the tenant"} has not answered`;
+        const reply = book.all("tribunal_reply").filter((r) => r.speaks_for === who && String(r.data?.application ?? "") === app).sort((x, y) => y.at - x.at)[0];
+        const replied = reply ? `; ${who} replied ${dateWords(reply.at)} (${reply.id}): its rent book shows ${usd(money(reply.data?.owed))} owed${reply.data?.takes_plan === true ? ", and it would take the plan offered" : reply.data?.takes_plan === false ? ", and it would not take the plan offered" : ""}${text(reply.data?.words) ? `; "${text(reply.data?.words)}"` : ""}` : "";
         const owed = ad.amount !== undefined ? money(ad.amount) : undefined;
         (by !== undefined && dayCome(by, t) ? possessionDue : possession).push({ id: app, since: a?.at ?? n.at, ...(by !== undefined ? { due: by } : {}), ...(owed !== undefined ? { amount: owed } : {}),
-          line: `${app}: ${who} applies for possession of ${ad.space ?? "a let home"} from ${against || "its tenant"}${ad.about ? ` (lease ${ad.about})` : ""}${owed !== undefined ? `, saying ${usd(owed)} of rent is owed` : ""}${ad.breach ? ", and that a plan the tribunal set was not kept" : ""}${relied}; taken in ${dateWords(n.at)}${told}${by !== undefined ? `, ${t >= by ? `the tenant's time to answer ran out ${dateWords(by)}` : dayCome(by, t) ? `the tenant's time to answer runs out today, ${dateWords(by)}` : `the tenant has until ${dateWords(by)} to answer`}` : ""}; ${said}; not decided` });
+          line: `${app}: ${who} applies for possession of ${ad.space ?? "a let home"} from ${against || "its tenant"}${ad.about ? ` (lease ${ad.about})` : ""}${owed !== undefined ? `, saying ${usd(owed)} of rent is owed` : ""}${ad.breach ? ", and that a plan the tribunal set was not kept" : ""}${relied}; taken in ${dateWords(n.at)}${told}${by !== undefined ? `, ${t >= by ? `the tenant's time to answer ran out ${dateWords(by)}` : dayCome(by, t) ? `the tenant's time to answer runs out today, ${dateWords(by)}` : `the tenant has until ${dateWords(by)} to answer`}` : ""}; ${said}${replied}; not decided` });
       }
       const lists = takenIn(book, filed, t, ownDay);
       return [
         // (Every case that stands open, with the day the other side may answer by and whether an answer has come:
         // those whose day has come first, said in every paper for as long as they stand; then those waiting, the
         // soonest first, however long ago each was listed.)
-        ...pressing("Applications for possession of a let home whose day has come, not decided", possessionDue),
+        ...pressing(`Applications for possession of a let home whose day has come, not decided${lawOfOrder(book)}`, possessionDue),
         ...pressing("Cases listed whose hearing day has come, with no order made", due),
         ...pressing("Applications on the tribunal's lists whose time to answer has run, not decided", lists.ran),
         ...heading("Applications to the tribunal, not yet listed for a hearing", notYet),
@@ -182,6 +187,37 @@ export function tribunalMemberBooks(ctx: ParticipantContext): OfficeBooks {
       ];
     },
   };
+}
+
+/** A tenant's answer to an application for possession, as they gave it: what they told, in the order of the
+ * tribunal's form, and nothing for what they left out (an answer that says little reads as one). */
+function answerWords(against: string, a: StatementRecord): string {
+  const d = (a.data ?? {}) as any, parts: string[] = [];
+  if (d.left) parts.push(`they have left the home${finite(d.left_at) !== undefined ? `, on ${dateWords(Number(d.left_at))}` : ""}`);
+  if (d.owes !== undefined) parts.push(`says ${usd(money(d.owes))} is owed today${d.disputes_sum ? ", less than the landlord says" : ""}`);
+  if (d.paid !== undefined) parts.push(`says ${usd(money(d.paid))} has been paid since`);
+  if (d.disputes_notice) parts.push("says the notice to vacate did not give the days the law asks");
+  if (d.offer !== undefined) parts.push(money(d.offer) > 0 ? `could pay ${usd(money(d.offer))} ${finite(d.every_days) && Number(d.every_days) !== 30 ? `every ${d.every_days} days` : "a month"} toward what is owed, beyond the rent` : "can pay nothing toward what is owed beyond the rent");
+  if (finite(d.out_of_work_since) !== undefined) parts.push(`out of work since ${dateWords(Number(d.out_of_work_since))}`);
+  if (d.pay_short) parts.push("pay has come short of what was agreed");
+  if (d.claim === "refused") parts.push(`a claim for support was refused${finite(d.claim_on) !== undefined ? ` on ${dateWords(Number(d.claim_on))}` : ""}`);
+  else if (d.claim === "pending") parts.push("a claim for support has been made and not decided");
+  if (d.ill) parts.push("illness in the home");
+  if (finite(d.people) !== undefined) parts.push(`${d.people} live in the home${finite(d.children) ? `, ${d.children} of them children` : ""}${Array.isArray(d.ages) && d.ages.length ? ` (aged ${d.ages.join(", ")})` : ""}`);
+  if (finite(d.lived_days) !== undefined) parts.push(`has lived there ${d.lived_days} days`);
+  if (d.go_to === "nowhere") parts.push("has nowhere else to go");
+  else if (d.go_to === "someone_to_ask") parts.push("has someone they could ask to take them in");
+  else if (d.go_to === "means_for_another") parts.push("has the means for another home");
+  return `${against} answered ${dateWords(a.at)} (${a.id})${parts.length ? `: ${parts.join("; ")}` : ", saying nothing more"}`;
+}
+
+/** What the law on possession says of the order, from the law as published (its typed fields), for the head of the
+ * member's list of cases to decide: the same words the law itself has. Nothing where no such law is on file. */
+function lawOfOrder(book: Book): string {
+  const l = book.open("law").filter((r) => r.data?.tenancy === "possession").sort((a, b) => b.at - a.at)[0] ?? book.all("procedure").filter((r) => r.data?.law === "law-possession" && r.data?.plan_consider !== undefined)[0];
+  const d = l?.data as any;
+  if (!d || d.plan_consider === undefined) return "";
+  return `. The law on the order (possession order form): ${planLawWords({ plan_months: Number(d.plan_months ?? 0), plan_consider: d.plan_consider, plan_barred_rent_months: d.plan_barred_rent_months, cure_days: d.cure_days })} An application that does not meet what the law asks is dismissed`;
 }
 
 // ------------------------------------------------------------------ tribunal.registrar

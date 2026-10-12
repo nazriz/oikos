@@ -191,6 +191,16 @@ terms from an advertisement are general contract law, no case opened)**.
 is the agreement's). A worker with no place of work does not write to ask where to come, and an employer cannot add
 one to a signed agreement: it gives notice and offers again.
 
+## Returns on the law's days (2026-10-12): when withheld tax is reported and paid over
+
+**What it was.** A payroll (`Staffing`) paid over what it had withheld a month (30 days) after it first ran, and again a month after each return; the counter was the payroll's own. Returns of different employers fell on different days, a month with nothing owed advanced the counter and left no paper, and nobody reading the law or the finance office's books could say what fell due when (the fifth living pilot's finance seat guessed "every 30 days or so").
+
+**What it is.** The published tax law lists its returns (`data.returns`, from the profile's `public_finance.returns`: id, name, the charges it reports, `every_months`, `day`, `in`). `returns.ts` has the one calendar function, `nextReturn(rule, after)`: the first due day after a moment, with the period it reports. The world has no calendar of names, so "the Nth day of the following month" is made in the world's own months: twelve of 30 days from the year's first day, the twelfth taking the last five (35); a quarter is three of them; `day` is capped at 30. Every `Staffing` (firms, shops, factories, the town, schools, clinics, police) keeps only the due day it has reached for each return, taken from that function, and files when the day comes: a report and a payment to each collector of the return's charges, `data.return`, `due`, `period_from`, `period_to`. An office that wakes every few days (`wakes`: the employer's week, the town's three days) files at the last look on or before the day; the others on the day, or, where a firm does not look in on the day (a weekend), at its next look: the `due` in the report is always the calendar's. A return with nothing owed files nothing; its next day is still the calendar's. Short of money, an employer pays what it can and the rest is carried to the next return of those charges. A charge no return names is reported monthly, on the first day of the month after.
+
+**What the books say.** The finance office's books list, under "Returns of tax withheld from wages falling due, and the day each is due by", each return of the law on file: its name and charges, the law, the day it next falls due, the period, when the last was made, and what has been withheld from wages paid since (the law's own reckoning of each pay in the books).
+
+**Limits.** Weekends and holidays are not in the world's days, so "working day" rules are approximated (Germany's third-last bank working day, Kenya's housing levy). Semiweekly depositors, quarterly returns of small employers and annual reconciliations are not used by any profile.
+
 ## Calibration notes for the checkpoint
 
 Over a 2-year run of the 200-citizen town (`worlds/town.yaml`):

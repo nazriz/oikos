@@ -99,6 +99,7 @@ export async function reportOfLog(dir: string, log: string): Promise<any> {
     }));
     return s;
   };
+  let platformOverrun: any, keptBack: any;
   const tr = { model_calls: 0, failed_calls: 0, cost_microusd: 0, retries: 0 };
   // With two translators as one (translator/src/arrangement.ts): each request's route, as the run noted it, and what
   // the translator's calls cost by model.
@@ -175,7 +176,12 @@ export async function reportOfLog(dir: string, log: string): Promise<any> {
     } else if (b.annotation === "note" && b.subject && b.data) {
       // What the participant noted about its own seat's answers (participants/src/llm/participant.ts), by reason.
       const d = b.data;
-      if (b.subject === "orchestrator") continue;
+      if (b.subject === "orchestrator") {
+        // The platform's overrun of the limit (the end's calls, never cut off by it), apart from the pilot's own spending.
+        if (d.platform_overrun_of_limit) platformOverrun = d.platform_overrun_of_limit;
+        if (d.kept_back_for_the_end) keptBack = d.kept_back_for_the_end;
+        continue;
+      }
       if (d.translation_retry) { tr.retries++; const r = req(d.translation_retry.draft, e.t); if (r) r.retries++; continue; }
       if (d.translation_route) { routes.set(String(d.translation_route.draft), d.translation_route); continue; }
       const s = seat(b.subject);
@@ -277,7 +283,10 @@ export async function reportOfLog(dir: string, log: string): Promise<any> {
     citizen_records: citizens,
 
     // (The whole run's, as its log records it: every part of a run that was stopped and resumed.)
-    cost: { recorded_microusd: totalMicroUsd, recorded_usd: (totalMicroUsd / 1e6).toFixed(2), model_calls: totalCalls },
+    cost: { recorded_microusd: totalMicroUsd, recorded_usd: (totalMicroUsd / 1e6).toFixed(2), model_calls: totalCalls,
+      ...(keptBack ? { kept_back_for_the_end: keptBack } : {}),
+      // (Told apart from the run having stopped at its limit, which is `stopped`: this is the end's own spending beyond it.)
+      ...(platformOverrun ? { platform_overrun_of_limit: platformOverrun } : {}) },
     debriefs: { given: [...debriefed].sort(), not_given: owed },
     // The debriefs and exit accounts in a few lines (debriefs.ts): asked, answered, declined, kept back; the scaled
     // items as each seat gave them; the accounts asked for and declined; the dark pieces asked for. No interpretation.
@@ -378,6 +387,8 @@ export function renderReport(r: any): string {
     : "citizen records: NONE (no citizen decision or outcome is in this log: a lean log, or --record-decisions none)");
 
   if (r.cost) L.push(`recorded cost of the whole run: ${r.cost.recorded_usd} over ${r.cost.model_calls} model calls (as the log records it, in the money the models are priced in)${r.debriefs ? `; debriefs given: ${r.debriefs.given.length}${r.debriefs.not_given.length ? `, NOT given: ${r.debriefs.not_given.map((d: any) => d.seat).join(", ")}` : ""}` : ""}`);
+  if (r.cost?.platform_overrun_of_limit) { const o = r.cost.platform_overrun_of_limit; L.push(`PLATFORM OVERRUN OF THE SPENDING LIMIT: ${(o.microusd / 1e6).toFixed(3)} USD, spent by the run's end (debriefs, exit accounts) beyond the limit, for ${Object.entries<number>(o.by_subject).map(([k, v]) => `${k} ${(v / 1e6).toFixed(3)}`).join(", ")}; the platform's, not the pilot reaching its limit and not any seat's own spending`); }
+  if (r.cost?.kept_back_for_the_end?.limit_too_small) L.push(`LIMIT TOO SMALL FOR THE END: ${r.cost.kept_back_for_the_end.limit_too_small}`);
   if (r.folder_note) L.push(`folder note: ${r.folder_note.slice(0, 400)}`);
   for (const [k, s] of Object.entries<any>(r.per_seat)) {
     L.push(`-- ${k}: ${s.model_calls} calls${s.failed_calls ? ` (${s.failed_calls} failed)` : ""}, ${s.cost_microusd} microusd; tool uses: ${kv(s.tool_uses)}; answers with no tool use: ${s.answers_without_tool_use}`);

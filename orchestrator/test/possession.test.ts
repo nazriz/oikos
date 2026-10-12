@@ -21,7 +21,7 @@ test("the generated town publishes its place's law on possession, and tells land
   expect(c.positions.find((p: any) => p.role_module?.code === "firm.landlord").role_module.params.possession.tribunal).toBe("tribunal");
   expect(c.participants.find((p: any) => p.controller?.impl === "tribunal.member").controller.params.hears.some((h: any) => h.about === "possession")).toBe(true);
   expect(c.participants.find((p: any) => p.controller?.impl === "tribunal.registrar").controller.params.enforcer).toBe("police");
-  expect(c.participants.find((p: any) => p.controller?.impl === "citizen.default").controller.params.possession).toEqual({ stay_bps: 5000, obey_bps: 5900 });
+  expect(c.participants.find((p: any) => p.controller?.impl === "citizen.default").controller.params.possession).toEqual({ stay_bps: 5000, obey_bps: 5900, answer_bps: 4300, notice_days: 14 });
 });
 
 test("a tenant who cannot pay and will not go is put out by the police on the tribunal's warrant, and by nothing before it", async () => {
@@ -120,5 +120,44 @@ test("a tenant who cannot pay and goes on the notice gives the home up: they are
     expect(orders.filter((o) => o.data.finding === "possession")).toEqual([]);
   }
   console.log(`a tenant who goes on the notice: notice's date day ${Math.floor(ntv.data.by / DAY)}, gone day ${Math.floor(went.at / DAY)}; applications for possession ${apps.length} (each withdrawn or dismissed)`);
+  rmSync(out, { recursive: true, force: true });
+}, 900_000);
+
+test("a tenant who goes after the order, before anyone comes: no removal is recorded; a warrant already out is withdrawn, or carried out saying nobody was there", async () => {
+  // (The fifth living pilot: 11 of 23 warrants "carried out" were at homes the household had left inside the warrant's
+  // notice of the day; every call to put someone out was refused, and the station said "carried out" all the same.)
+  const config = generate(base) as any;
+  const leases = config.world.records.filter((r: any) => r.record === "agreement" && r.terms.template === "lease");
+  const age = (id: string) => -config.world.entities.find((e: any) => e.id === id).born_at / (365 * DAY);
+  const alone = leases.find((l: any) => !/with their household/.test(l.terms.text) && age(l.terms.parties[1]) >= 25 && age(l.terms.parties[1]) < 55)!;
+  const tenant = alone.terms.parties[1] as string, landlord = alone.terms.parties[0] as string;
+  const job = config.world.records.find((r: any) => r.record === "agreement" && r.terms.template === "employment" && r.terms.parties[1] === tenant);
+  if (job) config.world.records = config.world.records.filter((r: any) => r.id !== job.id && r.agreement !== job.id && r.basis !== job.id);
+  config.world.accounts.find((a: any) => a.id === `acc-${tenant}`).balance = "0";
+  const who = config.participants.find((p: any) => p.person === tenant);
+  // (For the test: stays past the notice, does not answer, and goes once ordered out, at their first look after the order's day.)
+  who.controller = { ...who.controller, params: { ...who.controller.params, in_labour_force: false, possession: { stay_bps: 10_000, obey_bps: 10_000, answer_bps: 0 }, leave_after_homeless_days: 9_999 } };
+  const out = join(root, "runs", "test-possession-goes-on-order");
+  rmSync(out, { recursive: true, force: true });
+  const s = await runWorld({ config: { ...config, log: { ...config.log, detail: "lean" } }, runId: "possession-goes-on-order", outDir: out, until: 200 * DAY, recordObservations: "none" });
+  const ev = readFileSync(s.logPath, "utf8").trim().split("\n").filter((l) => l.includes('"event"')).map((l) => JSON.parse(l)).filter((e) => e.kind === "event").map((e) => ({ t: e.t, ...e.body }));
+  const recs = ev.filter((e) => e.event === "recorded").map((e) => e.record);
+  const order = recs.find((r) => r.kind === "tribunal_order" && r.data?.about === alone.id && r.data?.finding === "possession");
+  expect(order).toBeDefined();
+  const went = recs.find((r) => r.record === "notice" && r.agreement === alone.id && r.as === tenant);
+  expect(went.at).toBeGreaterThanOrEqual(order.data.due);
+  // Nobody was put out: the tenant went of their own accord, and no paper says otherwise.
+  expect(ev.filter((e) => e.event === "vacated" && e.occupant === tenant && e.reason === "removed" && e.by !== `${tenant}-self`)).toEqual([]);
+  expect(recs.filter((r) => r.kind === "warrant_executed" && r.data?.lease === alone.id && r.data?.removed !== 0)).toEqual([]);
+  const warrant = recs.find((r) => r.kind === "warrant" && r.data?.order === order.id);
+  if (warrant) {
+    const withdrawn = recs.some((r) => r.record === "withdrawal" && r.withdraws === warrant.id);
+    const empty = recs.find((r) => r.kind === "warrant_executed" && r.data?.warrant === warrant.id);
+    expect(withdrawn || !!empty).toBe(true);
+    if (empty) expect(empty.data.removed).toBe(0);
+    console.log(`a tenant who goes after the order: order's day ${Math.floor(order.data.due / DAY)}, gone day ${Math.floor(went.at / DAY)}, warrant issued day ${Math.floor(warrant.at / DAY)}: ${withdrawn ? "withdrawn on the landlord's word" : "carried out, nobody there"}`);
+  } else console.log(`a tenant who goes after the order: gone day ${Math.floor(went.at / DAY)} before any warrant was asked`);
+  // The landlord ends the tenancy on the record either way.
+  expect(recs.some((r) => r.record === "notice" && r.agreement === alone.id && r.as === landlord)).toBe(true);
   rmSync(out, { recursive: true, force: true });
 }, 900_000);

@@ -216,6 +216,13 @@ Three changes on the person's side of the firm and landlord fixes (docs/decision
 - **On the record and nothing more:** a landlord's request for rent owed (`rent_asked`), an application for possession, when the notice of hearing comes (`possession_applied`), and an offer of a plan (`plan_offered`), which is answered with what the household could pay a month beyond its rent and essentials. Whether these should move trust or agency has no source here, so they do not.
 - **A letter from an office in its own words** is read, kept and noted (docs/behaviour/letters.md, "A letter to a person").
 
+## Answering the tribunal, and losing a home (0.53.0, 2026-10-12)
+
+- **Served with an application for possession**, a tenant answers or does not: one draw for each application at the profile's rate of tenants who answer (`possession.answer_bps`), read by trust in courts, the sense of agency, what a desk or tribunal has been found to do, fear of the landlord and whether there is somewhere to go. What is told is typed and the tenant's own; what is left out follows the gap between what they think of the landlord and what they say (docs/behaviour/justice.md, "A tenant's answer").
+- **The order and the removal are on the record** as events of their own (`ordered_out`, `put_out`), each about whoever did it, and move trust in the tribunal and the police.
+- **With no dwelling** the leaseholder asks the people the household is closest to whether it may stay, and is taken in where there is room, means and willingness; asked, a person answers by the same rule (docs/behaviour/households.md, "Taken in during the year"). Parameters: `stay` (`ask`, `ask_again_days`, `willing_affinity_bps`: placeholders).
+- **Draws about a notice and an order** (`stay-`, `obey-`, `answer-`, `tells-`) are keyed on the lease, never on a paper's number, so a run and its twin draw the same for the same tenancy.
+
 ## What a citizen does
 
 | | Rule | Source |

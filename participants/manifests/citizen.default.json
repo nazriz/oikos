@@ -1,6 +1,6 @@
 {
   "name": "citizen.default",
-  "version": "0.52.0",
+  "version": "0.53.0",
   "doc": "docs/behaviour/citizen.md",
   "params": {
     "accept_fewer_bedrooms_after_days": {
@@ -642,6 +642,17 @@
     "started": {
       "schema": {},
       "default": null,
+      "source": "placeholder"
+    },
+    "stay": {
+      "schema": {
+        "type": "object"
+      },
+      "default": {
+        "ask": 5,
+        "ask_again_days": 30,
+        "willing_affinity_bps": 1500
+      },
       "source": "placeholder"
     },
     "stop_work_curve": {

@@ -10,6 +10,8 @@ import type { OfficeBooks, OpenHeading, OpenItem, ParticipantContext } from "../
 import { cents } from "../money";
 import { Book, commitmentOf, DAY, Directions, jobTerms, ownAccount, usd } from "./common";
 import { Staffing, staffingUnder } from "./firms";
+import { dueFrom, returnsOf } from "./returns";
+import { incomeTaxLaw, withheld } from "./tax";
 
 const YEAR = 365 * DAY;
 const addressed = (r: StatementRecord, me: string) => (r.addressed_to ?? []).includes(me);
@@ -176,12 +178,37 @@ export function financeBooks(ctx: ParticipantContext): OfficeBooks {
       }
       if (withheldSince > 0) tax.push({ id: "withheld-since-last-report", running: true, amount: withheldSince, ...(lastReportEnd >= 0 ? { since: lastReportEnd } : {}),
         line: `${usd(withheldSince)} of tax has been withheld from wages paid ${lastReportEnd >= 0 ? `since the last report to a collector (${dateWords(lastReportEnd)})` : "so far, with no report yet to a collector"}` });
+      // ---- the returns of tax withheld that fall due, by the law's calendar (participants/src/behaviour/returns.ts) ----
+      const falling: OpenItem[] = [];
+      const law = incomeTaxLaw(book);
+      if (law) {
+        const orderEvery = (order: string): number => { const r = book.records.get(order); return r?.record === "statement" && Number(r.data?.every) > 0 ? Number(r.data?.every) : p.period; };
+        for (const rule of returnsOf(law)) {
+          const next = dueFrom(rule, t);
+          const filed = reports.filter((r) => r.data?.return === rule.id).reduce((m, r) => Math.max(m, Number(r.data?.period_end ?? r.at)), -1);
+          // (What each pay withheld under this return's charges, as the law reckons it from the gross: the pay as paid, and what was held.)
+          let sum = 0;
+          for (const x of money.byOrder) {
+            if (x.t <= filed) continue;
+            const hold = held.get(x.order) ?? 0;
+            const parts = withheld(law, x.amount + hold, orderEvery(x.order)).parts;
+            const all = parts.reduce((n, c) => n + c.amount, 0);
+            const mine = parts.filter((c) => rule.charges === undefined || rule.charges.includes(c.charge.id)).reduce((n, c) => n + c.amount, 0);
+            sum += all > 0 ? Math.round((hold * mine) / all) : 0;
+          }
+          const names = (rule.charges ?? law.charges.map((c) => c.id)).map((id) => law.charges.find((c) => c.id === id)?.name ?? id).join(", ");
+          const days = Math.round((next.due - Math.floor(t / DAY) * DAY) / DAY);
+          falling.push({ id: `${rule.id}-${next.due}`, running: true, due: next.due, amount: sum,
+            line: `${rule.name ?? "Return of tax withheld from wages"} (${names}), under ${law.id}: the next falls due on ${dateWords(next.due)} (${days === 0 ? "today" : days === 1 ? "tomorrow" : `in ${days} days`}), for pay from ${dateWords(next.from)} to ${dateWords(next.to - 1)}; the last was ${filed >= 0 ? `made on ${dateWords(filed)}` : "none yet"}; ${usd(sum)} of this has been withheld from wages paid since` });
+        }
+      }
       return [
         ...heading("Invoices addressed to the town, not paid", invoices),
         ...heading("Employees of the town with no standing payment of their wage on file", unpaid),
         ...heading("Wages still being paid to someone who has died or whose employment has ended", stale),
         ...heading("The budget for the year, against what has been paid", budget),
         ...heading("Tax withheld from wages and not yet paid over", tax),
+        ...(falling.length ? [{ what: "Returns of tax withheld from wages falling due, and the day each is due by", items: falling.sort((a, b) => (a.due ?? 0) - (b.due ?? 0) || (a.id < b.id ? -1 : 1)) }] : []),
       ];
     },
   };

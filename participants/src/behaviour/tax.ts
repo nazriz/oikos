@@ -4,6 +4,7 @@
 // supplies.
 
 import type { Book } from "./common";
+import { MONTH_WORDS, returnRuleInWords, returnRulesOf, returnsOf, type ReturnRule } from "./returns";
 
 const DAY = 86_400;
 const YEAR = 365 * DAY;
@@ -46,7 +47,8 @@ export interface Charge {
 }
 
 /** A law taxing pay: its charges, in the order the law lists them. */
-export interface IncomeTaxLaw { id: string; charges: Charge[] }
+/** (`returns`: when each charge is reported and paid over; docs/behaviour/firms.md, "Returns on the law's days". None: every charge monthly, on the first day of the month after.) */
+export interface IncomeTaxLaw { id: string; charges: Charge[]; returns?: ReturnRule[] }
 
 /**
  * A tax law's terms, from its record's data. `charges` as above (a charge that names no collector is its lawmaker's).
@@ -54,7 +56,7 @@ export interface IncomeTaxLaw { id: string; charges: Charge[] }
  * rates on a year's pay, and a levy on the whole of a pay from a threshold, both paid into one account.
  */
 export function taxLawOf(id: string, data: any, lawmaker?: string): IncomeTaxLaw | undefined {
-  if (Array.isArray(data?.charges)) return { id, charges: data.charges.map((c: Charge) => ({ ...c, collector: c.collector ?? data.collector ?? lawmaker })) };
+  if (Array.isArray(data?.charges)) return { id, charges: data.charges.map((c: Charge) => ({ ...c, collector: c.collector ?? data.collector ?? lawmaker })), ...(returnRulesOf(data.returns)?.length ? { returns: returnRulesOf(data.returns) } : {}) };
   if (!Array.isArray(data?.brackets)) return undefined;
   const to = { collector: data.collector ?? lawmaker, account: data.account };
   return { id, charges: [
@@ -200,4 +202,11 @@ export function chargesInWords(charges: Charge[], written: (amount: number) => s
     const reliefs = (c.reliefs ?? []).map((r) => ("none_due_up_to" in r ? `none due where that is ${written(r.none_due_up_to)} or less` : `less ${written(r.amount)} of the charge${r.tapers ? ` (reduced by ${pct(r.tapers.bps)} of pay above ${written(r.tapers.above)})` : ""}`));
     return `${c.name ?? c.id}: ${[on, ...(b.from ? [`from ${written(b.from)}`] : []), ...(b.up_to !== undefined ? [`up to ${written(b.up_to)}`] : []), ...less].join(", ")}: ${rates}${reliefs.length ? `; ${reliefs.join("; ")}` : ""}; paid to ${payee(c)}${c.itemised ? ", reported worker by worker" : ""}`;
   }).join(". ");
+}
+
+/** What the law says of the returns: which charges are reported together, how often, and the day each is due (returns.ts). */
+export function returnsInWords(law: IncomeTaxLaw): string {
+  const rules = returnsOf(law);
+  const name = (id: string) => law.charges.find((c) => c.id === id)?.name ?? id;
+  return `Employers report what they withheld, and pay it over with the report, in ${rules.length === 1 ? "this return" : "these returns"}: ${rules.map((r) => returnRuleInWords(r.id === "return-rest" ? { ...r, name: "Return of tax withheld from wages" } : r, (r.charges ?? []).map(name).join(", "))).join("; ")}. ${MONTH_WORDS}`;
 }

@@ -1,0 +1,34 @@
+{
+  "about": "What debriefs and exit accounts have cost, measured from the usage annotations of every run on file that debriefed a seat in the present way (scripts/debrief-costs.ts; the table is in docs/behaviour/debrief.md). microusd is the figure used: the largest measured (a shortfall is costlier than a surplus, which is simply not spent). The run multiplies it by margin_percent (a whole number, per cent). A model with no entry gets the floor: the greater of the old reckoning at its price and the largest figure here, times margin_percent. Add a model by measuring it, not by editing a figure.",
+  "margin_percent": 125,
+  "seat": {
+    "claude-code/claude-sonnet-5-5": {
+      "microusd": 503112,
+      "n": 16,
+      "mean_microusd": 352433,
+      "median_microusd": 373452,
+      "measured": "2026-10-12",
+      "runs": [
+        "lv-04",
+        "lv-05",
+        "living-world-5-2026-10-11/lw5-debrief-01",
+        "living-world-5-2026-10-11/lw5b-debrief-02",
+        "unstated-framing-2026-10-12/uf-unstated",
+        "unstated-framing-2026-10-12/uf-simulation"
+      ]
+    }
+  },
+  "account": {
+    "claude-code/claude-sonnet-5-5": {
+      "microusd": 21197,
+      "n": 12,
+      "mean_microusd": 10568,
+      "median_microusd": 9305,
+      "measured": "2026-10-12",
+      "runs": [
+        "lv-04",
+        "lv-05"
+      ]
+    }
+  }
+}

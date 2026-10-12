@@ -155,6 +155,33 @@ test("a direction on an office's form binds its staff's post as it binds the off
 
 // ------------------------------------------------------------------ possession (docs/behaviour/justice.md)
 
+test("an application before the tribunal: the landlord's books say what has changed since it was made, and what is ordinarily done where the rent is paid; never what to do", () => {
+  // (The fifth living pilot: a seated landlord kept an application before the tribunal after the tenant paid in full,
+  // and another after granting a stay. Nothing in its books set the application beside either.)
+  const b = landlordBooks(ctx("landlord-1"));
+  const law = st("law-possession", 0, "law", "state", { data: { tenancy: "possession", arrears_days: 14, notice_days: 14, possession_days: 14 } });
+  b.absorb(obs(0, "landlord-1", [law, lease("lease-a", "a", 100_000), ...signed("lease-a", "a")], { ...account, transactions: [{ ...rentPaid(0, "a", 100_000), memo: "rent" }] }));
+  const ending = (t: number) => head(b.open(t), "Tenancies being ended for arrears under the law on possession, and where each has got to")?.items[0];
+  b.absorb(obs(87 * DAY, "landlord-1", [st("rec.20", 70 * DAY, "notice_to_vacate", "landlord-1", { addressed_to: ["a"], basis: "lease-a", data: { lease: "lease-a", reason: "arrears", by: 85 * DAY } }),
+    st("rec.21", 87 * DAY, "tribunal_application", "landlord-1", { addressed_to: ["tribunal"], basis: "lease-a", data: { kind: "possession", matter: "possession", against: "a", about: "lease-a", amount: 200_000 } })]));
+  expect(ending(88 * DAY)!.line).toContain("it has not decided");
+  expect(ending(88 * DAY)!.line).not.toContain("ordinarily withdraw");
+  // The tenant answers the tribunal: shown, with whether this office has replied.
+  b.absorb(obs(90 * DAY, "landlord-1", [st("rec.30", 90 * DAY, "tribunal_response", "a", { addressed_to: ["tribunal"], basis: "rec.21", data: { application: "rec.21", owes: 200_000, offer: 30_000 } })]));
+  expect(ending(91 * DAY)!.line).toContain("a answered the tribunal year 1, day 91 (rec.30), offering $300.00 a month toward what is owed; we have not replied (reply to a tenant's answer form)");
+  b.absorb(obs(92 * DAY, "landlord-1", [st("rec.31", 92 * DAY, "tribunal_reply", "landlord-1", { addressed_to: ["tribunal", "a"], basis: "rec.21", data: { application: "rec.21", owed: 300_000 } })]));
+  expect(ending(93 * DAY)!.line).toContain("we have replied");
+  // The tenant pays everything owed: the books set that beside the application, and say what is ordinarily done.
+  b.absorb(obs(95 * DAY, "landlord-1", [], { ...account, transactions: [{ ...rentPaid(95 * DAY, "a", 300_000), memo: "rent owed" }] }));
+  const line = ending(96 * DAY)!.line;
+  expect(line).toContain("Since the application: the application said $2,000.00 was owed; the rent book shows less than a rent owed now");
+  expect(line).toContain("An application stands until it is decided or withdrawn; where the rent owed has been paid or terms agreed, landlords ordinarily withdraw it");
+  expect(line).not.toMatch(/\b(should|ought|must withdraw|withdraw it now)\b/i);
+  // Withdrawn: no longer shown as waiting on the tribunal.
+  b.absorb(obs(97 * DAY, "landlord-1", [{ id: "rec.40", at: 97 * DAY, record: "withdrawal", author: "landlord-1-office-system", speaks_for: "landlord-1", withdraws: "rec.21", visible_to: ["landlord-1", "tribunal", "a"] }]));
+  expect(ending(98 * DAY)?.line ?? "").not.toContain("we applied to the tribunal");
+});
+
 test("a landlord's books show each tenancy being ended for arrears at the stage its papers put it at, and what the law's procedure has next; the last payment's own words are in the rent book", () => {
   const b = landlordBooks(ctx("landlord-1"));
   const law = st("law-possession", 0, "law", "state", { data: { tenancy: "possession", arrears_days: 14, notice_days: 14, possession_days: 14 } });
