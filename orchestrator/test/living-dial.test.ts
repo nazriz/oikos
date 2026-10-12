@@ -61,7 +61,9 @@ const TOWN = join(root, "worlds/town.yaml");
 // other offices ... payments that carry a budget line"): the town's opening wage orders name the staff line, and the finance office's
 // brief says which line pays for what (two parameters of its own). Nothing else of this branch moves a town without the option: tested
 // by taking the lines and the parameters out, which gives 43f2bf77... again.
-const STEP_1 = "9665fd1dfeceeea682943229d3ab5cbf884948eb48b0bd9507c0bbc5d8f325af";
+// And again on 2026-10-12, with draws named for the day or the matter, not the hour (9665fd1d... until then; docs/decisions.md, "Draws and
+// the moment"): every participant's stream is a different stream, so every town's draws fall differently. Nothing else moved. (b9db68a1... for the first version of the change, which counted hours.)
+const STEP_1 = "42832ef34c44d8fa9577ceb9dc0564e3b200366c2a45dcf58a2f1fd81527fe37";
 
 test("with the dial absent or at 0 a town is step 1's town, to the state hash", async () => {
   const out = mkdtempSync(join(tmpdir(), "oikos-dial-"));

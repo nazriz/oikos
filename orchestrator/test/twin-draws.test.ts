@@ -44,7 +44,7 @@ const scribbling = (inner: string): BehaviourModule => ({
   },
 });
 
-async function run(name: string, more: object, scribe?: string) {
+async function town(name: string, more: object, scribe?: string, days = Number(process.env.TWIN_DAYS ?? 120)) {
   const dir = mkdtempSync(join(tmpdir(), `oikos-${name}-`));
   try {
     const config = generate({ ...living, ...more });
@@ -55,13 +55,24 @@ async function run(name: string, more: object, scribe?: string) {
       part.controller = { ...part.controller, impl: wrapped.name };
       modules = { [wrapped.name]: wrapped };
     }
-    const s = await runWorld({ config, runId: name, outDir: dir, until: Number(process.env.TWIN_DAYS ?? 120) * DAY, logDetail: "lean", recordObservations: "none", ...(modules ? { modules } : {}) } as any);
+    const draws = new Map<string, number>();
+    const s = await runWorld({ config, runId: name, outDir: dir, until: days * DAY, logDetail: "lean", recordObservations: "none", drawTrace: (k: readonly string[]) => { const x = k.join("|"); draws.set(x, (draws.get(x) ?? 0) + 1); }, ...(modules ? { modules } : {}) } as any);
     expect(s.participantErrors).toBe(0);
-    const records: any[] = [];
-    for (const l of readFileSync(s.logPath, "utf8").split("\n")) if (l.includes('"event":"recorded"')) { const r = JSON.parse(l).body.record; if (r?.record === "statement") records.push(r); }
-    return records;
+    const records: any[] = [], decisions: string[] = [], acts: string[] = [];
+    // (Each named for who, what and the day, and which time that was for them that day: never by the hour.)
+    const nth = new Map<string, number>();
+    const once = (base: string) => { const n = (nth.get(base) ?? 0) + 1; nth.set(base, n); return `${base}#${n}`; };
+    // (An invoice quoted in a claim carries the second it was issued at: the paper is the same, issued in another hour.)
+    const plain = (x: string) => x.replace(/rec\.[0-9]+/g, "rec").replace(/"at":[0-9]+/g, '"at":0');
+    for (const l of readFileSync(s.logPath, "utf8").split("\n")) {
+      if (l.includes('"event":"recorded"')) { const r = JSON.parse(l).body.record; if (r?.record === "statement") records.push(r); }
+      else if (l.includes('"annotation":"decision"')) { const d = JSON.parse(l); decisions.push(once(`${d.body.subject}|${d.body.data.domain}|${Math.floor(d.t / DAY)}|${plain(String(d.body.data.choice))}`)); }
+      else if (l.includes('"command":"act"')) { const d = JSON.parse(l); acts.push(once(`${d.body.participant}|${Math.floor(d.t / DAY)}|${plain(String(d.body.provenance?.call ?? JSON.stringify(d.body.blocks)))}`)); }
+    }
+    return { records, decisions, acts, draws };
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }
+async function run(name: string, more: object, scribe?: string) { return (await town(name, more, scribe)).records; }
 
 /** Each request to put something right with the answer it got, named for who asked whom about what and which time
  * that was for the pair, at the hour it was asked: never by a record's number. */
@@ -146,3 +157,70 @@ test("the world's prices are the world's: a town and its twin with an office in 
     expect(b).toEqual(a);
   } finally { if (prev === undefined) delete process.env.TWIN_DAYS; else process.env.TWIN_DAYS = prev; }
 }, 1_800_000);
+
+/** What two towns drew alike: the keys of a stream (who, in what capacity, the day, what for, which time that was
+ * that day) in both, with how many times each. A draw is told apart by what it is for, so a key in one town and in
+ * the other fell the same way. `by` says whose a key is. */
+function alike(a: Map<string, number>, b: Map<string, number>, mine: (pid: string) => boolean) {
+  let same = 0, all = 0;
+  const apart: string[] = [];
+  for (const [k, n] of a) {
+    if (!mine(k.split("|")[1]!)) continue;
+    all += n;
+    const m = Math.min(n, b.get(k) ?? 0);
+    same += m;
+    if (m < n) apart.push(k);
+  }
+  return { same, all, apart };
+}
+const share = (x: { same: number; all: number }) => `${x.same} of ${x.all} (${((100 * x.same) / Math.max(1, x.all)).toFixed(1)}%)`;
+/** A decision or act by a participant: who it was is the first part of its name. */
+function matched(a: string[], b: string[], mine: (pid: string) => boolean) {
+  const there = new Set(b);
+  const ours = a.filter((x) => mine(x.split("|")[0]!));
+  return { same: ours.filter((x) => there.has(x)).length, all: ours.length, apart: ours.filter((x) => !there.has(x)) };
+}
+
+test("a year with one office in a mock seat that sits at other hours and files papers of no effect: everyone else decides, answers, prices and draws the same on the same days", async () => {
+  // (2026-10-12, draws and the moment. A seat acts at other hours than its code twin and files papers the twin does not,
+  // so a stream named for the hour someone woke, or for a paper's number, fell differently for all the town. Now a draw
+  // is named for the one who draws, the calendar day, what it is for and which time that was for them that day.)
+  // The ombudsman's office deals with nobody in this town: its seat sits in office hours, reads its staff's reports and
+  // files its own. Every draw but the seat's own, every decision, every act, every answer and every price must be the same.
+  const [twin, seat, mayor] = await Promise.all([town("moments-code", {}, undefined, 365), town("moments-seat", { model_seats: "ombudsman-officer" }, undefined, 365), town("moments-mayor", { mayor: "llm" }, undefined, 365)]);
+  const office = (pid: string) => pid.startsWith("ombudsman-officer");
+  const papers = seat.records.filter((r) => r.kind === "staff_report").length;
+  expect(papers).toBeGreaterThan(8);
+  expect(twin.records.some((r) => r.kind === "staff_report")).toBe(false);
+  const draws = alike(twin.draws, seat.draws, (pid) => !office(pid));
+  const decided = matched(twin.decisions, seat.decisions, (pid) => !office(pid));
+  // (An act addressed to the ombudsman is dealt with by the seat: a complaint it was sent and when its answer came is the seat's.)
+  const acted = matched(twin.acts.filter((x) => !x.includes("ombudsman")), seat.acts.filter((x) => !x.includes("ombudsman")), (pid) => !office(pid));
+  console.log(`twin moments, a seat that deals with nobody (${papers} papers of its own): draws ${share(draws)}; decisions ${share(decided)}; acts ${share(acted)}`);
+  expect(draws.apart).toEqual([]);
+  expect(decided.apart).toEqual([]);
+  expect(acted.apart).toEqual([]);
+  expect(decided.all).toBeGreaterThan(5_000);
+  expect([...answers(seat.records, new Set()).entries()].sort()).toEqual([...answers(twin.records, new Set()).entries()].sort());
+  const prices = (rs: any[]) => rs.filter((r) => r.kind === "price_list" && /at world prices/.test(String(r.text))).map((r) => `${Math.floor(r.at / (30 * DAY))} ${String(r.text).replace(/rec\.[0-9]+/g, "rec")}`);
+  expect(prices(seat.records)).toEqual(prices(twin.records));
+  // And the mayor's seat, which does deal with the town (its orders reach planning, finance and the builders, and what
+  // they do on other days is another town from there): it is not the same town, but what the seat did not reach is still
+  // drawn alike. Reported; held at a floor that the draws named for the hour could not reach.
+  const mDraws = alike(twin.draws, mayor.draws, (pid) => !pid.startsWith("mayor"));
+  const mDecided = matched(twin.decisions, mayor.decisions, (pid) => !pid.startsWith("mayor"));
+  console.log(`twin moments, the mayor's seat: draws ${share(mDraws)}; decisions ${share(mDecided)}`);
+  // (A year of this town with draws named for the hour: 34% of draws and 35% of decisions alike; now 79% and 45%.)
+  expect(mDraws.same / mDraws.all).toBeGreaterThan(0.65);
+  expect(mDecided.same / mDecided.all).toBeGreaterThan(0.4);
+}, 1_800_000);
+
+test("no module names a draw for a moment", () => {
+  // A purpose with the time in it (`shop-${t}`) is a draw that falls differently in two towns that woke at other hours.
+  const dir = join(root, "participants/src/behaviour");
+  const found: string[] = [];
+  for (const f of new Bun.Glob("*.ts").scanSync(dir)) {
+    readFileSync(join(dir, f), "utf8").split("\n").forEach((l, i) => { if (/\brng\(`[^`]*\$\{(t|obs\.t|now|at)\}/.test(l)) found.push(`${f}:${i + 1}`); });
+  }
+  expect(found).toEqual([]);
+});

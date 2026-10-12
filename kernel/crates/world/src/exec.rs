@@ -45,8 +45,6 @@ pub struct Exec<'a> {
     pub participant: &'a str,
     pub position: Option<&'a str>,
     pub entity: Id,
-    /// The action's id, for keyed randomness.
-    pub action: &'a str,
     /// Local refs bound so far in this action.
     pub refs: BTreeMap<String, Id>,
     pub events: Vec<Timed>,
@@ -78,7 +76,7 @@ pub fn can_act(p: &Participant) -> bool {
 
 /// Apply `blocks` for `participant` (in `position`, or as itself) to `st`. On error, `st` is left
 /// partly modified and must be discarded.
-pub fn exec_action(s: &Statics, st: &mut State, participant: &str, position: Option<&str>, action: &str, blocks: &[Block]) -> R<ExecResult> {
+pub fn exec_action(s: &Statics, st: &mut State, participant: &str, position: Option<&str>, blocks: &[Block]) -> R<ExecResult> {
     let p = st.participants.get(participant).ok_or_else(|| refuse(RefusalCode::UnknownParticipant, format!("no participant {participant}")))?;
     if !can_act(p) {
         return Err(refuse(RefusalCode::ParticipantInactive, format!("{participant} no longer acts")));
@@ -93,7 +91,7 @@ pub fn exec_action(s: &Statics, st: &mut State, participant: &str, position: Opt
         }
         None => p.person.clone().ok_or_else(|| refuse(RefusalCode::NotInPosition, format!("{participant} is a system: it acts only in a position")))?,
     };
-    let mut ex = Exec { s, st, participant, position, entity, action, refs: BTreeMap::new(), events: vec![], surveyed: None, investigated: None, worked_on: vec![] };
+    let mut ex = Exec { s, st, participant, position, entity, refs: BTreeMap::new(), events: vec![], surveyed: None, investigated: None, worked_on: vec![] };
     for (i, b) in blocks.iter().enumerate() {
         ex.block(b, i).map_err(|mut r| {
             r.block.get_or_insert(i);
@@ -694,8 +692,9 @@ pub fn scheduled(s: &Statics, st: &mut State, item: Scheduled) -> Vec<Timed> {
                 return vec![];
             }
             let present = b.present;
-            // Its sex, where the world models it: drawn by the kernel, keyed by the id the child is about to get.
-            let next_id = format!("ent.{}", st.counters.ent + 1);
+            // Its sex, where the world models it: drawn by the kernel, keyed by its mother and which child of hers it is
+            // (not by the id it is about to get: that is its place in the order everything was made in the town).
+            let next_id = format!("{}/{}", parents[0], b.children.len());
             let sex = s.life().and_then(|l| l.birth.as_ref()).and_then(|bp| bp.female_bps).map(|f| {
                 if uniform(s, &["birth", &next_id, "sex"], 10_000) < f as i64 { Sex::Female } else { Sex::Male }
             });
@@ -1050,10 +1049,13 @@ impl<'a> Exec<'a> {
             let (from, at) = (self.r(&iv.from)?, self.r(&iv.at)?);
             let found = self.st.takings.iter().rev().find(|x| x.from == from && x.at == at && x.kind == iv.kind).cloned();
             let chance = spec.as_ref().map_or(0, |x| x.detection_bps);
-            // (Keyed by the block as well as the action, as harm is: two investigations in one action draw
+            // (Keyed by the block as well as the day, as harm is: two investigations in one action draw
             // independently. Until 2026-10-05 they shared the action's one draw.)
             let idx = index.to_string();
-            let mut rng = self.s.randomness.stream(&["investigate", self.action, &idx]);
+            // (Keyed by who asks, what about and the day, never by the act's number in the world's file: that
+            // moves with every act anyone has made, and two towns that differ by one act would draw alike nowhere.)
+            let (who, day) = (self.participant.to_string(), self.now().div_euclid(86_400).to_string());
+            let mut rng = self.s.randomness.stream(&["investigate", &who, &from, &at, &iv.kind, &day, &idx]);
             let taker = found.as_ref().filter(|_| rng.below(10_000) < chance as u64).map(|x| x.by.clone());
             self.investigated = Some(serde_json::json!({ "from": from, "at": at, "kind": iv.kind, "taken": found.is_some(), "taker": taker }));
         }
@@ -1114,7 +1116,10 @@ impl<'a> Exec<'a> {
             schedule.push((c.until, Sched::ConditionEnds { person: person.into(), condition: c.id.clone() }));
             let mut called_off = false;
             if let Some(d) = c.death_at.filter(|d| *d >= now) {
-                let mut rng = self.s.randomness.stream(&["care", self.action, person, &c.id]);
+                // (The condition by its kind and onset, not by the number it was given: that is its place in the order
+                // conditions began, anywhere in the town.)
+                let (kind, since) = (format!("{:?}", c.kind), c.since.to_string());
+                let mut rng = self.s.randomness.stream(&["care", person, &kind, &since]);
                 if rng.below(10_000) < tr.fatal_kept_bps as u64 {
                     let nd = keep(d).min(c.until - 1).max(now);
                     c.death_at = Some(nd);
@@ -1143,7 +1148,8 @@ impl<'a> Exec<'a> {
         let cat = &self.s.config.catalogue;
         let nature = self.st.nature.as_deref();
         let idx = index.to_string();
-        let mut rng = self.s.randomness.stream(&["survey", self.action, &idx, &sv.of]);
+        let (who, day) = (self.participant.to_string(), self.now().div_euclid(86_400).to_string());
+        let mut rng = self.s.randomness.stream(&["survey", &who, &sv.of, &day, &idx]);
         let species = cat.species.iter().find(|x| x.id == sv.of);
         let mut found = serde_json::Map::new();
         for cell in &sv.cells {
@@ -1810,7 +1816,7 @@ impl<'a> Exec<'a> {
                 }
                 let idx = index.to_string();
                 let age = self.st.body(&victim).map_or(0, |b| (self.now() - b.born_at).div_euclid(self.s.life().map_or(365 * 86_400, |l| l.year)));
-                let (severity, duration, death) = draw_severity(self.s, &harm.severity, age, &["harm", self.action, &idx, &victim]);
+                let (severity, duration, death) = draw_severity(self.s, &harm.severity, age, &["harm", &me, &victim, &self.now().div_euclid(86_400).to_string(), &idx, &self.st.body(&victim).map_or(0, |b| b.conditions.len()).to_string()]);
                 let t = self.now();
                 let (cid, events) = begin_condition(self.s, self.st, &victim, ConditionKind::Injury, severity, t + duration, death.map(|d| t + d));
                 self.emit(EventBody::Harmed { person: victim, by: self.participant.into(), condition: cid });

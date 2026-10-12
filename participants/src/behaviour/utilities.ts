@@ -217,7 +217,7 @@ export const energy: BehaviourModule = {
   ],
   // (What it buys in, it orders on its own order form: its staff's orders to the grid are that paper.)
   issues: [P.ORDER, P.REMEDY_ANSWER, ...P.VENUE_ANSWERS],
-  version: "0.3.0", // 0.3.0: some bills are wrong (an estimated reading entered too high), at the friction dial, and the retailer answers a customer who asks for a wrong bill to be put right from its own record of the bill; 0.2.1: its staff's first bills fall due one period after the standing order came into force; 0.2.0: has an order form of its own for buying from the grid; its staff report what they supplied and billed, and why they did not buy when stock ran low (docs/behaviour/standing-work.md, "The staff's report")
+  version: "0.3.1", // 0.3.1: draws are named for the day and which time that is, never the hour or the moment (docs/reliability.md, "Draws and the moment"); 0.3.0: some bills are wrong (an estimated reading entered too high), at the friction dial, and the retailer answers a customer who asks for a wrong bill to be put right from its own record of the bill; 0.2.1: its staff's first bills fall due one period after the standing order came into force; 0.2.0: has an order form of its own for buying from the grid; its staff report what they supplied and billed, and why they did not buy when stock ran low (docs/behaviour/standing-work.md, "The staff's report")
   doc: "docs/behaviour/utilities.md",
   cadence: () => DAY,
   firstWake: (ctx) => 6 * 3600 + ctx.rng("first-wake").below(3600),
@@ -343,7 +343,7 @@ export const energy: BehaviourModule = {
             if (gone.has(who)) customers.delete(who);
             if (days === 0 || gone.has(who) && book.all("death_registration").some((r) => r.data?.deceased === who)) continue;
             // (A bill may be wrong: an estimated reading entered too high, so more units are billed than were used.)
-            const wrong = dial > 0 && arises(ctx.rng(`bill-error-${who}-${t}`), p.billing_error_bps_per_year, days, dial);
+            const wrong = dial > 0 && arises(ctx.rng(`bill-error-${who}`), p.billing_error_bps_per_year, days, dial);
             const units = wrong ? Math.round((p.units_per_customer_per_day * days * (10_000 + p.billing_over_bps)) / 10_000) : p.units_per_customer_per_day * days;
             const amount = days * p.supply_per_day + units * p.price_per_unit;
             routines.did("bill", t);

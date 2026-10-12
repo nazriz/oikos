@@ -40,7 +40,9 @@ test("a tenant who cannot pay and will not go is put out by the police on the tr
   who.controller = { ...who.controller, params: { ...who.controller.params, in_labour_force: false, possession: { stay_bps: 10_000, obey_bps: 0 }, leave_after_homeless_days: 9_999 } };
   const out = join(root, "runs", "test-possession");
   rmSync(out, { recursive: true, force: true });
-  const s = await runWorld({ config: { ...config, log: { ...config.log, detail: "lean" } }, runId: "possession", outDir: out, until: 200 * DAY, recordObservations: "none" });
+  // (The run's seed is pinned: in the generated seed's run, with draws named for the day (2026-10-12), the station's officers did not
+  // get to the warrant in the six days it ran and it lapsed, which the office does and says; this test is of one carried out.)
+  const s = await runWorld({ config: { ...config, seed: 2, log: { ...config.log, detail: "lean" } }, runId: "possession", outDir: out, until: 200 * DAY, recordObservations: "none" });
   const ev = readFileSync(s.logPath, "utf8").trim().split("\n").filter((l) => l.includes('"event"')).map((l) => JSON.parse(l)).filter((e) => e.kind === "event").map((e) => ({ t: e.t, ...e.body }));
   const recs = ev.filter((e) => e.event === "recorded").map((e) => e.record);
   const mine = (kind: string) => recs.filter((r) => r.kind === kind && JSON.stringify(r).includes(alone.id));

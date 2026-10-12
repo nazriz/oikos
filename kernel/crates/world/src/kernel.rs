@@ -720,8 +720,7 @@ impl World {
             return perr("an action has 1..=32 blocks");
         }
         let mut scratch = self.state.clone();
-        let action = scratch.mint("act");
-        Ok(match exec_action(&self.s, &mut scratch, participant, position, &action, blocks) {
+        Ok(match exec_action(&self.s, &mut scratch, participant, position, blocks) {
             Ok(_) => Check { ok: true, refusal: None },
             Err(r) => Check { ok: false, refusal: Some(refusal_info(&r)) },
         })
@@ -768,7 +767,7 @@ impl World {
             Err(refuse(RefusalCode::ParticipantInactive, format!("{participant} no longer acts")))
         } else {
             let mut scratch = self.state.clone();
-            exec_action(&self.s, &mut scratch, participant, position, &action, blocks).map(|res| (scratch, res))
+            exec_action(&self.s, &mut scratch, participant, position, blocks).map(|res| (scratch, res))
         };
         let pos = position.map(String::from);
         let (events, outcome) = match result {

@@ -21,7 +21,9 @@ test("the diff finds nothing between a batch and itself, and lists every measure
   const rows = await diff(join(out, "measure"), join(out, "measure"));
   expect(rows.length).toBeGreaterThan(20);
   expect(rows.filter((r) => r.flagged)).toEqual([]);
-  expect(rows.every((r) => r.n[0] === 2 && r.base === r.change)).toBe(true);
+  // (A measure of a thing that happened in only one of two 20-day runs of 60 people, such as the share of a union's members at the start, has one run to it: n is 1 there.)
+  expect(rows.every((r) => r.base === r.change && (r.n[0] === 2 || (r.n[0] === 1 && r.n[1] === 1)))).toBe(true);
+  expect(rows.filter((r) => r.n[0] === 2).length).toBeGreaterThan(rows.length * 0.9);
   // The health report: each target the town measures, against it (a breach outside its tolerance); others said so.
   const h = await health(join(out, "measure"), [{ what: "employment_to_population_pct", value: 0 }, { what: "a_target_nothing_measures", value: 1 }]);
   const employment = h.find((r) => r.what === "employment_to_population_pct")!;

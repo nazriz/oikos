@@ -827,7 +827,7 @@ export const idle: BehaviourModule = {
  */
 export const migration: BehaviourModule = {
   name: "world.migration",
-  version: "0.6.1", // 0.6.0: says how many came (the statistician counts them); 0.6.1: counts every payment for those out of work
+  version: "0.6.2", // 0.6.2: draws are named for the day and which time that is, never the hour or the moment (docs/reliability.md, "Draws and the moment"); 0.6.0: says how many came (the statistician counts them); 0.6.1: counts every payment for those out of work
   doc: "docs/behaviour/boundary.md",
   cadence: () => 30 * DAY,
   firstWake: () => 30 * DAY,
@@ -920,8 +920,8 @@ export const migration: BehaviourModule = {
           const gapBps = Math.floor(((mean * chance - p.outside_monthly_income) * 10_000) / p.outside_monthly_income);
           const perPosting = Math.min(10_000, Math.max(0, Math.floor((gapBps * p.response_bps) / 10_000)));
           let n = 0;
-          for (let i = 0; i < postings.length && n < p.max_households_per_month; i++) if (ctx.rng(`come-${obs.t}-${i}`).below(10_000) < perPosting) n++;
-          const r = ctx.rng(`households-${obs.t}`);
+          for (let i = 0; i < postings.length && n < p.max_households_per_month; i++) if (ctx.rng(`come-${i}`).below(10_000) < perPosting) n++;
+          const r = ctx.rng(`households`);
           for (let k = 0; k < n; k++) {
             const d = drawHousehold(H, (m) => r.below(m));
             const refs = d.members.map((_, j) => `m${j}`);
