@@ -117,7 +117,17 @@ export interface Profile {
        * the police have to carry out a warrant. And two figures of how tenants answer: of those given a notice to
        * vacate they cannot pay off, the share who stay past its date; of those ordered out, the share gone by the
        * tribunal's date. Left out: a notice for arrears ends the lease and the tenant leaves, as before. */
-      possession?: { arrears_days: number; notice_days: number; possession_days: number; plan_months: number; warrant_days: number; /** The notice of the day the enforcer must give the tenant before carrying a warrant out. */ eviction_notice_days: number; stay_past_notice_bps: number; leave_on_order_bps: number };
+      possession?: { arrears_days: number; notice_days: number; possession_days: number; plan_months: number; warrant_days: number; /** The notice of the day the enforcer must give the tenant before carrying a warrant out. */ eviction_notice_days: number; stay_past_notice_bps: number; leave_on_order_bps: number;
+        /** Of tenants served with an application for possession, the share who answer it in writing or attend (the
+         * citizen's rate, read against who each is). None: every tenant with something to offer answers, as before. */
+        answer_bps?: number;
+        /** What the law says of a plan to pay in place of possession: the tribunal `may` set one, `must` consider one
+         * before it orders possession, or has `none` to set. None stated: `may` where `plan_months` is above nought. */
+        plan_consider?: "may" | "must" | "none";
+        /** Where the law takes the plan away once so many months' rent are owed on the day the tribunal decides. */
+        plan_barred_rent_months?: number;
+        /** Where the law ends the claim if everything owed is paid within so many days of the application. */
+        cure_days?: number };
       end_notice_days?: number; tenant_notice_days?: number; rent_review_months?: number; rent_increase_notice_days?: number; rent_review_practice_months?: number; after_fixed_term?: "periodic";
       /** Rent as a share of household income among the place's renting households (docs/behaviour/generator.md, "Homes
        * by income"): the share of them in each band, lowest first, `under_bps` rising and the last band open; `of` says

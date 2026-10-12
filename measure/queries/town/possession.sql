@@ -17,8 +17,21 @@ c as (select x.run_id,
     count(*) filter (where x.kind = 'warrant_lapsed') as warrants_lapsed,
     count(*) filter (where x.record = 'notice' and json_extract_string(x.body, '$.text') like 'Notice: rent is in arrears%') as ended_by_notice
   from records x join r on r.run_id = x.run_id where x.t > r.from_t and x.t <= r.end_t group by all)
+-- (2026-10-12: what tenants answered, what landlords replied and withdrew, and warrants that removed nobody: each from the few papers of its kind, never from a pass over every record.)
+, apps as (select run_id, id from records where kind = 'tribunal_application' and json_extract_string(body, '$.data.kind') = 'possession'),
+ans as (select x.run_id, count(*) as answers, count(*) filter (where json_extract_string(x.body, '$.data.left') = 'true') as answers_left,
+    count(*) filter (where try_cast(json_extract_string(x.body, '$.data.offer') as bigint) > 0) as answers_offering
+  from (select * from records where kind = 'tribunal_response') x join r on r.run_id = x.run_id join apps on apps.run_id = x.run_id and apps.id = json_extract_string(x.body, '$.data.application')
+  where x.t > r.from_t and x.t <= r.end_t group by all),
+more as (select x.run_id, count(*) filter (where x.kind = 'tribunal_reply') as replies, count(*) filter (where x.kind = 'warrant_executed' and json_extract_string(x.body, '$.data.removed') = '0') as nobody_there
+  from (select * from records where kind in ('tribunal_reply', 'warrant_executed')) x join r on r.run_id = x.run_id where x.t > r.from_t and x.t <= r.end_t group by all),
+wd as (select w.run_id, count(*) filter (where n.kind = 'warrant') as warrants_withdrawn, count(*) filter (where n.kind = 'tribunal_application' and json_extract_string(n.body, '$.data.kind') = 'possession') as applications_withdrawn
+  from (select * from records where withdraws is not null) w join r on r.run_id = w.run_id join (select * from records where kind in ('warrant', 'tribunal_application')) n on n.run_id = w.run_id and n.id = w.withdraws
+  where w.t > r.from_t and w.t <= r.end_t group by all)
 select r.run_id, r.seed, coalesce(renting.n, 0) as renting_households, coalesce(c.notices_to_vacate, 0) as notices_to_vacate, coalesce(c.lapsed_paid, 0) as lapsed_paid, coalesce(c.applications, 0) as applications,
   coalesce(c.plans, 0) as plans, coalesce(c.possession_orders, 0) as possession_orders, coalesce(c.dismissed, 0) as dismissed, coalesce(c.warrants_asked, 0) as warrants_asked, coalesce(c.warrants, 0) as warrants,
   coalesce(c.carried_out, 0) as carried_out, coalesce(c.warrants_lapsed, 0) as warrants_lapsed, coalesce(c.ended_by_notice, 0) as ended_by_notice,
-  round(1000.0 * coalesce(c.applications, 0) / nullif(renting.n, 0), 1) as applications_per_1000, round(1000.0 * coalesce(c.carried_out, 0) / nullif(renting.n, 0), 1) as carried_out_per_1000
-from r left join renting on renting.run_id = r.run_id left join c on c.run_id = r.run_id order by r.world, r.seed
+  round(1000.0 * coalesce(c.applications, 0) / nullif(renting.n, 0), 1) as applications_per_1000, round(1000.0 * coalesce(c.carried_out, 0) / nullif(renting.n, 0), 1) as carried_out_per_1000,
+  coalesce(ans.answers, 0) as answers, coalesce(ans.answers_left, 0) as answers_left, coalesce(ans.answers_offering, 0) as answers_offering, coalesce(more.replies, 0) as replies, coalesce(wd.applications_withdrawn, 0) as applications_withdrawn,
+  coalesce(more.nobody_there, 0) as carried_out_nobody_there, coalesce(c.carried_out, 0) - coalesce(more.nobody_there, 0) as removals, coalesce(wd.warrants_withdrawn, 0) as warrants_withdrawn
+from r left join renting on renting.run_id = r.run_id left join c on c.run_id = r.run_id left join ans on ans.run_id = r.run_id left join more on more.run_id = r.run_id left join wd on wd.run_id = r.run_id order by r.world, r.seed

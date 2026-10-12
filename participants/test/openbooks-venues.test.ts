@@ -293,7 +293,7 @@ test("the tribunal's books show an application for possession with the home, wha
   expect(b.open(morning).map((h) => [h.what, h.always])).toEqual([[RIPE, true]]);
   item = heading(b.open(by + DAY), RIPE)!.items[0]!;
   expect(item.line).toContain("ann answered");
-  expect(item.line).toContain("has been paid since, and offering");
+  expect(item.line).toContain("has been paid since; could pay");
   expect(item.line).toContain("the tenant's time to answer ran out");
   const order = st("rec.4", by + DAY, "tribunal_order", "tribunal", { basis: "rec.1", data: { application: "rec.1", kind: "possession", applicant: "landlord-1", against: "ann", about: "lease-a", finding: "possession", due: by + 15 * DAY, space: "apts-1/dwelling.1" } });
   b.absorb(obs(by + DAY, "tribunal", [order]));

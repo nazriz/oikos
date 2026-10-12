@@ -21,6 +21,7 @@ export { yearsOfSchooling, type SchoolingSpec } from "./behaviour/school";
 export { linesInWords, tabledLines, votedWords, yearInDays } from "./behaviour/government";
 export { Roster, type RosterNow } from "./behaviour/roster";
 export { Tally, type BallotCount } from "./behaviour/tally";
+export { planLaw, planLawWords, POSSESSION_ANSWER, possessionOrderFor } from "./behaviour/papers";
 import type { BehaviourModule } from "./module";
 import { answering } from "./behaviour/common";
 import { bankPaymentSystem } from "./behaviour/bank";

@@ -62,7 +62,7 @@ export const trade: BehaviourModule = {
     { what: "future", why: "A researcher's scripted shocks to world prices and demand are a scenario's boundary condition: this module is the world market and applies each from its day, publishing nothing of one before it comes." },
     { what: "every:factory", why: "The outside world's demand for the town's goods is a boundary condition, split when the world is made among the factories that export." },
   ],
-  version: "0.2.0",
+  version: "0.2.1", // 0.2.1: a month's world price is drawn for the good and the month from the seed, never for the hour this office wakes in (a town and its twin see the same prices);
   doc: "docs/behaviour/boundary.md",
   cadence: () => DAY,
   firstWake: () => 0,
@@ -119,7 +119,11 @@ export const trade: BehaviourModule = {
         // A new month: world prices take their step (a random step, drifting back towards where they started).
         const m0 = Math.floor(t / MONTH);
         if (m0 !== month && month >= 0) for (const [kind, pr] of Object.entries(p.price_process).sort(([a], [b]) => (a < b ? -1 : 1))) {
-          const r = ctx.rng(`price-${kind}-${m0}`);
+          // (The world's price for a month is the world's: named for the good and the month, from the seed, and never
+          // for the hour this office happens to wake in. Until 2026-10-12 it was drawn on the participant's stream,
+          // which is keyed on the hour: a town and its twin, or the same town before and after any change that moved
+          // this office's first look of a month, saw two different years of prices.)
+          const r = (ctx.chance ?? ctx.rng)(`world-price/${kind}/${m0}`);
           let z = -60_000; // a normal draw in basis points of a standard deviation: 12 uniforms less 6 (Irwin-Hall)
           for (let i = 0; i < 12; i++) z += r.below(10_000);
           const now = level.get(kind) ?? 10_000;

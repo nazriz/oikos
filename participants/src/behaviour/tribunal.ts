@@ -8,7 +8,7 @@ import { dateWords } from "../forms";
 import { cites } from "../contracts";
 import { cents } from "../money";
 import { need, params, type BehaviourModule, type ParticipantContext } from "../module";
-import { because, Book, breaches, CounterWork, noting, DAY, say, StandingWork, type Step, usd } from "./common";
+import { because, Book, breaches, CounterWork, noting, DAY, say, StandingWork, type Step, usd, withdraw } from "./common";
 import { hearingNotice, Hearings, HEARING_DEFAULTS, type Hears } from "./desk";
 import { stepper } from "./firms";
 import * as P from "./papers";
@@ -30,7 +30,7 @@ export const member: BehaviourModule = {
   opens: (p, me) => ((p.hears ?? []).length && p.part !== "staff" ? [hearingNotice(me, "The tribunal hears", tribunalHears(p.hears), { fee: p.fee, account: p.account })] : []),
   answers: {"office": "the tribunal", "acts": "What it acts on: an application made to it by a party to a dispute, which it hears and decides by the laws in force."},
   issues: P.TRIBUNAL_MEMBER,
-  version: "0.6.0", // 0.6.0: an application for possession of a home the tenant has left is dismissed, and one its maker withdraws is decided by nobody; cases its own file says are already listed are taken as they stand, never listed again; 0.5.0: where a model holds the member's chair in a living town, the tribunal's registry staff list each application and tell both sides, under a standing work order, and the member decides (docs/behaviour/justice.md, "The registry lists; the member decides"); its notice of what it hears is on file when a seat arrives; 0.4.0: hears applications for possession of a let home for arrears: a plan to pay, or possession on a date (docs/behaviour/justice.md, "Possession"); 0.3.0: lists (docs/behaviour/frictions.md): the matters the world says it hears beyond its own three, heard by the common procedure on its own forms, as far as its hearing days go; it says what it hears and what applying costs
+  version: "0.7.0", // 0.7.0: decides an application for possession by a stated rule on the tenant's answer and the landlord's reply (left; a notice shorter than the law asks; nothing owed; a plan where the law has one and the offer clears what is owed; else possession), the law on plans read from the world's; 0.6.0: an application for possession of a home the tenant has left is dismissed, and one its maker withdraws is decided by nobody; cases its own file says are already listed are taken as they stand, never listed again; 0.5.0: where a model holds the member's chair in a living town, the tribunal's registry staff list each application and tell both sides, under a standing work order, and the member decides (docs/behaviour/justice.md, "The registry lists; the member decides"); its notice of what it hears is on file when a seat arrives; 0.4.0: hears applications for possession of a let home for arrears: a plan to pay, or possession on a date (docs/behaviour/justice.md, "Possession"); 0.3.0: lists (docs/behaviour/frictions.md): the matters the world says it hears beyond its own three, heard by the common procedure on its own forms, as far as its hearing days go; it says what it hears and what applying costs
   doc: "docs/behaviour/justice.md",
   cadence: () => DAY,
   firstWake: (ctx) => 9 * 3600 + ctx.rng("first-wake").below(3600),
@@ -49,7 +49,7 @@ export const member: BehaviourModule = {
       account: "",
       // Possession of a let home (docs/behaviour/justice.md, "Possession"), where it hears that: the days from its
       // order to the date for possession, and the longest plan to pay it sets (the world's law's figures).
-      possession: null as { days: number; plan_months: number } | null,
+      possession: null as { days: number; plan_months: number; notice_days?: number; plan_consider?: "may" | "must" | "none"; plan_barred_rent_months?: number } | null,
       // Which part of the office this is (docs/behaviour/standing-work.md): "" the whole tribunal, as code runs one;
       // "staff" its registry, who list; "seat" the member, who decides. `counter`: whether the town gives it a registry.
       part: "" as "" | "seat" | "staff", office: "", counter: false,
@@ -180,7 +180,7 @@ export const registrar: BehaviourModule = {
   answers: {"office": "the tribunal's registry", "acts": "What it acts on: an order of the tribunal to pay that has gone unpaid, which it enforces by an order to the debtor's bank."},
   issues: P.TRIBUNAL_REGISTRAR,
   issuesWith: (p) => ({ banks: p.banks ?? [], enforcer: p.enforcer || undefined }),
-  version: "0.2.0", // 0.2.0: issues a warrant of possession, to whoever carries its warrants out, on an order whose date has passed; 0.1.1: an order to pay that rests on no recorded debt is settled against the order itself
+  version: "0.3.0", // 0.3.0: withdraws a warrant not yet carried out when the landlord withdraws its request (the tenant has gone); 0.2.0: issues a warrant of possession, to whoever carries its warrants out, on an order whose date has passed; 0.1.1: an order to pay that rests on no recorded debt is settled against the order itself
   doc: "docs/behaviour/justice.md",
   cadence: () => DAY,
   firstWake: (ctx) => 10 * 3600 + ctx.rng("first-wake").below(3600),
@@ -229,6 +229,15 @@ export const registrar: BehaviourModule = {
           steps.push(because(`An order for possession whose date has passed, and the tenant has not left: a warrant to ${p.enforcer}, to be carried out from ${dateWords(notBefore)} to ${dateWords(until)}.`,
             say("warrant", `Warrant of possession under order ${o.id}: ${o.data.against} and their household are to be removed from ${o.data.space ?? "the home"}, and possession given to ${o.data.applicant}. To be carried out ${p.eviction_notice_days > 0 ? `no sooner than ${dateWords(notBefore)} and ` : ""}by ${dateWords(until)}.`,
               { to: [p.enforcer], visible: [p.enforcer, me, o.data.against, o.data.applicant], basis: o.id, data: { order: o.id, lease: o.data.about, tenant: o.data.against, landlord: o.data.applicant, space: o.data.space, structure: o.data.structure, household: o.data.household ?? [o.data.against], not_before: notBefore, until } })));
+        }
+        // A landlord who withdraws its request for a warrant (the tenant has gone): the warrant we issued on it, if
+        // not yet carried out or run out, is withdrawn, which whoever was to carry it out reads.
+        for (const w of book.open("warrant").filter((x) => x.speaks_for === me && !done.has(`w:${x.id}`))) {
+          const req = book.all("warrant_request").find((r) => r.data?.order === w.data?.order && r.speaks_for === w.data?.landlord && book.withdrawn.has(r.id));
+          if (!req) continue;
+          done.add(`w:${w.id}`);
+          if (t > Number(w.data?.until ?? Infinity) || book.all("warrant_executed").some((x) => x.data?.warrant === w.id)) continue;
+          steps.push(because(`${w.data?.landlord} has withdrawn its request for the warrant ${w.id} (the tenant has left): withdrawing the warrant.`, withdraw(w.id, "Withdrawn: the landlord says the tenant has left the home.")));
         }
         return steps;
       },

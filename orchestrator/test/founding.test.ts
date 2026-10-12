@@ -63,7 +63,11 @@ const LIVING = "living.initiative_bps=10000";
 // And again on 2026-10-12, with homes dealt by income (0adec141... until then; docs/decisions.md, "Homes by income"):
 // every town opens differently (payments in force, people with nothing coming in living with kin, owners by the
 // head's age, tenancies by income).
-const STEP_2B = "c23648b8d9e07522cdfd4a6c82ab0429b8f234dff188ff287ff5ff5bf8784ce2";
+// And again on 2026-10-12, with what the fifth living pilot found (c23648b8... until then; docs/decisions.md, "What the
+// fifth living pilot found"): the law on possession says what the place's law has of a plan, the tribunal's answer
+// form is published, tenants answer an application as often as tenants there do, a household with no dwelling asks
+// to be taken in, a warrant's paper says how many were put out, and a month's world price is drawn for the month.
+const STEP_2B = "436676b6a8d1a428ca7515d8f131cb3a7e1ef555b7d0fdb0ee016c498a6b0fc2";
 
 test("with founding off a living town is step 2b's town, to the state hash; turned on with no shape to found, nobody does anything they did not do before", async () => {
   const out = mkdtempSync(join(tmpdir(), "oikos-founding-"));

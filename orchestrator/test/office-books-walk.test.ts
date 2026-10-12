@@ -56,7 +56,10 @@ test("what each office's code acts on was in that office's books, as its clerk k
   try {
     const s = await runWorld({ config: { ...config, log: { ...config.log, detail: "lean" } }, runId: "books-walk", outDir: out, until: Number(process.env.WALK_DAYS ?? 150) * DAY, recordObservations: "none" });
     expect(s.participantErrors).toBe(0);
-    for (const l of readFileSync(s.logPath, "utf8").split("\n")) if (l.includes('"event":"recorded"')) { const r = JSON.parse(l).body.record; if (r?.record === "statement") recs.push(r); }
+    for (const l of readFileSync(s.logPath, "utf8").split("\n")) if (l.includes('"event":"recorded"')) { const r = JSON.parse(l).body.record; if (r?.record === "statement" || r?.record === "withdrawal") recs.push(r); }
+    // (Withdrawals too, 2026-10-12: a landlord now withdraws an application once the rent owed is paid, and a case so
+    // withdrawn has left the tribunal's list with no order. Until then only statements were read here, and the one
+    // withdrawal there was, of a home already left, came with a dismissal.)
   } finally { rmSync(out, { recursive: true, force: true }); }
   const seatOf = new Map<string, string>(["mayor", ...seats].map((id) => [`${id}-system`, id]));
   const books = recs.filter((r) => r.kind === "office_books");

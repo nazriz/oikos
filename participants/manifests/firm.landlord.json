@@ -1,6 +1,6 @@
 {
   "name": "firm.landlord",
-  "version": "0.17.0",
+  "version": "0.18.0",
   "doc": "docs/behaviour/firms.md",
   "params": {
     "after_term": {
@@ -808,6 +808,69 @@
             "id": "=lease",
             "record": "agreement"
           }
+        }
+      }
+    },
+    {
+      "form": "possession_reply",
+      "title": "Reply to a tenant's answer to an application for possession",
+      "does": "Replies to what a tenant has answered the tribunal on an application of this office's for possession: what the rent book shows owed on the day of the reply, and whether a plan the tenant offers would be taken. It goes to the tribunal, for the member who decides, and to the tenant. It withdraws nothing and decides nothing.",
+      "fields": {
+        "application": {
+          "type": "record",
+          "required": true,
+          "description": "The application for possession."
+        },
+        "tenant": {
+          "type": "entity",
+          "required": true,
+          "description": "The tenant."
+        },
+        "owed": {
+          "type": "amount",
+          "required": true,
+          "description": "What the rent book shows owed on the day of this reply."
+        },
+        "takes_plan": {
+          "type": "choice",
+          "options": [
+            "yes",
+            "no"
+          ],
+          "description": "Whether the plan the tenant offers would be taken."
+        },
+        "words": {
+          "type": "text",
+          "description": "Anything else for the tribunal, in words."
+        }
+      },
+      "writes": {
+        "sends": [
+          {
+            "to": [
+              "@tribunal"
+            ],
+            "why": "The tribunal's member decides the application, on what both sides have said."
+          }
+        ],
+        "kind": "tribunal_reply",
+        "text": "Reply on application {application}: our rent book shows {owed} owed by {tenant} today.",
+        "basis": "=application",
+        "to": [
+          "@tribunal",
+          "=tenant"
+        ],
+        "visible": [
+          "=self",
+          "@tribunal",
+          "=tenant"
+        ],
+        "data": {
+          "application": "=application",
+          "against": "=tenant",
+          "owed": "#owed",
+          "takes_plan": "?takes_plan",
+          "words": "=words"
         }
       }
     },

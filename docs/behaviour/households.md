@@ -87,7 +87,28 @@ Among hosts of the nearest kind, one is drawn (the stream `taken-in`). The host'
 
 **Counted** in the town's description: households taken in, households renting on savings, households without a home. At 1,000 people (seed 1): Victoria's 16 taken in, 17 renting on savings; Tamil Nadu's 27 and 34; Nakuru's 44 and 11.
 
-**Leaves out.** Kin are matched by age alone: there are no surnames or family trees to match by, so a "parent" is someone of a parent's age. People with nothing coming in who live in an institution, on a relative's money in a home of their own (remittances), or on a payment the profile's law does not state. A host chosen for being near (everyone is in one town). Leaving again when work is found: they stay members of the household until it moves or they leave town, as an adult child does.
+**Leaves out.** Kin are matched by age alone: there are no surnames or family trees to match by, so a "parent" is someone of a parent's age. People with nothing coming in who live in an institution, on a relative's money in a home of their own (remittances), or on a payment the profile's law does not state. A host chosen for being near (everyone is in one town). Leaving again when work is found: they stay members of the household until it moves or they leave town, as an adult child does. (A household taken in during the year, below, is a guest and does go on looking.)
+
+### Taken in during the year: a household with no dwelling stays with people it knows (citizen 0.53.0, 2026-10-12)
+
+**Why.** In the fifth living pilot none of 50 households that lost a home found another in up to 80 days, and nothing else could become of them but leaving town after 90: nobody moved into another household's home. People who lose a home mostly go to people they know first (of 42 tenants interviewed at Cleveland's housing court who expected to have to move, 16.7% expected to go to family or a partner, 9.5% to a shelter, 40.5% to another rental, 26.2% did not know: an intention, not an outcome; Case Western Reserve University, 2019, opened. No figure of what became of households was found for any other profile).
+
+**Asking.** The leaseholder of a household with no dwelling (put out, gone on a notice or an order, or without a home for any other reason) asks the people outside its household it is closest to, up to five (`stay.ask`), closest first, all at its next look: a `stay_request` to each, saying how many adults and children they are and how many of the adults have nothing coming in. After 30 days (`stay.ask_again_days`) with no roof it asks whoever it has come to know since; nobody is asked twice while it is without a home.
+
+**The one asked says yes** where all of these hold, and otherwise no, with which failed:
+- the home is theirs to open: they hold its lease or own it. Someone asked who lives in a home another holds, and is willing themselves, puts the asking to whoever holds it, and their word stands for willingness: a household takes in a member's friend where it has the room and the means (an assumption). Unwilling themselves, they say no;
+- nobody is staying with them already;
+- there is room for the bodies: their household and the guests are no more than the dwelling holds;
+- they could carry them: what the household has coming in covers a month's essentials for each of its own adults and each guest adult with nothing coming in (the rule homes are dealt by as a town opens, "Taken in", above);
+- they are willing: their affinity for the asker is at least `stay.willing_affinity_bps` (1,500: about five conversations; lower for someone who holds benevolence more than their town does, higher for less), and they trust them no less than they trust people in general.
+
+**Staying.** The household goes there as guests: the leaseholder moves in with the children and tells the other adults, who follow as they follow any move. **It keeps its own household record and its own leaseholder** (it is not merged into the host's household), so it goes on looking for a home it can carry and moves out when it has one. Its need for shelter is met as far as living in another's home meets it (6,000 of 10,000, as for any adult not on the lease). Nothing is paid to the host: money is each adult's own, as in an extended household. The first yes is taken; a later yes is thanked and declined.
+
+**Ending.** The guests find a home, or leave town, and tell the host; or the host's own home ends, the host tells them, and they are without a roof again and ask again. **A household with someone's roof over it does not leave town for want of a home**: the days that count toward leaving (`leave_after_homeless_days`) are days with no roof at all. It still leaves if nobody in it earns and it has nothing left, as any household does.
+
+**On the record.** `asked_to_stay`, `taken_in` (after how many days), `not_taken_in` (why), `stay_ended`; the host's `took_in` or `declined_to_take_in`. Being taken in raises the tie and trust in the host; a refusal for want of willingness lowers the tie a little. **Measured:** `town/after-home-loss`: of households that lost a home for arrears, how many are in a home of their own again, staying with someone, gone, or with no dwelling at the end, how many asked and of how many people, and the days to a roof. `town/households`' overcrowding does not see guests (they are not in the host's record).
+
+**Assumed, with no source:** the threshold of willingness and its weight on benevolence; five people asked; thirty days before asking again; that a stay has no term of its own; that guests pay nothing. **Leaves out:** a stay that wears out (hosts tiring, guests asked to go); a share of the rent or of food; kin as such (there are no family trees: a tie is whoever one has come to know); two households staying in one home; a child sent to stay alone.
 
 ### How an extended household lives: what today's citizen does, and what was assumed
 

@@ -455,6 +455,11 @@ export class Inner {
   spent(category: string, seconds: number): void {
     if (seconds > 0) this.hours[category] = (this.hours[category] ?? 0) + Math.round(seconds);
   }
+  /** Someone whose first hour in the world is `t` (they came to town then): their hours are counted from there. */
+  hoursBegin(t: number): void {
+    this.hours = {};
+    this.hoursFrom = t;
+  }
   /** The hours since they were last taken, and from when; they start again from `t`. */
   takeHours(t: number): { from: number; to: number; seconds: { [category: string]: number } } {
     const out = { from: this.hoursFrom, to: t, seconds: Object.fromEntries(Object.entries(this.hours).sort(([a], [b]) => (a < b ? -1 : 1))) };

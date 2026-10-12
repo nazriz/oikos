@@ -1,6 +1,6 @@
 {
   "name": "police.station",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "doc": "docs/behaviour/crime.md",
   "params": {
     "account": {
@@ -326,7 +326,7 @@
     {
       "form": "warrant_executed",
       "title": "A warrant of possession carried out",
-      "does": "Says, to the tenant and the landlord, that a warrant of the tribunal has been carried out: the tenant and the household are out of the home and possession is the landlord's. It is the paper of what officers have done at the home (putting out whoever of the household was there), not the doing of it.",
+      "does": "Says, to the tenant and the landlord, that a warrant of the tribunal has been carried out and possession is the landlord's, and how many of the household were there and were put out (none, where nobody was there: possession is given all the same, and nobody was removed). It is the paper of what officers have done at the home, not the doing of it.",
       "fields": {
         "warrant": {
           "type": "record",
@@ -356,12 +356,17 @@
         "household": {
           "type": "list",
           "required": true,
-          "description": "The household put out."
+          "description": "The household the warrant names."
+        },
+        "removed": {
+          "type": "count",
+          "required": true,
+          "description": "How many of the household were there and were put out (nobody there: 0)."
         }
       },
       "writes": {
         "kind": "warrant_executed",
-        "text": "Warrant {warrant} has been carried out: {tenant} and their household are out of {home}, and possession is {landlord}'s.",
+        "text": "Warrant {warrant} has been carried out at {home}: of {tenant} and their household, {removed} were there and were put out. Possession is {landlord}'s.",
         "basis": "=warrant",
         "to": [
           "=tenant",
@@ -378,7 +383,8 @@
           "lease": "=lease",
           "tenant": "=tenant",
           "space": "=home",
-          "household": "=household"
+          "household": "=household",
+          "removed": "=removed"
         }
       }
     },

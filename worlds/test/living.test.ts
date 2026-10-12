@@ -59,7 +59,11 @@ test("a spec without `living` generates what it generated before (byte for byte)
   // the profile's payments in force from the first day, people with nothing coming in living with kin, owners by the
   // head's age, and the first tenancies dealt by income (generator 0.49.0); and the outside world's funding, market
   // and weather offices are given their own papers by kind, no longer the support office's file. Nothing of `living` in it.
-  expect(hash(c)).toBe("5cb516d4dcf3aaad948ff932dd04b842d1d9efdcae927d4fb455363d97951d2d");
+  // And on 2026-10-12 (5cb516d4... until then; docs/decisions.md, "What the fifth living pilot found"): generator
+  // 0.50.0: the law on possession carries what the place's law has of a plan to pay, the tribunal's form for a
+  // tenant's answer is published, people are given their place's rate of answering an application, and the modules'
+  // versions. Nothing of `living` in it.
+  expect(hash(c)).toBe("0e1b60e4110e8c6da2f01fbc9582384ab11caad8dd3b50c6106819c1c9608520");
   const text = JSON.stringify(c);
   expect(text).not.toContain('"started"');
   expect(text).not.toContain("attach_mean");

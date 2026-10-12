@@ -446,6 +446,24 @@ Additions only; no schema file changed, nothing renamed or removed. A log made b
 - **Outcome records of a person** (kinds are free text): `membership` / `draw_paid`, `draw_refused` (`why`, `foretold`); a `found` decision's situation may carry `occasion.answered_by`.
 - **The debrief** is script 0.3.0 and exit accounts 0.2.1 (docs/behaviour/debrief.md): no field changed.
 
+## Changes since v0.8 closed (2026-10-12: what the fifth living pilot found; docs/decisions.md of the day; under the owner's blanket approval of contract changes of 2026-10-11)
+
+Additions only; no schema file changed, nothing renamed or removed. A log made before them is a valid log.
+
+- **Statements, new kinds and fields** (kinds are free text; these are what code reads):
+  - `tribunal_response` to an application for possession: `data.owes`, `offer` (0: nothing), `every_days`, `disputes_sum`, `disputes_notice`, `out_of_work_since`, `pay_short`, `claim` (`refused` / `pending`), `claim_on`, `ill`, `people`, `children`, `ages`, `lived_days`, `go_to` (`nowhere` / `someone_to_ask` / `means_for_another`); every one optional;
+  - `tribunal_reply`, a landlord's to the tribunal and the tenant: `data.application`, `against`, `owed`, `takes_plan`, `words`;
+  - `warrant_executed` gains `data.removed` (how many of the household were there and were put out; 0 where nobody was), and its text says the number;
+  - `stay_request`, `stay_answer`, `stay_ended`, between people: `data.adults`, `children`, `without_income`; `data.request`, `yes`, `space` or `why` (`not_mine`, `hosting`, `no_room`, `means`, `not_willing`); `data.by` (`host` / `guest`);
+  - `tribunal_order` on possession may carry `notice_short: true`.
+- **The law on possession** (`law-possession`, and `proc-<office>-possession`): `data.plan_consider` (`may` / `must` / `none`), `plan_barred_rent_months`, `cure_days`.
+- **Forms** (`participants/src/behaviour/papers.ts`): `possession_answer` (the tribunal's, published in the town as `form-tribunal-possession-answer`, a statement of kind `public_form`, for a tenant); `possession_reply` (a landlord's); `warrant_executed` gains the required field `removed`. `possession_order` is published without `plan`, `instalment` and `pay_into` in a town whose law has no plan.
+- **A profile** (`worlds/generator/profile.ts`): `tenancy.possession.answer_bps`, `plan_consider`, `plan_barred_rent_months`, `cure_days`.
+- **Module parameters:** `citizen.default` `possession.answer_bps`, `possession.notice_days`, `stay`; `tribunal.member` `possession.notice_days`, `plan_consider`, `plan_barred_rent_months`.
+- **Outcome records of a person** (kinds are free text), area `home`: `asked_to_stay`, `taken_in`, `not_taken_in`, `stay_ended`, `took_in`, `declined_to_take_in`; `possession_applied` gains `answers`. A record's memories gain `ordered_out` and `put_out`.
+- **Measures:** `town/after-home-loss` (new); `town/possession` gains columns at its end.
+- **Draws:** `stay-` and `obey-` are keyed on the lease (they were keyed on a paper's number); `answer-` and `tells-` are new. A run's state hash differs from one made before at the same seed.
+
 ## Versioning
 
 `contracts: "0.8"`. Pre-1.0, every change bumps the minor version and is proposed explicitly. A draft version collects agreed changes until it's closed. Older logs remain valid logs of their own version and replay only on a kernel build of that version (D6).

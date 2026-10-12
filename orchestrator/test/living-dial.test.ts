@@ -44,7 +44,11 @@ const TOWN = join(root, "worlds/town.yaml");
 // And again on 2026-10-12, with homes dealt by income (d48e330b... until then; docs/decisions.md, "Homes by income"):
 // every town opens differently: payments in force from the first day, people with nothing coming in living with
 // kin, owners by the head's age, tenancies by what each household has coming in.
-const STEP_1 = "611b0834cbc1e1e0fd3d9e458219afc9fb0816de95c78e1a35c32e6453737d9b";
+// And again on 2026-10-12, with what the fifth living pilot found (611b0834... until then; docs/decisions.md, "What the
+// fifth living pilot found"): the law on possession says what the place's law has of a plan, the tribunal's answer
+// form is published, tenants answer an application as often as tenants there do, a household with no dwelling asks
+// to be taken in, a warrant's paper says how many were put out, and a month's world price is drawn for the month.
+const STEP_1 = "33b7c1e31164d89a42dbcae54aefdef9b4287eb249b39e07032085536bb2fa0a";
 
 test("with the dial absent or at 0 a town is step 1's town, to the state hash", async () => {
   const out = mkdtempSync(join(tmpdir(), "oikos-dial-"));

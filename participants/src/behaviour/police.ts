@@ -23,7 +23,7 @@ export const station: BehaviourModule = {
   issues: [P.JOB_ADVERTISEMENT, ...P.POLICE],
   staffed: (p) => ({ role: p.role ?? "police officer", posts: { establishment: p.officers ?? 0 } }),
   issuesWith: (p) => ({ ...P.staffingOwn({ role: p.role ?? "police officer", industry: p.industry ?? "public_safety", workplace: p.workplace, notice_days: p.notice_days ?? 14 }), tribunal: p.tribunal, registry: p.registry }),
-  version: "0.4.0", // 0.4.0: carries out a tribunal's warrant of possession, in an officer's hours (docs/behaviour/justice.md, "Possession"); 0.3.1: a death that someone at home outlived by more than a day is not "found" at a later call; 0.3.0: calls at a home when asked to (a welfare check), by going there; no longer shown the town's homes
+  version: "0.5.0", // 0.5.0: a warrant carried out says how many of the household were there and were put out (none, where nobody was: possession is given all the same); one its registrar has withdrawn is not gone on; 0.4.0: carries out a tribunal's warrant of possession, in an officer's hours (docs/behaviour/justice.md, "Possession"); 0.3.1: a death that someone at home outlived by more than a day is not "found" at a later call; 0.3.0: calls at a home when asked to (a welfare check), by going there; no longer shown the town's homes
   doc: "docs/behaviour/crime.md",
   cadence: () => DAY,
   firstWake: (ctx) => 10 * 3600 + ctx.rng("first-wake").below(3600),
@@ -152,14 +152,31 @@ export const station: BehaviourModule = {
             steps.push(because(`The warrant ${w.id} ran out before an officer could carry it out: telling ${w.landlord}.`, say("warrant_lapsed", `Warrant ${w.id} was not carried out by its last day, and has lapsed.`, { to: [w.landlord], visible: [me, w.landlord], basis: w.id, data: { warrant: w.id, lease: w.lease } })));
             continue;
           }
+          // (A warrant its registrar has withdrawn, the landlord having said the tenant is gone: nobody goes.)
+          if (book.withdrawn.has(w.id)) { warrants.shift(); continue; }
           const officer = here.find((x) => p.working_day - (used.get(x) ?? 0) >= p.task_seconds);
           if (!officer) break;
           warrants.shift();
           used.set(officer, (used.get(officer) ?? 0) + p.task_seconds);
-          // (Each on their own: someone not at home is not there to be put out, and comes back to a home that is no longer theirs.)
-          for (const who of w.household) steps.push(because(`Carrying out warrant ${w.id} at ${w.space}: putting ${who} out, if they are there.`, C.call("occupancy", { in: w.structure, who, leave: "yes" })));
-          steps.push(because(`Warrant ${w.id} carried out at ${w.space} (${Math.round(p.task_seconds / 3600)} hours of an officer's day): possession is ${w.landlord}'s. Telling both.`,
-            say("warrant_executed", `Warrant ${w.id} has been carried out: ${w.tenant} and their household are out of ${w.space}, and possession is ${w.landlord}'s.`, { to: [w.tenant, w.landlord], visible: [...new Set([me, w.tenant, w.landlord, ...w.household])], basis: w.id, data: { warrant: w.id, lease: w.lease, tenant: w.tenant, space: w.space, household: w.household } })));
+          // (Each on their own: someone not at home is not there to be put out, and comes back to a home that is no
+          // longer theirs. The warrant gives the landlord possession whoever is there; what the officer says is what
+          // they found: how many of the household were put out, or that nobody was there and nobody was removed. An
+          // officer cannot tell a home given up from one whose tenant is out for the day, so possession is given
+          // either way and the tenant told. Until 2026-10-12 every warrant an officer went on was said to have put
+          // the household out; in the fifth living pilot 11 of 23 had put out nobody.)
+          let put = 0;
+          w.household.forEach((who, i) => {
+            const st = because(`Carrying out warrant ${w.id} at ${w.space}: putting ${who} out, if they are there.`, C.call("occupancy", { in: w.structure, who, leave: "yes" }));
+            st.then = (out) => {
+              if (out.status === "applied") put++;
+              if (i < w.household.length - 1) return;
+              const hours = Math.round(p.task_seconds / 3600);
+              return [because(put > 0 ? `Warrant ${w.id} carried out at ${w.space} (${hours} hours of an officer's day): ${put} of the household put out; possession is ${w.landlord}'s. Telling both.`
+                  : `Warrant ${w.id} carried out at ${w.space} (${hours} hours of an officer's day): nobody of the household was there, and nobody was removed; possession is ${w.landlord}'s. Telling both.`,
+                say("warrant_executed", `Warrant ${w.id} has been carried out at ${w.space}: of ${w.tenant} and their household, ${put} were there and were put out. Possession is ${w.landlord}'s.`, { to: [w.tenant, w.landlord], visible: [...new Set([me, w.tenant, w.landlord, ...w.household])], basis: w.id, data: { warrant: w.id, lease: w.lease, tenant: w.tenant, space: w.space, household: w.household, removed: put } }))];
+            };
+            steps.push(st);
+          });
         }
         while (queue.length) {
           const officer = here.find((w) => p.working_day - (used.get(w) ?? 0) >= p.task_seconds);

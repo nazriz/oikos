@@ -43,7 +43,11 @@ export interface HearingParams {
   refer_to: { [matter: string]: { to: string; kind: string } };
   /** Possession of a let home for arrears (docs/behaviour/justice.md, "Possession"), where it hears that: how long
    * after its order the date for possession falls, and the longest plan to pay it will set (the world's law's). */
-  possession?: { days: number; plan_months: number };
+  possession?: { days: number; plan_months: number;
+    /** What the law asks and allows, as the world's law has it (docs/behaviour/justice.md, "A tenant's answer"): the
+     * days a notice to vacate must give; whether a plan may be set, must be considered, or there is none; and where
+     * a plan is taken away once so many months' rent are owed. */
+    notice_days?: number; plan_consider?: "may" | "must" | "none"; plan_barred_rent_months?: number };
 }
 export const HEARING_DEFAULTS: HearingParams = { hears: [], answer_days: 14, cases_per_day: 4, uphold_bps: { other: 5_000 }, within_days: 28, refer_to: {} };
 
@@ -218,23 +222,40 @@ export class Hearings {
         // the law allows, and that has not been tried and broken: the tenant stays, on the plan. Otherwise the
         // landlord is to have the home on a date; a tenant still there after it is put out by whoever enforces the
         // tribunal's warrants, never by the landlord. (A seat in the tribunal decides for itself.)
+        // The code member's rule, in this order, on the papers alone (it weighs nothing else: not hardship, not who
+        // lives there, not whether they have anywhere to go; a seat is shown the same papers and decides for itself):
+        //  1. the tenant says they have left: dismissed (the law gives possession against a tenant who has not);
+        //  2. the notice relied on, by the application's own dates, gave fewer days than the law asks: dismissed;
+        //  3. nothing is owed (the landlord's reply where there is one, else the tenant's figure, else the
+        //     application's): dismissed;
+        //  4. the law gives a plan, not taken away at this sum, none was set and broken before, and what the tenant
+        //     offers clears what is owed within the law's longest plan: a plan;
+        //  5. otherwise possession, on the law's day.
         const P = this.p.possession ?? { days: 14, plan_months: 0 };
-        const arrears = Math.max(0, claimed - cents((x as any).paid ?? 0));
+        const reply = book.all("tribunal_reply").filter((y) => y.speaks_for === c.applicant && String(y.data?.application ?? "") === c.id).sort((a, b) => b.at - a.at)[0];
+        const stated = (x as any).owes !== undefined ? Math.max(0, cents((x as any).owes)) : (x as any).paid !== undefined ? Math.max(0, claimed - cents((x as any).paid)) : undefined;
+        const arrears = reply?.data?.owed !== undefined ? Math.max(0, cents(reply.data.owed)) : stated ?? claimed;
         const offer = Math.max(0, cents((x as any).offer ?? 0));
         const home = c.data.space ? { space: c.data.space, structure: c.data.structure, household: c.data.household } : {};
-        // (The law gives possession against a tenant who has not left. One who answers that they have gone has
-        // given the home up: there is nothing for an order to give.)
+        const given = Number(c.data.notice_given), by = Number(c.data.notice_by);
+        const gave = c.data.notice_given !== undefined && c.data.notice_by !== undefined && Number.isFinite(given) && Number.isFinite(by) ? Math.floor((by - given) / DAY) : undefined;
+        const rent = cents(c.data.rent ?? 0);
+        const consider = P.plan_months > 0 ? P.plan_consider ?? "may" : "none";
+        const barred = consider !== "none" && !!P.plan_barred_rent_months && rent > 0 && arrears >= P.plan_barred_rent_months * rent;
+        const whose = reply?.data?.owed !== undefined ? "by the landlord's rent book" : stated !== undefined ? "by the tenant's answer" : "by the application";
         if ((x as any).left) say2(c, "dismissed", `${c.against} has left ${c.data.space ?? "the home"}; there is nothing left to order. Dismissed.`, { left: true }, `${c.against} answers that they have left the home: nothing to order; dismissed.`);
-        else if (arrears <= 0) say2(c, "dismissed", "the rent owed has been paid; dismissed.", {}, `${c.against} answers that the rent owed is paid: dismissed.`);
-        else if (r && offer > 0 && !c.data.breach && P.plan_months > 0 && arrears <= offer * P.plan_months) {
+        else if (gave !== undefined && P.notice_days && gave < P.notice_days) say2(c, "dismissed", `the notice to vacate relied on gave ${gave} days, and the law asks at least ${P.notice_days}. Dismissed.`, { notice_short: true }, `The notice relied on gave ${gave} days where the law asks ${P.notice_days}: what the law asks before an order is not met; dismissed.`);
+        else if (arrears <= 0) say2(c, "dismissed", "the rent owed has been paid; dismissed.", {}, `Nothing is owed now (${whose}): dismissed.`);
+        else if (r && offer > 0 && !c.data.breach && consider !== "none" && !barred && arrears <= offer * P.plan_months) {
           say2(c, "plan", `${c.against} is to pay the rent as it falls due and ${usd(offer)} a month toward the ${usd(arrears)} owed, until it is paid. If the plan is not kept, ${c.applicant} may apply again for possession.`,
             { amount: arrears, instalment: offer, ...(c.data.account ? { to: c.data.account } : {}), ...home },
-            `${c.against} is ${usd(arrears)} behind and offers ${usd(offer)} a month, which clears it within ${P.plan_months} months: a plan to pay, and no possession.`);
+            `${c.against} is ${usd(arrears)} behind (${whose}) and offers ${usd(offer)} a month, which clears it within ${P.plan_months} months: a plan to pay, and no possession.`);
         } else {
           const date = t + P.days * DAY;
+          const why = c.data.breach ? " and has not kept the plan set" : !r ? " and did not answer" : consider === "none" ? "; the law here gives no plan to set" : barred ? `; ${P.plan_barred_rent_months} months' rent or more is owed, where the law allows no plan` : offer > 0 ? `, and what they offer (${usd(offer)} a month) would not clear it within ${P.plan_months} months` : ", and says they can pay nothing toward it";
           say2(c, "possession", `${c.applicant} is to have possession of ${c.data.space ?? "the home"} on ${dateWords(date)}: ${c.against} and their household are to leave by then. If they have not, ${c.applicant} may ask our registrar for a warrant, which is carried out by those who enforce our orders, and by nobody else.`,
             { amount: arrears, due: date, ...home },
-            `${c.against} is ${usd(arrears)} behind with the rent${c.data.breach ? " and has not kept the plan set" : r ? (offer > 0 ? `, and what they offer (${usd(offer)} a month) would not clear it within ${P.plan_months} months` : " and offers no plan to pay") : " and did not answer"}: ordering possession by ${dateWords(date)}.`);
+            `${c.against} is ${usd(arrears)} behind with the rent (${whose})${why}: ordering possession by ${dateWords(date)}. (Decided on the sum owed and the sum offered alone.)`);
         }
         continue;
       }
