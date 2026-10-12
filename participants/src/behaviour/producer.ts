@@ -185,7 +185,11 @@ export const producer: BehaviourModule = {
           return winding.sell(obs, book, acc.account, acc.balance, where, worth ? Math.floor((worth * p.premises_sale_bps) / 10_000) : undefined, (x) => distribute(book, me, acc, x, "The proceeds of our premises: to our shareholders by their shares").steps);
         }
         if (!acc) return steps;
-        if (winding.due(t)) return winding.finish(t, book, acc.account, acc.balance, (x) => distribute(book, me, acc, x, "Wound up: what's left, to our shareholders by their shares").steps);
+        if (winding.due(t)) {
+          // (What we owe our supplier for inputs delivered on its terms is paid first, as the debts recorded against us are.)
+          const owed = payables.settle(t, acc.account, acc.balance);
+          return [...owed.steps, ...winding.finish(t, book, acc.account, acc.balance - owed.paid, (x) => distribute(book, me, acc, x, "Wound up: what's left, to our shareholders by their shares").steps)];
+        }
         const trading = winding.state === "trading";
         const workers = staffing.workers(book, t);
         // Before a month's history: what our export customers want (our share of the market's offer), or failing that

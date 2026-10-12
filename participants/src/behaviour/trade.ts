@@ -374,13 +374,22 @@ export class Payables {
     return this.open.some((o) => o.seller === seller && t > o.due) || t - (this.refused.get(seller) ?? -Infinity) < retry_days * DAY;
   }
 
+  /** Closing or winding up: every invoice we owe, due or not, oldest first, while the account covers it. What was paid, and the steps. */
+  settle(t: number, from: string, balance: number): { steps: Step[]; paid: number } {
+    const lines = this.pay(t, from, balance, 0, undefined, true);
+    return { steps: lines, paid: this.sentNow };
+  }
+  private sentNow = 0;
+
   /** Invoices that have fallen due, oldest first, paid while we can and keep `keep` in hand (the next pay day's wages come first). */
-  pay(t: number, from: string, balance: number, keep: number, committed?: Committed): Step[] {
+  pay(t: number, from: string, balance: number, keep: number, committed?: Committed, all = false): Step[] {
     const lines: Step[] = [];
+    this.sentNow = 0;
     let left = balance - keep - this.pending(t);
     for (const o of [...this.open].sort((a, b) => a.due - b.due || (a.order < b.order ? -1 : 1))) {
-      if (o.due > t || o.amount > left) continue;
+      if ((!all && o.due > t) || o.amount > left) continue;
       left -= o.amount;
+      this.sentNow += o.amount;
       this.open = this.open.filter((x) => x !== o);
       this.sent.push({ t, amount: o.amount });
       committed?.add(o.account, o.amount, t);

@@ -294,7 +294,11 @@ export const retailer: BehaviourModule = {
         // A shop just founded sets itself up before it trades.
         if (!setup.ready) return settingUp(obs, acc);
         if (!acc) return steps;
-        if (winding.due(t)) return winding.finish(t, book, acc.account, acc.balance, (x) => distribute(book, me, acc, x, "Wound up: what's left, to our shareholders by their shares").steps);
+        if (winding.due(t)) {
+          // (What we owe our suppliers for goods delivered on their terms is paid first, as the debts recorded against us are.)
+          const owed = payables.settle(t, acc.account, acc.balance);
+          return [...owed.steps, ...winding.finish(t, book, acc.account, acc.balance - owed.paid, (x) => distribute(book, me, acc, x, "Wound up: what's left, to our shareholders by their shares").steps)];
+        }
         const trading = winding.state === "trading";
         const workers = staffing.workers(book, t);
         if (headcount < 0) headcount = p.operator ? 0 : Math.max(workers.length, p.min_staff); // (a new shop starts by hiring its minimum)
@@ -440,8 +444,10 @@ export const retailer: BehaviourModule = {
           for (const o of orders.due(book, t).paid) steps.push(fillWith(o, 0, 0, [], "We are not trading: refunding the order."));
           if (at.gone && !at.closed) {
             at.closed = true;
-            const out = distribute(book, me, acc, acc.balance, at.givenUp ? "Our owner has given the business up: what it holds is theirs" : "Our owner has gone from the town: what the business holds is theirs");
-            steps.push(...out.steps, because(at.givenUp ? "Closed: our owner has given the business up." : "Closed: our owner has gone.", say("closure", `${me} has closed: its owner has ${at.givenUp ? "given it up" : "gone"}.`, { visible: "public", data: { firm: me, to_creditors: 0, to_shareholders: out.paid, ...(at.givenUp ? { given_up: true } : {}) } })));
+            // (A business that closes pays its suppliers what it owes them first, out of what it holds; the rest is its owner's.)
+            const owed = payables.settle(t, acc.account, acc.balance);
+            const out = distribute(book, me, acc, acc.balance - owed.paid, at.givenUp ? "Our owner has given the business up: what it holds is theirs" : "Our owner has gone from the town: what the business holds is theirs");
+            steps.push(...owed.steps, ...out.steps, because(at.givenUp ? "Closed: our owner has given the business up." : "Closed: our owner has gone.", say("closure", `${me} has closed: its owner has ${at.givenUp ? "given it up" : "gone"}.`, { visible: "public", data: { firm: me, to_creditors: 0, to_shareholders: out.paid, ...(at.givenUp ? { given_up: true } : {}) } })));
           }
           return steps;
         }

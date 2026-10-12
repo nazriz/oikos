@@ -240,3 +240,14 @@ test("a dividend leaves the money the shop's invoices are paid from", () => {
   expect(owing).toBeLessThan(free);
   expect(free - owing).toBeGreaterThanOrEqual(19_000_000);
 });
+
+test("a firm closing or winding up pays every invoice it owes, due or not, oldest first, while its account covers them", () => {
+  const note = (id: string, at: number, owed: number) => statement(id, at, "delivery_note", { speaks_for: "factory-1", addressed_to: ["shop-1"], data: { order: id, kind: "goods", ordered: 10, delivered: 10, refund: 0, owed, pay_in_days: 30, pay_to: "acc-factory-1" } });
+  const p = new Payables("shop-1");
+  p.take(bookOf(note("o1", DAY, 100_000), note("o2", 5 * DAY, 100_000), note("o3", 6 * DAY, 100_000)));
+  const r = p.settle(8 * DAY, "acc-shop-1", 250_000);
+  expect(r.paid).toBe(200_000);
+  expect(r.steps.length).toBe(2);
+  expect(p.owing).toBe(100_000);
+  expect(JSON.stringify(r.steps)).toContain("Invoice o1");
+});
