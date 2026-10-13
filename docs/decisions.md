@@ -4711,6 +4711,28 @@ Asked: size each shop's opening staff and stock to the custom its catchment can 
 
 **Revisit if:** the gate fails on respect, reason or answers, or politeness alone moves the reader; no reader passes the author's-family check for the stewards under study; in two pilots the words' summed effect is under the spread between seeds; the step sizes start being changed after pilots; a later slice would need the reader to see a person's record (the review VISION 15, point 7 requires).
 
+## 2026-10-13 · Culture: plan (what a town holds in common; a plan awaiting the owner's word; nothing built)
+
+**What:** Naz asked whether the world has any mechanism for culture ("we probably need that"). It does not: everything is a person's own. This is a plan for one, in code with no model: docs/design/ai-citizens.md, section 14. No code, no contract change, no model call, nothing a run does changes.
+
+**Proposed, and why:**
+- **Three mechanisms.** (1) For a closed list of conducts, each tied to a draw the code already makes (answering a tribunal, staying past a notice, taking a wrong to the tribunal, complaining, taking someone in, joining the union, a strike vote, taking from an employer, and three that are organisations'), a person holds four numbers: what those around them do, what those around them approve of, what they think themself, what they say. (2) A town memory: six slots a person for public events, fading, retold at catch-ups, moving trust in whoever did it once, for people it never touched. (3) An organisation's practice on its own record, shown to whoever holds the office as its history, in counts, with no advice.
+- **Nothing is the town's.** No figure anywhere stands for "the norm here": that would be a god's view and the start of a judgement. Each figure is a person's or an organisation's; what is held in common is a measure outside, from logs.
+- **Only three ways of learning it:** from those one knows (first-hand, typed phrases on the catch-up that already exists), by being present, and from what is published. No channel is added.
+- **One bounded term a conduct,** at the draw the conduct already has, through `swayed`; no draw added, moved or renamed. Dial `living.culture`, absent by default; absent, byte-identical to today; on, the calibrated rates hold at the opening because every person's lean is about the profile's figure.
+- **One set of sizes for every conduct.** No conduct has a size of its own, so nothing can be fitted outcome by outcome.
+- **Tipping and pluralistic ignorance are not built; they follow** from people who differ, see only those near them, and say less than they think. They are looked for by measures fixed beforehand.
+- **Fixed size:** at most 750 bytes of norms and 450 of memory on a person's record, under 500 of practice on an organisation's; the cap of 8,192 stands. Nothing runs daily; the cost to watch is the log's growth, measured at step 1.
+- **Profiles:** a new optional key `culture` (not `outlook`, which every town is given), each figure with its source; with none, a conduct runs on its own rate in the profile and a marked placeholder for approval.
+
+**Where the plan departs from the ask as put:** paying rent before other things, paying rates and reporting a neighbour are not choices anyone makes today (standing payments; only shops report), so they are not in the first list and join it when the choice exists. Customs and difference between groups are not new mechanisms: gatherings and local ties carry them; the one addition is a founded body retelling the event it was founded on. Origin as a group is not added.
+
+**Alternatives rejected:** a norm held by the town or by a group as an object (a god's view; and somebody would have to keep it); a tipping parameter (an outcome tuned in); hearsay about what third persons did (one act counted many times); a size a conduct; norms about conducts with no choice behind them; a model anywhere.
+
+**For Naz:** whether to build it; origin as a group (recommended: not now, and only by his separate ruling); whether a seat is shown its office's past practice and the debrief gains two lines and one question (recommended: yes).
+
+**Revisit if:** a year with the dial on moves a calibrated rate out of its band with nothing having happened (halve the one sway once; if that fails, record norms and read them in no decision); in two living pilots the norm figures move less than the spread between seeds (keep memory and practice, drop the rest); a conduct is found to need a size of its own; the log or run time grows by more than a tenth at 3,000 people; the patterns written down before the proof run fail.
+
 ## 2026-10-13 · Reading: building it (steps 1 to 4 of design 13h; no model called)
 
 Naz approved building the plan of section 13 and running its gate later, with three rulings, recorded here and corrected in 13:

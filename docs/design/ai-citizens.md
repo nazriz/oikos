@@ -679,6 +679,7 @@ A decision without an outcome is one whose run ended first (a gathering decided 
   - **What else moved:** departures and move-ins fall (the artefact going); overcrowding rises where kin are taken in (Tamil Nadu 2.7 to 20 households, Nakuru 7 to 52: a consequence); redundancies rise in Victoria (7.9% to 9.9%; 1.8% sourced), because rent that was not being paid is paid and shops sell about 3% less (a consequence leaning on a known fault); support claims refused fall below the survey's share (a payment in force is never decided: named, not fixed); and runs in which several factories cannot cover their wages late in the year are more frequent in the batches after (Tamil Nadu two of six for one; Victoria's two-year runs one of three for none), **which six runs cannot tell from noise and is the first thing to look at next**.
   - **For the next living pilot:** `opening_caseload` gives the pilots' town 14 tenancies with rent owed and 5 cases before the tribunal where it gave 198 and 49: a seat in the tribunal has little before it again. A sourced rate of arrears is what the option would need to give more, and no profile has one. Founding has fewer occasions too: in the small test town most were about homes nobody could pay for.
 - **Reading: what words mean to a person, planned** (2026-10-13; section 13; docs/decisions.md, "Reading: plan"). The first model slice under Naz's decision of 2026-10-12: a reader model says what a worded paper is like (respect, a reason, whether it answers, recourse, threat, the values it appeals to) and the code mind applies that to each person by their own record, as a shift from the plain paper code would have written. Three kinds of paper: a decision addressed to a person, a public statement, a founder's statement. **Nothing built, no model called; awaiting Naz.** The gate is fixed in 13f before any call.
+- **Culture: what a town holds in common, planned** (2026-10-13; section 14; docs/decisions.md, "Culture: plan"). Code, no model. Three mechanisms: what each person takes those around them to do and to approve of, for a closed list of conducts that already have a draw (four numbers a conduct on the record, moved only by ties, presence and what is published, entering each decision as one bounded term); a town memory of public events (six slots a person, fading, retold, moving trust in an institution once for people it never touched); and an organisation's practice, which a seat is shown as its office's own history. Nothing is the town's: what is held in common is measured outside, from logs. Three conducts asked for are not yet choices anyone makes (rent first, rates, reporting a neighbour) and wait for those. **Nothing built; awaiting Naz** (14m: whether to build; origin as a group; what a seat is shown of its office's past).
 
 ## 9. What the literature taught, and where it's used
 
@@ -953,6 +954,7 @@ A model always produces something that reads well. Five checks, none of which do
 5. **Debriefs:** every seat after every run; exit interviews for a sample of people. *Built 2026-10-11: "Progress".*
 6. **The assistant role**, with the composing model's silent comparison. *Planned 2026-10-12: section 12, awaiting Naz.*
    **Reading what words mean** (the first model slice under the decision of 2026-10-12). *Planned 2026-10-13: section 13, awaiting Naz.*
+   **Culture** (norms about conduct, town memory, an organisation's practice; code, no model). *Planned 2026-10-13: section 14, awaiting Naz.*
 7. **Pilots with the dials**, then steward experiments.
 
 ## 11. The everyday model: plan (10k step 4; 2026-10-11)
@@ -2169,6 +2171,367 @@ tribunal seats wrote orders much alike); whether a reader of the stewards' own f
    reader of our own exists (recommended); or wait on the other family's windows.
 3. **Whether words may only scale what a decision does** (recommended, to start: a kind refusal still costs
    trust), or may outweigh it, as some of the procedural-justice findings would allow.
+
+## 14. Culture: what a town holds in common
+
+**Status:** a plan awaiting Naz's word. Nothing is built, no model was called, and nothing in a run changes.
+Decision: docs/decisions.md, 2026-10-13, "Culture: plan". Sources: docs/research/references.md, "Culture".
+
+**What he asked** (2026-10-13): "do we have any mechanism for culture? we probably need that." Under his standing
+direction: a living world whose people are not frozen; darkness in; nothing over the top; and platform models our
+own, so **this is code, no model anywhere.**
+
+**What is here, read from the code, and what is missing.** Everything is a person's own: values, temperament,
+teachings, what is thought and said of up to four who hold power over them, wants taken up from those they know,
+learning by experience. Three things already lean toward culture: a petition is signed by thresholds (Granovetter),
+joining the union is weighed by workmates, and the imitating mind counts how many it knows took an option
+(`Choice.others`). What is missing:
+- **No expectation outlasts the moment of a choice.** Nobody holds a view of what people here do when summoned, or
+  what would be thought of them for it. `others` is counted afresh at each decision and forgotten.
+- **What happens to one household is nobody else's.** Told of a notice, a listener trusts the landlord less only "if
+  it is one we deal with" (citizen.md, "What moves trust"). A removal on a street leaves the street as it was.
+- **An office has no past.** An organisation's record has character and wants. A seat that takes an office is shown
+  what stands open (office-books.md) and nothing of how the office has been run.
+
+**Three corrections to the ask as it was put to this plan.**
+1. **Three of the conducts named are not choices anyone makes today:** paying rent before other things and paying
+   rates (standing payments the bank carries out or fails for want of money), and reporting a neighbour (only a shop
+   reports, from its stocktake). A norm about a choice nobody makes moves nothing. Each joins the list, as one row,
+   when the choice exists.
+2. **Nothing may be the town's.** A number for "the norm here" would be a god's view and the first step to a
+   judgement. Every figure below is one person's belief or one organisation's own history. What the town holds in
+   common is read from logs, outside (14h).
+3. **Tipping is not built; it is looked for.** People who differ, watching only those near them, already give
+   thresholds and cascades. A tipping parameter would be an outcome tuned in.
+
+### 14a. What culture is here, and the smallest set that gives it
+
+Culture is what people expect of each other and what they remember together: for a short list of things people here
+do, what each person takes those around them to do and to approve of; the public events each still carries; and how
+each office and firm has habitually acted. None of it is held anywhere but in persons' and organisations' records,
+and none of it moves except along ties, by being present, or by being published. A town has a culture when those
+private pictures agree, and a divided one when they agree within a street or a works and not across them.
+
+**Three mechanisms, in this order:** (1) expectations about conduct (14b to 14d); (2) town memory (14e); (3) an
+organisation's practice (14g). **Not new mechanisms:** customs and difference between groups, which come from
+gatherings and ties already built (14f). **Deferred:** observances on a calendar; origin as a group; taste, dress,
+food and speech; conducts with no choice behind them; punishing at a cost to oneself; a law that provokes the
+opposite of what it says; a story changing as it is retold (it arrives with people who use words); a broken promise
+(needs the check that a published commitment was kept, as 13a found).
+
+### 14b. The data
+
+**A conduct** is a kind of occasion with two answers, typed and named neutrally, tied to one draw the code already
+makes. The list is closed, in code, at most 12 a world; the world's config says which are live. The first eleven:
+
+| Conduct | The occasion, and the answer counted as "does" | Decided today by |
+|---|---|---|
+| `answer_tribunal` | served with an application for possession: answers it | `possession.answer_bps`, draw `answer-<lease>` |
+| `stay_past_notice` | told to vacate, cannot pay: still there at the date | `possession.stay_bps`, `stay-<lease>` |
+| `take_to_tribunal` | an unlawful rent rise, or a debt unpaid: applies | `tribunal.challenge_bps`, `apply_bps`, through `reads` |
+| `complain` | a service failed: writes to the town | `complain_bps`, through `reads` |
+| `take_in` | asked for a roof by someone known: says yes | `stay.willing_affinity_bps` |
+| `join_union` | a new job, or a grievance at work: joins | `union_join_bps`, `SWAY.union_peers` |
+| `strike` | a ballot for action: votes yes | `strike_vote_yes_bps`, `vote-<ballot>` |
+| `take_from_employer` | in need, at work among goods: takes some | `crime.take_bps` |
+| `apply_possession` | (a landlord) rent behind by the law's days: applies | the letting office's rule on arrears (firms.md) |
+| `heads_before_hours` | (an employer) more hands than trade: lets go, not cuts | `Staffing.reviewHours` |
+| `order_possession` | (a venue) an application heard: orders possession | the tribunal's stated rule, or a seat |
+
+The last three are organisations' conducts: a person holds a view of them (what landlords here do, and whether it is
+right) and an organisation holds its own history of them (14g). Signing a petition keeps its own thresholds.
+
+**A norm is four numbers a person holds for a conduct,** each 0 to 10,000, and a count:
+- `does`: of those I know of who met the occasion, the share who did it (Bicchieri's empirical expectation;
+  Cialdini's descriptive norm);
+- `approves`: how far I take those around me to approve of doing it (the normative expectation; the injunctive norm);
+- `own`: what I think of it myself (the personal normative belief), from my values;
+- `says`: what I say I think, when asked;
+- `n`: how much I have seen, as a weight, held to `window`.
+
+**Where it lives.** In the mind's working state as a fixed array (12 conducts of 5 integers), and on the person's
+record as one new section, `norms`, in whole percent, written again only when a figure has moved by 2 in 100. About
+62 bytes a conduct as written: **at most 750 bytes, for ever.** With 14e's memory (at most 450 bytes) a person's
+record goes from 1 to 2 KB to about 2 to 3 KB, under the cap of 8,192 that stands. Neither grows with the town or
+with time.
+
+**How it starts.** From the profile, under a new key `culture` (not `outlook`: everything there is given to every
+town, docs/profiles.md): for each conduct `does_bps`, `approves_bps`, each with its source. Where the profile gives
+no `does_bps` it is the conduct's own rate in that profile (the share who answer a tribunal is already there, with
+its source), so the picture people start with is the town as calibrated. Where it gives no `approves_bps`: 5,000, a
+named placeholder, as trust has where a survey is silent. A person's `does` and `approves` start at those with
+weight `prior_weight` (4); `own` starts at `approves_bps`, plus the person's own lean (sd `own_sd_bps` 1,500, from
+their stream) and `values_bps` (500) for each standard deviation of the values that speak to the conduct. That
+mapping is one table in code, ours, to test against data, as needs-from-values is.
+
+**What a profile must now carry, with the kind of source** (none was opened for this plan: all to confirm; item
+numbers to be read from the questionnaires, never recalled):
+
+| Conduct | `au-vic-2026` | `ke-nakuru-2026` |
+|---|---|---|
+| `answer_tribunal`, `take_to_tribunal` | what people do about a legal problem: the Legal Australia-Wide Survey (Law and Justice Foundation of NSW, 2012); the Public Understanding of Law Survey (Victoria Law Foundation, 2023) | *Justice Needs and Satisfaction in Kenya* (HiiL, 2017); Afrobarometer, whether courts' decisions must always be abided by |
+| `stay_past_notice` | no survey known; the profile's rate, a placeholder | the same |
+| `complain` | contacted an official or politician: the Australian Election Study | contacted a local councillor in the past year: Afrobarometer |
+| `take_in` | support from outside the household in a crisis: ABS General Social Survey | transfers between households: Kenya Integrated Household Budget Survey 2015/16 |
+| `join_union`, `strike` | the profile's membership; joining strikes (done, might, never): World Values Survey wave 7 (Australia 2018) | the same items, WVS wave 7 (Kenya 2021); joined a protest: Afrobarometer |
+| `take_from_employer` | how justifiable stealing property is: WVS wave 7 | the same |
+| `apply_possession`, `heads_before_hours`, `order_possession` | none found for what people think right; `does` from the profile's own rates | the same |
+
+Imperfect is fine (Naz, 2026-10-09): a conduct with no source runs on the profile's rate and the placeholder, marked.
+
+**How a person learns what others do: three ways, no fourth.**
+- **From those they know.** Catching up already carries typed phrases (union member, where one goes, let go, given
+  notice). Two are added: what I did at an occasion in the last `news_days` ("We answered the tribunal."), and, of a
+  conduct that came up, what I say of it. First-hand only: nobody passes on what a third person did, so one act is
+  never counted twice.
+- **By being there.** Who walked out at my workplace; officers at a door in my building; who came.
+- **Published.** A petition's running count, a ballot's declared result, an order a venue publishes, the paper.
+
+No channel is added and no register is read. `orchestrator/test/no-god-view.test.ts` stays as it is.
+
+### 14c. The dynamics
+
+One set of parameters for every conduct. **No conduct has a size of its own:** that is what keeps this from being
+fitted outcome by outcome. Every size is a placeholder unless a source is named.
+
+| What | Rule | Basis |
+|---|---|---|
+| **Seeing conduct** | Each sighting moves `does` toward it by its weight over the weight held: 1 for someone known, `close_weight` (2) for a close tie, a published count as its share with weight up to `published_weight` (4). `n` is held to `window` (20), so the recent counts for more. | Descriptive norms move conduct (Cialdini, Reno and Kallgren 1990). Adoption that needs several sources, and spreads through close, clustered ties: complex contagion (Centola and Macy 2007; Centola 2010) |
+| **Hearing approval** | The same rule on `approves`, from what others *say* of it. | Normative expectations are formed from what is said and sanctioned, not from what is privately thought (Bicchieri 2006) |
+| **What I think** | `own` follows my values as they move, and settles toward `approves` by half every `internalise_days` (1,095). | Compliance becoming internalised (Kelman 1958) |
+| **What I say** | `says` is `own`, moved toward `approves` by how much belonging weighs with me times what integrity leaves: the arithmetic of `Inner.view`, with standing among ties where fear of a landlord was. | Preference falsification (Kuran 1995), as built |
+| **Not telling** | I mention my own conduct only if it sits within `conceal_bps` of what I take to be approved, or my integrity is high. What was seen cannot be kept back. | The same; and why private conduct is under-counted |
+| **Breaking one, seen** | Someone who learns a tie did what they hold against (by more than `margin_bps` 2,500) cools toward them (`cool_bps` 500 at most) and says so once in a typed phrase; the one told takes a dent in belonging (`Inner.dent`, `disapproved_bps` 300) and moves `approves`. Approval warms a tie by `esteem_bps` (200). Nothing is blocked and nobody is fined: a tie cools, and people catch up less with those they are cooler to, as today. | Informal sanction among neighbours: gossip, coolness, withdrawal (Ellickson 1991). Esteem as the currency (Brennan and Pettit 2004). Being left out hurts belonging (Williams 2007) |
+| **A law** | Learning that a law in force speaks to a conduct is one hearing of approval, weighted `law_weight` (3) times how far I trust its maker above the middle; at or below the middle, nothing. | Law states what is expected (Sunstein 1996; McAdams 2000); it is heeded as its maker is thought legitimate (Tyler 1990) |
+| **A child** | Coming of age, a child's four numbers are the mean of the adults who raised them, with weight `prior_weight`; then they watch as anyone does. | Parents, then others (Cavalli-Sforza and Feldman 1981; Bisin and Verdier 2001) |
+| **A newcomer** | Arrives with the profile's figures at weight 1, so what they see here soon outweighs it. | Acculturation (Berry 1997) |
+
+**Tipping** follows from these and is not a rule. People differ in conformity and in `own`, so each has a different
+point at which what they see is enough (Granovetter 1978); they see only those near them, so a conduct takes a works
+or a building before a town (Schelling 1971; Centola); the imitating mind already weighs numbers more than
+proportionally for a conformist (`decideAs`: Boyd and Richerson).
+
+**Pluralistic ignorance** follows too: `approves` is built from what others say and `does` from what they let be
+known. A street can each privately think going to the tribunal is right, each say it is not done, and none go. A
+count taken in secret and published (a ballot, a survey an office runs and posts) is a sighting of what people
+think, and can undo it in a week (Prentice and Miller 1993; Kuran's cascades). That is a lever a steward has, and it
+costs only publishing.
+
+**What an institution's act does.** A by-law: the row above. A removal seen: a memory (14e), and a sighting of
+`apply_possession`. A tribunal that always orders possession: each who answered and lost says so; their listeners'
+`does` for `answer_tribunal` falls as fewer are heard to have answered, their picture of `order_possession` rises,
+and fewer answer. Nobody wrote that rule; it is the three rows above.
+
+### 14d. How norms enter the decisions the mind already makes
+
+One term a conduct, at the draw that conduct already has:
+
+```
+lean = ( c * (w_does * (does - does0) + w_approves * (approves - approves0)) + (1 - c) * (own - approves0) ) / sd_bps
+rate' = swayed(rate, lean, culture.sway)
+```
+
+`c` is the person's conformity (temperament, 0 to 1); `does0`, `approves0` the profile's; `sd_bps` 2,500; `w_does`
+0.6 and `w_approves` 0.4 (where what is done and what is approved part, people follow what is done: Bicchieri and
+Xiao 2009; the sizes are placeholders); `swayed` is the function of `wants.ts`, held to three standard deviations,
+with `culture.sway` 0.3 as trust and agency have. A conformist follows the street; someone who is not follows
+themself.
+
+- **Where.** `answer_tribunal`, `stay_past_notice`, `strike`, `take_from_employer`: the rate before its draw.
+  `take_to_tribunal`, `complain`: inside `reads`, beside trust and agency. `join_union`: beside `SWAY.union_peers`.
+  `take_in`: on `willing_affinity_bps`. Where a conduct is a way to a want (`waysFor`, `pursue`): the same lean, in
+  points, added to the way's `adj`. Organisations: 14g.
+- **No draw is added, moved or renamed.** The same draw meets a shifted rate, so a town and its twin still draw
+  alike (`orchestrator/test/twin-draws.test.ts`).
+- **The dial** is `living.culture` (absent by default; `sway`, and which conducts are live). Absent: no section,
+  no phrase, no term, **byte-identical to today.** On: at the opening every `does` and `approves` is the profile's,
+  so the lean is the person's `own` alone, which sums to nothing over a town, as every `sway` does: the calibrated
+  rates hold on day 1 and move only as the town does.
+- **Recorded.** The decision annotation carries the four numbers and the lean, so a reading of a run can say how
+  much of a choice was the street's.
+
+### 14e. Town memory
+
+**What makes an event public.** No flag does. An event is public to the extent that people outside the household it
+happened to hold it, and they come to hold it three ways: they were there (a removal carried out in their building,
+a walk-out at their works); it was published (an order, a law, a declared ballot, the paper's item); they were told.
+
+**The slot.** Six a person, in a new section `heard`, beside the memory of their own life, which is untouched:
+`{kind, about, t, strength, how, hops}`. `kind` is closed: `put_out`, `strike`, `let_go_many` (three or more from one employer in a month),
+`closed`, `ruling`, `law`, `vote`, `disaster`. `about` is who did it. `how` is saw, read or told. The weakest gives
+way to a stronger arrival. About 75 bytes as written: **at most 450 bytes.**
+
+| What | Rule | Basis |
+|---|---|---|
+| **Strength at first** | Seen: 10,000. Read: the paper's weight for the item, to 5,000. Told: the teller's strength times `pass_bps` (6,000), and `negative_bps` (2,000) more for an event the hearer holds against. Past `max_hops` (3) it is not kept. | Bad news travels further in retelling (Bebbington et al. 2017). A story thins with each hand |
+| **Fading** | By half every `half_life_days`: 365 seen, 180 read or told. Worked out when read, from the days gone; no daily pass. | Collective attention falls fast, then slowly (Candia et al. 2019). What is passed by word of mouth lasts while those who saw it tell it (Assmann 1995) |
+| **Telling** | Catching up, I add one typed phrase for the strongest I hold above `tell_at_bps` (2,000) that I have not told this person (the tie keeps what was last told). No draw. | Remembering together is how a group's memory is kept (Hirst and Echterhoff 2012; Halbwachs 1950) |
+| **Hearing it again** | Strength returns `rehearse_bps` (3,000) of the way to what it first was. | Rehearsal |
+| **Trust** | On first learning it, once: `Inner.experience(about, kind, ..., { heard: true })` weighted by strength and `bystander_bps` (5,000), **whether or not I deal with them.** Up or down by where my own `own` sits on the conduct the event shows (a removal is `apply_possession`): someone who holds a landlord right to apply trusts that landlord a little more for it. Hearing it again moves nothing. | Reputation reaches those never dealt with (Ellickson 1991). The sign is the person's, never the platform's |
+
+Trust still returns to where it started by half every two years, as built: a memory pushes once and fades.
+
+### 14f. Customs, and difference within a town
+
+**Customs: what gathers already carries.** A gathering is where people are present together, so it is where the
+sightings and tellings of 14b and 14e happen at once among people who will meet again. One rule is added: **a body
+whose founding want was born of an event** (its record's `purpose` says so; founding.md) retells that event at each
+gathering to those present. That is commemoration, and it is the only way a memory outlasts its half-life: a
+tenants' body founded after a removal keeps the removal alive for members who never saw it (Assmann: memory that
+lasts needs a body to keep it). Observances on a calendar (a day a town keeps) need profile figures with sources
+and are deferred; when built they are gatherings on a date, and need nothing new here.
+
+**Difference** needs no mechanism: ties are local (household, building, workplace, gathering), so pictures diverge
+by those. A steward can face a works where striking is done and a street where nobody answers a summons. Measured by
+building, workplace, membership and tenure (14h). A profile may give `culture` figures by membership or tenure
+(members of a religious body, renters) where it has a source; then those people start there. **Origin is not in any
+profile and is not added here:** it is where a simulation most easily encodes prejudice (crime.md says the same),
+and it is Naz's ruling (14m).
+
+### 14g. An organisation's practice: what a seat inherits
+
+**The data.** One new section on the organisation's record, `practice`: for each conduct that is the
+organisation's own (at most 6), `{of, occasions, did, days, since}`: of the times the occasion arose, how often it
+did the thing, and how long it took, weighted to the last `practice.window_days` (1,825). Under 500 bytes. Written
+by the bookkeeping of the post that keeps the record (`keeps_record`), from the office's own papers, as its books
+are. A landlord: `apply_possession`, holding a rent when asked, letting a tenant under notice stay. An employer:
+`heads_before_hours`, a rise when asked. A venue: `order_possession` against a plan or a dismissal. A support
+office: claims granted.
+
+**It opens with a past.** The generator gives each organisation the practice its character and the profile's rates
+imply, as `opening_caseload` gives a registry its cases: an office is never new on day 1.
+
+**What a holder is shown.** One more heading in the office's books, "How this office has done things", in counts
+and days and nothing else: *"Since 2024: 41 tenancies reached two months behind. This office applied for possession
+in 29, on average 71 days after the rent fell due, and agreed a plan in 8."* It is the office's own record, which is
+its holder's to read (no-god-view: it is theirs). It says nothing of what other landlords do, and nothing of what
+to do. A code holder and a seat are shown the same.
+
+**What a code holder does with it.** Where there are `min_occasions` (5), its rate is drawn `inertia_bps` (5,000) of
+the way toward its own practice. At the opening practice is what character already gives, so nothing moves; it
+matters after a change of owner, or when trade turns and the habit lags. Basis: organisations act by routines that
+outlast those who made them (Nelson and Winter 1982); the practice of an office is made at its counter and handed on
+(Lipsky 1980); what was laid down early persists (Stinchcombe 1965). A seat is bound by nothing: what it does
+becomes the office's practice, and whoever follows it inherits that.
+
+**The other half of what is inherited is outside the office.** Trust is in the office, not its holder, and the
+street's memory of what it did (14e) does not reset when a model sits down. A seat is not shown that: it is in other
+people's records. It meets it as tenants who do not answer.
+
+### 14h. What becomes measurable (outside the world, from logs)
+
+Measures in `measure/`, reading record changes and decision annotations; nothing in the world computes them.
+- **Norm shares over time,** by conduct and by building, workplace, membership and tenure: mean `does`, `approves`,
+  `own`, `says`, beside the rate at which people in fact did it.
+- **Tipping events:** the measure's own definition, fixed before any run: within a group, the rate at which a
+  conduct is done moving from under a third to over two thirds, or back, inside 90 days; with what preceded it.
+- **Two gaps:** `own` against `says` (falsification), and mean `own` against mean `approves` (pluralistic ignorance:
+  a town wrong about itself).
+- **Memory of a steward's acts:** for each act of a seat that became an event, who holds it and how strongly at 30,
+  180 and 365 days; how many hands it passed through; trust in that office among those who never dealt with it.
+- **Division:** the spread of a conduct's `does` between groups against within them.
+- **Practice under a holder:** each office's practice at the seat's first day and its last, and the code twin's.
+- **Ties cooled for a conduct,** by conduct: who was cooled toward, by whom. Counted, not named good or bad.
+
+### 14i. Performance and determinism
+
+- **Nothing runs daily.** Norms move at a catch-up, a sighting or a published count; fading is worked out when a
+  figure is read. A catch-up costs at most three more phrases to write and read (about 150 characters on a message
+  already sent), 15 integer updates and one pass over six slots; a decision costs one term, about ten integer
+  operations. At the rates of a living town that is some tens of integer operations a person a day: well under a
+  millisecond a simulated day for 10,000 people. No new message, no new wake, no new channel.
+- **Bytes.** Working state about 0.5 KB a person (5 MB at 10,000). The record at most 1.2 KB more (12 MB at 10,000,
+  where the kernel holds about 3.9 GB). **The cost to watch is the log:** each rewritten section is a record
+  change. The 2-in-100 grain is there for that; step 1 measures it at 3,000 people before anything else is built,
+  and the grain is coarsened if the log grows by more than a tenth.
+- **Determinism.** Decisions use the draws they have. The only new draws are a person's starting lean a conduct
+  (`<person>/culture-own-<conduct>`, on the person's own stream, at the kernel's seed) and an organisation's opening
+  practice (the generator's stream). Keys name the person, the conduct, the lease or the ballot, never a paper's
+  number. Telling and concealing are rules, not draws.
+
+### 14j. Darkness and welfare
+
+- **Norms can be ugly, and will be.** A works where taking from the employer is what is done. A street that cools
+  toward whoever went to the tribunal against a neighbour's landlord. Households that stop taking kin in because
+  nobody does. Nothing here softens that and nothing labels it: the fields are `does` and `approves`, the measures
+  count, and no conduct is marked as the one a good town has.
+- **No conduct is defined about a kind of person.** Shunning can only emerge, tie by tie, from what someone did.
+  A norm aimed at a group (by origin, by faith) is not expressible in the list, and adding one is Naz's ruling.
+- **The people of the town** stay records kept by arithmetic (VISION 15, point 7). No model reads a record, speaks
+  as a person or is asked to hold a norm. Exit accounts (an author shown a record, who may decline) will have the
+  new sections before them; nothing else changes for the composing model.
+- **Seats.** A seat inherits a practice it did not make and a reputation it cannot see. That is realistic pressure,
+  not added pressure (point 2), and it is shown as the office's record, not as an instruction. The debrief's plain
+  summary should say what the office's practice was when the seat took it and what it was at the end. Whether to
+  add one fixed question ("Did how the office had done things before weigh on what you did?") changes the script
+  agreed on 2026-10-11, so it is Naz's (14m).
+- **A seat is never told what the town thinks of it** beyond what reaches its office as papers. Finding out is work
+  it may do: a count it runs and publishes.
+
+### 14k. Build order
+
+Each step is a day for a Sonnet agent, behind the dial, mock only. **No step calls a model.**
+
+1. **`culture.ts`, the dial, the record section.** `CultureParams`, the four numbers, starting from the profile.
+   *Tests:* dial absent, same hash (three profiles); dial on, the leans sum to nothing over a drawn town; record
+   under its cap at 12 conducts; the log's growth at 3,000 people measured and written down; generality test.
+2. **Learning what others do:** the two phrases, presence, published counts, the update, not telling. *Tests:* a
+   person's numbers move only from a tie, a presence or a publication (each other route tried and refused); a ring
+   of twenty by hand moves as the arithmetic says; replay exact.
+3. **The term at each person's conduct,** one conduct at a time, with the annotation. *Tests:* bounded; the right
+   way; twin draws alike; a year of three profiles with the dial on stays inside the calibration bands (the slots).
+4. **Breaking one, esteem, what is said; children and newcomers.** *Tests:* a built street that privately approves
+   and says otherwise does not act, and a published secret count releases it; a child starts at its parents'.
+5. **Town memory.** *Tests:* never more than six; nothing past three hands; trust moves once; an event reaches
+   nobody without a tie, a presence or a publication; strength a year on is the formula's.
+6. **Practice:** the section, the bookkeeping, the heading in `openbooks*.ts`, the generator's opening practice,
+   inertia for code holders, commemoration by founded bodies. *Tests:* a mock seat is shown what its code twin
+   reads; practice outlasts a change of holder; dial absent, same hash.
+7. **Measures** (14h), on a fixture log.
+8. **Profiles:** Sonnet agents read the sources of 14b for the nine profiles and write `culture` with each figure's
+   source, or the marked placeholder. No run depends on it: step 1's defaults stand until then.
+9. **Proof, before any pilot** (10i): three patterns written down first (a conduct's spread over time is S-shaped
+   where it spreads at all; who does it clusters by building and works beyond chance; the gap between `own` and
+   `approves` is widest for conducts people keep back), checked on a year of the code town; twins with the dial
+   off and on. Then a checkpoint with Naz.
+
+**Profiles need:** the `culture` key (optional; docs/profiles.md gains its paragraph at step 1). **Contracts, all
+additive, each logged when made** (blanket approval of 2026-10-11): `entity-record.schema.json` (`norms`, `heard`
+on a person; `practice` on an organisation); world config `living.culture`; the profile schema's `culture`; the
+decision annotation's `norm`. No kernel change, no new act, no channel. **The translator learns nothing:** no seat
+gains a form, the new phrases are code people's own, and practice reaches a seat as a heading in its books.
+
+### 14l. What would make us drop or simplify it
+
+- **Step 3's year moves a calibrated rate out of its band with nothing having happened in the town.** Then
+  `culture.sway` is halved once, for every conduct together. If that does not hold it, norms are recorded and read
+  by no decision (as trust was at first), and memory and practice go on alone.
+- **Nothing can be seen:** in two living pilots the norm figures move less than the spread between seeds. Then
+  drop 14b to 14d and keep 14e and 14g, which are cheap and are what a seat meets.
+- **It wants a size a conduct.** The day someone needs `strike` to weigh more than `complain` to make a town look
+  right is the day to stop and checkpoint.
+- **The log or the run's time grows by more than a tenth** at 3,000 people and a coarser grain does not mend it.
+- **Step 9's patterns fail:** the world would be saying something about norms that the evidence does not.
+
+**The calibration rule.** Mechanisms with a real-world basis, sizes from sources or marked placeholders, one set for
+all conducts, fixed at step 3 from bounds and changed after that only by a source. A town that turns on people who
+go to the tribunal is a finding. A mechanism that double-counts one act is a bug. Nothing is tuned so that a norm
+tips, holds or looks plausible.
+
+### 14m. Unsure, and Naz's to decide
+
+**Unsure:** every size (the literature gives directions, almost never amounts); whether a town of 1,000 to 3,000
+with about 15 ties a person has occasions enough for a picture to move in a pilot's 90 to 120 days (answers to a
+tribunal are a few dozen a year: norms may only show over a year or more, and practice and memory sooner); whether
+approval can be sourced at all for most conducts in most profiles.
+
+**Naz's:**
+1. **Whether to build it** (steps 1 to 7 and 9; no model, no cost but time). Recommended: yes, and no pilot with
+   the dial on until step 9's year has passed.
+2. **Origin as a group.** Recommended: not now. Groups are building, workplace, membership and tenure. Origin only
+   for a profile with a sourced figure, and by his separate ruling, since it is where prejudice gets written in.
+3. **A seat and its office's past.** Recommended: show it, as counts with no advice; add the two plain lines to the
+   debrief's summary and the one question.
 
 ## Open
 
