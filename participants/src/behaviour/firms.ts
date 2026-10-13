@@ -961,6 +961,32 @@ export function terminationLaw(book: Book): TerminationLaw | undefined {
   const under = Number(l.data?.small_employer_under);
   return { id: l.id, notice: steps(l.data?.notice), redundancy_pay: steps(l.data?.redundancy_pay), ...(under > 0 ? { small_employer_under: under } : {}) };
 }
+/**
+ * The law on cutting an employee's hours in place of ending the job (docs/behaviour/firms.md, "Hours before heads"),
+ * as its lawmaker published it: whether an employer may reduce hours for want of work (`may_cut`: "notice" by giving
+ * notice, "consent" with the employee's agreement, "no" not at all), the ordinary week, the notice, the least hours it
+ * may cut to (a share of the ordinary), the longest spell, and the pay owed for the hours not worked (a share of the
+ * pay for them, from an employer of that many staff). A record an employer and a worker read; nothing here holds
+ * any place's figures, and a world with no such law has firms that do not cut hours.
+ */
+export interface HoursLaw { id: string; may_cut: "notice" | "consent" | "no"; ordinary_week_hours: number; notice_days: number; floor_bps: number; max_days: number; pay_bps: number; pay_owed_from: number; consent_bps: number }
+export function hoursLaw(book: Book): HoursLaw | undefined {
+  const l = book.open("law").filter((r) => r.data?.employment === "hours").sort((a, b) => b.at - a.at || (a.id < b.id ? 1 : -1))[0];
+  if (!l) return undefined;
+  const n = (x: unknown, d: number) => (Number.isFinite(Number(x)) && Number(x) >= 0 ? Number(x) : d);
+  const may = l.data?.may_cut === "notice" || l.data?.may_cut === "consent" ? (l.data.may_cut as "notice" | "consent") : "no";
+  return { id: l.id, may_cut: may, ordinary_week_hours: n(l.data?.ordinary_week_hours, 40), notice_days: n(l.data?.notice_days, 0), floor_bps: Math.min(10_000, n(l.data?.floor_bps, 0)), max_days: n(l.data?.max_days, 0),
+    pay_bps: Math.min(10_000, n(l.data?.pay_bps, 0)), pay_owed_from: n(l.data?.pay_owed_from, 0), consent_bps: Math.min(10_000, n(l.data?.consent_bps, 10_000)) };
+}
+/** A cut of someone's hours that we have made (`set`) or put to them for their agreement (`proposed`). */
+interface Cut { agreement: string; worker: string; full: number; hoursBps: number; paidBps: number; wage: number; from: number; until: number; since: number; state: "proposed" | "set"; replyBy: number }
+/** The days a paper to the staff goes ahead of the pay it changes, where the law gives none (ours: it must reach them before the first pay it changes). */
+export const HOURS_GRACE_DAYS = 3;
+/** The ordinary week of a job in hours: its agreement's hours term, else the law's ordinary week. */
+export const ordinaryHours = (a: any, worker: string, law: HoursLaw | undefined): number => { const h = jobTerms(a, worker).hours; return h ? h / 3600 : law?.ordinary_week_hours ?? 0; };
+/** The pay a cut leaves, in 10,000ths of the ordinary pay: the hours worked at full pay, and the hours cut at the share the law owes for them. */
+export const paidShare = (hoursBps: number, payBps: number): number => hoursBps + Math.floor(((10_000 - hoursBps) * payBps) / 10_000);
+
 /** A schedule by service (days of pay), read at a length of service as weeks of pay (the last step at or below it; before the first: nothing). */
 export const weeksAt = (steps: { from_years: number; days: number }[], years: number): number => steps.reduce((x, b) => (years >= b.from_years ? b.days : x), 0) / 7;
 
@@ -974,7 +1000,9 @@ export const weeksAt = (steps: { from_years: number; days: number }[], years: nu
  * `smooth_months`: the horizon (0: last month's figure, the rule as it was). `hiring_cost_weeks`: what taking someone
  * on costs, in weeks of their pay. With neither (`smooth_months` 0 and no cost), an employer reacts to each month as before.
  */
-export interface AdjustParams { smooth_months: number; hiring_cost_weeks: number }
+export interface AdjustParams { smooth_months: number; hiring_cost_weeks: number;
+  /** Hours before heads (docs/behaviour/firms.md, "Hours before heads"): the least change, in 10,000ths of the ordinary hours, worth a notice to the staff (a placeholder; left out: 1,000). */
+  hours_step_bps?: number }
 export class LabourPlan {
   private level: number;
   private surplus = 0; // months in a row with more staff than the trade expected needs
@@ -1036,6 +1064,13 @@ export class Staffing {
     }
   }
 
+  // Hours before heads (docs/behaviour/firms.md): cuts we have made or put to the staff, by agreement, and wage changes
+  // waiting for the day their paper names.
+  private readonly cuts = new Map<string, Cut>();
+  private readonly due: { at: number; agreement: string; wage: number; why: string }[] = [];
+  private readonly declined = new Set<string>(); // agreements whose worker has not agreed to a cut, this spell
+  private noCutUntil = -Infinity;
+  private repliesRead = 0;
   /** Wages our orders have paid, gross (what they paid, and what they withheld), since we began. */
   wagesPaid = 0;
   // Pay that's changed since hiring (an enterprise agreement), and pay stopped (a strike: no pay for time on strike).
@@ -1364,6 +1399,7 @@ export class Staffing {
       this.severance.delete(a.id);
     }
 
+    if (doesPay) steps.push(...this.applyHours(book, t, account));
     if (doesPay) steps.push(...this.latePay(book, t, account, (() => { const b = channels.accounts(obs).find((x) => x.account === account)?.balance; return b === undefined ? undefined : cents(b); })(),
       staff.reduce((x, a) => x + (this.noticed.has(a.id) || byTheDay(a) ? 0 : this.wageOf(a)), 0)));
 
@@ -1421,6 +1457,8 @@ export class Staffing {
       steps.push(because(`Hiring for our posting: an applicant picked at random among ${mine.length}.`,
         ["job", offer(worker, {
           template: "employment", ourNotice: this.o.notice_days * DAY, theirNotice: this.o.notice_days * DAY,
+          // (The job's ordinary hours in a week, as the world's law has the ordinary week: the agreement's hours term.)
+          ...(hoursLaw(book)?.ordinary_week_hours ? { hours: hoursLaw(book)!.ordinary_week_hours * 3600 } : {}),
           we: pay(chosen.data?.account ?? worker, wage, { every: this.o.period, for: "wages" }),
           they: this.o.workplace ? C.call("occupancy", { who: worker, in: this.o.workplace }) : undefined,
           text: `${worker} works for ${me} as ${post.data?.role ?? "staff"} for ${moneyNow(wage)} every ${this.o.period / DAY} days. First pay ${this.o.period / DAY} days after both have signed.`,
@@ -1532,7 +1570,10 @@ export class Staffing {
     const refs: [string, string, Withheld][] = [];
     for (const a of this.staff(book, t)) {
       if (one && a.id !== one.agreement) continue; // (a rise for one of us, at the wage asked)
-      const wage = one ? one.wage : Math.floor((this.wageOf(a) * (10_000 + riseBps)) / 10_000);
+      let wage = one ? one.wage : Math.floor((this.wageOf(a) * (10_000 + riseBps)) / 10_000);
+      // (A rise for someone on cut hours is a rise of their full wage, and they are paid their hours' share of it.)
+      const cut = this.cuts.get(a.id);
+      if (cut && !one) { cut.full = Math.floor((cut.full * (10_000 + riseBps)) / 10_000); wage = Math.floor((cut.full * cut.paidBps) / 10_000); cut.wage = wage; }
       this.gross.set(a.id, wage);
       if (one?.short) this.skim.set(a.id, one.short); else this.skim.delete(a.id); // (a wage set afresh is paid as set)
       const order = this.orders.get(a.id);
@@ -1724,6 +1765,113 @@ export class Staffing {
     return steps;
   }
 
+  // ---- Hours before heads (docs/behaviour/firms.md): the hours term of an agreement, cut and restored by a paper to the worker ----
+
+  /** What the wage of an agreement is when its hours are whole: the cut's full wage where it is cut, else the wage now. */
+  fullWageOf(a: any): number {
+    const c = this.cuts.get(a.id);
+    return c?.state === "set" ? c.full : this.wageOf(a);
+  }
+  /** The share of the ordinary hours someone works at `t` (10,000: whole), as our cuts stand. */
+  hoursBpsAt(worker: string, t: number): number {
+    for (const c of this.cuts.values()) if (c.worker === worker && c.state === "set" && t >= c.from && t < c.until) return c.hoursBps;
+    return 10_000;
+  }
+  /** Whether any of our staff is on cut hours or has been put a cut. */
+  get cutting(): boolean { return this.cuts.size > 0; }
+
+  /**
+   * The month's look at hours (called by a shop or a factory whose staff outrun its trade, or whose trade has come back).
+   * `targetBps`: the share of the ordinary hours the trade expected needs of the staff we have (10,000 or more: all of
+   * them). Where the law lets an employer cut hours, we cut across all our staff to that share (never below the law's
+   * floor), by a paper to each; where the trade has come back, or the law's longest spell is run, hours are restored by
+   * another. Returns the steps and the share our staff will work, which the module reads to see whether a surplus of
+   * hands is left (and only then lets anyone go). A world with no such law, or one that does not allow it: nothing, 10,000.
+   */
+  reviewHours(book: Book, t: number, targetBps: number, stepBps = 1_000): { steps: Step[]; achieved: number; why: string } {
+    const none = { steps: [] as Step[], achieved: 10_000, why: "" };
+    const law = hoursLaw(book);
+    if (this.o.does?.pay === false || this.o.does?.hire === false) return none;
+    const staff = this.staff(book, t).filter((a) => !this.noticed.has(a.id) && !byTheDay(a));
+    const steps: Step[] = [];
+    const restore = (why: string, only?: Cut[]) => {
+      for (const c of only ?? [...this.cuts.values()]) {
+        this.cuts.delete(c.agreement);
+        const text = `Your hours are back to the ordinary ${ordinaryHours(book.records.get(c.agreement), c.worker, law)} a week, and your pay with them: ${usd(c.full)} every ${durationWords(jobTerms(book.records.get(c.agreement), c.worker).period)}.`;
+        const at = t + HOURS_GRACE_DAYS * DAY;
+        if (c.state === "set") this.due.push({ at, agreement: c.agreement, wage: c.full, why: `Hours restored: ${c.worker} back on ${usd(c.full)}.` });
+        steps.push(because(why, say("hours_restored", text, { to: [c.worker], visible: [this.me, c.worker], basis: c.agreement, data: { employer: this.me, agreement: c.agreement, wage: c.full, hours_bps: 10_000, from: at, ...(law ? { law: law.id } : {}) } })));
+      }
+    };
+    // The law's longest spell: a cut that has run it is ended, and we cut no more for as long again.
+    const over = [...this.cuts.values()].filter((c) => c.state === "set" && t >= c.until - HOURS_GRACE_DAYS * DAY);
+    if (over.length) { restore(`The longest spell the law allows on cut hours (${law?.max_days} days) is run for ${over.length} of our staff: back to their ordinary hours.`, over); this.noCutUntil = t + (law?.max_days ?? 0) * DAY; }
+    // Proposals not agreed to in time are dropped, and not put again this spell.
+    for (const c of [...this.cuts.values()]) if (c.state === "proposed" && t > c.replyBy) { this.cuts.delete(c.agreement); this.declined.add(c.agreement); }
+    if (!law || law.may_cut === "no") {
+      if (this.cuts.size) restore("The law no longer lets us cut hours: back to the ordinary.");
+      return { ...none, steps };
+    }
+    if (targetBps >= 10_000 - stepBps) {
+      if (this.cuts.size) restore("Trade has come back to what our staff at their ordinary hours need: their hours are restored.");
+      this.declined.clear();
+      return { steps, achieved: 10_000, why: "" };
+    }
+    if (t < this.noCutUntil || !staff.length) return { steps, achieved: this.achieved(staff), why: "" };
+    const goal = Math.min(10_000, Math.max(law.floor_bps, Math.ceil(targetBps / 100) * 100));
+    const each = staff.length >= law.pay_owed_from ? law.pay_bps : 0;
+    let changed = 0;
+    for (const a of staff) {
+      const worker = a.terms.parties[1] as string, now = this.cuts.get(a.id);
+      if (this.declined.has(a.id)) continue;
+      const current = now?.hoursBps ?? 10_000;
+      if (Math.abs(current - goal) < stepBps) continue;
+      const full = now?.state === "set" ? now.full : this.wageOf(a);
+      const paidBps = paidShare(goal, each);
+      const wage = Math.floor((full * paidBps) / 10_000);
+      const ordinary = ordinaryHours(a, worker, law);
+      const notice = Math.max(law.notice_days, HOURS_GRACE_DAYS);
+      const since = now?.since ?? t;
+      const until = law.max_days > 0 ? since + law.max_days * DAY : t + 20 * 365 * DAY;
+      const from = t + notice * DAY;
+      const period = jobTerms(a, worker).period;
+      const consent = law.may_cut === "consent";
+      const hours = Math.round((ordinary * goal) / 100) / 100;
+      const text = `${consent ? "We ask you to agree to" : "We are cutting"} your hours from ${ordinary} a week to ${hours}, ${consent ? "from the day you agree" : `from ${dateWords(from)}`}, because there is not the trade for everyone's full week. Your pay for them is ${usd(wage)} every ${durationWords(period)}, where it was ${usd(full)}.${law.pay_bps > 0 && each > 0 ? ` (The law owes ${law.pay_bps / 100}% of pay for hours not worked.)` : ""}${law.max_days > 0 ? ` It is for at most ${law.max_days} days.` : ""} We would sooner do this than let anyone go.`;
+      this.cuts.set(a.id, { agreement: a.id, worker, full, hoursBps: goal, paidBps, wage, from, until, since, state: consent ? "proposed" : "set", replyBy: t + Math.max(law.notice_days, 7) * DAY });
+      if (!consent) this.due.push({ at: from, agreement: a.id, wage, why: `Hours cut to ${hours} a week: ${worker} on ${usd(wage)} from the next pay.` });
+      steps.push(because(`${now ? "Changing" : "Cutting"} ${worker}'s hours to ${goal / 100}% of the ordinary, in place of letting anyone go (docs/behaviour/firms.md, "Hours before heads").`,
+        say("hours_notice", text, { to: [worker], visible: [this.me, worker], basis: a.id, data: { employer: this.me, agreement: a.id, hours_bps: goal, ordinary_week_hours: Math.round(ordinary), minutes_week: Math.round(hours * 60), wage, was: full, from, until, consent, consent_bps: law.consent_bps, law: law.id, reply_by: t + Math.max(law.notice_days, 7) * DAY } })));
+      changed++;
+    }
+    return { steps, achieved: this.achieved(staff), why: changed ? `cut hours across our staff to ${goal / 100}% of the ordinary` : "" };
+  }
+  /** The average share of the ordinary hours our staff work, counting what is put to them for their agreement. */
+  private achieved(staff: any[]): number {
+    return staff.length ? Math.round(staff.reduce((x, a) => x + (this.cuts.get(a.id)?.hoursBps ?? 10_000), 0) / staff.length) : 10_000;
+  }
+  /** Agreements to cuts we put (an `hours_reply` of the worker's), and the wage changes whose day has come. */
+  applyHours(book: Book, t: number, account: string): Step[] {
+    const steps: Step[] = [];
+    const replies = book.open("hours_reply").filter((r) => (r.addressed_to ?? []).includes(this.me));
+    for (const r of replies) {
+      const c = this.cuts.get(String(r.data?.agreement));
+      if (!c || c.state !== "proposed" || r.speaks_for !== c.worker || this.handled.has(r.id)) continue;
+      this.handled.add(r.id);
+      if (r.data?.agree === true) {
+        c.state = "set"; c.from = Math.max(t + HOURS_GRACE_DAYS * DAY, c.from);
+        this.due.push({ at: c.from, agreement: c.agreement, wage: c.wage, why: `${c.worker} has agreed to the cut: on ${usd(c.wage)} from the next pay.` });
+      } else { this.cuts.delete(c.agreement); this.declined.add(c.agreement); }
+    }
+    const now = this.due.filter((d) => d.at <= t);
+    for (const d of now) {
+      this.due.splice(this.due.indexOf(d), 1);
+      if (this.noticed.has(d.agreement) || !this.staff(book, t).some((a) => a.id === d.agreement)) { this.cuts.delete(d.agreement); continue; }
+      steps.push(...this.raise(book, t, account, 0, d.why, { agreement: d.agreement, wage: d.wage }));
+    }
+    return steps;
+  }
+
   /** Let one worker go (the most recent hire not already under notice), with the notice their contract gives. */
   letGo(book: Book, t: number, why: string, reason: string): Step[] {
     const staff = this.staff(book, t);
@@ -1751,7 +1899,7 @@ export class Staffing {
     const law = terminationLaw(book);
     if (!law || byTheDay(a)) return { sum: 0, law: "", words: "" };
     const terms = jobTerms(a, a.terms.parties[1]), years = this.serviceYears(book, t, a);
-    const weekly = (this.wageOf(a) * 7 * DAY) / terms.period;
+    const weekly = (this.fullWageOf(a) * 7 * DAY) / terms.period;
     const small = !!law.small_employer_under && staff < law.small_employer_under;
     const redundancy = small ? 0 : weeksAt(law.redundancy_pay, years);
     const agreed = (a.terms.termination?.find((x: any) => x.party === this.me)?.notice ?? 0) / (7 * DAY);

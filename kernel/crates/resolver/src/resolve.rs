@@ -1041,6 +1041,10 @@ impl Resolver<'_> {
                 commitments.push(Json::Object(ordered));
             }
         }
+        // The job's ordinary hours in a week (an employment's hours term, 2026-10-13): the other side's commitment to work them.
+        if let Some(h) = Self::seconds(c, "hours")?.filter(|h| *h != 0) {
+            commitments.push(json!({ "who": other, "does": { "outcome": { "work": { "task": "ordinary_hours", "hours": h } } }, "every": 7 * 86_400 }));
+        }
         if commitments.is_empty() {
             return ask("An agreement says what each side is to do or pay, and this one says nothing either side commits to. Say what you will do or pay, and what they will: money, goods, a building, occupancy, an account or work.");
         }
@@ -1527,6 +1531,16 @@ mod tests {
         let many: Vec<String> = (1..=65).map(|i| format!("rec.{i}")).collect();
         assert_eq!(asks(&format!(r#"statement(kind=notice, text="x", basis={})"#, json!(many))), vec!["That cites more records than one act can: 64 at most."]);
         assert_eq!(blocks(&format!(r#"statement(kind=notice, text="x", basis={})"#, json!(many[..64])))[0]["basis"], json!(many[..64]));
+    }
+
+    /// (The same case as translator/test/resolver.test.ts has: an agreement's hours term, 2026-10-13.)
+    #[test]
+    fn an_agreements_hours_term_is_a_second_commitment_of_the_other_side() {
+        let b = blocks(r#"agreement(with=greenco, template=employment, hours="136800 seconds", we_do=money(to=acc-greenco, amount="2,000", every="14 days", from=acc-city))"#);
+        let c = b[0]["terms"]["commitments"].as_array().unwrap().iter().filter(|c| c["who"] == "greenco").cloned().collect::<Vec<_>>();
+        assert_eq!(c, vec![json!({ "who": "greenco", "does": { "outcome": { "work": { "task": "ordinary_hours", "hours": 136_800 } } }, "every": 604_800 })]);
+        let none = blocks(r#"agreement(with=greenco, template=employment, we_do=money(to=acc-greenco, amount="2,000", every="14 days", from=acc-city))"#);
+        assert_eq!(none[0]["terms"]["commitments"].as_array().unwrap().len(), 1);
     }
 
     /// The payment a finance seat lost in a pilot (four dockets and a budget cited, written as a list): a request to

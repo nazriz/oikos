@@ -1535,9 +1535,9 @@ export const record = (position: "right" | "liberty", holder: string, about: unk
   C.call("claim", { position, holder, about: C.json(about), against: o.against, basis: o.basis });
 
 /** Offer an agreement (signed on our side). `we` and `they` are the outcomes each side commits to. */
-export function offer(withWhom: string, o: { template: string; we?: C.Call; they?: C.Call; term?: number; then?: "periodic"; ourNotice?: number; theirNotice?: number; text?: string; basis?: string }): C.Call {
+export function offer(withWhom: string, o: { template: string; we?: C.Call; they?: C.Call; term?: number; then?: "periodic"; ourNotice?: number; theirNotice?: number; text?: string; basis?: string; /** An employment's ordinary hours in a week (seconds): the agreement's hours term. */ hours?: number }): C.Call {
   return C.call("agreement", {
-    with: withWhom, template: o.template, we_do: o.we, they_do: o.they, term: o.term ? C.secs(o.term) : undefined, then: o.then,
+    with: withWhom, template: o.template, we_do: o.we, they_do: o.they, hours: o.hours ? C.secs(o.hours) : undefined, term: o.term ? C.secs(o.term) : undefined, then: o.then,
     our_notice: o.ourNotice ? C.secs(o.ourNotice) : undefined, their_notice: o.theirNotice ? C.secs(o.theirNotice) : undefined,
     terms: o.text ? C.text(o.text) : undefined, basis: o.basis,
   });
@@ -1545,7 +1545,7 @@ export function offer(withWhom: string, o: { template: string; we?: C.Call; they
 
 // ------------------------------------------------------------------ reading agreements (the standard encoding, §9.2)
 
-export type Outcome = { money?: { from?: string; to: string; amount: number; for?: string }; goods?: { kind: string; quantity: string; to: string; at: string; from?: string }; occupancy?: { who: string; in: string; leave?: boolean }; structure?: { type?: string; on?: string; remove?: string } };
+export type Outcome = { work?: { task: string; at?: string; hours?: number }; money?: { from?: string; to: string; amount: number; for?: string }; goods?: { kind: string; quantity: string; to: string; at: string; from?: string }; occupancy?: { who: string; in: string; leave?: boolean }; structure?: { type?: string; on?: string; remove?: string } };
 
 /** The structure a space is in (`apts-3/dwelling.2` -> `apts-3`). */
 export const structureOf = (space: string) => space.split("/")[0]!;
@@ -1588,7 +1588,7 @@ export function advertisedJob(book: Book, a: Record | undefined): StatementRecor
  * that says nothing of where the work is and was made on an advertisement is on the advertisement's terms: with the
  * reader's `book`, the workplace is then the advertised one.
  */
-export function jobTerms(a: Record | undefined, worker: string, book?: Book): { wage: number; period: number; workplace?: string } {
+export function jobTerms(a: Record | undefined, worker: string, book?: Book): { wage: number; period: number; workplace?: string; /** The ordinary hours in a week the agreement states (seconds), where it states them. */ hours?: number } {
   if (a?.record !== "agreement") return { wage: 0, period: 14 * DAY };
   const employer = a.terms.parties.find((x) => x !== worker)!;
   const pays = commitmentOf(a, employer);
@@ -1596,7 +1596,8 @@ export function jobTerms(a: Record | undefined, worker: string, book?: Book): { 
   const theirs = a.terms.commitments.filter((c) => c.who === worker).map((c) => c.does?.outcome);
   const stated: string | undefined = theirs.map((o) => o?.occupancy?.in).find((x) => typeof x === "string" && x) ?? theirs.map((o) => o?.work?.at).find((x) => typeof x === "string" && x);
   const advertised = stated || !book ? undefined : advertisedJob(book, a)?.data?.space;
-  return { wage: cents(pays.outcome?.money?.amount), period: pays.every ?? 14 * DAY, workplace: stated ?? (typeof advertised === "string" && advertised ? advertised : undefined) };
+  const hours = theirs.map((o) => o?.work?.hours).find((x) => Number.isFinite(Number(x)) && Number(x) > 0);
+  return { wage: cents(pays.outcome?.money?.amount), period: pays.every ?? 14 * DAY, workplace: stated ?? (typeof advertised === "string" && advertised ? advertised : undefined), ...(hours !== undefined ? { hours: Number(hours) } : {}) };
 }
 
 export const between = (lo: number, hi: number, u: number) => lo + Math.floor(u * (hi - lo + 1));

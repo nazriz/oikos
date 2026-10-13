@@ -84,3 +84,7 @@ Lengnick, M. (2013), *Agent-based macroeconomics: a baseline model*, **Journal o
 - **Several products.**
 - **Stock that deteriorates.**
 - **Choosing between suppliers.** There is one supplier, the world market, until the town makes inputs.
+
+## Hours before heads (0.9.0, 2026-10-13)
+
+Over its stock band, a works whose world's law lets an employer cut hours cuts everyone's by one hand's worth before it lets anyone go, and makes in its staff's hours (firms.md, "Hours before heads"). Parameter: `adjust.hours_step_bps` (1,000).

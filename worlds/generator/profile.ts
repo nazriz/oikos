@@ -80,7 +80,14 @@ export interface Profile {
       termination?: { notice: { from_years: number; days: number }[]; redundancy_pay: { from_years: number; days: number }[]; small_employer_under?: number };
       /** How employers here adjust their staff to their trade: the months a firm smooths its trade over, and what
        * taking someone on costs it, in weeks of their pay. Left out: the modules' own (placeholders). */
-      adjustment?: { smooth_months?: number; hiring_cost_weeks?: number };
+      adjustment?: { smooth_months?: number; hiring_cost_weeks?: number; hours_step_bps?: number };
+      /** The place's law on an employer cutting hours in place of ending jobs (docs/behaviour/firms.md, "Hours before
+       * heads"), published in the town as a law its employers and workers read. `may_cut`: "notice" (by notice),
+       * "consent" (with the employee's agreement) or "no" (not at all: firms here do not do it); `ordinary_week_hours`;
+       * `notice_days`; `floor_bps` (the least hours it may cut to, as a share of the ordinary); `max_days` (the longest spell; 0: none
+       * stated); `pay_bps` (the share of pay owed for hours cut) from `pay_owed_from` employees; `consent_bps` (of workers asked, the
+       * share who agree: a placeholder). Left out: no such law in the town, and its firms do not cut hours. */
+      hours?: { may_cut: "notice" | "consent" | "no"; ordinary_week_hours: number; notice_days?: number; floor_bps?: number; max_days?: number; pay_bps?: number; pay_owed_from?: number; consent_bps?: number };
       casual_bps?: { shop?: number; factory?: number; construction?: number }; day_wage?: { shop?: number; factory?: number; construction?: number };
       /** People who work for themselves, alone (docs/behaviour/entry.md, "A person working for themself"): of people
        * in work, the share who do (`share_bps`), and what they do, as the place's survey divides them (`kinds`, their

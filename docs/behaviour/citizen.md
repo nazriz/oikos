@@ -394,3 +394,7 @@ Unless a source is named above, a figure is a placeholder, to calibrate.
 - Misremembering. (Memory is bounded since 0.44.0: the last eight things and four that defined the person.)
 - Founding more than once; taking over what someone else founded; a founded thing acting beyond gathering, a fund and a hearing (a picket, a petition of its own, a rule for its members).
 - The sparse mind on a real model: its robustness audit (`oikos consult-audit`) is built and tested on the mock, not yet run on one.
+
+## Cut hours (0.56.0, 2026-10-13)
+
+An employer's paper cutting or restoring our hours (`hours_notice`, `hours_restored`) is the pay agreed from the day it names, so a cut we were told of or agreed to is not pay come short, and our income, rent, essentials and offers follow it. A pay at the old figure up to three days after that day is still pay agreed. Asked to agree to a cut, we answer by a paper (`hours_reply`) with the world's share who agree (`consent_bps`, a placeholder) on our own draw (`hours-consent-<agreement>-<day>`). Pay lower than the whole with no paper behind it is short pay, as before (frictions.md). See firms.md, "Hours before heads".

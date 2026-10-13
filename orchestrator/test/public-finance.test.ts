@@ -51,6 +51,11 @@ test("wages are paid net of the tax withheld, which is paid over; rates are levi
     // found on 2026-10-12, when the town as now drawn first had such a hire; the employer's order was right.)
     const signed = [...config.world.records, ...recs].filter((r: any) => r.record === "signature" && r.agreement === a.id && r.as === a.terms.parties[1]).map((r: any) => r.at as number).sort((x, y) => x - y)[0] ?? a.at;
     for (const ea of eas.filter((x) => x.data.employer === a.terms.parties[0] && x.at <= o.at && x.at >= signed)) gross = Math.floor((gross * (10_000 + ea.data.rise_bps)) / 10_000);
+    // (Or, for someone whose hours were cut or restored by their employer's paper, the wage that paper names, from its day, once agreed
+    // where it asks for agreement: docs/behaviour/firms.md, "Hours before heads".)
+    const agreed = (n: any) => !n.data.consent || recs.some((x) => x.kind === "hours_reply" && x.data.agreement === a.id && x.data.agree === true && x.at >= n.at);
+    const paper = recs.filter((x) => (x.kind === "hours_notice" || x.kind === "hours_restored") && x.data.agreement === a.id && x.data.from <= o.at && agreed(x)).sort((x, y) => y.data.from - x.data.from)[0];
+    if (paper) gross = paper.data.wage;
     expect(Number(o.data.outcome.money.amount)).toBe(gross - withholding(law, gross, every));
   }
   // What's withheld is paid over monthly, with a report (a firm short of money pays what it has, and owes the rest).

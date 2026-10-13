@@ -63,7 +63,9 @@ const TOWN = join(root, "worlds/town.yaml");
 // by taking the lines and the parameters out, which gives 43f2bf77... again.
 // And again on 2026-10-12, with draws named for the day or the matter, not the hour (9665fd1d... until then; docs/decisions.md, "Draws and
 // the moment"): every participant's stream is a different stream, so every town's draws fall differently. Nothing else moved. (b9db68a1... for the first version of the change, which counted hours.)
-const STEP_1 = "42832ef34c44d8fa9577ceb9dc0564e3b200366c2a45dcf58a2f1fd81527fe37";
+// And again on 2026-10-13 (42832ef3... until then; docs/decisions.md, "Hours before heads"): the town publishes its law on cutting hours, and shops, factories
+// and townspeople read it (agreements for new hires carry their hours; firms cut hours before they let people go). Nothing of `living` in it.
+const STEP_1 = "46e3ae5e37b055407ff075510ae6cbcd2e73c4c1a3252c6ca4c8758d7f2c68ce";
 
 test("with the dial absent or at 0 a town is step 1's town, to the state hash", async () => {
   const out = mkdtempSync(join(tmpdir(), "oikos-dial-"));
