@@ -170,7 +170,7 @@ export interface TownSpec {
   opening_caseload?: boolean;
   /** A dial for `opening_caseload`, in basis points of what the town's own mechanism gives (10,000: as it gives; the default):
    * for a pilot or a test that wants thicker files. It scales the other offices' counts (support, desks, planning, bank,
-   * finance); the landlords' and the tribunal's come from who cannot pay, and are not scaled. */
+   * finance); the landlords' and the tribunal's come from who cannot pay, and are not scaled: it is no dial on the tribunal's caseload. */
   opening_caseload_scale_bps?: number;
   /** A living world (docs/design/ai-citizens.md 10j). Absent: the town is generated exactly as it was. `starting_attachment`
    * (on unless false): people open attached to their place, trade and group by the profile's years of residence and tenure.

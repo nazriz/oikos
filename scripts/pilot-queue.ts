@@ -22,7 +22,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } fr
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { alert } from "../orchestrator/src/pilot-alerts";
-import { framingSets, readWorldFile, limitedProviders, limitWaitMs, localStamp, measureFailure, nextPilot, parkedPath, providersOf, runState, scanOptOuts, type Parked } from "../orchestrator/src/pilot-state";
+import { framingSets, readWorldFile, limitedProviders, limitWaitMs, localStamp, measureFailure, nextPilot, noteOf, parkedPath, providersOf, runState, scanOptOuts, type Parked } from "../orchestrator/src/pilot-state";
 
 interface Pilot { name: string; world: string; sets?: string[]; /** What its seats are told the town is (VISION 15, point 1): a disclosure by name, or { disclosure, reason }. Passed to the run as its world's `framing`. */ framing?: string | { disclosure: string; reason?: string }; model: string; translator?: string; translator_first?: string; translator_arrangement?: "then" | "beside"; until: number; budget: number; env?: { [k: string]: string }; note?: string; test?: boolean; args?: string[] }
 
@@ -79,7 +79,7 @@ for (;;) {
   mkdirSync(dir, { recursive: true });
   // PILOT.txt: the queue's entry, as it was when the pilot was first started ("test": true is read from it by the pilot
   // report, so that later steps keep a held-out test's requests out of training).
-  if (!existsSync(join(dir, "PILOT.txt"))) writeFileSync(join(dir, "PILOT.txt"), `${p.test ? "TEST PILOT: its requests are kept out of training (a held-out test).\n\n" : ""}${p.note ? p.note + "\n\n" : ""}${JSON.stringify(p, null, 1)}\n`);
+  if (!existsSync(join(dir, "PILOT.txt"))) writeFileSync(join(dir, "PILOT.txt"), `${p.test ? "TEST PILOT: its requests are kept out of training (a held-out test).\n\n" : ""}${p.note ? noteOf(p.note) + "\n\n" : ""}${JSON.stringify(p, null, 1)}\n`);
   if (!kept.has(p.name)) kept.set(p.name, { failures: 0, offsets: new Map(), optedOut: new Set(), notSent: 0, unanswered: 0, unansweredAt: -1 });
   const k = kept.get(p.name)!;
   const s = await runState(dir, p.until);

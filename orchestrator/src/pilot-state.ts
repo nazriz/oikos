@@ -268,3 +268,16 @@ export function framingSets(p: { framing?: string | { disclosure: string; reason
 export function readWorldFile(path: string): any {
   try { const text = readFileSync(path, "utf8"); return /\.ya?ml$/.test(path) ? Bun.YAML.parse(text) : JSON.parse(text); } catch { return undefined; }
 }
+
+/**
+ * A queue entry's note as PILOT.txt carries it. A note that names the caseload dial (`opening_caseload_scale_bps`) is
+ * followed by what the generator says it does, whatever the note says (the sixth living pilot's note called it a pilot's
+ * dial for the tribunal's caseload; it scales only the other offices': docs/behaviour/generator.md, "The other offices'
+ * caseload"). Nothing else in the note is touched.
+ */
+export function noteOf(note: string | undefined): string {
+  if (!note) return "";
+  if (!note.includes("opening_caseload_scale_bps")) return note;
+  return `${note}\n\n[opening_caseload_scale_bps, as the generator has it: a dial on the opening caseload of the OTHER offices (support, desks, planning, bank, finance). It does not reach the landlords' or the tribunal's, which come from who cannot pay: there is no dial on those.]`;
+}
+

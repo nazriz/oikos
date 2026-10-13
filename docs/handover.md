@@ -47,8 +47,9 @@ line: what, the doc, the dial (a dial off gives the earlier town).
 - **Homes by income.** A town's first tenancies follow what its households have coming in; payments owed are in
   payment from day 1; people with nothing coming in live with kin. `docs/behaviour/generator.md`.
 - **Opening caseloads.** A town may open in the middle of things: the landlords' and tribunal's ordinary caseload, and
-  the support office's, desks', planning's, finance's and bank's. Spec flag `opening_caseload` (`opening_caseload_scale_bps`
-  thickens it). `generator.md`; decisions 2026-10-12 "Opening caseloads of the other offices".
+  the support office's, desks', planning's, finance's and bank's. Spec flag `opening_caseload`. Its dial `opening_caseload_scale_bps` thickens
+  the OTHER offices' files only (support, desks, planning, bank, finance); the landlords' and tribunal's come from who cannot
+  pay and have no dial (a pilot that needs more tribunal cases needs a different town, not this dial). `generator.md`; decisions 2026-10-12 "Opening caseloads of the other offices".
 - **Firms' trade credit and shock response.** A factory sells to shops on terms, a second loan, inputs bought to what
   can be sold, no dividend while wages are owed. `docs/behaviour/trade.md`, `credit.md`, `producer.md`, `firms.md`.
   Terms come from a profile's `business.trade_credit_days`; a profile without it trades for cash as before.
