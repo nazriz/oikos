@@ -1394,9 +1394,43 @@
     "cases_per_day": 4,
     "uphold_without_proof_bps": 5000
    }
+  },
+  "culture": {
+   "origin": {
+    "groups": [
+     {
+      "id": "branca",
+      "name": "Branca (white)",
+      "share_bps": 4110
+     },
+     {
+      "id": "parda",
+      "name": "Parda (brown)",
+      "share_bps": 4670
+     },
+     {
+      "id": "preta",
+      "name": "Preta (black)",
+      "share_bps": 1180
+     },
+     {
+      "id": "amarela",
+      "name": "Amarela (yellow)",
+      "share_bps": 20
+     },
+     {
+      "id": "indigena",
+      "name": "Indígena",
+      "share_bps": 20
+     }
+    ],
+    "same_household_bps": 6930,
+    "homophily_bps": 5000
+   }
   }
  },
  "sources": {
+    "culture.origin": "PLACE: Minas Gerais (state), Censo 2022, cor ou raça (the census's own classes, self-declared). groups: IBGE Censo Demográfico 2022 results, Minas Gerais: branca 41.1%, parda 46.8%, preta 11.8%, amarela 0.2%, indígena 0.2% (sum 100.1% as rounded; parda lowered by 10 bp to sum to 10000). (to confirm): the IBGE news page (agenciadenoticias.ibge.gov.br, 'Censo 2022: pela primeira vez, desde 1991, a maior parte da população do Brasil se declara parda', 2023-12-22) returned HTTP 403 and was NOT opened; the figures are as quoted in search results from several outlets (e.g. https://www.em.com.br/gerais/2023/12/6773939-saiba-quais-sao-as-cidades-mineiras-com-mais-brancos-pretos-e-pardos.html , not opened). same_household_bps: 6930 = 69.3% of Brazilian couples of the same cor ou raça, IBGE Censo 2010 (white 74.5%, pardo 68.5%, indigenous 65.0%), as reported by Zero Hora 2012-10-18 and reproduced at https://ihu.unisinos.br/514657-censo-retrata-um-novo-perfil-da-familia-brasileira , OPENED 2026-10-13 (the IBGE table itself not opened). National, 2010, not Minas Gerais 2022. homophily_bps: PLACEHOLDER 5000 (a close tie is half again as likely within a group as by chance). No survey of close ties or friendship by group for this place was found and opened; McPherson, Smith-Lovin and Cook 2001 ('Birds of a feather', Annual Review of Sociology 27) gives the general fact, not this place's figure. CHILDREN: cor ou raça is declared by the household for each member, and 'parda' takes in many of mixed descent, so a child of a mixed couple is often declared parda, not either parent's group: the generator's rule does not fit well (to confirm; the census says nothing on this in the pages opened).",
     "tenancy.rent_share_of_income": "IBGE, Sintese de Indicadores Sociais 2024, Tabela 3.23 (onus excessivo com aluguel), Brazil 2023: in 26.99% of rented households the monthly rent was 30% or more of household income (25.95% in 2022) (https://ftp.ibge.gov.br/Indicadores_Sociais/Sintese_de_Indicadores_Sociais/Sintese_de_Indicadores_Sociais_2024/Tabelas/xls/3_Moradia_xls.zip, opened 2026-10-12). National: for Minas Gerais only the share of people is published (19.83%, Tabela 3.22). IBGE publishes that one threshold and no other band, median or mean, so there are two bands: under 30%, and 30% or more. Gross household income from all sources; rent alone; households without income are left out by the source. HOW IT IS USED (docs/behaviour/generator.md, \"Homes by income\"): each renting household of a new town draws its share from these bands (evenly within a band; the open band from its lower bound to twice it, at most everything), which gives the rent it carries; households and let homes are matched by it. A target as well: the town's own distribution at the start is reported beside it and is not fitted to it.",
     "support.take_up_bps": "pension 85%: TO CONFIRM: secondary reports put those aged 65 and over covered by a retirement benefit, a pension or the old-age assistance benefit at about nine in ten; what was opened is 69.5% of people aged 60 and over receiving a retirement benefit or pension of their own in 2024 (IBGE, Sintese de Indicadores Sociais 2025, Tabela 2.28, https://ftp.ibge.gov.br/Indicadores_Sociais/Sintese_de_Indicadores_Sociais/Sintese_de_Indicadores_Sociais_2025/Tabelas/xls/2_Distribuicao_Renda_xls.zip, opened 2026-10-12), which leaves out the assistance benefit and counts from 60. unemployment 40%: PLACEHOLDER: the payment is a stand-in (the family transfer paid to those out of work), and no share of the unemployed receiving it exists; 13.9% of households in Minas Gerais received it in 2024 (IBGE, SIDRA table 7457, opened). HOW IT IS USED (docs/behaviour/generator.md, \"Payments in force\"): of those the payment's rule already entitles as the year begins, this share open with it in payment; the rest claim it when they first look, as before.",
     "ownership.owner_bps_by_age": "A PROXY: IBGE publishes no tenure by age of the household's reference person in the tables found. Residents of occupied private dwellings by their own age, Minas Gerais, Censo 2022 (IBGE, SIDRA table 9938, https://servicodados.ibge.gov.br/api/v3/agregados/9938, opened 2026-10-12): living in a home a resident owns: 64.4% at 15-34, 70.6% at 35-44, 77.2% at 45-54, 82.6% at 55-64, 86.5% at 65 and over. People, not households: used for the slope by age only. HOW IT IS USED (docs/behaviour/generator.md, \"Homes by income\"): only as how much likelier a household of one age is than another to be among the town's owners; their number is the houses the profile's house_owner_bps makes owner-occupied.",

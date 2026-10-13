@@ -514,6 +514,14 @@ Additions only; nothing renamed or removed. A log or a world made before them is
 - **Dataset: `readings.jsonl`** (`Reading` in `dataset.schema.json`; additive): one row per paper read, as filed in the log: the paper, the kind and outcome it decided, the standing, the paper's words as the reader was shown them (tagged) and their hash, what it answered (tagged), the source (model, cache, apart, declined, no_answer, unread, over_limit, no_table), the reader's model and versions, the typed reading, the plain paper's, and the shift. The reading's `note` annotation (`data.reading`) gains `text`, `text_hash` and `answers_text`.
 - **A reader** is not a participant and has no id in the world; the contract of a reader is the TypeScript interface `Reader` (`participants/src/llm/reader.ts`), not a schema.
 
+## Changes since v0.8 closed (2026-10-13: culture, steps 1 to 3; docs/decisions.md, "Culture: building it"; under the owner's blanket approval of contract changes, 2026-10-11)
+
+- **Entity record: `norms`** (additive, optional, on a person): at most 12 rows of `{ conduct, numbers: [does, approves, own, says, n] }`, the first four whole percent, `n` a weight; absent where the culture dial is off. One person's belief, never the town's.
+- **World config: `dials.culture`** (additive, optional): `conducts` (which are live), `sway_milli`, `step` (the arithmetic's sizes, validated at the run's start), `profile` (the profile's figures by conduct and by origin group, and `homophily_bps`). Absent: the world is as before, to the state hash.
+- **Outcome `facts`** (additive, in practice; the schema already allows integer keys): `norm_does`, `norm_approves`, `norm_own`, `norm_says`, `norm_lean` on the outcome that follows a choice a norm swayed.
+- **Profile (`values.culture`, a TypeScript type; profiles are not schema-checked):** `conducts`, `origin` { `groups`, `same_household_bps`, `homophily_bps`, `by_group` }. Optional; a profile with none has no such figures and no origin groups.
+- **Participant params:** `origin` (a string, a person's own group), given by the generator only where the dial is on and the profile has groups.
+
 ## Versioning
 
 `contracts: "0.8"`. Pre-1.0, every change bumps the minor version and is proposed explicitly. A draft version collects agreed changes until it's closed. Older logs remain valid logs of their own version and replay only on a kernel build of that version (D6).

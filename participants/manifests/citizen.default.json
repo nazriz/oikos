@@ -183,6 +183,11 @@
       },
       "source": "placeholder"
     },
+    "close_affinity_bps": {
+      "schema": {},
+      "unit": "bps",
+      "source": "the world gives it (no default)"
+    },
     "complain_about": {
       "schema": {
         "type": "string"
@@ -425,6 +430,11 @@
       "source": "placeholder"
     },
     "occupancy": {
+      "schema": {},
+      "default": null,
+      "source": "placeholder"
+    },
+    "origin": {
       "schema": {},
       "default": null,
       "source": "placeholder"
@@ -691,6 +701,10 @@
         "enterprise_achievement": 0.3
       },
       "source": "placeholder"
+    },
+    "sway_milli": {
+      "schema": {},
+      "source": "the world gives it (no default)"
     },
     "tell_on_leaving": {
       "schema": {

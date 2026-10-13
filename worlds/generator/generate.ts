@@ -186,7 +186,11 @@ export interface TownSpec {
      * shares, eight pieces a month; or how many pieces a month, the mix, the fallback and the follow-up sample. */
     composer?: boolean | { pieces_per_month?: number; mix?: { model: string; share_bps: number }[]; fallback?: string; follow_up_bps?: number; accounts?: number };
     /** Reading (docs/behaviour/reading.md): seats' worded papers are read by a reader. Off unless set; the dial is carried into the config as given. */
-    reading?: { reader: string; papers?: string[]; calls_per_run?: number; step?: object } };
+    reading?: { reader: string; papers?: string[]; calls_per_run?: number; step?: object };
+    /** Culture (docs/behaviour/culture.md): people hold a picture of what those around them do and approve of. Off unless set;
+     * `true`, or which conducts are live and the sizes (`sway_milli`, `step`). The profile's `culture` figures go with the dial; people are
+     * given an origin group only where the profile has `culture.origin` (drawn on a stream of its own). */
+    culture?: boolean | { conducts?: string[]; sway_milli?: number; step?: object } };
   /** How hard a seat's model reasons, where its way in takes that (docs/real-models.md, "A seat's settings"): one word
    * for every seat ("low"), or by office id ({ finance: "low" }). Not given: the model's own default. */
   seat_effort?: string | { [seat: string]: string };
@@ -571,6 +575,10 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     fallback: CO_SPEC.fallback ?? (CO_SPEC.mix ?? [{ model: "claude-code/claude-sonnet-5-5" }])[0]!.model, follow_up_bps: CO_SPEC.follow_up_bps ?? 2_500,
     ...(CO_SPEC.accounts !== undefined ? { accounts: Number(CO_SPEC.accounts) } : {}) } : undefined;
   const READING = spec.living?.reading ? { ...spec.living.reading } : undefined;
+  const CU_SPEC = spec.living?.culture === true ? {} : spec.living?.culture || undefined;
+  const CU = CU_SPEC ? V.culture : undefined;
+  const CULTURE = CU_SPEC ? { ...(CU_SPEC.conducts ? { conducts: CU_SPEC.conducts } : {}), ...(CU_SPEC.sway_milli !== undefined ? { sway_milli: CU_SPEC.sway_milli } : {}), ...(CU_SPEC.step ? { step: CU_SPEC.step } : {}),
+    profile: { ...(CU?.conducts ? { conducts: CU.conducts } : {}), ...(CU?.origin?.by_group ? { by_origin: CU.origin.by_group } : {}), ...(CU?.origin ? { homophily_bps: CU.origin.homophily_bps } : {}) } } : undefined;
   const frictionRng = rng("frictions");
   const worn = () => (FR ? { variables: { disrepair: frictionRng.below(DISREPAIR_AT) } } : {});
   const UT = V.utilities && spec.utilities !== false ? V.utilities : undefined;
@@ -2526,6 +2534,31 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     return Object.keys(started).length ? { started } : {};
   };
   const livingRng = rng("living");
+  // Where people come from (docs/behaviour/culture.md, "Origin"): only where the culture dial is on and the profile has groups.
+  // Drawn on a stream of its own, so no other draw moves. A household's first adult is drawn from the groups' shares; each
+  // other adult is of the same group with the profile's `same_household_bps`, else drawn again; a child takes a parent's.
+  const originOf = new Map<string, string>();
+  if (CU?.origin) {
+    const O = CU.origin, or = rng("origin");
+    const total = O.groups.reduce((a, x) => a + x.share_bps, 0);
+    const pick = () => { let r = or.below(total); return (O.groups.find((x) => (r -= x.share_bps) < 0) ?? O.groups.at(-1)!).id; };
+    // (First those with no parents in the town, household by household; then whoever has parents, from them, in as many
+    // rounds as it takes: a grown child's parents live in another household.)
+    const firstOf = new Map<Household, string>();
+    for (const h of households) {
+      const first = pick();
+      firstOf.set(h, first);
+      let nth = 0;
+      for (const a of h.members.filter((m) => !(m.parents ?? []).length)) originOf.set(a.id, nth++ === 0 || or.below(10_000) < O.same_household_bps ? first : pick());
+    }
+    for (let round = 0; round < 4; round++) for (const h of households) for (const m of h.members) {
+      if (originOf.has(m.id)) continue;
+      const parents = (m.parents ?? []).filter((x) => originOf.has(x));
+      if (!parents.length && round < 3) continue;
+      // (A child of parents of two groups takes either parent's with an equal chance: the sources say how children of mixed couples are counted, and none gives a split.)
+      originOf.set(m.id, parents.length ? originOf.get(parents.length > 1 && or.below(10_000) >= 5_000 ? parents[1]! : parents[0]!)! : firstOf.get(h)!);
+    }
+  }
   const homeHouseholdOf = new Map(households.flatMap((h) => h.members.map((m) => [m.id, h] as const)));
   // Those outside the labour force don't look for work (their own controller settings).
   const outsideLabourForce = { ...citizenController, params: { ...citizenController.params, in_labour_force: false } };
@@ -2534,7 +2567,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     const held = beliefs.get(m.id);
     // (Their own beliefs; and, where people here stop work at ages of their own, theirs.)
     const own = { own_values: valuesOf.get(m.id)!, ...(held ? { beliefs: held } : {}), ...(stopsAt.has(m.id) ? { stops_work_at: stopsAt.get(m.id) } : {}), ...(ownWorkOf.has(m.id) ? { own_work: ownWorkOf.get(m.id) } : {}),
-      ...(living ? { ...(attachMean ? { attach_mean: attachMean } : {}), ...startedOf(m) } : {}) };
+      ...(living ? { ...(attachMean ? { attach_mean: attachMean } : {}), ...startedOf(m) } : {}), ...(originOf.has(m.id) ? { origin: originOf.get(m.id) } : {}) };
     participants.push({ id: `${m.id}-self`, kind: "person", person: m.id, channels: citizenChannels, controller: Object.keys(own).length ? { ...controller, params: { ...controller.params, ...own } } : controller, framing: unstated });
   }
   // Possession: landlords are told where an application goes and what it costs (the tribunal's fee, where it has
@@ -2822,8 +2855,8 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     contracts: "0.8",
     meta: { name: spec.name, description: `Generated town (generator ${GENERATOR_VERSION}, seed ${spec.seed}): ${everyone.length} people in ${households.length} households, ${homes.length} homes, ${jobSlots.length} jobs.${RS ? ` As the year begins: ${[...inForce.values()].reduce((x, y) => x + y.length, 0)} payments in force; ${start.taken_in} households with nothing coming in live with kin, ${start.on_savings} rent on their savings, ${start.without} households are without a home.` : ""}${OA ? ` ${ownBusinesses.length} people working for themselves, in the kinds the town holds (${OA_HELD.map((k) => k.name).join(", ") || "none"}); of the profile's own-account workers, ${(10_000 - OA_HELD.reduce((x, k) => x + k.share_bps, 0)) / 100}% are in kinds it cannot hold yet and are drawn in jobs.` : ""}${under.applied.length ? ` Starting conditions: ${under.applied.join(", ")}.` : ""}`, canary: CANARY },
     seed: spec.seed,
-    ...(spec.living?.initiative_bps !== undefined || FR || FND || READING ? { dials: { ...(spec.living?.initiative_bps !== undefined ? { initiative_bps: spec.living.initiative_bps } : {}), ...(FR ? { friction_bps: FRICTION_BPS } : {}),
-      ...(FND ? { founding: { shapes: FO_SHAPES, scale_bps: FO_SPEC!.scale_bps ?? 10_000 } } : {}), ...(COMPOSER ? { composer: COMPOSER } : {}), ...(READING ? { reading: READING } : {}) } } : {}),
+    ...(spec.living?.initiative_bps !== undefined || FR || FND || READING || CULTURE ? { dials: { ...(spec.living?.initiative_bps !== undefined ? { initiative_bps: spec.living.initiative_bps } : {}), ...(FR ? { friction_bps: FRICTION_BPS } : {}),
+      ...(FND ? { founding: { shapes: FO_SHAPES, scale_bps: FO_SPEC!.scale_bps ?? 10_000 } } : {}), ...(COMPOSER ? { composer: COMPOSER } : {}), ...(READING ? { reading: READING } : {}), ...(CULTURE ? { culture: CULTURE } : {}) } } : {}),
     clock: { tick_seconds: 3600, run_seconds: spec.years * 365 * DAY },
     log: { checkpoint_every: MONTH, anchor_every_entries: 1000 },
     // Amounts and quantities on the wire are decimal strings (D58); the generator counts in numbers.

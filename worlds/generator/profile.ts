@@ -150,6 +150,16 @@ export interface Profile {
     job_move?: { premium_bps: number; per_year_bps: number; cap_years: number; other_trade_bps?: number };
     /** How fast a belief not kept up fades, a month, in a living town: fitted to the place's trend in stated affiliation (docs/behaviour/citizen.md, "Belief"). */
     belief?: { living_fade_bps_per_month?: number };
+    /** What a town holds in common (docs/behaviour/culture.md), read only for a living town that turns the culture dial on:
+     * for the conducts the build lists (participants/src/behaviour/culture.ts), the share who do each (`does_bps`) and the
+     * share who approve of it (`approves_bps`), each figure with its source in `sources["culture.conducts"]` or marked a
+     * placeholder; a conduct with no figure runs on the world's own rate and a marked placeholder. `origin`: where people
+     * come from, as groups the place's own statistics name: `groups` (an id, a name, a share of the people, in basis
+     * points summing to 10000), `same_household_bps` (of two adults living together, how often both are of one group),
+     * `homophily_bps` (how much closer a tie forms between two of one group, as an added affinity), and `by_group` (any
+     * conduct's figures for those of a group, replacing the place's). A profile with no `origin` has no such groups. */
+    culture?: { conducts?: { [conduct: string]: { does_bps?: number; approves_bps?: number } };
+      origin?: { groups: { id: string; name: string; share_bps: number }[]; same_household_bps: number; homophily_bps: number; by_group?: { [group: string]: { [conduct: string]: { does_bps?: number; approves_bps?: number } } } } };
     /** Everyday frictions (docs/behaviour/frictions.md), read only for a living town: of adults, the share who have
      * each kind of problem in a year; how often the other side puts a thing right when asked, by matter; the sizes
      * of a short pay, a wrong bill and a faulty lot of goods; a repair's hours; the support office's processing time

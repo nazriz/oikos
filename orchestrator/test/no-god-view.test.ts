@@ -9,7 +9,7 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { DayBook, modules } from "@oikos/participants";
+import { culture, DayBook, modules } from "@oikos/participants";
 import { generate } from "@oikos/worlds/generator/generate";
 import { PUBLISHED } from "@oikos/worlds/generator/knowing";
 import { wholeViews, type WholeView } from "../src/views";
@@ -171,4 +171,22 @@ test("an office's own file (what a seat is shown of what it sent, filed and paid
   expect(text).not.toContain("7,777");
   // A town has no god's-eye register in it by construction: the file has no source but the observation.
   expect(book.text(5 * 86_400, "x")).not.toContain("acc-c0001");
+});
+
+// Culture (docs/behaviour/culture.md; design 14): what a person takes those around them to do and approve of is one person's
+// belief, kept in their own record, moved only along a tie, by being there, or by what is published. Nothing is the
+// town's, no register is read, and no channel is added.
+test("culture adds no whole view, no channel and no register: a town with the dial on shows the same keepers, and a picture refuses any other route", () => {
+  const base = { ...spec, factories: 5 };
+  const channelsOf = (town: any) => JSON.stringify([town.positions.map((p: any) => p.channels), town.participants.map((p: any) => p.channels)]);
+  const off = generate({ ...base, living: { culture: false } }), on = generate({ ...base, living: { culture: true } }); // (a living town either way: only the dial differs)
+  expect(wholeViews(on).map((v) => `${v.module}: ${v.what}`).sort()).toEqual(wholeViews(off).map((v) => `${v.module}: ${v.what}`).sort());
+  expect(channelsOf(on)).toBe(channelsOf(off)); // (no channel is added)
+  // What a person holds is in their own params and record: nobody's params list another's group or picture.
+  for (const x of on.participants.filter((p: any) => p.kind === "person")) expect(x.controller.params.origin === undefined || typeof x.controller.params.origin === "string").toBe(true);
+  // The arithmetic refuses every route but the three; a test of each is in participants/test/culture-learning.test.ts.
+  expect(culture.ROUTES).toEqual(["tie", "close_tie", "here", "published"]);
+  const dial = culture.cultureDial({ dials: { culture: {} } })!;
+  const c = new culture.Culture(dial.params, dial, { z: () => 0, conformity: () => 0.5, belonging: () => 0.5, integrity: () => 0.5, draw: () => 0 }, { complain: 3_000 });
+  for (const route of ["register", "directory", "population", "town"]) expect(() => c.seeAct("complain", true, route as any)).toThrow(/by what is published/);
 });

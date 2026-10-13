@@ -446,6 +446,26 @@
             ]
           }
         },
+        "norms": {
+          "description": "What the person takes those around them to do and approve of, for each conduct the world holds (docs/design/ai-citizens.md section 14; docs/behaviour/culture.md): for each conduct five `numbers`: `does`, of those they know of who met the occasion, the share they take to have done it; `approves`, how far they take those around them to approve; `own`, what they think themselves, from their values; `says`, what they say when asked (each a whole percent); and `n`, how much they have seen, as a weight held to a window. One person's belief, never the town's. Written again when a figure has moved by 2 in 100. Absent where the culture dial is off.",
+          "type": "array",
+          "maxItems": 12,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["conduct", "numbers"],
+            "properties": {
+              "conduct": { "type": "string", "maxLength": 40 },
+              "numbers": {
+                "description": "[does, approves, own, says, n], in that order: the first four whole percent (0 to 100), n the weight of what has been seen (a whole number, held to a window).",
+                "type": "array",
+                "minItems": 5,
+                "maxItems": 5,
+                "items": { "type": "integer", "minimum": 0, "maximum": 1000 }
+              }
+            }
+          }
+        },
         "wants": {
           "description": "What the entity is trying to bring about (docs/design/ai-citizens.md 10a): what it is about and whom it concerns, what would satisfy it in the world's typed outcomes, the paper in its way, how much it matters, since when, where it came from, and what has been tried. Heaviest first. Empty for an entity that takes no initiative.",
           "type": "array",

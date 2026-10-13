@@ -843,6 +843,34 @@
             }
           }
         },
+        "culture": {
+          "description": "Culture (docs/design/ai-citizens.md section 14; docs/behaviour/culture.md): each person holds a picture of what those around them do and approve of, for a short list of conducts, moved only by what reaches them along a tie, by being there, or by what is published; a bounded term in the decisions the code mind already makes follows from it. The profile's figures for the conducts, and for those of each origin group, travel here. Absent: no person holds any, no section is written, and the world is as before, to the state hash.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "conducts": {
+              "description": "Which conducts are live (absent: all the build lists).",
+              "type": "array",
+              "uniqueItems": true,
+              "maxItems": 12,
+              "items": { "enum": ["answer_tribunal", "stay_past_notice", "take_to_tribunal", "complain", "take_in", "join_union", "strike", "take_from_employer", "apply_possession", "heads_before_hours", "order_possession"] }
+            },
+            "sway_milli": {
+              "description": "How far a lean moves a rate, per standard deviation, in thousandths of the rate (absent: 300).",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000
+            },
+            "step": {
+              "description": "The sizes of the arithmetic (participants/src/behaviour/culture.ts, CultureParams); every one a placeholder unless docs/behaviour/culture.md names a source. Absent: the defaults.",
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/OpaqueObject"
+            },
+            "profile": {
+              "description": "The profile's figures: by conduct, `does_bps` and `approves_bps`; by origin group, the same for those who come from it; and how much closer a tie forms between two of one group (`homophily_bps`).",
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/OpaqueObject"
+            }
+          }
+        },
         "composer": {
           "description": "The composing model (docs/design/ai-citizens.md 10e; VISION 15, point 7): the words of a founded thing are written by a model asked as an author shown the founder's own record, who may decline. Absent: no model is asked, and every statement of purpose is the plain one code writes. A run plays the composer on the mock unless it is started with the composer for real; either way the mix here is on record.",
           "type": "object",

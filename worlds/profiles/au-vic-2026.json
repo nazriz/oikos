@@ -928,9 +928,53 @@
         "cases_per_day": 4,
         "uphold_without_proof_bps": 5000
       }
+    },
+    "culture": {
+      "origin": {
+        "groups": [
+          {
+            "id": "australia",
+            "name": "Australia",
+            "share_bps": 6500
+          },
+          {
+            "id": "india",
+            "name": "India",
+            "share_bps": 400
+          },
+          {
+            "id": "england",
+            "name": "England",
+            "share_bps": 270
+          },
+          {
+            "id": "china",
+            "name": "China",
+            "share_bps": 260
+          },
+          {
+            "id": "new_zealand",
+            "name": "New Zealand",
+            "share_bps": 150
+          },
+          {
+            "id": "vietnam",
+            "name": "Vietnam",
+            "share_bps": 140
+          },
+          {
+            "id": "other",
+            "name": "All other countries of birth and not stated",
+            "share_bps": 2280
+          }
+        ],
+        "same_household_bps": 7500,
+        "homophily_bps": 5000
+      }
     }
   },
   "sources": {
+    "culture.origin": "PLACE: Victoria (the state), 2021. groups: ABS Census 2021 QuickStats, Victoria, country of birth (ABS, 2021), https://www.abs.gov.au/census/find-census-data/quickstats/2021/2 , OPENED 2026-10-13: born in Australia 65.0% (4,228,667), India 4.0%, England 2.7%, China 2.6%, New Zealand 1.5%, Vietnam 1.4%; 'all other' is the remainder (22.8%), including not stated; shares rounded to basis points. same_household_bps: 7500 = the share of couples with both partners born in the same country, 75% in 2017, from the HILDA Survey (Melbourne Institute, released 2019) as reported in The Conversation, 'Language of love: a quarter of Australians are in inter-ethnic relationships', https://theconversation.com/language-of-love-a-quarter-of-australians-are-in-inter-ethnic-relationships-120416 , OPENED 2026-10-13 (the article, not the HILDA tables; 56% of couples had both partners born in Australia). National, not Victoria; Victoria has fewer Australian-born (65.0% against 66.9%), so the share here is probably a little lower (to confirm). homophily_bps: PLACEHOLDER 5000 (a close tie is half again as likely within a group as by chance). No survey of close ties or friendship by group for this place was found and opened; McPherson, Smith-Lovin and Cook 2001 ('Birds of a feather', Annual Review of Sociology 27) gives the general fact, not this place's figure. CHILDREN: the census counts each person by their own country of birth (and has separate questions on parents' birthplaces), so a child born in Australia to a mixed couple is counted Australian-born whatever the parents' countries: the generator's rule (either parent's group, equal chance) does not match this source for the birth-country classes. To confirm against ABS 'Country of birth of parents'.",
     "tenancy.rent_share_of_income": "PLACEHOLDER bands around one opened mean: private renters' housing costs averaged 20.2% of gross household income in 2019-20; lower-income private renters averaged 32%, and 58% of them paid over 30% (ABS, Housing Occupancy and Costs, 2019-20, https://www.abs.gov.au/statistics/people/housing/housing-occupancy-and-costs/latest-release, release page opened 2026-10-12; national). The bands themselves (56% under a fifth, 23% a fifth to three tenths, 15% three tenths to a half, 6% over a half) were NOT read: they are in the release's data cubes 4, 8 and 13, which were not opened. To replace from cube 4. HOW IT IS USED (docs/behaviour/generator.md, \"Homes by income\"): each renting household of a new town draws its share from these bands (evenly within a band; the open band from its lower bound to twice it, at most everything), which gives the rent it carries; households and let homes are matched by it. A target as well: the town's own distribution at the start is reported beside it and is not fitted to it.",
     "support.take_up_bps": "pension 64%: DERIVED from an opened page: on 28 March 2025, 62% of people aged 65 and over received income support and 91% of those the Age Pension, so about 56% of those 65 and over (26% at 65-69, 59% at 70-79, 80% at 85 and over; AIHW, Australia's welfare, Income support for older Australians, https://www.aihw.gov.au/reports/australias-welfare/income-support-older-australians, opened 2026-10-12); the pension starts at 67, so the two years before it are taken out of the denominator by a rough twelfth (to confirm against DSS payment demographics by single age). The real pension is means-tested and the profile's is not: those not drawing it here claim it on the first day and are granted. unemployment 50%: PLACEHOLDER: no ratio of JobSeeker recipients to the unemployed was found. HOW IT IS USED (docs/behaviour/generator.md, \"Payments in force\"): of those the payment's rule already entitles as the year begins, this share open with it in payment; the rest claim it when they first look, as before.",
     "ownership.owner_bps_by_age": "Home ownership by age of the household reference person, Census 2021, national: 36% at 25-29, 50% at 30-34, 72% at 50-54 (AIHW, Australia's welfare, Home ownership and housing tenure, https://www.aihw.gov.au/reports/australias-welfare/home-ownership-and-housing-tenure, opened 2026-10-12); 79.4% at 65 and over (a search summary of ABS Census 2021 reporting: to confirm). The bands between are not filled: 35 to 49 is read at the 30-34 figure and under 30 at the 25-29 figure, which understates both. To replace from the Census table by ten-year bands. HOW IT IS USED (docs/behaviour/generator.md, \"Homes by income\"): only as how much likelier a household of one age is than another to be among the town's owners; their number is the houses the profile's house_owner_bps makes owner-occupied.",

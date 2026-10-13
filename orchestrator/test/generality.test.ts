@@ -42,6 +42,24 @@ test("platform code names no place: its figures and rules come from profiles and
   expect(found).toEqual([]);
 });
 
+// ---- no origin group in the code: where people come from is profile data (values.culture.origin, docs/behaviour/culture.md);
+// the platform's code names none of a profile's groups, and no figure of theirs.
+test("platform code names no profile's origin group", () => {
+  const names = new Set<string>();
+  for (const f of readdirSync(PROFILE_DIR).filter((x) => x.endsWith(".json"))) {
+    const o = JSON.parse(readFileSync(join(PROFILE_DIR, f), "utf8")).values?.culture?.origin;
+    for (const g of o?.groups ?? []) if (String(g.name).length >= 5) names.add(String(g.name));
+  }
+  expect(names.size).toBeGreaterThan(5);
+  const found: string[] = [];
+  for (const dir of CODE) for (const f of files(join(root, dir))) {
+    // (A citation of a model by an institution's name, "Bank of England", is no group.)
+    const text = readFileSync(f, "utf8").replaceAll("Bank of England", "");
+    for (const n of names) if (new RegExp(`\\b${n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(text)) found.push(`${relative(root, f)}: "${n}"`);
+  }
+  expect(found).toEqual([]);
+});
+
 // ---- no currency in the code: a world's money is written as its config says (world.currencies: its sign, its words,
 // its decimal places), so the code that runs for any world writes no currency's sign and none of its words.
 
