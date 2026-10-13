@@ -497,6 +497,10 @@ Additions only; no schema file changed in shape, nothing renamed or removed. A l
 - **A module's parameter:** `firm.retailer` and `firm.producer` read `adjust.hours_step_bps` (default 1,000).
 - **Outcomes** (the citizen's dataset, `job` domain; kinds are free words): `hours_cut`, `hours_restored`, `hours_agreed`, `hours_refused`.
 
+## Changes since v0.8 closed (2026-10-13: four platform faults from the sixth living pilot; docs/decisions.md, "Four platform faults from the sixth living pilot"; under the owner's blanket approval of contract changes, 2026-10-11)
+
+- **Log: refusal code `offer_withdrawn`** (additive; `log.schema.json` `RefusalCode`): a `sign_agreement` on an agreement its owner has withdrawn before every party had signed. It is refused and leaves no record. Logs written before it may hold such a signature on the record (the books count it as nothing, docs/behaviour/offers.md); they replay only on the build that wrote them.
+
 ## Versioning
 
 `contracts: "0.8"`. Pre-1.0, every change bumps the minor version and is proposed explicitly. A draft version collects agreed changes until it's closed. Older logs remain valid logs of their own version and replay only on a kernel build of that version (D6).

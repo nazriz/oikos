@@ -4646,3 +4646,14 @@ The tribunal chain did not move: no answer offered a sum, no plan was set. **Tha
 **Prompt size** (mock run of the living-6 line-up, first turn of each sitting, characters; the mock's notebook is near empty and its offices quiet, so these are a floor): finance 2,963 to 5,427 mean (max 9,889 to 11,460); landlord 8,120 to 9,568 (12,358 to 13,075); mayor 5,157 to 6,490 (19,754, unchanged: its first sitting has no file yet); tribunal member 1,182 to 2,783 (11,949 to 12,638). The file itself was at most 3,532 characters in this run. Real seats with busy offices can reach the bound: +4,500 on a first turn that was 12,000 to 24,000.
 
 **Revisit if** a pilot shows a seat treating the file as a to-do list or repeating its own acts; the bound binds (the tribunal's member on a day with dozens of orders: then list decisions by application in a compact form, or a look on request); a seat needs papers older than 40 days (on its file and can be looked up); or the double-record rates bill is settled as a books fix. The finance prompt ceiling in `orchestrator/test/seat-sight.test.ts` went from 52,000 to 56,000 (largest then 52,193). Prompt growth of 20 to 40 percent per sitting is the price; if cost matters, the money-in and older-open sections are the first to shrink.
+
+## 2026-10-13 · Four platform faults from the sixth living pilot (`plat-faults`)
+
+Four small faults found in lv-06 and its review, each traced before it was touched (findings, with the evidence: `runs/plat-faults-2026-10-13/STATUS`). No model was called, no pilot run. One commit each.
+
+### 1. A late signature on a withdrawn offer is refused by the kernel
+
+- **Cause.** Not seen in lv-06 (170 agreements, none withdrawn); a known gap, listed in docs/behaviour/offers.md as "revisit if a kernel-level refusal is wanted": the kernel recorded any signature, and the books (`Book.takenBack`) counted one made after the owner's withdrawal as nothing. A signature that reached the record after a withdrawal could still be read as an agreement by any reader that did not use that rule (the measures, a seat reading the raw record).
+- **Change.** `sign_agreement` on an agreement whose owner has withdrawn it, with a party not yet signed, is refused: new refusal code `offer_withdrawn`, in the world's words for a signer ("the offer has been taken back by whoever made it, so there is nothing to sign"). Physics, not law: an offer that no longer stands cannot be accepted. `State::marks` gains the derived `withdrawn_at` (not serialised). Order at one instant is the kernel's one command order: the first stored decides.
+- **What moves.** No state hash (the field is derived). Logs that hold such a signature do not replay on the new build (D6); none in the checked pilot logs. The books' reading is kept for old logs.
+- **Revisit if** an offer should lapse by itself, or be put back after being taken back.
