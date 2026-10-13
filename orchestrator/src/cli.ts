@@ -64,6 +64,7 @@
 //     The teachers' gate: scrambled records, one-thing edits, option order, rewording, the town's totals, agreement.
 //     The mock by default. Every call is kept, and served again from the same folder.
 //   oikos dataset <DIR|log.jsonl> [--out DIR] [--actions]
+//     (and, for a run with the culture dial on, culture.json beside it: norm shares, verdicts, talk, standing, events remembered, tipping)
 //     Run datasets: each log's data as training examples, in <run>.dataset/ (docs/design/run-datasets.md): the manifest,
 //     system prompts, translations, model participants' decisions; code participants' acts with --actions; code
 //     citizens' decisions, each with its outcomes under it, and the outcomes as a list of their own; and
@@ -558,6 +559,10 @@ try {
     for (const log of logsIn(src)) {
       const out = join(flag("out") ?? join(log, ".."), `${log.split("/").at(-1)!.replace(/\.jsonl(\.zst)?$/, "")}.dataset`);
       const m = await exportDataset(log, out, { actions: has("actions") });
+      // (Where the run had culture on: what a town held in common, read from the log, beside the dataset: docs/behaviour/culture.md, "Measures".)
+      const { cultureMeasures } = await import("./culture-measures");
+      const cm = await cultureMeasures(log);
+      if (cm) { await Bun.write(join(out, "culture.json"), `${JSON.stringify(cm, null, 1)}\n`); console.log(`${m.run}: culture.json (${cm.norm_shares.length} norm rows, ${cm.tipping.events.length} tipping events)`); }
       console.log(`${m.run}: ${Object.entries(m.files).map(([f, x]: [string, any]) => `${f} ${x.rows}${x.synthetic ? ` (${x.synthetic} synthetic)` : ""}`).join(", ")} -> ${out}`);
     }
   } else if (cmd === "corpus" && positional()[0]) {

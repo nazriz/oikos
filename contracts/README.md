@@ -532,6 +532,9 @@ Additions only; nothing renamed or removed. A log or a world made before them is
 
 - **Participant messages (code citizens' own phrasing, not a contract; 2026-10-13):** ordinary talk about a third person's act, `About <id>: <occasion>: <they did or did not>. Of that, I say it is <step>.`, added to the reply to "how are things" where the culture dial is on. **Dial `culture.step`:** `gossip_bps`, `gossip_days`, `third_kept` (additive, inside the opaque `step`).
 
+- **Entity record `practice`** (additive, optional, on an organisation; 2026-10-14, culture step 6): up to 6 rows `{ of, occasions, did, since }` (`of`: hold, rise or stay), how an office has carried on when asked to hold a rent, give a rise or let a tenant under notice stay; only where the culture dial is on and the organisation takes initiative. Never shown to a seat as counts.
+- **Dial `culture.step`** (inside the opaque `step`, additive): `practice_window_days`, `practice_min_occasions`, `practice_inertia_bps`, `practice_opening`.
+
 ## Versioning
 
 `contracts: "0.8"`. Pre-1.0, every change bumps the minor version and is proposed explicitly. A draft version collects agreed changes until it's closed. Older logs remain valid logs of their own version and replay only on a kernel build of that version (D6).

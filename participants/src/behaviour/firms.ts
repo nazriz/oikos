@@ -846,7 +846,7 @@ export const landlord: BehaviourModule = {
         const paidUp = !org.wants.get("arrears", tenant);
         const reply = (granted: boolean, words: string) => say("variation_answer", words, { to: [tenant], visible: [me, tenant], basis: r.id, data: { about, granted } });
         if (paper?.record === "statement" && paper.kind === "rent_increase" && paper.speaks_for === me && !book.withdrawn.has(paper.id)) {
-          const g = org.grants("hold", ctx.rng(`vary-${r.id}`), paidUp ? 0.5 : -1);
+          const g = org.grants("hold", ctx.rng(`vary-${r.id}`), paidUp ? 0.5 : -1, t);
           org.remember(t, g.granted ? "held_rent" : "refused_hold", tenant, 2_000);
           if (g.granted) {
             const changes = rentChanges.get(a.id) ?? [];
@@ -857,7 +857,7 @@ export const landlord: BehaviourModule = {
         } else if (r.data?.would?.does?.outcome?.occupancy && noticeGiven.has(a.id) && !renewed.has(a.id)) {
           const ends = book.endsAt(a.id);
           const lt = leaseTerms(a, tenant);
-          const g = org.grants("stay", ctx.rng(`vary-${r.id}`), paidUp ? 0.5 : -1);
+          const g = org.grants("stay", ctx.rng(`vary-${r.id}`), paidUp ? 0.5 : -1, t);
           org.remember(t, g.granted ? "let_stay" : "refused_stay", tenant, 2_000);
           if (g.granted && ends !== undefined && lt.space) {
             renewed.add(a.id);
@@ -1706,7 +1706,7 @@ export class Staffing {
       const bill = this.staff(book, t).reduce((x, s) => x + this.wageOf(s), 0);
       const can = Number.isSafeInteger(wage) && wage > now && wage <= now * 2 && balance >= org.p.rise_cover_periods * (bill + wage - now);
       const years = (t - (book.signedAt(a.id) ?? t)) / (365 * DAY);
-      const g = can ? org.grants("rise", this.ctx.rng(`rise-${r.id}`), Math.max(-1, Math.min(1, years - 1))) : { granted: false, chance: 0 };
+      const g = can ? org.grants("rise", this.ctx.rng(`rise-${r.id}`), Math.max(-1, Math.min(1, years - 1)), t) : { granted: false, chance: 0 };
       org.remember(t, g.granted ? "gave_rise" : "refused_rise", worker, 2_000);
       if (g.granted) steps.push(...this.raise(book, t, account, 0, `${worker} asks for a rise, to ${usd(wage)}: we would sooner keep them (for us, ${g.chance / 100}% of such requests): their wage is ${usd(wage)} from the next pay day.`, { agreement: a.id, wage }),
         because(`Telling ${worker} their rise is granted.`, reply(true, `Granted: your pay is ${usd(wage)} from the next pay day.`)));

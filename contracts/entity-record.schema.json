@@ -894,6 +894,22 @@
             }
           }
         },
+        "practice": {
+          "description": "How the organisation has carried on (docs/behaviour/culture.md, \"An office's practice\"): for each answer it gives when asked, how many times the occasion arose, how many times it said yes, and the day the count runs from (counts roll over `practice_window_days`). Its own record, kept by its keeping post and outliving whoever holds the office. At most 6 rows, under 500 bytes. Never shown to a seat as counts (the owner's ruling, 2026-10-13): a seat reads its office's papers. Absent where the culture dial is off.",
+          "type": "array",
+          "maxItems": 6,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["of", "occasions", "did", "since"],
+            "properties": {
+              "of": { "enum": ["hold", "rise", "stay"] },
+              "occasions": { "type": "integer", "minimum": 0 },
+              "did": { "type": "integer", "minimum": 0 },
+              "since": { "type": "integer", "minimum": 0 }
+            }
+          }
+        },
         "circumstances": {
           "type": "object",
           "description": "How things stand, in whole numbers (what it lets, whom it employs, what it has been asked and granted).",
