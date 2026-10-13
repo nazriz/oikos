@@ -37,6 +37,17 @@ export const WORDS: { [c in Conduct]?: { occasion: string; did: string; didNot: 
   strike: { occasion: "Balloted on action", did: "I voted yes", didNot: "I voted no", thing: "voting for action" },
   take_from_employer: { occasion: "Short of money at work among goods", did: "I took some", didNot: "I took nothing", thing: "taking goods from an employer" },
 };
+/** The same acts in the third person, for what a person tells of someone else's (ordinary talk: "About p12: ...: they answered it. Of that, I say it is wrong."). */
+export const THEY: { [c in Conduct]?: { did: string; didNot: string } } = {
+  answer_tribunal: { did: "they answered it", didNot: "they did not answer it" },
+  stay_past_notice: { did: "they were still there at the date", didNot: "they left by the date" },
+  take_to_tribunal: { did: "they applied to the tribunal", didNot: "they did not apply" },
+  complain: { did: "they wrote to the town", didNot: "they did not write" },
+  take_in: { did: "they said yes", didNot: "they said no" },
+  join_union: { did: "they joined the union", didNot: "they did not join" },
+  strike: { did: "they voted yes", didNot: "they voted no" },
+  take_from_employer: { did: "they took some", didNot: "they took nothing" },
+};
 /** What is said of a conduct, in five steps, and the middle of each (basis points). */
 export const SAYINGS = [["plainly wrong", 1_000], ["wrong", 3_000], ["neither right nor wrong", 5_000], ["right", 7_000], ["plainly right", 9_000]] as const;
 
@@ -62,6 +73,28 @@ export const CULTURE_WORDS = {
     for (const c of PERSONS_CONDUCTS) {
       const w = WORDS[c]!;
       for (const did of [true, false]) for (const [s, mid] of SAYINGS) if (text === `Of your ${did ? "" : "not "}${w.thing}: I say it is ${s}.`) return { conduct: c, did, approval: mid };
+    }
+    return undefined;
+  },
+  /** What I tell of someone else's act, to someone who asks how things are (ordinary talk): who, the occasion and what they did, and how I judge the act (approval of it, as a verdict does). */
+  about: (who: string, c: Conduct, did: boolean, approvalBps: number): string => {
+    const w = WORDS[c], th = THEY[c];
+    if (!w || !th) return "";
+    return `About ${who}: ${w.occasion}: ${did ? th.did : th.didNot}. Of that, I say it is ${SAYINGS[Math.max(0, Math.min(4, Math.floor(approvalBps / 2_000)))]![0]}.`;
+  },
+  /** What such a phrase tells: of whom, the conduct, whether they did it, and how the teller judges their act (a step's middle). */
+  aboutHeard: (text: string): { who: string; conduct: Conduct; did: boolean; approval: number } | undefined => {
+    for (const c of PERSONS_CONDUCTS) {
+      const w = WORDS[c]!, th = THEY[c]!;
+      for (const did of [true, false]) for (const [s, mid] of SAYINGS) {
+        const tail = `: ${w.occasion}: ${did ? th.did : th.didNot}. Of that, I say it is ${s}.`;
+        const at = text.indexOf(tail);
+        if (at < 0) continue;
+        const head = text.lastIndexOf("About ", at);
+        if (head < 0) continue;
+        const who = text.slice(head + 6, at);
+        if (who && !/\s/.test(who)) return { who, conduct: c, did, approval: mid };
+      }
     }
     return undefined;
   },
@@ -122,6 +155,15 @@ export interface CultureParams {
   conceal_bps: number;
   /** An integrity above this tells whatever it is. */
   integrity_tells_bps: number;
+  /** The weight of the cost of standing out, against the cost of saying what one does not think, in thousandths (1,000 = one to one): what is said is the weighted mean of what one thinks and what one takes the street to approve, with the weights `reputation_scale_milli/1000 x belonging x conformity` and `integrity` (Kuran 1995: one chooses what to say to balance the reputation lost by standing out against the inner cost of misstating one's view). See docs/behaviour/culture.md, "What I think and what I say". */
+  reputation_scale_milli: number;
+  // ---- ordinary talk about others' conduct (docs/behaviour/culture.md, "Ordinary talk"). Placeholders, fixed before any run and not adjusted after.
+  /** The chance that, asked how things are, I also tell of one other person's conduct that I know first-hand of (if I have one to tell). */
+  gossip_bps: number;
+  /** I tell of an act for this many days after I heard it. */
+  gossip_days: number;
+  /** The most people whose acts I keep to tell of. */
+  third_kept: number;
   /** What fraction (basis points) of the move of a number is kept before the record is written again: the record's grain, whole percent. */
   grain_percent: number;
   /** Placeholder for what is approved where the profile is silent. */
@@ -164,7 +206,7 @@ export interface CultureParams {
 }
 export const CULTURE_DEFAULTS: CultureParams = {
   prior_weight: 4, own_sd_bps: 1_500, values_bps: 500, window: 20, known_weight: 1, close_weight: 2, published_weight: 4, close_affinity_bps: 3_000,
-  internalise_days: 1_095, sd_bps: 2_500, w_does_bps: 6_000, w_approves_bps: 4_000, sway_milli: 300, conceal_bps: 7_500, integrity_tells_bps: 7_000,
+  internalise_days: 1_095, reputation_scale_milli: 1_000, gossip_bps: 3_000, gossip_days: 180, third_kept: 8, sd_bps: 2_500, w_does_bps: 6_000, w_approves_bps: 4_000, sway_milli: 300, conceal_bps: 7_500, integrity_tells_bps: 7_000,
   grain_percent: 2, approves_default_bps: 5_000, does_default_bps: 5_000, phrases: 3,
   margin_bps: 2_500, cool_bps: 500, esteem_bps: 200, disapproved_bps: 300, newcomer_weight: 1, way_points: 1_500,
   slots: 6, seen_bps: 10_000, read_bps: 5_000, pass_bps: 6_000, negative_bps: 2_000, max_hops: 3, half_life_seen_days: 365, half_life_told_days: 180,
@@ -177,9 +219,9 @@ const INTS: (keyof CultureParams)[] = Object.keys(CULTURE_DEFAULTS) as (keyof Cu
 export function cultureParams(given?: any): CultureParams {
   const p = { ...CULTURE_DEFAULTS, ...(given ?? {}) } as CultureParams;
   for (const k of INTS) if (!Number.isInteger(p[k]) || p[k] < 0) throw new Error(`dials.culture.step.${k}: a size is a whole number, not below 0; got ${p[k]}`);
-  for (const k of ["own_sd_bps", "values_bps", "w_does_bps", "w_approves_bps", "close_affinity_bps", "conceal_bps", "integrity_tells_bps", "approves_default_bps", "does_default_bps", "margin_bps", "cool_bps", "esteem_bps", "disapproved_bps", "seen_bps", "read_bps", "pass_bps", "negative_bps", "tell_at_bps", "rehearse_bps", "bystander_bps"] as const)
+  for (const k of ["own_sd_bps", "values_bps", "w_does_bps", "w_approves_bps", "close_affinity_bps", "conceal_bps", "integrity_tells_bps", "approves_default_bps", "does_default_bps", "margin_bps", "cool_bps", "esteem_bps", "gossip_bps", "disapproved_bps", "seen_bps", "read_bps", "pass_bps", "negative_bps", "tell_at_bps", "rehearse_bps", "bystander_bps"] as const)
     if (p[k] > 10_000) throw new Error(`dials.culture.step.${k}: a share is from 0 to 10000; got ${p[k]}`);
-  for (const k of ["prior_weight", "window", "known_weight", "close_weight", "published_weight", "internalise_days", "sd_bps", "newcomer_weight", "slots", "half_life_seen_days", "half_life_told_days", "witness_days"] as const)
+  for (const k of ["prior_weight", "window", "known_weight", "close_weight", "published_weight", "internalise_days", "sd_bps", "newcomer_weight", "slots", "half_life_seen_days", "half_life_told_days", "witness_days", "gossip_days", "third_kept"] as const)
     if (p[k] < 1) throw new Error(`dials.culture.step.${k}: must be at least 1; got ${p[k]}`);
   if (p.window < p.prior_weight || p.window < p.published_weight) throw new Error("dials.culture.step.window: must hold the prior's and a published count's weight");
   if (p.sway_milli > 1_000) throw new Error(`dials.culture.step.sway_milli: a lean may move a rate by at most the whole of it per standard deviation; got ${p.sway_milli}`);
@@ -267,6 +309,10 @@ export class Culture {
   /** Conducts a tie told me of in the last days: what I may say of them when asked. */
   private readonly heardOf = new Map<Conduct, { t: number; told: Set<string> }>();
   private origin: string | undefined;
+  /** What I know first-hand of other people's acts, because they told me (a tie), by who: to tell of in ordinary talk, and to whom already told. */
+  private readonly ofOthers = new Map<string, Map<Conduct, { did: boolean; t: number; told: Set<string> }>>();
+  /** Acts told to me of someone else, kept so the same one is not counted twice from a second teller. */
+  private readonly toldOf = new Set<string>();
 
   /**
    * @param rates the conducts this person has a rate for in their world, and the rate (what is done there as calibrated)
@@ -312,10 +358,22 @@ export class Culture {
     const settled = this.approves.get(c)! + (base - this.approves.get(c)!) * keep;
     return clamp(settled + this.p.values_bps * (this.zOf(c) - this.zStart.get(c)!));
   }
-  /** What I say when asked: what I think, moved toward what I take to be approved by how much belonging weighs with me and what integrity leaves (the arithmetic of `Inner.view`). */
+  /**
+   * The share of the way from what I think to what I take the street to approve that I go in what I say, 0..1 (Kuran 1995). I choose what to say to
+   * make two costs as small as I can: the reputation lost by saying what is far from what the street approves, which weighs more the more I belong
+   * and the more I follow others (`reputation_scale_milli/1000 x belonging x conformity`), and the inner cost of saying what I do not think, which
+   * weighs as my integrity does. Each cost grows with the square of its distance, so the best thing to say lies between the two, at the share
+   * `reputation / (reputation + integrity)` of the way: nothing if I do not care what the street thinks, the whole way if I have no integrity,
+   * half if the two weigh alike. A view farther from the street is moved by more points, the same share of a longer way.
+   */
+  pressure(): number {
+    const rep = (this.p.reputation_scale_milli / 1_000) * this.env.belonging() * this.env.conformity(), inner = this.env.integrity();
+    return rep + inner > 0 ? rep / (rep + inner) : 0;
+  }
+  /** What I say when asked: what I think, moved toward what I take to be approved by `pressure()` of the way. */
   private says(c: Conduct, t: number): number {
-    const own = this.own(c, t), gap = Math.max(0, Math.min(1, this.env.belonging() * (1 - this.env.integrity()) * 4));
-    return clamp(own + gap * (this.approves.get(c)! - own));
+    const own = this.own(c, t);
+    return clamp(own + this.pressure() * (this.approves.get(c)! - own));
   }
 
   /** The four numbers and the weight held for a conduct (basis points), as of `t`. */
@@ -404,6 +462,54 @@ export class Culture {
       if (Math.floor(says / 2_000) !== 2) out.push(CULTURE_WORDS.says(c, says));
     }
     return out.filter(Boolean);
+  }
+
+  // ---------------------------------------------------------------- ordinary talk about others' conduct
+
+  /** A tie told me of their own act: now I know it first-hand, and may tell of it (the oldest person's acts give way beyond `third_kept`). */
+  learnOf(about: string, c: Conduct, did: boolean, t: number): void {
+    if (!this.has(c)) return;
+    const row = this.ofOthers.get(about) ?? new Map();
+    row.set(c, { did, t, told: new Set() });
+    this.ofOthers.delete(about);
+    this.ofOthers.set(about, row);
+    while (this.ofOthers.size > this.p.third_kept) this.ofOthers.delete(this.ofOthers.keys().next().value!);
+  }
+  /**
+   * In a talk with `asker`, maybe tell of one act of a third person that I know first-hand (a tie told me; nobody else's, nothing from a register), within
+   * `gossip_days`, not the asker's own and not one I have told them; and what I say of it, as `says` is (what the teller says, not what the teller thinks).
+   * `roll` draws 0..9,999 on the person's own stream and is called only when there is something to tell. Returns the phrase.
+   */
+  gossip(asker: string, t: number, roll: () => number): string | undefined {
+    let best: { about: string; c: Conduct; a: { did: boolean; t: number; told: Set<string> } } | undefined;
+    for (const [about, row] of this.ofOthers) {
+      if (about === asker) continue;
+      for (const [c, a] of row) {
+        if (a.told.has(asker) || t - a.t > this.p.gossip_days * 86_400) continue;
+        if (!best || a.t > best.a.t || (a.t === best.a.t && (about + c < best.about + best.c))) best = { about, c, a };
+      }
+    }
+    if (!best || roll() >= this.p.gossip_bps) return undefined;
+    best.a.told.add(asker);
+    const said = this.says(best.c, t);
+    return CULTURE_WORDS.about(best.about, best.c, best.a.did, best.a.did ? said : 10_000 - said);
+  }
+  /**
+   * Told by `teller` of a third person's act and what the teller says of it. By the existing rules: one more sighting of the conduct along a tie (it moves `does`),
+   * and what the teller said is what is approved (`hearSaid`), as a verdict is. What I make of the one talked about, by my own view as step 4 has it: the
+   * tie to them cools or warms (the caller applies it, if they are anyone to me); and I may say what I think of the matter when asked. The same act told twice
+   * is counted once. Returns the reaction, if any.
+   */
+  hearAbout(who: string, c: Conduct, did: boolean, approval: number, t: number, route: Route = "tie"): Reaction | undefined {
+    if (!this.has(c)) return undefined;
+    const key = `${who}|${c}|${did}`;
+    if (this.toldOf.has(key) || this.ofOthers.get(who)?.get(c)?.did === did) return undefined;
+    this.toldOf.add(key);
+    while (this.toldOf.size > 64) this.toldOf.delete(this.toldOf.values().next().value!);
+    this.seeAct(c, did, route);
+    this.hearSaid(c, did ? approval : 10_000 - approval, route);
+    this.noteHeard(c, t);
+    return this.react(c, did, t);
   }
 
   // ---------------------------------------------------------------- what a tie's act is to me (step 4)

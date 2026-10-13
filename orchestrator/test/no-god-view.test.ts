@@ -205,3 +205,25 @@ test("town memory adds no channel and no register: events come in only seen, rea
   expect(m.size()).toBeLessThanOrEqual(6);
   expect(m.heardFrom("strike", "e", 3, 40 * 86_400, 9_000, dial.params.max_hops, false)).toBe("dropped"); // a fourth hand
 });
+
+// Ordinary talk about others' conduct (docs/behaviour/culture.md, "Ordinary talk"): a person tells of a third person's act only if that person told it to
+// them (a tie), only of the acts they keep (a few people's, for a few months), never of the asker, and what the hearer learns moves their own picture along
+// a tie. No channel is added, no register is read, and a stranger cannot be told of from nothing.
+test("ordinary talk adds no channel and no register: a person can tell only of what a tie told them of themself, and a hearer learns it along a tie", () => {
+  const base = { ...spec, factories: 5 };
+  const channelsOf = (town: any) => JSON.stringify([town.positions.map((p: any) => p.channels), town.participants.map((p: any) => p.channels)]);
+  expect(channelsOf(generate({ ...base, living: { culture: true } }))).toBe(channelsOf(generate({ ...base, living: { culture: false } })));
+  const dial = culture.cultureDial({ dials: { culture: { step: { gossip_bps: 10_000 } } } })!;
+  const mk = () => new culture.Culture(dial.params, dial, { z: () => 0, conformity: () => 0.5, belonging: () => 0.5, integrity: () => 0.5, draw: () => 0 }, { complain: 3_000 });
+  const teller = mk();
+  // Nobody told them anything: they have nothing to tell, however many ask, and the draw is never made.
+  let draws = 0;
+  for (const asker of ["a", "b", "c"]) expect(teller.gossip(asker, 0, () => (draws++, 0))).toBeUndefined();
+  expect(draws).toBe(0);
+  // One tie told them of themself: they can tell of that tie and of no one else.
+  teller.learnOf("tie-1", "complain", true, 0);
+  const phrases = ["a", "b", "tie-1", "c"].map((asker) => teller.gossip(asker, 1, () => 0)).filter(Boolean) as string[];
+  expect(phrases.map((x) => culture.CULTURE_WORDS.aboutHeard(x)!.who)).toEqual(["tie-1", "tie-1", "tie-1"]); // (to a, b and c; not to tie-1 about themself)
+  // The hearer's picture moves only by a tie's route; any other is refused.
+  for (const route of ["register", "directory", "population", "town"]) expect(() => mk().hearAbout("tie-1", "complain", true, 1_000, 1, route as any)).toThrow(/by what is published/);
+});

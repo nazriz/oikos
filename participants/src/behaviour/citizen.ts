@@ -900,6 +900,15 @@ export const citizen: BehaviourModule = {
           }
         }
         for (const s of heard.says) cul.hearSaid(s.conduct, s.bps, route);
+        // (They told me of themselves, so I know it first-hand and may tell of it in ordinary talk.)
+        for (const d of heard.did) cul.learnOf(who, d.conduct, d.did, t);
+      }
+      // Ordinary talk: told of a third person's act, and what the teller says of it (design 14c; docs/behaviour/culture.md, "Ordinary talk"). The one talked about
+      // gains or loses standing with me only if they are anyone to me; a stranger's act still moves my picture of what is done and approved.
+      const about = CULTURE_WORDS.aboutHeard(text);
+      if (about && about.who !== me) {
+        const r = cul.hearAbout(about.who, about.conduct, about.did, about.approval, t, ties.affinity(who, t) >= cul.p.close_affinity_bps ? "close_tie" : "tie");
+        if (r?.tie && ties.trust(about.who) !== undefined) ties.add(about.who, r.tie, t, r.tie < 0 ? "disapproved" : "esteemed");
       }
       const from = CULTURE_WORDS.fromHeard(text);
       if (from && cdial.homophily_bps > 0) {
@@ -4000,7 +4009,7 @@ export const citizen: BehaviourModule = {
       initiative && wants.all().length ? CATCHING_UP.after(wants.all().filter((w) => w.way).slice(0, 3).map((w) => ({ about: w.about, way: w.way!.startsWith("offer:") ? w.way! : w.way!.split(":")[0]! }))) : "",
       initiative && withdrew && lastSeenT - withdrew.t <= p.news_days * DAY ? CATCHING_UP.gaveUp(withdrew.about) : "",
       // (Culture: where we come from, and what we did at an occasion and say of it; docs/behaviour/culture.md.)
-      ...(cul ? [...(cul.group && cdial!.homophily_bps > 0 ? [CULTURE_WORDS.from(cul.group)] : []), ...(asker ? cul.tell(asker, lastSeenT, p.news_days) : []), ...(asker && mem ? [mem.tell(asker, lastSeenT) ?? ""] : [])] : []),
+      ...(cul ? [...(cul.group && cdial!.homophily_bps > 0 ? [CULTURE_WORDS.from(cul.group)] : []), ...(asker ? cul.tell(asker, lastSeenT, p.news_days) : []), ...(asker ? [cul.gossip(asker, lastSeenT, () => ctx.rng("culture-gossip").below(10_000)) ?? ""] : []), ...(asker && mem ? [mem.tell(asker, lastSeenT) ?? ""] : [])] : []),
     ].filter(Boolean).join(" ") || CATCHING_UP.nothing;
     /**
      * Being there (culture, step 5): in a building we are in the world shows who is there and who last left and why, so a removal carried out in our building,

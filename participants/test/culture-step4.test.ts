@@ -22,9 +22,9 @@ const mk = (o: { draw?: number; conformity?: number; belonging?: number; integri
 // ---- said and thought
 
 test("a person may voice approval of what they privately doubt, and cool toward the one who did it while they say so", () => {
-  // The street is taken to approve (8,000); this person privately holds it wrong (own about 2,000); belonging weighs, integrity does not.
+  // The street is taken to approve (8,000); this person privately holds it wrong (own about 2,000); belonging and following others weigh, integrity hardly does.
   const d = dial({ profile: { conducts: { complain: { does_bps: 3_000, approves_bps: 8_000 } } } });
-  const c = mk({ d, draw: -4, belonging: 0.9, integrity: 0.1 });
+  const c = mk({ d, draw: -4, belonging: 1, conformity: 1, integrity: 0.05 });
   const r = c.read("complain", 0)!;
   expect(r.own).toBeLessThan(2_500);
   expect(r.says).toBeGreaterThan(7_500); // what they say is what they take the street to say
@@ -33,7 +33,7 @@ test("a person may voice approval of what they privately doubt, and cool toward 
   expect(reaction.voice).toBeGreaterThan(7_500); // aloud, it is approved
   expect(CULTURE_WORDS.verdict("complain", true, reaction.voice!)).toMatch(/I say it is (plainly )?right\.$/);
   // Someone of integrity says what they think.
-  const frank = mk({ d, draw: -4, belonging: 0.9, integrity: 0.99 });
+  const frank = mk({ d, draw: -4, belonging: 0.2, conformity: 0.2, integrity: 1 });
   expect(frank.react("complain", true, 0)!.voice).toBeLessThan(2_500);
 });
 
@@ -89,7 +89,7 @@ test("the words round-trip: a verdict, and what a parent tells a child", () => {
 /** A street of twelve who privately approve (own about 6,500), take the street to disapprove (approves 2,000), belong and do not keep to their own mind: so each says "wrong". */
 function street(): Culture[] {
   const d = dial({ profile: { conducts: { complain: { does_bps: 3_000, approves_bps: 2_000 } } } });
-  return Array.from({ length: 12 }, () => mk({ d, draw: 3, belonging: 0.8, integrity: 0.2, conformity: 0.8 }));
+  return Array.from({ length: 12 }, () => mk({ d, draw: 3, belonging: 1, integrity: 0, conformity: 1 }));
 }
 const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
 const gap = (s: Culture[], t: number) => mean(s.map((c) => c.read("complain", t)!.own)) - mean(s.map((c) => c.read("complain", t)!.approves));
