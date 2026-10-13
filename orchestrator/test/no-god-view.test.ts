@@ -9,7 +9,7 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { modules } from "@oikos/participants";
+import { DayBook, modules } from "@oikos/participants";
 import { generate } from "@oikos/worlds/generator/generate";
 import { PUBLISHED } from "@oikos/worlds/generator/knowing";
 import { wholeViews, type WholeView } from "../src/views";
@@ -147,4 +147,28 @@ test("nobody is shown anyone's own record but their own: the only channel that s
       if (p.kind !== "person") expect(params.includes("own_values")).toBe(false);
     }
   }
+});
+
+test("an office's own file (what a seat is shown of what it sent, filed and paid) is made only of what the seat was shown: its own papers and accounts, and nothing of anyone else's", () => {
+  // (docs/behaviour/office-books.md, "The office's own file". The file is kept by code from the observations the seat
+  // receives; it asks the engine for nothing, so it can hold no more than the seat's channels carried.)
+  const me = "landlord-1", seat = "landlord-1-office-system";
+  const obs = (records: object[], transactions: object[]): any => ({ t: 5 * 86_400, entity: me, inbox: [], outcomes: [], drafts: [],
+    channels: { "landlord-1-office/mine": { kind: "records", records },
+      "landlord-1-office/books": { kind: "accounts", accounts: [{ account: "acc-landlord-1", holder: me, custodian: "bank", currency: "KES", balance: "1" }], transactions } } });
+  const book = new DayBook({ entity: me, authors: [seat] });
+  book.absorb(obs([
+    { id: "rec.1", record: "statement", kind: "notice", author: seat, speaks_for: me, at: 86_400, text: "Our own notice.", visible_to: [me] },
+    { id: "rec.2", record: "statement", kind: "complaint", author: "c0009-self", speaks_for: "c0009", at: 86_400, text: "A TENANT'S OWN BUSINESS", visible_to: ["c0009"] },
+  ], [
+    { t: 86_400, from: "acc-landlord-1", to: "acc-city", amount: "100000", currency: "KES", by: me },
+    { t: 86_400, from: "acc-c0001", to: "acc-c0002", amount: "777700", currency: "KES", by: "c0001" },
+  ]));
+  const text = book.text(5 * 86_400, "Letting office");
+  expect(text).toContain("Our own notice.");
+  expect(text).toContain("1,000.00 to acc-city");
+  expect(text).not.toContain("TENANT");
+  expect(text).not.toContain("7,777");
+  // A town has no god's-eye register in it by construction: the file has no source but the observation.
+  expect(book.text(5 * 86_400, "x")).not.toContain("acc-c0001");
 });

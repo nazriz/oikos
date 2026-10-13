@@ -28,7 +28,7 @@ import { debriefsBeside } from "./logs";
 import { join } from "node:path";
 import { besideOf, largest, leftAlone, renderSummary, SUMMARY_MAX } from "./debrief-summary";
 import { readForEnd } from "./run-end";
-import { calls, canonical, DECISIONS, OUTCOMES, RECORD, WORDS, type Words, inCurrency, paramErrors, modules as builtin, Randomness, Roster, slice, Tally, View, type BehaviourModule, type Controller, type Currency, type DecisionRecord, type OutcomeRecord, type RecordChange, formatMoney, type LookRequest, type Observation, type ParticipantAction, type ParticipantContext } from "@oikos/participants";
+import { DayBook, calls, canonical, DECISIONS, OUTCOMES, RECORD, WORDS, type Words, inCurrency, paramErrors, modules as builtin, Randomness, Roster, slice, Tally, View, type BehaviourModule, type Controller, type Currency, type DecisionRecord, type OutcomeRecord, type RecordChange, formatMoney, type LookRequest, type Observation, type ParticipantAction, type ParticipantContext } from "@oikos/participants";
 import { ACCOUNT_TOKENS, ACCOUNT_VERSION, ACCOUNTS_DEFAULT, ACCOUNTS_MOST, darkAccount, DEBRIEF_ANSWER_TOKENS, DEBRIEF_VERSION, endNeedMicroUsd, keptBackFor, reckonedEndMicroUsd, type EndCosts, type MockPolicy, mockAccount, sampleAccounts, stepsOf, writeAccount, type AccountBrief, type AccountCounts, type DebriefInput, type DebriefWording, COMPOSE_VERSION, createCompose, mockCompose, type ComposerConfig, CONSULT_VERSION, createConsult, createLlmParticipant, LLM_PARTICIPANT_VERSION, MOCK_VERSION, MockAdapter, mockPolicies, PRICES, ModelCallFailed, ModelUnreachable, SpendingLimitReached, type Budget, type LlmAdapter, type LlmController, type LlmIO, type MockBrain, type Price } from "@oikos/participants/llm";
 import { createArrangement, createTranslator, draftText, Knowledge, RESOLVER, resolve, TRANSLATOR_VERSION, type Draft, type Resolution, type Route, NOT_CHECKED } from "@oikos/translator";
 import { Kernel } from "./kernel";
@@ -222,7 +222,7 @@ interface Unit {
   entity: string;
   module: BehaviourModule;
   controller: Controller;
-  llm?: { controller: LlmController; config: any; drafts: { draft: Draft; hash: string; reasoning?: string }[]; drafted: number; roster?: Roster; tally?: Tally };
+  llm?: { controller: LlmController; config: any; drafts: { draft: Draft; hash: string; reasoning?: string }[]; drafted: number; roster?: Roster; tally?: Tally; dayBook?: DayBook };
   ctx: ParticipantContext;
   /** How long it sleeps when it waits without saying until when, and when it first wakes: for the engine's schedule
    * (kernel/src/schedule.rs), which decides every wake from then on. */
@@ -549,7 +549,12 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       // (Its organisation's only office, its own staff's post apart: what is addressed to the organisation is its post.)
       ...(office && [...positions.values()].filter((x: any) => x.entity === office.entity && !mine.some((m) => x.id === `${m.id}-staff`)).length === 1 ? { sole: true } : {}) };
     const ownAuthors = mine.flatMap((x) => { const staff = positions.get(`${x.id}-staff`)?.holder; return staff ? [staff] : []; });
-    const config = { ...(pp.mock?.debrief ? { mockDebrief: pp.mock.debrief } : {}), trays, ownAuthors, ...(pp.wake_on_papers === false ? { wakeOnPapers: false } : {}), ...(typeof pp.effort === "string" && pp.effort ? { effort: pp.effort } : {}), ...(roster || tally ? { staff: { text: setOut } } : {}), whoIs, participant: p.id, entity, entityName, onRequest, kinds, ways, title: office?.title ?? p.title, role: office?.role, framing: p.framing, standing: standingIds, titles, cadenceDays: pp.cadence_days ?? 7, draftText,
+    // The office's own file (behaviour/daybook.ts): its own papers and payments, and what stands open on its books (its
+    // module's `books`, read from what the seat is shown as its clerk reads it), set out at every sitting.
+    const officeModule = office ? mods[office.role_module?.code ?? ""] : undefined;
+    const dayBook = new DayBook({ entity, authors: [p.id, ...ownAuthors], name: (id: string) => whoIs(id)?.name,
+      ...(office && officeModule?.books ? { books: officeModule.books(ctxFor(p.id, office.id, entity, sortedKeys(office.role_module?.params ?? {}) as any)) } : {}) });
+    const config = { dayBook: { text: (at: number) => dayBook.text(at, office?.title ?? entityName ?? "The office") }, ...(pp.mock?.debrief ? { mockDebrief: pp.mock.debrief } : {}), trays, ownAuthors, ...(pp.wake_on_papers === false ? { wakeOnPapers: false } : {}), ...(typeof pp.effort === "string" && pp.effort ? { effort: pp.effort } : {}), ...(roster || tally ? { staff: { text: setOut } } : {}), whoIs, participant: p.id, entity, entityName, onRequest, kinds, ways, title: office?.title ?? p.title, role: office?.role, framing: p.framing, standing: standingIds, titles, cadenceDays: pp.cadence_days ?? 7, draftText,
       ...(pp.sessions ? { sessions: pp.sessions } : {}), ...(pp.max_actions ? { maxActions: pp.max_actions } : {}),
       // Folders that hold some kinds of paper only (by the channel's own id, as `standing` is given), and the most a prompt may be.
       ...(pp.folders ? { folders: new Map<string, string[]>(Object.entries(pp.folders as { [id: string]: string[] }).flatMap(([id, kinds]) => chans.filter((x) => x.path === id || x.path.endsWith(`/${id}`)).map((x) => [x.path, kinds] as [string, string[]]))) } : {}),
@@ -573,7 +578,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     }
     return {
       key: p.id, participant: p.id, entity, module, controller: controller as unknown as Controller, ctx,
-      llm: { controller, config: p, drafts: [], drafted: 0, ...(roster ? { roster } : {}), ...(tally ? { tally } : {}) },
+      llm: { controller, config: p, drafts: [], drafted: 0, ...(roster ? { roster } : {}), ...(tally ? { tally } : {}), ...(dayBook ? { dayBook } : {}) },
       cadence: ceilTo(cadence, tick), firstWake: wakeAt ?? 0, wokeFor: "start", since: 0,
       knowledge: new Knowledge(currency), view: new View(new Set(standingIds)), notices: [],
     };
@@ -854,6 +859,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     const obs: Observation = { ...u.view.apply(raw), woke_for: u.wokeFor, since: u.since };
     // (A seat's roster of its own staff, and what a draft's preview may say of it: read from what it is shown.)
     u.llm?.tally?.absorb(obs);
+    u.llm?.dayBook?.absorb(obs);
     if (u.llm?.roster) {
       const roster = u.llm.roster;
       roster.absorb(obs);

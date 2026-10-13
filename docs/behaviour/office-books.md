@@ -135,3 +135,46 @@ The fourth living pilot's seats said in their debriefs what they lacked. Each wa
 | An order paid or not (the member) | No: the tribunal learns of an unpaid order only if the creditor asks its registrar to enforce it, and of a paid one never | Left: the registrar's books show requests to enforce; the member's do not, and a paid order leaves no paper at the tribunal. |
 
 Never shown: an outcome the office would not learn of by its ordinary papers.
+
+## The office's own file (2026-10-13)
+
+**Source:** `participants/src/behaviour/daybook.ts`; wired in `orchestrator/src/run.ts` (the seat's `dayBook`) and shown by
+`participants/src/llm/participant.ts` (0.18.0). Tests: `participants/test/daybook.test.ts`, and a case in
+`orchestrator/test/no-god-view.test.ts`. Decision: docs/decisions.md, "What a seat carries between sittings" (2026-10-13).
+
+**The fault.** The books above say what stands open. A real office-holder also has what the office *did*: the file of what
+it sent and when, the ledger of what it paid and was paid, the record of what it decided. A seat has its notebook and,
+for what it did, nothing else: each paper it files comes back to it once, as a new paper, and is not shown again. In the
+sixth living pilot the letting office paid a rates notice on day 31 and again on day 73 and let a second fall overdue; the
+seat said it had "depended on the notebook for continuity, and I missed some things". The papers were the office's own.
+
+**What a real office does.** A clerk keeps a day book (what went out, what was filed, when), a payments ledger, and the
+aged list of what is open; the office-holder reads them when they sit down. (To confirm: common practice; no source opened.)
+
+**How it works.**
+1. **At every sitting** the first message carries, after the report, a section "<Office>: The office's own file", made by
+   code from what the seat itself has been shown: its own papers and its staff's (never the clerk's `office_books` nor a
+   staff report), its own accounts' payments out and in, and the office module's `books` (the same reader the clerk uses)
+   for what stands open. Nothing is asked of the engine; the file holds only what the seat's channels carried (the
+   knowing rules: it is theirs). A code-run office has none.
+2. **Sent, filed and paid**, newest first, the last 40 days, each with its date and id. A paper that someone else's paper
+   cites is followed by "followed <date> by a <kind> (<who>)". A request to the bank to pay is replaced by the payment
+   when it was carried out ("paid KSh 2,977.86 to the city, settling rec.19352; asked of the bank <date>") and says
+   "no payment out of the account seen yet" when it was not. Standing payments of one sum for one stated reason are one
+   line (how many, to how many, since when). Three or more papers of one kind in one day are one line.
+3. **Into the account**, the last 40 days, by payer: how many, how much, the latest, the memo.
+4. **Standing open on the books now**: each heading with a count and its first three lines; the rest counted.
+5. **The bound.** At most 4,500 characters in all (`DAYBOOK_MAX`): 1,700 for the lines sent, filed and paid; 500 for money
+   in; 1,400 for what is open; the rest is headings. Lines are whole; what does not fit, and everything older than 40
+   days, is counted by kind in one line ("Before that and beyond the lines above: 50 rental listings, 40 withdrawals ...").
+   Folding is by code, never by a model. Test: a busy office over 90 days never passes it.
+6. **Nothing says what to do with it.** The seat's standing instructions, the translator's prompt and its forms list are
+   unchanged. The notebook stays the seat's own free notes.
+
+**Out of scope, noted.** The book of "Invoices addressed to us" and "Sums recorded against us" can list two records for one
+bill (the rates notice rec.19352 and rec.19353 in the sixth pilot): paying one does not settle the other. That is a books
+question (is it one bill or two?), not a memory one, and is not changed here.
+
+**Revisit if** a seat's own record is read as a to-do list or leads it to repeat (watch the first pilot that has it); if the
+bound binds on a seat whose office does a great deal (the tribunal's member, with sixty cases in a day); or if a seat
+needs the papers it sent more than 40 days ago, which are on its file and can be looked up.
