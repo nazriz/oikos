@@ -271,24 +271,38 @@ export class Inner {
     return e ? Math.round(e.bps) : undefined;
   }
 
-  /** Something it did, to us (`weight` 1) or to someone who told us (`heard`): well or badly. */
-  experience(who: string, kind: TrustKind, good: boolean, t: number, o: { weight?: number; heard?: boolean } = {}): { before: number; after: number } {
+  /** Something it did, to us (`weight` 1) or to someone who told us (`heard`): well or badly. `scale` is the reading of
+   * the words it came in (participants/src/behaviour/reading.ts), a multiplier on the weight, 1 where there are none;
+   * `plain` is the figure as it would have stood without it. */
+  experience(who: string, kind: TrustKind, good: boolean, t: number, o: { weight?: number; heard?: boolean; scale?: number } = {}): { before: number; after: number; plain: number } {
     const e = this.entry(who, kind, t);
     const before = Math.round(e.bps);
     const w = (o.weight ?? 1) * (o.heard ? this.p.trust.heard_bps / 10_000 : 1);
-    e.bps = good ? up(e.bps, this.p.trust.good_bps * w) : down(e.bps, this.p.trust.bad_bps * w);
-    return { before, after: Math.round(e.bps) };
+    const moved = (x: number) => (good ? up(x, this.p.trust.good_bps * w * (o.scale ?? 1)) : down(x, this.p.trust.bad_bps * w * (o.scale ?? 1)));
+    const plain = o.scale === undefined || o.scale === 1 ? undefined : Math.round(good ? up(e.bps, this.p.trust.good_bps * w) : down(e.bps, this.p.trust.bad_bps * w));
+    e.bps = moved(e.bps);
+    const after = Math.round(e.bps);
+    return { before, after, plain: plain ?? after };
   }
 
   // ---------------------------------------------------------------- agency
 
-  /** Something we set out to do came off, or did not. */
-  tried(worked: boolean, weight = 1): void {
-    this.agency = worked ? up(this.agency, this.p.agency.worked_bps * weight) : down(this.agency, this.p.agency.failed_bps * weight);
+  /** Something we set out to do came off, or did not. `scale`: as for `experience`. */
+  tried(worked: boolean, weight = 1, scale?: number): { before: number; after: number; plain: number } {
+    const before = Math.round(this.agency);
+    const step = (w: number) => (worked ? up(this.agency, this.p.agency.worked_bps * w) : down(this.agency, this.p.agency.failed_bps * w));
+    const plain = scale === undefined || scale === 1 ? undefined : Math.round(step(weight));
+    this.agency = step(weight * (scale ?? 1));
+    const after = Math.round(this.agency);
+    return { before, after, plain: plain ?? after };
   }
-  /** Something was done to us that we had no say in. */
-  doneTo(weight = 1): void {
-    this.agency = Math.max(0, this.agency - this.p.agency.done_to_bps * weight);
+  /** Something was done to us that we had no say in. `scale`: as for `experience`. */
+  doneTo(weight = 1, scale?: number): { before: number; after: number; plain: number } {
+    const before = Math.round(this.agency);
+    const plain = scale === undefined || scale === 1 ? undefined : Math.round(Math.max(0, this.agency - this.p.agency.done_to_bps * weight));
+    this.agency = Math.max(0, this.agency - this.p.agency.done_to_bps * weight * (scale ?? 1));
+    const after = Math.round(this.agency);
+    return { before, after, plain: plain ?? after };
   }
 
   // ---------------------------------------------------------------- belonging and meaning

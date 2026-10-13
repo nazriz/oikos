@@ -1790,7 +1790,7 @@ What it taught the plan:
 
 ## 13. Reading: what words mean to a person (the first model slice under B)
 
-**Status:** a plan awaiting Naz's word. Nothing is built, no model was called, and nothing in a run changes.
+**Status (2026-10-13):** approved by Naz with three rulings (docs/decisions.md, "Reading: building it"). Steps 1 to 4 of 13h are built (no model called); step 5, the first that calls a model, is not. With the dial off nothing in a run changes. **Rulings that correct what follows:** the reader is an interim external model, Haiku 5.5 through `claude -p`, whose readings are gathered as training data for a small reader of our own (13e's teacher paragraph is superseded); kind words soften and never outweigh (13j.3, answered: yes), checked as a property by the tests; the reading is filed as a `note` annotation (`data.reading`).
 Decision: docs/decisions.md, 2026-10-13, "Reading: plan". Sources: docs/research/references.md, "Reading".
 
 **What was decided** (Naz, 2026-10-12, "B"; docs/decisions.md, "Two decisions of Naz's"). Routine choices stay
@@ -2004,8 +2004,8 @@ words on has its row). In a run a template is never sent to a model. What this g
 
 ### 13e. Which model, and cost
 
-- **The teacher: `claude-code/claude-sonnet-5-5`** through `claude -p`, on plan usage; no paid key. Beside it
-  `claude-code/claude-haiku-5-5` as the second reader, and `codex/gpt-6-luna` as the other family when its window
+- **The reader (superseded by Naz's ruling of 2026-10-13): `claude-code/claude-haiku-5-5`** through `claude -p`, on plan usage; no paid key; an interim, its readings kept as training data for our own. Where this section says teacher or Sonnet 5.5 as reader, read Haiku 5.5, with Sonnet 5.5 a second reader of the gate only if the owner allows it. Beside it
+  the other family as the second reader, and `codex/gpt-6-luna` as the other family when its window
   answers, never waited for (this is narrow rating work). Never the largest Claude model; never `gpt-6-astra`.
 - **Never the model that holds a seat in the same run.** A model reading its own words reads them as it meant
   them, and evaluator models have been found to recognise and favour their own writing (Panickssery and others

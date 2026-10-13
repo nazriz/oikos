@@ -41,6 +41,7 @@ import { Inner, innerParams, UPBRINGING, type InnerParams, type Outlook } from "
 import { VALUES as VALUES_OF_MIND, NEEDS as NEEDS_OF_MIND } from "./mind";
 import { chancePpm, frictionDial, PAPER, tendered } from "./frictions";
 import { acceptEntity, chanceOf, darkOf, drawOf, foundingParams, plainName, plainPurpose, shapeOdds, type FoundingParams, type Shape } from "./founding";
+import { angerAdded, doneToAgency, failedAgency, fearAdded, grantTrust, isNoShift, obeyRate, readFacts, readingDial, recourseScore, refusalTrust, tieMoved, type PaperRead } from "./reading";
 import { bringsOf, meets, swayed, SEEKS_OF_NEED, Wants, wantParams, type Opening, type SeekKey, type Want as Wanted, type WantParams } from "./wants";
 import { factsOf, Feelings, Mind, MIND_DEFAULTS, MIND_VERSION, Pursuit, satisfaction, Ties, type Circumstances, type Facts, type MindParams, type NeedLevels, type PopulationValues, type Value } from "./mind";
 
@@ -803,6 +804,37 @@ export const citizen: BehaviourModule = {
     // (Kept: as many as we keep contacts, and the few we resent. How far a tie is trusted starts from how far people
     // here say most people can be trusted, where the world says.)
     const ties = new Ties(180, p.max_contacts + 3, p.outlook.people_bps ?? 5_000);
+    // ---- reading (docs/behaviour/reading.md): what the words of a paper addressed to us were read to be. Only where the
+    // world's dial has reading on and the paper was read (a seat's own words); otherwise nothing here is entered and
+    // every figure is the one it always was. The reader saw the paper and nothing of us; what the words mean to us is
+    // worked out here, from our own record.
+    const rdial = readingDial(ctx.world);
+    const readOf = (paper: string): PaperRead | undefined => {
+      const x = rdial && ctx.read ? ctx.read(paper, "addressee") : undefined;
+      return x && !isNoShift(x.shift) ? x : undefined;
+    };
+    /** The odds of appealing, by matter: a step of recourse in the last answer read raises the score of asking again and of a venue. */
+    const recourseBump = new Map<string, number>();
+    /** A decision that reached us, landing on the record: trust in whoever decided (`trust`: the decision's own weight), the sense of agency (`tried`: something we tried, which worked or not; `doneTo`: something done to us), and, where its words were read, what they changed. Returns what moved, beside what it would have been, for the outcome. */
+    const landing = (rd: PaperRead | undefined, by: string, ok: boolean, t: number, o: { trust?: number; tried?: boolean; doneTo?: number; kind?: string; feel?: boolean }): { [what: string]: { after: number; plain: number; before?: number } } => {
+      const P = rdial?.params;
+      const moved: { [what: string]: { after: number; plain: number; before?: number } } = {};
+      if (o.tried !== undefined) { const a = inner.tried(o.tried, 1, rd && !o.tried ? failedAgency(rd.shift, P!) : undefined); if (rd) moved.agency = { before: a.before, after: a.after, plain: a.plain }; }
+      if (o.trust !== undefined) { const e = inner.experience(by, o.kind ?? kindOf(by), ok, t, { weight: o.trust, ...(rd ? { scale: ok ? grantTrust(rd.shift, P!) : refusalTrust(rd.shift, P!) } : {}) }); if (rd) moved.trust = { before: e.before, after: e.after, plain: e.plain }; }
+      if (o.doneTo !== undefined) { const a = inner.doneTo(o.doneTo, rd ? doneToAgency(rd.shift, P!) : undefined); if (rd) moved.agency_done_to = { before: a.before, after: a.after, plain: a.plain }; }
+      if (rd && o.feel !== false) {
+        const anger = angerAdded(rd.shift, P!), fear = fearAdded(rd.shift, P!), tie = tieMoved(rd.shift, P!);
+        if (anger) { const was = feelings.level("anger", by, t); feelings.add("anger", by, anger, t); moved.anger = { after: feelings.level("anger", by, t), plain: was }; }
+        if (fear) { const was = feelings.level("fear", by, t); feelings.add("fear", by, fear, t); moved.fear = { after: feelings.level("fear", by, t), plain: was }; }
+        if (tie) { const was = ties.affinity(by, t); ties.add(by, tie, t); moved.tie = { after: ties.affinity(by, t), plain: was }; }
+      }
+      return moved;
+    };
+    /** What the words did, on the outcome just recorded (the person's side is theirs: the paper, the shift, each figure beside what it would have been). */
+    const withRead = (rd: PaperRead | undefined, moved: { [what: string]: { after: number; plain: number; before?: number } }): void => {
+      const last = outcomes[outcomes.length - 1];
+      if (rd && last) last.read = readFacts(rd, moved);
+    };
     const leadFrom = new Map<string, string>(); // a building someone told us to look at -> who told us
     // Goals: what we're pursuing, by which method; since when each need has gone unmet; when we may try again after
     // giving up; and, looking for a cheaper home, the rent to beat (for the first month of the hunt).
@@ -2196,7 +2228,7 @@ export const citizen: BehaviourModule = {
         const best = new Map<string, Way>();
         for (const o of ways) if (!best.has(o.kind) || o.adj > best.get(o.kind)!.adj) best.set(o.kind, o);
         const learned = mind.learned("way");
-        const options = [...best.values()].map((o) => ({ key: o.kind, value: o.adj + Math.round((K.others * Math.min(5, o.others) * (10_000 + mind.person.temperament.conformity)) / 10_000) }));
+        const options = [...best.values()].map((o) => ({ key: o.kind, value: o.adj + Math.round((K.others * Math.min(5, o.others) * (10_000 + mind.person.temperament.conformity)) / 10_000) + (o.kind === "ask" || o.kind === "desk" ? recourseBump.get(w.about) ?? 0 : 0) }));
         // Doing nothing: the likelier the less a person believes what they do makes a difference.
         options.push({ key: "wait", value: -K.own - Math.round(K.agency * inner.zAgency()) });
         options.sort((a, b) => (a.key < b.key ? -1 : 1));
@@ -2493,12 +2525,15 @@ export const citizen: BehaviourModule = {
         if (r.record !== "statement" || r.kind !== "fund_decision" || !(r.addressed_to ?? []).includes(me) || !r.speaks_for) continue;
         const host = r.speaks_for, m = groups.get(host);
         const granted = r.data?.granted === true, why = String(r.data?.why ?? "");
+        const rd = readOf(r.id);
         const stated = book.open("membership").find((x) => x.speaks_for === host)?.data?.fund as { qualify_days?: number; every_days?: number } | undefined;
         // (What its stated rule foretold: too new a member, drawn too lately, the fund without the money.)
         const foretold = !!stated && (why === "the fund has not got it" || (!!m && ((why === "not yet a member long enough" && t - m.t < Number(stated.qualify_days ?? 0) * DAY) || why === "drew not long ago")));
-        if (granted) { if (m) m.drew = t; inner.experience(host, kindOf(host), true, t, { weight: 2 }); }
-        else { inner.experience(host, kindOf(host), false, t, { weight: foretold ? 1 : 2 }); if (!foretold) refusedBy.add(host); }
+        let moved: ReturnType<typeof landing> = {};
+        if (granted) { if (m) m.drew = t; moved = landing(rd, host, true, t, { trust: 2 }); }
+        else { moved = landing(rd, host, false, t, { trust: foretold ? 1 : 2 }); if (!foretold) refusedBy.add(host); }
         outcome({ t, domain: "membership", option: "member", kind: granted ? "draw_paid" : "draw_refused", way: "mine", from: host, facts: { with: host, ...(granted ? { amount: cents(r.data?.amount ?? 0) } : { why, foretold }) } });
+        withRead(rd, moved);
       }
       for (const r of fresh) {
         if (r.record === "agreement" && r.terms.template === "membership" && r.terms.parties.includes(me) && !book.signedBy(r.id, me) && !book.takenBack(r.id)) {
@@ -2552,9 +2587,10 @@ export const citizen: BehaviourModule = {
         const about = String(r.data?.about ?? "");
         const by = r.speaks_for ?? r.author;
         const ok = !!r.data?.granted;
+        const rd = readOf(r.id);
         learn("way", "ask", ok ? 10_000 : 1_000, { t, kind: ok ? "granted" : "refused", way: "mine", from: by, facts: { about } });
-        inner.tried(ok);
-        inner.experience(by, kindOf(by), ok, t, { weight: ok ? 2 : 1 });
+        const moved = landing(rd, by, ok, t, { tried: ok, trust: ok ? 2 : 1 });
+        withRead(rd, moved);
         ties.add(by, ok ? 1_500 : -500, t, ok ? "granted" : "refused");
         if (ok && job && by === job.employer && about === job.agreement && Number(r.data?.wage) > job.wage) {
           outcome({ t, domain: "job", option: job.employer, kind: "rise", way: "mine", facts: { wage: Number(r.data.wage), was: job.wage, asked: true } });
@@ -2601,9 +2637,11 @@ export const citizen: BehaviourModule = {
           if (!g) continue;
           const ok = !!r.data?.granted;
           g.answer = ok ? "granted" : "refused";
+          const rd = readOf(r.id);
           learn("way", "ask", ok ? 10_000 : 1_000, { t, kind: ok ? "granted" : "refused", way: "mine", from: by, facts: { about: g.matter } });
-          inner.tried(ok);
-          inner.experience(by, kindOf(by), ok, t, { weight: ok ? 2 : 1 });
+          const moved = landing(rd, by, ok, t, { tried: ok, trust: ok ? 2 : 1 });
+          withRead(rd, moved);
+          if (rd && rdial) recourseBump.set(g.matter, recourseScore(rd.shift, rdial.params));
           ties.add(by, ok ? 1_000 : -1_000, t, ok ? "granted" : "refused");
           if (ok && g.amount !== undefined) {
             if (g.matter === "underpaid" && job && job.agreement === g.about) job.short = 0;
@@ -2619,10 +2657,11 @@ export const citizen: BehaviourModule = {
           const f = String(r.data.finding);
           g.applied.get(by)!.finding = f;
           const won = f === "pay" || f === "do" || f === "set_aside" || f === "settled";
+          const rd = readOf(r.id);
           learn("way", "desk", won ? 10_000 : f === "referred" ? 5_000 : 500, { t, kind: f, way: "mine", from: by, facts: { about: g.matter, days: Math.floor((t - g.applied.get(by)!.t) / DAY), binding: r.data.binding !== false } });
           if (f !== "referred") {
-            inner.tried(won);
-            inner.experience(by, civil(by), won, t, { weight: 2 });
+            withRead(rd, landing(rd, by, won, t, { tried: won, trust: 2, kind: civil(by) }));
+            if (rd && rdial) recourseBump.set(g.matter, recourseScore(rd.shift, rdial.params));
           }
           if (f === "settled") ended(g, "settled", true);
           else if (won) {
@@ -2818,21 +2857,25 @@ export const citizen: BehaviourModule = {
           }
         } else if (r.kind === "tribunal_order" && r.data?.kind === "possession" && r.data?.against === me && r.data?.about === home.agreement) {
           const by = r.speaks_for!;
+          const rd = readOf(r.id);
           if (r.data.finding === "possession") {
-            const obeys = fixed(`obey-${home.agreement}`).below(10_000) < (p.possession?.obey_bps ?? 10_000);
+            // (The words of the order, where read, move the odds of obeying: the same draw, another threshold.)
+            const obeyAt = rd && rdial ? obeyRate(p.possession?.obey_bps ?? 10_000, rd.shift, rdial.params) : (p.possession?.obey_bps ?? 10_000);
+            const obeys = fixed(`obey-${home.agreement}`).below(10_000) < obeyAt;
             // (The order is on our record as its own event, with who made it: until 2026-10-12 only the notice was.)
             inner.happened("ordered_out", t, { about: by });
-            inner.experience(by, kindOf(by), false, t, { weight: 2 });
+            const movedTrust = landing(rd, by, false, t, { trust: 2 });
             if (answeredApps.has(String(r.data.application))) learn("way", "desk", 500, { t, kind: "possession", way: "mine", from: by, facts: { about: "possession", answered: true } });
             home.vacate = { paper: r.id, by: Number(r.data.due) || t, stays: !obeys, ordered: true };
             outcome({ t, domain: "home", option: home.space, kind: "possession_ordered", way: "mine", from: home.landlord, facts: { by: home.vacate.by, obeys } });
-            inner.doneTo();
+            withRead(rd, { ...movedTrust, ...landing(rd, by, false, t, { doneTo: 1, feel: false }) });
           } else {
             home.vacate = undefined;
             noticeOver.add(home.agreement);
-            inner.experience(by, kindOf(by), true, t, { weight: 2 });
+            const movedTrust = landing(rd, by, true, t, { trust: 2 });
             if (answeredApps.has(String(r.data.application))) learn("way", "desk", 10_000, { t, kind: String(r.data.finding), way: "mine", from: by, facts: { about: "possession", answered: true } });
             outcome({ t, domain: "home", option: home.space, kind: r.data.finding === "plan" ? "plan_ordered" : "possession_dismissed", way: "mine", from: home.landlord, facts: r.data.finding === "plan" ? { instalment: cents(r.data.instalment ?? 0), owed: cents(r.data.amount ?? 0) } : {} });
+            withRead(rd, movedTrust);
           }
         } else if (r.kind === "warrant_executed" && r.data?.lease === home.agreement) {
           home.vacate = { paper: r.id, by: t, stays: false, ordered: true, removed: true };

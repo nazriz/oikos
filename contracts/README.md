@@ -503,6 +503,17 @@ Additions only; no schema file changed in shape, nothing renamed or removed. A l
 - **Measures: `town/possession` gains a last column `left_on_order`** (tenants who left a home on a possession order with no warrant carried out on it first). **Entity records: `memory[].what` gains the word `left_on_order`** (free text; additive: records written before keep `evicted`). The exit-account strata and dark rule read it as they read `evicted`.
 - **Measures: nothing else moves**; `outcome` records of a person already carried `how` (`removed`, `left_on_order`, `left_on_notice`).
 
+## Changes since v0.8 closed (2026-10-13: reading; docs/decisions.md, "Reading: building it"; under the owner's blanket approval of contract changes, 2026-10-11)
+
+Additions only; nothing renamed or removed. A log or a world made before them is valid.
+
+- **World config: `dials.reading`** (`world-config.schema.json`): `{ reader (required), papers?, calls_per_run?, step? }`. Absent: no paper is read and the world is as before, to the state hash (a test holds it). `step` takes the sizes of `participants/src/behaviour/reading.ts` (`ReadingParams`); a setting that would let words reverse or outweigh a decision is refused when the world loads. The generator's `living.reading` carries it into the config.
+- **Log: the usage purpose `reading`** (added at the first step that calls a reader) and, as a `note` annotation, `data.reading`: `{ paper, kind, standing, text (hash of the tagged words), reader: { model, prompt, table }, source (model | cache | table | declined | no_answer | unread | apart | over_limit), askings, reading, plain, shift }`. Free text in an existing annotation; no enum changes.
+- **Outcomes** (the citizen's dataset): an `outcome` a reading touched carries `read` in its `facts`: the paper, the shift, and each moved figure beside what it would have been.
+- **Dataset: `CitizenOutcome.read`** (additive, optional): `{ paper, source, shift, moved }` where a reading touched the outcome; `moved` gives each figure the words moved (trust, agency, anger, fear, tie) beside what it would have been without them, and `before` where there is one.
+- **Dataset: `readings.jsonl`** (`Reading` in `dataset.schema.json`; additive): one row per paper read, as filed in the log: the paper, the kind and outcome it decided, the standing, the paper's words as the reader was shown them (tagged) and their hash, what it answered (tagged), the source (model, cache, apart, declined, no_answer, unread, over_limit, no_table), the reader's model and versions, the typed reading, the plain paper's, and the shift. The reading's `note` annotation (`data.reading`) gains `text`, `text_hash` and `answers_text`.
+- **A reader** is not a participant and has no id in the world; the contract of a reader is the TypeScript interface `Reader` (`participants/src/llm/reader.ts`), not a schema.
+
 ## Versioning
 
 `contracts: "0.8"`. Pre-1.0, every change bumps the minor version and is proposed explicitly. A draft version collects agreed changes until it's closed. Older logs remain valid logs of their own version and replay only on a kernel build of that version (D6).

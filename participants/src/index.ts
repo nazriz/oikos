@@ -136,3 +136,4 @@ export const modules: { [name: string]: BehaviourModule & { source: string } } =
   ).map(([m, src]) => [m.name, { ...keepingBooks(answering(m)), source: new URL(`./${src}`, import.meta.url).pathname }]),
 );
 for (const m of Object.values(modules)) if (m.books) keepers.set(m.name, m);
+export * as reading from "./behaviour/reading";

@@ -814,6 +814,35 @@
             }
           }
         },
+        "reading": {
+          "description": "Reading (docs/design/ai-citizens.md section 13; docs/behaviour/reading.md): a paper that carries a seat's own words is read once by a reader, which says what the paper is like on nine small whole numbers; the code mind then moves each person it reaches from their own record, by the difference from the plain paper code would have written. The reader sees the paper, never a person. Words scale what a decision does and never reverse or outweigh it. Absent: no paper is read and the world is as before, to the state hash.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["reader"],
+          "properties": {
+            "papers": {
+              "description": "Which kinds of paper are read: decisions addressed to a person; public statements; founders' statements. Absent: decisions.",
+              "type": "array",
+              "uniqueItems": true,
+              "maxItems": 3,
+              "items": { "enum": ["decision", "public", "founding"] }
+            },
+            "reader": {
+              "description": "The reader's model, as 'provider/model'. It holds no seat in the same run (docs/design/ai-citizens.md 13e); 'mock' plays it on the deterministic mock.",
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "calls_per_run": {
+              "description": "The most reader calls in a run; past it papers are read as the plain paper and counted (absent: 800).",
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/Count"
+            },
+            "step": {
+              "description": "The sizes of how each line lands (participants/src/behaviour/reading.ts, ReadingParams); every one a placeholder. Absent: the defaults. A setting that would let words reverse or outweigh a decision is refused.",
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/OpaqueObject"
+            }
+          }
+        },
         "composer": {
           "description": "The composing model (docs/design/ai-citizens.md 10e; VISION 15, point 7): the words of a founded thing are written by a model asked as an author shown the founder's own record, who may decline. Absent: no model is asked, and every statement of purpose is the plain one code writes. A run plays the composer on the mock unless it is started with the composer for real; either way the mix here is on record.",
           "type": "object",

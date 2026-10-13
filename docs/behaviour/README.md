@@ -75,3 +75,4 @@ Trade in goods (price lists, orders paid with the order, delivery notes) is shar
 The town these modules run in is made by the [generator](generator.md). What a participant reads before it confirms a draft is in [preview.md](preview.md).
 
 **Every act says why.** A module wraps each act's calls in `because("…", ...)` (`participants/src/behaviour/common.ts`): the rule that fired, in plain words, with the numbers it used ("Applying for apts-3/dwelling.2: the dearest home we've seen within a third of household income, with at least 2 bedrooms"). It goes into the log as the act's `reasoning`, and records cite what they rest on (`basis`) where there is something to cite. The renderer's causal trace (Stage 3) reads both. `measure … why` shows the coverage.
+| `reading` (dial, not a seat) | what the words of a seat's paper mean to the person who receives it: a reader says what the paper is like, code moves each person from their own record | [reading.md](reading.md) |
