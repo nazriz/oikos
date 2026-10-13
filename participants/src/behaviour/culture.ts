@@ -141,12 +141,34 @@ export interface CultureParams {
   newcomer_weight: number;
   /** The points a standard deviation of the lean adds to a way a want may take (as trust and agency do: wants.ts `choice`). */
   way_points: number;
+  // ---- town memory (step 5; docs/behaviour/culture.md): what a person remembers of what was public. Every size a placeholder.
+  /** The most events a person holds; the weakest gives way to a stronger arrival. */
+  slots: number;
+  /** How strongly an event first reaches me: seen (I was there), read (the paper's heaviest item), and told (this share of the teller's strength, `negative_bps` more for what I hold against). */
+  seen_bps: number;
+  read_bps: number;
+  pass_bps: number;
+  negative_bps: number;
+  /** An event told through more hands than this is not kept. */
+  max_hops: number;
+  /** A strength halves in this many days: what I saw; what I read or was told. */
+  half_life_seen_days: number;
+  half_life_told_days: number;
+  /** I tell what I hold above this strength. Hearing it again returns this share of the way to what it first was. */
+  tell_at_bps: number;
+  rehearse_bps: number;
+  /** An event bears on my trust in whoever did it, once, at its strength times this, and by where my own view of the conduct it shows sits. */
+  bystander_bps: number;
+  /** A departure I find in a building I am in counts as seen if it is no older than this. */
+  witness_days: number;
 }
 export const CULTURE_DEFAULTS: CultureParams = {
   prior_weight: 4, own_sd_bps: 1_500, values_bps: 500, window: 20, known_weight: 1, close_weight: 2, published_weight: 4, close_affinity_bps: 3_000,
   internalise_days: 1_095, sd_bps: 2_500, w_does_bps: 6_000, w_approves_bps: 4_000, sway_milli: 300, conceal_bps: 7_500, integrity_tells_bps: 7_000,
   grain_percent: 2, approves_default_bps: 5_000, does_default_bps: 5_000, phrases: 3,
   margin_bps: 2_500, cool_bps: 500, esteem_bps: 200, disapproved_bps: 300, newcomer_weight: 1, way_points: 1_500,
+  slots: 6, seen_bps: 10_000, read_bps: 5_000, pass_bps: 6_000, negative_bps: 2_000, max_hops: 3, half_life_seen_days: 365, half_life_told_days: 180,
+  tell_at_bps: 2_000, rehearse_bps: 3_000, bystander_bps: 5_000, witness_days: 3,
 };
 const INTS: (keyof CultureParams)[] = Object.keys(CULTURE_DEFAULTS) as (keyof CultureParams)[];
 
@@ -155,12 +177,14 @@ const INTS: (keyof CultureParams)[] = Object.keys(CULTURE_DEFAULTS) as (keyof Cu
 export function cultureParams(given?: any): CultureParams {
   const p = { ...CULTURE_DEFAULTS, ...(given ?? {}) } as CultureParams;
   for (const k of INTS) if (!Number.isInteger(p[k]) || p[k] < 0) throw new Error(`dials.culture.step.${k}: a size is a whole number, not below 0; got ${p[k]}`);
-  for (const k of ["own_sd_bps", "values_bps", "w_does_bps", "w_approves_bps", "close_affinity_bps", "conceal_bps", "integrity_tells_bps", "approves_default_bps", "does_default_bps", "margin_bps", "cool_bps", "esteem_bps", "disapproved_bps"] as const)
+  for (const k of ["own_sd_bps", "values_bps", "w_does_bps", "w_approves_bps", "close_affinity_bps", "conceal_bps", "integrity_tells_bps", "approves_default_bps", "does_default_bps", "margin_bps", "cool_bps", "esteem_bps", "disapproved_bps", "seen_bps", "read_bps", "pass_bps", "negative_bps", "tell_at_bps", "rehearse_bps", "bystander_bps"] as const)
     if (p[k] > 10_000) throw new Error(`dials.culture.step.${k}: a share is from 0 to 10000; got ${p[k]}`);
-  for (const k of ["prior_weight", "window", "known_weight", "close_weight", "published_weight", "internalise_days", "sd_bps", "newcomer_weight"] as const)
+  for (const k of ["prior_weight", "window", "known_weight", "close_weight", "published_weight", "internalise_days", "sd_bps", "newcomer_weight", "slots", "half_life_seen_days", "half_life_told_days", "witness_days"] as const)
     if (p[k] < 1) throw new Error(`dials.culture.step.${k}: must be at least 1; got ${p[k]}`);
   if (p.window < p.prior_weight || p.window < p.published_weight) throw new Error("dials.culture.step.window: must hold the prior's and a published count's weight");
   if (p.sway_milli > 1_000) throw new Error(`dials.culture.step.sway_milli: a lean may move a rate by at most the whole of it per standard deviation; got ${p.sway_milli}`);
+  if (p.slots > 12) throw new Error(`dials.culture.step.slots: at most 12 events held; got ${p.slots}`);
+  if (p.max_hops > 8) throw new Error(`dials.culture.step.max_hops: at most 8 hands; got ${p.max_hops}`);
   if (p.way_points > 10_000) throw new Error(`dials.culture.step.way_points: at most 10000 a standard deviation; got ${p.way_points}`);
   if (p.phrases > 6) throw new Error(`dials.culture.step.phrases: at most 6 phrases a time; got ${p.phrases}`);
   return p;
@@ -413,6 +437,8 @@ export class Culture {
   }
   /** The points the lean adds to a way a want may take (`way_points` a standard deviation, times the sway), bounded as the lean is. */
   way(c: Conduct, t: number): number { return Math.round(this.p.way_points * (this.p.sway_milli / 1_000) * this.lean(c, t)); }
+  /** How much an event bears on trust in whoever did it: its strength times `bystander_bps` times how far my own view of the conduct sits from the middle. */
+  bearing(strength: number, own: number): number { return (strength / 10_000) * (this.p.bystander_bps / 10_000) * (Math.abs(own - 5_000) / 5_000); }
   /** What a tie warms by when it tells me what I did is approved. */
   get warmth(): number { return Math.round(this.p.esteem_bps / 2); }
   /** A tie told me of an act: I may say what I think of it, to whoever asks, for the next days. */

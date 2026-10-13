@@ -457,6 +457,14 @@
             ]
           }
         },
+        "heard": {
+          "description": "What the person remembers of what was public (docs/behaviour/culture.md, town memory): at most 12 events, each positional [kind, about, event day, strength then, how, hands, day of that strength]. `kind`: the place in put_out, strike, ruling, law, vote, founded; `about`: who did it; `strength then`: how strongly it was held on the last day it arrived (whole percent); `how`: 0 saw, 1 read, 2 told; `hands`: how many people it passed through before reaching them. The strength now is the formula's (it halves every 365 days seen, 180 read or told, from the last day), never written: the section changes only when something arrives. One person's memory, never the town's. Absent where the culture dial is off.",
+          "type": "array",
+          "maxItems": 12,
+          "items": { "type": "array", "minItems": 7, "maxItems": 7, "prefixItems": [
+            { "type": "integer", "minimum": 0, "maximum": 11 }, { "type": "string", "maxLength": 80 }, { "type": "integer", "minimum": 0 },
+            { "type": "integer", "minimum": 0, "maximum": 100 }, { "type": "integer", "minimum": 0, "maximum": 2 }, { "type": "integer", "minimum": 0, "maximum": 8 }, { "type": "integer", "minimum": 0 } ] }
+        },
         "wants": {
           "description": "What the entity is trying to bring about (docs/design/ai-citizens.md 10a): what it is about and whom it concerns, what would satisfy it in the world's typed outcomes, the paper in its way, how much it matters, since when, where it came from, and what has been tried. Heaviest first. Empty for an entity that takes no initiative.",
           "type": "array",

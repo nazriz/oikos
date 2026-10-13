@@ -42,6 +42,7 @@ import { VALUES as VALUES_OF_MIND, NEEDS as NEEDS_OF_MIND } from "./mind";
 import { chancePpm, frictionDial, PAPER, tendered } from "./frictions";
 import { acceptEntity, chanceOf, darkOf, drawOf, foundingParams, plainName, plainPurpose, shapeOdds, type FoundingParams, type Shape } from "./founding";
 import { Culture, CULTURE_WORDS, cultureDial, standardNormal, type Conduct } from "./culture";
+import { EVENT_CONDUCT, PAPER_WEIGHT, paperStrength, TOWN_WORDS, TownMemory, type EventKind } from "./townmemory";
 import { angerAdded, doneToAgency, failedAgency, fearAdded, grantTrust, isNoShift, obeyRate, readFacts, readingDial, recourseScore, refusalTrust, tieMoved, type PaperRead } from "./reading";
 import { bringsOf, meets, swayed, SEEKS_OF_NEED, Wants, wantParams, type Opening, type SeekKey, type Want as Wanted, type WantParams } from "./wants";
 import { factsOf, Feelings, Mind, MIND_DEFAULTS, MIND_VERSION, Pursuit, satisfaction, Ties, type Circumstances, type Facts, type MindParams, type NeedLevels, type PopulationValues, type Value } from "./mind";
@@ -579,6 +580,7 @@ export const citizen: BehaviourModule = {
     const GRAIN: { [section: string]: number } = { agency: 50, trust: 100, attached: 200, views: 200, ties: 500, beliefs: 100 };
     let hoursAt = 0;
     let normsNow: ReturnType<Culture["section"]> | undefined, normsWritten: typeof normsNow;
+    let heardNow: ReturnType<TownMemory["section"]> | undefined, heardWritten: typeof heardNow;
     /** The record as it stands, for the kernel to hold (contracts/entity-record.schema.json): the sections that have
      * moved since they were last written, to go with our next action. `adult`: needs and the rest are judged. */
     const writeRecord = (t: number, adult: boolean, means?: { income: number; savings: number }) => {
@@ -603,11 +605,13 @@ export const citizen: BehaviourModule = {
         wants: initiative ? wants.section() : [],
         // (Only when the picture has been worked out again: the same array as last time is not compared again.)
         ...(cul && (normsNow = cul.section(t)) !== normsWritten ? { norms: normsNow } : {}),
+        ...(mem && (heardNow = mem.section()) !== heardWritten && (heardNow.length || heardWritten) ? { heard: heardNow } : {}),
         memory: sec.memory,
         circumstances: { household: household?.members.length ?? 1, housed: home || livingAt ? 1 : 0, working: job || ownWork ? 1 : 0, retired: retired ? 1 : 0,
           ...(means ? { income: whole(means.income), savings: whole(means.savings) } : {}) },
       };
       if (all.norms) normsWritten = all.norms as typeof normsNow;
+      if (all.heard) heardWritten = all.heard as typeof heardNow;
       // Where the hours went: a week's at a time.
       if (t - hoursAt >= 7 * DAY) {
         hoursAt = t;
@@ -840,8 +844,39 @@ export const citizen: BehaviourModule = {
         ...(p.union && union.length ? { join_union: Math.round(union.reduce((a, b) => a + b, 0) / union.length) } : {}),
         ...(p.union ? { strike: p.strike_vote_yes_bps } : {}),
         ...(p.crime ? { take_from_employer: Math.round((p.crime.take_bps * (10_000 - p.crime.caught_bps)) / 10_000) } : {}),
+        // (A landlord's applying for possession: a view of it is held where the world has a law on possession; no rate of its own: the placeholder.)
+        ...(p.possession ? { apply_possession: cdial!.params.does_default_bps } : {}),
       };
     })(), p.origin ?? undefined) : undefined;
+    // ---- town memory (step 5): what we remember of what was public, in a few typed slots of our own record; only where the dial is on.
+    const mem: TownMemory | undefined = cul ? new TownMemory(cul.p) : undefined;
+    /** Who carries out a removal in this world, for an event about one: the police where the world has them, else the tribunal. */
+    const removalsBy = (): string | undefined => p.welfare?.police ?? p.tribunal?.entity;
+    /** An event has just become ours for the first time: it bears once on trust in whoever did it, by the sign of OUR view of the conduct it shows (never the platform's),
+     * at its strength times `bystander_bps` and how strong that view is, whether or not we have dealt with them. Hearing it again moves nothing. */
+    const bearOnTrust = (kind: EventKind, about: string, strength: number, t: number) => {
+      const conduct = EVENT_CONDUCT[kind];
+      const own = conduct && cul ? cul.read(conduct, t)?.own : undefined;
+      if (own === undefined || own === 5_000) return;
+      // A removal held right is the doer vindicated; a walk-out held right is the employer's trust lost.
+      const ok = kind === "put_out" ? own > 5_000 : own < 5_000;
+      inner.experience(about, kindOf(about), ok, t, { weight: cul!.bearing(strength, own), heard: true });
+    };
+    /** Something public reached us (we saw it, read it): kept, and, the first time, a sighting of the conduct it shows where we were there. */
+    const remember = (kind: EventKind, about: string, eventT: number, t: number, how: "saw" | "read", strength: number) => {
+      if (!mem || !cul) return;
+      const r = how === "saw" ? mem.saw(kind, about, eventT, t) : mem.read(kind, about, eventT, t, strength);
+      if (r !== "fresh") return;
+      bearOnTrust(kind, about, mem.strengthOf(kind, about, eventT, t), t);
+    };
+    /** What a tie told us of the town (found anywhere in a message): the same, at the teller's strength less a hand's. */
+    const hearTown = (text: string, t: number) => {
+      const w = mem && TOWN_WORDS.heard(text);
+      if (!mem || !cul || !w) return;
+      const conduct = EVENT_CONDUCT[w.kind];
+      const against = conduct ? (cul.read(conduct, t)?.own ?? 5_000) < 5_000 : false;
+      if (mem.heardFrom(w.kind, w.about, w.day, t, w.strength, w.hops, against) === "fresh") bearOnTrust(w.kind, w.about, mem.strengthOf(w.kind, w.about, w.day * DAY, t), t);
+    };
     // Where those we have talked with say they come from (told when asked how things are, only where the profile gives a homophily):
     // bounded by the people we keep up with.
     const originSeen = new Map<string, string>();
@@ -1001,6 +1036,7 @@ export const citizen: BehaviourModule = {
     let askedHow: string[] = [];
     /** What we hold to say of an act a tie told us of, and to whom (culture, step 4): sent with our next steps. */
     let verdicts: { to: string; text: string }[] = [];
+    const readNews = new Set<string>(); // the paper's items already held as events
     const countedBallots = new Set<string>(); // declared results counted once into the culture's picture
     const complainNoted = new Set<string>(); // homes we have noted not writing about, for the culture's sake
     let nextCatchUp: number | null = null;
@@ -1436,7 +1472,7 @@ export const citizen: BehaviourModule = {
           ties.add(person, 300, obs.t, "talked"); peopleWeKnow.add(person);
           continue;
         }
-        if (cul) hearCulture(m.text, person, obs.t, m.from);
+        if (cul) { hearCulture(m.text, person, obs.t, m.from); hearTown(m.text, obs.t); }
         const told = heardNews(m.text);
         if (told) {
           // What they do, and how it goes for them: counted as others doing it, and learned from as others' payoffs.
@@ -2424,6 +2460,11 @@ export const citizen: BehaviourModule = {
       }
       if (!job && !ownWork && joblessSince === null) joblessSince = t;
 
+      // (Culture: a body founded in the run, its statement of purpose read when it reaches us: an event the town can remember.)
+      if (mem) for (const r of fresh) if (r.record === "statement" && r.kind === "purpose" && r.speaks_for && r.speaks_for !== me && r.at > 0 && (r.data as any)?.for !== me && !readNews.has(r.id)) {
+        readNews.add(r.id);
+        remember("founded", r.speaks_for, r.at, t, "read", paperStrength(3, cul!.p));
+      }
       // Offers made to us: sign what we asked for and can afford.
       for (const r of fresh) {
         if (r.record !== "agreement" || !r.terms.parties.includes(me) || book.signedBy(r.id, me) || book.takenBack(r.id)) continue; // (an offer its maker has taken back is not signed)
@@ -2691,6 +2732,7 @@ export const citizen: BehaviourModule = {
       }
       if (striking && !striking.out && job) {
         striking.out = true;
+        if (mem) mem.saw("strike", job.employer, t, t);
         striking.left = job.workplace && inside(job.workplace) ? job.workplace : undefined;
         steps.push(because(`The union's stoppage at ${job.employer}: stopping work.`, ...(striking.left ? [moveOut(striking.left, me)] : [])));
       }
@@ -3008,7 +3050,7 @@ export const citizen: BehaviourModule = {
         } else if (r.kind === "warrant_executed" && r.data?.lease === home.agreement) {
           home.vacate = { paper: r.id, by: t, stays: false, ordered: true, removed: true };
           // (Put out by an officer: on our record with who did it.)
-          if (r.speaks_for) { inner.happened("put_out", t, { about: r.speaks_for }); inner.experience(r.speaks_for, kindOf(r.speaks_for), false, t, { weight: 2 }); }
+          if (r.speaks_for) { inner.happened("put_out", t, { about: r.speaks_for }); inner.experience(r.speaks_for, kindOf(r.speaks_for), false, t, { weight: 2 }); if (mem) mem.saw("put_out", r.speaks_for, t, t); }
         }
       }
       // (A notice to vacate that has lapsed: the arrears were paid.)
@@ -3958,12 +4000,31 @@ export const citizen: BehaviourModule = {
       initiative && wants.all().length ? CATCHING_UP.after(wants.all().filter((w) => w.way).slice(0, 3).map((w) => ({ about: w.about, way: w.way!.startsWith("offer:") ? w.way! : w.way!.split(":")[0]! }))) : "",
       initiative && withdrew && lastSeenT - withdrew.t <= p.news_days * DAY ? CATCHING_UP.gaveUp(withdrew.about) : "",
       // (Culture: where we come from, and what we did at an occasion and say of it; docs/behaviour/culture.md.)
-      ...(cul ? [...(cul.group && cdial!.homophily_bps > 0 ? [CULTURE_WORDS.from(cul.group)] : []), ...(asker ? cul.tell(asker, lastSeenT, p.news_days) : [])] : []),
+      ...(cul ? [...(cul.group && cdial!.homophily_bps > 0 ? [CULTURE_WORDS.from(cul.group)] : []), ...(asker ? cul.tell(asker, lastSeenT, p.news_days) : []), ...(asker && mem ? [mem.tell(asker, lastSeenT) ?? ""] : [])] : []),
     ].filter(Boolean).join(" ") || CATCHING_UP.nothing;
+    /**
+     * Being there (culture, step 5): in a building we are in the world shows who is there and who last left and why, so a removal carried out in our building,
+     * is seen by us and by no one whose own place did not put them there. (A walk-out is not read off who left a workplace: people leave it at all hours, part-timers among them, and the world shows no cause. Those who stop work hold it as theirs; the rest are told.) Each departure is taken in once,
+     * and only while it is recent (`witness_days`). What is seen is held (strongly), bears once on trust in whoever did it, and is a sighting of the conduct it shows
+     * (the landlord applied; the household stayed past the notice). A building we are not in shows only that someone was seen leaving.
+     */
+    const witnessAround = (around: SiteStructure[], t: number) => {
+      if (!mem || !cul) return;
+      const W = cul.p, ours = new Set<string>([me, ...(household?.members ?? []).map((m) => m.person)]);
+      const by = removalsBy();
+      if (by) for (const st of around) for (const sp of st.spaces) for (const d of sp.left ?? []) {
+        if (d.reason !== "removed" || ours.has(d.occupant) || d.at > t || t - d.at > W.witness_days * DAY) continue;
+        if (!mem.newSighting(`${sp.space}|${d.occupant}|${d.at}`)) continue;
+        remember("put_out", by, d.at, t, "saw", W.seen_bps);
+        cul.seeAct("apply_possession", true, "here");
+        cul.seeAct("stay_past_notice", true, "here");
+      }
+    };
     const wordOfMouth = (obs: Observation, t: number, steps: Step[]) => {
       // The buildings around us; in our own we see who's there (they're the people we know).
       const around: SiteStructure[] = obs.channels.street?.kind === "sites" ? channels.structures({ ...obs, channels: { street: obs.channels.street } }) : [];
       for (const st of around) for (const sp of st.spaces) for (const o of sp.occupants ?? []) if (o !== me) contacts.set(o, t);
+      if (mem) witnessAround(around, t);
       if (contacts.size > p.max_contacts) {
         // Those we're close to, and those we've seen lately (a month counts as much as a fair friendship), kept.
         const keeps = (k: string, seen: number) => ties.affinity(k, t) + (t - seen <= MONTH ? 2_000 : 0);
@@ -4510,6 +4571,15 @@ export const citizen: BehaviourModule = {
       // the kind; about the government; each item once. Its tone as the paper gives it, -1 to 1: one beyond that counts
       // as the limit, one that isn't a number as none. (Until 0.35.6 any statement of kind `news` was read, whoever
       // published it, with whatever tone it claimed: one item from anyone could set a reader's approval to either end.)
+      if (mem && readsNews && p.paper) for (const r of book.open("news")) {
+        // (An event in the paper, read: held at the paper's weight for the item, to `read_bps`; who made the law, the budget, the result or the decision is on the record it reports.)
+        const reported = PAPER_WEIGHT[String(r.data?.kind)];
+        if (!reported || r.speaks_for !== p.paper || readNews.has(r.id)) continue;
+        readNews.add(r.id);
+        const basis = basesOf(r)[0] !== undefined ? book.records.get(basesOf(r)[0]!) : undefined;
+        const by = (basis?.record === "statement" ? basis.speaks_for : undefined) ?? p.electoral_town;
+        if (by) remember(reported.kind, by, r.at, t, "read", paperStrength(reported.weight, cul!.p));
+      }
       if (readsNews && p.paper) for (const r of book.open("news")) {
         if (readItems.has(r.id) || r.speaks_for !== p.paper || r.data?.about_office !== true) continue;
         readItems.add(r.id);

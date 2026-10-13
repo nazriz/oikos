@@ -116,7 +116,7 @@ test("a person of this dial writes a norms section into their record; with the d
   await off.p.wake(DAY);
   expect(off.kept.record.norms).toBeUndefined();
   const norms = normsRows(on.kept.record.norms as NormsSection);
-  expect(norms.map((x) => x.conduct)).toEqual(["answer_tribunal", "stay_past_notice", "take_to_tribunal", "complain", "take_in"]);
+  expect(norms.map((x) => x.conduct)).toEqual(["answer_tribunal", "stay_past_notice", "take_to_tribunal", "complain", "take_in", "apply_possession"]);
   const complain = norms.find((x) => x.conduct === "complain")!;
   expect(complain.numbers.slice(0, 2)).toEqual([25, 65]);
   // Nothing else of the record is different.

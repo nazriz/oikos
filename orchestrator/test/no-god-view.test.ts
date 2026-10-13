@@ -9,7 +9,7 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { culture, DayBook, modules } from "@oikos/participants";
+import { culture, DayBook, modules, townmemory } from "@oikos/participants";
 import { generate } from "@oikos/worlds/generator/generate";
 import { PUBLISHED } from "@oikos/worlds/generator/knowing";
 import { wholeViews, type WholeView } from "../src/views";
@@ -189,4 +189,19 @@ test("culture adds no whole view, no channel and no register: a town with the di
   const dial = culture.cultureDial({ dials: { culture: {} } })!;
   const c = new culture.Culture(dial.params, dial, { z: () => 0, conformity: () => 0.5, belonging: () => 0.5, integrity: () => 0.5, draw: () => 0 }, { complain: 3_000 });
   for (const route of ["register", "directory", "population", "town"]) expect(() => c.seeAct("complain", true, route as any)).toThrow(/by what is published/);
+});
+
+// Town memory (docs/behaviour/culture.md; design 14e): what a person remembers of what was public reaches them only by being there (the world shows
+// who left a building to those inside it), by what was published, or from a tie; the memory has no other way in, holds a few slots, and passes
+// nothing on past a few hands. A look from outside shows only that someone was seen leaving, never who or why.
+test("town memory adds no channel and no register: events come in only seen, read or told, a few are held, and none is passed far", () => {
+  const base = { ...spec, factories: 5 };
+  const channelsOf = (town: any) => JSON.stringify([town.positions.map((p: any) => p.channels), town.participants.map((p: any) => p.channels)]);
+  expect(channelsOf(generate({ ...base, living: { culture: true } }))).toBe(channelsOf(generate({ ...base, living: { culture: false } })));
+  const dial = culture.cultureDial({ dials: { culture: {} } })!;
+  const m = new townmemory.TownMemory(dial.params);
+  expect(Object.getOwnPropertyNames(Object.getPrototypeOf(m)).filter((k) => ["saw", "read", "heardFrom", "take"].includes(k)).sort()).toEqual(["heardFrom", "read", "saw", "take"]);
+  for (let i = 0; i < 20; i++) m.saw("put_out", `by-${i}`, i * 86_400, 30 * 86_400);
+  expect(m.size()).toBeLessThanOrEqual(6);
+  expect(m.heardFrom("strike", "e", 3, 40 * 86_400, 9_000, dial.params.max_hops, false)).toBe("dropped"); // a fourth hand
 });
