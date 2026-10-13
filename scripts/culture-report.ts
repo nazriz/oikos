@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 // Culture, read from logs alone (docs/behaviour/culture.md; design 14h): nothing in a run computes this.
-//   bun scripts/culture-report.ts run <log.jsonl[.zst]> <profile> <seed> > run.json     one run: norms by conduct and group over time, the gap between
+//   bun scripts/culture-report.ts run <log.jsonl[.zst]> <profile> <seed> [world.yaml] > run.json     one run: norms by conduct and group over time, the gap between
 //        what is thought and said, what people remember of the town and how far it travelled, the verdicts and tellings in the log
 //   bun scripts/culture-report.ts sum <run.json>...                                      many runs of one profile: per conduct, how far the picture moved
 //        against how far runs differ from one another (the drop condition of 14l), and the town's memory
@@ -18,8 +18,8 @@ const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.l
 const sd = (xs: number[]) => { const m = mean(xs); return Math.sqrt(mean(xs.map((x) => (x - m) ** 2))); };
 const r1 = (x: number) => Math.round(x * 10) / 10;
 
-async function run(log: string, profile: string, seed: number) {
-  const base = Bun.YAML.parse(readFileSync("worlds/town-1000.yaml", "utf8")) as any;
+async function run(log: string, profile: string, seed: number, world = "worlds/town-1000.yaml") {
+  const base = Bun.YAML.parse(readFileSync(world, "utf8")) as any;
   const config = generate({ ...base, profile, seed, living: { initiative_bps: 10_000, culture: true } }) as any;
   const originOf = new Map<string, string>(config.participants.filter((x: any) => x.kind === "person" && x.controller?.params?.origin).map((x: any) => [x.person, x.controller.params.origin]));
   const norms = new Map<string, { conduct: string; numbers: number[] }[]>();
@@ -81,6 +81,6 @@ function sum(files: string[]) {
 }
 
 const [mode, ...args] = process.argv.slice(2);
-if (mode === "run") console.log(JSON.stringify(await run(args[0]!, args[1]!, Number(args[2] ?? 1))));
+if (mode === "run") console.log(JSON.stringify(await run(args[0]!, args[1]!, Number(args[2] ?? 1), args[3])));
 else if (mode === "sum") console.log(JSON.stringify(sum(args), null, 1));
-else console.error("usage: culture-report.ts run <log> <profile> <seed> | sum <run.json>...");
+else console.error("usage: culture-report.ts run <log> <profile> <seed> [world.yaml] | sum <run.json>...");
