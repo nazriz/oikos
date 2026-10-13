@@ -1,0 +1,6 @@
+{
+  "status": "empty until the gate has been run for real (docs/design/ai-citizens.md 13h, step 5): the plain papers are read by the same reader outside any run and frozen here, with the reader's version. With no row for a kind of decision, the paper is not shifted (the world is as it was) and the desk counts it as `no_table`.",
+  "version": null,
+  "reader": null,
+  "rows": {}
+}

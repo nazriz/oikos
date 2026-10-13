@@ -28,7 +28,10 @@ import { debriefsBeside } from "./logs";
 import { join } from "node:path";
 import { besideOf, largest, leftAlone, renderSummary, SUMMARY_MAX } from "./debrief-summary";
 import { readForEnd } from "./run-end";
+import { ReadingDesk, type DeskCounts } from "./reading";
+import { reading as readingNs } from "@oikos/participants";
 import { DayBook, calls, canonical, DECISIONS, OUTCOMES, RECORD, WORDS, type Words, inCurrency, paramErrors, modules as builtin, Randomness, Roster, slice, Tally, View, type BehaviourModule, type Controller, type Currency, type DecisionRecord, type OutcomeRecord, type RecordChange, formatMoney, type LookRequest, type Observation, type ParticipantAction, type ParticipantContext } from "@oikos/participants";
+import { lexiconReader, READING_TABLE, READING_VERSION, type Reader, type ReadingTable } from "@oikos/participants/llm";
 import { ACCOUNT_TOKENS, ACCOUNT_VERSION, ACCOUNTS_DEFAULT, ACCOUNTS_MOST, darkAccount, DEBRIEF_ANSWER_TOKENS, DEBRIEF_VERSION, endNeedMicroUsd, keptBackFor, reckonedEndMicroUsd, type EndCosts, type MockPolicy, mockAccount, sampleAccounts, stepsOf, writeAccount, type AccountBrief, type AccountCounts, type DebriefInput, type DebriefWording, COMPOSE_VERSION, createCompose, mockCompose, type ComposerConfig, CONSULT_VERSION, createConsult, createLlmParticipant, LLM_PARTICIPANT_VERSION, MOCK_VERSION, MockAdapter, mockPolicies, PRICES, ModelCallFailed, ModelUnreachable, SpendingLimitReached, type Budget, type LlmAdapter, type LlmController, type LlmIO, type MockBrain, type Price } from "@oikos/participants/llm";
 import { createArrangement, createTranslator, draftText, Knowledge, RESOLVER, resolve, TRANSLATOR_VERSION, type Draft, type Resolution, type Route, NOT_CHECKED } from "@oikos/translator";
 import { Kernel } from "./kernel";
@@ -91,6 +94,14 @@ export interface RunOptions {
   composerAdapters?: Map<string, LlmAdapter>;
   /** Tests and audits: the composer's prompt in another wording (never a run that is compared). */
   composerSystem?: string;
+  /** The reader of seats' worded papers (docs/behaviour/reading.md), where the world's `dials.reading` is on: a
+   * `Reader` (participants/src/llm/reader.ts). Absent, the dial's `reader: "mock"` plays it on the lexicon mock; a dial
+   * naming a model with no reader given is refused (this build calls no model). Tests give the mocks. */
+  reader?: Reader;
+  /** The plain papers' readings the dial shifts from (participants/src/llm/reading-table.json); tests give their own. */
+  readingTable?: ReadingTable;
+  /** Tests only: which authors count as seats, and where their words are, so that a code office's paper can be read as a seat's. */
+  readingSeam?: { bySeat?: (author: string) => boolean; words?: (s: { id: string; kind: string; text: string; data?: { [k: string]: unknown } }) => string | undefined };
   /** Which wording of the debrief's questions this run uses (participants/src/llm/debrief.ts): "a" unless a rewording
    * check asks for "b". The log says which. */
   debriefWording?: DebriefWording;
@@ -141,6 +152,8 @@ export interface RunSummary {
   /** Where the world has a composer: pieces asked for, composed, declined; how many of those asked for were dark by
    * the stated rule (VISION 15, point 7: reported with every run); how many the month's allowance left unasked, went
    * to the fallback model, could not be read, and were followed by the question about the task. */
+  /** Where the world has reading on: what the desk did (papers asked, read, cached, declined, and the rest). */
+  reading?: DeskCounts;
   composer?: { asked: number; composed: number; declined: number; dark: number; capped: number; fell_back: number; unread: number; followed_up: number };
   /** The debriefs of the run's model seats (VISION 15, point 7): how each ended, by seat. Never what was said. */
   debriefs?: { [seat: string]: string };
@@ -363,6 +376,14 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   const composer = composerCfg
     ? createCompose(io, composerCfg, composerAdapters!, (purpose) => randomness.stream(["compose", purpose]), o.composerSystem)
     : undefined;
+  // Reading (docs/behaviour/reading.md): the world's dial, its sizes checked now (a setting that would let words reverse
+  // or outweigh a decision is refused here, not found mid-run), and the reader. It is never the largest model, never
+  // a model that holds a seat in the same run (checked below, once the seats are known), and in this build never a model.
+  const readingCfg = readingNs.readingDial(cfg);
+  if (readingCfg && /astra|fable|opus/i.test(readingCfg.reader)) throw new Error(`dials.reading.reader names ${readingCfg.reader}, which is never a reader (docs/behaviour/reading.md)`);
+  if (readingCfg && !o.reader && readingCfg.reader !== "mock") throw new Error(`dials.reading.reader names ${readingCfg.reader}: this build calls no model (design 13h: a model reader is step 5, with the owner's word); give a reader, or "mock"`);
+  const readerOf: Reader | undefined = readingCfg ? o.reader ?? lexiconReader() : undefined;
+  let desk: ReadingDesk | undefined;
   // Exit accounts of a sample of people at the run's end, where the composer is on (account.ts): how many.
   // (A composer allowed no pieces is asked for none here either, unless the world says how many.)
   const accountsN = composerCfg ? Math.max(0, Math.min(ACCOUNTS_MOST, composerCfg.accounts ?? (composerCfg.pieces_per_month > 0 ? ACCOUNTS_DEFAULT : 0))) : 0;
@@ -446,6 +467,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     world: { tickSeconds: tick, runEnd, currency, ...(cfg.dials ? { dials: cfg.dials } : {}) },
     ...(consult ? { consult } : {}),
     ...(composer ? { compose: composer } : {}),
+    ...(readingCfg ? { read: (paper: string, standing: readingNs.Standing) => desk?.lookup(paper, standing) } : {}),
     // Keys sorted: the log keeps the config in canonical form, so a resumed run must see its parameters exactly as the
     // original did, whatever order the world's author wrote them in.
     params: sortedKeys(params ?? {}) as any,
@@ -666,6 +688,14 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       needed_microusd: need.microusd, a_seat_microusd: need.seat.each, a_seat_by: need.seat.basis, ...(need.account ? { an_account_microusd: need.account.each, an_account_by: need.account.basis } : {}), margin_percent: costs.margin_percent,
       ...(kept.short_microusd ? { short_microusd: kept.short_microusd, limit_too_small: `the limit is too small to keep back what the end of this run is expected to need (${(need.microusd / 1e6).toFixed(2)} USD, of a limit of ${(o.budget.limitMicroUsd / 1e6).toFixed(2)}): half of it is kept back, and any debrief or account beyond it is run over the limit, as the platform's overrun` } : {}) } } } });
   }
+  // Reading, if the world has it: the desk, made now that the kernel and the cast are here, and said at the start.
+  if (readingCfg && readerOf) {
+    const seatModels = new Set(Object.values(bindings).map((b: any) => String(b.adapter)).concat(Object.values(bindings).map((b: any) => String(b.configured))));
+    if (seatModels.has(readerOf.model)) throw new Error(`the reader ${readerOf.model} holds a seat in this run: a model never reads papers in a run that seats it (docs/behaviour/reading.md)`);
+    desk = new ReadingDesk({ dial: readingCfg, reader: readerOf, table: o.readingTable ?? READING_TABLE, bySeat: o.readingSeam?.bySeat ?? ((author) => { const p = parts.get(author); return !!p && isLlm(p); }), ...(o.readingSeam?.words ? { words: o.readingSeam.words } : {}),
+      file: async (data) => { await k.request({ op: "annotate", annotation: { annotation: "note", subject: "orchestrator", data } }); } });
+    await k.request({ op: "annotate", annotation: { annotation: "note", subject: "orchestrator", data: { reading: { version: READING_VERSION, reader: readerOf.model, reader_version: readerOf.version, papers: readingCfg.papers, calls_per_run: readingCfg.calls_per_run, table: o.readingTable?.version ?? READING_TABLE.version ?? null, interim: readerOf.model.startsWith("mock/") ? false : true } } } });
+  }
   // The composer, if the world has one: said at the start, with its mix and whether models or the mock play it.
   if (composerCfg) await k.request({ op: "annotate", annotation: { annotation: "note", subject: "orchestrator", data: { composer: { version: COMPOSE_VERSION, ...composerCfg, played_by: o.composerAdapters ? "models" : "mock" } } } });
   // The sparse mind, if on: said at the start (a resumed run reads it back), with the model it asks.
@@ -720,6 +750,11 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       refusedBy[e.code] = (refusedBy[e.code] ?? 0) + 1;
     }
     noteCast(r.events);
+    // A statement recorded: a seat's worded decision is read now, so its reading is on file before anyone sees the paper.
+    if (desk) for (const e of r.events) if (e.event === "recorded" && e.record?.record === "statement") {
+      const x = e.record;
+      await desk.onStatement({ id: x.id, author: x.author, kind: x.kind, text: x.text, ...(x.data ? { data: x.data } : {}), ...(x.addressed_to ? { addressed_to: x.addressed_to } : {}), ...(x.basis ? { basis: x.basis } : {}), ...(x.speaks_for ? { speaks_for: x.speaks_for } : {}) });
+    }
     for (const pid of changed) await syncUnits(pid, t);
     changed.clear();
   };
@@ -1317,6 +1352,8 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   }
   // What the composer was asked for, with the run (VISION 15, point 7: how many dark pieces a run asked a model to write).
   if (composer) await k.request({ op: "annotate", annotation: { annotation: "note", subject: "orchestrator", data: { composer_pieces: { ...composer.counts } } } });
+  // What the reading desk did (docs/behaviour/reading.md): papers asked, read, cached, declined, over the limit, and the rest.
+  if (desk) await k.request({ op: "annotate", annotation: { annotation: "note", subject: "orchestrator", data: { reading_counts: { ...desk.counts } } } });
   // The run's end for those in it (VISION 15, point 7; docs/behaviour/debrief.md): every model seat is debriefed by
   // the fixed interview, those who left the study included; then, where the composer is on, an author writes the
   // exit accounts of a sample of people. Both are paid from what the spending limit keeps back for them.
@@ -1423,7 +1460,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   log(`${o.runId}: ${commands} commands, ${refused} refused, ${wakes} wakes, t=${t}${participantErrors ? `; ${participantErrors} failures to decide, recovered (see the log's participant_error notes)` : ""}`);
   if (resolverDiffCount) await Bun.write(join(o.outDir, `${o.runId}.resolver-diffs.json`), JSON.stringify(resolverDiffs, null, 1));
   return { ...(resolverChecked ? { resolverShadow: { checked: resolverChecked, differed: resolverDiffCount } } : {}), runId: o.runId,
-    end: { reason: completed ? "completed" : "aborted", ...(completed ? {} : { detail: stopped ?? `stopped at ${until}` }) }, ...(stopped ? { stopped: { why: stopped, by: stoppedBy! } } : {}), logPath, anchorsPath, stateHash: end.state_hash, ...(composer ? { composer: { ...composer.counts } } : {}), ...(Object.keys(debriefed).length ? { debriefs: debriefed } : {}), ...(accountsN ? { accounts: accountCounts } : {}), commands, refused, wakes, wakesBy, participantErrors, t, kernelMs: Math.round(kernelMs), moduleMs: Math.round(moduleMs), platformMs: Math.round(platformMs),
+    end: { reason: completed ? "completed" : "aborted", ...(completed ? {} : { detail: stopped ?? `stopped at ${until}` }) }, ...(stopped ? { stopped: { why: stopped, by: stoppedBy! } } : {}), logPath, anchorsPath, stateHash: end.state_hash, ...(composer ? { composer: { ...composer.counts } } : {}), ...(desk ? { reading: { ...desk.counts } } : {}), ...(Object.keys(debriefed).length ? { debriefs: debriefed } : {}), ...(accountsN ? { accounts: accountCounts } : {}), commands, refused, wakes, wakesBy, participantErrors, t, kernelMs: Math.round(kernelMs), moduleMs: Math.round(moduleMs), platformMs: Math.round(platformMs),
     health: { backlog: { ...backlog }, repeats: { ...repeats }, refused: { ...refusedBy } },
     profile: { modules: Object.fromEntries(Object.entries(profModules).map(([k, v]) => [k, { ms: Math.round(v.ms), steps: v.steps }])), kernel: Object.fromEntries(Object.entries(profKernel).map(([k, v]) => [k, { ms: Math.round(v.ms), n: v.n }])),
       requests: Object.fromEntries(Object.entries(k.profile).map(([op, v]) => [op, { n: v.n, encode: Math.round(v.encode), engine: Math.round(v.engine), decode: Math.round(v.decode) }])) },

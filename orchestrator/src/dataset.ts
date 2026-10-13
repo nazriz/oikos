@@ -323,7 +323,7 @@ export async function exportDataset(logPath: string, outDir: string, o: DatasetO
           }
           const dec = Number.isInteger(o.of) ? decisionOf.get(b.subject)?.get(o.of) : undefined;
           const said = { ...(o.from !== undefined ? { from: o.from } : {}), ...(o.facts ? { facts: o.facts } : {}), ...(o.learned ? { learned: o.learned } : {}), ...(o.need !== undefined ? { need: o.need } : {}),
-            ...(o.felt ? { felt: o.felt } : {}), ...(o.belief ? { belief: o.belief } : {}) };
+            ...(o.felt ? { felt: o.felt } : {}), ...(o.belief ? { belief: o.belief } : {}), ...(o.read ? { read: o.read } : {}) };
           citizenOutcomes.write({ run: run(), t: o.t ?? e.t, seq: e.seq, participant: b.subject, domain: o.domain, option: o.option, ...(Number.isInteger(o.of) ? { of: o.of } : {}),
             ...(dec ? { decision_seq: dec.seq, decision_t: dec.t } : {}), kind: o.kind, way: o.way, ...said });
           by(String(o.domain)).outcomes++;

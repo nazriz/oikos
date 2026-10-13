@@ -1433,6 +1433,18 @@
             }
           }
         },
+        "read": {
+          "description": "Where the words of a paper addressed to the citizen were read (docs/behaviour/reading.md; docs/design/ai-citizens.md 13d): the paper's id, how the reading came about (model, cache, table, apart), the shift of the reading from the plain paper's line by line, and each figure the words moved beside what it would have been without them. Nothing in it says whether the paper was good.",
+          "type": "object",
+          "required": ["paper", "source", "shift", "moved"],
+          "additionalProperties": false,
+          "properties": {
+            "paper": { "type": "string" },
+            "source": { "type": "string" },
+            "shift": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/OpaqueObject" },
+            "moved": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/OpaqueObject" }
+          }
+        },
         "belief": {
           "description": "How strongly the citizen holds what `host` teaches (the strongest of its teachings; basis points), before and after.",
           "type": "object",

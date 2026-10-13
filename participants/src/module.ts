@@ -13,6 +13,7 @@
 //   - memory is allowed (people remember), but must depend only on what the
 //     participant has observed and drawn.
 
+import type { PaperRead, Standing } from "./behaviour/reading";
 import type { Block, Observation, ParticipantAction } from "./contracts";
 import type { Currency } from "./money";
 import type { Rng } from "./rng";
@@ -106,6 +107,11 @@ export interface ParticipantContext {
   /** The composing model (docs/design/ai-citizens.md 10e): words for something an entity founds. Present only where
    * the world's dial has the composer on; a module writes its own plain words otherwise. */
   compose?: Compose;
+  /** What a paper addressed to this participant was read to be (docs/design/ai-citizens.md 13; docs/behaviour/reading.md):
+   * the shift from the plain paper of its kind, filed when the paper was written. Present only where the world's dial
+   * has reading on. Absent, or answering nothing (a paper with no words of its own, or one not read), a module acts as
+   * it always did. It never carries a person: the reader was shown the paper alone. */
+  read?(paper: string, standing: Standing): PaperRead | undefined;
   /** A deterministic stream for this participant, this moment and this purpose. */
   rng(purpose: string): Rng;
   /** A deterministic stream for a purpose alone: the same for whoever draws it. For what is a fact about a thing in the
@@ -391,6 +397,8 @@ export interface OutcomeRecord {
   need?: string;
   felt?: { emotion: string; about: string; bps: number; before: number; after: number }[];
   belief?: { host: string; before: number; after: number };
+  /** Where the words of a paper addressed to the citizen were read (docs/behaviour/reading.md): the paper, how the reading came about, the shift from the plain paper's, and each figure the words moved beside what it would have been. */
+  read?: { paper: string; source: string; shift: object; moved: { [what: string]: { after: number; plain: number; before?: number } } };
   /** With a founding (domain `found`, kind `founded`): what a composing model would be shown for it, whether or not
    * one was asked (docs/behaviour/founding.md): the recorded situations the composer's audits are run on. */
   brief?: ComposeBrief;

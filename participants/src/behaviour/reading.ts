@@ -273,6 +273,6 @@ export function plainKey(kind: string, data: { [k: string]: unknown } | undefine
 export interface PaperRead { paper: string; standing: Standing; shift: Shift; source: string }
 
 /** The figures a person's record keeps of one reading (the `read` of an outcome's facts), only where something moved. */
-export function readFacts(rd: PaperRead, moved: { [what: string]: { after: number; plain: number } }): { paper: string; source: string; shift: Shift; moved: { [what: string]: { after: number; plain: number } } } {
+export function readFacts(rd: PaperRead, moved: { [what: string]: { after: number; plain: number; before?: number } }): { paper: string; source: string; shift: Shift; moved: { [what: string]: { after: number; plain: number; before?: number } } } {
   return { paper: rd.paper, source: rd.source, shift: rd.shift, moved };
 }
