@@ -388,3 +388,11 @@ test("the payment pilot 10 lost (a finance seat's, citing four dockets and a bud
   }]);
   expect(new Preview(town()).of(r.blocks)).toContain("Cites: rec.11904, rec.16123, rec.21887, rec.25703 and rec.25150.");
 });
+
+test("an agreement's hours term is a second commitment of the other side: work, task ordinary_hours, the seconds, every week; with none, nothing is added", () => {
+  const blocks = (src: string) => { const r = run(src, town(), "mayor"); if (!r.ok) throw new Error(r.questions.join(" ")); return r.blocks; };
+  const withHours = blocks('agreement(with=greenco, template=employment, hours="136800 seconds", we_do=money(to=acc-greenco, amount="$2,000", every="14 days", from=acc-city))')[0] as any;
+  expect(withHours.terms.commitments.filter((c: any) => c.who === "greenco")).toEqual([{ who: "greenco", does: { outcome: { work: { task: "ordinary_hours", hours: 136_800 } } }, every: 7 * 86_400 }]);
+  const without = blocks('agreement(with=greenco, template=employment, we_do=money(to=acc-greenco, amount="$2,000", every="14 days", from=acc-city))')[0] as any;
+  expect(without.terms.commitments.length).toBe(1);
+});

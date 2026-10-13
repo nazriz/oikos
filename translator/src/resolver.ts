@@ -686,7 +686,10 @@ class Resolver {
     const other = this.need(c, "with", "An agreement with whom?");
     const ours = this.outcome(this.raw(c, "we_do"), me);
     const theirs = this.outcome(this.raw(c, "they_do"), other);
-    const commitments = [...(ours ? [{ who: me, ...ours }] : []), ...(theirs ? [{ who: other, ...theirs }] : [])];
+    // The ordinary hours of a job in a week (an employment's hours term, added 2026-10-13): the other side's commitment to work them.
+    const weekly = this.seconds(c, "hours");
+    const hoursTerm = weekly ? [{ who: other, does: { outcome: { work: { task: "ordinary_hours", hours: weekly } } }, every: 7 * 86_400 }] : [];
+    const commitments = [...(ours ? [{ who: me, ...ours }] : []), ...(theirs ? [{ who: other, ...theirs }] : []), ...hoursTerm];
     if (!commitments.length) throw new Ask(NO_COMMITMENTS);
     const term = this.seconds(c, "term");
     // After the term: it may continue, periodically, until ended by notice.

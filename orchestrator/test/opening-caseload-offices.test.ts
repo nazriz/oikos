@@ -22,9 +22,11 @@ const OTHERS = ["benefit_claim", "benefit_decision", "remedy_request", "applicat
 const ofOthers = (c: any) => c.world.records.filter((r: any) => OTHERS.includes(r.kind) && r.data?.brought_forward);
 
 test("off, a town is unchanged to the state hash (the world as origin/main generated it); the option alone adds only the new offices' papers", () => {
-  // (Hashes of `config.world` for these specs, taken on origin/main (1f28843) before the change.)
-  expect(worldHash(generate(town()))).toBe("f3c535b01fd48cc44208b34c5ec2cdb3acc669cf109835382b7518d37d6f8f9b");
-  expect(worldHash(generate(town({ profile: "ke-nakuru-2026" })))).toBe("702ceb4d09c4be293c287101b1cc25922a85d9f8fb306090871a71a794caec00");
+  // (Hashes of `config.world` for these specs, taken on origin/main (1f28843) before the change. Moved on purpose,
+  // 2026-10-13, by generator 0.54.0: every town whose profile states one now publishes its law on cutting hours,
+  // `law-cutting-hours`, and the modules' versions; docs/decisions.md, "Hours before heads". Nothing of the opening caseload in it.)
+  expect(worldHash(generate(town()))).toBe("4e1e761a8e98dc61fd0932b3f8a375946324490a40640ee9e5b1575672068588");
+  expect(worldHash(generate(town({ profile: "ke-nakuru-2026" })))).toBe("f16bee9e83046c06f3b411f57957fa1e61678bac26a119bb5bb2bf1b34c28547");
   // (On, the landlords' and the tribunal's papers are as they were; a scale of nothing adds no paper to the other offices.)
   const POSS = ["rent_statement", "notice_to_vacate", "tribunal_application", "hearing_notice", "tribunal_order"];
   const possession = (c: any) => createHash("sha256").update(JSON.stringify(c.world.records.filter((r: any) => POSS.includes(r.kind)))).digest("hex");

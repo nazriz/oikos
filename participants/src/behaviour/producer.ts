@@ -9,7 +9,7 @@ import type { Observation } from "../contracts";
 import { channels } from "../contracts";
 import { need, params, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
 import { nextLook, because, Book, publishedPrice as buildingPrice, DAY, MONTH, ownAccount, Pace, pay, say, type Step, usd, withdraw, outOfTime, team } from "./common";
-import { Bargaining, LabourPlan, Staffing, stepper, terminationLaw, WindingUp } from "./firms";
+import { type AdjustParams, Bargaining, LabourPlan, Staffing, stepper, terminationLaw, WindingUp } from "./firms";
 import { Borrowing } from "./credit";
 import { distribute, LENGNICK, movePrice, moveWage, payOut } from "./lengnick";
 import { Committed, declineOnTerms, Deliveries, fill, goodsPrices, held, order, OrderBook, Payables, priceList } from "./trade";
@@ -27,7 +27,7 @@ export const producer: BehaviourModule = {
   name: "firm.producer",
   issues: [P.JOB_ADVERTISEMENT, ...P.TRADE, P.REMEDY_ANSWER, ...P.VENUE_ANSWERS],
   issuesWith: (p) => ({ ...P.staffingOwn({ role: p.role ?? "factory worker", industry: p.industry, workplace: p.workplace, notice_days: p.notice_days ?? 14 }) }),
-  version: "0.8.0", // 0.8.0: buys its inputs on the supplier's terms where it states them, and sells to shops on terms of its own where its world gives them (docs/behaviour/trade.md, "Trade credit"); makes and buys to what it can sell, and none while a unit loses money before wages (docs/behaviour/producer.md, "Inputs bought to what can be sold"); borrows again as its bank allows; no dividend while wages are owed or anyone is under notice (docs/behaviour/firms.md, "Before a dividend"); 0.7.1: returns of tax withheld are filed on the days the law states (docs/behaviour/firms.md, "Returns on the law's days"); 0.7.0: 0.7.0: adjusts its staff as firms do (docs/behaviour/firms.md, "Adjusting labour"): demand smoothed over months, people held while it makes less, let go only when the surplus has lasted what ending the job costs, redundancy pay under the world's law, no recruiting after letting someone go for want of money; 0.6.0: everyday frictions (docs/behaviour/frictions.md): pay that comes short, at the world's rate and its character's; asked, told or ordered to put it right; 0.5.0: wants of its own (docs/behaviour/firm-wants.md): a character from its owner's values, which answers a worker who asks for a rise, and a record of its own; 0.4.5: money promised in orders the bank has not yet paid out is not spent again by the next wake (one works placed the same order 40 times in a day); 0.4.4: 0.4.4: takes on the share of its hands the world gives by the day; 0.4.3: registers the share of its jobs the world gives for its kind
+  version: "0.9.0", // 0.9.0: over its stock band, where the world's law lets an employer cut hours, it cuts everyone's hours by a hand's worth before it lets anyone go, and makes in its staff's hours (docs/behaviour/firms.md, "Hours before heads"); 0.8.0: 0.8.0: buys its inputs on the supplier's terms where it states them, and sells to shops on terms of its own where its world gives them (docs/behaviour/trade.md, "Trade credit"); makes and buys to what it can sell, and none while a unit loses money before wages (docs/behaviour/producer.md, "Inputs bought to what can be sold"); borrows again as its bank allows; no dividend while wages are owed or anyone is under notice (docs/behaviour/firms.md, "Before a dividend"); 0.7.1: returns of tax withheld are filed on the days the law states (docs/behaviour/firms.md, "Returns on the law's days"); 0.7.0: 0.7.0: adjusts its staff as firms do (docs/behaviour/firms.md, "Adjusting labour"): demand smoothed over months, people held while it makes less, let go only when the surplus has lasted what ending the job costs, redundancy pay under the world's law, no recruiting after letting someone go for want of money; 0.6.0: everyday frictions (docs/behaviour/frictions.md): pay that comes short, at the world's rate and its character's; asked, told or ordered to put it right; 0.5.0: wants of its own (docs/behaviour/firm-wants.md): a character from its owner's values, which answers a worker who asks for a rise, and a record of its own; 0.4.5: money promised in orders the bank has not yet paid out is not spent again by the next wake (one works placed the same order 40 times in a day); 0.4.4: 0.4.4: takes on the share of its hands the world gives by the day; 0.4.3: registers the share of its jobs the world gives for its kind
   doc: "docs/behaviour/producer.md",
   cadence: () => DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(24) * 3600,
@@ -51,7 +51,7 @@ export const producer: BehaviourModule = {
         // How it adjusts its staff to its trade (docs/behaviour/firms.md, "Adjusting labour"): the months it smooths
         // demand over, and what taking someone on costs it in weeks of their pay (placeholders; a world's profile may
         // state its own). 0 and 0: it reacts to each month's stock, as it did until 2026-10-11.
-        adjust: { smooth_months: 3, hiring_cost_weeks: 8 },
+        adjust: { smooth_months: 3, hiring_cost_weeks: 8 } as AdjustParams,
         // Of the jobs it fills, the share it puts on its payroll returns (the world's figure for employers of its kind;
         // 10,000: all). One it does not register is paid whole, and reported to nobody (docs/behaviour/firms.md).
         registered_bps: 10_000,
@@ -250,7 +250,16 @@ export const producer: BehaviourModule = {
           headcountWhy = why.length ? `; ${why.join("; ")}` : "";
           // Hiring and letting go (Lengnick): stock against demand decides this month's headcount.
           headcount = workers.length;
-          if (low && workers.length < p.max_staff && !losing) {
+          // Hours before heads (docs/behaviour/firms.md): over its band, a works whose law lets it cuts everyone's hours by
+          // one hand's worth before it lets anyone go; stock back in band, or low, the hours are restored.
+          const overBy = high && workers.length > 0;
+          const hoursNow = staffing.reviewHours(book, t, overBy ? Math.floor(((workers.length - 1) * 10_000) / workers.length) : 10_000, p.adjust.hours_step_bps);
+          steps.push(...hoursNow.steps);
+          const absorbed = overBy && Math.floor((workers.length * hoursNow.achieved) / 10_000) <= workers.length - 1;
+          if (absorbed) {
+            labour.month(false, 1);
+            steps.push(because(`Month's end: stock (${stock}) is above ${demandWords}: making less, with everyone's hours cut to ${hoursNow.achieved / 100}% of the ordinary, and no one let go.`));
+          } else if (low && workers.length < p.max_staff && !losing) {
             labour.month(false, 1);
             headcount = workers.length + 1;
             headcountWhy = `: at the month's end, stock (${stock}) was below ${p.phi_low_bps / 100}% of ${demandWords}${headcountWhy}`;
@@ -390,7 +399,7 @@ export const producer: BehaviourModule = {
         // Beyond the top of Lengnick's band, more stock is no use: the workers are paid, but nothing is made today.
         const enough = stock * 10_000 > p.phi_high_bps * lastDemand;
         if (workDay(t) && present.length && !enough && winding.state === "trading") {
-          const crew = team(present, (w) => p.working_day - (used.get(w) ?? 0));
+          const crew = team(present, (w) => Math.max(0, Math.floor((p.working_day * staffing.hoursBpsAt(w, t)) / 10_000) - (used.get(w) ?? 0)));
           const byHours = Math.floor((crew.each * crew.who.length) / pace.perUnit(crew.who));
           const byInputs = Math.min(...Object.entries(p.per_unit).map(([k, q]) => Math.floor(held(obs, p.works, k) / q)));
           // No further than the top of the band: a day's making can be a lot next to a month's demand.

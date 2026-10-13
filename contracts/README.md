@@ -486,6 +486,17 @@ Additions only; no schema file changed, nothing renamed or removed. A log made b
 - **An offer taken back** (docs/behaviour/offers.md): no schema changed. Both resolvers ask back to `agreement(sign=<a withdrawn paper>)` (a case in `contracts/test/holds.json`).
 - **A module's parameter:** `police.station` takes `part` ("", "seat" or "staff"), as the other offices with routines do; `city.finance_officer` takes `lines_by_structure` and `lines_by_position`; `police.station` declares routines `carry_out_warrants`, `look_into_reports` and `call_at_homes` (`Routine`, `participants/src/module.ts`; manifests regenerated).
 
+## Changes since v0.8 closed (2026-10-13: hours before heads; docs/decisions.md, "Hours before heads"; under the owner's blanket approval of contract changes, 2026-10-11)
+
+Additions only; no schema file changed in shape, nothing renamed or removed. A log made before them is a valid log.
+
+- **The call language, `agreement(hours=...)`** (`calls.md`, `calls.schema.json`: one more name in the `agreement` call's argument list): the ordinary hours of a job in a week, a length of time. The resolver adds a second commitment of the other side: `work` with `task: "ordinary_hours"`, `hours` (seconds, there in the schema's `work` outcome all along) and `every` a week. Absent: the agreement has no hours term, and reads as the world's ordinary week. An employer offering a job in a world with a law on hours writes it; **the translator's call vocabulary has a new name a seat could write** (it does not need it).
+- **Laws as records:** `law-cutting-hours` (`kind: law`, `data.employment: "hours"`; `may_cut` "notice" | "consent" | "no", `ordinary_week_hours`, `notice_days`, `floor_bps`, `max_days`, `pay_bps`, `pay_owed_from`, `consent_bps`). Written from the profile's `employment.hours`; absent: no such law, and firms do not cut hours.
+- **Statements, new kinds** (free text; these are what code reads): `hours_notice` (an employer to a worker: `data.agreement`, `employer`, `hours_bps`, `ordinary_week_hours`, `minutes_week`, `wage`, `was`, `from`, `until`, `consent`, `consent_bps`, `reply_by`, `law`), `hours_restored` (`data.agreement`, `employer`, `wage`, `from`) and `hours_reply` (a worker to an employer: `data.agreement`, `agree`, `notice`). Money in them is integer cents; no number in them is fractional.
+- **Profile field** (`worlds/generator/profile.ts`; docs/profiles.md): `employment.hours`; and `employment.adjustment.hours_step_bps` (the least change in hours worth a notice, a placeholder).
+- **A module's parameter:** `firm.retailer` and `firm.producer` read `adjust.hours_step_bps` (default 1,000).
+- **Outcomes** (the citizen's dataset, `job` domain; kinds are free words): `hours_cut`, `hours_restored`, `hours_agreed`, `hours_refused`.
+
 ## Versioning
 
 `contracts: "0.8"`. Pre-1.0, every change bumps the minor version and is proposed explicitly. A draft version collects agreed changes until it's closed. Older logs remain valid logs of their own version and replay only on a kernel build of that version (D6).

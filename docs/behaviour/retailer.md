@@ -86,3 +86,7 @@ With these, a 200-person town's shops need about 30 staff at full demand. Retail
 - Credit to customers.
 - Choosing among suppliers by anything but price and reliability.
 - Shops opening or closing: the number of shops is fixed.
+
+## Hours before heads (0.15.0, 2026-10-13)
+
+At its month's end a shop with more staff than its smoothed trade needs cuts everyone's hours first, where the world's law lets an employer (firms.md, "Hours before heads"), and lets someone go only for what hours cannot absorb; it serves in its staff's hours (the day's time of a worker on cut hours is the share of the working day). Parameter: `adjust.hours_step_bps` (1,000).

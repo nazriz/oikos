@@ -4573,6 +4573,39 @@ A third of Nakuru's households that lose a home are under someone's roof at the 
 
 **Revisit if:** (1) a town with rents sized to its wages (a fixed Nakuru table, or a profile whose rents are 30 to 40% of a wage) shows the same zero: then the cause is elsewhere and this entry is wrong; (2) hours cut or short-time work is built (firms.md) — then measure again, the partial-loss path will exist; (3) a pilot needs cases with an offer in them: use a scenario with a town whose wages carry its rents (say so in the pilot's plan, not a change to the behaviour), or a seat-side framing; (4) the profile's rent table is corrected.
 
+## 2026-10-13 · Hours before heads: a firm over its need cuts hours first, where the place's law lets it
+
+**What was asked.** The finding of "Why no tenant in arrears has anything to offer" named the real path not built: partial and temporary loss of income, hours cut. A firm whose trade fell could only keep everyone on full pay or make people redundant. Build the hours term, the law as profile data, the firm's rule and the worker's reading, and measure honestly without tuning for any outcome.
+
+**What was built** (docs/behaviour/firms.md, "Hours before heads"; `runs/plat-hours-2026-10-13` on the run server).
+- **The agreement** may carry its ordinary hours (`agreement(hours=...)`, a second commitment of the worker); absent, the law's ordinary week. Additive: nothing older changes.
+- **The law** is `employment.hours` in each of the nine profiles, published as `law-cutting-hours`: by notice, with the employee's agreement, or not at all. Victoria, Minas Gerais, Lower Saxony, England, Nakuru: agreement. Tamil Nadu, Akita, Ohio: notice (Tamil Nadu owes half pay for the hours cut from 50 staff, Akita 60%). Jalisco: no. Three sources were opened (SGB III, Labour Standards Act art 26, ERA Part XI in summary), the rest are marked to confirm. `consent_bps` 9,000 is a placeholder, the same everywhere.
+- **The firm** (shops and factories): where it has more staff than the smoothed trade needs and the law lets it, it cuts everyone's hours to need over staff (never under the floor; a change only of 10 points or more) by a paper to each, and restores them when trade is back or the law's spell ends; heads go only for what hours cannot absorb, under the old rule. Shops serve, and factories make, in the hours worked.
+- **The worker** reads the paper as the pay agreed from the day it names. Short pay is unchanged: a pay below the wage with no paper behind it, or over a refusal, fires it.
+
+**What was measured** (code only, six seeds, a year of the 1,000-person living town; before = main, after = this branch; means of six runs).
+
+| | Victoria before | after | Nakuru before | after |
+|---|---|---|---|---|
+| firms cutting hours | 0 | 19.8 | 0 | 5.8 |
+| workers put on cut hours (agreed) | 0 | 87 | 0 | 10.3 |
+| papers restoring hours | 0 | 79.8 | 0 | 3.8 |
+| redundancy notices (all reasons) | 31.2 | 12.0 | 21.2 | 19.5 |
+| ...for want of trade | 21.0 | 0 | not split | not split |
+| rent payments missed | 19.2 | 20.5 | 570.7 | 579.7 |
+| applications for possession | 2.5 | 2.5 | 17.3 | 18.8 |
+| answers | 3.2 | 2.5 | 7.3 | 8.3 |
+| answers offering a sum | 0 | 0 | 0 | 0 |
+| plans set | 0 | 0 | 0 | 0 |
+
+The tribunal chain did not move: no answer offered a sum, no plan was set. **That is the honest result, and nothing was tuned toward it.** Why: Victoria's wages carry its rents, so a worker at three quarters of the hours still pays, and few reached a hearing; Nakuru's wages do not (the profile's recorded inconsistency) and its shops had little to cut (6 of 30 cut, 10 workers a run), so most of its arrears come from the households that had no work or a wage below rent already. A town where wages sit between rent and rent plus essentials, and where hours are cut, would show it; neither of these is that.
+
+**What else moved.** Redundancies for want of trade in Victoria fell from 21 to nothing (31 to 12 in all: the 12 are for want of cash, and what the floor leaves). Workers on cut hours leave for better-paid postings more: resignations "moving to another job" rose from 38 to 60 a year, departures from town from 96 to 107 (z 4.5), jobs (hires of all kinds) from 126 to 138; arrivals follow (z 2.9). That is the existing rule meeting a lower wage (a posting is better than a cut wage), not a special case. Unemployment, employed and the other standing measures did not move beyond the noise. A cut lasts 91 days at the median (116 mean) and a worker is cut twice a year on average: some of that is the month boundary of a head count, which is flagged to revisit.
+
+**Contracts, kernel, versions.** Contracts: additive (contracts/README.md "2026-10-13": the call `agreement(hours=...)`, `law-cutting-hours`, the kinds `hours_notice`, `hours_restored`, `hours_reply`). Kernel: none of the world's physics; **the engine's resolver (`kernel/crates/resolver`) gained the same four lines as the translator's, for `hours=`** (without them every agreement a run made lacked the term: the runs use the engine's). **Pinned state hashes moved on purpose** (every town whose profile states the law publishes it): `worlds/test/living.test.ts`, `orchestrator/test/living-dial.test.ts` (step 1), `founding.test.ts` (step 2b), `opening-caseload-offices.test.ts` (two world hashes), each with its note; the public-finance test reads an order made after an hours paper as the paper's wage; the founding test's seed is now 7 (seeds 2 and 5 each have one person sharing the want that founds now; a draw, not the rule). Modules: `firm.retailer` 0.15.0, `firm.producer` 0.9.0, `citizen.default` 0.56.0, generator 0.54.0. **The translator's call vocabulary gains one name, `agreement(hours=...)`; no request a seat gets needs it yet, and the forms list it is trained on does not change.** (The gold-coverage test now lists `agreement.hours` among the arguments with no gold, as it does `statement.formal`.)
+
+**Revisit if** a town with wages between rent and rent plus essentials shows the chain moving (then the tribunal's cases will have offers and the measure should be taken again); the quits among workers on cut hours turn out to be too many against a source on short-time workers' job search; the cut-and-restore churn is a boundary effect (add a minimum spell); `consent_bps` gets a source; or a state scheme is built where a profile has one. **Alternatives not taken:** cutting some workers' hours and not others (who is a fairness decision with no source here); a mechanic that lowers a number with no paper; hours for the other employers (the council, the builder, offices: they follow budgets, not trade).
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Calibration, measured again after the first-year risk fix** (2026-10-05, at 0251d3a, `runs/calibration-2026-10-05` on the run server; the small town, 3 seeds × 2 years, code only, as below). Health: 4 breaches of 15 (8 measured). Recorded, not chased: Naz decides what to do with the numbers.
