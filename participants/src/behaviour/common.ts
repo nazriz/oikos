@@ -1502,6 +1502,22 @@ export const PAYEE_DIED = {
 /** An amount in words, for reasons and letters, as the world writes its money (money.ts). */
 export const usd = moneyNow;
 
+/**
+ * A rates bill is one thing on two papers (docs/behaviour/government.md, "One bill, two papers"): the city's notice to
+ * the owner (a `rates_notice` letter) and the right it records against them (a `claim` of kind rates), made together,
+ * with the same sum and due day. The notices that go with a rates claim.
+ */
+export function noticesOf(book: Book, claim: any): any[] {
+  if (claim?.about?.kind !== "rates") return [];
+  return book.all("rates_notice").filter((n: any) => (n.addressed_to ?? []).includes(claim.counterparty) && n.data?.due === claim.about?.due && Number(n.data?.amount) === Number(claim.about?.amount));
+}
+
+/** Is a debt recorded against someone settled by what has been paid? A payment that names the claim, or, for a rates
+ * claim, the notice that goes with it, settles the bill however many papers mention it. */
+export function billSettled(book: Book, claim: any, settled: ReadonlySet<string>): boolean {
+  return settled.has(claim.id) || noticesOf(book, claim).some((n: any) => settled.has(n.id));
+}
+
 /** Money to an account: a one-off or repeating payment. */
 export function pay(to: string, amount: number, o: { from?: string; for?: string; settles?: string; every?: number; first?: number; basis?: string; per_request?: string; line?: string } = {}): C.Call {
   return C.call("money", {

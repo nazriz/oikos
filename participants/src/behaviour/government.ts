@@ -11,7 +11,7 @@ import { dateWords } from "../forms";
 import type { SiteStructure, StatementRecord } from "../contracts";
 import { basesOf, channels, cites } from "../contracts";
 import { need, params, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
-import { nextLook, because, Book, cellsOf, DAY, draftLaw, figureGiven, figureWords, heldValue, jobTerms, Letters, lotOf, message, MONTH, ownAccount, pay, publishedCount, publishedPrice, record, say, type LawFigure, type LawSchedule, type Step, usd, variableToday, vote, withdraw, outOfTime, team, lookUp, goSee, visited, VISIT_MAX, Directions, StandingWork, CounterWork } from "./common";
+import { billSettled, nextLook, because, Book, cellsOf, DAY, draftLaw, figureGiven, figureWords, heldValue, jobTerms, Letters, lotOf, message, MONTH, ownAccount, pay, publishedCount, publishedPrice, record, say, type LawFigure, type LawSchedule, type Step, usd, variableToday, vote, withdraw, outOfTime, team, lookUp, goSee, visited, VISIT_MAX, Directions, StandingWork, CounterWork } from "./common";
 import { Staffing, staffingForm, staffingUnder, stepper } from "./firms";
 import { incomeTaxLaw, withholding } from "./tax";
 import { ownLand } from "./institutions";
@@ -785,7 +785,7 @@ export const ratesOfficer: BehaviourModule = {
     // due day). Whoever is sent a rates notice pays "the rates notice"; until 2026-10-11 only a payment naming the
     // claim counted, and two landlord seats who paid on the notice were charged interest and paid again (wave 2c's
     // review, fault 4).
-    const paid = (book: Book, c: any): boolean => settled.has(c.id) || book.all("rates_notice").some((n) => settled.has(n.id) && (n.addressed_to ?? []).includes(c.counterparty) && n.data?.due === c.about?.due && Number(n.data?.amount) === Number(c.about?.amount));
+    const paid = (book: Book, c: any): boolean => billSettled(book, c, settled);
     const lastInterest = new Map<string, number>(); // overdue claim -> when interest was last charged
     let next = p.first_day * DAY;
     let reportDay = -1;

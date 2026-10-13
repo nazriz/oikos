@@ -274,3 +274,22 @@ the votes).
 - **A seat paying an invoice** says the line in the payment (`money(..., settles=<invoice>, line=parks)`).
 
 **Revisit if** the council's lines should bind (a payment over its line held for the council's word): that is a rule of the town's, not of the books. If lines are redrawn in the year (a budget amended), payments keep the label they were made with.
+
+## One bill, two papers (rates, 2026-10-13)
+
+**What a real rates office does.** It sends an owner a notice and enters the sum in its ledger against them: two papers for one debt. The owner pays the bill, whichever paper they have in front of them; the ledger is credited and the notice is marked paid. Nobody owes it twice for paying "the notice" rather than "the ledger entry".
+
+**What the town did.** The rates officer writes, for each owner and instalment, a `rates_notice` letter to the owner and a `claim` (the city's right against them, kind `rates`) in one step, with the same sum and due day. The office had learned (2026-10-11, wave 2c) that a payment naming the notice settles the claim, so it charged no interest and sent no reminder. A landlord's books (`owedByUs`, "Sums recorded against us (rates, fines), not paid") did not: they listed claims only and counted one settled only if a payment named the claim. In the sixth living pilot (lv-06) the landlord seat paid rec.19352, the notice, on day 32 (KSh 2,977.86), saw rec.19353, the claim, still listed as unpaid, and paid it on day 74: **the same sum twice, 5,955.72 from its account to the city's for one bill of 2,977.86.** Nothing refused the second; the city took it.
+
+**Not the cause, looked for:** a reminder issued as a fresh notice (the rates office sends none; it adds penalty interest as a claim of its own kind), an opening-caseload paper (both records were made on day 31 by the live levy), the books double-listing one record (they listed one, the claim; it was the settlement that was missed).
+
+**The rule now** (`noticesOf`, `billSettled` in `participants/src/behaviour/common.ts`): the notices that go with a rates claim are those to the same owner with the same due day and sum; a bill is settled when a payment names the claim or any of its notices. The rates office's own `paid()` and the landlord's books use the one reading. The books line for a rates claim names the notice that came with it ("one bill: the city's notice for it is rec.N, and paying either settles it"), so a seat sees one bill on two papers. Fines, tax penalty and interest have no notice and are as before.
+
+**What does not change.** A bank pays what it is instructed; a second payment of a bill that is settled is still possible (a seat that does not read its books), and the city takes it: a real office would credit it against the next bill, which the town does not model. The code landlord paid the claim and never twice.
+
+**Seen by seats:** the "Sums recorded against us" book line for a rates claim gains the parenthesis above. No form, no standing instruction and nothing of the translator's prompt changes.
+
+Tests: `participants/test/rates-one-bill.test.ts` (4: listed once with its notice named; paying either paper settles it; only its own instalment and sum; a fine is settled only by naming it); `orchestrator/test/government.test.ts` (a run: no rates bill is paid more than once, whichever paper is named).
+
+**Revisit if** a payment of a settled bill should be turned away or credited by the rates office; or a notice should name its claim (a field on the paper) in place of matching by owner, due day and sum.
+

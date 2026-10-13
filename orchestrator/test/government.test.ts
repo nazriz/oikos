@@ -207,4 +207,10 @@ test("budget, park and rates run through the town's own procedures", async () =>
   const claims = recs.filter((r) => r.record === "claim" && r.about?.kind === "rates" && r.counterparty.startsWith("landlord"));
   expect(claims.length).toBe(notices.length);
   expect(ev.some((e) => e.event === "transfer" && e.from.startsWith("acc-landlord") && e.to === "acc-city" && claims.some((c) => c.id === e.settles))).toBe(true);
+  // One bill is one payment, whichever of its two papers (the notice, the claim recorded with it) a payment names.
+  for (const c of claims) {
+    const notice = notices.find((n) => n.addressed_to.includes(c.counterparty) && n.data.due === c.about.due && n.data.amount === c.about.amount);
+    expect(notice).toBeDefined();
+    expect(ev.filter((e) => e.event === "transfer" && e.to === "acc-city" && (e.settles === c.id || e.settles === notice.id)).length).toBeLessThanOrEqual(1);
+  }
 }, 300_000);

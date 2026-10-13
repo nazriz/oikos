@@ -171,9 +171,9 @@ aged list of what is open; the office-holder reads them when they sit down. (To 
 6. **Nothing says what to do with it.** The seat's standing instructions, the translator's prompt and its forms list are
    unchanged. The notebook stays the seat's own free notes.
 
-**Out of scope, noted.** The book of "Invoices addressed to us" and "Sums recorded against us" can list two records for one
-bill (the rates notice rec.19352 and rec.19353 in the sixth pilot): paying one does not settle the other. That is a books
-question (is it one bill or two?), not a memory one, and is not changed here.
+**Out of scope here, done after** (2026-10-13, docs/behaviour/government.md "One bill, two papers"). The book of "Sums
+recorded against us" listed the rates claim (rec.19353) as unpaid after the notice beside it (rec.19352) had been paid:
+a books fault, not a memory one. Fixed there: a payment naming either paper settles the bill.
 
 **Revisit if** a seat's own record is read as a to-do list or leads it to repeat (watch the first pilot that has it); if the
 bound binds on a seat whose office does a great deal (the tribunal's member, with sixty cases in a day); or if a seat

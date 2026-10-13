@@ -8,7 +8,7 @@ import { basesOf, channels, cites, type Observation, type StatementRecord } from
 import { dateWords } from "../forms";
 import type { OfficeBooks, OpenHeading, OpenItem, ParticipantContext } from "../module";
 import { cents } from "../money";
-import { Book, broughtForward, DAY, leaseTerms, madeAt, MONTH, ownAccount, usd, whenWords } from "./common";
+import { billSettled, Book, broughtForward, noticesOf, DAY, leaseTerms, madeAt, MONTH, ownAccount, usd, whenWords } from "./common";
 import { PAPER } from "./frictions";
 
 const addressed = (r: StatementRecord, me: string) => (r.addressed_to ?? []).includes(me);
@@ -74,8 +74,8 @@ export function askedOfUs(book: Book, me: string, money: Money, forms: { notice:
 export function owedByUs(book: Book, me: string, money: Money): OpenHeading[] {
   const invoices = book.open("invoice").filter((r) => addressed(r, me) && r.data?.outcome?.money && !money.settled.has(r.id))
     .map((r): OpenItem => ({ id: r.id, since: madeAt(r), amount: cents(r.data!.outcome.money.amount), line: `${r.id}: invoice from ${r.speaks_for ?? r.author} for ${usd(cents(r.data!.outcome.money.amount))}, dated ${whenWords(madeAt(r))}, not paid` }));
-  const sums = book.ofType("claim").filter((r: any) => r.record === "claim" && r.position === "right" && r.counterparty === me && ["fine", "tax_penalty", "rates", "rates_interest"].includes(r.about?.kind) && !money.settled.has(r.id) && !book.released.has(r.id))
-    .map((r: any): OpenItem => ({ id: r.id, since: r.at, amount: cents(r.about.amount), line: `${r.id}: ${String(r.about.kind).replace(/_/g, " ")} of ${usd(cents(r.about.amount))} recorded against us by ${r.holder}${Number.isFinite(Number(r.about?.due)) ? `, due ${dateWords(Number(r.about.due))}` : ""}, not paid` }));
+  const sums = book.ofType("claim").filter((r: any) => r.record === "claim" && r.position === "right" && r.counterparty === me && ["fine", "tax_penalty", "rates", "rates_interest"].includes(r.about?.kind) && !billSettled(book, r, money.settled) && !book.released.has(r.id))
+    .map((r: any): OpenItem => ({ id: r.id, since: r.at, amount: cents(r.about.amount), line: `${r.id}: ${String(r.about.kind).replace(/_/g, " ")} of ${usd(cents(r.about.amount))} recorded against us by ${r.holder}${Number.isFinite(Number(r.about?.due)) ? `, due ${dateWords(Number(r.about.due))}` : ""}, not paid${noticesOf(book, r).length ? ` (one bill: the city's notice for it is ${noticesOf(book, r).map((n: any) => n.id).join(", ")}, and paying either settles it)` : ""}` }));
   return [...heading("Invoices addressed to us, not paid", invoices), ...heading("Sums recorded against us (rates, fines), not paid", sums)];
 }
 
