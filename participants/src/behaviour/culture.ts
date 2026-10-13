@@ -122,6 +122,8 @@ export interface CultureParams {
   conceal_bps: number;
   /** An integrity above this tells whatever it is. */
   integrity_tells_bps: number;
+  /** The weight of the cost of standing out, against the cost of saying what one does not think, in thousandths (1,000 = one to one): what is said is the weighted mean of what one thinks and what one takes the street to approve, with the weights `reputation_scale_milli/1000 x belonging x conformity` and `integrity` (Kuran 1995: one chooses what to say to balance the reputation lost by standing out against the inner cost of misstating one's view). See docs/behaviour/culture.md, "What I think and what I say". */
+  reputation_scale_milli: number;
   /** What fraction (basis points) of the move of a number is kept before the record is written again: the record's grain, whole percent. */
   grain_percent: number;
   /** Placeholder for what is approved where the profile is silent. */
@@ -164,7 +166,7 @@ export interface CultureParams {
 }
 export const CULTURE_DEFAULTS: CultureParams = {
   prior_weight: 4, own_sd_bps: 1_500, values_bps: 500, window: 20, known_weight: 1, close_weight: 2, published_weight: 4, close_affinity_bps: 3_000,
-  internalise_days: 1_095, sd_bps: 2_500, w_does_bps: 6_000, w_approves_bps: 4_000, sway_milli: 300, conceal_bps: 7_500, integrity_tells_bps: 7_000,
+  internalise_days: 1_095, reputation_scale_milli: 1_000, sd_bps: 2_500, w_does_bps: 6_000, w_approves_bps: 4_000, sway_milli: 300, conceal_bps: 7_500, integrity_tells_bps: 7_000,
   grain_percent: 2, approves_default_bps: 5_000, does_default_bps: 5_000, phrases: 3,
   margin_bps: 2_500, cool_bps: 500, esteem_bps: 200, disapproved_bps: 300, newcomer_weight: 1, way_points: 1_500,
   slots: 6, seen_bps: 10_000, read_bps: 5_000, pass_bps: 6_000, negative_bps: 2_000, max_hops: 3, half_life_seen_days: 365, half_life_told_days: 180,
@@ -312,10 +314,22 @@ export class Culture {
     const settled = this.approves.get(c)! + (base - this.approves.get(c)!) * keep;
     return clamp(settled + this.p.values_bps * (this.zOf(c) - this.zStart.get(c)!));
   }
-  /** What I say when asked: what I think, moved toward what I take to be approved by how much belonging weighs with me and what integrity leaves (the arithmetic of `Inner.view`). */
+  /**
+   * The share of the way from what I think to what I take the street to approve that I go in what I say, 0..1 (Kuran 1995). I choose what to say to
+   * make two costs as small as I can: the reputation lost by saying what is far from what the street approves, which weighs more the more I belong
+   * and the more I follow others (`reputation_scale_milli/1000 x belonging x conformity`), and the inner cost of saying what I do not think, which
+   * weighs as my integrity does. Each cost grows with the square of its distance, so the best thing to say lies between the two, at the share
+   * `reputation / (reputation + integrity)` of the way: nothing if I do not care what the street thinks, the whole way if I have no integrity,
+   * half if the two weigh alike. A view farther from the street is moved by more points, the same share of a longer way.
+   */
+  pressure(): number {
+    const rep = (this.p.reputation_scale_milli / 1_000) * this.env.belonging() * this.env.conformity(), inner = this.env.integrity();
+    return rep + inner > 0 ? rep / (rep + inner) : 0;
+  }
+  /** What I say when asked: what I think, moved toward what I take to be approved by `pressure()` of the way. */
   private says(c: Conduct, t: number): number {
-    const own = this.own(c, t), gap = Math.max(0, Math.min(1, this.env.belonging() * (1 - this.env.integrity()) * 4));
-    return clamp(own + gap * (this.approves.get(c)! - own));
+    const own = this.own(c, t);
+    return clamp(own + this.pressure() * (this.approves.get(c)! - own));
   }
 
   /** The four numbers and the weight held for a conduct (basis points), as of `t`. */
