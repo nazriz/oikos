@@ -52,7 +52,9 @@ test("a seat that looks into its office's papers at every sitting is shown lists
   // folder of forms, which holds the town's public forms too: 49,371. The cost is recorded in docs/behaviour/office-papers.md.)
   // (52,000 since 2026-10-12, where it was 50,000: the tax law says its returns and the day each falls due, and the books
   // list them; 50,483 in the Kenyan town with four. Docs/decisions.md, "Returns on the law's days".)
-  expect(Math.max(...finance.map((p) => p.size))).toBeLessThan(52_000);
+  // (56,000 since 2026-10-13, where it was 52,000: the office's own file is set out at every sitting, at most 4,500
+  // characters (docs/decisions.md, "What a seat carries between sittings"); the largest finance prompt was 52,193.)
+  expect(Math.max(...finance.map((p) => p.size))).toBeLessThan(56_000);
   // The folder named for payroll holds the employment agreements, a line each; the files, everything, as a list.
   const second = finance[1]!.text;
   expect(second).toContain("## Finance officer: Payroll: what you looked up (");
