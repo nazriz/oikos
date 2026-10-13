@@ -553,7 +553,9 @@ export const citizen: BehaviourModule = {
     let lastSeenT = 0; // when we last woke
     // Upbringing (docs/behaviour/citizen.md): someone the world gave no values of their own (born here, or come as a
     // child) has, until they come of age, those drawn for them; then they ask the parents they live with, and theirs settle.
-    const upbringing = { settled: !!p.own_values, askedAt: null as number | null, told: [] as { most: string[]; least: string[] }[] };
+    const upbringing = { settled: !!p.own_values, askedAt: null as number | null, told: [] as { most: string[]; least: string[] }[],
+      /** What the parents told of how they see things here, and where they say they come from (culture, step 4): one entry for each parent who spoke. */
+      culture: [] as { pictures: { conduct: Conduct; does: number; approves: number }[]; group?: string }[] };
     let askedWhatMatters: string[] = [];
     /** What we were at since we last woke, by where our body is (where the hours go: docs/design/ai-citizens.md 10b,
      * 10h): work, learning, a gathering, care, home (our own, or any dwelling: a child knows theirs only by being in
@@ -847,12 +849,21 @@ export const citizen: BehaviourModule = {
     /** What a tie said of itself in the words of culture: what they did at an occasion and what they say of it move what we take
      * others to do and approve of, by the tie's weight (design 14b: first-hand only, so no act is counted twice); and where they
      * come from, which makes a tie to someone of our own group likelier (homophily). */
-    const hearCulture = (text: string, who: string, t: number) => {
+    const hearCulture = (text: string, who: string, t: number, replyTo: string) => {
       if (!cul || !cdial) return;
       const heard = CULTURE_WORDS.heard(text);
       if (heard) {
         const route = ties.affinity(who, t) >= cul.p.close_affinity_bps ? "close_tie" : "tie";
-        for (const d of heard.did) cul.seeAct(d.conduct, d.did, route);
+        for (const d of heard.did) {
+          cul.seeAct(d.conduct, d.did, route);
+          // What I make of it, and what I say of it (step 4: the tie cools or warms by what I think; I voice it by what I would say).
+          cul.noteHeard(d.conduct, t);
+          const r = cul.react(d.conduct, d.did, t);
+          if (r) {
+            if (r.tie) ties.add(who, r.tie, t, r.tie < 0 ? "disapproved" : "esteemed");
+            if (r.voice !== undefined) verdicts.push({ to: replyTo, text: CULTURE_WORDS.verdict(d.conduct, d.did, r.voice) });
+          }
+        }
         for (const s of heard.says) cul.hearSaid(s.conduct, s.bps, route);
       }
       const from = CULTURE_WORDS.fromHeard(text);
@@ -988,6 +999,8 @@ export const citizen: BehaviourModule = {
     const toldUs = new Map<string, News & { t: number }>();
     const talked = new Map<string, number>();
     let askedHow: string[] = [];
+    /** What we hold to say of an act a tie told us of, and to whom (culture, step 4): sent with our next steps. */
+    let verdicts: { to: string; text: string }[] = [];
     const countedBallots = new Set<string>(); // declared results counted once into the culture's picture
     const complainNoted = new Set<string>(); // homes we have noted not writing about, for the culture's sake
     let nextCatchUp: number | null = null;
@@ -1388,6 +1401,21 @@ export const citizen: BehaviourModule = {
           if (upbringing.askedAt !== null && !upbringing.settled) upbringing.told.push(matters);
           continue;
         }
+        // (Culture: a parent tells a child who asked how they see things here, and where they come from; or someone tells us what they say of what we did.)
+        if (cul) {
+          const seen = CULTURE_WORDS.householdHeard(m.text);
+          if (seen.length) {
+            if (upbringing.askedAt !== null && !upbringing.settled) upbringing.culture.push({ pictures: seen, ...(CULTURE_WORDS.fromHeard(m.text) ? { group: CULTURE_WORDS.fromHeard(m.text)! } : {}) });
+            continue;
+          }
+          const verdict = CULTURE_WORDS.verdictHeard(m.text);
+          if (verdict) {
+            const dent = cul.judged(verdict.conduct, verdict.did, verdict.approval, ties.affinity(person, obs.t) >= cul.p.close_affinity_bps ? "close_tie" : "tie");
+            if (dent) { inner.disapproved(dent, obs.t, person); ties.add(person, -Math.round(dent / 2), obs.t, "disapproved"); }
+            else ties.add(person, cul.warmth, obs.t, "esteemed");
+            continue;
+          }
+        }
         // Someone we know tells us that one of theirs has died: felt by how close the one who died was to us; and
         // they are no longer anyone we can turn to.
         const gone = MOURNING.heard(m.text);
@@ -1408,7 +1436,7 @@ export const citizen: BehaviourModule = {
           ties.add(person, 300, obs.t, "talked"); peopleWeKnow.add(person);
           continue;
         }
-        if (cul) hearCulture(m.text, person, obs.t);
+        if (cul) hearCulture(m.text, person, obs.t, m.from);
         const told = heardNews(m.text);
         if (told) {
           // What they do, and how it goes for them: counted as others doing it, and learned from as others' payoffs.
@@ -1621,6 +1649,16 @@ export const citizen: BehaviourModule = {
 
     const plan = (obs: Observation): Step[] => {
       if (plannedAt === -1) learnFromInitialRecords(obs);
+      // Culture (step 4): someone made in the run, born here or come from elsewhere, holds the picture they have lightly (a newcomer sees the local
+      // one soon outweigh it); a newcomer with no parents here is of a group drawn from the profile's shares, as the people of the town were.
+      if (cul && plannedAt === -1 && !p.own_values) {
+        cul.arrive(obs.t);
+        const shares = cdial!.shares, total = shares.reduce((x, g) => x + g.share_bps, 0);
+        if (!cul.group && shares.length && total > 0 && !(obs.body?.parents ?? []).length) {
+          let r = ctx.rng("culture-origin").below(total);
+          cul.setGroup((shares.find((g) => (r -= g.share_bps) < 0) ?? shares.at(-1)!).id);
+        }
+      }
       if (!home) findOwnHome(obs);
       // How long we had lived, worked and belonged here when the world began (the world's figures, from its profile).
       if (plannedAt === -1 && p.started) {
@@ -1867,6 +1905,9 @@ export const citizen: BehaviourModule = {
       if (askedWhatMatters.length) {
         const ranked = [...VALUES_OF_MIND].sort((a, b) => mind.person.values[b] - mind.person.values[a] || (a < b ? -1 : 1));
         steps.push(because("Asked by one of ours what matters to us: telling them.", message([...new Set(askedWhatMatters)].sort(), UPBRINGING_WORDS.say(ranked.slice(0, 3), ranked.slice(-3).reverse()))));
+        // (And, where the world has culture, how we see things here and where we come from: what a child takes with them.)
+        if (cul) steps.push(because("Asked by one of ours how things are here: telling them as we see it.", message([...new Set(askedWhatMatters)].sort(),
+          [...(cul.group ? [CULTURE_WORDS.from(cul.group)] : []), ...cul.household().map((x) => CULTURE_WORDS.household(x.conduct, x.does, x.approves))].filter(Boolean).join(" "))));
         askedWhatMatters = [];
       }
       // Come of age without values the world gave us: we ask the parents we live with, once; a fortnight on (or as
@@ -1891,6 +1932,13 @@ export const citizen: BehaviourModule = {
             }
             mind.reweigh();
             inner.remember({ t, what: "came_of_age", size: 5_000 });
+          }
+          // (Culture: from the household, the picture of what is done and approved, and where they come from. Parents of two groups: either, equally.)
+          if (cul && upbringing.culture.length) {
+            const groups = upbringing.culture.flatMap((c) => (c.group ? [c.group] : []));
+            const group = cul.group ?? (groups.length ? groups[groups.length > 1 ? ctx.rng("culture-parent-group").below(groups.length) : 0] : undefined);
+            const taken = cul.adoptHousehold(upbringing.culture.map((c) => c.pictures), t);
+            if (group) cul.setGroup(group, taken);
           }
         }
       }
@@ -1988,6 +2036,9 @@ export const citizen: BehaviourModule = {
         const ag = Math.round(K.agency * inner.zAgency());
         const trustOf = (who: string) => Math.round(K.trust * inner.zTrust(who, kindOf(who), t)); // (against the town's figure for its kind: the town's rates stay put)
         const fearOf = (who: string) => Math.round((K.fear * Math.max(feelings.level("fear", who, t), Math.round(feelings.level("fear", "money", t) / 2))) / 10_000);
+        // The lean of what we take those around us to do and approve of, in points, on a way that is a conduct (culture: the same lean the conduct's draw takes,
+        // bounded as every term is; `way_points` a standard deviation, as trust and agency have).
+        const nw = (c: Conduct): number => (cul ? cul.way(c, t) : 0);
         const out: Way[] = [];
         // The job board: what its offers bring (as the postings we last saw there say; none seen: pay for work).
         if (!retired && p.in_labour_force && !ownWork) {
@@ -2019,7 +2070,7 @@ export const citizen: BehaviourModule = {
           const peers = heardNow.filter((n) => n.employer === job!.employer && n.member).length;
           if (holdTo(p.union) > 0 || peers > 0 || mind.learned("membership").known("member"))
             out.push({ key: `join:${p.union}`, kind: "join", by: p.union, brings: [], bears: [job.employer],
-              adj: Math.round((K.belief * holdTo(p.union)) / 10_000) + trustOf(p.union) + ag, others: peers, act: () => { joinNow = true; return undefined; } });
+              adj: Math.round((K.belief * holdTo(p.union)) / 10_000) + trustOf(p.union) + ag + nw("join_union"), others: peers, act: () => { joinNow = true; return undefined; } });
         }
         // Whoever made the paper in our way, or is the other party to an agreement of ours: they can vary or undo
         // it, and we can ask (a letter). Less readily the more we fear them and the less we trust them.
@@ -2054,7 +2105,7 @@ export const citizen: BehaviourModule = {
           const desk = p.tribunal.entity;
           const notice = w.against?.kind === "rent_increase" && hears.includes("rent_increase") ? book.records.get(w.against.record) : undefined;
           if (notice?.record === "statement" && notice.speaks_for && !challenged.has(notice.id) && breaches(book, { block: "publish", kind: "rent_increase", data: notice.data }, notice.speaks_for, notice.at).length)
-            out.push({ key: `desk:${desk}`, kind: "desk", id: notice.id, by: desk, brings: [], undoes: { record: notice.id }, adj: trustOf(desk) + ag, others: after("desk"),
+            out.push({ key: `desk:${desk}`, kind: "desk", id: notice.id, by: desk, brings: [], undoes: { record: notice.id }, adj: trustOf(desk) + ag + nw("take_to_tribunal"), others: after("desk"),
               act: () => {
                 challenged.add(notice.id);
                 steps.push(because("A notice of rent increase that breaks the law: taking it to the tribunal, and paying the rent as it was meanwhile.",
@@ -2062,11 +2113,11 @@ export const citizen: BehaviourModule = {
                 return notice.id;
               } });
           const owed = hears.includes("debt") && w.whom ? (book.claimsBy("holder", me) as readonly any[]).find((c) => c.holder === me && c.about?.kind === "debt" && c.counterparty === w.whom && !pursued.has(c.id)) : undefined;
-          if (owed) out.push({ key: `desk:${desk}`, kind: "desk", id: owed.id, by: desk, brings: ["money.to"], bears: [w.whom!], adj: trustOf(desk) + ag, others: after("desk"), act: () => { applyDebtNow.add(owed.id); return owed.id; } });
+          if (owed) out.push({ key: `desk:${desk}`, kind: "desk", id: owed.id, by: desk, brings: ["money.to"], bears: [w.whom!], adj: trustOf(desk) + ag + nw("take_to_tribunal"), others: after("desk"), act: () => { applyDebtNow.add(owed.id); return owed.id; } });
         }
         // The town's own desk for what it has not done (a complaint).
         if (p.complain_to && home && isLeaseholder() && complainedOf !== home.structure)
-          out.push({ key: `desk:${p.complain_to}`, kind: "desk", by: p.complain_to, brings: [], bears: [p.complain_to], adj: trustOf(p.complain_to) + ag, others: after("desk"), act: () => { complainNow = true; return undefined; } });
+          out.push({ key: `desk:${p.complain_to}`, kind: "desk", by: p.complain_to, brings: [], bears: [p.complain_to], adj: trustOf(p.complain_to) + ag + nw("complain"), others: after("desk"), act: () => { complainNow = true; return undefined; } });
         // A petition on the board about landlords, and an election called: they bear on the landlord, and on the town.
         if (willing && home && !home.owned) for (const pet of found.petitions) {
           if (pet.speaks_for === me || signed.has(pet.id) || !(pet.data?.demand?.tags ?? []).includes("tenant_protection")) continue;
@@ -2501,7 +2552,7 @@ export const citizen: BehaviourModule = {
         if (!member) cul?.act("join_union", joins, t);
         // Recorded as the mind's decision (docs/design/ai-citizens.md 7): weighed, from the chance as the person came to it.
         if (!member) decision({ t, domain: "membership", strategy: "deliberate", choice: joins ? "join" : "not",
-          options: [{ key: "join", score: chance }, { key: "not", score: 10_000 - chance }] }, ...(joins ? ["member"] : []));
+          options: [{ key: "join", score: chance }, { key: "not", score: 10_000 - chance }], ...(cul ? { norm: cul.norm("join_union", t) } : {}) }, ...(joins ? ["member"] : []));
         if (joins)
           steps.push(because(`A new job: joining the union (${rate / 100}% of those working in ${industry.replaceAll("_", " ")} do; for me, ${chance / 100}%${saidJoin ? `, thinking what it would mean to me: ${Math.round((saidJoin.join ?? 0) / 1_000)} of 10 against ${Math.round((saidJoin.not ?? 0) / 1_000)} not to` : ""}).`, say("membership_application", "Application to join.", { to: [p.union], visible: [me, p.union], data: { account: acc.account, employer: job.employer, industry } })));
       }
@@ -2620,15 +2671,21 @@ export const citizen: BehaviourModule = {
         // what members do (docs/behaviour/culture.md), once.
         if (cul && r.kind === "ballot_result" && typeof r.data?.employer === "string" && Number(r.data.voted) > 0 && Number.isFinite(Number(r.data.yes)) && !countedBallots.has(r.id)) {
           countedBallots.add(r.id);
-          cul.seeShare("strike", Math.round((Number(r.data.yes) * 10_000) / Number(r.data.voted)), "published");
+          const share = Math.round((Number(r.data.yes) * 10_000) / Number(r.data.voted));
+          cul.seeShare("strike", share, "published");
+          // (A count of a ballot taken in secret is also what those who voted thought: a sighting of what people approve, which can undo a street's ignorance of it.)
+          cul.hearSaid("strike", share, "published");
         }
         // Voting, and how, follow the person: those who value others' welfare (benevolence, universalism) turn out and
         // back action more; those who value security, less (the town's rates stay as calibrated).
         const solidarity = (zValue("benevolence") + zValue("universalism")) / 2;
         // (A ballot about a workplace we've left isn't ours to vote in.)
         if (r.kind === "action_ballot" && r.data?.employer === job?.employer && ctx.rng(`turnout-${r.id}`).below(10_000) < shifted(p.ballot_turnout_bps, p.sway.turnout * solidarity)) {
-          const yes = ctx.rng(`vote-${r.id}`).below(10_000) < shifted(p.strike_vote_yes_bps, p.sway.strike_vote * (solidarity - zValue("security")) + (cul ? (cul.p.sway_milli / 1_000) * cul.lean("strike", t) : 0));
+          const yesChance = shifted(p.strike_vote_yes_bps, p.sway.strike_vote * (solidarity - zValue("security")) + (cul ? (cul.p.sway_milli / 1_000) * cul.lean("strike", t) : 0));
+          const yes = ctx.rng(`vote-${r.id}`).below(10_000) < yesChance;
           cul?.act("strike", yes, t);
+          // (Recorded as a choice, with the picture it was made from; the lean is in the chance beside the vote's own shift.)
+          if (cul) decision({ t, domain: "strike", strategy: "deliberate", choice: yes ? "yes" : "no", options: [{ key: "yes", score: yesChance }, { key: "no", score: 10_000 - yesChance }], norm: cul.norm("strike", t) });
           steps.push(because(`The union's protected action ballot: voting ${yes ? "yes" : "no"}.`, vote(r.id, yes ? "yes" : "no")));
         }
       }
@@ -3341,6 +3398,7 @@ export const citizen: BehaviourModule = {
         if (cul && now > 0 && days >= 7 && feelings.level("anger", p.complain_to, t) >= bearing && complainedOf !== home.structure && (writes || !complainNoted.has(home.structure))) {
           complainNoted.add(home.structure);
           cul.act("complain", writes, t);
+          decision({ t, domain: "complain", strategy: "deliberate", choice: writes ? "write" : "not", options: [{ key: "write", score: reads(p.complain_bps, p.complain_to, "complain") }, { key: "not", score: 10_000 - reads(p.complain_bps, p.complain_to, "complain") }], norm: cul.norm("complain", t) });
         }
         if (now > 0 && days >= 7 && feelings.level("anger", p.complain_to, t) >= bearing && complainedOf !== home.structure && writes) {
           complainedOf = home.structure;
@@ -3657,6 +3715,7 @@ export const citizen: BehaviourModule = {
         const homeAt = home?.movedIn ? structureOf(home.space) : livingAt ? structureOf(livingAt) : undefined;
         const takes = !!homeAt && ctx.rng(`take`).below(10_000) < chance;
         if (homeAt) cul?.act("take_from_employer", takes, t);
+        if (homeAt && cul) decision({ t, domain: "take", strategy: "deliberate", choice: takes ? "take" : "not", options: [{ key: "take", score: chance }, { key: "not", score: 10_000 - chance }], norm: cul.norm("take_from_employer", t) });
         if (takes) {
           const at = structureOf(job.workplace);
           steps.push(because(`We can't make ends meet (${usd(acc.balance)}, less than a month's essentials): taking ${p.crime.quantity} ${p.goods} from ${job.employer}'s stock at work, and home with them.`,
@@ -3929,6 +3988,9 @@ export const citizen: BehaviourModule = {
         steps.push(because("Asked how things are: telling them.", message([who], newsOfMine(who))));
       }
       askedHow = [];
+      // (Culture: what we hold to say to someone of what they did, said once, when we heard of it.)
+      for (const v of verdicts) steps.push(because("Told what they did: saying what we make of it.", message([v.to], v.text)));
+      verdicts = [];
       if (nextCatchUp === null) nextCatchUp = t + ctx.rng("catch-up").below(p.catch_up_days) * DAY;
       if (t >= nextCatchUp) {
         nextCatchUp = t + Math.round((p.catch_up_days * DAY) / (pursuing("catch up more") ? 2 : 1));

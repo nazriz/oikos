@@ -945,6 +945,20 @@
           },
           "description": "Every option the citizen had before it, by key. `score` is 0 where the way of deciding gave it none: all of them under repeat; under imitate, those nobody known to the citizen took."
         },
+        "norm": {
+          "description": "Culture (docs/behaviour/culture.md): where the choice is a conduct the culture dial holds, the citizen's own picture of it when they decided, and the lean it gave their rate (one person's belief, never the town's): `does`, of those they know of who met the occasion, the share they take to have done it; `approves`, how far they take those around them to approve; `own`, what they think themselves; `says`, what they say when asked (each a whole percent); `lean`, in hundredths of a standard deviation. Absent where the dial is off.",
+          "type": "object",
+          "required": ["conduct", "does", "approves", "own", "says", "lean"],
+          "additionalProperties": false,
+          "properties": {
+            "conduct": { "type": "string", "maxLength": 40 },
+            "does": { "type": "integer", "minimum": 0, "maximum": 100 },
+            "approves": { "type": "integer", "minimum": 0, "maximum": 100 },
+            "own": { "type": "integer", "minimum": 0, "maximum": 100 },
+            "says": { "type": "integer", "minimum": 0, "maximum": 100 },
+            "lean": { "type": "integer", "minimum": -300, "maximum": 300 }
+          }
+        },
         "current": {
           "description": "The option that is the citizen's routine, if they have one.",
           "type": "string"

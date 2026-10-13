@@ -10,6 +10,7 @@ import { join } from "node:path";
 import { generate } from "@oikos/worlds/generator/generate";
 import { PROFILE_DIR } from "@oikos/worlds/generator/profile";
 import { loadWorld } from "../src/batch";
+import { logLines } from "../src/logs";
 import { recordChanges, Records } from "../src/records";
 import { runWorld } from "../src/run";
 
@@ -137,3 +138,28 @@ test("origin: only where the profile has groups; their shares, households and ch
   const ke = generate({ ...base, profile: "ke-nakuru-2026", living: { culture: true } }) as any;
   expect(JSON.stringify(ke.participants)).not.toContain('"origin"');
 });
+
+test("dial on: the lean is recorded on the decisions of the conducts that had no record of it (join, and a vote to strike, writing to the town, taking from an employer where they come up), and the contract takes it", async () => {
+  const d = out();
+  try {
+    const config = (await loadWorld(join(root, "worlds/town.yaml"), ["living.initiative_bps=10000", "living.culture=true"])).config;
+    const r = await runWorld({ config: { ...config, seed: 1 }, runId: "dec", outDir: d, until: 120 * DAY, recordObservations: "none" });
+    const per: { [domain: string]: { all: number; withNorm: number } } = {};
+    for await (const line of logLines(r.logPath)) {
+      if (!line.includes('"annotation":"decision"')) continue;
+      const data = JSON.parse(line).body.data;
+      const x = (per[data.domain] ??= { all: 0, withNorm: 0 });
+      x.all++;
+      if (data.norm) {
+        x.withNorm++;
+        check("dataset#/$defs/CitizenDecision/properties/norm", data.norm);
+      }
+    }
+    // Every decision of these domains carries its norm; the others carry none.
+    for (const [domain, x] of Object.entries(per)) {
+      if (["membership", "strike", "complain", "take"].includes(domain)) expect(x.withNorm, domain).toBe(x.all);
+      else expect(x.withNorm, domain).toBe(0);
+    }
+    expect(per.membership?.all ?? 0).toBeGreaterThan(0);
+  } finally { rmSync(d, { recursive: true, force: true }); }
+}, 600_000);

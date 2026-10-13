@@ -111,9 +111,10 @@ test("a citizen's picture moves from what a tie told it; an unrelated line, or a
   await a.p.wake(2 * DAY, { inbox: [from("c9", "Much the same.")] });
   await a.p.wake(3 * DAY, { inbox: [from("c9", "Everyone in this town writes in, whatever happens.", "m2")] });
   expect(valueOf(a.kept, "complain", 0)).toBe(d0);
-  // A tie says it wrote: does moves up from 30 by (10000-3000)/5 = 1400 bps => 44%.
+  // A tie says it wrote. This person was made in the run (no values of their own given: a newcomer), so holds their picture at weight 1 (step 4):
+  // does moves up from 30 by (10000-3000)/2 = 3500 bps => 65%. (One whose world gave them values holds it at weight 4: 44%; tested below.)
   await a.p.wake(4 * DAY, { inbox: [from("c9", CULTURE_WORDS.did("complain", true), "m3")] });
-  expect(valueOf(a.kept, "complain", 0)).toBe(44);
+  expect(valueOf(a.kept, "complain", 0)).toBe(65);
   // And what they say of it moves approves.
   const ap0 = valueOf(a.kept, "complain", 1);
   await a.p.wake(5 * DAY, { inbox: [from("c9", CULTURE_WORDS.says("complain", 1_000), "m4")] });
