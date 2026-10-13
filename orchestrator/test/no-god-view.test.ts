@@ -173,6 +173,23 @@ test("an office's own file (what a seat is shown of what it sent, filed and paid
   expect(book.text(5 * 86_400, "x")).not.toContain("acc-c0001");
 });
 
+// An office's practice and its past (docs/behaviour/culture.md, "An office's practice"; the owner's ruling of 2026-10-13: a seat is
+// not shown its office's past practice as ready counts). The way a holder learns how its office has acted is its own files:
+// its papers are `mine` and nobody else's, so another office's files are not a report it can be given.
+test("a holder looks through its own office's files and no one else's: every `mine` channel of every seat names no one, another office's files are refused by the contract, and an organisation's record is shown to no one", () => {
+  const OWN_KEYS = ["id", "kind", "way", "match", "title", "every", "on_request"];
+  for (const town of towns()) for (const p of town.positions) for (const c of p.channels ?? []) {
+    if (c.kind === "records" && c.way === "mine") {
+      for (const k of Object.keys(c)) expect(OWN_KEYS).toContain(k); // (no `of`, `office` or `entity`: nothing to point it at another office)
+      expect(JSON.stringify(c.match ?? {}).includes("involving")).toBe(false);
+    }
+    expect(c.kind).not.toBe("org_record"); // (an organisation's record, its practice with it, has no channel at all)
+  }
+  // The contract's own example of a channel aimed at another office's files is invalid (contracts/test runs every invalid example).
+  const ex = JSON.parse(readFileSync(join(root, "contracts/examples/invalid/world-config/files-of-another-office.json"), "utf8"));
+  expect(JSON.stringify(ex)).toContain('"of": "office-2"'.replace(/ /g, "")) ;
+});
+
 // Culture (docs/behaviour/culture.md; design 14): what a person takes those around them to do and approve of is one person's
 // belief, kept in their own record, moved only along a tie, by being there, or by what is published. Nothing is the
 // town's, no register is read, and no channel is added.

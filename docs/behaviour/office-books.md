@@ -178,3 +178,9 @@ a books fault, not a memory one. Fixed there: a payment naming either paper sett
 **Revisit if** a seat's own record is read as a to-do list or leads it to repeat (watch the first pilot that has it); if the
 bound binds on a seat whose office does a great deal (the tribunal's member, with sixty cases in a day); or if a seat
 needs the papers it sent more than 40 days ago, which are on its file and can be looked up.
+
+## How the office has acted before (2026-10-14)
+
+A seat is not shown its office's past practice as counts. It goes and looks in the office's own files, by kind of paper and
+by date, as any holder of papers of its own can (docs/behaviour/culture.md, "An office's practice"). The books and the
+office's own file above are unchanged by it.

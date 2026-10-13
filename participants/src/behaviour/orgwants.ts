@@ -13,6 +13,8 @@ import { RECORD, type RecordChange } from "../module";
 import type { Rng } from "../rng";
 import type { Value } from "./mind";
 import { swayed, Wants, wantParams, type WantEvent, type WantParams } from "./wants";
+import { cultureDial } from "./culture";
+import { Practice, PRACTICES, type PracticeRow } from "./practice";
 
 export const ORG_WANTS = ["keep_trading", "grow", "keep", "be_rid", "pay_less", "standing"] as const;
 export type OrgWant = (typeof ORG_WANTS)[number];
@@ -71,18 +73,32 @@ export class Org {
   readonly character: Character;
   readonly wants: Wants;
   readonly p: OrgParams;
+  /** Its habit, where the culture dial is on and it takes initiative (docs/behaviour/culture.md, "An office's practice"); absent otherwise. */
+  readonly practice?: Practice;
   private readonly recent: { t: number; what: string; about?: string; size: number }[] = [];
   private since: { t: number; what: string; about?: string; size: number; by?: string }[] = [];
   private written = "";
   private readonly counts: { [what: string]: number } = {};
   private told: WantEvent[] = [];
 
-  constructor(ctx: { rng: (purpose: string) => Rng; world: { dials?: { [name: string]: unknown } } }, given: { initiative?: boolean | null; owner_values?: { [v: string]: number } | null; values?: { [v in Value]?: { mean_bps: number; sd_bps: number } }; org?: Partial<OrgParams> }) {
+  constructor(ctx: { rng: (purpose: string) => Rng; world: { dials?: { [name: string]: unknown } } }, given: { practice?: PracticeRow[]; initiative?: boolean | null; owner_values?: { [v: string]: number } | null; values?: { [v in Value]?: { mean_bps: number; sd_bps: number } }; org?: Partial<OrgParams> }) {
     const dial = Number(ctx.world.dials?.initiative_bps ?? 0);
     this.lively = given.initiative ?? (dial > 0 && ctx.rng("initiative").below(10_000) < dial);
     this.character = this.lively ? characterOf(given.owner_values, given.values) : characterOf(null);
     this.p = { ...ORG_DEFAULTS, ...(given.org ?? {}) };
     this.wants = new Wants(wantParams(this.p.wants));
+    const cul = cultureDial(ctx.world);
+    if (this.lively && cul) {
+      this.practice = new Practice(cul.params, given.practice);
+      // (An office is never new on day 1: it opens with the habit its character gives, so at the opening nothing moves.)
+      for (const k of PRACTICES) this.practice.open(k, this.chanceOf(k, 0), 0);
+    }
+  }
+
+  private chanceOf(what: "hold" | "rise" | "stay", worth: number): number {
+    const c = this.character;
+    const lean = (c.keep + c.standing) / 2 - (what === "rise" ? c.pay_less : what === "stay" ? c.be_rid : c.grow) + worth;
+    return swayed(what === "hold" ? this.p.hold_bps : what === "rise" ? this.p.rise_bps : this.p.stay_bps, lean, this.p.answer);
   }
 
   /**
@@ -91,11 +107,12 @@ export class Org {
    * Holding a rent or letting a tenant stay sets keeping them and being thought well of against growing; a rise
    * sets them against paying less.
    */
-  grants(what: "hold" | "rise" | "stay", rng: Rng, worth = 0): { granted: boolean; chance: number } {
-    const c = this.character;
-    const lean = (c.keep + c.standing) / 2 - (what === "rise" ? c.pay_less : what === "stay" ? c.be_rid : c.grow) + worth;
-    const chance = swayed(what === "hold" ? this.p.hold_bps : what === "rise" ? this.p.rise_bps : this.p.stay_bps, lean, this.p.answer);
+  grants(what: "hold" | "rise" | "stay", rng: Rng, worth = 0, t = 0): { granted: boolean; chance: number } {
+    let chance = this.chanceOf(what, worth);
+    // (Its habit, where the culture dial is on: the rate is drawn part of the way from what its character gives toward what the office has in fact done. No draw is added.)
+    if (this.practice) chance = this.practice.pulled(what, chance, this.chanceOf(what, 0));
     const granted = this.lively && rng.below(10_000) < chance;
+    this.practice?.observe(what, t, granted);
     this.count(granted ? "granted" : "refused");
     return { granted, chance };
   }
@@ -143,6 +160,7 @@ export class Org {
       character: Object.fromEntries(ORG_WANTS.map((w) => [w, bps(this.character[w])])),
       wants: this.wants.section(),
       memory: { recent: this.recent.map((r) => ({ ...r })) },
+      ...(this.practice ? { practice: this.practice.section() } : {}),
       circumstances: { ...Object.fromEntries(Object.entries(this.counts).sort(([a], [b]) => (a < b ? -1 : 1))), ...circumstances },
     };
     const text = JSON.stringify(all);

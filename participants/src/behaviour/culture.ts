@@ -203,6 +203,15 @@ export interface CultureParams {
   bystander_bps: number;
   /** A departure I find in a building I am in counts as seen if it is no older than this. */
   witness_days: number;
+  // ---- an organisation's practice (step 6; docs/behaviour/culture.md, "An office's practice"). Placeholders, fixed before any run.
+  /** Practice is counted over this many days (older counts are halved as the window rolls). */
+  practice_window_days: number;
+  /** Below this many occasions an office's habit is not yet one. */
+  practice_min_occasions: number;
+  /** A code holder's rate is drawn this much of the way from what its character gives toward its own practice. */
+  practice_inertia_bps: number;
+  /** An office is never new on day 1: it opens with a past of this many occasions, at the rate its character gives. */
+  practice_opening: number;
 }
 export const CULTURE_DEFAULTS: CultureParams = {
   prior_weight: 4, own_sd_bps: 1_500, values_bps: 500, window: 20, known_weight: 1, close_weight: 2, published_weight: 4, close_affinity_bps: 3_000,
@@ -211,6 +220,7 @@ export const CULTURE_DEFAULTS: CultureParams = {
   margin_bps: 2_500, cool_bps: 500, esteem_bps: 200, disapproved_bps: 300, newcomer_weight: 1, way_points: 1_500,
   slots: 6, seen_bps: 10_000, read_bps: 5_000, pass_bps: 6_000, negative_bps: 2_000, max_hops: 3, half_life_seen_days: 365, half_life_told_days: 180,
   tell_at_bps: 2_000, rehearse_bps: 3_000, bystander_bps: 5_000, witness_days: 3,
+  practice_window_days: 1_825, practice_min_occasions: 5, practice_inertia_bps: 5_000, practice_opening: 100,
 };
 const INTS: (keyof CultureParams)[] = Object.keys(CULTURE_DEFAULTS) as (keyof CultureParams)[];
 
@@ -219,9 +229,9 @@ const INTS: (keyof CultureParams)[] = Object.keys(CULTURE_DEFAULTS) as (keyof Cu
 export function cultureParams(given?: any): CultureParams {
   const p = { ...CULTURE_DEFAULTS, ...(given ?? {}) } as CultureParams;
   for (const k of INTS) if (!Number.isInteger(p[k]) || p[k] < 0) throw new Error(`dials.culture.step.${k}: a size is a whole number, not below 0; got ${p[k]}`);
-  for (const k of ["own_sd_bps", "values_bps", "w_does_bps", "w_approves_bps", "close_affinity_bps", "conceal_bps", "integrity_tells_bps", "approves_default_bps", "does_default_bps", "margin_bps", "cool_bps", "esteem_bps", "gossip_bps", "disapproved_bps", "seen_bps", "read_bps", "pass_bps", "negative_bps", "tell_at_bps", "rehearse_bps", "bystander_bps"] as const)
+  for (const k of ["own_sd_bps", "values_bps", "w_does_bps", "w_approves_bps", "close_affinity_bps", "conceal_bps", "integrity_tells_bps", "approves_default_bps", "does_default_bps", "margin_bps", "cool_bps", "esteem_bps", "gossip_bps", "disapproved_bps", "seen_bps", "read_bps", "pass_bps", "negative_bps", "tell_at_bps", "rehearse_bps", "bystander_bps", "practice_inertia_bps"] as const)
     if (p[k] > 10_000) throw new Error(`dials.culture.step.${k}: a share is from 0 to 10000; got ${p[k]}`);
-  for (const k of ["prior_weight", "window", "known_weight", "close_weight", "published_weight", "internalise_days", "sd_bps", "newcomer_weight", "slots", "half_life_seen_days", "half_life_told_days", "witness_days", "gossip_days", "third_kept"] as const)
+  for (const k of ["prior_weight", "window", "known_weight", "close_weight", "published_weight", "internalise_days", "sd_bps", "newcomer_weight", "slots", "half_life_seen_days", "half_life_told_days", "witness_days", "gossip_days", "third_kept", "practice_window_days", "practice_min_occasions", "practice_opening"] as const)
     if (p[k] < 1) throw new Error(`dials.culture.step.${k}: must be at least 1; got ${p[k]}`);
   if (p.window < p.prior_weight || p.window < p.published_weight) throw new Error("dials.culture.step.window: must hold the prior's and a published count's weight");
   if (p.sway_milli > 1_000) throw new Error(`dials.culture.step.sway_milli: a lean may move a rate by at most the whole of it per standard deviation; got ${p.sway_milli}`);

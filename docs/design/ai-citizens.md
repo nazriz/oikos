@@ -2420,7 +2420,7 @@ in 29, on average 71 days after the rent fell due, and agreed a plan in 8."* It 
 its holder's to read (no-god-view: it is theirs). It says nothing of what other landlords do, and nothing of what
 to do. A code holder and a seat are shown the same.
 
-**What a code holder does with it.** Where there are `min_occasions` (5), its rate is drawn `inertia_bps` (5,000) of
+**What a code holder does with it.** (Built 2026-10-14 for the three answers a code organisation gives when asked, as `Org.grants` has them; docs/behaviour/culture.md, "An office's practice".) Where there are `min_occasions` (5), its rate is drawn `inertia_bps` (5,000) of
 the way toward its own practice. At the opening practice is what character already gives, so nothing moves; it
 matters after a change of owner, or when trade turns and the habit lags. Basis: organisations act by routines that
 outlast those who made them (Nelson and Winter 1982); the practice of an office is made at its counter and handed on
