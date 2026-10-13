@@ -530,6 +530,8 @@ Additions only; nothing renamed or removed. A log or a world made before them is
 - **Profile `values.culture.conducts` filled (2026-10-13, culture-3; data only, the TypeScript type is unchanged):** all nine profiles give `approves_bps` for `answer_tribunal`, `take_to_tribunal`, `complain` and `join_union`, from their own `outlook.trust`, with the mapping in `sources["culture.conducts"]`. Read only where the culture dial is on.
 - **World config `dials.culture.step.reputation_scale_milli`** (inside the opaque `step`, additive; 2026-10-13): the weight of the cost of standing out against the cost of misstating one's view, thousandths, default 1,000.
 
+- **Participant messages (code citizens' own phrasing, not a contract; 2026-10-13):** ordinary talk about a third person's act, `About <id>: <occasion>: <they did or did not>. Of that, I say it is <step>.`, added to the reply to "how are things" where the culture dial is on. **Dial `culture.step`:** `gossip_bps`, `gossip_days`, `third_kept` (additive, inside the opaque `step`).
+
 ## Versioning
 
 `contracts: "0.8"`. Pre-1.0, every change bumps the minor version and is proposed explicitly. A draft version collects agreed changes until it's closed. Older logs remain valid logs of their own version and replay only on a kernel build of that version (D6).
