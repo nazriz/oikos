@@ -183,6 +183,11 @@
       },
       "source": "placeholder"
     },
+    "close_affinity_bps": {
+      "schema": {},
+      "unit": "bps",
+      "source": "the world gives it (no default)"
+    },
     "complain_about": {
       "schema": {
         "type": "string"
