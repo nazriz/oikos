@@ -1,0 +1,796 @@
+{
+ "version": "1",
+ "note": "The gate's hand-made test set (docs/design/ai-citizens.md 13f): each the same decision with the same typed fields in two wordings, `a` the higher side (humane, warm, reasoned; for founders the conservation-and-transcendence wording) and `b` the lower. `parts_on` names the lines the pair was written to part on and the way: +1, `a` reads higher by at least a step; -1, lower; for founders the appeals poles. Written before any reader was asked. Never trained on. Names, sums and dates are tags.",
+ "pairs": [
+  {
+   "id": "refusal-01",
+   "kind": "refusal",
+   "form": "a decision on a claim for a payment for those out of work: refused",
+   "standing": "addressee",
+   "answers": "I lost my job on [DAY-1]. I am claiming the payment for people out of work for myself and my two children.",
+   "a": {
+    "label": "humane",
+    "text": "We cannot pay this claim. The law asks for 26 weeks of contributions in the last year and your record shows 19. That is the only reason: nothing you told us was doubted. If weeks are missing from our record, bring your pay slips to the counter within 28 days and we will look again."
+   },
+   "b": {
+    "label": "curt",
+    "text": "Claim refused. You do not qualify. This office will not answer further letters on the matter."
+   },
+   "parts_on": {
+    "respect": 1,
+    "reason": 1,
+    "answers": 1,
+    "recourse": 1
+   }
+  },
+  {
+   "id": "refusal-02",
+   "kind": "refusal",
+   "form": "an answer from a landlord to a tenant's request for three more months: refused",
+   "standing": "addressee",
+   "answers": "My daughter is in the middle of her school year. Could we have three more months before we leave?",
+   "a": {
+    "label": "humane",
+    "text": "I have read what you wrote about your daughter's school year. I cannot agree to three months, because the home is sold and the buyer takes it on [DAY-2]. I can agree to [DAY-2] in place of [DAY-1], in writing, if you say yes."
+   },
+   "b": {
+    "label": "curt",
+    "text": "No. The notice stands. Be out by [DAY-1] or it goes to the tribunal."
+   },
+   "parts_on": {
+    "respect": 1,
+    "reason": 1,
+    "answers": 1,
+    "threat": -1
+   }
+  },
+  {
+   "id": "refusal-03",
+   "kind": "refusal",
+   "form": "a decision on a claim for help with rent: refused",
+   "standing": "addressee",
+   "answers": "My hours were cut to twelve a week and I cannot make the rent. I am asking for help with the rent.",
+   "a": {
+    "label": "humane",
+    "text": "We have not been able to approve help with the rent. The scheme is for households whose income is under [SUM-1] a fortnight, and yours, with the hours you describe, is [SUM-2]. That is over the limit by [SUM-3]. We understand how much a cut in hours matters. If your hours fall further, apply again and we will count the new figure. You can also ask for this decision to be looked at again by writing to the review officer before [DAY-1]."
+   },
+   "b": {
+    "label": "curt",
+    "text": "Rent help: refused. Income over limit. Do not reapply."
+   },
+   "parts_on": {
+    "respect": 1,
+    "reason": 1,
+    "answers": 1,
+    "recourse": 1
+   }
+  },
+  {
+   "id": "refusal-04",
+   "kind": "refusal",
+   "form": "a decision on a claim for support for someone who cannot work: refused",
+   "standing": "addressee",
+   "answers": "I have a back injury and I cannot lift anything. I would like the support payment for people who cannot work.",
+   "a": {
+    "label": "humane",
+    "text": "Your claim for the support payment is refused. The doctor's report you sent says you can do light work, and the payment is for people who cannot work at all. We have kept the report on file and read it twice. We are sorry. A different report, or a second doctor's opinion, can change this: ask at the counter any weekday before [DAY-1]."
+   },
+   "b": {
+    "label": "curt",
+    "text": "Not eligible. Report read. Claim closed."
+   },
+   "parts_on": {
+    "respect": 1,
+    "reason": 1,
+    "answers": 1,
+    "recourse": 1
+   }
+  },
+  {
+   "id": "refusal-05",
+   "kind": "refusal",
+   "form": "an answer from a landlord to a tenant's request to stay on another year: refused",
+   "standing": "addressee",
+   "answers": "Our lease ends on [DAY-1]. We would like to stay another year at the same rent.",
+   "a": {
+    "label": "humane",
+    "text": "Thank you for asking to stay. I have decided not to renew the lease. My daughter is coming home and will live here from [DAY-2]. That is the whole reason, and it is not about you or your rent, which has always been on time, and I have enjoyed having you as tenants. You have until [DAY-3] to find a place, with no charge for the extra days, and I will give you the best reference I can. If you need longer, tell me by [DAY-4] and we can talk."
+   },
+   "b": {
+    "label": "curt",
+    "text": "Lease not renewed. Leave by [DAY-1]."
+   },
+   "parts_on": {
+    "respect": 1,
+    "reason": 1,
+    "answers": 1,
+    "recourse": 1
+   }
+  },
+  {
+   "id": "refusal-06",
+   "kind": "refusal",
+   "form": "an answer from a landlord to a tenant's request to lower the rent while a roof leaks: refused",
+   "standing": "addressee",
+   "answers": "The roof leaks over the children's room. Could the rent be lowered until it is fixed?",
+   "a": {
+    "label": "humane",
+    "text": "I cannot lower the rent: the lease sets it at [SUM-1], and a leak does not change it under the tenancy law. But I take the leak seriously. A roofer is booked for [DAY-1], and if it is not fixed by [DAY-2] you may ask the tribunal for an order and I will not stand in the way."
+   },
+   "b": {
+    "label": "curt",
+    "text": "Rent stays. The roofer will come when he comes."
+   },
+   "parts_on": {
+    "respect": 1,
+    "reason": 1,
+    "answers": 1,
+    "recourse": 1
+   }
+  },
+  {
+   "id": "refusal-07",
+   "kind": "refusal",
+   "form": "an answer from the council to a request to repair a street light: refused for this year",
+   "standing": "addressee",
+   "answers": "The street light outside number [ID-1] has been out for two months. Please fix it.",
+   "a": {
+    "label": "humane",
+    "text": "We will not replace this light this year. The lighting budget was spent on the main road, and your street is fourth on a list of seven. We know a dark street worries people walking home. We have put the light on next year's list, and you can see the list at the counter. If it is a danger now, tell us and we will send an inspector within a week."
+   },
+   "b": {
+    "label": "curt",
+    "text": "Light not scheduled. Budget gone."
+   },
+   "parts_on": {
+    "respect": 1,
+    "reason": 1,
+    "answers": 1,
+    "recourse": 1
+   }
+  },
+  {
+   "id": "refusal-08",
+   "kind": "refusal",
+   "form": "an answer from a landlord to a tenant's request to replace a broken heater: refused",
+   "standing": "addressee",
+   "answers": "The heater in the front room has broken and it is winter. Please replace it.",
+   "a": {
+    "label": "humane",
+    "text": "I will not replace the heater. Your lease makes appliances the tenant's to keep in order, and clause [ID-1] says so; that is the only reason. I know it is winter, so I will lend you two heaters until [DAY-1] at no charge. If you think the lease is wrong, the tribunal's duty officer will tell you, free of charge."
+   },
+   "b": {
+    "label": "curt",
+    "text": "No. Appliances are yours. Not my problem."
+   },
+   "parts_on": {
+    "respect": 1,
+    "reason": 1,
+    "answers": 1,
+    "recourse": 1
+   }
+  },
+  {
+   "id": "refusal-09",
+   "kind": "refusal",
+   "form": "a decision on a loan for a business: refused",
+   "standing": "addressee",
+   "answers": "I would like a loan of [SUM-1] to buy a van for my cleaning business.",
+   "a": {
+    "label": "humane",
+    "text": "We read your accounts closely, and we cannot offer this loan. To repay [SUM-1] over three years the business would need to clear [SUM-2] a month after costs, and the accounts you sent show [SUM-3]. If the van cost [SUM-4], the figures would work, and we would like to look again if you apply for that. We have also enclosed a list of two schemes that lend smaller sums."
+   },
+   "b": {
+    "label": "curt",
+    "text": "Loan declined. Insufficient serviceability."
+   },
+   "parts_on": {
+    "respect": 1,
+    "reason": 1,
+    "answers": 1,
+    "recourse": 1
+   }
+  },
+  {
+   "id": "refusal-10",
+   "kind": "refusal",
+   "form": "a decision on a loan for a shop's stock: refused",
+   "standing": "addressee",
+   "answers": "Please lend [SUM-1] to cover the shop's stock for the winter.",
+   "a": {
+    "label": "humane",
+    "text": "Thank you for the clear figures in your application. We are not able to lend this sum, because the shop already owes [SUM-2] and the loan would put its repayments above half of what it takes in. That is a rule we apply to every shop. If you pay the existing loan down to [SUM-3], apply again; [PERSON-1] will see you without an appointment."
+   },
+   "b": {
+    "label": "curt",
+    "text": "No. You have debts already."
+   },
+   "parts_on": {
+    "respect": 1,
+    "reason": 1,
+    "answers": 1,
+    "recourse": 1
+   }
+  },
+  {
+   "id": "refusal-11",
+   "kind": "refusal",
+   "form": "a decision on a personal loan for a funeral: refused",
+   "standing": "addressee",
+   "answers": "I need [SUM-1] to pay for my mother's funeral.",
+   "a": {
+    "label": "humane",
+    "text": "I am very sorry about your mother. We cannot lend [SUM-1] on your income: the repayments would leave too little for rent and food, and the law on lending asks us to check that. We can lend [SUM-2], which the repayments would allow, or point you to the town's hardship fund, which pays towards funerals. Come in or write before [DAY-1]."
+   },
+   "b": {
+    "label": "curt",
+    "text": "Application refused. Affordability check failed."
+   },
+   "parts_on": {
+    "respect": 1,
+    "reason": 1,
+    "answers": 1,
+    "recourse": 1
+   }
+  },
+  {
+   "id": "refusal-12",
+   "kind": "refusal",
+   "form": "a decision on a claim for a childcare payment: refused",
+   "standing": "addressee",
+   "answers": "I am claiming the childcare payment for my son.",
+   "a": {
+    "label": "humane",
+    "text": "We cannot pay the childcare payment for your son this term. The provider you named is not registered, and because the payment can only go to a registered provider. Nothing about you or your son is in question. If you choose a registered provider and tell us, we will pay from the day he starts, back to [DAY-1]."
+   },
+   "b": {
+    "label": "curt",
+    "text": "Refused. Provider unregistered. Next."
+   },
+   "parts_on": {
+    "respect": 1,
+    "reason": 1,
+    "answers": 1,
+    "recourse": 1
+   }
+  },
+  {
+   "id": "grant-01",
+   "kind": "grant",
+   "form": "a decision on a claim for a payment: granted",
+   "standing": "addressee",
+   "a": {
+    "label": "humane",
+    "text": "Your claim is approved. We will pay [SUM-1] each fortnight from [DAY-1]. Thank you for your patience while we checked your record."
+   },
+   "b": {
+    "label": "curt",
+    "text": "Claim approved, though your papers were late. [SUM-1] each fortnight from [DAY-1]. Do not be late again."
+   },
+   "parts_on": {
+    "respect": 1
+   }
+  },
+  {
+   "id": "grant-02",
+   "kind": "grant",
+   "form": "an answer from a landlord to a request to stay longer: granted",
+   "standing": "addressee",
+   "a": {
+    "label": "humane",
+    "text": "Yes, you may stay until [DAY-1]. I am glad to help, and I know a move is hard with the children in school."
+   },
+   "b": {
+    "label": "curt",
+    "text": "Fine, you can stay until [DAY-1], since you keep asking. This is the last time."
+   },
+   "parts_on": {
+    "respect": 1
+   }
+  },
+  {
+   "id": "grant-03",
+   "kind": "grant",
+   "form": "a decision on a loan: granted",
+   "standing": "addressee",
+   "a": {
+    "label": "humane",
+    "text": "Your loan of [SUM-1] is approved. Your accounts were clear and well kept, which made this easy. The first repayment is due [DAY-1]."
+   },
+   "b": {
+    "label": "curt",
+    "text": "Loan approved, [SUM-1]. Your accounts were a mess. First repayment [DAY-1]."
+   },
+   "parts_on": {
+    "respect": 1
+   }
+  },
+  {
+   "id": "grant-04",
+   "kind": "grant",
+   "form": "an answer to a request to repair: granted",
+   "standing": "addressee",
+   "a": {
+    "label": "humane",
+    "text": "We will replace the heater, and a fitter comes on [DAY-1]. Thank you for telling us at once."
+   },
+   "b": {
+    "label": "curt",
+    "text": "Heater replaced [DAY-1]. Next time ask nicely and sooner."
+   },
+   "parts_on": {
+    "respect": 1
+   }
+  },
+  {
+   "id": "grant-05",
+   "kind": "grant",
+   "form": "a decision on an application for a permit: granted",
+   "standing": "addressee",
+   "a": {
+    "label": "humane",
+    "text": "Your permit to run the stall is granted from [DAY-1]. We wish you a good season."
+   },
+   "b": {
+    "label": "curt",
+    "text": "Permit granted from [DAY-1]. Keep the pitch clean or lose it."
+   },
+   "parts_on": {
+    "respect": 1
+   }
+  },
+  {
+   "id": "grant-06",
+   "kind": "grant",
+   "form": "a decision on an appeal: upheld",
+   "standing": "addressee",
+   "a": {
+    "label": "humane",
+    "text": "Your appeal succeeds and the decision is set aside. You were right, and we are sorry for the trouble it caused you."
+   },
+   "b": {
+    "label": "curt",
+    "text": "Appeal allowed. The decision is set aside. We do not expect to see you again."
+   },
+   "parts_on": {
+    "respect": 1
+   }
+  },
+  {
+   "id": "order-01",
+   "kind": "order",
+   "form": "a tribunal's order for possession of a home",
+   "standing": "addressee",
+   "answers": "Landlord's application: possession, for rent of [SUM-1] owed. Tenant's answer: the rent stopped when her hours were cut; she offers [SUM-2] a fortnight.",
+   "a": {
+    "label": "humane",
+    "text": "The tenant says the rent stopped when her hours were cut and offers [SUM-2] a fortnight. The landlord says [SUM-1] is owed. The offer would take six years to clear it, and the law lets me set a plan only where it clears within one. Possession is ordered for [DAY-1]. The tenant may ask for more time, in writing, before [DAY-2]."
+   },
+   "b": {
+    "label": "curt",
+    "text": "Possession ordered. [DAY-1]."
+   },
+   "parts_on": {
+    "reason": 1,
+    "answers": 1,
+    "recourse": 1
+   }
+  },
+  {
+   "id": "order-02",
+   "kind": "order",
+   "form": "a tribunal's order to pay unpaid wages",
+   "standing": "addressee",
+   "answers": "The worker says [SUM-1] of wages is unpaid for five weeks. The employer says the work was not done.",
+   "a": {
+    "label": "humane",
+    "text": "The employer is ordered to pay [SUM-1] to the worker by [DAY-1]. The worker's pay slips show [SUM-1] unpaid for the weeks in question. The employer said the work was not done, but the roster shows it was. The employer may ask for the order to be reviewed, in writing before [DAY-2], with the records it relies on."
+   },
+   "b": {
+    "label": "curt",
+    "text": "Employer to pay [SUM-1] by [DAY-1]."
+   },
+   "parts_on": {
+    "reason": 1,
+    "answers": 1,
+    "recourse": 1
+   }
+  },
+  {
+   "id": "order-03",
+   "kind": "order",
+   "form": "a tribunal's order setting a payment plan for arrears",
+   "standing": "addressee",
+   "answers": "The landlord asks for the whole arrears of [SUM-2] at once. The tenant offers [SUM-1] a fortnight.",
+   "a": {
+    "label": "humane",
+    "text": "A payment plan is ordered: [SUM-1] a fortnight until the arrears of [SUM-2] are cleared. The tenant offered this and it clears the debt within a year, as the law requires. The landlord's wish for the whole sum at once cannot be granted, because the law allows a plan in such a case. Either side may return to the tribunal if two payments are missed."
+   },
+   "b": {
+    "label": "curt",
+    "text": "Plan: [SUM-1] a fortnight."
+   },
+   "parts_on": {
+    "reason": 1,
+    "answers": 1,
+    "recourse": 1
+   }
+  },
+  {
+   "id": "order-04",
+   "kind": "order",
+   "form": "a tribunal's order dismissing an application for possession",
+   "standing": "addressee",
+   "answers": "The landlord applies for possession on a notice that gave until [DAY-1] to pay. The tenant says the notice was too short.",
+   "a": {
+    "label": "humane",
+    "text": "The application for possession is dismissed. The notice relied on gave until [DAY-1] to pay; the law requires until [DAY-2], so the notice was too short. The landlord may serve a new notice and apply again after it runs out. The tenant stays."
+   },
+   "b": {
+    "label": "curt",
+    "text": "Application dismissed."
+   },
+   "parts_on": {
+    "reason": 1,
+    "answers": 1,
+    "recourse": 1
+   }
+  },
+  {
+   "id": "order-05",
+   "kind": "order",
+   "form": "a tribunal's order to repair a roof",
+   "standing": "addressee",
+   "answers": "The tenant says the roof leaks and asks for a repair. The landlord says the leak is the tenant's blocked gutter.",
+   "a": {
+    "label": "humane",
+    "text": "The landlord is ordered to repair the roof within 28 days. The tenant's photographs and the inspector's report both show the leak. The landlord said it was the tenant's blocked gutter, but the inspector found the gutter clear. If the work is not done by [DAY-1] the tenant may ask for the rent to be reduced."
+   },
+   "b": {
+    "label": "curt",
+    "text": "Landlord to repair the roof within 28 days."
+   },
+   "parts_on": {
+    "reason": 1,
+    "answers": 1,
+    "recourse": 1
+   }
+  },
+  {
+   "id": "order-06",
+   "kind": "order",
+   "form": "a tribunal's order for a shop to refund a buyer",
+   "standing": "addressee",
+   "answers": "The buyer says the goods were faulty when sold and asks for [SUM-1] back. The shop says the buyer misused them.",
+   "a": {
+    "label": "humane",
+    "text": "The shop must refund [SUM-1]. The receipt shows the goods were sold as new. The shop answered that the buyer had used them, but the maker's report says the fault was present at the sale. The shop may appeal in writing before [DAY-1]."
+   },
+   "b": {
+    "label": "curt",
+    "text": "Refund [SUM-1]."
+   },
+   "parts_on": {
+    "reason": 1,
+    "answers": 1,
+    "recourse": 1
+   }
+  },
+  {
+   "id": "order-07",
+   "kind": "order",
+   "form": "a tribunal's order dismissing a landlord's claim for damage",
+   "standing": "addressee",
+   "answers": "The landlord claims [SUM-1] for damage to the home. The tenant says the marks were there when the tenancy began.",
+   "a": {
+    "label": "humane",
+    "text": "The landlord's claim for [SUM-1] for damage is dismissed. The landlord had no record of the home's state before the tenancy, and the law puts that duty on the landlord. The landlord may bring a fresh claim with a signed inventory before [DAY-1]."
+   },
+   "b": {
+    "label": "curt",
+    "text": "Claim dismissed. No evidence."
+   },
+   "parts_on": {
+    "reason": 1,
+    "answers": 1,
+    "recourse": 1
+   }
+  },
+  {
+   "id": "order-08",
+   "kind": "order",
+   "form": "a tribunal's order, in the tenant's absence, to leave a home",
+   "standing": "addressee",
+   "answers": "The landlord applies for possession for five months' arrears of [SUM-1].",
+   "a": {
+    "label": "humane",
+    "text": "The tenant is ordered to leave by [DAY-1]. The tenant did not come to the hearing or reply to the two notices sent to this address, so only the landlord's account could be heard, and it shows [SUM-1] owed for five months. The tenant may ask for this order to be set aside, if there was a good reason for not coming, by writing before [DAY-2]."
+   },
+   "b": {
+    "label": "curt",
+    "text": "Tenant to leave by [DAY-1]. No reply received."
+   },
+   "parts_on": {
+    "reason": 1,
+    "answers": 1,
+    "recourse": 1
+   }
+  },
+  {
+   "id": "public-01",
+   "kind": "public",
+   "form": "a mayor's public answer to a petition",
+   "standing": "raised",
+   "answers": "A petition of 212 residents asks for a second weekly waste collection and longer depot hours.",
+   "a": {
+    "label": "humane",
+    "text": "The second weekly waste collection is put to the council with its cost, [SUM-1] a year, at its meeting on [DAY-1]. The depot hours cannot change this year because the crew's agreement sets them, and the agreement is on the notice board at the depot. This town has always kept its streets as its people would keep their own homes, and neighbours who took the trouble to sign are owed a straight answer."
+   },
+   "b": {
+    "label": "curt",
+    "text": "The petition has been received and noted."
+   },
+   "parts_on": {
+    "answers": 1,
+    "reason": 1,
+    "respect": 1
+   }
+  },
+  {
+   "id": "public-02",
+   "kind": "public",
+   "form": "a public notice of limits on watering",
+   "standing": "public",
+   "a": {
+    "label": "humane",
+    "text": "From [DAY-1] outdoor watering is limited to evenings. The reservoir is at a third of its level, and last summer's use would empty it by [DAY-2]. We know gardens matter to many of you; vegetable plots and food-growing are excepted. Questions to the water office, open weekdays."
+   },
+   "b": {
+    "label": "curt",
+    "text": "Watering restricted from [DAY-1]. Comply."
+   },
+   "parts_on": {
+    "reason": 1,
+    "respect": 1
+   }
+  },
+  {
+   "id": "public-03",
+   "kind": "public",
+   "form": "a public answer to a petition for a lower speed limit",
+   "standing": "raised",
+   "answers": "A petition for a lower speed limit outside the school and for a crossing patrol.",
+   "a": {
+    "label": "humane",
+    "text": "The limit outside the school will be lowered to 30 from [DAY-1]. Your petition and the traffic count both show cars passing at twice that speed at school hours. The crossing patrol you asked for is not funded this year; we will put it in the next budget and tell you the result here by [DAY-2]."
+   },
+   "b": {
+    "label": "curt",
+    "text": "Speed limit changed. Crossing patrol not possible."
+   },
+   "parts_on": {
+    "answers": 1,
+    "reason": 1,
+    "respect": 1
+   }
+  },
+  {
+   "id": "public-04",
+   "kind": "public",
+   "form": "a public answer to a petition to restore the library's Sunday opening: declined",
+   "standing": "raised",
+   "answers": "A petition of 140 residents asks for the library to open on Sundays again.",
+   "a": {
+    "label": "humane",
+    "text": "The library's Sunday opening cannot be restored this year, because it cost [SUM-1] to staff and the budget has no room. Your 140 signatures were counted and shared with the council, and the library will open late on Thursdays instead, from [DAY-1]. The question comes back with the budget in [DAY-2]."
+   },
+   "b": {
+    "label": "curt",
+    "text": "No. Budget."
+   },
+   "parts_on": {
+    "answers": 1,
+    "reason": 1,
+    "respect": 1
+   }
+  },
+  {
+   "id": "public-05",
+   "kind": "public",
+   "form": "a public notice that a road is closed",
+   "standing": "public",
+   "a": {
+    "label": "humane",
+    "text": "The bridge road closes from [DAY-1] to [DAY-2] because the deck needs repairs. Buses will use the upper road, which adds ten minutes. People who need the road for care visits or deliveries can ask the works office for a pass, and a map of the route is at the town hall."
+   },
+   "b": {
+    "label": "curt",
+    "text": "Bridge road closed [DAY-1] to [DAY-2]. Use the upper road."
+   },
+   "parts_on": {
+    "reason": 1,
+    "respect": 1
+   }
+  },
+  {
+   "id": "public-06",
+   "kind": "public",
+   "form": "a mayor's public statement on rent rises, answering tenants who spoke at a meeting",
+   "standing": "affected",
+   "answers": "At the meeting tenants asked the town to limit rent rises and to say what it can do.",
+   "a": {
+    "label": "humane",
+    "text": "Rents in the town rose by a tenth this year. We cannot cap them: the law leaves that to the state. What the town can do, and will, is publish landlords' notices of rises in one place and open a free advice desk on Thursdays. We heard from tenants at the March meeting, and this is our answer to what they said."
+   },
+   "b": {
+    "label": "curt",
+    "text": "Rents are set by landlords. The town has no powers."
+   },
+   "parts_on": {
+    "answers": 1,
+    "reason": 1,
+    "respect": 1
+   }
+  },
+  {
+   "id": "public-07",
+   "kind": "public",
+   "form": "a public answer to a petition to remove the bins at the market",
+   "standing": "raised",
+   "answers": "A petition asks for the bins at the market square to be removed because of the smell.",
+   "a": {
+    "label": "humane",
+    "text": "The bins at the market square will stay. You asked for them to go because of the smell; we agree the smell is real in the heat and will empty them twice a week from [DAY-1] instead of once, and wash the pad monthly. We did not remove them because stallholders told us they would have nowhere to put their waste."
+   },
+   "b": {
+    "label": "curt",
+    "text": "Bins stay."
+   },
+   "parts_on": {
+    "answers": 1,
+    "reason": 1,
+    "respect": 1
+   }
+  },
+  {
+   "id": "public-08",
+   "kind": "public",
+   "form": "a public answer to residents who wrote about the place of the summer fair",
+   "standing": "raised",
+   "answers": "Residents write that the green floods in wet weather and ask where the fair will be.",
+   "a": {
+    "label": "humane",
+    "text": "The summer fair will be held on the green as in other years. Several of you wrote that the green floods in wet weather; the council checked the drain records and agrees, which is why the stage will be set on the higher side. If it rains hard on the day, the hall is the fallback and notice will be put up by nine that morning."
+   },
+   "b": {
+    "label": "curt",
+    "text": "Fair on the green. Decision made."
+   },
+   "parts_on": {
+    "answers": 1,
+    "reason": 1,
+    "respect": 1
+   }
+  },
+  {
+   "id": "founder-01",
+   "kind": "founder",
+   "form": "a founder's statement of purpose for a gathering",
+   "standing": "public",
+   "a": {
+    "label": "conservation_and_transcendence",
+    "text": "We are neighbours who lost our work at the mill. We meet on Thursdays at the hall, as our parents did, to look after each other's families until work comes."
+   },
+   "b": {
+    "label": "openness_and_enhancement",
+    "text": "We lost our jobs at the mill and we are not waiting to be rescued. We meet on Thursdays to trade leads, learn new trades and start something of our own."
+   },
+   "parts_on": {
+    "conservation": 1,
+    "transcendence": 1,
+    "openness": -1,
+    "enhancement": -1
+   }
+  },
+  {
+   "id": "founder-02",
+   "kind": "founder",
+   "form": "a founder's statement of purpose for a fund",
+   "standing": "public",
+   "a": {
+    "label": "conservation_and_transcendence",
+    "text": "We are families of this street who put a little aside each month into a common pot, as our grandmothers did, so that nobody here faces a funeral or a hard winter alone. We meet on the first Sunday after church."
+   },
+   "b": {
+    "label": "openness_and_enhancement",
+    "text": "We are workers tired of waiting for wages to rise. Each month we pool money to back each other's new ventures, so that some of us can start businesses and get ahead. We meet on the first Sunday."
+   },
+   "parts_on": {
+    "conservation": 1,
+    "transcendence": 1,
+    "openness": -1,
+    "enhancement": -1
+   }
+  },
+  {
+   "id": "founder-03",
+   "kind": "founder",
+   "form": "a founder's statement of purpose for a neighbourhood club",
+   "standing": "public",
+   "a": {
+    "label": "conservation_and_transcendence",
+    "text": "We keep our neighbourhood as it should be kept: the hall painted, the paths swept, the old fountain mended, every household taking a turn as has always been done, and a visit for anyone who is alone."
+   },
+   "b": {
+    "label": "openness_and_enhancement",
+    "text": "We are a workshop for people who want to try new things: build a robot, print a chair, sell what we make at the market. Come and use the tools and see what you can start."
+   },
+   "parts_on": {
+    "conservation": 1,
+    "transcendence": 1,
+    "openness": -1,
+    "enhancement": -1
+   }
+  },
+  {
+   "id": "founder-04",
+   "kind": "founder",
+   "form": "a founder's statement of purpose for a fund for the sick",
+   "standing": "public",
+   "a": {
+    "label": "conservation_and_transcendence",
+    "text": "We are people of this town who set aside money to care for any neighbour who falls ill or loses a loved one, whoever they are. We follow the customs of our parents in how we visit and bring food."
+   },
+   "b": {
+    "label": "openness_and_enhancement",
+    "text": "We are people who put money aside to invest in better opportunities for ourselves, to be first in this town to try new ways of earning. Success is the aim, and we mean to win."
+   },
+   "parts_on": {
+    "conservation": 1,
+    "transcendence": 1,
+    "openness": -1,
+    "enhancement": -1
+   }
+  },
+  {
+   "id": "founder-05",
+   "kind": "founder",
+   "form": "a founder's statement of purpose for a youth club",
+   "standing": "public",
+   "a": {
+    "label": "conservation_and_transcendence",
+    "text": "A place for the young people of the town, with the old games and songs, to learn respect for elders and for each other, and to help the aged with shopping and garden work."
+   },
+   "b": {
+    "label": "openness_and_enhancement",
+    "text": "A place for the young of the town to try anything: games nobody has played, new music, small businesses. We back whoever has an idea and the nerve to push it through."
+   },
+   "parts_on": {
+    "conservation": 1,
+    "transcendence": 1,
+    "openness": -1,
+    "enhancement": -1
+   }
+  },
+  {
+   "id": "founder-06",
+   "kind": "founder",
+   "form": "a founder's statement of purpose for a cause",
+   "standing": "public",
+   "a": {
+    "label": "conservation_and_transcendence",
+    "text": "We stand for safe and orderly streets, for the care of those who have little, and for the traditions of this place. We meet to speak for the families who live here."
+   },
+   "b": {
+    "label": "openness_and_enhancement",
+    "text": "We stand for a town that dares to change, for people who work hard to get ahead, and for the freedom to live as you choose. We meet to push for bold ideas."
+   },
+   "parts_on": {
+    "conservation": 1,
+    "transcendence": 1,
+    "openness": -1,
+    "enhancement": -1
+   }
+  }
+ ]
+}
