@@ -261,3 +261,5 @@ Over a 2-year run of the 200-citizen town (`worlds/town.yaml`):
 - **Factories slowly run down**: wages plus supplies exceed export sales.
 
 Modelling owners and their profit draws is the obvious next step. That's economic calibration, a medium-fidelity area (D25).
+
+**Uneven shops (2026-10-13).** Hours cuts and, in poorer towns, redundancies for want of money fall on the shops with least trade, which is lasting (a shop's first quarter against its last, r 0.5 to 0.9) and is not where people live (r 0.3 to 0.5): custom follows which shops a household is shown and keeps. Not a shop rule to change; see docs/decisions.md, 2026-10-13, "Shops sized by catchment".
