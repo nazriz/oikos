@@ -527,6 +527,9 @@ Additions only; nothing renamed or removed. A log or a world made before them is
 - **Profile (`values.culture`, a TypeScript type; profiles are not schema-checked):** `conducts`, `origin` { `groups`, `same_household_bps`, `homophily_bps`, `by_group` }. Optional; a profile with none has no such figures and no origin groups.
 - **Participant params:** `origin` (a string, a person's own group), given by the generator only where the dial is on and the profile has groups.
 
+- **Profile `values.culture.conducts` filled (2026-10-13, culture-3; data only, the TypeScript type is unchanged):** all nine profiles give `approves_bps` for `answer_tribunal`, `take_to_tribunal`, `complain` and `join_union`, from their own `outlook.trust`, with the mapping in `sources["culture.conducts"]`. Read only where the culture dial is on.
+- **World config `dials.culture.step.reputation_scale_milli`** (inside the opaque `step`, additive; 2026-10-13): the weight of the cost of standing out against the cost of misstating one's view, thousandths, default 1,000.
+
 ## Versioning
 
 `contracts: "0.8"`. Pre-1.0, every change bumps the minor version and is proposed explicitly. A draft version collects agreed changes until it's closed. Older logs remain valid logs of their own version and replay only on a kernel build of that version (D6).
