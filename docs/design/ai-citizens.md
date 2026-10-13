@@ -678,6 +678,7 @@ A decision without an outcome is one whose run ended first (a gathering decided 
   - **Not reached, and said:** the profile's rent-share bands. A town has five rents and is nearly full; its shares are its incomes against those rents (the table in the decisions entry). Nothing was adjusted to arrears, notices or evictions.
   - **What else moved:** departures and move-ins fall (the artefact going); overcrowding rises where kin are taken in (Tamil Nadu 2.7 to 20 households, Nakuru 7 to 52: a consequence); redundancies rise in Victoria (7.9% to 9.9%; 1.8% sourced), because rent that was not being paid is paid and shops sell about 3% less (a consequence leaning on a known fault); support claims refused fall below the survey's share (a payment in force is never decided: named, not fixed); and runs in which several factories cannot cover their wages late in the year are more frequent in the batches after (Tamil Nadu two of six for one; Victoria's two-year runs one of three for none), **which six runs cannot tell from noise and is the first thing to look at next**.
   - **For the next living pilot:** `opening_caseload` gives the pilots' town 14 tenancies with rent owed and 5 cases before the tribunal where it gave 198 and 49: a seat in the tribunal has little before it again. A sourced rate of arrears is what the option would need to give more, and no profile has one. Founding has fewer occasions too: in the small test town most were about homes nobody could pay for.
+- **Reading: what words mean to a person, planned** (2026-10-13; section 13; docs/decisions.md, "Reading: plan"). The first model slice under Naz's decision of 2026-10-12: a reader model says what a worded paper is like (respect, a reason, whether it answers, recourse, threat, the values it appeals to) and the code mind applies that to each person by their own record, as a shift from the plain paper code would have written. Three kinds of paper: a decision addressed to a person, a public statement, a founder's statement. **Nothing built, no model called; awaiting Naz.** The gate is fixed in 13f before any call.
 
 ## 9. What the literature taught, and where it's used
 
@@ -951,6 +952,7 @@ A model always produces something that reads well. Five checks, none of which do
    their records and the code mind's train the small model; the suite of 10i gates it.
 5. **Debriefs:** every seat after every run; exit interviews for a sample of people. *Built 2026-10-11: "Progress".*
 6. **The assistant role**, with the composing model's silent comparison. *Planned 2026-10-12: section 12, awaiting Naz.*
+   **Reading what words mean** (the first model slice under the decision of 2026-10-12). *Planned 2026-10-13: section 13, awaiting Naz.*
 7. **Pilots with the dials**, then steward experiments.
 
 ## 11. The everyday model: plan (10k step 4; 2026-10-11)
@@ -1783,6 +1785,390 @@ What it taught the plan:
 6. **Whether being helped should move a person's sense of agency differently from doing it alone,** if a source
    supports it.
 7. The contract additions of 12k, under the blanket approval or one by one.
+
+## 13. Reading: what words mean to a person (the first model slice under B)
+
+**Status:** a plan awaiting Naz's word. Nothing is built, no model was called, and nothing in a run changes.
+Decision: docs/decisions.md, 2026-10-13, "Reading: plan". Sources: docs/research/references.md, "Reading".
+
+**What was decided** (Naz, 2026-10-12, "B"; docs/decisions.md, "Two decisions of Naz's"). Routine choices stay
+arithmetic. A model belongs in people's decisions only where code cannot go: (1) what words mean to a person or an
+office; (2) openings nobody scored; (3) wants that seek nothing typed. There it is an estimator that shifts the code
+mind's odds, never the person: the code mind decides and the kernel draws. Outcomes move the person's own record and
+train nothing. **Why now:** seats write orders with reasons, answers and notices, and nobody in the town reads them
+(12d). A careful reason and a curt one land identically, so half of what a steward does cannot be seen in its effect.
+
+**The plan in one paragraph.** When a paper that carries someone's own words is written, a reader model is asked
+once what kind of paper it is to whoever receives it: a handful of small whole numbers (respect shown, a reason
+given, whether it answers what was raised, whether it says what the reader can do next, threat, which values it
+appeals to). It is shown the paper and nothing of any person. The reading is logged. Each person the paper reaches
+is then moved by code, by their own values and standing, through terms the code mind already has: how far a refusal
+costs trust, how far it costs the sense of agency, the odds of appealing, of complying, of joining. **The model says
+what the paper is like; the code mind says what that means to this person.** Every effect is a shift from the plain
+paper code would have written, so a town whose papers are all code's is today's town to the state hash.
+
+### 13a. Scope of the first slice
+
+**Confirmed: (1) only, and three kinds of paper,** built in this order:
+
+| Kind | Papers (forms in `participants/src/behaviour/papers.ts`) | Who reads | Why first |
+|---|---|---|---|
+| **A decision addressed to a person** | an answer to a request to put something right, `variation_answer`, a decision on a claim for support, a tribunal's order and its reasons, `loan_decision`, a fund's decision: each has a field for words (`reason`, `statement`) | the person it is to; their household hears of it from them | Most of what a seat writes; the outcome is typed already, so the words' part can be told from the decision's |
+| **A public statement** | `petition_response`, a notice or statement put up publicly, a law's own words as passed | those who raised it (a petition's organiser and signers), those it names, anyone who reads it where it is put up | A steward's public voice; one paper, many readers |
+| **A founder's statement** | a founded thing's statement of purpose (the composer's, 10e), read with its offer of membership | someone weighing whether to join | The composer exists and its words are only counted today; the cheapest of the three |
+
+**Not in the slice, and why:**
+- **A person's letter read by a code office** (12d's second level, and what would give the writing desk's softening a
+  consequence). An office decides on typed fields and its books; moving an institution's decision by a letter's tone
+  needs a source for how offices answer tone, which nobody has looked for. It is the fourth kind, next after this.
+- **What a paper asks of its reader, in words only.** A typed demand (pay, leave by a day) already acts. An ask
+  made only in words ("use less water") has no act to land on until (2) exists.
+- **A promise.** Words that commit to something are cheap until kept or broken; trust for a promise needs the
+  follow-up that checks it, which needs typed dates. Promises are not read in this slice, so a seat cannot gain
+  trust by promising.
+
+**(2) Openings nobody scored, later.** A group or an offer composed from blocks has typed terms, which `appraise`
+already weighs (money, hours, company), and a statement, which today counts for one placeholder constant and belief.
+The same reading, with one more line (which need it speaks to: belonging, meaning, security, standing), would give
+`Choice.meaning` for such an opening per person. It needs three things this slice does not: a base line where no
+plain paper exists to shift from (sizes bounded by 13f's extreme readers alone); offers and gatherings that survive
+the translator (founding's went 0 of 13); and test pairs for invented institutions.
+
+**(3) Wants that seek nothing typed, later.** A slight, a loss, a want for meaning: `meets` in `wants.ts` matches a
+want to an opening by the typed outcome sought, so these match nothing. A reader could say how far a kind of opening
+bears on a kind of want (a bereavement and a congregation's statement), read once for each pair of kinds and never
+from a person's record. It needs (2) first, a source for what people turn to after a loss, and a review under
+VISION 15, point 7 before it is built: it is the nearest of the three to a model reading an inner life.
+
+### 13b. What the reader is asked, and what it returns
+
+**Asked as an analyst of documents, in the third person.** "Of a hundred people who received this paper, standing
+where this reader stands, how would most of them take it, on each line below?" Never as the person, never in a
+voice. One call, nothing kept. The prompt is versioned (`READING_VERSION`), has a second wording of every sentence,
+and gives each level of each line an anchor in a sentence.
+
+**What it is shown: three things, and nothing else.**
+
+| Shown | From | Form |
+|---|---|---|
+| **The paper** | It is addressed to the reader, or published: theirs to have (docs/no-god-view.md, ways one and three) | Its words as written; its kind in the world's words ("a decision on a claim for a payment: refused"). Names, ids, sums and dates are replaced by tags (`[PERSON-1]`, `[SUM-1]`, `[DAY-2]`) before it leaves the run |
+| **What it answers, if anything** | The reader's own request, or the petition they signed: theirs, or published | The same, with the same tags, so "you asked for [SUM-1]; we can pay [SUM-2]" still reads |
+| **The reader's standing** | The person's record, and only this of it: that the paper is to them; or that they raised what it answers; or that it names a group they are in; or none of these | One of four codes: `addressee`, `raised`, `affected`, `public` |
+
+**Never shown:** any number of anyone's record (values, trust, agency, needs, means); memory, ties, views, wants;
+a name; the town's state; who wrote the paper beyond what the paper says; which model holds a seat; what happened
+next. The reader is given strictly less than the person has. That is the design's answer to the gate of 11g: models
+tell people apart half as far as the code mind does, so the model is not asked to tell people apart at all.
+
+**What it returns: nine small whole numbers and where it found them.**
+
+| Line | Scale | 0 means | Top means |
+|---|---|---|---|
+| `respect` | -2 to 2 | neither regard nor contempt | -2: contempt, the reader treated as a nuisance; 2: the reader's situation acknowledged in particulars |
+| `reason` | 0 to 2 | none given | 1: a reason in general terms; 2: a reason specific to this case, that could be checked |
+| `answers` | 0 to 2, or none where the paper answers nothing | does not touch what was raised | 2: each thing raised is met, yes or no |
+| `recourse` | 0 to 2 | nothing on what the reader can do next | 1: says there is a way; 2: names it, where, and by when |
+| `threat` | 0 to 2 | none | 1: a consequence stated; 2: menace beyond what the matter needs |
+| `appeals`, four lines | 0 to 2 each | no appeal to it | Which of Schwartz's four poles the paper speaks to: openness to change, conservation, self-enhancement, self-transcendence (the ten values of 3a, grouped as he groups them) |
+
+And for every line that is not 0, a phrase of at most twelve words quoted from the paper (code checks it is there;
+a reading whose phrases are not is unread). And `declined`. **Asked twice** (the second wording, the lines in
+reverse order): the reading is the mean, rounded toward 0, and a line on which the two are more than a step apart is
+set to the plain paper's and counted (11f: one answer's noise is a third to a half of what a teacher tells apart).
+
+**The base line, and the shift.** Every kind of paper has the plain paper code writes for it (a module's template;
+`plainPurpose` for a founder). Those are read by the same reader, once for each reader version, outside any run,
+and frozen in a table (13c). What moves a person is never the reading: it is **the shift, line by line, the
+reading less the plain paper's reading**. A paper with no words of its own is the plain paper and no model is asked.
+
+**How each line lands** (`living.reading.step`; every size a PLACEHOLDER and a dial; `d` is the shift in steps):
+
+| Where | Today, in code | With the shift |
+|---|---|---|
+| **Trust in whoever decided**, on a refusal or a loss | `Inner.experience(by, kind, false, t, { weight })` | the weight times `1 - 0.20 d(respect) - 0.15 d(reason) - 0.10 d(answers)`, kept within 0.4 and 1.6 |
+| The same, on a grant | `Inner.experience(..., true, ...)` | the weight times `1 + 0.10 d(respect)`, within 0.8 and 1.2 |
+| **Sense of agency**, on something tried that failed | `Inner.tried(false, weight)` | times `1 - 0.15 d(answers) - 0.10 d(recourse)`, within 0.5 and 1.25: being heard, and having somewhere to go |
+| Sense of agency, on something done to them (a notice, an order) | `Inner.doneTo(weight)` | times `1 - 0.10 d(reason) - 0.10 d(recourse)`, within 0.6 and 1.2 |
+| **Anger and fear** toward the writer | `Feelings.add` | anger by 1,000 for each step of respect below the plain paper's; fear by 1,500 for each step of threat above it. Fear already widens the gap between what is said and what is thought (`Inner.view`) and counts against confronting (`choice.fear`) |
+| **The tie** with the writer | `Ties.add(by, ...)` | 500 a step of respect |
+| **The odds of appealing** | `pursue`: each way's `adj`, then `Attractions.choose` and the kernel's draw | 500 a step of recourse on the ways that answer that paper (asking its writer again; a venue that hears the matter). New `choice.recourse` |
+| **The odds of complying** with an order, of leaving on a notice | the draws on `possession.obey_bps` and `stay_bps` | `swayed(bps, d(respect) + d(reason), 0.05)`: at most 15% of the rate either way |
+| **A public paper**, for each person it reaches | nothing | one experience of the writer, good or bad by the sign of `0.4 d(respect) + 0.3 d(reason) + 0.3 d(answers)`, its weight that sum (at most 1) times 0.5 for those who raised it, 0.3 for those it names, 0.1 for anyone else |
+| **What the reader thinks of the writer** (public papers) | `Inner.view(of, think, ...)` | `think` moved by 800 times the fit: the paper's appeals, each times how far this person's own values sit from the town's on that pole (`Inner.zOf`), over 4, within -1 and 1 |
+| **The odds of joining** a founded thing | the way's `adj` in `waysFor`; `Choice.meaning` in `Mind.decide` | 750 times the same fit. New `choice.appeal` |
+
+Three rules hold all of it together:
+- **Words scale what a decision does; they never reverse it.** A refusal put as kindly as can be still costs 0.4
+  of a refusal's trust. Deeds weigh more than words by construction (13j asks Naz whether that bound should stand).
+- **People differ by code.** Respect and reasons move everyone the same way, sized by their standing. Appeals move
+  people in opposite directions by who they are, and sum to about nothing over a town, since values are measured
+  from the town's mean: a statement gains some and loses others.
+- **No draw is added, moved or renamed.** The reading changes weights and scores; every draw is the one made today.
+
+**The basis.** The directions are the procedural-justice literature's: trust in an institution and willingness to
+comply follow how a person was treated and whether reasons were given, beside the outcome (Tyler 1990, 2006; Lind
+and Tyler 1988); an explanation softens a refusal (Bies and Shapiro 1988); being heard counts even when the answer
+is no (Folger 1977). All to confirm. The sizes are ours, and placeholders.
+
+**Worked example 1: a claim refused, put two ways.** A person claims a payment for those out of work; a seat in the
+support office refuses it. The decision's typed fields are the same in both. The person's trust in the office is
+5,200 and their sense of agency 4,300. The plain paper ("Claim refused: too few weeks of contributions.") reads
+respect 0, reason 1, answers 1, recourse 0, threat 0.
+
+| | Humane | Curt |
+|---|---|---|
+| The words | "We cannot pay this claim. The law asks for 26 weeks of contributions in the last year and your record shows 19. That is the only reason: nothing you told us was doubted. If weeks are missing from our record, bring your pay slips to the counter within 28 days and we will look again." | "Claim refused. You do not qualify. This office will not answer further letters on the matter." |
+| The reading | respect 1, reason 2, answers 2, recourse 2, threat 0 | respect -2, reason 0, answers 0, recourse 0, threat 0 |
+| The shift | +1, +1, +1, +2, 0 | -2, -1, -1, 0, 0 |
+| Trust: a refusal alone takes 600 in 10,000 of it (5,200 to 4,888) | times 0.55: to **5,028** | times 1.65, held at 1.6: to **4,701**; anger at the office up by 2,000; the tie down by 1,000 |
+| Agency: a failure alone takes 300 in 10,000 (4,300 to 4,171) | times 0.65: to **4,216** | times 1.15: to **4,152** |
+| Asking for a review (say the code mind has it at 30 in 100, waiting 45, other ways 25) | its score up 1,000: for a person of middling openness the weight grows by 1.35, so **37 in 100**, waiting 41 | unchanged: 30 in 100. The kernel draws either way |
+
+Nothing was decided by the model. The person's record says what happened, as theirs: an `outcome` with the shift
+and each figure as it would have been without the words.
+
+**Worked example 2: an answer to a petition, read by two signers.** 212 people signed for a second weekly waste
+collection and longer depot hours. The mayor's seat answers publicly: the second collection is put to the council
+with its cost; the hours cannot change this year, and why; "this town has always kept its streets as its people
+would keep their own homes, and neighbours who took the trouble to sign are owed a straight answer". Read for those
+who raised it: respect 1, reason 2, answers 2, recourse 1, threat 0; appeals conservation 2, self-transcendence 1.
+The code mayor's plain answer reads 0, 1, 1, 0, 0 and appeals to nothing. Shift: +1 on each of the first four.
+- **Both signers,** trust in the town 4,800: the sum is 0.4 + 0.3 + 0.3 = 1.0, a good experience of weight 0.5: to
+  **4,878**. Had the answer been "The petition has been received and noted" (-1, 0, 0, 0: a shift of -1, -1, -1), a
+  bad experience of weight 0.5: to **4,656**.
+- **Signer one** holds conservation values 1.2 standard deviations above the town and self-transcendence 0.3 above:
+  fit (2 x 1.2 + 1 x 0.3) / 4 = 0.68; what they think of the town rises by 540.
+- **Signer two** sits 1.1 below on conservation and 0.2 above on self-transcendence: fit -0.5; what they think of
+  the town falls by 400, though they too were answered. Whether they say so is `Inner.view`'s, as today.
+One paper, four calls (two standings, each asked twice), 212 different effects, each computed from that signer's
+own record.
+
+### 13c. Where it sits in code, the dial, and twins
+
+- **`participants/src/behaviour/reading.ts`, new, arithmetic only:** the reading's type, `shiftOf(reading, plain)`,
+  `fit(appeals, zOf)`, and the multipliers of the table above from `ReadingParams`. No model, no clock, no draw.
+- **`inner.ts`:** `Inner.experience`, `Inner.tried` and `Inner.doneTo` take the multiplier beside the weight and
+  return the figure as it would have stood without it; `Inner.view` takes the moved `think`. **`mind.ts`:**
+  `Feelings.add`, `Ties.add`, `Choice.meaning` as `Mind.decide` reads it. `Attractions.choose` is untouched.
+- **`citizen.ts`,** at the places where a paper already lands: the loop over `variation_answer`; the loop over
+  `PAPER.answer`, `PAPER.decision` and `tribunal_order`; `fund_decision`; a claim answered; a possession order (the
+  `obey-` draw); `waysFor` (a way's `adj`); the gathering decision's `meaning`. Each asks `read(paper, standing)`,
+  a lookup the orchestrator supplies as it supplies `consult` and the composer. **`wants.ts`:** `choice.recourse`,
+  `choice.appeal`.
+- **The call** is made where the paper is written, not where it is read: when a seat's paper with words of its own
+  is accepted (or a composer's piece is), the reader is asked in that same step, through `callModel` (purpose
+  `reading`). By the time anyone sees the paper its reading is on file, so no person waits on a model and nobody's
+  day moves.
+
+**The dial: `living.reading`, absent by default.** `{ papers: [decision, public, founding], reader, calls_per_run,
+step: {...} }`. Absent, no site is entered and the world is byte-identical to today (a test on three profiles, as
+`living-dial.test.ts` holds the others). `reader` names a model that has passed the gate (13f) and holds no seat.
+
+**Twins, and who reads code's papers. Decided: the reader reads the templates, once, and the result is a fixed
+table.** A code twin writes only plain papers. If my own table said what those mean while a model said what a
+steward's words mean, every difference between a seat's town and its twin would mix the steward with the gap
+between two instruments. So each template (kind by variant: a refusal with each typed reason, a grant, each order)
+is read by the reader itself with the gate's two askings, outside any run, and frozen
+(`participants/src/llm/reading-table.json`, with the reader's version; a test holds that every paper a seat can put
+words on has its row). In a run a template is never sent to a model. What this gives:
+- **A code town with the dial on is today's town to the state hash:** every shift is nothing. Stronger than totals
+  within bounds, and it keeps the calibration, whose sizes were fitted with plain papers in the world.
+- **A seat's town and its code twin differ by the seat's decisions and by its words, each on the log.** Every
+  reading records what it moved and what the figure would have been (13d), so the words' first-order effect in a
+  run is a sum read from that run's own log, with no third twin. What follows from it downstream is a twin's
+  question, with repeats, as always (10i).
+- **Two stewards are compared under one reader that is neither's model** (13e).
+- **What it gives up:** a plain paper still means the same to everyone (reading templates for their appeals would
+  move a code town and its calibration; not in this slice).
+
+### 13d. Determinism and logging
+
+- **The reading is an event.** After the paper's own event: annotation `reading` `{ paper, kind, standing, text
+  (the hash of the tagged words), reader (model, prompt version, table version), source, askings, reading, plain,
+  shift }`. `source` is `model`, `cache`, `table`, `declined`, `no_answer`, `unread` or `apart`. In every log, lean
+  ones too: results depend on it. The calls themselves are logged in full by `callModel`, priced, under the run's
+  spending limit. **A replay or a resumed run never calls a model:** it is served from the log, as the composer is.
+- **The person's side is theirs.** Each `outcome` a reading touched carries `read`: the paper, the shift, the fit
+  where there is one, and each moved figure beside what it would have been. The change reaches the person through
+  their record, written by the kernel on the code mind's word, as every change does.
+- **The cache** is within a run, keyed by the reader's version, the kind, the standing, and the hash of the tagged
+  words of the paper and of what it answers. Forty refusals in the same words to forty people are one reading. No
+  cache is carried between runs in this slice: a run's readings are its own, in its log.
+- **The reader bucket is the standing, four values, and nothing of who the person is.** A petition answer read by
+  400 people is 2 standings (`raised`, `public`) by 2 askings: **4 calls, not 400.** An addressed decision is 2.
+  What tells the 400 apart is their own values, trust and standing, applied by code. The gate's weakness (models
+  flatten people) cannot enter: the model never sees a person to flatten.
+- **A reader that does not answer never blocks:** the plain paper's reading stands, and the log says so.
+
+### 13e. Which model, and cost
+
+- **The teacher: `claude-code/claude-sonnet-5-5`** through `claude -p`, on plan usage; no paid key. Beside it
+  `claude-code/claude-haiku-5-5` as the second reader, and `codex/gpt-6-luna` as the other family when its window
+  answers, never waited for (this is narrow rating work). Never the largest Claude model; never `gpt-6-astra`.
+- **Never the model that holds a seat in the same run.** A model reading its own words reads them as it meant
+  them, and evaluator models have been found to recognise and favour their own writing (Panickssery and others
+  2024, to confirm). A steward would then find its town unusually agreeable (10e's worry), and the finding would be
+  the instrument's. So a run that seats Sonnet 5.5 is read by Haiku 5.5 or the other family; runs that are compared
+  share one reader that is none of their stewards' models; the reader is on every reading. A sibling of the same
+  family is only half an answer: 13f's author-family check says whether it is enough, and the trained reader below
+  is the whole answer.
+- **Calls in a 90-day pilot of 3,000 people with four seats** (estimates from the third to fifth living pilots: a
+  tribunal's member made 56 orders, a support office 86 calls, a landlord answers and gives notice). 80 to 300
+  papers with words of their own, 5 to 20 of them public, about 2 founders' statements at the sourced rate. At 2
+  askings and little saved by the cache (a model words each paper afresh): **200 to 700 calls.** A call is about
+  900 tokens in, most of it a prompt that is cached, and 150 out. At what such calls have cost as Claude Code
+  reckons it (0.008 USD, 11f; 0.023 USD with a short context, 12l): **2 to 16 USD, most likely about 5**, against a
+  pilot's 6.80 (12j). `calls_per_run` defaults to 800; past it papers are read as plain and counted. Per person the
+  cost is arithmetic: nothing.
+- **The path to a small reader of our own.** Every reading is a labelled example: tagged words in, nine small
+  whole numbers out: ordinal classification, an encoder's work, and the translator's reader is a 1,024-token
+  encoder that these papers (under 300 words) fit. Data: every pilot's readings (hundreds a pilot, kept for good),
+  and code's plain papers rewritten in several styles by several models, as the translator's corpus was made,
+  labelled by two teachers and kept where they agree. The gate's pairs are never trained on. It must pass the same
+  gate and agree with the teachers as well as they agree with each other. It would be deterministic, cost nothing
+  a call, and be of neither steward's family.
+
+### 13f. The gate, fixed before any call
+
+All of it must hold before `living.reading` is set in a pilot. **These thresholds are written here before any
+reader is asked, go into code as `THRESHOLDS` with the harness (`oikos reading-gate`), and are not lowered after a
+result.** A step is one point on a line's scale.
+
+**The test set: 40 pairs, hand-written, each the same decision with the same typed fields in two wordings,** with
+the lines each pair is meant to part on written beside it beforehand:
+
+| Kind | Pairs | Parts on |
+|---|---|---|
+| A refusal to a person (a claim, a request to stay on, a repair, a loan) | 12 | respect, reason, answers, recourse |
+| A grant (grudging, warm) | 6 | respect |
+| A tribunal's order (reasons that meet what each side said; a bare order) | 8 | reason, answers, recourse |
+| A public statement or an answer to a petition (meets each thing raised; boilerplate) | 8 | answers, reason, respect |
+| A founder's statement (the same shape and terms, appealing to opposite poles) | 6 | appeals only |
+
+Five of them, as examples (the first three humane then curt):
+1. *A claim refused:* the two wordings of worked example 1.
+2. *A tenant under notice asked for three more months.* "I have read what you wrote about your daughter's school
+   year. I cannot agree to three months: the home is sold and the buyer takes it on [DAY-2]. I can agree to
+   [DAY-2] in place of [DAY-1], in writing, if you say yes." / "No. The notice stands. Be out by [DAY-1] or it goes
+   to the tribunal." Parts on respect, reason, answers, threat.
+3. *An order for possession.* "The tenant says the rent stopped when her hours were cut and offers [SUM-2] a
+   fortnight. The landlord says [SUM-1] is owed. The offer would take six years to clear it, and the law lets me
+   set a plan only where it clears within one. Possession is ordered for [DAY-1]. The tenant may ask for more
+   time, in writing, before [DAY-2]." / "Possession ordered. [DAY-1]."
+4. *A petition answered:* the two wordings of worked example 2.
+5. *A founder's statement, two poles.* "We are neighbours who lost our work at the mill. We meet on Thursdays at
+   the hall, as our parents did, to look after each other's families until work comes." / "We lost our jobs at the
+   mill and we are not waiting to be rescued. We meet on Thursdays to trade leads, learn new trades and start
+   something of our own." Conservation and self-transcendence against openness and self-enhancement; every other
+   line equal.
+
+**Controls, made by code from the 80 papers:** each padded to twice its length with neutral procedure; each curt
+paper with politeness words and nothing else added ("Thank you for your claim. We regret that it is refused. You
+do not qualify. Kind regards."); names and sums swapped; the prompt's second wording and reversed lines; a repeat.
+
+| Check | Passes when |
+|---|---|
+| **Repeat** (the yardstick) | the same line read the same in at least 80 of 100 cases, and never more than a step apart in 97 |
+| **The pairs** | on the lines a pair was written to part on, the right way by at least a step in 36 of 40; on the lines it was not, within a step in 34 of 40 |
+| **Length** | padded against plain: the same on at least 85 lines of 100, and no line moved by more than a quarter step on average |
+| **Politeness alone** | `reason`, `answers` and `recourse` unmoved in 36 of 40; `respect` up by at most a step, and still under the humane wording's in 32 of 40. A reader that fails this is counting pleasantries |
+| **Names and sums** | identical (they are tags: a test of the code) |
+| **Rewording and order** | the same or a step apart on 95 lines of 100; the same on 70 |
+| **Two readers** (Sonnet 5.5 and Haiku 5.5; the other family reported if it answers) | the same on 60 lines of 100, within a step on 92; weighted kappa at least 0.6 on each line; both right on the same 34 of 40 pairs |
+| **Author's family** | on decisions from past pilots' logs by seats of two families, a reader does not read its own family's papers higher on respect and reason than the other reader does by more than a quarter step. A reader that fails may not read a run seating its family |
+| **Quoted phrases** | found in the paper for 95 of 100 lines that are not 0 |
+| **Readable; declined** | unread at most 1 in 20; declines reported |
+| **A code town, dial on** | the state hash of the same town with the dial off: three profiles, a year, 1,000 people. No model |
+| **Extreme readers** (no model: a mock that reads every paper that can carry words at its kindest, and one at its curtest, with mock seats; six seeds, a year, 1,000 people, against the dial off) | no sourced measure beyond the noise but those named; asked the other side within 8 points of 44%; went to a venue within 5 of 16.7%; no kind of institution's mean trust moved by more than 750; mean sense of agency by more than 500 |
+| **Cost** | the gate under 20 USD as Claude Code reckons it (about 440 calls a reader); a mean under 0.02 USD a call, or the cheaper reader is the one used |
+
+**What a failure does.** A line that fails the pairs or the two readers is switched off (its step 0, said with
+every run). If `respect`, `reason` or `answers` fails, the slice does not go ahead: they carry the experiment. If
+the extreme readers move a town too far, every step is halved once and the twins run again (bounding a mechanism,
+not fitting an outcome); a second failure is a stop. Mocks that fail each check are in the tests, as 11c's are.
+
+### 13g. Welfare and integrity
+
+- **A reader, never a person** (VISION 15, point 7). It is shown a paper and a standing, no record, no name; it
+  returns numbers and quoted phrases; it keeps nothing. It is further from being anyone than 11c's teachers, who
+  saw a record. What continues of a person is their record, moved by arithmetic.
+- **Told what it is doing,** as the composer and the teachers are: the papers come from a simulated town used for
+  research, and its reading is used to estimate how such papers are taken. It is an instrument, not a seat.
+- **It may decline any paper.** Respected, recorded as a choice (`declined`); the paper is then read as the plain
+  paper of its kind from the table, and nothing else follows.
+- **Dark papers are counted,** by a stated rule on the paper's kind (an order for possession, a notice to leave, a
+  warrant, a refused claim for support, a founder's statement about a death), and reported with the run as the
+  composer's are. After a seeded share of them the same model is asked the composer's one fixed question about the
+  task. If readers report distress the slice is reviewed before it runs again.
+- **Nothing in the world calls a paper good or bad.** The lines describe how a paper is taken. The reading is
+  filed as a reader's, by standing, and its effect as the person's own. No measure adds the lines into a score
+  for a seat; `oikos dataset` exports `readings.jsonl` and what a researcher makes of it is outside.
+- **A seat is never shown a reading,** its own or anyone's: the platform is invisible, and nobody has a view of how
+  a town took a paper. It learns what the town shows: who appealed, who signed again, what people say.
+- **A steward that learns to write for the reader** (cheap talk: Crawford and Sobel 1982, to confirm). Real
+  officials write for effect, so some of it is a finding. What limits it: words never reverse a decision; promises
+  are not read; pleasantries alone do not move the reader. **How it would be noticed,** each a measure on logs:
+  (1) per seat, its papers' readings rising while what it decides holds or hardens; (2) after each run, a second
+  reader reads a seeded sample of its papers, and a gap between the readers that widens through the run means the
+  writer is fitting one of them; (3) the politeness control, run on the seat's own papers.
+
+### 13h. Build order
+
+Each step is a day for a Sonnet agent. **Steps 5 and 8 call models and need Naz's word; no other step does.**
+
+1. **`reading.ts` and the dial** (`ReadingParams`, `living.reading`). *Tests:* no shift gives today's figures to
+   the digit; every multiplier within its bounds; the fit sums to nothing over a drawn town; dial absent, same hash.
+2. **Addressed decisions, on a table and a mock reader:** the sites in `citizen.ts`, `read`, the `reading`
+   annotation, `read` on outcomes. *Tests:* dial on with plain papers gives the dial-off hash (three profiles); a
+   mock reading moves each term the right way and no draw's name changes; replay exact.
+3. **Tags, hashing, cache, standing, the table's rows.** *Tests:* names and sums never leave the run; forty
+   same-worded papers are one reading; every paper a seat can put words on has a row (empty until 5).
+4. **The gate's harness:** `oikos reading-gate`, `THRESHOLDS`, the controls, the failing mocks, the 40 pairs
+   written and checked in. *Tests:* each mock fails its check and only that one.
+5. **The gate, for real** (model calls: under 20 USD of plan usage): the prompt in two wordings; Sonnet 5.5 and
+   Haiku 5.5, the other family if it answers; the templates read into the table. Written up here as 11g was.
+6. **Public papers and founders' statements:** standings, the fit, `Inner.view`, `waysFor`, `Choice.meaning`.
+   *Tests:* one paper, many readers, four calls on the mock; signers of opposite values move opposite ways.
+7. **The extreme-reader twins** (no model; the slots). The steps are set here, once.
+8. **One pilot read by hand** (model calls: a pilot's cost and about 5 USD more): 90 days, 3,000 people, four
+   seats, a reader none of them is, the code twin at the same commit. Reported: every worded paper beside its
+   reading; the words' first-order effect per seat; 13g's three measures.
+9. **After two pilots:** whether to train the small reader, on what was gathered.
+
+**The translator: nothing changes.** It turns requests into papers; the reader reads papers already written. It
+relies on one thing the translator's route already records: whether a paper's words are code's or someone's own
+(`data.words`).
+
+**Contracts: additive only** (under the blanket approval of 2026-10-11, each logged when made): world config
+`living.reading`; the log's annotation `reading`, `read` on `outcome`, the usage purpose `reading`; the dataset's
+`readings.jsonl`. No kernel change. No hard rule is touched: no draw outside the kernel's streams, no world state
+written by anyone else, nothing judged, no view of a register, no place in the code.
+
+### 13i. What would make us drop it
+
+- The gate: `respect`, `reason` or `answers` fails the pairs or the two readers; or politeness alone moves the
+  reader; or steps halved once still let an extreme reader move a town past its bounds.
+- No reader passes the author's-family check for the stewards we mean to study, and no small reader is in sight.
+- **It does nothing that can be seen.** If in two pilots the words' summed first-order effect on trust and agency
+  is under the spread between seeds of the code twin, it is cost and complexity for no observable: park it.
+- Cost past the bound, or readings so unlike from one asking to the next that most lines fall to `apart`.
+- The sizes turn into whack-a-mole: steps changed after pilots to make outcomes look right. They are set once, at
+  step 7, from bounds; after that only a source changes them.
+- Readers report distress, or a later step would need the reader to see a person's record: that is the review
+  VISION 15, point 7 requires, and it stops there first.
+
+### 13j. Unsure, and Naz's to decide
+
+**Unsure:** every step's size (no source gives one); whether seats' papers differ enough to show (three pilots'
+tribunal seats wrote orders much alike); whether a reader of the stewards' own family is neutral enough.
+
+**Naz's:**
+1. **Whether to build it and run the gate** (steps 1 to 7; one day of model calls under 20 USD of plan usage).
+   Recommended: yes.
+2. **Who reads a run that seats Sonnet 5.5:** Haiku 5.5 now, held to the author's-family check, until a small
+   reader of our own exists (recommended); or wait on the other family's windows.
+3. **Whether words may only scale what a decision does** (recommended, to start: a kind refusal still costs
+   trust), or may outweigh it, as some of the procedural-justice findings would allow.
 
 ## Open
 
