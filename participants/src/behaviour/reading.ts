@@ -276,3 +276,10 @@ export interface PaperRead { paper: string; standing: Standing; shift: Shift; so
 export function readFacts(rd: PaperRead, moved: { [what: string]: { after: number; plain: number; before?: number } }): { paper: string; source: string; shift: Shift; moved: { [what: string]: { after: number; plain: number; before?: number } } } {
   return { paper: rd.paper, source: rd.source, shift: rd.shift, moved };
 }
+
+/** What a tribunal's order or a venue's decision can find (the forms' options, papers.ts): the outcomes of those kinds of decision. */
+export const FINDINGS: readonly string[] = ["dismissed", "rejected", "pay", "do", "set_aside", "settled", "referred", "plan", "possession", "valid", "invalid", "paid"];
+/** Every key of the table of plain papers: each kind of decision by each outcome it can state. A seat can put words on any of them, so each has a row. */
+export function plainKeys(): string[] {
+  return DECISION_KINDS.flatMap((k) => (k === "tribunal_order" || k === "venue_decision" ? FINDINGS : ["granted", "refused"]).map((o) => `${k}:${o}`));
+}

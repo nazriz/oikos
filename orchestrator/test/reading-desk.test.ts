@@ -3,16 +3,16 @@
 
 import { expect, test } from "bun:test";
 import { reading as R } from "@oikos/participants";
-import { curtestReader, kindestReader, type ReadRequest, type Reader } from "@oikos/participants/llm";
-import { ReadingDesk, type ReadingTable, type Statement } from "../src/reading";
+import { curtestReader, kindestReader, Tagger, type ReadRequest, type Reader, type ReadingTable } from "@oikos/participants/llm";
+import { ReadingDesk, type Statement } from "../src/reading";
 
 const PLAIN: R.Reading = { respect: 0, reason: 1, answers: 1, recourse: 0, threat: 0, appeals: { openness: 0, conservation: 0, enhancement: 0, transcendence: 0 } };
 const TABLE: ReadingTable = { version: "t", rows: { "remedy_answer:refused": PLAIN, "remedy_answer:granted": PLAIN } };
 const dial = (calls = 800): R.ReadingDial => ({ papers: ["decision"], reader: "mock", calls_per_run: calls, params: R.READING_DEFAULTS });
-const refusal = (id: string, author: string, data: object = { granted: false, reason: "We cannot pay. The law asks for more." }): Statement => ({ id, author, kind: "remedy_answer", text: "Answer to your request r1: no.", data, addressed_to: ["c1"], basis: "r1" });
+const refusal = (id: string, author: string, data: { [k: string]: unknown } = { granted: false, reason: "We cannot pay. The law asks for more." }): Statement => ({ id, author, kind: "remedy_answer", text: "Answer to your request r1: no.", data, addressed_to: ["c1"], basis: "r1" });
 function desk(reader: Reader, o: { calls?: number; table?: ReadingTable } = {}) {
   const filed: any[] = [];
-  const d = new ReadingDesk({ dial: dial(o.calls), reader, table: o.table ?? TABLE, bySeat: (a) => a.startsWith("seat"), file: async (x) => { filed.push(x); } });
+  const d = new ReadingDesk({ dial: dial(o.calls), reader, table: o.table ?? TABLE, tag: () => new Tagger({ names: [] }), bySeat: (a) => a.startsWith("seat"), file: async (x) => { filed.push(x); } });
   return { d, filed };
 }
 
@@ -53,7 +53,7 @@ test("a reader that declines, fails, is unreadable, or is over its calls never b
   }
   const over = desk(kindestReader(), { calls: 3 });
   await over.d.onStatement(refusal("a-1", "seat-1"));
-  await over.d.onStatement(refusal("a-2", "seat-1"));
+  await over.d.onStatement(refusal("a-2", "seat-1", { granted: false, reason: "Other words, other reasons, in this paper." }));
   expect(over.d.counts).toMatchObject({ read: 1, over_limit: 1, calls: 2 });
   expect(over.d.lookup("a-2", "addressee")!.shift).toEqual(R.NO_SHIFT);
   const none = desk(kindestReader(), { table: { rows: {} } });

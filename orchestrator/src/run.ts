@@ -31,7 +31,7 @@ import { readForEnd } from "./run-end";
 import { ReadingDesk, type DeskCounts } from "./reading";
 import { reading as readingNs } from "@oikos/participants";
 import { DayBook, calls, canonical, DECISIONS, OUTCOMES, RECORD, WORDS, type Words, inCurrency, paramErrors, modules as builtin, Randomness, Roster, slice, Tally, View, type BehaviourModule, type Controller, type Currency, type DecisionRecord, type OutcomeRecord, type RecordChange, formatMoney, type LookRequest, type Observation, type ParticipantAction, type ParticipantContext } from "@oikos/participants";
-import { lexiconReader, READING_TABLE, READING_VERSION, type Reader, type ReadingTable } from "@oikos/participants/llm";
+import { lexiconReader, READING_TABLE, Tagger, READING_VERSION, type Reader, type ReadingTable } from "@oikos/participants/llm";
 import { ACCOUNT_TOKENS, ACCOUNT_VERSION, ACCOUNTS_DEFAULT, ACCOUNTS_MOST, darkAccount, DEBRIEF_ANSWER_TOKENS, DEBRIEF_VERSION, endNeedMicroUsd, keptBackFor, reckonedEndMicroUsd, type EndCosts, type MockPolicy, mockAccount, sampleAccounts, stepsOf, writeAccount, type AccountBrief, type AccountCounts, type DebriefInput, type DebriefWording, COMPOSE_VERSION, createCompose, mockCompose, type ComposerConfig, CONSULT_VERSION, createConsult, createLlmParticipant, LLM_PARTICIPANT_VERSION, MOCK_VERSION, MockAdapter, mockPolicies, PRICES, ModelCallFailed, ModelUnreachable, SpendingLimitReached, type Budget, type LlmAdapter, type LlmController, type LlmIO, type MockBrain, type Price } from "@oikos/participants/llm";
 import { createArrangement, createTranslator, draftText, Knowledge, RESOLVER, resolve, TRANSLATOR_VERSION, type Draft, type Resolution, type Route, NOT_CHECKED } from "@oikos/translator";
 import { Kernel } from "./kernel";
@@ -692,7 +692,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   if (readingCfg && readerOf) {
     const seatModels = new Set(Object.values(bindings).map((b: any) => String(b.adapter)).concat(Object.values(bindings).map((b: any) => String(b.configured))));
     if (seatModels.has(readerOf.model)) throw new Error(`the reader ${readerOf.model} holds a seat in this run: a model never reads papers in a run that seats it (docs/behaviour/reading.md)`);
-    desk = new ReadingDesk({ dial: readingCfg, reader: readerOf, table: o.readingTable ?? READING_TABLE, bySeat: o.readingSeam?.bySeat ?? ((author) => { const p = parts.get(author); return !!p && isLlm(p); }), ...(o.readingSeam?.words ? { words: o.readingSeam.words } : {}),
+    desk = new ReadingDesk({ dial: readingCfg, reader: readerOf, table: o.readingTable ?? READING_TABLE, tag: () => new Tagger({ names: [...entityNames.values()], currency }), bySeat: o.readingSeam?.bySeat ?? ((author) => { const p = parts.get(author); return !!p && isLlm(p); }), ...(o.readingSeam?.words ? { words: o.readingSeam.words } : {}),
       file: async (data) => { await k.request({ op: "annotate", annotation: { annotation: "note", subject: "orchestrator", data } }); } });
     await k.request({ op: "annotate", annotation: { annotation: "note", subject: "orchestrator", data: { reading: { version: READING_VERSION, reader: readerOf.model, reader_version: readerOf.version, papers: readingCfg.papers, calls_per_run: readingCfg.calls_per_run, table: o.readingTable?.version ?? READING_TABLE.version ?? null, interim: readerOf.model.startsWith("mock/") ? false : true } } } });
   }

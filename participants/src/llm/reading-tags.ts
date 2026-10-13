@@ -27,12 +27,14 @@ export class Tagger {
   private readonly patterns: { tag: Tag; re: RegExp }[];
 
   constructor(world: TagWorld) {
-    const num = String.raw`\d(?:[\d.,'   ]*\d)?`;
+    const num = String.raw`\d+(?:[.,'   ]\d+)*`; // (groups joined by one separator: \"205. 5\" is two numbers)
     const marks = [world.currency?.symbol, world.currency?.code].filter((x): x is string => !!x).map(esc);
     const units = (world.currency?.unit_words ?? []).map(esc);
+    // (A number just after a letter or another number is not a sum's: a code that ends in digits, then a sign and an amount, has one sum.)
+    const lone = String.raw`(?<![A-Za-z0-9.,])`;
     const sum = [
-      ...(marks.length ? [String.raw`(?:${marks.join("|")})[  ]?${num}`, String.raw`${num}[  ]?(?:${marks.join("|")})`] : []),
-      ...(units.length ? [String.raw`${num}[  ]?(?:${units.join("|")})\b`] : []),
+      ...(marks.length ? [String.raw`(?<![A-Za-z])(?:${marks.join("|")})[\u00a0 ]?${num}`, String.raw`${lone}${num}[\u00a0 ]?(?:${marks.join("|")})(?![A-Za-z0-9])`] : []),
+      ...(units.length ? [String.raw`${lone}${num}[\u00a0 ]?(?:${units.join("|")})\b`] : []),
     ];
     const names = [...new Set(world.names.filter((n) => n.trim().length >= 2))].sort((a, b) => b.length - a.length).map(esc);
     this.patterns = [

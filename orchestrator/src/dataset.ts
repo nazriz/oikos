@@ -162,6 +162,8 @@ export async function exportDataset(logPath: string, outDir: string, o: DatasetO
   const ideaRows = lines(join(outDir, "ideas.jsonl"));
   const passageRows = lines(join(outDir, "idea_passages.jsonl"));
   const wordRows = lines(join(outDir, "words.jsonl"));
+  // Readings of seats' worded papers (docs/behaviour/reading.md): the training data of a small reader of our own.
+  const readingRows = lines(join(outDir, "readings.jsonl"));
   const ideaOf = new Map<string, string>(); // whoever teaches or stands for it -> its latest idea
   const ideaCounts = { written_by: {} as { [k: string]: number }, passages: {} as { [k: string]: number }, founded: {} as { [k: string]: number }, words: {} as { [k: string]: number }, composer: {} as { [k: string]: number } };
   const bump = (c: { [k: string]: number }, k: string) => { c[k] = (c[k] ?? 0) + 1; };
@@ -299,6 +301,10 @@ export async function exportDataset(logPath: string, outDir: string, o: DatasetO
         const w = b.data.words;
         wordRows.write({ run: run(), t: e.t, seq: e.seq, participant: b.subject, what: String(w.what), ...(w.idea ? { idea: w.idea } : {}), ...(w.draft ? { draft: w.draft } : {}), result: w.result, ...(w.why ? { why: w.why } : {}), ...(w.by ? { by: w.by } : {}), ...(w.plumbing_added ? { plumbing_added: true } : {}) });
         bump(ideaCounts.words, `${w.what}: ${w.result}`);
+      } else if (a === "note" && b.data?.reading?.paper) {
+        const r = b.data.reading;
+        readingRows.write({ run: run(), t: e.t, seq: e.seq, paper: r.paper, kind: r.kind, standing: r.standing, ...(r.text !== undefined ? { text: r.text, text_hash: r.text_hash } : {}), ...(r.answers_text !== undefined ? { answers_text: r.answers_text } : {}),
+          source: r.source, ...(r.askings !== undefined ? { askings: r.askings } : {}), reader: r.reader, ...(r.reading ? { reading: r.reading } : {}), ...(r.plain ? { plain: r.plain } : {}), shift: r.shift, ...(r.apart ? { apart: r.apart } : {}) });
       } else if (a === "note" && b.data?.compose) {
         const c = b.data.compose;
         if (c.result) bump(ideaCounts.composer, `${c.result}${c.model ? `: ${c.model}` : ""}`);
@@ -496,7 +502,7 @@ export async function exportDataset(logPath: string, outDir: string, o: DatasetO
   if (vr.rows) files["venues.jsonl"] = vr;
   else await Bun.file(join(outDir, "venues.jsonl")).delete();
   const lineage: { [name: string]: { rows: number } } = {};
-  for (const [name, w] of [["founded.jsonl", foundedRows], ["ideas.jsonl", ideaRows], ["idea_passages.jsonl", passageRows], ["words.jsonl", wordRows]] as const) {
+  for (const [name, w] of [["founded.jsonl", foundedRows], ["ideas.jsonl", ideaRows], ["idea_passages.jsonl", passageRows], ["words.jsonl", wordRows], ["readings.jsonl", readingRows]] as const) {
     const x = await w.close();
     lineage[name] = x;
     if (x.rows) files[name] = x;

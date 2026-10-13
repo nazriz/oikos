@@ -11,6 +11,7 @@ import { join } from "node:path";
 import { generate } from "@oikos/worlds/generator/generate";
 import { curtestReader, kindestReader, lexiconReader, neutralReader, type ReadingTable } from "@oikos/participants/llm";
 import { reading as R } from "@oikos/participants";
+import { exportDataset } from "../src/dataset";
 import { runWorld } from "../src/run";
 
 const root = join(import.meta.dir, "../..");
@@ -78,6 +79,29 @@ test("a worded decision is read once and filed as an event; kinder and curter re
     const filed = notes(kind.run.logPath).map((n) => n.data?.reading).filter((x) => x?.paper);
     expect(filed.length).toBe(kind.run.reading!.asked);
     expect(filed.find((x) => x.source === "model")).toMatchObject({ standing: "addressee", askings: 2, reader: { model: "mock/kindest" } });
+    // Nothing of the run leaves with the paper: the reader was shown tags where there were ids, sums, days and names, and the
+    // same words are one reading.
+    for (const x of filed) expect(x.text.replace(/\[(?:DAY|SUM|ID|PERSON)-\d+\]/g, ""), x.paper).not.toMatch(/\b[a-z]+[.\-][a-z0-9]*\d|\bday \d|\bC\d|\$\d/i);
+    expect(kind.run.reading!.cached).toBeGreaterThan(0);
+    expect(filed.filter((x) => x.source === "cache").length).toBe(kind.run.reading!.cached);
+    // The training data of a reader of our own: readings.jsonl in the dataset, each valid; the outcomes the words touched carry `read`.
+    const ajv = new Ajv2020({ strict: true, strictRequired: false, allErrors: true });
+    for (const f of readdirSync(join(root, "contracts")).filter((f) => f.endsWith(".schema.json"))) ajv.addSchema(JSON.parse(readFileSync(join(root, "contracts", f), "utf8")));
+    const dir = join(kind.d, "r.dataset");
+    const manifest = await exportDataset(kind.run.logPath, dir);
+    const rows = (f: string) => readFileSync(join(dir, f), "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l));
+    const readings = rows("readings.jsonl");
+    expect(readings.length).toBe(filed.length);
+    const rv = ajv.getSchema("urn:oikos:contracts:0.8:dataset#/$defs/Reading")!;
+    for (const r of readings) expect(rv(r), JSON.stringify(rv.errors)).toBe(true);
+    expect(readings.find((r) => r.source === "model")).toMatchObject({ standing: "addressee", reader: { model: "mock/kindest" }, askings: 2 });
+    expect(readings.find((r) => r.source === "model").text.length).toBeGreaterThan(0);
+    expect((manifest as any).files["readings.jsonl"].rows).toBe(readings.length);
+    const ov = ajv.getSchema("urn:oikos:contracts:0.8:dataset#/$defs/CitizenOutcome")!;
+    const touched = rows("citizen_outcomes.jsonl").filter((o) => o.read);
+    expect(touched.length).toBeGreaterThan(0);
+    for (const o of touched) expect(ov(o), JSON.stringify(ov.errors)).toBe(true);
+    expect(touched[0].read.moved.trust.after).toBeGreaterThanOrEqual(touched[0].read.moved.trust.plain);
     // Replay: the same town, the same reader, the same world, to the state hash.
     expect(kind2.run.stateHash).toBe(kind.run.stateHash);
     // (The kindest and the curtest are two different worlds, neither the neutral one.)

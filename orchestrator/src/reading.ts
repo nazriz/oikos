@@ -9,7 +9,7 @@
 // spent its calls: the paper is read as the plain paper of its kind, and that is counted.
 
 import { reading as R } from "@oikos/participants";
-import { READING_VERSION, type Reader, type ReadAnswer, type ReadingTable } from "@oikos/participants/llm";
+import { READING_VERSION, readingKey, textHash, type Reader, type ReadAnswer, type ReadingTable } from "@oikos/participants/llm";
 
 const { combineAskings, DECISION_KINDS, isNoShift, NO_SHIFT, plainKey, shiftOf, wellFormed, wordsOf } = R;
 type Line = R.Line; type PaperRead = R.PaperRead; type Reading = R.Reading; type ReadingDial = R.ReadingDial; type Shift = R.Shift; type Standing = R.Standing;
@@ -25,6 +25,8 @@ export interface DeskOptions {
   table: ReadingTable;
   /** Whether the paper was written by a seat (a model): code's papers are plain and are never read. */
   bySeat: (author: string) => boolean;
+  /** A fresh registry of tags for one paper and what it answers (participants/src/llm/reading-tags.ts): names, ids, sums and days leave the run as tags, and nothing else does. */
+  tag: () => { tag(text: string): string };
   /** Where the writer's own words are, if not in the paper's text fields (a seam for tests that read a code office's paper as a seat's). */
   words?: (s: Statement) => string | undefined;
   /** Files a reading in the log (a `note` annotation, `data.reading`). */
@@ -35,6 +37,8 @@ export class ReadingDesk {
   readonly counts: DeskCounts = { asked: 0, read: 0, cached: 0, declined: 0, no_answer: 0, unread: 0, apart_lines: 0, over_limit: 0, no_table: 0, calls: 0 };
   private readonly filed = new Map<string, PaperRead>();
   private readonly seen = new Map<string, { kind: string; words: string }>();
+  /** Readings within this run, by the reader's version, the kind, the standing and the hash of the tagged words (and of what they answer): no cache is carried between runs. */
+  private readonly cache = new Map<string, { source: "model" | "apart" | "declined" | "no_answer" | "unread"; reading?: Reading; apart?: Line[] }>();
 
   constructor(private readonly o: DeskOptions) {}
 
@@ -61,27 +65,43 @@ export class ReadingDesk {
     c.asked++;
     const key = plainKey(s.kind, s.data);
     const plain = this.o.table.rows[key];
+    // What leaves the run is the paper and what it answers with tags in the place of names, ids, sums and days, and the
+    // reader's standing: nothing of any person. The paper first, so that its tags number first.
+    const tagger = this.o.tag();
     const answered = s.basis ? this.seen.get(s.basis) : undefined;
-    const req = { kind: key, standing, paper: words, ...(answered ? { answers: answered.words } : {}) };
-    const out = { paper: s.id, kind: key, standing, reader: { model: this.o.reader.model, version: this.o.reader.version, prompt: READING_VERSION, table: this.o.table.version ?? null } };
+    const paper = tagger.tag(words);
+    const answers = answered ? tagger.tag(answered.words) : undefined;
+    const req = { kind: key, standing, paper, ...(answers !== undefined ? { answers } : {}) };
+    const out = { paper: s.id, kind: key, standing, text: paper, text_hash: textHash(paper), ...(answers !== undefined ? { answers_text: answers } : {}),
+      reader: { model: this.o.reader.model, version: this.o.reader.version, prompt: READING_VERSION, table: this.o.table.version ?? null } };
     const fileIt = async (source: string, extra: object = {}, shift: Shift = NO_SHIFT) => {
       this.filed.set(`${s.id}\n${standing}`, { paper: s.id, standing, shift, source });
       await this.o.file({ reading: { ...out, source, ...extra, shift } });
     };
     if (!plain) { c.no_table++; return fileIt("no_table"); }
+    const ck = readingKey({ reader: this.o.reader.model, version: `${this.o.reader.version}/${READING_VERSION}`, kind: key, standing, paper, ...(answers !== undefined ? { answers } : {}) });
+    const hit = this.cache.get(ck);
+    if (hit) {
+      c.cached++;
+      if (hit.source === "declined") c.declined++; else if (hit.source === "no_answer") c.no_answer++; else if (hit.source === "unread") c.unread++;
+      if (!hit.reading) return fileIt(hit.source);
+      const shift = shiftOf(hit.reading, plain);
+      return fileIt("cache", { askings: 2, reading: hit.reading, plain, ...(hit.apart?.length ? { apart: hit.apart } : {}) }, isNoShift(shift) ? NO_SHIFT : shift);
+    }
     if (c.calls + 2 > this.o.dial.calls_per_run) { c.over_limit++; return fileIt("over_limit"); }
     const asked: ReadAnswer[] = [];
     for (const wording of [1, 2] as const) {
       c.calls++;
       try { asked.push(await this.o.reader.read({ ...req, wording })); } catch { asked.push({}); }
     }
-    if (asked.some((a) => a.declined)) { c.declined++; return fileIt("declined"); }
-    if (asked.some((a) => !a.reading)) { c.no_answer++; return fileIt("no_answer"); }
-    const readable = asked.every((a) => wellFormed(a.reading) && phrasesFound(a, words));
-    if (!readable) { c.unread++; return fileIt("unread"); }
+    if (asked.some((a) => a.declined)) { c.declined++; this.cache.set(ck, { source: "declined" }); return fileIt("declined"); }
+    if (asked.some((a) => !a.reading)) { c.no_answer++; this.cache.set(ck, { source: "no_answer" }); return fileIt("no_answer"); }
+    const readable = asked.every((a) => wellFormed(a.reading) && phrasesFound(a, paper));
+    if (!readable) { c.unread++; this.cache.set(ck, { source: "unread" }); return fileIt("unread"); }
     const { reading, apart } = combineAskings(asked[0]!.reading!, asked[1]!.reading!, plain);
     c.read++;
-    if (apart.length) c.apart_lines += apart.length;
+    c.apart_lines += apart.length;
+    this.cache.set(ck, { source: apart.length ? "apart" : "model", reading, apart });
     const shift = shiftOf(reading, plain);
     await fileIt(apart.length ? "apart" : "model", { askings: 2, reading, plain, ...(apart.length ? { apart } : {}) }, isNoShift(shift) ? NO_SHIFT : shift);
   }

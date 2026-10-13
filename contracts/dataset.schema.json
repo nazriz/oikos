@@ -1983,6 +1983,30 @@
         }
       }
     },
+    "Reading": {
+      "description": "A row of readings.jsonl (docs/behaviour/reading.md; docs/design/ai-citizens.md 13d): one paper read by a reader, as it was filed in the log. The reader's interim: these rows are the training data of a small reader of our own, so each holds the paper's text as the reader was shown it (names, ids, sums and days as tags), what it answered if anything, the typed reading, and the reader's model and versions. `shift` is the reading less the plain paper's, line by line. Nothing in it says whether the paper was good; no person is in it.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["run", "t", "seq", "paper", "kind", "standing", "source", "reader", "shift"],
+      "properties": {
+        "run": { "type": "string" },
+        "t": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/SimTime" },
+        "seq": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/Count" },
+        "paper": { "type": "string" },
+        "kind": { "type": "string", "description": "The kind of decision and what it decided, as the plain papers' table keys it (`variation_answer:refused`)." },
+        "standing": { "enum": ["addressee", "raised", "affected", "public"] },
+        "text": { "type": "string", "description": "The paper's words as the reader was shown them, tagged." },
+        "text_hash": { "type": "string" },
+        "answers_text": { "type": "string", "description": "What the paper answers, tagged the same way." },
+        "source": { "enum": ["model", "cache", "apart", "declined", "no_answer", "unread", "over_limit", "no_table"] },
+        "askings": { "type": "integer", "minimum": 0 },
+        "reader": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/OpaqueObject" },
+        "reading": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/OpaqueObject" },
+        "plain": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/OpaqueObject" },
+        "shift": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/OpaqueObject" },
+        "apart": { "type": "array", "items": { "type": "string" } }
+      }
+    },
     "Words": {
       "description": "A row of words.jsonl: a part of a composed piece (name, purpose, gathers, asks) sent through the translator by a code participant, and what came of it: done (the draft was what the participant's module said it may be, and its acts went ahead) or not_done, with why; `by`: which of two translators answered, where a run has two; `plumbing_added`: the acts carried something of the module's own that the draft did not (a post's channels).",
       "type": "object",
