@@ -312,6 +312,12 @@ export class Inner {
     const d = this.dents[need];
     return Math.round(d.bps * left(t - d.t, this.p.needs.dent_half_life_days));
   }
+  /** Someone told us that they hold against something we did (culture: docs/behaviour/culture.md, step 4): a dent to belonging, healing as any does, and remembered. */
+  disapproved(bps: number, t: number, by: string): void {
+    if (bps <= 0) return;
+    this.dentBy("belonging", bps, t);
+    this.remember({ t, what: "disapproved", about: by, size: bps });
+  }
   private dentBy(need: "belonging" | "meaning", bps: number, t: number): void {
     this.dents[need] = { bps: Math.min(10_000, this.dent(need, t) + bps), t };
   }

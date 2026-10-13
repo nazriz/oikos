@@ -348,6 +348,8 @@ export interface DecisionRecord {
   /** For a decision about a want (areas `want`, `found`): the situation it was made in, as the everyday model would
    * be given it (docs/design/ai-citizens.md 11; contracts/dataset.schema.json, CitizenSituation). */
   situation?: Situation;
+  /** Culture (docs/behaviour/culture.md): the picture of the conduct this choice is, as the person held it, and the lean it gave (whole percent; lean in hundredths of a standard deviation). Only where the world's culture dial is on. */
+  norm?: { conduct: string; does: number; approves: number; own: number; says: number; lean: number };
   current?: string;
   circumstances?: { monthly_income: number; savings: number; homeless: boolean; bedrooms_needed?: number; essentials?: number };
   satisfied_here?: number; doubt?: number;

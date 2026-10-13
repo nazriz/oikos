@@ -2174,7 +2174,7 @@ tribunal seats wrote orders much alike); whether a reader of the stewards' own f
 
 ## 14. Culture: what a town holds in common
 
-**Status:** Naz said build it (2026-10-13); steps 1 to 3 are built behind a dial that is off by default; no pilot uses culture until step 9's proof has passed. Nothing in a run with the dial off changes. No model is called anywhere.
+**Status:** Naz said build it (2026-10-13); steps 0, 1 to 5 are built behind a dial that is off by default (steps 4 and 5, and a year measured: docs/decisions.md, 2026-10-13); no pilot uses culture until step 9's proof has passed. Nothing in a run with the dial off changes. No model is called anywhere.
 Decisions: docs/decisions.md, 2026-10-13, "Culture: plan" and "Culture: building it, steps 1 to 3" (his rulings: origin is a group; a seat is not handed its office's past practice as ready counts). Sources: docs/research/references.md, "Culture".
 
 **What he asked** (2026-10-13): "do we have any mechanism for culture? we probably need that." Under his standing

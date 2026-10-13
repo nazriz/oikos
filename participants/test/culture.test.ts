@@ -3,7 +3,7 @@
 
 import { expect, test } from "bun:test";
 import { citizen } from "../src/behaviour/citizen";
-import { CONDUCTS, Culture, CULTURE_DEFAULTS, cultureDial, cultureParams, standardNormal, type CultureEnv, type Conduct } from "../src/behaviour/culture";
+import { CONDUCTS, Culture, CULTURE_DEFAULTS, cultureDial, cultureParams, normsRows, standardNormal, type CultureEnv, type Conduct, type NormsSection } from "../src/behaviour/culture";
 import { VALUES } from "../src/behaviour/mind";
 import { Randomness } from "../src/rng";
 import { RECORD } from "../src/module";
@@ -86,7 +86,7 @@ test("the record's section holds at most 12 rows of whole percent, under 750 byt
   const after = at(3_650 * DAY);
   expect(after.length).toBeLessThan(750);
   expect(Math.abs(after.length - before)).toBeLessThan(150);
-  for (const row of c.section(0)) row.numbers.slice(0, 4).forEach((x) => { expect(Number.isInteger(x)).toBe(true); expect(x).toBeGreaterThanOrEqual(0); expect(x).toBeLessThanOrEqual(100); });
+  for (const row of normsRows(c.section(0))) row.numbers.slice(0, 4).forEach((x) => { expect(Number.isInteger(x)).toBe(true); expect(x).toBeGreaterThanOrEqual(0); expect(x).toBeLessThanOrEqual(100); });
 });
 
 test("what is thought settles toward what is approved, worked out when read, by half in the days the dial sets", () => {
@@ -115,11 +115,33 @@ test("a person of this dial writes a norms section into their record; with the d
   await on.p.wake(DAY);
   await off.p.wake(DAY);
   expect(off.kept.record.norms).toBeUndefined();
-  const norms = on.kept.record.norms as { conduct: string; numbers: number[] }[];
-  expect(norms.map((x) => x.conduct)).toEqual(["answer_tribunal", "stay_past_notice", "take_to_tribunal", "complain", "take_in"]);
+  const norms = normsRows(on.kept.record.norms as NormsSection);
+  expect(norms.map((x) => x.conduct)).toEqual(["answer_tribunal", "stay_past_notice", "take_to_tribunal", "complain", "take_in", "apply_possession"]);
   const complain = norms.find((x) => x.conduct === "complain")!;
   expect(complain.numbers.slice(0, 2)).toEqual([25, 65]);
   // Nothing else of the record is different.
   const { norms: _n, ...rest } = on.kept.record;
   expect(rest).toEqual(off.kept.record);
+});
+
+// Step 0: a section that has not moved costs nothing to carry. The kernel canonicalises and hashes a person's whole record at every change,
+// so what a section costs is its bytes, each time anything in the record is written; and it is not written again unless a figure has moved.
+test("the norms section is positional and small, and a record whose pictures have not moved is not given it again", async () => {
+  const c = someone(3);
+  const sec = c.section(0);
+  expect(sec.length).toBeLessThanOrEqual(12);
+  expect(JSON.stringify(sec).length).toBeLessThan(200); // (named rows were about 400 bytes for the same eight conducts)
+  expect(normsRows(sec).map((r) => r.conduct)).toEqual(c.held);
+  // Asked again with nothing moved: the very same array (not worked out again, not compared again).
+  expect(c.section(5 * DAY)).toBe(sec);
+  const dials = { culture: { profile: { conducts: { complain: { does_bps: 2_500, approves_bps: 6_500 } } } } };
+  const params = { complain_to: "town", complain_bps: 3_000, possession: { stay_bps: 2_000, obey_bps: 5_000, answer_bps: 6_000 }, origin: "north" };
+  let sets = 0;
+  const module = { create: (ctx: any) => {
+    const m = citizen.create(ctx);
+    return { step: async (o: any, cx: any) => { const a: any = await m.step(o, cx); if (a[RECORD]?.set?.norms) sets++; return a; } };
+  } };
+  const p = person(module, params, { dials });
+  for (let d = 1; d <= 20; d++) await p.wake(d * DAY);
+  expect(sets).toBe(1); // written once, at the start; twenty days of nothing told or seen add no write
 });

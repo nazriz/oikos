@@ -55,6 +55,26 @@ export const CULTURE_WORDS = {
     }
     return did.length || says.length ? { did, says } : undefined;
   },
+  /** What I say to someone of what they did (step 4): of their doing it, or of their not doing it, how I judge it: how far it is right (the five steps of what is said of it, as approval of the act). */
+  verdict: (c: Conduct, did: boolean, approvalBps: number): string => { const w = WORDS[c]; if (!w) return ""; const s = SAYINGS[Math.max(0, Math.min(4, Math.floor(approvalBps / 2_000)))]![0]; return `Of your ${did ? "" : "not "}${w.thing}: I say it is ${s}.`; },
+  /** What a verdict tells: the conduct, whether it was of their doing or not doing, and how it judges the act (a step's middle). */
+  verdictHeard: (text: string): { conduct: Conduct; did: boolean; approval: number } | undefined => {
+    for (const c of PERSONS_CONDUCTS) {
+      const w = WORDS[c]!;
+      for (const did of [true, false]) for (const [s, mid] of SAYINGS) if (text === `Of your ${did ? "" : "not "}${w.thing}: I say it is ${s}.`) return { conduct: c, did, approval: mid };
+    }
+    return undefined;
+  },
+  /** What a parent tells a child who asks (step 4): how I see it, in tenths: how many here do it, and how many would call it right. */
+  household: (c: Conduct, doesBps: number, approvesBps: number): string => { const w = WORDS[c]; return w ? `As I see it, of ${w.thing}: ${Math.round(doesBps / 1_000)} in 10 do it, ${Math.round(approvesBps / 1_000)} in 10 would call it right.` : ""; },
+  householdHeard: (text: string): { conduct: Conduct; does: number; approves: number }[] => {
+    const out: { conduct: Conduct; does: number; approves: number }[] = [];
+    for (const c of PERSONS_CONDUCTS) {
+      const m = new RegExp(`As I see it, of ${WORDS[c]!.thing}: (\\d+) in 10 do it, (\\d+) in 10 would call it right\\.`).exec(text);
+      if (m) out.push({ conduct: c, does: Number(m[1]) * 1_000, approves: Number(m[2]) * 1_000 });
+    }
+    return out;
+  },
   /** Where a person comes from, told when asked how things are (only where the world has origin groups). */
   from: (group: string): string => `I come from the ${group} group.`,
   fromHeard: (text: string): string | undefined => /I come from the ([^\s.]+) group\./.exec(text)?.[1],
@@ -110,11 +130,45 @@ export interface CultureParams {
   does_default_bps: number;
   /** Most phrases a person adds to what they say when asked how things are. */
   phrases: number;
+  /** Disapproval and esteem between ties (step 4). An act told by a tie sits with what I think of it by more than this (of the middle, 5,000) before I feel for them or say anything of it. */
+  margin_bps: number;
+  /** A tie cools toward someone whose act I hold against by at most this (at the greatest distance from the middle), and warms by at most `esteem_bps` toward one whose act I hold with. */
+  cool_bps: number;
+  esteem_bps: number;
+  /** Told by someone that they hold what I did against: a dent to my belonging of at most this, times a half to one and a half by my conformity. */
+  disapproved_bps: number;
+  /** A newcomer arrives holding the profile's picture at this weight, so what they see here soon outweighs it. */
+  newcomer_weight: number;
+  /** The points a standard deviation of the lean adds to a way a want may take (as trust and agency do: wants.ts `choice`). */
+  way_points: number;
+  // ---- town memory (step 5; docs/behaviour/culture.md): what a person remembers of what was public. Every size a placeholder.
+  /** The most events a person holds; the weakest gives way to a stronger arrival. */
+  slots: number;
+  /** How strongly an event first reaches me: seen (I was there), read (the paper's heaviest item), and told (this share of the teller's strength, `negative_bps` more for what I hold against). */
+  seen_bps: number;
+  read_bps: number;
+  pass_bps: number;
+  negative_bps: number;
+  /** An event told through more hands than this is not kept. */
+  max_hops: number;
+  /** A strength halves in this many days: what I saw; what I read or was told. */
+  half_life_seen_days: number;
+  half_life_told_days: number;
+  /** I tell what I hold above this strength. Hearing it again returns this share of the way to what it first was. */
+  tell_at_bps: number;
+  rehearse_bps: number;
+  /** An event bears on my trust in whoever did it, once, at its strength times this, and by where my own view of the conduct it shows sits. */
+  bystander_bps: number;
+  /** A departure I find in a building I am in counts as seen if it is no older than this. */
+  witness_days: number;
 }
 export const CULTURE_DEFAULTS: CultureParams = {
   prior_weight: 4, own_sd_bps: 1_500, values_bps: 500, window: 20, known_weight: 1, close_weight: 2, published_weight: 4, close_affinity_bps: 3_000,
   internalise_days: 1_095, sd_bps: 2_500, w_does_bps: 6_000, w_approves_bps: 4_000, sway_milli: 300, conceal_bps: 7_500, integrity_tells_bps: 7_000,
   grain_percent: 2, approves_default_bps: 5_000, does_default_bps: 5_000, phrases: 3,
+  margin_bps: 2_500, cool_bps: 500, esteem_bps: 200, disapproved_bps: 300, newcomer_weight: 1, way_points: 1_500,
+  slots: 6, seen_bps: 10_000, read_bps: 5_000, pass_bps: 6_000, negative_bps: 2_000, max_hops: 3, half_life_seen_days: 365, half_life_told_days: 180,
+  tell_at_bps: 2_000, rehearse_bps: 3_000, bystander_bps: 5_000, witness_days: 3,
 };
 const INTS: (keyof CultureParams)[] = Object.keys(CULTURE_DEFAULTS) as (keyof CultureParams)[];
 
@@ -123,12 +177,15 @@ const INTS: (keyof CultureParams)[] = Object.keys(CULTURE_DEFAULTS) as (keyof Cu
 export function cultureParams(given?: any): CultureParams {
   const p = { ...CULTURE_DEFAULTS, ...(given ?? {}) } as CultureParams;
   for (const k of INTS) if (!Number.isInteger(p[k]) || p[k] < 0) throw new Error(`dials.culture.step.${k}: a size is a whole number, not below 0; got ${p[k]}`);
-  for (const k of ["own_sd_bps", "values_bps", "w_does_bps", "w_approves_bps", "close_affinity_bps", "conceal_bps", "integrity_tells_bps", "approves_default_bps", "does_default_bps"] as const)
+  for (const k of ["own_sd_bps", "values_bps", "w_does_bps", "w_approves_bps", "close_affinity_bps", "conceal_bps", "integrity_tells_bps", "approves_default_bps", "does_default_bps", "margin_bps", "cool_bps", "esteem_bps", "disapproved_bps", "seen_bps", "read_bps", "pass_bps", "negative_bps", "tell_at_bps", "rehearse_bps", "bystander_bps"] as const)
     if (p[k] > 10_000) throw new Error(`dials.culture.step.${k}: a share is from 0 to 10000; got ${p[k]}`);
-  for (const k of ["prior_weight", "window", "known_weight", "close_weight", "published_weight", "internalise_days", "sd_bps"] as const)
+  for (const k of ["prior_weight", "window", "known_weight", "close_weight", "published_weight", "internalise_days", "sd_bps", "newcomer_weight", "slots", "half_life_seen_days", "half_life_told_days", "witness_days"] as const)
     if (p[k] < 1) throw new Error(`dials.culture.step.${k}: must be at least 1; got ${p[k]}`);
   if (p.window < p.prior_weight || p.window < p.published_weight) throw new Error("dials.culture.step.window: must hold the prior's and a published count's weight");
   if (p.sway_milli > 1_000) throw new Error(`dials.culture.step.sway_milli: a lean may move a rate by at most the whole of it per standard deviation; got ${p.sway_milli}`);
+  if (p.slots > 12) throw new Error(`dials.culture.step.slots: at most 12 events held; got ${p.slots}`);
+  if (p.max_hops > 8) throw new Error(`dials.culture.step.max_hops: at most 8 hands; got ${p.max_hops}`);
+  if (p.way_points > 10_000) throw new Error(`dials.culture.step.way_points: at most 10000 a standard deviation; got ${p.way_points}`);
   if (p.phrases > 6) throw new Error(`dials.culture.step.phrases: at most 6 phrases a time; got ${p.phrases}`);
   return p;
 }
@@ -144,6 +201,8 @@ export interface CultureDial {
   byOrigin: { [group: string]: { [c: string]: ConductFigures } };
   /** The profile's origin groups: the shares people are drawn from live in the generator; here only what a person needs to act on (homophily). */
   homophily_bps: number;
+  /** The profile's origin groups and their shares of the people (basis points), for a newcomer to be drawn from; empty where the profile has none. */
+  shares: { id: string; share_bps: number }[];
 }
 export function cultureDial(world: { dials?: { [name: string]: unknown } } | undefined): CultureDial | undefined {
   const d = world?.dials?.culture as any;
@@ -152,7 +211,8 @@ export function cultureDial(world: { dials?: { [name: string]: unknown } } | und
   for (const c of conducts) if (!(CONDUCTS as readonly string[]).includes(c)) throw new Error(`dials.culture.conducts: ${c} is not a conduct the build knows`);
   if (conducts.length > MAX_CONDUCTS) throw new Error(`dials.culture.conducts: at most ${MAX_CONDUCTS}`);
   const params = cultureParams({ ...(d.step ?? {}), ...(Number.isInteger(d.sway_milli) ? { sway_milli: d.sway_milli } : {}) });
-  return { conducts, params, figures: d.profile?.conducts ?? {}, byOrigin: d.profile?.by_origin ?? {}, homophily_bps: Number.isInteger(d.profile?.homophily_bps) ? d.profile.homophily_bps : 0 };
+  return { conducts, params, figures: d.profile?.conducts ?? {}, byOrigin: d.profile?.by_origin ?? {}, homophily_bps: Number.isInteger(d.profile?.homophily_bps) ? d.profile.homophily_bps : 0,
+    shares: Array.isArray(d.profile?.origin_shares) ? d.profile.origin_shares : [] };
 }
 
 /** How a person's own situation reaches the arithmetic (closures over the citizen's mind, so this file knows no more of it). */
@@ -175,6 +235,17 @@ const clamp = (x: number, lo = 0, hi = 10_000) => Math.max(lo, Math.min(hi, Math
 const sd = (z: number) => Math.max(-3, Math.min(3, z));
 const half = (days: number, h: number) => Math.pow(0.5, days / h);
 
+/** A conduct's five numbers in the record: [does, approves, own, says, n]. */
+export type NormsRow = [number, number, number, number, number];
+/** The record's `norms`: one place for each conduct of `CONDUCTS`, in that order, null where the person holds none. */
+export type NormsSection = (NormsRow | null)[];
+/** The record's norms as named rows (for a reader of a log or a test): the conduct, and its numbers. */
+export const normsRows = (section: NormsSection | undefined): { conduct: Conduct; numbers: NormsRow }[] =>
+  (section ?? []).flatMap((r, i) => (r ? [{ conduct: CONDUCTS[i]!, numbers: r }] : []));
+
+/** What I feel for a tie whose act was told to me (basis points on the tie: negative cools, positive warms) and, if I would say something of it, how I would judge it (approval of the act, 0..10000). */
+export interface Reaction { tie: number; voice?: number }
+
 /** A person's own act at an occasion, kept for `news_days` to be told: to whom already told, so it is counted once by each. */
 interface Act { conduct: Conduct; did: boolean; t: number; told: Set<string> }
 
@@ -191,12 +262,18 @@ export class Culture {
   private readonly does0 = new Map<Conduct, number>();
   private readonly approves0 = new Map<Conduct, number>();
   private readonly acts = new Map<Conduct, Act>();
+  /** The person's own starting lean for each conduct, kept (a standard normal), so a picture taken later can start `own` the same way. */
+  private readonly lean0 = new Map<Conduct, number>();
+  /** Conducts a tie told me of in the last days: what I may say of them when asked. */
+  private readonly heardOf = new Map<Conduct, { t: number; told: Set<string> }>();
+  private origin: string | undefined;
 
   /**
    * @param rates the conducts this person has a rate for in their world, and the rate (what is done there as calibrated)
    * @param group the origin group the person comes from, if the world has any
    */
-  constructor(readonly p: CultureParams, readonly dial: CultureDial, private readonly env: CultureEnv, rates: { [c in Conduct]?: number }, readonly group?: string, t = 0) {
+  constructor(readonly p: CultureParams, readonly dial: CultureDial, private readonly env: CultureEnv, rates: { [c in Conduct]?: number }, group?: string, t = 0) {
+    this.origin = group;
     const held: Conduct[] = [];
     for (const c of CONDUCTS) {
       if (!dial.conducts.includes(c)) continue;
@@ -212,12 +289,17 @@ export class Culture {
       this.approves.set(c, clamp(grp?.approves_bps ?? approves0));
       const z = this.zOf(c);
       this.zStart.set(c, z);
-      this.ownBase.set(c, clamp(this.approves.get(c)! + p.own_sd_bps * env.draw(c) + p.values_bps * z));
+      const draw = env.draw(c);
+      this.lean0.set(c, draw);
+      this.ownBase.set(c, clamp(this.approves.get(c)! + p.own_sd_bps * draw + p.values_bps * z));
       this.ownAt.set(c, t);
       this.n.set(c, p.prior_weight);
     }
     this.held = held;
   }
+
+  /** Where I come from, if the world has groups and I know. */
+  get group(): string | undefined { return this.origin; }
 
   /** The values that speak to a conduct, summed (signed, in standard deviations). */
   private zOf(c: Conduct): number { return VALUE_MAP[c].reduce((a, [v, s]) => a + s * this.env.z(v), 0); }
@@ -256,6 +338,11 @@ export class Culture {
   /** A rate (basis points) as this person's lean sways it: `swayed`, with this dial's sway. */
   term(bps: number, c: Conduct, t: number, sign: 1 | -1 = 1): number {
     return clamp(bps * (1 + (this.p.sway_milli / 1_000) * sign * this.lean(c, t)));
+  }
+  /** The numbers and the lean for a recorded decision's `norm` (whole percent; the lean in hundredths of a standard deviation). */
+  norm(c: Conduct, t: number): { conduct: string; does: number; approves: number; own: number; says: number; lean: number } | undefined {
+    const r = this.read(c, t);
+    return r ? { conduct: c, does: Math.round(r.does / 100), approves: Math.round(r.approves / 100), own: Math.round(r.own / 100), says: Math.round(r.says / 100), lean: Math.round(this.lean(c, t) * 100) } : undefined;
   }
   /** The numbers and the lean as whole integers, for the record of a decision (an outcome's facts). */
   facts(c: Conduct, t: number): { [k: string]: number } {
@@ -308,25 +395,124 @@ export class Culture {
       if (out.length < this.p.phrases) out.push(CULTURE_WORDS.says(a.conduct, this.says(a.conduct, t)));
     }
     for (const [c, a] of this.acts) if (t - a.t > newsDays * 86_400) this.acts.delete(c);
+    // What I say of what I have been told of (not my own act): my opinion, once to each who asks, for a matter lately in the news (said in company).
+    for (const [c, h] of [...this.heardOf].sort((a, b) => b[1].t - a[1].t || (a[0] < b[0] ? -1 : 1))) {
+      if (t - h.t > newsDays * 86_400) { this.heardOf.delete(c); continue; }
+      if (out.length >= this.p.phrases || h.told.has(asker) || this.acts.has(c)) continue;
+      h.told.add(asker);
+      const says = this.says(c, t);
+      if (Math.floor(says / 2_000) !== 2) out.push(CULTURE_WORDS.says(c, says));
+    }
     return out.filter(Boolean);
+  }
+
+  // ---------------------------------------------------------------- what a tie's act is to me (step 4)
+
+  /**
+   * A tie's act, told to me, as I take it. Privately I judge it by what I think (`own`): it sits with that or against it, and by more than
+   * `margin_bps` of the middle I feel for them (a tie cools toward whoever did what I hold against, by at most `cool_bps`, warms by at most
+   * `esteem_bps` toward whoever did what I hold with: Ellickson, Brennan and Pettit). What I SAY of it is another thing, `says`, which is `own` moved
+   * toward what I take to be approved: one who privately holds it wrong may say nothing, or say it is right, where they take the street to approve
+   * (Kuran). I voice a verdict only if what I would say sits beyond the margin. Nothing is blocked and nobody is fined.
+   */
+  react(c: Conduct, did: boolean, t: number): Reaction | undefined {
+    if (!this.has(c)) return undefined;
+    const r = this.read(c, t)!, M = this.p.margin_bps;
+    const thought = did ? r.own : 10_000 - r.own, said = did ? r.says : 10_000 - r.says;
+    const dev = thought - 5_000;
+    const tie = Math.abs(dev) <= M ? 0 : dev < 0 ? -Math.round((this.p.cool_bps * -dev) / 5_000) : Math.round((this.p.esteem_bps * dev) / 5_000);
+    const voice = Math.abs(said - 5_000) > M ? said : undefined;
+    return tie === 0 && voice === undefined ? undefined : { tie, ...(voice !== undefined ? { voice } : {}) };
+  }
+  /**
+   * Told by someone what they say of what I did (`approval` of my doing it, or of my not doing it): what they say is what is approved, so my picture
+   * of that moves along the tie (Bicchieri: normative expectations are made of what is said and sanctioned). Held against, it dents my belonging, by
+   * at most `disapproved_bps`, from half to one and a half times that as I am a conformist (Williams: being left out hurts, the more the more one
+   * belongs). Returns the dent to apply (0 when approved).
+   */
+  judged(c: Conduct, did: boolean, approval: number, route: Route): number {
+    if (!this.has(c)) return 0;
+    this.hearSaid(c, did ? approval : 10_000 - approval, route);
+    return approval >= 5_000 ? 0 : Math.round(this.p.disapproved_bps * (0.5 + this.env.conformity()) * ((5_000 - approval) / 5_000));
+  }
+  /** The points the lean adds to a way a want may take (`way_points` a standard deviation, times the sway), bounded as the lean is. */
+  way(c: Conduct, t: number): number { return Math.round(this.p.way_points * (this.p.sway_milli / 1_000) * this.lean(c, t)); }
+  /** How much an event bears on trust in whoever did it: its strength times `bystander_bps` times how far my own view of the conduct sits from the middle. */
+  bearing(strength: number, own: number): number { return (strength / 10_000) * (this.p.bystander_bps / 10_000) * (Math.abs(own - 5_000) / 5_000); }
+  /** What a tie warms by when it tells me what I did is approved. */
+  get warmth(): number { return Math.round(this.p.esteem_bps / 2); }
+  /** A tie told me of an act: I may say what I think of it, to whoever asks, for the next days. */
+  noteHeard(c: Conduct, t: number): void { if (this.has(c)) this.heardOf.set(c, { t, told: new Set() }); }
+
+  // ---------------------------------------------------------------- children and newcomers (step 4)
+
+  /** Where I come from, learned now (a child coming of age takes a parent's): and, where the profile gives that group's figures and I took nothing from a household, I start from them. */
+  setGroup(group: string | undefined, fromHousehold: Set<Conduct> = new Set()): void {
+    this.origin = group;
+    if (!group) return;
+    for (const c of this.held) {
+      const g = this.dial.byOrigin[group]?.[c];
+      if (!g || fromHousehold.has(c)) continue;
+      if (g.does_bps !== undefined) this.does.set(c, clamp(g.does_bps));
+      if (g.approves_bps !== undefined) this.approves.set(c, clamp(g.approves_bps));
+      this.rebase(c, 0);
+    }
+    this.dirty = true;
+  }
+  /** My own lean restarted from the picture I have now (the same draw, the values as they stand). */
+  private rebase(c: Conduct, t: number): void {
+    this.zStart.set(c, this.zOf(c));
+    this.ownBase.set(c, clamp(this.approves.get(c)! + this.p.own_sd_bps * this.lean0.get(c)! + this.p.values_bps * this.zStart.get(c)!));
+    this.ownAt.set(c, t);
+  }
+  /**
+   * Coming of age in a household: what the parents told me, each their own picture of what is done and approved; mine is their mean, held at
+   * `prior_weight` (Cavalli-Sforza and Feldman; Bisin and Verdier: parents first, then everyone else, who are met as sightings from then on).
+   * A conduct no parent spoke of keeps the picture it had. Returns the conducts taken.
+   */
+  adoptHousehold(told: { conduct: Conduct; does: number; approves: number }[][], t: number): Set<Conduct> {
+    const taken = new Set<Conduct>();
+    for (const c of this.held) {
+      const rows = told.flatMap((parent) => parent.filter((x) => x.conduct === c));
+      if (!rows.length) continue;
+      this.does.set(c, clamp(rows.reduce((a, x) => a + x.does, 0) / rows.length));
+      this.approves.set(c, clamp(rows.reduce((a, x) => a + x.approves, 0) / rows.length));
+      this.n.set(c, this.p.prior_weight);
+      this.rebase(c, t);
+      taken.add(c);
+    }
+    if (taken.size) this.dirty = true;
+    return taken;
+  }
+  /** What I tell a child who asks: my picture of what is done and approved, for each conduct I hold. */
+  household(): { conduct: Conduct; does: number; approves: number }[] { return this.held.map((c) => ({ conduct: c, does: this.does.get(c)!, approves: this.approves.get(c)! })); }
+  /** Arrived here from elsewhere: I bring the picture I have and hold it lightly, so what I see here soon outweighs it (Berry: acculturation). */
+  arrive(t: number): void {
+    for (const c of this.held) this.n.set(c, this.p.newcomer_weight);
+    this.dirty = true;
+    void t;
   }
 
   // ---------------------------------------------------------------- the record
 
-  /** The record's section: a conduct a row, its five numbers in order [does, approves, own, says, n], the first four in whole percent
-   * (bounded: 12 rows, whatever the town or the time; the compact form keeps the log, which carries every rewrite, small). */
-  section(t: number): { conduct: string; numbers: [number, number, number, number, number] }[] {
+  /** The record's section, positional: the place in `CONDUCTS` is the conduct (so no name is written), a row its five numbers in order
+   * [does, approves, own, says, n], the first four in whole percent; `null` where the person holds no such conduct, the tail of nulls left off.
+   * Bounded (12 places, whatever the town or the time). A record is canonicalised and hashed whole at every change, so a section pays for each
+   * byte every time anything in the record moves: named rows were 400 bytes of a 1,700-byte record, this is about 150. */
+  section(t: number): NormsSection {
     // (Worked out again only when a picture has moved or `REFRESH_DAYS` have passed: `own` and `says` drift slowly with the days and the values,
     // and the record is written again only for a move of 2 in 100, so a month's staleness changes nothing written. Nothing runs daily.)
     if (this.cached && !this.dirty && t - this.cachedAt < REFRESH_DAYS * 86_400 && t >= this.cachedAt) return this.cached;
     this.dirty = false;
     this.cachedAt = t;
-    return (this.cached = this.held.map((c) => {
-      const r = this.read(c, t)!;
-      return { conduct: c, numbers: [Math.round(r.does / 100), Math.round(r.approves / 100), Math.round(r.own / 100), Math.round(r.says / 100), Math.round(r.n)] as [number, number, number, number, number] };
-    }));
+    const rows: NormsSection = CONDUCTS.map((c) => {
+      const r = this.read(c, t);
+      return r ? [Math.round(r.does / 100), Math.round(r.approves / 100), Math.round(r.own / 100), Math.round(r.says / 100), Math.round(r.n)] as NormsRow : null;
+    });
+    while (rows.length && rows[rows.length - 1] === null) rows.pop();
+    return (this.cached = rows);
   }
-  private cached: { conduct: string; numbers: [number, number, number, number, number] }[] | undefined;
+  private cached: NormsSection | undefined;
   private cachedAt = 0;
   private dirty = true;
 }

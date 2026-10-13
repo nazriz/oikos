@@ -578,7 +578,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   const CU_SPEC = spec.living?.culture === true ? {} : spec.living?.culture || undefined;
   const CU = CU_SPEC ? V.culture : undefined;
   const CULTURE = CU_SPEC ? { ...(CU_SPEC.conducts ? { conducts: CU_SPEC.conducts } : {}), ...(CU_SPEC.sway_milli !== undefined ? { sway_milli: CU_SPEC.sway_milli } : {}), ...(CU_SPEC.step ? { step: CU_SPEC.step } : {}),
-    profile: { ...(CU?.conducts ? { conducts: CU.conducts } : {}), ...(CU?.origin?.by_group ? { by_origin: CU.origin.by_group } : {}), ...(CU?.origin ? { homophily_bps: CU.origin.homophily_bps } : {}) } } : undefined;
+    profile: { ...(CU?.conducts ? { conducts: CU.conducts } : {}), ...(CU?.origin?.by_group ? { by_origin: CU.origin.by_group } : {}), ...(CU?.origin ? { homophily_bps: CU.origin.homophily_bps, origin_shares: CU.origin.groups.map((g) => ({ id: g.id, share_bps: g.share_bps })) } : {}) } } : undefined;
   const frictionRng = rng("frictions");
   const worn = () => (FR ? { variables: { disrepair: frictionRng.below(DISREPAIR_AT) } } : {});
   const UT = V.utilities && spec.utilities !== false ? V.utilities : undefined;
