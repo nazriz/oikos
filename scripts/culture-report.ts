@@ -12,7 +12,7 @@ import { CONDUCTS, normsRows } from "../participants/src/behaviour/culture";
 import { EVENT_KINDS } from "../participants/src/behaviour/townmemory";
 
 const DAY = 86_400;
-const CHECK = [0, 30, 90, 180, 270, 364];
+const CHECK = [7, 30, 90, 180, 270, 364]; // (day 7: everyone has written their record by then; the first record change is at the start)
 const NAMES = ["does", "approves", "own", "says"] as const;
 const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
 const sd = (xs: number[]) => { const m = mean(xs); return Math.sqrt(mean(xs.map((x) => (x - m) ** 2))); };
@@ -31,7 +31,7 @@ async function run(log: string, profile: string, seed: number) {
     for (const [who, ns] of norms) for (const g of ["all", ...(originOf.has(who) ? [originOf.get(who)!] : [])]) for (const n of ns) ((rows[g] ??= {})[n.conduct] ??= []).push(n.numbers);
     for (const [g, byC] of Object.entries(rows)) for (const [c, rs] of Object.entries(byC)) {
       const o: any = { day, group: g, conduct: c, people: rs.length };
-      NAMES.forEach((nm, i) => { const xs = rs.map((r) => r[i]!); o[nm] = r1(mean(xs)); if (nm === "does") o.does_sd = r1(sd(xs)); });
+      NAMES.forEach((nm, i) => { const xs = rs.map((r) => r[i]!); o[nm] = r1(mean(xs)); o[`${nm}_sd`] = r1(sd(xs)); });
       o.gap_own_says = r1(mean(rs.map((r) => Math.abs(r[2]! - r[3]!)))); // said against thought, per person
       o.gap_own_approves = r1(mean(rs.map((r) => r[2]! - r[1]!))); // what the people think against what they take the others to approve (a town wrong about itself)
       norm.push(o);
@@ -65,12 +65,13 @@ function sum(files: string[]) {
   const rows: any[] = [];
   for (const c of CONDUCTS) for (const nm of NAMES) {
     const at = (r: any, day: number) => r.norm.find((x: any) => x.day === day && x.group === "all" && x.conduct === c)?.[nm] as number | undefined;
-    const start = runs.map((r) => at(r, 0)).filter((x): x is number => x !== undefined), end = runs.map((r) => at(r, last)).filter((x): x is number => x !== undefined);
+    const start = runs.map((r) => at(r, CHECK[0]!)).filter((x): x is number => x !== undefined), end = runs.map((r) => at(r, last)).filter((x): x is number => x !== undefined);
     if (!start.length || !end.length) continue;
-    const moved = runs.map((r) => (at(r, last) ?? NaN) - (at(r, 0) ?? NaN)).filter((x) => !Number.isNaN(x));
+    const moved = runs.map((r) => (at(r, last) ?? NaN) - (at(r, CHECK[0]!) ?? NaN)).filter((x) => !Number.isNaN(x));
     // The drop condition (14l): the picture moves less than the runs differ from one another. `spread` is the sd of the end value over runs
     // (the same town, run seeds apart); `shift` is the mean change over a year. Below one spread: not distinguishable from the seeds.
-    rows.push({ conduct: c, number: nm, start: r1(mean(start)), end: r1(mean(end)), shift: r1(mean(moved)), spread: r1(sd(end)), moves_more_than_seeds_differ: Math.abs(mean(moved)) > sd(end) });
+    const sdAt = (day: number) => r1(mean(runs.map((r) => r.norm.find((x: any) => x.day === day && x.group === "all" && x.conduct === c)?.[`${nm}_sd`] ?? 0)));
+    rows.push({ conduct: c, number: nm, start: r1(mean(start)), end: r1(mean(end)), people_sd_start: sdAt(CHECK[0]!), people_sd_end: sdAt(last), shift: r1(mean(moved)), spread: r1(sd(end)), moves_more_than_seeds_differ: Math.abs(mean(moved)) > sd(end) });
   }
   const m = (f: (r: any) => number) => r1(mean(runs.map(f)));
   const final = (r: any) => r.mem[r.mem.length - 1];

@@ -107,6 +107,10 @@ Join (the `membership` decision that existed), the vote on a ballot for action (
 
 **Not built:** commemoration by a body founded after an event (14f); the kinds `let_go_many`, `closed`, `disaster` (nothing public in the world makes them seen yet); a founding read from anywhere but its published purpose.
 
+## What a year showed (2026-10-13; docs/decisions.md, "steps 4 and 5 measured")
+
+1,000 people, three profiles, five seeds each, dial on against off: no standing measure moved that a control does not also move; `take_in` `does` falls 5 to 7 points and nothing else moves by a point except ke-nakuru `complain` `does` (+1.5); `approves` stays at 50; people think and say things 10 points apart on average; a removal seen by 15 people in one building is held by 453 of 1,067 a year later through three hands, and creates trust in the police in about 450 who never dealt with them. The drop condition of 14l is still met for every conduct but `take_in` and, in one profile, `complain`. `scripts/culture-report.ts` reads all of it from a log.
+
 ## Not built here (steps 6 to 9 of the plan)
 
 An organisation's practice (6; **a seat is not handed it as ready counts: Naz, 2026-10-13**); the measures (7); the profiles' conduct figures (8); the proof run (9). A law as one hearing of approval (a row of 14c, not in step 4's list as asked) is not built. **No pilot uses culture until step 9's proof has passed.**
