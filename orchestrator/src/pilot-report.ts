@@ -12,6 +12,7 @@ import { currentLogs, logLines, runOf } from "./logs";
 import { measureFailure } from "./pilot-state";
 import { debriefCounts, DebriefCollector, renderDebriefCounts } from "./debriefs";
 import { framingOf } from "@oikos/participants/llm";
+import { cultureMeasures, renderCultureMeasures } from "./culture-measures";
 import { NOT_CHECKED, NOT_PUT } from "../../translator/src/index";
 
 /** The sentences a translator that asked back says (translator/src/index.ts `unsureText`): which one, which words, a
@@ -266,6 +267,7 @@ export async function reportOfLog(dir: string, log: string): Promise<any> {
   }
   // (A debrief lost and never given: the pilot is not finished for that seat either.)
   const owed = [...notDebriefed].filter(([seat]) => !debriefed.has(seat)).map(([seat, why]) => ({ seat, why })).sort((a, b) => (a.seat < b.seat ? -1 : 1));
+  const culture = await cultureMeasures(log);
   return {
     ...(short.length || owed.length ? { not_whole: { ...(short.length ? { why: "a seat sat for less than its run: it missed sittings because its model did not answer", seats: short } : { seats: [] }), ...(owed.length ? { debriefs_not_given: owed } : {}) } } : {}),
     pilot: basename(resolve(dir)), run, log: basename(log),
@@ -281,6 +283,8 @@ export async function reportOfLog(dir: string, log: string): Promise<any> {
     days_run: Math.round(((end?.t ?? last) / 86_400) * 10) / 10, until_days: until !== undefined ? Math.round((until / 86_400) * 10) / 10 : null,
     stopped,
     citizen_records: citizens,
+    // What a town held in common, read from the log (only where the run had culture on: orchestrator/src/culture-measures.ts).
+    ...(culture ? { culture } : {}),
 
     // (The whole run's, as its log records it: every part of a run that was stopped and resumed.)
     cost: { recorded_microusd: totalMicroUsd, recorded_usd: (totalMicroUsd / 1e6).toFixed(2), model_calls: totalCalls,
@@ -399,6 +403,7 @@ export function renderReport(r: any): string {
     if (s.opted_out) L.push(`   OPTED OUT on day ${s.opted_out.day}: ${JSON.stringify(s.opted_out.statement)}`);
   }
   if (r.debrief) L.push(...renderDebriefCounts(r.debrief));
+  if (r.culture) L.push(...renderCultureMeasures(r.culture));
   const t = r.translator_report;
   L.push(`-- translator: ${t.requests} requests, ${t.model_calls} calls (${t.its_own_retries} own retries), ${t.cost_microusd} microusd`);
   L.push(`   endings: ${kv(t.endings)}; refused by label: ${kv(t.refused_by_label)}`);
