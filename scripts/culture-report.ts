@@ -24,7 +24,8 @@ async function run(log: string, profile: string, seed: number, world = "worlds/t
   const originOf = new Map<string, string>(config.participants.filter((x: any) => x.kind === "person" && x.controller?.params?.origin).map((x: any) => [x.person, x.controller.params.origin]));
   const norms = new Map<string, { conduct: string; numbers: number[] }[]>();
   const heard = new Map<string, any[]>();
-  const norm: any[] = [], mem: any[] = [];
+  const norm: any[] = [], mem: any[] = [], tiesSeries: any[] = [];
+  const ties = new Map<string, { resented: number; closest: number }>();
   let next = 0;
   const snap = (day: number) => {
     const rows: { [g: string]: { [c: string]: number[][] } } = {};
@@ -33,30 +34,38 @@ async function run(log: string, profile: string, seed: number, world = "worlds/t
       const o: any = { day, group: g, conduct: c, people: rs.length };
       NAMES.forEach((nm, i) => { const xs = rs.map((r) => r[i]!); o[nm] = r1(mean(xs)); o[`${nm}_sd`] = r1(sd(xs)); });
       o.gap_own_says = r1(mean(rs.map((r) => Math.abs(r[2]! - r[3]!)))); // said against thought, per person
+      // The share who said something other than "neither right nor wrong" (the middle step, 40 to 60), and the share who privately lean one way while taking the street to lean the other
+      // (pluralistic ignorance: own and approves on opposite sides of the middle by more than 5 points each).
+      o.says_voiced_pct = r1((100 * rs.filter((r) => r[3]! < 40 || r[3]! >= 60).length) / rs.length);
+      o.pluralistic_pct = r1((100 * rs.filter((r) => (r[2]! > 55 && r[1]! < 45) || (r[2]! < 45 && r[1]! > 55)).length) / rs.length);
       o.gap_own_approves = r1(mean(rs.map((r) => r[2]! - r[1]!))); // what the people think against what they take the others to approve (a town wrong about itself)
       norm.push(o);
     }
     const slots = [...heard.values()].flat();
     const byKind: { [k: string]: number } = {}, byHow: { [k: string]: number } = {}, byHops: { [k: string]: number } = {};
     for (const s of slots) { byKind[EVENT_KINDS[s[0]] ?? s[0]] = (byKind[EVENT_KINDS[s[0]] ?? s[0]] ?? 0) + 1; byHow[["saw", "read", "told"][s[4]]!] = (byHow[["saw", "read", "told"][s[4]]!] ?? 0) + 1; byHops[s[5]] = (byHops[s[5]] ?? 0) + 1; }
+    const resented = [...ties.values()].map((t) => t.resented), closest = [...ties.values()].map((t) => t.closest);
+    tiesSeries.push({ day, people: ties.size, resented_per_person: r1(mean(resented)), closest_per_person: r1(mean(closest)) });
     mem.push({ day, people: norms.size, holding: [...heard.values()].filter((h) => h.length).length, slots: slots.length, byKind, byHow, byHops });
   };
   for await (const c of recordChanges(log)) {
     while (next < CHECK.length && c.t >= CHECK[next]! * DAY) snap(CHECK[next++]!);
     if (c.set.norms) norms.set(c.entity, normsRows(c.set.norms as any));
+    if (c.set.ties) ties.set(c.entity, { resented: ((c.set.ties as any).resented ?? []).length, closest: ((c.set.ties as any).close ?? []).length });
     if (c.set.heard) heard.set(c.entity, c.set.heard as any[]);
   }
   while (next < CHECK.length) snap(CHECK[next++]!);
   // The log's own counts: what happened in the town (removals, stoppages), and what was said (verdicts, tellings of the town's talk).
-  const n = { warrant_executed: 0, stop_work: 0, verdicts: 0, town_talk: 0, household_answers: 0 };
+  const n = { warrant_executed: 0, stop_work: 0, verdicts: 0, talk_about: 0, town_talk: 0, household_answers: 0 };
   for await (const line of logLines(log)) {
     if (line.includes('"kind":"warrant_executed"') && line.includes('"block":"publish"')) n.warrant_executed++;
     else if (line.includes('"kind":"stop_work"') && line.includes('"block":"publish"')) n.stop_work++;
     if (line.includes(": I say it is ") && line.includes("Of your ")) n.verdicts++;
+    if (line.includes('"command":"act"') && line.includes("About ") && line.includes("Of that, I say it is ")) n.talk_about++;
     if (line.includes("Talk of the town:")) n.town_talk++;
     if (line.includes("As I see it, of ")) n.household_answers++;
   }
-  return { profile, seed, norm, mem, counts: n };
+  return { profile, seed, norm, mem, ties: tiesSeries, counts: n };
 }
 
 function sum(files: string[]) {
@@ -77,7 +86,7 @@ function sum(files: string[]) {
   const final = (r: any) => r.mem[r.mem.length - 1];
   return { runs: runs.length, profile: runs[0].profile, norms: rows,
     memory: { holding_share_pct: m((r) => (100 * final(r).holding) / Math.max(1, final(r).people)), slots_per_person: m((r) => final(r).slots / Math.max(1, final(r).people)), byKind: runs.map((r) => final(r).byKind), byHow: runs.map((r) => final(r).byHow), byHops: runs.map((r) => final(r).byHops) },
-    counts: { warrants_executed: m((r) => r.counts.warrant_executed), stoppages: m((r) => r.counts.stop_work), verdicts: m((r) => r.counts.verdicts), town_talk: m((r) => r.counts.town_talk), household_answers: m((r) => r.counts.household_answers) } };
+    counts: { warrants_executed: m((r) => r.counts.warrant_executed), stoppages: m((r) => r.counts.stop_work), verdicts: m((r) => r.counts.verdicts), talk_about: m((r) => r.counts.talk_about ?? 0), town_talk: m((r) => r.counts.town_talk), household_answers: m((r) => r.counts.household_answers) } };
 }
 
 const [mode, ...args] = process.argv.slice(2);
