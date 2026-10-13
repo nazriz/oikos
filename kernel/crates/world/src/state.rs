@@ -349,6 +349,8 @@ fn is_zero_i64(x: &i64) -> bool {
 pub struct AgreementMarks {
     pub signatures: Vec<oikos_terms::Mark>,
     pub notices: Vec<oikos_terms::Mark>,
+    /// When the paper's owner withdrew it (the first such withdrawal stored): an offer that no longer stands.
+    pub withdrawn_at: Option<i64>,
 }
 
 impl State {
@@ -689,6 +691,18 @@ impl State {
             crate::blocks::RecordBody::Notice { agreement, party, .. } => {
                 let m = self.marks.entry(agreement.clone()).or_default();
                 m.notices.push(oikos_terms::Mark { party: party.clone(), at: record.at });
+            }
+            crate::blocks::RecordBody::Withdrawal { withdraws, .. } => {
+                // (Only its owner ends a paper's standing: the same test as perception's `taken_down`.)
+                let by_owner = self.records.get(withdraws).is_some_and(|t| {
+                    let owner = |r: &Record| -> Vec<String> { r.speaks_for.iter().cloned().chain(self.author_entity(r)).collect() };
+                    let by = owner(&record);
+                    matches!(t.record.body, crate::blocks::RecordBody::Agreement { .. }) && owner(&t.record).iter().any(|o| by.contains(o))
+                });
+                if by_owner {
+                    let m = self.marks.entry(withdraws.clone()).or_default();
+                    m.withdrawn_at.get_or_insert(record.at);
+                }
             }
             _ => {}
         }

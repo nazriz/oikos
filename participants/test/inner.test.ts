@@ -241,3 +241,21 @@ test("whatever happens, for however long, the sections stay within their bounds 
   expect(largest).toBeLessThan(first * 1.03);
   expect(largest).toBeLessThan(2_500);
 });
+
+test("leaving a home on the tribunal's order is a kind of its own on the record and weighs as being made to leave does", () => {
+  const same = (a: string, b: string) => {
+    const x = person("same").inner, y = person("same").inner;
+    x.happened(a, 40 * DAY, { about: "landlord-1" });
+    y.happened(b, 40 * DAY, { about: "landlord-1" });
+    return [x.sections(), y.sections()] as const;
+  };
+  const [left, evicted] = same("left_on_order", "evicted");
+  // (Same needs, same values, same size, same place on the record: only the word differs.)
+  expect({ ...left, memory: undefined }).toEqual({ ...evicted, memory: undefined });
+  expect(left.memory.defining.map((m) => m.what)).toEqual(["left_on_order"]);
+  expect(evicted.memory.defining.map((m) => m.what)).toEqual(["evicted"]);
+  expect(left.memory.defining[0]!.size).toBe(evicted.memory.defining[0]!.size);
+  // A word the parameters do not know is only remembered, small, as before.
+  expect(same("something_else", "evicted")[0].memory.defining).toEqual([]);
+});
+

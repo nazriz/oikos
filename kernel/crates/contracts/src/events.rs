@@ -83,6 +83,9 @@ pub enum RefusalCode {
     NotComingDown,
     /// It's being demolished.
     ComingDown,
+    /// A signature on an agreement whose owner has withdrawn it before every party had signed: an offer that no longer
+    /// stands cannot be accepted.
+    OfferWithdrawn,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

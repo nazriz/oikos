@@ -337,3 +337,39 @@ fn opting_out_silences_a_participant_unless_the_world_names_a_stand_in() {
     let r = act(&mut run, "mayor", json!([{"block": "message", "to": ["city"], "text": "hello"}]));
     assert_eq!(refusal(&r), None);
 }
+
+#[test]
+fn an_offer_its_owner_has_taken_back_cannot_be_signed() {
+    let offer = |run: &mut Run<Vec<u8>>| {
+        let r = act(run, "developer", json!([{"block": "propose_agreement", "speaks_for": "devco", "ref": "job", "terms": {"template": "construction", "parties": ["devco", "buildco"], "commitments": [{"who": "buildco", "does": {"outcome": {"structure": {"type": "apartments", "on": "p12"}}}}]}},
+                                             {"block": "sign_agreement", "agreement": "$job", "as": "devco"}]));
+        created(&r, "job")
+    };
+    let signatures = |run: &Run<Vec<u8>>, a: &str| run.kernel().state().marks.get(a).map_or(0, |m| m.signatures.len());
+    let mut run = town();
+
+    // Taken back by someone else (anyone may write that they "withdraw" anything): nothing is taken back, the signature stands.
+    let a = offer(&mut run);
+    act(&mut run, "builder", json!([{"block": "withdraw", "record": a, "speaks_for": "buildco"}]));
+    assert_eq!(refusal(&act(&mut run, "builder", json!([{"block": "sign_agreement", "agreement": a, "as": "buildco"}]))), None);
+    assert_eq!(signatures(&run, &a), 2);
+
+    // Taken back by its owner before the other party signed: a signature after it is refused, in the same instant too
+    // (the order the kernel took the two commands in decides, and a refusal leaves no record).
+    let b = offer(&mut run);
+    act(&mut run, "developer", json!([{"block": "withdraw", "record": b, "speaks_for": "devco"}]));
+    let before = run.kernel().state().records.len();
+    let r = act(&mut run, "builder", json!([{"block": "sign_agreement", "agreement": b, "as": "buildco"}]));
+    assert_eq!(refusal(&r), Some(RefusalCode::OfferWithdrawn));
+    assert_eq!(run.kernel().state().records.len(), before, "a refused signature is not on the record");
+    assert_eq!(signatures(&run, &b), 1);
+    run.command(&Command::Advance { to: DAY }).unwrap();
+    assert_eq!(refusal(&act(&mut run, "builder", json!([{"block": "sign_agreement", "agreement": b, "as": "buildco"}]))), Some(RefusalCode::OfferWithdrawn), "nor a day later");
+
+    // The signature that came first stands, and withdrawing the paper afterwards ends nothing: signing again is harmless.
+    let c = offer(&mut run);
+    assert_eq!(refusal(&act(&mut run, "builder", json!([{"block": "sign_agreement", "agreement": c, "as": "buildco"}]))), None);
+    act(&mut run, "developer", json!([{"block": "withdraw", "record": c, "speaks_for": "devco"}]));
+    assert_eq!(refusal(&act(&mut run, "builder", json!([{"block": "sign_agreement", "agreement": c, "as": "buildco"}]))), None);
+    assert_eq!(signatures(&run, &c), 3);
+}

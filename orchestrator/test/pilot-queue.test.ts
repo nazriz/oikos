@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { compressLog } from "../src/logs";
 import { lastAlerts } from "../src/pilot-alerts";
-import { framingSets, limitedProviders, localStamp, measureFailure, nextPilot, parkedPath, providersOf, readWorldFile, runState, scanOptOuts, STEWARD_FRAMING } from "../src/pilot-state";
+import { framingSets, limitedProviders, localStamp, measureFailure, nextPilot, noteOf, parkedPath, providersOf, readWorldFile, runState, scanOptOuts, STEWARD_FRAMING } from "../src/pilot-state";
 
 const UNTIL = 5_184_000;
 const base = realpathSync(mkdtempSync(join(tmpdir(), "oikos-pilot-queue-test-")));
@@ -359,3 +359,12 @@ test("a pilot's framing: the entry's own, else its world file's own, else unstat
   expect(readWorldFile(join(import.meta.dir, "../../worlds/town-300.yaml"))).toMatchObject({ generate: "town", citizens: 300 });
   expect(readWorldFile(join(base, "no-such-world.yaml"))).toBeUndefined();
 });
+
+test("a note that names the caseload dial is followed by what the dial reaches: the other offices, not the landlords or the tribunal", () => {
+  const said = noteOf("opening_caseload with opening_caseload_scale_bps a PILOT'S DIAL for the tribunal's caseload");
+  expect(said).toContain("PILOT'S DIAL for the tribunal's caseload"); // (the note itself is not edited)
+  expect(said).toMatch(/OTHER offices \(support, desks, planning, bank, finance\)\. It does not reach the landlords' or the tribunal's/);
+  expect(noteOf("a held-out test")).toBe("a held-out test");
+  expect(noteOf(undefined)).toBe("");
+});
+

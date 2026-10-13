@@ -54,6 +54,7 @@ const REFUSAL: Record<string, string> = {
   not_being_built: "that isn't being built",
   not_coming_down: "that isn't being demolished",
   coming_down: "it's being demolished",
+  offer_withdrawn: "the offer has been taken back by whoever made it, so there is nothing to sign",
 };
 
 /**

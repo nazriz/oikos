@@ -1934,6 +1934,18 @@ impl<'a> Exec<'a> {
                 let agreement = self.r(agreement)?;
                 self.record_of_kind(&agreement, "agreement")?;
                 let party = self.r(party)?;
+                // An offer its owner has taken back can no longer be accepted (an agreement every party had signed is
+                // concluded all the same: withdrawing the paper ends nothing). Whichever of the two commands the kernel
+                // took first decides it: a withdrawal not yet stored does not stop a signature.
+                if let Some(m) = self.st.marks.get(&agreement) {
+                    if let (Some(at), Some(stored)) = (m.withdrawn_at, self.st.records.get(&agreement)) {
+                        if let RecordBody::Agreement { terms } = &stored.record.body {
+                            if !terms.parties.iter().all(|p| m.signatures.iter().any(|s| &s.party == p)) {
+                                return Err(refuse(RefusalCode::OfferWithdrawn, format!("{agreement} was withdrawn by its maker at {at}; it can no longer be signed")));
+                            }
+                        }
+                    }
+                }
                 let id = self.new_record(RecordBody::Signature { agreement, party: party.clone() }, Some(party), None, None)?;
                 self.bind(bind, &id)
             }

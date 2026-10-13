@@ -7,6 +7,8 @@ import { expect, test } from "bun:test";
 import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { generate } from "@oikos/worlds/generator/generate";
+import { exportLogs, query, runQuery } from "@oikos/measure";
+import { recordChanges } from "../src/records";
 import { runWorld } from "../src/run";
 
 const root = join(import.meta.dir, "../..");
@@ -77,6 +79,13 @@ test("a tenant who cannot pay and will not go is put out by the police on the tr
   // From then the tenancy is over for the tenant: they pay no more rent and hold no home; the landlord never removed anyone.
   expect(ev.some((e) => e.event === "transfer" && e.from === `acc-${tenant}` && e.to === `acc-${landlord}` && e.t > done.at + 3 * DAY)).toBe(false);
   expect(recs.some((r) => r.record === "notice" && r.agreement === alone.id && r.as === tenant && r.at >= done.at)).toBe(true);
+  // On their record they were put out (and are "evicted", as a notice's leaving is): never "left on the order", which is
+  // for those who went on it with no warrant carried out.
+  const memories: string[] = [];
+  for await (const c of recordChanges(s.logPath)) if (c.entity === tenant) for (const b of (c.because ?? []) as any[]) memories.push(b.what);
+  expect(memories).toContain("put_out");
+  expect(memories).toContain("evicted");
+  expect(memories).not.toContain("left_on_order");
 }, 900_000);
 
 test("a tenant who cannot pay and goes on the notice gives the home up: they are not back in it, no rent is counted after, and nobody applies for possession of a home already left", async () => {
@@ -161,5 +170,20 @@ test("a tenant who goes after the order, before anyone comes: no removal is reco
   } else console.log(`a tenant who goes after the order: gone day ${Math.floor(went.at / DAY)} before any warrant was asked`);
   // The landlord ends the tenancy on the record either way.
   expect(recs.some((r) => r.record === "notice" && r.agreement === alone.id && r.as === landlord)).toBe(true);
+
+  // On the tenant's own record: the order, and then leaving on it, a kind of its own. Not "evicted" at the leaving (that
+  // is a warrant's removal, or a notice gone on), and the tenant's weights are the same as for being made to leave.
+  const memories: { what: string; t: number }[] = [];
+  for await (const c of recordChanges(s.logPath)) if (c.entity === tenant) for (const b of (c.because ?? []) as any[]) memories.push({ what: b.what, t: b.t ?? c.t });
+  expect(memories.some((m) => m.what === "ordered_out")).toBe(true);
+  expect(memories.some((m) => m.what === "left_on_order")).toBe(true);
+  expect(memories.some((m) => m.what === "evicted" && m.t >= went.at)).toBe(false);
+  expect(memories.some((m) => m.what === "put_out")).toBe(false);
+  // And the measure tells it from a removal: left on an order, with no warrant carried out on that home.
+  const m = join(out, "measure");
+  await exportLogs([s.logPath], m);
+  const row = (await runQuery(m, "town/possession"))[0] as any;
+  expect(Number(row.left_on_order)).toBe(1); // (the town's other order was carried out on another household: that one is a removal)
+  expect(Number(row.possession_orders)).toBeGreaterThan(Number(row.left_on_order));
   rmSync(out, { recursive: true, force: true });
 }, 900_000);

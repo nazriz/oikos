@@ -1958,7 +1958,8 @@
         "bad_investigation",
         "not_being_built",
         "not_coming_down",
-        "coming_down"
+        "coming_down",
+        "offer_withdrawn"
       ]
     },
     "AnnotationEntry": {
