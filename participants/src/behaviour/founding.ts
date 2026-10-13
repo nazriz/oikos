@@ -171,7 +171,7 @@ export function darkOf(want: { about: string }, record: { [section: string]: any
   const why: string[] = [];
   if (DARK_ABOUT.includes(want.about)) why.push(`about:${want.about}`);
   const defining = (record.memory?.defining ?? []) as { what: string }[];
-  for (const w of ["bereaved", "ruined", "evicted"]) if (defining.some((m) => m.what === w)) why.push(`lived:${w}`);
+  for (const w of ["bereaved", "ruined", "evicted", "left_on_order"]) if (defining.some((m) => m.what === w)) why.push(`lived:${w}`);
   if (record.circumstances?.housed === 0) why.push("homeless");
   if (zAgency <= -1) why.push("agency_low");
   return why;

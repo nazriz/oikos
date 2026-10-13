@@ -500,6 +500,8 @@ Additions only; no schema file changed in shape, nothing renamed or removed. A l
 ## Changes since v0.8 closed (2026-10-13: four platform faults from the sixth living pilot; docs/decisions.md, "Four platform faults from the sixth living pilot"; under the owner's blanket approval of contract changes, 2026-10-11)
 
 - **Log: refusal code `offer_withdrawn`** (additive; `log.schema.json` `RefusalCode`): a `sign_agreement` on an agreement its owner has withdrawn before every party had signed. It is refused and leaves no record. Logs written before it may hold such a signature on the record (the books count it as nothing, docs/behaviour/offers.md); they replay only on the build that wrote them.
+- **Measures: `town/possession` gains a last column `left_on_order`** (tenants who left a home on a possession order with no warrant carried out on it first). **Entity records: `memory[].what` gains the word `left_on_order`** (free text; additive: records written before keep `evicted`). The exit-account strata and dark rule read it as they read `evicted`.
+- **Measures: nothing else moves**; `outcome` records of a person already carried `how` (`removed`, `left_on_order`, `left_on_notice`).
 
 ## Versioning
 

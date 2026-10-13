@@ -98,6 +98,11 @@ export interface InnerParams {
   memory: { recent: number; defining: number; /** An event at least this large is kept for good (the largest few). */ defining_bps: number };
 }
 
+/** Events that are a kind of their own on the record and weigh as another kind does: leaving a home on the tribunal's
+ * order (no warrant carried out) is not being put out by officers, and a record says which, but it costs a person what
+ * being made to leave costs (docs/behaviour/justice.md, "Left on an order"). */
+const LIKE: { [what: string]: string } = { left_on_order: "evicted" };
+
 export const INNER_DEFAULTS: InnerParams = {
   trust: { start_bps: 5_000, spread_bps: 1_500, values_bps: 500, good_bps: 300, bad_bps: 600, heard_bps: 5_000, return_half_life_days: 730, kept: 12 },
   agency: { mean_bps: 5_000, sd_bps: 2_000, worked_bps: 300, failed_bps: 300, done_to_bps: 600, return_half_life_days: 365 },
@@ -397,11 +402,12 @@ export class Inner {
    */
   happened(what: string, t: number, o: { about?: string; closeness?: number; size?: number } = {}): void {
     const c = Math.max(0, Math.min(1, o.closeness ?? 1));
-    const dents = this.p.needs.dents[what];
+    const like = LIKE[what] ?? what; // (a kind of its own on the record, weighed as the kind it is a case of)
+    const dents = this.p.needs.dents[like];
     if (dents?.belonging) this.dentBy("belonging", dents.belonging * c, t);
     if (dents?.meaning) this.dentBy("meaning", dents.meaning * c, t);
-    this.shock(what, c);
-    const size = Math.round(o.size ?? Math.max(dents?.belonging ?? 0, dents?.meaning ?? 0, this.p.values.shocks[what] ? this.p.memory.defining_bps : 1_000) * c);
+    this.shock(like, c);
+    const size = Math.round(o.size ?? Math.max(dents?.belonging ?? 0, dents?.meaning ?? 0, this.p.values.shocks[like] ? this.p.memory.defining_bps : 1_000) * c);
     this.remember({ t, what, ...(o.about !== undefined ? { about: o.about } : {}), size });
   }
 

@@ -1665,7 +1665,9 @@ export const citizen: BehaviourModule = {
       if (home && (put ? (!put.stays && t >= put.by) || (!put.stays && t >= endsAt(home)) : t >= endsAt(home))) {
         if (put) {
           outcome({ t, domain: "home", option: home.space, kind: "evicted", way: "mine", from: home.landlord, facts: { how: put.removed ? "removed" : put.ordered ? "left_on_order" : "left_on_notice" } });
-          inner.happened("evicted", t, { about: home.landlord });
+          // (What it is called on the record: put out on a warrant, or given notice and gone, is "evicted"; gone on the
+          // tribunal's order with no warrant carried out is its own kind, which dents and shocks as "evicted" does.)
+          inner.happened(put.ordered && !put.removed ? "left_on_order" : "evicted", t, { about: home.landlord });
           // (Ours to end on the record too, if nobody has: we are gone.)
           if (endsAt(home) === Number.MAX_SAFE_INTEGER || t < endsAt(home)) if (!(book.notices.get(home.agreement) ?? []).some((n) => n.as === me)) steps.push(because(put.removed ? "We have been put out of our home on the tribunal's warrant." : put.ordered ? "The tribunal has ordered us out of our home, and its date has come: leaving." : "We cannot pay what is owed and have been given notice to vacate: leaving.", notice(home.agreement, "Leaving: told to vacate for arrears.")));
         }

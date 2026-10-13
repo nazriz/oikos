@@ -365,3 +365,16 @@ test("a model nobody has measured gets the floor: the greater of the old reckoni
   // An account is not sized where there are none.
   expect(endNeedMicroUsd(COSTS, { seats: 1, seatModel: SONNET, seatReckoned: 0 }).account).toBeUndefined();
 });
+
+test("an exit account tells leaving on the tribunal's order from being put out or given notice: its own stratum, dark like the others, and said plainly to the author", () => {
+  const left = person("c0773", [{ what: "left_on_order", about: "landlord-13" }]);
+  left.record.memory.defining = [{ t: 67 * 86_400, what: "left_on_order", about: "landlord-13", size: 5_000 } as any];
+  expect(strataOf(left.record)).toEqual(["evicted"]); // (still one of those who lost a home against their will)
+  expect(darkAccount(left.record, 0)).toContain("lived:left_on_order");
+  const text = renderAccountBrief({ person: "c0773", record: left.record, means: { income: "$0.00", savings: "$2,162.60" }, days: 90, strata: [], dark: [], names: { "landlord-13": "Property Co. 13", c0773: "c0773" } });
+  expect(text).toContain("left the home on the tribunal's order, with no warrant carried out (Property Co. 13)");
+  expect(text).not.toMatch(/evicted|put out/);
+  // The others are as they were.
+  expect(renderAccountBrief({ person: "c0007", record: person("c0007", [{ what: "put_out", about: "police" }]).record, means: { income: "$1.00", savings: "$1.00" }, days: 20, strata: [], dark: [] })).toContain("put out (police)");
+});
+

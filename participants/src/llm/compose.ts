@@ -73,6 +73,9 @@ const way = (w: string) => WAY_WORDS[w] ?? WAY_WORDS[w.split(":")[0]!] ?? w.repl
 const level = (bps: number, words: [string, string, string, string, string]) => words[bps >= 8_000 ? 4 : bps >= 6_000 ? 3 : bps >= 4_000 ? 2 : bps >= 2_000 ? 1 : 0];
 const sorted = (o: { [k: string]: number }) => Object.entries(o).sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1));
 const plain = (s: string) => s.replace(/_/g, " ");
+/** A memory the record names in a word that does not read as itself: said plainly, and so that it is not told as another
+ * (leaving on the tribunal's order is not being put out by officers, nor given notice). */
+const MEMORY_WORDS: { [what: string]: string } = { left_on_order: "left the home on the tribunal's order, with no warrant carried out" };
 const day = (t: number) => `day ${Math.floor(t / 86_400)}`;
 
 /** The brief in plain words: what the model is shown, and all it is shown. Code-rendered, so what it may say is testable. */
@@ -114,7 +117,7 @@ export function recordLines(who: string, r: any, means: { income: string; saving
   if (r.beliefs?.length) lines.push(`What they hold to: ${(r.beliefs as { teaching: string; bps: number; from?: string }[]).map((x) => `what ${x.from ?? x.teaching} teaches, ${level(x.bps, ["barely", "a little", "somewhat", "firmly", "very firmly"])}`).join("; ")}.`);
   const wants = (r.wants ?? []) as { about: string; whom?: string; tried: number; way?: string; since: number }[];
   if (wants.length) lines.push(`What else they are trying to bring about: ${wants.map((w) => `${plain(w.about)}${w.whom ? ` (about ${w.whom})` : ""}, tried ${w.tried} time${w.tried === 1 ? "" : "s"}${w.way ? `, lately by ${way(w.way)}` : ""}`).join("; ")}.`);
-  const mem = (x: { t: number; what: string; about?: string; by?: string }) => `${day(x.t)}: ${plain(x.what)}${x.about ? ` (${plain(x.about)})` : ""}${x.by ? `, ${x.what.startsWith("want_") ? way(x.by) : plain(x.by)}` : ""}`;
+  const mem = (x: { t: number; what: string; about?: string; by?: string }) => `${day(x.t)}: ${MEMORY_WORDS[x.what] ?? plain(x.what)}${x.about ? ` (${plain(x.about)})` : ""}${x.by ? `, ${x.what.startsWith("want_") ? way(x.by) : plain(x.by)}` : ""}`;
   if (r.memory?.defining?.length) lines.push(`What has defined them: ${(r.memory.defining as any[]).map(mem).join("; ")}.`);
   if (r.memory?.recent?.length) lines.push(`What has happened lately: ${(r.memory.recent as any[]).map(mem).join("; ")}.`);
   return lines;
