@@ -102,7 +102,7 @@ test("dial on, in a living town: people hold norms in their records, within thei
       if (r.sections.character) continue;
       people++;
       check("entity-record#/$defs/PersonRecord", r.sections);
-      const norms = r.sections.norms as { conduct: string; numbers: number[] }[] | undefined;
+      const norms = r.sections.norms as (number[] | null)[] | undefined;
       if (norms) {
         withNorms++;
         expect(norms.length).toBeLessThanOrEqual(12);

@@ -4,7 +4,7 @@
 
 import { expect, test } from "bun:test";
 import { CATCHING_UP, citizen } from "../src/behaviour/citizen";
-import { Culture, CULTURE_DEFAULTS, CULTURE_WORDS, cultureDial, ROUTES, standardNormal, type Conduct, type CultureEnv } from "../src/behaviour/culture";
+import { Culture, CULTURE_DEFAULTS, CULTURE_WORDS, cultureDial, normsRows, ROUTES, standardNormal, type Conduct, type CultureEnv } from "../src/behaviour/culture";
 import { VALUES } from "../src/behaviour/mind";
 import { RECORD } from "../src/module";
 import { Randomness } from "../src/rng";
@@ -102,7 +102,7 @@ function watched(params: object, dials?: object) {
 }
 const PARAMS = { complain_to: "town", complain_bps: 3_000, possession: { stay_bps: 2_000, obey_bps: 5_000, answer_bps: 6_000 }, origin: "north" };
 const DIALS = { culture: { profile: { conducts: { complain: { does_bps: 3_000, approves_bps: 5_000 } }, homophily_bps: 6_000 } } };
-const valueOf = (kept: any, conduct: string, k: number) => kept.record.norms.find((x: any) => x.conduct === conduct).numbers[k] as number;
+const valueOf = (kept: any, conduct: string, k: number) => normsRows(kept.record.norms).find((x) => x.conduct === conduct)!.numbers[k] as number;
 
 test("a citizen's picture moves from what a tie told it; an unrelated line, or a word that is not in the phrasing, moves nothing", async () => {
   const a = watched(PARAMS, DIALS.culture ? DIALS : undefined);

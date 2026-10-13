@@ -175,6 +175,14 @@ const clamp = (x: number, lo = 0, hi = 10_000) => Math.max(lo, Math.min(hi, Math
 const sd = (z: number) => Math.max(-3, Math.min(3, z));
 const half = (days: number, h: number) => Math.pow(0.5, days / h);
 
+/** A conduct's five numbers in the record: [does, approves, own, says, n]. */
+export type NormsRow = [number, number, number, number, number];
+/** The record's `norms`: one place for each conduct of `CONDUCTS`, in that order, null where the person holds none. */
+export type NormsSection = (NormsRow | null)[];
+/** The record's norms as named rows (for a reader of a log or a test): the conduct, and its numbers. */
+export const normsRows = (section: NormsSection | undefined): { conduct: Conduct; numbers: NormsRow }[] =>
+  (section ?? []).flatMap((r, i) => (r ? [{ conduct: CONDUCTS[i]!, numbers: r }] : []));
+
 /** A person's own act at an occasion, kept for `news_days` to be told: to whom already told, so it is counted once by each. */
 interface Act { conduct: Conduct; did: boolean; t: number; told: Set<string> }
 
@@ -313,20 +321,24 @@ export class Culture {
 
   // ---------------------------------------------------------------- the record
 
-  /** The record's section: a conduct a row, its five numbers in order [does, approves, own, says, n], the first four in whole percent
-   * (bounded: 12 rows, whatever the town or the time; the compact form keeps the log, which carries every rewrite, small). */
-  section(t: number): { conduct: string; numbers: [number, number, number, number, number] }[] {
+  /** The record's section, positional: the place in `CONDUCTS` is the conduct (so no name is written), a row its five numbers in order
+   * [does, approves, own, says, n], the first four in whole percent; `null` where the person holds no such conduct, the tail of nulls left off.
+   * Bounded (12 places, whatever the town or the time). A record is canonicalised and hashed whole at every change, so a section pays for each
+   * byte every time anything in the record moves: named rows were 400 bytes of a 1,700-byte record, this is about 120. */
+  section(t: number): NormsSection {
     // (Worked out again only when a picture has moved or `REFRESH_DAYS` have passed: `own` and `says` drift slowly with the days and the values,
     // and the record is written again only for a move of 2 in 100, so a month's staleness changes nothing written. Nothing runs daily.)
     if (this.cached && !this.dirty && t - this.cachedAt < REFRESH_DAYS * 86_400 && t >= this.cachedAt) return this.cached;
     this.dirty = false;
     this.cachedAt = t;
-    return (this.cached = this.held.map((c) => {
-      const r = this.read(c, t)!;
-      return { conduct: c, numbers: [Math.round(r.does / 100), Math.round(r.approves / 100), Math.round(r.own / 100), Math.round(r.says / 100), Math.round(r.n)] as [number, number, number, number, number] };
-    }));
+    const rows: NormsSection = CONDUCTS.map((c) => {
+      const r = this.read(c, t);
+      return r ? [Math.round(r.does / 100), Math.round(r.approves / 100), Math.round(r.own / 100), Math.round(r.says / 100), Math.round(r.n)] as NormsRow : null;
+    });
+    while (rows.length && rows[rows.length - 1] === null) rows.pop();
+    return (this.cached = rows);
   }
-  private cached: { conduct: string; numbers: [number, number, number, number, number] }[] | undefined;
+  private cached: NormsSection | undefined;
   private cachedAt = 0;
   private dirty = true;
 }

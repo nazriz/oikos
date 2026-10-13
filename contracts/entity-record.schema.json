@@ -447,23 +447,14 @@
           }
         },
         "norms": {
-          "description": "What the person takes those around them to do and approve of, for each conduct the world holds (docs/design/ai-citizens.md section 14; docs/behaviour/culture.md): for each conduct five `numbers`: `does`, of those they know of who met the occasion, the share they take to have done it; `approves`, how far they take those around them to approve; `own`, what they think themselves, from their values; `says`, what they say when asked (each a whole percent); and `n`, how much they have seen, as a weight held to a window. One person's belief, never the town's. Written again when a figure has moved by 2 in 100. Absent where the culture dial is off.",
+          "description": "What the person takes those around them to do and approve of, for each conduct the world holds (docs/design/ai-citizens.md section 14; docs/behaviour/culture.md). POSITIONAL: the place in the closed list of conducts is the conduct (answer_tribunal, stay_past_notice, take_to_tribunal, complain, take_in, join_union, strike, take_from_employer, apply_possession, heads_before_hours, order_possession, then room for one more), null where the person holds none, trailing nulls left off. A conduct's five numbers are `does`, of those they know of who met the occasion, the share they take to have done it; `approves`, how far they take those around them to approve; `own`, what they think themselves, from their values; `says`, what they say when asked (each a whole percent); and `n`, how much they have seen, as a weight held to a window. One person's belief, never the town's. Written again when a figure has moved by 2 in 100. Absent where the culture dial is off. (Positional because a record is canonicalised and hashed whole at every change: named rows were a quarter of a record.)",
           "type": "array",
           "maxItems": 12,
           "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["conduct", "numbers"],
-            "properties": {
-              "conduct": { "type": "string", "maxLength": 40 },
-              "numbers": {
-                "description": "[does, approves, own, says, n], in that order: the first four whole percent (0 to 100), n the weight of what has been seen (a whole number, held to a window).",
-                "type": "array",
-                "minItems": 5,
-                "maxItems": 5,
-                "items": { "type": "integer", "minimum": 0, "maximum": 1000 }
-              }
-            }
+            "oneOf": [
+              { "type": "null" },
+              { "type": "array", "minItems": 5, "maxItems": 5, "items": { "type": "integer", "minimum": 0, "maximum": 1000 } }
+            ]
           }
         },
         "wants": {

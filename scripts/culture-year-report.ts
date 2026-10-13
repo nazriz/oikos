@@ -5,6 +5,7 @@
 import { readFileSync } from "node:fs";
 import { generate } from "../worlds/generator/generate";
 import { recordChanges } from "../orchestrator/src/records";
+import { normsRows } from "../participants/src/behaviour/culture";
 
 const [log, profile, seed] = [process.argv[2]!, process.argv[3]!, Number(process.argv[4] ?? 1)];
 const DAY = 86_400;
@@ -23,7 +24,7 @@ const snap = (day: number) => {
 let next = 0;
 for await (const c of recordChanges(log)) {
   while (next < CHECK.length && c.t >= CHECK[next]!) snap(CHECK[next++]! / DAY);
-  if (c.set.norms) latest.set(c.entity, c.set.norms as any);
+  if (c.set.norms) latest.set(c.entity, normsRows(c.set.norms as any));
 }
 while (next < CHECK.length) snap(CHECK[next++]! / DAY);
 const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / Math.max(1, xs.length);
