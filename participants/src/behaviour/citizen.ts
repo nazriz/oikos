@@ -576,6 +576,7 @@ export const citizen: BehaviourModule = {
     // twentieth of itself, below). Needs, values and what is remembered are written whenever they change.
     const GRAIN: { [section: string]: number } = { agency: 50, trust: 100, attached: 200, views: 200, ties: 500, beliefs: 100 };
     let hoursAt = 0;
+    let normsNow: ReturnType<Culture["section"]> | undefined, normsWritten: typeof normsNow;
     /** The record as it stands, for the kernel to hold (contracts/entity-record.schema.json): the sections that have
      * moved since they were last written, to go with our next action. `adult`: needs and the rest are judged. */
     const writeRecord = (t: number, adult: boolean, means?: { income: number; savings: number }) => {
@@ -598,11 +599,13 @@ export const citizen: BehaviourModule = {
         }),
         // (Wants: docs/design/ai-citizens.md 10a. A want held with one's household names it.)
         wants: initiative ? wants.section() : [],
-        ...(cul ? { norms: cul.section(t) } : {}),
+        // (Only when the picture has been worked out again: the same array as last time is not compared again.)
+        ...(cul && (normsNow = cul.section(t)) !== normsWritten ? { norms: normsNow } : {}),
         memory: sec.memory,
         circumstances: { household: household?.members.length ?? 1, housed: home || livingAt ? 1 : 0, working: job || ownWork ? 1 : 0, retired: retired ? 1 : 0,
           ...(means ? { income: whole(means.income), savings: whole(means.savings) } : {}) },
       };
+      if (all.norms) normsWritten = all.norms as typeof normsNow;
       // Where the hours went: a week's at a time.
       if (t - hoursAt >= 7 * DAY) {
         hoursAt = t;
@@ -632,7 +635,11 @@ export const citizen: BehaviourModule = {
     /** A cited rate of turning to an institution, as this person's trust in it and their sense of agency sway it
      * (docs/behaviour/citizen.md "Readers"): symmetric about the town's mean, so the town's rate stays as
      * calibrated. Read only for one who takes initiative. */
-    const reads = (bps: number, who: string): number => (initiative ? swayed(swayed(bps, inner.zTrust(who, kindOf(who), lastSeenT), wants.p.sway.trust), inner.zAgency(), wants.p.sway.agency) : bps);
+    const reads = (bps: number, who: string, conduct?: Conduct): number => {
+      const read = initiative ? swayed(swayed(bps, inner.zTrust(who, kindOf(who), lastSeenT), wants.p.sway.trust), inner.zAgency(), wants.p.sway.agency) : bps;
+      // (And, where the world has culture on, the lean of what we take those around us to do and approve of: one bounded term, beside trust and agency.)
+      return cul && conduct ? cul.term(read, conduct, lastSeenT) : read;
+    };
     /** A member of an organisation now: a membership agreement with it in force. */
     /** How much of a month of our household's essentials a fund's stated draw would cover (0 to 1); undefined for
      * what is no fund. Under `FUND_WORTH_MIN` a fund does not answer "nothing to fall back on" for us at all. */
@@ -2489,7 +2496,7 @@ export const citizen: BehaviourModule = {
         const creed = p.union ? (p.sway.union_belief * holdTo(p.union)) / 10_000 : 0;
         // And by what the model says it would mean to someone like us, if asked.
         const meant = saidJoin ? (p.sway.consult * ((saidJoin.join ?? 0) - (saidJoin.not ?? 0))) / 10_000 : 0;
-        const chance = shifted(rate, p.sway.union_join * (zValue("benevolence") + zValue("universalism")) / 2 + learnedMember + conform + creed + meant);
+        const chance = shifted(rate, p.sway.union_join * (zValue("benevolence") + zValue("universalism")) / 2 + learnedMember + conform + creed + meant + (cul ? (cul.p.sway_milli / 1_000) * cul.lean("join_union", t) : 0));
         const joins = !member && ctx.rng(`join-${job.agreement}`).below(10_000) < chance;
         if (!member) cul?.act("join_union", joins, t);
         // Recorded as the mind's decision (docs/design/ai-citizens.md 7): weighed, from the chance as the person came to it.
@@ -2620,7 +2627,7 @@ export const citizen: BehaviourModule = {
         const solidarity = (zValue("benevolence") + zValue("universalism")) / 2;
         // (A ballot about a workplace we've left isn't ours to vote in.)
         if (r.kind === "action_ballot" && r.data?.employer === job?.employer && ctx.rng(`turnout-${r.id}`).below(10_000) < shifted(p.ballot_turnout_bps, p.sway.turnout * solidarity)) {
-          const yes = ctx.rng(`vote-${r.id}`).below(10_000) < shifted(p.strike_vote_yes_bps, p.sway.strike_vote * (solidarity - zValue("security")));
+          const yes = ctx.rng(`vote-${r.id}`).below(10_000) < shifted(p.strike_vote_yes_bps, p.sway.strike_vote * (solidarity - zValue("security")) + (cul ? (cul.p.sway_milli / 1_000) * cul.lean("strike", t) : 0));
           cul?.act("strike", yes, t);
           steps.push(because(`The union's protected action ballot: voting ${yes ? "yes" : "no"}.`, vote(r.id, yes ? "yes" : "no")));
         }
@@ -2753,7 +2760,7 @@ export const citizen: BehaviourModule = {
           const adultsIn = Number(r.data?.adults ?? 1), kids = Number(r.data?.children ?? 0), without = Number(r.data?.without_income ?? 0);
           const place = home?.movedIn ? home.space : null;
           const lean0 = initiative ? Math.max(-3, Math.min(3, zValue("benevolence"))) : 0;
-          const willingOurselves = vouched || (ties.affinity(asker, t) >= Math.round(p.stay.willing_affinity_bps * (1 - 0.3 * lean0)) && (ties.trust(asker) ?? 0) >= (p.outlook.people_bps ?? 5_000));
+          const willingOurselves = vouched || (ties.affinity(asker, t) >= (cul ? cul.term(Math.round(p.stay.willing_affinity_bps * (1 - 0.3 * lean0)), "take_in", t, -1) : Math.round(p.stay.willing_affinity_bps * (1 - 0.3 * lean0))) && (ties.trust(asker) ?? 0) >= (p.outlook.people_bps ?? 5_000));
           // (We live in a home that is someone else's to open, and would have them: we put it to whoever holds it.)
           if (!place && !vouched && !stay && livingAt && household && household.leaseholder !== me && willingOurselves) {
             outcome({ t, domain: "home", option: livingAt, kind: "asked_for_another", way: "mine", from: asker, facts: { adults: adultsIn, children: kids } });
@@ -2769,7 +2776,7 @@ export const citizen: BehaviourModule = {
             : !willingOurselves ? "not_willing" : undefined;
           if (!why) tookIn.add(asker);
           if (!why || why === "not_willing") cul?.act("take_in", !why, t); // (no room or no means is not a matter of willingness)
-          outcome({ t, domain: "home", option: place ?? "none", kind: why ? "declined_to_take_in" : "took_in", way: "mine", from: asker, facts: { adults: adultsIn, children: kids, ...(why ? { why } : {}) } });
+          outcome({ t, domain: "home", option: place ?? "none", kind: why ? "declined_to_take_in" : "took_in", way: "mine", from: asker, facts: { adults: adultsIn, children: kids, ...(why ? { why } : {}), ...(cul?.facts("take_in", t) ?? {}) } });
           steps.push(because(why ? `${asker} asks whether their household may stay with us: ${why === "not_mine" ? "the home is not ours to open" : why === "hosting" ? "someone is staying with us already" : why === "no_room" ? "there is no room for them here" : why === "means" ? "we could not carry them" : "we are not close enough to them"}; saying no.` : `${asker} asks whether their household may stay with us: there is room, and we are willing; saying yes.`,
             say("stay_answer", why ? `Answer to your asking ${asking}: no, we cannot take you in.` : `Answer to your asking ${asking}: yes. Come and stay with us at ${place}.`, { to: [asker], visible: [me, asker], basis: r.id, data: { request: asking, yes: !why, ...(why ? { why } : { space: place }) } })));
           continue;
@@ -2821,10 +2828,10 @@ export const citizen: BehaviourModule = {
         if (r.kind === "notice_to_vacate" && r.data?.lease === home.agreement && (r.addressed_to ?? []).includes(me)) {
           // (A notice whose date had gone before it is first on our file, and we are still here: we stayed. That was
           // decided then; it is not drawn again.)
-          const stays = Number(r.data.by) <= r.at && r.data?.brought_forward ? true : fixed(`stay-${home.agreement}`).below(10_000) < (p.possession?.stay_bps ?? 0);
+          const stays = Number(r.data.by) <= r.at && r.data?.brought_forward ? true : fixed(`stay-${home.agreement}`).below(10_000) < (cul ? cul.term(p.possession?.stay_bps ?? 0, "stay_past_notice", t) : (p.possession?.stay_bps ?? 0));
           if (!(Number(r.data.by) <= r.at && r.data?.brought_forward)) cul?.act("stay_past_notice", stays, t);
           home.vacate = { paper: r.id, by: Number(r.data.by) || t, stays };
-          outcome({ t, domain: "home", option: home.space, kind: "notice_to_vacate", way: "mine", from: home.landlord, facts: { arrears: cents(r.data.arrears ?? 0), by: home.vacate.by, stays } });
+          outcome({ t, domain: "home", option: home.space, kind: "notice_to_vacate", way: "mine", from: home.landlord, facts: { arrears: cents(r.data.arrears ?? 0), by: home.vacate.by, stays, ...(cul?.facts("stay_past_notice", t) ?? {}) } });
           inner.doneTo();
           // What being told to leave does to a tenant, whoever the landlord is and whatever paper says it: until
           // 2026-10-12 it was done by a notice on the lease alone, and under a law on possession that comes only
@@ -2881,10 +2888,11 @@ export const citizen: BehaviourModule = {
               bps = swayed(bps, -(feelings.level("fear", home.landlord, t) - 5_000) / 5_000, S.agency);
               bps = swayed(bps, goTo === "nowhere" ? 0.5 : -0.5, S.attachment);
             }
+            if (cul) bps = cul.term(bps, "answer_tribunal", t);
             answers = fixed(`answer-${home.agreement}-${nth}`).below(10_000) < bps;
           }
           cul?.act("answer_tribunal", answers, t);
-          outcome({ t, domain: "home", option: home.space, kind: "possession_applied", way: "mine", from: home.landlord, facts: { owed: claimed, answer_by: Number(r.data.answer_by ?? r.data.hearing_at ?? t), offer, answers } });
+          outcome({ t, domain: "home", option: home.space, kind: "possession_applied", way: "mine", from: home.landlord, facts: { owed: claimed, answer_by: Number(r.data.answer_by ?? r.data.hearing_at ?? t), offer, answers, ...(cul?.facts("answer_tribunal", t) ?? {}) } });
           if (answers) {
             // (How ready we are to say what we think of it: the gap our record keeps between what we think of the
             // landlord and what we say. Each further thing is told or left out by it; the money is always said.)
@@ -3058,10 +3066,10 @@ export const citizen: BehaviourModule = {
         // as it was meanwhile; an invalid notice changes nothing.
         if (p.tribunal && !challenged.has(r.id) && r.speaks_for && breaches(book, { block: "publish", kind: "rent_increase", data: r.data }, r.speaks_for, r.at).length) {
           challenged.add(r.id);
-          const challenging = ctx.rng(`challenge-${r.id}`).below(10_000) < reads(p.tribunal.challenge_bps, p.tribunal.entity);
+          const challenging = ctx.rng(`challenge-${r.id}`).below(10_000) < reads(p.tribunal.challenge_bps, p.tribunal.entity, "take_to_tribunal");
           cul?.act("take_to_tribunal", challenging, t);
           if (challenging) {
-            outcome({ t, domain: "home", option: home.space, kind: "rent_increase", way: "mine", facts: { rent, was: home.rent, from: Number(r.data.from), challenged: true }, felt: [felt("feel", "anger", home.landlord, 4_000, t)] });
+            outcome({ t, domain: "home", option: home.space, kind: "rent_increase", way: "mine", facts: { rent, was: home.rent, from: Number(r.data.from), challenged: true, ...(cul?.facts("take_to_tribunal", t) ?? {}) }, felt: [felt("feel", "anger", home.landlord, 4_000, t)] });
             steps.push(because(`A notice of rent increase that breaks the law: taking it to the tribunal, and paying the rent as it was meanwhile.`,
               say("tribunal_application", `Application: the notice of rent increase ${r.id} from ${r.speaks_for} breaks the law; we ask that it be found invalid.`, { to: [p.tribunal.entity], visible: [me, p.tribunal.entity, r.speaks_for], basis: r.id, data: { kind: "rent_increase", against: r.speaks_for, notice: r.id, evidence: evidence(r) } })));
             continue;
@@ -3327,7 +3335,7 @@ export const citizen: BehaviourModule = {
         // (And only while it's still there, a week or more on.)
         // (For one who takes initiative it is a grievance against whoever should have come, held until it is seen to.)
         if (now > 0 && days >= 7 && feelings.level("anger", p.complain_to, t) >= bearing && complainedOf !== home.structure) wantBorn(t, "service", [], feelings.level("anger", p.complain_to, t) / 10_000, "shelter", { whom: p.complain_to });
-        const writes = complainNow || ctx.rng(`complain`).below(10_000) < reads(p.complain_bps, p.complain_to);
+        const writes = complainNow || ctx.rng(`complain`).below(10_000) < reads(p.complain_bps, p.complain_to, "complain");
         complainNow = false;
         // (An occasion for the town's culture: a service failed and we are angry enough; noted once if we did not write, and when we do.)
         if (cul && now > 0 && days >= 7 && feelings.level("anger", p.complain_to, t) >= bearing && complainedOf !== home.structure && (writes || !complainNoted.has(home.structure))) {
@@ -3645,7 +3653,7 @@ export const citizen: BehaviourModule = {
         // (A want long unmet, with little trust in the town and little belief that anything one does counts, sways it:
         // symmetric about the town's mean, as every sway is. Circumstances still decide who is ever in this position.)
         const strain = initiative && wants.all().some((w) => w.grown > 0 || w.tried >= wants.p.tries) ? -(inner.zAgency() + (p.electoral_town ? inner.zTrust(p.electoral_town, "government", t) : 0)) / 2 : 0;
-        const chance = swayed(Math.round((p.crime.take_bps * (10_000 - p.crime.caught_bps)) / 10_000), strain, wants.p.sway.agency);
+        const chance = (cul ? (x: number) => cul.term(x, "take_from_employer", t) : (x: number) => x)(swayed(Math.round((p.crime.take_bps * (10_000 - p.crime.caught_bps)) / 10_000), strain, wants.p.sway.agency));
         const homeAt = home?.movedIn ? structureOf(home.space) : livingAt ? structureOf(livingAt) : undefined;
         const takes = !!homeAt && ctx.rng(`take`).below(10_000) < chance;
         if (homeAt) cul?.act("take_from_employer", takes, t);
@@ -4331,7 +4339,7 @@ export const citizen: BehaviourModule = {
         pursued.add(c.id);
         const owed = cents(c.about.amount) - (settledToUs.get(c.id) ?? 0);
         if (owed <= 0 || !acc) continue;
-        const applying = applyDebtNow.has(c.id) || ctx.rng(`apply-${c.id}`).below(10_000) < reads(tr.apply_bps, tr.entity);
+        const applying = applyDebtNow.has(c.id) || ctx.rng(`apply-${c.id}`).below(10_000) < reads(tr.apply_bps, tr.entity, "take_to_tribunal");
         if (!applyDebtNow.has(c.id)) cul?.act("take_to_tribunal", applying, t);
         if (!applying) continue;
         steps.push(because(`${c.counterparty} still owes us ${usd(owed)} (${c.about.for ?? "a debt"}), ${Math.floor((t - c.at) / DAY)} days on: applying to the tribunal.`,

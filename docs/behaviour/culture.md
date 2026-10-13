@@ -67,7 +67,7 @@ Nothing in code makes any group better or worse at anything, and no conduct is d
 
 ## Where it is in the decisions (step 3)
 
-One bounded term per conduct, at the draw the conduct already has; the outcome that follows records the four numbers and the lean (`norm_does`, `norm_approves`, `norm_own`, `norm_says`, `norm_lean`, whole percent / hundredths of a standard deviation, in its `facts`).
+One bounded term per conduct, at the draw the conduct already has (`citizen.ts`): `answer_tribunal`, `stay_past_notice` and `take_from_employer` sway the rate before the draw; `take_to_tribunal` (a rent rise challenged, a debt applied for) and `complain` sway it inside `reads`, beside trust and agency; `take_in` sways the affinity a tie must have (a lean toward yes lowers it); `join_union` and `strike` add the lean (times the sway) to the shift beside `union_peers` and the vote's own shift. Where the choice already has an outcome (answer, stay, challenge, take in), the outcome records the numbers and the lean (`norm_does`, `norm_approves`, `norm_own`, `norm_says`, whole percent; `norm_lean`, hundredths of a standard deviation, in its `facts`); join, strike, complain and take have none, so their lean is not recorded. **Not built:** the term on a want's way (`adj` of `waysFor`, `pursue`).
 
 ## Not built here (steps 4 to 9 of the plan)
 
@@ -75,4 +75,4 @@ Breaking one seen, esteem, what is said in company, children's and newcomers' pi
 
 ## Cost
 
-Nothing runs daily. A norm moves at a catch-up, a sighting or a published count; fading is worked out when a figure is read. A decision costs one term, about ten integer operations. See docs/decisions.md for the measured log size and time.
+Nothing runs daily. A norm moves at a catch-up, a sighting or a published count; fading is worked out when a figure is read. A decision costs one term, about ten integer operations. Measured (docs/decisions.md, "Culture: building it"): culture's own computing is about 0.3% of a run's time; carrying the section in each record adds about 2.3% (every record change rehashes a bigger record) and 0.4% to the compressed log.

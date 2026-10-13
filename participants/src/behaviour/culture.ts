@@ -279,12 +279,14 @@ export class Culture {
     const held = Math.min(this.p.window, this.n.get(c)! + w);
     this.does.set(c, clamp(this.does.get(c)! + ((x - this.does.get(c)!) * w) / held));
     this.n.set(c, held);
+    this.dirty = true;
   }
   /** Heard what someone says of it: the same rule on `approves`, from what others say, not what they are thought to think. */
   hearSaid(c: Conduct, bps: number, route: Route): void {
     if (!this.has(c)) return;
     const w = this.weight(route);
     this.approves.set(c, clamp(this.approves.get(c)! + ((clamp(bps) - this.approves.get(c)!) * w) / (this.n.get(c)! + w)));
+    this.dirty = true;
   }
 
   // ---------------------------------------------------------------- telling
@@ -314,12 +316,23 @@ export class Culture {
   /** The record's section: a conduct a row, its five numbers in order [does, approves, own, says, n], the first four in whole percent
    * (bounded: 12 rows, whatever the town or the time; the compact form keeps the log, which carries every rewrite, small). */
   section(t: number): { conduct: string; numbers: [number, number, number, number, number] }[] {
-    return this.held.map((c) => {
+    // (Worked out again only when a picture has moved or `REFRESH_DAYS` have passed: `own` and `says` drift slowly with the days and the values,
+    // and the record is written again only for a move of 2 in 100, so a month's staleness changes nothing written. Nothing runs daily.)
+    if (this.cached && !this.dirty && t - this.cachedAt < REFRESH_DAYS * 86_400 && t >= this.cachedAt) return this.cached;
+    this.dirty = false;
+    this.cachedAt = t;
+    return (this.cached = this.held.map((c) => {
       const r = this.read(c, t)!;
-      return { conduct: c, numbers: [Math.round(r.does / 100), Math.round(r.approves / 100), Math.round(r.own / 100), Math.round(r.says / 100), Math.round(r.n)] };
-    });
+      return { conduct: c, numbers: [Math.round(r.does / 100), Math.round(r.approves / 100), Math.round(r.own / 100), Math.round(r.says / 100), Math.round(r.n)] as [number, number, number, number, number] };
+    }));
   }
+  private cached: { conduct: string; numbers: [number, number, number, number, number] }[] | undefined;
+  private cachedAt = 0;
+  private dirty = true;
 }
+
+/** How long the record's section may go without being worked out again when nothing moved a picture. */
+export const REFRESH_DAYS = 30;
 
 /** A standard normal from a stream (the sum of 12 uniforms less 6: the Irwin-Hall approximation the mind uses). */
 export function standardNormal(rng: { below(n: number): number }): number {

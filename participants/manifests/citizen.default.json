@@ -702,6 +702,10 @@
       },
       "source": "placeholder"
     },
+    "sway_milli": {
+      "schema": {},
+      "source": "the world gives it (no default)"
+    },
     "tell_on_leaving": {
       "schema": {
         "type": "array"
