@@ -346,6 +346,11 @@ export class Inner {
 
   // ---------------------------------------------------------------- what is thought and what is said
 
+  /** How much our own mind holds out against what is expected (0..1): a base, and our values (self-direction and universalism raise it, conformity and security lower it). */
+  integrity(): number {
+    return Math.max(0, Math.min(1, (this.p.views.integrity_bps + this.p.views.integrity_values_bps * ((this.zOf("self_direction") + this.zOf("universalism")) / 2 - (this.zOf("conformity") + this.zOf("security")) / 2)) / 10_000));
+  }
+
   /**
    * Our view of someone who holds power over us (Kuran 1995): what we think of them, and what we say. What is said
    * leans from what is thought toward what those around us say (`norm`; none heard: toward saying nothing, 0), by the
@@ -355,7 +360,7 @@ export class Inner {
    */
   view(of: string, think: number, o: { dependence: number; fear: number; trust: number; norm?: number }): View {
     const pressure = (o.dependence / 10_000) * (o.fear / 10_000) * (1 - o.trust / 10_000);
-    const integrity = Math.max(0, Math.min(1, (this.p.views.integrity_bps + this.p.views.integrity_values_bps * ((this.zOf("self_direction") + this.zOf("universalism")) / 2 - (this.zOf("conformity") + this.zOf("security")) / 2)) / 10_000));
+    const integrity = this.integrity();
     const gap = Math.max(0, Math.min(1, pressure * (1 - integrity) * 4)); // (at full pressure and no integrity, wholly the norm; the 4 a PLACEHOLDER scale)
     const priv = clamp(think, -10_000, 10_000);
     const v: View = { of, private: priv, expressed: clamp(priv + gap * ((o.norm ?? 0) - priv), -10_000, 10_000) };

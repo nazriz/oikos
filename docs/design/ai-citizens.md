@@ -679,7 +679,7 @@ A decision without an outcome is one whose run ended first (a gathering decided 
   - **What else moved:** departures and move-ins fall (the artefact going); overcrowding rises where kin are taken in (Tamil Nadu 2.7 to 20 households, Nakuru 7 to 52: a consequence); redundancies rise in Victoria (7.9% to 9.9%; 1.8% sourced), because rent that was not being paid is paid and shops sell about 3% less (a consequence leaning on a known fault); support claims refused fall below the survey's share (a payment in force is never decided: named, not fixed); and runs in which several factories cannot cover their wages late in the year are more frequent in the batches after (Tamil Nadu two of six for one; Victoria's two-year runs one of three for none), **which six runs cannot tell from noise and is the first thing to look at next**.
   - **For the next living pilot:** `opening_caseload` gives the pilots' town 14 tenancies with rent owed and 5 cases before the tribunal where it gave 198 and 49: a seat in the tribunal has little before it again. A sourced rate of arrears is what the option would need to give more, and no profile has one. Founding has fewer occasions too: in the small test town most were about homes nobody could pay for.
 - **Reading: what words mean to a person, planned** (2026-10-13; section 13; docs/decisions.md, "Reading: plan"). The first model slice under Naz's decision of 2026-10-12: a reader model says what a worded paper is like (respect, a reason, whether it answers, recourse, threat, the values it appeals to) and the code mind applies that to each person by their own record, as a shift from the plain paper code would have written. Three kinds of paper: a decision addressed to a person, a public statement, a founder's statement. **Nothing built, no model called; awaiting Naz.** The gate is fixed in 13f before any call.
-- **Culture: what a town holds in common, planned** (2026-10-13; section 14; docs/decisions.md, "Culture: plan"). Code, no model. Three mechanisms: what each person takes those around them to do and to approve of, for a closed list of conducts that already have a draw (four numbers a conduct on the record, moved only by ties, presence and what is published, entering each decision as one bounded term); a town memory of public events (six slots a person, fading, retold, moving trust in an institution once for people it never touched); and an organisation's practice, which a seat is shown as its office's own history. Nothing is the town's: what is held in common is measured outside, from logs. Three conducts asked for are not yet choices anyone makes (rent first, rates, reporting a neighbour) and wait for those. **Nothing built; awaiting Naz** (14m: whether to build; origin as a group; what a seat is shown of its office's past).
+- **Culture: what a town holds in common, planned** (2026-10-13; section 14; docs/decisions.md, "Culture: plan"). Code, no model. Three mechanisms: what each person takes those around them to do and to approve of, for a closed list of conducts that already have a draw (four numbers a conduct on the record, moved only by ties, presence and what is published, entering each decision as one bounded term); a town memory of public events (six slots a person, fading, retold, moving trust in an institution once for people it never touched); and an organisation's practice (a seat is not handed it as ready counts: Naz, 2026-10-13). Nothing is the town's: what is held in common is measured outside, from logs. Three conducts asked for are not yet choices anyone makes (rent first, rates, reporting a neighbour) and wait for those. **Steps 1 to 3 built behind a dial, off by default** (2026-10-13; Naz: build it; origin is a group; a seat is not handed its office's past practice as ready counts; docs/decisions.md, "Culture: building it").
 
 ## 9. What the literature taught, and where it's used
 
@@ -2174,8 +2174,8 @@ tribunal seats wrote orders much alike); whether a reader of the stewards' own f
 
 ## 14. Culture: what a town holds in common
 
-**Status:** a plan awaiting Naz's word. Nothing is built, no model was called, and nothing in a run changes.
-Decision: docs/decisions.md, 2026-10-13, "Culture: plan". Sources: docs/research/references.md, "Culture".
+**Status:** Naz said build it (2026-10-13); steps 1 to 3 are built behind a dial that is off by default; no pilot uses culture until step 9's proof has passed. Nothing in a run with the dial off changes. No model is called anywhere.
+Decisions: docs/decisions.md, 2026-10-13, "Culture: plan" and "Culture: building it, steps 1 to 3" (his rulings: origin is a group; a seat is not handed its office's past practice as ready counts). Sources: docs/research/references.md, "Culture".
 
 **What he asked** (2026-10-13): "do we have any mechanism for culture? we probably need that." Under his standing
 direction: a living world whose people are not frozen; darkness in; nothing over the top; and platform models our
@@ -2214,7 +2214,7 @@ private pictures agree, and a divided one when they agree within a street or a w
 
 **Three mechanisms, in this order:** (1) expectations about conduct (14b to 14d); (2) town memory (14e); (3) an
 organisation's practice (14g). **Not new mechanisms:** customs and difference between groups, which come from
-gatherings and ties already built (14f). **Deferred:** observances on a calendar; origin as a group; taste, dress,
+gatherings and ties already built (14f). **Deferred:** observances on a calendar; taste, dress,
 food and speech; conducts with no choice behind them; punishing at a cost to oneself; a law that provokes the
 opposite of what it says; a story changing as it is retold (it arrives with people who use words); a broken promise
 (needs the check that a published commitment was kept, as 13a found).
@@ -2250,8 +2250,9 @@ right) and an organisation holds its own history of them (14g). Signing a petiti
 - `n`: how much I have seen, as a weight, held to `window`.
 
 **Where it lives.** In the mind's working state as a fixed array (12 conducts of 5 integers), and on the person's
-record as one new section, `norms`, in whole percent, written again only when a figure has moved by 2 in 100. About
-62 bytes a conduct as written: **at most 750 bytes, for ever.** With 14e's memory (at most 450 bytes) a person's
+record as one new section, `norms`, in whole percent, written again only when a figure has moved by 2 in 100. As
+built (2026-10-13) each row is `{conduct, numbers: [does, approves, own, says, n]}`, about 55 bytes: **under 700 bytes
+at 12 conducts, for ever** (named fields would have been about 80 a row, and the log pays for every rewrite). With 14e's memory (at most 450 bytes) a person's
 record goes from 1 to 2 KB to about 2 to 3 KB, under the cap of 8,192 that stands. Neither grows with the town or
 with time.
 
@@ -2384,9 +2385,18 @@ and are deferred; when built they are gatherings on a date, and need nothing new
 **Difference** needs no mechanism: ties are local (household, building, workplace, gathering), so pictures diverge
 by those. A steward can face a works where striking is done and a street where nobody answers a summons. Measured by
 building, workplace, membership and tenure (14h). A profile may give `culture` figures by membership or tenure
-(members of a religious body, renters) where it has a source; then those people start there. **Origin is not in any
-profile and is not added here:** it is where a simulation most easily encodes prejudice (crime.md says the same),
-and it is Naz's ruling (14m).
+(members of a religious body, renters) where it has a source; then those people start there.
+
+**Origin is a group (Naz, 2026-10-13: "yes implement").** Where people come from divides a town as building, workplace,
+membership and tenure do. Its shares are profile data (`values.culture.origin`: the groups the place's own statistics
+name, their shares, how often a couple is of one group, how much likelier a tie is within a group), each with its
+source; a profile with no figure has no such groups. Origin passes to children as the sources say (where they do not,
+a child of a mixed couple takes either parent's, equally). **Origin does two things only:** it makes ties within a
+group likelier (homophily, with a source or a marked placeholder), and, where a source gives a group's figures for a
+conduct, it is where one starts from. Nothing in code makes any group better or worse at anything; prejudice
+between groups may emerge from the mechanisms (a tie cools toward someone for what they did, and ties are mostly
+within groups), and the platform records it and judges nothing. No conduct is defined about a group (14j). No
+place's figure or group name is in code.
 
 ### 14g. An organisation's practice: what a seat inherits
 
@@ -2401,7 +2411,10 @@ office: claims granted.
 **It opens with a past.** The generator gives each organisation the practice its character and the profile's rates
 imply, as `opening_caseload` gives a registry its cases: an office is never new on day 1.
 
-**What a holder is shown.** One more heading in the office's books, "How this office has done things", in counts
+**What a holder is shown. (Superseded 2026-10-13: Naz ruled that a seat is not handed its office's past practice as
+ready counts, since he found it too close to a god's view; step 6 does not build this heading for a seat. Read
+the paragraph as the first plan. What a seat meets of an office's past is the papers on its file and the people who
+deal with it.)** One more heading in the office's books, "How this office has done things", in counts
 and days and nothing else: *"Since 2024: 41 tenancies reached two months behind. This office applied for possession
 in 29, on average 71 days after the rent fell due, and agreed a plan in 8."* It is the office's own record, which is
 its holder's to read (no-god-view: it is theirs). It says nothing of what other landlords do, and nothing of what
@@ -2461,7 +2474,7 @@ Measures in `measure/`, reading record changes and decision annotations; nothing
   as a person or is asked to hold a norm. Exit accounts (an author shown a record, who may decline) will have the
   new sections before them; nothing else changes for the composing model.
 - **Seats.** A seat inherits a practice it did not make and a reputation it cannot see. That is realistic pressure,
-  not added pressure (point 2), and it is shown as the office's record, not as an instruction. The debrief's plain
+  not added pressure (point 2). (Naz, 2026-10-13: it is not shown to the seat as ready counts.) The debrief's plain
   summary should say what the office's practice was when the seat took it and what it was at the end. Whether to
   add one fixed question ("Did how the office had done things before weigh on what you did?") changes the script
   agreed on 2026-10-11, so it is Naz's (14m).
@@ -2526,12 +2539,12 @@ tribunal are a few dozen a year: norms may only show over a year or more, and pr
 approval can be sourced at all for most conducts in most profiles.
 
 **Naz's:**
-1. **Whether to build it** (steps 1 to 7 and 9; no model, no cost but time). Recommended: yes, and no pilot with
-   the dial on until step 9's year has passed.
-2. **Origin as a group.** Recommended: not now. Groups are building, workplace, membership and tenure. Origin only
-   for a profile with a sourced figure, and by his separate ruling, since it is where prejudice gets written in.
-3. **A seat and its office's past.** Recommended: show it, as counts with no advice; add the two plain lines to the
-   debrief's summary and the one question.
+1. **Whether to build it** (steps 1 to 7 and 9; no model, no cost but time). *Ruled 2026-10-13: yes; no pilot with
+   the dial on until step 9's year has passed.*
+2. **Origin as a group.** *Ruled 2026-10-13: yes.* Groups are building, workplace, membership, tenure and origin.
+   Origin from a profile's sourced shares only (14f). Prejudice may emerge; nothing in code makes a group better or worse.
+3. **A seat and its office's past.** *Ruled 2026-10-13: a seat is not handed its office's past practice as ready counts.*
+   (Whether the debrief's summary and one question say anything of it is not settled and not built.)
 
 ## Open
 

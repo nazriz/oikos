@@ -25,11 +25,11 @@ export function callsOf(action: { type: string; call?: string; reasoning?: strin
 }
 
 /** A participant's context: its randomness from a seed, keyed by participant and purpose as the kernel's streams are. */
-export const context = (participant: string, entity: string, params: object, o: { position?: string; seed?: bigint; currency?: object } = {}): any => ({
+export const context = (participant: string, entity: string, params: object, o: { position?: string; seed?: bigint; currency?: object; dials?: object } = {}): any => ({
   participant, entity, position: o.position, params,
   rng: (purpose: string) => new Randomness(o.seed ?? 1n).stream([participant, purpose]),
   chance: (purpose: string) => new Randomness(o.seed ?? 1n).stream(["chance", purpose]),
-  world: { tickSeconds: 3600, runEnd: 4000 * DAY, currency: o.currency },
+  world: { tickSeconds: 3600, runEnd: 4000 * DAY, currency: o.currency, ...(o.dials ? { dials: o.dials } : {}) },
 });
 
 /**
@@ -97,10 +97,10 @@ export interface Woken { records?: any[]; inbox?: any[]; balance?: number; trans
  * own standing orders and statements come back to them as records, as the world would show them; agreements read as
  * `readings` says (kept between wakes).
  */
-export function person(citizen: { create: (ctx: any) => any }, params: object = {}, o: { me?: string; seed?: bigint; age?: number; sex?: "female" | "male"; currency?: object } = {}) {
+export function person(citizen: { create: (ctx: any) => any }, params: object = {}, o: { me?: string; seed?: bigint; age?: number; sex?: "female" | "male"; currency?: object; dials?: object } = {}) {
   const me = o.me ?? "c1";
   const participant = `${me}-self`;
-  const m = citizen.create(context(participant, me, params, { seed: o.seed, currency: o.currency }));
+  const m = citizen.create(context(participant, me, params, { seed: o.seed, currency: o.currency, ...(o.dials ? { dials: o.dials } : {}) }));
   const readings: { [id: string]: object } = {};
   const ids = { n: 0 };
   let balance = 0;

@@ -1348,9 +1348,38 @@
         "cases_per_day": 4,
         "uphold_without_proof_bps": 5000
       }
+    },
+    "culture": {
+      "origin": {
+        "groups": [
+          {
+            "id": "jalisco",
+            "name": "Nacidos en la entidad (born in Jalisco)",
+            "share_bps": 8601
+          },
+          {
+            "id": "otra_entidad",
+            "name": "Nacidos en otra entidad (born in another state of Mexico)",
+            "share_bps": 1288
+          },
+          {
+            "id": "eua",
+            "name": "Nacidos en Estados Unidos de América",
+            "share_bps": 80
+          },
+          {
+            "id": "otro_pais",
+            "name": "Nacidos en otro país",
+            "share_bps": 31
+          }
+        ],
+        "same_household_bps": 8233,
+        "homophily_bps": 5000
+      }
     }
   },
   "sources": {
+    "culture.origin": "PLACE: Jalisco (state), Censo de Población y Vivienda 2020, place of birth. groups: INEGI via IIEG Jalisco, 'Día Internacional del Migrante 2021', https://iieg.gob.mx/ns/wp-content/uploads/2021/12/D%C3%ADaInternacionalMigrante2021.pdf , OPENED 2026-10-13: born in Jalisco 7,128,608; another state 1,067,778; United States 66,464; another country 25,523 (specified total 8,288,373; 59,778 not specified, left out; shares of the specified total, rounded). Cross-checked in INEGI press release 47/21 (https://www.inegi.org.mx/contenidos/saladeprensa/boletines/2021/EstSociodemo/ResultCenso2020_Jal.pdf , OPENED): 91,987 born in another country, 66,464 of them in the United States. Indigenous language speakers (0.8%) and Afro-Mexican self-recognition (1.7%) are also counted by the census but not used here. same_household_bps: 8233 PLACEHOLDER, DERIVED, not a statistic: no table of couples by place of birth was found and opened. It is the chance share of same-group couples from these four groups (sum of squares, 75.6%) raised by the homophily below as c(1+h)/(c(1+h)+1-c) with h=0.5. homophily_bps: PLACEHOLDER 5000 (a close tie is half again as likely within a group as by chance). No survey of close ties or friendship by group for this place was found and opened; McPherson, Smith-Lovin and Cook 2001 ('Birds of a feather', Annual Review of Sociology 27) gives the general fact, not this place's figure. CHILDREN: the census counts a person by their own place of birth, not the parents', so the generator's either-parent rule does not match this source: a child born in Jalisco is born in Jalisco whatever its parents' birthplaces.",
     "tenancy.rent_share_of_income": "PLACEHOLDER bands around one opened median: tenant households in Mexico paid a median of 15% of gross income in rent in 2022 (OECD Affordable Housing Database, indicator HC1.2, Housing costs over income, from INEGI's ENIGH 2022, https://oecd.org/els/family/hc1-2-housing-costs-over-income.pdf, opened 2026-10-12; national). No bands were found (ENIGH 2024 by decile, from a news summary and not opened: 32.6% of income in the lowest tenth, 11.5% in the highest). The bands (63% under a fifth, 19% a fifth to three tenths, 13% three tenths to a half, 5% over a half) are a placeholder shaped to that median. To replace from ENIGH's tabulations. HOW IT IS USED (docs/behaviour/generator.md, \"Homes by income\"): each renting household of a new town draws its share from these bands (evenly within a band; the open band from its lower bound to twice it, at most everything), which gives the rent it carries; households and let homes are matched by it. A target as well: the town's own distribution at the start is reported beside it and is not fitted to it.",
     "support.take_up_bps": "pension 90%: PLACEHOLDER: the pension is universal from 65 with no means test (Secretaria de Bienestar, Reglas de Operacion 2024, DOF 29 December 2023, https://www.gob.mx/cms/uploads/attachment/file/878500/PPBPAM2024.pdf, opened 2026-10-12); 13.4 million people were said to receive it in 2026 (a news report of the government's count), and no population of 65 and over was opened to divide by. HOW IT IS USED (docs/behaviour/generator.md, \"Payments in force\"): of those the payment's rule already entitles as the year begins, this share open with it in payment; the rest claim it when they first look, as before.",
     "tenancy.possession": "PLACEHOLDERS: the Codigo Civil del Estado de Jalisco lets a landlord rescind a lease for unpaid rent through the civil courts (juicio de desahucio; two months unpaid is the usual ground: recalled, to confirm); no figure was opened. The police stand for the court's actuario. The two shares of how tenants answer are the same in every profile: stay_past_notice_bps 5000 is a PLACEHOLDER (no figure was found for the share of tenants who stay past a notice for arrears); leave_on_order_bps 5900 is England's, used everywhere: of 16,848 landlord possession orders in January to March 2026, 6,888 repossessions were by county court bailiffs, 41%, so about 59% of those ordered out were gone without one (Ministry of Justice, Mortgage and Landlord Possession Statistics, January to March 2026: opened by a research agent for this work, 2026-10-11; a ratio of one quarter's flows, not of one cohort). eviction_notice_days: the notice of the day that whoever carries out a warrant gives the tenant; England's county court bailiffs give 14 days' notice of an eviction (Civil Procedure Rules 83.8A: to confirm, recalled), Germany's Gerichtsvollzieher about three weeks (to confirm); every other place's figure is a PLACEHOLDER (7 days; Ohio 3, within its ten). HOW IT IS USED (docs/behaviour/justice.md, \"Possession\"): published in the town as a law; a landlord gives a notice to vacate under it, applies to the tribunal if the tenant stays, and asks for a warrant if they stay past its order; the tribunal sets a plan or a date by it; the police carry the warrant out. Tenants who answer, and plans (2026-10-12): answer_bps 4000 is a PLACEHOLDER (no figure was found for this place of how many tenants served with an application for possession answer it in writing or attend; it is the middle of the two figures opened for other places: 43% of hearings with the renter or someone for them in Victoria, 39.3% of tenants present in Cleveland, Ohio). plan_consider 'may' is a PLACEHOLDER: nothing of Jalisco's procedure was opened.",

@@ -429,6 +429,11 @@
       "default": null,
       "source": "placeholder"
     },
+    "origin": {
+      "schema": {},
+      "default": null,
+      "source": "placeholder"
+    },
     "outlook": {
       "schema": {
         "type": "object"

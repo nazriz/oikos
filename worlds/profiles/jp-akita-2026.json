@@ -1354,9 +1354,48 @@
         "cases_per_day": 4,
         "uphold_without_proof_bps": 5000
       }
+    },
+    "culture": {
+      "origin": {
+        "groups": [
+          {
+            "id": "japan",
+            "name": "Japan (Japanese nationals)",
+            "share_bps": 9936
+          },
+          {
+            "id": "china",
+            "name": "China",
+            "share_bps": 10
+          },
+          {
+            "id": "vietnam",
+            "name": "Viet Nam",
+            "share_bps": 12
+          },
+          {
+            "id": "philippines",
+            "name": "Philippines",
+            "share_bps": 11
+          },
+          {
+            "id": "korea",
+            "name": "Korea (Republic of)",
+            "share_bps": 5
+          },
+          {
+            "id": "other",
+            "name": "Other nationalities and regions",
+            "share_bps": 26
+          }
+        ],
+        "same_household_bps": 9660,
+        "homophily_bps": 5000
+      }
     }
   },
   "sources": {
+    "culture.origin": "PLACE: Akita Prefecture (the prefecture, not Ikawa Town), nationality, end of 2024. groups: Immigration Services Agency, 'Number of foreign residents at the end of 2024' (Ministry of Justice), table 5 (by prefecture and nationality), https://www.moj.go.jp/isa/content/001434756.xlsx (from https://www.moj.go.jp/isa/publications/press/13_00052.html), OPENED 2026-10-13: Akita 5,851 foreign residents: China 939, Viet Nam 1,086, Korea 470, Philippines 1,011, other 2,345. Population 897,000 on 2024-10-01 (Statistics Bureau, population estimates, seen in a search result about Akita Prefecture, NOT opened: to confirm). Japanese nationals are 897,000 less 5,851 (so the shares are about 0.65% foreign in all; the estimate includes foreign residents). Shares in basis points, rounded; Japan takes the remainder. same_household_bps: 9660 (to confirm) = 100% less 3.4%, the share of marriages in Japan where one spouse is a foreign national (2016, from a search result on the Ministry of Health, Labour and Welfare vital statistics, NOT opened; IPSS table https://www.ipss.go.jp/syoushika/tohkei/Data/Popular2022/T06-17.files/sheet001.htm was opened but unreadable). National, not Akita. homophily_bps: PLACEHOLDER 5000 (a close tie is half again as likely within a group as by chance). No survey of close ties or friendship by group for this place was found and opened; McPherson, Smith-Lovin and Cook 2001 ('Birds of a feather', Annual Review of Sociology 27) gives the general fact, not this place's figure. CHILDREN: nationality follows the parents (a child of a mixed couple is a Japanese national if either parent is, which would put it in the Japan group; Nationality Act, from memory, to confirm); the generator's equal-chance rule would put half of such children among foreign nationals, so it does not fit well.",
     "tenancy.rent_share_of_income": "PLACEHOLDER: no distribution, median or mean of rent against income was found (the Housing and Land Survey 2023 has renting households by income class and rent in e-Stat tables 115-1 and 48-1-1, which were not readable; mean rents read: Japan 59,656 yen a month, Akita 42,004). The bands are borrowed from de-ni-2026's (Lower Saxony's, of net income): another place of regulated tenancies and public housing, and no more than that. HOW IT IS USED (docs/behaviour/generator.md, \"Homes by income\"): each renting household of a new town draws its share from these bands (evenly within a band; the open band from its lower bound to twice it, at most everything), which gives the rent it carries; households and let homes are matched by it. A target as well: the town's own distribution at the start is reported beside it and is not fitted to it.",
     "support.take_up_bps": "pension 91.7%: DERIVED from opened figures: recipients of the basic old-age pension aged 65 and over, summed by single year of age (MHLW, overview of the employees' and national pension schemes, fiscal 2023), over the population aged 65 and over (36.25 million, Statistics Bureau, September 2024); national (opened 2026-10-12). The payment for those out of work is reckoned from a record of contributions and opens with nobody drawing it (about 24% of the unemployed drew it in fiscal 2023: 423 thousand recipients a month over 1.78 million unemployed, derived; recorded, not used). HOW IT IS USED (docs/behaviour/generator.md, \"Payments in force\"): of those the payment's rule already entitles as the year begins, this share open with it in payment; the rest claim it when they first look, as before.",
     "ownership.owner_bps_by_age": "Statistics Bureau of Japan, Housing and Land Survey 2023, table 45-1-1 (tenure by age of the household's main earner), national (opened 2026-10-12): owner households 13.8% under 35, 49.9% at 35-44, 62.2% at 45-54, 70.6% at 55-64, 80.8% at 65 and over (60.9% overall; Akita 77.1% overall, no split by age found). HOW IT IS USED (docs/behaviour/generator.md, \"Homes by income\"): only as how much likelier a household of one age is than another to be among the town's owners; their number is the houses the profile's house_owner_bps makes owner-occupied.",

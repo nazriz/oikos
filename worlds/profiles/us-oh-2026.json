@@ -1407,9 +1407,33 @@
         "cases_per_day": 4,
         "uphold_without_proof_bps": 5000
       }
+    },
+    "culture": {
+      "origin": {
+        "groups": [
+          {
+            "id": "white_nh",
+            "name": "White alone, not Hispanic or Latino",
+            "share_bps": 9490
+          },
+          {
+            "id": "hispanic",
+            "name": "Hispanic or Latino",
+            "share_bps": 300
+          },
+          {
+            "id": "other_nh",
+            "name": "All others, not Hispanic or Latino (Black, Asian, American Indian, two or more races)",
+            "share_bps": 210
+          }
+        ],
+        "same_household_bps": 9000,
+        "homophily_bps": 5000
+      }
     }
   },
   "sources": {
+    "culture.origin": "PLACE: Wyandot County, Ohio (the county the profile is modelled on), U.S. Census Bureau QuickFacts. groups: via IndexMundi's copy of QuickFacts (2019 vintage), https://www.indexmundi.com/facts/united-states/quick-facts/ohio/county/wyandot , OPENED 2026-10-13: White alone, not Hispanic or Latino 94.9%; Hispanic or Latino 3.0%; the rest (2.1%, the remainder, made of Asian 0.8%, two or more races 1.1%, Black 0.4% and American Indian 0.3% in the page, partly Hispanic) is left as one group. census.gov QuickFacts itself returned HTTP 403 and was NOT opened (a search result quotes its 2023 vintage as 94.4% white non-Hispanic and 3.0% Hispanic: to confirm). same_household_bps: 9000 (to confirm) = Pew Research Center: about one in ten married people in 2015 had a spouse of a different race or ethnicity (a search result; the Pew pages could not be opened). National, 2015; a rural Ohio county with 95% in one group probably has the same share higher. homophily_bps: PLACEHOLDER 5000 (a close tie is half again as likely within a group as by chance). No survey of close ties or friendship by group for this place was found and opened; McPherson, Smith-Lovin and Cook 2001 ('Birds of a feather', Annual Review of Sociology 27) gives the general fact, not this place's figure. CHILDREN: race is self-reported and a two-or-more-races answer exists; the groups here fold that into the last group, so the generator's either-parent rule is a simplification the source does not support.",
     "tenancy.rent_share_of_income": "U.S. Census Bureau, American Community Survey 2020-2024 5-year estimates, Wyandot County, Ohio, table B25070 (gross rent as a percentage of household income), read through the Census Reporter API (https://api.censusreporter.org/1.0/data/show/acs2024_5yr?table_ids=B25070,B25071&geo_ids=05000US39175,04000US39, opened 2026-10-12): of 2,128 renter households with a computed share, 239 under 10%, 565 at 10 to 14.9, 238 at 15 to 19.9, 167 at 20 to 24.9, 244 at 25 to 29.9, 244 at 30 to 34.9, 74 at 35 to 39.9, 110 at 40 to 49.9, 247 at 50% or more; median 20.7% (B25071; Ohio 28.3%). Gross rent (with utilities) over gross household income. A further 199 households (8.6% of all renters) are 'not computed' (no cash rent, or no or negative income) and are left out. HOW IT IS USED (docs/behaviour/generator.md, \"Homes by income\"): each renting household of a new town draws its share from these bands (evenly within a band; the open band from its lower bound to twice it, at most everything), which gives the rent it carries; households and let homes are matched by it. A target as well: the town's own distribution at the start is reported beside it and is not fitted to it.",
     "support.take_up_bps": "pension 88%: the share of people aged 65 and over receiving Social Security benefits, United States (SSA, Fact Sheet on Social Security, 30 June 2026, https://www.ssa.gov/OACT/FACTS/: from a search summary, the page refused a fetch: to confirm; 94% at 75 and over; not a figure for 67 and over, for Ohio or for the county). The payment for those out of work is reckoned from a record of contributions and opens with nobody drawing it (Ohio's recipiency rate was 18.1% of the unemployed in 2025: Federal Reserve Bank of Cleveland, 1 July 2026, opened 2026-10-12; recorded, not used). HOW IT IS USED (docs/behaviour/generator.md, \"Payments in force\"): of those the payment's rule already entitles as the year begins, this share open with it in payment; the rest claim it when they first look, as before.",
     "ownership.owner_bps_by_age": "U.S. Census Bureau, American Community Survey 2020-2024 5-year estimates, Wyandot County, Ohio, table B25007 (tenure by age of householder), through the Census Reporter API (https://api.censusreporter.org/1.0/data/show/acs2024_5yr?table_ids=B25007&geo_ids=05000US39175,04000US39, opened 2026-10-12): owner-occupied 47.9% under 35, 72.0% at 35-44, 86.5% at 45-54, 76.6% at 55-64, 80.1% at 65 and over (74.1% of all households; Ohio 67.2%). HOW IT IS USED (docs/behaviour/generator.md, \"Homes by income\"): only as how much likelier a household of one age is than another to be among the town's owners; their number is the houses the profile's house_owner_bps makes owner-occupied.",

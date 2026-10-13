@@ -41,6 +41,7 @@ import { Inner, innerParams, UPBRINGING, type InnerParams, type Outlook } from "
 import { VALUES as VALUES_OF_MIND, NEEDS as NEEDS_OF_MIND } from "./mind";
 import { chancePpm, frictionDial, PAPER, tendered } from "./frictions";
 import { acceptEntity, chanceOf, darkOf, drawOf, foundingParams, plainName, plainPurpose, shapeOdds, type FoundingParams, type Shape } from "./founding";
+import { Culture, cultureDial, standardNormal, type Conduct } from "./culture";
 import { angerAdded, doneToAgency, failedAgency, fearAdded, grantTrust, isNoShift, obeyRate, readFacts, readingDial, recourseScore, refusalTrust, tieMoved, type PaperRead } from "./reading";
 import { bringsOf, meets, swayed, SEEKS_OF_NEED, Wants, wantParams, type Opening, type SeekKey, type Want as Wanted, type WantParams } from "./wants";
 import { factsOf, Feelings, Mind, MIND_DEFAULTS, MIND_VERSION, Pursuit, satisfaction, Ties, type Circumstances, type Facts, type MindParams, type NeedLevels, type PopulationValues, type Value } from "./mind";
@@ -394,6 +395,8 @@ export const citizen: BehaviourModule = {
       // industry the job's posting said (the world's profile; "other" for the rest), and in a protected
       // action ballot, the chance of voting and of voting yes (placeholders). ("other": for the rest.)
       union: null as string | null,
+      /** Where this person comes from, if the world has origin groups (docs/behaviour/culture.md): given by the generator only where the culture dial is on. */
+      origin: null as string | null,
       union_join_bps: {} as { [kind: string]: number },
       ballot_turnout_bps: 7000,
       strike_vote_yes_bps: 8500,
@@ -595,6 +598,7 @@ export const citizen: BehaviourModule = {
         }),
         // (Wants: docs/design/ai-citizens.md 10a. A want held with one's household names it.)
         wants: initiative ? wants.section() : [],
+        ...(cul ? { norms: cul.section(t) } : {}),
         memory: sec.memory,
         circumstances: { household: household?.members.length ?? 1, housed: home || livingAt ? 1 : 0, working: job || ownWork ? 1 : 0, retired: retired ? 1 : 0,
           ...(means ? { income: whole(means.income), savings: whole(means.savings) } : {}) },
@@ -809,6 +813,26 @@ export const citizen: BehaviourModule = {
     // every figure is the one it always was. The reader saw the paper and nothing of us; what the words mean to us is
     // worked out here, from our own record.
     const rdial = readingDial(ctx.world);
+    // ---- culture (docs/behaviour/culture.md): what we take those around us to do and approve of. Only where the world's
+    // dial has it on; otherwise nothing here is entered, no section is written, no phrase said, no term applied.
+    const cdial = cultureDial(ctx.world);
+    if (cdial) GRAIN.norms = cdial.params.grain_percent; // (the record's grain for the norms: whole percent)
+    const cul: Culture | undefined = cdial ? new Culture(cdial.params, cdial, {
+      z: (v) => inner.zOf(v), conformity: () => mind.person.temperament.conformity / 10_000, belonging: () => (mind.person.weights.belonging - 10_000) / 10_000,
+      integrity: () => inner.integrity(), draw: (c) => standardNormal(ctx.rng(`culture-own-${c}`)),
+    }, ((): { [c in Conduct]?: number } => {
+      const union = p.union ? Object.values(p.union_join_bps) : [];
+      return {
+        ...(p.possession?.answer_bps !== undefined ? { answer_tribunal: p.possession.answer_bps } : {}),
+        ...(p.possession ? { stay_past_notice: p.possession.stay_bps } : {}),
+        ...(p.tribunal ? { take_to_tribunal: p.tribunal.challenge_bps } : {}),
+        ...(p.complain_to ? { complain: p.complain_bps } : {}),
+        take_in: cdial!.params.does_default_bps, // (no rate of its own: the placeholder, marked in the doc)
+        ...(p.union && union.length ? { join_union: Math.round(union.reduce((a, b) => a + b, 0) / union.length) } : {}),
+        ...(p.union ? { strike: p.strike_vote_yes_bps } : {}),
+        ...(p.crime ? { take_from_employer: Math.round((p.crime.take_bps * (10_000 - p.crime.caught_bps)) / 10_000) } : {}),
+      };
+    })(), p.origin ?? undefined) : undefined;
     const readOf = (paper: string): PaperRead | undefined => {
       const x = rdial && ctx.read ? ctx.read(paper, "addressee") : undefined;
       return x && !isNoShift(x.shift) ? x : undefined;

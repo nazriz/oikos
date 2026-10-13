@@ -137,3 +137,4 @@ export const modules: { [name: string]: BehaviourModule & { source: string } } =
 );
 for (const m of Object.values(modules)) if (m.books) keepers.set(m.name, m);
 export * as reading from "./behaviour/reading";
+export * as culture from "./behaviour/culture";

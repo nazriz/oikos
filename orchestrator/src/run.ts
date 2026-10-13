@@ -29,7 +29,7 @@ import { join } from "node:path";
 import { besideOf, largest, leftAlone, renderSummary, SUMMARY_MAX } from "./debrief-summary";
 import { readForEnd } from "./run-end";
 import { ReadingDesk, type DeskCounts } from "./reading";
-import { reading as readingNs } from "@oikos/participants";
+import { culture as cultureNs, reading as readingNs } from "@oikos/participants";
 import { DayBook, calls, canonical, DECISIONS, OUTCOMES, RECORD, WORDS, type Words, inCurrency, paramErrors, modules as builtin, Randomness, Roster, slice, Tally, View, type BehaviourModule, type Controller, type Currency, type DecisionRecord, type OutcomeRecord, type RecordChange, formatMoney, type LookRequest, type Observation, type ParticipantAction, type ParticipantContext } from "@oikos/participants";
 import { lexiconReader, READING_TABLE, Tagger, READING_VERSION, type Reader, type ReadingTable } from "@oikos/participants/llm";
 import { ACCOUNT_TOKENS, ACCOUNT_VERSION, ACCOUNTS_DEFAULT, ACCOUNTS_MOST, darkAccount, DEBRIEF_ANSWER_TOKENS, DEBRIEF_VERSION, endNeedMicroUsd, keptBackFor, reckonedEndMicroUsd, type EndCosts, type MockPolicy, mockAccount, sampleAccounts, stepsOf, writeAccount, type AccountBrief, type AccountCounts, type DebriefInput, type DebriefWording, COMPOSE_VERSION, createCompose, mockCompose, type ComposerConfig, CONSULT_VERSION, createConsult, createLlmParticipant, LLM_PARTICIPANT_VERSION, MOCK_VERSION, MockAdapter, mockPolicies, PRICES, ModelCallFailed, ModelUnreachable, SpendingLimitReached, type Budget, type LlmAdapter, type LlmController, type LlmIO, type MockBrain, type Price } from "@oikos/participants/llm";
@@ -380,6 +380,8 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   // or outweigh a decision is refused here, not found mid-run), and the reader. It is never the largest model, never
   // a model that holds a seat in the same run (checked below, once the seats are known), and in this build never a model.
   const readingCfg = readingNs.readingDial(cfg);
+  // Culture (docs/behaviour/culture.md): the world's dial, its sizes checked now, not found mid-run (a size that would break the arithmetic is refused).
+  cultureNs.cultureDial(cfg);
   if (readingCfg && /astra|fable|opus/i.test(readingCfg.reader)) throw new Error(`dials.reading.reader names ${readingCfg.reader}, which is never a reader (docs/behaviour/reading.md)`);
   if (readingCfg && !o.reader && readingCfg.reader !== "mock") throw new Error(`dials.reading.reader names ${readingCfg.reader}: this build calls no model (design 13h: a model reader is step 5, with the owner's word); give a reader, or "mock"`);
   const readerOf: Reader | undefined = readingCfg ? o.reader ?? lexiconReader() : undefined;
