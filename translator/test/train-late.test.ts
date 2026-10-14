@@ -70,12 +70,13 @@ test("hours: half of the offers of employment state the job's hours (hours=\"N h
   for (const g of made.filter((x) => !x.program.includes("hours="))) expect(g.notes!.join(" ")).toContain("none is written");
 });
 
-test("practice and offer: one public statement each, with the practice or the offer as data in whole seconds, never an agreement", () => {
+test("practice and offer: one public statement each, with the practice or the offer as data whose lengths of time are words, never an agreement", () => {
   for (const g of lateKinds({ kind: "practice", n: 60, seed: 2 })) {
     const c = lines(g.program)[0]!.call;
     expect([c.fn, (c.args.kind as { id: string }).id, (c.args.visible as { id: string }).id]).toEqual(["statement", "notice", "public"]);
-    const p = (c.args.practice as { json: { at: string; every: number; lasts?: number } }).json;
-    expect(p.every % 86_400).toBe(0);
+    const p = (c.args.practice as { json: { at: string; every: string; lasts?: string } }).json;
+    expect(calls.parseDuration(p.every.replace(/^every /, ""))).toBeGreaterThan(0);
+    expect(g.notes!.join(" ")).toContain(p.every);
     expect(typeof p.at).toBe("string");
     expect("on" in c.args).toBe(true);
     expect(g.program).not.toContain("agreement(");
@@ -84,10 +85,10 @@ test("practice and offer: one public statement each, with the practice or the of
   for (const g of offers) {
     const c = lines(g.program)[0]!.call;
     expect(c.fn).toBe("statement");
-    const o = (c.args.offer as { json: { take_up: string; terms: { commitments: { who: string }[]; termination: { notice: number }[] } } }).json;
+    const o = (c.args.offer as { json: { take_up: string; terms: { commitments: { who: string }[]; termination: { notice: string }[] } } }).json;
     expect(o.take_up).toBe("join");
     expect(o.terms.commitments[0]!.who).toBe("taker");
-    expect(o.terms.termination[0]!.notice % 86_400).toBe(0);
+    expect(calls.parseDuration(o.terms.termination[0]!.notice)).toBeGreaterThan(0);
   }
   expect(offers.some((g) => g.program.includes('"for":"dues"'))).toBe(true);
   expect(offers.some((g) => !g.program.includes('"for":"dues"'))).toBe(true);

@@ -85,7 +85,7 @@ export function asLabel(s: string): string {
 export const durationWords = forms.durationWords;
 
 /** Resolve a program. `typeOf` gives a structure type from the world's catalogue, for building on a lot. */
-export function resolve(program: calls.Program, k: Knowledge, typeOf: (type: string) => StructureTypeInfo | undefined = () => undefined, as?: string, o: { /** The program was written by a translator from a request in words: an offer's amounts are as the request wrote them (a code participant's are the smallest unit already). */ written?: boolean } = {}): Resolution {
+export function resolve(program: calls.Program, k: Knowledge, typeOf: (type: string) => StructureTypeInfo | undefined = () => undefined, as?: string, o: { /** The program was written by a translator from a request in words: a practice's and an offer's amounts and lengths of time are as the request wrote them (a code participant's are the smallest unit and whole seconds already). */ written?: boolean } = {}): Resolution {
   if ("none" in program) return { ok: false, questions: [LABEL_TEXT[program.none]] };
   if (calls.programText(program).length > 65536) return { ok: false, questions: [LABEL_TEXT.too_much] };
   const invalid = calls.contractErrors(program);
@@ -738,11 +738,12 @@ class Resolver {
     }
     // What someone may take up, and a recurring situation people take part in (docs/design/ai-citizens.md 2a, 2b):
     // facts in the typed vocabulary, checked by the contract when the act is.
-    // (A translator writes an offer's money as the request wrote it, to be copied the way a payment's amount is; it is
-    // the smallest unit in the block, as everywhere in them, and a translator is not asked to know the currency's.
-    // A code participant's is that already. 2026-10-14, prompt 0.9.5.)
-    const offer = this.asWritten ? this.offerAmounts(this.json(c, "offer")) : this.json(c, "offer");
-    const practice = this.json(c, "practice");
+    // (A translator writes a practice's and an offer's money and lengths of time as the request wrote them, to be copied
+    // the way a payment's amount is: the block has the smallest unit and whole seconds, as everywhere in them, and a
+    // translator is not asked to know the currency's or to count seconds. A code participant's are that already.
+    // 2026-10-14, prompt 0.9.5.)
+    const offer = this.asWritten ? this.writtenData(this.json(c, "offer")) : this.json(c, "offer");
+    const practice = this.asWritten ? this.writtenData(this.json(c, "practice")) : this.json(c, "practice");
     const assertion = this.json(c, "assertion");
     const registry = this.json(c, "registry");
     return [{ block: "publish", kind, text, ...(to ? { addressed_to: to } : {}), ...(on ? { place: on } : {}), ...(data !== undefined ? { data } : {}), ...(adico !== undefined ? { adico } : {}), ...(formal ? { formal: { language: "cel", condition: formal } } : {}),
@@ -750,11 +751,15 @@ class Resolver {
       ...(assertion !== undefined ? { assertion } : {}), ...(registry !== undefined ? { registry } : {}), ...common }];
   }
 
-  /** An offer's data with the amounts of its money outcomes read as an amount is (calls.parseAmount: as written, in the world's money). */
-  private offerAmounts(v: unknown): unknown {
+  /** What a translator wrote as data for a practice or an offer, read as the request wrote it (`resolve`, `written`): the amounts
+   * of its money outcomes as an amount is (calls.parseAmount, in the world's money), and its lengths of time (`every`,
+   * `lasts`, `term`, `notice`) as a length of time is (calls.parseDuration: "14 days", "90 minutes", "a month"), where
+   * they are text; whole seconds are passed on as they are. */
+  private writtenData(v: unknown): unknown {
+    const lengths = new Set(["every", "lasts", "term", "notice"]);
     const walk = (x: unknown, inMoney: boolean): unknown => {
       if (Array.isArray(x)) return x.map((y) => walk(y, inMoney));
-      if (x && typeof x === "object") return Object.fromEntries(Object.entries(x as object).map(([k, y]) => [k, k === "amount" && inMoney && typeof y === "string" ? calls.parseAmount(y, this.k.currency) : walk(y, inMoney || k === "money")]));
+      if (x && typeof x === "object") return Object.fromEntries(Object.entries(x as object).map(([k, y]) => [k, typeof y === "string" && k === "amount" && inMoney ? calls.parseAmount(y, this.k.currency) : typeof y === "string" && lengths.has(k) ? calls.parseDuration(y) : walk(y, inMoney || k === "money")]));
       return x;
     };
     return walk(v, false);

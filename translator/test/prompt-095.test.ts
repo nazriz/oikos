@@ -31,7 +31,7 @@ test("0.9.5: the sentences are there, in general words", () => {
     "one statement, never an agreement and never a form",
     "An offer that anyone may take up",
     "which is between named parties",
-    "the one place a length of time is written as whole seconds",
+    "amounts and lengths of time are copied as the request writes them, as text",
   ]) expect(system).toContain(said);
   // `line` is taught: it is in the functions' list, and nothing is code's alone now.
   expect(system).toMatch(/- money\(to\*, amount\*, from, every, first, for, settles, basis, per_request, line\)/);
@@ -67,19 +67,28 @@ test("0.9.5: the line resolves onto the payment, and a statement with a practice
   expect(pay.ok ? [] : pay.questions).toEqual([]);
   expect(JSON.stringify(pay.ok ? pay.blocks : [])).toContain('"line":"parks"');
   // The worked gathering and offer, as the translator would write them for the founding requests, resolve to a notice the module accepts.
-  const gather = resolve(calls.parseProgram('statement(kind=notice, visible=public, text="The Circle gathers every fortnight.", on=cell.4.7, practice={"at":"apts-3/dwelling.2","every":1209600,"lasts":5400})'), k, () => undefined, "finance");
+  const gather = resolve(calls.parseProgram('statement(kind=notice, visible=public, text="The Circle gathers every fortnight.", on=cell.4.7, practice={"at":"apts-3/dwelling.2","every":"14 days","lasts":"90 minutes"})'), k, () => undefined, "finance", { written: true });
   expect(gather.ok ? [] : gather.questions).toEqual([]);
   const g = acceptGathering("org-1", { at: "apts-3/dwelling.2", every_days: [14], lasts_minutes: [90], first: [0, 30 * 86_400], at_seconds: 68_400 });
   const blocks = (gather.ok ? gather.blocks : []).map((b: any) => ({ ...b, speaks_for: "org-1" }));
   expect(typeof g(blocks as any)).not.toBe("string");
-  const join = resolve(calls.parseProgram('statement(kind=notice, visible=public, text="Anyone may join.", offer={"take_up":"join","terms":{"commitments":[{"who":"taker","does":{"outcome":{"money":{"to":"acc-9","amount":"20","for":"dues"}}},"every":2592000}],"termination":[{"party":"taker","notice":604800}]}})'), k, () => undefined, "finance", { written: true });
+  const join = resolve(calls.parseProgram('statement(kind=notice, visible=public, text="Anyone may join.", offer={"take_up":"join","terms":{"commitments":[{"who":"taker","does":{"outcome":{"money":{"to":"acc-9","amount":"20","for":"dues"}}},"every":"a month"}],"termination":[{"party":"taker","notice":"7 days"}]}})'), k, () => undefined, "finance", { written: true });
   expect(join.ok ? [] : join.questions).toEqual([]);
   const m = acceptMembership("org-1", { account: "acc-9", dues: [2000], notice: 604800 });
   const offered = (join.ok ? join.blocks : []).map((b: any) => ({ ...b, speaks_for: "org-1" }));
   expect(typeof m(offered as any)).not.toBe("string");
 });
 
-test("0.9.5: an offer's dues are the amount as the request wrote it, read in the world's money (the smallest unit in the block)", () => {
+test("0.9.5: a practice's and an offer's amounts and lengths of time are as the request wrote them, read in the world's money and in seconds; whole numbers pass as they are", () => {
+  const k = seat();
+  const gather = resolve(calls.parseProgram('statement(kind=notice, visible=public, text="x", on=cell.4.7, practice={"at":"apts-3/dwelling.2","every":"14 days","lasts":"90 minutes"})'), k, () => undefined, "finance", { written: true });
+  expect((gather.ok ? (gather.blocks[0] as any) : {}).practice).toEqual({ at: "apts-3/dwelling.2", every: 1_209_600, lasts: 5400 });
+  const seconds = resolve(calls.parseProgram('statement(kind=notice, visible=public, text="x", practice={"at":"apts-3/dwelling.2","every":1209600})'), k, () => undefined, "finance", { written: true });
+  expect((seconds.ok ? (seconds.blocks[0] as any) : {}).practice).toEqual({ at: "apts-3/dwelling.2", every: 1_209_600 });
+  const notTime = resolve(calls.parseProgram('statement(kind=notice, visible=public, text="x", practice={"at":"apts-3/dwelling.2","every":"often"})'), k, () => undefined, "finance", { written: true });
+  expect(notTime.ok).toBe(false);
+  const join0 = resolve(calls.parseProgram('statement(kind=notice, visible=public, text="Anyone may join.", offer={"take_up":"join","terms":{"commitments":[{"who":"taker","does":{"outcome":{"money":{"to":"acc-9","amount":"XYZ 20.00","for":"dues"}}},"every":"a month"}],"termination":[{"party":"taker","notice":"7 days"}]}})'), k, () => undefined, "finance", { written: true });
+  expect((join0.ok ? (join0.blocks[0] as any) : {}).offer.terms).toMatchObject({ commitments: [{ every: 2_592_000 }], termination: [{ notice: 604_800 }] });
   const join = resolve(calls.parseProgram('statement(kind=notice, visible=public, text="Anyone may join.", offer={"take_up":"join","terms":{"commitments":[{"who":"taker","does":{"outcome":{"money":{"to":"acc-9","amount":"XYZ 20.00","for":"dues"}}},"every":2592000}]}})'), seat(), () => undefined, "finance", { written: true });
   expect(join.ok ? [] : join.questions).toEqual([]);
   const money = (join.ok ? (join.blocks[0] as any) : {}).offer.terms.commitments[0].does.outcome.money;

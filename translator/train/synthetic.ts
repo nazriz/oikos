@@ -1275,7 +1275,7 @@ export function payments(o: { kind: "per_request" | "finance"; n?: number; seed?
 /** The lines of a body's budget, as a request names one: a bare word (neutral: no place's budget). */
 const BUDGET_LINES = ["parks", "roads", "schools", "services", "libraries", "health", "housing", "water", "waste", "safety", "works", "culture", "transport", "lighting", "markets", "relief"];
 const GATHERERS = ["Circle", "Club", "Society", "Guild", "Fellowship", "Union", "League", "Association", "Choir", "Congregation"];
-const GATHERINGS = ["every 7 days", "every 14 days", "every 14 days", "every 28 days", "every 21 days", "every 10 days"];
+const GATHERINGS = ["every 7 days", "every 14 days", "every 14 days", "every 28 days", "every 21 days", "every 10 days", "every week", "every fortnight", "every month"];
 const REPORT_PARTS = ["withheld from", "paid to", "taken from", "due from", "deducted from", "owed by"];
 
 export type LateKind = "line" | "report" | "split" | "hours" | "practice" | "offer";
@@ -1295,7 +1295,7 @@ export const LATE_TAGS: { [kind in LateKind]: string } = { line: "line_payment",
  *  - `hours` (tag `hours_term`): an offer of employment, with the job's ordinary hours in a week stated (`hours="40 hours"`)
  *    in half of them and not stated in the other half (a request that states none gets none).
  *  - `practice` (tag `practice_notice`): a public notice of something held again and again at a place, one statement
- *    carrying `practice=` (lengths in whole seconds, no start) and `on=`.
+ *    carrying `practice=` (its lengths of time as the request writes them, no start) and `on=`.
  *  - `offer` (tag `offer_notice`): a public offer anyone may take up (joining a group, with dues or without), one
  *    statement carrying `offer=`, never an agreement.
  * For a seed, always the same.
@@ -1355,22 +1355,21 @@ export function lateKinds(o: { kind: LateKind; n?: number; seed?: number; curren
       const at = d.maybe(0.7) ? (d.inside() as { id: string }).id : d.cellId();
       const on = d.ground() as { id: string };
       const every = d.pick(GATHERINGS);
-      const days = Number(/\d+/.exec(every)![0]);
-      const lasts = d.pick([30, 45, 60, 90, 120, 180]);
+      const lasts = d.pick(["30 minutes", "45 minutes", "60 minutes", "90 minutes", "2 hours", "3 hours"]);
       const hasLasts = d.maybe(0.85);
-      const text = `${name} gathers ${every.replace("every ", "every ")}${hasLasts ? `, for ${lasts} minutes` : ""}. All welcome.`;
-      lines = [call("statement", { kind: id("notice"), visible: id("public"), text: tx(text), on, practice: { json: { at, every: days * 86_400, ...(hasLasts ? { lasts: lasts * 60 } : {}) } } })];
-      d.notes.push(`This is a public notice of something held again and again at ${at}: ${name} gathers ${every}${hasLasts ? ` for ${lasts} minutes` : ""}. The notice is put up on ${on.id}, and it says where it is held (${at}) and how often${hasLasts ? " and for how long" : ""} in words, never in seconds. The notice's words are copied exactly: ${text}`);
+      const text = `${name} gathers ${every}${hasLasts ? `, for ${lasts}` : ""}. All welcome.`;
+      lines = [call("statement", { kind: id("notice"), visible: id("public"), text: tx(text), on, practice: { json: { at, every, ...(hasLasts ? { lasts } : {}) } } })];
+      d.notes.push(`This is a public notice of something held again and again at ${at}: ${name} gathers ${every}${hasLasts ? ` for ${lasts}` : ""}. The notice is put up on ${on.id}, and it says where it is held (${at}) and how often${hasLasts ? " and for how long" : ""}, in exactly these words for the lengths of time (${every}${hasLasts ? `, ${lasts}` : ""}). The notice's words are copied exactly: ${text}`);
     } else {
       const name = `${d.place()} ${d.pick(GATHERERS)}`;
       const dues = d.maybe(0.7);
       const account = d.account() as { id: string };
-      const notice = d.pick([[7, "7 days"], [14, "14 days"], [30, "a month"], [14, "two weeks"], [7, "a week"]]) as [number, string];
+      const notice = d.pick(["7 days", "14 days", "a month", "two weeks", "a week", "30 days"]);
       const amount = d.amount() as { text: string };
       const text = `Anyone may join ${name}.${dues ? ` Members pay ${amount.text} a month.` : " Nothing is asked but to come."}`;
-      const commitment = dues ? { who: "taker", does: { outcome: { money: { to: account.id, amount: amount.text, for: "dues" } } }, every: 30 * 86_400 } : { who: "taker", does: { text: "take part" } };
-      lines = [call("statement", { kind: id("notice"), visible: id("public"), text: tx(text), offer: { json: { take_up: "join", terms: { commitments: [commitment], termination: [{ party: "taker", notice: notice[0] * 86_400 }] } } } })];
-      d.notes.push(`This is a public offer that anyone may take up: to join ${name}${dues ? `, with dues of ${amount.text} a month paid into ${account.id}` : ", asking nothing"}, and a notice of ${notice[1]} to leave. It is made to anyone, in public, never to a named person, and is no agreement with anyone. The notice's words are copied exactly: ${text}`);
+      const commitment = dues ? { who: "taker", does: { outcome: { money: { to: account.id, amount: amount.text, for: "dues" } } }, every: "a month" } : { who: "taker", does: { text: "take part" } };
+      lines = [call("statement", { kind: id("notice"), visible: id("public"), text: tx(text), offer: { json: { take_up: "join", terms: { commitments: [commitment], termination: [{ party: "taker", notice }] } } } })];
+      d.notes.push(`This is a public offer that anyone may take up: to join ${name}${dues ? `, with dues of ${amount.text} a month paid into ${account.id}` : ", asking nothing"}, and a notice of ${notice} to leave (said in exactly those words). It is made to anyone, in public, never to a named person, and is no agreement with anyone. The notice's words are copied exactly: ${text}`);
     }
     const g = goldOf(lines, d, `synthetic: late ${o.kind}`, undefined, o.dropped, { late: true, most: 14 });
     if (!g || seen.has(g.program)) continue;
