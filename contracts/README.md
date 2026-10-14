@@ -535,6 +535,8 @@ Additions only; nothing renamed or removed. A log or a world made before them is
 - **Entity record `practice`** (additive, optional, on an organisation; 2026-10-14, culture step 6): up to 6 rows `{ of, occasions, did, since }` (`of`: hold, rise or stay), how an office has carried on when asked to hold a rent, give a rise or let a tenant under notice stay; only where the culture dial is on and the organisation takes initiative. Never shown to a seat as counts.
 - **Dial `culture.step`** (inside the opaque `step`, additive): `practice_window_days`, `practice_min_occasions`, `practice_inertia_bps`, `practice_opening`.
 
+- **Log: the usage purpose `reading`** is now in the enum of the `usage` annotation (`log.schema.json`; additive, 2026-10-14, reading step 5): the model reader's calls are priced and filed under it. The readings the gate and a run gather are also kept whole outside the log as `readings` JSONL (one row: reader, prompt version, wording, kind, standing, the tagged paper, what it answers, the typed reading and phrases or the decline, cost and tokens), as training data for a reader of our own; that file's shape is `ReadingRecord` in `participants/src/llm/reader-model.ts`, not a schema.
+
 ## Versioning
 
 `contracts: "0.8"`. Pre-1.0, every change bumps the minor version and is proposed explicitly. A draft version collects agreed changes until it's closed. Older logs remain valid logs of their own version and replay only on a kernel build of that version (D6).
