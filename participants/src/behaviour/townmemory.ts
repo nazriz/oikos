@@ -7,7 +7,7 @@
 // The platform judges nothing: what an event does to a person's trust is the sign of their OWN view of the conduct it shows, never the platform's.
 // Every size is a PLACEHOLDER unless docs/behaviour/culture.md names a source; one set for every kind of event.
 
-import type { CultureParams } from "./culture";
+import { SAYINGS, type Conduct, type CultureParams } from "./culture";
 
 /** What a person may remember of the town, in the order the record keeps them (a closed list; the kinds that something in the world makes public). */
 export const EVENT_KINDS = ["put_out", "strike", "ruling", "law", "vote", "founded"] as const;
@@ -18,6 +18,21 @@ const DAY = 86_400;
 
 /** The conduct an event shows, for the sighting it is of that conduct and for the sign of its bearing on trust (a person's own view of that conduct). */
 export const EVENT_CONDUCT: { [k in EventKind]?: "apply_possession" | "strike" } = { put_out: "apply_possession", strike: "strike" };
+
+/**
+ * The conducts an event is an instance of, for the sighting it is of each (docs/behaviour/culture.md, "Events join the picture"): a removal under a warrant is a landlord
+ * applying for possession and a household staying past the notice; a walk-out is an instance of acting on a ballot for action. Only these two of the six kinds show
+ * a conduct a person holds: a law, a ruling, a declared result and a founding are not someone's act of the kinds in the list (a declared result already reaches the
+ * picture as a published count). The first conduct of a kind is the one whose said view travels with it.
+ */
+export const EVENT_CONDUCTS: { [k in EventKind]?: readonly Conduct[] } = { put_out: ["apply_possession", "stay_past_notice"], strike: ["strike"] };
+
+/**
+ * Which way an event bears on trust in whoever did it, for a person whose own view of the conduct it shows is `ownBps`: +1 (trust rises), -1 (it falls), 0 (no view, no move).
+ * A removal held right is the doer vindicated; a walk-out held right is the employer's trust lost. The sign is the person's, never the platform's; the measure of
+ * movement toward or away from the party reads it from the same place.
+ */
+export const trustDirection = (kind: EventKind, ownBps: number): 1 | -1 | 0 => (ownBps === 5_000 || !EVENT_CONDUCT[kind] ? 0 : (kind === "put_out" ? ownBps > 5_000 : ownBps < 5_000) ? 1 : -1);
 
 /** Words for each kind, in the world's terms and without a judgement; a code person's phrasing, understood only in this phrasing. */
 const KIND_WORDS: { [k in EventKind]: string } = {
@@ -30,14 +45,16 @@ const KIND_WORDS: { [k in EventKind]: string } = {
 };
 export const TOWN_WORDS = {
   /** What I tell: the kind, who it was about, which day it was, how strongly I hold it (tenths), and through how many hands it came to me. */
-  say: (kind: EventKind, about: string, day: number, strengthBps: number, hops: number): string =>
-    `Talk of the town: ${KIND_WORDS[kind]}, ${about}, day ${day}; I hold it at ${Math.max(1, Math.min(10, Math.round(strengthBps / 1_000)))} in 10, through ${hops} ${hops === 1 ? "hand" : "hands"}.`,
+  say: (kind: EventKind, about: string, day: number, strengthBps: number, hops: number, saysBps?: number): string =>
+    `Talk of the town: ${KIND_WORDS[kind]}, ${about}, day ${day}; I hold it at ${Math.max(1, Math.min(10, Math.round(strengthBps / 1_000)))} in 10, through ${hops} ${hops === 1 ? "hand" : "hands"}.` +
+    (saysBps === undefined ? "" : ` Of that, I say it is ${SAYINGS[Math.max(0, Math.min(4, Math.floor(saysBps / 2_000)))]![0]}.`),
   /** What a phrase tells (found anywhere in a message, which joins a person's phrases): the kind, who it was about, the day, the teller's strength (basis points) and hands. */
-  heard: (text: string): { kind: EventKind; about: string; day: number; strength: number; hops: number } | undefined => {
-    const m = new RegExp(`Talk of the town: (${EVENT_KINDS.map((k) => KIND_WORDS[k]).join("|")}), ([^\\s,]+), day (\\d+); I hold it at (\\d+) in 10, through (\\d+) hands?\\.`).exec(text);
+  heard: (text: string): { kind: EventKind; about: string; day: number; strength: number; hops: number; says?: number } | undefined => {
+    const m = new RegExp(`Talk of the town: (${EVENT_KINDS.map((k) => KIND_WORDS[k]).join("|")}), ([^\\s,]+), day (\\d+); I hold it at (\\d+) in 10, through (\\d+) hands?\\.(?: Of that, I say it is (${SAYINGS.map(([w]) => w).join("|")})\\.)?`).exec(text);
     if (!m) return undefined;
     const kind = EVENT_KINDS.find((k) => KIND_WORDS[k] === m[1])!;
-    return { kind, about: m[2]!, day: Number(m[3]), strength: Number(m[4]) * 1_000, hops: Number(m[5]) };
+    const says = m[6] === undefined ? undefined : SAYINGS.find(([w]) => w === m[6])![1];
+    return { kind, about: m[2]!, day: Number(m[3]), strength: Number(m[4]) * 1_000, hops: Number(m[5]), ...(says !== undefined ? { says } : {}) };
   },
 };
 
@@ -126,7 +143,7 @@ export class TownMemory {
    * What I tell someone who asks how things are: the one thing I hold strongest, above `tell_at_bps`, that I have not told them (each tie keeps what it was told).
    * Nothing is drawn. Returns the phrase, or none.
    */
-  tell(asker: string, now: number): string | undefined {
+  tell(asker: string, now: number, view?: (kind: EventKind) => number | undefined): string | undefined {
     let best: Slot | undefined;
     for (const s of this.held) {
       if (s.told.has(asker)) continue;
@@ -137,7 +154,7 @@ export class TownMemory {
     if (!best) return undefined;
     best.told.add(asker);
     if (best.told.size > 40) best.told.delete(best.told.values().next().value!);
-    return TOWN_WORDS.say(best.kind, best.about, best.day, this.strength(best, now), best.hops);
+    return TOWN_WORDS.say(best.kind, best.about, best.day, this.strength(best, now), best.hops, view?.(best.kind));
   }
 
   /** The record's section, positional and small (a few dozen bytes a slot); the same array until something arrives. */
