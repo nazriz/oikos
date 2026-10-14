@@ -195,10 +195,23 @@ function sidecarList(dir: string): string[] | undefined {
   }
 }
 
+/** The forms whose drafts the model may offer, from forms-released.json beside its config.json
+ * (scripts/forms-released.ts: a form is on it once it passes its own per-form mark); none if there is no such file or it
+ * is malformed. A folder with no list is read as before: the forms the model was taught. */
+function releasedList(dir: string): string[] | undefined {
+  try {
+    const x = JSON.parse(readFileSync(join(dir, "forms-released.json"), "utf8")).forms_released;
+    return Array.isArray(x) && x.every((y: unknown) => typeof y === "string") ? (x as string[]) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /** What a trained model's reader takes, as its folder says (config.json): the most it reads (`max_tokens` of its
  * encoder's tokens, or `max_pieces` where it reads pieces), and the most forms it was shown in training where the
- * folder says that (`max_forms`: no model's does yet, and the reader's length is then the only limit). */
-export function readerOf(dir: string): { most?: number; forms?: number; trained?: string[] } {
+ * folder says that (`max_forms`: no model's does yet, and the reader's length is then the only limit). `released`: the
+ * forms its drafts are offered for (forms-released.json), where its folder carries the list. */
+export function readerOf(dir: string): { most?: number; forms?: number; trained?: string[]; released?: string[] } {
   try {
     const c = JSON.parse(readFileSync(join(dir, "config.json"), "utf8"));
     const n = (x: unknown) => (typeof x === "number" && x > 0 ? x : undefined);
@@ -207,7 +220,8 @@ export function readerOf(dir: string): { most?: number; forms?: number; trained?
     // config.json's keys as they are, so the list is kept apart).)
     const names = (x: unknown) => (Array.isArray(x) && x.every((y: unknown) => typeof y === "string") ? (x as string[]) : undefined);
     const trained = names(c.forms_trained) ?? sidecarList(dir);
-    return { most: n(c.encoder ? c.max_tokens : c.max_pieces), forms: n(c.max_forms), ...(trained ? { trained } : {}) };
+    const released = releasedList(dir);
+    return { most: n(c.encoder ? c.max_tokens : c.max_pieces), forms: n(c.max_forms), ...(trained ? { trained } : {}), ...(released ? { released } : {}) };
   } catch {
     return {};
   }
@@ -221,7 +235,7 @@ export class DecideAdapter implements LlmAdapter {
   private queue: Promise<unknown> = Promise.resolve();
   /** Each answer's sureness and time, in the order asked (for whoever measures). */
   answers: { sure: number; ms: number; program: string; steps?: number; parts?: { choices: number; places: number; texts: number; least: number }; unsure?: object; shown?: { forms: string[]; of: number } }[] = [];
-  private reader?: { most?: number; forms?: number; trained?: string[] };
+  private reader?: { most?: number; forms?: number; trained?: string[]; released?: string[] };
   /** Whose forms were once more than the reader takes (by who asked): absent a list of the forms the model was
    * trained on, any form such an asker's draft fills is taken as one the model never saw. */
   private subsetFor = new Set<string>();
@@ -368,10 +382,16 @@ export class DecideAdapter implements LlmAdapter {
     // the model had never seen were right; a seat confirms nearly everything). The translator behind drafts for the
     // world, and the two are compared on the route. Which forms are outside its training: those not in the list its
     // folder carries (`forms_trained`, in config.json or forms-trained.json); absent the list, any form of an asker whose forms were ever a subset.
+    // Where the folder also carries forms-released.json (the owner, 2026-10-14: a form is handed to our model as soon as
+    // it passes its own per-form mark, whatever the model as a whole scores), that list is the one: a form taught and not
+    // yet released is recorded as one never taught is (`form_unseen`), and the translator behind drafts for the world.
     if (shown && o.who) this.subsetFor.add(o.who);
     if (!withheld && !/^none\(\w+\)$/.test(program)) {
       const filled = [...program.matchAll(/\bform=([\w.-]+)/g)].map((m) => m[1]!);
-      const unseen = reader.trained ? filled.some((f) => !reader.trained!.includes(f) && !reader.trained!.includes(partsOf(forms.find((l) => partsOf(l).id === f) ?? "").name)) : filled.length > 0 && !!o.who && this.subsetFor.has(o.who);
+      // (The forms the folder says are released, where it says; else those it was taught; else, for an asker whose forms
+      // were once a subset, any.)
+      const known = reader.released ?? reader.trained;
+      const unseen = known ? filled.some((f) => !known.includes(f) && !known.includes(partsOf(forms.find((l) => partsOf(l).id === f) ?? "").name)) : filled.length > 0 && !!o.who && this.subsetFor.has(o.who);
       if (shown) withheld = "forms_subset";
       else if (unseen) withheld = "form_unseen";
       if (withheld) program = "none(unclear)";

@@ -20,6 +20,7 @@ import torch
 from safetensors.torch import save_file
 
 from model import Config, POINTERS, Translator, features
+from limits import reader_pieces
 from slots import Follow, Masks, slot_names
 from tokens import spans, text_of, to_pieces, tokenize
 
@@ -311,6 +312,10 @@ def main() -> None:
     ap.add_argument("--batch", type=int, default=48); ap.add_argument("--lr", type=float, default=6e-4)
     ap.add_argument("--renumber", type=float, default=0.0); ap.add_argument("--forms", type=float, default=0.0); ap.add_argument("--dropout", type=float, default=0.1); ap.add_argument("--piece-dropout", type=float, default=0.0)
     ap.add_argument("--forms-most", type=int, default=5)
+    # The most pieces of an input a row may have (the reader length switch: 1024 or 2048; model.py's 640 where not given).
+    # With an encoder this is what keeps a long input a training example: a row of more pieces is left out, as is a
+    # row of more tokens than --max-tokens. Raise both together (docs/design/translator-round-3.md, section 4).
+    ap.add_argument("--max-pieces", type=int, default=None)
     ap.add_argument("--max-steps", type=int, default=None); ap.add_argument("--old-steps-most", type=int, default=0)
     ap.add_argument("--resume", action="store_true"); ap.add_argument("--stop-after", type=int, default=0)
     ap.add_argument("--seed", type=int, default=1); ap.add_argument("--device", default="mps" if torch.backends.mps.is_available() else "cpu")
@@ -327,6 +332,8 @@ def main() -> None:
     how = {"decoding": "slots", "grammar": export["grammar"], "slots": slot_names(export["grammar"])} if export.get("decoding") == "slots" else {}
     if a.max_steps:
         how["max_steps"] = a.max_steps
+    if a.max_pieces:
+        how["max_pieces"] = reader_pieces(a.max_pieces)
     if how.get("decoding") == "slots" and not a.encoder:
         sys.exit("slot-by-slot data needs a reader with tokens (--encoder)")
     device = torch.device(a.device)
