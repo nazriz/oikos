@@ -145,3 +145,40 @@ test("the extreme readers of 13f read every paper at its kindest and at its curt
   expect(() => mockReader("claude-code/claude-haiku-5-5")).toThrow(/calls no model/);
   expect(() => mockReader("mock:nonesuch")).toThrow(/no mock reader/);
 });
+
+test("the author's-family check can set the reader against another family's reader, where the second reader is its own family's", async () => {
+  const fam = [
+    ...Array.from({ length: 4 }, (_, i) => ({ family: "claude", kind: "a decision on a claim: refused", standing: "addressee" as const, paper: `We cannot pay this claim. The law asks for 26 weeks. Bring your pay slips to the counter within 28 days. (${i})` })),
+    ...Array.from({ length: 4 }, (_, i) => ({ family: "gpt", kind: "a decision on a claim: refused", standing: "addressee" as const, paper: `Claim refused. You do not qualify. (${i})` })),
+  ];
+  // The reader and its second agree (two models of one family); the other family's reader reads the reader's own family's papers a step lower.
+  const lowerOnClaude = familyBiased((paper) => !paper.includes("Claim refused"));
+  const same = await runGate({ reader: lexiconReader(), second: lexiconReader(), pairs: pairs.slice(0, 2), family: fam });
+  expect(same.checks.find((c) => c.id === "author_family")!.status).toBe("pass");
+  const biased = await runGate({ reader: familyBiased((paper) => !paper.includes("Claim refused")), second: lexiconReader(), other: lexiconReader(), pairs: pairs.slice(0, 2), family: fam });
+  expect(biased.checks.find((c) => c.id === "author_family")!.status).toBe("fail");
+  void lowerOnClaude;
+});
+
+test("the model gate runner refuses the largest Claude model and gpt-6-astra, and a model reader needs a folder to keep its readings in", async () => {
+  const { modelReaderFor, Spend } = await import("../../scripts/reading-gate");
+  const spend = new Spend(20, "/nonexistent-never-written");
+  for (const spec of ["claude-code/claude-fable-5-1", "claude-code/claude-opus-5-5", "codex/gpt-6-astra"]) expect(() => modelReaderFor(spec, "reader", spend)).toThrow(/never uses the largest/);
+  expect(modelReaderFor("claude-code/claude-haiku-5-5@low", "reader", spend).model).toBe("claude-code/claude-haiku-5-5@low");
+});
+
+test("a recorded sitting is replayed in order for the same request, and anything not recorded goes to the live reader", async () => {
+  const { replayReader } = await import("../../scripts/reading-gate");
+  const r = { kind: "k", standing: "addressee" as const, paper: "p", wording: 1 as const };
+  const rec = (respect: number) => ({ reader: "x", prompt_version: "1", wording: 1 as const, kind: "k", standing: "addressee" as const, paper: "p", result: "read" as const, reading: { ...NEUTRAL, respect }, phrases: {}, cost_microusd: 5, at: "t" });
+  let live = 0;
+  const rd = replayReader({ model: "x", version: "1", read: async () => { live++; return { declined: true }; } }, [rec(1), rec(2), { ...rec(0), result: "declined" as const }]);
+  expect((await rd.read(r)).reading!.respect).toBe(1);
+  expect((await rd.read(r)).reading!.respect).toBe(2);
+  expect((await rd.read(r)).declined).toBe(true);
+  expect(live).toBe(0);
+  expect((await rd.read(r)).declined).toBe(true);
+  expect((await rd.read({ ...r, paper: "other" })).declined).toBe(true);
+  expect(live).toBe(2);
+  expect(rd.misses).toBe(2);
+});
