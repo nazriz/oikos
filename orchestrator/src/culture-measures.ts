@@ -19,7 +19,7 @@ import { recordChanges } from "./records";
 import { culture, townmemory } from "@oikos/participants";
 
 const { CONDUCTS, normsRows, PERSONS_CONDUCTS, SAYINGS, WORDS } = culture;
-const { EVENT_KINDS } = townmemory;
+const { EVENT_CONDUCT, EVENT_KINDS, trustDirection } = townmemory;
 
 const DAY = 86_400;
 const NUMBERS = ["does", "approves", "own", "says"] as const;
@@ -135,15 +135,7 @@ export async function cultureMeasures(log: string, o: MeasureOptions = {}): Prom
     const rs = [...ties.values()];
     tieSeries.push({ day, people: ties.size, resented_per_person: r1(mean(rs.map((t) => t.resented))), close_per_person: r1(mean(rs.map((t) => t.close))) });
     // Trust moved in those an event was about: the change since the first trust seen, for those who hold such an event, against those who hold none about that party.
-    const held = new Map<string, Set<string>>();
-    for (const [who, sl] of heard) for (const s of sl) { if (!held.has(s[1])) held.set(s[1], new Set()); held.get(s[1])!.add(who); }
-    const row: { [party: string]: { holders: number[]; others: number[] } } = {};
-    for (const [who, now] of trustNow) for (const [party, bps] of now) {
-      const first = trustFirst.get(who)?.get(party);
-      if (first === undefined || !held.has(party)) continue;
-      ((row[party] ??= { holders: [], others: [] })[held.get(party)!.has(who) ? "holders" : "others"]).push(bps - first);
-    }
-    trustMoved.push({ day, parties: Object.fromEntries(Object.entries(row).filter(([, v]) => v.holders.length >= 3).map(([p, v]) => [p, { holders: v.holders.length, holders_moved_bps: Math.round(mean(v.holders)), others: v.others.length, others_moved_bps: Math.round(mean(v.others)) }])) });
+    trustMoved.push({ day, parties: trustMovement(heard, norms, trustFirst, trustNow) });
   };
   const lastDay = (end: number) => (wantChecks ?? Array.from({ length: Math.floor(end / (30 * DAY)) }, (_, i) => (i + 1) * 30));
   // ---- pass 1: the records
@@ -225,6 +217,38 @@ export async function cultureMeasures(log: string, o: MeasureOptions = {}): Prom
     tipping: { definition: `rate done within a group moving from under ${TIPPING.low_bps / 100}% to over ${TIPPING.high_bps / 100}% (or back) inside ${TIPPING.within_days} days, in ${TIPPING.window_days}-day windows of at least ${TIPPING.min_decisions} decisions; only for the conducts whose decisions carry a norm`, events: tipping, ...(decisions.length ? {} : { note: "this log records no decisions (a lean log, or --record-decisions none): tipping events cannot be read" }) },
     world,
   };
+}
+
+/**
+ * Trust moved in those an event was about, for those who hold such an event against those who hold none about that party (each side at least three for the holders).
+ * The signed mean (`holders_moved_bps`) cancels by construction, since each person's bearing takes the sign of their OWN view of the conduct and views are spread round
+ * the middle. So there is a second reading, added 2026-10-14 (culture-5; docs/behaviour/culture.md, "Events join the picture"): each person's movement taken in the direction
+ * the event gives for them (`trustDirection`: toward the party for one whose own view makes it so, away for the other), the share who moved that way, and the mean of
+ * movement in that direction (`*_toward_bps`), for holders against others. A person with no view of the conduct, or a party none of whose events shows a conduct, has no
+ * direction and is left out of it. Nothing about the event is judged: the direction is the person's.
+ */
+export function trustMovement(heard: Map<string, any[]>, norms: Map<string, { [c: string]: number[] }>, trustFirst: Map<string, Map<string, number>>, trustNow: Map<string, Map<string, number>>) {
+  const held = new Map<string, Set<string>>();
+  for (const [who, sl] of heard) for (const s of sl) { if (!held.has(s[1])) held.set(s[1], new Set()); held.get(s[1])!.add(who); }
+  const kindOfParty = new Map<string, (typeof EVENT_KINDS)[number]>();
+  for (const sl of heard.values()) for (const s of sl) { const k = EVENT_KINDS[s[0]]; if (k && !kindOfParty.has(s[1])) kindOfParty.set(s[1], k); }
+  const row: { [party: string]: { holders: number[]; others: number[]; hDir: number[]; oDir: number[] } } = {};
+  for (const [who, now] of trustNow) for (const [party, bps] of now) {
+    const first = trustFirst.get(who)?.get(party);
+    if (first === undefined || !held.has(party)) continue;
+    const r = (row[party] ??= { holders: [], others: [], hDir: [], oDir: [] }), holds = held.get(party)!.has(who);
+    r[holds ? "holders" : "others"].push(bps - first);
+    const kind = kindOfParty.get(party), conduct = kind ? (EVENT_CONDUCT as { [k: string]: string })[kind] : undefined;
+    const own = conduct ? norms.get(who)?.[conduct]?.[2] : undefined;
+    const dir = kind && own !== undefined ? trustDirection(kind, own * 100) : 0;
+    if (dir !== 0) r[holds ? "hDir" : "oDir"].push(dir * (bps - first));
+  }
+  const share = (xs: number[]) => (xs.length ? r1((100 * xs.filter((x) => x > 0).length) / xs.length) : null);
+  return Object.fromEntries(Object.entries(row).filter(([, v]) => v.holders.length >= 3).map(([p, v]) => [p, {
+    holders: v.holders.length, holders_moved_bps: Math.round(mean(v.holders)), others: v.others.length, others_moved_bps: Math.round(mean(v.others)),
+    holders_with_a_view: v.hDir.length, holders_toward_bps: v.hDir.length ? Math.round(mean(v.hDir)) : null, holders_toward_share: share(v.hDir),
+    others_with_a_view: v.oDir.length, others_toward_bps: v.oDir.length ? Math.round(mean(v.oDir)) : null, others_toward_share: share(v.oDir),
+  }]));
 }
 
 /** The measure in a few lines, for the pilot report's text. */

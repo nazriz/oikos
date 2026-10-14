@@ -69,6 +69,13 @@ for (const p of parties) {
   const sv = seeds.map((s) => g(S.get(s))).filter((x): x is number => x !== undefined), cv = seeds.map((s) => g(C.get(s))).filter((x): x is number => x !== undefined);
   console.log(`${p.padEnd(30)} shocked ${f(mean(sv), 0)} (sd ${f(sd(sv), 0)}, n ${sv.length})  calm ${f(mean(cv), 0)} (sd ${f(sd(cv), 0)}, n ${cv.length})`);
 }
+// (Added by culture-5, 2026-10-14: the same, in the direction the event gives for each person; see trustMovement in orchestrator/src/culture-measures.ts. Absent from the first proof's files.)
+console.log("-- R4 trust moved toward the party in the direction the event gives (per person, by their own view), holders minus others, in bps, last picture");
+for (const p of parties) {
+  const g = (r: any) => { const x = r.m.trust_moved.at(-1)?.parties?.[p]; return x && x.holders_toward_bps !== null && x.holders_toward_bps !== undefined ? x.holders_toward_bps - (x.others_toward_bps ?? 0) : undefined; };
+  const sv = seeds.map((s) => g(S.get(s))).filter((x): x is number => x !== undefined), cv = seeds.map((s) => g(C.get(s))).filter((x): x is number => x !== undefined);
+  console.log(`${p.padEnd(30)} shocked ${f(mean(sv), 0)} (sd ${f(sd(sv), 0)}, n ${sv.length})  calm ${f(mean(cv), 0)} (sd ${f(sd(cv), 0)}, n ${cv.length})`);
+}
 console.log("-- tipping events (per run)");
 line("tipping events", pair((r) => r.m.tipping.events.length), 1);
 line("decisions recorded", pair((r) => r.m.decisions_recorded), 0);

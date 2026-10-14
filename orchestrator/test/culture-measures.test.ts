@@ -11,7 +11,8 @@ import { join } from "node:path";
 import { generate } from "@oikos/worlds/generator/generate";
 import { currentLogs } from "../src/logs";
 import { exportDataset } from "../src/dataset";
-import { cultureMeasures, renderCultureMeasures, tippingEvents, TIPPING, type Dec } from "../src/culture-measures";
+import { townmemory } from "@oikos/participants";
+import { cultureMeasures, renderCultureMeasures, tippingEvents, trustMovement, TIPPING, type Dec } from "../src/culture-measures";
 import { pilotReport } from "../src/pilot-report";
 import { runWorld } from "../src/run";
 
@@ -75,3 +76,28 @@ test("a run with culture on is measured from its log: norm shares by group, verd
     expect((await pilotReport(join(dir, "off"), false)).culture).toBeUndefined();
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }, 240_000);
+
+test("trust moved is read in the direction the event gives, not as a signed mean that cancels: holders' movement toward the party for those whose view makes it so, away for the rest", () => {
+  // Six who hold a walk-out about "works": three whose own view of striking is against (trust in the employer rises), three for (it falls); each moved by 400 as the rule gives.
+  const heard = new Map<string, any[]>(), norms = new Map<string, { [c: string]: number[] }>(), first = new Map<string, Map<string, number>>(), now = new Map<string, Map<string, number>>();
+  const KIND = townmemory.EVENT_KINDS.indexOf("strike");
+  for (let i = 0; i < 6; i++) {
+    const who = `p${i}`, against = i < 3;
+    heard.set(who, [[KIND, "works", 10, 100, 0, 0, 10]]);
+    norms.set(who, { strike: [85, 50, against ? 30 : 70, 50, 20] });
+    first.set(who, new Map([["works", 5_000]]));
+    now.set(who, new Map([["works", 5_000 + (against ? 400 : -400)]]));
+  }
+  // Two who hold nothing about it and moved the other way, to show the others' side.
+  for (const who of ["q1", "q2"]) { norms.set(who, { strike: [85, 50, 30, 50, 20] }); first.set(who, new Map([["works", 5_000]])); now.set(who, new Map([["works", 5_000]])); }
+  const row = trustMovement(heard, norms, first, now).works!;
+  expect(row.holders_moved_bps).toBe(0); // (the signed mean cancels, as the first proof found)
+  expect(row.holders_with_a_view).toBe(6);
+  expect(row.holders_toward_bps).toBe(400);
+  expect(row.holders_toward_share).toBe(100);
+  expect(row.others_with_a_view).toBe(2);
+  expect(row.others_toward_bps).toBe(0);
+  // A person with no view (own at the middle) has no direction and is left out.
+  norms.set("p0", { strike: [85, 50, 50, 50, 20] });
+  expect(trustMovement(heard, norms, first, now).works!.holders_with_a_view).toBe(5);
+});
