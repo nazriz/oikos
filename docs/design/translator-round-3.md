@@ -212,3 +212,7 @@ Done as section 5 says, with these differences from what the plan assumed about 
 ### Step 2 (2026-10-15, Sonnet 5.5, Haiku 5.5, Codex `gpt-6.1-sol` while its window answered)
 
 Done as docs/decisions.md 2026-10-15 ("step 2") says: 787 examples from lv-01 to lv-05 (410 the seats' own, 377 written; 136 of the seats' own held back as tests), lv-06 38 test examples, the new real set 84 cases keyed by rule N1 (66 on new forms; withholding_return, possession_order and rent_reminder reach 8), readers' disagreement on new-form requests 5.7% (seats' own), 21.6% (written), 0% (lv-06): no stop. About 17 USD of plan usage and the hand readings. Differences from the plan are in the entry (sol as second reader, the reader cost, `every` 3).
+
+### Step 3 (2026-10-15, Sonnet 5.5, Haiku 5.5; Codex's window was shut)
+
+Done as docs/decisions.md 2026-10-15 ("step 3") says: 2,075 generated examples kept (1,767 to train, 308 held back as per-form tests), the part from code participants' calls from a 120-day code-only run of the lv-06 town, Haiku's reading of step 2's 377 written examples (321 stand), practice and offer left out of the model, three forms with a field `to` found unusable. Spend 77.09 of 80 USD. `step3/JOIN.json` says what step 4 joins.

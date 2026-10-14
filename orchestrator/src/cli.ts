@@ -109,6 +109,7 @@
 //     withdrawal: one request of two lines, never too_much); --pairs-only writes requests for those alone.
 //     --broad: a wide part (the registers rambling, flat and slips dealt beside the styles; who is asking said in
 //     every brief; look_first for any act on a record named by description, no_such_act for attending).
+//     --world-forms-only A,B and --world-forms-more A=N,B=N: only those papers (the others still shown beside), some in more ways.
 //     --world-forms N adds every paper the worlds' own offices issue, each filled in N ways, every field of it in
 //     the first two (--only world_form: requests for those alone).
 //     --bank-payments N adds N payments a keeper of accounts makes carrying out a request to pay (per_request; asked
@@ -453,7 +454,7 @@ try {
       perShape: num("per-shape"), perGold: num("per-gold"), refusalsPerLabel: num("refusals"), refusalFloor: num("refusal-floor"), floor: num("floor"), generated: num("generated"), ceiling: num("ceiling"), validation: num("validation"),
       limit: num("limit"), seed: num("seed"), log: console.log,
       ...(flag("indirect") !== undefined ? { indirect: Number(flag("indirect")) } : {}), ...(flag("only") ? { only: list("only") } : {}), ...(flag("refusal-labels") ? { refusalLabels: list("refusal-labels") } : {}),
-      amountForms: num("amount-forms"), pairs: num("pairs"), pairsOnly: has("pairs-only"), broad: has("broad"), worldForms: num("world-forms"), ...(flag("styles") ? { styles: list("styles") } : {}),
+      amountForms: num("amount-forms"), pairs: num("pairs"), pairsOnly: has("pairs-only"), broad: has("broad"), worldForms: num("world-forms"), ...(flag("world-forms-only") ? { worldFormsOnly: list("world-forms-only") } : {}), ...(flag("world-forms-more") ? { worldFormsMore: weights("world-forms-more") } : {}), ...(flag("styles") ? { styles: list("styles") } : {}),
       bankPayments: num("bank-payments"), financePayments: num("finance-payments"), late: Object.fromEntries(([["line", "line-payments"], ["report", "report-payments"], ["split", "split-payments"], ["hours", "hours-terms"], ["practice", "practice-notices"], ["offer", "offer-notices"]] as const).filter(([, f]) => flag(f)).map(([k, f]) => [k, num(f)!])), ...(flag("askers") ? { askers: weights("askers") } : {}), ...(flag("money") ? { money: weights("money") } : {}),
     });
     if (has("briefs")) console.log(`${r.briefs} briefs written to ${r.out} (plan.json, briefs.jsonl${flag("writers") ? ", a briefs file for each writer" : ""}, writer-instructions.txt)`);

@@ -116,6 +116,9 @@ export interface TrainingDataOptions {
   /** Every paper the worlds' own offices issue is added to the gold set, each filled in so many ways, every field of
    * it in the first two (synthetic.ts `worldForms`; none if absent). `only: ["world_form"]` writes requests for them alone. */
   worldForms?: number;
+  /** Only these papers (by form name), and how many ways for some of them (`name=N`): the others are left out of the gold set (still shown beside). */
+  worldFormsOnly?: string[];
+  worldFormsMore?: { [form: string]: number };
   /** So many payments that carry out a request to pay (a bank's, out of an account it keeps: `per_request`), and so
    * many of a finance office's kinds (a net wage with the gross and what was withheld said, what was withheld
    * remitted, a payment resting on several records, a standing payment with its first day), are added to the gold
@@ -308,7 +311,7 @@ export async function trainingData(o: TrainingDataOptions): Promise<{ examples: 
   // Forms of several amounts, where asked for: beside the gold set's own forms (they are forms like any other to a
   // part of the set, a split and a refusal built from one).
   if (o.amountForms) gold = [...gold, ...amountForms({ forms: o.amountForms, seed: o.seed ?? 1, ...drawn })];
-  if (o.worldForms) gold = [...gold, ...worldForms({ perForm: o.worldForms, seed: o.seed ?? 1, askers: PAPER_ASKERS, ...drawn })];
+  if (o.worldForms) gold = [...gold, ...worldForms({ perForm: o.worldForms, seed: o.seed ?? 1, askers: PAPER_ASKERS, ...(o.worldFormsOnly ? { only: o.worldFormsOnly } : {}), ...(o.worldFormsMore ? { perFormOf: o.worldFormsMore } : {}), ...drawn })];
   if (o.bankPayments) gold = [...gold, ...payments({ kind: "per_request", n: o.bankPayments, seed: o.seed ?? 1, ...drawn })];
   if (o.financePayments) gold = [...gold, ...payments({ kind: "finance", n: o.financePayments, seed: o.seed ?? 1, ...drawn })];
   for (const kind of Object.keys(LATE_TAGS) as LateKind[]) if (o.late?.[kind]) gold = [...gold, ...lateKinds({ kind, n: o.late[kind]!, seed: o.seed ?? 1, ...drawn })];
