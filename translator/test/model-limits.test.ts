@@ -2,7 +2,7 @@
 // 1024 or 2048 for the third round (docs/design/translator-round-3.md, section 4). The trainer needs torch; the switch
 // does not, and neither does reading the option off the trainer's source.
 import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const PY = join(import.meta.dir, "../model/py");
@@ -26,4 +26,14 @@ test("the trainer offers --max-pieces, puts it in the model's config only where 
   expect(train).toContain('how["max_pieces"] = reader_pieces(a.max_pieces)');
   expect(train).toContain("from limits import reader_pieces");
   expect(readFileSync(join(PY, "model.py"), "utf8")).toContain("max_pieces: int = 640");
+});
+
+test("the pod batch sends the trainer every module it imports from its own folder (limits.py was left out once: three runs failed on the pod)", () => {
+  const pod = readFileSync(join(import.meta.dir, "../model/pod/pod.sh"), "utf8");
+  const sent = pod.match(/rsync -az -e "\$SSH"([^|\n]*?) root@\$H:\/work\/py\//)![1]!;
+  const files = new Set(sent.match(/py\/(\w+)\.py/g)!.map((s) => s.slice(3, -3)));
+  const mine = new Set(readdirSync(PY).filter((f) => f.endsWith(".py")).map((f) => f.slice(0, -3)));
+  for (const f of ["train", "predict"]) {
+    for (const m of readFileSync(join(PY, `${f}.py`), "utf8").matchAll(/^\s*(?:from|import) (\w+)/gm)) if (mine.has(m[1]!)) expect([f, m[1], files.has(m[1]!)]).toEqual([f, m[1], true]);
+  }
 });

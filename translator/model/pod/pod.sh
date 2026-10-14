@@ -149,7 +149,7 @@ chmod +x /work/run.sh' < /dev/null || return 1
 queue() {
   local DATA=$1; shift
   local SSH=$(ssh_opts) H=$(host) spec q=$S/queue.sh
-  rsync -az -e "$SSH" $W/translator/model/py/model.py $W/translator/model/py/train.py $W/translator/model/py/tokens.py $W/translator/model/py/predict.py $W/translator/model/py/slots.py root@$H:/work/py/ || return 1
+  rsync -az -e "$SSH" $W/translator/model/py/model.py $W/translator/model/py/train.py $W/translator/model/py/tokens.py $W/translator/model/py/predict.py $W/translator/model/py/slots.py $W/translator/model/py/limits.py root@$H:/work/py/ || return 1
   rsync -az -e "$SSH" ${DATA:A} root@$H:/work/data/ || return 1
   { echo "#!/bin/sh"; for spec in "$@"; do
       local f=("${(@s/:/)spec}")
