@@ -31,7 +31,7 @@ const quoted = (s: string) => s.replace(/\s+/g, " ").replace(/"/g, "'").trim();
 
 export const founded: BehaviourModule = {
   name: "group.founded",
-  version: "0.2.0", // 0.2.0: a fund states its rule with its offer of membership (who may draw, how much, how often), in words and figures, and says it again when it refuses; 0.1.0: what a founder's post does for a group, a fund or a body that takes grievances up (docs/behaviour/founding.md)
+  version: "0.2.1", // 0.2.1: the gathering's request names the cell the founder's home stands on (`place_on`), so that a translator can write the notice's on=; 0.2.0: a fund states its rule with its offer of membership (who may draw, how much, how often), in words and figures, and says it again when it refuses; 0.1.0: what a founder's post does for a group, a fund or a body that takes grievances up (docs/behaviour/founding.md)
   doc: "docs/behaviour/founding.md",
   cadence: (ctx) => (ctx.params.shape === "cause" ? DAY : 7 * DAY),
   firstWake: () => 0,
@@ -42,6 +42,9 @@ export const founded: BehaviourModule = {
       want: { about: "", since: 0, weight: 0 } as { about: string; whom?: string; since: number; weight: number },
       // Where it can gather: the founder's home, and how many it holds besides those who live there.
       place: "", place_room: 4,
+      // The cell the home stands on (empty: not known): the gathering's request puts the notice up on it, for the
+      // translator's `on=` (a place on the ground, which a space inside a building is not; docs/decisions.md, 2026-10-14).
+      place_on: "",
       bank: "", founded_at: 0,
       // The composed piece, where there is one (the name is the organisation's already).
       composed: null as Composed | null,
@@ -141,7 +144,7 @@ export const founded: BehaviourModule = {
         const way: Way = [chose(c?.choice.every_days, p.every_days), chose(c?.choice.lasts_minutes, p.lasts_minutes)].includes("choice") ? "choice" : "code";
         if (c && !asked.has("gathers")) {
           asked.add("gathers");
-          out.push(through("gathers", `Put up a public notice of our gathering, a practice held at ${place}: "${quoted(c.gathers)}"`,
+          out.push(through("gathers", `Put up a public notice of our gathering, a practice held at ${place}${p.place_on && place === p.place ? `, on ${p.place_on}` : ""}: "${quoted(c.gathers)}"`,
             acceptGathering(me, { at: place, every_days: p.every_days, lasts_minutes: p.lasts_minutes, first: [t, t + 30 * DAY], at_seconds: p.at_seconds }), () => sayGathering(way), way));
         } else if (!c) { arrived.gathers = "code"; out.push(sayGathering("code")); }
         return out;

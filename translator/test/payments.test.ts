@@ -147,7 +147,7 @@ test("a call that fills per_request with words is the call's fault: tried again,
 test("prompt 0.9.3: a figure named with something to be taken off it is an amount to be worked out; a direction with no form is a message; what per_request is", () => {
   const { translatorSystem, TRANSLATOR_VERSION } = require("../src/index");
   const s: string = translatorSystem();
-  expect(TRANSLATOR_VERSION).toBe("0.9.4");
+  expect(TRANSLATOR_VERSION).toBe("0.9.5");
   for (const said of [
     "So is an amount given only as a figure with something to be taken off it or added to it that the request doesn't state as a figure",
     "the figure named is what the amount is worked out from, and is never written as the amount.",
@@ -178,7 +178,7 @@ test("prompt 0.9.4: the rulings are there in general words, each with a worked e
   const { translatorSystem, TRANSLATOR_VERSION } = require("../src/index");
   const { CASES } = require("../eval/cases");
   const s: string = translatorSystem();
-  expect(TRANSLATOR_VERSION).toBe("0.9.4");
+  expect(TRANSLATOR_VERSION).toBe("0.9.5");
   for (const said of [
     "What the payment settles, named by its record",
     "The text ends where what they are told ends",

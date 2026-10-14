@@ -2631,7 +2631,7 @@ export const citizen: BehaviourModule = {
           const fill = (x: unknown): unknown => typeof x === "string" ? x.replaceAll("{founder}", me) : Array.isArray(x) ? x.map(fill) : x && typeof x === "object" ? Object.fromEntries(Object.entries(x).map(([k, y]) => [k, fill(y)])) : x;
           const module = (name: string) => ({ ...(fill(F.template!.role_module) as object), params: { ...(fill(F.template!.role_module.params) as object),
             founder: me, shape: b.shape, idea: b.brief.idea, name, purpose: b.brief.code.purpose, want: { about: b.want.about, ...(b.want.whom ? { whom: b.want.whom } : {}), since: Math.round(b.want.since), weight: Math.round(b.want.weight) },
-            place: ourPlace, place_room: room, bank: F.bank, founded_at: t,
+            place: ourPlace, ...(homeSite?.at && ourPlace === home?.space ? { place_on: homeSite.at } : {}), place_room: room, bank: F.bank, founded_at: t,
             ...(piece ? { composed: { purpose: piece.purpose, asks: piece.asks, gathers: piece.gathers, choice: piece.choice, model: piece.model } } : {}),
             dues: b.dues, every_days: F.every_days, starts_in_days: F.starts_in_days, lasts_minutes: F.lasts_minutes, at_seconds: F.at_seconds, lapse_days: F.lapse_days, min_members: F.min_members,
             hall: F.hall, fund: F.fund, cause: F.cause, ...(F.template!.role_module.params.values ? { owner_values: { ...mind.person.values } } : {}) } });

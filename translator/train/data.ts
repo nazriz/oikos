@@ -330,7 +330,7 @@ export function askable(p: calls.Program, maxLines = 3): boolean {
 }
 
 /** Arguments whose bare value is a word (a kind of thing, a choice) and not the id of anything. */
-const WORD_ARGS = new Set(["kind", "task", "type", "template", "role", "position", "choice", "survey", "then", "visible", "leave", "sex", "form"]);
+const WORD_ARGS = new Set(["kind", "task", "type", "template", "role", "position", "choice", "survey", "then", "visible", "leave", "sex", "form", "line"]);
 /** The functions on which `for` means something (contracts/calls.md, and the resolver): a payment's purpose on
  * `money`; whose name the act is in on the others. On anything else nothing reads it. */
 const FOR_MEANS = new Set(["money", "statement", "vote", "claim", "agreement", "form"]);
@@ -357,7 +357,7 @@ const YEAR = 365 * 86_400;
  * into words, and the check that ids are copied can't tell), and a word with an underscore. A real world's ids are
  * what they are (`builder`, `works`), so a log's programs aren't held to this.
  */
-export function implausible(program: calls.Program | string, o: { invented?: boolean; forms?: FormSpec[]; /** Fields of a form whose lists are of plain words (a ballot's tags), not of ids. */ wordLists?: string[] } = {}): string | undefined {
+export function implausible(program: calls.Program | string, o: { invented?: boolean; forms?: FormSpec[]; /** Fields of a form whose lists are of plain words (a ballot's tags), not of ids. */ wordLists?: string[]; /** Payments and the report of them are one thing, whether or not the report uses what a payment made (round 3, `lateKinds`). */ together?: boolean } = {}): string | undefined {
   const p = typeof program === "string" ? calls.parseProgram(program) : program;
   if ("none" in p) return undefined;
   const said = (v: calls.Value | undefined): string | undefined => (v === undefined ? undefined : "id" in v ? v.id : "text" in v ? v.text : undefined);
@@ -441,7 +441,7 @@ export function implausible(program: calls.Program | string, o: { invented?: boo
     if (alike) {
       const texts = p.lines.map((l) => Object.entries(l.call.args).map(([k, v]) => `${k}=${calls.callText({ fn: "harm", args: { who: v } })}`));
       for (const [i, x] of texts.entries()) for (const [j, y] of texts.entries()) if (i !== j && x.every((t) => y.includes(t)) && (x.length < y.length || i < j)) return "a line that repeats another";
-    } else if (!p.lines.slice(1).every((l, i) => uses(l, i + 1))) return "lines that don't depend on each other";
+    } else if (!(o.together && p.lines.length > 1 && p.lines.slice(0, -1).every((l) => l.call.fn === "money") && p.lines.at(-1)!.call.fn === "statement" && said(p.lines.at(-1)!.call.args.kind) === "report") && !p.lines.slice(1).every((l, i) => uses(l, i + 1))) return "lines that don't depend on each other";
     for (const l of p.lines) {
       const re = l.call.args.re;
       const about = l.call.fn === "message" && re && "var" in re ? p.lines.find((e) => e.bind === re.var && e.call.fn === "statement") : undefined;
@@ -1429,6 +1429,8 @@ const PARTICULAR: { [fn: string]: [arg: string, said: string][] } = {
   agreement: [["sign", "an agreement that was offered is signed: accepted"], ["notice", "notice is given to end an agreement (the agreement is the one named; any words given are the notice's own)"], ["", "an agreement is offered to someone: what we commit to, what they commit to, for how long, on what notice"]],
   statement: [["withdraw", "something published earlier, or standing on record, is withdrawn: taken down, cancelled (a hold that is withdrawn is lifted: what it held goes on again)"],
     ["hold", "something standing on record (a standing payment, a standing work order, an instruction someone carries out for the speaker) is put on hold for a time, to be resumed later: it stays on record, and is not ended, cancelled or withdrawn"],
+    ["practice", "a public notice is put up of something held again and again at a place (where it is held, how often and, where given, how long are in the call; they are said in words of days, hours and minutes, never as seconds)"],
+    ["offer", "a public offer is made that anyone may take up, such as joining a group (its dues and the notice to leave are in the call, said in words; it is made to anyone and is no agreement with a named person)"],
     ["visible=own", "an entry is made in the speaker's own books, on their own file: it moves nothing, and nobody else is told or shown it (its words are given)"],
     ["", "something is published (a notice, a law, a report: its kind is the call's word, its words are given)"]],
   presence: [["leave,who", "the person named leaves the world: goes away from it altogether"], ["leave", "the speaker leaves the world: goes away from it altogether (nobody else is named: it is their own leaving)"], ["who", "someone who was away comes back into the world from outside: returns, arrives back (never \"is present\" or \"attends\")"], ["", "a newcomer comes into the world from outside: arrives, is let in (their name, their age, what they come as; any money they carry)"]],
@@ -2348,6 +2350,8 @@ export function builtRefusals(positives: Example[], seed = 1, share = 0.05, floo
 }
 
 /** How an amount is left to be worked out: each a line of instruction to the writer. */
+/** How a sum is divided between several accounts when no share is a figure (round 3: the `needs_calculation` refusals made from `split_payment` programs). */
+const SPLIT_RULES = ["in equal shares", "in proportion to what each is owed", "by a percentage each, to be worked out from their last month's takings", "whatever each is short of the target", "half and half after the fee is taken off", "according to how many each has to feed"];
 const WORKED_OUT = [
   "a share of something (half, a third, a quarter of what's in an account or a budget)",
   "a percentage of something (10% of a balance, 2% of last month's takings)",
@@ -2597,7 +2601,18 @@ export function refusalBriefs(gold: Gold[], perLabel: number, seed = 1, o: { /**
     return { label: "no_such_act", mustCopy: [], source: "brief",
       brief: `The speaker wants a routine of their own office or organisation changed, stopped or started from now on: ${choose(ROUTINES)}. It is something the office carries on by itself, without anyone asking each time. Nobody is addressed: no office, post or person is named as the one to be directed, told or asked (the speaker says "we", "our office", "this office", or says only what is to change), and no form is spoken of. It is not a request to write to anyone, to publish a rule or a notice, or to undo anything already done; it names no record, and it sets no task, place and frequency for staff to work to (that would be a roster, which is another thing).`, seats: STAYS };
   };
+  // (Programs that pay one sum to several accounts, each share stated: `lateKinds` `split`. Where there are any, every
+  // other needs_calculation brief divides a sum between accounts and states no share: an extra brief, so that a part
+  // with none is as it was.)
+  const splits = gold.filter((g) => g.tag === "split_payment" && g.program.includes("\n"));
   for (let i = 0; i < perLabel; i++) {
+    if (splits.length && i % 2 === 0) {
+      const g = wchoose(splits);
+      const p = calls.parseProgram(g.program) as { lines: calls.Line[] };
+      const without = calls.programText({ lines: p.lines.map((l) => { const { amount: _, ...rest } = l.call.args; return { call: { fn: "money" as const, args: rest } }; }) });
+      out.push({ label: "needs_calculation", mustCopy: mustAppear(calls.parseProgram(without)), source: g.source, gold: g.family ?? g.program,
+        brief: `Payments like these, one sum paid out to several accounts, but with no amount stated for any of them:\n${without}\nInstead of amounts, the request says how the sum is to be divided between them: ${wchoose(SPLIT_RULES)}. It must not contain any resulting figure, and it may not state the share of any one of them as a figure.` });
+    }
     if (payments.length) {
       const g = choose(payments);
       const p = calls.parseProgram(g.program) as { lines: calls.Line[] };

@@ -177,6 +177,11 @@ The letting office was shown 13 to 15 of its 25 forms: **its own 15 do not alway
 
 **What this does and does not settle.** Selection gets a seat with many forms read at all, and measured, never offered. It does not make the model right on forms it was never shown in training, and for an office whose own forms nearly fill the reader there is almost no room: that needs the model's next round (a longer reader, or forms shown by name with the fields fetched for the one chosen). Until then a letting office's requests on its new forms are mostly the one behind's work, and should be reported so.
 
+
+### Forms released one by one (2026-10-14)
+
+A form the model was taught is not for that reason one it answers for the world. The model's folder may carry `forms-released.json` beside `forms-trained.json` (`scripts/forms-released.ts`, read by `readerOf` and `DecideAdapter.translate`): the forms whose drafts are offered. A form taught and not on the list is recorded and not offered, as one never taught is (`form_unseen`, the draft on the route as `wrote`), and the translator behind drafts for the world. A folder without the file is read as before: the forms taught. **The mark** is per form: at least 8 real requests of it, 90% right, no wrong draft, and 90% of its generated tests. The owner's ruling of 2026-10-14: **a form is handed to our model as soon as it passes its own mark, even while the model as a whole is under 90%.** The list is written once beside a model (nothing there is overwritten, and a form the model was not taught is refused); a list that grows is the work of the step that scores a model and of the pilots after it. No model is called by any of it.
+
 ## The composing model (2026-10-11)
 
 Where a town has `living.composer` (docs/behaviour/founding.md, "Words"), the words of what people found are written by a model asked as an author shown the founder's record, who may decline (VISION 15, point 7). It is not a seat and not the translator: it has its own purpose in the log (`compose`) and its own models.

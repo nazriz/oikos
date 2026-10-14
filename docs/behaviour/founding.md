@@ -121,7 +121,7 @@ With `dials.composer`, when a founding is drawn the founder's words are asked of
 |---|---|---|---|
 | name | Found a group called "…", with me in its first post as Convenor. | one `create_entity` of kind `group`; the post's channels and module are the founder's own plumbing, put in by the check | the plain name |
 | purpose | Put out a public statement, of kind purpose, in these words: "…" | one public statement in the organisation's name, carrying only its words | the plain statement of purpose |
-| gathers | Put up a public notice of our gathering, a practice held at (the place): "…" | one public notice with a practice at that place, its rhythm and length among those open | the composer's closed choice, written by code; or the default |
+| gathers | Put up a public notice of our gathering, a practice held at (the place), on (the cell the home stands on, where it is known): "…" | one public notice with a practice at that place, its rhythm and length among those open | the composer's closed choice, written by code; or the default |
 | asks | Offer membership publicly, for anyone to join: "…" | one public offer to join whose only typed ask is monthly dues among those open, into the organisation's own account | the composer's closed choice, written by code; or the default |
 
 Nobody reads a code person's draft, so the module says what it may be; anything else is not done. Every request is on record as a seat's is (the translator's calls, the draft, a signoff, a failure) with a `words` note of what came of it. Which way each part arrived (`translator`, `choice`, `code`) is on the organisation's record and on each paper code wrote (`data.words`).

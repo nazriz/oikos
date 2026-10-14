@@ -1,6 +1,6 @@
 {
   "name": "group.founded",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "doc": "docs/behaviour/founding.md",
   "params": {
     "at_seconds": {
@@ -130,6 +130,13 @@
       "source": "placeholder"
     },
     "place": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
+      "source": "placeholder"
+    },
+    "place_on": {
       "schema": {
         "type": "string"
       },

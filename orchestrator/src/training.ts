@@ -30,7 +30,7 @@ import { loadHeldOut, TEST_CURRENCY } from "@oikos/translator/eval";
 import { CASES } from "../../translator/eval/cases";
 import { blindRequests, checkAnswers, type BlindAnswer, type BlindReport } from "../../translator/train/blind";
 import { ASKERS, BROAD_DEAL, PAPER_ASKERS, CLOSE, DATA_VERSION, OPEN, inOnly, fromWritten, functionOf, generate, goldFromCases, goldFromLog, knowing, planOf, refusalWriterSystem, sampler, shuffled, split, surfaceVariant, writerSystem, type Back, type Example, type Gold, type Manifest, type PlanItem, type Reject, type WrittenRequest } from "../../translator/train/data";
-import { amountForms, everyCurrency, payments, piled, synthetic, worldForms } from "../../translator/train/synthetic";
+import { amountForms, everyCurrency, LATE_TAGS, lateKinds, payments, piled, synthetic, worldForms, type LateKind } from "../../translator/train/synthetic";
 import { logsIn } from "./corpus";
 import { logLines, runOf } from "./logs";
 
@@ -41,7 +41,7 @@ import { logLines, runOf } from "./logs";
  */
 /** Kinds of program by name that are added to the gold set by an option of their own (`bankPayments`,
  * `financePayments`), as the forms of several amounts are: `only` takes them. */
-const ADDED = ["per_request", "finance_payment"];
+const ADDED = ["per_request", "finance_payment", ...Object.values(LATE_TAGS)];
 
 export const TAGS: { [tag: string]: string } = {
   hold: "statement", entry: "statement", standing_work_hold: "statement", standing_work_withdraw: "statement",
@@ -123,6 +123,13 @@ export interface TrainingDataOptions {
    * requests for them alone. */
   bankPayments?: number;
   financePayments?: number;
+  /** So many programs of each kind the call language gained after the data was first made (synthetic.ts `lateKinds`,
+   * prompt 0.9.5; none if absent): payments drawn on a line of the budget (`line_payment`), payments with a report
+   * naming several amounts (`report_amounts`), one sum paid to several accounts (`split_payment`: the refusals that
+   * state no share are made from these, data.ts `refusalBriefs`), offers of employment with and without hours
+   * (`hours_term`), a notice of a practice (`practice_notice`) and an offer anyone may take up (`offer_notice`).
+   * `only` takes them by those names. */
+  late?: { [kind in LateKind]?: number };
   /** A wide part weighted toward some askers: the share of its requests each makes (data.ts `PlanOptions.askers`). */
   askers?: { [asker: string]: number };
   /** A part weighted toward some worlds' money: how many times over each of these currencies, by its code, stands
@@ -304,6 +311,7 @@ export async function trainingData(o: TrainingDataOptions): Promise<{ examples: 
   if (o.worldForms) gold = [...gold, ...worldForms({ perForm: o.worldForms, seed: o.seed ?? 1, askers: PAPER_ASKERS, ...drawn })];
   if (o.bankPayments) gold = [...gold, ...payments({ kind: "per_request", n: o.bankPayments, seed: o.seed ?? 1, ...drawn })];
   if (o.financePayments) gold = [...gold, ...payments({ kind: "finance", n: o.financePayments, seed: o.seed ?? 1, ...drawn })];
+  for (const kind of Object.keys(LATE_TAGS) as LateKind[]) if (o.late?.[kind]) gold = [...gold, ...lateKinds({ kind, n: o.late[kind]!, seed: o.seed ?? 1, ...drawn })];
   log(`${gold.length} gold programs of ${new Set(gold.map((g) => g.shape)).size} shapes`);
   if (o.shard) {
     // One part of several: the same gold set is cut the same way every time (every `of`-th program, counted function

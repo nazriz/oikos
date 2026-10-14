@@ -625,7 +625,7 @@ const DEPENDENT: { [fn: string]: ((d: Draw) => Lines)[] } = {
 
 /** A program worth keeping, as gold: it parses back, passes the contract, is askable and is a plausible thing to ask
  * for (`dropped` counts, by reason, the ones that aren't plausible); otherwise undefined. */
-function goldOf(lines: Lines, d: Draw, source: string, forms?: FormSpec[], dropped?: { [reason: string]: number }, o: { /** As many values as this, where a sentence or two's ten is too few (an office's paper has more). */ most?: number; /** Fields whose lists are of plain words. */ wordLists?: string[]; /** A payment that carries out a request to pay (`payments`): kept, where a log's own is a keeper's bookkeeping. */ carriesOut?: boolean } = {}): Gold | undefined {
+function goldOf(lines: Lines, d: Draw, source: string, forms?: FormSpec[], dropped?: { [reason: string]: number }, o: { /** As many values as this, where a sentence or two's ten is too few (an office's paper has more). */ most?: number; /** Fields whose lists are of plain words. */ wordLists?: string[]; /** A payment that carries out a request to pay (`payments`): kept, where a log's own is a keeper's bookkeeping. */ carriesOut?: boolean; /** A statement carrying data in the contract's typed vocabulary (a practice, an offer) and payments with their report: kept (`lateKinds`). */ late?: boolean } = {}): Gold | undefined {
   let p: calls.Program;
   try {
     p = calls.parseProgram(calls.programText(calls.programOf(...lines)));
@@ -633,8 +633,8 @@ function goldOf(lines: Lines, d: Draw, source: string, forms?: FormSpec[], dropp
     return undefined;
   }
   const not = whyNot(p);
-  if (calls.contractErrors(p).length || (not !== undefined && !(not === "more than ten values" && literals(p).length <= (o.most ?? 10)) && !(o.carriesOut && not.startsWith("carries out")))) return undefined;
-  const why = implausible(p, { invented: true, ...(forms ? { forms } : {}), ...(o.wordLists ? { wordLists: o.wordLists } : {}) });
+  if (calls.contractErrors(p).length || (not !== undefined && !(not === "more than ten values" && literals(p).length <= (o.most ?? 10)) && !(o.carriesOut && not.startsWith("carries out")) && !(o.late && /^structured data: statement\.(practice|offer)$/.test(not)))) return undefined;
+  const why = implausible(p, { invented: true, ...(forms ? { forms } : {}), ...(o.wordLists ? { wordLists: o.wordLists } : {}), ...(o.late ? { together: true } : {}) });
   if (why) {
     if (dropped) dropped[why] = (dropped[why] ?? 0) + 1;
     return undefined;
@@ -1266,6 +1266,115 @@ export function payments(o: { kind: "per_request" | "finance"; n?: number; seed?
     if (!g || seen.has(g.program)) continue;
     seen.add(g.program);
     out.push(o.kind === "per_request" ? { ...g, asker: "banker" } : g);
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------- kinds the call language gained and the prompt taught later
+
+/** The lines of a body's budget, as a request names one: a bare word (neutral: no place's budget). */
+const BUDGET_LINES = ["parks", "roads", "schools", "services", "libraries", "health", "housing", "water", "waste", "safety", "works", "culture", "transport", "lighting", "markets", "relief"];
+const GATHERERS = ["Circle", "Club", "Society", "Guild", "Fellowship", "Union", "League", "Association", "Choir", "Congregation"];
+const GATHERINGS = ["every 7 days", "every 14 days", "every 14 days", "every 28 days", "every 21 days", "every 10 days", "every week", "every fortnight", "every month"];
+const REPORT_PARTS = ["withheld from", "paid to", "taken from", "due from", "deducted from", "owed by"];
+
+export type LateKind = "line" | "report" | "split" | "hours" | "practice" | "offer";
+/** The tag each kind of program carries (`Gold.tag`; `inOnly`: `--only line_payment`). */
+export const LATE_TAGS: { [kind in LateKind]: string } = { line: "line_payment", report: "report_amounts", split: "split_payment", hours: "hours_term", practice: "practice_notice", offer: "offer_notice" };
+
+/**
+ * Programs of kinds the call language gained after the data was first made, or that the model was weak on and no
+ * recipe made enough of (docs/design/translator-round-3.md, section 2; prompt 0.9.5). By `kind`:
+ *  - `line` (tag `line_payment`): a payment the request says is drawn on a line of the budget, `money(..., line=<label>)`,
+ *    half of them settling an invoice, a few standing.
+ *  - `report` (tag `report_amounts`): a payment (or two) together with a report naming each of several amounts, which
+ *    is one program of two or three lines: the money, then `statement(kind=report, text=...)` whose words carry each
+ *    amount as written. What is paid is the one figure the request states as the sum to pay.
+ *  - `split` (tag `split_payment`): the same sum paid to several accounts, each amount stated: a line each. (The ones
+ *    that state no share as a figure are `needs_calculation` refusals: data.ts `refusalBriefs` makes them from these.)
+ *  - `hours` (tag `hours_term`): an offer of employment, with the job's ordinary hours in a week stated (`hours="40 hours"`)
+ *    in half of them and not stated in the other half (a request that states none gets none).
+ *  - `practice` (tag `practice_notice`): a public notice of something held again and again at a place, one statement
+ *    carrying `practice=` (its lengths of time as the request writes them, no start) and `on=`.
+ *  - `offer` (tag `offer_notice`): a public offer anyone may take up (joining a group, with dues or without), one
+ *    statement carrying `offer=`, never an agreement.
+ * For a seed, always the same.
+ */
+export function lateKinds(o: { kind: LateKind; n?: number; seed?: number; currencies?: Currency[]; dropped?: { [reason: string]: number } }): Gold[] {
+  const rand = sampler(hash(`${o.seed ?? 1}:late ${o.kind}`));
+  const want = o.n ?? 100;
+  const out: Gold[] = [];
+  const seen = new Set<string>();
+  for (let tries = 0; out.length < want && tries < want * 40; tries++) {
+    const d = new Draw(rand, o.currencies ?? everyCurrency());
+    d.tag = LATE_TAGS[o.kind];
+    const per = 10 ** d.currency.minor_units;
+    let lines: Lines;
+    if (o.kind === "line") {
+      const label = d.pick(BUDGET_LINES);
+      const settles = d.maybe(0.5);
+      const every = !settles && d.maybe(0.2);
+      lines = [call("money", { to: d.maybe(0.6) ? d.account() : d.party(), amount: d.amount(), from: d.maybe(0.85) ? d.account() : undefined, every: every ? d.every() : undefined, for: d.maybe(0.6) ? d.purpose() : undefined, settles: settles ? d.rec() : undefined, basis: d.maybe(0.1) ? d.record() : undefined, line: id(label) })];
+      d.notes.push(`The payment is drawn on the ${label} line of the budget: say so in words of your own ("charged to the ${label} line", "out of the ${label} line of the budget", "under the ${label} line"), naming the line exactly as it is written here (${label}). A line of the budget is not an account: the account the money leaves is named separately.`);
+    } else if (o.kind === "report") {
+      const parts = d.int(2, 4);
+      const k = d.int(0, 5);
+      const figures = Array.from({ length: parts }, () => (d.int(10, 400) * (d.maybe(0.5) ? 10 : 1) * per) + (per > 1 && d.maybe(0.3) ? d.int(1, per - 1) : 0));
+      const total = figures.reduce((a, b) => a + b, 0);
+      const written = (x: number) => { const ways = amountWritings(BigInt(x), d.currency); return ways[k] ?? ways[0]!; };
+      const who = Array.from({ length: parts }, () => d.personId());
+      const what = d.pick(REPORT_PARTS);
+      const text = who.map((w, i) => `${written(figures[i]!)} ${what} ${w}`).join(", ").replace(/, ([^,]*)$/, " and $1");
+      const two = d.maybe(0.25);
+      const to = d.maybe(0.6) ? d.account() : d.party(["org", "person"]);
+      const from = d.maybe(0.8) ? d.account() : undefined;
+      const pay = (x: number, dest: V) => call("money", { to: dest, amount: tx(written(x)), from, for: d.maybe(0.5) ? d.purpose() : undefined });
+      lines = two && parts >= 3 ? [pay(figures.slice(0, 2).reduce((a, b) => a + b, 0), to), pay(figures.slice(2).reduce((a, b) => a + b, 0), d.account()), call("statement", { kind: id("report"), text: tx(text) })]
+        : [pay(total, to), call("statement", { kind: id("report"), text: tx(text) })];
+      d.notes.push(two && parts >= 3 ? `Two payments are made, and one report beside them names every amount: ${text}. Say the report's words exactly as written (the amounts and who each is for), as the words of the report, and the two sums to pay as the sums to pay.` : `One payment is made, of the total, ${written(total)}, and a report beside it names each of ${parts} amounts: ${text}. Say the report's words exactly as written (the amounts and who each is for), as the words of the report; the sum to pay is the total, ${written(total)}, stated as the sum to pay.`);
+    } else if (o.kind === "split") {
+      const n = d.int(2, 3);
+      const from = d.maybe(0.8) ? d.account() : undefined;
+      const why = d.maybe(0.6) ? d.purpose() : undefined;
+      const tos = Array.from({ length: n }, () => d.account());
+      if (new Set(tos.map((t) => (t as { id: string }).id)).size < n) continue;
+      const k = d.int(0, 5);
+      const sums = tos.map(() => d.int(10, 900) * d.pick([1, 10, 100]) * per + (per > 1 && d.maybe(0.3) ? d.int(1, per - 1) : 0));
+      const written = (x: number) => { const ways = amountWritings(BigInt(x), d.currency); return ways[k] ?? ways[0]!; };
+      lines = tos.map((to, i) => call("money", { to, amount: tx(written(sums[i]!)), from, for: why }));
+      d.notes.push(`One request pays ${n} accounts, each a sum stated as a figure: the same payment to each of them, one line apiece. Every account and its sum are said.`);
+    } else if (o.kind === "hours") {
+      const stated = out.length % 2 === 0;
+      const other = d.party(["person"]);
+      const wage = call("money", { to: d.maybe(0.5) ? d.account() : id(`acc-c${pad(d.int(1, 9999), 4)}`), amount: d.amount(), every: d.every(), from: d.maybe(0.7) ? d.account() : undefined });
+      const hours = `${d.pick([8, 12, 15, 16, 20, 24, 25, 30, 32, 35, 36, 37, 38, 40, 42, 44, 48])} hours`;
+      lines = [call("agreement", { with: other, template: id(d.pick(["employment", "employment", "apprenticeship", "retainer"])), term: d.maybe(0.3) ? d.term() : undefined, our_notice: d.maybe(0.6) ? d.notice() : undefined, their_notice: d.maybe(0.6) ? d.notice() : undefined, hours: stated ? tx(hours) : undefined, we_do: { call: wage }, they_do: nest("work", { task: d.word(TASKS), at: d.structure() }), basis: d.maybe(0.15) ? d.record() : undefined })];
+      d.notes.push(stated ? `The request states the job's ordinary hours in a week: ${hours} ("${hours} a week", "${hours} each week"): the number of hours is written exactly as ${hours} somewhere in the request.` : "The request states no hours for the job and no number of hours a week: none is written.");
+    } else if (o.kind === "practice") {
+      const name = `${d.place()} ${d.pick(GATHERERS)}`;
+      const at = d.maybe(0.7) ? (d.inside() as { id: string }).id : d.cellId();
+      const on = d.ground() as { id: string };
+      const every = d.pick(GATHERINGS);
+      const lasts = d.pick(["30 minutes", "45 minutes", "60 minutes", "90 minutes", "2 hours", "3 hours"]);
+      const hasLasts = d.maybe(0.85);
+      const text = `${name} gathers ${every}${hasLasts ? `, for ${lasts}` : ""}. All welcome.`;
+      lines = [call("statement", { kind: id("notice"), visible: id("public"), text: tx(text), on, practice: { json: { at, every, ...(hasLasts ? { lasts } : {}) } } })];
+      d.notes.push(`This is a public notice of something held again and again at ${at}: ${name} gathers ${every}${hasLasts ? ` for ${lasts}` : ""}. The notice is put up on ${on.id}, and it says where it is held (${at}) and how often${hasLasts ? " and for how long" : ""}, in exactly these words for the lengths of time (${every}${hasLasts ? `, ${lasts}` : ""}). The notice's words are copied exactly: ${text}`);
+    } else {
+      const name = `${d.place()} ${d.pick(GATHERERS)}`;
+      const dues = d.maybe(0.7);
+      const account = d.account() as { id: string };
+      const notice = d.pick(["7 days", "14 days", "a month", "two weeks", "a week", "30 days"]);
+      const amount = d.amount() as { text: string };
+      const text = `Anyone may join ${name}.${dues ? ` Members pay ${amount.text} a month.` : " Nothing is asked but to come."}`;
+      const commitment = dues ? { who: "taker", does: { outcome: { money: { to: account.id, amount: amount.text, for: "dues" } } }, every: "a month" } : { who: "taker", does: { text: "take part" } };
+      lines = [call("statement", { kind: id("notice"), visible: id("public"), text: tx(text), offer: { json: { take_up: "join", terms: { commitments: [commitment], termination: [{ party: "taker", notice }] } } } })];
+      d.notes.push(`This is a public offer that anyone may take up: to join ${name}${dues ? `, with dues of ${amount.text} a month paid into ${account.id}` : ", asking nothing"}, and a notice of ${notice} to leave (said in exactly those words). It is made to anyone, in public, never to a named person, and is no agreement with anyone. The notice's words are copied exactly: ${text}`);
+    }
+    const g = goldOf(lines, d, `synthetic: late ${o.kind}`, undefined, o.dropped, { late: true, most: 14 });
+    if (!g || seen.has(g.program)) continue;
+    seen.add(g.program);
+    out.push(g);
   }
   return out;
 }

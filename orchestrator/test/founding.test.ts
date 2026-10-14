@@ -181,7 +181,7 @@ function scriptedTranslator(seen: string[]): LlmAdapter {
       let m: RegExpExecArray | null;
       const program = (m = /^Found a (\w+) called "(.*)", with me in its first post as (\w+)\.$/.exec(text)) ? `entity(kind=${m[1]}, name=${q(m[2]!)}, position=${q(m[3]!)})`
         : (m = /^Put out a public statement, of kind purpose, in these words: "(.*)"$/.exec(text)) ? `statement(kind=purpose, visible=public, text=${q(m[1]!)})`
-        : (m = /^Put up a public notice of our gathering, a practice held at (\S+): "(.*)"$/.exec(text)) ? `statement(kind=notice, visible=public, text=${q(m[2]!)}, practice={"at":${q(m[1]!)},"every":${7 * DAY},"lasts":3600})`
+        : (m = /^Put up a public notice of our gathering, a practice held at ([^\s,]+)(?:, on (\S+))?: "(.*)"$/.exec(text)) ? `statement(kind=notice, visible=public, text=${q(m[3]!)}${m[2] ? `, on=${m[2]}` : ""}, practice={"at":${q(m[1]!)},"every":${7 * DAY},"lasts":3600})`
         : (m = /^Offer membership publicly, for anyone to join: "(.*)"/.exec(text)) ? `statement(kind=notice, visible=public, text=${q(m[1]!)}, offer={"take_up":"join","terms":{"commitments":[{"who":"taker","does":{"outcome":{"money":{"to":"acc-city","amount":"999"}}},"every":${30 * DAY}}]}})`
         : "none(unclear)";
       const content = [{ type: "tool_use" as const, id: `t${seen.length}`, name: "call", input: { program } }];

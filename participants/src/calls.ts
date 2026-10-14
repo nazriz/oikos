@@ -160,12 +160,13 @@ export function parseProgram(text: string): Program {
 
 /**
  * Arguments the contract allows that only code writes, and that no one asking in words or a model writing a program is
- * offered: `money(..., line=parks)` names the line of a body's adopted budget a payment is drawn on (contracts/calls.md;
- * docs/behaviour/government.md, "Payments carry their budget line"). They are in the contract, and a program that carries
- * one is valid; they are not in `ARGS`, which is what a translator is taught and shown, so that adding one changes nothing
- * a trained model has learned.
+ * offered. None now: `money(..., line=parks)`, which names the line of a body's adopted budget a payment is drawn on
+ * (contracts/calls.md; docs/behaviour/government.md, "Payments carry their budget line"), was one until 2026-10-14,
+ * when it was taught to the translator (prompt 0.9.5; docs/decisions.md, the third round's step 0): a request that
+ * names the line it is charged to carries it. It is in `ARGS` now, so a translator is taught and shown it. The
+ * mechanism stays for an argument that must again be code's alone.
  */
-export const CODE_ARGS: { [fn: string]: Set<string> } = { money: new Set(["line"]) };
+export const CODE_ARGS: { [fn: string]: Set<string> } = {};
 
 /** Per function: the arguments it takes (undefined: any, as with a form's fields) and the ones it needs. Read from contracts/calls.schema.json, so it can't drift from the contract. Not the arguments only code writes (`CODE_ARGS`). */
 export const ARGS: { [fn: string]: { allowed?: Set<string>; required: string[] } } = Object.fromEntries(
