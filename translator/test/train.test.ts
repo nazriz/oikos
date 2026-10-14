@@ -397,10 +397,10 @@ test("generated gold covers each function's ways of being used, and every argume
   // Every argument the contract allows is used somewhere, but the ones out of the first model's scope (structured
   // data, a rule's formal condition), a keeper's bookkeeping, and `for` where nothing reads it (goods, work: only a
   // payment has a purpose), and `agreement.hours` (2026-10-13: an employer's offer in a world with a law on hours; no
-  // request a seat gets carries it yet: the translator learns it with its next round of forms).
+  // request a seat gets carries it yet: the translator learns it with its next round of forms), and `money.line` (taught from prompt 0.9.5; the default recipes make none, so the data of a seed is what it was, and `lateKinds` makes them: translator/test/train-late.test.ts).
   const used = new Set(gold.flatMap((g) => argsOf(g.program).map(([fn, k]) => `${fn}.${k}`)));
   const left = Object.entries(calls.ARGS).flatMap(([fn, a]) => [...(a.allowed ?? [])].map((k) => `${fn}.${k}`)).filter((k) => !used.has(k));
-  expect(left.sort()).toEqual([...JSON_OUT_OF_SCOPE, "money.per_request", "statement.formal", "goods.for", "work.for", "agreement.hours"].sort());
+  expect(left.sort()).toEqual([...JSON_OUT_OF_SCOPE, "money.per_request", "statement.formal", "goods.for", "work.for", "agreement.hours", "money.line"].sort());
   // No structured data but a list of names and a claim's slots.
   for (const g of gold) for (const [fn, k, v] of argsOf(g.program)) if ("json" in v && !Array.isArray(v.json)) expect(`${fn}.${k}`).toBe("claim.about");
 });

@@ -86,9 +86,10 @@ test("a program comes back exactly from its slot decisions: ids, text, a word, a
 test("the decisions of a payment and of a form, one by one: the contract's order, and the form's own", () => {
   const [pay, , , , form] = cases();
   const e = slots(pay!);
-  // money's slots as the contract lists them: to, amount, from, every, first, for, settles, basis, per_request.
-  expect([...calls.ARGS.money!.allowed!]).toEqual(["to", "amount", "from", "every", "first", "for", "settles", "basis", "per_request"]);
-  expect(read(e.input, e.steps)).toEqual([PROGRAM, "lines:1", "fn:money", "c0412", "$1,200.90", "acc-city", "every 14 days", 'const:"0 days"', "the fence", LEFT_OUT, LEFT_OUT, LEFT_OUT]);
+  // money's slots as the contract lists them: to, amount, from, every, first, for, settles, basis, per_request, line
+  // (`line` taught from 2026-10-14: a model trained before has nine, and decodes by its own grammar: below).
+  expect([...calls.ARGS.money!.allowed!]).toEqual(["to", "amount", "from", "every", "first", "for", "settles", "basis", "per_request", "line"]);
+  expect(read(e.input, e.steps)).toEqual([PROGRAM, "lines:1", "fn:money", "c0412", "$1,200.90", "acc-city", "every 14 days", 'const:"0 days"', "the fence", LEFT_OUT, LEFT_OUT, LEFT_OUT, LEFT_OUT]);
   // A form: form, to, then the fields of the line it names and goes to (the second of the two budget proposals is
   // another office's, with other fields), in that line's order: year, works, staff, reserve, note.
   const f = slots(form!);
@@ -127,15 +128,15 @@ test("a call cannot end early and a program cannot: too few decisions, or too ma
 test("an argument the contract requires cannot be left out; a form's required field can, and the answer then says which", () => {
   const input = "Pay c0412 $5.";
   // money needs to and amount (the contract): the first two slots.
-  const whole: Step[] = [PROGRAM, "lines:1", "fn:money", ["id", 4, 9], ["text", 10, 12], ...Array(7).fill(LEFT_OUT)];
+  const whole: Step[] = [PROGRAM, "lines:1", "fn:money", ["id", 4, 9], ["text", 10, 12], ...Array(8).fill(LEFT_OUT)];
   expect(decodeSlots(input, whole)).toBe('money(amount="$5", to=c0412)');
   const without: Step[] = whole.map((s, i) => (i === 4 ? LEFT_OUT : s));
   expect(() => decodeSlots(input, without)).toThrow("money needs amount");
   // As a model's answer over pieces: no program, so it asks back. (In the other decoding the same call is offered,
   // and whoever resolves it asks for the amount.)
   const ps = pieces(input);
-  expect(programOf(input, ps, [PROGRAM, "lines:1", "fn:money", ["id", 1, 1], LEFT_OUT, ...Array(7).fill(LEFT_OUT)], "slots")).toBe("none(unclear)");
-  expect(programOf(input, ps, [PROGRAM, "lines:1", "fn:money", ["id", 1, 1], ["text", 2, 3], ...Array(7).fill(LEFT_OUT)], "slots")).toBe('money(amount="$5", to=c0412)');
+  expect(programOf(input, ps, [PROGRAM, "lines:1", "fn:money", ["id", 1, 1], LEFT_OUT, ...Array(8).fill(LEFT_OUT)], "slots")).toBe("none(unclear)");
+  expect(programOf(input, ps, [PROGRAM, "lines:1", "fn:money", ["id", 1, 1], ["text", 2, 3], ...Array(8).fill(LEFT_OUT)], "slots")).toBe('money(amount="$5", to=c0412)');
   expect(programOf(input, ps, ["fn:money", "arg:to", ["id", 1, 1], ")", "eos"])).toBe("money(to=c0412)");
   expect(programOf(input, ps, ["none:not_yours"], "slots")).toBe("none(not_yours)");
   // A form must say which form (the contract).
@@ -259,4 +260,17 @@ test("a model's folder says which decoding it answers in; one that says nothing 
   expect(cannotSay(vocabularyOf(dir)!)).toEqual([]);
   writeFileSync(join(dir, "config.json"), JSON.stringify({ vocabulary: ["program"], decoding: "slots", slots: ["kind", "arg:to"] }));
   expect(cannotSay(vocabularyOf(dir)!).map(([c]) => c)).toContain("arg:hold");
+});
+
+test("a model is read by the slots it was taught: one trained before money gained `line` has nine, and its answers decode as they did", () => {
+  const input = "Pay c0412 $5.";
+  const taught = grammar();
+  const before = { ...taught, money: { ...taught.money!, args: taught.money!.args.filter((a) => a !== "line") } };
+  const nine: Step[] = [PROGRAM, "lines:1", "fn:money", ["id", 4, 9], ["text", 10, 12], ...Array(7).fill(LEFT_OUT)];
+  expect(decodeSlots(input, nine, { grammar: before })).toBe('money(amount="$5", to=c0412)');
+  // (Read against the contract as it stands, the same nine decisions end early.)
+  expect(() => decodeSlots(input, nine)).toThrow(NotEncodable);
+  expect(programFrom(input, nine, "slots", before)).toBe('money(amount="$5", to=c0412)');
+  const ps = pieces(input);
+  expect(programOf(input, ps, [PROGRAM, "lines:1", "fn:money", ["id", 1, 1], ["text", 2, 3], ...Array(7).fill(LEFT_OUT)], "slots", before)).toBe('money(amount="$5", to=c0412)');
 });

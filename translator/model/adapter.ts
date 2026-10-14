@@ -7,7 +7,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import type { LlmAdapter, LlmRequest, LlmResponse } from "@oikos/participants/llm";
 import { calls } from "@oikos/participants";
-import { formsIn, inputOf, lineOf, programFrom, type Decoding } from "./encode";
+import { formsIn, inputOf, lineOf, programFrom, type Decoding, type Grammar } from "./encode";
 import { pieces } from "./export";
 import { namedAmong, partsOf, ranked, taken, type FormFacts } from "./subset";
 
@@ -29,14 +29,14 @@ export function shown(text: string): { request: string; forms: string[] } {
  * it in config.json). The steps are read in the decoding the model was trained in (`decodingOf` its folder): slot by
  * slot, decisions that break the slots' rule (an argument the contract requires left out, too few or too many) are no
  * program either. (A form's required field left out is a program; `formsMisfit` then says which field it lacks.) */
-export function programOf(input: string, ps: { at: [number, number] }[], steps: (string | [string, number, number])[], decoding: Decoding = "steps"): string {
+export function programOf(input: string, ps: { at: [number, number] }[], steps: (string | [string, number, number])[], decoding: Decoding = "steps", grammar?: Grammar): string {
   try {
     const program = programFrom(input, steps.map((s) => {
       if (typeof s === "string") return s;
       const a = ps[s[1]], z = ps[s[2]];
       if (!a || !z || z.at[1] <= a.at[0]) throw new Error("a span of no piece");
       return [s[0] as "id", a.at[0], z.at[1]];
-    }), decoding);
+    }), decoding, grammar);
     // (A function or an argument the language doesn't have. An argument left out is not that: whoever resolves the
     // call asks for it.)
     if (calls.contractErrors(calls.parseProgram(program)).some((e) => !/ needs [a-z_]+$/.test(e))) throw new Error("not in the call language");
@@ -77,6 +77,19 @@ export function vocabularyOf(dir: string): string[] | undefined {
     const v = c?.vocabulary;
     if (!Array.isArray(v) || !v.every((x) => typeof x === "string")) return undefined;
     return c.decoding === "slots" && Array.isArray(c.slots) ? [...v, ...c.slots.filter((x: unknown) => typeof x === "string" && x.startsWith("arg:"))] : v;
+  } catch {
+    return undefined;
+  }
+}
+
+/** The slots a slot-by-slot model was trained with, as its folder says (config.json `grammar`): each function's arguments
+ * in order and which are required. None for a model that does not write slot by slot, or whose folder says nothing: its
+ * decisions are then read against the contract as it stands. */
+export function grammarOf(dir: string): Grammar | undefined {
+  try {
+    const file = join(dir, "config.json");
+    const g = existsSync(file) ? JSON.parse(readFileSync(file, "utf8")).grammar : undefined;
+    return g && typeof g === "object" && Object.values(g).every((x: any) => Array.isArray(x?.args) && Array.isArray(x?.required)) ? (g as Grammar) : undefined;
   } catch {
     return undefined;
   }
@@ -219,12 +232,15 @@ export class DecideAdapter implements LlmAdapter {
   readonly cannot: [choice: string, what: string][];
   /** The decoding the model answers in (its folder says). */
   readonly decoding: Decoding;
+  /** The slots the model was taught (`grammarOf`). */
+  private readonly grammar?: Grammar;
   /** `first`: this model answers first with another translator behind it (translator/src/arrangement.ts), so whoever
    * it is unsure for is never told so by it: the request goes behind. Then nobody is "given its best draft the next
    * time", and the cut-off holds for every request. */
   constructor(public model: string, private o: { dir?: string; threshold?: number; unchecked?: boolean; quiet?: boolean; first?: boolean } = {}) {
     const vocabulary = vocabularyOf(this.dir());
     this.decoding = decodingOf(this.dir());
+    this.grammar = this.decoding === "slots" ? grammarOf(this.dir()) : undefined;
     this.cannot = vocabulary ? cannotSay(vocabulary) : [];
     if (this.cannot.length && !o.quiet) console.error(`decide/${model} was trained before these were in the call language and cannot answer with them: ${this.cannot.map(([, what]) => what).join("; ")}. A request for one gets what the model was taught then. Retrain to add them.`);
   }
@@ -318,7 +334,7 @@ export class DecideAdapter implements LlmAdapter {
       n--;
     }
     const shown = n < all.length ? { forms: at_.map((i) => partsOf(all[i]!).id || partsOf(all[i]!).name), of: all.length } : undefined;
-    let program = programOf(input, ps, a.steps, this.decoding);
+    let program = programOf(input, ps, a.steps, this.decoding, this.grammar);
     // Why no draft is offered, where the reason is this adapter's and not the model's own refusal, and what the model
     // had written (for the record: it is never offered).
     let withheld: Withheld | undefined;

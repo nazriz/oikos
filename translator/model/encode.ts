@@ -210,23 +210,27 @@ const said = (v: calls.Value | undefined): string | undefined => (v && "id" in v
 /** `required`: the contract requires it, and it cannot be left out. `wanted`: a form's field its line marks required. */
 export interface Slot { name: string; required: boolean; wanted?: boolean; field?: [number, number] }
 /** A call's slots, in order. A form's are known once `form` and `to` are (pass them; without them, its own two). */
-export function slotsOf(fn: string, forms: FormLine[], form?: string, to?: string): Slot[] {
+export function slotsOf(fn: string, forms: FormLine[], form?: string, to?: string, own?: Grammar): Slot[] {
   const a = calls.ARGS[fn];
   if (!a) throw new NotEncodable(`${fn} is no function`);
-  if (fn !== "form") return [...(a.allowed ?? [])].map((name) => ({ name, required: a.required.includes(name) }));
+  // (A model decides the slots it was taught, in the order it was taught them: its own `grammar` (config.json) where
+  // it is given, as the contract had them when it was trained. An argument the contract gained since is a slot the
+  // model does not have: 2026-10-14, `money.line`.)
+  if (fn !== "form") return (own?.[fn]?.args ?? [...(a.allowed ?? [])]).map((name) => ({ name, required: (own?.[fn]?.required ?? a.required).includes(name) }));
   return [{ name: "form", required: true }, { name: "to", required: false }, ...(lineOf(forms, form, to)?.fields ?? []).filter((f) => !FORM_ARGS.has(f.name)).map((f) => ({ name: f.name, required: false, wanted: f.required, field: f.at }))];
 }
 
 /** What the contract gives a model's decoder: each function's slots in order and which must be filled (a form's own
  * two; its fields come from its line). Kept with the export and with the model (config.json `grammar`). */
-export const grammar = (): { [fn: string]: { args: string[]; required: string[] } } =>
+export type Grammar = { [fn: string]: { args: string[]; required: string[] } };
+export const grammar = (): Grammar =>
   Object.fromEntries(Object.entries(calls.ARGS).map(([fn, a]) => [fn, fn === "form" ? { args: ["form", "to"], required: ["form"] } : { args: [...(a.allowed ?? [])], required: a.required.filter((k) => a.allowed?.has(k)) }]));
 
 /** The program a run of slot decisions comes to. Throws on decisions no program is made of: too few or too many, one
  * that is not allowed where it stands (an argument the contract requires left out, a name used before it is bound, a
  * pointer where a choice is wanted). `lacks`: given a list, every required field of a form that was left out is added
  * to it (104 training labels leave one out, because the request does not give it). */
-export function decodeSlots(input: string, steps: Step[], o: { lacks?: { form: string; field: string }[] } = {}): string {
+export function decodeSlots(input: string, steps: Step[], o: { lacks?: { form: string; field: string }[]; /** The slots of the model that answered (its config.json `grammar`); the contract's now where absent. */ grammar?: Grammar } = {}): string {
   let at = 0;
   const next = (): Step => {
     if (at >= steps.length) throw new NotEncodable("the decisions end early");
@@ -295,7 +299,7 @@ export function decodeSlots(input: string, steps: Step[], o: { lacks?: { form: s
       const own = slotsOf(fn, forms);
       own.forEach(fill);
       slotsOf(fn, forms, said(args.form), said(args.to)).slice(own.length).forEach(fill);
-    } else slotsOf(fn, forms).forEach(fill);
+    } else slotsOf(fn, forms, undefined, undefined, o.grammar).forEach(fill);
     return { fn: fn as calls.Fn, args };
   };
   const lines: calls.Line[] = [];
@@ -317,7 +321,7 @@ export function decodeSlots(input: string, steps: Step[], o: { lacks?: { form: s
 }
 
 /** The program a model's decisions come to, in the decoding it was trained in. */
-export const programFrom = (input: string, steps: Step[], decoding: Decoding = "steps"): string => (decoding === "slots" ? decodeSlots(input, steps) : decode(input, steps));
+export const programFrom = (input: string, steps: Step[], decoding: Decoding = "steps", grammar?: Grammar): string => (decoding === "slots" ? decodeSlots(input, steps, { grammar }) : decode(input, steps));
 
 /** The lines of the forms shown, each with where it begins in the input. */
 function formLines(input: string, from: number): [number, string][] {
