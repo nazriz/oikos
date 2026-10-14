@@ -163,6 +163,7 @@ Costs and counts are in the reviews. The wave-2 plan is `docs/waves/wave-2/plan.
   what becomes of its office after the way out.
 - **The everyday gate:** whether the teacher's answer is taken as its shift from its own mean (a change to the gate).
 - **The translator:** the next round's go-ahead and the base-model question (older; see `translator-pipeline.md`).
+- **Gradual disempowerment: the plan** (`docs/design/gradual-disempowerment.md`, 2026-10-15): what the town must carry for AI adoption to spread by real incentives, the precedents as tests, the measures of human leverage, robustness at ten years and 10,000 people, and a build order (about 42 agent-days, no model calls). Awaits his word and his answers to its three questions (section 9).
 - Others are in the "For Naz" lines at the ends of decisions entries; search the log for "for Naz" and "owner's".
 
 ## 7. How to run things
