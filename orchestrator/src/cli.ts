@@ -92,6 +92,7 @@
 //         [--only FN,FN,...] [--indirect SHARE] [--refusal-labels L,L,...]
 //         [--amount-forms N] [--pairs SHARE [--pairs-only]] [--broad] [--world-forms N] [--styles S,S]   (these options on a run with models too)
 //         [--bank-payments N] [--finance-payments N] [--askers ASKER=SHARE,...] [--money CODE=TIMES,...]
+//         [--line-payments N] [--report-payments N] [--split-payments N] [--hours-terms N] [--practice-notices N] [--offer-notices N]
 //     No model: the plan of what is to be written (DIR/plan.json), what each writer is asked, item by item
 //     (DIR/briefs.jsonl: {id, kind, brief}; with --writers, DIR/briefs-NAME.jsonl each, the items dealt in turn), and
 //     the writers' instructions (DIR/writer-instructions.txt), for writers who work on files. --shard I/N: part I of
@@ -114,6 +115,12 @@
 //     by someone at a bank's counter; --only per_request: those alone); --finance-payments N adds N of a finance
 //     office's kinds (a net wage with the gross and what was withheld said, what was withheld remitted, a payment
 //     resting on several records, a standing payment with its first day; --only finance_payment: those alone).
+//     The kinds the call language gained later (prompt 0.9.5; synthetic.ts `lateKinds`): --line-payments N (payments
+//     drawn on a line of the budget; --only line_payment), --report-payments N (payments with a report naming several
+//     amounts; report_amounts), --split-payments N (one sum paid to several accounts, each stated; split_payment; the
+//     needs_calculation refusals that state no share are made from these), --hours-terms N (offers of employment with
+//     and without hours; hours_term), --practice-notices N (a public notice of something held again and again;
+//     practice_notice) and --offer-notices N (a public offer anyone may take up; offer_notice).
 //     --askers banker=0.4: with --broad, that share of the requests (of those not in an office-holder's style) is
 //     asked by that asker. --money CODE=3,...: those currencies are drawn that many times as often as the others.
 //   oikos translator-data-write <DIR> --requests FILE --writer NAME [--requests FILE --writer NAME ...]
@@ -447,7 +454,7 @@ try {
       limit: num("limit"), seed: num("seed"), log: console.log,
       ...(flag("indirect") !== undefined ? { indirect: Number(flag("indirect")) } : {}), ...(flag("only") ? { only: list("only") } : {}), ...(flag("refusal-labels") ? { refusalLabels: list("refusal-labels") } : {}),
       amountForms: num("amount-forms"), pairs: num("pairs"), pairsOnly: has("pairs-only"), broad: has("broad"), worldForms: num("world-forms"), ...(flag("styles") ? { styles: list("styles") } : {}),
-      bankPayments: num("bank-payments"), financePayments: num("finance-payments"), ...(flag("askers") ? { askers: weights("askers") } : {}), ...(flag("money") ? { money: weights("money") } : {}),
+      bankPayments: num("bank-payments"), financePayments: num("finance-payments"), late: Object.fromEntries(([["line", "line-payments"], ["report", "report-payments"], ["split", "split-payments"], ["hours", "hours-terms"], ["practice", "practice-notices"], ["offer", "offer-notices"]] as const).filter(([, f]) => flag(f)).map(([k, f]) => [k, num(f)!])), ...(flag("askers") ? { askers: weights("askers") } : {}), ...(flag("money") ? { money: weights("money") } : {}),
     });
     if (has("briefs")) console.log(`${r.briefs} briefs written to ${r.out} (plan.json, briefs.jsonl${flag("writers") ? ", a briefs file for each writer" : ""}, writer-instructions.txt)`);
     else console.log(`${r.examples} examples written to ${r.out} (examples.jsonl, manifest.json)${r.stopped ? `; writing stopped early: ${r.stopped}` : ""}`);
