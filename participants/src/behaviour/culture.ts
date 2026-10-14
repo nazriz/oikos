@@ -436,10 +436,22 @@ export class Culture {
     this.n.set(c, held);
     this.dirty = true;
   }
-  /** Heard what someone says of it: the same rule on `approves`, from what others say, not what they are thought to think. */
-  hearSaid(c: Conduct, bps: number, route: Route): void {
+  /**
+   * A public event that is an instance of conduct `c` is mine (docs/behaviour/culture.md, "Events join the picture"): one more sighting of `c` done, by the rule that
+   * exists (`moveDoes`), at the weight of the route it came by times how strongly the event is held (so a retold event counts for less, as its strength already
+   * says: `pass_bps` of the teller's a hand), and, where the teller said what they think of it, the same rule on `approves` at the same weight. Evidence of what people
+   * around here do and approve, whoever it was about: no size of its own. Called once for an event, when it becomes mine.
+   */
+  sawEvent(c: Conduct, route: Route, strengthBps: number, saidBps?: number): void {
     if (!this.has(c)) return;
-    const w = this.weight(route);
+    const scale = Math.max(0, Math.min(10_000, strengthBps)) / 10_000;
+    this.moveDoes(c, 10_000, this.weight(route) * scale);
+    if (saidBps !== undefined) this.hearSaid(c, saidBps, route, scale);
+  }
+  /** Heard what someone says of it: the same rule on `approves`, from what others say, not what they are thought to think. */
+  hearSaid(c: Conduct, bps: number, route: Route, scale = 1): void {
+    if (!this.has(c)) return;
+    const w = this.weight(route) * scale;
     this.approves.set(c, clamp(this.approves.get(c)! + ((clamp(bps) - this.approves.get(c)!) * w) / (this.n.get(c)! + w)));
     this.dirty = true;
   }

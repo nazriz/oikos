@@ -223,6 +223,15 @@ test("town memory adds no channel and no register: events come in only seen, rea
   expect(m.heardFrom("strike", "e", 3, 40 * 86_400, 9_000, dial.params.max_hops, false)).toBe("dropped"); // a fourth hand
 });
 
+// Events join the picture (docs/behaviour/culture.md): an event that is an instance of a conduct moves a picture only by the three routes, once, and only
+// the two kinds that show a conduct do it; a register, a directory or a count cannot.
+test("an event moves a picture only along a tie, by being there or by what is published, and only a removal and a walk-out show a conduct", () => {
+  const dial = culture.cultureDial({ dials: { culture: {} } })!;
+  const c = new culture.Culture(dial.params, dial, { z: () => 0, conformity: () => 0.5, belonging: () => 0.5, integrity: () => 0.5, draw: () => 0 }, { strike: 8_500 });
+  for (const route of ["register", "directory", "population", "town"]) expect(() => c.sawEvent("strike", route as any, 10_000, 1_000)).toThrow(/by what is published/);
+  expect(Object.keys(townmemory.EVENT_CONDUCTS).sort()).toEqual(["put_out", "strike"]);
+});
+
 // Ordinary talk about others' conduct (docs/behaviour/culture.md, "Ordinary talk"): a person tells of a third person's act only if that person told it to
 // them (a tie), only of the acts they keep (a few people's, for a few months), never of the asker, and what the hearer learns moves their own picture along
 // a tie. No channel is added, no register is read, and a stranger cannot be told of from nothing.

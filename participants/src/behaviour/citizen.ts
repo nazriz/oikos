@@ -42,7 +42,7 @@ import { VALUES as VALUES_OF_MIND, NEEDS as NEEDS_OF_MIND } from "./mind";
 import { chancePpm, frictionDial, PAPER, tendered } from "./frictions";
 import { acceptEntity, chanceOf, darkOf, drawOf, foundingParams, plainName, plainPurpose, shapeOdds, type FoundingParams, type Shape } from "./founding";
 import { Culture, CULTURE_WORDS, cultureDial, standardNormal, type Conduct } from "./culture";
-import { EVENT_CONDUCT, PAPER_WEIGHT, paperStrength, TOWN_WORDS, TownMemory, type EventKind } from "./townmemory";
+import { EVENT_CONDUCT, EVENT_CONDUCTS, PAPER_WEIGHT, paperStrength, TOWN_WORDS, TownMemory, trustDirection, type EventKind } from "./townmemory";
 import { angerAdded, doneToAgency, failedAgency, fearAdded, grantTrust, isNoShift, obeyRate, readFacts, readingDial, recourseScore, refusalTrust, tieMoved, type PaperRead } from "./reading";
 import { bringsOf, meets, swayed, SEEKS_OF_NEED, Wants, wantParams, type Opening, type SeekKey, type Want as Wanted, type WantParams } from "./wants";
 import { factsOf, Feelings, Mind, MIND_DEFAULTS, MIND_VERSION, Pursuit, satisfaction, Ties, type Circumstances, type Facts, type MindParams, type NeedLevels, type PopulationValues, type Value } from "./mind";
@@ -858,8 +858,8 @@ export const citizen: BehaviourModule = {
       const conduct = EVENT_CONDUCT[kind];
       const own = conduct && cul ? cul.read(conduct, t)?.own : undefined;
       if (own === undefined || own === 5_000) return;
-      // A removal held right is the doer vindicated; a walk-out held right is the employer's trust lost.
-      const ok = kind === "put_out" ? own > 5_000 : own < 5_000;
+      // A removal held right is the doer vindicated; a walk-out held right is the employer's trust lost (`trustDirection`).
+      const ok = trustDirection(kind, own) > 0;
       inner.experience(about, kindOf(about), ok, t, { weight: cul!.bearing(strength, own), heard: true });
     };
     /** Something public reached us (we saw it, read it): kept, and, the first time, a sighting of the conduct it shows where we were there. */
@@ -870,12 +870,18 @@ export const citizen: BehaviourModule = {
       bearOnTrust(kind, about, mem.strengthOf(kind, about, eventT, t), t);
     };
     /** What a tie told us of the town (found anywhere in a message): the same, at the teller's strength less a hand's. */
-    const hearTown = (text: string, t: number) => {
+    const hearTown = (text: string, t: number, who: string) => {
       const w = mem && TOWN_WORDS.heard(text);
       if (!mem || !cul || !w) return;
       const conduct = EVENT_CONDUCT[w.kind];
       const against = conduct ? (cul.read(conduct, t)?.own ?? 5_000) < 5_000 : false;
-      if (mem.heardFrom(w.kind, w.about, w.day, t, w.strength, w.hops, against) === "fresh") bearOnTrust(w.kind, w.about, mem.strengthOf(w.kind, w.about, w.day * DAY, t), t);
+      if (mem.heardFrom(w.kind, w.about, w.day, t, w.strength, w.hops, against) === "fresh") {
+        const held = mem.strengthOf(w.kind, w.about, w.day * DAY, t);
+        bearOnTrust(w.kind, w.about, held, t);
+        // The event is an instance of the conduct(s) it shows: evidence of what people here do, and the teller's said view of it of what they approve (once, when it becomes mine).
+        const route = ties.affinity(who, t) >= cul.p.close_affinity_bps ? "close_tie" : "tie";
+        (EVENT_CONDUCTS[w.kind] ?? []).forEach((c, i) => cul.sawEvent(c, route, held, i === 0 ? w.says : undefined));
+      }
     };
     // Where those we have talked with say they come from (told when asked how things are, only where the profile gives a homophily):
     // bounded by the people we keep up with.
@@ -1481,7 +1487,7 @@ export const citizen: BehaviourModule = {
           ties.add(person, 300, obs.t, "talked"); peopleWeKnow.add(person);
           continue;
         }
-        if (cul) { hearCulture(m.text, person, obs.t, m.from); hearTown(m.text, obs.t); }
+        if (cul) { hearCulture(m.text, person, obs.t, m.from); hearTown(m.text, obs.t, person); }
         const told = heardNews(m.text);
         if (told) {
           // What they do, and how it goes for them: counted as others doing it, and learned from as others' payoffs.
@@ -4009,7 +4015,7 @@ export const citizen: BehaviourModule = {
       initiative && wants.all().length ? CATCHING_UP.after(wants.all().filter((w) => w.way).slice(0, 3).map((w) => ({ about: w.about, way: w.way!.startsWith("offer:") ? w.way! : w.way!.split(":")[0]! }))) : "",
       initiative && withdrew && lastSeenT - withdrew.t <= p.news_days * DAY ? CATCHING_UP.gaveUp(withdrew.about) : "",
       // (Culture: where we come from, and what we did at an occasion and say of it; docs/behaviour/culture.md.)
-      ...(cul ? [...(cul.group && cdial!.homophily_bps > 0 ? [CULTURE_WORDS.from(cul.group)] : []), ...(asker ? cul.tell(asker, lastSeenT, p.news_days) : []), ...(asker ? [cul.gossip(asker, lastSeenT, () => ctx.rng("culture-gossip").below(10_000)) ?? ""] : []), ...(asker && mem ? [mem.tell(asker, lastSeenT) ?? ""] : [])] : []),
+      ...(cul ? [...(cul.group && cdial!.homophily_bps > 0 ? [CULTURE_WORDS.from(cul.group)] : []), ...(asker ? cul.tell(asker, lastSeenT, p.news_days) : []), ...(asker ? [cul.gossip(asker, lastSeenT, () => ctx.rng("culture-gossip").below(10_000)) ?? ""] : []), ...(asker && mem ? [mem.tell(asker, lastSeenT, (kind) => { const c = EVENT_CONDUCT[kind], says = c ? cul.read(c, lastSeenT)?.says : undefined; return says !== undefined && Math.floor(says / 2_000) !== 2 ? says : undefined; }) ?? ""] : [])] : []),
     ].filter(Boolean).join(" ") || CATCHING_UP.nothing;
     /**
      * Being there (culture, step 5): in a building we are in the world shows who is there and who last left and why, so a removal carried out in our building,
