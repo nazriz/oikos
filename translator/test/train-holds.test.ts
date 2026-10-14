@@ -239,6 +239,6 @@ test("the seen cases for the three, and the real requests re-keyed to them, are 
   expect(passesReal(real("9-finance-d60-1"), 'money(to=acc-c0877, amount="$2,393.34", from=acc-city, settles=rec.28524)\nstatement(kind=entry, visible=own, text="Withheld.")')).toBe(true);
   const keyed = (gap: string) => PILOT_CASES.filter((c) => c.gap === gap).map((c) => c.expect[0]!.replace(/\(.*$/s, "")).sort();
   expect(keyed("pause")).toEqual([...Array(2).fill("none"), ...Array(9).fill("statement")]);
-  expect(PILOT_CASES.filter((c) => c.expect.includes("none(look_first)")).length).toBe(2 + 6 + 5);
+  expect(PILOT_CASES.filter((c) => c.expect.includes("none(look_first)")).length).toBe(2 + 6 + 5 + 1); // + c9-mayor-d230-1 (2026-10-14, round 3 step 1)
   expect(PILOT_CASES.length).toBe(180);
 });
