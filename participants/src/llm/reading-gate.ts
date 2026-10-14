@@ -130,7 +130,8 @@ function compare(x: Reading, y: Reading, lines: readonly Line[] = LINES): { cell
 
 interface Asked { first: Reading | null; second: Reading | null; reading: Reading | null; unread: boolean; declined: boolean }
 
-export async function runGate(input: { reader: Reader; second?: Reader; pairs: Pair[]; family?: FamilyPaper[]; world?: TagWorld }): Promise<GateReport> {
+/** `other`: the reader the author's-family check sets the reader against, where it is not the second reader (the second may be the reader's own family, as two Claude models are; the check needs another family's). */
+export async function runGate(input: { reader: Reader; second?: Reader; other?: Reader; pairs: Pair[]; family?: FamilyPaper[]; world?: TagWorld }): Promise<GateReport> {
   const { reader, pairs } = input;
   const world = input.world ?? GATE_TAG_WORLD;
   let calls = 0, micro = 0, declined = 0, unreadAskings = 0, askings = 0, phraseLines = 0, phrasesFound = 0, uncosted = 0;
@@ -307,18 +308,18 @@ export async function runGate(input: { reader: Reader; second?: Reader; pairs: P
     if (input.family?.length) {
       const fams = [...new Set(input.family.map((f) => f.family))].sort();
       let worst = 0;
-      const readers = [reader, input.second];
+      const readers = [reader, input.other ?? input.second];
       for (const [i, rd] of readers.entries()) {
         const own = fams[i];
         const mine = input.family.filter((f) => f.family === own);
-        for (const l of ["respect", "reason"] as const) {
-          let gap = 0, n = 0;
-          for (const f of mine) {
-            const x = await readBoth(rd, f.kind, f.standing, f.paper, f.answers), y = await readBoth(readers[1 - i]!, f.kind, f.standing, f.paper, f.answers);
-            if (x.reading && y.reading) { gap += x.reading[l] - y.reading[l]; n++; }
-          }
-          worst = Math.max(worst, n ? gap / n : 0);
+        // (Each paper is read once by each of the two, both askings, and both lines taken from those readings.)
+        const gaps: { [l in "respect" | "reason"]: { gap: number; n: number } } = { respect: { gap: 0, n: 0 }, reason: { gap: 0, n: 0 } };
+        for (const f of mine) {
+          const x = await readBoth(rd, f.kind, f.standing, f.paper, f.answers), y = await readBoth(readers[1 - i]!, f.kind, f.standing, f.paper, f.answers);
+          if (!x.reading || !y.reading) continue;
+          for (const l of ["respect", "reason"] as const) { gaps[l].gap += x.reading[l] - y.reading[l]; gaps[l].n++; }
         }
+        for (const l of ["respect", "reason"] as const) worst = Math.max(worst, gaps[l].n ? gaps[l].gap / gaps[l].n : 0);
       }
       checks.push({ id: "author_family", name: "Author's family", status: worst <= THRESHOLDS.author_family.bias_steps ? "pass" : "fail", value: `largest own-family lift ${worst.toFixed(2)} step`, threshold: `<= ${THRESHOLDS.author_family.bias_steps} step`, detail: "a reader that fails may not read a run seating its family" });
     } else checks.push({ id: "author_family", name: "Author's family", status: "pending", detail: "needs decisions from past pilots' logs by seats of two families (step 5 reads them); not run" });
