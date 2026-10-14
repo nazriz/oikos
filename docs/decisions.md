@@ -5079,3 +5079,31 @@ Plan: `docs/design/gradual-disempowerment.md`. The owner's direction of 2026-10-
 - **For the owner (three questions, section 9):** which roles a real model may hold first (recommended: deciders about systems, not systems); data matching between offices as named asks under a data-sharing agreement (recommended; it touches the no-god-view hard rule, so it is his); the technology on offer fixed at today's prices by default, a falling trend as a named scenario (recommended).
 - **Not verified:** the three precedents' figures come from search summaries, not the reports (marked in `docs/research/references.md`); the ten-year, 10,000-person projection (15 to 25 hours, about 240 GB of raw log) is a month's figures multiplied, never run; whether casework time can be sourced for most places.
 - **Revisit if** R1 shows ten years at 10,000 out of reach on one machine (then 3,000 and partitions by place); the adoption rule's uptake turns out to be set by one weight rather than costs; casework time cannot be sourced; or the precedent chains need a national state to complete.
+
+## 2026-10-15 · Foundations: plan (awaiting the owner; nothing built, no model called)
+
+Plan: `docs/design/foundations.md`. The owner's direction of 2026-10-15: stop fixing one case at a time; every piece of
+work costs time, enforced at the foundation; he agreed to an audit and a plan, and kernel changes come back to him
+before anything is built.
+
+- **What the audit found.** Acting already costs time (`kernel/crates/time`, rebuild 6.3) and physical work already
+  needs performers with hours. The fault is a free machine: the generator makes every office's holder, staff and clerk
+  a system nobody supplied or pays, that can do anything at one second an act (`generate.ts` 64-76, 1966-1968). The
+  patches on top of it (the support office's capacity, delay and backlog-doubled errors; `cases_per_day` on every
+  venue; the clerk's one paper a day; the free newspaper and bank; free admin everywhere) are listed for deletion.
+  `work` keeps a second time ledger (`labour_used`) beside the timelines, so a worker can act while working.
+- **Decided in the plan.** Seven laws: nothing from nothing (money, goods and time conserved); all work takes time, read
+  from what it makes; only actors work (a person, or a system a supplier delivered from a template that says what it
+  can do); what works or holds value changes hands only by its holder (a supplier delivers and can switch off);
+  every act records its author and performers and can be wrong (errors from procedure, data and time; slips only at
+  sourced rates through one helper; review and appeal as law data); who may do what is data (kept); information with
+  its keeper (kept; answering takes the keeper's time). The act is the task: no task objects or queues in the kernel.
+- **Reduction.** Of the gradual-disempowerment plan's 21 steps, 5 disappear into the laws, 4 shrink to data and a
+  small piece, 12 remain (9 of them robustness, measures, tests and runs). Foundations about 20 agent-days, the rest
+  of that plan about 25: about 45 in all against 42, with about fifteen existing special cases deleted.
+- **For the owner (section 8):** the four kernel changes; every town's baseline moving (offices hire clerks and pay
+  licences); a seat in a human post working at a person's speed.
+- **Not verified:** the performance estimate (under 2% more acts) is reasoned, not measured; casework seconds have not
+  been searched for any place; the new references are named from memory.
+- **Revisit if** F1 costs more than 1.5 times a 10,000-person month, F5 leaves towns unable to staff offices at
+  sourced wages, the backstop needs a list of exceptions, or F6 turns into a chase.

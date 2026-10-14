@@ -712,3 +712,25 @@ A plan, nothing built. Opened on 2026-10-15: the Kulveit et al. abstract page an
 - **The strike's concession by the cost of holding out.** Hicks (1932), cited in docs/behaviour/unions.md. Used: B10 replaces the fixed half-the-gap schedule with the cost of a stoppage to the employer (2.5).
 - **Taxation and representation.** Ross, M. L. (2004), "Does Taxation Lead to Representation?", *British Journal of Political Science* 34(2), 229–249 **(to confirm)**. Used: why the dependence of public revenue on residents is measured (M3), not built as a mechanism.
 - **Exit and voice.** Hirschman (1970), cited above. Used: the levers' table (2.5).
+
+## Foundations: the laws of how the world works (docs/design/foundations.md; docs/decisions.md, 2026-10-15, "Foundations: plan")
+
+A plan, nothing built. Nothing new was opened on 2026-10-15: every source below is named from memory and is **(to
+confirm)** unless it is already cited above.
+
+- **Tasks with time requirements, performers with capacity; automation as moving a task from labour to capital.**
+  Acemoglu and Restrepo (2019), cited above (D24 named the framework). Used: laws 2 and 3 (an act's work is a task's
+  time; a system is another performer of a task).
+- **A queue's length follows from arrivals and the time to serve them.** Little, J. D. C. (1961), "A Proof for the
+  Queuing Formula: L = λW", *Operations Research* 9(3), 383–387 **(to confirm)**. Used: why backlogs and delays are
+  left to follow from time and are never a parameter (law 2).
+- **Make or buy; lock-in from what is specific to one supplier.** Coase, R. H. (1937), "The Nature of the Firm",
+  *Economica* 4(16), 386–405; Williamson, O. E. (1985), *The Economic Institutions of Capitalism*, Free Press
+  **(both to confirm)**. Used: a system as something bought or licensed from a supplier, and the supplier's switch as
+  physical leverage (laws 3 and 4).
+- **Slips as one kind of human error, apart from mistakes of rule or knowledge.** Reason, J. (1990), *Human Error*,
+  Cambridge University Press; Norman, D. A. (1981), "Categorization of action slips", *Psychological Review* 88(1),
+  1–15 **(both to confirm)**. Used: errors come first from procedure and data, and only slips are drawn at a rate
+  (law 5).
+- **Street-level and system-level bureaucracy.** Lipsky (1980) and Bovens and Zouridis (2002), cited above. Used: an
+  office's capacity is its staff's time, and automating it changes who does the work (law 3).
