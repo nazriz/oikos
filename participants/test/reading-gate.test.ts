@@ -166,3 +166,19 @@ test("the model gate runner refuses the largest Claude model and gpt-6-astra, an
   for (const spec of ["claude-code/claude-fable-5-1", "claude-code/claude-opus-5-5", "codex/gpt-6-astra"]) expect(() => modelReaderFor(spec, "reader", spend)).toThrow(/never uses the largest/);
   expect(modelReaderFor("claude-code/claude-haiku-5-5@low", "reader", spend).model).toBe("claude-code/claude-haiku-5-5@low");
 });
+
+test("a recorded sitting is replayed in order for the same request, and anything not recorded goes to the live reader", async () => {
+  const { replayReader } = await import("../../scripts/reading-gate");
+  const r = { kind: "k", standing: "addressee" as const, paper: "p", wording: 1 as const };
+  const rec = (respect: number) => ({ reader: "x", prompt_version: "1", wording: 1 as const, kind: "k", standing: "addressee" as const, paper: "p", result: "read" as const, reading: { ...NEUTRAL, respect }, phrases: {}, cost_microusd: 5, at: "t" });
+  let live = 0;
+  const rd = replayReader({ model: "x", version: "1", read: async () => { live++; return { declined: true }; } }, [rec(1), rec(2), { ...rec(0), result: "declined" as const }]);
+  expect((await rd.read(r)).reading!.respect).toBe(1);
+  expect((await rd.read(r)).reading!.respect).toBe(2);
+  expect((await rd.read(r)).declined).toBe(true);
+  expect(live).toBe(0);
+  expect((await rd.read(r)).declined).toBe(true);
+  expect((await rd.read({ ...r, paper: "other" })).declined).toBe(true);
+  expect(live).toBe(2);
+  expect(rd.misses).toBe(2);
+});

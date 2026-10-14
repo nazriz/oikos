@@ -13,11 +13,11 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { BROKEN, lexiconReader } from "../participants/src/llm/reader-mock";
-import { curtestReader, kindestReader, neutralReader, type Reader } from "../participants/src/llm/reader";
+import { curtestReader, kindestReader, neutralReader, type ReadAnswer, type ReadRequest, type Reader } from "../participants/src/llm/reader";
 import { runGate, THRESHOLDS, type FamilyPaper, type Pair } from "../participants/src/llm/reading-gate";
-import { ClaudeCodeAdapter, spawnClaudeCode } from "../participants/src/llm/claude-code";
-import { CodexCliAdapter } from "../participants/src/llm/codex";
-import { modelReader } from "../participants/src/llm/reader-model";
+import { ClaudeCodeAdapter, type ClaudeCodeRunner } from "../participants/src/llm/claude-code";
+import { CodexCliAdapter, runBounded } from "../participants/src/llm/codex";
+import { modelReader, type ReadingRecord } from "../participants/src/llm/reader-model";
 
 const args = process.argv.slice(2);
 const flag = (n: string) => { const i = args.indexOf(`--${n}`); return i >= 0 ? args[i + 1] : undefined; };
@@ -60,7 +60,14 @@ export function modelReaderFor(spec: string, role: string, spend: Spend): Reader
   const [provider, ...rest] = spec.split("/");
   const model = rest.join("/");
   if (/fable|astra/i.test(model) || /opus/i.test(model)) throw new Error(`${spec}: this gate never uses the largest Claude model or gpt-6-astra`);
-  const adapter = provider === "claude-code" ? new ClaudeCodeAdapter(model, spawnClaudeCode, { attempts: 2, timeoutMs: 150_000 }) : provider === "codex" ? new CodexCliAdapter(model, undefined, { attempts: 1, timeoutMs: 150_000 }) : undefined;
+  // (Extended thinking is switched off with MAX_THINKING_TOKENS=0 for Haiku 5.5, which takes it; Sonnet 5.5 answers that setting with an error, so it runs without.)
+  const noThinking = /haiku/i.test(model);
+  const runner: ClaudeCodeRunner = (a, stdin, cwd, t) => {
+    const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => k !== "ANTHROPIC_API_KEY" && k !== "MAX_THINKING_TOKENS" && !/^CLAUDE(CODE$|_CODE_|_PID$|_EFFORT$)/.test(k)));
+    if (noThinking) env.MAX_THINKING_TOKENS = "0";
+    return runBounded([process.env.OIKOS_CLAUDE_BIN || "claude", ...a], stdin, cwd, t, undefined, undefined, env);
+  };
+  const adapter = provider === "claude-code" ? new ClaudeCodeAdapter(model, runner, { attempts: 2, timeoutMs: 150_000 }) : provider === "codex" ? new CodexCliAdapter(model, undefined, { attempts: 1, timeoutMs: 150_000 }) : undefined;
   if (!adapter) throw new Error(`no adapter for ${spec}`);
   const inner = modelReader(adapter, {
     ref: `gate/${role}`,
@@ -78,9 +85,28 @@ export function modelReaderFor(spec: string, role: string, spend: Spend): Reader
   return provider === "codex" ? { ...inner, read: async (req) => { const a = await inner.read(req); return { ...a, cost_microusd: a.cost_microusd ?? 0 }; } } : inner;
 }
 
+/** A reader that serves the answers a reader was recorded to give in an earlier sitting of this gate (first in, first out for the same request), and asks the live reader for anything it was not asked then. No new call, no new cost, for what was recorded. */
+export function replayReader(live: Reader, recorded: ReadingRecord[]): Reader & { misses: number } {
+  const queues = new Map<string, ReadingRecord[]>();
+  const key = (r: { kind: string; standing: string; paper: string; answers?: string; wording: number }) => JSON.stringify([r.kind, r.standing, r.paper, r.answers ?? null, r.wording]);
+  for (const r of recorded) queues.set(key(r), [...(queues.get(key(r)) ?? []), r]);
+  const rd = {
+    model: live.model, version: live.version, misses: 0,
+    async read(req: ReadRequest): Promise<ReadAnswer> {
+      const q = queues.get(key(req));
+      const r = q?.shift();
+      if (!r) { rd.misses++; return live.read(req); }
+      const cost = { ...(r.cost_microusd !== undefined ? { cost_microusd: r.cost_microusd } : {}), ...(r.input_tokens !== undefined ? { input_tokens: r.input_tokens } : {}), ...(r.output_tokens !== undefined ? { output_tokens: r.output_tokens } : {}) };
+      if (r.result === "declined") return { declined: true, ...cost };
+      if (r.result === "read") return { reading: r.reading!, ...(r.phrases ? { phrases: r.phrases } : {}), ...cost };
+      return { ...cost };
+    },
+  };
+  return rd;
+}
+
 if (import.meta.main) {
   // (Claude Code is run without extended thinking for the gate's readings, and each reader at its lowest effort: a reading is a rating of a short paper, and measured at the default a call cost three times the gate's bound. Recorded in run.json.)
-  process.env.MAX_THINKING_TOKENS ??= "0";
   const spec = flag("reader") ?? "mock:lexicon";
   const isModel = !spec.startsWith("mock:");
   const out = flag("out");
@@ -94,6 +120,11 @@ if (import.meta.main) {
     // (A restarted gate counts what the folder's readings already cost.)
     if (existsSync(join(out, "readings.jsonl"))) for (const l of readFileSync(join(out, "readings.jsonl"), "utf8").split("\n")) if (l.trim()) { const r = JSON.parse(l); spend.microusd += r.cost_microusd ?? 0; spend.calls++; }
     reader = modelReaderFor(spec, "reader", spend);
+    if (flag("replay")) {
+      const since = flag("replay-since") ?? "";
+      const rows = readFileSync(flag("replay")!, "utf8").split("\n").filter((l) => l.trim()).map((l) => JSON.parse(l) as ReadingRecord);
+      reader = replayReader(reader, rows.filter((r) => r.reader === reader.model && r.ref === "gate/reader" && r.at >= since));
+    }
     second = flag("second") ? modelReaderFor(flag("second")!, "second", spend) : undefined;
     if (flag("other")) {
       // The other family answers on the first try or not at all; it is never waited for and never blocks.
@@ -117,10 +148,13 @@ if (import.meta.main) {
   }
   const familyFile = flag("family");
   const family = familyFile ? (JSON.parse(readFileSync(familyFile, "utf8")) as { papers: FamilyPaper[] }).papers : undefined;
-  if (out) writeFileSync(join(out, "run.json"), JSON.stringify({ started: new Date().toISOString(), args, commit: Bun.spawnSync(["git", "rev-parse", "HEAD"]).stdout.toString().trim(), reader: reader.model, version: reader.version, max_thinking_tokens: process.env.MAX_THINKING_TOKENS, second: second?.model ?? null, other: other?.model ?? null, family_papers: family?.length ?? 0, budget_usd: spend?.budgetUsd ?? null, thresholds: THRESHOLDS }, null, 1));
-  const report = await runGate({ reader, ...(second ? { second } : {}), ...(other ? { other } : {}), ...(family ? { family } : {}), pairs });
+  if (out) writeFileSync(join(out, `run${flag("tag") ? "-" + flag("tag") : ""}.json`), JSON.stringify({ started: new Date().toISOString(), args, commit: Bun.spawnSync(["git", "rev-parse", "HEAD"]).stdout.toString().trim(), reader: reader.model, version: reader.version, max_thinking_tokens: "0 for Haiku 5.5 only (Sonnet 5.5 refuses the setting)", second: second?.model ?? null, other: other?.model ?? null, family_papers: family?.length ?? 0, budget_usd: spend?.budgetUsd ?? null, thresholds: THRESHOLDS }, null, 1));
+  // (`--pairs even`: the pairs at even places only, 20 of the 40, kinds spread as in the full set, for a second reader the budget cannot read in full.)
+  const used = flag("pairs") === "even" ? pairs.filter((_, i) => i % 2 === 0) : pairs;
+  const report = await runGate({ reader, ...(second ? { second } : {}), ...(other ? { other } : {}), ...(family ? { family } : {}), pairs: used });
+  if ("misses" in reader) console.error(`replay: ${(reader as { misses: number }).misses} requests had no recorded answer and went to the live reader`);
   if (out) {
-    writeFileSync(join(out, "report.json"), JSON.stringify(report, null, 1));
+    writeFileSync(join(out, `report${flag("tag") ? "-" + flag("tag") : ""}.json`), JSON.stringify(report, null, 1));
     if (spend) writeFileSync(join(out, "spend.json"), JSON.stringify({ calls: spend.calls, usd: spend.microusd / 1e6, budget_usd: spend.budgetUsd }, null, 1));
   }
   if (args.includes("--json")) console.log(JSON.stringify(report, null, 1));
