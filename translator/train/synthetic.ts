@@ -1044,7 +1044,7 @@ const TAG_WORDS = ["budget", "roads", "housing", "parks", "rates", "water", "sch
  * (`Gold.asker`: a landlord for a rental listing, a union's organiser for a wage claim). Each way is in another
  * world's money. A paper may have more to say than a sentence or two holds: up to twenty values. For a seed, always the same.
  */
-export function worldForms(o: { perForm?: number; seed?: number; currencies?: Currency[]; dropped?: { [reason: string]: number }; /** Who asks for an office's papers (data.ts `PAPER_ASKERS`). */ askers?: { [office: string]: string } } = {}): Gold[] {
+export function worldForms(o: { perForm?: number; seed?: number; currencies?: Currency[]; dropped?: { [reason: string]: number }; /** Who asks for an office's papers (data.ts `PAPER_ASKERS`). */ askers?: { [office: string]: string }; /** Fill in only these papers (by form name; the others still stand beside them in what is shown, and the programs of these are those of a run without the limit). */ only?: string[]; /** Ways to fill a paper, for papers named here (in place of `perForm`). */ perFormOf?: { [form: string]: number } } = {}): Gold[] {
   const out: Gold[] = [];
   const seen = new Set<string>();
   const currencies = o.currencies ?? everyCurrency();
@@ -1056,9 +1056,10 @@ export function worldForms(o: { perForm?: number; seed?: number; currencies?: Cu
     const to = sd.officeId();
     const specs: FormSpec[] = papers.map((p) => ({ form: p.form, to, office: "paper" as const, fields: Object.fromEntries(Object.entries(p.fields).map(([k, f]) => [k, { type: f.type, ...(f.required ? { required: true } : {}), ...(f.options ? { options: [...f.options] } : {}), ...(f.description ? { description: f.description } : {}) }])) }));
     for (const spec of specs) {
+      if (o.only && !o.only.includes(spec.form)) { fi++; continue; }
       const rand = sampler(hash(`${o.seed ?? 1}:world form ${office}.${spec.form}`));
       const optional = Object.entries(spec.fields).filter(([, f]) => !f.required).map(([k]) => k);
-      for (let n = 0, tries = 0; n < (o.perForm ?? 6) && tries < 80; tries++) {
+      for (let n = 0, tries = 0; n < (o.perFormOf?.[spec.form] ?? o.perForm ?? 6) && tries < 80; tries++) {
         const d = new Draw(rand, currencies);
         d.currency = currencies[(fi * 7 + n * 3 + (o.seed ?? 1)) % currencies.length]!;
         d.names[to] = sd.names[to]!;

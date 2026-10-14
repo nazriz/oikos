@@ -55,6 +55,17 @@ test("a wide plan says who is asking in every brief: an office-holder in an offi
   expect(askerFor("chatty", { shape: "form(form,to)", tag: "world_form", asker: "landlord" }, sampler(1))).toBe("landlord");
 });
 
+test("papers can be limited to some by name, and some filled in more ways, the programs of those the same as without the limit", () => {
+  const all = worldForms({ perForm: 3, seed: 9, askers: PAPER_ASKERS });
+  const names = [...new Set(all.map((g) => g.source!.split(".").at(-1)!))].slice(3, 5);
+  const some = worldForms({ perForm: 3, seed: 9, askers: PAPER_ASKERS, only: names, perFormOf: { [names[0]!]: 5 } });
+  expect(new Set(some.map((g) => g.source!.split(".").at(-1)!))).toEqual(new Set(names));
+  const of = (gs: typeof all, n: string) => gs.filter((g) => g.source!.endsWith(`.${n}`)).map((g) => g.program);
+  expect(of(some, names[0]!).length).toBe(5);
+  expect(of(some, names[0]!).slice(0, 3)).toEqual(of(all, names[0]!));
+  expect(of(some, names[1]!)).toEqual(of(all, names[1]!));
+});
+
 test("every paper the worlds' own offices issue is there, each with every field it has in its first two fillings", () => {
   const declared = Object.entries(PAPERS).flatMap(([office, x]) => (Array.isArray(x) ? x : typeof x === "object" && x && "form" in x ? [x] : []).map((p: any) => ({ office, form: p.form as string, fields: Object.keys(p.fields) })));
   // (41 when this was written; a paper a module declares later is covered without anything here changing.)
