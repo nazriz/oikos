@@ -2,59 +2,31 @@
   "about": "F0 (docs/design/foundations.md, 2026-10-15): every special case the plan says the foundations delete or replace, where it stands today. `find` is a literal string in `file` (a glob counts across files); `count` and `lines` are today's. F10's backstop (orchestrator/test/all-work-takes-time.test.ts) reads this file and requires count 0 for every `delete` and `replace` entry by the step named, `history` entries excepted (a decision is never edited). Entries are removed from here by the step that removes the case, with a line in docs/decisions.md.",
   "entries": [
     {
-      "id": "k-deploy-free",
-      "law": 3,
-      "step": "F4",
-      "kind": "replace",
-      "file": "kernel/crates/world/src/exec.rs",
-      "find": "create_participant(self.s, self.st, template, None, Some(org), title.clone())",
-      "what": "`deploy` makes a system for the acting organisation out of nothing; it becomes the supplier's act naming a client",
-      "plan": "2.3(c)",
-      "count": 1,
-      "lines": [
-        "kernel/crates/world/src/exec.rs:1859"
-      ]
-    },
-    {
-      "id": "k-retire-owner-only",
-      "law": 4,
-      "step": "F4",
-      "kind": "replace",
-      "file": "kernel/crates/world/src/exec.rs",
-      "find": "x.owner.as_deref() != Some(org.as_str())",
-      "what": "`retire` is the owner's alone; F4 adds the supplier",
-      "plan": "2.3(d)",
-      "count": 1,
-      "lines": [
-        "kernel/crates/world/src/exec.rs:1868"
-      ]
-    },
-    {
-      "id": "k-system-performer-refused",
-      "law": 3,
-      "step": "F4",
-      "kind": "replace",
-      "file": "kernel/crates/world/src/exec.rs",
-      "find": "self.living_present(p)?;",
-      "what": "`work` takes only bodies as performers (a system is `not_a_person`); a template that lists the work may perform it (moved from F3 at F3: a system performer needs a template that lists the work, which is F4; until then a system is refused as performer by `by` too)",
-      "plan": "2.3",
-      "count": 1,
-      "lines": [
-        "kernel/crates/world/src/exec.rs:880"
-      ]
-    },
-    {
       "id": "g-free-holder",
       "law": 3,
       "step": "F5",
       "kind": "delete",
       "file": "worlds/generator/generate.ts",
       "find": "const holder = `${id}-system`;",
-      "what": "every office's holder (and its staff's and clerk's) is a system nobody supplied",
+      "what": "every office's holder (and its staff's and clerk's) is a system of one placeholder kind, delivered at genesis by `outside` with no limit on what it does (F4 made the delivery a record; F5 replaces the holders with people or licensed systems of their own kind)",
       "plan": "2.3",
       "count": 1,
       "lines": [
-        "worlds/generator/generate.ts:1966"
+        "worlds/generator/generate.ts:1978"
+      ]
+    },
+    {
+      "id": "g-genesis-template",
+      "law": 3,
+      "step": "F5",
+      "kind": "delete",
+      "file": "worlds/generator/generate.ts",
+      "find": "const GENESIS_SYSTEM = \"genesis-system\";",
+      "what": "the one placeholder template of every genesis system: supplier `outside`, no `does` (so no limit); F5 gives each system its own template with what it does, at a licence price, sourced or marked",
+      "plan": "2.3",
+      "count": 1,
+      "lines": [
+        "worlds/generator/generate.ts:1976"
       ]
     },
     {

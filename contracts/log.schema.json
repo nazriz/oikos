@@ -1538,6 +1538,10 @@
             "template": {
               "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId"
             },
+            "supplier": {
+              "description": "A system's: the organisation that delivered it (foundations F4).",
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+            },
             "traits": {
               "$ref": "urn:oikos:contracts:0.8:common#/$defs/OpaqueObject"
             }
@@ -1971,6 +1975,8 @@
         "unknown_place",
         "unknown_task",
         "not_at_work",
+        "not_capable",
+        "not_supplier",
         "no_time_left",
         "bad_survey",
         "no_body_effect",

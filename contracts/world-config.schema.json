@@ -2633,6 +2633,14 @@
           "description": "Its own parameters (a person's disposition: a political leaning, how strictly it follows procedure), used by the role modules it runs in positions it holds.",
           "$ref": "urn:oikos:contracts:0.8:common#/$defs/OpaqueObject"
         },
+        "template": {
+          "description": "For a system: the template it is from (foundations F4). A system that holds a post names its template and its supplier: it was delivered, and at the start of the world delivery is this record.",
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId"
+        },
+        "supplier": {
+          "description": "For a system: the organisation that supplied it. It may switch it off, as its owner may.",
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+        },
         "lanes": {
           "description": "For a system: how many acts it carries out at once (docs/design/rebuild.md 6.3). A person always has one timeline.",
           "type": "integer",
@@ -2749,6 +2757,43 @@
         },
         "traits": {
           "$ref": "urn:oikos:contracts:0.8:common#/$defs/OpaqueObject"
+        },
+        "does": {
+          "description": "For a system (foundations F4): what a system from this template can do. A system acts, or does another's work, only within these rows; outside them the act is refused (`not_capable`). Absent: the template states no limit (a hand-written world's). Never on a person's.",
+          "type": "array",
+          "maxItems": 256,
+          "items": {
+            "type": "object",
+            "required": [
+              "block"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "block": {
+                "description": "The block (message, publish, work, ...).",
+                "type": "string",
+                "minLength": 1
+              },
+              "task": {
+                "description": "For work: only this task. Absent: any.",
+                "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId"
+              },
+              "kind": {
+                "description": "For publish and create_entity: only this kind of record. Absent: any.",
+                "type": "string",
+                "minLength": 1
+              },
+              "seconds": {
+                "description": "For work: the seconds a unit when a system does it (in place of the task's labour); a crew of systems only takes the slowest's. Absent: the task's labour.",
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
+        },
+        "supplier": {
+          "description": "For a system (foundations F4): the organisation that supplies systems from this template. Only it delivers one (`deploy`, naming the client), and it may switch one off (`retire`) as the client may. Absent: nobody supplies it, so none is delivered. Never on a person's.",
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
         }
       }
     },

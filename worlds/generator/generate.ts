@@ -1973,10 +1973,11 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   /** What a person holding an office has on their desk that its code never needed (`extra.desk`: channels), and which
    * of them stand on file for them (`extra.desk_standing`: channel ids). Given only when a model holds the office. */
   const desks = new Map<string, { channels: any[]; standing: string[]; ballot_count?: "keeper" | "member" }>();
+  const GENESIS_SYSTEM = "genesis-system";
   const office = (id: string, entity: string, title: string, role: string | undefined, channels: any[], controller: any, extra: any = {}) => {
     const holder = `${id}-system`;
     if (extra.desk) desks.set(id, { channels: extra.desk, standing: extra.desk_standing ?? [], ...(extra.ballot_count ? { ballot_count: extra.ballot_count } : {}) });
-    participants.push({ id: holder, kind: "system", owner: entity, title, controller, framing: extra.framing ?? unstated, ...(extra.on_opt_out ? { on_opt_out: extra.on_opt_out } : {}), ...(extra.lanes ? { lanes: extra.lanes } : {}) });
+    participants.push({ id: holder, kind: "system", owner: entity, template: GENESIS_SYSTEM, supplier: "outside", title, controller, framing: extra.framing ?? unstated, ...(extra.on_opt_out ? { on_opt_out: extra.on_opt_out } : {}), ...(extra.lanes ? { lanes: extra.lanes } : {}) });
     const job = controller.type === "code" ? { code: controller.impl, params: controller.params ?? {} } : extra.role_module;
     positions.push({ id, entity, title, ...(role ? { role } : {}), channels, ...(job ? { role_module: job } : {}), holder });
   };
@@ -2653,7 +2654,12 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   }
   // People who may come later: newcomers from elsewhere, and children born here.
   // (Each also outside the labour force, at the profile's participation: a newcomer who didn't come for the job, a child.)
-  const templates = [...["newcomer", "child"].map((id) => ({ id, kind: "person", channels: citizenChannels, controller: citizenController, framing: unstated })),
+  const templates = [
+    // (The systems a town begins with were delivered before it began, by the outside world, from this one kind: each
+    // runs the module its post names, and the template states no limit on what it can do. A placeholder for F5, which
+    // gives each office a person or a licensed system of its own kind: docs/design/foundations.md 2.3.)
+    { id: GENESIS_SYSTEM, kind: "system", title: "A system the town began with", supplier: "outside", controller: code("system.genesis"), framing: unstated },
+    ...["newcomer", "child"].map((id) => ({ id, kind: "person", channels: citizenChannels, controller: citizenController, framing: unstated })),
     ...["newcomer-outside-lf", "child-outside-lf"].map((id) => ({ id, kind: "person", channels: citizenChannels, controller: outsideLabourForce, framing: unstated }))];
   if (spec.migration !== false) {
     office("migration", "outside", "People moving from elsewhere", undefined, [jobBoard, K.lookUp(),
@@ -2955,7 +2961,8 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     ...(spec.life === false ? {} : { life: W && CL && L ? { ...life, illness: { ...(life.illness as object), fields: [...((life.illness as any).fields ?? []), { field: "heat", bps_per_unit: CL.heat_illness_bps_per_unit }] } } : life }),
     caps: { max_created_entities: 50 },
     knowing: K.knowing(positions, { holderSearch: [], dealings: 20, ...(V.knowing ? { visit_seconds: V.knowing.visit_seconds } : {}), ...(FR ? { hearings: true } : {}), ...(FND ? { founding: true } : {}) }),
-    orchestration: { thinking_time: "free", act_time: {
+    // (Work is done in a workplace: a person named to do an act's work must be in one. `by` is F3's; the generator names none yet.)
+    orchestration: { thinking_time: "free", performers_in: "workplace", act_time: {
       ...WORK_TIME, person: { ...WORK_TIME.person, ...V.work_time?.person }, ...(V.work_time?.system ? { system: V.work_time.system } : {}),
       sources: { ...WORK_TIME.sources, ...V.work_time?.sources } } },
   };

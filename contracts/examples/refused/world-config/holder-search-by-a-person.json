@@ -320,7 +320,9 @@
       "framing": {
         "disclosure": "unstated",
         "reason": "An example."
-      }
+      },
+      "template": "installed-system",
+      "supplier": "outside"
     },
     {
       "id": "shopkeeper-system",
@@ -334,7 +336,9 @@
       "framing": {
         "disclosure": "unstated",
         "reason": "An example."
-      }
+      },
+      "template": "installed-system",
+      "supplier": "outside"
     }
   ],
   "positions": [
@@ -502,5 +506,20 @@
   },
   "orchestration": {
     "thinking_time": "free"
-  }
+  },
+  "templates": [
+    {
+      "id": "installed-system",
+      "kind": "system",
+      "supplier": "outside",
+      "controller": {
+        "type": "code",
+        "impl": "example"
+      },
+      "framing": {
+        "disclosure": "unstated",
+        "reason": "An example."
+      }
+    }
+  ]
 }

@@ -262,13 +262,14 @@ fn when_a_holder_dies_their_positions_fall_vacant_and_nobody_takes_them_automati
 #[test]
 fn an_office_changes_hands_and_its_files_go_with_it_not_the_holders_memory() {
     let mut run = town();
-    // The city deploys a system and appoints it to the clerk's office.
-    let r = act(&mut run, "mayor-system", Some("mayor"), json!([{"block": "deploy", "template": "clerk-bot", "ref": "bot"}, {"block": "appoint", "position": "clerk", "participant": "$bot"}]));
+    // The outside world, which supplies the system, delivers one to the city; the city appoints it to the clerk's office.
+    let r = act(&mut run, "outside-system", Some("outside-trade"), json!([{"block": "deploy", "template": "clerk-bot", "to": "city", "ref": "bot"}]));
     assert_eq!(refusal(&r), None);
     let bot = match &r.events[0].body {
         EventBody::ActionApplied { created: Some(c), .. } => c["bot"].clone(),
         other => panic!("{other:?}"),
     };
+    assert_eq!(refusal(&act(&mut run, "mayor-system", Some("mayor"), json!([{"block": "appoint", "position": "clerk", "participant": bot}]))), None);
     // Its first look through the office's channels: everything they cover.
     let o = observe(&mut run, &bot);
     let laws = |o: &Observation| match o.channels.get("clerk/laws") {

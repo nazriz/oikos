@@ -412,6 +412,9 @@ pub struct Participant {
     pub owner: Option<Id>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub template: Option<Id>,
+    /// A system's: the organisation that delivered it (it may switch it off, as its owner may).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub supplier: Option<Id>,
     pub def: Arc<ParticipantDef>,
     /// Its own parameters, as drawn when it was created.
     #[serde(default, skip_serializing_if = "Option::is_none")]

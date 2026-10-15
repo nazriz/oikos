@@ -39,13 +39,17 @@ test("laws 6 and 7, and law 1's money and goods, are kept already, each by a tes
 // Law 3 (generator): every post is held by a person or a system someone supplied.
 // ---------------------------------------------------------------------------------------------------------------------
 
-test.todo("F5: law 3: every post in a generated town is held by a person, or by a system delivered from a template by a supplier", () => {
+// (Switched on by F4, which made delivery a record on the system and the kernel refuse a world with a free holder at
+// load. What F5 adds is that most posts are held by people, and the systems left have a kind of their own.)
+test("law 3 (F4): every post in a generated town is held by a person, or by a system delivered from a template by a supplier", () => {
   const c = town();
   const byId = new Map<string, any>(c.participants.map((p: any) => [p.id, p]));
+  const templates = new Map<string, any>(c.templates.map((t: any) => [t.id, t]));
+  const orgs = new Set<string>(c.world.entities.filter((e: any) => e.kind !== "person").map((e: any) => e.id));
   const free = c.positions
     .filter((p: any) => p.holder)
     .map((p: any) => ({ post: p.id, holder: byId.get(p.holder) }))
-    .filter(({ holder }: any) => holder && holder.kind === "system" && !(holder.template && holder.supplier))
+    .filter(({ holder }: any) => holder && holder.kind === "system" && !(templates.get(holder.template)?.kind === "system" && orgs.has(holder.supplier)))
     .map(({ post }: any) => post);
   expect(free, "posts held by a system nobody supplied").toEqual([]);
 });
@@ -141,10 +145,10 @@ test("every special case in the inventory still stands where it says, as many ti
   for (const s of inv.stays) expect(stands(s.file, s.find).length, s.what).toBeGreaterThan(0);
 });
 
-test("the inventory covers the plan's deletions: every step from F1 to F8 has entries, and every kernel one is in the kernel", () => {
+test("the inventory covers the plan's deletions: every step from F5 to F8 has entries, and every kernel one is in the kernel", () => {
   const steps = new Set(inv.entries.map((e) => e.step));
-  // (A step that is built has taken its entries out with the code: F1 to F3 have none left but history.)
-  for (const s of ["F4", "F5", "F6", "F7", "F8"]) expect(steps.has(s), s).toBe(true);
+  // (A step that is built has taken its entries out with the code: F1 to F4 have none left but history.)
+  for (const s of ["F5", "F6", "F7", "F8"]) expect(steps.has(s), s).toBe(true);
   for (const e of inv.entries.filter((x) => x.id.startsWith("k-"))) expect(e.file, e.id).toMatch(/^kernel\//);
 });
 

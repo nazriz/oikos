@@ -722,6 +722,13 @@ pub struct ParticipantCfg {
     /// fall vacant); a code stand-in means it carries on (the orchestrator runs the stand-in).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub on_opt_out: Option<Value>,
+    /// A system's: the template it was made from, and the organisation that supplied it (foundations F4: a system
+    /// exists because someone delivered it; one at the start of the world is delivered by a genesis record naming both).
+    /// A system that holds a post must name both.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub template: Option<Id>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub supplier: Option<Id>,
     /// Its own parameters (a person's disposition), used by the role modules it runs.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub traits: Option<Value>,
@@ -783,6 +790,46 @@ pub struct Template {
     /// Trait values, `{"uniform": [lo, hi]}` (integers) or `{"pick": {value: weight}}`, drawn when the participant is created.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub traits: Option<Value>,
+    /// A system's: what a system from this template can do (foundations F4). Each row lists a block (and, for `work`, a
+    /// task, or for `publish`, a kind of record). A system acts, or does another's work, only within its rows; outside
+    /// them the act is refused (`not_capable`). Absent: the template states no limit (a hand-written world's), which
+    /// is the only way a system is unlimited.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub does: Option<Vec<Does>>,
+    /// A system's: the organisation that supplies systems from this template. Only it delivers one (`deploy`, naming
+    /// the client), and it may switch one off (`retire`) as the client may. Absent: nobody supplies it, so none is delivered.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub supplier: Option<Id>,
+}
+
+/// One thing a system from a template can do (foundations F4).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Does {
+    /// The block (`message`, `publish`, `work`, ...).
+    pub block: String,
+    /// For `work`: only this task. Absent: any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub task: Option<String>,
+    /// For `publish`, `create_entity`: only this kind of record. Absent: any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
+    /// For `work`: the seconds a unit when the system is the one doing it (in place of the task's labour). Absent: the task's.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub seconds: Option<i64>,
+}
+
+impl Does {
+    /// Does this row cover a block, whose `makes` is as `Block::makes` gives it?
+    pub fn covers(&self, block: &str, makes: Option<&str>) -> bool {
+        if self.block != block {
+            return false;
+        }
+        match self.task.as_deref().or(self.kind.as_deref()) {
+            None => true,
+            Some(x) => makes.and_then(|m| m.split_once('/')).is_some_and(|(_, m)| m == x),
+        }
+    }
 }
 
 /// The physics of bodies (docs/design/v0.4-cast-and-land.md §4): all optional.
@@ -2118,6 +2165,50 @@ pub fn validate(c: &Config) -> Result<(), String> {
         }
         if r.at != 0 {
             return Err(format!("record {} in the initial world must be at t=0", r.id));
+        }
+    }
+
+    // Systems come from a supplier (foundations F4). A template's supplier is an organisation of the world; a template
+    // that lists what it does lists only systems' work. A system that holds a post was delivered: it names the template
+    // it is from (a system's) and the organisation that supplied it, which is the world's delivery at its start.
+    let org_exists = |who: &str, what: &str| -> Result<(), String> {
+        match entities.get(who) {
+            None => Err(format!("{what}: unknown entity {who:?}")),
+            Some(e) if e.kind == PERSON => Err(format!("{what}: {who} is a person, and only an organisation supplies a system")),
+            Some(_) => Ok(()),
+        }
+    };
+    for t in &c.templates {
+        if t.kind == ParticipantKind::Person && (t.does.is_some() || t.supplier.is_some()) {
+            return Err(format!("template {}: a person's has no `does` or supplier (only a system is supplied)", t.id));
+        }
+        if let Some(s) = &t.supplier {
+            org_exists(s, &format!("template {}: its supplier", t.id))?;
+        }
+        for r in t.does.iter().flatten() {
+            if r.seconds.is_some_and(|x| x < 1) || (r.seconds.is_some() && r.block != "work") {
+                return Err(format!("template {}: `seconds` is a work row's, and is positive", t.id));
+            }
+        }
+    }
+    let template_of: BTreeMap<&str, &Template> = c.templates.iter().map(|t| (t.id.as_str(), t)).collect();
+    for p in &c.participants {
+        if p.kind == ParticipantKind::Person && (p.template.is_some() || p.supplier.is_some()) {
+            return Err(format!("participant {} is a person's, so it has no supplier", p.id));
+        }
+        if let Some(t) = &p.template {
+            if template_of.get(t.as_str()).is_none_or(|t| t.kind != ParticipantKind::System) {
+                return Err(format!("system participant {}: no system template {t:?}", p.id));
+            }
+        }
+        if let Some(s) = &p.supplier {
+            org_exists(s, &format!("system participant {}: its supplier", p.id))?;
+        }
+    }
+    for pos in c.positions.iter().filter(|x| x.holder.is_some()) {
+        let h = participants[pos.holder.as_deref().unwrap_or_default()];
+        if h.kind == ParticipantKind::System && (h.template.is_none() || h.supplier.is_none()) {
+            return Err(format!("position {} is held by {}, a system nobody supplied (it names its template and supplier)", pos.id, h.id));
         }
     }
 

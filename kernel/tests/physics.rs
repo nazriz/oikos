@@ -73,7 +73,7 @@ fn money_enters_only_through_the_outside_worlds_own_participant() {
     );
     // ...until a world gives the outside world a position someone acts in: its behaviour is the boundary condition (D31).
     let mut c = riverbend();
-    c["participants"].as_array_mut().unwrap().push(json!({"id": "export-demand-system", "kind": "system", "owner": "outside", "controller": {"type": "code", "impl": "world.export_demand"}, "framing": {"disclosure": "unstated", "reason": "Code controller."}}));
+    c["participants"].as_array_mut().unwrap().push(json!({"id": "export-demand-system", "kind": "system", "owner": "outside", "template": "installed-system", "supplier": "outside", "controller": {"type": "code", "impl": "world.export_demand"}, "framing": {"disclosure": "unstated", "reason": "Code controller."}}));
     c["positions"].as_array_mut().unwrap().push(json!({"id": "export-demand", "entity": "outside", "holder": "export-demand-system"}));
     let mut run = Run::start(c, "boundary", Vec::new(), None).unwrap();
     let total = run.kernel().state().total_money();

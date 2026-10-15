@@ -173,15 +173,18 @@ pub enum Block {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         participant: Option<IdOrRef>,
     },
-    /// A new system participant belonging to the acting organisation, from a template.
+    /// The acting organisation, which supplies a template, delivers a new system from it to a client organisation
+    /// (`to`; absent: itself). The system belongs to the client; the supplier may also switch it off (foundations F4).
     Deploy {
         template: Id,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        to: Option<IdOrRef>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         title: Option<String>,
         #[serde(default, rename = "ref", skip_serializing_if = "Option::is_none")]
         bind: Option<String>,
     },
-    /// Switch off a system participant belonging to the acting organisation.
+    /// Switch off a system participant belonging to, or supplied by, the acting organisation.
     Retire {
         participant: IdOrRef,
     },
