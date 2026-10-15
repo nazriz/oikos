@@ -393,7 +393,7 @@ export const builder: BehaviourModule = {
     const builtCell = new Map<string, boolean>(); // what stands on each cell, as we last saw it
     const finished = new Set<string>(); // buildings our crew has seen finished
     const ourLots = new Set<string>(); // lots with a building job of ours on them, queued or begun
-    const projects: { structure: string; task: "build" | "demolish"; left: number }[] = [];
+    const projects: { structure: string; task: "build" | "demolish"; left: number; flying?: number }[] = []; // (flying: hours sent to the crew whose work has not taken effect yet, which takes their hours: F1, 2026-10-15)
     const typeOf = new Map<string, string>(); // structure -> its kind of building: what we've built, and what we've seen
     const onOrder = new Map<string, number>(); // kind -> ordered, not yet delivered
     const orderQty = new Map<string, { kind: string; quantity: number }>(); // our order -> what it was for
@@ -405,7 +405,7 @@ export const builder: BehaviourModule = {
     const paidIn = new Map<string, number>();
     const spokenFor = new Map<string, number>();
     const dealtWith = new Set<string>();
-    const repairs: { id: string; orderer: string; structure: string; units: number; left: number; at: number; refused: number }[] = [];
+    const repairs: { id: string; orderer: string; structure: string; units: number; left: number; at: number; refused: number; flying?: number }[] = [];
     // Hourly pay: the wage over the hours it pays for (working days in the period x the working day).
     let wage: number = p.wage; // (an enterprise agreement raises it)
     const bargaining = new Bargaining(ctx.entity);
@@ -634,12 +634,13 @@ export const builder: BehaviourModule = {
         const repairWork = () => {
           if (!p.repair_task || p.repair_labour <= 0) return;
           for (const r of [...repairs]) {
-            if (r.left <= 0) continue;
+            if (r.left - (r.flying ?? 0) <= 0) continue;
             const avail = Math.min(...crew.map((w) => p.working_day - (used.get(w) ?? 0)));
-            const units = Math.min(r.left, Math.floor((Math.max(0, avail) * crew.length) / p.repair_labour));
+            const units = Math.min(r.left - (r.flying ?? 0), Math.floor((Math.max(0, avail) * crew.length) / p.repair_labour));
             if (units <= 0) break;
             const share = Math.ceil((units * p.repair_labour) / crew.length);
             for (const w of crew) used.set(w, (used.get(w) ?? 0) + share);
+            r.flying = (r.flying ?? 0) + units;
             const close = (kind: "repair_done" | "repair_declined", why: string, text: string, data: object) => {
               repairs.splice(repairs.indexOf(r), 1);
               return [because(why, say(kind, text, { to: [r.orderer], visible: [me, r.orderer], basis: r.id, data: { order: r.id, structure: r.structure, ...data } }))];
@@ -647,13 +648,14 @@ export const builder: BehaviourModule = {
             const s = because(`The day's work: ${crew.length} of our crew repairing ${r.structure} (${units} of the ${r.left} units left).`,
               C.call("work", { task: p.repair_task, units: C.text(String(units)), at: p.yard, by: C.json(crew), on: r.structure }));
             s.then = (out) => {
+              r.flying = Math.max(0, (r.flying ?? 0) - units);
               if (out.status === "applied") {
                 r.left -= units;
                 return r.left <= 0 ? close("repair_done", `The repair of ${r.structure} is done: telling ${r.orderer}.`, `The repair of ${r.structure} is done: ${r.units} units.`, { units: r.units }) : undefined;
               }
               for (const w of crew) used.set(w, Math.max(0, (used.get(w) ?? 0) - share));
               const short = outOfTime(out);
-              if (short?.who) used.set(short.who, p.working_day - short.left);
+              if (short?.who) { used.set(short.who, p.working_day - short.left); for (const w of crew) used.set(w, Math.max(used.get(w) ?? 0, p.working_day - short.left)); } // (the crew shares the work, so the others have no more room than they)
               else if (short) for (const w of crew) used.set(w, p.working_day);
               if (short) return undefined; // (tomorrow)
               // The building is gone; or the work is refused again and again: the order is closed, saying so.
@@ -673,18 +675,21 @@ export const builder: BehaviourModule = {
             }
             const avail = Math.min(...crew.map((w) => p.working_day - (used.get(w) ?? 0)));
             if (avail <= 0) break;
-            const units = Math.min(pr.left, avail * crew.length);
+            const units = Math.min(pr.left - (pr.flying ?? 0), avail * crew.length);
+            if (units <= 0) continue;
             const share = Math.ceil(units / crew.length);
             for (const w of crew) used.set(w, (used.get(w) ?? 0) + share);
+            pr.flying = (pr.flying ?? 0) + units;
             const s = because(`The day's work: ${crew.length} of our crew ${pr.task === "build" ? "building" : "demolishing"} ${pr.structure} (${Math.round(units / 3600)} hours of the ${Math.round(pr.left / 3600)} left).`,
               C.call("work", { task: pr.task, units: C.text(String(units)), at: p.yard, by: C.json(crew), on: pr.structure }));
             s.then = (out) => {
+              pr.flying = Math.max(0, (pr.flying ?? 0) - units);
               if (out.status === "applied") pr.left -= units;
               else {
                 for (const w of crew) used.set(w, Math.max(0, (used.get(w) ?? 0) - share));
                 // Someone's day is fuller than our count of it (work elsewhere today): the world's count, from now on.
                 const short = outOfTime(out);
-                if (short?.who) used.set(short.who, p.working_day - short.left);
+                if (short?.who) { used.set(short.who, p.working_day - short.left); for (const w of crew) used.set(w, Math.max(used.get(w) ?? 0, p.working_day - short.left)); } // (the crew shares the work, so the others have no more room than they)
                 else if (short) for (const w of crew) used.set(w, p.working_day);
                 // Not (or no longer) there to work on: the job is over.
                 if (["not_being_built", "not_coming_down", "unknown_structure"].includes(out.refusal?.code ?? "")) pr.left = 0;

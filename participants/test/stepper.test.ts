@@ -79,3 +79,20 @@ test("what a module needs to look up is asked before it plans, one look after an
   expect((m.step(done) as any).type).toBe("look");
   expect([which(m.step(obs(3600))), which(m.step(obs(3600))), which(m.step(obs(3600)))]).toEqual(["step 7", "step 8", "wait"]);
 });
+
+test("an act's outcome goes to the act it is of, however late: a refusal that comes at once is not the end of the work sent before it", () => {
+  // (Foundations F1, 2026-10-15. An office that sets a crew to work is free again before the crew is done, and an order that
+  // will not fit the crew's day is refused at once: its outcome comes before that of the long work sent earlier.)
+  const heard: string[] = [];
+  const order = (name: string): Step => Object.assign(note(0), { then: (o: any) => void heard.push(`${name}:${o.status}`) });
+  let wake = 0;
+  const s = stepper(() => {}, () => (wake++ === 0 ? [order("long"), order("short")] : []));
+  s.step(obs(0));
+  (s as any).sent("act.1");
+  s.step({ ...obs(2), outcomes: [] } as any);
+  (s as any).sent("act.2");
+  // The short one is refused at once; the long one is applied hours later.
+  s.step({ ...obs(4), outcomes: [{ action: "act.2", status: "refused", t: 3 }] } as any);
+  s.step({ ...obs(20_000), outcomes: [{ action: "act.1", status: "applied", t: 18_000 }] } as any);
+  expect(heard).toEqual(["short:refused", "long:applied"]);
+});

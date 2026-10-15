@@ -7,6 +7,7 @@ import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { generate } from "@oikos/worlds/generator/generate";
 import { runWorld } from "../src/run";
+import { workStarts } from "./lib/work-starts";
 import { modules } from "./fixtures/trade-modules";
 
 const root = join(import.meta.dir, "../..");
@@ -17,7 +18,7 @@ const base = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")
 const tight = { ...base, ownership: false, citizens: 120, apartment_blocks: 2, houses: 16, landlord_capital: 300_000_000, landlord_compliance_bps: 10_000 };
 
 /** Refusals from same-moment races (D58): someone who'd just left, named for work by a firm acting on what it saw. */
-const RACES = ["not_present", "not_at_work", "capacity_exceeded", "no_time_left"]; // and moving into a home still being left; a new job's first day after a full one at the old
+const RACES = ["not_present", "not_at_work", "capacity_exceeded", "no_time_left", "insufficient_quantity", "dead"]; // (insufficient_quantity and dead: work takes the crew's hours, so it takes effect hours after it was ordered, and meanwhile the goods go to an earlier order or a performer dies; F1, 2026-10-15) and moving into a home still being left; a new job's first day after a full one at the old
 
 async function run(name: string, config: any, until: number) {
   const out = join(root, "runs", `test-building-${name}`);
@@ -68,8 +69,10 @@ test("the builder buys materials from outside, and its crew's hours finish each 
   }
   // No one works more than a working day in a day.
   const perDay = new Map<string, number>();
+  // (A working day is counted on the day the work starts: it takes the crew's hours, so it takes effect hours later; F1.)
+  const startOf = workStarts(ev);
   for (const w of ev.filter((e) => e.event === "worked")) for (const p of w.performers) {
-    const k = `${p}|${Math.floor(w.t / DAY)}`;
+    const k = `${p}|${Math.floor(startOf.get(w)! / DAY)}`;
     perDay.set(k, (perDay.get(k) ?? 0) + Math.ceil(w.labour / w.performers.length));
   }
   expect(Math.max(...perDay.values())).toBeLessThanOrEqual(config.catalogue.working_day);

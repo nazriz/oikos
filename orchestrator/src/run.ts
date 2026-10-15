@@ -794,6 +794,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     const started = r?.events.find((e: any) => e.event === "action_started");
     if (started) {
       u.acted = true; // (its wake goes on when the act is done: the engine's schedule)
+      if (!u.llm) u.controller.sent?.(started.action); // (so that it can tell which act an outcome is of)
       const b = (backlog[u.module.name] ??= { acts: 0, waited: 0, longest: 0 });
       const waited = started.starts - (t + thinking);
       b.acts++;

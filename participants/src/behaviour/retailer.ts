@@ -179,6 +179,7 @@ export const retailer: BehaviourModule = {
     let openedAt = -1;
     let reviewed = false;
     let sold = 0; // this month: items customers ordered and paid for (served or not): what they wanted
+    let reserved = 0; // goods in orders sent to be served whose work has not taken effect yet (it takes the crew's hours: F1, 2026-10-15)
     const queue: { o: Order; served: number; since: number }[] = []; // paid orders being served, oldest first
     let lastDemand: number = p.demand;
     let fullMonths = 0;
@@ -553,7 +554,7 @@ export const retailer: BehaviourModule = {
         const room = (w: string) => (workDay(t) ? Math.max(0, Math.floor((p.working_day * staffing.hoursBpsAt(w, t)) / 10_000) - (used.get(w) ?? 0)) : 0);
         // (Who serves today: those here with the most time between them, the work shared evenly.)
         const crew = team(present, room).who;
-        let left = stock;
+        let left = Math.max(0, stock - reserved);
         for (const x of [...queue]) {
           const want = x.o.quantity - x.served;
           const minRoom = crew.length ? Math.min(...crew.map(room)) : 0;
@@ -574,7 +575,9 @@ export const retailer: BehaviourModule = {
             : left === 0 && out !== "late" ? `Out of stock: served ${x.served} of the ${x.o.quantity} ordered; refunding the rest.`
             : `We couldn't serve all of an order within ${within} days: served ${x.served} of the ${x.o.quantity}; refunding the rest.`;
           const st = fillWith(x.o, q, finished ? x.served : -1, q ? crew : [], why);
+          reserved += q;
           st.then = (res) => {
+            reserved = Math.max(0, reserved - q);
             if (res.status === "applied") {
               books.out += q;
               return void (q && pace.done(crew, Math.floor(t / DAY)));
@@ -583,7 +586,7 @@ export const retailer: BehaviourModule = {
             for (const w of crew) if (share) used.set(w, Math.max(0, (used.get(w) ?? 0) - share));
             // Someone's day is fuller than our count of it (work elsewhere today): the world's count, from now on.
             const short = outOfTime(res);
-            if (short?.who) used.set(short.who, p.working_day - short.left);
+            if (short?.who) { used.set(short.who, p.working_day - short.left); for (const w of crew) used.set(w, Math.max(used.get(w) ?? 0, p.working_day - short.left)); } // (the crew shares the work, so the others have no more room than they)
             else if (short) for (const w of crew) used.set(w, p.working_day);
             // (A business of one whose owner could not work where they trade, for whatever the world's reason: the place
             // under water, the owner elsewhere. They see it, and try no more today.)

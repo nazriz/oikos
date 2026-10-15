@@ -184,6 +184,8 @@ test("a tenant who goes after the order, before anyone comes: no removal is reco
   await exportLogs([s.logPath], m);
   const row = (await runQuery(m, "town/possession"))[0] as any;
   expect(Number(row.left_on_order)).toBe(1); // (the town's other order was carried out on another household: that one is a removal)
-  expect(Number(row.possession_orders)).toBeGreaterThan(Number(row.left_on_order));
+  // (Until foundations F1, 2026-10-15, the town had a second order in these 200 days, carried out on another household, which the
+  // measure told from this one; now it has only this one. What is held is that the one left on is counted, and counted once.)
+  expect(Number(row.possession_orders)).toBeGreaterThanOrEqual(Number(row.left_on_order));
   rmSync(out, { recursive: true, force: true });
 }, 900_000);

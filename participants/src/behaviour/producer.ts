@@ -126,6 +126,7 @@ export const producer: BehaviourModule = {
     const orders = new OrderBook(me, undefined, p.terms_days > 0 ? { days: p.terms_days, stop_after_days: p.terms_stop_after_days, claim_after_days: p.terms_claim_after_days } : null);
     const payables = new Payables(me); // what we owe our supplier for inputs delivered on its terms
     const deliveries = new Deliveries();
+    const making: { units: number; by: number }[] = []; // makings ordered whose crew has not had the hours for them yet (the work takes the crew's hours: F1, 2026-10-15)
     const committed = new Committed(); // inputs paid for with orders whose payment the bank has not yet made
     const onOrder = new Map<string, number>(); // inputs ordered, not yet delivered
     const orderQty = new Map<string, { kind: string; quantity: number }>();
@@ -403,20 +404,23 @@ export const producer: BehaviourModule = {
           const byHours = Math.floor((crew.each * crew.who.length) / pace.perUnit(crew.who));
           const byInputs = Math.min(...Object.entries(p.per_unit).map(([k, q]) => Math.floor(held(obs, p.works, k) / q)));
           // No further than the top of the band: a day's making can be a lot next to a month's demand.
-          const room = Math.max(0, Math.ceil((p.phi_high_bps * lastDemand) / 10_000) - stock);
+          const room = Math.max(0, Math.ceil((p.phi_high_bps * lastDemand) / 10_000) - stock - making.filter((x) => x.by > t).reduce((n, x) => n + x.units, 0));
           const units = Math.min(byHours, byInputs, room);
           if (units > 0) {
             const share = Math.ceil((units * pace.perUnit(crew.who)) / crew.who.length);
             for (const w of crew.who) used.set(w, (used.get(w) ?? 0) + share);
+            const inFlight = { units, by: t + 2 * share }; // (its crew may be busy first: twice the hours it needs, to be safe)
+            making.splice(0, making.length, ...making.filter((x) => x.by > t), inFlight);
             const st = because(`The day's work: ${crew.who.length} of our workers making ${units} ${p.output}${byInputs < byHours ? ` (all our inputs allow)` : ""}${crew.who.length < present.length ? ` (the others here have done a day's work already)` : ""}.`,
               C.call("work", { task: p.task, units: C.text(String(units)), at: p.works, by: C.json(crew.who) }));
             st.then = (out) => {
               if (out.status === "applied") return void pace.done(crew.who, Math.floor(t / DAY));
               pace.refused(out, units, crew.who);
+              inFlight.by = 0;
               for (const w of crew.who) used.set(w, Math.max(0, (used.get(w) ?? 0) - share));
               // Someone's day is fuller than our count of it (work elsewhere today): the world's count, from now on.
               const short = outOfTime(out);
-              if (short?.who) used.set(short.who, p.working_day - short.left);
+              if (short?.who) { used.set(short.who, p.working_day - short.left); for (const w of crew.who) used.set(w, Math.max(used.get(w) ?? 0, p.working_day - short.left)); } // (the crew shares the work, so the others have no more room than they)
               else if (short) for (const w of crew.who) used.set(w, p.working_day);
             };
             steps.push(st);

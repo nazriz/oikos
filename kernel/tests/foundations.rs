@@ -138,10 +138,8 @@ fn law1_a_system_never_has_more_in_hand_than_it_has_lanes() {
     }
 }
 
-/// THE time ledger is one: what a person spends on `work` is not also free for something else (F1). Today `work` is
-/// charged to a separate daily budget (`labour_used`) and never to the performer's timeline.
+/// THE time ledger is one: what a person spends on `work` is not also free for something else (F1): `work` is placed on its performers' timelines like any act's time.
 #[test]
-#[ignore = "F1: one time ledger. `work` charges its performers' timelines (kernel.rs `begin` only places the ACTOR's time; exec.rs `work` keeps `labour_used`)"]
 fn law1_work_takes_the_performers_time_and_the_act_is_done_when_they_are() {
     let mut run = town();
     // Two hours of carol's at the shop. The act is done when her work is: at 7,200 s, not at the developer's 1 s.
@@ -151,7 +149,6 @@ fn law1_work_takes_the_performers_time_and_the_act_is_done_when_they_are() {
 }
 
 #[test]
-#[ignore = "F1: one time ledger (see above)"]
 fn law1_two_works_naming_one_performer_do_not_overlap() {
     let mut run = town();
     begun(&mut run, &make(2, &["carol"])); // one hour of hers
@@ -161,7 +158,6 @@ fn law1_two_works_naming_one_performer_do_not_overlap() {
 
 /// An act with several performers starts when every one of them is free (F1, plan 2.1).
 #[test]
-#[ignore = "F1/F3: an act starts when all its performers are free"]
 fn law1_an_act_starts_when_all_its_performers_are_free() {
     let mut run = town_with_times(json!({"person": {"message": 3_600}}));
     assert_eq!(begun(&mut run, &msg("carol-self")), (0, 3_600)); // carol is busy for an hour with her own affairs
@@ -171,7 +167,6 @@ fn law1_an_act_starts_when_all_its_performers_are_free() {
 
 /// The daily limit is a body's, counted on the same ledger (F1): a day's work is the time on the timeline.
 #[test]
-#[ignore = "F1: the daily limit counts time on the timeline, not `labour_used`"]
 fn law1_a_working_day_is_counted_on_the_timeline() {
     let mut run = town();
     // The day is 8 hours. Carol works 8 (16 units of 1,800 s ... of the task) and then has no time for anything else
@@ -179,6 +174,17 @@ fn law1_a_working_day_is_counted_on_the_timeline() {
     applied(&mut run, &make(16, &["carol"]));
     let (starts, _) = begun(&mut run, &msg("carol-self"));
     assert!(starts >= 8 * 3_600, "carol worked all day and then wrote a message at {starts}");
+}
+
+/// A refusal for want of working hours says whose hours and how many are left, as participants read it (a shop works out
+/// from it what its crew can still serve): "<who> has <n> s of work left today; this needs <m>".
+#[test]
+fn law1_a_refusal_for_want_of_hours_says_how_many_are_left() {
+    let mut run = town();
+    applied(&mut run, &make(12, &["carol"])); // 6 of her 8 hours
+    let r = step(&mut run, &make(8, &["carol"])).unwrap(); // 4 more
+    let detail = r.events.iter().find_map(|e| match &e.body { EventBody::ActionRefused { detail, .. } => detail.clone(), _ => None }).expect("refused");
+    assert_eq!(detail, "carol has 7200 s of work left today; this needs 14400");
 }
 
 // ------------------------------------------------------------------------------------------------------------------
@@ -222,7 +228,6 @@ fn law2_time_is_read_from_the_kind_of_record_an_act_writes() {
 /// A `work` task's time is its labour a unit: the performers' timelines carry exactly that (the table's time is the
 /// time charged), for a person and for a system by its template.
 #[test]
-#[ignore = "F1/F2: the time charged equals the table's, on the performers' timelines"]
 fn law2_the_time_charged_is_the_tables_time() {
     let mut run = town();
     applied(&mut run, &make(3, &["carol"])); // 3 units x 1,800 s

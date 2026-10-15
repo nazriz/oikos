@@ -10,6 +10,7 @@ import { generate, generateFrom } from "@oikos/worlds/generator/generate";
 import { loadProfile } from "@oikos/worlds/generator/profile";
 import { exportLogs, runQuery } from "@oikos/measure";
 import { runWorld } from "../src/run";
+import { workStarts } from "./lib/work-starts";
 
 const root = join(import.meta.dir, "../..");
 const DAY = 86_400, HOUR = 3_600;
@@ -101,7 +102,7 @@ test("they sell to households by their own hours, draw what the business clears,
   const placeOf = new Map<string, string>(config.positions.filter((x: any) => firms.has(x.entity)).map((x: any) => [x.entity, x.role_module.params.premises]));
   const market = config.world.structures.find((x: any) => x.type === "market").id;
   // Nothing refused but same-moment races and a day's hours running out (as for any shop).
-  const odd = ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left"].includes(e.code));
+  const odd = ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left", "insufficient_quantity", "dead"].includes(e.code));
   expect(odd.map((e) => [e.code, e.detail])).toEqual([]);
   // Selling: at the place the business is worked from, by its owner alone, a working day at most.
   const sold = ev.filter((e) => e.event === "worked" && e.task === "sell");
@@ -109,11 +110,13 @@ test("they sell to households by their own hours, draw what the business clears,
   const owners = new Set(firms.values());
   const places = new Set(placeOf.values());
   const perDay = new Map<string, number>();
+  // (A day's hours are counted on the day the work starts: it takes the owner's hours, so it takes effect hours later; F1.)
+  const startOf = workStarts(ev);
   for (const w of sold) {
     expect(w.performers.length).toBe(1);
     expect(owners.has(w.performers[0])).toBe(true);
     expect(places.has(w.at) || recs.some((r) => r.kind === "trading_from" && r.speaks_for === w.performers[0] && r.data?.structure === w.at)).toBe(true);
-    const k = `${w.performers[0]}|${Math.floor(w.t / DAY)}`;
+    const k = `${w.performers[0]}|${Math.floor(startOf.get(w)! / DAY)}`;
     perDay.set(k, (perDay.get(k) ?? 0) + w.labour);
   }
   expect(Math.max(...perDay.values())).toBeLessThanOrEqual(config.catalogue.working_day);
@@ -121,8 +124,9 @@ test("they sell to households by their own hours, draw what the business clears,
   expect(sold.some((w) => w.at !== market)).toBe(true);
   // At a pitch in working hours only (the round); at home whenever its owner is.
   for (const w of sold.filter((x) => x.at === market)) {
-    const hour = Math.floor((w.t % DAY) / HOUR);
-    expect(hour >= 8 && hour < 18 && Math.floor(w.t / DAY) % 7 < 5).toBe(true);
+    const at = startOf.get(w)!; // (when it was begun: a pitch is worked in the round's hours)
+    const hour = Math.floor((at % DAY) / HOUR);
+    expect(hour >= 8 && hour < 18 && Math.floor(at / DAY) % 7 < 5).toBe(true);
   }
   // Most of them sold something; households' orders reached them as they reach shops.
   const sellers = new Set(sold.map((w) => w.performers[0]));

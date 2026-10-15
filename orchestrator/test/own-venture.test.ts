@@ -12,8 +12,8 @@ const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
 const base = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")) as any;
 
-async function run(name: string, days: number, change: (params: any) => void) {
-  const config = generate(base);
+async function run(name: string, days: number, change: (params: any) => void, seed?: number) {
+  const config = generate(seed === undefined ? base : { ...base, seed });
   const citizens = config.participants.filter((p: any) => p.controller?.impl === "citizen.default");
   // (The town's own chance is small: nobody else starts one in the test.)
   for (const p of citizens) p.controller = { ...p.controller, params: { ...p.controller.params, found_own_ppm: 0 } };
@@ -66,7 +66,7 @@ test("someone out of work with savings and a home starts a business of one, puts
 
 test("a business of one that does not pay its owner a living is given up: it closes, and its owner looks for work again", async () => {
   // (Judged after two months, against a living nobody's trade from home could clear: for the test.)
-  const { person, ev, recs } = await run("own-venture-given-up", 200, (p) => Object.assign(p, { give_up_months: 2, give_up_below_bps: 1_000_000 }));
+  const { person, ev, recs } = await run("own-venture-given-up", 300, (p) => Object.assign(p, { give_up_months: 2, give_up_below_bps: 1_000_000 }), 2);
   const firm = ev.find((e) => e.event === "entity_created" && e.kind === "own_account")!.entity as string;
   const closure = recs.find((r) => r.kind === "closure" && r.speaks_for === firm);
   expect(closure).toBeDefined();
@@ -87,6 +87,7 @@ test("a founding's draw of the shape \"business\" reaches the business of one: s
     const a = config.world.accounts.find((x: any) => x.id === `acc-${p.person}`);
     if (a && Number(a.balance) < 2 * venture.capital) a.balance = String(2 * venture.capital);
   }
+  // (600 days, not 330, since foundations F1 (2026-10-15): the town changed and the runs from seeds 1 to 7 have no such occasion in 330 days; the runs from 1 and 2 have one in 600. And the given-up test is the town drawn from seed 2: in the town from seed 1 the owner starts the next business at once and does not apply, in seeds 1 and 3, and does in 2 and 4.)
   // (And 1 since draws are named for the day or the matter, not the hour, 2026-10-12: every stream is another, so who is out of work
   // and when moved again; of seeds 1 to 7 the runs from 1, 3 and 5 have an occasion and those from 2, 4, 6 and 7 none.)
   // (The run's seed is 2 since 2026-10-12, homes by income: in the town as now drawn the run from seed 1 has no
@@ -99,7 +100,7 @@ test("a founding's draw of the shape \"business\" reaches the business of one: s
   // gives a want up and when; of seeds 1 to 5 the runs from 1 and 4 have such an occasion, those from 2, 3 and 5 none.)
   const out = join(root, "runs", "test-own-venture-meant");
   rmSync(out, { recursive: true, force: true });
-  const s = await runWorld({ config: { ...config, seed: 1 }, runId: "meant", outDir: out, until: 330 * DAY, recordObservations: "none" });
+  const s = await runWorld({ config: { ...config, seed: 1 }, runId: "meant", outDir: out, until: 600 * DAY, recordObservations: "none" });
   const log = readFileSync(s.logPath, "utf8").trim().split("\n").filter((l) => l.includes("found_shape") || l.includes('"own_account"') || l.includes("found_own")).map((l) => JSON.parse(l));
   const meant = log.filter((e) => e.kind === "annotation" && e.body.data?.domain === "found_shape" && e.body.data?.choice === "business").map((e) => ({ t: e.t, who: e.body.subject as string }));
   expect(meant.length).toBeGreaterThan(0);

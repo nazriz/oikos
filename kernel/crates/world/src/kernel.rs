@@ -212,7 +212,6 @@ impl World {
                 })
                 .collect(),
             accounts: w.accounts.iter().map(|a| (a.id.clone(), Arc::new(Account { holder: a.holder.clone(), custodian: a.custodian.clone(), currency: cur_of(a), balance: a.balance, changed: 0 }))).collect(),
-            labour_used: crate::state::Map::new(),
             holdings: w
                 .holdings
                 .iter()
@@ -711,6 +710,38 @@ impl World {
         sections
     }
 
+    /// A performer whose working day (`catalogue.working_day`) has no room for this share of work on that day: the hours
+    /// are counted on the person's own timeline, where the work is placed.
+    /// (Said as the refusal has always said it, which is what a participant reads the hours left from.)
+    fn over_the_day(&self, shares: &BTreeMap<Id, i64>, day_idx: i64) -> Option<String> {
+        let day = self.s.config.catalogue.working_day?;
+        shares.iter().find_map(|(p, share)| {
+            let used = self.state.timelines.get(p).map_or(0, |tl| tl.worked_on(day_idx));
+            (used + share > day).then(|| format!("{p} has {} s of work left today; this needs {share}", (day - used).max(0)))
+        })
+    }
+
+    /// Who is where, for each work in an act that is on a person or a space (literal ids only): kept with the act, which
+    /// takes effect hours later.
+    fn seen_at_order(&self, blocks: &[Block]) -> BTreeMap<Id, Vec<Id>> {
+        let mut out = BTreeMap::new();
+        for b in blocks {
+            let Block::Work { at, on: Some(on), performers, .. } = b else { continue };
+            if at.starts_with('$') || on.starts_with('$') {
+                continue;
+            }
+            let Some(m) = self.state.occupancy.get(at) else { continue };
+            if self.state.body(on).is_some() {
+                if m.values().any(|bodies| bodies.contains(on)) {
+                    out.insert(on.clone(), vec![on.clone()]);
+                }
+            } else if let Some(bodies) = m.get(on) {
+                out.insert(on.clone(), bodies.iter().filter(|x| !performers.contains(x)).cloned().collect());
+            }
+        }
+        out
+    }
+
     /// Dry run: would physics allow this action right now?
     pub fn check(&self, participant: &str, position: Option<&str>, blocks: &[Block]) -> Result<Check, ProtocolError> {
         if !self.state.participants.contains_key(participant) {
@@ -721,7 +752,10 @@ impl World {
         }
         let mut scratch = self.state.clone();
         Ok(match exec_action(&self.s, &mut scratch, participant, position, blocks) {
-            Ok(_) => Check { ok: true, refusal: None },
+            Ok(res) => match self.over_the_day(&work_shares(&res.events), crate::exec::day_of(self.state.t)) {
+                Some(d) => Check { ok: false, refusal: Some(refusal_info(&refuse(RefusalCode::NoTimeLeft, d))) },
+                None => Check { ok: true, refusal: None },
+            },
             Err(r) => Check { ok: false, refusal: Some(refusal_info(&r)) },
         })
     }
@@ -752,27 +786,114 @@ impl World {
             .max()
             .unwrap_or(0);
         let seconds = self.s.act_times.program(actor, blocks.iter().map(Block::name)) + trip;
-        let mut timeline = self.state.timelines.get(&key).cloned().unwrap_or_default();
-        let (starts, done) = oikos_time::place(&mut timeline, lanes, t + thinking, seconds);
-        self.state.timelines.insert(key, timeline);
+        let ready = t + thinking;
+        // One time account per person (docs/design/foundations.md law 1; F1): the hours of a `work` are the time of
+        // those who do it, placed on their timelines like any act's time. The act starts when its actor and every one
+        // of its performers are free, and is done when the last of them is. (What the work would be is read from a dry
+        // run of the act as the world stands; if it would be refused, nobody's time is taken for it.)
+        let mut shares: BTreeMap<Id, i64> = BTreeMap::new();
+        let mut late = false; // work the world could not yet show would be done (someone not there until the act is): placed when it takes effect
+        if blocks.iter().any(|b| matches!(b, Block::Work { .. })) {
+            let mut scratch = self.state.clone();
+            if let Ok(res) = exec_action(&self.s, &mut scratch, participant, position, blocks) {
+                shares = work_shares(&res.events);
+            } else {
+                late = true;
+            }
+        }
+        let free_from = |tl: Option<&crate::state::Timeline>, lanes: usize| -> i64 {
+            let mut lanes_now = tl.map(|x| x.lanes.clone()).unwrap_or_default();
+            oikos_time::place(&mut lanes_now, lanes, ready, 0).0
+        };
+        let mut start = free_from(self.state.timelines.get(&key), lanes);
+        for p in shares.keys().filter(|p| **p != key) {
+            start = start.max(free_from(self.state.timelines.get(p), 1));
+        }
+        // A performer's working day: what is already placed on it, and this act's share, within the day's hours.
+        let mut start = start;
+        let mut day_idx = crate::exec::day_of(start);
+        let mut over = self.over_the_day(&shares, day_idx);
+        if over.is_some() {
+            // (No room in their day: the act is refused, and its actor hears so now, not when the crew would have been free.)
+            shares.clear();
+            start = free_from(self.state.timelines.get(&key), lanes);
+            day_idx = crate::exec::day_of(start);
+            over = over.take();
+        }
+        let placed = crate::state::Placed { over, day: day_idx, hours: shares.clone(), seen: self.seen_at_order(blocks), late };
+        let mut done = start;
+        let place = |state: &mut State, who: &Id, lanes: usize, secs: i64, work: i64| {
+            let mut tl = state.timelines.get(who).cloned().unwrap_or_default();
+            let (_, d) = oikos_time::place(&mut tl.lanes, lanes, start, secs);
+            if work > 0 {
+                tl.worked = Some((day_idx, tl.worked_on(day_idx) + work));
+            }
+            state.timelines.insert(who.clone(), tl);
+            d
+        };
+        let own = shares.get(&key).copied().unwrap_or(0);
+        let own_done = place(&mut self.state, &key, lanes, seconds + own, own);
+        done = done.max(own_done);
+        for (p, share) in shares.iter().filter(|(p, _)| **p != key) {
+            done = done.max(place(&mut self.state, p, 1, *share, *share));
+        }
+        let starts = start;
+        let free = (own_done < done).then_some(own_done);
         let pos = position.map(String::from);
-        self.state.schedule(done, crate::state::Sched::Act { action: action.clone(), participant: participant.into(), position: pos.clone(), blocks: blocks.to_vec() });
-        Output { events: vec![Timed::new(t, EventBody::ActionStarted { action, participant: participant.into(), position: pos, starts, done })] }
+        self.state.schedule(done, crate::state::Sched::Act { action: action.clone(), participant: participant.into(), position: pos.clone(), blocks: blocks.to_vec(), placed });
+        Output { events: vec![Timed::new(t, EventBody::ActionStarted { action, participant: participant.into(), position: pos, starts, done, free })] }
     }
 
     /// An act done: applied now, as a whole (or refused), and its outcome delivered at the actor's next observation.
-    fn act(&mut self, action: Id, participant: &str, position: Option<&str>, blocks: &[Block]) -> Output {
+    fn act(&mut self, action: Id, participant: &str, position: Option<&str>, blocks: &[Block], placed: crate::state::Placed) -> Output {
         let t = self.state.t;
+        let mut late_shares: BTreeMap<Id, i64> = BTreeMap::new();
         let result = if !can_act(&self.state.participants[participant]) {
             Err(refuse(RefusalCode::ParticipantInactive, format!("{participant} no longer acts")))
+        } else if let Some(d) = placed.over.clone() {
+            let i = blocks.iter().position(|b| matches!(b, Block::Work { .. }));
+            Err(Refusal { block: i, ..refuse(RefusalCode::NoTimeLeft, d) })
         } else {
             let mut scratch = self.state.clone();
-            exec_action(&self.s, &mut scratch, participant, position, blocks).map(|res| (scratch, res))
+            let done = crate::exec::exec_action_seen(&self.s, &mut scratch, participant, position, blocks, Some(&placed.seen)).map(|res| (scratch, res));
+            match done {
+                // (Work the dry run could not place when the act began is placed now: the hours are counted on the day, and
+                // are the performers' from now. Nobody does more than a day's work for having been asked in a way that
+                // could not be checked.)
+                Ok((scratch, res)) if placed.late => {
+                    late_shares = work_shares(&res.events);
+                    match self.over_the_day(&late_shares, crate::exec::day_of(t)) {
+                        Some(d) => {
+                            late_shares.clear();
+                            Err(Refusal { block: blocks.iter().position(|b| matches!(b, Block::Work { .. })), ..refuse(RefusalCode::NoTimeLeft, d) })
+                        }
+                        None => Ok((scratch, res)),
+                    }
+                }
+                other => other,
+            }
         };
+        // (Hours given back for work that was not done: they were not worked, so they do not count against the day.)
+        if result.is_err() {
+            for (who, secs) in &placed.hours {
+                if let Some(tl) = self.state.timelines.get_mut(who) {
+                    if tl.worked.is_some_and(|(d, _)| d == placed.day) {
+                        tl.worked = Some((placed.day, (tl.worked_on(placed.day) - secs).max(0)));
+                    }
+                }
+            }
+        }
         let pos = position.map(String::from);
         let (events, outcome) = match result {
             Ok((scratch, res)) => {
                 self.state = scratch;
+                let day = crate::exec::day_of(t);
+                for (who, secs) in &late_shares {
+                    let mut tl = self.state.timelines.get(who).cloned().unwrap_or_default();
+                    oikos_time::place(&mut tl.lanes, 1, t, *secs);
+                    tl.worked = Some((day, tl.worked_on(day) + secs));
+                    self.state.timelines.insert(who.clone(), tl);
+                }
                 let created = (!res.created.is_empty()).then_some(res.created);
                 let mut events = vec![Timed::new(t, EventBody::ActionApplied { action: action.clone(), participant: participant.into(), position: pos.clone(), created: created.clone() })];
                 events.extend(res.events);
@@ -797,7 +918,7 @@ impl World {
             let item = self.state.schedule.pop_first().unwrap();
             self.state.t = item.at;
             match item.what {
-                crate::state::Sched::Act { action, participant, position, blocks } => events.extend(self.act(action, &participant, position.as_deref(), &blocks).events),
+                crate::state::Sched::Act { action, participant, position, blocks, placed } => events.extend(self.act(action, &participant, position.as_deref(), &blocks, placed).events),
                 _ => events.extend(scheduled(&self.s, &mut self.state, item)),
             }
         }
@@ -881,4 +1002,22 @@ impl World {
 pub fn known_field(f: &str) -> bool {
     matches!(f, "id" | "record" | "kind" | "at" | "author" | "speaks_for" | "basis" | "claim" | "holder")
         || f.strip_prefix("data.").or_else(|| f.strip_prefix("about.")).is_some_and(|p| !p.is_empty() && p.split('.').all(|x| !x.is_empty()))
+}
+
+/// Each performer's hours in the work an act did (one `Worked` event each, a share a performer: the labour split
+/// between them, rounded up).
+fn work_shares(events: &[Timed]) -> BTreeMap<Id, i64> {
+    let mut out: BTreeMap<Id, i64> = BTreeMap::new();
+    for e in events {
+        if let EventBody::Worked { performers, labour, .. } = &e.event.body {
+            if performers.is_empty() || *labour <= 0 {
+                continue;
+            }
+            let share = (labour + performers.len() as i64 - 1) / performers.len() as i64;
+            for p in performers {
+                *out.entry(p.clone()).or_insert(0) += share;
+            }
+        }
+    }
+    out
 }

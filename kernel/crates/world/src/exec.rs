@@ -51,6 +51,9 @@ pub struct Exec<'a> {
     /// A survey's estimates, for the actor alone (nature).
     pub surveyed: Option<Value>,
     pub investigated: Option<Value>,
+    /// Who was where a work was ordered, by what it is on (a person, or a space): a work takes the crew's hours, so it
+    /// takes effect hours after it was ordered, and those it is worked on are those who were there then (F1).
+    pub seen: Option<&'a BTreeMap<Id, Vec<Id>>>,
     /// The buildings worked on by people sent to them, in the order first worked on (what they see is made when the
     /// act is done).
     pub worked_on: Vec<Id>,
@@ -77,6 +80,11 @@ pub fn can_act(p: &Participant) -> bool {
 /// Apply `blocks` for `participant` (in `position`, or as itself) to `st`. On error, `st` is left
 /// partly modified and must be discarded.
 pub fn exec_action(s: &Statics, st: &mut State, participant: &str, position: Option<&str>, blocks: &[Block]) -> R<ExecResult> {
+    exec_action_seen(s, st, participant, position, blocks, None)
+}
+
+/// `exec_action`, for an act whose work was ordered earlier: `seen` says who was where when it was.
+pub fn exec_action_seen(s: &Statics, st: &mut State, participant: &str, position: Option<&str>, blocks: &[Block], seen: Option<&BTreeMap<Id, Vec<Id>>>) -> R<ExecResult> {
     let p = st.participants.get(participant).ok_or_else(|| refuse(RefusalCode::UnknownParticipant, format!("no participant {participant}")))?;
     if !can_act(p) {
         return Err(refuse(RefusalCode::ParticipantInactive, format!("{participant} no longer acts")));
@@ -91,7 +99,7 @@ pub fn exec_action(s: &Statics, st: &mut State, participant: &str, position: Opt
         }
         None => p.person.clone().ok_or_else(|| refuse(RefusalCode::NotInPosition, format!("{participant} is a system: it acts only in a position")))?,
     };
-    let mut ex = Exec { s, st, participant, position, entity, refs: BTreeMap::new(), events: vec![], surveyed: None, investigated: None, worked_on: vec![] };
+    let mut ex = Exec { s, st, participant, position, entity, refs: BTreeMap::new(), events: vec![], surveyed: None, investigated: None, seen, worked_on: vec![] };
     for (i, b) in blocks.iter().enumerate() {
         ex.block(b, i).map_err(|mut r| {
             r.block.get_or_insert(i);
@@ -897,15 +905,13 @@ impl<'a> Exec<'a> {
                 total = ((total as i128 * factor + 9_999) / 10_000).max(1) as i64;
             }
         }
-        let today = day_of(self.now());
+        // (How much of a performer's working day is left is read where the work is placed: on their timeline, when the act
+        // begins. Here a work is refused only if it is longer than a day, or the world has no day.)
         let share = if who.is_empty() { 0 } else { (total + who.len() as i64 - 1) / who.len() as i64 };
         if total > 0 {
             let day = self.s.config.catalogue.working_day.ok_or_else(|| refuse(RefusalCode::NotModelled, "this world has no working day: work that takes time isn't modelled"))?;
-            for p in &who {
-                let used = self.st.labour_used.get(p).filter(|(d, _)| *d == today).map_or(0, |(_, u)| *u);
-                if used + share > day {
-                    return Err(refuse(RefusalCode::NoTimeLeft, format!("{p} has {} s of work left today; this needs {share}", (day - used).max(0))));
-                }
+            if share > day {
+                return Err(refuse(RefusalCode::NoTimeLeft, format!("{} has {day} s of work left today; this needs {share}", who[0])));
             }
         }
         // What's used up must be here, held by the actor.
@@ -956,7 +962,8 @@ impl<'a> Exec<'a> {
         let bodies: Option<Vec<Id>> = match &on {
             Some(o) if self.st.body(o).is_some() => {
                 self.living_present(o)?;
-                if !self.st.occupancy.get(&at).is_some_and(|m| m.values().any(|b| b.contains(o))) {
+                let was_there = self.seen.is_some_and(|m| m.get(o).is_some_and(|v| v.contains(o)));
+                if !was_there && !self.st.occupancy.get(&at).is_some_and(|m| m.values().any(|b| b.contains(o))) {
                     return Err(refuse(RefusalCode::NotPresent, format!("{o} isn't at {at}")));
                 }
                 Some(vec![o.clone()])
@@ -966,7 +973,11 @@ impl<'a> Exec<'a> {
                 if self.s.space(&self.st.structures[&at].structure_type, local).is_none() {
                     return Err(refuse(RefusalCode::UnknownSpace, format!("{at} has no space {local}")));
                 }
-                Some(self.st.occupancy.get(&at).and_then(|m| m.get(o)).map_or(vec![], |b| b.iter().filter(|x| !who.contains(x)).cloned().collect()))
+                Some(match self.seen.and_then(|m| m.get(o)) {
+                    // (Those who were there when it was ordered, if they still are in the world.)
+                    Some(v) => v.iter().filter(|x| !who.contains(x) && self.living_present(x).is_ok()).cloned().collect(),
+                    None => self.st.occupancy.get(&at).and_then(|m| m.get(o)).map_or(vec![], |b| b.iter().filter(|x| !who.contains(x)).cloned().collect()),
+                })
             }
             _ => None,
         };
@@ -987,10 +998,6 @@ impl<'a> Exec<'a> {
             }
         }
         // Done: time spent, inputs used, outputs made, changes applied, progress made.
-        for p in &who {
-            let used = self.st.labour_used.get(p).filter(|(d, _)| *d == today).map_or(0, |(_, u)| *u);
-            self.st.labour_used.insert(p.clone(), (today, used + share));
-        }
         let c = self.st.stamp();
         if let Some(x) = &spec {
             for (k, per) in &x.consumes {

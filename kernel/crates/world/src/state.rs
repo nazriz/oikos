@@ -34,9 +34,6 @@ pub struct State {
     /// Holdings of resources (phase B), keyed `holder|at|kind` (holding_key): who holds how much of what, where.
     #[serde(default)]
     pub holdings: Map<String, Holding>,
-    /// Work time each person has used on a day (phase B): person -> (day, seconds).
-    #[serde(default)]
-    pub labour_used: Map<Id, (i64, i64)>,
     /// Accounts that have been closed, kept so those who keep or hold them perceive the closure.
     pub closed_accounts: Map<Id, ClosedAccount>,
     pub cells: Map<Id, Cell>,
@@ -85,7 +82,7 @@ pub struct State {
     /// Each actor's timeline (docs/design/rebuild.md 6.3): when each of its lanes is next free. A person's is keyed by
     /// their body, shared by every participant and capacity acting as them; a system's by the participant.
     #[serde(default, skip_serializing_if = "Map::is_empty")]
-    pub timelines: Map<Id, Vec<i64>>,
+    pub timelines: Map<Id, Timeline>,
     /// Nature (docs/design/world-expansion.md 2): fields, populations, extinctions, covers' succession. Changed once a
     /// day, so kept behind an `Arc`: an action's copy of the state shares it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -581,6 +578,65 @@ pub struct Scheduled {
     pub what: Sched,
 }
 
+/// One actor's account of time (docs/design/foundations.md law 1; step F1): when each of its lanes is next free, and,
+/// for a body that works, how much of its working day (`catalogue.working_day`) has been placed on that day. There is
+/// no other ledger: work is placed on the timeline of every performer, and the day's limit is read where it is placed.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Timeline {
+    pub lanes: Vec<i64>,
+    /// (day, seconds of work placed on it), for a body that has worked.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub worked: Option<(i64, i64)>,
+}
+
+/// What an act's `work` took of its performers' time when the act began: the day it was counted on and the seconds of
+/// each performer's (given back if the act is refused when done: time not worked is not counted against the day), or
+/// the performer whose working day had no room for it (the act is then refused for that).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Placed {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub over: Option<String>,
+    #[serde(default)]
+    pub day: i64,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub hours: BTreeMap<Id, i64>,
+    /// Who was where when the work was ordered (see `Exec::seen`): what it is on -> the bodies there.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub seen: BTreeMap<Id, Vec<Id>>,
+    /// The work could not be checked when the act began (a dry run refused it, say for someone not there yet): it is
+    /// placed when the act takes effect.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub late: bool,
+}
+
+impl Placed {
+    pub fn is_empty(&self) -> bool {
+        self.over.is_none() && self.hours.is_empty() && self.seen.is_empty() && !self.late
+    }
+}
+
+impl Timeline {
+    /// Seconds of work already placed on this day.
+    pub fn worked_on(&self, day: i64) -> i64 {
+        self.worked.filter(|(d, _)| *d == day).map_or(0, |(_, s)| s)
+    }
+}
+
+impl std::ops::Deref for Timeline {
+    type Target = Vec<i64>;
+    fn deref(&self) -> &Vec<i64> {
+        &self.lanes
+    }
+}
+
+impl<'a> IntoIterator for &'a Timeline {
+    type Item = &'a i64;
+    type IntoIter = std::slice::Iter<'a, i64>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.lanes.iter()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Sched {
@@ -607,6 +663,9 @@ pub enum Sched {
         #[serde(default, rename = "as", skip_serializing_if = "Option::is_none")]
         position: Option<Id>,
         blocks: Vec<crate::blocks::Block>,
+        /// How the act's work was placed on its performers' timelines (nothing, for an act with no work).
+        #[serde(default, skip_serializing_if = "Placed::is_empty")]
+        placed: Placed,
     },
     /// A visit in progress (docs/design/knowing.md): when it ends its looker sees what is at these cells.
     Visit {

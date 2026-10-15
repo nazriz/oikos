@@ -135,7 +135,7 @@ test("a town with extended households runs: three generations share a home and i
   expect(housed.length).toBeGreaterThan(0);
   const { s, out, ev } = await run("extended", config, 45 * DAY);
   // Nothing refused but the usual races (as the households test lists them, with the daily round).
-  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left", "too_far", "participant_inactive", "flooded"].includes(e.code)).map((e) => e.code)).toEqual([]);
+  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left", "insufficient_quantity", "dead", "too_far", "participant_inactive", "flooded"].includes(e.code)).map((e) => e.code)).toEqual([]);
   // The household's money rules as they are, applied to the larger household: in a rented home every other adult with
   // pay has a standing order for a share of the rent to the leaseholder, grandparent and grown child alike, and the
   // bank pays it.

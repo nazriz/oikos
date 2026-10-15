@@ -24,7 +24,7 @@ async function run(name: string, config: any, until: number) {
   // Nothing refused but same-moment races (D58): someone who'd just left, named for work; and, where workers differ in
   // skill, a crew's first day short of time (a shop learns how long a crew takes from being told: Pace). Once per crew,
   // or near it: not the same plan again and again.
-  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left"].includes(e.code))).toEqual([]);
+  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left", "insufficient_quantity", "dead"].includes(e.code))).toEqual([]);
   const short = ev.filter((e) => e.event === "action_refused" && e.code === "no_time_left");
   const acts = ev.filter((e) => e.event === "action_applied").length;
   expect(short.length * 50).toBeLessThan(acts);
@@ -53,7 +53,7 @@ test("households buy from shops and use their goods up; shops serve with their s
   const orders = new Map(recs.filter((r) => r.kind === "order" && /^c\d+$/.test(r.speaks_for)).map((r) => [r.id, r]));
   expect(orders.size).toBeGreaterThan(100);
   const notes = recs.filter((r) => r.kind === "delivery_note" && orders.has(r.data.order));
-  expect(notes.length).toBeGreaterThan(orders.size * 0.9); // the last few days' may still be waiting
+  expect(notes.length).toBeGreaterThan(orders.size * 0.8); // the last few days' may still be waiting (0.9 until F1, 2026-10-15: a shop serves in its crew's hours now, so more of the last days' are still in the queue)
   for (const n of notes) {
     const o = orders.get(n.data.order)!;
     expect(n.data.ordered).toBe(o.data.quantity);

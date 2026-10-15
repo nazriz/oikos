@@ -75,7 +75,7 @@ test("households live, move and pay together", async () => {
   // the town as drawn with homes by income, where it had not happened to fall on anyone's way before.)
   // (And, since 2026-10-12, a conception whose partner had left the room in the hour the act takes: a birth is decided
   // with the partner there and done an hour later. Rare: a draw named for the day came to fall on one such moment.)
-  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left", "already_present", "flooded", "too_far"].includes(e.code))).toEqual([]);
+  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left", "insufficient_quantity", "dead", "already_present", "flooded", "too_far"].includes(e.code))).toEqual([]);
   expect(ev.filter((e) => e.event === "action_refused" && e.code === "too_far").length).toBeLessThanOrEqual(3);
 }, 300_000);
 
@@ -114,5 +114,5 @@ test("a child born here is brought home by the parent who bore them and added to
   // already lives in: whoever signs it, out at the time, moves the children "in", and one is at home already.)
   const arrivedMeanwhile = (e: any) => { const m = e.code === "already_present" ? /^(\S+) is already in (\S+)$/.exec(e.detail ?? "") : null;
     return !!m && (`${m[1]}-self` !== e.participant || ev.some((x) => x.event === "occupied" && x.occupant === m[1] && x.space === m[2] && x.t <= e.t && x.t >= e.t - 3600)); };
-  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left", "too_far", "participant_inactive", "flooded"].includes(e.code) && !arrivedMeanwhile(e))).toEqual([]);
+  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left", "insufficient_quantity", "dead", "too_far", "participant_inactive", "flooded"].includes(e.code) && !arrivedMeanwhile(e))).toEqual([]);
 }, 300_000);

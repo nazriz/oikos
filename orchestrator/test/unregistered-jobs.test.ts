@@ -74,7 +74,9 @@ test("an unregistered job is paid whole and reported to nobody; a registered one
   // Wages: an unregistered job's order pays the wage agreed, whole; a registered one's, less what the law withholds.
   const eas = recs.filter((r) => r.kind === "enterprise_agreement");
   let whole = 0, net = 0;
-  for (const o of wageOrders) {
+  // (An employer that cut the hours of a job pays what the hours come to, not the agreement's wage: left out.)
+  const cut = new Set(recs.filter((r) => r.kind === "hours_notice").map((r) => r.basis));
+  for (const o of wageOrders.filter((x) => !cut.has(x.basis))) {
     const a = jobs.get(o.basis);
     const pays = a.terms.commitments.find((c: any) => c.who === employerOf(a));
     let gross = Number(pays.does.outcome.money.amount);
