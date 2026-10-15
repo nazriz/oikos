@@ -1016,3 +1016,10 @@ impl std::fmt::Debug for GroundCache {
         write!(f, "GroundCache(epoch {})", self.epoch)
     }
 }
+
+/// The key of one capacity's queue of transactions on one entity's accounts (`Participant::new_transactions`): a capacity is "self"
+/// or a position the participant holds, and each has its own queue, so that a person who holds two posts of one organisation is
+/// told of a payment in each (foundations F6).
+pub fn transactions_key(capacity: &str, entity: &str) -> String {
+    format!("{capacity}|{entity}")
+}

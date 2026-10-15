@@ -552,3 +552,27 @@ fn law5_a_record_names_who_made_it_when_not_its_author() {
     assert_eq!(by_of(&mut run, &publish(&["carol"])), Some(vec!["carol".to_string()]));
     assert_eq!(by_of(&mut run, &publish(&[])), None, "the author did it: nothing to add");
 }
+
+/// A person who holds two posts of one organisation is told of a payment through each: the first to look does not take
+/// it from the other (F6: a body's payroll officer and its other office, held by the same member of staff, were told
+/// in turn, and the payroll never heard of the wages it had paid, so never paid over the tax withheld).
+#[test]
+fn a_person_holding_two_posts_of_one_organisation_is_told_of_a_payment_in_each() {
+    let mut c = world(&default_params());
+    for id in ["devco-office", "devco-payroll"] {
+        c["positions"].as_array_mut().unwrap().push(json!({"id": id, "entity": "devco", "title": id, "channels": [{"id": "money", "kind": "accounts"}], "role_module": {"code": "test"}, "holder": "bob-self"}));
+    }
+    let mut run = start(c);
+    let pay = cmd("carol-self", None, json!([{"block": "transfer", "from": "acc-carol", "to": "acc-devco", "amount": "5"}]));
+    applied(&mut run, &pay);
+    let told = |run: &mut R, post: &str| -> usize {
+        let o = run.command(&Command::Observe { participant: "bob-self".into(), only: Some(post.into()) }).unwrap().observation.unwrap();
+        match o.channels.get(&format!("{post}/money")) {
+            Some(oikos_kernel::observe::ChannelData::Accounts { transactions, .. }) => transactions.len(),
+            other => panic!("no accounts channel: {other:?}"),
+        }
+    };
+    assert_eq!(told(&mut run, "devco-office"), 1, "the office is told");
+    assert_eq!(told(&mut run, "devco-payroll"), 1, "and so is the payroll, after the office has looked");
+    assert_eq!(told(&mut run, "devco-office"), 0, "told once");
+}

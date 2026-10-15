@@ -16,7 +16,7 @@ use crate::canon::MAX_SAFE;
 use crate::money::{Money, MAX_MONEY};
 use crate::config::{check_channels, footprint_cells, split_space, Channel, ParticipantKind, Severity, BOUNDARY, PERSON, SELF};
 use crate::events::{EndReason, EventBody, RefusalCode, Timed, TransferReason, VacateReason};
-use crate::state::{
+use crate::state::{transactions_key, 
     Account, Body, Condition, ConditionKind, DeathCause, Entity, Message, Participant, ParticipantDef, ParticipantStatus, Position, Sched,
     Scheduled, Sex, State, Structure, Transaction,
 };
@@ -1417,16 +1417,18 @@ impl<'a> Exec<'a> {
         let mut told: BTreeSet<(Id, Id)> = BTreeSet::new();
         for e in concerned {
             // Only those who'd see it: a capacity with an accounts channel (others never look through one, and their
-            // queue would grow for ever: the whole state with it).
+            // queue would grow for ever: the whole state with it). Each capacity has a queue of its own: a person who
+            // holds two posts of one organisation (a manager and a payroll officer) is told of a payment in each, and
+            // the first to look does not take it from the other (foundations F6).
             for (p, cap) in self.st.acting_for(e) {
                 if self.st.sees_accounts(&p, &cap) {
-                    told.insert((p, e.to_string()));
+                    told.insert((p, transactions_key(&cap, e)));
                 }
             }
         }
-        for (p, e) in told {
+        for (p, key) in told {
             if let Some(x) = self.st.participants.get_mut(&p) {
-                Arc::make_mut(x).new_transactions.entry(e).or_default().push_back(tx.clone());
+                Arc::make_mut(x).new_transactions.entry(key).or_default().push_back(tx.clone());
             }
         }
         self.emit(EventBody::Transfer {
