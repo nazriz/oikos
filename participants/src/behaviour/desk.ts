@@ -32,8 +32,6 @@ export interface HearingParams {
   hears: Hears[];
   /** The other side's time to answer. */
   answer_days: number;
-  /** How many cases its staff can decide in a working day (their hours over the hours a case takes). */
-  cases_per_day: number;
   /** Where the record cannot settle it (one side's word against the other's): how often it finds for the applicant,
    * by matter (`other` for the rest). The profile's, where a venue's own figures give it. */
   uphold_bps: { [matter: string]: number };
@@ -49,7 +47,7 @@ export interface HearingParams {
      * a plan is taken away once so many months' rent are owed. */
     notice_days?: number; plan_consider?: "may" | "must" | "none"; plan_barred_rent_months?: number };
 }
-export const HEARING_DEFAULTS: HearingParams = { hears: [], answer_days: 14, cases_per_day: 4, uphold_bps: { other: 5_000 }, within_days: 28, refer_to: {} };
+export const HEARING_DEFAULTS: HearingParams = { hears: [], answer_days: 14, uphold_bps: { other: 5_000 }, within_days: 28, refer_to: {} };
 
 /** The offer a venue publishes: who it is, what it hears, what applying costs. */
 export function hearingOffer(me: string, hears: Hears[], o: { fee?: number; account?: string; members_of?: string } = {}): Offer {
@@ -200,7 +198,9 @@ export class Hearings {
     // ---- deciding: those whose time to answer has run, oldest first, as far as the day's hours go ----
     // (An application its maker has withdrawn is no longer a case: nothing is decided on it.)
     for (const c of [...this.cases.values()]) if (book.withdrawn.has(c.id)) { this.cases.delete(c.id); this.count("withdrawn"); }
-    let room = canDecide ?? Math.max(1, Math.floor(this.p.cases_per_day));
+    // (How many it gets through is the hours of whoever decides, not a number: each decision is an act that takes its maker's time, and the
+    // ones behind it wait (foundations F6). A seat's own room, where it is given one, is its day's hours.)
+    let room = canDecide ?? Infinity;
     // (The member decides a case on or after its day, and its books count the day from its first hour: a member who
     // sits in the morning decides what that day's list has. A whole office run by code decides at the hour, as before.)
     const ripe = (x: Case) => (part === "decide" ? Math.floor(x.answerBy / DAY) <= Math.floor(t / DAY) : t >= x.answerBy);
@@ -325,7 +325,6 @@ export const desk: BehaviourModule = {
       title: "desk", // what it calls itself in its notice
       hears: [] as Hears[],
       answer_days: HEARING_DEFAULTS.answer_days,
-      cases_per_day: HEARING_DEFAULTS.cases_per_day,
       uphold_bps: HEARING_DEFAULTS.uphold_bps,
       within_days: HEARING_DEFAULTS.within_days,
       refer_to: {} as HearingParams["refer_to"],
@@ -341,7 +340,7 @@ export const desk: BehaviourModule = {
     const counter = new CounterWork(routines, !!p.counter);
     const me = ctx.entity;
     const book = new Book();
-    const hearings = new Hearings(me, ctx.rng, { hears: p.hears, answer_days: p.answer_days, cases_per_day: p.cases_per_day, uphold_bps: { ...HEARING_DEFAULTS.uphold_bps, ...p.uphold_bps }, within_days: p.within_days, refer_to: p.refer_to });
+    const hearings = new Hearings(me, ctx.rng, { hears: p.hears, answer_days: p.answer_days, uphold_bps: { ...HEARING_DEFAULTS.uphold_bps, ...p.uphold_bps }, within_days: p.within_days, refer_to: p.refer_to });
     let said = false;
     return noting(book, stepper(
       (obs) => void book.absorb(obs),

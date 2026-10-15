@@ -2237,7 +2237,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       // (And possession of a let home for arrears, where the place's law has it: heard in any town, living or not.)
       ...(POSS ? { possession: { days: POSS.possession_days, plan_months: POSS.plan_months, notice_days: POSS.notice_days, ...planLaw(POSS) }, ...(FR ? {} : { hears: [{ about: "possession", can: ["order"] }] }) } : {}),
       ...(FR ? { hears: [{ about: "disrepair", can: ["order"] }, { about: "underpaid", can: ["order"] }, { about: "goods", can: ["order"] }, { about: "bill", can: ["order"] }, { about: "arrears", can: ["order"] }, { about: "claim_refused", can: ["order"], undoes: true }, ...(POSS ? [{ about: "possession", can: ["order"] }] : [])],
-        cases_per_day: FR.venues.cases_per_day, uphold_bps: { other: FR.venues.uphold_without_proof_bps }, fee: Math.round((wages.shop * FR.venues.tribunal_fee_hours_of_pay * 7) / (PAY / DAY) / V.ordinary_hours_per_week), account: "acc-outside" } : {}) }));
+        uphold_bps: { other: FR.venues.uphold_without_proof_bps }, fee: Math.round((wages.shop * FR.venues.tribunal_fee_hours_of_pay * 7) / (PAY / DAY) / V.ordinary_hours_per_week), account: "acc-outside" } : {}) }));
     office("tribunal-registrar", "tribunal", "Principal registrar", "registrar", [mine("tribunal-business")], code("tribunal.registrar", { banks: ["bank"], ...(POSS ? { enforcer: "police", warrant_days: POSS.warrant_days, eviction_notice_days: POSS.eviction_notice_days } : {}) }));
   }
   // The utilities (world-expansion 6.1): the water corporation draws the town's water from the river and bills owners;
@@ -2742,7 +2742,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     }
     // (And a shop founded in the run, as the shops the town began with.)
     Object.assign(shopVenture.role_module.params, { respond, short_pay: { per_year_bps: perJob, by_bps: FR.pay_short_by_bps } });
-    const hearing = { answer_days: FR.venues.answer_days, cases_per_day: FR.venues.cases_per_day, uphold_bps: { other: FR.venues.uphold_without_proof_bps } };
+    const hearing = { answer_days: FR.venues.answer_days, uphold_bps: { other: FR.venues.uphold_without_proof_bps } };
     office("ombudsman-officer", "ombudsman", "Ombudsman's officer", "officer", [mine("ombudsman-business"), lawBook],
       code("office.desk", { title: "ombudsman", ...hearing, hears: [{ about: "bill", can: ["recommend"] }, { about: "claim_refused", can: ["recommend"], undoes: true }] }));
     office("consumer-officer", "consumer-desk", "Conciliation officer", "officer", [mine("consumer-business"), lawBook],
