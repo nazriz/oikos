@@ -216,3 +216,7 @@ Done as docs/decisions.md 2026-10-15 ("step 2") says: 787 examples from lv-01 to
 ### Step 3 (2026-10-15, Sonnet 5.5, Haiku 5.5; Codex's window was shut)
 
 Done as docs/decisions.md 2026-10-15 ("step 3") says: 2,075 generated examples kept (1,767 to train, 308 held back as per-form tests), the part from code participants' calls from a 120-day code-only run of the lv-06 town, Haiku's reading of step 2's 377 written examples (321 stand), practice and offer left out of the model, three forms with a field `to` found unusable. Spend 77.09 of 80 USD. `step3/JOIN.json` says what step 4 joins.
+
+### Step 4 (2026-10-15, no model called; GPU about 5.2 USD)
+
+Done as docs/decisions.md 2026-10-15 ("step 4") says: `joined-14` (61,278 train rows), the leak check (0 left), batch 1 on RunPod (`pod-small-r3-s1`, `pod-small-r3-long-s1`, `-s2`), scored here. `pod-small-r3-long-s1` is 155 right / 8 wrong drafts on the 180 real, held out 53. Stop rules: none for 153 / 12 fired; wrong drafts on the new real set above 2% fired for all three runs; the 3 s timing did not; fewer than half of the new forms with 8 cases passing fired (only `rent_reminder`). Folder `runs/translator-round-3-2026-10-14/step4/`.
