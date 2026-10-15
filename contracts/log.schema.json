@@ -452,6 +452,11 @@
               "$ref": "urn:oikos:contracts:0.8:common#/$defs/SimTime"
             },
             "done": {
+              "description": "When the act takes effect: when its actor and every performer it names have done their part.",
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/SimTime"
+            },
+            "free": {
+              "description": "When the actor itself is free again, where that is before `done` (the act's work is done by others, on their own timelines, and takes longer than the actor's part). Absent: at `done`. Foundations step F1, 2026-10-15.",
               "$ref": "urn:oikos:contracts:0.8:common#/$defs/SimTime"
             }
           }

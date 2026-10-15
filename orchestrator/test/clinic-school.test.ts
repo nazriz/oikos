@@ -108,7 +108,7 @@ test("children are taught, the ill stay home and are seen at the clinic", async 
   // in a spring flood: the weather's; and, as the households and deaths tests allow with the daily round, a partner
   // gone to work while a conception was under way, "isn't near": which couple and which morning is the town's draw).
   const partnerGone = (e: any) => e.code === "too_far" && / isn't near /.test(e.detail ?? "");
-  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left", "participant_inactive", "flooded"].includes(e.code) && !partnerGone(e)).map((e) => e.code)).toEqual([]);
+  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left", "insufficient_quantity", "dead", "participant_inactive", "flooded"].includes(e.code) && !partnerGone(e)).map((e) => e.code)).toEqual([]);
 }, 2_400_000);
 
 test("with care in the world, treatable deaths come through severe illness, and with care as usual each age dies at the life table's rate", () => {

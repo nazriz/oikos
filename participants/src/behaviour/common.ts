@@ -1031,6 +1031,15 @@ export type Step = (C.Call | [string, C.Call])[] & { why?: string; then?: (o: Ac
  * share, so a team's hours are its size times the least time any of them has left today). Someone who's already done
  * a day's work elsewhere (a new starter, arriving from their old job) joins tomorrow.
  */
+/** Records in the order they were filed: `rec.9` before `rec.10` (a string comparison puts `rec.1000` before `rec.999`, so the
+ * order of two papers turned on how many records the town had made, and a town and its twin with a few more papers of
+ * no effect parted over it: traced at F1, 2026-10-15). Ids that are not `<name>.<n>` fall back to the text. */
+export function filedBefore(a: { id: string }, b: { id: string }): number {
+  const x = /^(.*?)(\d+)$/.exec(a.id), y = /^(.*?)(\d+)$/.exec(b.id);
+  if (x && y && x[1] === y[1]) return Number(x[2]) - Number(y[2]);
+  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+}
+
 export function team(here: string[], hoursLeft: (w: string) => number): { who: string[]; each: number } {
   const byHours = [...here].sort((a, b) => hoursLeft(b) - hoursLeft(a) || (a < b ? -1 : 1));
   let best = { who: [] as string[], each: 0 };

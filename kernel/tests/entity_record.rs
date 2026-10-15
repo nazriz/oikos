@@ -208,13 +208,13 @@ fn an_organisation_has_at_most_one_keeping_post_and_it_needs_a_module() {
 
 #[test]
 fn a_config_with_none_of_the_new_fields_stands_as_before() {
-    // The initial state hash of this fixture, computed by the code before record_keeper, keeps_record and dials existed.
+    // The initial state hash of this fixture, computed by the code before record_keeper, keeps_record and dials existed (re-taken at F1, 2026-10-15: the state no longer carries the empty `labour_used` map; was 96ac081a...).
     let run = Run::start(riverbend(), "record", Vec::new(), None).unwrap();
-    assert_eq!(run.kernel().state_hash().unwrap(), "96ac081ad9d1d5283cb6f7deace0b8290e118d8d66b840414e988cd343fb1fbe");
+    assert_eq!(run.kernel().state_hash().unwrap(), "9b57ede695d19fa96791a5d426e56c0a67f8adf4a8f44ceb6429be38866d142f");
     // The new fields change nothing the kernel hashes of the world, and dials are opaque to it.
     let mut cfg = riverbend();
     cfg["dials"] = json!({"initiative_bps": 2500, "other": [1, 2]});
     position_mut(&mut cfg, "finance")["keeps_record"] = json!(true);
     let run2 = Run::start(cfg, "record", Vec::new(), None).unwrap();
-    assert_eq!(run2.kernel().state_hash().unwrap(), "96ac081ad9d1d5283cb6f7deace0b8290e118d8d66b840414e988cd343fb1fbe");
+    assert_eq!(run2.kernel().state_hash().unwrap(), "9b57ede695d19fa96791a5d426e56c0a67f8adf4a8f44ceb6429be38866d142f");
 }

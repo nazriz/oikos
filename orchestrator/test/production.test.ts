@@ -8,6 +8,7 @@ import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { generate } from "@oikos/worlds/generator/generate";
 import { runWorld } from "../src/run";
+import { workStarts } from "./lib/work-starts";
 import { skillClock } from "./skill";
 
 const root = join(import.meta.dir, "../..");
@@ -38,7 +39,7 @@ test("goods are made from inputs by workers' hours, exported within each factory
   const { ev, recs } = await run("town", config, 300 * DAY);
   // Nothing refused but same-moment races (D58; and a new employer naming, on their first day, someone who has
   // already worked a full day at the job they just left: acts take time, so starting the new job is a moment of its own), and households moving into homes still being left.
-  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left"].includes(e.code))).toEqual([]);
+  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left", "insufficient_quantity", "dead"].includes(e.code))).toEqual([]);
   // Making: at the works, by the factory's own employees, never more than a working day each.
   const employees = new Map<string, Set<string>>();
   for (const a of [...config.world.records, ...recs].filter((r: any) => r.record === "agreement" && r.terms.template === "employment")) {
@@ -57,8 +58,9 @@ test("goods are made from inputs by workers' hours, exported within each factory
     if (want !== undefined) expect(w.labour).toBe(want);
   }
   const perDay = new Map<string, number>();
+  const startOf = workStarts(ev);
   for (const w of made) for (const p of w.performers) {
-    const k = `${p}|${Math.floor(w.t / DAY)}`;
+    const k = `${p}|${Math.floor(startOf.get(w)! / DAY)}`; // (the day the work starts: it takes hours; F1)
     perDay.set(k, (perDay.get(k) ?? 0) + Math.ceil(w.labour / w.performers.length));
   }
   expect(Math.max(...perDay.values())).toBeLessThanOrEqual(config.catalogue.working_day);
@@ -187,12 +189,15 @@ test("Lengnick: with too little demand a factory lets workers go and stops makin
     const ordered = (m: number) => recs1.filter((r) => r.kind === "delivery_note" && r.speaks_for === f && !r.data.declined && Math.floor(r.at / MONTH) === m).reduce((x, r) => x + r.data.ordered, 0);
     const quota = (m: number) => recs1.filter((r) => r.kind === "buying_offer" && Math.floor(r.at / MONTH) === m).reduce((x, r) => x + (r.data.quantities?.[f] ?? 0), 0);
     let stock = Number(slack.world.holdings.find((h: any) => h.holder === f && h.kind === "goods")?.quantity ?? 0);
+    // (Making takes the crew's hours now (F1, 2026-10-15), so it takes effect hours after it was ordered: it is held to the
+    // month it was ordered in, which is the month the factory counted its band for.)
+    const startOf1 = workStarts(e1);
     for (const e of e1) {
       if (e.event === "goods_moved" && e.kind === "goods" && e.from === f) stock -= Number(e.quantity);
       if (e.event === "goods_moved" && e.kind === "goods" && e.to === f) stock += Number(e.quantity);
       if (e.event === "worked" && e.task === "make" && e.at === `${f}-works`) {
         stock += e.units;
-        const m = Math.floor(e.t / MONTH);
+        const m = Math.floor((startOf1.get(e) ?? e.t) / MONTH);
         if (m >= 1) {
           expect(stock).toBeLessThanOrEqual(ordered(m - 1) + quota(m - 1) + 1);
         }

@@ -219,7 +219,7 @@ fn predict(run: &Run<Vec<u8>>, participant: &str, position: Option<&str>, b: &Bl
                 let day = s.config.catalogue.working_day.unwrap();
                 let share = (total + performers.len() as i64 - 1) / performers.len() as i64;
                 let today = oikos_kernel::exec::day_of(st.t);
-                if performers.iter().any(|p| st.labour_used.get(p).filter(|(d, _)| *d == today).map_or(0, |(_, u)| *u) + share > day) {
+                if performers.iter().any(|p| st.timelines.get(p).map_or(0, |tl| tl.worked_on(today)) + share > day) {
                     return Some(Err(RefusalCode::NoTimeLeft));
                 }
             }

@@ -128,6 +128,8 @@ export interface Controller {
   /** What it believes about the world when a wake is done, typed, for truth audits (docs/design/rebuild.md 8.2): test
    * and calibration runs check each against the terms' readings. Never used to decide anything. */
   beliefs?(): Belief[];
+  /** The act it just returned reached the world as this action: its outcome, when it comes, names it. */
+  sent?(action: string): void;
 }
 
 /**

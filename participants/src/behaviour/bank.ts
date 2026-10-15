@@ -15,7 +15,7 @@ import { DAY, wait, type BehaviourModule, type ParticipantContext } from "../mod
 import { refusalText } from "../llm/words";
 import * as C from "../calls";
 import { dateWords } from "../forms";
-import { because, Book, callAction, firstDue, Letters, message, pay, PAYEE_DIED, PAYMENT_FAILED, type Step, usd, Asked, whoWrote } from "./common";
+import { because, Book, callAction, firstDue, Letters, message, pay, PAYEE_DIED, PAYMENT_FAILED, type Step, usd, Asked, whoWrote, filedBefore } from "./common";
 
 /** `memo`: what the payer said the payment is for, as the payee's statement narrates it (a bank statement's line). */
 interface Payment { instruction: string; from: string; to: string; amount: number; due: number; settles?: string; memo?: string; line?: string }
@@ -309,7 +309,7 @@ export const bankPaymentSystem: BehaviourModule = {
       }
       for (const r of fresh) look.set(r.id, r);
       for (const [id, x] of lastCall) look.set(id, x.order);
-      const instructions = [...look.values()].sort((a, b) => (a.id < b.id ? -1 : 1));
+      const instructions = [...look.values()].sort(filedBefore);
       const out: Payment[] = [];
       // Deaths registered: the dead person's instructions are no longer carried out (law-succession).
       const deaths = book.all("death_registration");
@@ -437,7 +437,7 @@ export const bankPaymentSystem: BehaviourModule = {
           if (left <= 0) break;
         }
       }
-      out.sort((a, b) => a.due - b.due || (a.instruction < b.instruction ? -1 : 1));
+      out.sort((a, b) => a.due - b.due || filedBefore({ id: a.instruction }, { id: b.instruction }));
       return out;
     };
 
@@ -474,7 +474,7 @@ export const bankPaymentSystem: BehaviourModule = {
       };
       // The writer's own standing instructions, each by its reference (what it is named by to withdraw it or to hold
       // it): from an account of theirs, in their name. Nobody else's.
-      const orders = [...standing.values()].filter((r) => r.speaks_for === holder && ids.has(r.data?.outcome?.money?.from)).sort((a, b) => (a.id < b.id ? -1 : 1));
+      const orders = [...standing.values()].filter((r) => r.speaks_for === holder && ids.has(r.data?.outcome?.money?.from)).sort(filedBefore);
       const order = (r: StatementRecord) => {
         const m = r.data!.outcome.money, every = r.data!.every as number, next = nextDue.get(r.id);
         const on = (holdsOn.get(r.id) ?? []).filter((h) => ended.get(h.hold) === undefined).map((h) => h.hold);

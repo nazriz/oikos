@@ -137,6 +137,10 @@ pub enum EventBody {
         position: Option<Id>,
         starts: i64,
         done: i64,
+        /// When the actor itself is free again, if before `done`: its part of the act is over, but the work it set others
+        /// to takes them longer (foundations F1). Absent: at `done`.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        free: Option<i64>,
     },
     ActionApplied {
         action: Id,

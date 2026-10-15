@@ -271,7 +271,7 @@ impl Scheduler {
         for e in events {
             let news = match e["event"].as_str() {
                 // (Gone to look at somewhere: busy until back, as with an act.)
-                Some("action_started" | "visit_started") => News::Started { participant: e["participant"].as_str().unwrap_or_default(), capacity: e["as"].as_str(), done: e["done"].as_i64().unwrap_or(t) },
+                Some("action_started" | "visit_started") => News::Started { participant: e["participant"].as_str().unwrap_or_default(), capacity: e["as"].as_str(), done: e["free"].as_i64().or(e["done"].as_i64()).unwrap_or(t) },
                 Some("message_delivered") => News::Delivered(e["to"].as_array().into_iter().flatten().filter_map(Value::as_str).collect()),
                 Some("vacated") if e["reason"].as_str() == Some("flooded") => match e["occupant"].as_str() {
                     Some(person) => News::Body(person),
@@ -292,7 +292,8 @@ impl Scheduler {
     pub fn note_events(&mut self, st: Option<&State>, events: &[Event], t: i64) {
         for e in events {
             match &e.body {
-                EventBody::ActionStarted { participant, position, done, .. } | EventBody::VisitStarted { participant, position, done, .. } => self.news(st, News::Started { participant, capacity: position.as_deref(), done: *done }, t),
+                EventBody::ActionStarted { participant, position, done, free, .. } => self.news(st, News::Started { participant, capacity: position.as_deref(), done: free.unwrap_or(*done) }, t),
+                EventBody::VisitStarted { participant, position, done, .. } => self.news(st, News::Started { participant, capacity: position.as_deref(), done: *done }, t),
                 EventBody::MessageDelivered { to, .. } => self.news(st, News::Delivered(to.iter().map(String::as_str).collect()), t),
                 EventBody::Vacated { occupant, reason: VacateReason::Flooded, .. } => self.news(st, News::Body(occupant), t),
                 EventBody::ConditionBegan { person, .. } | EventBody::ConditionEnded { person, .. } | EventBody::ConditionTreated { person, .. } => self.news(st, News::Body(person), t),

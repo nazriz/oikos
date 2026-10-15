@@ -47,14 +47,36 @@ export function stepper(absorb: (obs: Observation) => void, plan: (obs: Observat
   /** A day's work (a step with a `work` call) left undone when the day's over is dropped, not carried: it spent that day's
    * hours. Its `then` hears it wasn't done, as if refused, so the module puts back what it counted on (an order served). */
   const worksToday = (s: Step) => s.some((l) => (Array.isArray(l) ? l[1] : l).fn === "work");
-  let sent: Step | undefined;
+  // (Acts of ours under way, by the action the world made of each. An office that sets a crew to work is free for its next act
+  // before the crew is done, and a refusal comes at once while an earlier act is still under way, so outcomes do not come
+  // in the order the acts were sent: each is matched to its act by name. F1, 2026-10-15.)
+  const underWay = new Map<string, { step: Step; at: number }>();
+  let last: Step | undefined;
+  let lastAt = 0;
+  let hooked = false; // the world tells us the name of each act we send (it does in a run; a test that feeds observations by hand does not)
+  let returned: Step | undefined; // (and then it is the last act's outcome that is the last outcome, as it always was)
   return {
+    sent(action: string) {
+      hooked = true;
+      if (last) underWay.set(action, { step: last, at: lastAt });
+      last = undefined;
+    },
     step(obs: Observation): ParticipantAction {
       const follow: Step[] = carried;
       carried = [];
-      const o = sent ? obs.outcomes.at(-1) : undefined;
-      if (sent?.then && o) follow.push(...(sent.then(o) ?? []));
-      sent = undefined;
+      // (An act that was never heard of again is not under way after days.)
+      for (const [id, x] of underWay) if (obs.t - x.at > 3 * DAY) underWay.delete(id);
+      if (!hooked) {
+        const o = returned ? obs.outcomes.at(-1) : undefined;
+        if (returned?.then && o) follow.push(...(returned.then(o) ?? []));
+      }
+      returned = undefined;
+      for (const o of hooked ? obs.outcomes : []) {
+        const x = underWay.get(o.action);
+        if (!x) continue;
+        underWay.delete(o.action);
+        if (x.step.then) follow.push(...(x.step.then(o) ?? []));
+      }
       absorb(obs);
       // A plan is made when a wake begins; woken because an act of ours is done, we carry on with it (acts take time:
       // docs/design/rebuild.md 6.3), never planning again what's still to do. With nothing left, it's a new moment: we
@@ -83,7 +105,9 @@ export function stepper(absorb: (obs: Observation) => void, plan: (obs: Observat
       if (!next) return wait(until?.(obs));
       // Done later than planned: a step that counts from when it's done is made again for now (a notice's date).
       if (next.redo && next.planned !== undefined && next.planned !== obs.t) next = next.redo(obs.t);
-      sent = next;
+      last = next;
+      returned = next;
+      lastAt = obs.t;
       return callAction(next);
     },
   };
