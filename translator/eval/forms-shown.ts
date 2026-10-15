@@ -46,7 +46,9 @@ for (const dir of runs) {
   const config = configOf(dir);
   const forms = formsOf(config);
   const currency = config.world.currencies?.[0];
-  const dataset = readdirSync(dir).find((f) => f.endsWith(".dataset"));
+  // (`oikos dataset` writes <run>.dataset/, and into a folder given it a <run>.dataset/ of its own: both are read.)
+  let dataset = readdirSync(dir).find((f) => f.endsWith(".dataset"));
+  if (dataset && !existsSync(join(dir, dataset, "translations.jsonl")) && existsSync(join(dir, dataset, dataset, "translations.jsonl"))) dataset = join(dataset, dataset);
   if (!dataset || !existsSync(join(dir, dataset, "translations.jsonl"))) throw new Error(`${dir}: no dataset with translations.jsonl (oikos dataset)`);
   const held = new Map<string, Set<string>>(), acts = new Map<string, string>();
   for (const p of config.positions as any[]) if (p.holder) (held.get(p.holder) ?? held.set(p.holder, new Set()).get(p.holder)!).add(p.id);

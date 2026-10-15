@@ -61,8 +61,12 @@ line: what, the doc, the dial (a dial off gives the earlier town).
   hour or a paper's number. `docs/reliability.md` ("Draws and the moment"); `orchestrator/test/twin-draws.test.ts`.
   The newest of this (draws by day, not hour) landed on main on 2026-10-13 (`ea49bff`); it moved every town's
   state hash.
-- **The translator and its arrangement.** Our own trained translator answers first, the prompt-driven one
-  (`claude-code/claude-sonnet-5-5`, prompt 0.9.4) behind. `docs/real-models.md` "Our own translator first";
+- **The translator and its arrangement.** Our own trained translator answers first (from 2026-10-15
+  `pod-small-r3-long-s1`, 2,048 tokens; `pod-small-r2-s1` still there by name; both in `runs/translator-model/`), the
+  prompt-driven one (`claude-code/claude-sonnet-5-5`, prompt 0.9.5) behind. The third round is closed (decisions
+  2026-10-15 "step 5"): the model serves the 917 forms the old one served; none of the 29 new forms is released
+  (`forms-released.json` beside the model). Open: the `to` field of three forms, `collector=` in 0.9.5, 22 new forms
+  with no real case. The next step for new forms is real cases from pilots. `docs/real-models.md` "Our own translator first";
   `docs/translator-pipeline.md`. Queue entry key `translator_first`; `--translator-arrangement beside` measures
   without touching the world.
 - **The `unstated` framing.** What a seat is told, the way out, and the debrief's "what did you take the town to be".
@@ -77,8 +81,8 @@ line: what, the doc, the dial (a dial off gives the earlier town).
 
 Naz's. Dates are when he said it; each is recorded where named.
 
-- **Translator parked and used (2026-10-11).** Our trained translator (`pod-small-r2-s1`, about 85% right on the 180
-  real requests, 153) is used first in pilots, the prompt-driven one behind; no training or prompt change comes with
+- **Translator parked and used (2026-10-11; first model changed 2026-10-15 to `pod-small-r3-long-s1`, 155 of the 180).**
+  Our trained translator (then `pod-small-r2-s1`, about 85% right on the 180 real requests, 153) is used first in pilots, the prompt-driven one behind; no training or prompt change comes with
   it; one model that works alone stays the goal. Decisions 2026-10-11 "Our own trained translator in pilots". The pass
   mark (90% right, at most 1% confidently wrong) is a floor and is not met.
 - **"B" (2026-10-12).** A model enters people's decisions only where code cannot go (what words mean, openings

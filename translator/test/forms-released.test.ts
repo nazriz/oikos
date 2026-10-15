@@ -6,7 +6,7 @@ import { expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { MARK, table, whyNot, writeSidecar, type FormResult } from "../../scripts/forms-released";
+import { MARK, arrangement, fromPerForm, table, whyNot, writeSidecar, type FormResult } from "../../scripts/forms-released";
 import { DecideAdapter, readerOf } from "../model/adapter";
 
 const result = (form: string, real: [number, number, number], generated: [number, number]): FormResult => ({ form, real: { n: real[0], right: real[1], wrong_drafts: real[2] }, generated: { n: generated[0], right: generated[1] } });
@@ -76,4 +76,23 @@ test("a form taught and not released is recorded and not offered, as a form neve
   // No list of the released: the forms taught, as before.
   expect((await ask(made({ trained: ["works_collection"] }))).input).toMatchObject({ program: "form(form=works_collection)" });
   expect((await ask(made({ trained: ["rent_reminder"] }))).input).toMatchObject({ withheld: "form_unseen" });
+});
+
+test("the arrangement: the forms served before stay; a new form is released only if the run may release and it passes its mark; a form with no result is behind", () => {
+  const per = {
+    rent_reminder: { real: { right: 8, of: 8, wrong: 0 }, generated_tests: { right: 4, of: 4 } },
+    possession_order: { real: { right: 12, of: 20, wrong: 7 }, generated_tests: { right: 1, of: 3 } },
+    warrant: { real: { right: 0, of: 0, wrong: 0 }, generated_tests: { right: 4, of: 5 } },
+  };
+  const results = fromPerForm(per);
+  expect(results.find((r) => r.form === "possession_order")).toEqual({ form: "possession_order", real: { n: 20, right: 12, wrong_drafts: 7 }, generated: { n: 3, right: 1 } });
+  const trained = ["old_b", "old_a", "rent_reminder", "possession_order", "warrant", "remedy_answer"], old = ["old_a", "old_b"];
+  const fired = arrangement(results, trained, old, true);
+  expect(fired.released).toEqual(["old_a", "old_b"]);
+  expect(fired.behind.map((b) => b.form)).toEqual(["possession_order", "remedy_answer", "rent_reminder", "warrant"]);
+  expect(fired.behind.find((b) => b.form === "rent_reminder")!.why).toContain("run-level rule");
+  expect(fired.behind.find((b) => b.form === "remedy_answer")!.why).toContain("no example");
+  const clear = arrangement(results, trained, old, false);
+  expect(clear.released).toEqual(["old_a", "old_b", "rent_reminder"]);
+  expect(clear.old_kept).toBe(2);
 });
