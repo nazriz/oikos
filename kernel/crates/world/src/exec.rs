@@ -128,7 +128,7 @@ pub fn check_at_work(s: &Statics, st: &State, p: &str, at: Option<&str>, space: 
 
 /// A system that is to act, or to do an organisation's work (foundations F4): it must be in service and, if it is to do
 /// another's, belong to the organisation the act is for (`org`); and each block must be one its template lists
-/// (`not_capable`). A template that lists nothing (`does` absent) states no limit.
+/// (`not_capable`).
 pub fn check_system_does(s: &Statics, st: &State, sys: &str, org: Option<&str>, blocks: &[Block]) -> R<()> {
     let x = st.participants.get(sys).ok_or_else(|| refuse(RefusalCode::UnknownParticipant, format!("no participant {sys}")))?;
     if !can_act(x) {
@@ -139,7 +139,8 @@ pub fn check_system_does(s: &Statics, st: &State, sys: &str, org: Option<&str>, 
             return Err(refuse(RefusalCode::NotTheirs, format!("{sys} isn't a system belonging to {org}")));
         }
     }
-    let Some(rows) = x.template.as_ref().and_then(|t| s.templates.get(t)).and_then(|t| t.does.as_ref()) else { return Ok(()) };
+    // (Every system names a template, and a template says what it does: the world does not load otherwise.)
+    let rows: &[oikos_contracts::config::Does] = x.template.as_ref().and_then(|t| s.templates.get(t)).and_then(|t| t.does.as_deref()).unwrap_or(&[]);
     for b in blocks {
         let makes = b.makes();
         if !rows.iter().any(|r| r.covers(b.name(), makes.as_deref())) {

@@ -2584,6 +2584,10 @@
           "description": "A person's participant: its person.",
           "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId"
         },
+        "shares_body": {
+          "description": "A person's participant that acts through a body another participant already has (foundations F5): a model's seat in one post of a person whose own participant goes on with the rest of their life and their other posts. It shares the person's body and timeline, holds the posts it is given and no others. A body has one participant of its own and any number of these beside it. Absent: the person's own.",
+          "type": "boolean"
+        },
         "owner": {
           "description": "A system participant: the organisation it belongs to.",
           "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId"
@@ -2704,6 +2708,18 @@
         "controller",
         "framing"
       ],
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "system"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "does"
+        ]
+      },
       "additionalProperties": false,
       "properties": {
         "id": {
@@ -2759,7 +2775,7 @@
           "$ref": "urn:oikos:contracts:0.8:common#/$defs/OpaqueObject"
         },
         "does": {
-          "description": "For a system (foundations F4): what a system from this template can do. A system acts, or does another's work, only within these rows; outside them the act is refused (`not_capable`). Absent: the template states no limit (a hand-written world's). Never on a person's.",
+          "description": "For a system (foundations F4): what a system from this template can do. A system acts, or does another's work, only within these rows; outside them the act is refused (`not_capable`). A system's template must say (foundations F5: there is no \"no limit\"). Never on a person's.",
           "type": "array",
           "maxItems": 256,
           "items": {
