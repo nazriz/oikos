@@ -10,6 +10,7 @@ import { ClaudeCodeAdapter, CodexCliAdapter, type LlmRequest } from "@oikos/part
 import { generate } from "@oikos/worlds/generator/generate";
 import { setPath } from "../src/batch";
 import { runWorld } from "../src/run";
+import { officeAt, officeBy, officesBy } from "./lib/offices";
 
 const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
@@ -57,7 +58,7 @@ test("in a run: a seat's effort goes with each of its calls and is on record; a 
   const run = async (wake: boolean) => {
     const s = { ...spec(), opening_budget: false, mayor: "code", model_seats: "council-clerk", seat_effort: { "council-clerk": "low" }, ...(wake ? {} : { wake_on_papers: false }) };
     const config = generate(s);
-    const clerk = config.participants.find((p: any) => p.id === "council-clerk-system");
+    const clerk = officeAt(config, "council-clerk").holder;
     clerk.controller.params.mock.back_days = 7; // (a seat that says it is back in a week, as the model seats of the live checks did)
     const r = await runWorld({ config, runId: "settings", outDir: mkdtempSync(join(tmpdir(), "oikos-seat-settings-")), until: 7 * DAY });
     const log = readFileSync(r.logPath, "utf8").trim().split("\n").map((l) => JSON.parse(l));

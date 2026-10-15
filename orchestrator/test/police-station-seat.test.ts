@@ -14,7 +14,8 @@ const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
 const spec = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")) as any;
 // (The town opens with the tribunal's orders for possession part-way through, so that warrants are asked for in the first months.)
-const town = { ...spec, seed: 3, citizens: 300, profile: "ke-nakuru-2026", opening_caseload: true, living: { initiative_bps: 10_000, friction_bps: 60_000 } };
+// (Seed 7 and 330 days where it was seed 3 and 200: foundations F5 moved the town's draws and the tribunal's person-time, and no seed from 1 to 9 had two warrants carried out in 200 days; seed 7 has two in 330.)
+const town = { ...spec, seed: 7, citizens: 300, profile: "ke-nakuru-2026", opening_caseload: true, living: { initiative_bps: 10_000, friction_bps: 60_000 } };
 
 async function run(over: object, days: number, seated: boolean, tweak?: (config: any) => void): Promise<any[]> {
   const config = generate({ ...town, ...over, ...(seated ? { mayor: "llm", model_seats: ["police-oic"] } : {}) }) as any;
@@ -31,8 +32,8 @@ async function run(over: object, days: number, seated: boolean, tweak?: (config:
 }
 const executed = (recs: any[]) => recs.filter((r) => r.kind === "warrant_executed").map((r) => ({ warrant: r.data.lease, day: Math.floor(r.at / DAY), removed: r.data.removed })).sort((a, b) => (a.warrant < b.warrant ? -1 : 1));
 
-test("a mock seat in the station over 200 days: the warrants are carried out as in the code twin, by the officers, under the orders in force at the start", async () => {
-  const twin = await run({}, 200, false), seat = await run({}, 200, true);
+test("a mock seat in the station over 330 days: the warrants are carried out as in the code twin, by the officers, under the orders in force at the start", async () => {
+  const twin = await run({}, 330, false), seat = await run({}, 330, true);
   const a = executed(twin), b = executed(seat);
   expect(a.length).toBeGreaterThanOrEqual(2);
   expect(b.map((x) => x.warrant)).toEqual(a.map((x) => x.warrant));

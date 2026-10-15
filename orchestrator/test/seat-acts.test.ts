@@ -146,7 +146,7 @@ test("in a living town the tribunal's registry staff list the cases and the memb
   expect(app).toBeDefined();
   // Listed by the staff, on the day it came or the next; decided by the member, on its form, on or after the day to answer by.
   const listed = recs.find((r) => r.kind === "hearing_notice" && r.data?.application === app.id);
-  expect(listed.author).toBe("tribunal-member-staff-system");
+  expect(listed.in_position).toBe("tribunal-member-staff"); // (the registry staff are residents: the paper names the post it was made in)
   expect(listed.at - app.at).toBeLessThan(2 * DAY);
   const order = recs.find((r) => r.kind === "tribunal_order" && r.data?.application === app.id);
   expect(order.author).toBe("tribunal-member-system");
@@ -156,7 +156,7 @@ test("in a living town the tribunal's registry staff list the cases and the memb
   const member = did(acts, "tribunal-member");
   expect(member.forms.has("hearing_notice")).toBe(false);
   expect(member.forms.get("possession_order")).toBeGreaterThan(0);
-  expect(recs.some((r) => r.kind === "staff_report" && r.author === "tribunal-member-staff-system" && /answered at the counter: \d+ tribunal application/.test(r.text))).toBe(true);
+  expect(recs.some((r) => r.kind === "staff_report" && r.in_position === "tribunal-member-staff" && /answered at the counter: \d+ tribunal application/.test(r.text))).toBe(true);
   // The landlord's seat asked for the rent on its form before it gave notice (a living town's landlord does).
   const asked = recs.find((r) => r.kind === "remedy_request" && r.data?.matter === "arrears" && r.data.about === alone.id);
   expect(asked.author).toBe(`${seats[0]}-system`);

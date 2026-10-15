@@ -19,6 +19,7 @@ import { join } from "node:path";
 import { bedroomsNeeded, calls, chargesOn, formatMoney, OCCUPANCY, type OccupancyStandard } from "@oikos/participants";
 import { generate, generateFrom } from "@oikos/worlds/generator/generate";
 import { loadProfile, PROFILE_DIR, type Profile } from "@oikos/worlds/generator/profile";
+import { officeAt, officeBy, officesBy } from "./lib/offices";
 
 const root = join(import.meta.dir, "../..");
 const DAY = 86_400, HOUR = 3600, MONTH = 30 * DAY;
@@ -33,11 +34,11 @@ const SLOW = 120_000;
 
 /** What a generated town's firms were given, read from the world itself. */
 function firms(c: any) {
-  const params = (impl: string) => c.participants.filter((p: any) => p.controller.impl === impl).map((p: any) => ({ entity: p.owner as string, ...p.controller.params }));
+  const params = (impl: string) => officesBy(c, impl).map((o) => ({ entity: o.entity, ...o.params }));
   const staff = new Map<string, number>();
   for (const r of c.world.records) if (r.record === "agreement" && r.terms.template === "employment") staff.set(r.terms.parties[0], (staff.get(r.terms.parties[0]) ?? 0) + 1);
   const balance = (entity: string) => Number(c.world.accounts.find((a: any) => a.holder === entity).balance);
-  const trade = c.participants.find((p: any) => p.controller.impl === "world.trade").controller.params;
+  const trade = officeBy(c, "world.trade").params;
   return { factories: params("firm.producer"), shops: params("firm.retailer"), staff, balance, trade };
 }
 
@@ -137,7 +138,7 @@ test("money in a generated town's laws and papers is written as its currency is,
       expect(loan.terms.text).toContain(`repays ${whole(repays)} a month`);
     }
     // The finance office's brief gives the crew's yearly wage in whole units of the money.
-    const finance = c.participants.find((p: any) => p.controller.impl === "city.finance_officer").controller.params;
+    const finance = officeBy(c, "city.finance_officer").params;
     // (The figure is a sum in whole units, written as the place writes it: it reads back in the place's money to whole units.)
     const figure = /about (.+?) a year each/.exec(finance.budget_lines.staff)?.[1];
     expect(figure).toBeDefined();
@@ -174,7 +175,7 @@ test("an institution a place doesn't have is absent from its town: no payment, l
   delete P.values.industrial_action.notice_days;
   delete P.values.retirement_fund;
   const c = generateFrom(spec, P);
-  const of = (impl: string) => c.participants.find((p: any) => p.controller.impl === impl).controller.params;
+  const of = (impl: string) => officeBy(c, impl).params;
   // No payment to the unemployed: none paid, none claimed, none counted.
   expect(c.world.records.find((r: any) => r.id === "law-support").data.payments.map((r: any) => r.id)).toEqual(["pension"]);
   expect(of("world.migration").jobseekers_payment).toBeUndefined();
@@ -201,7 +202,7 @@ test("an institution a place doesn't have is absent from its town: no payment, l
   delete Q.values.tenancy.rent_increase_notice_days;
   Q.values.tenancy.rent_review_practice_months = 12;
   const q = generateFrom(spec, Q);
-  expect(q.participants.find((p: any) => p.controller.impl === "firm.landlord").controller.params.rent_review_months).toBe(12);
+  expect(officeBy(q, "firm.landlord").params.rent_review_months).toBe(12);
   expect(q.world.records.some((r: any) => r.id === "law-rent-increases")).toBe(false);
 
   // Notice of industrial action without a ballot: a law of the notice alone, with its schedule and amendment form.
@@ -271,7 +272,7 @@ test("wages are paid on the profile's pay period: a month's pay monthly makes th
     expect(r.text).toContain(`every ${days} days`);
   }
   // Every employer's module is told the period; none is left on a default.
-  for (const [c, days] of [[a, 14], [b, 30]] as const) for (const p of c.participants) if (p.controller.params?.wage !== undefined && p.controller.params?.period !== undefined) expect(p.controller.params.period).toBe(days * DAY);
+  for (const [c, days] of [[a, 14], [b, 30]] as const) for (const p of [...c.participants.map((x: any) => x.controller), ...c.positions.map((x: any) => x.role_module && { params: x.role_module.params })]) if (p?.params?.wage !== undefined && p?.params?.period !== undefined) expect(p.params.period).toBe(days * DAY);
   // The same work for the same money: an item takes the same time, firms start with the same staff and (to rounding) money.
   const fa = firms(a), fb = firms(b);
   expect(Math.abs(fb.factories[0]!.labour_per_unit - fa.factories[0]!.labour_per_unit)).toBeLessThanOrEqual(1);
@@ -339,7 +340,7 @@ test("extended households are generated only where a profile states them, at its
 }, SLOW);
 
 test("the occupancy standard and a home's physical room are the profile's where it states them, and nobody's where it doesn't", () => {
-  const params = (c: any, impl: string) => [...c.participants, ...(c.templates ?? [])].filter((x: any) => x.controller?.impl === impl).map((x: any) => x.controller.params);
+  const params = (c: any, impl: string) => [...c.participants, ...(c.templates ?? [])].filter((x: any) => x.controller?.impl === impl).map((x: any) => x.controller.params).concat(officesBy(c, impl).filter((o) => o.holder.kind === "person").map((o) => o.params));
   // Not stated (no profile states either today): no citizen or landlord is given a standard, so each keeps its module's
   // own, and a home holds two for each bedroom and two besides: every town as it was.
   for (const id of ids) {
@@ -401,11 +402,11 @@ test("every town opens with its first year's budget on file: adopted by its coun
     // The budget is what the clerk's own form for an adopted budget writes: a year, and the town's lines.
     expect(Object.keys(budget.data).sort()).toEqual(["lines", "year"]);
     expect(budget.data.year).toBe(1);
-    const finance = c.participants.find((p: any) => p.controller.impl === "city.finance_officer").controller.params;
+    const finance = officeBy(c, "city.finance_officer").params;
     for (const k of Object.keys(budget.data.lines)) expect(Object.keys(finance.budget_lines)).toContain(k);
     // Its lines are the ones the mayor's office is given to table each year, and the proposal's amounts are the same.
-    const mayor = c.participants.find((p: any) => p.id === "mayor-system").controller.params;
-    expect(budget.data.lines).toEqual({ parks: mayor.park_budget, ...(mayor.road_budget ? { roads: mayor.road_budget } : {}), ...(mayor.staff_budget ? { staff: mayor.staff_budget } : {}), ...(mayor.services_budget ? { services: mayor.services_budget } : {}), ...(mayor.environment_budget ? { environment: mayor.environment_budget } : {}) });
+    const mayor = officeAt(c, "mayor").params;
+    expect(budget.data.lines).toEqual({ parks: mayor.park_budget, ...(mayor.road_budget ? { roads: mayor.road_budget } : {}), ...(mayor.staff_budget ? { staff: mayor.staff_budget } : {}), ...(mayor.administration_budget ? { administration: mayor.administration_budget } : {}), ...(mayor.services_budget ? { services: mayor.services_budget } : {}), ...(mayor.environment_budget ? { environment: mayor.environment_budget } : {}) });
     // (Written as the town writes its money, on a paper people read: no sum is a bare count of the smallest unit.)
     for (const [k, v] of Object.entries(budget.data.lines)) expect(proposal.data[k]).toBe(written(v as number));
     for (const v of Object.values(proposal.data)) expect(String(v)).not.toMatch(/^[0-9]{4,}$/);
@@ -413,7 +414,7 @@ test("every town opens with its first year's budget on file: adopted by its coun
     const wages = c.world.records.filter((r: any) => r.record === "agreement" && r.terms.template === "employment" && r.terms.parties[0] === "city")
       .reduce((sum: number, a: any) => sum + Math.floor((Number(a.terms.commitments[0].does.outcome.money.amount) * YEAR) / a.terms.commitments[0].every), 0);
     expect(wages).toBeGreaterThan(0);
-    expect((budget.data.lines.staff ?? 0) + (budget.data.lines.environment ?? 0)).toBeGreaterThanOrEqual(wages);
+    expect((budget.data.lines.staff ?? 0) + (budget.data.lines.administration ?? 0) + (budget.data.lines.environment ?? 0)).toBeGreaterThanOrEqual(wages);
     // Its words say each line and the sum as the town writes its money, the year in days, and that the council adopted it.
     for (const v of [...Object.values(budget.data.lines), Object.values(budget.data.lines).reduce((a: number, x: any) => a + x, 0)] as number[]) expect(budget.text).toContain(written(v));
     expect(budget.text).toContain("year 1 (day 0 to day 364)");
@@ -422,7 +423,7 @@ test("every town opens with its first year's budget on file: adopted by its coun
     expect(rec("proc-payments").text).toContain("only within the budget the council has adopted for the year");
     expect(rec("law-charter").text).toContain("at no more each month than a twelfth of the budget last adopted");
     // The mayor's office tables the next year's before the year ends.
-    expect(mayor.budget_lead_days).toBeGreaterThan(c.participants.find((p: any) => p.controller.impl === "city.council_clerk").controller.params.vote_days);
+    expect(mayor.budget_lead_days).toBeGreaterThan(officeBy(c, "city.council_clerk").params.vote_days);
   }
 }, SLOW);
 
@@ -460,22 +461,22 @@ test("every standing payment a town opens with says who gave it, when and under 
       expect(r.text).toContain(written(net));
       if (net < gross) expect(r.text).toContain(`(the agreed ${written(gross)} less ${written(gross - net)} withheld under law-income-tax)`);
       expect(r.text).toContain(`first on year 1, day ${r.data.first / DAY + 1}.`);
-      // (The agreement it pays under was signed for the town by the office that takes its crew on.)
-      expect(c.world.records.find((x: any) => x.record === "signature" && x.agreement === job.id && x.as === "city")).toMatchObject({ in_position: "works" });
+      // (The agreement it pays under was signed for the town by the office that takes its crew on, or, for an administrative officer (a role of its own), by the finance officer.)
+      expect(c.world.records.find((x: any) => x.record === "signature" && x.agreement === job.id && x.as === "city")).toMatchObject({ in_position: job.terms.text ? "finance" : "works" });
       expect(c.positions.some((x: any) => x.id === "works" && x.entity === "city")).toBe(true);
     }
     // What the town is paid from outside: the funder's determination is on file with it, and says what the grants
     // office pays by (the same figures the office is given).
-    for (const g of c.participants.filter((x: any) => x.controller.impl === "world.grants")) {
-      const q = g.controller.params, paper = rec(`grant-${q.to}`);
+    for (const g of officesBy(c, "world.grants")) {
+      const q = g.params, paper = rec(`grant-${q.to}`);
       expect(paper).toMatchObject({ kind: "grant_determination", speaks_for: "outside", addressed_to: [q.to], author: "genesis", at: 0, data: { per_resident_per_year: String(q.per_resident_per_year), every_days: q.every_days, first_day: q.first_day, account: q.to_account } });
-      expect(c.positions.find((x: any) => x.id === paper.in_position)?.holder).toBe(g.id);
+      expect(c.positions.find((x: any) => x.id === paper.in_position)?.holder).toBe(g.holder.id);
       expect(paper.text).toContain(`${written(q.per_resident_per_year)} a year for each resident`);
       expect(paper.text).toContain(`every ${q.every_days} days from year 1, day ${q.first_day + 1}`);
     }
     expect(rec("grant-city")).toBeDefined();
     // What the town is charged from outside: the landfill's charge is on file with it, where the place has one.
-    const landfill = c.participants.find((x: any) => x.controller.impl === "world.disposal").controller.params;
+    const landfill = officeBy(c, "world.disposal").params;
     if (landfill.price_per_tonne === undefined) expect(rec("landfill-charges")).toBeUndefined();
     else {
       expect(rec("landfill-charges")).toMatchObject({ kind: "charges_notice", speaks_for: "outside", addressed_to: ["city"], data: { price_per_tonne: String(landfill.price_per_tonne), every_days: landfill.every_days } });
@@ -501,8 +502,9 @@ test("a town's opening budget against the grant it expects: where the grant is f
     const note = P.sources["public_finance.grants_per_resident_per_year"] ?? "";
     if (grants > 1.5 * spending) expect({ id, flagged: note.includes("FLAGGED FOR THIS PROFILE'S AUTHOR") }).toEqual({ id, flagged: true });
   }
-  // (The two whose figure is a real municipality's whole general transfer, and the two placeholders sized to one.)
-  expect(Object.keys(ratios).filter((id) => ratios[id]! > 1.5).sort()).toEqual(["br-mg-2026", "jp-akita-2026", "ke-nakuru-2026", "mx-jal-2026"]);
+  // (The two whose figure is a real municipality's whole general transfer, and the one placeholder sized to one. Foundations F5: the
+  // budget now carries the town's administrative staff, a line of its own, which brought mx-jal-2026's grant (1.53 of the budget) under the bar.)
+  expect(Object.keys(ratios).filter((id) => ratios[id]! > 1.5).sort()).toEqual(["br-mg-2026", "jp-akita-2026", "ke-nakuru-2026"]);
 }, SLOW);
 
 test("a council with almost no reserves opens with the same budget and a hundredth of the money: a budget it cannot meet", () => {

@@ -12,6 +12,7 @@ import { join } from "node:path";
 import { calls as C, modules as builtin, type BehaviourModule } from "@oikos/participants";
 import { generate } from "@oikos/worlds/generator/generate";
 import { runWorld } from "../src/run";
+import { officeAt, officeBy, officesBy } from "./lib/offices";
 
 const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
@@ -63,8 +64,8 @@ async function held(name: string, settle: boolean, asList: boolean) {
   // It pays under an employment agreement: the record of what the town owes its worker, whatever the bank does.
   expect((config.world.records as any[]).some((r) => r.id === order.basis && r.record === "agreement" && r.terms.template === "employment")).toBe(true);
   const script: Script = { held: asList ? [order.id] : order.id, hold_day: F + 3, lift_day: F + 15, ...(settle ? { settle: { to, amount: wage, from: "acc-city" } } : {}) };
-  const finance = config.participants.find((x: any) => x.controller?.impl === "city.finance_officer");
-  finance.controller = { ...finance.controller, impl: holding.name, params: { ...(finance.controller.params ?? {}), script } };
+  const finance = officeBy(config, "city.finance_officer");
+  finance.run(holding.name, { ...finance.params, script });
   const out = join(root, "runs", `test-holds-run-${name}`);
   rmSync(out, { recursive: true, force: true });
   const s = await runWorld({ config, runId: name, outDir: out, until: (F + 45) * DAY, modules: { [holding.name]: holding } });
@@ -75,13 +76,13 @@ async function held(name: string, settle: boolean, asList: boolean) {
   const letters = lines.filter((e) => e.kind === "command").flatMap((e) => ((e.body.blocks ?? []) as any[]).filter((b) => b.block === "message").map((b) => ({ from: e.body.participant, ...b })));
   const day = (t: number) => Math.floor(t / DAY);
   const transfers = events.filter((e) => e.event === "transfer");
-  return { order, F, wage, to, day, events, letters, transfers, records: events.filter((e) => e.event === "recorded").map((e) => e.record),
+  return { bank: officeBy(config, "bank.payment_system").holder.id as string, order, F, wage, to, day, events, letters, transfers, records: events.filter((e) => e.event === "recorded").map((e) => e.record),
     /** The days on which the bank paid under an instruction. */
     under: (id: string) => transfers.filter((x) => x.per_instruction === id).map((x) => day(x.t)) };
 }
 
 test("a code finance officer holds the town's standing wage payment: the bank passes over the due date under the hold and pays again from the next once it is lifted, making nothing up; the town pays what was missed itself", async () => {
-  const { order, F, wage, to, day, letters, transfers, records, under } = await held("settled", true, false);
+  const { bank, order, F, wage, to, day, letters, transfers, records, under } = await held("settled", true, false);
   // The hold: a statement of the town's, made in the finance officer's post, to the bank, seen by the two of them; and
   // its withdrawal. Nothing else was needed of the world.
   const hold = records.find((r) => r.kind === "hold");
@@ -91,7 +92,7 @@ test("a code finance officer holds the town's standing wage payment: the bank pa
   expect(day(lift.at)).toBe(F + 15);
   // The bank's answer, once: which payment it stops and from which due date, and that nothing is made up.
   const answers = letters.filter((m) => m.re === hold.id);
-  expect(answers.map((m) => [m.from, m.to, m.text])).toEqual([["bank-payments-system", ["finance"], `Hold ${hold.id} is in place. Not paid while it stands: ${order.id}, from the payment due on day ${F + 15}. Anything due before then is still paid. A payment not made under a hold is not made up when the hold is lifted: what it was for is still owed, and is yours to settle with whoever it is owed to. To resume, withdraw ${hold.id}; payments then go on from the next due date.`]]);
+  expect(answers.map((m) => [m.from, m.to, m.text])).toEqual([[bank, ["finance"], `Hold ${hold.id} is in place. Not paid while it stands: ${order.id}, from the payment due on day ${F + 15}. Anything due before then is still paid. A payment not made under a hold is not made up when the hold is lifted: what it was for is still owed, and is yours to settle with whoever it is owed to. To resume, withdraw ${hold.id}; payments then go on from the next due date.`]]);
   // Paid on its first pay day; not on the one under the hold; again on each of the next two, once, the same sum.
   expect(under(order.id)).toEqual([F, F + 28, F + 42]);
   for (const x of transfers.filter((x) => x.per_instruction === order.id)) expect(x.amount).toBe(String(wage));

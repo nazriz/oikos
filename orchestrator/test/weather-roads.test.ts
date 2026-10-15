@@ -12,6 +12,7 @@ import { drawWeather } from "@oikos/worlds/generator/weather";
 import { loadProfile } from "@oikos/worlds/generator/profile";
 import { Randomness } from "@oikos/participants";
 import { runWorld } from "../src/run";
+import { officeAt, officeBy, officesBy } from "./lib/offices";
 
 const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
@@ -49,11 +50,11 @@ test("streets are laid, the bureau warns ahead, heat makes illness likelier, and
   const heat = config.catalogue.fields.find((f: any) => f.id === "heat");
   heat.source_by_day = [{ from_day: 0, bps: 0 }, { from_day: 20, bps: 10_000 }, { from_day: 40, bps: 0 }];
   config.life.illness.fields.find((f: any) => f.field === "heat").bps_per_unit = 3_000;
-  const bureau = config.participants.find((p: any) => p.id === "weather-bureau-system");
+  const bureau = officeAt(config, "weather-bureau").holder;
   bureau.controller.params.events = [{ kind: "heatwave", from_day: 20, days: 20 }];
   // The mayor builds toward anything not beside a road (a test's threshold: the town's is a few cells).
-  const mayor = config.participants.find((p: any) => p.id === "mayor-system");
-  for (const prm of [mayor.controller.params, mayor.controller.params?.mock?.params, config.positions?.find?.((x: any) => x.id === "mayor")?.role_module?.params].filter(Boolean)) prm.road_within = 1;
+  const mayor = officeAt(config, "mayor");
+  for (const prm of [mayor.params, mayor.holder.controller?.type === "llm" ? mayor.holder.controller.params?.mock?.params : undefined].filter(Boolean)) prm.road_within = 1;
 
   const out = join(root, "runs", "test-weather-roads");
   rmSync(out, { recursive: true, force: true });

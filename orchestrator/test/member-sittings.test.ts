@@ -44,13 +44,13 @@ async function walk(seated: boolean) {
   for (const r of recs) if (r.kind === "hearing_notice" && r.data?.application && r.data.answer_by !== undefined && !answerBy.has(r.data.application)) answerBy.set(r.data.application, r.data.answer_by);
   for (const app of withdrawn) answerBy.delete(app);
   const orders = new Map<string, number>();
-  for (const r of recs) if (r.kind === "tribunal_order" && String(r.author).startsWith("tribunal-member") && r.data?.application) orders.set(r.data.application, r.at);
+  for (const r of recs) if (r.kind === "tribunal_order" && r.in_position?.startsWith("tribunal-member") && r.data?.application) orders.set(r.data.application, r.at);
   return { recs, tally, prompts, answerBy, orders };
 }
 
 test("a member's seat with cases ripe: the day's list is one paper naming every ripe case in full, it brings the seat once, and no case is lost or late", async () => {
   const { recs, tally, prompts, answerBy, orders } = await walk(true);
-  const lists = recs.filter((r) => r.kind === "office_books" && String(r.author).startsWith("tribunal-member-staff") && r.data?.list);
+  const lists = recs.filter((r) => r.kind === "office_books" && r.in_position === "tribunal-member-staff" && r.data?.list);
   // One paper a day at most, by the clerk.
   const days = lists.map((r) => Math.floor(r.at / DAY));
   expect(new Set(days).size).toBe(days.length);
@@ -76,7 +76,7 @@ test("a member's seat with cases ripe: the day's list is one paper naming every 
   }
   for (const d of wanted) if (d < DAYS - 1) expect(sat).toContain(d);
   // What it was shown at a sitting that a list brought it to: the newest paper of the clerk's whole, so every ripe case in full.
-  const books = recs.filter((r) => r.kind === "office_books" && String(r.author).startsWith("tribunal-member-staff")).sort((x, y) => x.at - y.at);
+  const books = recs.filter((r) => r.kind === "office_books" && r.in_position === "tribunal-member-staff").sort((x, y) => x.at - y.at);
   let checked = 0;
   for (const d of wanted) {
     const shown = prompts.find((p) => p.day === d)?.text;
@@ -101,7 +101,7 @@ test("a member's seat with cases ripe: the day's list is one paper naming every 
 
 test("a code tribunal in the same town files no list, has no clerk, and decides each case on the day it is ripe", async () => {
   const { recs, answerBy, orders } = await walk(false);
-  expect(recs.filter((r) => r.kind === "office_books" && String(r.author).startsWith("tribunal-member")).length).toBe(0);
+  expect(recs.filter((r) => r.kind === "office_books" && r.in_position?.startsWith("tribunal-member")).length).toBe(0);
   let measured = 0;
   for (const [app, by] of answerBy) {
     if (by > (DAYS - 3) * DAY) continue;

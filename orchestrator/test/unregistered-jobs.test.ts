@@ -84,6 +84,9 @@ test("an unregistered job is paid whole and reported to nobody; a registered one
     // the wage their agreement says.)
     const joined = Math.max(a.at, ...all.filter((r: any) => r.record === "signature" && r.agreement === a.id).map((r: any) => r.at));
     for (const ea of eas.filter((x) => x.data.employer === employerOf(a) && x.at <= o.at && x.at >= joined)) gross = Math.floor((gross * (10_000 + ea.data.rise_bps)) / 10_000);
+    // (A hire whose signature and a rise of the employer's fall within the hour: a manager who is a person takes the two acts one after the other, a
+    // quarter of an hour each (foundations F5), and which came first is the order they were taken in, not what the rule says. Left out.)
+    if (eas.some((x) => x.data.employer === employerOf(a) && Math.abs(x.at - joined) < 3_600)) continue;
     const due = withholding(law, gross, pays.every);
     expect(due).toBeGreaterThan(0);
     expect(Number(o.data.outcome.money.amount)).toBe(off.has(a.id) ? gross : gross - due);
@@ -100,7 +103,9 @@ test("an unregistered job is paid whole and reported to nobody; a registered one
   const offWorkers = new Map([...off].map((id) => [`${employerOf(jobs.get(id))}|${jobs.get(id).terms.parties[1]}`, id]));
   const named = new Set<string>();
   for (const r of reports) for (const line of r.data.staff ?? []) {
-    expect(offWorkers.has(`${r.speaks_for}|${line.worker}`)).toBe(false);
+    // (Someone taken on again by the same employer, the second time off the books, is a worker of the first job too: it is named for that one.)
+    const onBooks = [...jobs.values()].some((j: any) => j.terms.parties[1] === line.worker && employerOf(j) === r.speaks_for && !off.has(j.id) && j.at <= r.at);
+    if (!onBooks) expect(offWorkers.has(`${r.speaks_for}|${line.worker}`)).toBe(false);
     named.add(`${r.speaks_for}|${line.worker}`);
   }
   expect([...named].some((x) => x.startsWith("factory-"))).toBe(true);

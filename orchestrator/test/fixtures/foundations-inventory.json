@@ -2,91 +2,6 @@
   "about": "F0 (docs/design/foundations.md, 2026-10-15): every special case the plan says the foundations delete or replace, where it stands today. `find` is a literal string in `file` (a glob counts across files); `count` and `lines` are today's. F10's backstop (orchestrator/test/all-work-takes-time.test.ts) reads this file and requires count 0 for every `delete` and `replace` entry by the step named, `history` entries excepted (a decision is never edited). Entries are removed from here by the step that removes the case, with a line in docs/decisions.md.",
   "entries": [
     {
-      "id": "g-free-holder",
-      "law": 3,
-      "step": "F5",
-      "kind": "delete",
-      "file": "worlds/generator/generate.ts",
-      "find": "const holder = `${id}-system`;",
-      "what": "every office's holder (and its staff's and clerk's) is a system of one placeholder kind, delivered at genesis by `outside` with no limit on what it does (F4 made the delivery a record; F5 replaces the holders with people or licensed systems of their own kind)",
-      "plan": "2.3",
-      "count": 1,
-      "lines": [
-        "worlds/generator/generate.ts:1978"
-      ]
-    },
-    {
-      "id": "g-genesis-template",
-      "law": 3,
-      "step": "F5",
-      "kind": "delete",
-      "file": "worlds/generator/generate.ts",
-      "find": "const GENESIS_SYSTEM = \"genesis-system\";",
-      "what": "the one placeholder template of every genesis system: supplier `outside`, no `does` (so no limit); F5 gives each system its own template with what it does, at a licence price, sourced or marked",
-      "plan": "2.3",
-      "count": 1,
-      "lines": [
-        "worlds/generator/generate.ts:1976"
-      ]
-    },
-    {
-      "id": "g-system-suffix-keeps-record",
-      "law": 3,
-      "step": "F5",
-      "kind": "delete",
-      "file": "worlds/generator/generate.ts",
-      "find": "endsWith(\"-system\")) pos.keeps_record",
-      "what": "the `-system` suffix decides which post keeps its organisation's record",
-      "plan": "3.2",
-      "count": 1,
-      "lines": [
-        "worlds/generator/generate.ts:2605"
-      ]
-    },
-    {
-      "id": "g-act-time-default-one",
-      "law": 2,
-      "step": "F5",
-      "kind": "delete",
-      "file": "worlds/generator/generate.ts",
-      "find": "default: 1,",
-      "what": "a second for any system's act",
-      "plan": "0",
-      "count": 1,
-      "lines": [
-        "worlds/generator/generate.ts:71"
-      ]
-    },
-    {
-      "id": "g-lanes-by-hand",
-      "law": 3,
-      "step": "F5",
-      "kind": "delete",
-      "file": "worlds/generator/generate.ts",
-      "find": "{ lanes: 2 });",
-      "what": "the works office's lanes set by hand (`two things at once`)",
-      "plan": "2.3",
-      "count": 1,
-      "lines": [
-        "worlds/generator/generate.ts:2081"
-      ]
-    },
-    {
-      "id": "g-lanes-by-hand-staff",
-      "law": 3,
-      "step": "F5",
-      "kind": "delete",
-      "file": "worlds/generator/generate.ts",
-      "find": "part.lanes ? { lanes: part.lanes } : {}",
-      "what": "lanes on generated staff and clerks",
-      "plan": "2.3",
-      "count": 2,
-      "lines": [
-        "worlds/generator/generate.ts:2675",
-        "worlds/generator/generate.ts:2731"
-      ]
-    },
-    {
       "id": "g-support-dials",
       "law": 2,
       "step": "F6",
@@ -427,34 +342,6 @@
       "count": 1,
       "lines": [
         "participants/src/behaviour/books.ts:99"
-      ]
-    },
-    {
-      "id": "b-news-no-staff",
-      "law": 3,
-      "step": "F5",
-      "kind": "replace",
-      "file": "participants/src/behaviour/news.ts",
-      "find": "every_days: 7,",
-      "what": "the newspaper has no staff, time or costs: an edition a week for nothing",
-      "plan": "3.2",
-      "count": 1,
-      "lines": [
-        "participants/src/behaviour/news.ts:40"
-      ]
-    },
-    {
-      "id": "b-bank-at-once",
-      "law": 2,
-      "step": "F5",
-      "kind": "replace",
-      "file": "participants/src/behaviour/bank.ts",
-      "find": "The answers come at once",
-      "what": "the bank's lookups are free and immediate",
-      "plan": "3.2",
-      "count": 1,
-      "lines": [
-        "participants/src/behaviour/bank.ts:503"
       ]
     },
     {

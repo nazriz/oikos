@@ -10,6 +10,7 @@ import { generate } from "@oikos/worlds/generator/generate";
 import { runWorld } from "../src/run";
 import { workStarts } from "./lib/work-starts";
 import { skillClock } from "./skill";
+import { officeAt, officeBy, officesBy } from "./lib/offices";
 
 const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
@@ -29,7 +30,7 @@ async function run(name: string, config: any, until: number) {
 
 test("goods are made from inputs by workers' hours, exported within each factory's share, and profits paid to shareholders", async () => {
   const config = generate(base);
-  const trader = config.participants.find((p: any) => p.id === "outside-trade-system").controller.params;
+  const trader = officeAt(config, "outside-trade").params;
   const share = trader.buys.goods.from as { [f: string]: number };
   const task = config.catalogue.tasks.find((t: any) => t.id === "make");
   // (300 days: until citizen 0.39.0 it was 200, and a factory first paid a dividend on day 120, by a margin of 4% of
@@ -159,12 +160,12 @@ test("Lengnick: with too little demand a factory lets workers go and stops makin
   // (Run seed 3, 2026-10-12, draws named for the day or the matter: in the generated seed's run nobody was let go in seven months, or in ten;
   // of seeds 2 to 5 the runs from 3, 4 and 5 have one let go in the seven.)
   const { ev: e1, cmds: c1 } = await run("slack", { ...slack, seed: 3 }, 7 * MONTH + DAY);
-  const letGo = c1.filter((c) => c.participant?.startsWith("factory-") && /letting one worker go/.test(c.reasoning ?? ""));
+  const letGo = c1.filter((c) => c.as?.startsWith("factory-") && /letting one worker go/.test(c.reasoning ?? ""));
   // Staff leave both ways: let go, or leaving for a better-paid job on their own (citizen 0.13.0).
   const factoryJobs = new Set([...slack.world.records, ...e1.filter((e) => e.event === "recorded").map((e) => e.record)].filter((r: any) => r.record === "agreement" && r.terms.template === "employment" && r.terms.parties[0].startsWith("factory-")).map((r: any) => r.id));
   const quit = e1.filter((e) => e.event === "recorded" && e.record.record === "notice" && factoryJobs.has(e.record.agreement) && e.record.text === "Resigning: moving to another job.");
   // ... or let go because the money for the next pay period isn't there (slack demand runs a factory's cash down).
-  const cashLetGo = c1.filter((c) => c.participant?.startsWith("factory-") && /Can't cover the next pay period/.test(c.reasoning ?? ""));
+  const cashLetGo = c1.filter((c) => c.as?.startsWith("factory-") && /Can't cover the next pay period/.test(c.reasoning ?? ""));
   // (Since shops stopped ordering all from one factory, 2026-10-08, a factory's orders are steadier and its making stops
   // at its band's top before its stock passes last month's demand: in this town the staff go for want of the wages,
   // not by the month's-end rule. Either is the factory letting workers go for too little demand.)
@@ -207,7 +208,7 @@ test("Lengnick: with too little demand a factory lets workers go and stops makin
   // Twice what they can make: they post jobs for a bigger headcount each month, up to the works' room.
   const busy = generate({ ...base, citizens: 120, exports_per_month: 120_000_000 });
   const { cmds: c2 } = await run("busy", busy, 4 * MONTH + DAY);
-  const posts = c2.filter((c) => c.participant?.startsWith("factory-") && /Short of this month's headcount .*stock .* was below/.test(c.reasoning ?? ""));
+  const posts = c2.filter((c) => c.as?.startsWith("factory-") && /Short of this month's headcount .*stock .* was below/.test(c.reasoning ?? ""));
   // (Three or more until 2026-10-09, which counted postings, and one works posting twice in a moment counted two. What
   // is meant is that the headcount sought rises: here a works with nobody seeks one, and with one seeks two. In the
   // town as now drawn it has stock enough at the end of one month not to post.)
@@ -216,7 +217,7 @@ test("Lengnick: with too little demand a factory lets workers go and stops makin
   // these four months: docs/behaviour/firms.md, "Adjusting labour". Before, it would have hired again a month later
   // on a month's wages. The other works goes on seeking a thirty-sixth hand.)
   expect(posts.length).toBeGreaterThanOrEqual(1);
-  expect(c2.filter((c) => c.participant?.startsWith("factory-") && /Short of this month's headcount/.test(c.reasoning ?? "")).length).toBeGreaterThanOrEqual(1);
+  expect(c2.filter((c) => c.as?.startsWith("factory-") && /Short of this month's headcount/.test(c.reasoning ?? "")).length).toBeGreaterThanOrEqual(1);
   // (One or more where it was three or more: with homes dealt by income, 2026-10-12, the other works is full, 36 of
   // 36, and stays so. Its two further postings were for the place of a hand who had left it twice in the first month,
   // people of households that opened without a home they could pay for; traced before and after.)

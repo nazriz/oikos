@@ -263,3 +263,8 @@ Over a 2-year run of the 200-citizen town (`worlds/town.yaml`):
 Modelling owners and their profit draws is the obvious next step. That's economic calibration, a medium-fidelity area (D25).
 
 **Uneven shops (2026-10-13).** Hours cuts and, in poorer towns, redundancies for want of money fall on the shops with least trade, which is lasting (a shop's first quarter against its last, r 0.5 to 0.9) and is not where people live (r 0.3 to 0.5): custom follows which shops a household is shown and keeps. Not a shop rule to change; see docs/decisions.md, 2026-10-13, "Shops sized by catchment".
+
+**F5 (2026-10-16): a firm's manager is a person.** A shop's, a factory's and the builder's manager is one of the firm's own staff; a
+letting office is held by a property manager, who holds those of several landlords (docs/behaviour/staffing.md). The manager's acts take the
+manager's time, as any person's. A factory that opens with no staff (the town's jobs run out before the last factory's) has a manager from
+the town's unemployed, unpaid and without an agreement: a rare case, recorded.

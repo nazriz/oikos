@@ -7,6 +7,7 @@ import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { generate, rentIncreaseLaw } from "@oikos/worlds/generator/generate";
 import { runWorld } from "../src/run";
+import { officesBy } from "./lib/offices";
 
 const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
@@ -28,7 +29,7 @@ test("rents are reviewed as landlords practise, within the law as a record says 
   const config = generate(base);
   // Landlords review every 6 months; the law (a record, as a lawmaker would write it) allows an increase only 9 months
   // after the last change, with 75 days' notice. They read the law as any participant does: its formal condition.
-  for (const p of config.participants.filter((x: any) => x.controller?.impl === "firm.landlord")) Object.assign(p.controller.params, { rent_review_months: 6, rent_increase_notice_days: 60 });
+  for (const p of officesBy(config, "firm.landlord")) Object.assign(p.params, { rent_review_months: 6, rent_increase_notice_days: 60 });
   const i = config.world.records.findIndex((r: any) => r.id === "law-rent-increases");
   config.world.records[i] = rentIncreaseLaw(9, 75);
   const law = { months: 9, notice: 75 };

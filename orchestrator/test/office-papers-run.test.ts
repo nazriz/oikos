@@ -12,6 +12,7 @@ import { join } from "node:path";
 import { modules } from "@oikos/participants";
 import { generate } from "@oikos/worlds/generator/generate";
 import { runWorld } from "../src/run";
+import { officesBy } from "./lib/offices";
 
 const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
@@ -21,7 +22,7 @@ const SEATS = ["registry", "works", "landlord-1-office", "bank-lending"];
 test("seats in the registry, the works office, a letting office and the lender issue their papers on their own forms, and the town goes on", async () => {
   const config = generate({ ...spec, works_crew_at_start: 0, model_seats: SEATS });
   config.life.other_causes.by_age = [{ from: 0, bps: 0 }, { from: 25, bps: 2500 }];
-  for (const x of config.participants) if (x.controller?.impl === "city.council_clerk") Object.assign(x.controller.params, { vote_days: 5 });
+  for (const x of officesBy(config, "city.council_clerk")) Object.assign(x.params, { vote_days: 5 });
   // Each seat has its office's stationery on file, seen by its organisation alone; a code office has none.
   const forms = (config.world.records as any[]).filter((r) => r.kind === "form" && r.data?.writes);
   expect(forms.filter((f) => f.data.office === "registry").map((f) => f.data.form)).toEqual(["death_registration", "death_certificate", "birth_registration", "transmission_application"]);

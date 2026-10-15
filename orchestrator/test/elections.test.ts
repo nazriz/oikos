@@ -9,6 +9,7 @@ import { join } from "node:path";
 import { generate } from "@oikos/worlds/generator/generate";
 import { instantRunoff } from "../../participants/src/behaviour/elections";
 import { runWorld } from "../src/run";
+import { officesBy } from "./lib/offices";
 
 const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
@@ -18,8 +19,8 @@ const POLL = 200;
 async function town(name: string, negligent: boolean, days: number, standBps?: number, extra: object = {}, standsAgain = true) {
   // (The negligent mayor's town has no budget on file at the start: the one its council adopts is that mayor's, with no staff line.)
   const config = generate({ ...spec, years: 1, first_election_days: POLL, ...(negligent ? { opening_budget: false } : {}), ...extra });
-  if (!standsAgain) for (const x of config.participants) if (x.controller?.impl === "city.mayor_code") x.controller.params.stands_again = false;
-  if (negligent) for (const x of config.participants) if (x.controller?.impl === "city.mayor_code") x.controller.params.staff_budget = 0;
+  if (!standsAgain) for (const x of officesBy(config, "city.mayor_code")) x.params.stands_again = false;
+  if (negligent) for (const x of officesBy(config, "city.mayor_code")) x.params.staff_budget = 0;
   // (How readily people stand, where the test needs a contest, or none.)
   if (standBps !== undefined) for (const c of [...config.participants.map((x: any) => x.controller), ...config.templates.map((x: any) => x.controller)]) if (c?.params?.civic) c.params = { ...c.params, civic: { ...c.params.civic, stand_bps: standBps } };
   const out = join(root, "runs", `test-elections-${name}`);
@@ -56,7 +57,7 @@ test("an election in a town run well, and in a town whose mayor funds no works c
   const kept = await town("kept", false, POLL + 5, 1000);
   // The office's records, in order: a notice, nominations (the incumbent among them), the roll and the ballot, then
   // the result on polling day, and the winner appointed.
-  const kinds = ["election_notice", "electoral_roll", "ballot_result"].map((k) => kept.recs.find((r) => r.kind === k && r.author === "electoral-system")?.at ?? -1);
+  const kinds = ["election_notice", "electoral_roll", "ballot_result"].map((k) => kept.recs.find((r) => r.kind === k && r.in_position === "electoral")?.at ?? -1);
   expect(kinds.every((t) => t > 0)).toBe(true);
   expect([...kinds].sort((a, b) => a - b)).toEqual(kinds);
   expect(Math.floor(kept.result.at / DAY)).toBe(POLL);
@@ -80,7 +81,9 @@ test("an election in a town run well, and in a town whose mayor funds no works c
   expect(editions.length).toBeGreaterThanOrEqual(4);
   expect(editions).toEqual(editions.map((_, i) => i + 1));
   const days = editions.map((e) => Math.floor(news.find((r) => r.data.edition === e).at / DAY));
-  for (let i = 1; i < days.length; i++) expect((days[i]! - days[0]!) % 7).toBe(0);
+  // (Never twice in a week. Until foundations F5 it was weekly to the day, a multiple of seven days from the first: its editor is now a person who is paid,
+  // whose acts take their time and whose day can slip, so an edition comes when the editor has the time, and the weeks after it keep to that day.)
+  for (let i = 1; i < days.length; i++) expect(days[i]! - days[i - 1]!).toBeGreaterThanOrEqual(7);
   expect(news.every((r) => r.assertion?.about?.includes("city"))).toBe(true);
   for (const e of editions) expect(news.filter((r) => r.data.edition === e).length).toBeLessThanOrEqual(5);
   expect(news.some((r) => r.data.kind === "election_notice" || r.data.kind === "nomination")).toBe(true);

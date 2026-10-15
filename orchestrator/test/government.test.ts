@@ -11,6 +11,7 @@ import { draftLaw } from "@oikos/participants";
 import { MockAdapter, type LlmRequest } from "@oikos/participants/llm";
 import { generate, rentIncreaseLaw } from "@oikos/worlds/generator/generate";
 import { runWorld } from "../src/run";
+import { officeAt, officesBy } from "./lib/offices";
 
 const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
@@ -30,13 +31,11 @@ async function amendment(name: string, leaning: number) {
   const i = config.world.records.findIndex((r: any) => r.id === "law-rent-increases");
   config.world.records[i] = rentIncreaseLaw(1, 30);
   const challenging = (c: any) => c?.impl === "citizen.default" && c.params?.tribunal && (c.params = { ...c.params, tribunal: { ...c.params.tribunal, challenge_bps: 10_000 } });
-  for (const x of config.participants) {
-    const c = x.controller;
-    if (c?.impl === "firm.landlord") Object.assign(c.params, { rent_review_months: 1, rent_increase_notice_days: 30, compliance_bps: 10_000 });
-    if (c?.impl === "city.councillor") Object.assign(c.params, { leaning, noise_bps: 0 });
-    if (c?.impl === "city.council_clerk") Object.assign(c.params, { vote_days: 7 });
-    challenging(c);
-  }
+  // (The offices are held by people, who run the post's module: its parameters are the position's.)
+  for (const o of officesBy(config, "firm.landlord")) Object.assign(o.params, { rent_review_months: 1, rent_increase_notice_days: 30, compliance_bps: 10_000 });
+  for (const o of officesBy(config, "city.councillor")) Object.assign(o.params, { leaning, noise_bps: 0 });
+  for (const o of officesBy(config, "city.council_clerk")) Object.assign(o.params, { vote_days: 7 });
+  for (const x of config.participants) challenging(x.controller);
   for (const t of config.templates) challenging(t.controller);
   for (const pos of config.positions) if (/^landlord-[2-9]-office$/.test(pos.id)) pos.channels = pos.channels.filter((c: any) => c.id !== "laws");
   let calls = 0, asked = false;
@@ -71,7 +70,7 @@ test("an amendment that passes binds: the clerk rewrites the law from the new fi
   const { recs, read, kind } = await amendment("amendment-passed", 80);
   // The mayor's request, on the law's form, as the resolver read it; balloted as what it would change.
   const prop = kind("proposal").find((r) => r.basis === "form-amend-rent-increases");
-  expect(prop).toMatchObject({ author: "mayor-system", data: { notice: 75 * DAY, affects: "tenants" } });
+  expect(prop).toMatchObject({ in_position: "mayor", data: { notice: 75 * DAY, affects: "tenants" } });
   const ballot = kind("ballot").find((r) => r.data.proposal === prop.id);
   expect(ballot.text).toBe("Council ballot: to amend the law on rent increases (law-rent-increases): notice of an increase 75 days (now 30 days).");
   expect(ballot.data.tags).toEqual(["tenant_protection"]);
@@ -81,10 +80,10 @@ test("an amendment that passes binds: the clerk rewrites the law from the new fi
   // The amended law: the clerk's, citing the ballot, by the same schedule (words, breakdown, rule), the figures recorded.
   const law = kind("law").find((r) => r.basis === ballot.id);
   const first = rentIncreaseLaw(1, 75);
-  expect(law).toMatchObject({ author: "council-clerk-system", speaks_for: "city", visible_to: "public", adico: first.adico, formal: first.formal,
+  expect(law).toMatchObject({ in_position: "council-clerk", speaks_for: "city", visible_to: "public", adico: first.adico, formal: first.formal,
     data: { schedule: "schedule-rent-increases", replaces: "law-rent-increases", figures: { review: { value: 30 * DAY, unit: "seconds" }, notice: { value: 75 * DAY, unit: "seconds" } } } });
   expect(law.text).toBe(`${first.text} (As amended by the council on ballot ${ballot.id}; this replaces law-rent-increases.)`);
-  expect(recs.some((r) => r.record === "withdrawal" && r.withdraws === "law-rent-increases" && r.author === "council-clerk-system" && r.at === law.at)).toBe(true);
+  expect(recs.some((r) => r.record === "withdrawal" && r.withdraws === "law-rent-increases" && r.in_position === "council-clerk" && r.at === law.at)).toBe(true);
   // The mayor is told, in the town's terms (the result, and the clerk's report with the figure as it now stands).
   expect(read).toContain("The law on rent increases is amended");
   expect(read).toContain(`the law on rent increases (${law.id}) on amend_rent_increases (notice: notice of an increase, now 75 days; review: least time between increases, now 1 month)`);
@@ -162,7 +161,7 @@ test("budget, park and rates run through the town's own procedures", async () =>
   const config = generate({ ...spec, citizens: 80, mayor: "code", landlord_compliance_bps: 10_000, opening_budget: false });
   // A payment from the town's account instructed by the mayor, a post the town
   // has not named as a signatory: the bank should decline it.
-  config.world.records.push({ id: "mayor-direct", record: "statement", author: "mayor-system", in_position: "mayor", speaks_for: "city", at: 0, visible_to: ["city", "bank"], kind: "request", addressed_to: ["bank"],
+  config.world.records.push({ id: "mayor-direct", record: "statement", author: officeAt(config, "mayor").holder.id, in_position: "mayor", speaks_for: "city", at: 0, visible_to: ["city", "bank"], kind: "request", addressed_to: ["bank"],
     text: "Please pay the builder $12.34 from the town's account.", data: { outcome: { money: { from: "acc-city", to: "acc-builder", amount: 1234 } } } });
   const out = join(root, "runs", "test-government");
   rmSync(out, { recursive: true, force: true });
@@ -174,14 +173,14 @@ test("budget, park and rates run through the town's own procedures", async () =>
 
   // The budget: proposed by the mayor, balloted by the clerk, voted by councillors, adopted with the ballot as basis.
   const budget = recs.find((r) => r.kind === "budget");
-  expect(budget?.author).toBe("council-clerk-system");
+  expect(budget?.in_position).toBe("council-clerk");
   const ballot = byId.get(budget.basis);
   expect(ballot?.kind).toBe("ballot");
   expect(byId.get(ballot.data.proposal)?.in_position).toBe("mayor");
   const result = recs.find((r) => r.kind === "ballot_result" && r.data.ballot === ballot.id);
   expect(result.data.passed).toBe(true);
   const votes = recs.filter((r) => r.record === "vote" && r.ballot === ballot.id);
-  expect(votes.every((v) => v.author.startsWith("councillor-"))).toBe(true);
+  expect(votes.every((v) => String(v.in_position).startsWith("councillor-"))).toBe(true);
   expect(result.data.yes).toBe(votes.filter((v) => v.choice === "yes").length);
 
   // The park: permit, commission, construction, invoice, approval, payment by the finance officer.
@@ -198,7 +197,7 @@ test("budget, park and rates run through the town's own procedures", async () =>
 
   // The instruction from a post the town didn't name: declined, with a message back.
   expect(ev.some((e) => e.event === "transfer" && e.from === "acc-city" && e.amount === 1234)).toBe(false);
-  expect(ev.some((e) => e.event === "message_delivered" && e.participant === "bank-payments-system" && e.to.includes("mayor-system"))).toBe(true);
+  expect(ev.some((e) => e.event === "message_delivered" && e.participant === "bank-payments-system" && e.to.includes(officeAt(config, "mayor").holder.id))).toBe(true);
   expect(readFileSync(s.logPath, "utf8").includes("Request mayor-direct not carried out: mayor is not an authorised signatory")).toBe(true);
 
   // Rates (the town's tax): landlords are sent notices on the valuer's valuations, and pay them into the town's account.

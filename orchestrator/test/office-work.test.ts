@@ -18,6 +18,7 @@ import { modules } from "@oikos/participants";
 import { generate } from "@oikos/worlds/generator/generate";
 import { runWorld } from "../src/run";
 import { applicantsTo, offeredTo, postingFor, scriptedSeats, type Sitting } from "../../scripts/scripted-seats";
+import { holderIdOf, officeAt, officeBy, officesBy } from "./lib/offices";
 
 const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
@@ -27,7 +28,7 @@ const spec = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")
 // show the crew at work. With draws named for the day, 2026-10-12, the generated seed's applicants came after the run ended.)
 async function worksSeat(citing: boolean) {
   const config = generate({ ...spec, opening_orders: false, model_seats: ["works"], works_crew_at_start: 0 });
-  const own = config.participants.find((p: any) => p.id === "works-staff-system").controller.params;
+  const own = officeAt(config, "works-staff").params;
   const wage = (own.wage / 100).toFixed(2), period = `${own.period / DAY} days`;
   const works: Sitting[] = [
     { day: 0, asks: () => [
@@ -51,11 +52,11 @@ async function worksSeat(citing: boolean) {
   const events = log.filter((e) => e.kind === "event").map((e) => ({ t: e.t, ...e.body }));
   const records = events.filter((e) => e.event === "recorded").map((e) => e.record);
   const hired = records.filter((r) => r.record === "agreement" && r.terms.template === "employment" && r.in_position === "works").map((r) => String(r.terms.parties[1]));
-  return { seats, events, records, hired, depot: String(own.workplace), shown: seats.shown.map((x) => x.text) };
+  return { seats, events, records, hired, depot: String(own.workplace), shown: seats.shown.map((x) => x.text), staffId: holderIdOf(config, "works-staff") };
 }
 
 test("a crew taken on by offers of the pay alone, made on the office's advertisement, comes to work and carries out the standing orders; the seat sees who worked and how each order stands", async () => {
-  const { seats, events, records, hired, depot, shown } = await worksSeat(true);
+  const { seats, events, records, hired, depot, shown, staffId } = await worksSeat(true);
   expect(hired.length).toBeGreaterThan(0);
   // The offers were of the pay alone: no place of work in them. Their preview says where the work is, by the advertisement.
   const offers = records.filter((r) => r.record === "agreement" && r.in_position === "works");
@@ -70,7 +71,7 @@ test("a crew taken on by offers of the pay alone, made on the office's advertise
   const leaving = new Set(records.filter((r) => r.record === "notice" && typeof r.as === "string" && hired.includes(r.as)).map((r) => r.as as string));
   expect(hired.filter((w) => came.has(w) || leaving.has(w)).length).toBe(hired.length);
   expect(hired.filter((w) => came.has(w)).length).toBeGreaterThan(0);
-  const collected = events.filter((e) => e.event === "worked" && e.by === "works-staff-system" && e.task === "collect");
+  const collected = events.filter((e) => e.event === "worked" && e.by === staffId && e.task === "collect");
   expect(collected.length).toBeGreaterThan(20);
   for (const c of collected) expect(c.performers.every((w: string) => hired.includes(w))).toBe(true);
   expect(records.filter((r) => r.kind === "complaint" && (r.addressed_to ?? []).includes("city"))).toEqual([]);
@@ -90,14 +91,14 @@ test("a crew taken on by offers of the pay alone, made on the office's advertise
 }, 600_000);
 
 test("offers that cite no advertisement: the preview says there is no place of work, nobody comes, and the crew's report and the seat's roster say the order is not carried out and why", async () => {
-  const { seats, events, records, hired, depot, shown } = await worksSeat(false);
+  const { seats, events, records, hired, depot, shown, staffId } = await worksSeat(false);
   expect(hired.length).toBeGreaterThan(0);
   expect(seats.previews.find((p) => p.text.includes("You will offer"))!.text).toContain("It names no place of work and cites no job advertisement that does: whoever signs it is paid and has nowhere to come to work.");
   // (Nobody comes for this job. One of those taken on now holds another job of the town's at the same address, taken
   // from the environment office the day before, and comes for that: left out.)
   const elsewhere = new Set(records.filter((r) => r.record === "agreement" && r.terms.template === "employment" && r.in_position !== "works" && r.terms.commitments.some((c: any) => c.does?.outcome?.occupancy?.in === depot)).map((r) => String(r.terms.parties[1])));
   expect(events.filter((e) => e.event === "occupied" && e.space === depot && hired.includes(e.occupant) && !elsewhere.has(e.occupant))).toEqual([]);
-  expect(events.filter((e) => e.event === "worked" && e.by === "works-staff-system")).toEqual([]);
+  expect(events.filter((e) => e.event === "worked" && e.by === staffId && ["collect", "maintain"].includes(e.task))).toEqual([]); // (the staff post is a resident, whose own life takes work too)
   const reports = records.filter((r) => r.kind === "staff_report");
   expect(reports.length).toBeGreaterThanOrEqual(1);
   const collect = reports[0]!.data.orders.find((o: any) => o.task === "collect");
@@ -117,8 +118,8 @@ test("offers that cite no advertisement: the preview says there is no place of w
 // sent back, as before.
 test("an energy seat orders from the grid on its own order form and is delivered; a payment with no order is sent back; its stationery says how", async () => {
   const config = generate({ ...spec, opening_orders: false, model_seats: ["energy-operations"] });
-  const market = config.participants.find((p: any) => p.id === "outside-trade-system").controller.params;
-  const own = config.participants.find((p: any) => p.id === "energy-operations-staff-system").controller.params;
+  const market = officeAt(config, "outside-trade").params;
+  const own = officeAt(config, "energy-operations-staff").params;
   const price = (market.sells.energy / 100).toFixed(2), least = Math.max(market.min_order ?? 100, 500);
   const sum = (n: number) => ((n * market.sells.energy) / 100).toFixed(2);
   const energy: Sitting[] = [
@@ -161,7 +162,7 @@ test("an energy seat orders from the grid on its own order form and is delivered
 // out one period after the order, and each office's staff report how its orders stand.
 test("bills go out one period after a standing billing order is made; the staff of the water, rates, clinic and school offices each report how their orders stand", async () => {
   const config = generate({ ...spec, opening_orders: false, model_seats: ["water-operations", "rates", "clinic-manager", "principal"] });
-  const params = (id: string) => config.participants.find((p: any) => p.id === `${id}-staff-system`).controller.params;
+  const params = (id: string) => officeAt(config, `${id}-staff`).params;
   const at = { water: params("water-operations").works, clinic: params("clinic-manager").building, school: params("principal").building };
   const idle = [4, 8, 11, 14].map((day) => ({ day, asks: () => [] }));
   const seats = scriptedSeats({
@@ -188,11 +189,12 @@ test("bills go out one period after a standing billing order is made; the staff 
   expect(of("water-operations")[0]!.text).toMatch(/draw_water \(rec\.\d+, every 1 day\): carried out: 1 days' draw, \d+ kL\. bill \(rec\.\d+, every 10 days\): in force; nothing fell due; the meters are read from year 1, day 1 and the next bills go out on year 1, day 11\./);
   expect(of("water-operations").some((r) => r.data.orders.some((o: any) => o.task === "bill" && o.state === "followed" && o.times === bills.length))).toBe(true);
   // The rates clerks, the doctors and the teachers report too, each to their own office.
-  expect(of("rates")[0]!.text).toMatch(/^Report of the rates clerks, year 1, day \d+, on the work under the office's standing work orders\. levy \(rec\.\d+, every 91 days\): in force; nothing fell due; (no property has been valued yet|the next notices go out on year 1, day \d+)/);
+  expect(of("rates").find((r) => /levy \(rec\./.test(r.text))!.text).toMatch(/^Report of the rates clerks, year 1, day \d+, on the work under the office's standing work orders( since year 1, day \d+)?\. levy \(rec\.\d+, every 91 days\): in force; nothing fell due; (no property has been valued yet|the next notices go out on year 1, day \d+)/);
+  // (The first report of the rates clerks and of the teachers that has the order in it: the person in the seat has the rest of their own time to spend as well, and the first report, on the second day, can come before the order is made: foundations F5.)
   // (Some report of theirs, not the first: the town's one doctor is now someone whose first working day is the
   // fourth, and the first report says, rightly, that nobody was at the clinic when it opened.)
   expect(of("clinic-manager").some((r) => /^Report of the clinic's doctors, .*treat \(rec\.\d+, every 1 day\): (carried out: \d+ patients seen|in force; nothing fell due).* In post \d+: c\d+ /.test(r.text))).toBe(true);
-  expect(of("principal")[0]!.text).toMatch(/^Report of the school's teachers, .*teach \(rec\.\d+, every 1 day\): carried out: \d+ lessons.* In post \d+: c\d+ last worked year 1, day \d+ \(teach\)/);
+  expect(of("principal").find((r) => /teach \(rec\.\d+, every 1 day\): carried out/.test(r.text))!.text).toMatch(/^Report of the school's teachers, .*teach \(rec\.\d+, every 1 day\): carried out: \d+ lessons.* In post \d+: c\d+ last worked year 1, day \d+ \(teach\)/);
   // And the seats that have a roster see it there: when each last worked, and each order as reported.
   const roster = seats.shown.filter((x) => x.seat === "principal" && x.text.includes("Staff of your office")).at(-1)!.text;
   expect(roster).toMatch(/last at work year 1, day \d+ \(teach\)/);

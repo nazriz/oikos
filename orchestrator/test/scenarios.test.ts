@@ -10,6 +10,7 @@ import { join } from "node:path";
 import { generate, type TownSpec } from "@oikos/worlds/generator/generate";
 import { loadProfile, PROFILE_DIR, type Profile } from "@oikos/worlds/generator/profile";
 import { scenarioIds } from "@oikos/worlds/generator/scenario";
+import { officeAt } from "./lib/offices";
 
 const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
@@ -58,7 +59,7 @@ test("the 1,000-person town under every scenario runs sixty days with mock parti
 test("at 1,000 people, the scenarios that shift an establishment change how many it has", () => {
   const spec = Bun.YAML.parse(readFileSync(join(root, WORLD), "utf8")) as TownSpec;
   const P = loadProfile(spec.profile!).values;
-  const params = (c: any, id: string) => c.participants.find((p: any) => p.id === `${id}-system`).controller.params;
+  const params = (c: any, id: string) => officeAt(c, id).params;
   const plain = generate(spec) as any, short = generate({ ...spec, scenario: "doctor-shortage+police-understrength" }) as any;
   const people = plain.world.entities.filter((e: any) => e.kind === "person").length;
   const establishment = (per1000: number) => Math.max(1, Math.ceil((per1000 * people) / 1000));

@@ -151,8 +151,9 @@ test("the same town and seed twice: the same records, change for change; and the
     expect(weeks.length).toBeGreaterThan(100);
     for (const p of weeks) expect(Math.abs(Object.values(p.hours as { [k: string]: number }).reduce((x, y) => x + y, 0) - (p.to - p.from))).toBeLessThanOrEqual(2 * DAY);
     expect(weeks.some((p) => (p.hours.work ?? 0) > 20 * 3_600)).toBe(true);
-    const text = JSON.stringify(periods.slice(0, 200)) + JSON.stringify(recs.slice(0, 200));
-    for (const word of ["good", "bad", "score", "reward", "wellbeing"]) expect(text.includes(`"${word}`)).toBe(false);
+    // (Without the hashes: one that begins "bad" or "good" in hex is a number, not a word.)
+    const text = (JSON.stringify(periods.slice(0, 200)) + JSON.stringify(recs.slice(0, 200))).replace(/"[0-9a-f]{32,}"/g, '""');
+    for (const word of ["good", "bad", "score", "reward", "wellbeing"]) expect(text.replace(/"goods/g, "").includes(`"${word}`)).toBe(false); // (a quantity of goods is not a judgement of them)
   } finally {
     rmSync(out, { recursive: true, force: true });
   }

@@ -24,7 +24,12 @@ const living = { ...spec, profile: "ke-nakuru-2026", living: { initiative_bps: 1
  * happens to someone: until then the arrears this file watched were households placed in homes they could not pay for.) */
 function withoutMeans(config: any) {
   const leases = config.world.records.filter((r: any) => r.record === "agreement" && r.terms.template === "lease" && !/with their household/.test(r.terms.text));
-  for (const l of leases.slice(0, 3)) {
+  // (Three whose rent days fall on different days of the week: the seat sits weekly, so two on one weekday are one day's letters. Taken in
+  // order until 2026-10-16, when the order of a town's leases moved with foundations F5 and the first three shared a day.)
+  const rentDay = (l: any) => Math.floor(((config.world.records.find((r: any) => r.kind === "request" && r.basis === l.id)?.data?.first ?? 0) / DAY) % 7);
+  const picked: any[] = [];
+  for (const l of leases) if (picked.length < 3 && !picked.some((x) => rentDay(x) === rentDay(l))) picked.push(l);
+  for (const l of picked) {
     const tenant = l.terms.parties[1] as string;
     const job = config.world.records.find((r: any) => r.record === "agreement" && r.terms.template === "employment" && r.terms.parties[1] === tenant);
     if (job) config.world.records = config.world.records.filter((r: any) => r.id !== job.id && r.agreement !== job.id && r.basis !== job.id);

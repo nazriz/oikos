@@ -13,6 +13,7 @@ import { join } from "node:path";
 import { calls as C, modules as builtin, type BehaviourModule } from "@oikos/participants";
 import { generate } from "@oikos/worlds/generator/generate";
 import { runWorld } from "../src/run";
+import { giveToAnother, officeAt, officesBy } from "./lib/offices";
 
 const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
@@ -55,13 +56,15 @@ async function town(name: string, who: { position: string; module: string }, scr
   // (No budget on file at the start: the works office recruits once the council adopts one, about a fortnight in,
   // which is when these tests' directions are standing or not.)
   const config = generate({ ...spec, citizens: 120, nature: false, works_crew_at_start: 0, opening_budget: false });
-  const pos = config.positions.find((x: any) => x.id === who.position);
-  const part = config.participants.find((x: any) => x.id === pos.holder);
-  expect(part.controller.impl).toBe(who.module);
+  // (The town's few clerks hold several posts: a direction from a person to an office they hold themselves is their own, and
+  // is not answered; here the works office has a holder of its own.)
+  giveToAnother(config, "works");
+  const part = officeAt(config, who.position);
+  expect(part.impl).toBe(who.module);
   const wrapped = directing(who.module);
-  part.controller = { ...part.controller, impl: wrapped.name, params: { ...(part.controller.params ?? {}), script } };
+  part.run(wrapped.name, { ...(part.params ?? {}), script });
   // (The council votes within the week, so that the budget is adopted well inside the run.)
-  for (const x of config.participants) if (x.controller?.impl === "city.council_clerk") Object.assign(x.controller.params, { vote_days: 5 });
+  for (const x of officesBy(config, "city.council_clerk")) Object.assign(x.params, { vote_days: 5 });
   const s = await runWorld({ config, runId: name, outDir: mkdtempSync(join(tmpdir(), `oikos-directions-${name}-`)), until: until * DAY, modules: { [wrapped.name]: wrapped } });
   expect(s.participantErrors).toBe(0);
   const lines = readFileSync(s.logPath, "utf8").trim().split("\n").map((l) => JSON.parse(l));
@@ -71,7 +74,8 @@ async function town(name: string, who: { position: string; module: string }, scr
   const day = (t: number) => Math.floor(t / DAY);
   const crewAdverts = records.filter((r) => r.kind === "job_posting" && r.speaks_for === "city" && r.data?.role === "works crew");
   const budget = records.find((r) => r.kind === "budget" && r.speaks_for === "city");
-  return { config, records, letters, day, crewAdverts, budget, crew: records.filter((r) => r.record === "agreement" && r.terms.template === "employment" && r.terms.parties[0] === "city") };
+  const holderOf = (post: string): string => officeAt(config, post).holder.id;
+  return { config, holderOf, records, letters, day, crewAdverts, budget, crew: records.filter((r) => r.record === "agreement" && r.terms.template === "employment" && r.terms.parties[0] === "city" && !/ as administrative officer for /.test(r.terms.text ?? "")) }; // (the works crew: the town's administrative staff, who have a role of their own, are not it)
 }
 
 test("the mayor directs the works office not to recruit: it advertises nothing while that stands, and recruits again when it is withdrawn", async () => {
@@ -99,9 +103,9 @@ test("the mayor directs the works office not to recruit: it advertises nothing w
   expect(r.crew.filter((a) => a.at > lifted.at).length).toBeGreaterThan(0);
   expect(r.crew.filter((a) => a.at <= lifted.at)).toEqual([]);
   // The office wrote to the mayor, once, to say what it would do.
-  const ack = r.letters.filter((m) => m.from === "works-system" && m.re === d.id);
+  const ack = r.letters.filter((m) => m.from === r.holderOf("works") && m.re === d.id);
   expect(ack.map((m) => m.text)).toEqual([`From the works office: your direction ${d.id} is received. The office advertises no post, takes down the advertisements it has out and makes no new offer of employment. It has no offer out that is not yet signed. It stands until you replace or withdraw it.`]);
-  expect(ack[0]!.to).toEqual(["mayor-system"]);
+  expect(ack[0]!.to).toEqual([r.holderOf("mayor")]);
 }, 600_000);
 
 test("the same direction from the finance officer, whom the town's rule does not name, changes nothing: the office recruits, and says why it does not follow it", async () => {
@@ -112,7 +116,7 @@ test("the same direction from the finance officer, whom the town's rule does not
   // Once the budget pays for a crew, the office advertises as it would have.
   expect(r.crewAdverts.length).toBeGreaterThan(0);
   expect(r.day(r.crewAdverts[0]!.at) - r.day(r.budget.at)).toBeLessThanOrEqual(3);
-  const reply = r.letters.filter((m) => m.from === "works-system" && m.re === d.id);
+  const reply = r.letters.filter((m) => m.from === r.holderOf("works") && m.re === d.id);
   expect(reply.map((m) => m.text)).toEqual([`From the works office: your direction ${d.id} is not being followed. This office takes directions on its forms only from those proc-directions names.`]);
-  expect(reply[0]!.to).toEqual(["finance-system"]);
+  expect(reply[0]!.to).toEqual([r.holderOf("finance")]);
 }, 600_000);

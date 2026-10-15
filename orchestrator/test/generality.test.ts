@@ -7,6 +7,7 @@ import { join, relative } from "node:path";
 import { draftLaw } from "@oikos/participants";
 import { generate } from "@oikos/worlds/generator/generate";
 import { PROFILE_DIR, type Profile } from "@oikos/worlds/generator/profile";
+import { officeBy } from "./lib/offices";
 
 const root = join(import.meta.dir, "../..");
 
@@ -179,8 +180,8 @@ test("a town is generated from each profile, taking its figures from it", () => 
   for (const p of profiles) {
     const c = generate({ ...spec, citizens: 60, profile: p.id });
     expect(c.world.currencies).toEqual([p.values.currency]);
-    const retail = c.participants.find((x: any) => x.controller?.impl === "firm.retailer");
-    expect(retail.controller.params.wage).toBe(p.values.wages_per_pay_period.shop);
+    const retail = officeBy(c, "firm.retailer");
+    expect(retail.params.wage).toBe(p.values.wages_per_pay_period.shop);
     const person = c.participants.find((x: any) => x.kind === "person");
     expect(person.controller.params.retirement_age).toBe(p.values.retirement_age);
   }
@@ -285,7 +286,7 @@ test("every word a generated town is given is in its own money: no other place's
     const planning = c.world.records.find((r: any) => r.id === "law-planning");
     expect(planning.data.fine).toBe(p.values.town_finance.unpermitted_building_fine);
     expect(planning.text).not.toMatch(/[{}]/);
-    expect(c.participants.find((x: any) => x.controller?.impl === "city.inspector").controller.params.fine).toBe(planning.data.fine);
+    expect(officeBy(c, "city.inspector").params.fine).toBe(planning.data.fine);
     // Every law made from figures reads exactly as its schedule writes it from the figures it carries.
     for (const r of c.world.records.filter((x: any) => x.kind === "law" && x.data?.schedule)) {
       const s = c.world.records.find((x: any) => x.id === r.data.schedule);

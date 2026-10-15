@@ -7,6 +7,7 @@ import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { generate } from "@oikos/worlds/generator/generate";
 import { runWorld } from "../src/run";
+import { officeAt, officeBy, officesBy } from "./lib/offices";
 
 const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
@@ -19,7 +20,7 @@ test("a failed shop's premises are bought by someone who founds a new shop there
   // way out, if people come to work and shop there: whether it does is the world's, not what this test is about.)
   config.world.accounts.find((a: any) => a.id === "acc-shop-1").balance = "0";
   config.world.holdings = config.world.holdings.filter((h: any) => h.holder !== "shop-1");
-  const shop1 = config.participants.find((p: any) => p.id === "shop-1-manager-system").controller.params;
+  const shop1 = officeAt(config, "shop-1-manager").params;
   Object.assign(shop1, { short_days: 10, wind_up_days: 10, idle_days: 30, lender: "", max_staff: 0 });
   for (const p of config.participants) if (p.controller?.impl === "citizen.default") p.controller.params.found_bps = 10_000;
   // Someone of working age in the labour force has the savings to buy the premises (an inheritance, say): in the

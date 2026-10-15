@@ -15,6 +15,7 @@ import { generate } from "@oikos/worlds/generator/generate";
 import { createTranslator, Knowledge, Preview, resolve } from "@oikos/translator";
 import { runWorld } from "../src/run";
 import { scriptedSeats } from "../../scripts/scripted-seats";
+import { officeAt, officeBy, officesBy } from "./lib/offices";
 
 const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
@@ -66,7 +67,7 @@ test("the rates seat's four requests of the pilot, as its translator wrote them:
 });
 
 test("each school day and each working day are read; a routine with its own rhythm takes it where the order gives none; what cannot be read says what it can be", () => {
-  const school = config.participants.find((p: any) => p.id === "principal-staff-system").controller.params.building;
+  const school = officeAt(config, "principal-staff").params.building;
   expect(made("principal", `work(at=${school}, every="each school day", task=teach)`).block.data).toEqual({ work: { task: "teach", at: school }, every: DAY });
   expect(made("works", 'work(at=town-hall, every="every working day", task=maintain)').block.data.every).toBe(DAY);
   // The principal's second request of the pilot: "enrol ... for each enrolment received", with no how often.
@@ -98,10 +99,10 @@ test("a rates seat that asks for its levy with no how often has an order from it
   const records = readFileSync(s.logPath, "utf8").trim().split("\n").map((l) => JSON.parse(l)).filter((e) => e.kind === "event" && e.body.event === "recorded").map((e) => e.body.record);
   const order = records.find((r) => r.kind === "work_order")!;
   expect(order).toMatchObject({ in_position: "rates", text: "Standing work order: levy at rates, as law-rates sets.", data: { schedule: "law-rates", by_procedure: "proc-rates-routines" } });
-  expect(order.at).toBeLessThan(DAY);
+  expect(order.at).toBeLessThan(2 * DAY); // (two days where it was one: the seat is a person of the town now, and its first day is spent on the town's as well: foundations F5)
   // The clerks' report names the order as it stands, and the notices go out on the office's first levy day.
   const reports = records.filter((r) => r.kind === "staff_report" && r.data.office === "rates");
-  expect(reports[0]!.text).toMatch(/levy \(rec\.\d+, as law-rates sets\): in force; nothing fell due; (no property has been valued yet|the next notices go out on year 1, day \d+)/);
+  expect(reports.find((r) => /levy \(rec\./.test(r.text))!.text).toMatch(/levy \(rec\.\d+, as law-rates sets\): in force; nothing fell due; (no property has been valued yet|the next notices go out on year 1, day \d+)/);
   const notices = records.filter((r) => r.kind === "rates_notice" && r.in_position === "rates-staff");
   expect(notices.length).toBeGreaterThan(10);
   expect(Math.min(...notices.map((n) => n.at))).toBeLessThan(32 * DAY);
