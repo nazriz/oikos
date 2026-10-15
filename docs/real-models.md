@@ -114,10 +114,10 @@ The owner's decision (docs/decisions.md, 2026-10-11): the trained translator is 
 the prompt-driven one. Interim, for pilots; one model that works alone remains the goal. Code: `translator/src/arrangement.ts`.
 
 ```bash
-OIKOS_TRANSLATOR_MODELS=~/oikos/runs/translator-round-2-2026-10-10/models \
+OIKOS_TRANSLATOR_MODELS=~/oikos/runs/translator-model \
 oikos run worlds/town-1000.yaml --set mayor=llm --set model_seats=finance \
   --model claude-code/claude-sonnet-5-5 --translator-model claude-code/claude-sonnet-5-5 --budget 6 \
-  --translator-first decide/pod-small-r2-s1 [--translator-arrangement then|beside]
+  --translator-first decide/pod-small-r3-long-s1 [--translator-arrangement then|beside]
 ```
 
 - `--translator-first decide/NAME` puts that trained model first; the run's translator (`--translator-model`, else the
@@ -144,7 +144,11 @@ oikos run worlds/town-1000.yaml --set mayor=llm --set model_seats=finance \
   carry `route` on each translation.
 - **A dry run** (`scripts/pilot-mock.ts`, `pilot-wave.ts --mock`) keeps an entry's trained first translator, with the mock
   behind it: it costs nothing and goes through the arrangement.
-- **Which model:** `pod-small-r2-s1` (153 of the 180 real requests right, 12 wrong drafts, no draft on 15; the reasons are
+- **Which model (from 2026-10-15): `pod-small-r3-long-s1`** (the third round's long reader, 2,048 tokens: 155 of the 180
+  real right, 8 wrong drafts, no draft on 17; held out 53 of 66; it serves the forms `pod-small-r2-s1` served and no new
+  form: `forms-released.json`, docs/decisions.md 2026-10-15 "step 5"). `OIKOS_TRANSLATOR_MODELS=~/oikos/runs/translator-model`
+  holds it and `pod-small-r2-s1` by name (links to their round folders): `--translator-first decide/pod-small-r2-s1`
+  still works. **Before it (2026-10-11):** `pod-small-r2-s1` (153 of the 180 real requests right, 12 wrong drafts, no draft on 15; the reasons are
   in the decisions log). **The shake-down** is `runs/tiu-01-shakedown/` (30 days, a mayor and a finance seat, `ke-nakuru-2026`):
   five requests, four answered by the first (three confirmed, one declined: a wage less withholding drafted gross), one
   behind after the decline (confirmed); 218 ms a request for the first; 0.58 USD. The decisions log has the detail.
@@ -187,9 +191,9 @@ A form the model was taught is not for that reason one it answers for the world.
 Where a town has `living.composer` (docs/behaviour/founding.md, "Words"), the words of what people found are written by a model asked as an author shown the founder's record, who may decline (VISION 15, point 7). It is not a seat and not the translator: it has its own purpose in the log (`compose`) and its own models.
 
 ```bash
-OIKOS_CLAUDE_BIN=~/.local/bin/claude OIKOS_TRANSLATOR_MODELS=~/oikos/runs/translator-round-2-2026-10-10/models \
+OIKOS_CLAUDE_BIN=~/.local/bin/claude OIKOS_TRANSLATOR_MODELS=~/oikos/runs/translator-model \
 oikos run worlds/town-1000.yaml --set living.initiative_bps=10000 --set living.founding=true --set living.composer=true \
-  --composer --model claude-code/claude-sonnet-5-5 --translator-first decide/pod-small-r2-s1 --budget 6
+  --composer --model claude-code/claude-sonnet-5-5 --translator-first decide/pod-small-r3-long-s1 --budget 6
 ```
 
 - **Which models** is the world's config (`dials.composer.mix`: `claude-code/claude-sonnet-5-5` and `codex/gpt-6.1-sol`, half each, unless the spec sets it), recorded at the start of every log and held fixed across runs that are compared. Which model writes a piece is drawn on a seeded stream. Never `gpt-6-astra`, never Fable: a mix that names either is refused.

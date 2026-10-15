@@ -48,6 +48,32 @@ export function table(results: FormResult[], mark = MARK): { released: string[];
   return { released, behind };
 }
 
+/** The arrangement's release (the third round, step 5; docs/decisions.md): the forms the model served before keep being
+ * served (`old`: the forms a model already in use was taught: behaviour as it was), and a form taught since is released
+ * only if the run as a whole may release any (`runRuleFired` false: wrong drafts on the new real set within the
+ * plan's 2%) and it passes its own mark. A new form that passes its mark while the run rule has fired is named
+ * ("passes, held by the run rule"). A form listed as taught with no per-form result (no example behind it) is behind. */
+export function arrangement(results: FormResult[], trained: string[], old: string[], runRuleFired: boolean, mark = MARK): { released: string[]; behind: { form: string; why: string }[]; old_kept: number } {
+  const t = table(results, mark);
+  const oldSet = new Set(old), passes = new Set(t.released);
+  const released = trained.filter((f) => oldSet.has(f));
+  const behind: { form: string; why: string }[] = [];
+  const have = new Map(results.map((r) => [r.form, r]));
+  for (const f of trained.filter((f) => !oldSet.has(f)).sort()) {
+    if (!have.has(f)) { behind.push({ form: f, why: "no per-form result: taught with no example behind it" }); continue; }
+    if (passes.has(f)) {
+      if (runRuleFired) behind.push({ form: f, why: "passes its own mark, held behind by the run-level rule (wrong drafts on the new real set above 2%)" });
+      else released.push(f);
+    } else behind.push({ form: f, why: t.behind.find((b) => b.form === f)!.why });
+  }
+  return { released: released.sort(), behind, old_kept: released.filter((f) => oldSet.has(f)).length };
+}
+
+/** A scorer's per-form block (step 4's RESULTS.json `per_form`) as the table reads it. */
+export function fromPerForm(perForm: Record<string, { real: { right: number; of: number; wrong: number }; generated_tests: { right: number; of: number } }>): FormResult[] {
+  return Object.entries(perForm).map(([form, p]) => ({ form, real: { n: p.real.of, right: p.real.right, wrong_drafts: p.real.wrong }, generated: { n: p.generated_tests.of, right: p.generated_tests.right } }));
+}
+
 /** The list written beside a model: "wrote", or "same"; a different list is refused (nothing is overwritten). Every name
  * must be a form the model was taught, where its folder says which. */
 export function writeSidecar(modelDir: string, names: string[], basis: { mark: typeof MARK; behind: { form: string; why: string }[]; results?: string }): "wrote" | "same" {
@@ -67,7 +93,17 @@ export function writeSidecar(modelDir: string, names: string[], basis: { mark: t
   return "wrote";
 }
 
-if (import.meta.main) {
+if (import.meta.main && process.argv[2] === "--arrangement") {
+  // bun scripts/forms-released.ts --arrangement MODEL_DIR RESULTS.json MODEL_NAME OLD_FORMS_TRAINED.json fired|clear [--dry]
+  const [modelDir, resultsFile, name, oldFile, rule] = process.argv.slice(3);
+  if (!modelDir || !resultsFile || !name || !oldFile || (rule !== "fired" && rule !== "clear")) { console.error("usage: bun scripts/forms-released.ts --arrangement MODEL_DIR RESULTS.json MODEL_NAME OLD_FORMS_TRAINED.json fired|clear [--dry]"); process.exit(2); }
+  const trained = JSON.parse(readFileSync(join(modelDir, "forms-trained.json"), "utf8")).forms_trained as string[];
+  const old = JSON.parse(readFileSync(oldFile, "utf8")).forms_trained as string[];
+  const a = arrangement(fromPerForm(JSON.parse(readFileSync(resultsFile, "utf8"))[name].per_form), trained, old, rule === "fired");
+  console.log(`${a.released.length} released (${a.old_kept} the model served before); ${a.behind.length} new forms stay behind`);
+  for (const b of a.behind) console.log(`  behind: ${b.form}: ${b.why}`);
+  if (!process.argv.includes("--dry")) console.log(writeSidecar(modelDir, a.released, { mark: MARK, behind: a.behind, results: resultsFile }));
+} else if (import.meta.main) {
   const [modelDir, resultsFile] = process.argv.slice(2);
   if (!modelDir || !resultsFile) { console.error("usage: bun scripts/forms-released.ts MODEL_DIR RESULTS.json"); process.exit(2); }
   const t = table(JSON.parse(readFileSync(resultsFile, "utf8")) as FormResult[]);
