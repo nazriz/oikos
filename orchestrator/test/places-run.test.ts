@@ -108,11 +108,7 @@ test("a town paid monthly, with no payment to the unemployed and no rent or ball
   for (const j of kept) {
     const times = paid.get(`acc-${j.terms.parties[1]}`) ?? [];
     // (Three for someone whose first pay day fell in the run's first five days.)
-    // FOUND AND NOT FIXED (foundations F5, docs/decisions.md): when a rise replaces a worker's wage order, the manager's act (withdraw the old,
-    // make the new) takes a person's minutes; if the pay moment falls inside it the old order pays and the new one pays a day later. Rare (a
-    // worker in sixty, here), and the worker's other payments are as they were. A worker whose order was replaced is left out of the count.
-    const replaced = wages.some((w: any) => w.to === `acc-${j.terms.parties[1]}` && w.per_instruction !== `${j.id}-wages`);
-    if (replaced) continue;
+    // (Including a worker whose wage order was replaced by a rise: pay rises begin at the next pay run, never paying twice in a period.)
     expect({ worker: j.terms.parties[1], times: Math.min(2, times.length), early: times.length === 3 ? times[0]! <= 5 * DAY + DAY : false }).toEqual({ worker: j.terms.parties[1], times: 2, early: times.length === 3 });
     expect(times.length).toBeLessThanOrEqual(3);
     for (let i = 1; i < times.length; i++) expect(times[i]! - times[i - 1]!).toBeGreaterThanOrEqual(29 * DAY);
