@@ -25,6 +25,7 @@ fn cmd(participant: &str, position: Option<&str>, blocks: Value) -> Command {
         participant: participant.into(),
         position: position.map(String::from),
         blocks: serde_json::from_value(blocks).expect("the blocks parse"),
+        by: vec![],
         provenance: json!({"via": "direct"}),
         reasoning: None,
         thinking: None,
@@ -72,6 +73,14 @@ fn applied(run: &mut R, c: &Command) -> Value {
 /// 4 units of `make` at 1,800 s a unit: two hours of carol's, at the shop where she works.
 fn make(units: u64, performers: &[&str]) -> Command {
     cmd("developer-system", Some("developer"), json!([{"block": "work", "task": "make", "units": units, "at": "s-shop", "performers": performers}]))
+}
+
+/// A command naming who does the work (`by`, on the action).
+fn cmd_by(participant: &str, position: Option<&str>, blocks: Value, by: &[&str]) -> Command {
+    match cmd(participant, position, blocks) {
+        Command::Act { participant, position, blocks, provenance, reasoning, thinking, .. } => Command::Act { participant, position, blocks, by: by.iter().map(|s| s.to_string()).collect(), provenance, reasoning, thinking },
+        c => c,
+    }
 }
 
 fn msg(from: &str) -> Command {
@@ -214,7 +223,6 @@ fn law2_the_table_is_by_block_and_by_who_does_it() {
 /// How long is not a property of the block but of what is made: a decision on a claim is not a notice (F2). The key's
 /// spelling (`<block>/<kind>` here) is the plan's to settle at F2; what is fixed is that a record's kind can have a row.
 #[test]
-#[ignore = "F2: the work table keyed by what an act makes (a block and the kind of record it writes)"]
 fn law2_time_is_read_from_the_kind_of_record_an_act_writes() {
     let mut run = town_with_times(json!({"person": {"publish": 900, "publish/benefit_decision": 2_400}}));
     let notice = cmd("alice-self", None, json!([{"block": "publish", "kind": "notice", "text": "a notice"}]));
@@ -359,7 +367,6 @@ fn law5_an_applied_act_records_who_acted_and_in_which_post() {
 
 /// `by`: who did the work is on the record of the act (F3), read from the log, never inferred (the GD plan's M1).
 #[test]
-#[ignore = "F3: `by` on any act, and recorded on the applied act"]
 fn law5_the_performers_of_an_act_are_on_its_record() {
     let mut run = town();
     let work = cmd("developer-system", Some("developer"), json!([{"block": "work", "task": "make", "units": 1, "at": "s-shop", "performers": ["carol"]}]));
@@ -373,10 +380,63 @@ fn law5_the_performers_of_an_act_are_on_its_record() {
 /// Any act may name performers; a person performer must be present where the work's row asks, alive and within their
 /// day (F3): a clerk not at work cannot decide.
 #[test]
-#[ignore = "F3: performers on any act; a person performer must be at the place the work asks (`not_at_work`)"]
 fn law5_a_performer_who_is_not_there_cannot_do_the_work() {
-    let mut run = town();
-    // Alice is at home (s-house), not at a workplace of the shop: she cannot be the hand that sends this.
-    let c = cmd("developer-system", Some("developer"), json!([{"block": "message", "to": ["bob-self"], "text": "hi", "by": ["alice"]}]));
-    assert_eq!(outcome(&mut run, &c).as_deref(), Some("not_at_work"));
+    // The world says work is done in a workplace space (`orchestration.performers_in`). Alice is at home (s-house, a
+    // dwelling), not at work: she cannot be the hand that sends this. Carol is at the shop's workplace: she can.
+    let mut c = world(&default_params());
+    c["orchestration"]["performers_in"] = json!("workplace");
+    let mut run = start(c);
+    let hi = json!([{"block": "message", "to": ["bob-self"], "text": "hi"}]);
+    assert_eq!(outcome(&mut run, &cmd_by("developer-system", Some("developer"), hi.clone(), &["alice"])).as_deref(), Some("not_at_work"));
+    assert_eq!(outcome(&mut run, &cmd_by("developer-system", Some("developer"), hi, &["carol"])), None);
+}
+
+/// Who is to be at work is looked at when the work begins, not when it ends (F3; F1 had found the plan wrong here): a
+/// work that queued behind other time is refused at its start, at once, if its performer is gone by then; it never
+/// takes anyone's time to the end.
+#[test]
+fn law5_presence_is_looked_at_when_the_work_begins() {
+    let mut run = town_with_times(json!({"person": {"vacate": 3_600}}));
+    // Carol leaves the shop (an hour, her own affairs). Meanwhile, ordered now when she is there, a work of hers queues
+    // behind that hour.
+    begun(&mut run, &cmd("carol-self", None, json!([{"block": "vacate", "occupant": "carol", "from": "s-shop"}])));
+    let r = run.command(&make(1, &["carol"])).unwrap();
+    assert!(r.events.iter().any(|e| matches!(e.body, EventBody::ActionStarted { starts: 3_600, .. })), "the work waits for carol: {:?}", r.events);
+    let goods = run.kernel().state().holding("devco", "s-shop", "goods");
+    let r = run.command(&Command::Advance { to: 3_601 }).unwrap();
+    let refused = r.events.iter().find_map(|e| match &e.body { EventBody::ActionRefused { code, .. } => Some(serde_json::to_value(code).unwrap()), _ => None });
+    assert_eq!(refused, Some(json!("not_at_work")), "refused when it was to begin (3600), not when it would have ended (5400): {:?}", r.events);
+    assert_eq!(run.kernel().state().holding("devco", "s-shop", "goods"), goods, "nothing was made");
+    // Her hour for the work is given back: she is free from then.
+    assert_eq!(begun(&mut run, &msg("carol-self")).0, 3_601, "carol's time was not kept for work that never began");
+}
+
+/// An action that names others to do its work: the act's time is theirs, shared, and the actor is held a second.
+#[test]
+fn law5_an_act_naming_performers_takes_their_time_shared() {
+    let mut c = world(&default_params());
+    c["orchestration"]["act_time"] = json!({"person": {"message": 600}, "system": {"message": 1_200}});
+    c["orchestration"]["performers_in"] = json!("workplace");
+    let mut run = start(c);
+    let m = cmd_by("developer-system", Some("developer"), json!([{"block": "message", "to": ["bob-self"], "text": "hi"}]), &["carol"]);
+    let (s, d) = begun(&mut run, &m);
+    assert_eq!((s, d), (0, 1_200), "a system's message is 1,200 s; carol alone does it");
+    assert_eq!(run.kernel().state().timelines["carol"].lanes.iter().copied().max(), Some(1_200));
+    let e = applied(&mut run, &m);
+    assert_eq!(e["by"], json!(["carol"]));
+}
+
+/// A record says who did the work of making it when that was not its author (F3).
+#[test]
+fn law5_a_record_names_who_made_it_when_not_its_author() {
+    let mut c = world(&default_params());
+    c["orchestration"]["performers_in"] = json!("workplace");
+    let mut run = start(c);
+    let publish = |by: &[&str]| cmd_by("developer-system", Some("developer"), json!([{"block": "publish", "kind": "notice", "text": "x"}]), by);
+    let by_of = |run: &mut R, c: &Command| {
+        let r = step(run, c).unwrap();
+        r.events.iter().find_map(|e| match &e.body { EventBody::Recorded { record } => Some(record.by.clone()), _ => None }).expect("a record")
+    };
+    assert_eq!(by_of(&mut run, &publish(&["carol"])), Some(vec!["carol".to_string()]));
+    assert_eq!(by_of(&mut run, &publish(&[])), None, "the author did it: nothing to add");
 }

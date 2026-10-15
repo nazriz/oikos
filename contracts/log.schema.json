@@ -178,7 +178,15 @@
             "blocks": {
               "$ref": "urn:oikos:contracts:0.8:blocks#/$defs/Action/properties/blocks"
             },
-            "provenance": {
+            "by": {
+              "description": "Who does the act's work, if not the actor alone: people, each alive, present and at work (`orchestration.performers_in`). The act's time is theirs, shared between them; it starts when all are free. Absent: the actor. Foundations step F3.",
+              "type": "array",
+              "items": {
+                "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+              },
+              "maxItems": 1000
+            },
+"provenance": {
               "$ref": "#/$defs/Provenance"
             },
             "reasoning": {
@@ -488,7 +496,15 @@
             "as": {
               "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
             },
-            "created": {
+            "by": {
+              "description": "Who did the work, read from the log and never inferred (the GD plan's M1): the performers the action named (`by`), else those a `work` block named, else the acting participant itself. Foundations step F3, 2026-10-15.",
+              "type": "array",
+              "items": {
+                "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+              },
+              "maxItems": 1000
+            },
+"created": {
               "type": "object",
               "propertyNames": {
                 "$ref": "urn:oikos:contracts:0.8:common#/$defs/RefName"

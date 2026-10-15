@@ -32,6 +32,10 @@ pub enum Command {
         #[serde(default, rename = "as", skip_serializing_if = "Option::is_none")]
         position: Option<Id>,
         blocks: Vec<Block>,
+        /// Who does the act's work, if not the actor alone (foundations F3): people, each alive, present and at work
+        /// (`orchestration.performers_in`). The act's time is theirs, shared; it starts when all are free.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        by: Vec<Id>,
         /// Logged, never interpreted.
         provenance: Value,
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -157,6 +161,7 @@ impl World {
             currency: currency.clone(),
             tick: c.clock.tick_seconds,
             act_times: oikos_time::ActTimes::from_orchestration(&c.orchestration),
+            performers_in: c.orchestration["performers_in"].as_str().map(String::from),
             randomness: Randomness::new(c.seed),
             nature: oikos_nature::configured(&c.catalogue).then(|| {
                 let cells: BTreeSet<(Id, i64, i64)> = crate::config::detailed_rects(&w.places)
@@ -612,7 +617,7 @@ impl World {
     /// `apply`, for a caller that has just prechecked this command against the world as it is (nothing done since).
     pub fn apply_prechecked(&mut self, cmd: &Command) -> Result<Output, ProtocolError> {
         Ok(match cmd {
-            Command::Act { participant, position, blocks, thinking, .. } => self.begin(participant, position.as_deref(), blocks, thinking.unwrap_or(0)),
+            Command::Act { participant, position, blocks, by, thinking, .. } => self.begin(participant, position.as_deref(), blocks, by, thinking.unwrap_or(0)),
             Command::Advance { to } => self.advance(*to),
             // (What a participant perceives is perception's to build, read-only; the engine then has the world deliver it.)
             Command::Observe { .. } | Command::Look { .. } => return perr("observing is the engine's: perception builds it, and the world delivers it"),
@@ -751,7 +756,7 @@ impl World {
             return perr("an action has 1..=32 blocks");
         }
         let mut scratch = self.state.clone();
-        Ok(match exec_action(&self.s, &mut scratch, participant, position, blocks) {
+        Ok(match exec_action(&self.s, &mut scratch, participant, position, blocks, &[]) {
             Ok(res) => match self.over_the_day(&work_shares(&res.events), crate::exec::day_of(self.state.t)) {
                 Some(d) => Check { ok: false, refusal: Some(refusal_info(&refuse(RefusalCode::NoTimeLeft, d))) },
                 None => Check { ok: true, refusal: None },
@@ -762,7 +767,7 @@ impl World {
 
     /// An act begun: its actor is busy with it for the time it takes (the world's `act_time`), after any thinking, and
     /// it takes effect when done (docs/design/rebuild.md 6.2, 6.3).
-    fn begin(&mut self, participant: &str, position: Option<&str>, blocks: &[Block], thinking: i64) -> Output {
+    fn begin(&mut self, participant: &str, position: Option<&str>, blocks: &[Block], by: &[Id], thinking: i64) -> Output {
         let action = self.state.mint("act");
         let t = self.state.t;
         let p = &self.state.participants[participant];
@@ -785,21 +790,34 @@ impl World {
             })
             .max()
             .unwrap_or(0);
-        let seconds = self.s.act_times.program(actor, blocks.iter().map(Block::name)) + trip;
+        let seconds = self.s.act_times.program(actor, blocks.iter().map(|b| (b.name(), b.makes()))) + trip;
         let ready = t + thinking;
+        // Who else does the act's work (F3): the action's `by`, a person other than the actor. The act's own time is theirs,
+        // shared (the actor, if it is among them, takes a share; if not, only the second of ordering it).
+        let others: Vec<Id> = by.iter().filter(|w| **w != key && *w != participant).cloned().collect::<std::collections::BTreeSet<_>>().into_iter().collect();
+        let (actor_seconds, by_share) = if others.is_empty() {
+            (seconds, 0)
+        } else {
+            let n = others.len() as i64 + i64::from(by.iter().any(|w| *w == key || w == participant));
+            let share = (seconds + n - 1) / n;
+            (if n as usize > others.len() { share } else { oikos_time::DEFAULT_ACT_SECONDS }, share)
+        };
         // One time account per person (docs/design/foundations.md law 1; F1): the hours of a `work` are the time of
         // those who do it, placed on their timelines like any act's time. The act starts when its actor and every one
         // of its performers are free, and is done when the last of them is. (What the work would be is read from a dry
         // run of the act as the world stands; if it would be refused, nobody's time is taken for it.)
         let mut shares: BTreeMap<Id, i64> = BTreeMap::new();
         let mut late = false; // work the world could not yet show would be done (someone not there until the act is): placed when it takes effect
-        if blocks.iter().any(|b| matches!(b, Block::Work { .. })) {
+        if !others.is_empty() || blocks.iter().any(|b| matches!(b, Block::Work { .. })) {
             let mut scratch = self.state.clone();
-            if let Ok(res) = exec_action(&self.s, &mut scratch, participant, position, blocks) {
+            if let Ok(res) = exec_action(&self.s, &mut scratch, participant, position, blocks, by) {
                 shares = work_shares(&res.events);
             } else {
                 late = true;
             }
+        }
+        for w in &others {
+            *shares.entry(w.clone()).or_insert(0) += by_share;
         }
         let free_from = |tl: Option<&crate::state::Timeline>, lanes: usize| -> i64 {
             let mut lanes_now = tl.map(|x| x.lanes.clone()).unwrap_or_default();
@@ -820,6 +838,23 @@ impl World {
             day_idx = crate::exec::day_of(start);
             over = over.take();
         }
+        // (Who is to be at work when the work begins, looked at then if that is later than now.)
+        let checks: Vec<crate::state::WorkCheck> = if late || over.is_some() || start <= t {
+            vec![]
+        } else {
+            let mut v: Vec<crate::state::WorkCheck> = vec![];
+            for b in blocks {
+                if let Block::Work { task, at, performers, .. } = b {
+                    if at.starts_with('$') || performers.iter().any(|x| x.starts_with('$')) {
+                        continue;
+                    }
+                    let space = self.s.config.catalogue.tasks.iter().find(|x| x.id == *task).and_then(|x| x.in_space.clone());
+                    v.extend(performers.iter().map(|w| crate::state::WorkCheck { who: w.clone(), at: Some(at.clone()), space: space.clone() }));
+                }
+            }
+            v.extend(others.iter().map(|w| crate::state::WorkCheck { who: w.clone(), at: None, space: None }));
+            v
+        };
         let placed = crate::state::Placed { over, day: day_idx, hours: shares.clone(), seen: self.seen_at_order(blocks), late };
         let mut done = start;
         let place = |state: &mut State, who: &Id, lanes: usize, secs: i64, work: i64| {
@@ -832,7 +867,7 @@ impl World {
             d
         };
         let own = shares.get(&key).copied().unwrap_or(0);
-        let own_done = place(&mut self.state, &key, lanes, seconds + own, own);
+        let own_done = place(&mut self.state, &key, lanes, actor_seconds + own, own);
         done = done.max(own_done);
         for (p, share) in shares.iter().filter(|(p, _)| **p != key) {
             done = done.max(place(&mut self.state, p, 1, *share, *share));
@@ -840,12 +875,15 @@ impl World {
         let starts = start;
         let free = (own_done < done).then_some(own_done);
         let pos = position.map(String::from);
-        self.state.schedule(done, crate::state::Sched::Act { action: action.clone(), participant: participant.into(), position: pos.clone(), blocks: blocks.to_vec(), placed });
+        let seq = self.state.schedule(done, crate::state::Sched::Act { action: action.clone(), participant: participant.into(), position: pos.clone(), blocks: blocks.to_vec(), by: by.to_vec(), placed: placed.clone() });
+        if !checks.is_empty() {
+            self.state.schedule(start, crate::state::Sched::Start { action: action.clone(), participant: participant.into(), position: pos.clone(), done, seq, checks, placed });
+        }
         Output { events: vec![Timed::new(t, EventBody::ActionStarted { action, participant: participant.into(), position: pos, starts, done, free })] }
     }
 
     /// An act done: applied now, as a whole (or refused), and its outcome delivered at the actor's next observation.
-    fn act(&mut self, action: Id, participant: &str, position: Option<&str>, blocks: &[Block], placed: crate::state::Placed) -> Output {
+    fn act(&mut self, action: Id, participant: &str, position: Option<&str>, blocks: &[Block], by: &[Id], placed: crate::state::Placed) -> Output {
         let t = self.state.t;
         let mut late_shares: BTreeMap<Id, i64> = BTreeMap::new();
         let result = if !can_act(&self.state.participants[participant]) {
@@ -855,7 +893,7 @@ impl World {
             Err(Refusal { block: i, ..refuse(RefusalCode::NoTimeLeft, d) })
         } else {
             let mut scratch = self.state.clone();
-            let done = crate::exec::exec_action_seen(&self.s, &mut scratch, participant, position, blocks, Some(&placed.seen)).map(|res| (scratch, res));
+            let done = crate::exec::exec_action_seen(&self.s, &mut scratch, participant, position, blocks, by, Some(&placed.seen), !placed.late).map(|res| (scratch, res));
             match done {
                 // (Work the dry run could not place when the act began is placed now: the hours are counted on the day, and
                 // are the performers' from now. Nobody does more than a day's work for having been asked in a way that
@@ -875,13 +913,7 @@ impl World {
         };
         // (Hours given back for work that was not done: they were not worked, so they do not count against the day.)
         if result.is_err() {
-            for (who, secs) in &placed.hours {
-                if let Some(tl) = self.state.timelines.get_mut(who) {
-                    if tl.worked.is_some_and(|(d, _)| d == placed.day) {
-                        tl.worked = Some((placed.day, (tl.worked_on(placed.day) - secs).max(0)));
-                    }
-                }
-            }
+            self.give_back(&placed);
         }
         let pos = position.map(String::from);
         let (events, outcome) = match result {
@@ -895,7 +927,26 @@ impl World {
                     self.state.timelines.insert(who.clone(), tl);
                 }
                 let created = (!res.created.is_empty()).then_some(res.created);
-                let mut events = vec![Timed::new(t, EventBody::ActionApplied { action: action.clone(), participant: participant.into(), position: pos.clone(), created: created.clone() })];
+                // Who did it: whom the action named, else those a work named, else the actor itself.
+                let applied_by: Vec<Id> = if !by.is_empty() {
+                    by.to_vec()
+                } else {
+                    let mut v: Vec<Id> = vec![];
+                    for e in &res.events {
+                        if let EventBody::Worked { performers, .. } = &e.event.body {
+                            for p in performers {
+                                if !v.contains(p) {
+                                    v.push(p.clone());
+                                }
+                            }
+                        }
+                    }
+                    if v.is_empty() {
+                        v.push(participant.into());
+                    }
+                    v
+                };
+                let mut events = vec![Timed::new(t, EventBody::ActionApplied { action: action.clone(), participant: participant.into(), position: pos.clone(), by: applied_by, created: created.clone() })];
                 events.extend(res.events);
                 (events, Outcome { action, t, status: OutcomeStatus::Applied, created, refusal: None, surveyed: res.surveyed, investigated: res.investigated, seen: res.seen })
             }
@@ -912,13 +963,51 @@ impl World {
         Output { events }
     }
 
+    /// Hours placed for work that was not done: they were not worked, so they do not count against the day.
+    fn give_back(&mut self, placed: &crate::state::Placed) {
+        for (who, secs) in &placed.hours {
+            if let Some(tl) = self.state.timelines.get_mut(who) {
+                if tl.worked.is_some_and(|(d, _)| d == placed.day) {
+                    tl.worked = Some((placed.day, (tl.worked_on(placed.day) - secs).max(0)));
+                }
+            }
+        }
+    }
+
+    /// The work of an act begins (it queued behind its performers' other time): those who are to do it are looked at
+    /// now. If one is not at work, the act is refused now: nobody's time is kept for it, and it is not applied later
+    /// (foundations F3; F1 had found that the check at the end refuses work its performers had begun).
+    #[allow(clippy::too_many_arguments)]
+    fn start_check(&mut self, action: Id, participant: &str, position: Option<&str>, done: i64, seq: u64, checks: &[crate::state::WorkCheck], placed: &crate::state::Placed) -> Output {
+        let t = self.state.t;
+        let failed = checks.iter().find_map(|c| crate::exec::check_at_work(&self.s, &self.state, &c.who, c.at.as_deref(), c.space.as_deref()).err());
+        let Some(r) = failed else { return Output::default() };
+        self.state.schedule.remove(done, seq);
+        self.give_back(placed);
+        // (Their time, placed to the end of the work, is given back from now.)
+        let actor_key = self.state.participants[participant].person.clone().unwrap_or_else(|| participant.into());
+        for k in placed.hours.keys().chain(std::iter::once(&actor_key)) {
+            if let Some(tl) = self.state.timelines.get_mut(k) {
+                for lane in tl.lanes.iter_mut().filter(|l| **l == done) {
+                    *lane = t;
+                }
+            }
+        }
+        let pos = position.map(String::from);
+        let ev = Timed::new(t, EventBody::ActionRefused { action: action.clone(), participant: participant.into(), position: pos.clone(), block: None, code: r.code, detail: r.detail.clone() });
+        let out = Outcome { action, t, status: OutcomeStatus::Refused, created: None, refusal: Some(refusal_info(&r)), surveyed: None, investigated: None, seen: vec![] };
+        Arc::make_mut(self.state.participants.get_mut(participant).unwrap()).pending.entry(pos.unwrap_or_else(|| SELF.into())).or_default().outcomes.push(out);
+        Output { events: vec![ev] }
+    }
+
     fn advance(&mut self, to: i64) -> Output {
         let mut events = vec![];
         while self.state.schedule.first().is_some_and(|x| x.at <= to) {
             let item = self.state.schedule.pop_first().unwrap();
             self.state.t = item.at;
             match item.what {
-                crate::state::Sched::Act { action, participant, position, blocks, placed } => events.extend(self.act(action, &participant, position.as_deref(), &blocks, placed).events),
+                crate::state::Sched::Act { action, participant, position, blocks, by, placed } => events.extend(self.act(action, &participant, position.as_deref(), &blocks, &by, placed).events),
+                crate::state::Sched::Start { action, participant, position, done, seq, checks, placed } => events.extend(self.start_check(action, &participant, position.as_deref(), done, seq, &checks, &placed).events),
                 _ => events.extend(scheduled(&self.s, &mut self.state, item)),
             }
         }

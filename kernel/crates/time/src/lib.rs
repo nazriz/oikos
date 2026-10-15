@@ -44,10 +44,20 @@ impl ActTimes {
         table.get(kind).copied().or(self.default).unwrap_or(DEFAULT_ACT_SECONDS)
     }
 
-    /// How long a program of several steps takes: the sum of its steps' times (never less than a second, so acting
-    /// always moves time on).
-    pub fn program<'a>(&self, actor: Actor, kinds: impl IntoIterator<Item = &'a str>) -> i64 {
-        kinds.into_iter().map(|k| self.of(actor, k)).sum::<i64>().max(1)
+    /// How long one act takes that makes something the table may name (`publish/benefit_decision`): that row if the
+    /// table has it, else the block's own (docs/design/foundations.md law 2; F2).
+    pub fn of_making(&self, actor: Actor, block: &str, makes: Option<&str>) -> i64 {
+        let table = match actor {
+            Actor::Person => &self.person,
+            Actor::System => &self.system,
+        };
+        makes.and_then(|m| table.get(m).copied()).unwrap_or_else(|| self.of(actor, block))
+    }
+
+    /// How long a program of several steps takes: the sum of its steps' times, each a block and what it makes if the
+    /// block says (never less than a second, so acting always moves time on).
+    pub fn program(&self, actor: Actor, steps: impl IntoIterator<Item = (&'static str, Option<String>)>) -> i64 {
+        steps.into_iter().map(|(b, m)| self.of_making(actor, b, m.as_deref())).sum::<i64>().max(1)
     }
 }
 
@@ -82,7 +92,11 @@ mod tests {
         assert_eq!(t.of(Actor::Person, "message"), 120);
         assert_eq!(t.of(Actor::System, "transfer"), 2);
         assert_eq!(t.of(Actor::Person, "transfer"), 30); // the world's default
-        assert_eq!(t.program(Actor::Person, ["message", "transfer"]), 150);
+        assert_eq!(t.program(Actor::Person, [("message", None), ("transfer", None)]), 150);
+        let t2 = ActTimes::from_orchestration(&json!({ "act_time": { "person": { "publish": 900, "publish/decision": 2400 } } }));
+        assert_eq!(t2.of_making(Actor::Person, "publish", Some("publish/decision")), 2400);
+        assert_eq!(t2.of_making(Actor::Person, "publish", Some("publish/notice")), 900);
+        assert_eq!(t2.of_making(Actor::System, "publish", Some("publish/decision")), DEFAULT_ACT_SECONDS);
         let none = ActTimes::from_orchestration(&json!({}));
         assert_eq!(none.of(Actor::System, "anything"), DEFAULT_ACT_SECONDS);
     }

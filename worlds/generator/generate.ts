@@ -57,20 +57,31 @@ const UNIT_ROUNDING_BPS = 500;
 const CREW = { capacity: 12, start: 4 };
 
 /**
- * How long each act takes whoever does it (docs/design/rebuild.md 6.3): a person's acts take minutes (writing, filling
- * in, going somewhere), a system's a second. Placeholders, not a place's figures: sourced per place, they'd move to
- * profiles. Block names as the kernel knows them; a person's `occupy` is going there (travel).
+ * How long each piece of work takes whoever does it (docs/design/rebuild.md 6.3; docs/design/foundations.md law 2): by
+ * the block, and where what is made matters by the block and what it makes (`publish/<kind of record>`,
+ * `create_entity/<kind>`, `work/<task>`: the kernel reads the narrower row first). A person's acts take minutes
+ * (writing, filling in, going somewhere), a system's a second. Placeholders, not a place's figures: a profile states
+ * its own in `values.work_time` (same shape), each with its source, and its rows replace these. Block names as the
+ * kernel knows them; a person's `occupy` is going there (travel).
  */
-const ACT_TIME = {
+const WORK_TIME = {
   person: {
     message: 300, publish: 900, withdraw: 300, propose_agreement: 1800, sign_agreement: 600, give_notice: 600, vote: 600,
     transfer: 300, open_account: 900, close_account: 900, occupy: 900, vacate: 300, leave: 3600, arrive: 3600,
     work: 300, move_goods: 600, construct: 900, demolish: 900, record_claim: 900, transfer_claim: 900, release_claim: 900,
     birth: 3600, harm: 300, create_entity: 1800, create_position: 900, appoint: 600, deploy: 1800, retire: 600,
+    // By what is made: a form to a hearing body, and a decision or an order, take longer than a notice.
+    "publish/tribunal_application": 1800, "publish/tribunal_response": 1800, "publish/tribunal_order": 2700,
+    "publish/venue_decision": 1800, "publish/benefit_decision": 1200,
   },
   default: 1,
   sources: {
     person: "Placeholder: minutes for a person's act (5 for a message, 15 to fill in or go somewhere, 30 to draft an agreement, an hour to leave or arrive), to be sourced (time-use surveys, the Oikos time model: docs/design/rebuild.md 6.3).",
+    "person.publish/tribunal_application": "Placeholder: half an hour to fill in a form to a hearing body, to be sourced per place (the profile's values.work_time).",
+    "person.publish/tribunal_response": "Placeholder: half an hour to answer one, to be sourced per place.",
+    "person.publish/tribunal_order": "Placeholder: 45 minutes to write an order after hearing, to be sourced per place.",
+    "person.publish/venue_decision": "Placeholder: half an hour to decide a complaint on its papers, to be sourced per place.",
+    "person.publish/benefit_decision": "Placeholder: 20 minutes to decide a claim on its file, to be sourced per place (casework seconds a case: foundations F5/F6).",
     default: "Placeholder: a second for a system's act (software).",
   },
 };
@@ -2944,6 +2955,8 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     ...(spec.life === false ? {} : { life: W && CL && L ? { ...life, illness: { ...(life.illness as object), fields: [...((life.illness as any).fields ?? []), { field: "heat", bps_per_unit: CL.heat_illness_bps_per_unit }] } } : life }),
     caps: { max_created_entities: 50 },
     knowing: K.knowing(positions, { holderSearch: [], dealings: 20, ...(V.knowing ? { visit_seconds: V.knowing.visit_seconds } : {}), ...(FR ? { hearings: true } : {}), ...(FND ? { founding: true } : {}) }),
-    orchestration: { thinking_time: "free", act_time: ACT_TIME },
+    orchestration: { thinking_time: "free", act_time: {
+      ...WORK_TIME, person: { ...WORK_TIME.person, ...V.work_time?.person }, ...(V.work_time?.system ? { system: V.work_time.system } : {}),
+      sources: { ...WORK_TIME.sources, ...V.work_time?.sources } } },
   };
 }

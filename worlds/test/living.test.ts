@@ -72,7 +72,9 @@ test("a spec without `living` generates what it generated before (byte for byte)
   // And again the same day (b794ef5b... until then): the town's opening wage orders name the staff line and the finance office has two parameters more (payments that carry a budget line).
   // And on 2026-10-13 (a465b4e3... until then; docs/decisions.md, "Hours before heads"): generator 0.54.0: the profile's law on cutting hours
   // is published (`law-cutting-hours`) and the retailer's, the producer's and the citizen's versions. Nothing of `living` in it.
-  expect(hash(c)).toBe("2300e2d0d1a30e3a1f2f083831d4c75ed6e2b09645ebdf1a91d60326295e76f2");
+  // And on 2026-10-15 (2300e2d0... until then; docs/decisions.md, "Foundations F2"): the world's table of act times has rows by what an act makes
+  // (publish/<kind of record>) and their sources. Nothing of `living` in it.
+  expect(hash(c)).toBe("3facfdc8299f1d57e014dbd5476d789d5c5697d8be232d5499a79a948878406b");
   const text = JSON.stringify(c);
   expect(text).not.toContain('"started"');
   expect(text).not.toContain("attach_mean");

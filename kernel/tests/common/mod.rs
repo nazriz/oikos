@@ -54,7 +54,7 @@ pub fn rb(participant: &str) -> (String, Option<String>) {
 /// An act command for a Riverbend actor (see `rb`).
 pub fn rb_act(participant: &str, blocks: Value) -> Command {
     let (participant, position) = rb(participant);
-    Command::Act { participant, position, blocks: serde_json::from_value(blocks).unwrap(), provenance: json!({"via": "direct"}), reasoning: None, thinking: None }
+    Command::Act { participant, position, blocks: serde_json::from_value(blocks).unwrap(), by: vec![], provenance: json!({"via": "direct"}), reasoning: None, thinking: None }
 }
 
 pub const TICK: i64 = 3600;
@@ -382,7 +382,7 @@ fn pick<T: Clone>(v: &[T], i: u8) -> Option<T> {
 }
 
 pub fn direct(participant: &str, position: Option<&str>, blocks: Vec<Block>) -> Option<Command> {
-    Some(Command::Act { participant: participant.into(), position: position.map(String::from), blocks, provenance: json!({"via": "direct"}), reasoning: None, thinking: None })
+    Some(Command::Act { participant: participant.into(), position: position.map(String::from), blocks, by: vec![], provenance: json!({"via": "direct"}), reasoning: None, thinking: None })
 }
 
 /// Everyone who can act now, in each capacity: (participant, position, entity acted for).

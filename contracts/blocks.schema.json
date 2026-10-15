@@ -18,6 +18,14 @@
           },
           "minItems": 1,
           "maxItems": 32
+        },
+        "by": {
+          "description": "Who does the act's work, if not the actor alone (foundations F3): people, each alive, present and at work (`orchestration.performers_in`). The act's time is theirs, shared; it starts when all are free and takes effect when the last is done.",
+          "type": "array",
+          "items": {
+            "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+          },
+          "maxItems": 1000
         }
       }
     },

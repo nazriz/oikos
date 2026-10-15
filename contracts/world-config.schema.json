@@ -947,8 +947,12 @@
             "never"
           ]
         },
+        "performers_in": {
+          "description": "The kind of space (a structure type's space kind, e.g. a workplace) a person must be in to do another's work when an action names `by` (foundations F3). Absent: anywhere in the world.",
+          "type": "string"
+        },
         "act_time": {
-          "description": "How long each kind of act takes its actor, in world seconds (docs/design/rebuild.md 6.3), by actor kind; an act takes effect when done. Keyed by block name (transfer, message, publish...); `default` for any kind a table doesn't name. Absent (or no figure for a kind, and no default): one second. Each figure sourced or a placeholder (sources).",
+          "description": "How long each kind of act takes its actor, in world seconds (docs/design/rebuild.md 6.3), by actor kind; an act takes effect when done. Keyed by block name (transfer, message, publish...) or, narrower, by what the act makes: `publish/<kind of record>`, `create_entity/<kind>`, `work/<task>` (the kernel reads that row first and falls back to the block's; kinds are opaque labels to it; docs/design/foundations.md law 2); `default` for any kind a table doesn't name. Absent (or no figure for a kind, and no default): one second. Each figure sourced or a placeholder (sources).",
           "type": "object",
           "additionalProperties": false,
           "properties": {

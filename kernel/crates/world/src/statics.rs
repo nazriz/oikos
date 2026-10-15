@@ -21,6 +21,8 @@ pub struct Statics {
     pub tick: i64,
     /// How long each act takes its actor (the world's `orchestration.act_time`).
     pub act_times: oikos_time::ActTimes,
+    /// The kind of space a person must be in to do another's work (`orchestration.performers_in`); absent: anywhere.
+    pub performers_in: Option<String>,
     /// The detailed places' areas: where cells exist (D58).
     pub detailed: Vec<crate::config::PlaceRect>,
     pub randomness: Randomness,

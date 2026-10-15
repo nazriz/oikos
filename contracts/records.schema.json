@@ -89,6 +89,15 @@
         "basis": {
           "$ref": "#/$defs/Basis"
         },
+        "by": {
+          "description": "Who did the work of making it, where that was not the author itself (the action's `by`). Foundations step F3.",
+          "type": "array",
+          "items": {
+            "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+          },
+          "minItems": 1,
+          "maxItems": 1000
+        },
         "in_position": {
           "description": "The position the author made it in (absent: as itself). The record is then the position's organisation's.",
           "anyOf": [

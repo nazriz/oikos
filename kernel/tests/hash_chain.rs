@@ -40,7 +40,7 @@ fn sample_log() -> (Vec<u8>, Vec<u8>) {
     let mut run = Run::start(config, "chain", Vec::new(), Some(Box::new(anchors.clone()))).unwrap();
     let act = |participant: &str, blocks: Value| {
         let (participant, position) = rb(participant);
-        oikos_kernel::Command::Act { participant, position, blocks: serde_json::from_value(blocks).unwrap(), provenance: json!({"via": "direct"}), reasoning: Some("because".into()), thinking: None }
+        oikos_kernel::Command::Act { participant, position, blocks: serde_json::from_value(blocks).unwrap(), by: vec![], provenance: json!({"via": "direct"}), reasoning: Some("because".into()), thinking: None }
     };
     run.done(&act(
         "bank-payments",

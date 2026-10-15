@@ -57,6 +57,9 @@ pub struct Exec<'a> {
     /// The buildings worked on by people sent to them, in the order first worked on (what they see is made when the
     /// act is done).
     pub worked_on: Vec<Id>,
+    /// Who the action named to do its work, and whether their being at work was looked at when it began (F3).
+    pub by: &'a [Id],
+    pub started: bool,
 }
 
 pub struct ExecResult {
@@ -79,12 +82,49 @@ pub fn can_act(p: &Participant) -> bool {
 
 /// Apply `blocks` for `participant` (in `position`, or as itself) to `st`. On error, `st` is left
 /// partly modified and must be discarded.
-pub fn exec_action(s: &Statics, st: &mut State, participant: &str, position: Option<&str>, blocks: &[Block]) -> R<ExecResult> {
-    exec_action_seen(s, st, participant, position, blocks, None)
+pub fn exec_action(s: &Statics, st: &mut State, participant: &str, position: Option<&str>, blocks: &[Block], by: &[Id]) -> R<ExecResult> {
+    exec_action_seen(s, st, participant, position, blocks, by, None, false)
 }
 
-/// `exec_action`, for an act whose work was ordered earlier: `seen` says who was where when it was.
-pub fn exec_action_seen(s: &Statics, st: &mut State, participant: &str, position: Option<&str>, blocks: &[Block], seen: Option<&BTreeMap<Id, Vec<Id>>>) -> R<ExecResult> {
+/// A person who is to do work: alive and in the world; and, if `at` is given, in that structure (in a space of the
+/// given kind, if given); else in a space of the kind the world says work is done in (`orchestration.performers_in`),
+/// if it says. The one rule for a `work`'s performers and for an action's `by` (foundations F3).
+pub fn check_at_work(s: &Statics, st: &State, p: &str, at: Option<&str>, space: Option<&str>) -> R<()> {
+    let b = st.body(p).ok_or_else(|| {
+        if st.entities.contains_key(p) {
+            refuse(RefusalCode::NotAPerson, format!("{p} isn't a person"))
+        } else {
+            refuse(RefusalCode::UnknownEntity, format!("no entity {p}"))
+        }
+    })?;
+    if !b.alive {
+        return Err(refuse(RefusalCode::Dead, format!("{p} has died")));
+    }
+    if !b.present {
+        return Err(refuse(RefusalCode::NotPresent, format!("{p} isn't in the world")));
+    }
+    let kind = space.or(if at.is_none() { s.performers_in.as_deref() } else { None });
+    let in_kind = |space: &str| kind.is_none_or(|k| split_space(space).is_some_and(|(_, local)| local.split('.').next() == Some(k)));
+    let there = match at {
+        Some(at) => st.occupancy.get(at).is_some_and(|m| m.iter().any(|(sp, bodies)| bodies.contains(p) && in_kind(sp))),
+        None => kind.is_none() || st.occupancy.values().any(|m| m.iter().any(|(sp, bodies)| bodies.contains(p) && in_kind(sp))),
+    };
+    if !there {
+        return Err(refuse(
+            RefusalCode::NotAtWork,
+            match at {
+                Some(at) => format!("{p} isn't at {at}{}", kind.map_or(String::new(), |k| format!(" (in a {k})"))),
+                None => format!("{p} isn't at work (in a {})", kind.unwrap_or_default()),
+            },
+        ));
+    }
+    Ok(())
+}
+
+/// What `exec_action` takes besides the blocks, for an act whose work was ordered earlier: `seen` says who was where
+/// when it was; `by` is who the action named; `started` that the performers' being there was looked at when the work
+/// began (so it is not looked at again when it ends).
+pub fn exec_action_seen(s: &Statics, st: &mut State, participant: &str, position: Option<&str>, blocks: &[Block], by: &[Id], seen: Option<&BTreeMap<Id, Vec<Id>>>, started: bool) -> R<ExecResult> {
     let p = st.participants.get(participant).ok_or_else(|| refuse(RefusalCode::UnknownParticipant, format!("no participant {participant}")))?;
     if !can_act(p) {
         return Err(refuse(RefusalCode::ParticipantInactive, format!("{participant} no longer acts")));
@@ -99,7 +139,17 @@ pub fn exec_action_seen(s: &Statics, st: &mut State, participant: &str, position
         }
         None => p.person.clone().ok_or_else(|| refuse(RefusalCode::NotInPosition, format!("{participant} is a system: it acts only in a position")))?,
     };
-    let mut ex = Exec { s, st, participant, position, entity, refs: BTreeMap::new(), events: vec![], surveyed: None, investigated: None, seen, worked_on: vec![] };
+    for w in by {
+        if w != participant && p.person.as_deref() != Some(w.as_str()) {
+            if started {
+                // (Looked at when the work began; here only that they are alive.)
+                st.body(w).filter(|b| b.alive).ok_or_else(|| refuse(RefusalCode::Dead, format!("{w} has died")))?;
+            } else {
+                check_at_work(s, st, w, None, None)?;
+            }
+        }
+    }
+    let mut ex = Exec { s, st, participant, position, entity, refs: BTreeMap::new(), events: vec![], surveyed: None, investigated: None, seen, worked_on: vec![], by, started };
     for (i, b) in blocks.iter().enumerate() {
         ex.block(b, i).map_err(|mut r| {
             r.block.get_or_insert(i);
@@ -692,7 +742,7 @@ pub fn scheduled(s: &Statics, st: &mut State, item: Scheduled) -> Vec<Timed> {
             die(s, st, &person, cause)
         }
         // (Acts in progress are the kernel's to apply: Kernel::advance.)
-        Sched::Act { .. } => vec![],
+        Sched::Act { .. } | Sched::Start { .. } => vec![],
         Sched::Visit { participant, position, channel, places, cells, names } => crate::sites::end(s, st, &participant, position.as_deref(), &channel, places, &cells, names),
         Sched::BirthDue { parents, name, template } => {
             let Some(b) = st.body(&parents[0]) else { return vec![] };
@@ -885,12 +935,11 @@ impl<'a> Exec<'a> {
         }
         let kind = spec.as_ref().and_then(|x| x.in_space.clone());
         for p in &who {
-            self.living_present(p)?;
-            let there = self.st.occupancy.get(&at).is_some_and(|m| {
-                m.iter().any(|(space, bodies)| bodies.contains(p) && kind.as_ref().is_none_or(|k| split_space(space).is_some_and(|(_, local)| local.split('.').next() == Some(k.as_str()))))
-            });
-            if !there {
-                return Err(refuse(RefusalCode::NotAtWork, format!("{p} isn't at {at}{}", kind.as_ref().map_or(String::new(), |k| format!(" (in a {k})")))));
+            if self.started {
+                // (Looked at when the work began, hours ago if it queued; here only that they are still alive.)
+                self.living_present(p)?;
+            } else {
+                check_at_work(self.s, self.st, p, Some(&at), kind.as_deref())?;
             }
         }
         // Skill at work: the labour scales with the performers' mean of a body variable (all of it at the minimum, the
@@ -1350,6 +1399,7 @@ impl<'a> Exec<'a> {
             at: self.now(),
             visible_to,
             basis,
+            by: (!self.by.is_empty() && self.by != [self.participant.to_string()]).then(|| self.by.to_vec()),
             body,
         };
         for e in rec.entities_named().into_iter().chain(rec.visibility_entities()) {
