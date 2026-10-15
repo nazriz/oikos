@@ -102,6 +102,11 @@ export function stepper(absorb: (obs: Observation) => void, plan: (obs: Observat
       }
       todo.unshift(...follow.filter((s) => s.length));
       let next = todo.shift();
+      // (A step whose moment has passed is not sent: told it was not got to, as a day's work is at the day's turn.)
+      while (next?.lapsed?.(obs.t)) {
+        todo.unshift(...(next.then?.({ action: "", t: obs.t, status: "refused", refusal: { code: "not_done", detail: "not got to before the day's hours were over" } } as any) ?? []).filter((x) => x.length));
+        next = todo.shift();
+      }
       if (!next) return wait(until?.(obs));
       // Done later than planned: a step that counts from when it's done is made again for now (a notice's date).
       if (next.redo && next.planned !== undefined && next.planned !== obs.t) next = next.redo(obs.t);

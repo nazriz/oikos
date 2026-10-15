@@ -2469,7 +2469,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     const price = RETAIL_PRICE;
     office(`${w.employer}-manager`, w.employer, "Manager", undefined, [{ id: "books", kind: "accounts" }, mine(), deaths, market("outside", "builder"), ...shopBoards, lawBook, { id: "stock", kind: "holdings" }, K.premises("premises", [cell])],
       code("firm.retailer", { premises: w.structure, workplace: w.space, max_staff: w.capacity, wage: w.wage, period: PAY, working_day: WORKING_DAY, serve_labour: SHOP.serve, industry: w.industry, lender: "bank", builder: "builder",
-        suppliers: ["outside"], ...shopLooks, price, demand: SHOP.demand, shopfront: true, ...look, ...(RD ? { work_days: SHOP_DAYS } : {}), ...(CR ? { police: "police" } : {}), ...informalOf(w) }));
+        suppliers: ["outside"], ...shopLooks, price, demand: SHOP.demand, shopfront: true, ...look, ...(RD ? { work_days: SHOP_DAYS, open_from: RD.work_start_hour * HOUR, open_until: RD.work_end_hour * HOUR } : {}), ...(CR ? { police: "police" } : {}), ...informalOf(w) }));
   }
   // People working for themselves: each holds the only position of their business, and runs a shop's rules in it
   // alone. It sees its own books, papers and stock, its supplier's prices and what producers advertise to the trade.

@@ -35,11 +35,11 @@ const check = (ref: string, row: unknown) => {
 // (au-vic-2026 re-taken on 2026-10-15 at foundations F1, as living-dial.test.ts's step 1; the other two profiles as the run gives them, below.)
 const BEFORE: { [profile: string]: { days: number; state: string } } = {
   // (Re-taken on 2026-10-16 at foundations F5: the town's offices are held by people, their staff hired, its systems delivered from templates that say what they do; 3fdeff6a... until then.)
-  "au-vic-2026": { days: 60, state: "dc4748937e00ea0a27ffa3f4846176190e9329c2d74901e5f6bf85a2ab76cd8b" },
+  "au-vic-2026": { days: 60, state: "5add20d124a8386426e8111b1e9799ed7b937a95712ace0d4ff0b317975c9ba1" },
   // (Re-taken on 2026-10-16 at foundations F5: the town's offices are held by people, their staff hired, its systems delivered from templates that say what they do; 3b4bc97e... until then.)
-  "gb-eng-2026": { days: 30, state: "0aaf8bb7f1f3a011cd1dcbe1a9a4108dbe319fc37743247369fbc42a505ab5d2" },
+  "gb-eng-2026": { days: 30, state: "f64c33a477080a71990c3d6e4686666dd0a5121810b93ca977a2259c2df91144" },
   // (Re-taken on 2026-10-16 at foundations F5: the town's offices are held by people, their staff hired, its systems delivered from templates that say what they do; ab25cb7d... until then.)
-  "ke-nakuru-2026": { days: 30, state: "5d77834326b601e22f70ccc6b9707be84bccf3c0a85bddb613d6f842fc743c40" },
+  "ke-nakuru-2026": { days: 30, state: "4ef9f5b01295b02ff1ecda3296c716201d2ae836e554e11844de92074ff3ab8b" },
 };
 // (Re-taken once more at foundations F4, 2026-10-15: a generated town's systems name their template and supplier, and its world names where work is done (`performers_in`): the config hashes and the states move, the draws and the town's life do not.)
 // (The config hashes were re-taken on 2026-10-15 at foundations F2: the world's act-time table gained rows by what an act makes. The states did not move.)
@@ -47,7 +47,7 @@ const cfgHash = (c: unknown) => new Bun.CryptoHasher("sha256").update(JSON.strin
 // (Re-taken on 2026-10-16 at foundations F5: the town's offices are held by people, their staff hired, its systems delivered from templates that say what they do; 1f5ef6f6... until then.)
 // (Re-taken on 2026-10-16 at foundations F5: the town's offices are held by people, their staff hired, its systems delivered from templates that say what they do; 66456d26... until then.)
 // (Re-taken on 2026-10-16 at foundations F5: the town's offices are held by people, their staff hired, its systems delivered from templates that say what they do; 2ecddd70... until then.)
-const CONFIG_BEFORE: { [profile: string]: string } = { "au-vic-2026": "40d909c430f90bbd", "gb-eng-2026": "8f4c9a2db5f8fe33", "ke-nakuru-2026": "43c602882f03a035" };
+const CONFIG_BEFORE: { [profile: string]: string } = { "au-vic-2026": "2fadfdc426d66159", "gb-eng-2026": "66760b3e6b43b13e", "ke-nakuru-2026": "b36ff85eed60d44b" };
 
 test("the dial in the world config is a schema-valid setting; a size that would break the arithmetic is refused when the run starts", async () => {
   const v = ajv.getSchema(`${NS}:world-config`)!;

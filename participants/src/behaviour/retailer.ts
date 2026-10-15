@@ -539,6 +539,10 @@ export const retailer: BehaviourModule = {
         // some other reason, the work is refused and the order waits, as when a shop's hand has just left.)
         const tod = t - Math.floor(t / DAY) * DAY;
         const present = p.operator ? (!p.open_until || (workDay(t) && tod >= p.open_from && tod < p.open_until) ? [p.operator] : [])
+          // (Its staff serve in their working hours, where the world has them: a hand still in the workplace after the day's end is
+          // on the way home, and work ordered then reaches the door after they have left, behind the walk home on their one
+          // timeline. Foundations F6: the shop's manager is a resident now, and their own acts share the lane.)
+          : p.open_until && !(workDay(t) && tod >= p.open_from && tod < p.open_until) ? []
           : [...new Set(channels.cells(obs).filter((c) => c.structure?.structure === p.premises).flatMap((c) => c.structure!.spaces.flatMap((sp) => (sp.kind === "workplace" ? sp.occupants ?? [] : []))))].filter((w) => mine.has(w)).sort();
         // Every paid order joins the queue: what customers wanted, served or not.
         const { paid, unpaid } = orders.due(book, t);
@@ -575,6 +579,9 @@ export const retailer: BehaviourModule = {
             : left === 0 && out !== "late" ? `Out of stock: served ${x.served} of the ${x.o.quantity} ordered; refunding the rest.`
             : `We couldn't serve all of an order within ${within} days: served ${x.served} of the ${x.o.quantity}; refunding the rest.`;
           const st = fillWith(x.o, q, finished ? x.served : -1, q ? crew : [], why);
+          // (Orders are sent one at a time, each when the last is done, and a delivery takes the crew out: one that comes up after the
+          // close finds the crew gone, so it is not sent: it waits for tomorrow, as an order not got to in the day does.)
+          if (q && !p.operator && p.open_until) st.lapsed = (now) => now - Math.floor(now / DAY) * DAY >= p.open_until && Math.floor(now / DAY) === day;
           reserved += q;
           st.then = (res) => {
             reserved = Math.max(0, reserved - q);
