@@ -37,6 +37,7 @@ import { retailer } from "./behaviour/retailer";
 import { builder, childProtection, inspector, landRegistry, planningOfficer, registry } from "./behaviour/institutions";
 import { councilClerk, councillor, financeOfficer, mayorCode, ratesOfficer, taxClerk, works } from "./behaviour/government";
 import { environment } from "./behaviour/environment";
+import { bodyPayroll } from "./behaviour/payroll";
 import { electoralOffice } from "./behaviour/elections";
 import { newspaper } from "./behaviour/news";
 import { principal } from "./behaviour/school";
@@ -118,6 +119,7 @@ export const modules: { [name: string]: BehaviourModule & { source: string } } =
       [ratesOfficer, "behaviour/government.ts"],
       [works, "behaviour/government.ts"],
       [environment, "behaviour/environment.ts"],
+      [bodyPayroll, "behaviour/payroll.ts"],
       [electoralOffice, "behaviour/elections.ts"],
       [newspaper, "behaviour/news.ts"],
       [principal, "behaviour/school.ts"],

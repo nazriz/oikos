@@ -1221,6 +1221,11 @@ export class Staffing {
   staff(book: Book, t: number): any[] {
     return this.contracts(book).filter((a) => book.inForce(a.id) && t < this.endOf(book, a)).sort((x, y) => book.signedAt(x.id)! - book.signedAt(y.id)!);
   }
+  /** Those of our staff we know to have died: by the registry's entry or by our bank's word (docs/behaviour/deaths.md). */
+  knownDead(book: Book, t: number): string[] {
+    const dead = new Set([...book.all("death_registration").map((r) => r.data?.deceased as string), ...this.bankSaysDead]);
+    return this.staff(book, t).map((a) => a.terms.parties[1] as string).concat(this.contracts(book).filter((a) => this.noticed.has(a.id)).map((a) => a.terms.parties[1] as string)).filter((w, i, all) => dead.has(w) && all.indexOf(w) === i);
+  }
   /** Our staff, as we have them (truth audits). */
   beliefs(book: Book): Belief[] {
     // (An office that keeps only its own role's staff doesn't hold its organisation's whole list: it says nothing of it.)

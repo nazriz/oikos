@@ -2058,7 +2058,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   const systemsUsed = new Set<string>();
   const sysId = (post: string) => `${post}-system`;
   /** Posts a person will hold, until `resolveHolders` names them: the post, its body, whether a model holds it, and the body's pool. */
-  const toHold: { post: any; entity: string; seat?: { controller: any; framing?: any } }[] = [];
+  const toHold: { post: any; entity: string; apart?: string; seat?: { controller: any; framing?: any } }[] = [];
   const office = (id: string, entity: string, title: string, role: string | undefined, channels: any[], controller: any, extra: any = {}) => {
     if (extra.desk) desks.set(id, { channels: extra.desk, standing: extra.desk_standing ?? [], ...(extra.ballot_count ? { ballot_count: extra.ballot_count } : {}) });
     const job = controller.type === "code" ? { code: controller.impl, params: controller.params ?? {} } : extra.role_module;
@@ -2072,7 +2072,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     }
     const post = { id, entity, title, ...(role ? { role } : {}), channels, ...(job ? { role_module: job } : {}) } as any;
     positions.push(post);
-    toHold.push({ post, entity, ...(controller.type !== "code" ? { seat: { controller, framing: extra.framing } } : {}) });
+    toHold.push({ post, entity, ...(extra.apart ? { apart: extra.apart } : {}), ...(controller.type !== "code" ? { seat: { controller, framing: extra.framing } } : {}) });
   };
   const adultCount = everyone.filter((m) => m.adult).length;
   // (Elections: the adults on the roll at the start, each enrolled.)
@@ -2121,8 +2121,8 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   const deaths = K.mine("deaths", ["death_registration", "death_certificate"]);
   // The bank's lending office (docs/behaviour/credit.md): the profile's lending rules; funding from outside.
   const Cr = V.credit;
-  office("bank-lending", "bank", "Lending officer", undefined, [{ id: "ledger", kind: "accounts" }, mine("applications"), K.lookUp()],
-    code("bank.lending", { who: "who", rate_bps: Cr.lending_rate_bps, buffer_bps: Cr.serviceability_buffer_bps ?? 0, max_share_bps: Cr.max_repayment_share_bps, max_months: Cr.max_months,
+  office("bank-lending", "bank", "Lending officer", undefined, [{ id: "ledger", kind: "accounts" }, mine("applications"), K.lookUp(), deaths, lawBook],
+    code("bank.lending", { who: "who", pay_staff: true, rate_bps: Cr.lending_rate_bps, buffer_bps: Cr.serviceability_buffer_bps ?? 0, max_share_bps: Cr.max_repayment_share_bps, max_months: Cr.max_months,
       default_days: Cr.default_days, arrears_days: Cr.arrears_days, reserve: Cr.reserve, ...(OW?.market ? { mortgage_rate_bps: OW.mortgage_rate_bps, mortgage_max_months: OW.market.mortgage_months, max_lvr_bps: 10_000 - OW.market.deposit_bps } : {}), funding_from: "outside", funding_rate_bps: Cr.cash_rate_bps + Cr.funding_spread_bps }));
   // The weather bureau (the outside world's): warns of heavy rain, drought and heatwaves a few days ahead.
   if (W?.events.length) office("weather-bureau", "outside", "Weather bureau", undefined, [K.mine("bureau", ["weather_warning"])], code("world.weather", { events: W.events, lead_days: CL!.warning_lead_days }));
@@ -2827,6 +2827,51 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     post.holder = seat.id;
     return seat;
   };
+  // ---- a body's own paperwork, done by its staff (foundations F6; docs/behaviour/staffing.md, "A body's own paperwork") ----
+  // Every body that employs people runs a payroll as any employer's: a payroll officer (a post of its staff) starts and stops the
+  // wages, files the returns of the tax withheld on the law's days and pays it over, and hears of a death as an employer does. The
+  // bodies that run no payroll of their own (the tribunal, the desks, the commission, the paper, the registry, the bank, the union,
+  // the water and energy bodies) and the heads of the clinic, school and police (whose own modules pay the doctors, teachers and
+  // officers) get one. Every body with two or more staff has a deputy as well, who keeps the officer's post, and the head's, filled
+  // from the staff when its holder dies (only a living holder of a post of an organisation can appoint into it). A body of one
+  // has none: nobody is left to do it, and the missing law is an owner's or a board's power to appoint (docs/behaviour/staffing.md).
+  const payrollPosts: { entity: string; officer?: string; deputy?: string; params: any[] }[] = [];
+  {
+    const heldApart = new Map<string, string>(); // a deputy's post -> the post whose holder it must not share
+    const staffN = (e: string) => staffAt.get(e)?.length ?? 0;
+    const payer = (b: Body) => b.entity !== "city";
+    const done = new Set<string>();
+    // (What a payroll clerk is shown: the organisation's employment agreements and what ends them, the orders that pay its staff, and its notices of
+    // starters and leavers: never its whole file. The bank's payroll is done by its lending office, a keeper of the bank's file of instructions, and
+    // not by a clerk who would have to be shown every customer's.)
+    const agreements = K.mine("payroll", { records: ["agreement", "signature", "notice"] });
+    const papers = [agreements, K.mine("orders", ["request"]), K.mine("notes", ["payroll_notice", "off_books"])];
+    for (const b of bodies.filter(payer)) {
+      if (done.has(b.entity)) continue;
+      done.add(b.entity);
+      const entityRole = b.paidBy === "funded" ? b.role : "";
+      const mk = (part: "officer" | "deputy") => {
+        const params: any = { part, watch: [], ...(entityRole ? { role: entityRole } : {}) };
+        const id = `${b.entity}-payroll${part === "deputy" ? "-deputy" : ""}`;
+        office(id, b.entity, part === "officer" ? "Payroll officer" : "Deputy payroll officer", undefined,
+          part === "officer" ? [{ id: "books", kind: "accounts" }, ...papers, deaths, lawBook, K.lookUp()] : [agreements, deaths, K.lookUp()],
+          code("body.payroll", params), part === "deputy" ? { apart: `${b.entity}-payroll` } : {});
+        return { id, params };
+      };
+      const o = b.entity === "bank" ? undefined : mk("officer");
+      const d = headsOf(b.entity) >= 2 ? mk("deputy") : undefined;
+      payrollPosts.push({ entity: b.entity, ...(o ? { officer: o.id } : {}), ...(d ? { deputy: d.id } : {}), params: [...(o ? [o.params] : []), ...(d ? [d.params] : [])] });
+    }
+    // (A shop's, a factory's and the builder's manager runs the payroll in the manager's own post; a deputy keeps that post filled.)
+    for (const w of workplaces) if (/^(shop|factory)-/.test(w.employer) || w.employer === "builder") {
+      if (staffN(w.employer) < 2 || payrollPosts.some((x) => x.entity === w.employer)) continue;
+      const params: any = { part: "deputy", watch: [] };
+      const id = `${w.employer}-deputy`;
+      office(id, w.employer, "Deputy manager", undefined, [agreements, deaths, K.lookUp()], code("body.payroll", params), { apart: `${w.employer}-manager` });
+      payrollPosts.push({ entity: w.employer, deputy: id, params: [params] });
+    }
+    void heldApart;
+  }
   const resolveHolders = () => {
     const todo = toHold.filter((x) => !x.post.holder);
     const poolFor = (x: (typeof toHold)[number]): string[] => {
@@ -2847,7 +2892,11 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       if (!base.length) throw new Error(`office ${x.post.id}: no one in the town to hold it`);
       const key = keyOf(x), k = rotor.get(key) ?? 0;
       rotor.set(key, k + 1);
-      x.post.holder = `${base[k % base.length]!}-self`;
+      let pick = k % base.length;
+      // (A deputy is someone other than the person whose post they keep filled, where the body has another.)
+      const apartFrom = x.apart ? positions.find((q) => q.id === x.apart)?.holder : undefined;
+      if (apartFrom && base.length > 1 && `${base[pick]!}-self` === apartFrom) pick = (pick + 1) % base.length;
+      x.post.holder = `${base[pick]!}-self`;
       if (x.seat) seatFor(x.post, x.seat.controller, x.seat.framing);
     }
   };
@@ -2947,6 +2996,18 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     }
   }
   resolveHolders(); // (the staff posts and clerks the seats just made)
+  // The payroll posts keep filled the posts a person holds, whether the person or a model's seat in their body acts in it (a town with a seat is the
+  // town without it but for that post: the deputy looks at the same posts either way); a post a system holds never falls vacant.
+  {
+    const personHeld = (pos: any) => { const h = participants.find((q) => q.id === pos.holder); return !!h && h.kind === "person"; };
+    for (const x of payrollPosts) {
+      const own = positions.filter((q) => q.entity === x.entity && personHeld(q));
+      for (const params of x.params) {
+        const id = params.part === "officer" ? x.officer : x.deputy;
+        params.watch = params.part === "officer" ? (x.deputy ? [x.deputy] : []) : own.map((q) => q.id).filter((q) => q !== id);
+      }
+    }
+  }
   // Settings of every seat a model holds, as the town's description gives them: whether papers bring it back, and how
   // hard its model reasons (by office, or one word for all).
   for (const part of participants) {
