@@ -214,7 +214,6 @@ fn law2_the_table_is_by_block_and_by_who_does_it() {
 /// How long is not a property of the block but of what is made: a decision on a claim is not a notice (F2). The key's
 /// spelling (`<block>/<kind>` here) is the plan's to settle at F2; what is fixed is that a record's kind can have a row.
 #[test]
-#[ignore = "F2: the work table keyed by what an act makes (a block and the kind of record it writes)"]
 fn law2_time_is_read_from_the_kind_of_record_an_act_writes() {
     let mut run = town_with_times(json!({"person": {"publish": 900, "publish/benefit_decision": 2_400}}));
     let notice = cmd("alice-self", None, json!([{"block": "publish", "kind": "notice", "text": "a notice"}]));

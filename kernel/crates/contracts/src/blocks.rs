@@ -330,6 +330,18 @@ pub enum Block {
 }
 
 impl Block {
+    /// What the act makes, where the block names it: the row of the work table that is narrower than the block's own
+    /// (`publish/<kind of record>`, `create_entity/<kind>`, `work/<task>`). Kinds are opaque labels to the kernel
+    /// (docs/design/foundations.md law 2; F2).
+    pub fn makes(&self) -> Option<String> {
+        match self {
+            Block::Publish { kind, .. } => Some(format!("publish/{kind}")),
+            Block::CreateEntity { kind, .. } => Some(format!("create_entity/{kind}")),
+            Block::Work { task, .. } => Some(format!("work/{task}")),
+            _ => None,
+        }
+    }
+
     pub fn name(&self) -> &'static str {
         match self {
             Block::Transfer { .. } => "transfer",

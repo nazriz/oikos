@@ -49,6 +49,10 @@ export interface Profile {
     };
     /** Who knows what (docs/behaviour/knowing.md): how long looking at one place gone to takes; what a search of the
      * land register costs (recorded; nobody is charged yet). */
+    /** How long the place's work takes, in world seconds, by actor and by block or by block and what it makes
+     * (`publish/<kind of record>`; docs/design/foundations.md law 2): rows laid over the generator's neutral placeholders,
+     * each with its source in `sources` (keyed `person.<row>` or `system.<row>`). Left out: the placeholders stand. */
+    work_time?: { person?: Record<string, number>; system?: Record<string, number>; sources?: Record<string, string> };
     knowing?: { visit_seconds: number; /** How long reading one meter takes someone who has gone to it. */ meter_read_seconds?: number; title_search_fee?: number; index_search_fee?: number };
     /** The working week a full-time wage is pay for, in hours: what people here work, not a legal ceiling above it. The
      * generator spreads it over the days of the week people work, and reckons an hour's pay from it. */

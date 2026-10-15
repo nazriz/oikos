@@ -143,7 +143,8 @@ test("every special case in the inventory still stands where it says, as many ti
 
 test("the inventory covers the plan's deletions: every step from F1 to F8 has entries, and every kernel one is in the kernel", () => {
   const steps = new Set(inv.entries.map((e) => e.step));
-  for (const s of ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8"]) expect(steps.has(s), s).toBe(true);
+  // (A step that is built has taken its entries out with the code: F1 and F2 have none left but history.)
+  for (const s of ["F3", "F4", "F5", "F6", "F7", "F8"]) expect(steps.has(s), s).toBe(true);
   for (const e of inv.entries.filter((x) => x.id.startsWith("k-"))) expect(e.file, e.id).toMatch(/^kernel\//);
 });
 

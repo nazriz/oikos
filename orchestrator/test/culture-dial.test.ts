@@ -37,8 +37,9 @@ const BEFORE: { [profile: string]: { days: number; state: string } } = {
   "gb-eng-2026": { days: 30, state: "f0ded0a5fe8c83cd9508107e45066dc910c6526707708c62e73badb5ddd57c2a" },
   "ke-nakuru-2026": { days: 30, state: "8078db8e6e51e8ea4783a874aee2238fe2714540bf6b7dfa75fe93b90ea24218" },
 };
+// (The config hashes were re-taken on 2026-10-15 at foundations F2: the world's act-time table gained rows by what an act makes. The states did not move.)
 const cfgHash = (c: unknown) => new Bun.CryptoHasher("sha256").update(JSON.stringify(c)).digest("hex").slice(0, 16);
-const CONFIG_BEFORE: { [profile: string]: string } = { "au-vic-2026": "2300e2d0d1a30e3a", "gb-eng-2026": "40db9584b9c935b5", "ke-nakuru-2026": "4213b5187fa96716" };
+const CONFIG_BEFORE: { [profile: string]: string } = { "au-vic-2026": "3facfdc8299f1d57", "gb-eng-2026": "8c52420384e1b956", "ke-nakuru-2026": "f79d3dd6b86fade0" };
 
 test("the dial in the world config is a schema-valid setting; a size that would break the arithmetic is refused when the run starts", async () => {
   const v = ajv.getSchema(`${NS}:world-config`)!;

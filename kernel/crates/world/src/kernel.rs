@@ -785,7 +785,7 @@ impl World {
             })
             .max()
             .unwrap_or(0);
-        let seconds = self.s.act_times.program(actor, blocks.iter().map(Block::name)) + trip;
+        let seconds = self.s.act_times.program(actor, blocks.iter().map(|b| (b.name(), b.makes()))) + trip;
         let ready = t + thinking;
         // One time account per person (docs/design/foundations.md law 1; F1): the hours of a `work` are the time of
         // those who do it, placed on their timelines like any act's time. The act starts when its actor and every one
