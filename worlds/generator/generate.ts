@@ -690,10 +690,6 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   const informalOf = (w: { employer: string }) => ({ ...(registeredBps(w) < 10_000 ? { registered_bps: registeredBps(w) } : {}), ...(casualBps(w) > 0 ? { casual_bps: casualBps(w), day_wage: dayWage(w) } : {}) });
   const hallLot = site();
   structures.push({ id: "town-hall", at: cellOf.get(hallLot), type: "civic", built_by: "builder" });
-  // The building where the bodies that have none of their own work (a bank's and a union's office, the local paper, the
-  // utilities' and the letting managers' desks): one workplace, sized below to the staff it holds (foundations F5).
-  const officesLot = site();
-  structures.push({ id: "town-offices", at: cellOf.get(officesLot), type: "offices", built_by: "builder" });
   // People who work for themselves, alone (docs/behaviour/entry.md): the profile's share of people in work, in the
   // kinds it lists. The town holds those who trade (they buy goods and sell them to households, as a shop does);
   // people of the kinds it cannot hold yet are drawn as they always were, in jobs.
@@ -751,6 +747,11 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     own(substationLot, "energy-co");
     entities.push({ id: "water-corp", kind: "utility", name: `${spec.name} Water` }, { id: "energy-co", kind: "utility", name: "Energy retailer" });
   }
+  // The building where the bodies that have none of their own work (a bank's and a union's office, the local paper, the
+  // utilities' and the letting managers' desks): one workplace, sized below to the staff it holds (foundations F5). Its lot is taken
+  // last of the town's, so that every other building stands where it did (a shifted lot put a school on the river's flood plain).
+  const officesLot = site();
+  structures.push({ id: "town-offices", at: cellOf.get(officesLot), type: "offices", built_by: "builder" });
   for (const lot of [...roadLots].sort()) structures.push({ id: `road-${lot.slice(4)}`, at: cellOf.get(lot), type: "road", built_by: "builder" });
   for (const p of parcels) if (!titleOf.has(p.id)) own(p.id, "city");
   // ---- elections: the electors enrolled at the start, and the law that has them elect the mayor (world-expansion 3) ----

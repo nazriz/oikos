@@ -120,7 +120,7 @@ Generator 0.55.0. The holder of every post of the town's own bodies is a residen
 profile's rate per 1,000 residents and pay (`values.public_service`; docs/behaviour/staffing.md). A body keeps at least one person; a
 person may hold several posts (their one timeline is the limit); a model's seat has a person and a post of its own and keeps the id
 `<post>-system`. The jobs are filled first, so public staff are drawn from the same workforce and fewer remain for the factories (the
-spec's `employed_bps` is unchanged). A building, `town-offices`, houses the staff of the bodies that have none of their own. The systems
+spec's `employed_bps` is unchanged). A building, `town-offices`, houses the staff of the bodies that have none of their own; its lot is the last the generator takes, so that every other building stands where it did. The systems
 left are the bank's payment platform (under licence, `licence-bank-payments`) and the outside world's own; each comes from a template that
 says what it does (`payment-system`, `agency-system`, `market-system`). The placeholder `genesis-system`, the `-system` suffix that said
 which post keeps its organisation's record, the works office's hand-set lanes and the staff's are gone; a system's act time is a row of

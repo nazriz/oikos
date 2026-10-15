@@ -26,9 +26,9 @@ test("off, a town is unchanged to the state hash (the world as origin/main gener
   // 2026-10-13, by generator 0.54.0: every town whose profile states one now publishes its law on cutting hours,
   // `law-cutting-hours`, and the modules' versions; docs/decisions.md, "Hours before heads". Nothing of the opening caseload in it.)
   // (Re-taken on 2026-10-16 at foundations F5: the town's offices are held by people, their staff hired, its systems delivered from templates that say what they do; 4e1e761a... until then.)
-  expect(worldHash(generate(town()))).toBe("88d6b3481fb94682fff223680b144c6a2e705e431828abb043f74b4fdb8d42a6");
+  expect(worldHash(generate(town()))).toBe("02ce106fc0fad854af10575ef497e6074b265c775b1a98f9a1aecdb94d140c5a");
   // (Re-taken on 2026-10-16 at foundations F5: the town's offices are held by people, their staff hired, its systems delivered from templates that say what they do; f16bee9e... until then.)
-  expect(worldHash(generate(town({ profile: "ke-nakuru-2026" })))).toBe("81dab8d07f2eec4b616edeb5ac863c4389eaf49920e85b6ada73322c3b69c7b4");
+  expect(worldHash(generate(town({ profile: "ke-nakuru-2026" })))).toBe("0236786b8fedf668d1e6b649c860c0e197853ec952561d0774bfc54a0166ad05");
   // (On, the landlords' and the tribunal's papers are as they were; a scale of nothing adds no paper to the other offices.)
   const POSS = ["rent_statement", "notice_to_vacate", "tribunal_application", "hearing_notice", "tribunal_order"];
   const possession = (c: any) => createHash("sha256").update(JSON.stringify(c.world.records.filter((r: any) => POSS.includes(r.kind)))).digest("hex");

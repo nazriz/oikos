@@ -55,7 +55,7 @@ test("what each office's code acts on was in that office's books, as its clerk k
   let recs: any[] = [];
   const withdrawals: any[] = []; // (a withdrawal is a record of its own, not a statement: `withdrawnAt` below looked among statements and could never find one, until the day a landlord withdrew a case the member had listed, 2026-10-12)
   try {
-    const s = await runWorld({ config: { ...config, log: { ...config.log, detail: "lean" } }, runId: "books-walk", outDir: out, until: Number(process.env.WALK_DAYS ?? 250) * DAY, recordObservations: "none" });
+    const s = await runWorld({ config: { ...config, log: { ...config.log, detail: "lean" } }, runId: "books-walk", outDir: out, until: Number(process.env.WALK_DAYS ?? 400) * DAY, recordObservations: "none" });
     expect(s.participantErrors).toBe(0);
     for (const l of readFileSync(s.logPath, "utf8").split("\n")) if (l.includes('"event":"recorded"')) { const r = JSON.parse(l).body.record; if (r?.record === "statement") recs.push(r); else if (r?.record === "withdrawal") withdrawals.push(r); }
   } finally { rmSync(out, { recursive: true, force: true }); }
@@ -152,6 +152,7 @@ test("what each office's code acts on was in that office's books, as its clerk k
     if (ripe) ripeCases++;
   }
   console.log(`  the tribunal's list: ${listed.length} cases listed, ${tribunal.length} papers; a case on a paper's list ${onList} times; ${ripeCases} cases stood with their day come at some paper, named there ${ripeNamed} times; faults ${missing.length}${missing.length ? ` (${missing.slice(0, 5).join("; ")})` : ""}`);
+  // (400 days where it was 250 since foundations F5 (2026-10-16): the tribunal's staff are people now, each with a body's one timeline, and in this town no case stood with its day come in 250 days; one does in 400.)
   // (250 days where it was 150: with draws named for the day, 2026-10-12, no case in this town stood with its day come before day 150.)
   // (More than 2 where it was more than 3: with homes dealt by income, 2026-10-12, this town opens with the cases its
   // own households make, those where someone is out of work as the year begins, not a quarter of its tenancies.)

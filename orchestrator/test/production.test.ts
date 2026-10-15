@@ -40,7 +40,9 @@ test("goods are made from inputs by workers' hours, exported within each factory
   const { ev, recs } = await run("town", config, 300 * DAY);
   // Nothing refused but same-moment races (D58; and a new employer naming, on their first day, someone who has
   // already worked a full day at the job they just left: acts take time, so starting the new job is a moment of its own), and households moving into homes still being left.
-  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left", "insufficient_quantity", "dead"].includes(e.code))).toEqual([]);
+  // (And a person who has moved by the time an act reaches the one it is for, "X isn't near Y", since foundations F5 (2026-10-16): people hold the offices now and are busier, so more acts wait; the same class as not_present, and as in clinic-school and deaths.)
+  const partnerGone = (e: any) => e.code === "too_far" && / isn't near /.test(e.detail ?? "");
+  expect(ev.filter((e) => e.event === "action_refused" && !partnerGone(e) && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left", "insufficient_quantity", "dead"].includes(e.code))).toEqual([]);
   // Making: at the works, by the factory's own employees, never more than a working day each.
   const employees = new Map<string, Set<string>>();
   for (const a of [...config.world.records, ...recs].filter((r: any) => r.record === "agreement" && r.terms.template === "employment")) {

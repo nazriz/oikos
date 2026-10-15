@@ -123,11 +123,16 @@ test("they sell to households by their own hours, draw what the business clears,
   expect(sold.some((w) => w.at === market)).toBe(true);
   expect(sold.some((w) => w.at !== market)).toBe(true);
   // At a pitch in working hours only (the round); at home whenever its owner is.
-  for (const w of sold.filter((x) => x.at === market)) {
+  // (Not every one since foundations F5 (2026-10-16): a person's acts queue on one timeline, so a round decided in the hours can begin
+  // an hour or two late behind work still in hand; one in this town begins at 19:14. At most one in a hundred, none long after.)
+  const pitchSold = sold.filter((x) => x.at === market);
+  let late = 0;
+  for (const w of pitchSold) {
     const at = startOf.get(w)!; // (when it was begun: a pitch is worked in the round's hours)
     const hour = Math.floor((at % DAY) / HOUR);
-    expect(hour >= 8 && hour < 18 && Math.floor(at / DAY) % 7 < 5).toBe(true);
+    if (!(hour >= 8 && hour < 18 && Math.floor(at / DAY) % 7 < 5)) { late++; expect(hour >= 8 && hour < 21).toBe(true); }
   }
+  expect(late).toBeLessThanOrEqual(Math.ceil(pitchSold.length / 100));
   // Most of them sold something; households' orders reached them as they reach shops.
   const sellers = new Set(sold.map((w) => w.performers[0]));
   expect(sellers.size).toBeGreaterThan(firms.size * 0.7);
