@@ -25,6 +25,7 @@ fn act(run: &mut Run<Vec<u8>>, participant: &str, position: Option<&str>, blocks
         participant: participant.into(),
         position: position.map(String::from),
         blocks: serde_json::from_value(blocks).unwrap(),
+        by: vec![],
         provenance: json!({"via": "direct"}),
         reasoning: None,
         thinking: None,

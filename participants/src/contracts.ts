@@ -104,7 +104,7 @@ export type Json = any;
 export type Block = { block: string } & { [k: string]: Json };
 
 export type ParticipantAction =
-  | { type: "act"; blocks: Block[]; as?: Id; reasoning?: string }
+  | { type: "act"; blocks: Block[]; as?: Id; by?: Id[]; reasoning?: string }
   | { type: "propose"; text: string; as?: Id; reasoning?: string }
   | { type: "sign"; draft: string; decision: "accept" | "reject"; note?: string }
   | { type: "message"; to: Id[]; text: string; re?: Id; as?: Id }

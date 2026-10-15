@@ -147,6 +147,10 @@ pub enum EventBody {
         participant: Id,
         #[serde(default, rename = "as", skip_serializing_if = "Option::is_none")]
         position: Option<Id>,
+        /// Who did the work (foundations F3; the GD plan's M1): the performers the action named (`by`, or a `work`'s
+        /// performers), else the acting participant itself. Read from the log, never inferred.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        by: Vec<Id>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         created: Option<BTreeMap<String, Id>>,
     },

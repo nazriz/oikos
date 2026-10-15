@@ -31,11 +31,12 @@ const check = (ref: string, row: unknown) => {
 // there on 2026-10-13 with the same script as the run below): au-vic-2026 after 60 days (the pinned world of
 // living-dial.test.ts), gb-eng-2026 and ke-nakuru-2026 after 30. A change meant to move what a town without the dial
 // does says so where it is made; culture is not such a change.
+// (au-vic-2026 re-taken again at foundations F3, gb-eng and ke-nakuru too if they changed; see living-dial.test.ts.)
 // (au-vic-2026 re-taken on 2026-10-15 at foundations F1, as living-dial.test.ts's step 1; the other two profiles as the run gives them, below.)
 const BEFORE: { [profile: string]: { days: number; state: string } } = {
-  "au-vic-2026": { days: 60, state: "6dbd604e247cd0c7be78cd3257852c6430bfd8e50b1bcc4718a84640281cef39" },
-  "gb-eng-2026": { days: 30, state: "f0ded0a5fe8c83cd9508107e45066dc910c6526707708c62e73badb5ddd57c2a" },
-  "ke-nakuru-2026": { days: 30, state: "8078db8e6e51e8ea4783a874aee2238fe2714540bf6b7dfa75fe93b90ea24218" },
+  "au-vic-2026": { days: 60, state: "cd7ca8ccd6b0a21edd0765b7174f1b75deba495dcf2da8568bcdde191bf1ce92" },
+  "gb-eng-2026": { days: 30, state: "69c254ec5dedbab4be0f15208d208acb1409c8d8a90822a2bf6bf3d2084ab0fd" },
+  "ke-nakuru-2026": { days: 30, state: "516d33fc8c9f624d2fbaadfc563805ce56617a49f61cdf35bd67e4f9a86c5e35" },
 };
 // (The config hashes were re-taken on 2026-10-15 at foundations F2: the world's act-time table gained rows by what an act makes. The states did not move.)
 const cfgHash = (c: unknown) => new Bun.CryptoHasher("sha256").update(JSON.stringify(c)).digest("hex").slice(0, 16);

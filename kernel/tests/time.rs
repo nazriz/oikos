@@ -15,6 +15,7 @@ fn act(participant: &str, position: Option<&str>, blocks: Value, thinking: Optio
         participant: participant.into(),
         position: position.map(String::from),
         blocks: serde_json::from_value(blocks).unwrap(),
+        by: vec![],
         provenance: json!({"via": "direct"}),
         reasoning: None,
         thinking,

@@ -32,11 +32,11 @@
     {
       "id": "k-system-performer-refused",
       "law": 3,
-      "step": "F3",
+      "step": "F4",
       "kind": "replace",
       "file": "kernel/crates/world/src/exec.rs",
       "find": "self.living_present(p)?;",
-      "what": "`work` takes only bodies as performers (a system is `not_a_person`); a template that lists the work may perform it",
+      "what": "`work` takes only bodies as performers (a system is `not_a_person`); a template that lists the work may perform it (moved from F3 at F3: a system performer needs a template that lists the work, which is F4; until then a system is refused as performer by `by` too)",
       "plan": "2.3",
       "count": 1,
       "lines": [

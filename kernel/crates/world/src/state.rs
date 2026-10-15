@@ -146,6 +146,9 @@ impl Schedule {
     pub fn insert(&mut self, item: Scheduled) {
         self.0.insert((item.at, item.seq), item);
     }
+    pub fn remove(&mut self, at: i64, seq: u64) -> Option<Scheduled> {
+        self.0.remove(&(at, seq))
+    }
     pub fn len(&self) -> usize {
         self.0.len()
     }
@@ -609,6 +612,17 @@ pub struct Placed {
     pub late: bool,
 }
 
+/// A person who is to be at work when an act's work begins: alive, in the world, and, if `at` is given, in that
+/// structure (in a space of `space`'s kind, if given); else, if the world names where work is done, in a space of that kind.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WorkCheck {
+    pub who: Id,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub at: Option<Id>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub space: Option<String>,
+}
+
 impl Placed {
     pub fn is_empty(&self) -> bool {
         self.over.is_none() && self.hours.is_empty() && self.seen.is_empty() && !self.late
@@ -663,8 +677,25 @@ pub enum Sched {
         #[serde(default, rename = "as", skip_serializing_if = "Option::is_none")]
         position: Option<Id>,
         blocks: Vec<crate::blocks::Block>,
+        /// Who the action named to do its work (`by`), apart from any a `work` names.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        by: Vec<Id>,
         /// How the act's work was placed on its performers' timelines (nothing, for an act with no work).
         #[serde(default, skip_serializing_if = "Placed::is_empty")]
+        placed: Placed,
+    },
+    /// The start of an act whose work could not begin when it was ordered (its performers were busy): who is to be at
+    /// work is looked at now, when the work begins, not when it ends (foundations F3). If someone is not there, the act
+    /// is refused now, the time placed for it is given back, and the item that would have applied it (`done`, `seq`)
+    /// is taken out.
+    Start {
+        action: Id,
+        participant: Id,
+        #[serde(default, rename = "as", skip_serializing_if = "Option::is_none")]
+        position: Option<Id>,
+        done: i64,
+        seq: u64,
+        checks: Vec<WorkCheck>,
         placed: Placed,
     },
     /// A visit in progress (docs/design/knowing.md): when it ends its looker sees what is at these cells.
@@ -699,10 +730,11 @@ impl State {
         format!("{prefix}.{n}")
     }
 
-    pub fn schedule(&mut self, at: i64, what: Sched) {
+    pub fn schedule(&mut self, at: i64, what: Sched) -> u64 {
         self.counters.sched += 1;
-        let item = Scheduled { at, seq: self.counters.sched, what };
-        self.schedule.insert(item);
+        let seq = self.counters.sched;
+        self.schedule.insert(Scheduled { at, seq, what });
+        seq
     }
 
     /// The next change stamp.

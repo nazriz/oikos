@@ -464,6 +464,7 @@ fn the_oracle_is_exercised() {
         participant: p.into(),
         position: pos.map(String::from),
         blocks: vec![serde_json::from_value(b).unwrap()],
+        by: vec![],
         provenance: json!({"via": "direct"}),
         reasoning: None,
         thinking: None,

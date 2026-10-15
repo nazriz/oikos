@@ -625,6 +625,9 @@ pub struct Record {
     pub visible_to: Visibility,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub basis: Option<Basis>,
+    /// Who did the work of making it, where that was not the author itself (the action's `by`; foundations F3).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub by: Option<Vec<Id>>,
     #[serde(flatten)]
     pub body: RecordBody,
 }

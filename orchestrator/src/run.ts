@@ -963,7 +963,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     const asField = as ? { as } : {};
     if (action.type === "act" || action.type === "message") {
       const blocks = action.type === "act" ? action.blocks : [{ block: "message", to: action.to, text: action.text, ...(action.re ? { re: action.re } : {}) }];
-      const r = await begin(u, { command: "act", participant: u.participant, ...asField, blocks, provenance: { via: "direct" }, ...(action.type === "act" && action.reasoning && keepReasoning(u) ? { reasoning: action.reasoning } : {}) });
+      const r = await begin(u, { command: "act", participant: u.participant, ...asField, blocks, ...(action.type === "act" && action.by?.length ? { by: action.by } : {}), provenance: { via: "direct" }, ...(action.type === "act" && action.reasoning && keepReasoning(u) ? { reasoning: action.reasoning } : {}) });
       if (r === null) {
         // Off-contract: never logged by the kernel, so record the attempt ourselves; and a seat is told (never silence).
         const words = action.type === "message" ? `Your letter to ${action.to.join(", ")} (${JSON.stringify(action.text.length > 60 ? `${action.text.slice(0, 60)}…` : action.text)}) was not sent: it could not be delivered as it was written. Nothing went. You could write it again, to each by their id.`

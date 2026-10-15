@@ -1098,6 +1098,14 @@
             "as": {
               "description": "The position to act in (absent: as itself, a person's only).",
               "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+            },
+            "by": {
+              "description": "Who does the act's work, if not the actor alone (foundations F3): people at work, whose time it takes.",
+              "type": "array",
+              "items": {
+                "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+              },
+              "maxItems": 1000
             }
           }
         },
