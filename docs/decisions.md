@@ -5069,3 +5069,41 @@ Plan: docs/design/translator-round-3.md (section 2, step 3 of section 5). Files:
 - **Spend** (Claude Code's reckoning from the ledgers): **77.09 USD of 80**: forms 44.3 (wf-1 6.22, wf-2 11.58, wf-3 10.96, wf-4 3.27, wf-5 8.06, wf-6 4.20), calc 3.70 (+1.69 of a first try that the uniformity guard stopped: every answer a refusal, so the part was planned again with positives beside), line 2.61, fin 1.98, reports 2.65, splits 2.70, hours 2.83, code 4.67, Haiku's re-reading 9.97. 306 calls (Haiku 5.5 about 65 USD: it is the dearer model here, and the reader of Sonnet's writing; Sonnet 5.5 about 12 USD). Each part had its own limit in `scripts/go.sh` (raised twice for wf-2 and wf-3, which stopped at theirs and were run on). The plan said about 80 for 3,100 written and read; the 2,075 kept (2,560 read, 2,400 written) come in at that cost because Haiku's reading and writing cost 5 to 7 times Sonnet's.
 - **Not verified.** The writing is two Claude models only (no Codex voice), and every kept example was read by one model that did not write it, not two. The 26-form count rests on the generator's coverage of every field; the readers' agreement is on the act, free text not compared. A venue form's `venue`/`applicant` and the statements' kinds are agreed on by the readers because they pick the same, not because the prompt says which is right. Step 2's real set and step 3's examples have not met a trained model yet.
 - **Revisit if** step 4's or step 5's scores show `venue_decision`, `possession_reply` or the venue forms confidently wrong (then the `venue`/`applicant` sentence in the prompt, and the examples are read again); the owner renames the `to` field of the three forms (then those parts are written again); Codex answers again and a sol reading of a third of the generated examples is wanted (free); or practice and offer are wanted in the model.
+
+## 2026-10-15 · Gradual disempowerment: plan (awaiting the owner; nothing built, no model called)
+
+Plan: `docs/design/gradual-disempowerment.md`. The owner's direction of 2026-10-15 ("The whole point of the platform is to model gradual disempowerment scenarios"; real-world centred; robustness and real power before experiment design) and the frame he agreed to, turned into decisions and steps.
+
+- **Decided in the plan.** (1) Adoption is a cost comparison per task on a firm's or office's own review, with imitation of those it knows of (Acemoglu and Restrepo 2019; Mansfield 1961); the only outside input is the technology on offer, set from sources in the profile or as a scenario from day 0; no adoption rate, share or date is ever set. (2) An automated system is a system participant deployed from a vendor's template (the `deploy` block exists); one contract change lets `work` name a deployed system as performer. Its errors come from its procedure and data, not a rate, except for reading and matching. Every act's basis says whether a person reviewed the case. (3) Clerical work must cost staff time first (today it costs nothing, `standing-work.md`), or automating an office saves nothing; this changes every town's baseline and is measured before and after. (4) Systems are code by default; seats decide about systems before any model is a system. (5) Reinstatement is kept to oversight tasks and ordinary business entry, a stated limit that leans the town towards displacement. (6) The strike's concession follows the cost of a stoppage to the employer instead of a fixed schedule. (7) The national state stays outside; the town measures its own and the outside world's dependence on residents. (8) Robodebt, MiDAS and the Dutch childcare benefits scandal are acceptance tests that each chain can complete, never that harm happens. (9) Six measures fixed before any run (M1 a human in the decision, M2 responsiveness, direct and by twins with one act withheld, M3 dependence, M4 reversibility, M5 concentration, M6 what people read).
+- **Build order:** robustness first (R1 to R5: long-run probes at 3,000 and 10,000, bounded growth, streaming measures, kernel costs, seats over years), then B1 to B13 and M1, M2, then ten-year code-only runs: about 42 agent-days, none needing a model call.
+- **For the owner (three questions, section 9):** which roles a real model may hold first (recommended: deciders about systems, not systems); data matching between offices as named asks under a data-sharing agreement (recommended; it touches the no-god-view hard rule, so it is his); the technology on offer fixed at today's prices by default, a falling trend as a named scenario (recommended).
+- **Not verified:** the three precedents' figures come from search summaries, not the reports (marked in `docs/research/references.md`); the ten-year, 10,000-person projection (15 to 25 hours, about 240 GB of raw log) is a month's figures multiplied, never run; whether casework time can be sourced for most places.
+- **Revisit if** R1 shows ten years at 10,000 out of reach on one machine (then 3,000 and partitions by place); the adoption rule's uptake turns out to be set by one weight rather than costs; casework time cannot be sourced; or the precedent chains need a national state to complete.
+
+## 2026-10-15 · Foundations: plan (awaiting the owner; nothing built, no model called)
+
+Plan: `docs/design/foundations.md`. The owner's direction of 2026-10-15: stop fixing one case at a time; every piece of
+work costs time, enforced at the foundation; he agreed to an audit and a plan, and kernel changes come back to him
+before anything is built.
+
+- **What the audit found.** Acting already costs time (`kernel/crates/time`, rebuild 6.3) and physical work already
+  needs performers with hours. The fault is a free machine: the generator makes every office's holder, staff and clerk
+  a system nobody supplied or pays, that can do anything at one second an act (`generate.ts` 64-76, 1966-1968). The
+  patches on top of it (the support office's capacity, delay and backlog-doubled errors; `cases_per_day` on every
+  venue; the clerk's one paper a day; the free newspaper and bank; free admin everywhere) are listed for deletion.
+  `work` keeps a second time ledger (`labour_used`) beside the timelines, so a worker can act while working.
+- **Decided in the plan.** Seven laws: nothing from nothing (money, goods and time conserved); all work takes time, read
+  from what it makes; only actors work (a person, or a system a supplier delivered from a template that says what it
+  can do); what works or holds value changes hands only by its holder (a supplier delivers and can switch off);
+  every act records its author and performers and can be wrong (errors from procedure, data and time; slips only at
+  sourced rates through one helper; review and appeal as law data); who may do what is data (kept); information with
+  its keeper (kept; answering takes the keeper's time). The act is the task: no task objects or queues in the kernel.
+- **Reduction.** Of the gradual-disempowerment plan's 21 steps, 5 disappear into the laws, 4 shrink to data and a
+  small piece, 12 remain (9 of them robustness, measures, tests and runs). Foundations about 20 agent-days, the rest
+  of that plan about 25: about 45 in all against 42, with about fifteen existing special cases deleted.
+- **For the owner (section 8):** the four kernel changes; every town's baseline moving (offices hire clerks and pay
+  licences); a seat in a human post working at a person's speed.
+- **Not verified:** the performance estimate (under 2% more acts) is reasoned, not measured; casework seconds have not
+  been searched for any place; the new references are named from memory.
+- **Revisit if** F1 costs more than 1.5 times a 10,000-person month, F5 leaves towns unable to staff offices at
+  sourced wages, the backstop needs a list of exceptions, or F6 turns into a chase.
