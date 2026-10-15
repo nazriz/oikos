@@ -1,7 +1,9 @@
 # Foundations: the laws of how the world works (plan, 2026-10-15)
 
-**Status:** a plan, awaiting the owner. Nothing here is built; the kernel changes in it come back to him before any
-code is written. His direction (Naz, 2026-10-15, close to his words): the platform must be very generalisable; stop
+**Status:** a plan, approved by the owner (Naz, 2026-10-15): the three questions in section 8 are answered, all yes
+(decisions log, 2026-10-15, "Foundations: approved"). Step F0 is built (the laws as tests, and the inventory of what is
+deleted: `kernel/tests/foundations.rs`, `orchestrator/test/foundations-laws.test.ts`, `orchestrator/test/fixtures/foundations-inventory.json`);
+F1 onward is not. Earlier: the kernel changes in it come back to him before any code is written. His direction (Naz, 2026-10-15, close to his words): the platform must be very generalisable; stop
 fixing one case at a time ("office work doesn't cost staff time", "systems can't do tasks", "no vendors or
 tenders"); "every single piece of work should cost time, and that should be enforced at the kernel level or the
 platform level ... it should just be at the foundational level how the world operates". He agreed to an audit and a
@@ -346,7 +348,7 @@ error drawn outside `slip()`. It should never fire.
 
 ## 8. For the owner, and what would stop us
 
-**Questions** (each with a recommendation):
+**Questions** (each with a recommendation; all three answered yes by the owner, 2026-10-15, as recommended):
 
 1. **The four kernel changes** (one time ledger; time read from what an act makes; performers on any act; systems
    only from a supplier's template, delivered and switched off by the supplier). *Recommend: yes, all four.* They are
