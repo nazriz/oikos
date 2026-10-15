@@ -192,6 +192,7 @@ export const lending: BehaviourModule = {
     let termsOffered = false;
     const paidOut = new Map<string, number>(); // a loan -> when a payment of ours that settles it was seen to leave (its principal paid out)
     let adopted = false; // loans in force when we first looked (the world's: mortgages already being repaid), taken on
+    let payrollDay = -1;
     const payroll = p.pay_staff ? new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, role: "staff", does: { hire: false, pay: true }, wakes: DAY }) : undefined;
 
     return stepper(
@@ -410,7 +411,11 @@ export const lending: BehaviourModule = {
           }
         }
         // The bank's own staff are paid and their tax paid over as any employer's: starts, stops (a death), returns on the law's days.
-        if (payroll && own) steps.push(...payroll.routine(obs, book, own, { target: 0, wage: 0, canPost: false }));
+        // (Once a day, not at every wake: it goes through the bank's whole file of instructions, and the office wakes for every application and letter.)
+        if (payroll && own && Math.floor(obs.t / DAY) > payrollDay) {
+          payrollDay = Math.floor(obs.t / DAY);
+          steps.push(...payroll.routine(obs, book, own, { target: 0, wage: 0, canPost: false }));
+        }
         return steps;
       },
       undefined,
