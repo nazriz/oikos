@@ -34,13 +34,14 @@ const check = (ref: string, row: unknown) => {
 // (au-vic-2026 re-taken again at foundations F3, gb-eng and ke-nakuru too if they changed; see living-dial.test.ts.)
 // (au-vic-2026 re-taken on 2026-10-15 at foundations F1, as living-dial.test.ts's step 1; the other two profiles as the run gives them, below.)
 const BEFORE: { [profile: string]: { days: number; state: string } } = {
-  "au-vic-2026": { days: 60, state: "cd7ca8ccd6b0a21edd0765b7174f1b75deba495dcf2da8568bcdde191bf1ce92" },
-  "gb-eng-2026": { days: 30, state: "69c254ec5dedbab4be0f15208d208acb1409c8d8a90822a2bf6bf3d2084ab0fd" },
-  "ke-nakuru-2026": { days: 30, state: "516d33fc8c9f624d2fbaadfc563805ce56617a49f61cdf35bd67e4f9a86c5e35" },
+  "au-vic-2026": { days: 60, state: "3fdeff6a80d13b7f44a624cef7c9b1952b85c944f6d8de0e5136df0ecffc01fa" },
+  "gb-eng-2026": { days: 30, state: "3b4bc97eedf9880ff6232081b6695daa20edf95f52575457c904bdea5f121ae7" },
+  "ke-nakuru-2026": { days: 30, state: "ab25cb7d74797da2599c3108ab6410990395cee63c225617461683c317d0eee5" },
 };
+// (Re-taken once more at foundations F4, 2026-10-15: a generated town's systems name their template and supplier, and its world names where work is done (`performers_in`): the config hashes and the states move, the draws and the town's life do not.)
 // (The config hashes were re-taken on 2026-10-15 at foundations F2: the world's act-time table gained rows by what an act makes. The states did not move.)
 const cfgHash = (c: unknown) => new Bun.CryptoHasher("sha256").update(JSON.stringify(c)).digest("hex").slice(0, 16);
-const CONFIG_BEFORE: { [profile: string]: string } = { "au-vic-2026": "3facfdc8299f1d57", "gb-eng-2026": "8c52420384e1b956", "ke-nakuru-2026": "f79d3dd6b86fade0" };
+const CONFIG_BEFORE: { [profile: string]: string } = { "au-vic-2026": "1f5ef6f6d55542ce", "gb-eng-2026": "66456d26003c4254", "ke-nakuru-2026": "2ecddd701415f13f" };
 
 test("the dial in the world config is a schema-valid setting; a size that would break the arithmetic is refused when the run starts", async () => {
   const v = ajv.getSchema(`${NS}:world-config`)!;

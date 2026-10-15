@@ -187,7 +187,7 @@ pub fn world(p: &WorldParams) -> Value {
         match pos {
             None => participants.push(json!({"id": id, "kind": "person", "person": entity, "channels": channels(), "controller": code, "framing": framing})),
             Some(pos) => {
-                participants.push(json!({"id": id, "kind": "system", "owner": entity, "controller": code, "framing": framing}));
+                participants.push(json!({"id": id, "kind": "system", "owner": entity, "template": "installed-system", "supplier": "outside", "controller": code, "framing": framing}));
                 positions.push(json!({"id": pos, "entity": entity, "title": pos, "channels": channels(), "role_module": {"code": "test"}, "holder": id}));
             }
         }
@@ -252,7 +252,9 @@ pub fn world(p: &WorldParams) -> Value {
         "templates": [
             {"id": "newcomer", "kind": "person", "channels": channels(), "controller": code, "framing": framing, "traits": {"thrift": {"uniform": [0, 100]}, "lean": -20, "sex": {"pick": {"female": 4869, "male": 5131}}}},
             {"id": "child", "kind": "person", "channels": [{"id": "mine", "kind": "records", "way": "mine", "match": {}}], "controller": code, "framing": framing},
-            {"id": "clerk-bot", "kind": "system", "title": "Clerk bot", "controller": code, "framing": framing}
+            // (The systems the world began with, delivered by the outside world; and a kind the outside world supplies.)
+            {"id": "installed-system", "kind": "system", "supplier": "outside", "controller": code, "framing": framing},
+            {"id": "clerk-bot", "kind": "system", "title": "Clerk bot", "supplier": "outside", "controller": code, "framing": framing}
         ],
         // Who knows what in this test world: every statement is published (so the tests can watch records being made);
         // the town keeps the land register and answers about one lot, one title or one title's dealings.
@@ -758,7 +760,7 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
                     B::Harm { person } => Block::Harm { person: pick(&persons, *person).unwrap() },
                     B::CreatePosition => serde_json::from_value(json!({"block": "create_position", "title": "Deputy", "channels": [{"id": "laws", "kind": "records", "way": "published", "match": {"records": ["statement"]}}]})).unwrap(),
                     B::Appoint { position, participant } => Block::Appoint { position: pick(&positions, *position).unwrap(), participant: participant.map(|i| pick(&participants, i).unwrap()) },
-                    B::Deploy => Block::Deploy { template: "clerk-bot".into(), title: None, bind: None },
+                    B::Deploy => Block::Deploy { template: "clerk-bot".into(), to: None, title: None, bind: None },
                     B::Retire { participant } => Block::Retire { participant: pick(&participants, *participant).unwrap() },
                 });
             }

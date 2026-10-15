@@ -68,7 +68,8 @@ const TOWN = join(root, "worlds/town.yaml");
 // And again on 2026-10-15, foundations F1 (46e3ae5e... until then; docs/decisions.md, "Foundations F1"): work takes its performers' time on their timelines, and the state no longer
 // carries an empty `labour_used`. Nothing of `living` in it.
 // (Re-taken on 2026-10-15 at foundations F3, which looks at a work's performers when the work begins; 6dbd604e... until then. docs/decisions.md, "Foundations F3".)
-const STEP_1 = "cd7ca8ccd6b0a21edd0765b7174f1b75deba495dcf2da8568bcdde191bf1ce92";
+// (Re-taken on 2026-10-15 at foundations F4: the town's systems carry their template and supplier; cd7ca8cc... until then. docs/decisions.md, "Foundations F4".)
+const STEP_1 = "3fdeff6a80d13b7f44a624cef7c9b1952b85c944f6d8de0e5136df0ecffc01fa";
 
 test("with the dial absent or at 0 a town is step 1's town, to the state hash", async () => {
   const out = mkdtempSync(join(tmpdir(), "oikos-dial-"));

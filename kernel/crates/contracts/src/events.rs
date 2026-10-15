@@ -65,6 +65,10 @@ pub enum RefusalCode {
     UnknownTask,
     /// A performer isn't at the place of work (in a space of the task's kind there).
     NotAtWork,
+    /// A system asked to act, or to do work, that its template doesn't list.
+    NotCapable,
+    /// A system delivered by an organisation that is not its template's supplier.
+    NotSupplier,
     /// A performer has no time left today (the world's working day).
     NoTimeLeft,
     /// A survey that doesn't say what of or where, of something the world has, or work that says so for a task that isn't one.
@@ -349,6 +353,9 @@ pub enum EventBody {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         owner: Option<Id>,
         template: Id,
+        /// A system's: the organisation that delivered it (foundations F4).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        supplier: Option<Id>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         traits: Option<Value>,
     },

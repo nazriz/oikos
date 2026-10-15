@@ -558,7 +558,7 @@ export class Preview {
       case "appoint":
         return one(b.participant ? `You will appoint ${this.who(b.participant)} to ${b.position}.` : `You will leave ${b.position} with nobody in it.`, ["participant", "position"]);
       case "deploy":
-        return one(`You will put a new system to work${b.title ? `, ${b.title}` : ""} (${b.template}).`, ["title", "template"]);
+        return one(`You will put a new system to work${b.to ? ` for ${this.who(b.to)}` : ""}${b.title ? `, ${b.title}` : ""} (${b.template}).`, ["title", "template", "to"]);
       case "retire":
         return one(`You will switch off ${b.participant} for good.`, ["participant"]);
       case "record_claim": {

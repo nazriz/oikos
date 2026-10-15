@@ -173,5 +173,5 @@ test("people stop work at one age where the profile gives no curve, and at ages 
   expect([...many.workers].filter((w) => many.age.get(w)! >= P.values.retirement_age).length).toBeGreaterThan(0);
   expect(inForce.filter((id) => many.age.get(id)! < P.values.retirement_age && many.age.get(id)! >= many.params.get(id).stops_work_at).length).toBeGreaterThan(0);
   // Those who come later draw their own from the same curve.
-  expect(many.c.templates.every((t: any) => JSON.stringify(t.controller.params.stop_work_curve) === JSON.stringify(P.values.labour_force_share_by_age))).toBe(true);
+  expect(many.c.templates.filter((t: any) => t.kind === "person").every((t: any) => JSON.stringify(t.controller.params.stop_work_curve) === JSON.stringify(P.values.labour_force_share_by_age))).toBe(true);
 }, 120_000);

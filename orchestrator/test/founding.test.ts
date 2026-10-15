@@ -83,7 +83,8 @@ const LIVING = "living.initiative_bps=10000";
 // Moved again on 2026-10-13 (21464c87... until then; docs/decisions.md, "Hours before heads"): the same reason as living-dial.test.ts's step 1.
 // Moved again on 2026-10-15, foundations F1 (e5111b98... until then): the same reason as living-dial.test.ts's step 1.
 // (Re-taken on 2026-10-15 at foundations F3; ff96bf60... until then. docs/decisions.md, "Foundations F3".)
-const STEP_2B = "90b19b40a904a7bf03ac4adcaed3f7deaa385f212e73785f52475e36717552b8";
+// (Re-taken on 2026-10-15 at foundations F4: the same reason as living-dial.test.ts's step 1; 90b19b40... until then.)
+const STEP_2B = "fd6c525eb4f29ceb7b461c176d5a14ae9b50e03a522437fb069cf21723f48450";
 
 test("with founding off a living town is step 2b's town, to the state hash; turned on with no shape to found, nobody does anything they did not do before", async () => {
   const out = mkdtempSync(join(tmpdir(), "oikos-founding-"));

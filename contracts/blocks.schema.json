@@ -1045,7 +1045,7 @@
       }
     },
     "deploy": {
-      "description": "A new system participant belonging to the acting organisation, from a template (software, or an AI system). What it costs is an ordinary payment to whoever supplies it.",
+      "description": "The supplier's act (foundations F4): the acting organisation, which supplies the template, delivers a new system from it (software, or an AI system) to a client organisation, which owns it. Anyone else is refused (`not_supplier`). What it costs is an ordinary payment to whoever supplies it, which is an agreement and a transfer, never this block.",
       "type": "object",
       "required": [
         "block",
@@ -1059,6 +1059,10 @@
         "template": {
           "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId"
         },
+        "to": {
+          "description": "The client organisation the system is delivered to, and belongs to. Absent: the supplier itself.",
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/IdOrRef"
+        },
         "title": {
           "$ref": "urn:oikos:contracts:0.8:common#/$defs/Name"
         },
@@ -1068,7 +1072,7 @@
       }
     },
     "retire": {
-      "description": "Switch off a system participant belonging to the acting organisation: it never acts again, and its positions fall vacant.",
+      "description": "Switch off a system participant belonging to the acting organisation, or supplied by it (a licence ended, the vendor's switch): it never acts again, and its positions fall vacant.",
       "type": "object",
       "required": [
         "block",

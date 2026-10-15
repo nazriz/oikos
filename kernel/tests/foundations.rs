@@ -247,14 +247,54 @@ fn law2_the_time_charged_is_the_tables_time() {
 // Law 3. Only actors work: a person, or a system someone supplied. A system acts within its template.
 // ------------------------------------------------------------------------------------------------------------------
 
-/// Today `work` takes a body's hours only. A system named as a performer is refused (it has no working day). After F3
-/// and F4 a system whose template lists the work may perform it; one whose template does not is still refused. This
-/// holds in both states, for a system with no such row.
+/// A system may perform a work only if it is the acting organisation's and its template lists the task (F4).
 #[test]
 fn law3_a_system_with_no_row_for_a_work_cannot_perform_it() {
-    let mut run = town();
-    let code = outcome(&mut run, &make(1, &["builder-system"]));
-    assert!(code.is_some(), "a system with no template row for `make` was allowed to perform it");
+    let mut run = with_template(|t| {
+        t["does"] = json!([{"block": "message"}]);
+        t["supplier"] = json!("outside");
+    });
+    let bot = deliver_to(&mut run, "devco");
+    // devco's own system, whose template lists no `make`: refused as incapable, and nobody's time is taken.
+    assert_eq!(outcome(&mut run, &make(1, &[&bot])).as_deref(), Some("not_capable"));
+    // Another organisation's system is not devco's to name (the template lists nothing of it, but it is not theirs).
+    assert_eq!(outcome(&mut run, &make(1, &["builder-system"])).as_deref(), Some("not_theirs"));
+}
+
+/// A system whose template lists the work does it at the template's seconds a unit, on its own timeline: no person's
+/// hours are taken (F4: "a system does a task, a person's hours are freed").
+#[test]
+fn law3_a_system_that_lists_the_work_does_it_and_frees_the_people() {
+    let mut run = with_template(|t| {
+        t["does"] = json!([{"block": "work", "task": "make", "seconds": 600}]);
+        t["supplier"] = json!("outside");
+    });
+    let bot = deliver_to(&mut run, "devco");
+    let goods = run.kernel().state().holding("devco", "s-shop", "goods");
+    let c = make(4, &[&bot]);
+    let (starts, done) = begun(&mut run, &c);
+    assert_eq!(done - starts, 2_400, "4 units at the template's 600 s, not the task's 1,800 s");
+    let r = run.command(&Command::Advance { to: done }).unwrap();
+    let by = r.events.iter().find_map(|e| match &e.body { EventBody::ActionApplied { by, .. } => Some(by.clone()), _ => None }).expect("the work was done");
+    assert_eq!(by, vec![bot.clone()]);
+    assert!(run.kernel().state().holding("devco", "s-shop", "goods") > goods, "the system made goods");
+    let st = run.kernel().state();
+    assert!(st.timelines.get("carol").is_none(), "carol's time was not taken");
+    assert_eq!(st.timelines[&bot].lanes.iter().copied().max(), Some(done));
+}
+
+/// A system has no working day (a person's limit): a long work is not refused for the hours it takes (F4).
+#[test]
+fn law3_a_system_in_service_does_not_tire() {
+    let mut run = with_template(|t| {
+        t["does"] = json!([{"block": "work", "task": "make", "seconds": 1_800}]);
+        t["supplier"] = json!("outside");
+    });
+    let bot = deliver_to(&mut run, "devco");
+    let day = world(&default_params())["catalogue"]["working_day"].as_i64().expect("the test world has a working day");
+    let units = (day / 1_800) as u64 * 2; // two days of work for a person
+    assert_eq!(outcome(&mut run, &make(units, &["carol"])).as_deref(), Some("no_time_left"), "a person is held to the day");
+    assert_eq!(outcome(&mut run, &make(units, &[&bot])), None, "a system is not");
 }
 
 #[test]
@@ -274,7 +314,6 @@ fn with_template(f: impl FnOnce(&mut Value)) -> R {
 /// Template fields (F4): `does` lists the blocks (or works) a system from it may do; `supplier` is the organisation
 /// that delivers it. The names are the plan's (2.3); F4 settles the exact spelling.
 #[test]
-#[ignore = "F4: a system acts only within its template's `does` (refusal `not_capable`)"]
 fn law3_a_system_acts_only_within_its_template() {
     let mut run = with_template(|t| {
         t["does"] = json!([{"block": "message"}]);
@@ -288,14 +327,17 @@ fn law3_a_system_acts_only_within_its_template() {
     assert_eq!(outcome(&mut run, &pay).as_deref(), Some("not_capable"), "what it does not list is refused");
 }
 
-/// Deliver a clerk-bot to the city the way the plan says: the supplier's act, naming the client (F4).
-fn deliver(run: &mut R) -> String {
-    let r = applied(run, &cmd("outside-system", Some("outside-trade"), json!([{"block": "deploy", "template": "clerk-bot", "to": "city", "ref": "bot"}])));
+/// Deliver a clerk-bot to an organisation the way the plan says: the supplier's act, naming the client (F4).
+fn deliver_to(run: &mut R, client: &str) -> String {
+    let r = applied(run, &cmd("outside-system", Some("outside-trade"), json!([{"block": "deploy", "template": "clerk-bot", "to": client, "ref": "bot"}])));
     r["created"]["bot"].as_str().expect("the delivered system's id").to_string()
 }
 
+fn deliver(run: &mut R) -> String {
+    deliver_to(run, "city")
+}
+
 #[test]
-#[ignore = "F4: `deploy` is the supplier's act, naming the client organisation (`deploy.to`); refusal `not_supplier`"]
 fn law3_only_the_templates_supplier_delivers_a_system() {
     let mut run = with_template(|t| t["supplier"] = json!("outside"));
     // The city cannot make itself a system out of nothing (today it can: `deploy` makes one for the acting org).
@@ -309,8 +351,8 @@ fn law3_only_the_templates_supplier_delivers_a_system() {
 #[test]
 fn law4_a_system_is_retired_by_its_owner_and_not_by_anyone_else() {
     let mut run = town();
-    let r = applied(&mut run, &cmd("mayor-system", Some("mayor"), json!([{"block": "deploy", "template": "clerk-bot", "ref": "bot"}])));
-    let bot = r["created"]["bot"].as_str().unwrap().to_string();
+    // (F4: it is delivered by its supplier to the city, which owns it.)
+    let bot = deliver(&mut run);
     let by_stranger = cmd("developer-system", Some("developer"), json!([{"block": "retire", "participant": bot}]));
     assert_eq!(outcome(&mut run, &by_stranger).as_deref(), Some("not_theirs"));
     let by_owner = cmd("mayor-system", Some("mayor"), json!([{"block": "retire", "participant": bot}]));
@@ -318,7 +360,6 @@ fn law4_a_system_is_retired_by_its_owner_and_not_by_anyone_else() {
 }
 
 #[test]
-#[ignore = "F4: the supplier may also switch a system off (a licence ended, the vendor's switch: lock-in is physical)"]
 fn law4_a_system_is_switched_off_by_its_supplier_too() {
     let mut run = with_template(|t| t["supplier"] = json!("outside"));
     let bot = deliver(&mut run);
@@ -328,13 +369,18 @@ fn law4_a_system_is_switched_off_by_its_supplier_too() {
     assert_eq!(outcome(&mut run, &supplier), None);
 }
 
-/// A world loads only if every post's holder is a person or a system delivered from a template (F4(e)). The test
-/// world's own systems name no template (they are hand-written); F4 updates the fixtures and turns this on.
+/// A world loads only if every post's holder is a person or a system delivered from a template (F4(e)). Delivery at
+/// the start of a world is a record on the participant: its template and its supplier.
 #[test]
-#[ignore = "F4: a world whose posts are held by systems no template made is refused at load"]
 fn law3_a_world_with_a_free_holder_does_not_load() {
-    let c = world(&default_params()); // mayor-system is a system with no template and no supplier
-    assert!(Run::start(c, "foundations", Vec::new(), None).is_err(), "a post held by a system nobody supplied loaded");
+    assert!(Run::start(world(&default_params()), "foundations", Vec::new(), None).is_ok(), "the test world's systems were all delivered");
+    for (what, field) in [("a template", "template"), ("a supplier", "supplier")] {
+        let mut c = world(&default_params());
+        let mayor = c["participants"].as_array_mut().unwrap().iter_mut().find(|p| p["id"] == "mayor-system").unwrap();
+        mayor.as_object_mut().unwrap().remove(field); // mayor-system, a system with no template, or no supplier
+        let e = Run::start(c, "foundations", Vec::new(), None).err().unwrap_or_else(|| panic!("a post held by a system with no {what} loaded"));
+        assert!(e.to_string().contains("nobody supplied"), "{e}");
+    }
 }
 
 // ------------------------------------------------------------------------------------------------------------------

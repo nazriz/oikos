@@ -90,6 +90,11 @@ pub fn exec_action(s: &Statics, st: &mut State, participant: &str, position: Opt
 /// given kind, if given); else in a space of the kind the world says work is done in (`orchestration.performers_in`),
 /// if it says. The one rule for a `work`'s performers and for an action's `by` (foundations F3).
 pub fn check_at_work(s: &Statics, st: &State, p: &str, at: Option<&str>, space: Option<&str>) -> R<()> {
+    // (A system has no body to be anywhere: it does the work while it is in service. Whether its template lists the
+    // work is looked at when the act is ordered, `check_system_does`.)
+    if let Some(x) = st.participants.get(p).filter(|x| x.kind == ParticipantKind::System) {
+        return if can_act(x) { Ok(()) } else { Err(refuse(RefusalCode::ParticipantInactive, format!("{p} no longer acts"))) };
+    }
     let b = st.body(p).ok_or_else(|| {
         if st.entities.contains_key(p) {
             refuse(RefusalCode::NotAPerson, format!("{p} isn't a person"))
@@ -121,6 +126,32 @@ pub fn check_at_work(s: &Statics, st: &State, p: &str, at: Option<&str>, space: 
     Ok(())
 }
 
+/// A system that is to act, or to do an organisation's work (foundations F4): it must be in service and, if it is to do
+/// another's, belong to the organisation the act is for (`org`); and each block must be one its template lists
+/// (`not_capable`). A template that lists nothing (`does` absent) states no limit.
+pub fn check_system_does(s: &Statics, st: &State, sys: &str, org: Option<&str>, blocks: &[Block]) -> R<()> {
+    let x = st.participants.get(sys).ok_or_else(|| refuse(RefusalCode::UnknownParticipant, format!("no participant {sys}")))?;
+    if !can_act(x) {
+        return Err(refuse(RefusalCode::ParticipantInactive, format!("{sys} no longer acts")));
+    }
+    if let Some(org) = org {
+        if x.owner.as_deref() != Some(org) {
+            return Err(refuse(RefusalCode::NotTheirs, format!("{sys} isn't a system belonging to {org}")));
+        }
+    }
+    let Some(rows) = x.template.as_ref().and_then(|t| s.templates.get(t)).and_then(|t| t.does.as_ref()) else { return Ok(()) };
+    for b in blocks {
+        let makes = b.makes();
+        if !rows.iter().any(|r| r.covers(b.name(), makes.as_deref())) {
+            return Err(refuse(
+                RefusalCode::NotCapable,
+                format!("{sys} can't {}: its kind of system ({}) doesn't do that", makes.as_deref().unwrap_or(b.name()), x.template.as_deref().unwrap_or("-")),
+            ));
+        }
+    }
+    Ok(())
+}
+
 /// What `exec_action` takes besides the blocks, for an act whose work was ordered earlier: `seen` says who was where
 /// when it was; `by` is who the action named; `started` that the performers' being there was looked at when the work
 /// began (so it is not looked at again when it ends).
@@ -139,9 +170,16 @@ pub fn exec_action_seen(s: &Statics, st: &mut State, participant: &str, position
         }
         None => p.person.clone().ok_or_else(|| refuse(RefusalCode::NotInPosition, format!("{participant} is a system: it acts only in a position")))?,
     };
+    // A system acts only within its template.
+    if p.kind == ParticipantKind::System {
+        check_system_does(s, st, participant, None, blocks)?;
+    }
     for w in by {
         if w != participant && p.person.as_deref() != Some(w.as_str()) {
-            if started {
+            if st.participants.get(w).is_some_and(|x| x.kind == ParticipantKind::System) {
+                // (A system named to do the act's work: the organisation's own, and the act within its template.)
+                check_system_does(s, st, w, Some(&entity), blocks)?;
+            } else if started {
                 // (Looked at when the work began; here only that they are alive.)
                 st.body(w).filter(|b| b.alive).ok_or_else(|| refuse(RefusalCode::Dead, format!("{w} has died")))?;
             } else {
@@ -382,7 +420,7 @@ fn draw_traits(s: &Statics, traits: &Option<Value>, participant: &str) -> Option
 }
 
 /// A new participant from a template.
-fn create_participant(s: &Statics, st: &mut State, template: &str, person: Option<Id>, owner: Option<Id>, title: Option<String>) -> (Id, Vec<Timed>) {
+fn create_participant(s: &Statics, st: &mut State, template: &str, person: Option<Id>, owner: Option<Id>, supplier: Option<Id>, title: Option<String>) -> (Id, Vec<Timed>) {
     let t = st.t;
     let tpl = &s.templates[template];
     let id = st.mint("par");
@@ -395,6 +433,7 @@ fn create_participant(s: &Statics, st: &mut State, template: &str, person: Optio
             person: person.clone(),
             owner: owner.clone(),
             template: Some(template.into()),
+            supplier: supplier.clone(),
             def: Arc::new(ParticipantDef {
                 title: title.or_else(|| tpl.title.clone()),
                 channels: Arc::new(tpl.channels.clone()),
@@ -411,7 +450,7 @@ fn create_participant(s: &Statics, st: &mut State, template: &str, person: Optio
             looks: BTreeMap::new(),
         }),
     );
-    let ev = Timed::new(t, EventBody::ParticipantCreated { participant: id.clone(), kind: tpl.kind, person, owner, template: template.into(), traits });
+    let ev = Timed::new(t, EventBody::ParticipantCreated { participant: id.clone(), kind: tpl.kind, person, owner, template: template.into(), supplier, traits });
     (id, vec![ev])
 }
 
@@ -441,7 +480,7 @@ fn create_person(s: &Statics, st: &mut State, name: &str, born_at: i64, sex: Opt
             e.changed = c;
         }
     }
-    let (pid, mut pev) = create_participant(s, st, template, Some(id.clone()), None, None);
+    let (pid, mut pev) = create_participant(s, st, template, Some(id.clone()), None, None, None);
     st.entities.get_mut(&id).unwrap().body.as_mut().unwrap().participant = Some(pid.clone());
     schedule_birthday(s, st, &id, born_at);
     let mut events = vec![Timed::new(t, EventBody::PersonCreated { person: id.clone(), name: name.into(), born_at, sex, parents, participant: Some(pid) })];
@@ -934,8 +973,12 @@ impl<'a> Exec<'a> {
             return Err(refuse(RefusalCode::NotAtWork, format!("{task} takes time: say who does it")));
         }
         let kind = spec.as_ref().and_then(|x| x.in_space.clone());
+        let work_block = Block::Work { task: task.into(), units, at: at.clone(), performers: vec![], on: None, survey: None, investigate: None };
         for p in &who {
-            if self.started {
+            if self.st.participants.get(p).is_some_and(|x| x.kind == ParticipantKind::System) {
+                // (A system does the work if it is the organisation's and its template lists the task: foundations F4.)
+                check_system_does(self.s, self.st, p, Some(&self.entity), std::slice::from_ref(&work_block))?;
+            } else if self.started {
                 // (Looked at when the work began, hours ago if it queued; here only that they are still alive.)
                 self.living_present(p)?;
             } else {
@@ -944,11 +987,29 @@ impl<'a> Exec<'a> {
         }
         // Skill at work: the labour scales with the performers' mean of a body variable (all of it at the minimum, the
         // task's share at the maximum).
-        if let Some(lb) = spec.as_ref().and_then(|x| x.labour_by.as_ref()).filter(|_| !who.is_empty() && total > 0) {
+        let systems = |me: &Self| who.iter().filter(|p| me.st.participants.get(*p).is_some_and(|x| x.kind == ParticipantKind::System)).count();
+        let n_systems = systems(self);
+        // A crew of systems only: the seconds a unit that their templates give (the slowest's), in place of the task's.
+        if n_systems > 0 && n_systems == who.len() {
+            let rows: Vec<Option<i64>> = who
+                .iter()
+                .map(|p| {
+                    let t = self.st.participants.get(p).and_then(|x| x.template.as_ref()).and_then(|t| self.s.templates.get(t))?;
+                    t.does.as_ref()?.iter().find(|r| r.covers("work", work_block.makes().as_deref())).and_then(|r| r.seconds)
+                })
+                .collect();
+            if !rows.is_empty() && rows.iter().all(|r| r.is_some()) {
+                let per = rows.iter().flatten().copied().max().unwrap_or(0);
+                total = per.checked_mul(units as i64).ok_or_else(|| refuse(RefusalCode::Overflow, "too much work"))?;
+            }
+        }
+        // (A skill is a body's: a crew's mean is over the people in it.)
+        if let Some(lb) = spec.as_ref().and_then(|x| x.labour_by.as_ref()).filter(|_| n_systems < who.len() && total > 0) {
             if let Some(cfg) = self.s.config.catalogue.body_variables.iter().find(|v| v.id == lb.variable).filter(|c| c.max > c.min) {
                 let now = self.now();
-                let sum: i128 = who.iter().map(|p| self.st.body(p).and_then(|b| b.variables.get(&cfg.id)).map_or(cfg.initial, |x| crate::state::body_variable_at(cfg, *x, now).0) as i128).sum();
-                let mean = sum / who.len() as i128;
+                let people: Vec<&Id> = who.iter().filter(|p| self.st.body(p).is_some()).collect();
+                let sum: i128 = people.iter().map(|p| self.st.body(p).and_then(|b| b.variables.get(&cfg.id)).map_or(cfg.initial, |x| crate::state::body_variable_at(cfg, *x, now).0) as i128).sum();
+                let mean = sum / people.len() as i128;
                 let off = (10_000 - lb.at_max_bps.min(10_000) as i128) * (mean - cfg.min as i128) / (cfg.max - cfg.min) as i128;
                 let factor = 10_000 - off;
                 total = ((total as i128 * factor + 9_999) / 10_000).max(1) as i64;
@@ -957,7 +1018,7 @@ impl<'a> Exec<'a> {
         // (How much of a performer's working day is left is read where the work is placed: on their timeline, when the act
         // begins. Here a work is refused only if it is longer than a day, or the world has no day.)
         let share = if who.is_empty() { 0 } else { (total + who.len() as i64 - 1) / who.len() as i64 };
-        if total > 0 {
+        if total > 0 && n_systems < who.len() {
             let day = self.s.config.catalogue.working_day.ok_or_else(|| refuse(RefusalCode::NotModelled, "this world has no working day: work that takes time isn't modelled"))?;
             if share > day {
                 return Err(refuse(RefusalCode::NoTimeLeft, format!("{} has {day} s of work left today; this needs {share}", who[0])));
@@ -1908,22 +1969,38 @@ impl<'a> Exec<'a> {
                 Ok(())
             }
 
-            Block::Deploy { template, title, bind } => {
+            Block::Deploy { template, to, title, bind } => {
+                // The supplier's act (foundations F4): the acting organisation delivers a system from a template it supplies,
+                // to a client organisation (itself, if none is named). The system belongs to the client.
                 let org = self.acting_org()?;
-                if self.s.templates.get(template).is_none_or(|t| t.kind != ParticipantKind::System) {
+                let tpl = self.s.templates.get(template).filter(|t| t.kind == ParticipantKind::System);
+                let Some(tpl) = tpl else {
                     return Err(refuse(RefusalCode::UnknownTemplate, format!("no template {template} for a system")));
+                };
+                if tpl.supplier.as_deref() != Some(org.as_str()) {
+                    return Err(refuse(RefusalCode::NotSupplier, format!("{org} doesn't supply {template}")));
                 }
-                let (id, events) = create_participant(self.s, self.st, template, None, Some(org), title.clone());
+                let client = match to {
+                    Some(t) => self.r(t)?,
+                    None => org.clone(),
+                };
+                match self.st.entities.get(&client) {
+                    None => return Err(refuse(RefusalCode::UnknownEntity, format!("no entity {client}"))),
+                    Some(e) if e.kind == PERSON => return Err(refuse(RefusalCode::NotTheirs, format!("{client} is a person, not an organisation: a system is delivered to an organisation"))),
+                    _ => {}
+                }
+                let (id, events) = create_participant(self.s, self.st, template, None, Some(client), Some(org), title.clone());
                 self.emit_all(events);
                 self.bind(bind, &id)
             }
 
             Block::Retire { participant } => {
+                // Switched off by its owner (the client) or by its supplier: a licence ended, the vendor's switch.
                 let org = self.acting_org()?;
                 let p = self.r(participant)?;
                 let x = self.st.participants.get(&p).ok_or_else(|| refuse(RefusalCode::UnknownParticipant, format!("no participant {p}")))?;
-                if x.owner.as_deref() != Some(org.as_str()) {
-                    return Err(refuse(RefusalCode::NotTheirs, format!("{p} isn't a system belonging to {org}")));
+                if x.owner.as_deref() != Some(org.as_str()) && x.supplier.as_deref() != Some(org.as_str()) {
+                    return Err(refuse(RefusalCode::NotTheirs, format!("{p} isn't a system belonging to, or supplied by, {org}")));
                 }
                 if x.status == ParticipantStatus::Ended {
                     return Err(refuse(RefusalCode::ParticipantInactive, format!("{p} has already ended")));

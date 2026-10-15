@@ -244,7 +244,8 @@ impl World {
                             kind: p.kind,
                             person: p.person.clone(),
                             owner: p.owner.clone(),
-                            template: None,
+                            template: p.template.clone(),
+                            supplier: p.supplier.clone(),
                             def: Arc::new(ParticipantDef {
                                 title: p.title.clone(),
                                 channels: p.channels.clone(),
@@ -721,6 +722,10 @@ impl World {
     fn over_the_day(&self, shares: &BTreeMap<Id, i64>, day_idx: i64) -> Option<String> {
         let day = self.s.config.catalogue.working_day?;
         shares.iter().find_map(|(p, share)| {
+            // (A working day is a body's: a system in service does not tire.)
+            if self.state.participants.get(p).is_some_and(|x| x.kind == ParticipantKind::System) {
+                return None;
+            }
             let used = self.state.timelines.get(p).map_or(0, |tl| tl.worked_on(day_idx));
             (used + share > day).then(|| format!("{p} has {} s of work left today; this needs {share}", (day - used).max(0)))
         })
@@ -824,8 +829,10 @@ impl World {
             oikos_time::place(&mut lanes_now, lanes, ready, 0).0
         };
         let mut start = free_from(self.state.timelines.get(&key), lanes);
+        // (A system that does another's work takes it on as many lanes as it has.)
+        let lanes_of = |state: &State, p: &str| state.participants.get(p).filter(|x| x.kind == ParticipantKind::System).map_or(1, |x| x.def.lanes.unwrap_or(1) as usize);
         for p in shares.keys().filter(|p| **p != key) {
-            start = start.max(free_from(self.state.timelines.get(p), 1));
+            start = start.max(free_from(self.state.timelines.get(p), lanes_of(&self.state, p)));
         }
         // A performer's working day: what is already placed on it, and this act's share, within the day's hours.
         let mut start = start;
@@ -870,7 +877,8 @@ impl World {
         let own_done = place(&mut self.state, &key, lanes, actor_seconds + own, own);
         done = done.max(own_done);
         for (p, share) in shares.iter().filter(|(p, _)| **p != key) {
-            done = done.max(place(&mut self.state, p, 1, *share, *share));
+            let l = lanes_of(&self.state, p);
+            done = done.max(place(&mut self.state, p, l, *share, *share));
         }
         let starts = start;
         let free = (own_done < done).then_some(own_done);

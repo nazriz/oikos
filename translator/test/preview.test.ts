@@ -65,7 +65,7 @@ const SAMPLES: any[] = [
   { block: "harm", person: "c0042" },
   { block: "create_position", title: "Clerk", role: "clerk", channels: [{ id: "books", kind: "accounts" }], role_module: { module: "x.y", params: { a: 1 } }, ref: "p" },
   { block: "appoint", position: "planning", participant: "c0042-self" },
-  { block: "deploy", template: "assistant", title: "Front desk", ref: "d" },
+  { block: "deploy", template: "assistant", to: "greenco", title: "Front desk", ref: "d" },
   { block: "retire", participant: "works-system" },
   { block: "move_goods", kind: "gravel", quantity: "40", from_at: "str.7", to: "builder", to_at: "str.8" },
   { block: "work", task: "build", units: 7200, at: "str.2", performers: ["c0042", "builder"], on: "str.5", survey: { of: "glider", cells: ["cell.1.1", "cell.1.2"] }, investigate: { from: "greenco", at: "str.7", kind: "gravel" } },
