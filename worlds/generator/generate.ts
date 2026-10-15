@@ -76,6 +76,9 @@ const WORK_TIME = {
     // Routine documents made from records already on file (a notice from a rate book, an invoice from a sale, a delivery note):
     // two or three minutes each, not a quarter of an hour.
     "publish/rates_notice": 120, "publish/invoice": 180, "publish/delivery_note": 120,
+    // An employer's, a lender's and a clerk's paperwork (foundations F6): a return of the tax withheld is made up from the pay run and checked,
+    // a notice to payroll is a form, a lending decision is weighed on a file, a written approval is read and signed.
+    "publish/withholding_report": 1800, "publish/payroll_notice": 300, "publish/loan_decision": 1800, "publish/loan_terms": 900, "publish/approval": 300,
   },
   // What a system does takes it a second: it is software that was delivered to do just that (foundations F5: there is no default
   // for a block a system's template does not list, because it cannot do it).
@@ -90,6 +93,11 @@ const WORK_TIME = {
     "person.publish/rates_notice": "Placeholder: two minutes to make a notice from the rate book, to be sourced (clerical work studies; to confirm).",
     "person.publish/invoice": "Placeholder: three minutes to make an invoice from a sale on file, to be sourced.",
     "person.publish/delivery_note": "Placeholder: two minutes to make a delivery note, to be sourced.",
+    "person.publish/withholding_report": "Placeholder: half an hour to make up and check a return of the tax withheld from a pay run, to be sourced (payroll practice; to confirm).",
+    "person.publish/payroll_notice": "Placeholder: five minutes to fill in a notice of a starter or a leaver for payroll, to be sourced.",
+    "person.publish/loan_decision": "Placeholder: half an hour to decide a loan on its file, to be sourced (credit underwriting studies; to confirm).",
+    "person.publish/loan_terms": "Placeholder: a quarter of an hour to write the terms of a loan agreed, to be sourced.",
+    "person.publish/approval": "Placeholder: five minutes to read and sign a written approval, to be sourced.",
     system: "Placeholder: a second for each act a delivered system does (software).",
   },
 };

@@ -54,13 +54,13 @@ test("the day's list: every case whose day has come is set out in full in the pa
 test("the clerk files the day's list once a working day, only when it has changed; a case ripening the next day is on the next day's paper; a case decided leaves it", () => {
   let open: OpenHeading[] = [];
   const clerk = new Clerk("tribunal-member-staff", "tribunal-member", { absorb() {}, open: () => open });
-  const paper = (t: number) => { const a: any = clerk.due(t); return a ? parsed(a).data : undefined; };
+  const paper = (t: number, woke?: "news") => { const a: any = clerk.due(t, woke); return a ? parsed(a).data : undefined; };
   expect(paper(5 * DAY + 9 * HOUR)).toBeUndefined(); // nothing has ever stood open
   open = ripe(["a", "b", "c"]);
   expect(paper(6 * DAY + 9 * HOUR).list).toEqual({ ripe: 3, new: 3 });
   // Later that day another case's day "comes" (a case taken in with its time already run): not before the next day.
   open = ripe(["a", "b", "c", "d"]);
-  expect(paper(6 * DAY + 15 * HOUR)).toBeUndefined();
+  expect(paper(6 * DAY + 15 * HOUR, "news")).toBeUndefined(); // (woken by a paper, not on its round)
   expect(paper(7 * DAY + 9 * HOUR).list).toEqual({ ripe: 4, new: 1 });
   // Nothing changed: no paper. Two decided, one case new on a later day: one paper that day, with one new.
   expect(paper(8 * DAY + 9 * HOUR)).toBeUndefined();
