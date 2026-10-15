@@ -3001,7 +3001,8 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   {
     const personHeld = (pos: any) => { const h = participants.find((q) => q.id === pos.holder); return !!h && h.kind === "person"; };
     for (const x of payrollPosts) {
-      const own = positions.filter((q) => q.entity === x.entity && personHeld(q));
+      // (Not the staff and clerk a model's seat is given: they are the seat's, and a town without the seat has none to look at.)
+      const own = positions.filter((q) => q.entity === x.entity && personHeld(q) && !String(q.id).endsWith("-staff"));
       for (const params of x.params) {
         const id = params.part === "officer" ? x.officer : x.deputy;
         params.watch = params.part === "officer" ? (x.deputy ? [x.deputy] : []) : own.map((q) => q.id).filter((q) => q !== id);

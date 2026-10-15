@@ -124,7 +124,8 @@ test("founding in code: with the composer off no model is called; a founded thin
     // (Seed 2, 2026-10-12, draws named for the day or the matter: in seed 1 only one person shared the want that founds; seeds 2 and 5 have two or more, 3 and 4 do not.)
     // (Seed 6 from 2026-10-15, foundations F1: the world differs again; of seeds 1 to 8 only 6 has two or more who share the want that founds.)
     // (Seed 7 from 2026-10-13, hours before heads: the world differs, and seeds 2 and 5 now have one person who shares the want that founds. Which seed has two or more is a matter of draws, not of the rule.)
-    const s = await runWorld({ config: { ...config, seed: 6 }, runId: "code", outDir: out, until: 205 * DAY, recordObservations: "none" });
+    // (Seed 13 from 2026-10-16, foundations F6: the world differs again; of seeds 1 to 16 only 13 has two or more who share the want that founds, 19 of them. Every other has one.)
+    const s = await runWorld({ config: { ...config, seed: 13 }, runId: "code", outDir: out, until: 205 * DAY, recordObservations: "none" });
     expect(s.composer).toBeUndefined();
     const log = readFileSync(s.logPath, "utf8");
     // No model anywhere: not a usage entry, not a transcript.

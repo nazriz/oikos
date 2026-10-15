@@ -30,7 +30,13 @@ async function run(over: object, days: number, seated: boolean, tweak?: (config:
   } finally { rmSync(out, { recursive: true, force: true }); }
   return recs;
 }
-const executed = (recs: any[]) => recs.filter((r) => r.kind === "warrant_executed").map((r) => ({ warrant: r.data.lease, day: Math.floor(r.at / DAY), removed: r.data.removed })).sort((a, b) => (a.warrant < b.warrant ? -1 : 1));
+// (Each by the days from the registrar's warrant to the officers carrying it out: that is the station's work. When the warrant itself is issued is the tribunal's and
+// its landlord's, and a seat in the station is a person's time spent, so what a town does elsewhere on other days is another town from there: foundations F6, where
+// the same warrant was issued 28 days earlier in the town with the seat and carried out 8.4 days after in both.)
+const executed = (recs: any[]) => recs.filter((r) => r.kind === "warrant_executed").map((r) => {
+  const issued = recs.find((q) => q.kind === "warrant" && q.data?.lease === r.data.lease);
+  return { warrant: r.data.lease, day: Math.floor((r.at - (issued?.at ?? 0)) / DAY), removed: r.data.removed };
+}).sort((a, b) => (a.warrant < b.warrant ? -1 : 1));
 
 test("a mock seat in the station over 330 days: the warrants are carried out as in the code twin, by the officers, under the orders in force at the start", async () => {
   const twin = await run({}, 330, false), seat = await run({}, 330, true);
