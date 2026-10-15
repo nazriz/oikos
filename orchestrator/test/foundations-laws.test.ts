@@ -141,9 +141,11 @@ test("law 2 (F5): what a system's act takes is a row of the world's table, for e
 // Law 2 (behaviour): no parameter sets throughput or delay directly; a backlog comes from hours.
 // ---------------------------------------------------------------------------------------------------------------------
 
-const DIALS = /^(cases_per_day|capacity_per_day|processing_days|error_bps)$|^(cases|capacity|claims|decisions|reviews)_per_day$/;
+// (`error_bps`, the share of qualifying claims wrongly refused, is a slip rate and not a throughput or a delay: F7 moves it to `slip()`
+// and its test below. Until F6 it was doubled while a backlog stood; that is gone.)
+const DIALS = /^(cases_per_day|capacity_per_day|processing_days)$|^(cases|capacity|claims|decisions|reviews)_per_day$/;
 /** The throughput dials a generated town hands its modules: `cases_per_day`, `capacity_per_day`, `processing_days`,
- * `error_bps`, and any other `<cases|capacity|claims|decisions|reviews>_per_day`. (A physical rate, as litres a person a day,
+ * and any other `<cases|capacity|claims|decisions|reviews>_per_day`. (A physical rate, as litres a person a day,
  * or a rate of events in a population, is not a dial.) */
 function dials(x: unknown, path: string, out: Set<string>) {
   if (Array.isArray(x)) x.forEach((v, i) => dials(v, `${path}[${i}]`, out));
@@ -153,13 +155,15 @@ function dials(x: unknown, path: string, out: Set<string>) {
   }
 }
 
-test.todo("F6: law 2: a generated town sets no throughput or delay as a parameter (the dials F6 deletes, and any *_per_day capacity)", () => {
+test("F6: law 2: a generated town sets no throughput or delay as a parameter (the dials F6 deletes, and any *_per_day capacity)", () => {
   const found = new Set<string>();
   const c = town();
   dials(c.positions.map((p: any) => p.role_module), "positions", found);
   dials(c.participants.map((p: any) => p.controller), "participants", found);
   expect([...found].sort(), "throughput or delay set directly").toEqual([]);
-});
+  // And no profile states one.
+  for (const profile of profiles) expect(JSON.stringify(loadProfile(profile).values), profile).not.toMatch(/"(cases_per_day|capacity_per_day|processing_days)"/);
+}, 120_000);
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Law 5: an error arises from procedure, data and time, or from a slip at a sourced rate through `slip()`.
@@ -228,10 +232,11 @@ test("every special case in the inventory still stands where it says, as many ti
   for (const s of inv.stays) expect(stands(s.file, s.find).length, s.what).toBeGreaterThan(0);
 });
 
-test("the inventory covers the plan's deletions: every step from F6 to F8 has entries, and every kernel one is in the kernel", () => {
+test("the inventory covers the plan's deletions: every step from F7 to F8 has entries, and every kernel one is in the kernel", () => {
   const steps = new Set(inv.entries.map((e) => e.step));
-  // (A step that is built has taken its entries out with the code: F1 to F5 have none left but history.)
-  for (const s of ["F6", "F7", "F8"]) expect(steps.has(s), s).toBe(true);
+  // (A step that is built has taken its entries out with the code: F1 to F6 have none left but history.)
+  for (const s of ["F7", "F8"]) expect(steps.has(s), s).toBe(true);
+  for (const s of ["F1", "F2", "F3", "F4", "F5", "F6"]) expect(inv.entries.filter((e) => e.step === s && e.kind !== "history").map((e) => e.id), `${s} is built: nothing of it is left`).toEqual([]);
   for (const e of inv.entries.filter((x) => x.id.startsWith("k-"))) expect(e.file, e.id).toMatch(/^kernel\//);
 });
 
