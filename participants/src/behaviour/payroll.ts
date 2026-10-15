@@ -25,7 +25,8 @@ const LOOK_EVERY = 3 * DAY;
 export const bodyPayroll: BehaviourModule = {
   name: "body.payroll",
   answers: { office: "the payroll office", acts: "What it acts on: the employment agreements of its organisation's staff and the standing payments that pay them; the tax withheld from wages, paid over on the law's days; and a member of staff who has died." },
-  version: "0.1.0",
+  version: "0.2.0", // 0.2.0: deaf to news, on a round of its own
+  deaf: true,
   doc: "docs/behaviour/staffing.md",
   cadence: () => 3 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(3) * DAY,
@@ -54,7 +55,11 @@ export const bodyPayroll: BehaviourModule = {
     // The round is the payroll's own: every few days on a day of its own, whatever else wakes it. A paper addressed to the organisation wakes everyone who acts
     // for it (a seat's, say), and a payroll that did its work whenever it was woken would file on other days in a town with a seat than in the town without one.
     const phase = ctx.rng("first-wake").below(3) * DAY;
-    const onRound = (obs: { woke_for?: string }) => obs.woke_for !== "news";
+    // It acts at the first wake at or after each of its days, whatever woke it (a paper's news wake that falls on the day does the round, and the cadence's
+    // wake after it finds it done): so it acts at the same moments with or without the papers.
+    let ranRound = -1;
+    const roundOf = (t: number) => Math.floor((t - phase) / (3 * DAY));
+    const onRound = (obs: { t: number }) => roundOf(obs.t) > ranRound;
     return stepper(
       (obs) => {
         book.absorb(obs);
@@ -62,6 +67,7 @@ export const bodyPayroll: BehaviourModule = {
       },
       (obs) => {
         if (!onRound(obs)) return [];
+        ranRound = roundOf(obs.t);
         const t = obs.t;
         const steps: Step[] = [];
         const acc = ownAccount(obs);

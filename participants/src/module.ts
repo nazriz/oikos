@@ -295,6 +295,9 @@ export interface BehaviourModule {
   /** What it carries of the world's edge: a module that stands for the simulation's own boundary conditions (the
    * weather to come, the outside market's prices) is handed them, and says so here so that it is seen. */
   boundary?: Kept[];
+  /** Woken by its cadence and by what it asks for, never by news (a record naming its organisation, a message): a payroll keeps its own round, and a paper that
+   * wakes everyone who acts for an organisation would put its acts at other moments in a town with a seat than in one without (foundations F6). */
+  deaf?: boolean;
   /** The name worlds use in controller.impl, e.g. "bank.payment_system". */
   name: string;
   /** Bump whenever the rules change; recorded in every run's log. */

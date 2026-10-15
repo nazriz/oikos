@@ -636,7 +636,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
         added.push(u);
       }
     }
-    if (added.length) await k.request({ op: "units_add", units: added.map((u) => ({ key: u.key, participant: u.participant, ...(u.llm ? { llm: true } : { capacity: u.capacity }), cadence: u.cadence, next_wake: u.firstWake })) });
+    if (added.length) await k.request({ op: "units_add", units: added.map((u) => ({ key: u.key, participant: u.participant, ...(u.llm ? { llm: true } : { capacity: u.capacity }), cadence: u.cadence, next_wake: u.firstWake, ...(u.module?.deaf ? { deaf: true } : {}) })) });
   };
   for (const pid of [...parts.keys()].sort()) await syncUnits(pid);
 
