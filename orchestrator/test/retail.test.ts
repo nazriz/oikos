@@ -9,6 +9,7 @@ import { join } from "node:path";
 import { generate } from "@oikos/worlds/generator/generate";
 import { runWorld } from "../src/run";
 import { skillClock } from "./skill";
+import { officeAt, officeBy, officesBy } from "./lib/offices";
 
 const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
@@ -88,7 +89,7 @@ test("a shop with no staff serves nobody: what it can't serve within three days 
   config.world.records = config.world.records.filter((r: any) => !(r.id.startsWith("job-") && staff.has(r.id.replace(/^job-/, "").replace(/-(sig-.*|wages)$/, ""))));
   config.world.occupancy = config.world.occupancy.filter((o: any) => !(staff.has(o.occupant) && o.space.startsWith("shop-1-")));
   // ... and doesn't hire before the month's end (people in work look for better jobs, so it could otherwise).
-  config.participants.find((p: any) => p.id === "shop-1-manager-system").controller.params.min_staff = 0;
+  officeAt(config, "shop-1-manager").params.min_staff = 0;
   const { ev, recs } = await run("unstaffed", config, 20 * DAY);
   expect(ev.some((e) => e.event === "worked" && e.task === "serve" && e.at === "shop-1-premises")).toBe(false);
   const notes = recs.filter((r) => r.kind === "delivery_note" && r.speaks_for === "shop-1");
@@ -103,7 +104,7 @@ test("shops at one wholesale price don't all order from the same factory: each h
   // (By name, every shop of a town ordered from its first factory, which could fill a few of the orders and refunded
   // the rest a week on, while the other factories' goods stood unsold and households went without: found 2026-10-08.)
   const config = generate({ ...base, citizens: 300, shops: 9, factories: 3, apartment_blocks: 5, houses: 54, landlords: 6, grid: { w: 24, h: 15 } });
-  const { recs } = await run("suppliers", config, 21 * DAY);
+  const { recs } = await run("suppliers", config, 45 * DAY); // (45 days where it was 21: the shops' first orders, at the first hour, go to the world market, before the factories' price lists are out (a person takes a quarter of an hour to post one: foundations F5), and they restock from the factories later)
   const toFactories = recs.filter((r) => r.kind === "order" && /^shop-/.test(r.speaks_for) && (r.addressed_to ?? []).some((x: string) => /^factory-/.test(x)));
   // (After the first day, when not every factory's price list is out yet: each shop's first order once all are.)
   const first = new Map<string, string>();

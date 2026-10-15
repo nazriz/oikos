@@ -7,6 +7,7 @@ import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { generate } from "@oikos/worlds/generator/generate";
 import { runWorld } from "../src/run";
+import { officeAt, officeBy, officesBy } from "./lib/offices";
 
 const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
@@ -17,7 +18,7 @@ test("a factory with no customers and no credit is wound up: everyone let go, wh
   // Factory 2: little money, and no export customers (the world market buys none of its goods).
   const acc = config.world.accounts.find((a: any) => a.id === "acc-factory-2");
   acc.balance = "200000";
-  const trader = config.participants.find((p: any) => p.id === "outside-trade-system").controller.params;
+  const trader = officeAt(config, "outside-trade").params;
   trader.buys.goods.from["factory-2"] = 0;
   // ... nor the town's shops (with the energy retailer's ordering loop fixed, 2026-10-02, they bought from it, and it
   // didn't fail).
@@ -52,7 +53,7 @@ test("a factory with no customers and no credit is wound up: everyone let go, wh
   const closure = recs.find((r) => r.kind === "closure" && r.speaks_for === "factory-2");
   expect(closure).toBeDefined();
   expect(closure.at - insolvency.at).toBeGreaterThanOrEqual(60 * DAY);
-  const actsAfter = log.filter((e) => e.kind === "command" && e.body.command === "act" && e.body.participant === "factory-2-manager-system" && e.t > closure.at);
+  const actsAfter = log.filter((e) => e.kind === "command" && e.body.command === "act" && e.body.as === "factory-2-manager" && e.t > closure.at);
   expect(actsAfter.length).toBeGreaterThan(0);
   expect(actsAfter.every((e) => /premises/.test(e.body.reasoning ?? ""))).toBe(true);
   // Creditors before shareholders: nothing to shareholders unless every debt recorded against it was paid.

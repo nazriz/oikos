@@ -64,7 +64,7 @@ test("every office that employs staff says so in its module; the others have non
   const staffed = Object.values(modules).filter((m) => m.staffed).map((m) => m.name).sort();
   expect(staffed).toEqual(["city.environment", "city.works", "clinic.practice", "police.station", "school.principal"]);
   expect(modules["city.works"]!.staffed!({ wage: 300_000, period: 14 * DAY })).toEqual({ role: "works crew", own: "role_or_unnamed", posts: { budget_line: "staff", wage: 300_000, period: 14 * DAY } });
-  expect(modules["clinic.practice"]!.staffed!({ doctors: 3 })).toEqual({ role: "doctor", posts: { establishment: 3 } });
+  expect(modules["clinic.practice"]!.staffed!({ doctors: 3 })).toEqual({ role: "doctor", own: "role_or_unnamed", posts: { establishment: 3 } });
   // Every form of an office that can be a seat here says what issuing it does.
   for (const name of ["city.works", "city.environment", "city.registry", "city.inspector", "city.planning_officer", "police.station", "tribunal.member", "tribunal.registrar", "clinic.practice", "school.principal"])
     for (const f of modules[name]!.issues ?? []) expect(`${name}/${f.form}: ${f.does ?? ""}`).toMatch(/: .{20,}/);

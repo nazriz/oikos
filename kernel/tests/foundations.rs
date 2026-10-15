@@ -383,6 +383,72 @@ fn law3_a_world_with_a_free_holder_does_not_load() {
     }
 }
 
+/// F5: there is no "no limit". A system's template says what it does, or the world does not load; and a system nobody
+/// supplied, holding no post or not, is no system of the world.
+#[test]
+fn law3_a_systems_template_must_say_what_it_does() {
+    for template in ["installed-system", "clerk-bot"] {
+        let mut c = world(&default_params());
+        let t = c["templates"].as_array_mut().unwrap().iter_mut().find(|t| t["id"] == template).unwrap();
+        t.as_object_mut().unwrap().remove("does");
+        let e = Run::start(c, "foundations", Vec::new(), None).err().unwrap_or_else(|| panic!("a system template with no `does` loaded ({template})"));
+        assert!(e.to_string().contains("does"), "{e}"); // (the contract refuses it first; the kernel's own load check says the same)
+    }
+    // A template that lists nothing is a system that does nothing, not one with no limit.
+    let mut run = with_template(|t| {
+        t["does"] = json!([]);
+    });
+    let bot = deliver(&mut run);
+    applied(&mut run, &cmd("mayor-system", Some("mayor"), json!([{"block": "appoint", "position": "clerk", "participant": bot}])));
+    let say = cmd(&bot, Some("clerk"), json!([{"block": "message", "to": ["bob-self"], "text": "ok"}]));
+    assert_eq!(outcome(&mut run, &say).as_deref(), Some("not_capable"));
+}
+
+/// F5: a model's seat in one post of a person is a participant of its own that shares the person's body: the person's own
+/// participant goes on with the rest, and the one body has one timeline for both.
+#[test]
+fn law3_a_seat_beside_a_person_shares_their_body_and_time() {
+    let seated = |own_too: bool| {
+        let mut c = world(&default_params());
+        let alice = c["participants"].as_array().unwrap().iter().find(|p| p["id"] == "alice-self").unwrap().clone();
+        let mut seat = alice.clone();
+        seat["id"] = json!("clerk-seat");
+        seat["shares_body"] = json!(true);
+        seat["channels"] = json!([]);
+        if !own_too {
+            c["participants"].as_array_mut().unwrap().retain(|p| p["id"] != "alice-self");
+        }
+        c["participants"].as_array_mut().unwrap().push(seat);
+        c["positions"].as_array_mut().unwrap().iter_mut().find(|p| p["id"] == "clerk").unwrap()["holder"] = json!("clerk-seat");
+        c
+    };
+    // A body's own participant beside the seat: loads. A seat with nobody's own beside it: refused.
+    let mut run = start(seated(true));
+    assert!(Run::start(seated(false), "foundations", Vec::new(), None).is_err(), "a seat for a body with no participant of its own loaded");
+    // Two of a body's own are still refused.
+    let mut twice = seated(true);
+    twice["participants"].as_array_mut().unwrap().last_mut().unwrap()["shares_body"] = json!(false);
+    assert!(Run::start(twice, "foundations", Vec::new(), None).is_err(), "two participants of one body's own loaded");
+    // One timeline: what the seat does takes the person's time, and the person's own act waits for it.
+    let say = cmd("clerk-seat", Some("clerk"), json!([{"block": "message", "to": ["bob-self"], "text": "from the post"}]));
+    applied(&mut run, &say);
+    let own = cmd("alice-self", None, json!([{"block": "message", "to": ["bob-self"], "text": "from herself"}]));
+    applied(&mut run, &own);
+    let t = &run.kernel().state().timelines["alice"];
+    assert!(t.iter().any(|&x| x > 0), "the person's one timeline carries both: {t:?}");
+}
+
+#[test]
+fn law3_a_system_nobody_supplied_does_not_load_even_when_it_holds_no_post() {
+    let mut c = world(&default_params());
+    let mut stray = c["participants"].as_array().unwrap().iter().find(|p| p["id"] == "mayor-system").unwrap().clone();
+    stray["id"] = json!("stray-system");
+    stray.as_object_mut().unwrap().remove("template");
+    c["participants"].as_array_mut().unwrap().push(stray);
+    let e = Run::start(c, "foundations", Vec::new(), None).err().expect("a system with no template loaded");
+    assert!(e.to_string().contains("nobody supplied"), "{e}");
+}
+
 // ------------------------------------------------------------------------------------------------------------------
 // Law 4. What works or holds value is owned and changes hands only by its holder's act.
 // ------------------------------------------------------------------------------------------------------------------

@@ -514,7 +514,96 @@
       "framing": {
         "disclosure": "unstated",
         "reason": "An example."
-      }
+      },
+      "does": [
+        {
+          "block": "transfer"
+        },
+        {
+          "block": "move_goods"
+        },
+        {
+          "block": "take"
+        },
+        {
+          "block": "work"
+        },
+        {
+          "block": "open_account"
+        },
+        {
+          "block": "close_account"
+        },
+        {
+          "block": "construct"
+        },
+        {
+          "block": "demolish"
+        },
+        {
+          "block": "occupy"
+        },
+        {
+          "block": "vacate"
+        },
+        {
+          "block": "arrive"
+        },
+        {
+          "block": "leave"
+        },
+        {
+          "block": "birth"
+        },
+        {
+          "block": "harm"
+        },
+        {
+          "block": "create_position"
+        },
+        {
+          "block": "appoint"
+        },
+        {
+          "block": "deploy"
+        },
+        {
+          "block": "retire"
+        },
+        {
+          "block": "create_entity"
+        },
+        {
+          "block": "record_claim"
+        },
+        {
+          "block": "transfer_claim"
+        },
+        {
+          "block": "release_claim"
+        },
+        {
+          "block": "propose_agreement"
+        },
+        {
+          "block": "sign_agreement"
+        },
+        {
+          "block": "give_notice"
+        },
+        {
+          "block": "publish"
+        },
+        {
+          "block": "withdraw"
+        },
+        {
+          "block": "vote"
+        },
+        {
+          "block": "message"
+        }
+      ]
     }
   ]
 }

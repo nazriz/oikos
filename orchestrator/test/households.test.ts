@@ -8,6 +8,7 @@ import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { generate } from "@oikos/worlds/generator/generate";
 import { runWorld } from "../src/run";
+import { officesBy } from "./lib/offices";
 
 const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
@@ -20,7 +21,7 @@ test("households live, move and pay together", async () => {
   // (Moves to watch: leases that end at their term, and landlords who don't renew. Where tenancies run on
   // periodically, as the world's law has them, few households move in a year.)
   for (const r of config.world.records) if (r.terms?.template === "lease") delete r.terms.then;
-  for (const p of config.participants) if (p.controller?.impl === "firm.landlord") Object.assign(p.controller.params, { renew: false, after_term: null });
+  for (const p of officesBy(config, "firm.landlord")) Object.assign(p.params, { renew: false, after_term: null });
   const s = await runWorld({ config, runId: "households", outDir: out, until: 365 * DAY });
   const ev = readFileSync(s.logPath, "utf8").trim().split("\n").map((l) => JSON.parse(l)).filter((e) => e.kind === "event").map((e) => ({ t: e.t, ...e.body }));
   const households = config.world.records.filter((r: any) => r.kind === "household").map((r: any) => r.data);

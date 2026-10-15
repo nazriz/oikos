@@ -8,6 +8,7 @@ import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { generate } from "@oikos/worlds/generator/generate";
 import { runWorld } from "../src/run";
+import { officeAt, officeBy, officesBy } from "./lib/offices";
 
 const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
@@ -63,7 +64,7 @@ test("a crew the budget pays for collects the waste, takes it to the landfill, a
 test("with no staff in the budget the crew is let go, nobody collects the waste, and people complain to the town", async () => {
   // (No budget on file at the start: the one the council adopts is the mayor's, with no staff line.)
   const config = generate({ ...base, mayor: "code", opening_budget: false });
-  config.participants.find((p: any) => p.id === "mayor-system").controller.params.staff_budget = 0;
+  officeAt(config, "mayor").params.staff_budget = 0;
   const { ev, recs } = await run("no-crew", config, 100);
   // Once the budget is adopted, the crew is let go (with notice); after that, nothing is collected.
   const notices = recs.filter((r) => r.record === "notice" && r.text === "Redundancy: the budget doesn't pay for the position.");

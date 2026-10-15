@@ -253,8 +253,8 @@ pub fn world(p: &WorldParams) -> Value {
             {"id": "newcomer", "kind": "person", "channels": channels(), "controller": code, "framing": framing, "traits": {"thrift": {"uniform": [0, 100]}, "lean": -20, "sex": {"pick": {"female": 4869, "male": 5131}}}},
             {"id": "child", "kind": "person", "channels": [{"id": "mine", "kind": "records", "way": "mine", "match": {}}], "controller": code, "framing": framing},
             // (The systems the world began with, delivered by the outside world; and a kind the outside world supplies.)
-            {"id": "installed-system", "kind": "system", "supplier": "outside", "controller": code, "framing": framing},
-            {"id": "clerk-bot", "kind": "system", "title": "Clerk bot", "supplier": "outside", "controller": code, "framing": framing}
+            {"id": "installed-system", "kind": "system", "supplier": "outside", "does": all_blocks(), "controller": code, "framing": framing},
+            {"id": "clerk-bot", "kind": "system", "title": "Clerk bot", "supplier": "outside", "does": all_blocks(), "controller": code, "framing": framing}
         ],
         // Who knows what in this test world: every statement is published (so the tests can watch records being made);
         // the town keeps the land register and answers about one lot, one title or one title's dealings.
@@ -811,4 +811,10 @@ pub fn step<W: std::io::Write>(run: &mut Run<W>, cmd: &Command) -> Option<Respon
         }
         Err(e) => panic!("{e}"),
     }
+}
+
+
+/// What a test world's systems can do: every kind of act (a system's template must say what it does; F5).
+pub fn all_blocks() -> Value {
+    json!([{"block": "transfer"},{"block": "move_goods"},{"block": "take"},{"block": "work"},{"block": "open_account"},{"block": "close_account"},{"block": "construct"},{"block": "demolish"},{"block": "occupy"},{"block": "vacate"},{"block": "arrive"},{"block": "leave"},{"block": "birth"},{"block": "harm"},{"block": "create_position"},{"block": "appoint"},{"block": "deploy"},{"block": "retire"},{"block": "create_entity"},{"block": "record_claim"},{"block": "transfer_claim"},{"block": "release_claim"},{"block": "propose_agreement"},{"block": "sign_agreement"},{"block": "give_notice"},{"block": "publish"},{"block": "withdraw"},{"block": "vote"},{"block": "message"}])
 }

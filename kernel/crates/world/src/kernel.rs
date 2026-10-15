@@ -172,7 +172,7 @@ impl World {
             }),
             config: loaded.config.clone(),
         };
-        let person_of: BTreeMap<&str, &str> = c.participants.iter().filter_map(|p| p.person.as_deref().map(|e| (e, p.id.as_str()))).collect();
+        let person_of: BTreeMap<&str, &str> = c.participants.iter().filter(|p| !p.shares_body).filter_map(|p| p.person.as_deref().map(|e| (e, p.id.as_str()))).collect();
         // Each parent's children, in the order the entities are given (found once, not by looking through every
         // entity for every person).
         let mut children_of: BTreeMap<&str, Vec<Id>> = BTreeMap::new();

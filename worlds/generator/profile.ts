@@ -278,6 +278,15 @@ export interface Profile {
       upkeep_hours_per_week_per_asset: number;
       complain_bps: number;
     };
+    /** Who staffs the town's own offices and what they are paid (foundations F5; docs/behaviour/staffing.md): each post is held by a
+     * resident hired from the town, at these rates per 1,000 residents (full-time equivalents; a body keeps at least one person),
+     * paid `wage_per_pay_period`; and the systems an office runs are delivered under a licence at these prices. Each figure has its
+     * source in `sources["public_service.*"]`, or is marked a placeholder. */
+    public_service: {
+      wage_per_pay_period: number;
+      staff_per_1000: { administration: number; courts: number; oversight: number; elections: number; land_registry: number; press: number; banking: number; utilities: number; union: number; property_management: number };
+      licences: { payment_system: { per_resident_per_year: number; term_days: number } };
+    };
     unions: { membership_bps: { [kind: string]: number }; dues_per_month: number; resignation_notice_days: number; claim_margin_bps: number; meeting_every_days?: number; teaching?: string };
     /** Social groups that meet (clubs, congregations): their kinds, how often and how long they meet, how many. */
     groups?: { kinds: { kind: string; name: string; every_days: number; lasts_minutes: number; teaching?: string; held_at_start_bps?: number }[]; per_kind_per_1000_people: number; taking_part_bps: number; leave_notice_days: number };

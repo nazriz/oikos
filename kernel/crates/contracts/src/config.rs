@@ -692,6 +692,10 @@ pub enum ParticipantKind {
 }
 
 /// No channels (for a shared list of them).
+pub fn is_false(b: &bool) -> bool {
+    !*b
+}
+
 pub fn no_channels(channels: &Arc<Vec<Channel>>) -> bool {
     channels.is_empty()
 }
@@ -708,6 +712,12 @@ pub struct ParticipantCfg {
     /// System participants: the organisation it belongs to.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub owner: Option<Id>,
+    /// A person's participant that acts through a body another participant already has (foundations F5): a model's seat in
+    /// one post of a person whose own participant goes on with the rest of their life and posts. It shares the person's body
+    /// and timeline, holds the posts it is given and no others; a body has one participant of its own, and any number of
+    /// these beside it. Absent: the person's own.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub shares_body: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
     /// Personal channels (persons only): what it perceives of its own life. (Shared, as its controller and framing
@@ -792,8 +802,7 @@ pub struct Template {
     pub traits: Option<Value>,
     /// A system's: what a system from this template can do (foundations F4). Each row lists a block (and, for `work`, a
     /// task, or for `publish`, a kind of record). A system acts, or does another's work, only within its rows; outside
-    /// them the act is refused (`not_capable`). Absent: the template states no limit (a hand-written world's), which
-    /// is the only way a system is unlimited.
+    /// them the act is refused (`not_capable`). A system's template must say (F5: there is no "no limit"); a person's has none.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub does: Option<Vec<Does>>,
     /// A system's: the organisation that supplies systems from this template. Only it delivers one (`deploy`, naming
@@ -2033,7 +2042,11 @@ pub fn validate(c: &Config) -> Result<(), String> {
 
     // Participants: persons have bodies of their own; systems belong to organisations.
     let mut bodies = BTreeSet::new();
+    let mut deputies: Vec<(&str, &str)> = vec![];
     for p in &c.participants {
+        if p.shares_body && p.kind != ParticipantKind::Person {
+            return Err(format!("participant {} shares a body, and only a person's participant can", p.id));
+        }
         match p.kind {
             ParticipantKind::Person => {
                 let person = p.person.as_deref().ok_or_else(|| format!("participant {} is a person's but names no person", p.id))?;
@@ -2043,8 +2056,10 @@ pub fn validate(c: &Config) -> Result<(), String> {
                 if p.owner.is_some() {
                     return Err(format!("participant {} is a person's, so it has no owner", p.id));
                 }
-                if !bodies.insert(person) {
-                    return Err(format!("{person} has more than one participant"));
+                if p.shares_body {
+                    deputies.push((p.id.as_str(), person));
+                } else if !bodies.insert(person) {
+                    return Err(format!("{person} has more than one participant of their own"));
                 }
             }
             ParticipantKind::System => {
@@ -2059,6 +2074,11 @@ pub fn validate(c: &Config) -> Result<(), String> {
         }
         check_channels(&format!("participant {}", p.id), &p.channels, &seat!(None))?;
         check_traits(&format!("participant {}", p.id), &p.traits)?;
+    }
+    for (id, person) in &deputies {
+        if !bodies.contains(person) {
+            return Err(format!("participant {id} shares {person}'s body, and {person} has no participant of their own"));
+        }
     }
     for t in &c.templates {
         if t.kind == ParticipantKind::System && !t.channels.is_empty() {
@@ -2185,6 +2205,10 @@ pub fn validate(c: &Config) -> Result<(), String> {
         if let Some(s) = &t.supplier {
             org_exists(s, &format!("template {}: its supplier", t.id))?;
         }
+        // A system can do only what its template lists (foundations F5): a template that says nothing of it is refused, never read as no limit.
+        if t.kind == ParticipantKind::System && t.does.is_none() {
+            return Err(format!("template {}: a system's template says what it does (`does`)", t.id));
+        }
         for r in t.does.iter().flatten() {
             if r.seconds.is_some_and(|x| x < 1) || (r.seconds.is_some() && r.block != "work") {
                 return Err(format!("template {}: `seconds` is a work row's, and is positive", t.id));
@@ -2193,6 +2217,9 @@ pub fn validate(c: &Config) -> Result<(), String> {
     }
     let template_of: BTreeMap<&str, &Template> = c.templates.iter().map(|t| (t.id.as_str(), t)).collect();
     for p in &c.participants {
+        if p.kind == ParticipantKind::System && (p.template.is_none() || p.supplier.is_none()) {
+            return Err(format!("system participant {}: nobody supplied it (it names its template and supplier)", p.id));
+        }
         if p.kind == ParticipantKind::Person && (p.template.is_some() || p.supplier.is_some()) {
             return Err(format!("participant {} is a person's, so it has no supplier", p.id));
         }

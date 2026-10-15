@@ -13,6 +13,7 @@ import { join } from "node:path";
 import { calls as C, modules as builtin, type BehaviourModule } from "@oikos/participants";
 import { generate } from "@oikos/worlds/generator/generate";
 import { runWorld } from "../src/run";
+import { holderIdOf, officeAt, officeBy, officesBy } from "./lib/offices";
 
 const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
@@ -47,14 +48,15 @@ test("office-holders set their staff's routine once; the staff do it; a hold sto
   const config = generate({ ...spec, opening_orders: false, model_seats: ["works", "clinic-manager", "rates"] });
   // Each of the three has a staff post run by the office's code, and the office-holder's part is the seat's.
   for (const id of ["works", "clinic-manager", "rates"]) {
-    const staff = config.participants.find((p: any) => p.id === `${id}-staff-system`);
-    expect(staff.controller).toMatchObject({ type: "code", params: { part: "staff" } });
+    const staff = officeAt(config, `${id}-staff`);
+    expect(staff.holder.kind).toBe("person");
+    expect(staff.params).toMatchObject({ part: "staff" });
     expect(config.participants.find((p: any) => p.id === `${id}-system`).controller.params.mock.params.part).toBe("seat");
     expect((config.world.records as any[]).find((r) => r.id === `proc-${id}-routines`).text).toContain("by the office's standing work orders and only by them");
   }
   // (The seats sit each working day, as a model in one does; the works manager with its three acts.)
   for (const p of config.participants) if (["works-system", "clinic-manager-system", "rates-system"].includes(p.id)) p.controller.params.cadence_days = 1;
-  const works = config.participants.find((p: any) => p.id === "works-system");
+  const works = officeAt(config, "works").holder;
   works.controller.params.mock.brain = managing.name;
   // (Somebody ill enough to ask for care, so the doctors have patients.)
   const s = await runWorld({ config, runId: "standing", outDir: mkdtempSync(join(tmpdir(), "oikos-standing-work-")), until: 45 * DAY, modules: { [managing.name]: managing } });
@@ -74,7 +76,7 @@ test("office-holders set their staff's routine once; the staff do it; a hold sto
 
   // The crew's round: every address every week while the order is in force; nothing under the hold; nothing after it is withdrawn.
   const round = (config.world.records as any[]).filter((r) => r.kind === "service_address").map((r) => r.data.structure).sort();
-  const collected = blocks("works-staff-system", (b) => b.block === "work" && b.task === "collect");
+  const collected = blocks(holderIdOf(config, "works-staff"), (b) => b.block === "work" && b.task === "collect");
   const order = orders.find((o) => o.data.work.task === "collect")!;
   const hold = records.find((r) => r.kind === "hold" && r.data.holds.includes(order.id))!;
   const lifted = records.find((r) => r.record === "withdrawal" && r.withdraws === hold.id)!;
@@ -90,13 +92,13 @@ test("office-holders set their staff's routine once; the staff do it; a hold sto
   // The crew's hours are spent as any work spends them: each load names who did it.
   expect(collected.every((c) => c.performers.length > 0)).toBe(true);
   // The upkeep order was never touched, and goes on to the end.
-  expect(blocks("works-staff-system", (b) => b.block === "work" && b.task === "maintain").some((c) => c.t > ended.at)).toBe(true);
+  expect(blocks(holderIdOf(config, "works-staff"), (b) => b.block === "work" && b.task === "maintain").some((c) => c.t > ended.at)).toBe(true);
 
   // The rates clerks sent the instalment's notices under their order (the first falls on day 30).
-  expect(blocks("rates-staff-system", (b) => b.kind === "rates_notice").length).toBeGreaterThan(10);
+  expect(blocks(holderIdOf(config, "rates-staff"), (b) => b.kind === "rates_notice").length).toBeGreaterThan(10);
   // The doctors saw whoever came, under theirs.
   const asked = records.filter((r) => r.kind === "care_request").length;
-  expect(blocks("clinic-manager-staff-system", (b) => b.block === "work" && b.task === "treat").length).toBe(records.filter((r) => r.kind === "consultation").length);
+  expect(blocks(holderIdOf(config, "clinic-manager-staff"), (b) => b.block === "work" && b.task === "treat").length).toBe(records.filter((r) => r.kind === "consultation").length);
   if (asked > 0) expect(records.filter((r) => r.kind === "consultation").length).toBeGreaterThan(0);
 }, 900_000);
 

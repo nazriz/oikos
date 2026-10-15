@@ -8,6 +8,7 @@ import { join } from "node:path";
 import { taxLawOf, withholding } from "@oikos/participants";
 import { generate, industrialActionLaw } from "@oikos/worlds/generator/generate";
 import { runWorld } from "../src/run";
+import { officeAt, officeBy, officesBy } from "./lib/offices";
 
 const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
@@ -62,7 +63,7 @@ test("an offer too low: a ballot, notice, stoppages without pay, then an agreeme
   const config = generate(base);
   // The union bargains only at factory-1, where everyone is a member, and soon; it claims a lot, and settles only for
   // most of it; members all vote, and vote yes.
-  const org = config.participants.find((p: any) => p.id === "union-organiser-system").controller.params;
+  const org = officeAt(config, "union-organiser").params;
   // (Since union 0.5.0 it bargains wherever members in the industries it organises work, as they tell it, and at any
   // workplace it is told of besides: here it organises no industry, and is told of factory-1.)
   Object.assign(org, { employers: ["factory-1"], industries: ["none"], first_claim_days: 5, claim_margin_bps: 5000, accept_share_bps: 9000 });
@@ -130,7 +131,7 @@ test("an employer that closes: the union stops bargaining there, and members who
   // Shop 1 starts with nothing, no credit and no hiring, and closes (as in the entry test); its staff are all members.
   config.world.accounts.find((a: any) => a.id === "acc-shop-1").balance = "0";
   config.world.holdings = config.world.holdings.filter((h: any) => h.holder !== "shop-1");
-  Object.assign(config.participants.find((p: any) => p.id === "shop-1-manager-system").controller.params, { short_days: 10, wind_up_days: 10, idle_days: 30, lender: "", max_staff: 0 });
+  Object.assign(officeAt(config, "shop-1-manager").params, { short_days: 10, wind_up_days: 10, idle_days: 30, lender: "", max_staff: 0 });
   const staff = config.world.records.filter((r: any) => r.record === "agreement" && r.terms.template === "employment" && r.terms.parties[0] === "shop-1").map((r: any) => r.terms.parties[1]);
   expect(staff.length).toBeGreaterThan(0);
   const register = config.world.records.find((r: any) => r.id === "union-register");

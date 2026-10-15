@@ -11,6 +11,7 @@ import { draftHash } from "@oikos/translator";
 import { generate } from "@oikos/worlds/generator/generate";
 import { kernelBinary } from "../src/kernel";
 import { runWorld } from "../src/run";
+import { holderIdOf, officeAt, officeBy, officesBy, seatAt } from "./lib/offices";
 
 const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
@@ -151,7 +152,7 @@ test("opting out with no statement at all is honoured, and recorded as leaving t
 
 test("after opting out, a stand-in named in the world config carries the participant on", async () => {
   const config = town((c) => {
-    const mayor = c.participants.find((x: any) => x.id === "mayor-system");
+    const mayor = officeAt(c, "mayor").holder;
     mayor.controller.params.mock.opt_out_at = 20 * DAY;
     mayor.on_opt_out = { code: "city.mayor_code", params: mayor.controller.params.mock.params }; // (the same brief as the mock's: whom the town deals with)
   });
@@ -200,8 +201,8 @@ test("offices answer the mayor's letters with their reports, in figures", async 
   const wageOrder: string = config.world.records.find((r: any) => r.kind === "request" && r.speaks_for === "city" && r.addressed_to?.includes("bank")).id;
   const s = await run("letters", config, 20 * DAY, { adapter });
   const ev = lines(s.logPath).filter((e) => e.kind === "event").map((e) => e.body);
-  expect(ev.some((e) => e.event === "message_delivered" && e.participant === "finance-system" && e.to.includes("mayor-system"))).toBe(true);
-  expect(ev.some((e) => e.event === "message_delivered" && e.participant === "council-clerk-system" && e.to.includes("mayor-system"))).toBe(true);
+  expect(ev.some((e) => e.event === "message_delivered" && e.participant === holderIdOf(config, "finance") && e.to.includes("mayor-system"))).toBe(true);
+  expect(ev.some((e) => e.event === "message_delivered" && e.participant === holderIdOf(config, "council-clerk") && e.to.includes("mayor-system"))).toBe(true);
   const read = seen.join("\n");
   expect(read).toContain("Report from the finance office: the town's account acc-city holds");
   // The bank answers too (pilot 9: 34 letters, no reply), with the writer's own accounts: the town's, as the mayor
@@ -305,9 +306,10 @@ test("after the council adopts a budget, the clerk's report says so (it sees wha
     translator: () => [{ type: "tool_use", id: "x", name: "call", input: { program: 'form(to=city, form=council_proposal, kind=budget, parks="$150,000", proposal="Year 1 budget: parks $150,000.")' } }],
     debrief: () => [{ type: "text", text: "Thanks." }],
   });
-  const s = await run("clerk-budget", town(), 30 * DAY, { adapter });
+  const config = town();
+  const s = await run("clerk-budget", config, 30 * DAY, { adapter });
   const recs = lines(s.logPath).filter((e) => e.kind === "event" && e.body.event === "recorded").map((e) => e.body.record);
-  const budget = recs.find((r) => r.kind === "budget" && r.author === "council-clerk-system");
+  const budget = recs.find((r) => r.kind === "budget" && r.author === holderIdOf(config, "council-clerk"));
   expect(budget).toBeDefined();
   expect(seen.join("\n")).toContain(`The council adopted a budget for year 1 (${budget.id}).`);
 }, 300_000);
@@ -336,11 +338,9 @@ test("everyone waking at the same moment sees the same state; what they decide i
     return inner.complete(req);
   } };
   const s = await run("same-moment", town((c) => {
-    const planning = c.participants.find((p: any) => p.id === "planning-system");
-    planning.controller = { type: "llm", impl: "anthropic", model: "claude-sonnet-5", params: { cadence_days: 7 } };
-    planning.framing = { disclosure: "simulation", reason: "test" };
+    seatAt(c, "planning", { type: "llm", impl: "anthropic", model: "claude-sonnet-5", params: { cadence_days: 7 } }, { disclosure: "simulation", reason: "test" });
     // (Both at their desks whenever woken: this is about a moment, not office hours.)
-    delete c.participants.find((p: any) => p.id === "mayor-system").controller.params.sessions;
+    delete officeAt(c, "mayor").holder.controller.params.sessions;
   }), 2 * DAY, { adapter });
   // Round 1: both looked before either acted, so neither saw the other's letter.
   expect(seen["mayor-system"]![0]).not.toContain("Hello mayor.");
@@ -383,10 +383,8 @@ test("a round's requests are translated at once, and recorded in the cohort's or
     return inner.complete(req);
   } };
   const config = () => town((c) => {
-    const planning = c.participants.find((p: any) => p.id === "planning-system");
-    planning.controller = { type: "llm", impl: "anthropic", model: "claude-sonnet-5", params: { cadence_days: 7 } };
-    planning.framing = { disclosure: "simulation", reason: "test" };
-    delete c.participants.find((p: any) => p.id === "mayor-system").controller.params.sessions;
+    seatAt(c, "planning", { type: "llm", impl: "anthropic", model: "claude-sonnet-5", params: { cadence_days: 7 } }, { disclosure: "simulation", reason: "test" });
+    delete officeAt(c, "mayor").holder.controller.params.sessions;
   });
   const s = await run("translate-at-once", config(), 2 * DAY, { adapter });
   // Both were being translated at the same time, and planning's came back first.

@@ -69,7 +69,8 @@ const TOWN = join(root, "worlds/town.yaml");
 // carries an empty `labour_used`. Nothing of `living` in it.
 // (Re-taken on 2026-10-15 at foundations F3, which looks at a work's performers when the work begins; 6dbd604e... until then. docs/decisions.md, "Foundations F3".)
 // (Re-taken on 2026-10-15 at foundations F4: the town's systems carry their template and supplier; cd7ca8cc... until then. docs/decisions.md, "Foundations F4".)
-const STEP_1 = "3fdeff6a80d13b7f44a624cef7c9b1952b85c944f6d8de0e5136df0ecffc01fa";
+// (Re-taken on 2026-10-16 at foundations F5: the town's offices are held by people, their staff hired, its systems delivered from templates that say what they do; 3fdeff6a... until then.)
+const STEP_1 = "dc4748937e00ea0a27ffa3f4846176190e9329c2d74901e5f6bf85a2ab76cd8b";
 
 test("with the dial absent or at 0 a town is step 1's town, to the state hash", async () => {
   const out = mkdtempSync(join(tmpdir(), "oikos-dial-"));

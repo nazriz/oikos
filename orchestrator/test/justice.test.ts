@@ -8,6 +8,7 @@ import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { generate } from "@oikos/worlds/generator/generate";
 import { runWorld } from "../src/run";
+import { officeAt, officesBy } from "./lib/offices";
 
 const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
@@ -20,10 +21,8 @@ test("unlawful rent increases are taken to the tribunal, found invalid, and with
     adico: { attribute: "landlords", deontic: "must_not", aim: "increase a tenancy's rent by more than 4%", or_else: "the increase is invalid" },
     formal: { language: "cel", condition: "block.block == 'publish' && block.kind == 'rent_increase' && block.data.rent * 100 > block.data.was * 104" } });
   const challenging = (c: any) => c?.impl === "citizen.default" && c.params?.tribunal && (c.params = { ...c.params, tribunal: { ...c.params.tribunal, challenge_bps: 10_000 } });
-  for (const x of config.participants) {
-    if (x.controller?.impl === "firm.landlord") x.controller.params.rent_review_months = 6; // (their practice: reviews within the run)
-    challenging(x.controller);
-  }
+  for (const x of officesBy(config, "firm.landlord")) x.params.rent_review_months = 6; // (their practice: reviews within the run)
+  for (const x of config.participants) challenging(x.controller);
   for (const t of config.templates) challenging(t.controller);
   const out = join(root, "runs", "test-justice");
   rmSync(out, { recursive: true, force: true });
@@ -64,7 +63,7 @@ test("a law repealed by the town that made it stops binding those who followed i
     text: "A residential rent may not be increased. Or else: the increase is invalid.",
     adico: { attribute: "landlords", deontic: "must_not", aim: "increase a tenancy's rent", or_else: "the increase is invalid" },
     formal: { language: "cel", condition: "block.block == 'publish' && block.kind == 'rent_increase'" } });
-  for (const x of config.participants) if (x.controller?.impl === "firm.landlord") Object.assign(x.controller.params, { rent_review_months: 6, compliance_bps: 10_000 });
+  for (const x of officesBy(config, "firm.landlord")) Object.assign(x.params, { rent_review_months: 6, compliance_bps: 10_000 });
   const mayor = config.positions.find((p: any) => p.id === "mayor");
   const out = join(root, "runs", "test-justice-repeal");
   rmSync(out, { recursive: true, force: true });
@@ -89,5 +88,11 @@ test("a law repealed by the town that made it stops binding those who followed i
   expect(increases.filter((r) => r.at <= repealedAt!).length).toBe(0);
   expect(increases.filter((r) => r.at > repealedAt!).length).toBeGreaterThan(3);
   // Each landlord, the tribunal's member and the union were shown the repeal through their laws, once.
-  for (const who of ["landlord-1-office-system", "landlord-2-office-system", "tribunal-member-system", "union-organiser-system"]) expect([who, told.get(who)]).toEqual([who, 1]);
+  // (Once for each post of theirs among these: the offices are held by people, and one person may hold two.)
+  const posts = ["landlord-1-office", "landlord-2-office", "tribunal-member", "union-organiser"].map((post) => officeAt(config, post).holder.id as string);
+  // (Their book of laws is shown to each post they hold, and the repeal once in each: at least those of the four, at most all they hold and their own.)
+  for (const who of new Set(posts)) {
+    expect(told.get(who) ?? 0, who).toBeGreaterThanOrEqual(posts.filter((x) => x === who).length);
+    expect(told.get(who) ?? 0, who).toBeLessThanOrEqual(config.positions.filter((x: any) => x.holder === who).length + 1); // (and their own, as a citizen's)
+  }
 }, 2_400_000);

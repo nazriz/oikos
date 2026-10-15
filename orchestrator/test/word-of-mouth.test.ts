@@ -20,8 +20,12 @@ test("people ask the people they know, and are told only what those people could
   rmSync(out, { recursive: true, force: true });
   // What each citizen could see around them, at each look.
   const seen = new Map<string, { t: number; structures: Set<string>; people: Set<string>; carryingOn: boolean }[]>();
+  const config = generate({ ...spec, citizens: 120 });
+  // (People who hold no post of the town's: a person of the town who holds several decides over several wakes of their own and acts later, and what they
+  // could see "when they decided" is not one look. Foundations F5 made the town's staff such people.)
+  const postHolders = new Set(config.positions.map((p: any) => p.holder));
   const s = await runWorld({
-    config: generate({ ...spec, citizens: 120 }), runId: "word-of-mouth", outDir: out, until: 240 * DAY,
+    config, runId: "word-of-mouth", outDir: out, until: 240 * DAY,
     inspect: async (participant, obs) => {
       const street = obs.channels.street;
       if (street?.kind !== "sites") return;
@@ -34,7 +38,7 @@ test("people ask the people they know, and are told only what those people could
   const said = log.filter((e) => e.kind === "command" && e.body.command === "act" && /^c\d+-self$/.test(e.body.participant))
     .flatMap((e) => e.body.blocks.filter((b: any) => b.block === "message").map((b: any) => ({ t: e.t, participant: e.body.participant, ...b })));
   const asks = said.filter((m) => m.text === ASKING.home || m.text === ASKING.work);
-  const tips = said.filter((m) => m.re);
+  const tips = said.filter((m) => m.re && !postHolders.has(m.participant));
   expect(asks.length).toBeGreaterThan(5);
   expect(tips.length).toBeGreaterThan(5);
 

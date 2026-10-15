@@ -113,3 +113,15 @@ Turns a short spec (`worlds/town.yaml`) and a **profile** (`worlds/profiles/`, d
 **Leaves out:** claims on becoming unemployed (no profile gives how many job endings are followed by a spell out of work); applicants for permits other than the town (the flows of landlords and builders are not given by anything the generator holds); invoices from suppliers other than the landfill (nothing holds their amounts); loans of firms and people made in a run; loans already in default; a council's ballots open.
 
 **Shops open alike, and that stays (2026-10-13).** Every shop of a kind opens with the same staff, stock and `demand`, though trade differs between shops several times over. Sizing them to their catchment was measured and not built: where people live explains a tenth to a quarter of the difference and sizing by it fits worse (docs/decisions.md, 2026-10-13, "Shops sized by catchment").
+
+## Who holds the posts, and who works in them (foundations F5, 2026-10-16)
+
+Generator 0.55.0. The holder of every post of the town's own bodies is a resident, hired through the same jobs as anyone's, at the
+profile's rate per 1,000 residents and pay (`values.public_service`; docs/behaviour/staffing.md). A body keeps at least one person; a
+person may hold several posts (their one timeline is the limit); a model's seat has a person and a post of its own and keeps the id
+`<post>-system`. The jobs are filled first, so public staff are drawn from the same workforce and fewer remain for the factories (the
+spec's `employed_bps` is unchanged). A building, `town-offices`, houses the staff of the bodies that have none of their own; its lot is the last the generator takes, so that every other building stands where it did. The systems
+left are the bank's payment platform (under licence, `licence-bank-payments`) and the outside world's own; each comes from a template that
+says what it does (`payment-system`, `agency-system`, `market-system`). The placeholder `genesis-system`, the `-system` suffix that said
+which post keeps its organisation's record, the works office's hand-set lanes and the staff's are gone; a system's act time is a row of
+the table (`orchestration.act_time.system`), with no default. A profile without `public_service` is refused.

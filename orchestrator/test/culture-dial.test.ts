@@ -34,14 +34,20 @@ const check = (ref: string, row: unknown) => {
 // (au-vic-2026 re-taken again at foundations F3, gb-eng and ke-nakuru too if they changed; see living-dial.test.ts.)
 // (au-vic-2026 re-taken on 2026-10-15 at foundations F1, as living-dial.test.ts's step 1; the other two profiles as the run gives them, below.)
 const BEFORE: { [profile: string]: { days: number; state: string } } = {
-  "au-vic-2026": { days: 60, state: "3fdeff6a80d13b7f44a624cef7c9b1952b85c944f6d8de0e5136df0ecffc01fa" },
-  "gb-eng-2026": { days: 30, state: "3b4bc97eedf9880ff6232081b6695daa20edf95f52575457c904bdea5f121ae7" },
-  "ke-nakuru-2026": { days: 30, state: "ab25cb7d74797da2599c3108ab6410990395cee63c225617461683c317d0eee5" },
+  // (Re-taken on 2026-10-16 at foundations F5: the town's offices are held by people, their staff hired, its systems delivered from templates that say what they do; 3fdeff6a... until then.)
+  "au-vic-2026": { days: 60, state: "dc4748937e00ea0a27ffa3f4846176190e9329c2d74901e5f6bf85a2ab76cd8b" },
+  // (Re-taken on 2026-10-16 at foundations F5: the town's offices are held by people, their staff hired, its systems delivered from templates that say what they do; 3b4bc97e... until then.)
+  "gb-eng-2026": { days: 30, state: "0aaf8bb7f1f3a011cd1dcbe1a9a4108dbe319fc37743247369fbc42a505ab5d2" },
+  // (Re-taken on 2026-10-16 at foundations F5: the town's offices are held by people, their staff hired, its systems delivered from templates that say what they do; ab25cb7d... until then.)
+  "ke-nakuru-2026": { days: 30, state: "5d77834326b601e22f70ccc6b9707be84bccf3c0a85bddb613d6f842fc743c40" },
 };
 // (Re-taken once more at foundations F4, 2026-10-15: a generated town's systems name their template and supplier, and its world names where work is done (`performers_in`): the config hashes and the states move, the draws and the town's life do not.)
 // (The config hashes were re-taken on 2026-10-15 at foundations F2: the world's act-time table gained rows by what an act makes. The states did not move.)
 const cfgHash = (c: unknown) => new Bun.CryptoHasher("sha256").update(JSON.stringify(c)).digest("hex").slice(0, 16);
-const CONFIG_BEFORE: { [profile: string]: string } = { "au-vic-2026": "1f5ef6f6d55542ce", "gb-eng-2026": "66456d26003c4254", "ke-nakuru-2026": "2ecddd701415f13f" };
+// (Re-taken on 2026-10-16 at foundations F5: the town's offices are held by people, their staff hired, its systems delivered from templates that say what they do; 1f5ef6f6... until then.)
+// (Re-taken on 2026-10-16 at foundations F5: the town's offices are held by people, their staff hired, its systems delivered from templates that say what they do; 66456d26... until then.)
+// (Re-taken on 2026-10-16 at foundations F5: the town's offices are held by people, their staff hired, its systems delivered from templates that say what they do; 2ecddd70... until then.)
+const CONFIG_BEFORE: { [profile: string]: string } = { "au-vic-2026": "40d909c430f90bbd", "gb-eng-2026": "8f4c9a2db5f8fe33", "ke-nakuru-2026": "43c602882f03a035" };
 
 test("the dial in the world config is a schema-valid setting; a size that would break the arithmetic is refused when the run starts", async () => {
   const v = ajv.getSchema(`${NS}:world-config`)!;

@@ -33,7 +33,7 @@ test("the town's payments name their lines, the books show room by line, and a p
   // The town's wages (its works crew, on the staff line from the start) carry it.
   const wages = fromTown.filter((e) => e.memo === "wages");
   expect(wages.length).toBeGreaterThan(5);
-  for (const w of wages) expect(w.line, `wage ${w.to}`).toBe("staff");
+  for (const w of wages) expect(["staff", "administration"], `wage ${w.to}`).toContain(w.line); // (the works crew are on the staff line; the town's administrative officers, since foundations F5, on their own)
   // The landfill's invoice is on the services line, paid by finance with its line.
   const landfill = fromTown.filter((e) => e.settles && String(e.settles).startsWith("invoice-landfill"));
   expect(landfill.length).toBeGreaterThan(0);

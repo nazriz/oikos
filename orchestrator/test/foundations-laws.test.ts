@@ -12,6 +12,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { Glob } from "bun";
 import { generate } from "@oikos/worlds/generator/generate";
+import { loadProfile } from "@oikos/worlds/generator/profile";
 
 const root = join(import.meta.dir, "../..");
 const spec = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")) as any;
@@ -52,6 +53,88 @@ test("law 3 (F4): every post in a generated town is held by a person, or by a sy
     .filter(({ holder }: any) => holder && holder.kind === "system" && !(templates.get(holder.template)?.kind === "system" && orgs.has(holder.supplier)))
     .map(({ post }: any) => post);
   expect(free, "posts held by a system nobody supplied").toEqual([]);
+});
+
+// (Foundations F5: offices run by people, staff hired, the systems that are left under licence or the outside world's own.)
+const profiles = readdirSync(join(root, "worlds/profiles")).filter((f) => f.endsWith(".json")).map((f) => f.replace(/\.json$/, ""));
+const small = (profile: string) => generate({ ...spec, citizens: 300, profile, living: spec.living ?? {} });
+
+test("law 3 (F5): a system is delivered from a template that says what it does; no generated system is the old placeholder, and none can do what its kind does not", () => {
+  for (const profile of profiles) {
+    const c = small(profile);
+    const templates = new Map<string, any>(c.templates.map((t: any) => [t.id, t]));
+    expect(c.templates.some((t: any) => t.id === "genesis-system"), `${profile}: the placeholder template`).toBe(false);
+    for (const t of c.templates.filter((x: any) => x.kind === "system")) {
+      expect(Array.isArray(t.does) && t.does.length > 0, `${profile}: template ${t.id} says what it does`).toBe(true);
+      expect(t.does.some((r: any) => r.block === "work" || r.block === "construct" || r.block === "harm" || r.block === "vote"), `${profile}: template ${t.id} is software: it does no physical work`).toBe(false);
+    }
+    for (const p of c.participants.filter((x: any) => x.kind === "system")) expect(templates.get(p.template)?.kind, `${profile}: ${p.id} names a system template`).toBe("system");
+  }
+});
+
+test("law 3 (F5): the posts of the town's own bodies are held by people of the town; the only systems are a bank's payment platform and the outside world's own", () => {
+  for (const profile of profiles) {
+    const c = small(profile);
+    const byId = new Map<string, any>(c.participants.map((p: any) => [p.id, p]));
+    const persons = new Set(c.world.entities.filter((e: any) => e.kind === "person").map((e: any) => e.id));
+    const systems = c.positions.filter((p: any) => byId.get(p.holder)?.kind === "system").map((p: any) => `${p.entity}/${p.id}`);
+    expect(systems.filter((x: string) => !x.startsWith("outside/") && !/^bank\/bank-payments$|^fund\//.test(x)), `${profile}: posts held by a system`).toEqual([]);
+    for (const p of c.positions.filter((x: any) => byId.get(x.holder)?.kind === "person")) expect(persons.has(byId.get(p.holder).person), `${profile}: ${p.id} is held by a resident`).toBe(true);
+    // every post has a holder, and no person holds a seat's post along with another (none is a seat here)
+    expect(c.positions.filter((p: any) => !p.holder).map((p: any) => p.id), `${profile}: posts nobody holds`).toEqual([]);
+  }
+});
+
+test("law 3 (F5): each body keeps the staff its profile's rate says, hired from the town on a standing wage, and the town's budget carries the town's", () => {
+  for (const profile of profiles) {
+    const P = loadProfile(profile).values;
+    const c = generate({ ...spec, citizens: 1000, profile, living: spec.living ?? {} });
+    const residents = c.world.entities.filter((e: any) => e.kind === "person").length;
+    const jobs = c.world.records.filter((r: any) => r.record === "agreement" && r.terms?.template === "employment");
+    const role = (r: any) => /^c\d+ works for (\S+) as (.+?) for /.exec(r.terms.text ?? "");
+    const staffed = (entity: string, as: string) => jobs.filter((r: any) => role(r)?.[1] === entity && role(r)?.[2] === as);
+    const rate = P.public_service.staff_per_1000;
+    expect(staffed("city", "administrative officer").length, `${profile}: the town's administrative staff`).toBe(Math.max(1, Math.ceil((rate.administration * residents) / 1000)));
+    expect(staffed("bank", "bank officer").length).toBe(Math.max(1, Math.ceil((rate.banking * residents) / 1000)));
+    expect(staffed("tribunal", "tribunal officer").length).toBeGreaterThan(0);
+    for (const r of jobs.filter((x: any) => role(x))) expect(Number(r.terms.commitments[0].does.outcome.money.amount), `${profile}: pay`).toBe(P.public_service.wage_per_pay_period);
+    // paid by a standing instruction, from the body's own account
+    for (const r of jobs.filter((x: any) => role(x))) expect(c.world.records.some((q: any) => q.id === `${r.id}-wages` && q.data.outcome.money.from === `acc-${r.terms.parties[0]}`), `${profile}: ${r.id} is paid`).toBe(true);
+    // the town's: a budget line of its own, at least what its staff cost
+    const budget = c.world.records.find((r: any) => r.id === "budget-year-1");
+    const wages = staffed("city", "administrative officer").length * Math.floor((P.public_service.wage_per_pay_period * 365 * 86_400) / (P.pay_period_days * 86_400));
+    expect(Number(budget.data.lines.administration), `${profile}: the administration line`).toBeGreaterThanOrEqual(wages);
+  }
+}, 120_000);
+
+test("law 3 (F5): the bank's payment platform is under licence from its supplier at the profile's price, paid by the bank each month; and a model's seat in an office is a person of the town with a post of its own", () => {
+  for (const profile of profiles) {
+    const P = loadProfile(profile).values;
+    const c = small(profile);
+    const residents = c.world.entities.filter((e: any) => e.kind === "person").length;
+    const licence = c.world.records.find((r: any) => r.id === "licence-bank-payments");
+    const fee = Math.ceil((P.public_service.licences.payment_system.per_resident_per_year * residents) / 12);
+    expect(licence.terms.parties).toEqual(["bank", "outside"]);
+    expect(Number(licence.terms.commitments[1].does.outcome.money.amount)).toBe(fee);
+    expect(c.world.records.find((r: any) => r.id === "licence-bank-payments-pay").data.outcome.money).toMatchObject({ from: "acc-bank", to: "acc-outside", amount: String(fee) });
+    const platform = c.participants.find((p: any) => p.id === "bank-payments-system");
+    expect(platform).toMatchObject({ kind: "system", template: "payment-system", supplier: "outside" });
+  }
+  const seat = generate({ ...spec, citizens: 300, mayor: "llm", model_seats: ["finance", "planning"], living: spec.living ?? {} });
+  for (const id of ["mayor", "finance", "planning"]) {
+    const post = seat.positions.find((p: any) => p.id === id);
+    const part = seat.participants.find((p: any) => p.id === post.holder);
+    expect(part, id).toMatchObject({ kind: "person", id: `${id}-system` });
+    expect(part.controller.type).toBe("llm");
+    expect(seat.positions.filter((p: any) => p.holder === part.id).map((p: any) => p.id), `${id}'s person holds only that post`).toEqual([id]);
+  }
+}, 120_000);
+
+test("law 2 (F5): what a system's act takes is a row of the world's table, for every block its kinds do, and not a default", () => {
+  const c = small("au-vic-2026");
+  const table = c.orchestration.act_time;
+  expect(table.default).toBeUndefined();
+  for (const t of c.templates.filter((x: any) => x.kind === "system")) for (const r of t.does) expect(table.system[r.block], `${t.id}: ${r.block}`).toBeGreaterThan(0);
 });
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -145,10 +228,10 @@ test("every special case in the inventory still stands where it says, as many ti
   for (const s of inv.stays) expect(stands(s.file, s.find).length, s.what).toBeGreaterThan(0);
 });
 
-test("the inventory covers the plan's deletions: every step from F5 to F8 has entries, and every kernel one is in the kernel", () => {
+test("the inventory covers the plan's deletions: every step from F6 to F8 has entries, and every kernel one is in the kernel", () => {
   const steps = new Set(inv.entries.map((e) => e.step));
-  // (A step that is built has taken its entries out with the code: F1 to F4 have none left but history.)
-  for (const s of ["F5", "F6", "F7", "F8"]) expect(steps.has(s), s).toBe(true);
+  // (A step that is built has taken its entries out with the code: F1 to F5 have none left but history.)
+  for (const s of ["F6", "F7", "F8"]) expect(steps.has(s), s).toBe(true);
   for (const e of inv.entries.filter((x) => x.id.startsWith("k-"))) expect(e.file, e.id).toMatch(/^kernel\//);
 });
 

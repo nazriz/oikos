@@ -11,6 +11,7 @@ import { join } from "node:path";
 import { calls as C, modules as builtin, type BehaviourModule } from "@oikos/participants";
 import { generate } from "@oikos/worlds/generator/generate";
 import { runWorld } from "../src/run";
+import { officeAt, officeBy, officesBy } from "./lib/offices";
 
 const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
@@ -55,7 +56,8 @@ test("a seat looks the standing payment up in its files, holds it by its id and 
   const config = generate({ ...spec, citizens: 40, nature: false, model_seats: ["finance"] });
   const order = (config.world.records as any[]).filter((r) => r.kind === "request" && r.speaks_for === "city" && r.data?.every === 14 * DAY && /-wages$/.test(r.id)).sort((a, b) => (a.id < b.id ? -1 : 1))[0];
   const F = order.data.first / DAY, to: string = order.data.outcome.money.to;
-  const finance = config.participants.find((x: any) => x.id === "finance-system");
+  const finance = officeAt(config, "finance").holder; // (the person the seat is, in the finance post)
+  const financeId: string = finance.id;
   finance.controller.params.cadence_days = 1;
   finance.controller.params.mock = { brain: holding.name, params: { ...finance.controller.params.mock.params, script: { to, hold_day: F + 3, lift_day: F + 16 } } };
   const s = await runWorld({ config, runId: "holds-seat", outDir: mkdtempSync(join(tmpdir(), "oikos-holds-seat-")), until: (F + 45) * DAY, modules: { [holding.name]: holding } });
@@ -65,14 +67,14 @@ test("a seat looks the standing payment up in its files, holds it by its id and 
   const records = events.filter((e) => e.event === "recorded").map((e) => e.record);
   const day = (t: number) => Math.floor(t / DAY);
   // What the seat said: it looked into its files, then asked for the hold in a request that names the record by id.
-  const said = lines.filter((e) => e.kind === "annotation" && e.body.annotation === "transcript" && e.body.subject === "finance-system").flatMap((e) => ((e.body.data.output ?? []) as any[]).filter((b) => b.type === "tool_use"));
+  const said = lines.filter((e) => e.kind === "annotation" && e.body.annotation === "transcript" && e.body.subject === financeId).flatMap((e) => ((e.body.data.output ?? []) as any[]).filter((b) => b.type === "tool_use"));
   const look = said.findIndex((u) => u.name === "look" && String(u.input.report).endsWith("files"));
   const ask = said.findIndex((u) => u.name === "do" && String(u.input.what).includes(`hold=${order.id}`));
   expect(look).toBeGreaterThanOrEqual(0);
   expect(ask).toBeGreaterThan(look);
   // The hold: on that record, to the bank, confirmed by the seat.
   const hold = records.find((r) => r.kind === "hold")!;
-  expect(hold).toMatchObject({ author: "finance-system", in_position: "finance", speaks_for: "city", addressed_to: ["bank"], data: { holds: [order.id] } });
+  expect(hold).toMatchObject({ author: financeId, in_position: "finance", speaks_for: "city", addressed_to: ["bank"], data: { holds: [order.id] } });
   const lifted = records.find((r) => r.record === "withdrawal" && r.withdraws === hold.id)!;
   expect(lifted).toBeDefined();
   // The bank: paid on the first pay day, not on the one under the hold, and again after it was lifted.

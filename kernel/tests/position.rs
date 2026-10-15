@@ -68,7 +68,7 @@ fn street() -> Run<Vec<u8>> {
             person("carol-self", "carol"),
             {"id": "registry-system", "kind": "system", "owner": "registry", "template": "installed-system", "supplier": "outside", "controller": {"type": "code", "impl": "test"}, "framing": {"disclosure": "unstated", "reason": "test"}},
         ],
-        "templates": [{"id": "installed-system", "kind": "system", "supplier": "outside", "controller": {"type": "code", "impl": "test"}, "framing": {"disclosure": "unstated", "reason": "test"}}],
+        "templates": [{"id": "installed-system", "kind": "system", "supplier": "outside", "does": [{"block": "message"}, {"block": "publish"}], "controller": {"type": "code", "impl": "test"}, "framing": {"disclosure": "unstated", "reason": "test"}}],
         "positions": [{"id": "registry-office", "entity": "registry", "channels": office_channels, "holder": "registry-system"}],
         "knowing": {"published": [
             {"what": "records:statement", "why": "This test world publishes every statement, so tests can watch them."},

@@ -75,7 +75,8 @@ test("a spec without `living` generates what it generated before (byte for byte)
   // And on 2026-10-15 (2300e2d0... until then; docs/decisions.md, "Foundations F2"): the world's table of act times has rows by what an act makes
   // (publish/<kind of record>) and their sources. Nothing of `living` in it.
   // (Re-taken on 2026-10-15 at foundations F4: the generated systems name a template and a supplier and the world says where work is done; 3facfdc8... until then.)
-  expect(hash(c)).toBe("1f5ef6f6d55542ce1059a5f0081381f803a66bdfc4ddff3f416e0ae7475a98fa");
+  // (Re-taken on 2026-10-16 at foundations F5: the town's offices are held by people, their staff hired, its systems delivered from templates that say what they do; 1f5ef6f6... until then.)
+  expect(hash(c)).toBe("40d909c430f90bbdbc65bc47b2352f616ce13cb89a57b4240cfffb7a9bda3a79");
   const text = JSON.stringify(c);
   expect(text).not.toContain('"started"');
   expect(text).not.toContain("attach_mean");

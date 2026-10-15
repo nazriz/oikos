@@ -20,7 +20,8 @@ const ids = scenarioIds();
 const base = generate(spec) as any;
 const made = new Map<string, any>();
 const town = (scenario: string): any => made.get(scenario) ?? (made.set(scenario, generate({ ...spec, scenario })), made.get(scenario));
-const office = (c: any, id: string) => c.participants.find((p: any) => p.id === `${id}-system`)?.controller.params;
+// (An office's module parameters, whoever holds the post: a delivered system's controller, or a person's post module: foundations F5.)
+const office = (c: any, id: string) => { const post = c.positions.find((p: any) => p.id === id); const holder = c.participants.find((p: any) => p.id === post?.holder); return holder?.kind === "system" ? holder.controller.params : post?.role_module?.params; };
 const balance = (c: any, id: string) => Number(c.world.accounts.find((a: any) => a.id === id).balance);
 
 test("every scenario reads, says its basis for every change, and generates a valid town", () => {

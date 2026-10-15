@@ -25,13 +25,16 @@ test("off, a town is unchanged to the state hash (the world as origin/main gener
   // (Hashes of `config.world` for these specs, taken on origin/main (1f28843) before the change. Moved on purpose,
   // 2026-10-13, by generator 0.54.0: every town whose profile states one now publishes its law on cutting hours,
   // `law-cutting-hours`, and the modules' versions; docs/decisions.md, "Hours before heads". Nothing of the opening caseload in it.)
-  expect(worldHash(generate(town()))).toBe("4e1e761a8e98dc61fd0932b3f8a375946324490a40640ee9e5b1575672068588");
-  expect(worldHash(generate(town({ profile: "ke-nakuru-2026" })))).toBe("f16bee9e83046c06f3b411f57957fa1e61678bac26a119bb5bb2bf1b34c28547");
+  // (Re-taken on 2026-10-16 at foundations F5: the town's offices are held by people, their staff hired, its systems delivered from templates that say what they do; 4e1e761a... until then.)
+  expect(worldHash(generate(town()))).toBe("02ce106fc0fad854af10575ef497e6074b265c775b1a98f9a1aecdb94d140c5a");
+  // (Re-taken on 2026-10-16 at foundations F5: the town's offices are held by people, their staff hired, its systems delivered from templates that say what they do; f16bee9e... until then.)
+  expect(worldHash(generate(town({ profile: "ke-nakuru-2026" })))).toBe("0236786b8fedf668d1e6b649c860c0e197853ec952561d0774bfc54a0166ad05");
   // (On, the landlords' and the tribunal's papers are as they were; a scale of nothing adds no paper to the other offices.)
   const POSS = ["rent_statement", "notice_to_vacate", "tribunal_application", "hearing_notice", "tribunal_order"];
   const possession = (c: any) => createHash("sha256").update(JSON.stringify(c.world.records.filter((r: any) => POSS.includes(r.kind)))).digest("hex");
   expect(possession(generate(town({ opening_caseload: true })))).toBe("4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945");
-  expect(possession(generate(town({ profile: "ke-nakuru-2026", opening_caseload: true })))).toBe("e07d605477d2086615080b92c8a79dc2253525f2d115e4622fb0eca335c54e13");
+  // (Re-taken on 2026-10-16 at foundations F5: the town's offices are held by people, their staff hired, its systems delivered from templates that say what they do; e07d6054... until then.)
+  expect(possession(generate(town({ profile: "ke-nakuru-2026", opening_caseload: true })))).toBe("8694a655b15779eb25eda954f9bab1d454cf890650d118c1f34add057d53f3fc");
   const nothing = generate(town({ opening_caseload: true, opening_caseload_scale_bps: 0 })) as any;
   expect(ofOthers(nothing).filter((r: any) => !r.id.startsWith("claim-") && !r.id.startsWith("grant-"))).toEqual([]);
   // (A town is a twin of itself: the same description and seed give the same town.)

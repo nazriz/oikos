@@ -102,3 +102,12 @@ A charge may also say `itemised`: the employer's report of it names each worker 
 ## The rent tax, retired
 
 The generated town no longer has `law-tax` (10% of rent, reported monthly), which had no source. Rates are the town's own tax (municipal-economy.md §9 Q3). The modules for a tax on reported income (the landlord's `tax_rate_bps`, `city.tax_clerk`) stay, for worlds that want one.
+
+## The town's administrative staff are on its budget (foundations F5, 2026-10-16)
+
+The town's own offices are now staffed by residents it employs (docs/behaviour/staffing.md), at the profile's pay and rate. Their wages are
+a line of the budget of their own, `administration`, tabled by the mayor's office like the others (`administration_budget`; the first
+year's budget is the sum of a year's pay for the staff the town opens with). The finance officer pays them by standing instruction, on
+that line. The state's bodies (tribunal, ombudsman, consumer desk, electoral commission, land registry, the paper) are paid from a grant
+from outside sized to their wage bill; the bank, the union and the utilities from their own takings, with twelve weeks' pay in hand at the
+start. The bank also pays a monthly licence for its payment platform to the outside world.

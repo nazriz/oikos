@@ -25,8 +25,8 @@ export const yearInDays = (year: number): string => `day ${(year - 1) * 365} to 
 /** The lines of the budget the mayor's office tables, from what it is given for each (a line it is given nothing for
  * is left out, but for parks, which every budget of the town's has). The generator writes the budget a town opens
  * with by the same rule, so the first year's budget is one this office would have tabled. */
-export function tabledLines(p: { park_budget: number; road_budget?: number; staff_budget?: number; services_budget?: number; environment_budget?: number }): Record<string, number> {
-  return { parks: p.park_budget, ...(p.road_budget ? { roads: p.road_budget } : {}), ...(p.staff_budget ? { staff: p.staff_budget } : {}), ...(p.services_budget ? { services: p.services_budget } : {}), ...(p.environment_budget ? { environment: p.environment_budget } : {}) };
+export function tabledLines(p: { park_budget: number; road_budget?: number; staff_budget?: number; administration_budget?: number; services_budget?: number; environment_budget?: number }): Record<string, number> {
+  return { parks: p.park_budget, ...(p.road_budget ? { roads: p.road_budget } : {}), ...(p.staff_budget ? { staff: p.staff_budget } : {}), ...(p.administration_budget ? { administration: p.administration_budget } : {}), ...(p.services_budget ? { services: p.services_budget } : {}), ...(p.environment_budget ? { environment: p.environment_budget } : {}) };
 }
 
 /** A budget's lines in words, as the town writes its money, and their sum. */
@@ -66,7 +66,7 @@ export const mayorCode: BehaviourModule = {
   create(ctx: ParticipantContext) {
     const p = params({ responsiveness_bps: 7000, petition_threshold_bps: 1500, population: 200, park_budget: 8_000_000, builder: "", park_type: "park",
       // The rest of the budget's lines (docs/behaviour/services.md): the town's staff, and its services' running costs.
-      staff_budget: 0, services_budget: 0, environment_budget: 0,
+      staff_budget: 0, administration_budget: 0, services_budget: 0, environment_budget: 0,
       // Roads (docs/behaviour/daily-round.md): a year's budget for them, and how far (cells) a building may stand from one
       // before we build toward it, a road a time.
       road_budget: 0, road_type: "road", road_within: 3,

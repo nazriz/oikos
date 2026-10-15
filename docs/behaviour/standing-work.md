@@ -300,3 +300,7 @@ not converted; both offices are in the wave as seats and will show the block.
   look is of that moment); the roster's "last at work" is what tells it the staff came.
 - **Energy used while a supply order is on hold** is still owed by the network and supplied when the order is back;
   water not drawn on a day is not drawn later.
+
+**F5 (2026-10-16): the staff post of an office a model holds is held by a resident**, one of its body's staff other than the seat's own
+person, and not a system with hand-set lanes (`lanes` on generated staff and clerks are gone). It acts at a person's pace on the person's one
+timeline, shared with any other post that person holds (docs/behaviour/staffing.md).

@@ -98,9 +98,10 @@ test("a founding's draw of the shape \"business\" reaches the business of one: s
   // 6 the runs from 1 to 5 have none in 330 days and the run from 6 has one.)
   // (Before that 4 since the fifth living pilot's fixes, the same day: tenants who answer and households taken in move who
   // gives a want up and when; of seeds 1 to 5 the runs from 1 and 4 have such an occasion, those from 2, 3 and 5 none.)
+  // (The run's seed is 3 since foundations F5 (2026-10-16): offices are held by people and the town's layout and draws moved again; of seeds 1 to 4 the runs from 1 and 2 have no occasion in 600 days, those from 3 and 4 have.)
   const out = join(root, "runs", "test-own-venture-meant");
   rmSync(out, { recursive: true, force: true });
-  const s = await runWorld({ config: { ...config, seed: 1 }, runId: "meant", outDir: out, until: 600 * DAY, recordObservations: "none" });
+  const s = await runWorld({ config: { ...config, seed: 3 }, runId: "meant", outDir: out, until: 600 * DAY, recordObservations: "none" });
   const log = readFileSync(s.logPath, "utf8").trim().split("\n").filter((l) => l.includes("found_shape") || l.includes('"own_account"') || l.includes("found_own")).map((l) => JSON.parse(l));
   const meant = log.filter((e) => e.kind === "annotation" && e.body.data?.domain === "found_shape" && e.body.data?.choice === "business").map((e) => ({ t: e.t, who: e.body.subject as string }));
   expect(meant.length).toBeGreaterThan(0);

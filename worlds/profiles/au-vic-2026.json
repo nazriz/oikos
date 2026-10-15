@@ -765,6 +765,27 @@
       "upkeep_hours_per_week_per_asset": 4,
       "complain_bps": 3000
     },
+    "public_service": {
+      "wage_per_pay_period": 307700,
+      "staff_per_1000": {
+        "administration": 3.0,
+        "courts": 0.12,
+        "oversight": 0.06,
+        "elections": 0.035,
+        "land_registry": 0.045,
+        "press": 0.15,
+        "banking": 2.5,
+        "utilities": 1.2,
+        "union": 0.15,
+        "property_management": 3.0
+      },
+      "licences": {
+        "payment_system": {
+          "per_resident_per_year": 1500,
+          "term_days": 365
+        }
+      }
+    },
     "unions": {
       "membership_bps": {
         "manufacturing": 900,
@@ -1090,6 +1111,18 @@
     "services.asset_life_years": "Placeholder: a park or civic building wears out in 15 years without upkeep (after VAGO, Maintaining Local Roads: spray seals last 10-15 years).",
     "services.upkeep_hours_per_week_per_asset": "Placeholder: a crew member's half a day a week keeps a park or the hall up (mowing, bins, repairs).",
     "services.complain_bps": "Placeholder: the chance a week that a household whose waste has gone two weeks uncollected writes to the town. Who reports and who doesn't varies (the service-request literature, e.g. Stowers 2022, State and Local Government Review); a rate is to be sourced.",
+    "public_service.wage_per_pay_period": "[MIXED] Victorian Local Government Award 2015 (MA000132) Level 4 minimum was about $1,068 a week in 2025 (FWC wage draft; opened via search), about $1,119 after the 4.75% 2026 review; councils' enterprise agreements pay clerical Band 4 officers above the award, roughly $78-85k a year. Taken as $80,000 a year, $3,077 a fortnight (to confirm against a council EA).",
+    "public_service.staff_per_1000.administration": "[MIXED] Victoria's 79 councils employ about 37,000 EFT (MAV local government facts, search summary) for 6.9m people, about 5.4 per 1,000; the profile's works/waste crew takes part of that. Administration set at 3.0, about 55% of the total, after leaving out works, libraries and community services (share estimated, to confirm).",
+    "public_service.staff_per_1000.courts": "[PLACEHOLDER] VCAT (civil and residential tenancies lists) has about 600 staff plus several hundred full- and part-time members for 6.9m residents; annual report 2024-25 not opened for numbers. Estimated 0.12 per 1,000, with the Magistrates' Court civil list partly counted.",
+    "public_service.staff_per_1000.oversight": "[PLACEHOLDER] Victorian Ombudsman (about 130 staff) plus the consumer-affairs regulator and dispute-resolution staff (a few hundred, shared with other work) over 6.9m residents. Estimated 0.06 per 1,000; headcounts from memory, not opened.",
+    "public_service.staff_per_1000.elections": "[PLACEHOLDER] The Victorian Electoral Commission keeps roughly 250 permanent staff outside election periods (from memory, to confirm) for 6.9m residents, about 0.036 per 1,000.",
+    "public_service.staff_per_1000.land_registry": "[PLACEHOLDER] Land Use Victoria's titles and registry work is roughly 300 staff statewide (estimate, to confirm); over 6.9m residents it is about 0.045 per 1,000.",
+    "public_service.staff_per_1000.press": "[PLACEHOLDER] A regional or suburban local paper serving about 20,000 people with a three-person editorial team (editor and two reporters) gives 0.15 per 1,000; typical of small Australian mastheads, not from a dataset.",
+    "public_service.staff_per_1000.banking": "[PLACEHOLDER] Australian banks and credit unions employ about 150,000 people for 27m residents (5.5 per 1,000), most in head offices and call centres. A local retail bank's branch, lending and payments staff set at 2.5 per 1,000; estimate, ABS and APRA figures not opened.",
+    "public_service.staff_per_1000.utilities": "[PLACEHOLDER] Victoria's metropolitan and regional water corporations employ about 6,000 for 6.9m people (about 0.9 per 1,000); a retailer's operations add roughly 0.3. Total 1.2, estimated from memory of corporation annual reports (to confirm).",
+    "public_service.staff_per_1000.union": "[PLACEHOLDER] About 1.4m Victorian union members; roughly 1 paid officer or organiser per 1,500-2,000 members across unions gives about 700-900 staff, but local organisers are fewer. Set at 0.15 per 1,000; no source opened.",
+    "public_service.licences.payment_system": "[PLACEHOLDER] A core-banking and payments platform costs a small bank an estimated A$10-20 per customer a year in vendor fees; taken as $15 (1,500 cents) per resident. No vendor price list found; honest guess.",
+    "public_service.staff_per_1000.property_management": "[PLACEHOLDER] Carried over unchanged to every profile: property managers (people who run let homes for their owners) at about one to every 100 to 150 let homes is an industry rule of thumb (to confirm, not opened); a town here has about 380 homes for 1,000 people, so about 3 per 1,000 residents. A manager looks after the letting offices of several landlords.",
     "unions.membership_bps": "ABS, Trade union membership, August 2024: 13.1% of employees; by industry, manufacturing 9.0%, construction 11.7%, retail trade 7.0%, public administration and safety 23.1% (the industry figures to confirm against the release's tables); `other`, the overall rate. Keyed by the industries employers' postings name.",
     "unions.resignation_notice_days": "Fair Work (Registered Organisations) Act 2009 (Cth), s 174: a member may resign by written notice, which takes effect two weeks after it's received (or at once, if the member is no longer eligible; to confirm against the section). Written into each membership as the member's notice.",
     "groups.leave_notice_days": "Placeholder: a member may leave a club or congregation at once (a voluntary association; a club's own rules may ask for notice). Written into each membership as the member's notice.",

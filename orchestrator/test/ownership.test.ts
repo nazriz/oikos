@@ -8,6 +8,7 @@ import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { generate } from "@oikos/worlds/generator/generate";
 import { runWorld } from "../src/run";
+import { systemAt } from "./lib/offices";
 
 const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
@@ -62,6 +63,9 @@ test("owners own their houses, repay their mortgages, pay rates, and pass their 
   const config = generate({ ...spec, years: 1 });
   // Far more deaths than life, so a year of a small town has owners' deaths to follow.
   config.life.other_causes.by_age = [{ from: 0, bps: 0 }, { from: 25, bps: 5000 }];
+  // (The land registry's registrar is a system here, as every office was until foundations F5: with deaths this many its person, who is a resident,
+  // dies too, and the post stands vacant, since nothing yet appoints a successor (F6). The subject here is the transmission of titles, not the post.)
+  systemAt(config, "land-registrar");
   const { titles, owned, lived } = ownership(config);
   // Owner-occupied: each owner lives in the house on the lot they hold, and is the head of the household there.
   for (const o of owned) expect({ holder: o.holder, livesOn: o.livesOn, heads: o.heads }).toEqual({ holder: o.holder, livesOn: o.lot, heads: true });

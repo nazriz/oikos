@@ -8,6 +8,7 @@ import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { generate } from "@oikos/worlds/generator/generate";
 import { runWorld } from "../src/run";
+import { officeBy } from "./lib/offices";
 
 const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
@@ -47,8 +48,8 @@ test("an owner who'd leave sells; a renter buys on a mortgage, gets the title an
   params(buyer).market = { ...params(buyer).market, buy_bps: 10_000 };
   // Only they take part in the market (others who'd leave would list too, and the buyer take the cheapest).
   for (const x of config.participants) if (x.controller?.impl === "citizen.default" && x.controller.params?.market && ![...household, buyer].some((h: string) => x.id === `${h}-self`)) delete x.controller.params.market;
-  const lending = config.participants.find((x: any) => x.controller?.impl === "bank.lending");
-  lending.controller.params.max_share_bps = { ...lending.controller.params.max_share_bps, person: 10_000 };
+  const lending = officeBy(config, "bank.lending");
+  lending.params.max_share_bps = { ...lending.params.max_share_bps, person: 10_000 };
 
   const out = join(root, "runs", "test-home-market");
   rmSync(out, { recursive: true, force: true });

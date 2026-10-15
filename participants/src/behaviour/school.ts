@@ -38,7 +38,7 @@ export const principal: BehaviourModule = {
     { task: "enrol", at: "building", every: 1, what: "The school office answers each enrolment: a place in the least full classroom for a child of school age, or a letter saying why not; and gives each leaver a certificate of their years." },
   ],
   issues: [P.JOB_ADVERTISEMENT],
-  staffed: (p) => ({ role: p.role ?? "teacher", posts: { establishment: p.teachers ?? 0 } }),
+  staffed: (p) => ({ role: p.role ?? "teacher", own: "role_or_unnamed", posts: { establishment: p.teachers ?? 0 } }),
   issuesWith: (p) => P.staffingOwn({ role: p.role ?? "teacher", industry: p.industry ?? "education", workplace: p.workplace, notice_days: p.notice_days ?? 14 }),
   keeps: [
     { what: "school_enrolment", why: "A school keeps its own roll: every pupil's enrolment is made with it." },
@@ -70,7 +70,7 @@ export const principal: BehaviourModule = {
     const me = ctx.entity;
     const book = new Book();
     const routines = new StandingWork(me, p.part);
-    const staffing = new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, workplace: p.workplace, role: p.role, industry: p.industry });
+    const staffing = new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, workplace: p.workplace, role: p.role, industry: p.industry, own: "role_or_unnamed" });
     let view: SiteStructure | undefined;
     const pupils = new Map<string, { since: number; years_before: number; born_at?: number }>(); // who's been in our classrooms
     const answered = new Set<string>();
