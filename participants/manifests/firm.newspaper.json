@@ -6,7 +6,7 @@
     "every_days": {
       "schema": {
         "type": "integer",
-        "description": "an edition a week"
+        "description": "its rhythm: an edition a week, by an editor and reporters who are paid and whose time it takes"
       },
       "unit": "days",
       "default": 7,

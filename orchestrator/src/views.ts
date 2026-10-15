@@ -138,12 +138,13 @@ export function wholeViews(config: any): WholeView[] {
   // (An office's clerk is the office's own, shown what the office is shown and nothing more: a whole view it has is its
   // office's, to be declared by the module that runs the office. docs/behaviour/office-books.md.)
   const moduleOf = (controller: any, role?: { code?: string; params?: { of?: string } }): string => (role?.code === "office.clerk" && role.params?.of ? role.params.of : role?.code) ?? (controller?.type === "code" ? controller.impl : controller?.params?.mock?.brain) ?? "(none)";
-  const paramsFor = (controller: any, role?: { params?: object }) => ({ ...(role?.params ?? {}), ...(controller?.type === "code" ? controller.params : controller?.params?.mock?.params) });
+  // (A person in a post runs the post's module: their own controller is the citizen's, and its parameters are not the post's.)
+  const paramsFor = (controller: any, role?: { params?: object }, person?: boolean) => ({ ...(role?.params ?? {}), ...(controller?.type === "code" ? (person ? {} : controller.params) : controller?.params?.mock?.params) });
   for (const pos of config.positions ?? []) {
     const holder = participant.get(pos.holder);
     const module = moduleOf(holder?.controller, pos.role_module);
     channelsOf(module, pos.id, pos.entity, pos.channels);
-    paramsOf(module, pos.id, paramsFor(holder?.controller, pos.role_module));
+    paramsOf(module, pos.id, paramsFor(holder?.controller, pos.role_module, holder?.kind === "person"));
   }
   for (const p of [...(config.participants ?? []), ...(config.templates ?? [])]) {
     if (p.kind !== "person") continue;

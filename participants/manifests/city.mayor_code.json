@@ -3,6 +3,13 @@
   "version": "0.12.1",
   "doc": "docs/behaviour/government.md",
   "params": {
+    "administration_budget": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 0,
+      "source": "placeholder"
+    },
     "budget_lead_days": {
       "schema": {
         "type": "integer"

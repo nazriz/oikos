@@ -500,7 +500,7 @@ export const bankPaymentSystem: BehaviourModule = {
         letters.take(obs, book);
         if (queuedAt !== obs.t && (obs.woke_for !== "done" || queue.length === 0)) { // (a wake's payments, planned when it begins or its plan is done: the stepper)
           // Who wrote the instructions it is about to read for the first time: looked up first, each writer once
-          // (docs/behaviour/bank-payment-system.md, "Who wrote it"). The answers come at once, and it plans knowing them.
+          // (docs/behaviour/bank-payment-system.md, "Who wrote it"). Its payment platform is a system under licence, and a payment takes it a second (foundations F5): it plans knowing the answers.
           // (And who wrote a hold it is about to read: a hold is its customer's instruction too.)
           const whom = whoWrote(book, asked, who, [...[...book.all("request").slice(cursor), ...book.all("hold").slice(holdCursor)].filter((r) => (r.addressed_to ?? []).includes(obs.entity!)),
             // (And who wrote a withdrawal it is about to read: only whoever may instruct on an account ends an instruction on it.)

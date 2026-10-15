@@ -204,6 +204,8 @@ interface Part {
   id: string;
   kind: "person" | "system";
   person?: string;
+  /** A model's seat in one post of a person (foundations F5): it acts through their body, and only in its post, as a system does. */
+  shares_body?: boolean;
   owner?: string;
   title?: string;
   controller: any;
@@ -402,7 +404,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   const positions = new Map<string, Pos>();
   const participantOf = new Map<string, string>(); // person -> participant
   for (const p of cfg.participants) {
-    parts.set(p.id, { id: p.id, kind: p.kind, person: p.person, owner: p.owner, title: p.title, controller: p.controller, framing: p.framing, on_opt_out: p.on_opt_out, traits: p.traits, ended: false });
+    parts.set(p.id, { id: p.id, kind: p.kind, person: p.person, ...(p.shares_body ? { shares_body: true } : {}), owner: p.owner, title: p.title, controller: p.controller, framing: p.framing, on_opt_out: p.on_opt_out, traits: p.traits, ended: false });
     if (p.person) participantOf.set(p.person, p.id);
   }
   for (const x of cfg.positions) positions.set(x.id, { id: x.id, entity: x.entity, title: x.title, role: x.role, channels: x.channels ?? [], role_module: x.role_module, holder: x.holder, ...(x.keeps_record ? { keeps_record: true } : {}) });
@@ -482,7 +484,8 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   const whoIs = (id: string): { id: string; name?: string; of?: string } | undefined => {
     const p = parts.get(id);
     if (p) {
-      const posts = p.kind === "system" ? held(id) : [];
+      // (A system is known by its post; so is a model's seat, a person of the town in one post and no other.)
+      const posts = p.kind === "system" || (p.shares_body && held(id).length === 1) ? held(id) : [];
       if (posts.length === 1) return { id: posts[0]!.id, name: posts[0]!.title ?? p.title, of: posts[0]!.entity };
       const e = p.person ?? p.owner;
       return e ? { id: e, ...(entityNames.get(e) ? { name: entityNames.get(e)! } : {}) } : undefined;
@@ -545,7 +548,8 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     const standingIds: string[] = (pp.standing ?? []).flatMap((s: string) => chans.filter((x) => x.path === s || x.path.endsWith(`/${s}`)).map((x) => x.path));
     const onRequest = chans.filter((x) => x.ch.on_request).map((x) => x.path);
     const office = mine.length === 1 ? mine[0] : undefined;
-    const entity = p.person ?? office?.entity ?? p.owner!;
+    // (A person who holds one office, as a seat's person does, acts for its organisation: that is the entity its papers and trays are of.)
+    const entity = office?.entity ?? p.person ?? p.owner!;
     const entityName = (cfg.world?.entities ?? []).find((e: any) => e.id === entity)?.name;
     // What kind of report each is: with it, the seat can look into its papers, its buildings and ground, and who's who.
     const kinds = new Map<string, string>(chans.map((x) => [x.path, x.ch.kind]));
@@ -777,7 +781,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   };
 
   /** The capacity a language-model participant's acts are made in: its one position, or itself. (Several: see the resolver, D47.) */
-  const capacityOf = (u: Unit) => (u.capacity && u.capacity !== "self" ? u.capacity : held(u.participant).length === 1 && parts.get(u.participant)?.kind === "system" ? held(u.participant)[0]!.id : undefined);
+  const capacityOf = (u: Unit) => (u.capacity && u.capacity !== "self" ? u.capacity : held(u.participant).length === 1 && (parts.get(u.participant)?.kind === "system" || parts.get(u.participant)?.shares_body) ? held(u.participant)[0]!.id : undefined);
 
   /** An act begun (docs/design/rebuild.md 6.3): after its thinking, if deciding takes world time, it takes its actor the
    * act's time and takes effect when done; the unit's wake goes on then, when it sees the outcome. */

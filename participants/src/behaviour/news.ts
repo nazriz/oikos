@@ -37,7 +37,7 @@ export const newspaper: BehaviourModule = {
   create(ctx: ParticipantContext) {
     const p = params({
       town: "", // the government it reports on (the world must say)
-      every_days: 7, // an edition a week
+      every_days: 7, // its rhythm: an edition a week, by an editor and reporters who are paid and whose time it takes
       items_per_edition: 5,
       leaning_bps: 0, // -10,000 against the town's government to 10,000 for it (placeholder: none)
     }, ctx.params);

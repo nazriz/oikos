@@ -28,7 +28,7 @@ export const station: BehaviourModule = {
     { task: "call_at_homes", at: "workplace", every: 1, what: "Each working day an officer goes to each home the station has been asked to call at, where a neighbour has seen nobody come out; if someone is found dead there who is not yet registered as dead, the death is reported to the registry." },
   ],
   issues: [P.JOB_ADVERTISEMENT, ...P.POLICE],
-  staffed: (p) => ({ role: p.role ?? "police officer", posts: { establishment: p.officers ?? 0 } }),
+  staffed: (p) => ({ role: p.role ?? "police officer", own: "role_or_unnamed", posts: { establishment: p.officers ?? 0 } }),
   issuesWith: (p) => ({ ...P.staffingOwn({ role: p.role ?? "police officer", industry: p.industry ?? "public_safety", workplace: p.workplace, notice_days: p.notice_days ?? 14 }), tribunal: p.tribunal, registry: p.registry }),
   version: "0.6.0", // 0.6.0: run in parts where a model holds the office (part): the officers carry out warrants, look into reports and call at homes under standing work orders in force at the start, and report what they did; the office-holder hires and stands down officers and makes the orders; a station run by code is unchanged; 0.5.1: returns of tax withheld are filed on the days the law states (docs/behaviour/firms.md, "Returns on the law's days"); 0.5.0: a warrant carried out says how many of the household were there and were put out (none, where nobody was: possession is given all the same); one its registrar has withdrawn is not gone on; 0.4.0: carries out a tribunal's warrant of possession, in an officer's hours (docs/behaviour/justice.md, "Possession"); 0.3.1: a death that someone at home outlived by more than a day is not "found" at a later call; 0.3.0: calls at a home when asked to (a welfare check), by going there; no longer shown the town's homes
   doc: "docs/behaviour/crime.md",
@@ -54,7 +54,7 @@ export const station: BehaviourModule = {
     need(p, ["building", "workplace", "account", "tribunal"], "police.station");
     const me = ctx.entity;
     const book = new Book();
-    const staffing = new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, workplace: p.workplace, role: p.role, industry: p.industry });
+    const staffing = new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, workplace: p.workplace, role: p.role, industry: p.industry, own: "role_or_unnamed" });
     const routines = new StandingWork(me, p.part);
     const TASKS = { warrants: "carry_out_warrants", reports: "look_into_reports", calls: "call_at_homes" } as const;
     let callingNow = p.part === ""; // (whether the calls we are asked for are ours to make now: the plan says)

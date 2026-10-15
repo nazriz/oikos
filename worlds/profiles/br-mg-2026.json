@@ -937,6 +937,7 @@
    "upkeep_hours_per_week_per_asset": 4,
    "complain_bps": 3000
   },
+  "public_service": {"wage_per_pay_period": 115000, "staff_per_1000": {"administration": 6.0, "courts": 0.5, "oversight": 0.05, "elections": 0.06, "land_registry": 0.08, "press": 0.05, "banking": 1.6, "utilities": 1.2, "union": 0.12, "property_management": 3.0}, "licences": {"payment_system": {"per_resident_per_year": 1500, "term_days": 365}}},
   "unions": {
    "membership_bps": {
     "manufacturing": 1000,
@@ -1548,6 +1549,18 @@
   "services.asset_life_years": "Placeholder: carried over from the reference profile.",
   "services.upkeep_hours_per_week_per_asset": "Placeholder: carried over from the reference profile.",
   "services.complain_bps": "Placeholder: carried over from the reference profile.",
+  "public_service.wage_per_pay_period": "[SECONDARY] Advertised 2025 starting pay for administrative clerks in small Minas Gerais prefeituras (Auxiliar Administrativo R$1,518 and R$1,980/month; Agente Administrativo R$2,828/month, via concurso notices); a town clerk with some years in post taken at about R$2,500/month gross, x12/26 per 14-day period = R$1,150. Sits a little under the profile's shop wage. Not an official scale for any one town.",
+  "public_service.staff_per_1000.administration": "[PLACEHOLDER] IBGE counts about 7.6 million municipal public servants in 2024 (about 36 per 1,000 residents), most of them in schools and health; IPEA Atlas do Estado puts all public bonds at about 5.7% of the population. Offices proper (finance, property tax, planning, complaints, clerk) estimated at about 6 per 1,000, i.e. one sixth of the total. Registry of births/deaths is private in Brazil (cartorio), so not counted here. Not read from MUNIC tables (to confirm).",
+  "public_service.staff_per_1000.courts": "[PLACEHOLDER] State courts (TJMG) and the Juizados Especiais Civeis are the first-instance forum for small civil claims; CNJ Justica em Numeros 2025 gave national counts (955 exclusive Juizado magistrates) but the per-capita staffing was not opened. Estimated at about 0.5 per 1,000 for a juizado with judge, conciliators and cartorio staff for a comarca much larger than the town; scaled down. (to confirm)",
+  "public_service.staff_per_1000.oversight": "[PLACEHOLDER] Procon (municipal consumer protection) and an ouvidoria are typically a handful of staff for a town of several thousand; estimated at 0.05 per 1,000. No source opened.",
+  "public_service.staff_per_1000.elections": "[PLACEHOLDER] Permanent electoral staff sit in the Justica Eleitoral (TRE-MG zona offices): a few staff per zona serving tens of thousands of voters. Estimated at about 0.06 per 1,000. No source opened.",
+  "public_service.staff_per_1000.land_registry": "[PLACEHOLDER] Land titles are kept by private cartorios de registro de imoveis under public delegation; a small cartorio has about 3 to 8 staff for a comarca. Estimated at 0.08 per 1,000. No source opened.",
+  "public_service.staff_per_1000.press": "[PLACEHOLDER] Small-town press in Minas is a weekly or online outlet with 1 to 3 journalists; estimated at 0.05 per 1,000. No source opened.",
+  "public_service.staff_per_1000.banking": "[PLACEHOLDER] Brazil's banking workforce is about 450,000 (Contraf/Dieese figures from memory, not opened), about 2 per 1,000 residents; a small town's branches, a cooperative bank (Sicoob/Sicredi) and correspondent staff taken at 1.6. (to confirm)",
+  "public_service.staff_per_1000.utilities": "[PLACEHOLDER] Water/sewer (Copasa or a municipal SAAE) plus energy retailer (Cemig) operations staff; national sanitation and distribution workforces are on the order of 1 per 1,000. Estimated at 1.2. No source opened.",
+  "public_service.staff_per_1000.union": "[PLACEHOLDER] Union officers and organisers (sindicatos of servants, commerce and rural workers) in a small town: about one in ten thousand residents; estimated at 0.12. No source opened.",
+  "public_service.licences.payment_system": "[PLACEHOLDER] No vendor price found. Core-banking/payment platform fees estimated at about R$15 per resident served per year (cents: 1500), a rough order of magnitude from cooperative-bank IT spend; Pix itself is free to the bank at the central bank level, the cost is the platform.",
+  "public_service.staff_per_1000.property_management": "[PLACEHOLDER] Carried over unchanged to every profile: property managers (people who run let homes for their owners) at about one to every 100 to 150 let homes is an industry rule of thumb (to confirm, not opened); a town here has about 380 homes for 1,000 people, so about 3 per 1,000 residents. A manager looks after the letting offices of several landlords.",
   "unions.membership_bps": "Placeholder split by sector (relative sizes assumed). Context: IBGE PNAD Continua table 7106 (opened through the SIDRA API 2026-10-08): 8.0% of employed people in Minas Gerais and 8.8% in Brazil belong to a union; the sector figures here are not scaled to that mean.",
   "unions.dues_per_month": "Placeholder: about R$30 a month (a typical monthly member contribution of about 1% of a low wage). The compulsory union tax was made voluntary by Lei 13.467/2017.",
   "unions.resignation_notice_days": "Placeholder: 0; a member may leave at any time (Lei 13.467/2017 made union dues voluntary; to confirm).",
