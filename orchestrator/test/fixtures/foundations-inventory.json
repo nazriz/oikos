@@ -1,0 +1,791 @@
+{
+  "about": "F0 (docs/design/foundations.md, 2026-10-15): every special case the plan says the foundations delete or replace, where it stands today. `find` is a literal string in `file` (a glob counts across files); `count` and `lines` are today's. F10's backstop (orchestrator/test/all-work-takes-time.test.ts) reads this file and requires count 0 for every `delete` and `replace` entry by the step named, `history` entries excepted (a decision is never edited). Entries are removed from here by the step that removes the case, with a line in docs/decisions.md.",
+  "entries": [
+    {
+      "id": "k-labour-used-field",
+      "law": 1,
+      "step": "F1",
+      "kind": "delete",
+      "file": "kernel/crates/world/src/state.rs",
+      "find": "labour_used",
+      "what": "the second time ledger: a daily budget beside the timelines",
+      "plan": "2.1",
+      "count": 1,
+      "lines": [
+        "kernel/crates/world/src/state.rs:39"
+      ]
+    },
+    {
+      "id": "k-labour-used-init",
+      "law": 1,
+      "step": "F1",
+      "kind": "delete",
+      "file": "kernel/crates/world/src/kernel.rs",
+      "find": "labour_used",
+      "what": "its initial value",
+      "plan": "2.1",
+      "count": 1,
+      "lines": [
+        "kernel/crates/world/src/kernel.rs:215"
+      ]
+    },
+    {
+      "id": "k-labour-used-work",
+      "law": 1,
+      "step": "F1",
+      "kind": "delete",
+      "file": "kernel/crates/world/src/exec.rs",
+      "find": "labour_used",
+      "what": "`work` reads and writes it (limit check, and the charge)",
+      "plan": "2.1",
+      "count": 3,
+      "lines": [
+        "kernel/crates/world/src/exec.rs:905",
+        "kernel/crates/world/src/exec.rs:991",
+        "kernel/crates/world/src/exec.rs:992"
+      ]
+    },
+    {
+      "id": "k-labour-used-test",
+      "law": 1,
+      "step": "F1",
+      "kind": "delete",
+      "file": "kernel/tests/physical_feasibility.rs",
+      "find": "labour_used",
+      "what": "the model of `work` in the physical-feasibility test reads it",
+      "plan": "6",
+      "count": 1,
+      "lines": [
+        "kernel/tests/physical_feasibility.rs:222"
+      ]
+    },
+    {
+      "id": "k-begin-actor-only",
+      "law": 2,
+      "step": "F1",
+      "kind": "replace",
+      "file": "kernel/crates/world/src/kernel.rs",
+      "find": "oikos_time::place(&mut timeline, lanes, t + thinking, seconds)",
+      "what": "an act is placed on its ACTOR's timeline only; F1/F3 place it on every performer's",
+      "plan": "2.1, 2.3",
+      "count": 1,
+      "lines": [
+        "kernel/crates/world/src/kernel.rs:756"
+      ]
+    },
+    {
+      "id": "k-act-time-by-block",
+      "law": 2,
+      "step": "F2",
+      "kind": "replace",
+      "file": "kernel/crates/world/src/kernel.rs",
+      "find": "self.s.act_times.program(actor, blocks.iter().map(Block::name))",
+      "what": "an act's time is by block name and actor kind, not by what it makes",
+      "plan": "2.2",
+      "count": 1,
+      "lines": [
+        "kernel/crates/world/src/kernel.rs:754"
+      ]
+    },
+    {
+      "id": "k-deploy-free",
+      "law": 3,
+      "step": "F4",
+      "kind": "replace",
+      "file": "kernel/crates/world/src/exec.rs",
+      "find": "create_participant(self.s, self.st, template, None, Some(org), title.clone())",
+      "what": "`deploy` makes a system for the acting organisation out of nothing; it becomes the supplier's act naming a client",
+      "plan": "2.3(c)",
+      "count": 1,
+      "lines": [
+        "kernel/crates/world/src/exec.rs:1859"
+      ]
+    },
+    {
+      "id": "k-retire-owner-only",
+      "law": 4,
+      "step": "F4",
+      "kind": "replace",
+      "file": "kernel/crates/world/src/exec.rs",
+      "find": "x.owner.as_deref() != Some(org.as_str())",
+      "what": "`retire` is the owner's alone; F4 adds the supplier",
+      "plan": "2.3(d)",
+      "count": 1,
+      "lines": [
+        "kernel/crates/world/src/exec.rs:1868"
+      ]
+    },
+    {
+      "id": "k-system-performer-refused",
+      "law": 3,
+      "step": "F3",
+      "kind": "replace",
+      "file": "kernel/crates/world/src/exec.rs",
+      "find": "self.living_present(p)?;",
+      "what": "`work` takes only bodies as performers (a system is `not_a_person`); a template that lists the work may perform it",
+      "plan": "2.3",
+      "count": 1,
+      "lines": [
+        "kernel/crates/world/src/exec.rs:880"
+      ]
+    },
+    {
+      "id": "g-free-holder",
+      "law": 3,
+      "step": "F5",
+      "kind": "delete",
+      "file": "worlds/generator/generate.ts",
+      "find": "const holder = `${id}-system`;",
+      "what": "every office's holder (and its staff's and clerk's) is a system nobody supplied",
+      "plan": "2.3",
+      "count": 1,
+      "lines": [
+        "worlds/generator/generate.ts:1966"
+      ]
+    },
+    {
+      "id": "g-system-suffix-keeps-record",
+      "law": 3,
+      "step": "F5",
+      "kind": "delete",
+      "file": "worlds/generator/generate.ts",
+      "find": "endsWith(\"-system\")) pos.keeps_record",
+      "what": "the `-system` suffix decides which post keeps its organisation's record",
+      "plan": "3.2",
+      "count": 1,
+      "lines": [
+        "worlds/generator/generate.ts:2605"
+      ]
+    },
+    {
+      "id": "g-act-time-table",
+      "law": 2,
+      "step": "F2",
+      "kind": "replace",
+      "file": "worlds/generator/generate.ts",
+      "find": "const ACT_TIME = {",
+      "what": "the table is by block with `default: 1` a second for every system act; becomes rows by what is made",
+      "plan": "2.2",
+      "count": 1,
+      "lines": [
+        "worlds/generator/generate.ts:64"
+      ]
+    },
+    {
+      "id": "g-act-time-default-one",
+      "law": 2,
+      "step": "F5",
+      "kind": "delete",
+      "file": "worlds/generator/generate.ts",
+      "find": "default: 1,",
+      "what": "a second for any system's act",
+      "plan": "0",
+      "count": 1,
+      "lines": [
+        "worlds/generator/generate.ts:71"
+      ]
+    },
+    {
+      "id": "g-lanes-by-hand",
+      "law": 3,
+      "step": "F5",
+      "kind": "delete",
+      "file": "worlds/generator/generate.ts",
+      "find": "{ lanes: 2 });",
+      "what": "the works office's lanes set by hand (`two things at once`)",
+      "plan": "2.3",
+      "count": 1,
+      "lines": [
+        "worlds/generator/generate.ts:2081"
+      ]
+    },
+    {
+      "id": "g-lanes-by-hand-staff",
+      "law": 3,
+      "step": "F5",
+      "kind": "delete",
+      "file": "worlds/generator/generate.ts",
+      "find": "part.lanes ? { lanes: part.lanes } : {}",
+      "what": "lanes on generated staff and clerks",
+      "plan": "2.3",
+      "count": 2,
+      "lines": [
+        "worlds/generator/generate.ts:2675",
+        "worlds/generator/generate.ts:2731"
+      ]
+    },
+    {
+      "id": "g-support-dials",
+      "law": 2,
+      "step": "F6",
+      "kind": "delete",
+      "file": "worlds/generator/generate.ts",
+      "find": "processing_days: FR.support.processing_days, error_bps: FR.support.wrong_refusal_bps",
+      "what": "the support office's delay and error dials set from the profile",
+      "plan": "2.2, 2.5",
+      "count": 1,
+      "lines": [
+        "worlds/generator/generate.ts:2663"
+      ]
+    },
+    {
+      "id": "g-cases-per-day",
+      "law": 2,
+      "step": "F6",
+      "kind": "delete",
+      "file": "worlds/generator/generate.ts",
+      "find": "cases_per_day: FR.venues.cases_per_day",
+      "what": "a hearing venue's daily capacity, set twice (the tribunal and the desks)",
+      "plan": "2.2",
+      "count": 2,
+      "lines": [
+        "worlds/generator/generate.ts:2136",
+        "worlds/generator/generate.ts:2634"
+      ]
+    },
+    {
+      "id": "g-opening-caseload-wait",
+      "law": 2,
+      "step": "F6",
+      "kind": "replace",
+      "file": "worlds/generator/generate.ts",
+      "find": "FR.support.processing_days",
+      "what": "opening caseload age follows the processing days; follows the staff's hours",
+      "plan": "2.2",
+      "count": 3,
+      "lines": [
+        "worlds/generator/generate.ts:1502",
+        "worlds/generator/generate.ts:1504",
+        "worlds/generator/generate.ts:2663"
+      ]
+    },
+    {
+      "id": "g-profile-type-processing",
+      "law": 2,
+      "step": "F6",
+      "kind": "delete",
+      "file": "worlds/generator/profile.ts",
+      "find": "processing_days: number",
+      "what": "the profile's field type",
+      "plan": "2.2",
+      "count": 1,
+      "lines": [
+        "worlds/generator/profile.ts:169"
+      ]
+    },
+    {
+      "id": "g-profile-type-cases",
+      "law": 2,
+      "step": "F6",
+      "kind": "delete",
+      "file": "worlds/generator/profile.ts",
+      "find": "cases_per_day: number",
+      "what": "the profile's field type",
+      "plan": "2.2",
+      "count": 1,
+      "lines": [
+        "worlds/generator/profile.ts:170"
+      ]
+    },
+    {
+      "id": "g-profiles-processing-days",
+      "law": 2,
+      "step": "F6",
+      "kind": "delete",
+      "file": "worlds/profiles/*.json",
+      "find": "\"processing_days\"",
+      "what": "each profile's support delay (nine profiles)",
+      "plan": "2.2",
+      "count": 9,
+      "lines": [
+        "worlds/profiles/au-vic-2026.json:921",
+        "worlds/profiles/br-mg-2026.json:1387",
+        "worlds/profiles/de-ni-2026.json:1435",
+        "worlds/profiles/gb-eng-2026.json:1377",
+        "worlds/profiles/in-tn-2026.json:1372",
+        "worlds/profiles/jp-akita-2026.json:1347",
+        "worlds/profiles/ke-nakuru-2026.json:1361",
+        "worlds/profiles/mx-jal-2026.json:1341",
+        "worlds/profiles/us-oh-2026.json:1400"
+      ]
+    },
+    {
+      "id": "g-profiles-cases-per-day",
+      "law": 2,
+      "step": "F6",
+      "kind": "delete",
+      "file": "worlds/profiles/*.json",
+      "find": "\"cases_per_day\"",
+      "what": "each profile's venue capacity (nine profiles)",
+      "plan": "2.2",
+      "count": 9,
+      "lines": [
+        "worlds/profiles/au-vic-2026.json:928",
+        "worlds/profiles/br-mg-2026.json:1394",
+        "worlds/profiles/de-ni-2026.json:1442",
+        "worlds/profiles/gb-eng-2026.json:1384",
+        "worlds/profiles/in-tn-2026.json:1379",
+        "worlds/profiles/jp-akita-2026.json:1354",
+        "worlds/profiles/ke-nakuru-2026.json:1368",
+        "worlds/profiles/mx-jal-2026.json:1348",
+        "worlds/profiles/us-oh-2026.json:1407"
+      ]
+    },
+    {
+      "id": "g-living-test-dials",
+      "law": 2,
+      "step": "F6",
+      "kind": "delete",
+      "file": "worlds/test/living.test.ts",
+      "find": "processing_days: F.support.processing_days",
+      "what": "the test that the generated support office carries the delay and error dials",
+      "plan": "6",
+      "count": 1,
+      "lines": [
+        "worlds/test/living.test.ts:157"
+      ]
+    },
+    {
+      "id": "b-support-processing-days",
+      "law": 2,
+      "step": "F6",
+      "kind": "delete",
+      "file": "participants/src/behaviour/world.ts",
+      "find": "processing_days: 0,",
+      "what": "world.transfers: the delay parameter",
+      "plan": "2.2",
+      "count": 1,
+      "lines": [
+        "participants/src/behaviour/world.ts:270"
+      ]
+    },
+    {
+      "id": "b-support-capacity",
+      "law": 2,
+      "step": "F6",
+      "kind": "delete",
+      "file": "participants/src/behaviour/world.ts",
+      "find": "capacity_per_day",
+      "what": "world.transfers: the daily capacity (the generator never set it: a dead dial)",
+      "plan": "2.2",
+      "count": 5,
+      "lines": [
+        "participants/src/behaviour/world.ts:257",
+        "participants/src/behaviour/world.ts:271",
+        "participants/src/behaviour/world.ts:411",
+        "participants/src/behaviour/world.ts:413",
+        "participants/src/behaviour/world.ts:451"
+      ]
+    },
+    {
+      "id": "b-support-backlog-doubling",
+      "law": 5,
+      "step": "F7",
+      "kind": "delete",
+      "file": "participants/src/behaviour/world.ts",
+      "find": "(backlog ? 2 : 1)",
+      "what": "wrong refusals doubled under backlog",
+      "plan": "2.5",
+      "count": 1,
+      "lines": [
+        "participants/src/behaviour/world.ts:424"
+      ]
+    },
+    {
+      "id": "b-support-error-bps",
+      "law": 5,
+      "step": "F7",
+      "kind": "delete",
+      "file": "participants/src/behaviour/world.ts",
+      "find": "error_bps",
+      "what": "world.transfers: the wrong-refusal rate as a module parameter (becomes a row's slip rate)",
+      "plan": "2.5",
+      "count": 4,
+      "lines": [
+        "participants/src/behaviour/world.ts:257",
+        "participants/src/behaviour/world.ts:272",
+        "participants/src/behaviour/world.ts:423",
+        "participants/src/behaviour/world.ts:424"
+      ]
+    },
+    {
+      "id": "b-support-staff-refuse-nothing",
+      "law": 6,
+      "step": "F8",
+      "kind": "replace",
+      "file": "participants/src/behaviour/world.ts",
+      "find": "The staff refuse nothing",
+      "what": "who may refuse is in code; the office's procedure says it",
+      "plan": "2.6",
+      "count": 1,
+      "lines": [
+        "participants/src/behaviour/world.ts:430"
+      ]
+    },
+    {
+      "id": "b-desk-cases-per-day-type",
+      "law": 2,
+      "step": "F6",
+      "kind": "delete",
+      "file": "participants/src/behaviour/desk.ts",
+      "find": "cases_per_day",
+      "what": "hearings: the daily capacity (type, default 4, the room for the day, the venue module's parameter)",
+      "plan": "2.2",
+      "count": 5,
+      "lines": [
+        "participants/src/behaviour/desk.ts:36",
+        "participants/src/behaviour/desk.ts:52",
+        "participants/src/behaviour/desk.ts:203",
+        "participants/src/behaviour/desk.ts:328",
+        "participants/src/behaviour/desk.ts:344"
+      ]
+    },
+    {
+      "id": "b-tribunal-cases-per-day",
+      "law": 2,
+      "step": "F6",
+      "kind": "delete",
+      "file": "participants/src/behaviour/tribunal.ts",
+      "find": "cases_per_day",
+      "what": "the tribunal's own copy of it",
+      "plan": "2.2",
+      "count": 2,
+      "lines": [
+        "participants/src/behaviour/tribunal.ts:46",
+        "participants/src/behaviour/tribunal.ts:63"
+      ]
+    },
+    {
+      "id": "b-union-cases-per-day",
+      "law": 2,
+      "step": "F6",
+      "kind": "delete",
+      "file": "participants/src/behaviour/union.ts",
+      "find": "cases_per_day",
+      "what": "the union's hearing capacity",
+      "plan": "2.2",
+      "count": 2,
+      "lines": [
+        "participants/src/behaviour/union.ts:73",
+        "participants/src/behaviour/union.ts:88"
+      ]
+    },
+    {
+      "id": "b-founded-cases-per-day",
+      "law": 2,
+      "step": "F6",
+      "kind": "delete",
+      "file": "participants/src/behaviour/founded.ts",
+      "find": "cases_per_day",
+      "what": "a founded body's hearing capacity",
+      "plan": "2.2",
+      "count": 1,
+      "lines": [
+        "participants/src/behaviour/founded.ts:94"
+      ]
+    },
+    {
+      "id": "b-openbooks-cases-per-day",
+      "law": 2,
+      "step": "F6",
+      "kind": "delete",
+      "file": "participants/src/behaviour/openbooks-venues.ts",
+      "find": "cases_per_day",
+      "what": "comments that explain the daily room for deciding",
+      "plan": "2.2",
+      "count": 2,
+      "lines": [
+        "participants/src/behaviour/openbooks-venues.ts:122",
+        "participants/src/behaviour/openbooks-venues.ts:304"
+      ]
+    },
+    {
+      "id": "b-uphold-draw-desk",
+      "law": 5,
+      "step": "F7",
+      "kind": "replace",
+      "file": "participants/src/behaviour/desk.ts",
+      "find": "uphold-${",
+      "what": "a venue upholds a case it cannot prove at its own rate (drawn outside slip())",
+      "plan": "2.5",
+      "count": 2,
+      "lines": [
+        "participants/src/behaviour/desk.ts:116",
+        "participants/src/behaviour/desk.ts:287"
+      ]
+    },
+    {
+      "id": "b-billing-error",
+      "law": 5,
+      "step": "F7",
+      "kind": "replace",
+      "file": "participants/src/behaviour/utilities.ts",
+      "find": "billing_error_bps_per_year",
+      "what": "billing errors as a module rate (drawn as `bill-error-`)",
+      "plan": "2.5",
+      "count": 2,
+      "lines": [
+        "participants/src/behaviour/utilities.ts:234",
+        "participants/src/behaviour/utilities.ts:346"
+      ]
+    },
+    {
+      "id": "b-short-pay",
+      "law": 5,
+      "step": "F7",
+      "kind": "replace",
+      "file": "participants/src/behaviour/firms.ts",
+      "find": "short-pay-${",
+      "what": "short pay as a module rate (drawn outside slip())",
+      "plan": "2.5",
+      "count": 1,
+      "lines": [
+        "participants/src/behaviour/firms.ts:1620"
+      ]
+    },
+    {
+      "id": "b-clerk-one-paper",
+      "law": 3,
+      "step": "F6",
+      "kind": "delete",
+      "file": "participants/src/behaviour/books.ts",
+      "find": "at most one a day",
+      "what": "the clerk files at most one paper a day, whatever its time",
+      "plan": "2.3",
+      "count": 1,
+      "lines": [
+        "participants/src/behaviour/books.ts:99"
+      ]
+    },
+    {
+      "id": "b-news-no-staff",
+      "law": 3,
+      "step": "F5",
+      "kind": "replace",
+      "file": "participants/src/behaviour/news.ts",
+      "find": "every_days: 7,",
+      "what": "the newspaper has no staff, time or costs: an edition a week for nothing",
+      "plan": "3.2",
+      "count": 1,
+      "lines": [
+        "participants/src/behaviour/news.ts:40"
+      ]
+    },
+    {
+      "id": "b-bank-at-once",
+      "law": 2,
+      "step": "F5",
+      "kind": "replace",
+      "file": "participants/src/behaviour/bank.ts",
+      "find": "The answers come at once",
+      "what": "the bank's lookups are free and immediate",
+      "plan": "3.2",
+      "count": 1,
+      "lines": [
+        "participants/src/behaviour/bank.ts:503"
+      ]
+    },
+    {
+      "id": "b-mayor-approves",
+      "law": 6,
+      "step": "F8",
+      "kind": "replace",
+      "file": "participants/src/behaviour/government.ts",
+      "find": "a.in_position === p.mayor_position",
+      "what": "approval over a sum is the post `mayor_position` (a parameter defaulting to `mayor`, not a literal: the plan says 'always the post called mayor'; the default is the code's)",
+      "plan": "2.6",
+      "count": 1,
+      "lines": [
+        "participants/src/behaviour/government.ts:612"
+      ]
+    },
+    {
+      "id": "b-removals-by-police",
+      "law": 6,
+      "step": "F8",
+      "kind": "replace",
+      "file": "participants/src/behaviour/citizen.ts",
+      "find": "const removalsBy = ",
+      "what": "removals go to the police where there are police",
+      "plan": "2.6",
+      "count": 1,
+      "lines": [
+        "participants/src/behaviour/citizen.ts:854"
+      ]
+    },
+    {
+      "id": "b-remedy-request-generate",
+      "law": 5,
+      "step": "F8",
+      "kind": "replace",
+      "file": "worlds/generator/generate.ts",
+      "find": "\"remedy_request\"",
+      "what": "remedy_request as a special kind (becomes the generic review request)",
+      "plan": "2.5",
+      "count": 2,
+      "lines": [
+        "worlds/generator/generate.ts:1520",
+        "worlds/generator/generate.ts:2659"
+      ]
+    },
+    {
+      "id": "b-remedy-request-frictions",
+      "law": 5,
+      "step": "F8",
+      "kind": "replace",
+      "file": "participants/src/behaviour/frictions.ts",
+      "find": "\"remedy_request\"",
+      "what": "remedy_request again (the friction module asks with it)",
+      "plan": "2.5",
+      "count": 1,
+      "lines": [
+        "participants/src/behaviour/frictions.ts:40"
+      ]
+    },
+    {
+      "id": "b-remedy-request-papers",
+      "law": 5,
+      "step": "F8",
+      "kind": "replace",
+      "file": "participants/src/behaviour/papers.ts",
+      "find": "\"remedy_request\"",
+      "what": "same (the landlord's reminder uses the kind too)",
+      "plan": "2.5",
+      "count": 1,
+      "lines": [
+        "participants/src/behaviour/papers.ts:281"
+      ]
+    },
+    {
+      "id": "d-clerks-time-not-modelled",
+      "law": 2,
+      "step": "F6",
+      "kind": "delete",
+      "file": "docs/behaviour/standing-work.md",
+      "find": "the clerks' time is not modelled",
+      "what": "standing-work.md says staff cost nothing in hours",
+      "plan": "2.2",
+      "count": 1,
+      "lines": [
+        "docs/behaviour/standing-work.md:74"
+      ]
+    },
+    {
+      "id": "d-clerk-one-paper",
+      "law": 3,
+      "step": "F6",
+      "kind": "delete",
+      "file": "docs/behaviour/office-books.md",
+      "find": "at most one paper a day",
+      "what": "office-books.md: the clerk's one paper a working day",
+      "plan": "2.3",
+      "count": 1,
+      "lines": [
+        "docs/behaviour/office-books.md:64"
+      ]
+    },
+    {
+      "id": "d-under-load",
+      "law": 2,
+      "step": "F6",
+      "kind": "delete",
+      "file": "docs/behaviour/boundary.md",
+      "find": "**Under load**",
+      "what": "boundary.md: processing time, limited staff, hurried staff make mistakes",
+      "plan": "2.2",
+      "count": 1,
+      "lines": [
+        "docs/behaviour/boundary.md:118"
+      ]
+    },
+    {
+      "id": "d-frictions-cases-per-day",
+      "law": 2,
+      "step": "F6",
+      "kind": "delete",
+      "file": "docs/behaviour/frictions.md",
+      "find": "cases_per_day",
+      "what": "frictions.md: a venue decides as many a day as its staff",
+      "plan": "2.2",
+      "count": 3,
+      "lines": [
+        "docs/behaviour/frictions.md:70",
+        "docs/behaviour/frictions.md:92",
+        "docs/behaviour/frictions.md:94"
+      ]
+    },
+    {
+      "id": "d-decision-liberty-at-work",
+      "law": 1,
+      "step": "F1",
+      "kind": "history",
+      "file": "docs/decisions.md",
+      "find": "you're at home and at work at once",
+      "what": "D44's documented liberty: a decision is history and is not edited; F1's decision supersedes it for workers",
+      "plan": "2.1",
+      "count": 1,
+      "lines": [
+        "docs/decisions.md:234"
+      ]
+    }
+  ],
+  "unpriced": [
+    {
+      "file": "participants/src/behaviour/firms.ts",
+      "what": "leases, notices, payroll: a firm's administration takes no one's time",
+      "step": "F6"
+    },
+    {
+      "file": "participants/src/behaviour/government.ts",
+      "what": "an office's admin: payments, approvals, notices",
+      "step": "F6"
+    },
+    {
+      "file": "participants/src/behaviour/tax.ts",
+      "what": "the tax office's assessments and notices",
+      "step": "F6"
+    },
+    {
+      "file": "participants/src/behaviour/returns.ts",
+      "what": "returns taken and processed",
+      "step": "F6"
+    },
+    {
+      "file": "participants/src/behaviour/credit.ts",
+      "what": "lending decisions",
+      "step": "F6"
+    },
+    {
+      "file": "participants/src/behaviour/fund.ts",
+      "what": "a fund's administration",
+      "step": "F6"
+    },
+    {
+      "file": "participants/src/behaviour/utilities.ts",
+      "what": "billing and notices",
+      "step": "F6"
+    }
+  ],
+  "stays": [
+    {
+      "what": "thinking_time: \"free\" (a decision's time includes its thinking)",
+      "file": "worlds/generator/generate.ts",
+      "find": "thinking_time: \"free\""
+    },
+    {
+      "what": "faulty goods stay a product fact, not a slip",
+      "file": "participants/src/behaviour/citizen.ts",
+      "find": "faulty-${d.order}"
+    },
+    {
+      "what": "goods move instantly (a documented liberty; revisited after F10)",
+      "file": "kernel/crates/world/src/exec.rs",
+      "find": "Block::MoveGoods"
+    },
+    {
+      "what": "per-ask `most` (one answer is one thing); daily caps become time at F11",
+      "file": "docs/design/knowing.md",
+      "find": "most"
+    }
+  ]
+}
