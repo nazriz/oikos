@@ -51,12 +51,17 @@ export const bodyPayroll: BehaviourModule = {
     };
     const vacant = (post: string) => book.positions.has(post) && !book.positions.get(post)!.holder;
     const participantOf = (person: string) => [...book.participantPerson].find(([, who]) => who === person)?.[0];
+    // The round is the payroll's own: every few days on a day of its own, whatever else wakes it. A paper addressed to the organisation wakes everyone who acts
+    // for it (a seat's, say), and a payroll that did its work whenever it was woken would file on other days in a town with a seat than in the town without one.
+    const phase = ctx.rng("first-wake").below(3) * DAY;
+    const onRound = (obs: { woke_for?: string }) => obs.woke_for !== "news";
     return stepper(
       (obs) => {
         book.absorb(obs);
         staffing.absorb(obs);
       },
       (obs) => {
+        if (!onRound(obs)) return [];
         const t = obs.t;
         const steps: Step[] = [];
         const acc = ownAccount(obs);
@@ -76,9 +81,9 @@ export const bodyPayroll: BehaviourModule = {
         }
         return steps;
       },
-      undefined,
+      (obs) => phase + (Math.floor((obs.t - phase) / (3 * DAY)) + 1) * 3 * DAY,
       (obs) => {
-        if (!p.who) return [];
+        if (!p.who || !onRound(obs)) return [];
         const out: LookRequest[] = [];
         const t = obs.t;
         // Every few days: who holds each of the posts we keep filled.
