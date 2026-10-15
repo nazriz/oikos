@@ -1563,9 +1563,9 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     const paper = (id: string, kind: string, by: string, to: string[], visible: string[], basis: string | undefined, text: string, data: object, since: number) =>
       records.push({ id, record: "statement", author: "genesis", at: 0, visible_to: visible, speaks_for: by, kind, ...(to.length ? { addressed_to: to } : {}), ...(basis ? { basis } : {}), text, data: { ...data, since: -since * DAY, brought_forward: true } });
     // ---- the support office: claims in hand, and refusals asked to be looked at again ----
-    // (A claim waits `processing_days`; the flow is the people the law's pension reaches in a year, a cohort of one age
-    // year; they are drawn, youngest first, from those entitled and not drawing as the year begins. A claim refused is
-    // asked about at the profile's share of wrong refusals. Claims on losing work are not counted: no profile gives
+    // (The flow is the people the law's pension reaches in a year, a cohort of one age year; they are drawn, youngest
+    // first, from those entitled and not drawing as the year begins. A claim refused is asked about at the profile's
+    // share of wrong refusals. No claim is in hand: the office decides what it has the day it sees it (foundations F6). Claims on losing work are not counted: no profile gives
     // how many job endings are followed by a spell out of work.)
     const drawingNot = [...notDrawing].sort((a, b) => b.m.born_at - a.m.born_at || (a.m.id < b.m.id ? -1 : 1));
     const refused = new Set<string>();
@@ -1576,23 +1576,15 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       refused.add(n.m.id);
       return decision;
     };
-    if (FR && FR.support.processing_days > 0 && notDrawing.length) {
+    if (FR && notDrawing.length) {
       const draw = rng("opening-caseload-support");
-      const wait = FR.support.processing_days;
       for (const r of PAYMENTS.filter((x) => forAge(x) && TAKE?.[x.id] !== undefined)) {
         const from = r.who?.from_age ?? 0;
         const entrants = everyone.filter((m) => m.adult && ageOf(m) >= from && ageOf(m) < from + 5).length / 5;
         const pool = drawingNot.filter((n) => n.r === r && !refused.has(n.m.id));
-        const claims = Math.min(pool.length, count(draw, entrants, wait));
-        for (const n of pool.slice(0, claims)) {
-          const ago = draw.below(wait); // (made this long ago; decided when `wait` days have passed)
-          paper(`claim-${n.m.id}-${n.r.id}`, "benefit_claim", n.m.id, [n.r.payer], [n.m.id, n.r.payer], undefined, `Claim, made ${before(ago)}: ${n.r.id}.`,
-            { payment: n.r.id, account: `acc-${n.m.id}`, born_at: n.m.born_at, ...(n.declares ? { declares: n.declares } : {}) }, ago);
-          refused.add(n.m.id);
-        }
         // (A review asked for: the office answers on its next working day, so a request stands about a day.)
-        const reviews = Math.min(pool.length - claims, count(draw, (entrants * FR.support.wrong_refusal_bps) / 10_000, 1));
-        for (const n of pool.slice(claims, claims + reviews)) {
+        const reviews = Math.min(pool.length, count(draw, (entrants * FR.support.wrong_refusal_bps) / 10_000, 1));
+        for (const n of pool.slice(0, reviews)) {
           const ago = draw.below(1) + 1, decision = refusal(n, ago);
           paper(`review-${n.m.id}-${n.r.id}`, "remedy_request", n.m.id, [n.r.payer], [n.m.id, n.r.payer], decision, `Request to put right (claim_refused): ${n.r.id} was refused and I qualify.`,
             { matter: "claim_refused", against: n.r.payer, about: decision, seeks: n.r.id }, ago);
@@ -2790,7 +2782,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       K.mine("gone", ["death_registration", "departure"]), lawBook,
       ...(PAYMENTS.some((r) => r.who?.record || "share_bps" in r.amount) ? [K.mine("contributions", ["withholding_report"])] : [])],
     code("world.transfers", { account: "acc-outside", publish_every_days: 30,
-      ...(FR ? { processing_days: FR.support.processing_days, error_bps: FR.support.wrong_refusal_bps, respond: { grant_bps: FR.put_right_on_asking_bps } } : {}) }));
+      ...(FR ? { error_bps: FR.support.wrong_refusal_bps, respond: { grant_bps: FR.put_right_on_asking_bps } } : {}) }));
   // The retirement fund's trustee (docs/behaviour/firm-ownership.md): takes in what the fund's holdings pay, pays its
   // costs (its administrator is outside the town), and pays its retired members their pensions.
   if (FUND) office("fund-trustee", FUND, "Trustee", undefined,

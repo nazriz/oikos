@@ -158,7 +158,7 @@ test("a living town where things go wrong (docs/behaviour/frictions.md): homes w
   expect(module("firm.landlord")[0].repair.units).toBe(F.repair_hours);
   expect(module("firm.builder")[0].repair_task).toBe("repair");
   expect(module("utility.energy")[0].billing_error_bps_per_year).toBe(F.per_adult_bps_per_year.bill);
-  expect(module("world.transfers")[0]).toMatchObject({ processing_days: F.support.processing_days, error_bps: F.support.wrong_refusal_bps });
+  expect(module("world.transfers")[0]).toMatchObject({ error_bps: F.support.wrong_refusal_bps });
   expect(c.knowing.published.some((x: any) => x.what === "has:hears")).toBe(true);
   expect(c.participants.find((x: any) => x.controller?.impl === "citizen.default").channels.some((ch: any) => ch.match?.has?.includes("hears"))).toBe(true);
   // Twice as much goes wrong: the dial says so, and a home wears twice as fast.

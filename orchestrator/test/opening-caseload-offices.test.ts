@@ -72,22 +72,13 @@ async function run(config: any, days: number): Promise<Recs> {
   return { recs, events, config };
 }
 
-test("code offices act on the opening papers as on papers made in a run: claims decided in their time, complaints heard, permits decided, invoices paid, a review answered", async () => {
+test("code offices act on the opening papers as on papers made in a run: complaints heard, permits decided, invoices paid, a review answered", async () => {
   const config = generate(town({ opening_caseload: true, opening_caseload_scale_bps: 1_000_000 })) as any;
   const born = ofOthers(config);
   const { recs, events } = await run(config, 30);
-  const PROCESSING = 6; // (au-vic-2026: frictions.support.processing_days)
-  // Support: a claim in hand (no decision on file) is decided once its time has run, not before and not twice, and its claimant does not claim again.
-  const inHand = born.filter((r: any) => r.kind === "benefit_claim" && !born.some((d: any) => d.kind === "benefit_decision" && d.data.claim === r.id));
-  expect(inHand.length).toBeGreaterThan(3);
-  for (const c of inHand) {
-    const ds = recs.filter((r) => r.kind === "benefit_decision" && r.data?.claim === c.id);
-    expect(ds.length, c.id).toBe(1);
-    const due = c.data.since + PROCESSING * DAY;
-    expect(ds[0].at, c.id).toBeGreaterThanOrEqual(Math.max(0, due));
-    expect(ds[0].at, c.id).toBeLessThan(Math.max(0, due) + 2 * DAY);
-    expect(recs.filter((r) => r.kind === "benefit_claim" && r.speaks_for === c.speaks_for && r.data?.payment === c.data.payment).length, `${c.speaks_for} claims again`).toBe(0);
-  }
+  // Support: no claim is in hand when the year begins (the office decides what it has the day it sees it: foundations F6, which took out the
+  // processing time that kept claims waiting); what is on its desk is the reviews asked for of refusals, below.
+  expect(born.filter((r: any) => r.kind === "benefit_claim" && !born.some((d: any) => d.kind === "benefit_decision" && d.data.claim === r.id)).length).toBe(0);
   // Support: a refusal asked about is answered; a refusal already decided is not decided again.
   const refused = born.filter((r: any) => r.kind === "benefit_decision" && r.data.granted === false);
   expect(refused.length).toBeGreaterThan(3);
