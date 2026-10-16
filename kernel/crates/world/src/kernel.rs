@@ -12,7 +12,7 @@
 use crate::blocks::{Block, Id};
 use crate::canon;
 use crate::config::{cell_id, terrain_at, LoadedConfig, ParticipantKind, SELF};
-use crate::events::{EventBody, RefusalCode, Timed};
+use crate::events::{EventBody, RefusalCode, Timed, VacateReason};
 use crate::exec::{can_act, exec_action, refuse, schedule_birthday, scheduled, Refusal};
 use crate::rng::Randomness;
 use crate::state::{Account, Body, Cell, Counters, Entity, Outcome, OutcomeStatus, Participant, ParticipantDef, ParticipantStatus, Position, RefusalInfo, State, Structure};
@@ -45,6 +45,13 @@ pub enum Command {
         thinking: Option<i64>,
     },
     Advance {
+        to: i64,
+    },
+    /// `Advance`, but it stops at the moment something happens to a person's body (a condition begun, ended or
+    /// treated, or one flooded out of where they were), after everything scheduled for that moment: the clock is
+    /// then at that moment, not at `to`. So the news reaches the person when it happens, whoever else happens to
+    /// wake next (foundations F7: a pilot and its code twin differ only where a seat decides differently).
+    AdvanceToNews {
         to: i64,
     },
     Observe {
@@ -576,7 +583,7 @@ impl World {
                     }
                 }
             }
-            Command::Advance { to } => {
+            Command::Advance { to } | Command::AdvanceToNews { to } => {
                 if *to < self.state.t {
                     return perr(format!("cannot advance to {to}: the clock is at {}", self.state.t));
                 }
@@ -619,7 +626,8 @@ impl World {
     pub fn apply_prechecked(&mut self, cmd: &Command) -> Result<Output, ProtocolError> {
         Ok(match cmd {
             Command::Act { participant, position, blocks, by, thinking, .. } => self.begin(participant, position.as_deref(), blocks, by, thinking.unwrap_or(0)),
-            Command::Advance { to } => self.advance(*to),
+            Command::Advance { to } => self.advance(*to, false),
+            Command::AdvanceToNews { to } => self.advance(*to, true),
             // (What a participant perceives is perception's to build, read-only; the engine then has the world deliver it.)
             Command::Observe { .. } | Command::Look { .. } => return perr("observing is the engine's: perception builds it, and the world delivers it"),
             Command::EntityRecord { participant, entity, set, because } => {
@@ -1008,16 +1016,29 @@ impl World {
         Output { events: vec![ev] }
     }
 
-    fn advance(&mut self, to: i64) -> Output {
+    fn advance(&mut self, to: i64, stop_at_body_news: bool) -> Output {
         let mut events = vec![];
+        // (The moment body news came at, in an advance that stops there: what is scheduled for that moment is still done.)
+        let mut news_at: Option<i64> = None;
         while self.state.schedule.first().is_some_and(|x| x.at <= to) {
+            if news_at.is_some_and(|n| self.state.schedule.first().is_some_and(|x| x.at > n)) {
+                return Output { events };
+            }
             let item = self.state.schedule.pop_first().unwrap();
             self.state.t = item.at;
+            let from = events.len();
             match item.what {
                 crate::state::Sched::Act { action, participant, position, blocks, by, placed } => events.extend(self.act(action, &participant, position.as_deref(), &blocks, &by, placed).events),
                 crate::state::Sched::Start { action, participant, position, done, seq, checks, placed } => events.extend(self.start_check(action, &participant, position.as_deref(), done, seq, &checks, &placed).events),
                 _ => events.extend(scheduled(&self.s, &mut self.state, item)),
             }
+            if stop_at_body_news && news_at.is_none() && events[from..].iter().any(|e| is_body_news(&e.event.body)) {
+                news_at = Some(self.state.t);
+            }
+        }
+        if let Some(n) = news_at {
+            self.state.t = n;
+            return Output { events };
         }
         self.state.t = to;
         Output { events }
@@ -1044,6 +1065,10 @@ impl World {
                 outcomes.append(&mut x.outcomes);
                 inbox.append(&mut x.inbox);
                 visits.append(&mut x.visits);
+                // (A question still out, or an answer not yet looked through, stays: it is not something delivered.)
+                if !x.asked.is_empty() || !x.asks.is_empty() {
+                    p.pending.insert(k, crate::state::Pending { asked: x.asked, asks: x.asks, ..Default::default() });
+                }
             }
         }
         outcomes.sort_by(|a, b| (a.t, &a.action).cmp(&(b.t, &b.action)));
@@ -1074,11 +1099,103 @@ impl World {
         events
     }
 
+    /// The questions a look puts to a register's keeper (a channel of `way: ask` whose keeper is an organisation with
+    /// someone to answer, and a row in the world's table of work for answering; foundations F11): each is answered by the
+    /// keeper's performer, in the keeper's time, and its asker is given the answer with the observation after it is done.
+    /// A question the keeper cannot be said to take time over (no one in its posts who can answer, no row for the kind of
+    /// performer it has) is answered at once, as before. Returns the events, and which of `looks` are put off (they are
+    /// not answered now).
+    pub fn begin_asks(&mut self, participant: &str, looks: &[crate::config::LookRequest]) -> (Vec<Timed>, Vec<bool>) {
+        use crate::config::{ChannelKind as K, Way};
+        let mut events = vec![];
+        let mut put_off = vec![false; looks.len()];
+        for (i, l) in looks.iter().enumerate() {
+            let (key, id, channels) = match l.channel.split_once('/') {
+                None => (SELF.to_string(), l.channel.as_str(), self.state.participants[participant].def.channels.clone()),
+                Some((pos, id)) => match self.state.positions.get(pos) {
+                    Some(x) => (pos.to_string(), id, x.channels.clone()),
+                    None => continue,
+                },
+            };
+            let Some(K::Records { way: Way::Ask, of: Some(keeper), .. }) = channels.iter().find(|c| c.id == id).map(|c| c.kind.clone()) else { continue };
+            // The keeper's performer: of those who hold its posts and are there to answer, the one who is done soonest.
+            let t = self.state.t;
+            let mut best: Option<(i64, i64, Id, i64)> = None; // (done, start, performer, seconds)
+            for post in self.state.positions_of.get(&keeper).into_iter().flatten() {
+                let Some(holder) = self.state.positions.get(post).and_then(|x| x.holder.clone()) else { continue };
+                let Some(p) = self.state.participants.get(&holder) else { continue };
+                if p.status != ParticipantStatus::Active {
+                    continue;
+                }
+                let (tl_key, lanes, actor) = match p.kind {
+                    ParticipantKind::Person => {
+                        let Some(person) = p.person.clone() else { continue };
+                        if !self.state.body(&person).is_some_and(|b| b.alive) {
+                            continue;
+                        }
+                        (person, 1, oikos_time::Actor::Person)
+                    }
+                    ParticipantKind::System => (holder.clone(), p.def.lanes.unwrap_or(1) as usize, oikos_time::Actor::System),
+                };
+                let seconds = self.s.act_times.row(actor, &format!("answer/{id}")).or_else(|| self.s.act_times.row(actor, "answer"));
+                let Some(seconds) = seconds.filter(|s| *s > 0) else { continue };
+                let mut lanes_now = self.state.timelines.get(&tl_key).map(|x| x.lanes.clone()).unwrap_or_default();
+                let (start, done) = oikos_time::place(&mut lanes_now, lanes, t, seconds);
+                if best.as_ref().is_none_or(|b| (done, &holder) < (b.0, &b.2)) {
+                    best = Some((done, start, holder, seconds));
+                }
+            }
+            let Some((_, _, performer, seconds)) = best else { continue };
+            let p = &self.state.participants[&performer];
+            let (tl_key, lanes) = match p.kind {
+                ParticipantKind::Person => (p.person.clone().unwrap_or_else(|| performer.clone()), 1),
+                ParticipantKind::System => (performer.clone(), p.def.lanes.unwrap_or(1) as usize),
+            };
+            let mut timeline = self.state.timelines.get(&tl_key).cloned().unwrap_or_default();
+            let (starts, done) = oikos_time::place(&mut timeline.lanes, lanes, t, seconds);
+            self.state.timelines.insert(tl_key, timeline);
+            let position = (key != SELF).then(|| key.clone());
+            self.state.schedule(done, crate::state::Sched::Answer { participant: participant.into(), position: position.clone(), look: l.clone() });
+            Arc::make_mut(self.state.participants.get_mut(participant).unwrap()).pending.entry(key.clone()).or_default().asked.push(l.channel.clone());
+            events.push(Timed::new(t, EventBody::AskStarted { participant: participant.into(), position, channel: l.channel.clone(), keeper, by: performer, starts, done }));
+            put_off[i] = true;
+        }
+        (events, put_off)
+    }
+
+    /// The questions to a register's keeper that have been answered for a participant (in the capacities it would observe in),
+    /// taken: they are looked through with the observation they come with.
+    pub fn take_asks(&mut self, participant: &str, only: Option<&str>) -> Vec<crate::config::LookRequest> {
+        let Some(p) = self.state.participants.get(participant) else { return vec![] };
+        if !p.pending.iter().any(|(k, x)| only.is_none_or(|o| o == k.as_str()) && !x.asks.is_empty()) {
+            return vec![];
+        }
+        let p = Arc::make_mut(self.state.participants.get_mut(participant).unwrap());
+        let keys: Vec<Id> = p.pending.keys().filter(|k| only.is_none_or(|o| o == k.as_str())).cloned().collect();
+        let mut out = vec![];
+        for k in keys {
+            if let Some(x) = p.pending.get_mut(&k) {
+                out.append(&mut x.asks);
+                if x.is_empty() {
+                    p.pending.remove(&k);
+                }
+            }
+        }
+        out
+    }
+
+    /// The channels a participant has put a question to a keeper through that is not yet answered (in the capacities it would observe in).
+    pub fn asking(st: &State, participant: &str, only: Option<&str>) -> Vec<Id> {
+        let mut out: Vec<Id> = st.participants.get(participant).into_iter().flat_map(|p| p.pending.iter()).filter(|(k, _)| only.is_none_or(|o| o == k.as_str())).flat_map(|(_, x)| x.asked.iter().cloned()).collect();
+        out.sort();
+        out
+    }
+
     /// The outcomes and messages waiting for a participant in the capacities it would observe in, in the order
     /// `deliver` hands them over; nothing is handed over.
-    /// Is what a visit found waiting for a participant (in the capacities it would observe in)?
+    /// Is what a visit found, or the answer to a question put to a keeper (or a question still out), waiting for a participant (in the capacities it would observe in)?
     pub fn visited_waiting(st: &State, participant: &str, only: Option<&str>) -> bool {
-        st.participants.get(participant).is_some_and(|p| p.pending.iter().any(|(k, x)| only.is_none_or(|o| o == k.as_str()) && !x.visits.is_empty()))
+        st.participants.get(participant).is_some_and(|p| p.pending.iter().any(|(k, x)| only.is_none_or(|o| o == k.as_str()) && (!x.visits.is_empty() || !x.asks.is_empty() || !x.asked.is_empty())))
     }
 
     pub fn waiting(st: &State, participant: &str, only: Option<&str>) -> (Vec<Outcome>, Vec<crate::state::Message>) {
@@ -1099,6 +1216,14 @@ impl World {
 pub fn known_field(f: &str) -> bool {
     matches!(f, "id" | "record" | "kind" | "at" | "author" | "speaks_for" | "basis" | "claim" | "holder")
         || f.strip_prefix("data.").or_else(|| f.strip_prefix("about.")).is_some_and(|p| !p.is_empty() && p.split('.').all(|x| !x.is_empty()))
+}
+
+/// News the engine wakes someone for, which happens at no wake of anyone's (so an advance would carry the clock past it to the next
+/// wake): something happened to a person's own body (a condition begun, ended or treated, or flooded out of where they were:
+/// `News::Body`), or a keeper has answered an office's question (`News::Answered`, foundations F11). An advance that stops at it
+/// has the news met when it happens, whoever wakes next.
+pub fn is_body_news(b: &EventBody) -> bool {
+    matches!(b, EventBody::ConditionBegan { .. } | EventBody::ConditionEnded { .. } | EventBody::ConditionTreated { .. } | EventBody::Vacated { reason: VacateReason::Flooded, .. } | EventBody::AskAnswered { position: Some(_), .. })
 }
 
 /// Each performer's hours in the work an act did (one `Worked` event each, a share a performer: the labour split

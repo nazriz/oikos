@@ -13,7 +13,7 @@ import type { Offer, StatementRecord } from "../contracts";
 import { cents } from "../money";
 import { dateWords } from "../forms";
 import { params, type BehaviourModule, type ParticipantContext } from "../module";
-import type { Rng } from "../rng";
+import { slip, type Slipper } from "../slip";
 import { because, Book, CounterWork, DAY, noting, Occurrences, say, StandingWork, type Step, usd } from "./common";
 import { stepper } from "./firms";
 import { PAPER, responseTo, type Finding, type Matter } from "./frictions";
@@ -32,9 +32,6 @@ export interface HearingParams {
   hears: Hears[];
   /** The other side's time to answer. */
   answer_days: number;
-  /** Where the record cannot settle it (one side's word against the other's): how often it finds for the applicant,
-   * by matter (`other` for the rest). The profile's, where a venue's own figures give it. */
-  uphold_bps: { [matter: string]: number };
   /** An order to pay or to do: within this long. */
   within_days: number;
   /** Matters it passes to whoever must act: the office, and the kind of paper that office takes. */
@@ -47,7 +44,7 @@ export interface HearingParams {
      * a plan is taken away once so many months' rent are owed. */
     notice_days?: number; plan_consider?: "may" | "must" | "none"; plan_barred_rent_months?: number };
 }
-export const HEARING_DEFAULTS: HearingParams = { hears: [], answer_days: 14, uphold_bps: { other: 5_000 }, within_days: 28, refer_to: {} };
+export const HEARING_DEFAULTS: HearingParams = { hears: [], answer_days: 14, within_days: 28, refer_to: {} };
 
 /** The offer a venue publishes: who it is, what it hears, what applying costs. */
 export function hearingOffer(me: string, hears: Hears[], o: { fee?: number; account?: string; members_of?: string } = {}): Offer {
@@ -77,7 +74,9 @@ export class Hearings {
   readonly waits: number[] = [];
   constructor(
     private readonly me: string,
-    private readonly rng: (purpose: string) => Rng,
+    /** Whoever hears: where the record cannot settle a case (one side's word against the other's) it finds for the applicant at the
+     * rate of the world's table of slips for a venue's decision (`publish/venue_decision`, foundations F7). */
+    private readonly ctx: Slipper,
     readonly p: HearingParams,
     private readonly forms: { application: string[]; notice: string; response: string; decision: string } = { application: [PAPER.application], notice: PAPER.notice, response: PAPER.response, decision: PAPER.decision },
     /** Kinds the venue's own code hears itself (a tribunal's older lists): left alone here. */
@@ -111,7 +110,7 @@ export class Hearings {
         const c = n.data?.case as Case | undefined;
         if (!c) continue;
         const claimed = c.data.amount !== undefined ? cents(c.data.amount) : 0;
-        const upheld = this.rng(`uphold-${this.nth.key(c.id, c.applicant, c.against, c.matter)}`).below(10_000) < (this.p.uphold_bps[c.matter] ?? this.p.uphold_bps.other ?? 5_000);
+        const upheld = slip(this.ctx, "publish/venue_decision", this.nth.key(c.id, c.applicant, c.against, c.matter));
         const binding = (c.hears.can ?? ["order"]).includes("order"), due = t + this.p.within_days * DAY;
         const finding: Finding = !upheld ? "dismissed" : claimed > 0 ? "pay" : c.hears.undoes && c.data.about ? "set_aside" : "do";
         this.count(finding);
@@ -284,7 +283,7 @@ export class Hearings {
               { to: [this.me], visible: [this.me], basis: c.id, data: { application: c.id, matter: c.matter, applicant: c.applicant, against: c.against, case: c } })));
           continue;
         }
-        const upheld = !r || shown || this.rng(`uphold-${this.nth.key(c.id, c.applicant, c.against, c.matter)}`).below(10_000) < (this.p.uphold_bps[c.matter] ?? this.p.uphold_bps.other ?? 5_000);
+        const upheld = !r || shown || slip(this.ctx, "publish/venue_decision", this.nth.key(c.id, c.applicant, c.against, c.matter));
         finding = !upheld ? "dismissed" : claimed > 0 ? "pay" : c.hears.undoes && c.data.about ? "set_aside" : "do";
         amount = upheld ? claimed : 0;
         why = r ? `${c.against} cannot say from its records; ${shown ? "the applicant has shown a paper for it" : upheld ? "on what both say, the applicant's account is made out" : "the applicant has nothing to show for it, and it is not made out"}` : `${c.against} did not answer: the applicant's account stands`;
@@ -325,7 +324,6 @@ export const desk: BehaviourModule = {
       title: "desk", // what it calls itself in its notice
       hears: [] as Hears[],
       answer_days: HEARING_DEFAULTS.answer_days,
-      uphold_bps: HEARING_DEFAULTS.uphold_bps,
       within_days: HEARING_DEFAULTS.within_days,
       refer_to: {} as HearingParams["refer_to"],
       fee: 0, // what applying costs (none: nothing), paid into `account`
@@ -340,7 +338,7 @@ export const desk: BehaviourModule = {
     const counter = new CounterWork(routines, !!p.counter);
     const me = ctx.entity;
     const book = new Book();
-    const hearings = new Hearings(me, ctx.rng, { hears: p.hears, answer_days: p.answer_days, uphold_bps: { ...HEARING_DEFAULTS.uphold_bps, ...p.uphold_bps }, within_days: p.within_days, refer_to: p.refer_to });
+    const hearings = new Hearings(me, ctx, { hears: p.hears, answer_days: p.answer_days, within_days: p.within_days, refer_to: p.refer_to });
     let said = false;
     return noting(book, stepper(
       (obs) => void book.absorb(obs),

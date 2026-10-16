@@ -13,8 +13,11 @@ const pension: PaymentRule = { id: "pension", payer: "outside", account: "acc-o"
 const law = statement("law-support", 0, "law", { speaks_for: "outside", data: { support: "payments", payments: [pension] } });
 const claim = (id: string, at: number, who: string) => statement(id, at, "benefit_claim", { speaks_for: who, addressed_to: ["outside"], visible_to: [who, "outside"], data: { payment: "pension", account: `acc-${who}`, born_at: at - 70 * YEAR } });
 const office = (params: object = {}, dial?: number) => {
-  const c: any = context("outside-support-system", "outside", { account: "acc-o", ...params });
+  // (How often a decision is wrong is the world's table of slips, foundations F7: `error_bps` here stands for its row.)
+  const { error_bps, ...rest } = params as { error_bps?: number };
+  const c: any = context("outside-support-system", "outside", { account: "acc-o", ...rest });
   if (dial !== undefined) c.world = { ...c.world, dials: { friction_bps: dial } };
+  if (error_bps !== undefined) c.world = { ...c.world, slip: { person: { "publish/benefit_decision": { bps: error_bps, friction: true } } } };
   const m = transfers.create(c);
   const ids = { n: 0 };
   const records: any[] = [law]; // (shown at the first wake, then what it said comes back)

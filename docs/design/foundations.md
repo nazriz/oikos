@@ -3,7 +3,7 @@
 **Status:** a plan, approved by the owner (Naz, 2026-10-15): the three questions in section 8 are answered, all yes
 (decisions log, 2026-10-15, "Foundations: approved"). Step F0 is built (the laws as tests, and the inventory of what is
 deleted: `kernel/tests/foundations.rs`, `orchestrator/test/foundations-laws.test.ts`, `orchestrator/test/fixtures/foundations-inventory.json`);
-F1 to F6 are built (decisions log, 2026-10-15 and 16, "Foundations F1", "F2", "F3", "F4", "F5", "F6"); F7 onward is not. Earlier: the kernel changes in it come back to him before any code is written. His direction (Naz, 2026-10-15, close to his words): the platform must be very generalisable; stop
+F1 to F7 and F11 are built (decisions log, 2026-10-15 and 16, "Foundations F1", "F2", "F3", "F4", "F5", "F6", "F7"); F8 to F10 are not. Earlier: the kernel changes in it come back to him before any code is written. His direction (Naz, 2026-10-15, close to his words): the platform must be very generalisable; stop
 fixing one case at a time ("office work doesn't cost staff time", "systems can't do tasks", "no vendors or
 tenders"); "every single piece of work should cost time, and that should be enforced at the kernel level or the
 platform level ... it should just be at the foundational level how the world operates". He agreed to an audit and a
@@ -199,6 +199,7 @@ answering an ask is the keeper's work and takes the keeper's time (section 2.7).
 
 - **Today.** Enforced (`config.rs`, `check_channels`; the backstop `orchestrator/test/no-god-view.test.ts`). An ask
   is answered at once at no cost to the keeper; how many a keeper answers is a cap (`most`; `knowing.md` 114).
+- **Built (F11, 2026-10-16).** `docs/design/knowing.md` section 12 says what was built and what is left out.
 - **Changes.** An answer is the keeper's work: a row in the table (seconds per answer), charged to the keeper's named
   performer (a clerk, or a registry's system). The kernel answers when that performer is free, so a registry with one
   clerk answers slowly, and one with a system fast. This is what makes data matching between offices (Robodebt) cost

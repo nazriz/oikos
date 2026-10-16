@@ -622,9 +622,20 @@ impl Kernel {
                 // Visits begin (the world's: they take the looker's time); the rest is perceived now. (A visit begun
                 // is on its looker's timeline: nothing made ready is kept.)
                 let mut events = self.world.begin_visits(participant, looks);
+                // Questions to a register's keeper are answered in the keeper's time (foundations F11): those put off are not
+                // looked through now, and come with the observation after the keeper has answered.
+                let (asked, put_off) = self.world.begin_asks(participant, looks);
+                events.extend(asked);
                 if !events.is_empty() {
                     self.unplan();
                 }
+                let now: Vec<LookRequest>;
+                let looks = if put_off.iter().any(|x| *x) {
+                    now = looks.iter().zip(&put_off).filter(|(_, off)| !**off).map(|(l, _)| l.clone()).collect();
+                    &now[..]
+                } else {
+                    &looks[..]
+                };
                 let mut out = self.observe(participant, only.as_deref(), looks);
                 events.append(&mut out.events);
                 Ok(Output { events, ..out })
@@ -650,6 +661,10 @@ impl Kernel {
     }
 
     fn observe(&mut self, participant: &str, only: Option<&str>, looks: &[LookRequest]) -> Output {
+        // The answers a keeper has given to its questions since (foundations F11) are looked through with this observation.
+        let answered = self.world.take_asks(participant, only);
+        let looks: Vec<LookRequest> = if answered.is_empty() { looks.to_vec() } else { looks.iter().cloned().chain(answered).collect() };
+        let looks = &looks[..];
         // One made ready for exactly this (an observation with nothing asked for) is delivered as it is; a look with
         // something asked for is built now, and whatever was made ready for the participant is let go.
         let ready = self.take_ready(participant, only).filter(|_| looks.is_empty());
@@ -662,7 +677,7 @@ impl Kernel {
         }
         let (obs, seen, drained) = observe::observe(self.world.statics(), self.world.state(), &mut self.index, participant, only, looks);
         let (outcomes, inbox, visits) = self.world.deliver(participant, only, seen, drained);
-        let mut obs = Observation { outcomes, inbox, ..obs };
+        let mut obs = Observation { outcomes, inbox, asking: oikos_world::World::asking(self.world.state(), participant, only), ..obs };
         // What its visits found, through the channel each was asked through (a later one over an earlier).
         for v in visits {
             match obs.channels.get_mut(&v.channel) {

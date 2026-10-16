@@ -38,6 +38,10 @@ pub struct Observation {
     pub inbox: Vec<Message>,
     pub drafts: Vec<Value>,
     pub channels: BTreeMap<Id, ChannelData>,
+    /// The channels this participant (in the capacities this observation covers) has put a question to a keeper through,
+    /// not yet answered (foundations F11): the answer comes with an observation of its own, when the keeper has done it.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub asking: Vec<Id>,
     /// Readings of the agreements this observation brings (an agreement, or a signature or notice on one), by their own
     /// terms (contracts 0.7; docs/design/rebuild.md section 7): beside the records, never in their place.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty", skip_deserializing)]
@@ -1103,6 +1107,7 @@ fn build(s: &Statics, st: &State, index: &RecordIndex, participant: &str, mode: 
         inbox: vec![],
         drafts: vec![],
         channels,
+        asking: vec![],
         readings,
     };
     (obs, looks, drained)

@@ -85,7 +85,10 @@ const LIVING = "living.initiative_bps=10000";
 // (Re-taken on 2026-10-15 at foundations F3; ff96bf60... until then. docs/decisions.md, "Foundations F3".)
 // (Re-taken on 2026-10-15 at foundations F4: the same reason as living-dial.test.ts's step 1; 90b19b40... until then.)
 // (Re-taken on 2026-10-16 at foundations F5: the town's offices are held by people, their staff hired, its systems delivered from templates that say what they do; fd6c525e... until then.)
-const STEP_2B = "c36fb13611d9afb96a5c6948828931f1f5f6e2a16702a179b7fa70cf5c3cbdb5";
+// (Re-taken on 2026-10-16 at foundations F7: news of a person's body reaches them when it happens, not at the next wake; c36fb136... until then.)
+// (Re-taken again on 2026-10-16 at foundations F7: how often a decision, a bill or a pay goes wrong is a row of the table of slips and drawn by slip(), from streams of other names; f8b4c87e... until then.)
+// (Re-taken again on 2026-10-16 at foundations F11: a register's keeper answers in its own time; e52dc970... until then.)
+const STEP_2B = "f28ffd82124a874cd36d60b74b259e150602f750865d57e497cd3b0981e77389";
 
 test("with founding off a living town is step 2b's town, to the state hash; turned on with no shape to found, nobody does anything they did not do before", async () => {
   const out = mkdtempSync(join(tmpdir(), "oikos-founding-"));
@@ -125,7 +128,9 @@ test("founding in code: with the composer off no model is called; a founded thin
     // (Seed 6 from 2026-10-15, foundations F1: the world differs again; of seeds 1 to 8 only 6 has two or more who share the want that founds.)
     // (Seed 7 from 2026-10-13, hours before heads: the world differs, and seeds 2 and 5 now have one person who shares the want that founds. Which seed has two or more is a matter of draws, not of the rule.)
     // (Seed 1 from 2026-10-16, foundations F6: the world differs again; of seeds 1 to 16 only 1 and 3 have two who share the want that founds. Every other has one.)
-    const s = await runWorld({ config: { ...config, seed: 1 }, runId: "code", outDir: out, until: 205 * DAY, recordObservations: "none" });
+    // (Seed 3 from 2026-10-16, foundations F7: news of a body reaches a person when it happens, so the course differs again; of seeds 1 to 16 only 3, 10 and 11 have two who share the want that founds.)
+    // (Seed 2 from 2026-10-16, foundations F11: a register's keeper answers in its own time, and an office's slip rates are its systems' too, so the course differs; of seeds 1 to 16 only 2 and 5 have two who share the want that founds. Seed 3 held through foundations F7.)
+    const s = await runWorld({ config: { ...config, seed: 2 }, runId: "code", outDir: out, until: 205 * DAY, recordObservations: "none" });
     expect(s.composer).toBeUndefined();
     const log = readFileSync(s.logPath, "utf8");
     // No model anywhere: not a usage entry, not a transcript.

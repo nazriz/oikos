@@ -11,7 +11,7 @@ import * as C from "../calls";
 import type { StatementRecord } from "../contracts";
 import { params, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
 import { moneyNow } from "../money";
-import { because, Book, breaches, noting, DAY, MONTH, offer, pay, say, type Step } from "./common";
+import { because, Book, breaches, noting, DAY, MONTH, offer, pay, say, startsOn, type Step } from "./common";
 import { hearingNotice, hearingOffer, Hearings, HEARING_DEFAULTS, type Hears } from "./desk";
 import { stepper } from "./firms";
 import * as P from "./papers";
@@ -84,7 +84,7 @@ export const organiser: BehaviourModule = {
     const handled = new Set<string>();
     // A member's grievance taken up with their employer: put to the employer, and what the union then says should
     // be done is a recommendation with the union behind it, not an order.
-    const cases = p.hears.length ? new Hearings(me, ctx.rng, { ...HEARING_DEFAULTS, hears: p.hears.map((h) => ({ ...h, can: ["represent"] as Hears["can"] })), answer_days: p.answer_days }) : undefined;
+    const cases = p.hears.length ? new Hearings(me, ctx, { ...HEARING_DEFAULTS, hears: p.hears.map((h) => ({ ...h, can: ["represent"] as Hears["can"] })), answer_days: p.answer_days }) : undefined;
     let saidHears = false;
     // When each workplace's first claim is due: those known at our first plan are spread over `first_claim_days`; one
     // we learn of later (a member starts there, or joins from there), from then.
@@ -255,7 +255,6 @@ export const organiser: BehaviourModule = {
             // A stoppage starts with a day: the first to begin once the notice has run. (Until 2026-10-06 it started to
             // the second, counted from when we decided; the notice is on the record a moment later, so one given on
             // exactly the law's period was short of it by that moment: the landlord's fault of 0.12.1, here.)
-            const startsOn = (at: number, lead: number) => (Math.floor((at + lead) / DAY) + 1) * DAY;
             let lead = p.notice_days * DAY;
             let broken = breaches(book, act(startsOn(t, lead)), me, t);
             while (broken.length && lead < (p.notice_days + 30) * DAY) broken = breaches(book, act(startsOn(t, (lead += DAY))), me, t);

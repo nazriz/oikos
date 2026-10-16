@@ -15,6 +15,15 @@ export const DAY = 86_400;
 export { firstDue };
 export const MONTH = 30 * DAY;
 
+/** How long a notice takes to be given once it is sent (foundations F7, 2026-10-16): the act of publishing it takes the publisher's time (a quarter of an hour
+ * in the world's table), and it waits behind what the publisher has in hand; the paper is on the record, with its time, when that is done. A date counted from
+ * the moment of sending is short of the law's notice by that, for one sent in the last minutes of a day. */
+export const NOTICE_LAG = 3_600;
+
+/** The day a change begins that a notice of `lead` seconds is given for, sent at `at`: the first day to begin once the notice has run, counted from when it is on
+ * the record, which is a little after it is sent (`NOTICE_LAG`). */
+export const startsOn = (at: number, lead: number): number => (Math.floor((at + NOTICE_LAG + lead) / DAY) + 1) * DAY;
+
 type Claim = Extract<Record, { record: "claim" }>;
 
 /** What a claim can be looked up by (`Book.claimsBy`): who holds it, who it's against, or what it's about. */

@@ -215,8 +215,11 @@ fn next(session: &mut Session, req: &Value) -> Result<Reply, String> {
             Ok(Reply::Value(v))
         }
         crate::schedule::Next::Advance { to } => {
-            let resp = r.command(&Command::Advance { to }).map_err(|e| e.to_string())?;
-            s.note_events(Some(r.kernel().state()), &resp.events, r.kernel().t());
+            // (Time moves on to the next wake, or to the moment something happens to a person's body if that comes first: the
+            // news reaches them then, not at whichever wake follows.)
+            let resp = r.command(&Command::AdvanceToNews { to }).map_err(|e| e.to_string())?;
+            let to = r.kernel().t();
+            s.note_events(Some(r.kernel().state()), &resp.events, to);
             let mut line = Vec::with_capacity(64 + resp.logged.iter().map(|b| b.len() + 1).sum::<usize>());
             line.extend_from_slice(format!("{{\"advanced\":{to},\"events\":").as_bytes());
             write_events(&resp, &mut line)?;

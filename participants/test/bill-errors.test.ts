@@ -14,8 +14,11 @@ const CUSTOMERS = ["c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8"];
 /** The retailer, with a dial and parameters; woken every 30 days for a year, each customer asking to be supplied at the
  * start. Returns the bills it sent, and a way to wake it again with more on its file. */
 function retailer(params: object = {}, dial?: number) {
-  const base: any = context(`${ME}-system`, ME, { ...PARAMS, ...params }, { position: `${ME}-office` });
+  // (How often a bill is wrong is the world's table of slips, foundations F7: `billing_error_bps_per_year` here stands for its row.)
+  const { billing_error_bps_per_year: rate, ...rest } = params as { billing_error_bps_per_year?: number };
+  const base: any = context(`${ME}-system`, ME, { ...PARAMS, ...rest }, { position: `${ME}-office` });
   if (dial !== undefined) base.world = { ...base.world, dials: { friction_bps: dial } };
+  if (rate !== undefined) base.world = { ...base.world, slip: { person: { "publish/invoice/metered_bill": { bps: rate, per: "year", friction: true } } } };
   const m = energy.create(base);
   const ids = { n: 0 };
   const books = { kind: "accounts", accounts: [{ account: `acc-${ME}`, holder: ME, custodian: "bank", currency: "XTS", balance: "100000000" }], transactions: [] };

@@ -212,7 +212,9 @@ impl<W: Write> Run<W> {
             logged.push(self.log.append_as(timed.t, Kind::Event, &timed.event)?.1);
             events_logged.push(timed.event);
         }
-        if let Command::Advance { to } = cmd {
+        if matches!(cmd, Command::Advance { .. } | Command::AdvanceToNews { .. }) {
+            // (Where the clock is now: an advance that stops at body news has not gone as far as it was asked.)
+            let to = self.kernel.t();
             if to / self.checkpoint_every > from / self.checkpoint_every {
                 self.checkpoint()?;
             }

@@ -90,6 +90,9 @@ export interface WorldInfo {
   currency: Currency;
   /** Dials of a living world (docs/design/ai-citizens.md 10j), as the world's config sets them. Absent: every dial is off. */
   dials?: { [name: string]: unknown };
+  /** The world's table of slips (`orchestration.slip`: the rate at which a performer gets a kind of work wrong, with its
+   * source), read only through `slip()` (participants/src/slip.ts). Absent: nothing slips. */
+  slip?: import("./slip").SlipTable;
 }
 
 /**
@@ -99,6 +102,8 @@ export interface WorldInfo {
  */
 export interface ParticipantContext {
   participant: string;
+  /** Whether the participant is a person or a system (absent: a person). The kind of performer decides which row of the table of slips is theirs. */
+  kind?: "person" | "system";
   entity: string;
   position?: string;
   /** The sparse mind (docs/design/ai-citizens.md 4): asking a model how much each option would matter to someone like

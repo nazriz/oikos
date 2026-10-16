@@ -116,7 +116,7 @@ export const retailer: BehaviourModule = {
         // Everyday frictions (docs/behaviour/frictions.md): of those it takes on, the share it pays short and by how
         // much (the world's; none: nobody); and how it answers when asked to put something right, told of a
         // complaint, or ordered to (the world's rates; its character sways them).
-        short_pay: null as { per_year_bps: number; by_bps: number } | null,
+        short_pay: null as { by_bps: number } | null,
         respond: {} as Partial<RespondParams>,
         ...LENGNICK, // Lengnick (2013), Table 1
       },

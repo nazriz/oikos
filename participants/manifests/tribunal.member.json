@@ -67,16 +67,6 @@
       "schema": {},
       "default": null,
       "source": "placeholder"
-    },
-    "uphold_bps": {
-      "schema": {
-        "type": "object"
-      },
-      "unit": "bps",
-      "default": {
-        "other": 5000
-      },
-      "source": "placeholder"
     }
   },
   "perceives": [],

@@ -73,6 +73,8 @@ enum News<'a> {
     Delivered(Vec<&'a str>),
     /// Something happened to this person's own body.
     Body(&'a str),
+    /// A keeper has answered a question put in this capacity of this participant (foundations F11).
+    Answered { participant: &'a str, capacity: &'a str },
     /// A record made (its JSON).
     Recorded(&'a Value),
 }
@@ -279,6 +281,10 @@ impl Scheduler {
                 // (Gone to look at somewhere: busy until back, as with an act.)
                 Some("action_started" | "visit_started") => News::Started { participant: e["participant"].as_str().unwrap_or_default(), capacity: e["as"].as_str(), done: e["free"].as_i64().or(e["done"].as_i64()).unwrap_or(t) },
                 Some("message_delivered") => News::Delivered(e["to"].as_array().into_iter().flatten().filter_map(Value::as_str).collect()),
+                Some("ask_answered") => match (e["participant"].as_str(), e["as"].as_str()) {
+                    (Some(participant), Some(capacity)) => News::Answered { participant, capacity },
+                    _ => continue,
+                },
                 Some("vacated") if e["reason"].as_str() == Some("flooded") => match e["occupant"].as_str() {
                     Some(person) => News::Body(person),
                     None => continue,
@@ -301,6 +307,9 @@ impl Scheduler {
                 EventBody::ActionStarted { participant, position, done, free, .. } => self.news(st, News::Started { participant, capacity: position.as_deref(), done: free.unwrap_or(*done) }, t),
                 EventBody::VisitStarted { participant, position, done, .. } => self.news(st, News::Started { participant, capacity: position.as_deref(), done: *done }, t),
                 EventBody::MessageDelivered { to, .. } => self.news(st, News::Delivered(to.iter().map(String::as_str).collect()), t),
+                // A keeper has answered an office's question: the office is woken to go on from the answer. (Not a person's own unit: someone
+                // asking for themselves has it at their next wake. A wake at the moment it is done moved the hours a person wakes at.)
+                EventBody::AskAnswered { participant, position: Some(position), .. } => self.news(st, News::Answered { participant, capacity: position }, t),
                 EventBody::Vacated { occupant, reason: VacateReason::Flooded, .. } => self.news(st, News::Body(occupant), t),
                 EventBody::ConditionBegan { person, .. } | EventBody::ConditionEnded { person, .. } | EventBody::ConditionTreated { person, .. } => self.news(st, News::Body(person), t),
                 EventBody::Recorded { record } => {
@@ -322,6 +331,10 @@ impl Scheduler {
                 if let Some(u) = key.and_then(|k| self.units.get_mut(&k)) {
                     u.done_at = Some(u.done_at.map_or(done, |d| d.max(done)));
                 }
+            }
+            News::Answered { participant, capacity } => {
+                let keys = self.units_of(participant).filter(|(_, u)| u.capacity.as_deref() == Some(capacity) && u.next_wake > t && !Self::busy(u, t)).map(|(k, _)| k.clone()).collect();
+                self.wake_now(keys, t);
             }
             News::Delivered(to) => {
                 for to in to {
@@ -416,6 +429,24 @@ mod tests {
         assert!(matches!(s.next(7_200, 1_000_000).unwrap(), Next::Advance { to: 10_800 }));
         // Beyond `until`: the end.
         assert!(matches!(s.next(7_200, 9_000).unwrap(), Next::End));
+    }
+
+    #[test]
+    fn an_office_that_asked_is_woken_when_answered_and_a_person_asking_for_themselves_is_not() {
+        // Foundations F11: the capacity that asked is woken when its answer is done; a person's own unit is not (a wake at the moment it
+        // was done moved the hours people wake at).
+        let mut s = Scheduler::new(3600);
+        s.add(&[unit("p|self", 86_400, 0), unit("p|desk", 86_400, 0)]).unwrap();
+        let Next::Cohort(c) = s.next(0, 1_000_000).unwrap() else { panic!() };
+        for (k, _, _) in &c {
+            s.finished(k, None, 0);
+        }
+        let answered = |position: Option<&str>| json!([{ "event": "ask_answered", "participant": "p", "channel": "x", "as": position }]);
+        s.note(None, answered(None).as_array().unwrap(), 100);
+        assert!(matches!(s.next(100, 1_000_000).unwrap(), Next::Advance { to: 86_400 }), "nobody is woken for a person's own question");
+        s.note(None, answered(Some("desk")).as_array().unwrap(), 100);
+        let Next::Cohort(c) = s.next(100, 1_000_000).unwrap() else { panic!("the office is woken") };
+        assert_eq!(c.iter().map(|x| (x.0.as_str(), x.1)).collect::<Vec<_>>(), vec![("p|desk", "news")]);
     }
 
     #[test]

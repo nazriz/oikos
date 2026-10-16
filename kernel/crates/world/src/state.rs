@@ -443,11 +443,18 @@ pub struct Pending {
     /// What its visits found (docs/design/knowing.md), each as of when the looker was there.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub visits: Vec<crate::sites::Visited>,
+    /// Questions to a register's keeper that have been answered (foundations F11): each is looked through again, with
+    /// the observation it comes with, as the register is when it is delivered.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub asks: Vec<crate::config::LookRequest>,
+    /// The channels it has put a question to a keeper through and is not yet answered (each once for each question).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub asked: Vec<Id>,
 }
 
 impl Pending {
     pub fn is_empty(&self) -> bool {
-        self.outcomes.is_empty() && self.inbox.is_empty() && self.visits.is_empty()
+        self.outcomes.is_empty() && self.inbox.is_empty() && self.visits.is_empty() && self.asks.is_empty() && self.asked.is_empty()
     }
 }
 
@@ -700,6 +707,13 @@ pub enum Sched {
         seq: u64,
         checks: Vec<WorkCheck>,
         placed: Placed,
+    },
+    /// A question to a register's keeper being answered (foundations F11): when it is done the asker is given the answer.
+    Answer {
+        participant: Id,
+        #[serde(default, rename = "as", skip_serializing_if = "Option::is_none")]
+        position: Option<Id>,
+        look: crate::config::LookRequest,
     },
     /// A visit in progress (docs/design/knowing.md): when it ends its looker sees what is at these cells.
     Visit {

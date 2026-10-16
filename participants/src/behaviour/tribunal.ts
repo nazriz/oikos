@@ -39,11 +39,10 @@ export const member: BehaviourModule = {
       hearing_after_days: 21, // listed for a hearing this long after it's made (the respondent's time to answer)
       pay_within_days: 28, // an order to pay: within this long
       // Its lists (docs/behaviour/frictions.md, "Venues"): the matters it hears beyond a rent increase, a debt and
-      // a charge (none: it hears those three and says nothing of it, as before); how many such cases a day's
-      // hearings decide; how often it finds for an applicant with nothing to show; what applying costs, and where
-      // the fee is paid.
+      // a charge (none: it hears those three and says nothing of it, as before); what applying costs, and where
+      // the fee is paid. (How often it finds for an applicant with nothing to show is a slip, the world's table of
+      // slips has its rate: foundations F7.)
       hears: [] as Hears[],
-      uphold_bps: HEARING_DEFAULTS.uphold_bps,
       fee: 0,
       account: "",
       // Possession of a let home (docs/behaviour/justice.md, "Possession"), where it hears that: the days from its
@@ -59,7 +58,7 @@ export const member: BehaviourModule = {
     const book = new Book();
     const listed = new Map<string, number>(); // application -> its hearing
     const decided = new Set<string>();
-    const lists = p.hears.length ? new Hearings(me, ctx.rng, { hears: p.hears, answer_days: p.hearing_after_days, uphold_bps: { ...HEARING_DEFAULTS.uphold_bps, ...p.uphold_bps }, within_days: p.pay_within_days, refer_to: {}, ...(p.possession ? { possession: p.possession } : {}) },
+    const lists = p.hears.length ? new Hearings(me, ctx, { hears: p.hears, answer_days: p.hearing_after_days, within_days: p.pay_within_days, refer_to: {}, ...(p.possession ? { possession: p.possession } : {}) },
       { application: ["tribunal_application"], notice: "hearing_notice", response: "tribunal_response", decision: "tribunal_order" }, APPLICATION_KINDS) : undefined;
     const listKinds = new Set(p.hears.map((h) => h.about));
     let said = false;

@@ -14,7 +14,8 @@ import { drawHousehold, drawSavings, type HouseholdSpec } from "./household";
 import { yearsOfSchooling, type SchoolingSpec } from "./school";
 import { forAge, supportLaw, type Declared, type PaymentRule } from "./payments";
 import { incomeTaxLaw, withholding } from "./tax";
-import { frictionDial, Respondent } from "./frictions";
+import { Respondent } from "./frictions";
+import { slip } from "../slip";
 
 export const exportDemand: BehaviourModule = {
   name: "world.export_demand",
@@ -254,7 +255,7 @@ export const transfers: BehaviourModule = {
   routines: [{ task: "pay_claims", at: "office", every: 1, what: "Each working day the office's staff decide the claims that have waited their time, the oldest first: a claim that meets the conditions the support law states for its payment is granted, in writing, and paid each period from then until the claimant asks for it to stop, dies, leaves, or its time runs out, which the staff tell them. A claim that does not meet the conditions, or that the staff could not verify, is not refused by the staff: it is put before whoever holds the office, as a note on the office's file saying what it fails on, and decided by them on the office's decision form; a claim they grant on that form is paid by the staff like any other. A request to review a refusal comes to the office-holder.",
     papers: [{ kind: "benefit_claim", how: "decided by the support law's conditions: granted and paid if it meets them, put before the office-holder if it does not or could not be verified" }, { kind: "benefit_change", how: "a claimant's own request to stop their payment: it is stopped" }] }],
   issues: [...P.SUPPORT, P.REMEDY_ANSWER, ...P.VENUE_ANSWERS],
-  version: "0.8.0", // 0.8.0: no processing time, daily capacity or doubled errors under backlog: it decides every claim it has, and how many is the hours of whoever decides (foundations F6); 0.7.0: a claim made before the year began and still waiting (an opening caseload) is decided when its processing time from that day has run; a claim refused before it is decided; a refusal asked about that the paper says could not be verified is found wrong on review; 0.6.0: payments in force before the year (grants brought forward on paper) are taken up when the file is first opened and paid from the day each names; 0.5.0: run in parts where a model holds the office (part): the staff decide and pay what the law's conditions settle under a standing order (pay_claims) and put a refusal or a doubt before the office-holder, who decides it on the office's decision form and answers reviews; a town run by code is unchanged; 0.4.0: a claim may wait to be decided (processing_days), the staff decide so many a day (capacity_per_day), and some qualifying claims are wrongly refused, more while a backlog stands (error_bps, at the friction dial); asked to review a refusal found wrong, the office decides the next claim on its facts
+  version: "0.9.0", // 0.9.0: the wrong refusals are a slip at the rate of the world's table of slips (foundations F7), not a parameter; 0.8.0: no processing time, daily capacity or doubled errors under backlog: it decides every claim it has, and how many is the hours of whoever decides (foundations F6); 0.7.0: a claim made before the year began and still waiting (an opening caseload) is decided when its processing time from that day has run; a claim refused before it is decided; a refusal asked about that the paper says could not be verified is found wrong on review; 0.6.0: payments in force before the year (grants brought forward on paper) are taken up when the file is first opened and paid from the day each names; 0.5.0: run in parts where a model holds the office (part): the staff decide and pay what the law's conditions settle under a standing order (pay_claims) and put a refusal or a doubt before the office-holder, who decides it on the office's decision form and answers reviews; a town run by code is unchanged; 0.4.0: a claim may wait to be decided (processing_days), the staff decide so many a day (capacity_per_day), and some qualifying claims are wrongly refused, more while a backlog stands (error_bps, at the friction dial); asked to review a refusal found wrong, the office decides the next claim on its facts
   doc: "docs/behaviour/boundary.md",
   cadence: () => DAY,
   firstWake: () => 0,
@@ -264,9 +265,6 @@ export const transfers: BehaviourModule = {
         account: "", // the account it pays from where a payment names none (the world must say)
         year: 365 * DAY,
         publish_every_days: 0,
-        // Mistakes (docs/behaviour/boundary.md, "Mistakes"): of the claims that qualify, this share (basis points) is wrongly
-        // refused, at the friction dial. (How long a claim takes is the hours of whoever decides it, not a number here: foundations F6.)
-        error_bps: 0,
         respond: {} as object,
         // Which part of the office this is (docs/behaviour/standing-work.md): "" the whole office, as code runs it;
         // "seat" whoever holds it; "staff" its staff, who do the routine while a standing order for it is in force.
@@ -279,7 +277,6 @@ export const transfers: BehaviourModule = {
     const me = ctx.entity;
     const book = new Book();
     const decided = new Set<string>();
-    const dial = frictionDial(ctx.world);
     const routines = new StandingWork(me, p.part, ctx.position ? new Set([ctx.position.replace(/-staff$/, "")]) : undefined);
     const TASK = "pay_claims";
     const put = new Map<string, { doubt: boolean; why: string }>(); // claims the staff put before the office-holder (and, for the holder, those it has been shown)
@@ -410,12 +407,10 @@ export const transfers: BehaviourModule = {
           let d = decide(rule, c, t);
           // A claim that qualifies may be wrongly refused (a record not matched, a form read wrongly), unless the refusal of
           // this person's claim for this payment has already been reviewed and found wrong.
-          if (d.ok && dial > 0 && p.error_bps > 0 && !reviewed.has(`${who}|${payment}`)) {
-            const share = Math.min(10_000, p.error_bps);
-            if (ctx.rng(`claim-error-${claimNth.key(c.id, who, payment)}`).below(10_000) < Math.floor((share * dial) / 10_000)) {
-              d = { ok: false, why: "the claim could not be verified" };
-              wronglyRefused.add(c.id);
-            }
+          // (A slip of whoever decides: the world's table of slips has its rate for a decision on a claim, foundations F7.)
+          if (d.ok && !reviewed.has(`${who}|${payment}`) && slip(ctx, "publish/benefit_decision", claimNth.key(c.id, who, payment))) {
+            d = { ok: false, why: "the claim could not be verified" };
+            wronglyRefused.add(c.id);
           }
           // The staff refuse nothing: a claim that does not meet the conditions, or that they could not verify, is
           // put before whoever holds the office, with what it fails on (and, for a doubt, what it would be paid).

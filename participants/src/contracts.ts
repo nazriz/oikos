@@ -215,6 +215,8 @@ export interface Observation {
   drafts: Json[];
   /** The orchestrator's notes about the participant's own requests (not world state); absent when there are none. */
   notices?: { t: number; text: string; re?: string }[];
+  /** The channels it has put a question to a register's keeper through that is not yet answered (foundations F11): the answer comes with an observation of its own, when the keeper has done it. A module that needs the answer waits for it. */
+  asking?: string[];
   /** Readings of records it can see, by record id: their own terms, read mechanically (docs/design/rebuild.md 7). */
   readings?: { [record: Id]: Reading };
   /** Why this wake (contracts 0.7). */

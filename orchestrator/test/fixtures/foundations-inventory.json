@@ -2,23 +2,6 @@
   "about": "F0 (docs/design/foundations.md, 2026-10-15): every special case the plan says the foundations delete or replace, where it stands today. `find` is a literal string in `file` (a glob counts across files); `count` and `lines` are today's. F10's backstop (orchestrator/test/all-work-takes-time.test.ts) reads this file and requires count 0 for every `delete` and `replace` entry by the step named, `history` entries excepted (a decision is never edited). Entries are removed from here by the step that removes the case, with a line in docs/decisions.md.",
   "entries": [
     {
-      "id": "b-support-error-bps",
-      "law": 5,
-      "step": "F7",
-      "kind": "delete",
-      "file": "participants/src/behaviour/world.ts",
-      "find": "error_bps",
-      "what": "world.transfers: the wrong-refusal rate as a module parameter (becomes a row's slip rate)",
-      "plan": "2.5",
-      "count": 4,
-      "lines": [
-        "participants/src/behaviour/world.ts:257",
-        "participants/src/behaviour/world.ts:272",
-        "participants/src/behaviour/world.ts:423",
-        "participants/src/behaviour/world.ts:424"
-      ]
-    },
-    {
       "id": "b-support-staff-refuse-nothing",
       "law": 6,
       "step": "F8",
@@ -30,50 +13,6 @@
       "count": 1,
       "lines": [
         "participants/src/behaviour/world.ts:430"
-      ]
-    },
-    {
-      "id": "b-uphold-draw-desk",
-      "law": 5,
-      "step": "F7",
-      "kind": "replace",
-      "file": "participants/src/behaviour/desk.ts",
-      "find": "uphold-${",
-      "what": "a venue upholds a case it cannot prove at its own rate (drawn outside slip())",
-      "plan": "2.5",
-      "count": 2,
-      "lines": [
-        "participants/src/behaviour/desk.ts:116",
-        "participants/src/behaviour/desk.ts:287"
-      ]
-    },
-    {
-      "id": "b-billing-error",
-      "law": 5,
-      "step": "F7",
-      "kind": "replace",
-      "file": "participants/src/behaviour/utilities.ts",
-      "find": "billing_error_bps_per_year",
-      "what": "billing errors as a module rate (drawn as `bill-error-`)",
-      "plan": "2.5",
-      "count": 2,
-      "lines": [
-        "participants/src/behaviour/utilities.ts:234",
-        "participants/src/behaviour/utilities.ts:346"
-      ]
-    },
-    {
-      "id": "b-short-pay",
-      "law": 5,
-      "step": "F7",
-      "kind": "replace",
-      "file": "participants/src/behaviour/firms.ts",
-      "find": "short-pay-${",
-      "what": "short pay as a module rate (drawn outside slip())",
-      "plan": "2.5",
-      "count": 1,
-      "lines": [
-        "participants/src/behaviour/firms.ts:1620"
       ]
     },
     {

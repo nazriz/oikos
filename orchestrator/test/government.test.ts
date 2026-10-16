@@ -96,7 +96,8 @@ test("an amendment that passes binds: the clerk rewrites the law from the new fi
   expect(obeying.length).toBeGreaterThan(0);
   expect(others.length).toBeGreaterThan(0);
   for (const n of obeying) expect(n.data.from - n.at).toBeGreaterThanOrEqual(75 * DAY);
-  for (const n of others) expect(n.data.from - n.at).toBeLessThan(31 * DAY);
+  // (An hour over the day: a notice is dated to allow for the time it takes to give, 2026-10-16, foundations F7: participants/src/behaviour/common.ts, `NOTICE_LAG`.)
+  for (const n of others) expect(n.data.from - n.at).toBeLessThan(31 * DAY + 3_600);
   // Tenants, unchanged, take the short notices (lawful under the old law) to the tribunal, which finds them invalid
   // under the amended law; nobody applies against the landlord who complied.
   const applications = kind("tribunal_application");
@@ -122,7 +123,7 @@ test("an amendment that fails changes nothing: the law stands, and landlords and
   expect(notices.length).toBeGreaterThan(0);
   for (const n of notices) {
     expect(n.data.from - n.at).toBeGreaterThanOrEqual(30 * DAY);
-    expect(n.data.from - n.at).toBeLessThan(31 * DAY);
+    expect(n.data.from - n.at).toBeLessThan(31 * DAY + 3_600); // (and an hour for the giving: NOTICE_LAG)
   }
   expect(kind("tribunal_application").filter((a) => a.data.kind === "rent_increase")).toEqual([]);
 }, 600_000);

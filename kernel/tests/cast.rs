@@ -516,3 +516,33 @@ fn an_organisation_founded_in_a_run_keeps_a_record_through_the_post_made_with_it
     let e = run.command(&set("carol-self", &plain)).unwrap_err();
     assert!(e.to_string().contains("has no bookkeeping named for its record"), "{e}");
 }
+
+#[test]
+fn an_advance_to_news_stops_at_the_moment_a_body_gives_news_and_not_at_the_next_wake() {
+    // Foundations F7. News of a body (a condition begun) reaches its person when it happens: an advance towards a far wake
+    // stops at that moment (after all that is scheduled for it), so the person's unit wakes then, whoever else wakes next.
+    // `Advance` is as it was: it goes to the time asked.
+    let life = json!({"year": YEAR, "illness": {"by_age": [{"from": 0, "bps": 5000}, {"from": 100, "bps": 0}],
+        "severity": [{"label": "minor", "share_bps": 10000, "days": [1, 3], "fatal_bps": 0}]}});
+    let far = 2 * YEAR - TICK;
+    let mut stops = many(300, life.clone(), false);
+    let (mut now, mut news, mut stopped_early) = (0, 0, 0);
+    while now < far {
+        let r = stops.command(&Command::AdvanceToNews { to: far }).unwrap();
+        let t = stops.kernel().t();
+        assert!(t > now || t == far, "time moves on");
+        let began: Vec<i64> = r.events.iter().filter(|e| matches!(e.body, EventBody::ConditionBegan { .. } | EventBody::ConditionEnded { .. })).map(|_| t).collect();
+        news += began.len();
+        if t < far {
+            stopped_early += 1;
+            // It stopped where the news was: every event of the advance is at or before that moment, and some body's news is among them.
+            assert!(!began.is_empty(), "it stopped at {t} with no news of a body");
+        }
+        now = t;
+    }
+    assert!(stopped_early > 20 && news > 20, "{stopped_early} stops for {news} pieces of news");
+    // The same town, advanced plainly, comes to the same end state: the stops lose and add nothing.
+    let mut plain = many(300, life, false);
+    plain.command(&Command::Advance { to: far }).unwrap();
+    assert_eq!(stops.kernel().state_hash().unwrap(), plain.kernel().state_hash().unwrap());
+}

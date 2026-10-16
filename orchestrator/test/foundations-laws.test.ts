@@ -170,10 +170,12 @@ test("F6: law 2: a generated town sets no throughput or delay as a parameter (th
 // ---------------------------------------------------------------------------------------------------------------------
 
 const BEHAVIOUR = join(root, "participants/src/behaviour");
-/** Streams named for a wrong decision drawn by chance: `ctx.rng("uphold-...")`, `bill-error-`, `short-pay-`, `wrong-`. */
-const CHANCE_OF_WRONG = /\brng\(\s*[`"'](?:uphold|bill-error|short-pay|wrong|slip|error)[-`"'$]/;
+/** Streams named for a wrong decision drawn by chance: a purpose with `uphold`, `error`, `short-pay`, `wrong`, `mistake` or `slip` in it,
+ * drawn by a behaviour module (`ctx.rng("claim-error-...")`, `bill-error-`, `uphold-`). The one place such a draw is made is `slip()`
+ * (participants/src/slip.ts). (A thing that is faulty, or a house that wears, is a fact about the world and not a performer's decision.) */
+const CHANCE_OF_WRONG = /\b(?:rng|chance)\(\s*[`"'][^`"']*(?:uphold|error|short-pay|wrong|mistake|slip)/;
 
-test.todo("F7: law 5: no module makes a decision wrong by chance except through slip() (participants/src/slip.ts)", () => {
+test("F7: law 5: no module makes a decision wrong by chance except through slip() (participants/src/slip.ts)", () => {
   expect(existsSync(join(root, "participants/src/slip.ts")), "the one helper").toBe(true);
   const drawn: string[] = [];
   for (const f of readdirSync(BEHAVIOUR).filter((n) => n.endsWith(".ts"))) {
@@ -182,6 +184,38 @@ test.todo("F7: law 5: no module makes a decision wrong by chance except through 
     });
   }
   expect(drawn, "errors drawn outside slip()").toEqual([]);
+  // And no module is handed a rate of error as a parameter: it is the world's table of slips (`orchestration.slip`), with its source.
+  const c = town();
+  const params: string[] = [];
+  const find = (x: unknown, path: string) => {
+    if (Array.isArray(x)) x.forEach((v, i) => find(v, `${path}[${i}]`));
+    else if (x && typeof x === "object") for (const [k, v] of Object.entries(x)) {
+      if (/^(error_bps|uphold_bps|billing_error_bps_per_year)$/.test(k) || (k === "per_year_bps" && /short_pay$/.test(path))) params.push(`${path}.${k}`);
+      find(v, `${path}.${k}`);
+    }
+  };
+  find(c.positions.map((p: any) => p.role_module), "positions");
+  find(c.participants.map((p: any) => p.controller), "participants");
+  expect(params, "a rate of error set as a module parameter").toEqual([]);
+});
+
+test("F7: law 5: a living town's slips are rows of its table, each with a source, and a task without a row has none", () => {
+  const c = town();
+  const slip = c.orchestration.slip;
+  expect(slip, "the table of slips").toBeDefined();
+  const tasks = ["publish/benefit_decision", "publish/venue_decision", "publish/invoice/metered_bill", "transfer/wages"];
+  for (const t of tasks) {
+    expect(slip.person[t], t).toBeDefined();
+    expect(String(slip.sources[`person.${t}`] ?? "").length, `${t}: its source`).toBeGreaterThan(20);
+  }
+  expect(Object.keys(slip.person).sort()).toEqual([...tasks].sort());
+  // An office's decisions go wrong at the office's sourced rate whoever or whatever makes them (the support agency of the outside world is a system, and
+  // its wrong refusals are what the profile's figure is of); pay come short is an employer's, a person's.
+  expect(Object.keys(slip.system).sort()).toEqual(tasks.filter((x) => x !== "transfer/wages").sort());
+  for (const t of Object.keys(slip.system)) {
+    expect(slip.system[t], t).toEqual(slip.person[t]);
+    expect(String(slip.sources[`system.${t}`] ?? "").length, `${t}: its source for a system`).toBeGreaterThan(20);
+  }
 });
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -232,11 +266,11 @@ test("every special case in the inventory still stands where it says, as many ti
   for (const s of inv.stays) expect(stands(s.file, s.find).length, s.what).toBeGreaterThan(0);
 });
 
-test("the inventory covers the plan's deletions: every step from F7 to F8 has entries, and every kernel one is in the kernel", () => {
+test("the inventory covers the plan's deletions: F8 still has entries, and every kernel one is in the kernel", () => {
   const steps = new Set(inv.entries.map((e) => e.step));
-  // (A step that is built has taken its entries out with the code: F1 to F6 have none left but history.)
-  for (const s of ["F7", "F8"]) expect(steps.has(s), s).toBe(true);
-  for (const s of ["F1", "F2", "F3", "F4", "F5", "F6"]) expect(inv.entries.filter((e) => e.step === s && e.kind !== "history").map((e) => e.id), `${s} is built: nothing of it is left`).toEqual([]);
+  // (A step that is built has taken its entries out with the code: F1 to F7 have none left but history.)
+  for (const s of ["F8"]) expect(steps.has(s), s).toBe(true);
+  for (const s of ["F1", "F2", "F3", "F4", "F5", "F6", "F7"]) expect(inv.entries.filter((e) => e.step === s && e.kind !== "history").map((e) => e.id), `${s} is built: nothing of it is left`).toEqual([]);
   for (const e of inv.entries.filter((x) => x.id.startsWith("k-"))) expect(e.file, e.id).toMatch(/^kernel\//);
 });
 

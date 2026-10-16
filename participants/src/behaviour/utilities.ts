@@ -8,7 +8,8 @@ import * as C from "../calls";
 import { need, params, type BehaviourModule, type ParticipantContext } from "../module";
 import { because, Book, DAY, goSee, ownAccount, say, StandingWork, type Step, usd, variableToday, visited, VISIT_MAX } from "./common";
 import { stepper } from "./firms";
-import { arises, frictionDial, Respondent } from "./frictions";
+import { Respondent } from "./frictions";
+import { slip } from "../slip";
 import { Deliveries, goodsPrices, held as heldAt, order } from "./trade";
 import * as P from "./papers";
 
@@ -217,7 +218,7 @@ export const energy: BehaviourModule = {
   ],
   // (What it buys in, it orders on its own order form: its staff's orders to the grid are that paper.)
   issues: [P.ORDER, P.REMEDY_ANSWER, ...P.VENUE_ANSWERS],
-  version: "0.3.1", // 0.3.1: draws are named for the day and which time that is, never the hour or the moment (docs/reliability.md, "Draws and the moment"); 0.3.0: some bills are wrong (an estimated reading entered too high), at the friction dial, and the retailer answers a customer who asks for a wrong bill to be put right from its own record of the bill; 0.2.1: its staff's first bills fall due one period after the standing order came into force; 0.2.0: has an order form of its own for buying from the grid; its staff report what they supplied and billed, and why they did not buy when stock ran low (docs/behaviour/standing-work.md, "The staff's report")
+  version: "0.4.0", // 0.4.0: how often a bill is wrong is a slip at the rate of the world's table of slips (foundations F7), no longer a parameter; 0.3.1: draws are named for the day and which time that is, never the hour or the moment (docs/reliability.md, "Draws and the moment"); 0.3.0: some bills are wrong (an estimated reading entered too high), at the friction dial, and the retailer answers a customer who asks for a wrong bill to be put right from its own record of the bill; 0.2.1: its staff's first bills fall due one period after the standing order came into force; 0.2.0: has an order form of its own for buying from the grid; its staff report what they supplied and billed, and why they did not buy when stock ran low (docs/behaviour/standing-work.md, "The staff's report")
   doc: "docs/behaviour/utilities.md",
   cadence: () => DAY,
   firstWake: (ctx) => 6 * 3600 + ctx.rng("first-wake").below(3600),
@@ -229,9 +230,9 @@ export const energy: BehaviourModule = {
       units_per_customer_per_day: 0, // what a household uses (the world's figure)
       price_per_unit: 0, supply_per_day: 0, // the tariff (cents)
       bill_every_days: 30,
-      // Wrong bills (docs/behaviour/utilities.md, "Wrong bills"): of customers, the share (basis points) sent a wrong bill
-      // in a year, at the friction dial; and by how much a wrong bill overstates the units used. 0: none are wrong.
-      billing_error_bps_per_year: 0, billing_over_bps: 0,
+      // Wrong bills (docs/behaviour/utilities.md, "Wrong bills"): how often a bill is wrong is a slip, the world's table of
+      // slips has its rate (foundations F7); this is by how much a wrong bill overstates the units used.
+      billing_over_bps: 0,
       respond: {} as object, // how it answers a customer who asks for a bill to be put right
       // Which part of the office this is (docs/behaviour/standing-work.md): "" the whole office, as code runs one;
       // "seat" the office-holder alone, who sets the standing work orders; "staff" its staff, who follow them.
@@ -250,7 +251,6 @@ export const energy: BehaviourModule = {
     let nextBill = p.bill_every_days * DAY;
     let billedUnder = ""; // the standing order the round of bills is counted from (the staff's)
     let reportDay = -1;
-    const dial = frictionDial(ctx.world);
     // A bill asked about: what it should have been, from the days it names, against what was billed. Only a bill of ours, to the asker.
     const resp = new Respondent(ctx.rng, me, null, {
       params: p.respond,
@@ -343,7 +343,7 @@ export const energy: BehaviourModule = {
             if (gone.has(who)) customers.delete(who);
             if (days === 0 || gone.has(who) && book.all("death_registration").some((r) => r.data?.deceased === who)) continue;
             // (A bill may be wrong: an estimated reading entered too high, so more units are billed than were used.)
-            const wrong = dial > 0 && arises(ctx.rng(`bill-error-${who}`), p.billing_error_bps_per_year, days, dial);
+            const wrong = slip(ctx, "publish/invoice/metered_bill", who, { days });
             const units = wrong ? Math.round((p.units_per_customer_per_day * days * (10_000 + p.billing_over_bps)) / 10_000) : p.units_per_customer_per_day * days;
             const amount = days * p.supply_per_day + units * p.price_per_unit;
             routines.did("bill", t);
