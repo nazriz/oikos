@@ -1121,7 +1121,7 @@ export class Staffing {
   // waits for them), and an order withdrawn after its pay moment still pays it. So an order we have withdrawn stays on
   // our books (what it pays in that time is booked, with its tax), the pay moments it paid are read from its payments
   // (`paidTo`), and a change that can be held to a pay run is (`heldToRun`, `holdRise`, `PAY_CUTOFF`).
-  private readonly withdrawn = new Map<string, string>(); // a standing order we have withdrawn -> its agreement
+  private readonly withdrawn = new Map<string, { agreement: string; at: number }>(); // a standing order we have withdrawn -> its agreement, and when we decided to
   private readonly paidTo = new Map<string, number>(); // agreement -> the latest pay moment a withdrawn order of it paid
 
   /**
@@ -1224,10 +1224,13 @@ export class Staffing {
       this.pendingWithhold.delete(ref);
     }
     // Wages paid by our standing orders: what each withheld is now owed to the collector.
-    const ours = new Map<string, string>([...[...this.orders].map(([agreement, order]) => [order, agreement] as [string, string]), ...this.withdrawn]);
+    const ours = new Map<string, string>([...[...this.orders].map(([agreement, order]) => [order, agreement] as [string, string]), ...[...this.withdrawn].map(([order, w]) => [order, w.agreement] as [string, string])]);
     for (const tx of channels.transactions(obs)) {
       if (!tx.per_instruction || !ours.has(tx.per_instruction)) continue;
-      if (this.withdrawn.has(tx.per_instruction)) this.paidTo.set(ours.get(tx.per_instruction)!, Math.max(this.paidTo.get(ours.get(tx.per_instruction)!) ?? 0, tx.t));
+      // (A withdrawn order pays only inside the act that withdraws it, which waits a couple of days at most: a payment later than that is not its.)
+      const gone = this.withdrawn.get(tx.per_instruction);
+      if (gone && tx.t > gone.at + 2 * DAY) continue;
+      if (gone) this.paidTo.set(ours.get(tx.per_instruction)!, Math.max(this.paidTo.get(ours.get(tx.per_instruction)!) ?? 0, tx.t));
       const w = this.withholds.get(tx.per_instruction) ?? NOTHING_WITHHELD;
       if (!this.offBooks.has(ours.get(tx.per_instruction)!)) this.owe(this.lawId, w, ours.get(tx.per_instruction), cents(tx.amount) + w.total);
       this.wagesPaid += cents(tx.amount) + w.total;
@@ -1461,13 +1464,13 @@ export class Staffing {
       const ended = (book.notices.get(a.id) ?? []).some((n) => n.as === me);
       const s: Step = because(`${who}, who worked for us, has died: stopping their wages.`, ...(underNotice || ended ? [] : [notice(a.id, "The employee has died.")]));
       if (this.orders.has(a.id)) {
-        s.push(this.retire(a.id, "The employee has died; stop wages."));
+        s.push(this.retire(a.id, "The employee has died; stop wages.", t));
       }
       steps.push(s);
     }
     // Ended (notice served): stop the wages.
     for (const a of doesPay ? contracts : []) if (book.concluded(a.id) && t >= this.endOf(book, a) && this.orders.has(a.id)) {
-      steps.push(because("Employment has ended: stopping the wages.", this.retire(a.id, "Employment ended; stop wages.")));
+      steps.push(because("Employment has ended: stopping the wages.", this.retire(a.id, "Employment ended; stop wages.", t)));
     }
     // Ended for redundancy, with pay owed under the law: owed in our books from the day the job ends, and paid with
     // the wages we owe (at once if the account covers it; late if not).
@@ -1675,7 +1678,7 @@ export class Staffing {
       }
       const tax = this.offBooks.has(a.id) ? NOTHING_WITHHELD : withheld(law, wage, period);
       const ref = `wo${this.n++}`;
-      lines.push(this.retire(a.id, "Superseded: a new wage."), [ref, pay(to, wage - tax.total - (one?.short ?? 0), { from: account, every: period, first: Math.max(DAY, this.nextDue(book, order, t) - t), basis: a.id, for: `Wages for ${a.terms.parties[1]}.` })] as any);
+      lines.push(this.retire(a.id, "Superseded: a new wage.", t), [ref, pay(to, wage - tax.total - (one?.short ?? 0), { from: account, every: period, first: Math.max(DAY, this.nextDue(book, order, t) - t), basis: a.id, for: `Wages for ${a.terms.parties[1]}.` })] as any);
       refs.push([ref, a.id, tax]);
     }
     for (const [ref, id, tax] of refs) {
@@ -1689,9 +1692,9 @@ export class Staffing {
   }
 
   /** Withdraw an agreement's wage order; it stays on our books until its payments are seen (see `withdrawn`). */
-  private retire(agreement: string, why: string): C.Call {
+  private retire(agreement: string, why: string, t: number): C.Call {
     const order = this.orders.get(agreement)!;
-    this.withdrawn.set(order, agreement);
+    this.withdrawn.set(order, { agreement, at: t });
     this.orders.delete(agreement);
     return withdraw(order, why);
   }
@@ -1844,7 +1847,7 @@ export class Staffing {
       const period = jobTerms(a, a.terms.parties[1]).period;
       this.stopped.set(a.id, { since: t, lastDue: this.nextDue(book, order, t) - period });
       this.paidTo.delete(a.id);
-      lines.push(this.retire(a.id, "Stopped: on strike."));
+      lines.push(this.retire(a.id, "Stopped: on strike.", t));
     }
     const out: Step[] = [];
     for (let i = 0; i < lines.length; i += 30) out.push(because(why, ...lines.slice(i, i + 30)));
