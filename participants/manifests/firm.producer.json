@@ -786,7 +786,7 @@
           "required": true,
           "description": "The request answered."
         },
-        "to": {
+        "asker": {
           "type": "entity",
           "required": true,
           "description": "Who asked."
@@ -819,10 +819,10 @@
         "text": "Answer to your request {request}: {granted}.",
         "basis": "=request",
         "to": [
-          "=to"
+          "=asker"
         ],
         "visible": [
-          "=to",
+          "=asker",
           "=self"
         ],
         "data": {

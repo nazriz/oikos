@@ -20,3 +20,9 @@ test("a world's parameters are checked against the module's manifest: unknown or
   expect(paramErrors("firm.landlord", { cut_bps: "5%" })).toEqual(['firm.landlord\'s "cut_bps" is a whole number, not "5%"']);
   expect(paramErrors("no.such_module", { anything: 1 })).toEqual([]);
 });
+
+test("no form has a field named to: it is the routing of the call that fills it in (pilot 7B: three remedy answers misaddressed and declined)", () => {
+  const clash: string[] = [];
+  for (const [name, m] of manifests()) for (const i of m.issues ?? []) if ("to" in i.fields) clash.push(`${name}: ${i.form}`);
+  expect(clash).toEqual([]);
+});

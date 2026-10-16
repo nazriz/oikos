@@ -201,7 +201,7 @@
           "required": true,
           "description": "The request declined."
         },
-        "to": {
+        "asker": {
           "type": "entity",
           "required": true,
           "description": "Who asked."
@@ -212,10 +212,10 @@
         "text": "Declined: no such order to you to enforce (request {request}).",
         "basis": "=request",
         "to": [
-          "=to"
+          "=asker"
         ],
         "visible": [
-          "=to",
+          "=asker",
           "=self"
         ]
       }
