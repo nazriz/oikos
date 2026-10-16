@@ -807,13 +807,29 @@ impl World {
         let ready = t + thinking;
         // Who else does the act's work (F3): the action's `by`, a person other than the actor. The act's own time is theirs,
         // shared (the actor, if it is among them, takes a share; if not, only the second of ordering it).
-        let others: Vec<Id> = by.iter().filter(|w| **w != key && *w != participant).cloned().collect::<std::collections::BTreeSet<_>>().into_iter().collect();
-        let (actor_seconds, by_share) = if others.is_empty() {
-            (seconds, 0)
+        // (Someone the actor may not direct is refused when the act is done, and is charged nothing for it.)
+        let entity = position.and_then(|x| self.state.positions.get(x)).map(|x| x.entity.clone()).or_else(|| p.person.clone());
+        let others: Vec<Id> = by
+            .iter()
+            .filter(|w| **w != key && *w != participant)
+            .filter(|w| self.state.participants.get(*w).is_some_and(|x| x.kind == ParticipantKind::System && x.owner.as_deref() == entity.as_deref()) || entity.as_deref().is_some_and(|e| crate::exec::may_direct(&self.state, e, w)))
+            .cloned()
+            .collect::<std::collections::BTreeSet<_>>()
+            .into_iter()
+            .collect();
+        // Each performer is charged their own time for the work: a person by the person's row, a system by its template's
+        // (the world's table is by who does it), shared among those who do it.
+        let kind_of = |state: &State, w: &str| if state.participants.get(w).is_some_and(|x| x.kind == ParticipantKind::System) { oikos_time::Actor::System } else { oikos_time::Actor::Person };
+        let seconds_of = |state: &State, w: &str| self.s.act_times.program(kind_of(state, w), blocks.iter().map(|b| (b.name(), b.makes()))) + trip;
+        let actor_in = by.iter().any(|w| *w == key || w == participant);
+        let n = others.len() as i64 + i64::from(actor_in);
+        let by_shares: Vec<(Id, i64)> = others.iter().map(|w| (w.clone(), (seconds_of(&self.state, w) + n - 1) / n)).collect();
+        let actor_seconds = if others.is_empty() {
+            seconds
+        } else if actor_in {
+            (seconds + n - 1) / n
         } else {
-            let n = others.len() as i64 + i64::from(by.iter().any(|w| *w == key || w == participant));
-            let share = (seconds + n - 1) / n;
-            (if n as usize > others.len() { share } else { oikos_time::DEFAULT_ACT_SECONDS }, share)
+            oikos_time::DEFAULT_ACT_SECONDS
         };
         // One time account per person (docs/design/foundations.md law 1; F1): the hours of a `work` are the time of
         // those who do it, placed on their timelines like any act's time. The act starts when its actor and every one
@@ -829,8 +845,8 @@ impl World {
                 late = true;
             }
         }
-        for w in &others {
-            *shares.entry(w.clone()).or_insert(0) += by_share;
+        for (w, share) in &by_shares {
+            *shares.entry(w.clone()).or_insert(0) += share;
         }
         let free_from = |tl: Option<&crate::state::Timeline>, lanes: usize| -> i64 {
             let mut lanes_now = tl.map(|x| x.lanes.clone()).unwrap_or_default();

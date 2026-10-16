@@ -153,6 +153,26 @@ pub fn check_system_does(s: &Statics, st: &State, sys: &str, org: Option<&str>, 
     Ok(())
 }
 
+/// Whether an organisation may direct a person's time: the person is it (its own, a sole trader's), holds one of its
+/// posts, or is party, with it, to an agreement in force or ending (an employment). The kernel reads the agreement by its
+/// terms only (`oikos_terms::read`); whether it is a good one is for the world.
+pub fn may_direct(st: &State, entity: &str, person: &str) -> bool {
+    if entity == person {
+        return true;
+    }
+    let holds = st.positions_of.get(entity).into_iter().flatten().any(|pos| {
+        st.positions.get(pos).and_then(|x| x.holder.as_ref()).and_then(|h| st.participants.get(h)).is_some_and(|p| p.person.as_deref() == Some(person))
+    });
+    holds
+        || st.agreements_of.get(person).into_iter().flatten().any(|id| {
+            let Some(RecordBody::Agreement { terms }) = st.records.get(id).map(|r| &r.record.body) else { return false };
+            terms.parties.iter().any(|p| p == entity) && {
+                let m = st.marks.get(id).cloned().unwrap_or_default();
+                matches!(oikos_terms::read(terms, &m.signatures, &m.notices, st.t).status, "in_force" | "ending")
+            }
+        })
+}
+
 /// What `exec_action` takes besides the blocks, for an act whose work was ordered earlier: `seen` says who was where
 /// when it was; `by` is who the action named; `started` that the performers' being there was looked at when the work
 /// began (so it is not looked at again when it ends).
@@ -188,6 +208,8 @@ pub fn exec_action_seen(s: &Statics, st: &mut State, participant: &str, position
             if st.participants.get(w).is_some_and(|x| x.kind == ParticipantKind::System) {
                 // (A system named to do the act's work: the organisation's own, and the act within its template.)
                 check_system_does(s, st, w, Some(&entity), blocks)?;
+            } else if !may_direct(st, &entity, w) {
+                return Err(refuse(RefusalCode::NotTheirs, format!("{w} isn't someone {entity} may direct (not its own, nor in its posts, nor employed by it)")));
             } else if started {
                 // (Looked at when the work began; here only that they are alive.)
                 st.body(w).filter(|b| b.alive).ok_or_else(|| refuse(RefusalCode::Dead, format!("{w} has died")))?;

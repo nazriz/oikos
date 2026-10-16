@@ -4,7 +4,7 @@
 mod common;
 
 use common::*;
-use oikos_kernel::events::{EventBody, RefusalCode};
+use oikos_kernel::events::EventBody;
 use oikos_kernel::kernel::Command;
 use oikos_kernel::run::Run;
 use oikos_kernel::state::ParticipantStatus;
@@ -102,4 +102,62 @@ fn f3_a_world_whose_post_is_held_by_anothers_system_does_not_load() {
     c["positions"].as_array_mut().unwrap().iter_mut().find(|p| p["id"] == "clerk").unwrap()["holder"] = json!("outside-system");
     let err = Run::start(c, "fixes", Vec::new(), None).err().expect("loaded");
     assert!(format!("{err}").contains("belongs to"), "{err}");
+}
+
+/// An employment agreement both have signed.
+fn employ(run: &mut R, employer: &str, by: &str, position: Option<&str>, worker: &str) {
+    let propose = cmd(by, position, json!([{"block": "propose_agreement", "terms": {"parties": [employer, worker], "commitments": [{"who": employer, "does": {"outcome": {"money": {"to": format!("acc-{worker}"), "amount": "100"}}}, "every": 2_592_000}]}, "speaks_for": employer}]));
+    step(run, &propose).expect("accepted");
+    let id = run.kernel().state().record_order.iter().rev().find(|id| run.kernel().state().records[*id].record.body.kind_name() == "agreement").cloned().expect("an agreement");
+    step(run, &cmd(&format!("{worker}-self"), None, json!([{"block": "sign_agreement", "agreement": id, "as": worker}]))).expect("accepted");
+    step(run, &cmd(by, position, json!([{"block": "sign_agreement", "agreement": id, "as": employer}]))).expect("accepted");
+}
+
+fn hi() -> Value {
+    json!([{"block": "message", "to": ["bob-self"], "text": "hi"}])
+}
+
+/// Finding 5: `by` names someone the actor may direct: itself, its own systems, its staff by contract or in its posts.
+#[test]
+fn f5_by_names_only_someone_the_actor_may_direct() {
+    let mut run = start(world(&default_params()));
+    let by_carol = cmd_by("developer-system", Some("developer"), hi(), &["carol"]);
+    assert_eq!(said(outcome(&mut run, &by_carol)), "not_theirs", "a stranger's hours were taken");
+    assert!(run.kernel().state().timelines.get("carol").is_none_or(|t| t.iter().all(|&x| x <= 0)), "carol was charged");
+    employ(&mut run, "devco", "developer-system", Some("developer"), "carol");
+    assert_eq!(said(outcome(&mut run, &by_carol)), "applied", "its employee");
+    let by_alice = cmd_by("developer-system", Some("developer"), hi(), &["alice"]);
+    assert_eq!(said(outcome(&mut run, &by_alice)), "not_theirs", "carol's employment is not alice's");
+    // Its own system, and a person who holds one of its posts, may be directed.
+    let by_system = cmd_by("developer-system", Some("developer"), hi(), &["developer-system"]);
+    assert_eq!(said(outcome(&mut run, &by_system)), "applied");
+    step(&mut run, &cmd("mayor-system", Some("mayor"), json!([{"block": "appoint", "position": "clerk", "participant": "alice-self"}]))).unwrap();
+    let by_clerk = cmd_by("mayor-system", Some("mayor"), hi(), &["alice"]);
+    assert_eq!(said(outcome(&mut run, &by_clerk)), "applied", "a holder of the city's post");
+    // A system of another organisation is not its to direct.
+    let by_other = cmd_by("developer-system", Some("developer"), hi(), &["builder-system"]);
+    assert_eq!(said(outcome(&mut run, &by_other)), "not_theirs");
+}
+
+/// Finding 8: each performer is charged their own row's time for the work, whoever ordered it.
+#[test]
+fn f8_each_performer_is_charged_their_own_time() {
+    let mut c = world(&default_params());
+    c["orchestration"]["act_time"] = json!({"person": {"message": 2_400}, "system": {"message": 1}});
+    let mut run = start(c);
+    employ(&mut run, "devco", "developer-system", Some("developer"), "carol");
+    // A system names a person: the person is charged the person's 2,400 s, not the system's 1 s.
+    let m = cmd_by("developer-system", Some("developer"), hi(), &["carol"]);
+    let Command::Act { .. } = &m else { unreachable!() };
+    let before = run.kernel().state().timelines.get("carol").map_or(0, |t| t.iter().copied().max().unwrap_or(0));
+    let r = run.command(&m).unwrap();
+    let (starts, done) = r.events.iter().find_map(|e| match &e.body { EventBody::ActionStarted { starts, done, .. } => Some((*starts, *done)), _ => None }).unwrap();
+    assert_eq!(done - starts, 2_400, "carol did it: a person's row");
+    assert!(run.kernel().state().timelines["carol"].iter().copied().max().unwrap() >= before + 2_400);
+    // A person names a system of the organisation: the system is charged its own row (1 s), not the person's.
+    step(&mut run, &cmd("mayor-system", Some("mayor"), json!([{"block": "appoint", "position": "clerk", "participant": "alice-self"}]))).unwrap();
+    let m = cmd_by("alice-self", Some("clerk"), hi(), &["mayor-system"]);
+    let r = run.command(&m).unwrap();
+    let (starts, done) = r.events.iter().find_map(|e| match &e.body { EventBody::ActionStarted { starts, done, .. } => Some((*starts, *done)), _ => None }).unwrap();
+    assert_eq!(done - starts, 1, "the system did it: its template's row, not the person's 2,400 s");
 }
