@@ -119,7 +119,7 @@ function takenIn(book: Book, filed: Filed, t: number, aside: ReadonlySet<string>
  * `tribunal_order`s, which close a case; and `tribunal_response`s citing an application, from the respondent.
  * Not expressible from papers: the module's in-memory `listed`/`decided` sets are rebuilt from the notices and orders
  * on file, so an application it rejected or heard is closed here by its order and not otherwise; the cases a day's
- * hearings could not reach (its `cases_per_day`) show as "time has run, not decided" as they are.
+ * hearings could not reach (its member's hours, foundations F6) show as "time has run, not decided" as they are.
  */
 export function tribunalMemberBooks(ctx: ParticipantContext): OfficeBooks {
   const me = ctx.entity;
@@ -301,8 +301,8 @@ function venueHeadings(book: Book, me: string, t: number, o: { forDecision: bool
  * (`application`, `complaint_notice`, `complaint_response`, `venue_decision`): applications addressed to it; its own
  * notices (`answer_by` is the day the other side's time runs out); its own decisions (which close a case); and its
  * own `case_for_decision` notes, the cases its staff put before the office-holder. Not expressible: a case the code
- * office rejected or referred shows only by its decision on file; the day's room for deciding (`cases_per_day`) is
- * the code's and shows only as cases whose time has run and which stay undecided.
+ * office rejected or referred shows only by its decision on file; the member's hours for deciding (foundations F6) are
+ * the kernel's, and show only as cases whose time has run and which stay undecided.
  */
 export function deskBooks(ctx: ParticipantContext): OfficeBooks {
   const me = ctx.entity;

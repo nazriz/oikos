@@ -43,7 +43,6 @@ export const member: BehaviourModule = {
       // hearings decide; how often it finds for an applicant with nothing to show; what applying costs, and where
       // the fee is paid.
       hears: [] as Hears[],
-      cases_per_day: HEARING_DEFAULTS.cases_per_day,
       uphold_bps: HEARING_DEFAULTS.uphold_bps,
       fee: 0,
       account: "",
@@ -60,7 +59,7 @@ export const member: BehaviourModule = {
     const book = new Book();
     const listed = new Map<string, number>(); // application -> its hearing
     const decided = new Set<string>();
-    const lists = p.hears.length ? new Hearings(me, ctx.rng, { hears: p.hears, answer_days: p.hearing_after_days, cases_per_day: p.cases_per_day, uphold_bps: { ...HEARING_DEFAULTS.uphold_bps, ...p.uphold_bps }, within_days: p.pay_within_days, refer_to: {}, ...(p.possession ? { possession: p.possession } : {}) },
+    const lists = p.hears.length ? new Hearings(me, ctx.rng, { hears: p.hears, answer_days: p.hearing_after_days, uphold_bps: { ...HEARING_DEFAULTS.uphold_bps, ...p.uphold_bps }, within_days: p.pay_within_days, refer_to: {}, ...(p.possession ? { possession: p.possession } : {}) },
       { application: ["tribunal_application"], notice: "hearing_notice", response: "tribunal_response", decision: "tribunal_order" }, APPLICATION_KINDS) : undefined;
     const listKinds = new Set(p.hears.map((h) => h.about));
     let said = false;

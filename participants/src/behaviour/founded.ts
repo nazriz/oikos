@@ -91,7 +91,7 @@ export const founded: BehaviourModule = {
     let hoursAt = p.founded_at;
 
     const hears: Hears[] = p.shape === "cause" && p.want.about ? [{ about: p.want.about, can: ["recommend", "represent"] }] : [];
-    const hearings = new Hearings(me, ctx.rng, { hears, answer_days: p.cause.answer_days, cases_per_day: 1, uphold_bps: { other: 5_000 }, within_days: 28, refer_to: {} });
+    const hearings = new Hearings(me, ctx.rng, { hears, answer_days: p.cause.answer_days, uphold_bps: { other: 5_000 }, within_days: 28, refer_to: {} });
 
     const mine = (kind: string): StatementRecord | undefined => book.open(kind).find((r) => r.speaks_for === me);
     const members = (): { who: string; agreement: string; at: number }[] => book.ofType("agreement").flatMap((r) =>

@@ -29,6 +29,8 @@ struct Unit {
     /// "self", a position, or None (a language-model participant: all its capacities).
     capacity: Option<String>,
     llm: bool,
+    /// A unit that hears no news: it is woken by its cadence and what it asks for, never by a record or a message (foundations F6: a payroll's round is its own).
+    deaf: bool,
     cadence: i64,
     next_wake: i64,
     wake_for: &'static str,
@@ -129,6 +131,7 @@ impl Scheduler {
                 participant: u["participant"].as_str().ok_or("a unit needs a participant")?.to_string(),
                 capacity: u["capacity"].as_str().map(String::from),
                 llm: u["llm"].as_bool().unwrap_or(false),
+                deaf: u["deaf"].as_bool().unwrap_or(false),
                 cadence: u["cadence"].as_i64().filter(|c| *c > 0).ok_or("a unit needs a cadence (seconds)")?,
                 next_wake,
                 wake_for: "start",
@@ -262,6 +265,9 @@ impl Scheduler {
 
     fn wake_now(&mut self, keys: Vec<String>, t: i64) {
         for k in keys {
+            if self.units.get(&k).is_some_and(|u| u.deaf) {
+                continue;
+            }
             self.set_wake(&k, t, "news");
         }
     }
@@ -410,6 +416,24 @@ mod tests {
         assert!(matches!(s.next(7_200, 1_000_000).unwrap(), Next::Advance { to: 10_800 }));
         // Beyond `until`: the end.
         assert!(matches!(s.next(7_200, 9_000).unwrap(), Next::End));
+    }
+
+    #[test]
+    fn a_deaf_unit_is_woken_by_no_news_only_by_its_cadence() {
+        let mut s = Scheduler::new(3600);
+        let mut deaf = unit("d|self", 86_400, 0);
+        deaf["deaf"] = json!(true);
+        s.add(&[deaf, unit("h|self", 86_400, 0)]).unwrap();
+        let Next::Cohort(c) = s.next(0, 1_000_000).unwrap() else { panic!() };
+        for (k, _, _) in &c {
+            s.finished(k, None, 0);
+        }
+        // A message to both: the hearing unit wakes at once, the deaf one at its cadence.
+        s.note(None, &[json!({ "event": "message_delivered", "to": ["d", "h"] })], 100);
+        let Next::Cohort(c) = s.next(100, 1_000_000).unwrap() else { panic!() };
+        assert_eq!(c.iter().map(|x| (x.0.as_str(), x.1)).collect::<Vec<_>>(), vec![("h|self", "news")]);
+        s.finished("h|self", None, 100);
+        assert!(matches!(s.next(100, 1_000_000).unwrap(), Next::Advance { to: 86_400 }));
     }
 
     #[test]

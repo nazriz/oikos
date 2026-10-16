@@ -1024,7 +1024,7 @@ export class Asked {
  * depends on when it's done (a notice counting from today), how to make it again for a later moment (`redo`), should it
  * be done later than planned (a wake allows only so many actions). `planned`: when it was planned (the stepper's).
  */
-export type Step = (C.Call | [string, C.Call])[] & { why?: string; then?: (o: ActOutcome) => Step[] | void; redo?: (t: number) => Step; planned?: number };
+export type Step = (C.Call | [string, C.Call])[] & { why?: string; then?: (o: ActOutcome) => Step[] | void; redo?: (t: number) => Step; planned?: number; /** True once the moment for it has passed (a day's work when the day's hours are over): it is then not sent, but answered as a day's work not got to, `then` told `not_done`. */ lapsed?: (t: number) => boolean };
 
 /**
  * A day's shared work: of those here, the team that gets most done when the work is shared evenly (each does the same

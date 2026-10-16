@@ -76,7 +76,7 @@ test("a spec without `living` generates what it generated before (byte for byte)
   // (publish/<kind of record>) and their sources. Nothing of `living` in it.
   // (Re-taken on 2026-10-15 at foundations F4: the generated systems name a template and a supplier and the world says where work is done; 3facfdc8... until then.)
   // (Re-taken on 2026-10-16 at foundations F5: the town's offices are held by people, their staff hired, its systems delivered from templates that say what they do; 1f5ef6f6... until then.)
-  expect(hash(c)).toBe("40d909c430f90bbdbc65bc47b2352f616ce13cb89a57b4240cfffb7a9bda3a79");
+  expect(hash(c)).toBe("be6ff50f04ebe630d56b61a36429c8ce788f1c3ddb72cfb00ff651a14dae6c3f");
   const text = JSON.stringify(c);
   expect(text).not.toContain('"started"');
   expect(text).not.toContain("attach_mean");
@@ -158,7 +158,7 @@ test("a living town where things go wrong (docs/behaviour/frictions.md): homes w
   expect(module("firm.landlord")[0].repair.units).toBe(F.repair_hours);
   expect(module("firm.builder")[0].repair_task).toBe("repair");
   expect(module("utility.energy")[0].billing_error_bps_per_year).toBe(F.per_adult_bps_per_year.bill);
-  expect(module("world.transfers")[0]).toMatchObject({ processing_days: F.support.processing_days, error_bps: F.support.wrong_refusal_bps });
+  expect(module("world.transfers")[0]).toMatchObject({ error_bps: F.support.wrong_refusal_bps });
   expect(c.knowing.published.some((x: any) => x.what === "has:hears")).toBe(true);
   expect(c.participants.find((x: any) => x.controller?.impl === "citizen.default").channels.some((ch: any) => ch.match?.has?.includes("hears"))).toBe(true);
   // Twice as much goes wrong: the dial says so, and a home wears twice as fast.

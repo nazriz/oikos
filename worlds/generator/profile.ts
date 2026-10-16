@@ -170,8 +170,8 @@ export interface Profile {
      * and its share of wrong refusals; and how the bodies that hear grievances work. Each with its source or marked
      * a placeholder. */
     frictions?: { per_adult_bps_per_year: { landlord: number; wages: number; bill: number; benefits: number; goods: number }; put_right_on_asking_bps: { [matter: string]: number };
-      pay_short_by_bps: number; bill_over_bps: number; goods_faulty_share_bps: number; repair_hours: number; support: { processing_days: number; wrong_refusal_bps: number };
-      venues: { answer_days: number; tribunal_days: number; tribunal_fee_hours_of_pay: number; cases_per_day: number; uphold_without_proof_bps: number } };
+      pay_short_by_bps: number; bill_over_bps: number; goods_faulty_share_bps: number; repair_hours: number; support: { wrong_refusal_bps: number };
+      venues: { answer_days: number; tribunal_days: number; tribunal_fee_hours_of_pay: number; uphold_without_proof_bps: number } };
     /** Founding (docs/behaviour/founding.md), read only for a living town that turns it on: how often new associations
      * are registered here (`registered_per_100000_per_year`, with its source; code never reads it) and how many more
      * are never registered (`informal_multiple`, a placeholder), which together are what `chance_bps` (the chance at

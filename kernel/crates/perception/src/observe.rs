@@ -930,9 +930,10 @@ fn build(s: &Statics, st: &State, index: &RecordIndex, participant: &str, mode: 
                         }
                     }
                     accounts.sort_by(|a, b| a.account.cmp(&b.account));
-                    let transactions = if mode == Mode::Look { p.new_transactions.get(&me).map(|q| q.iter().cloned().collect()).unwrap_or_default() } else { vec![] };
+                    let queue = crate::state::transactions_key(&cap.key, &me);
+                    let transactions = if mode == Mode::Look { p.new_transactions.get(&queue).map(|q| q.iter().cloned().collect()).unwrap_or_default() } else { vec![] };
                     if mode == Mode::Look {
-                        drained.push(me.clone());
+                        drained.push(queue);
                     }
                     ChannelData::Accounts { accounts, transactions }
                 }

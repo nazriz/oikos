@@ -1,0 +1,56 @@
+{
+  "name": "body.payroll",
+  "version": "0.2.0",
+  "doc": "docs/behaviour/staffing.md",
+  "params": {
+    "notice_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 14,
+      "source": "placeholder"
+    },
+    "part": {
+      "schema": {
+        "type": "string",
+        "description": "the officer runs the payroll; the deputy keeps the officer's post filled"
+      },
+      "default": "officer",
+      "source": "placeholder"
+    },
+    "period": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 1209600,
+      "source": "placeholder"
+    },
+    "role": {
+      "schema": {
+        "type": "string",
+        "description": "when the organisation's own module employs others (the clinic's doctors), the role of the staff this payroll pays: absent, all of the organisation's"
+      },
+      "default": "",
+      "source": "when the organisation's own module employs others (the clinic's doctors), the role of the staff this payroll pays: absent, all of the organisation's"
+    },
+    "watch": {
+      "schema": {
+        "type": "array",
+        "description": "the organisation's posts a person holds, which this post keeps filled"
+      },
+      "default": [],
+      "source": "placeholder"
+    },
+    "who": {
+      "schema": {
+        "type": "string",
+        "description": "its channel onto who's who"
+      },
+      "default": "who",
+      "source": "placeholder"
+    }
+  },
+  "perceives": [],
+  "state": "none"
+}

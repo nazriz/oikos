@@ -18,13 +18,6 @@
       "default": 14,
       "source": "placeholder"
     },
-    "cases_per_day": {
-      "schema": {
-        "type": "integer"
-      },
-      "default": 4,
-      "source": "placeholder"
-    },
     "counter": {
       "schema": {
         "type": "boolean"

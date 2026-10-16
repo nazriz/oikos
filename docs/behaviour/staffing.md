@@ -53,8 +53,34 @@ law 3 says only actors work: a person, or a system someone supplied.
 | The police station's officer in charge | the police's grant | the grant is raised by one officer's pay |
 | The bank, the union, the water and energy bodies, the landlords | their own accounts | their takings; each starts with twelve weeks of the wage bill in hand |
 
-Left out, on purpose, and recorded: the withholding return for the staff of the bodies that have no office to file one (the tax stays in
-the body's account); the paper's advertising (it is grant-paid, a placeholder); an allowance for the mayor and the councillors.
+Left out, on purpose, and recorded: the paper's advertising (it is grant-paid, a placeholder); an allowance for the mayor and the councillors.
+
+## A body's own paperwork (foundations F6)
+
+A body that employs people does what any employer does with them, through the ordinary forms and laws, and its staff do it.
+
+- **A payroll officer** (`<body>-payroll`, module `body.payroll`, `participants/src/behaviour/payroll.ts`) is a post held by one of the body's
+  staff. It runs the same `Staffing` payroll as a firm's manager and the town's finance office: it picks up the wage standing orders the body
+  opened with, starts and stops wages, files the **return of the tax withheld** on the days the law states and pays it over, and, when a
+  member of staff dies, hears of it as any employer does (the registry's entry, or its bank's word, which now comes at **each** pay day
+  until the payment is stopped, because a letter to an office nobody holds is lost), ends the employment on record and withdraws the wage.
+  The tribunal, the desks, the electoral commission, the paper, the land registry, the bank, the union and the water and energy bodies have
+  one; the clinic's, the school's and the police station's has the same duty for their heads only (their own modules pay their doctors,
+  teachers and officers). Before this the tax withheld from these bodies' staff stayed in the bodies' accounts (5 to 11 per cent of the
+  year's tax and contributions in au-vic and gb-eng, about 5 per cent in ke-nakuru), and nobody stopped a dead officer's pay.
+- **A deputy** (`<body>-payroll-deputy`; for a shop, factory or the builder `<firm>-deputy`) is another of the staff who looks at the
+  organisation's posts every few days and, where a post a person held is empty (its holder died), appoints one of the staff to it. It is the
+  only way a post is refilled: only a living holder of a post of an organisation can appoint into it. The officer keeps the deputy's post
+  filled. A body with two or more staff has a deputy; a body of one has none.
+- **What is not done.** A body whose only member of staff dies has nobody left to stop the wage or fill the post (the wage goes on to the
+  estate until something outside acts). The law that is missing is an owner's or a board's power to appoint, which the kernel does not have
+  (`appoint` is the acting organisation's, by a post it holds). Nor does a body hire a replacement for staff who die; the town's works office
+  does, the bodies do not. Landlords' letting offices are held by property managers who each hold several landlords' offices, so a landlord whose
+  manager dies is not covered either.
+- **Why it was not seen before.** A transaction was queued once for a person and an organisation, and the first post of theirs to look took it:
+  a person holding two posts of one organisation (a payroll officer who is also the registry officer) told the other post nothing. Each
+  capacity has its own queue now (`transactions_key`, `kernel/crates/world/src/state.rs`; `kernel/tests/foundations.rs`,
+  `a_person_holding_two_posts_of_one_organisation_is_told_of_a_payment_in_each`).
 
 ## Where the figures come from
 
@@ -76,6 +102,6 @@ still has no `to`, so a seat that tries to deploy a system is refused `not_suppl
 ## Revisit if
 
 - the mayor and the councillors should be paid (a profile states an allowance);
-- the bodies' own paperwork (withholding returns, the paper's advertising) is to be done by their staff (F6);
+- the paper's advertising is to be done by its staff;
 - one person holding ten posts is thought too few (the rate is the profile's; a post nobody can staff should be said by the place);
 - a system's work should have its own seconds (a payments platform at a second a payment is not a figure anyone sourced).

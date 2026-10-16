@@ -71,7 +71,7 @@ paper and the previews are all a seat is told: the world's terms.
 **What `by`, `units` and a clerical task mean today.** The routines built take whoever of the staff is at work and
 judge the amount themselves; an order's `by` is recorded and shown to those named, and `units` is recorded, and
 neither changes what the built routines do. A task may be office work as well as hand-work ("bill", "levy",
-"enrol"): the clerks' time is not modelled, as a code office's paperwork never was, so those cost nothing in hours.
+"enrol"): a clerical task is the staff post's acts, and each act takes its maker's time as any act does (the world's table: a notice from a rate book 2 minutes, an invoice 3, a return of the tax withheld half an hour; placeholders), on the timeline of the resident who holds the staff post (foundations F5 and F6). Until F6 this said the clerks' time was not modelled and cost nothing in hours: with the posts held by people and every act a row of the table, it is.
 
 **Real-world basis.** A waste service runs to a collection schedule and crews work rostered rounds; a clinic's
 doctors work a sessional roster and see whoever is booked or waiting; a school teaches to a timetable; a billing

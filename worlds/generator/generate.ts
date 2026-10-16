@@ -76,6 +76,9 @@ const WORK_TIME = {
     // Routine documents made from records already on file (a notice from a rate book, an invoice from a sale, a delivery note):
     // two or three minutes each, not a quarter of an hour.
     "publish/rates_notice": 120, "publish/invoice": 180, "publish/delivery_note": 120,
+    // An employer's, a lender's and a clerk's paperwork (foundations F6): a return of the tax withheld is made up from the pay run and checked,
+    // a notice to payroll is a form, a lending decision is weighed on a file, a written approval is read and signed.
+    "publish/withholding_report": 1800, "publish/payroll_notice": 300, "publish/loan_decision": 1800, "publish/loan_terms": 900, "publish/approval": 300,
   },
   // What a system does takes it a second: it is software that was delivered to do just that (foundations F5: there is no default
   // for a block a system's template does not list, because it cannot do it).
@@ -90,11 +93,16 @@ const WORK_TIME = {
     "person.publish/rates_notice": "Placeholder: two minutes to make a notice from the rate book, to be sourced (clerical work studies; to confirm).",
     "person.publish/invoice": "Placeholder: three minutes to make an invoice from a sale on file, to be sourced.",
     "person.publish/delivery_note": "Placeholder: two minutes to make a delivery note, to be sourced.",
+    "person.publish/withholding_report": "Placeholder: half an hour to make up and check a return of the tax withheld from a pay run, to be sourced (payroll practice; to confirm).",
+    "person.publish/payroll_notice": "Placeholder: five minutes to fill in a notice of a starter or a leaver for payroll, to be sourced.",
+    "person.publish/loan_decision": "Placeholder: half an hour to decide a loan on its file, to be sourced (credit underwriting studies; to confirm).",
+    "person.publish/loan_terms": "Placeholder: a quarter of an hour to write the terms of a loan agreed, to be sourced.",
+    "person.publish/approval": "Placeholder: five minutes to read and sign a written approval, to be sourced.",
     system: "Placeholder: a second for each act a delivered system does (software).",
   },
 };
 
-export const GENERATOR_VERSION = "0.55.0"; // 0.55.0: foundations F5: the posts of the town's own bodies are held by people hired from the town at the profile's staffing rates and pay (`public_service`), the bank's payment platform is a licensed system, every system comes from a template that says what it does, and a seat is a person with a post of its own (docs/behaviour/staffing.md); 0.54.0: a profile's employment.hours is published as the law on cutting hours (law-cutting-hours) and its firms' hours step reaches them (docs/behaviour/firms.md, "Hours before heads"); 0.53.0: `opening_caseload` reaches the other offices (support claims in hand and refusals asked about, complaints before the town's desks, permit applications before planning, invoices unpaid at finance, loans behind at the bank), each from the town's own flow times the days a matter stands open; `opening_caseload_scale_bps` thickens them (docs/decisions.md, 2026-10-12, "Opening caseloads of the other offices"); 0.52.0: a profile's ordinary terms of trade credit (business.trade_credit_days) reach the factories that sell to shops and the world market that sells inputs to factories (docs/behaviour/trade.md, "Trade credit"); 0.51.0: the tax law lists its returns, from the profile's public_finance.returns (docs/decisions.md, 2026-10-12, "Returns on the law's days"): which charges each reports and the day of the month it falls due by, as words and as data; 0.50.0: the law on possession says what the place's law has of a plan to pay (may, must consider, none; where it is taken away; where paying in full ends the claim), the tribunal's form for a tenant's answer is published, the possession order form offers only what that law has, and people are given their place's rate of answering an application; 0.49.0: homes by income (docs/decisions.md, 2026-10-12, "Homes by income"): where the profile states its renters' rent as a share of income, a town's first tenancies are dealt by what each household has coming in, people with nothing coming in live with kin, owners are chosen by the head's age where the profile has it, and the payments its support law already owes are in payment from the first day by the profile's take-up; 0.48.0: `opening_caseload`: a town may open in the middle of things, its landlords' rent books and its tribunal's list as an ordinary day would have them (off unless set); a landlord's and the member's procedure say what the law has for a home the tenant has left; 0.47.0: an office a model holds opens with its institution's standing notices on file (what a body that hears grievances says it hears), its procedure under the law on possession (a landlord, the tribunal's member and registrar: what each form is for and what the law asks before each step, from the profile's figures) and what becomes of a letter to a person; the tribunal has registry staff in a living town (docs/decisions.md, 2026-10-12, "What the third living pilot found"); 0.46.0: the firm and landlord side (docs/decisions.md, 2026-10-11, "Four faults"): the place's laws on ending a job and on possession published from the profile; how firms adjust; a business of one as a venture, its chance derived from the place's business birth rate; short pay's chance over the jobs exposed; 0.45.4: the planning office's decision form records the liberty to build beside a grant (the form's own declaration: FormWrites `claim`); 0.45.3: a payroll folder holds the standing payments beside the employment agreements; an office's routines procedure says who makes a standing work order and how; the permit decision form says what records the permission; 0.45.2: the council's standing orders are a published procedure of the town's (proc-council), and a councillor's or a clerk's post held by a model has the council's papers on its desk (the charter, the standing orders, the laws, the forms, proposals and ballots as papers of its own body, petitions, budgets and results); 0.45.1: the tax law says, step by step and with each rounding, how what is withheld from a pay is reckoned (the one function every payroll uses), where it said "reckoned as a year's pay"; 0.45.0: a seat with routine work is shown its staff's reports on the work under its standing orders, and its procedure says they are made; 0.44.0: main's 0.39.1 (an office's own form says what issuing it does) with the institutions' opening papers (0.43.0)
+export const GENERATOR_VERSION = "0.56.0"; // 0.56.0: foundations F6: every body that employs people has a payroll officer and a deputy from its staff (a firm's manager a deputy), the bank's lending office pays the bank's staff, no venue or support office has a throughput or delay dial, paperwork has rows in the table; 0.55.0: foundations F5: the posts of the town's own bodies are held by people hired from the town at the profile's staffing rates and pay (`public_service`), the bank's payment platform is a licensed system, every system comes from a template that says what it does, and a seat is a person with a post of its own (docs/behaviour/staffing.md); 0.54.0: a profile's employment.hours is published as the law on cutting hours (law-cutting-hours) and its firms' hours step reaches them (docs/behaviour/firms.md, "Hours before heads"); 0.53.0: `opening_caseload` reaches the other offices (support claims in hand and refusals asked about, complaints before the town's desks, permit applications before planning, invoices unpaid at finance, loans behind at the bank), each from the town's own flow times the days a matter stands open; `opening_caseload_scale_bps` thickens them (docs/decisions.md, 2026-10-12, "Opening caseloads of the other offices"); 0.52.0: a profile's ordinary terms of trade credit (business.trade_credit_days) reach the factories that sell to shops and the world market that sells inputs to factories (docs/behaviour/trade.md, "Trade credit"); 0.51.0: the tax law lists its returns, from the profile's public_finance.returns (docs/decisions.md, 2026-10-12, "Returns on the law's days"): which charges each reports and the day of the month it falls due by, as words and as data; 0.50.0: the law on possession says what the place's law has of a plan to pay (may, must consider, none; where it is taken away; where paying in full ends the claim), the tribunal's form for a tenant's answer is published, the possession order form offers only what that law has, and people are given their place's rate of answering an application; 0.49.0: homes by income (docs/decisions.md, 2026-10-12, "Homes by income"): where the profile states its renters' rent as a share of income, a town's first tenancies are dealt by what each household has coming in, people with nothing coming in live with kin, owners are chosen by the head's age where the profile has it, and the payments its support law already owes are in payment from the first day by the profile's take-up; 0.48.0: `opening_caseload`: a town may open in the middle of things, its landlords' rent books and its tribunal's list as an ordinary day would have them (off unless set); a landlord's and the member's procedure say what the law has for a home the tenant has left; 0.47.0: an office a model holds opens with its institution's standing notices on file (what a body that hears grievances says it hears), its procedure under the law on possession (a landlord, the tribunal's member and registrar: what each form is for and what the law asks before each step, from the profile's figures) and what becomes of a letter to a person; the tribunal has registry staff in a living town (docs/decisions.md, 2026-10-12, "What the third living pilot found"); 0.46.0: the firm and landlord side (docs/decisions.md, 2026-10-11, "Four faults"): the place's laws on ending a job and on possession published from the profile; how firms adjust; a business of one as a venture, its chance derived from the place's business birth rate; short pay's chance over the jobs exposed; 0.45.4: the planning office's decision form records the liberty to build beside a grant (the form's own declaration: FormWrites `claim`); 0.45.3: a payroll folder holds the standing payments beside the employment agreements; an office's routines procedure says who makes a standing work order and how; the permit decision form says what records the permission; 0.45.2: the council's standing orders are a published procedure of the town's (proc-council), and a councillor's or a clerk's post held by a model has the council's papers on its desk (the charter, the standing orders, the laws, the forms, proposals and ballots as papers of its own body, petitions, budgets and results); 0.45.1: the tax law says, step by step and with each rounding, how what is withheld from a pay is reckoned (the one function every payroll uses), where it said "reckoned as a year's pay"; 0.45.0: a seat with routine work is shown its staff's reports on the work under its standing orders, and its procedure says they are made; 0.44.0: main's 0.39.1 (an office's own form says what issuing it does) with the institutions' opening papers (0.43.0)
 const DAY = 86_400;
 const MONTH = 30 * DAY;
 const YEAR = 365 * DAY;
@@ -1563,9 +1571,9 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     const paper = (id: string, kind: string, by: string, to: string[], visible: string[], basis: string | undefined, text: string, data: object, since: number) =>
       records.push({ id, record: "statement", author: "genesis", at: 0, visible_to: visible, speaks_for: by, kind, ...(to.length ? { addressed_to: to } : {}), ...(basis ? { basis } : {}), text, data: { ...data, since: -since * DAY, brought_forward: true } });
     // ---- the support office: claims in hand, and refusals asked to be looked at again ----
-    // (A claim waits `processing_days`; the flow is the people the law's pension reaches in a year, a cohort of one age
-    // year; they are drawn, youngest first, from those entitled and not drawing as the year begins. A claim refused is
-    // asked about at the profile's share of wrong refusals. Claims on losing work are not counted: no profile gives
+    // (The flow is the people the law's pension reaches in a year, a cohort of one age year; they are drawn, youngest
+    // first, from those entitled and not drawing as the year begins. A claim refused is asked about at the profile's
+    // share of wrong refusals. No claim is in hand: the office decides what it has the day it sees it (foundations F6). Claims on losing work are not counted: no profile gives
     // how many job endings are followed by a spell out of work.)
     const drawingNot = [...notDrawing].sort((a, b) => b.m.born_at - a.m.born_at || (a.m.id < b.m.id ? -1 : 1));
     const refused = new Set<string>();
@@ -1576,23 +1584,15 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       refused.add(n.m.id);
       return decision;
     };
-    if (FR && FR.support.processing_days > 0 && notDrawing.length) {
+    if (FR && notDrawing.length) {
       const draw = rng("opening-caseload-support");
-      const wait = FR.support.processing_days;
       for (const r of PAYMENTS.filter((x) => forAge(x) && TAKE?.[x.id] !== undefined)) {
         const from = r.who?.from_age ?? 0;
         const entrants = everyone.filter((m) => m.adult && ageOf(m) >= from && ageOf(m) < from + 5).length / 5;
         const pool = drawingNot.filter((n) => n.r === r && !refused.has(n.m.id));
-        const claims = Math.min(pool.length, count(draw, entrants, wait));
-        for (const n of pool.slice(0, claims)) {
-          const ago = draw.below(wait); // (made this long ago; decided when `wait` days have passed)
-          paper(`claim-${n.m.id}-${n.r.id}`, "benefit_claim", n.m.id, [n.r.payer], [n.m.id, n.r.payer], undefined, `Claim, made ${before(ago)}: ${n.r.id}.`,
-            { payment: n.r.id, account: `acc-${n.m.id}`, born_at: n.m.born_at, ...(n.declares ? { declares: n.declares } : {}) }, ago);
-          refused.add(n.m.id);
-        }
         // (A review asked for: the office answers on its next working day, so a request stands about a day.)
-        const reviews = Math.min(pool.length - claims, count(draw, (entrants * FR.support.wrong_refusal_bps) / 10_000, 1));
-        for (const n of pool.slice(claims, claims + reviews)) {
+        const reviews = Math.min(pool.length, count(draw, (entrants * FR.support.wrong_refusal_bps) / 10_000, 1));
+        for (const n of pool.slice(0, reviews)) {
           const ago = draw.below(1) + 1, decision = refusal(n, ago);
           paper(`review-${n.m.id}-${n.r.id}`, "remedy_request", n.m.id, [n.r.payer], [n.m.id, n.r.payer], decision, `Request to put right (claim_refused): ${n.r.id} was refused and I qualify.`,
             { matter: "claim_refused", against: n.r.payer, about: decision, seeks: n.r.id }, ago);
@@ -2058,7 +2058,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   const systemsUsed = new Set<string>();
   const sysId = (post: string) => `${post}-system`;
   /** Posts a person will hold, until `resolveHolders` names them: the post, its body, whether a model holds it, and the body's pool. */
-  const toHold: { post: any; entity: string; seat?: { controller: any; framing?: any } }[] = [];
+  const toHold: { post: any; entity: string; apart?: string; seat?: { controller: any; framing?: any } }[] = [];
   const office = (id: string, entity: string, title: string, role: string | undefined, channels: any[], controller: any, extra: any = {}) => {
     if (extra.desk) desks.set(id, { channels: extra.desk, standing: extra.desk_standing ?? [], ...(extra.ballot_count ? { ballot_count: extra.ballot_count } : {}) });
     const job = controller.type === "code" ? { code: controller.impl, params: controller.params ?? {} } : extra.role_module;
@@ -2072,7 +2072,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     }
     const post = { id, entity, title, ...(role ? { role } : {}), channels, ...(job ? { role_module: job } : {}) } as any;
     positions.push(post);
-    toHold.push({ post, entity, ...(controller.type !== "code" ? { seat: { controller, framing: extra.framing } } : {}) });
+    toHold.push({ post, entity, ...(extra.apart ? { apart: extra.apart } : {}), ...(controller.type !== "code" ? { seat: { controller, framing: extra.framing } } : {}) });
   };
   const adultCount = everyone.filter((m) => m.adult).length;
   // (Elections: the adults on the roll at the start, each enrolled.)
@@ -2121,8 +2121,8 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   const deaths = K.mine("deaths", ["death_registration", "death_certificate"]);
   // The bank's lending office (docs/behaviour/credit.md): the profile's lending rules; funding from outside.
   const Cr = V.credit;
-  office("bank-lending", "bank", "Lending officer", undefined, [{ id: "ledger", kind: "accounts" }, mine("applications"), K.lookUp()],
-    code("bank.lending", { who: "who", rate_bps: Cr.lending_rate_bps, buffer_bps: Cr.serviceability_buffer_bps ?? 0, max_share_bps: Cr.max_repayment_share_bps, max_months: Cr.max_months,
+  office("bank-lending", "bank", "Lending officer", undefined, [{ id: "ledger", kind: "accounts" }, mine("applications"), K.lookUp(), deaths, lawBook],
+    code("bank.lending", { who: "who", pay_staff: true, rate_bps: Cr.lending_rate_bps, buffer_bps: Cr.serviceability_buffer_bps ?? 0, max_share_bps: Cr.max_repayment_share_bps, max_months: Cr.max_months,
       default_days: Cr.default_days, arrears_days: Cr.arrears_days, reserve: Cr.reserve, ...(OW?.market ? { mortgage_rate_bps: OW.mortgage_rate_bps, mortgage_max_months: OW.market.mortgage_months, max_lvr_bps: 10_000 - OW.market.deposit_bps } : {}), funding_from: "outside", funding_rate_bps: Cr.cash_rate_bps + Cr.funding_spread_bps }));
   // The weather bureau (the outside world's): warns of heavy rain, drought and heatwaves a few days ahead.
   if (W?.events.length) office("weather-bureau", "outside", "Weather bureau", undefined, [K.mine("bureau", ["weather_warning"])], code("world.weather", { events: W.events, lead_days: CL!.warning_lead_days }));
@@ -2237,7 +2237,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       // (And possession of a let home for arrears, where the place's law has it: heard in any town, living or not.)
       ...(POSS ? { possession: { days: POSS.possession_days, plan_months: POSS.plan_months, notice_days: POSS.notice_days, ...planLaw(POSS) }, ...(FR ? {} : { hears: [{ about: "possession", can: ["order"] }] }) } : {}),
       ...(FR ? { hears: [{ about: "disrepair", can: ["order"] }, { about: "underpaid", can: ["order"] }, { about: "goods", can: ["order"] }, { about: "bill", can: ["order"] }, { about: "arrears", can: ["order"] }, { about: "claim_refused", can: ["order"], undoes: true }, ...(POSS ? [{ about: "possession", can: ["order"] }] : [])],
-        cases_per_day: FR.venues.cases_per_day, uphold_bps: { other: FR.venues.uphold_without_proof_bps }, fee: Math.round((wages.shop * FR.venues.tribunal_fee_hours_of_pay * 7) / (PAY / DAY) / V.ordinary_hours_per_week), account: "acc-outside" } : {}) }));
+        uphold_bps: { other: FR.venues.uphold_without_proof_bps }, fee: Math.round((wages.shop * FR.venues.tribunal_fee_hours_of_pay * 7) / (PAY / DAY) / V.ordinary_hours_per_week), account: "acc-outside" } : {}) }));
     office("tribunal-registrar", "tribunal", "Principal registrar", "registrar", [mine("tribunal-business")], code("tribunal.registrar", { banks: ["bank"], ...(POSS ? { enforcer: "police", warrant_days: POSS.warrant_days, eviction_notice_days: POSS.eviction_notice_days } : {}) }));
   }
   // The utilities (world-expansion 6.1): the water corporation draws the town's water from the river and bills owners;
@@ -2469,7 +2469,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     const price = RETAIL_PRICE;
     office(`${w.employer}-manager`, w.employer, "Manager", undefined, [{ id: "books", kind: "accounts" }, mine(), deaths, market("outside", "builder"), ...shopBoards, lawBook, { id: "stock", kind: "holdings" }, K.premises("premises", [cell])],
       code("firm.retailer", { premises: w.structure, workplace: w.space, max_staff: w.capacity, wage: w.wage, period: PAY, working_day: WORKING_DAY, serve_labour: SHOP.serve, industry: w.industry, lender: "bank", builder: "builder",
-        suppliers: ["outside"], ...shopLooks, price, demand: SHOP.demand, shopfront: true, ...look, ...(RD ? { work_days: SHOP_DAYS } : {}), ...(CR ? { police: "police" } : {}), ...informalOf(w) }));
+        suppliers: ["outside"], ...shopLooks, price, demand: SHOP.demand, shopfront: true, ...look, ...(RD ? { work_days: SHOP_DAYS, open_from: RD.work_start_hour * HOUR, open_until: RD.work_end_hour * HOUR } : {}), ...(CR ? { police: "police" } : {}), ...informalOf(w) }));
   }
   // People working for themselves: each holds the only position of their business, and runs a shop's rules in it
   // alone. It sees its own books, papers and stock, its supplier's prices and what producers advertise to the trade.
@@ -2742,7 +2742,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     }
     // (And a shop founded in the run, as the shops the town began with.)
     Object.assign(shopVenture.role_module.params, { respond, short_pay: { per_year_bps: perJob, by_bps: FR.pay_short_by_bps } });
-    const hearing = { answer_days: FR.venues.answer_days, cases_per_day: FR.venues.cases_per_day, uphold_bps: { other: FR.venues.uphold_without_proof_bps } };
+    const hearing = { answer_days: FR.venues.answer_days, uphold_bps: { other: FR.venues.uphold_without_proof_bps } };
     office("ombudsman-officer", "ombudsman", "Ombudsman's officer", "officer", [mine("ombudsman-business"), lawBook],
       code("office.desk", { title: "ombudsman", ...hearing, hears: [{ about: "bill", can: ["recommend"] }, { about: "claim_refused", can: ["recommend"], undoes: true }] }));
     office("consumer-officer", "consumer-desk", "Conciliation officer", "officer", [mine("consumer-business"), lawBook],
@@ -2790,7 +2790,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       K.mine("gone", ["death_registration", "departure"]), lawBook,
       ...(PAYMENTS.some((r) => r.who?.record || "share_bps" in r.amount) ? [K.mine("contributions", ["withholding_report"])] : [])],
     code("world.transfers", { account: "acc-outside", publish_every_days: 30,
-      ...(FR ? { processing_days: FR.support.processing_days, error_bps: FR.support.wrong_refusal_bps, respond: { grant_bps: FR.put_right_on_asking_bps } } : {}) }));
+      ...(FR ? { error_bps: FR.support.wrong_refusal_bps, respond: { grant_bps: FR.put_right_on_asking_bps } } : {}) }));
   // The retirement fund's trustee (docs/behaviour/firm-ownership.md): takes in what the fund's holdings pay, pays its
   // costs (its administrator is outside the town), and pays its retired members their pensions.
   if (FUND) office("fund-trustee", FUND, "Trustee", undefined,
@@ -2827,6 +2827,51 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     post.holder = seat.id;
     return seat;
   };
+  // ---- a body's own paperwork, done by its staff (foundations F6; docs/behaviour/staffing.md, "A body's own paperwork") ----
+  // Every body that employs people runs a payroll as any employer's: a payroll officer (a post of its staff) starts and stops the
+  // wages, files the returns of the tax withheld on the law's days and pays it over, and hears of a death as an employer does. The
+  // bodies that run no payroll of their own (the tribunal, the desks, the commission, the paper, the registry, the bank, the union,
+  // the water and energy bodies) and the heads of the clinic, school and police (whose own modules pay the doctors, teachers and
+  // officers) get one. Every body with two or more staff has a deputy as well, who keeps the officer's post, and the head's, filled
+  // from the staff when its holder dies (only a living holder of a post of an organisation can appoint into it). A body of one
+  // has none: nobody is left to do it, and the missing law is an owner's or a board's power to appoint (docs/behaviour/staffing.md).
+  const payrollPosts: { entity: string; officer?: string; deputy?: string; params: any[] }[] = [];
+  {
+    const heldApart = new Map<string, string>(); // a deputy's post -> the post whose holder it must not share
+    const staffN = (e: string) => staffAt.get(e)?.length ?? 0;
+    const payer = (b: Body) => b.entity !== "city";
+    const done = new Set<string>();
+    // (What a payroll clerk is shown: the organisation's employment agreements and what ends them, the orders that pay its staff, and its notices of
+    // starters and leavers: never its whole file. The bank's payroll is done by its lending office, a keeper of the bank's file of instructions, and
+    // not by a clerk who would have to be shown every customer's.)
+    const agreements = K.mine("payroll", { records: ["agreement", "signature", "notice"] });
+    const papers = [agreements, K.mine("orders", ["request"]), K.mine("notes", ["payroll_notice", "off_books"])];
+    for (const b of bodies.filter(payer)) {
+      if (done.has(b.entity)) continue;
+      done.add(b.entity);
+      const entityRole = b.paidBy === "funded" ? b.role : "";
+      const mk = (part: "officer" | "deputy") => {
+        const params: any = { part, watch: [], ...(entityRole ? { role: entityRole } : {}) };
+        const id = `${b.entity}-payroll${part === "deputy" ? "-deputy" : ""}`;
+        office(id, b.entity, part === "officer" ? "Payroll officer" : "Deputy payroll officer", undefined,
+          part === "officer" ? [{ id: "books", kind: "accounts" }, ...papers, deaths, lawBook, K.lookUp()] : [agreements, deaths, K.lookUp()],
+          code("body.payroll", params), part === "deputy" ? { apart: `${b.entity}-payroll` } : {});
+        return { id, params };
+      };
+      const o = b.entity === "bank" ? undefined : mk("officer");
+      const d = headsOf(b.entity) >= 2 ? mk("deputy") : undefined;
+      payrollPosts.push({ entity: b.entity, ...(o ? { officer: o.id } : {}), ...(d ? { deputy: d.id } : {}), params: [...(o ? [o.params] : []), ...(d ? [d.params] : [])] });
+    }
+    // (A shop's, a factory's and the builder's manager runs the payroll in the manager's own post; a deputy keeps that post filled.)
+    for (const w of workplaces) if (/^(shop|factory)-/.test(w.employer) || w.employer === "builder") {
+      if (staffN(w.employer) < 2 || payrollPosts.some((x) => x.entity === w.employer)) continue;
+      const params: any = { part: "deputy", watch: [] };
+      const id = `${w.employer}-deputy`;
+      office(id, w.employer, "Deputy manager", undefined, [agreements, deaths, K.lookUp()], code("body.payroll", params), { apart: `${w.employer}-manager` });
+      payrollPosts.push({ entity: w.employer, deputy: id, params: [params] });
+    }
+    void heldApart;
+  }
   const resolveHolders = () => {
     const todo = toHold.filter((x) => !x.post.holder);
     const poolFor = (x: (typeof toHold)[number]): string[] => {
@@ -2847,7 +2892,11 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       if (!base.length) throw new Error(`office ${x.post.id}: no one in the town to hold it`);
       const key = keyOf(x), k = rotor.get(key) ?? 0;
       rotor.set(key, k + 1);
-      x.post.holder = `${base[k % base.length]!}-self`;
+      let pick = k % base.length;
+      // (A deputy is someone other than the person whose post they keep filled, where the body has another.)
+      const apartFrom = x.apart ? positions.find((q) => q.id === x.apart)?.holder : undefined;
+      if (apartFrom && base.length > 1 && `${base[pick]!}-self` === apartFrom) pick = (pick + 1) % base.length;
+      x.post.holder = `${base[pick]!}-self`;
       if (x.seat) seatFor(x.post, x.seat.controller, x.seat.framing);
     }
   };
@@ -2947,6 +2996,19 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     }
   }
   resolveHolders(); // (the staff posts and clerks the seats just made)
+  // The payroll posts keep filled the posts a person holds, whether the person or a model's seat in their body acts in it (a town with a seat is the
+  // town without it but for that post: the deputy looks at the same posts either way); a post a system holds never falls vacant.
+  {
+    const personHeld = (pos: any) => { const h = participants.find((q) => q.id === pos.holder); return !!h && h.kind === "person"; };
+    for (const x of payrollPosts) {
+      // (Not the staff and clerk a model's seat is given: they are the seat's, and a town without the seat has none to look at.)
+      const own = positions.filter((q) => q.entity === x.entity && personHeld(q) && !String(q.id).endsWith("-staff"));
+      for (const params of x.params) {
+        const id = params.part === "officer" ? x.officer : x.deputy;
+        params.watch = params.part === "officer" ? (x.deputy ? [x.deputy] : []) : own.map((q) => q.id).filter((q) => q !== id);
+      }
+    }
+  }
   // Settings of every seat a model holds, as the town's description gives them: whether papers bring it back, and how
   // hard its model reasons (by office, or one word for all).
   for (const part of participants) {

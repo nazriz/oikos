@@ -82,7 +82,7 @@ test("a payment the world refuses is reported to the holder in other words (it \
   expect(PAYMENT_FAILED.is(told[0]!.args.text)).toBe(false);
 });
 
-test("someone who pays by standing order into the account of a person the bank has been told has died is told so, once, when a payment next falls due; it is still paid, into the estate", () => {
+test("someone who pays by standing order into the account of a person the bank has been told has died is told so when a payment next falls due, and at each after until they stop it; it is still paid, into the estate", () => {
   const m = bank();
   const wages = statement("r1", 0, "request", { author: "c1-self", speaks_for: "c1", addressed_to: ["bank"], visible_to: ["c1", "bank"],
     data: { outcome: { money: { from: "acc-c1", to: "acc-c2", amount: "50000", for: "Wages." } }, every: 14 * DAY, first: 14 * DAY } });
@@ -95,7 +95,9 @@ test("someone who pays by standing order into the account of a person the bank h
   expect(told(at(m, 21 * DAY, [death], { c1: 500_000, c2: 50_000 }))).toEqual([]);
   const next = at(m, 28 * DAY, [], { c1: 500_000, c2: 50_000 });
   expect(told(next).map((c) => [c.args.to, c.args.re, PAYEE_DIED.who(c.args.text)])).toEqual([[["c1-self"], "r1", "c2"]]);
-  expect(told(at(m, 42 * DAY, [], { c1: 500_000, c2: 100_000 }))).toEqual([]);
+  // (Told at each payment, not once, since foundations F6: a letter to an office with nobody in it is lost, and the wage went on for good.)
+  expect(told(at(m, 35 * DAY, [], { c1: 500_000, c2: 100_000 }))).toEqual([]);
+  expect(told(at(m, 42 * DAY, [], { c1: 500_000, c2: 100_000 })).map((c) => [c.args.re, PAYEE_DIED.who(c.args.text)])).toEqual([["r1", "c2"]]);
 });
 
 test("going through standing orders only when they're due gives the payments and replies that going through every one at every plan does", () => {

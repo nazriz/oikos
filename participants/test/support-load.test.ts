@@ -1,6 +1,6 @@
-// The support office under load (docs/behaviour/boundary.md, "Under load"): claims that wait their processing time, are
-// decided so many a day, oldest first, and some wrongly refused at the friction dial, more while a backlog stands; a
-// refusal asked about and found wrong is reviewed, and the claimant's next claim is decided on its facts.
+// The support office (docs/behaviour/boundary.md, "Mistakes"): every claim it has is decided the day it is seen, oldest first
+// (until foundations F6 a processing time and a daily capacity made a wave of claims wait), and some wrongly refused at the
+// friction dial; a refusal asked about and found wrong is reviewed, and the claimant's next claim is decided on its facts.
 import { expect, test } from "bun:test";
 import { inCurrency } from "../src/money";
 import { transfers } from "../src/behaviour/world";
@@ -32,29 +32,17 @@ const office = (params: object = {}, dial?: number) => {
 };
 const decisions = (w: ReturnType<typeof wake>) => w.of("statement", "benefit_decision").map((c) => c.args.data);
 
-test("with the new parameters at nought, claims are decided the day they are seen, as before, with no waiting noted", () => {
+test("claims are decided the day they are seen, every one the office has, with no waiting noted (foundations F6: no processing time, no daily capacity)", () => {
   const o = office({}, 10_000);
   const d = decisions(o.at(0, [claim("c1", 0, "a"), claim("c2", 0, "b")]));
   expect(d).toEqual([{ claim: "c1", payment: "pension", granted: true, amount: 50_000, every: 14 * DAY }, { claim: "c2", payment: "pension", granted: true, amount: 50_000, every: 14 * DAY }]);
-});
-
-test("a processing time: the claim is decided that many days after it was made", () => {
-  const o = office({ processing_days: 14 });
-  expect(decisions(o.at(0, [claim("c1", 0, "a")]))).toEqual([]);
-  expect(decisions(o.at(13 * DAY))).toEqual([]);
-  expect(decisions(o.at(14 * DAY))).toMatchObject([{ claim: "c1", granted: true, waited_days: 14 }]);
-});
-
-test("a capacity: ten claims on one day are decided two a day over five days, the oldest first", () => {
-  const o = office({ capacity_per_day: 2 });
+  // Ten claims on one day are all decided that day, oldest first: how many an office gets through in a day is the hours of whoever decides, which the kernel keeps
+  // (a system's lanes, a person's timeline), not a number here. An older claim goes before a younger one that came on an earlier id.
+  const many = office({}, 10_000);
   const claims = Array.from({ length: 10 }, (_, i) => claim(`c${String(i).padStart(2, "0")}`, 0, `p${i}`));
-  const order: string[][] = [];
-  for (let d = 0; d < 6; d++) order.push(decisions(o.at(d * DAY, d === 0 ? claims : [])).map((x: any) => x.claim));
-  expect(order).toEqual([["c00", "c01"], ["c02", "c03"], ["c04", "c05"], ["c06", "c07"], ["c08", "c09"], []]);
-  // (An older claim goes before a younger one that came on an earlier id.)
-  const p = office({ capacity_per_day: 1 });
-  expect(decisions(p.at(0, [claim("z", 0, "a"), claim("a", DAY, "b")])).map((x: any) => x.claim)).toEqual(["z"]);
-  expect(decisions(p.at(DAY)).map((x: any) => x.claim)).toEqual(["a"]);
+  expect(decisions(many.at(0, claims)).map((x: any) => x.claim)).toEqual(claims.map((c) => c.id));
+  const p = office({}, 10_000);
+  expect(decisions(p.at(0, [claim("z", 0, "a"), claim("a", DAY, "b")])).map((x: any) => x.claim)).toEqual(["z", "a"]);
 });
 
 const request = (id: string, at: number, who: string, about: string) => statement(id, at, "remedy_request", { speaks_for: who, addressed_to: ["outside"], visible_to: [who, "outside"], data: { matter: "claim_refused", against: "outside", about, seeks: "review" } });

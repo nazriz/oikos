@@ -116,3 +116,33 @@ test("shops at one wholesale price don't all order from the same factory: each h
   const came = recs.filter((r) => r.kind === "delivery_note" && ids.has(r.data?.order) && r.data.delivered > 0);
   expect(new Set(came.map((n) => n.speaks_for)).size).toBeGreaterThan(1);
 }, 600_000);
+
+// Foundations F6: a shop's manager is a resident now, and what the shop orders through them waits on their one
+// timeline, behind their own walk home. A shop that went on serving after its staff's working day ordered work that
+// reached the door after they had left (a year of the 1,000-person town: 172 `not_at_work` refusals of shop staff before
+// F5, 3,312 after). A shop in a world with working hours serves in them.
+test("a shop serves in its staff's working hours: nothing is ordered for staff on their way home", async () => {
+  const config = generate({ ...base, profile: "au-vic-2026" });
+  const hours = officesBy(config, "firm.retailer").filter((o) => /^shop-\d+-manager$/.test(o.id) && !o.params.operator).map((o) => o.params);
+  expect(hours.length).toBeGreaterThan(0);
+  for (const h of hours) {
+    expect(h.open_until).toBeGreaterThan(h.open_from);
+    expect(h.work_days).toBeGreaterThan(0);
+  }
+  const { open_from, open_until, work_days } = hours[0];
+  const out = join(root, "runs", "test-retail-hours");
+  rmSync(out, { recursive: true, force: true });
+  const s = await runWorld({ config, runId: "hours", outDir: out, until: 45 * DAY });
+  const log = readFileSync(s.logPath, "utf8").trim().split("\n").map((l) => JSON.parse(l));
+  const serving = log.filter((e) => e.kind === "command" && e.body.command === "act" && /^shop-\d+-manager$/.test(e.body.as ?? "") && (e.body.blocks ?? []).some((b: any) => b.block === "work" && b.task === "serve"));
+  expect(serving.length).toBeGreaterThan(50);
+  for (const c of serving) {
+    expect(Math.floor(c.t / DAY) % 7).toBeLessThan(work_days);
+    expect(c.t % DAY).toBeGreaterThanOrEqual(open_from);
+    expect(c.t % DAY).toBeLessThan(open_until);
+  }
+  // (And the staff's own walk home no longer overtakes the shop's orders: refused for it, a small fraction of the serving.)
+  const gone = log.filter((e) => e.kind === "event" && e.body.event === "action_refused" && e.body.code === "not_at_work" && /^shop-\d+-manager$/.test(e.body.as ?? ""));
+  expect(gone.length * 20).toBeLessThan(serving.length);
+  rmSync(out, { recursive: true, force: true });
+}, 300_000);

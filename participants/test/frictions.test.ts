@@ -112,14 +112,16 @@ test("where the other side cannot say from its records, someone who can show a p
   expect(bare(10_000)).toBe("pay");
 });
 
-test("a venue says so when it does not hear a matter, and falls behind when more come than its staff decide in a day", () => {
+test("a venue says so when it does not hear a matter, and decides every case whose time has run: how many a day is its members' hours, which the kernel keeps", () => {
   const not = heard({}, [[1, [application("a1", DAY, { matter: "noise", against: "c9" })]]]).out;
   expect(not.map((x) => [x.kind, x.data.finding])).toEqual([[PAPER.decision, "rejected"]]);
   const many = Array.from({ length: 6 }, (_, i) => application(`a${i}`, DAY, { matter: "underpaid", against: "shop-1", amount: 100 + i, account: "acc-c1" }, `c${i}`));
-  const { out, h } = heard({ cases_per_day: 2 }, [[1, many]]);
-  expect(out.filter((x) => x.kind === PAPER.decision).map((x) => x.day)).toEqual([15, 15, 16, 16, 17, 17]);
+  const { out, h } = heard({}, [[1, many]]);
+  // (Foundations F6: until then a number of cases a day, 2 here, spread these over three days. Now the module asks for all six on the day their time has
+  // run, and each is an act that takes its member's time (a row of the world's table) and waits its turn on their timeline: a backlog is hours.)
+  expect(out.filter((x) => x.kind === PAPER.decision).map((x) => x.day)).toEqual([15, 15, 15, 15, 15, 15]);
   expect(h.counts).toMatchObject({ applications: 6, pay: 6 });
-  expect(h.waits).toEqual([14, 14, 15, 15, 16, 16]);
+  expect(h.waits).toEqual([14, 14, 14, 14, 14, 14]);
 });
 
 test("a desk says publicly what it hears, in an offer anyone may apply to", () => {

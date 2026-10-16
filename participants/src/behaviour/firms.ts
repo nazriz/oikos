@@ -102,6 +102,11 @@ export function stepper(absorb: (obs: Observation) => void, plan: (obs: Observat
       }
       todo.unshift(...follow.filter((s) => s.length));
       let next = todo.shift();
+      // (A step whose moment has passed is not sent: told it was not got to, as a day's work is at the day's turn.)
+      while (next?.lapsed?.(obs.t)) {
+        todo.unshift(...(next.then?.({ action: "", t: obs.t, status: "refused", refusal: { code: "not_done", detail: "not got to before the day's hours were over" } } as any) ?? []).filter((x) => x.length));
+        next = todo.shift();
+      }
       if (!next) return wait(until?.(obs));
       // Done later than planned: a step that counts from when it's done is made again for now (a notice's date).
       if (next.redo && next.planned !== undefined && next.planned !== obs.t) next = next.redo(obs.t);
@@ -1059,9 +1064,13 @@ export class LabourPlan {
 /** How a hiring office's letter to the payroll office begins (an office's note: `officeNote`). */
 export const PAYROLL_NOTE = "Payroll notice from the hiring office, ";
 
+/** How long before a pay run a change of pay is left to the run after (payroll's cut-off: longer than any act takes). */
+const PAY_CUTOFF = 2 * DAY;
+
 export class Staffing {
   private readonly orders = new Map<string, string>(); // agreement -> wage standing order
   private readonly pendingOrder = new Map<string, string>(); // step marker -> agreement
+  private readonly replacing = new Map<string, number>(); // agreement -> when we replaced its wage order (until the replacement is on the book, or a couple of days pass)
   private readonly handled = new Set<string>();
   readonly noticed = new Map<string, number>(); // agreement -> when we gave notice
   /** Whom our bank has told us has died: someone a standing order of ours pays (docs/behaviour/deaths.md). */
@@ -1091,7 +1100,7 @@ export class Staffing {
   // Hours before heads (docs/behaviour/firms.md): cuts we have made or put to the staff, by agreement, and wage changes
   // waiting for the day their paper names.
   private readonly cuts = new Map<string, Cut>();
-  private readonly due: { at: number; agreement: string; wage: number; why: string }[] = [];
+  private readonly due: { at: number; agreement: string; wage: number; why: string; short?: number; /** A rise held back to the pay run (see `raise`). */ held?: boolean }[] = [];
   private readonly declined = new Set<string>(); // agreements whose worker has not agreed to a cut, this spell
   private noCutUntil = -Infinity;
   private repliesRead = 0;
@@ -1195,6 +1204,7 @@ export class Staffing {
     }
     for (const x of obs.outcomes) for (const [ref, id] of Object.entries(x.created ?? {})) if (this.pendingOrder.has(ref)) {
       this.orders.set(this.pendingOrder.get(ref)!, id);
+      this.replacing.delete(this.pendingOrder.get(ref)!);
       this.pendingOrder.delete(ref);
       if (this.pendingWithhold.has(ref)) this.withholds.set(id, this.pendingWithhold.get(ref)!);
       this.pendingWithhold.delete(ref);
@@ -1220,6 +1230,11 @@ export class Staffing {
   /** Employment agreements in force and not yet ended, oldest first. */
   staff(book: Book, t: number): any[] {
     return this.contracts(book).filter((a) => book.inForce(a.id) && t < this.endOf(book, a)).sort((x, y) => book.signedAt(x.id)! - book.signedAt(y.id)!);
+  }
+  /** Those of our staff we know to have died: by the registry's entry or by our bank's word (docs/behaviour/deaths.md). */
+  knownDead(book: Book, t: number): string[] {
+    const dead = new Set([...book.all("death_registration").map((r) => r.data?.deceased as string), ...this.bankSaysDead]);
+    return this.staff(book, t).map((a) => a.terms.parties[1] as string).concat(this.contracts(book).filter((a) => this.noticed.has(a.id)).map((a) => a.terms.parties[1] as string)).filter((w, i, all) => dead.has(w) && all.indexOf(w) === i);
   }
   /** Our staff, as we have them (truth audits). */
   beliefs(book: Book): Belief[] {
@@ -1282,7 +1297,7 @@ export class Staffing {
     const law = incomeTaxLaw(book);
     this.lawId = law?.id ?? this.lawId;
     this.readNotes(book);
-    for (const r of book.open("request")) for (const b of r.speaks_for === me && r.data?.every ? basesOf(r) : []) if (b && !this.orders.has(b)) {
+    for (const r of book.open("request")) for (const b of r.speaks_for === me && r.data?.every ? basesOf(r) : []) if (b && !this.orders.has(b) && !this.isReplacing(b, t)) { // (not one whose replacement is made but not yet on the book: the act waits for its performer's time)
       this.orders.set(b, r.id);
       const a = book.records.get(b);
       const gross = a?.record === "agreement" ? cents(commitmentOf(a, me).outcome?.money?.amount ?? 0) : 0;
@@ -1600,10 +1615,25 @@ export class Staffing {
       if (cut && !one) { cut.full = Math.floor((cut.full * (10_000 + riseBps)) / 10_000); wage = Math.floor((cut.full * cut.paidBps) / 10_000); cut.wage = wage; }
       this.gross.set(a.id, wage);
       if (one?.short) this.skim.set(a.id, one.short); else this.skim.delete(a.id); // (a wage set afresh is paid as set)
-      const order = this.orders.get(a.id);
       const to = this.payee(book, a);
+      // (A replacement already made, and not yet on the book: the act waits for its performer's time. Not replaced again
+      // until it is: the order it would withdraw is the one already withdrawn, and a second would be made beside the first.)
+      if (this.isReplacing(a.id, t)) {
+        this.holdRise(a.id, t + DAY, wage, why, one?.short);
+        continue;
+      }
+      const order = this.orders.get(a.id);
       if (!order || !to || this.stopped.has(a.id)) continue;
       const period = jobTerms(a, a.terms.parties[1]).period;
+      // A change of pay takes effect from a pay run, as payroll does it: with a cut-off. Replacing the order takes the
+      // manager's time (the act waits for them), and an order withdrawn after its pay moment still pays it, so a pay
+      // moment inside the act would be paid by the old order and again by the new. Within the cut-off before a pay run
+      // the change is held until the run has been made, and then made for the run after it.
+      const next = this.nextDue(book, order, t);
+      if (next - t < Math.min(PAY_CUTOFF, Math.floor(period / 2))) {
+        this.holdRise(a.id, next, wage, why, one?.short);
+        continue;
+      }
       const tax = this.offBooks.has(a.id) ? NOTHING_WITHHELD : withheld(law, wage, period);
       const ref = `wo${this.n++}`;
       lines.push(withdraw(order, "Superseded: a new wage."), [ref, pay(to, wage - tax.total - (one?.short ?? 0), { from: account, every: period, first: Math.max(DAY, this.nextDue(book, order, t) - t), basis: a.id, for: `Wages for ${a.terms.parties[1]}.` })] as any);
@@ -1612,11 +1642,24 @@ export class Staffing {
     }
     for (const [ref, id, tax] of refs) {
       this.pendingOrder.set(ref, id);
+      this.replacing.set(id, t);
       if (tax.total > 0) this.pendingWithhold.set(ref, tax);
     }
     const out: Step[] = [];
     for (let i = 0; i < lines.length; i += 30) out.push(because(why, ...lines.slice(i, i + 30)));
     return out;
+  }
+
+  private isReplacing(agreement: string, t: number): boolean {
+    const since = this.replacing.get(agreement);
+    return since !== undefined && t - since < 2 * DAY && [...this.pendingOrder.values()].includes(agreement);
+  }
+
+  /** A change of pay left for a later look (the latest for an agreement is the one kept). */
+  private holdRise(agreement: string, at: number, wage: number, why: string, short?: number) {
+    const kept = this.due.findIndex((d) => d.held && d.agreement === agreement);
+    if (kept >= 0) this.due.splice(kept, 1);
+    this.due.push({ at, agreement, wage, why, short, held: true });
   }
 
   /** The organisation's wants, where the post that runs it has them (docs/behaviour/firm-wants.md). */
@@ -1891,7 +1934,7 @@ export class Staffing {
     for (const d of now) {
       this.due.splice(this.due.indexOf(d), 1);
       if (this.noticed.has(d.agreement) || !this.staff(book, t).some((a) => a.id === d.agreement)) { this.cuts.delete(d.agreement); continue; }
-      steps.push(...this.raise(book, t, account, 0, d.why, { agreement: d.agreement, wage: d.wage }));
+      steps.push(...this.raise(book, t, account, 0, d.why, { agreement: d.agreement, wage: d.wage, short: d.short }));
     }
     return steps;
   }

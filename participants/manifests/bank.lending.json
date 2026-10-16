@@ -1,6 +1,6 @@
 {
   "name": "bank.lending",
-  "version": "0.4.4",
+  "version": "0.5.0",
   "doc": "docs/behaviour/credit.md",
   "params": {
     "arrears_days": {
@@ -90,9 +90,31 @@
       "default": 0,
       "source": "placeholder"
     },
+    "notice_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 14,
+      "source": "placeholder"
+    },
     "part": {
       "schema": {},
       "source": "the world gives it (no default)"
+    },
+    "pay_staff": {
+      "schema": {
+        "type": "boolean"
+      },
+      "default": false,
+      "source": "placeholder"
+    },
+    "period": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 1209600,
+      "source": "placeholder"
     },
     "rate_bps": {
       "schema": {

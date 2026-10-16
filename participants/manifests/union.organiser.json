@@ -63,13 +63,6 @@
       "default": 7,
       "source": "placeholder"
     },
-    "cases_per_day": {
-      "schema": {
-        "type": "integer"
-      },
-      "default": 2,
-      "source": "placeholder"
-    },
     "claim_margin_bps": {
       "schema": {
         "type": "integer",

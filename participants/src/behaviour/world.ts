@@ -254,7 +254,7 @@ export const transfers: BehaviourModule = {
   routines: [{ task: "pay_claims", at: "office", every: 1, what: "Each working day the office's staff decide the claims that have waited their time, the oldest first: a claim that meets the conditions the support law states for its payment is granted, in writing, and paid each period from then until the claimant asks for it to stop, dies, leaves, or its time runs out, which the staff tell them. A claim that does not meet the conditions, or that the staff could not verify, is not refused by the staff: it is put before whoever holds the office, as a note on the office's file saying what it fails on, and decided by them on the office's decision form; a claim they grant on that form is paid by the staff like any other. A request to review a refusal comes to the office-holder.",
     papers: [{ kind: "benefit_claim", how: "decided by the support law's conditions: granted and paid if it meets them, put before the office-holder if it does not or could not be verified" }, { kind: "benefit_change", how: "a claimant's own request to stop their payment: it is stopped" }] }],
   issues: [...P.SUPPORT, P.REMEDY_ANSWER, ...P.VENUE_ANSWERS],
-  version: "0.7.0", // 0.7.0: a claim made before the year began and still waiting (an opening caseload) is decided when its processing time from that day has run; a claim refused before it is decided; a refusal asked about that the paper says could not be verified is found wrong on review; 0.6.0: payments in force before the year (grants brought forward on paper) are taken up when the file is first opened and paid from the day each names; 0.5.0: run in parts where a model holds the office (part): the staff decide and pay what the law's conditions settle under a standing order (pay_claims) and put a refusal or a doubt before the office-holder, who decides it on the office's decision form and answers reviews; a town run by code is unchanged; 0.4.0: a claim may wait to be decided (processing_days), the staff decide so many a day (capacity_per_day), and some qualifying claims are wrongly refused, more while a backlog stands (error_bps, at the friction dial); asked to review a refusal found wrong, the office decides the next claim on its facts
+  version: "0.8.0", // 0.8.0: no processing time, daily capacity or doubled errors under backlog: it decides every claim it has, and how many is the hours of whoever decides (foundations F6); 0.7.0: a claim made before the year began and still waiting (an opening caseload) is decided when its processing time from that day has run; a claim refused before it is decided; a refusal asked about that the paper says could not be verified is found wrong on review; 0.6.0: payments in force before the year (grants brought forward on paper) are taken up when the file is first opened and paid from the day each names; 0.5.0: run in parts where a model holds the office (part): the staff decide and pay what the law's conditions settle under a standing order (pay_claims) and put a refusal or a doubt before the office-holder, who decides it on the office's decision form and answers reviews; a town run by code is unchanged; 0.4.0: a claim may wait to be decided (processing_days), the staff decide so many a day (capacity_per_day), and some qualifying claims are wrongly refused, more while a backlog stands (error_bps, at the friction dial); asked to review a refusal found wrong, the office decides the next claim on its facts
   doc: "docs/behaviour/boundary.md",
   cadence: () => DAY,
   firstWake: () => 0,
@@ -264,11 +264,8 @@ export const transfers: BehaviourModule = {
         account: "", // the account it pays from where a payment names none (the world must say)
         year: 365 * DAY,
         publish_every_days: 0,
-        // Under load (docs/behaviour/boundary.md, "Under load"): a claim is decided this many days after it is made (0:
-        // the day it is seen); the staff decide this many a day (0: no limit); of the claims that qualify, this share (basis
-        // points) is wrongly refused at the friction dial, twice as many while more claims wait than a day's capacity.
-        processing_days: 0,
-        capacity_per_day: 0,
+        // Mistakes (docs/behaviour/boundary.md, "Mistakes"): of the claims that qualify, this share (basis points) is wrongly
+        // refused, at the friction dial. (How long a claim takes is the hours of whoever decides it, not a number here: foundations F6.)
         error_bps: 0,
         respond: {} as object,
         // Which part of the office this is (docs/behaviour/standing-work.md): "" the whole office, as code runs it;
@@ -293,8 +290,6 @@ export const transfers: BehaviourModule = {
     const wronglyRefused = new Set<string>(); // claims refused though the claimant qualified
     const claimNth = new Occurrences(); // which claim each is: this person's nth for this payment, not its number on file
     const reviewed = new Set<string>(); // person|payment: a refusal reviewed and found wrong, so the next claim is decided on its facts
-    let decidedDay = -1;
-    let decidedToday = 0;
     type Paying = { person: string; account: string; payment: string; from: string; amount: number; every: number; next: number; until?: number; then?: string };
     const paying = new Map<string, Paying>(); // claim -> what we pay under it
     let opened = false; // our file has been opened once (payments in force before the year are taken up then)
@@ -385,11 +380,9 @@ export const transfers: BehaviourModule = {
               ...(Number.isSafeInteger(d.data.until) ? { until: d.data.until as number } : {}), ...(rule?.lasts?.then ? { then: rule.lasts.then } : {}) });
           }
         }
-        // Claims: granted if the claimant fits the payment's rule; the first payment one period on. A claim waits its
-        // processing time; the staff decide the oldest first, so many a day; more waiting than a day's capacity is a
-        // backlog, and hurried staff make more mistakes.
-        const day = Math.floor(t / DAY);
-        if (day !== decidedDay) { decidedDay = day; decidedToday = 0; }
+        // Claims: granted if the claimant fits the payment's rule; the first payment one period on. The office decides the
+        // oldest first, every one it has; how many it gets through is the hours of whoever decides (a system's lanes, a
+        // person's timeline), which the kernel keeps: each decision is an act that takes its maker's time.
         // (Who does the routine now: the whole office; its staff while their standing order is in force; the office-holder never.)
         const working = !!routines.does(book, TASK, t, { every: DAY });
         const staff = p.part === "staff";
@@ -407,11 +400,8 @@ export const transfers: BehaviourModule = {
               say("benefit_decision", `Claim ${d.claim} refused${why ? `: ${why}` : ""}.`, { to: [d.claimant], visible: [d.claimant, me], basis: d.claim, data: { claim: d.claim, payment: d.payment, granted: false, ...(why ? { reason: why } : {}) } })));
           }
         }
-        const waiting = !working ? [] : book.open("benefit_claim").filter((r) => (r.addressed_to ?? []).includes(me) && !decided.has(r.id) && t >= madeAt(r) + p.processing_days * DAY).sort((a, b) => madeAt(a) - madeAt(b) || (a.id < b.id ? -1 : 1));
-        const backlog = p.capacity_per_day > 0 && waiting.length > p.capacity_per_day;
+        const waiting = !working ? [] : book.open("benefit_claim").filter((r) => (r.addressed_to ?? []).includes(me) && !decided.has(r.id)).sort((a, b) => madeAt(a) - madeAt(b) || (a.id < b.id ? -1 : 1));
         for (const c of waiting) {
-          if (p.capacity_per_day > 0 && decidedToday >= p.capacity_per_day) break;
-          decidedToday++;
           decided.add(c.id);
           const who = c.speaks_for!;
           const payment = String(c.data?.payment);
@@ -421,7 +411,7 @@ export const transfers: BehaviourModule = {
           // A claim that qualifies may be wrongly refused (a record not matched, a form read wrongly), unless the refusal of
           // this person's claim for this payment has already been reviewed and found wrong.
           if (d.ok && dial > 0 && p.error_bps > 0 && !reviewed.has(`${who}|${payment}`)) {
-            const share = Math.min(10_000, p.error_bps * (backlog ? 2 : 1));
+            const share = Math.min(10_000, p.error_bps);
             if (ctx.rng(`claim-error-${claimNth.key(c.id, who, payment)}`).below(10_000) < Math.floor((share * dial) / 10_000)) {
               d = { ok: false, why: "the claim could not be verified" };
               wronglyRefused.add(c.id);
@@ -448,7 +438,7 @@ export const transfers: BehaviourModule = {
           const why = !d.ok && d.why ? `: ${d.why}` : "";
           steps.push(because(d.ok ? `A claim for ${payment} support from someone it's for (aged ${age}): granted, at ${usd(d.amount)} every ${rule!.every_days} days${lasting}.` : `A claim for ${payment} support that doesn't qualify${why}: refused.`,
             say("benefit_decision", d.ok ? `Claim ${c.id} granted: ${usd(d.amount)} every ${rule!.every_days} days${lasting}.` : `Claim ${c.id} refused${why}.`, {
-              to: [who], visible: [who, me], basis: c.id, data: { claim: c.id, payment, granted: d.ok, ...(p.processing_days > 0 || p.capacity_per_day > 0 ? { waited_days: Math.floor((t - madeAt(c)) / DAY) } : {}), ...(d.ok ? { amount: d.amount, every: rule!.every_days * DAY, ...(d.until !== undefined ? { until: d.until } : {}) } : d.why ? { reason: d.why } : {}) },
+              to: [who], visible: [who, me], basis: c.id, data: { claim: c.id, payment, granted: d.ok, ...(d.ok ? { amount: d.amount, every: rule!.every_days * DAY, ...(d.until !== undefined ? { until: d.until } : {}) } : d.why ? { reason: d.why } : {}) },
             })));
         }
         // Asked to review a refusal (the claimant's request): answered from the office's own books. Never the staff's.

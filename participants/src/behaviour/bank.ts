@@ -75,7 +75,7 @@ export const bankPaymentSystem: BehaviourModule = {
     { what: "request", why: "A bank keeps its own customers' instructions: every standing order and payment request it is asked to carry out is addressed to it." },
     { what: "accounts", why: "The ledger is the bank's own book: it keeps its customers' accounts, and pays from them as they instruct." },
   ],
-  version: "0.17.0", // 0.17.0: each payment carries what its payer said it was for (the line on a statement: docs/behaviour/firms.md, "Wages owed"); 0.16.0: a withdrawal of a standing instruction, of a hold, or an instruction that replaces another, is acted on only from whoever may instruct on the paying account; anyone else is answered and the instruction stands. 0.15.0: its list of a customer's standing instructions says of each who gave it, when, and what it cites. 0.14.0: it keeps a ledger of what it has paid in and out of each account, and a letter is answered with a statement from it (until then, with the payments new at that look: nearly always none)
+  version: "0.17.1", // 0.17.1: the payer of a standing order into a dead person's account is told at each payment, not once (a letter to an office nobody held was lost, and the wage went on for good: foundations F6); 0.17.0: 0.17.0: each payment carries what its payer said it was for (the line on a statement: docs/behaviour/firms.md, "Wages owed"); 0.16.0: a withdrawal of a standing instruction, of a hold, or an instruction that replaces another, is acted on only from whoever may instruct on the paying account; anyone else is answered and the instruction stands. 0.15.0: its list of a customer's standing instructions says of each who gave it, when, and what it cites. 0.14.0: it keeps a ledger of what it has paid in and out of each account, and a letter is answered with a statement from it (until then, with the payments new at that look: nearly always none)
   doc: "docs/behaviour/bank-payment-system.md",
   cadence: () => DAY,
   firstWake: () => 0,
@@ -366,15 +366,16 @@ export const bankPaymentSystem: BehaviourModule = {
           continue;
         }
         if (Number.isInteger(d.every) && d.every > 0) {
-          // A standing order into the account of someone we've been told has died: the payer is told, once (how an
-          // employer comes to know: docs/behaviour/deaths.md). It is still carried out, into the estate.
+          // A standing order into the account of someone we've been told has died: the payer is told at each payment until
+          // it stops it (how an employer comes to know: docs/behaviour/deaths.md; a letter to an office with nobody in it is lost, so
+          // it says so again at the next). It is still carried out, into the estate.
           const was = nextDue.get(ins.id);
           let due = was ?? firstDue(ins, d.every);
           // (Said when a payment under it next falls due, so that it is said at the same moment however often the
           // order is gone through.)
           const payee = due <= obs.t ? custody().get(d.to) : undefined;
-          if (payee && dead.has(payee.holder) && !done.has(`died:${ins.id}`)) {
-            done.add(`died:${ins.id}`);
+          if (payee && dead.has(payee.holder) && !done.has(`died:${ins.id}:${due}`)) {
+            done.add(`died:${ins.id}:${due}`);
             refusals.push(message([ins.author === "genesis" ? ins.speaks_for ?? me : ins.in_position ?? ins.author], PAYEE_DIED.note(payee.holder, d.to, ins.id), ins.id));
           }
           const until = Math.min(obs.t, lastCall.get(ins.id)?.until ?? obs.t);

@@ -46,7 +46,9 @@ test("a death is seen, reported, registered, and the world's people act on it", 
   // stopped work and stays at home.)
   const beenIn = new Set([...config.world.occupancy.map((o: any) => `${o.occupant}|${o.space}`), ...ev.filter((e) => e.event === "occupied").map((e) => `${e.occupant}|${e.space}`)]);
   const livedWith = (d: { person: string; t: number }) => housemates(d).filter((m) => beenIn.has(`${m}|${homeOf.get(d.person)}`));
-  const stillThere = (d: { person: string; t: number }) => [...new Set(ev.filter((e) => e.event === "occupied" && e.space === homeOf.get(d.person) && e.occupant !== d.person && e.t > d.t && e.t <= d.t + 3 * DAY).map((e) => e.occupant as string))];
+  // (Someone who came in and left the town within the three days was not there to report it: in one run of this town a household left an hour after
+  // the death and the landlord found it. Foundations F6: the draws of this scenario moved with the town's new posts.)
+  const stillThere = (d: { person: string; t: number }) => [...new Set(ev.filter((e) => e.event === "occupied" && e.space === homeOf.get(d.person) && e.occupant !== d.person && e.t > d.t && e.t <= d.t + 3 * DAY && (leftTown.get(e.occupant) ?? Infinity) > d.t + 3 * DAY).map((e) => e.occupant as string))];
   const shared = early.filter((d) => housemates(d).length > 0 && (livedWith(d).length > 0 || stillThere(d).length === 0));
   const withOthers = early.filter((d) => !shared.includes(d) && stillThere(d).length > 0);
   const alone = early.filter((d) => !shared.includes(d) && !withOthers.includes(d));
@@ -99,15 +101,15 @@ test("a death is seen, reported, registered, and the world's people act on it", 
     // dividend say, the bank passes on to the heirs.)
     const wageOrders = new Set(ev.filter((e) => e.event === "recorded" && e.record.kind === "request" && /^Wages for /.test(e.record.data?.outcome?.money?.for ?? "")).map((e) => e.record.id));
     for (const o of config.world.records) if (o.kind === "request" && o.data?.outcome?.money?.for === "wages") wageOrders.add(o.id);
-    // FOUND AND NOT FIXED (foundations F5, docs/decisions.md): the staff of the town's own bodies (administrative officers, bank and tribunal officers,
-    // property managers and the rest, hired with a role of their own) are paid by standing orders that no payroll duty watches: nothing withdraws one
-    // when its worker dies or leaves. Left out here until F6 gives each body one; every employer that runs a payroll is held to it.
+    // Wages stop for every employer that has anyone left to stop them (foundations F6): a body's payroll officer does what any employer's
+    // payroll does, and a post whose holder has died is filled from the body's own staff (participants/src/behaviour/payroll.ts). Left out
+    // here: an employer whose only employee was the one who died. Nobody of the organisation is left to act in it, and the law that is
+    // missing is an owner's or a board's power to appoint (docs/behaviour/staffing.md, "What is not done").
     const job = config.world.records.find((x: any) => x.record === "agreement" && x.terms.template === "employment" && x.terms.parties[1] === who);
-    const noPayroll = / as (administrative officer|bank officer|tribunal officer|ombudsman's officer|conciliation officer|electoral officer|registry officer|reporter|union officer|utility officer|property manager|officer in charge|practice manager|principal) /.test(job?.terms?.text ?? "");
-    // FOUND AND NOT FIXED (foundations F5): a person who holds a post and dies leaves it vacant, and nothing appoints a successor: an employer
-    // whose manager dies has nobody to withdraw anyone's standing order (a shop's, here). Left out until F6 gives a post its succession.
+    const employees = config.world.records.filter((x: any) => x.record === "agreement" && x.terms.template === "employment" && x.terms.parties[0] === job?.terms?.parties?.[0]).length;
     const heldAPost = config.positions.some((x: any) => x.holder === `${who}-self`);
-    if (!noPayroll && !heldAPost) expect(after.filter((x) => holder.get(x.to) === who && x.t > r.t + 15 * DAY && wageOrders.has(x.per_instruction)).length).toBe(0);
+    // (A post held by the dead is empty for a few days until the body fills it, and the new holder then hears of the death at the next pay day: a pay period more.)
+    if (!(heldAPost && employees <= 1)) expect(after.filter((x) => holder.get(x.to) === who && x.t > r.t + (heldAPost ? 35 : 15) * DAY && wageOrders.has(x.per_instruction)).length).toBe(0);
   }
   // An estate is left with nothing: what was there, and what comes in later (a dividend), goes on to the heirs, but
   // for anything that came in the last few days.
@@ -150,7 +152,8 @@ test("a death is seen, reported, registered, and the world's people act on it", 
   // nothing when its time is up, here only theirs, since anyone else refused for no longer acting would be a fault;
   // and a partner gone to work while a conception was under way, "isn't near". Both turned up when the run became a
   // different one, 2026-10-08.)
-  const diedDoing = (e: any) => e.code === "participant_inactive" && diedAt.has(String(e.participant).replace(/-self$/, "")) && e.t >= diedAt.get(String(e.participant).replace(/-self$/, ""))!;
+  // (Or a body's deputy appointing one of its staff who had died too, in the days before anyone told it: the next look names another. Foundations F6.)
+  const diedDoing = (e: any) => e.code === "participant_inactive" && (/-(deputy|payroll)(-deputy)?$/.test(e.as ?? "") || (diedAt.has(String(e.participant).replace(/-self$/, "")) && e.t >= diedAt.get(String(e.participant).replace(/-self$/, ""))!));
   const partnerGone = (e: any) => e.code === "too_far" && / isn't near /.test(e.detail ?? "");
   // (And, when the run's course changed again on 2026-10-08: someone on their way home, brought there meanwhile by
   // another of the household moving them in; their own arrival finds them already there.)

@@ -8,7 +8,7 @@ import { channels } from "../contracts";
 import { cents } from "../money";
 import { params, type BehaviourModule, type ParticipantContext } from "../module";
 import { because, Book, commitmentOf, DAY, MONTH, offer, ownAccount, pay, record, say, sign, type Step, usd, Asked, lookUp, LOOKS_MAX } from "./common";
-import { stepper } from "./firms";
+import { Staffing, stepper } from "./firms";
 import * as P from "./papers";
 
 /**
@@ -148,7 +148,7 @@ export const lending: BehaviourModule = {
     { what: "request", why: "The bank's own files: its customers' instructions, among them the repayments of the loans this office made." },
     { what: "accounts", why: "The bank's own ledger: it keeps its customers' accounts, and a lending office reads what an applicant holds with it." },
   ],
-  version: "0.4.4", // 0.4.4: repayments missed before the year began, by the bank's statement of the loan account on file (an opening caseload), are counted as due and none repaid, and a letter of arrears already on file is not sent again; 0.4.3: a loan it offered is read from its own file where it is not in its head, so whoever holds the office pays out what was approved; 0.4.2: a loan standing at the start is counted from its own repayment day where it names one (attrs.first_due), not from the bank's first look; 0.4.1: main's 0.3.1 with this branch's 0.4.0 (an applicant is looked up)
+  version: "0.5.0", // 0.5.0: pays the bank's own staff and files and pays over the tax withheld from them, as any employer's payroll does (`pay_staff`; foundations F6); 0.4.4: 0.4.4: repayments missed before the year began, by the bank's statement of the loan account on file (an opening caseload), are counted as due and none repaid, and a letter of arrears already on file is not sent again; 0.4.3: a loan it offered is read from its own file where it is not in its head, so whoever holds the office pays out what was approved; 0.4.2: a loan standing at the start is counted from its own repayment day where it names one (attrs.first_due), not from the bank's first look; 0.4.1: main's 0.3.1 with this branch's 0.4.0 (an applicant is looked up)
   doc: "docs/behaviour/credit.md",
   cadence: () => DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(24) * 3600,
@@ -169,6 +169,9 @@ export const lending: BehaviourModule = {
         funding_from: null as string | null, // who lends the bank money when it's short (an entity outside)
         funding_rate_bps: 500, // what that funding costs, a year
         who: "", // its channel onto who's who, where it looks up what kind of applicant it has ("": it knows what it is shown)
+        // The bank's own staff (foundations F6): the payroll of an employer is done by someone of it, and nobody but the lending office
+        // may be shown the bank's whole file of instructions, among which the wages it pays are only a few. "": it pays no staff.
+        pay_staff: false, period: 14 * DAY, notice_days: 14,
       },
       ctx.params,
     );
@@ -189,10 +192,13 @@ export const lending: BehaviourModule = {
     let termsOffered = false;
     const paidOut = new Map<string, number>(); // a loan -> when a payment of ours that settles it was seen to leave (its principal paid out)
     let adopted = false; // loans in force when we first looked (the world's: mortgages already being repaid), taken on
+    let payrollDay = -1;
+    const payroll = p.pay_staff ? new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, role: "staff", does: { hire: false, pay: true }, wakes: DAY }) : undefined;
 
     return stepper(
       (obs: Observation) => {
         book.absorb(obs);
+        payroll?.absorb(obs);
         own = own ?? ownAccount(obs)?.account;
         for (const tx of channels.transactions(obs)) {
           if (own && tx.from === own && tx.settles && !paidOut.has(tx.settles)) paidOut.set(tx.settles, tx.t);
@@ -403,6 +409,12 @@ export const lending: BehaviourModule = {
             if (funderAccount) funding -= repay;
             steps.push(s);
           }
+        }
+        // The bank's own staff are paid and their tax paid over as any employer's: starts, stops (a death), returns on the law's days.
+        // (Once a day, not at every wake: it goes through the bank's whole file of instructions, and the office wakes for every application and letter.)
+        if (payroll && own && Math.floor(obs.t / DAY) > payrollDay) {
+          payrollDay = Math.floor(obs.t / DAY);
+          steps.push(...payroll.routine(obs, book, own, { target: 0, wage: 0, canPost: false }));
         }
         return steps;
       },
