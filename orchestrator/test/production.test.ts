@@ -68,8 +68,14 @@ test("goods are made from inputs by workers' hours, exported within each factory
   const perDay = new Map<string, number>();
   const startOf = workStarts(ev);
   for (const w of made) for (const p of w.performers) {
-    const k = `${p}|${Math.floor(startOf.get(w)! / DAY)}`; // (the day the work starts: it takes hours; F1)
-    perDay.set(k, (perDay.get(k) ?? 0) + Math.ceil(w.labour / w.performers.length));
+    // (A work that runs past midnight counts on each day it is done on, as the kernel counts it: review of the foundations, finding 9.)
+    for (let at = startOf.get(w)!, left = Math.ceil(w.labour / w.performers.length); left > 0;) {
+      const day = Math.floor(at / DAY), take = Math.min(left, (day + 1) * DAY - at);
+      const k = `${p}|${day}`;
+      perDay.set(k, (perDay.get(k) ?? 0) + take);
+      at += take;
+      left -= take;
+    }
   }
   expect(Math.max(...perDay.values())).toBeLessThanOrEqual(config.catalogue.working_day);
   // Inputs come from outside at the world price the world market lists when they're ordered, paid with the order (or on its terms).

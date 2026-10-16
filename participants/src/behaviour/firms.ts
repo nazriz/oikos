@@ -670,8 +670,14 @@ export const landlord: BehaviourModule = {
       if (reviewMonths) for (const a of active) {
         // (A lease we've offered to renew isn't reviewed: the new one carries its rent, and its own reviews.)
         if (noticeGiven.has(a.id) || renewed.has(a.id)) continue;
-        const since = lastReview.get(a.id) ?? book.signedAt(a.id)!;
+        // (A review period runs from the notice on the record, not from the moment we decided: the notice is made a few
+        // minutes later, by how long it takes to say, and counting from the decision gave two notices a little under a period apart.)
+        let since = lastReview.get(a.id) ?? book.signedAt(a.id)!;
+        for (const n of book.open("rent_increase")) if (n.speaks_for === me && n.data?.lease === a.id && n.at > since && n.at <= t) since = n.at;
         if (t - since < reviewMonths * MONTH) continue;
+        // (A tenancy that ends before a new rent could begin, the tenant having given notice, has no rent to review.)
+        const ends = book.endsAt(a.id);
+        if (ends !== undefined && ends <= t + noticeDays * DAY) continue;
         const tenant = tenantOf(a);
         const unit = owned.find((o) => o.space === leaseTerms(a, tenant).space);
         if (!unit) continue;
