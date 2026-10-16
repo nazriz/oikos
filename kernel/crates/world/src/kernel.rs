@@ -625,7 +625,7 @@ impl World {
     /// `apply`, for a caller that has just prechecked this command against the world as it is (nothing done since).
     pub fn apply_prechecked(&mut self, cmd: &Command) -> Result<Output, ProtocolError> {
         Ok(match cmd {
-            Command::Act { participant, position, blocks, by, thinking, .. } => self.begin(participant, position.as_deref(), blocks, by, thinking.unwrap_or(0)),
+            Command::Act { participant, position, blocks, by, thinking, .. } => self.begin(participant, position.as_deref(), blocks, by, thinking.unwrap_or(0), None),
             Command::Advance { to } => self.advance(*to, false),
             Command::AdvanceToNews { to } => self.advance(*to, true),
             // (What a participant perceives is perception's to build, read-only; the engine then has the world deliver it.)
@@ -780,8 +780,8 @@ impl World {
 
     /// An act begun: its actor is busy with it for the time it takes (the world's `act_time`), after any thinking, and
     /// it takes effect when done (docs/design/rebuild.md 6.2, 6.3).
-    fn begin(&mut self, participant: &str, position: Option<&str>, blocks: &[Block], by: &[Id], thinking: i64) -> Output {
-        let action = self.state.mint("act");
+    fn begin(&mut self, participant: &str, position: Option<&str>, blocks: &[Block], by: &[Id], thinking: i64, again: Option<Id>) -> Output {
+        let action = again.clone().unwrap_or_else(|| self.state.mint("act"));
         let t = self.state.t;
         let p = &self.state.participants[participant];
         let (actor, key, lanes) = match p.kind {
@@ -836,13 +836,18 @@ impl World {
         // of its performers are free, and is done when the last of them is. (What the work would be is read from a dry
         // run of the act as the world stands; if it would be refused, nobody's time is taken for it.)
         let mut shares: BTreeMap<Id, i64> = BTreeMap::new();
+        let mut refused_to_place: Option<String> = None;
         let mut late = false; // work the world could not yet show would be done (someone not there until the act is): placed when it takes effect
         if !others.is_empty() || blocks.iter().any(|b| matches!(b, Block::Work { .. })) {
             let mut scratch = self.state.clone();
             if let Ok(res) = exec_action(&self.s, &mut scratch, participant, position, blocks, by) {
                 shares = work_shares(&res.events);
             } else {
-                late = true;
+                late = again.is_none();
+                // (An act begun again for its hours, and no longer to be done: it is refused when due, not done unpaid.)
+                if again.is_some() {
+                    refused_to_place = Some(format!("{participant}'s work could not be placed on its performers' time"));
+                }
             }
         }
         for (w, share) in &by_shares {
@@ -861,7 +866,7 @@ impl World {
         // A performer's working day: what is already placed on it, and this act's share, within the day's hours.
         let mut start = start;
         let mut day_idx = crate::exec::day_of(start);
-        let mut over = self.over_the_day(&shares, day_idx);
+        let mut over = self.over_the_day(&shares, day_idx).or(refused_to_place);
         if over.is_some() {
             // (No room in their day: the act is refused, and its actor hears so now, not when the crew would have been free.)
             shares.clear();
@@ -917,6 +922,17 @@ impl World {
     /// An act done: applied now, as a whole (or refused), and its outcome delivered at the actor's next observation.
     fn act(&mut self, action: Id, participant: &str, position: Option<&str>, blocks: &[Block], by: &[Id], placed: crate::state::Placed) -> Output {
         let t = self.state.t;
+        // Work the dry run could not place when the act began (a performer or an input not there until it was): its hours are
+        // the performers' time, and its effect never comes before them. Now that it can be done, it is begun again, from now: the
+        // hours are placed and it takes effect when they are over. (law 2: "the act is done when they are")
+        if placed.late && placed.over.is_none() && can_act(&self.state.participants[participant]) {
+            let mut scratch = self.state.clone();
+            if let Ok(res) = crate::exec::exec_action_seen(&self.s, &mut scratch, participant, position, blocks, by, Some(&placed.seen), false) {
+                if !work_shares(&res.events).is_empty() || !by.is_empty() {
+                    return self.begin(participant, position, blocks, by, 0, Some(action));
+                }
+            }
+        }
         let mut late_shares: BTreeMap<Id, i64> = BTreeMap::new();
         let result = if !can_act(&self.state.participants[participant]) {
             Err(refuse(RefusalCode::ParticipantInactive, format!("{participant} no longer acts")))

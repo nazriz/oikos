@@ -161,3 +161,31 @@ fn f8_each_performer_is_charged_their_own_time() {
     let (starts, done) = r.events.iter().find_map(|e| match &e.body { EventBody::ActionStarted { starts, done, .. } => Some((*starts, *done)), _ => None }).unwrap();
     assert_eq!(done - starts, 1, "the system did it: its template's row, not the person's 2,400 s");
 }
+
+/// Finding 2: work the dry run at order time could not place (a performer who is not there until later) takes effect only
+/// when its performers' hours are spent, not a second after the order.
+#[test]
+fn f2_work_that_could_not_be_checked_when_ordered_takes_effect_after_its_hours() {
+    let mut c = world(&default_params());
+    c["orchestration"]["act_time"] = json!({"person": {"occupy": 100, "vacate": 1}, "system": {"message": 200, "work": 1}});
+    let mut run = start(c);
+    let goods = |run: &R| run.kernel().state().holding("devco", "s-shop", "goods");
+    // Carol leaves the shop, and starts back (she is there from t=102); the developer is busy for 200 s, then orders her work
+    // at t=2, when she is not there: a dry run at the order refuses it.
+    run.command(&cmd("carol-self", None, json!([{"block": "vacate", "occupant": "carol", "from": "s-shop"}]))).unwrap();
+    run.command(&Command::Advance { to: 2 }).unwrap();
+    assert!(run.kernel().state().structures_of("carol").is_empty());
+    run.command(&cmd("carol-self", None, json!([{"block": "occupy", "space": "s-shop/workplace.1", "who": "carol"}]))).unwrap();
+    run.command(&cmd("developer-system", Some("developer"), hi())).unwrap();
+    let make = cmd("developer-system", Some("developer"), json!([{"block": "work", "task": "make", "units": 4, "at": "s-shop", "performers": ["carol"]}]));
+    let before = goods(&run);
+    let r = run.command(&make).unwrap();
+    let done = r.events.iter().find_map(|e| match &e.body { EventBody::ActionStarted { done, .. } => Some(*done), _ => None }).unwrap();
+    assert!(done < 300, "ordered behind the developer's other time: done at {done}");
+    run.command(&Command::Advance { to: done + 60 }).unwrap();
+    assert_eq!(goods(&run), before, "the output landed a minute after the order, before its two hours were spent");
+    run.command(&Command::Advance { to: done + 4 * 1_800 + 100 }).unwrap();
+    assert!(goods(&run) > before, "and it lands when they are spent");
+    // The hours are carol's, from when the work could begin.
+    assert!(run.kernel().state().timelines["carol"].iter().copied().max().unwrap() >= done + 4 * 1_800);
+}
