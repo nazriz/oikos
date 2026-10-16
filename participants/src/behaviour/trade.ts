@@ -215,7 +215,8 @@ export class OrderBook {
       const owing = r.amount - (this.invoiced.get(r.order) ?? 0);
       this.claimedAccounts.set(r.account, (this.claimedAccounts.get(r.account) ?? 0) + 1);
       const st = because(`${r.buyer} has not paid for the ${r.quantity} ${r.kind} we delivered on terms (order ${r.order}, ${usd(owing)}), ${Math.floor((t - r.since) / DAY - r.days)} days past the day: recording the debt against them.`,
-        record("right", this.me, { kind: "debt", amount: owing, account: sellerAccount, for: `${r.quantity} ${r.kind} delivered on terms, order ${r.order}: unpaid.` }, { against: r.buyer, basis: r.order }));
+        // (Bound as `claim`, so the world tells us the claim's id: a payment that settles it is then known for what it is.)
+        ["claim", record("right", this.me, { kind: "debt", amount: owing, account: sellerAccount, for: `${r.quantity} ${r.kind} delivered on terms, order ${r.order}: unpaid.` }, { against: r.buyer, basis: r.order })]);
       st.then = (out) => { const id = out.created?.claim; if (id) this.claimed.set(id, r.account); };
       steps.push(st);
     }
