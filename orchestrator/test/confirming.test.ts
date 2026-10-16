@@ -18,7 +18,7 @@ test("a seat's standing instructions say what confirming means, once, right afte
     expect(s).toContain(`Before anything takes effect, you'll see exactly what will happen, and confirm or decline it. ${CONFIRMING} You can also write to people directly.`);
   }
   // The seat's instructions changed, so its version did: a run's record says which a seat was given.
-  expect(LLM_PARTICIPANT_VERSION).toBe("0.18.0"); // (0.18.0: the office's own file at every sitting, the standing instructions unchanged; 0.17.1: the day's list brings a seat back; 0.17.0: the way out under framings other than honest disclosure; 0.16.0: the notebook's fold; the sentence on confirming is 0.15.0's)
+  expect(LLM_PARTICIPANT_VERSION).toBe("0.18.1"); // (0.18.1: only the no-turn return and a turn for what falls due; 0.18.0: the office's own file at every sitting, the standing instructions unchanged; 0.17.1: the day's list brings a seat back; 0.17.0: the way out under framings other than honest disclosure; 0.16.0: the notebook's fold; the sentence on confirming is 0.15.0's)
 });
 
 test("nothing else a seat is told of confirming contradicts it: not its instructions, its tools, or the words a draft comes with", () => {

@@ -77,9 +77,9 @@ export function staffingOwn(o: { role?: string; industry?: string; workplace?: s
 export const REMEDY_ANSWER: Issued = {
   form: "remedy_answer", title: "Answer to a request to put something right",
   does: "Answers someone who has asked the office in writing to put something right: yes or no, and where money is owed them and paid, how much. It does nothing by itself: what puts the thing right (a payment, a repair ordered, a paper withdrawn) is done besides.",
-  fields: { request: f("record", "The request answered.", req), to: f("entity", "Who asked.", req), matter: f("text", "What it is about, in the word the request uses.", req), granted: f("choice", "Whether it will be put right.", { ...req, options: YES_NO }),
+  fields: { request: f("record", "The request answered.", req), asker: f("entity", "Who asked.", req), matter: f("text", "What it is about, in the word the request uses.", req), granted: f("choice", "Whether it will be put right.", { ...req, options: YES_NO }),
     amount: f("amount", "Where money is owed them and paid: how much."), reason: f("text", "Where it is refused: why.") },
-  writes: { kind: "remedy_answer", text: "Answer to your request {request}: {granted}.", basis: "=request", to: ["=to"], visible: ["=to", "=self"], data: { request: "=request", matter: "=matter", granted: "?granted", amount: "#amount", reason: "=reason" } } };
+  writes: { kind: "remedy_answer", text: "Answer to your request {request}: {granted}.", basis: "=request", to: ["=asker"], visible: ["=asker", "=self"], data: { request: "=request", matter: "=matter", granted: "?granted", amount: "#amount", reason: "=reason" } } };
 
 /** The answer to a body that hears grievances, told of an application against the office (frictions.ts, `Respondent`). */
 const venueAnswer = (form: string, kind: string, title: string): Issued => ({
@@ -255,8 +255,8 @@ export const TRIBUNAL_REGISTRAR: Issued[] = [
     writes: { sends: [{ to: ["@enforcer"], why: "They carry the tribunal's warrants out: nobody else may." }], kind: "warrant", text: "Warrant of possession under order {order}: {tenant} and their household are to be removed from {home}, and possession given to {landlord}. To be carried out no sooner than {not_before} and by {until}.", basis: "=order", to: ["@enforcer"], visible: ["@enforcer", "=self", "=tenant", "=landlord"],
       data: { order: "=order", lease: "=lease", tenant: "=tenant", landlord: "=landlord", space: "=home", structure: "=building", household: "=household", not_before: "=not_before", until: "=until" } } },
   { form: "enforcement_decline", title: "A request to enforce, declined", does: "Tells whoever asked for an order to be enforced, or for a warrant, that it is declined: there is no such order to them to enforce. It does nothing else.",
-    fields: { request: f("record", "The request declined.", req), to: f("entity", "Who asked.", req) },
-    writes: { kind: "enforcement_decline", text: "Declined: no such order to you to enforce (request {request}).", basis: "=request", to: ["=to"], visible: ["=to", "=self"] } },
+    fields: { request: f("record", "The request declined.", req), asker: f("entity", "Who asked.", req) },
+    writes: { kind: "enforcement_decline", text: "Declined: no such order to you to enforce (request {request}).", basis: "=request", to: ["=asker"], visible: ["=asker", "=self"] } },
 ];
 
 // ------------------------------------------------------------------ landlords
@@ -359,8 +359,8 @@ export const POLICE: Issued[] = [
     fields: { warrant: f("record", "The warrant.", req), lease: f("record", "The lease.", req), landlord: f("entity", "The landlord.", req) },
     writes: { kind: "warrant_lapsed", text: "Warrant {warrant} was not carried out by its last day, and has lapsed.", basis: "=warrant", to: ["=landlord"], visible: ["=self", "=landlord"], data: { warrant: "=warrant", lease: "=lease" } } },
   { form: "investigation_closed", title: "An investigation closed", does: "Tells whoever reported a crime that its investigation is closed, and whether it was solved.",
-    fields: { report: f("record", "The report.", req), to: f("entity", "Who reported it.", req), solved: f("choice", "Whether it was solved.", { ...req, options: YES_NO }) },
-    writes: { kind: "investigation_closed", text: "Report {report}: closed; solved {solved}.", basis: "=report", to: ["=to"], visible: ["=self", "=to"], data: { report: "=report", solved: "?solved" } } },
+    fields: { report: f("record", "The report.", req), reporter: f("entity", "Who reported it.", req), solved: f("choice", "Whether it was solved.", { ...req, options: YES_NO }) },
+    writes: { kind: "investigation_closed", text: "Report {report}: closed; solved {solved}.", basis: "=report", to: ["=reporter"], visible: ["=self", "=reporter"], data: { report: "=report", solved: "?solved" } } },
 ];
 
 // ------------------------------------------------------------------ the union

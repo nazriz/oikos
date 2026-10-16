@@ -6,7 +6,7 @@
 // support payments, industry shares...) comes from the spec's profile (worlds/profiles/, docs/profiles.md), and what
 // isn't there is derived from it here by general formulas, or is a placeholder of the town's own shape.
 
-import { DECISION_KIND, decisionsInWords, returnsOf, returnsInWords, BOOKS, drawValues, raisedValues, UPBRINGING, adultAgeBands, bedroomsNeeded, declarationFor, drawHousehold, drawSavings, formatMoney, inCurrency, planLaw, planLawWords, POSSESSION_ANSWER, possessionOrderFor, forms as formWords, modules, votedWords, Randomness, chargesInWords, dayPayPeriod, forAge, forOutOfWork, linesInWords, paymentsInWords, tabledLines, yearInDays, stopsWorkAt, withholding, withholdingInWords, yearsOfSchooling, draftLaw, type HouseholdSpec, type IncomeTaxLaw, type Issued, type LawSchedule, type PaymentRule, type DecisionLaw, type Taken } from "@oikos/participants";
+import { particularsOf, DECISION_KIND, decisionsInWords, returnsOf, returnsInWords, BOOKS, drawValues, raisedValues, UPBRINGING, adultAgeBands, bedroomsNeeded, declarationFor, drawHousehold, drawSavings, formatMoney, inCurrency, planLaw, planLawWords, POSSESSION_ANSWER, possessionOrderFor, forms as formWords, modules, votedWords, Randomness, chargesInWords, dayPayPeriod, forAge, forOutOfWork, linesInWords, paymentsInWords, tabledLines, yearInDays, stopsWorkAt, withholding, withholdingInWords, yearsOfSchooling, draftLaw, type HouseholdSpec, type IncomeTaxLaw, type Issued, type LawSchedule, type PaymentRule, type DecisionLaw, type Taken } from "@oikos/participants";
 import law from "../law/basic.json";
 import schedules from "../law/schedules.json";
 import { loadProfile, type Profile } from "./profile";
@@ -1628,7 +1628,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
         const by = (days - ago) * DAY + 9 * 3600;
         paper(id, "application", applicant, [venue], [applicant, venue, against], undefined,
           `Application: ${matter.replace(/_/g, " ")} against ${against}${extra.structure ? `; at ${extra.structure}` : ""}; we asked them first and it was not put right.`,
-          { kind: matter, matter, against, ...extra, request: "asked before the year began" }, ago);
+          { kind: matter, matter, against, ...extra, particulars: particularsOf({ matter, party: against, since: -ago * DAY, ...extra, asked: { t: -ago * DAY } }, 0), request: "asked before the year began" }, ago);
         paper(`notice-${id}`, "complaint_notice", venue, [applicant, against], [applicant, against, venue], id,
           `${applicant} has applied to us about ${matter.replace(/_/g, " ")} (application ${id}). You may answer by ${formWords.dateWords(by)}.`,
           { application: id, kind: matter, matter, applicant, against, hearing_at: by, answer_by: by, ...(extra.about ? { about: extra.about } : {}), ...(extra.structure ? { structure: extra.structure } : {}), ...(extra.seeks ? { seeks: extra.seeks } : {}) }, ago);
@@ -2828,7 +2828,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   office("outside-support", "outside", "Support payments", undefined,
     [{ id: "ledger", kind: "accounts" }, K.mine("claims", ["benefit_claim", "benefit_change", "benefit_decision", "case_for_decision", DECISION_KIND.evidence, DECISION_KIND.confirmation]),
       // (And, where things go wrong: what is asked of it, and what a body that hears such things tells it and decides.)
-      ...(FR ? [K.mine("reviews", [DECISION_KIND.request, DECISION_KIND.review, "complaint_notice", "venue_decision", "hearing_notice", "tribunal_order", "benefit_decision"])] : []),
+      ...(FR ? [K.mine("reviews", [DECISION_KIND.request, DECISION_KIND.review, "complaint_notice", "venue_decision", "hearing_notice", "tribunal_order", "benefit_decision", DECISION_KIND.answer, "complaint_response", "tribunal_response"])] : []),
       K.mine("gone", ["death_registration", "departure"]), lawBook,
       ...(PAYMENTS.some((r) => r.who?.record || "share_bps" in r.amount) || DECISIONS.some((d) => d.needs?.some((n) => n.from === "employer")) ? [K.mine("contributions", ["withholding_report"])] : [])],
     code("world.transfers", { account: "acc-outside", publish_every_days: 30,

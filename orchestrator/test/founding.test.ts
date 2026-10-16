@@ -89,7 +89,8 @@ const LIVING = "living.initiative_bps=10000";
 // (Re-taken again on 2026-10-16 at foundations F7: how often a decision, a bill or a pay goes wrong is a row of the table of slips and drawn by slip(), from streams of other names; f8b4c87e... until then.)
 // (Re-taken again on 2026-10-16 at foundations F11: a register's keeper answers in its own time; e52dc970... until then.)
 // (Re-taken on 2026-10-16 at foundations F8: the support office asks for papers before it decides, looks at a refusal again when asked, and the tribunal hears an appeal at the law's fee; the profile's routes are published as `law-decisions`; f28ffd82... until then.)
-const STEP_2B = "2c3cfde920fab65d6dea5662df7e254e96f5042c6c52e28bc507fd79c3e6fdeb";
+// (Re-taken on 2026-10-16, pilot 7 fixes: applications carry their particulars, and the opening caseload's say so in words; 2c3cfde9... until then.)
+const STEP_2B = "e5a4d08af8d54171ac37e993a98e5868d8124de38e7f4687ccb1f089b04f9eca";
 
 test("with founding off a living town is step 2b's town, to the state hash; turned on with no shape to found, nobody does anything they did not do before", async () => {
   const out = mkdtempSync(join(tmpdir(), "oikos-founding-"));

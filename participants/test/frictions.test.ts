@@ -8,7 +8,7 @@ import { expect, test } from "bun:test";
 import { citizen } from "../src/behaviour/citizen";
 import { Book, callAction } from "../src/behaviour/common";
 import { desk, Hearings, HEARING_DEFAULTS, hearingOffer } from "../src/behaviour/desk";
-import { chancePpm, frictionDial, PAPER, Respondent } from "../src/behaviour/frictions";
+import { chancePpm, frictionDial, hasParticulars, PAPER, particularsOf, Respondent } from "../src/behaviour/frictions";
 import { inCurrency } from "../src/money";
 import { OUTCOMES } from "../src/module";
 import { Randomness } from "../src/rng";
@@ -115,6 +115,23 @@ test("where the other side cannot say from its records, someone who can show a p
   expect(bare(10_000)).toBe("pay");
 });
 
+test("an application that says nothing of what it is about is dismissed with leave to apply again; one that states its particulars is decided as before (a member would turn the first away)", () => {
+  const cannot = [3, [response("p1", 3 * DAY, "a1", { known: false })]] as [number, any[]];
+  // Nothing but the matter, the other side and when it was asked: no paper, place, sum, thing sought or evidence.
+  const bare = heard({ uphold_bps: { other: 10_000 } }, [[1, [application("a1", DAY, { matter: "goods", against: "shop-1", request: "asked on day -3" })]], cannot]).out;
+  expect(bare[1]!.data).toMatchObject({ finding: "dismissed", no_particulars: true });
+  // The same, with no answer (where the applicant's account would otherwise stand): the same.
+  expect(heard({}, [[1, [application("a1", DAY, { matter: "goods", against: "shop-1" })]]]).out[1]!.data).toMatchObject({ finding: "dismissed", no_particulars: true });
+  // With what the applicant knows of the dispute and its dates, it is heard: the account stands in default, and a sum is ordered where one is sought.
+  const stated = { matter: "goods", against: "shop-1", particulars: particularsOf({ matter: "goods", party: "shop-1", since: -3 * DAY, asked: { t: -2 * DAY }, answer: "ignored" }, DAY) };
+  expect(heard({}, [[1, [application("a1", DAY, stated)]]]).out[1]!.data).toMatchObject({ finding: "do" });
+  expect(heard({}, [[1, [application("a1", DAY, { ...stated, amount: 700 })]]]).out[1]!.data).toMatchObject({ finding: "pay", amount: 700 });
+  expect([{}, { matter: "goods" }, { particulars: " " }].map(hasParticulars)).toEqual([false, false, false]);
+  expect([{ about: "o1" }, { structure: "house-1" }, { seeks: "repair" }, { amount: 5 }, { evidence: {} }, { particulars: "x" }].map(hasParticulars)).toEqual([true, true, true, true, true, true]);
+  // The words: no sum is made up where the person's record has none.
+  expect(particularsOf({ matter: "bill", party: "energy-co", since: -3 * DAY, asked: { t: -3 * DAY } }, 0)).toBe("bill against energy-co; it arose 3 days before the year began; we asked them 3 days before the year began; made on year 1, day 1.");
+});
+
 test("a venue says so when it does not hear a matter, and decides every case whose time has run: how many a day is its members' hours, which the kernel keeps", () => {
   const not = heard({}, [[1, [application("a1", DAY, { matter: "noise", against: "c9" })]]]).out;
   expect(not.map((x) => [x.kind, x.data.finding])).toEqual([[PAPER.decision, "rejected"]]);
@@ -201,6 +218,8 @@ test("someone underpaid who acts asks the employer; refused, takes it to a body 
   expect(app.args.basis).toBe("h1");
   expect(app.args.data).toMatchObject({ kind: "underpaid", matter: "underpaid", against: "factory-1", amount: 6_000, account: "acc-c1" });
   expect(app.args.data.evidence).toBeDefined(); // (the agreement, tendered)
+  // What an applicant writes on the form, from their own record: the dispute, the paper, the sum, the dates.
+  expect(app.args.data.particulars).toMatch(/^underpaid against factory-1, about J1; the sum: \$60\.00; it arose on year 1, day \d+; we asked them on year 1, day \d+ and they refused; made on year 1, day \d+\.$/);
   const t = app.t;
   const decision = statement("dec-1", t + 20 * DAY, PAPER.decision, { speaks_for: "ombudsman", addressed_to: ["c1", "factory-1"], visible_to: ["c1", "factory-1", "ombudsman"], data: { application: "x", matter: "underpaid", applicant: "c1", against: "factory-1", finding: "pay", binding: false, amount: 6_000, to: "acc-c1", due: t + 48 * DAY } });
   await p.wake(t + 21 * DAY, { records: [decision] });
