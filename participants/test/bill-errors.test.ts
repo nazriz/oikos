@@ -70,7 +70,7 @@ test("at a high rate some bills overstate the units by the given share and say t
 });
 
 /** A customer's request to put a bill right, as the citizen sends one. */
-const ask = (id: string, at: number, who: string, about: string) => statement(id, at, "remedy_request", { speaks_for: who, addressed_to: [ME], visible_to: [who, ME],
+const ask = (id: string, at: number, who: string, about: string) => statement(id, at, "review_request", { speaks_for: who, addressed_to: [ME], visible_to: [who, ME],
   data: { matter: "bill", against: ME, about, amount: 99_999, account: `acc-${who}` } });
 
 test("asked about a wrong bill, the retailer says yes and pays back exactly the overcharge; about a right bill, it says no and pays nothing", () => {

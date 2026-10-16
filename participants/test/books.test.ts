@@ -116,7 +116,7 @@ test("a tenant's request with no answer of ours is in the book until answered", 
   const b = landlordBooks(ctx("landlord-1"));
   b.absorb(obs(0, "landlord-1", [lease("lease-a", "a", 100_000), ...signed("lease-a", "a"),
     st("rec.9", 5 * DAY, "variation_request", "a", { addressed_to: ["landlord-1"], text: "Request: please let us stay on.", data: { agreement: "lease-a", about: "lease-a" } }),
-    st("rec.10", 6 * DAY, "remedy_request", "a", { addressed_to: ["landlord-1"], data: { matter: "disrepair", against: "landlord-1", structure: "apts-1" } })], account));
+    st("rec.10", 6 * DAY, "review_request", "a", { addressed_to: ["landlord-1"], data: { matter: "disrepair", against: "landlord-1", structure: "apts-1" } })], account));
   const open = b.open(7 * DAY);
   expect(head(open, "Tenants' requests to vary something, not answered")!.items[0]).toMatchObject({ id: "rec.9", since: 5 * DAY });
   expect(head(open, "Requests to put something right, not answered")!.items[0]!.line).toContain("a asks us to put right disrepair at apts-1");

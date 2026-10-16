@@ -14,6 +14,7 @@ import { cents } from "../money";
 import { dateWords } from "../forms";
 import { params, type BehaviourModule, type ParticipantContext } from "../module";
 import { slip, type Slipper } from "../slip";
+import { appealLaw } from "./decisions";
 import { because, Book, CounterWork, DAY, noting, Occurrences, say, StandingWork, type Step, usd } from "./common";
 import { stepper } from "./firms";
 import { PAPER, responseTo, type Finding, type Matter } from "./frictions";
@@ -26,6 +27,8 @@ export interface Hears {
   undoes?: boolean;
   form?: string;
   within?: number;
+  /** What applying about this costs, where it differs from the body's own fee (the law on a decision's appeal states its own: foundations F8). */
+  fee?: number;
 }
 
 export interface HearingParams {
@@ -55,6 +58,7 @@ export function hearingOffer(me: string, hears: Hears[], o: { fee?: number; acco
   } as Offer;
 }
 
+const isBinding = (can: readonly string[]) => can.includes("order");
 interface Case { id: string; matter: string; applicant: string; against: string; at: number; answerBy: number; data: Matter & { [k: string]: any }; hears: Hears }
 
 /**
@@ -188,6 +192,21 @@ export class Hearings {
         say2(c, "rejected", "it names nobody it is against.", {}, "An application against no one: saying so.");
         continue;
       }
+      // An appeal against a decision (the law's, foundations F8): the days it may be made in, counted from the decision, or from the answer to a review
+      // where the law makes a review come first. The applicant tenders the dates from their own papers; a venue that cannot set aside takes the matter as it is.
+      const law = isBinding(can) ? appealLaw(book, matter) : undefined;
+      if (law?.appeal) {
+        const decided = Number((d as any).evidence?.at ?? (d as any).decided_on), reviewed = Number((d as any).reviewed_on);
+        const from = law.review?.required ? (Number.isFinite(reviewed) ? reviewed : undefined) : Number.isFinite(decided) ? decided : undefined;
+        if (law.review?.required && from === undefined) {
+          say2(c, "rejected", `the law asks that the decision be looked at again by the office that made it before it is appealed, and there is no answer to that on the papers.`, {}, `An appeal (${matter.replace(/_/g, " ")}) without the review the law asks first: saying so.`);
+          continue;
+        }
+        if (from !== undefined && Math.floor((a.at - from) / DAY) > law.appeal.within_days) {
+          say2(c, "rejected", `an appeal is to be made within ${law.appeal.within_days} days of ${law.review?.required ? "the answer to the review" : "the decision"}, and this was made ${Math.floor((a.at - from) / DAY)} days after.`, { out_of_time: true }, `An appeal (${matter.replace(/_/g, " ")}) outside the ${law.appeal.within_days} days the law allows: saying so.`);
+          continue;
+        }
+      }
       this.cases.set(a.id, c);
       steps.push(because(`An application (${matter.replace(/_/g, " ")}) by ${applicant} against ${against}: telling ${against}, who has until day ${Math.floor(c.answerBy / DAY)} to answer.`,
         say(this.forms.notice, `${applicant} has applied to us about ${matter.replace(/_/g, " ")}${d.amount ? `, seeking ${usd(cents(d.amount))}` : ""} (application ${a.id}). You may answer by day ${Math.floor(c.answerBy / DAY)}${can.includes("mediate") ? ", and say whether you will meet them with us" : ""}.`,
@@ -304,9 +323,16 @@ export function hearingNotice(me: string, words: string, hears: Hears[], o: { fe
     offer: hearingOffer(me, hears, { fee: o.fee, account: o.account, members_of: o.members_of }), data: { hears: hears.map((h) => h.about), ...(fee > 0 ? { fee } : {}) } };
 }
 
+/** The notices of what a body hears: one, or one for each fee where what it hears is charged differently (an appeal the law makes free beside its other lists). */
+export function hearingNotices(me: string, words: string, hears: Hears[], o: { fee?: number; account?: string; members_of?: string; members_apply?: boolean } = {}): ReturnType<typeof hearingNotice>[] {
+  const byFee = new Map<number, Hears[]>();
+  for (const h of hears) { const fee = h.fee ?? o.fee ?? 0; byFee.set(fee, [...(byFee.get(fee) ?? []), h]); }
+  return [...byFee].sort(([a], [b]) => a - b).map(([fee, hs]) => hearingNotice(me, words, hs, { ...o, fee }));
+}
+
 export const desk: BehaviourModule = {
   name: "office.desk",
-  opens: (p, me) => ((p.hears ?? []).length && p.part !== "staff" ? [hearingNotice(me, `The ${p.title ?? "desk"} hears`, p.hears, { fee: p.fee, account: p.account, members_of: p.members_of })] : []),
+  opens: (p, me) => ((p.hears ?? []).length && p.part !== "staff" ? hearingNotices(me, `The ${p.title ?? "desk"} hears`, p.hears, { fee: p.fee, account: p.account, members_of: p.members_of }) : []),
   // (Its counter: docs/behaviour/standing-work.md. What is routine is what the procedure settles on the record.)
   routines: [{ task: "answer", at: "office", every: 1, what: "The desk's staff take in each application, tell the one it is against and give them time to answer, and decide what the record settles: the other side's own answer, no answer at all, or a paper the applicant can show. A case the record cannot settle is put before the office-holder.",
     papers: [
@@ -348,10 +374,8 @@ export const desk: BehaviourModule = {
         if (!said && p.part !== "staff") {
           said = true;
           const standing = book.open("hearing").find((r: StatementRecord) => r.speaks_for === me && r.offer?.hears);
-          if (!standing && p.hears.length) {
-            const n = hearingNotice(me, `The ${p.title} hears`, p.hears, { fee: p.fee, account: p.account, members_of: p.members_of });
+          if (!standing && p.hears.length) for (const n of hearingNotices(me, `The ${p.title} hears`, p.hears, { fee: p.fee, account: p.account, members_of: p.members_of }))
             steps.push(because("Saying what we hear, so that whoever has such a matter can bring it.", say(n.kind, n.text, { visible: "public", offer: n.offer, data: n.data as object })));
-          }
         }
         // (With a counter, and someone in the office: the staff do what the record settles, while their standing
         // order stands; the office-holder decides the rest. Without one, whoever runs the office does it all.)

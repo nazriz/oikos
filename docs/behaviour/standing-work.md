@@ -160,7 +160,7 @@ The rates notices keep the rating law's instalments: the order says that they ar
 | police | `carry_out_warrants` | on each working day an officer at the station carries out the tribunal's warrants of possession that have come to it, once the day each gives has come: goes to the home and puts out whoever of the household is there, and tells the tenant and landlord how many were; a warrant withdrawn is not gone on; one not carried out by its last day lapses |
 | police | `look_into_reports` | each working day the officers look into the reports of goods taken, in the order made and as far as their hours go; a charge to the tribunal where they find who, the report closed unsolved where not |
 | police | `call_at_homes` | each working day an officer calls at the homes the station has been asked to call at; a death found there that is not registered is reported to the registry |
-| the support office | `pay_claims` | each working day the claims that have waited their time are decided, the oldest first: one that meets the conditions the support law states is granted in writing and paid each period until it ends; one that does not, or that the staff could not verify, is put before the office-holder (`case_for_decision`) and never refused by the staff; a claimant's own request to stop is followed; the period's figures are published (see "The support office" below) |
+| the support office | `pay_claims` | each working day the claims that have waited their time are decided, the oldest first: one that meets the conditions the support law states is granted in writing and paid each period until it ends; one that does not, or that the staff could not verify, is put before the office-holder (`case_for_decision`) and, where the law says the head alone refuses, never refused by the staff; a claim waits on its file for what the decisions law says it needs (papers from the claimant, a confirmation from their last employer) before it is decided; a claimant's own request to stop is followed; the period's figures are published (see "The support office" below) |
 
 ## The police station: warrants and reports are the officers' (2026-10-12)
 
@@ -215,7 +215,7 @@ an officer decides what the procedure leaves to judgement.
 - **The staff** (`part: "staff"`, while the standing order for `pay_claims` is in force): decide each claim that has
   waited its processing time, oldest first, as many a day as they have time for. A claim that meets the conditions
   is granted (`benefit_decision`, to the claimant) and paid each period from then, stopped when the claimant asks,
-  dies, leaves or its time runs out (`benefit_end`). **The staff refuse nothing**: a claim that does not meet the
+  dies, leaves or its time runs out (`benefit_end`). **Who may refuse is the law's** (`refused_by` in the decisions law, docs/behaviour/decisions.md; foundations F8): where it says the head alone refuses, which is what every profile says, the staff refuse nothing: a claim that does not meet the
   conditions, or that they could not verify (the office's wrong refusals, at the friction dial), is put before the
   office-holder as a note on the office's file (`case_for_decision`: the claim, the claimant, what it fails on, and
   for a doubt what the law's rule would pay).

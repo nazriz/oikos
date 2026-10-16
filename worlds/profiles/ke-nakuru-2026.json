@@ -1338,6 +1338,39 @@
       "spin_up_years": 10
     },
     "founding": {"registered_per_100000_per_year": 16, "informal_multiple": 5, "chance_bps": 232, "shared_min": 2, "rest_days": 365, "dues_minutes_of_pay": [0, 10, 30, 60], "every_days": [14, 7, 28], "starts_in_days": [7, 3, 14], "lasts_minutes": [90, 60, 120], "lapse_days": 120, "min_members": 2, "leave_after_days": 90, "hall_hire_hours_of_pay": 2, "fund": {"qualify_days": 60, "draw_months": 6, "every_days": 180}, "cause": {"case_hours": 6, "hours_per_member_month": 2}},
+    "decisions": [
+      {
+        "kind": "permit_decision",
+        "name": "A decision on a planning permit",
+        "review": {
+          "within_days": 30,
+          "grounds": "any: the office looks at its decision again on the application and the laws in force"
+        }
+      },
+      {
+        "kind": "benefit_decision",
+        "name": "A decision on a claim for support",
+        "payments": [
+          "pension"
+        ],
+        "refused_by": "office-holder",
+        "needs": [
+          {
+            "id": "papers",
+            "from": "claimant",
+            "what": "proof of who you are and of the details of your claim",
+            "within_days": 14,
+            "else": "refuse"
+          }
+        ],
+        "appeal": {
+          "matter": "claim_refused",
+          "within_days": 90,
+          "grounds": "any administrative action the law lets be challenged without good reason or reasons given (fair administrative action)",
+          "fee_hours_of_pay": 0
+        }
+      }
+    ],
     "frictions": {
       "per_adult_bps_per_year": {
         "landlord": 315,
@@ -1370,6 +1403,9 @@
     }
   },
   "sources": {
+    "decisions.permit_decision": "PLACEHOLDER: an office's own second look at a planning decision within 30 days of it; the place's appeal route for a permit (to a tribunal or an inspectorate) is not built, since no one in the town yet brings a permit to a body that hears it. No source was opened for the days.",
+    "decisions": "Review and appeal of a decision on a claim for support, and what the decision waits for (docs/behaviour/decisions.md; foundations F8). Recalled, not opened.",
+    "decisions.benefit_decision.pension": "PLACEHOLDER for the programme's own appeal route (none found). The 90 days to challenge an administrative action: the Fair Administrative Action Act 2015 (recalled, to confirm); no fee assumed; no review by the office is required first. 14 days for documents is a PLACEHOLDER.",
     "culture.conducts": "What people start out holding right, for the four conducts where a figure in this profile's own outlook speaks to it (the rest start from values alone: no figure was opened). approves_bps is the national share with 'a great deal' or 'quite a lot' of confidence, as `outlook.trust` has it (World Values Survey and European Values Study, joint wave 7, as Our World in Data publishes it; opened 2026-10-11, to confirm against the survey's tables; see sources.outlook for the country and the items). Mapping, ours: answer_tribunal and take_to_tribunal <- confidence in the courts (a person who trusts the courts approves of answering a case there and of taking a wrong to it); complain <- confidence in the civil service (writing to the town is approved where the town's officers are trusted to answer); join_union <- confidence in labour unions. Weak: confidence in an institution is not approval of an act toward it, and the share above a threshold is read as a mean, as outlook does; the figure sets where people start (their own lean and their picture of what others approve), nothing else, and the lean is measured from it, so the rates stay the calibrated ones. No figure for strike, take_in, stay_past_notice, take_from_employer or an organisation's conduct (the survey's items on joining strikes and on the justifiability of stealing property were not opened); no figure by origin group (no source found that gives one). National, not the place's. does_bps is never given: a conduct's own rate in the profile.",
     "tenancy.rent_share_of_income": "PLACEHOLDER bands around one opened mean: rent was 33.3% of renting households' EXPENDITURE in Nakuru County (urban 34.6%, rural 24.5%; Kenya 36.9%) (KNBS, 2023/24 Kenya Housing Survey Basic Report, Table 4.2, https://www.knbs.or.ke/wp-content/uploads/2025/01/2023-24-Kenya-Housing-Survey-Basic-Report1.pdf, opened 2026-10-12). No income is surveyed and no distribution is published: the bands (25% under a fifth, 26% a fifth to three tenths, 32% three tenths to a half, 17% over a half) are a placeholder shaped to that mean, and expenditure is read as income. KNOWN INCONSISTENCY, recorded and left (docs/decisions.md, 2026-10-12, \"Homes by income\"): this profile's rents by bedrooms are urban flats' (one bedroom 33% of one wage here, two bedrooms 71%, a let house 163%), so the town's own shares at the start sit far above these whoever lives where. HOW IT IS USED (docs/behaviour/generator.md, \"Homes by income\"): each renting household of a new town draws its share from these bands (evenly within a band; the open band from its lower bound to twice it, at most everything), which gives the rent it carries; households and let homes are matched by it. A target as well: the town's own distribution at the start is reported beside it and is not fitted to it.",
     "support.take_up_bps": "pension 45%: TO CONFIRM, indicative only: 1,215,343 older people received the transfer in August 2024 against about 2.7 million people aged 70 and over at the 2019 census (search summaries of news and parliamentary reports; neither count was opened, and the years differ). The transfer is aimed at the poor among those of 70 and excludes anyone with another pension. HOW IT IS USED (docs/behaviour/generator.md, \"Payments in force\"): of those the payment's rule already entitles as the year begins, this share open with it in payment; the rest claim it when they first look, as before.",

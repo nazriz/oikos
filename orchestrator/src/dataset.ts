@@ -150,7 +150,7 @@ export async function exportDataset(logPath: string, outDir: string, o: DatasetO
   const frictionRows = lines(join(outDir, "frictions.jsonl"));
   const venueRows = lines(join(outDir, "venues.jsonl"));
   const frictionCounts = { arose: {} as { [k: string]: number }, ended: {} as { [k: string]: number }, papers: {} as { [k: string]: number }, findings: {} as { [k: string]: number } };
-  const PAPERS: { [kind: string]: string } = { remedy_request: "request", remedy_answer: "answer", application: "application", tribunal_application: "application", complaint_notice: "notice", hearing_notice: "notice",
+  const PAPERS: { [kind: string]: string } = { review_request: "request", remedy_answer: "answer", application: "application", tribunal_application: "application", complaint_notice: "notice", hearing_notice: "notice",
     complaint_response: "response", tribunal_response: "response", venue_decision: "decision", tribunal_order: "decision", enforcement_request: "enforcement", repair_order: "repair_order", repair_done: "repair_done" };
   // Founding and the lineage of every idea (docs/design/ai-citizens.md 10h; docs/behaviour/founding.md, "What a log
   // can show"): each thing founded, with what a composing model would be shown for it; each idea (a statement put

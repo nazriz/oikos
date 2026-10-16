@@ -100,7 +100,7 @@ function answers(records: any[], dealtWith: Set<string>) {
   const out = new Map<string, string>();
   const reqKey = new Map<string, string>();
   for (const r of records) {
-    if (r.kind !== "remedy_request" || !r.data?.matter) continue;
+    if (r.kind !== "review_request" || !r.data?.matter) continue;
     const to = String((r.addressed_to ?? [])[0]);
     if (dealtWith.has(to) || dealtWith.has(r.speaks_for)) continue;
     const base = `${r.speaks_for}>${to}:${r.data.matter}:${r.data.structure ?? ""}`;
@@ -130,7 +130,7 @@ test("papers of no effect, filed by an office that deals with nobody, change no 
   const [twin, pilot] = await Promise.all([run("twin-draws-code", {}, undefined, "ombudsman-officer"), run("twin-draws-scribe", {}, "ombudsman-officer", "ombudsman-officer")]);
   const extra = pilot.filter((r) => r.kind === "entry" && /^(Nothing to enter at|Nor here)/.test(r.text)).length;
   expect(extra).toBeGreaterThan(50);
-  const idsOf = (rs: any[]) => rs.filter((r) => r.kind === "remedy_request").map((r) => r.id).join(",");
+  const idsOf = (rs: any[]) => rs.filter((r) => r.kind === "review_request").map((r) => r.id).join(",");
   expect(idsOf(pilot)).not.toBe(idsOf(twin));
   const a = answers(twin, new Set()), b = answers(pilot, new Set());
   console.log(`twin draws: ${extra} papers of no effect; ${a.size} requests and decisions in the twin, ${b.size} beside them`);

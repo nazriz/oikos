@@ -529,7 +529,7 @@
         }
       },
       "writes": {
-        "kind": "remedy_request",
+        "kind": "review_request",
         "text": "Request: the rent for your home is {amount} in arrears. Please pay it.",
         "basis": "=lease",
         "to": [

@@ -3,13 +3,6 @@
   "version": "0.10.1",
   "doc": "docs/behaviour/government.md",
   "params": {
-    "approval_over": {
-      "schema": {
-        "type": "integer"
-      },
-      "default": 5000000,
-      "source": "placeholder"
-    },
     "budget_lines": {
       "schema": {
         "type": "object"
@@ -37,13 +30,6 @@
         "type": "object"
       },
       "default": {},
-      "source": "placeholder"
-    },
-    "mayor_position": {
-      "schema": {
-        "type": "string"
-      },
-      "default": "mayor",
       "source": "placeholder"
     },
     "notice_days": {
@@ -77,7 +63,7 @@
     "procedure": {
       "schema": {
         "type": "string",
-        "description": "the record its approval rule comes from, if the world names one: withdrawn, the rule no longer applies"
+        "description": "the record its approval rule comes from (who approves a payment over what sum: its `data.approval`); withdrawn, or none, and no approval is asked"
       },
       "default": "",
       "source": "placeholder"

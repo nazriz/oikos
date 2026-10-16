@@ -72,7 +72,8 @@ const TOWN = join(root, "worlds/town.yaml");
 // (Re-taken on 2026-10-16 at foundations F5: the town's offices are held by people, their staff hired, its systems delivered from templates that say what they do; 3fdeff6a... until then.)
 // (Re-taken on 2026-10-16 at foundations F7: news of a person's body reaches them when it happens, not at the next wake; 5e3c3fcb... until then.)
 // (Re-taken on 2026-10-16 at foundations F11: a register's keeper answers in its own time; 88f2e1f7... until then.)
-const STEP_1 = "79ea9459430760cd761172263790f6cfafc5e7e9502474802866d90e071a9e12";
+// (Re-taken on 2026-10-16 at foundations F8: the support office asks for papers before it decides, looks at a refusal again when asked, and the tribunal hears an appeal at the law's fee; the profile's routes are published as `law-decisions`; 79ea9459... until then.)
+const STEP_1 = "c5a5a00f14ee6503b84be3d764f3020c956b87b31db645771e2fafac879dd026";
 
 test("with the dial absent or at 0 a town is step 1's town, to the state hash", async () => {
   const out = mkdtempSync(join(tmpdir(), "oikos-dial-"));

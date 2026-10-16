@@ -36,6 +36,7 @@ import { ADULT_YEARS, ageAt, bedroomsNeeded, hear, householdOf, SAYING, type Hea
 import { Deliveries, goodsPrices, offerOf as shopOffer, order } from "./trade";
 import { dayPayPeriod, incomeTaxLaw, withholding } from "./tax";
 import { declarationFor, forHousehold, forOutOfWork, stopsWorkAt, supportLaw, type PaymentRule } from "./payments";
+import { daysLeft, decisionLaw, KIND as DECISION } from "./decisions";
 import { Borrowing, loanFor } from "./credit";
 import { Inner, innerParams, UPBRINGING, type InnerParams, type Outlook } from "./inner";
 import { VALUES as VALUES_OF_MIND, NEEDS as NEEDS_OF_MIND } from "./mind";
@@ -412,6 +413,7 @@ export const citizen: BehaviourModule = {
     const book = new Book();
     let home: Home | null = null;
     let job: Job | null = null;
+    let lastEmployer: string | undefined; // whose employment we last left (what a claim for support is asked to show)
     let homeSite: SiteStructure | undefined; // our home's building, as we last saw it
     let striking: { employer: string; out: boolean; left?: string } | null = null; // on strike (protected action), from our job; the workplace we left
     let backTo: { employer: string; space: string } | null = null; // the stoppage is over: back into the workplace we left
@@ -516,8 +518,9 @@ export const citizen: BehaviourModule = {
     // want about them (for one who takes initiative); whatever becomes of it is recorded for everyone.
     const fdial = frictionDial(ctx.world);
     interface Grievance { key: string; matter: string; party: string; since: number; about?: string; amount?: number; structure?: string; seeks?: string; evidence?: unknown;
-      asked?: { t: number }; answer?: "granted" | "refused" | "ignored"; promised?: number; applied: Map<string, { t: number; finding?: string }>; ordered?: { id: string; by: string; binding: boolean; due: number; amount: number; enforced?: boolean }; told?: boolean }
+      asked?: { t: number }; answer?: "granted" | "refused" | "ignored"; answeredAt?: number; promised?: number; applied: Map<string, { t: number; finding?: string }>; ordered?: { id: string; by: string; binding: boolean; due: number; amount: number; enforced?: boolean }; told?: boolean }
     const grievances = new Map<string, Grievance>();
+    const evidenceSent = new Set<string>(); // requests for papers to support a claim of ours, answered
     const gkey = (matter: string, party: string, about?: string) => `${matter}:${about ?? party}`;
     const billed = new Map<string, number>(); // a service -> what its last bill came to a day
     const billSeen = new Set<string>();
@@ -850,8 +853,8 @@ export const citizen: BehaviourModule = {
     })(), p.origin ?? undefined) : undefined;
     // ---- town memory (step 5): what we remember of what was public, in a few typed slots of our own record; only where the dial is on.
     const mem: TownMemory | undefined = cul ? new TownMemory(cul.p) : undefined;
-    /** Who carries out a removal in this world, for an event about one: the police where the world has them, else the tribunal. */
-    const removalsBy = (): string | undefined => p.welfare?.police ?? p.tribunal?.entity;
+    /** Who carries out a removal in this world, for an event about one: whoever the law on possession names (it is published: foundations F8, law 6). None where the world has no such law. */
+    const enforcerOfRemovals = (): string | undefined => { const by = book.open("law").find((r) => r.data?.tenancy === "possession")?.data?.enforced_by; return typeof by === "string" ? by : undefined; };
     /** An event has just become ours for the first time: it bears once on trust in whoever did it, by the sign of OUR view of the conduct it shows (never the platform's),
      * at its strength times `bystander_bps` and how strong that view is, whether or not we have dealt with them. Hearing it again moves nothing. */
     const bearOnTrust = (kind: EventKind, about: string, strength: number, t: number) => {
@@ -1909,6 +1912,7 @@ export const citizen: BehaviourModule = {
       if (job && t >= jobEnds(job)) {
         if (job.workplace && inside(job.workplace)) steps.push(because("Our job has ended: leaving the workplace.", moveOut(job.workplace, me)));
         outcome({ t, domain: "job", option: job.employer, kind: "ended", way: "mine", facts: { by: job.leftAt !== undefined ? "self" : endedBy(job.agreement), held_days: Math.floor((t - job.since) / DAY), ...(job.claimed ? { unpaid: true } : {}) } });
+        lastEmployer = job?.employer ?? lastEmployer;
         job = null;
         joblessSince = t;
       }
@@ -2186,7 +2190,19 @@ export const citizen: BehaviourModule = {
           const account = acc.account;
           const words = g.matter.replace(/_/g, " ");
           const data = () => ({ matter: g.matter, against: g.party, ...(g.about ? { about: g.about } : {}), ...(g.amount !== undefined ? { amount: g.amount, account } : {}), ...(g.structure ? { structure: g.structure } : {}), ...(g.seeks ? { seeks: g.seeks } : {}) });
-          if (!g.asked) out.push({ key: `ask:${g.party}`, kind: "ask", by: g.party, brings: [], bears: [g.party], adj: trustOf(g.party) - fearOf(g.party) + ag, others: after("ask"),
+          // The law's route for a refused claim (foundations F8): whether the decision may be asked to be looked at again, still, and an appeal made, and in what days.
+          const dec = g.matter === "claim_refused" && g.about ? (book.records.get(g.about) as StatementRecord | undefined) : undefined;
+          const law = dec ? decisionLaw(book, "benefit_decision", typeof dec.data?.payment === "string" ? dec.data.payment : g.seeks) : undefined;
+          const decidedAt = dec?.at ?? (typeof (g.evidence as any)?.at === "number" ? (g.evidence as any).at : undefined);
+          const mayAsk = !law || (!!law.review && decidedAt !== undefined && daysLeft(decidedAt, law.review.within_days, t) >= 0);
+          const mayApply = (): boolean => {
+            if (!law) return true;
+            if (law.review && !g.answer) return false;
+            if (!law.appeal) return false;
+            const from = law.review?.required ? g.answeredAt : decidedAt;
+            return from !== undefined && daysLeft(from, law.appeal.within_days, t) >= 0;
+          };
+          if (!g.asked && mayAsk) out.push({ key: `ask:${g.party}`, kind: "ask", by: g.party, brings: [], bears: [g.party], adj: trustOf(g.party) - fearOf(g.party) + ag, others: after("ask"),
             act: () => {
               g.asked = { t };
               steps.push(because(`Asking ${g.party} to put it right (${words}${g.amount ? `, ${usd(g.amount)}` : ""}).`,
@@ -2195,7 +2211,7 @@ export const citizen: BehaviourModule = {
             } });
           // (A venue is for what asking did not settle: one goes there after the other side has said no, said
           // nothing, or said yes and not done it. It is a bother, in forms and waiting, whatever it costs in money.)
-          for (const h of g.answer && g.answer !== "granted" ? book.hearings() : []) {
+          for (const h of (g.answer && g.answer !== "granted") || (law && !law.review) ? (mayApply() ? book.hearings() : []) : []) {
             const venue = h.speaks_for ?? h.author;
             const entry = h.offer?.hears?.find((x) => x.about === g.matter);
             if (!entry || venue === g.party || venue === me || g.applied.has(venue)) continue;
@@ -2209,7 +2225,7 @@ export const citizen: BehaviourModule = {
                 g.applied.set(venue, { t });
                 steps.push(because(`Taking it to ${venue}, which hears such things (${words} against ${g.party})${cost ? `, with its fee of ${usd(cost)}` : ""}.`,
                   say(entry.form ?? PAPER.application, `Application: ${words} against ${g.party}${g.amount ? `; ${usd(g.amount)} is owed to us` : ""}${g.structure ? `; at ${g.structure}` : ""}${g.asked ? `; we asked them ${Math.floor((t - g.asked.t) / DAY)} days ago${g.answer === "refused" ? " and they refused" : g.answer === "ignored" ? " and had no answer" : ""}` : ""}.`,
-                    { to: [venue], visible: [me, venue, g.party], basis: h.id, data: { kind: g.matter, ...data(), ...(g.asked ? { request: `asked on day ${Math.floor(g.asked.t / DAY)}` } : {}), ...(g.evidence !== undefined ? { evidence: g.evidence } : {}) } }),
+                    { to: [venue], visible: [me, venue, g.party], basis: h.id, data: { kind: g.matter, ...data(), ...(g.asked ? { request: `asked on day ${Math.floor(g.asked.t / DAY)}` } : {}), ...(g.evidence !== undefined ? { evidence: g.evidence } : {}), ...(decidedAt !== undefined ? { decided_on: decidedAt } : {}), ...(g.answeredAt !== undefined ? { reviewed_on: g.answeredAt } : {}) } }),
                   ...(cost > 0 ? [pay(String(fee.to), cost, { from: account, for: "Application fee." })] : [])));
                 return h.id;
               } });
@@ -2813,11 +2829,20 @@ export const citizen: BehaviourModule = {
       for (const r of fresh) {
         if (r.record !== "statement" || !(r.addressed_to ?? []).includes(me)) continue;
         const by = r.speaks_for ?? r.author;
+        // An office that waits for papers before it decides our claim asks for them (the law's, foundations F8): we send what we have, as a person does
+        // when a letter comes, if it is for a claim of ours and we have not answered it.
+        if (r.kind === DECISION.evidence_request && typeof r.data?.claim === "string" && typeof r.data?.need === "string" && by !== me && !evidenceSent.has(r.id)) {
+          evidenceSent.add(r.id);
+          steps.push(because(`${by} asks for papers for our claim ${r.data.claim} (${String(r.data.what ?? "what the law asks")}): sending them.`,
+            say(DECISION.evidence, `For my claim ${r.data.claim}: ${String(r.data.what ?? "the papers asked for")}, as asked.`, { to: [by], visible: [me, by], basis: r.id, data: { claim: r.data.claim, need: r.data.need, request: r.id, ...(lastEmployer || job?.employer ? { last_employer: lastEmployer ?? job!.employer } : {}) } })));
+          continue;
+        }
         if (r.kind === PAPER.answer) {
           const g = [...grievances.values()].find((x) => x.matter === r.data?.matter && x.party === by && x.asked && !x.answer);
           if (!g) continue;
           const ok = !!r.data?.granted;
           g.answer = ok ? "granted" : "refused";
+          g.answeredAt = t;
           const rd = readOf(r.id);
           learn("way", "ask", ok ? 10_000 : 1_000, { t, kind: ok ? "granted" : "refused", way: "mine", from: by, facts: { about: g.matter } });
           const moved = landing(rd, by, ok, t, { tried: ok, trust: ok ? 2 : 1 });
@@ -3576,7 +3601,8 @@ export const citizen: BehaviourModule = {
           if (benefits.get(payment)?.claim === r.data?.claim) benefits.delete(payment);
           ranOut.add(payment);
         }
-        if (r.kind !== "benefit_decision" || !claiming.has(payment)) continue;
+        // (A refusal put right by the office on a second look, or set aside by a venue: the decision that grants it comes when we are no longer claiming.)
+        if (r.kind !== "benefit_decision" || !(claiming.has(payment) || (r.data?.on_review && r.data?.granted === true && !benefits.has(payment)))) continue;
         const rule = rules.find((x) => x.id === payment);
         if (r.data?.granted) benefits.set(payment, { claim: r.data.claim, payment, payer: rule?.payer ?? r.speaks_for!, amount: r.data.amount, every: r.data.every, lasting: !!rule && !forOutOfWork(rule) });
         else {
@@ -4026,7 +4052,7 @@ export const citizen: BehaviourModule = {
     const witnessAround = (around: SiteStructure[], t: number) => {
       if (!mem || !cul) return;
       const W = cul.p, ours = new Set<string>([me, ...(household?.members ?? []).map((m) => m.person)]);
-      const by = removalsBy();
+      const by = enforcerOfRemovals();
       if (by) for (const st of around) for (const sp of st.spaces) for (const d of sp.left ?? []) {
         if (d.reason !== "removed" || ours.has(d.occupant) || d.at > t || t - d.at > W.witness_days * DAY) continue;
         if (!mem.newSighting(`${sp.space}|${d.occupant}|${d.at}`)) continue;

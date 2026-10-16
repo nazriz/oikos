@@ -40,7 +40,12 @@ const executed = (recs: any[]) => recs.filter((r) => r.kind === "warrant_execute
 
 test("a mock seat in the station over 330 days: the warrants are carried out as in the code twin, by the officers, under the orders in force at the start", async () => {
   const twin = await run({}, 330, false), seat = await run({}, 330, true);
-  const a = executed(twin), b = executed(seat);
+  // The station's work is on the warrants both towns issued: when a warrant is issued is the tribunal's and its landlord's, and a seat in the station is a person's time spent, so
+  // a town elsewhere is another town from there (foundations F8: with the support office asking for papers and looking at its refusals again, the twin issued a warrant on day 225 that
+  // the town with the seat never did; no seed of 1 to 9 had two matching warrants and the same set issued in both). It is held to: every warrant both issued is carried out in both.
+  const issuedIn = (recs: any[]) => new Set(recs.filter((r) => r.kind === "warrant").map((r) => r.data?.lease));
+  const both = (recs: any[]) => executed(recs).filter((x) => issuedIn(twin).has(x.warrant) && issuedIn(seat).has(x.warrant));
+  const a = both(twin), b = both(seat);
   expect(a.length).toBeGreaterThanOrEqual(2);
   expect(b.map((x) => x.warrant)).toEqual(a.map((x) => x.warrant));
   // (How many of a household were at home when the officer came is the hour's: it is not held equal.)

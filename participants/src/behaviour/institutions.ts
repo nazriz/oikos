@@ -5,6 +5,7 @@
 // and applies them to what it can see, because that is its job, and
 // (depending on its parameters) it may do the job well, badly, or not at all.
 
+import { Reconsiderations } from "./decisions";
 import { amount, cents, moneyNow } from "../money";
 import * as C from "../calls";
 import type { LookRequest, Observation, SiteStructure, StatementRecord } from "../contracts";
@@ -78,7 +79,7 @@ export const planningOfficer: BehaviourModule = {
   name: "city.planning_officer",
   answers: {"office": "the planning office", "acts": "What it acts on: an application for a planning permit on the permit form (permit_application), which it decides under the planning law.", "forms": [{"about": ["permit", "build", "applic", "develop"], "say": "An application to build goes on the permit form (permit_application), naming the lot and the kind of building."}], "report": true},
   issues: P.PLANNING,
-  version: "0.10.0", // 0.10.0: its decision form records the liberty to build beside a decision to grant (FormWrites `claim`), as the code office does; 0.9.1: its decision form says what records the permission (the liberty to build, beside the decision); 0.9.0: the town's land from the town's own papers; no longer shown the land register or a survey of the town
+  version: "0.11.0", // 0.11.0: looks at a refusal again when asked inside the days the law gives, and records that it did (foundations F8); 0.10.0: its decision form records the liberty to build beside a decision to grant (FormWrites `claim`), as the code office does; 0.9.1: its decision form says what records the permission (the liberty to build, beside the decision); 0.9.0: the town's land from the town's own papers; no longer shown the land register or a survey of the town
   doc: "docs/behaviour/institutions.md",
   cadence: () => 7 * DAY,
   create(ctx: ParticipantContext) {
@@ -90,6 +91,7 @@ export const planningOfficer: BehaviourModule = {
     const decided = new Set<string>();
     const decided_: { application: string; decision: "granted" | "refused" | "incomplete"; law?: string }[] = [];
     const letters = new Letters(planningOfficer.answers);
+    const recon = new Reconsiderations(ctx.entity, ["permit_decision"]); // a refusal looked at again when asked inside the days the law gives (foundations F8)
     return noting(book, stepper(
       (obs) => {
         book.absorb(obs);
@@ -128,6 +130,24 @@ export const planningOfficer: BehaviourModule = {
           if (!refuse) step.unshift(record("liberty", applicant, { action: "build", object: app.data?.lot, structure_type: app.data?.structure_type }, { basis: app.id }));
           steps.push(step);
         }
+        // Asked to look at a refusal again: the law applied once more to the application as it stands, with the laws now in force, without the draw of
+        // whether the office follows them (a review does); a permit it would now grant is granted, with the liberty to build that goes with it.
+        steps.push(...recon.steps(book, obs.t, (dec, req) => {
+          if (dec.data?.decision !== "refused") return { changed: false, found: "the permit was not refused", steps: [] };
+          const app = typeof dec.data?.application === "string" ? (book.records.get(dec.data.application) as StatementRecord | undefined) : undefined;
+          if (!app || app.record !== "statement" || app.speaks_for !== req.speaks_for) return { changed: false, found: "the application is not on our file, or is not the asker's", steps: [] };
+          const granting = { block: "grant_permit", lot: app.data?.lot, structure_type: app.data?.structure_type };
+          const habitat = p.habitat_law ? book.current(p.habitat_law) : undefined;
+          const register = book.open("habitat_register").sort((a, b) => b.at - a.at)[0];
+          const onHabitat = habitat && ((register?.data?.lots as string[] | undefined) ?? []).includes(app.data?.lot);
+          const breached = prohibitions(book).find((l) => holdsOf(book, l, { block: granting, actor: app.speaks_for!, now: obs.t })) ?? (onHabitat ? habitat : undefined);
+          if (breached) return { changed: false, found: `it would still breach ${breached.id}`, steps: [] };
+          const grant = say("permit_decision", `Permit granted to build ${app.data?.structure_type} on ${app.data?.lot}, on a second look.`,
+            { to: [app.speaks_for!], basis: app.id, data: { application: app.id, decision: "granted", on_review: req.id, replaces: dec.id } });
+          const step: Step = because(`Asked to look at our refusal ${dec.id} again: nothing we know of forbids it now; granting.`, grant);
+          step.unshift(record("liberty", app.speaks_for!, { action: "build", object: app.data?.lot, structure_type: app.data?.structure_type }, { basis: app.id }));
+          return { changed: true, found: "no law in force forbids it now", steps: [step] };
+        }));
         steps.push(...letters.answer(() => {
           // (Its own decisions, as it made them: its channels show it applications, not what it published in reply, so
           // until 2026-10-02 the report said "39 decided: 0 granted, 0 refused", and pilot 7e's mayor asked why.)

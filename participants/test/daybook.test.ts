@@ -30,13 +30,13 @@ const mk = (open: () => OpenHeading[] = () => []) => new DayBook({ entity: ME, a
 test("a notice paid shows as paid, with its day and what it settled; a request not carried out shows as not yet; what followed a paper is named", () => {
   const d = mk();
   d.absorb(seen(31 * DAY, [pay("rec.21698", 31 * DAY, "acc-city", 297_786, "rec.19352"), pay("rec.30000", 32 * DAY, "acc-city", 500_000, "rec.19400"),
-    paper("rec.6495", "remedy_request", 6 * DAY, { addressed_to: ["c2396"], text: "Request: the rent for your home is KSh 14,000.00 in arrears. Please pay it." })], [tx(31 * DAY, `acc-${ME}`, "acc-city", 297_786, "rec.19352")]));
+    paper("rec.6495", "review_request", 6 * DAY, { addressed_to: ["c2396"], text: "Request: the rent for your home is KSh 14,000.00 in arrears. Please pay it." })], [tx(31 * DAY, `acc-${ME}`, "acc-city", 297_786, "rec.19352")]));
   d.absorb(seen(40 * DAY, [{ id: "rec.7000", record: "statement", kind: "tenant_payment_note", author: "c2396-self", speaks_for: "c2396", at: 20 * DAY, basis: "rec.6495", text: "Paid.", addressed_to: [ME], visible_to: [ME, "c2396"] }]));
   const text = d.text(41 * DAY, "Letting office");
   expect(text).toContain("The office's own file, year 1, day 42");
   expect(text).toContain("year 1, day 32: paid KSh 2,977.86 to the city, settling rec.19352");
   expect(text).toContain("asked the bank to pay KSh 5,000.00 to the city, settling rec.19400 (rec.30000); no payment out of the account seen yet");
-  expect(text).toContain("remedy request to Wanjiru");
+  expect(text).toContain("review request to Wanjiru");
   expect(text).toContain("followed year 1, day 21 by a tenant payment note");
   expect(text).not.toContain("rec.21698; no payment"); // (the paid one is not also listed as waiting)
 });

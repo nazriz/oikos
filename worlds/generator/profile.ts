@@ -172,6 +172,18 @@ export interface Profile {
     frictions?: { per_adult_bps_per_year: { landlord: number; wages: number; bill: number; benefits: number; goods: number }; put_right_on_asking_bps: { [matter: string]: number };
       pay_short_by_bps: number; bill_over_bps: number; goods_faulty_share_bps: number; repair_hours: number; support: { wrong_refusal_bps: number };
       venues: { answer_days: number; tribunal_days: number; tribunal_fee_hours_of_pay: number; uphold_without_proof_bps: number } };
+    /** What a decision waits for, and how it is reviewed and appealed (docs/behaviour/decisions.md; foundations F8): a list of rules, each for a kind of
+     * decision (the kind of statement the office makes: `benefit_decision`) and, where the place's law differs by payment, for named payments only.
+     * `needs`: what the decision waits for before it is made (papers from the claimant, a confirmation from their last employer), within so many days,
+     * and `else` what comes of it when they do not come (`refuse`, or `decide` on what is on hand). `review`: the office looks at its own decision again
+     * if asked within so many days, on what grounds, and whether an appeal lies only after it (`required`). `appeal`: the matter a venue that can set the
+     * decision aside hears (`claim_refused`), within so many days, on what grounds, and its fee in hours of ordinary pay (0: none). `refused_by`: where the
+     * office is a head and staff, whether the head alone may refuse. Each with its source (`sources["decisions.<kind>.<payment or all>"]`), or marked
+     * "PLACEHOLDER" or "(to confirm)". A route a place's law lacks is left out (no `review`: no internal reconsideration). */
+    decisions?: { kind: string; name: string; payments?: string[]; refused_by?: "office-holder" | "staff";
+      needs?: { id: string; from: "claimant" | "employer"; what: string; within_days: number; else: "refuse" | "decide" }[];
+      review?: { within_days: number; grounds: string; required?: boolean };
+      appeal?: { matter: string; within_days: number; grounds: string; fee_hours_of_pay: number } }[];
     /** Founding (docs/behaviour/founding.md), read only for a living town that turns it on: how often new associations
      * are registered here (`registered_per_100000_per_year`, with its source; code never reads it) and how many more
      * are never registered (`informal_multiple`, a placeholder), which together are what `chance_bps` (the chance at

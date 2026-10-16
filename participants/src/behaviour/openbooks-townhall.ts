@@ -8,7 +8,7 @@ import { basesOf, channels, type Observation, type StatementRecord } from "../co
 import { dateWords, durationWords } from "../forms";
 import type { OfficeBooks, OpenHeading, OpenItem, ParticipantContext } from "../module";
 import { cents } from "../money";
-import { Book, commitmentOf, DAY, Directions, jobTerms, madeAt, ownAccount, usd, whenWords } from "./common";
+import { approvalOf, Book, commitmentOf, DAY, Directions, jobTerms, madeAt, ownAccount, usd, whenWords } from "./common";
 import { Staffing, staffingUnder } from "./firms";
 import { dueFrom, returnsOf } from "./returns";
 import { incomeTaxLaw, withheld } from "./tax";
@@ -68,7 +68,7 @@ const contractsOf = (staffing: Staffing, book: Book): any[] => (staffing as any)
  */
 export function financeBooks(ctx: ParticipantContext): OfficeBooks {
   const me = ctx.entity;
-  const p = { approval_over: 5_000_000, mayor_position: "mayor", period: 14 * DAY, notice_days: 14, procedure: "", payroll_wait_days: 3, ...(ctx.params ?? {}) } as any;
+  const p = { period: 14 * DAY, notice_days: 14, procedure: "", payroll_wait_days: 3, ...(ctx.params ?? {}) } as any;
   const book = new Book();
   const money = new Paid();
   const staffing = new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, role: "staff", does: { hire: false, pay: true }, notice_wait: p.payroll_wait_days * DAY });
@@ -77,12 +77,12 @@ export function financeBooks(ctx: ParticipantContext): OfficeBooks {
     open(t) {
       const year = Math.floor(t / YEAR) + 1;
       // ---- invoices addressed to the town, not paid ----
-      const approvalRule = !(p.procedure && book.repealed(p.procedure));
-      const approved = new Set(book.open("approval").filter((a) => a.in_position === p.mayor_position).map((a) => String(a.data?.invoice)));
+      const rule = approvalOf(book, p.procedure);
+      const approved = new Set(rule ? book.open("approval").filter((a) => a.in_position === rule.by).map((a) => String(a.data?.invoice)) : []);
       const invoices = book.open("invoice").filter((r) => addressed(r, me) && r.data?.outcome?.money && !money.settled.has(r.id)).map((r): OpenItem => {
         const amount = cents(r.data!.outcome.money.amount);
-        const over = approvalRule && amount > cents(p.approval_over);
-        return { id: r.id, since: madeAt(r), amount, line: `${r.id}: invoice from ${r.speaks_for ?? r.author} for ${usd(amount)}, dated ${whenWords(madeAt(r))}, not paid${over ? `; it is over the payments procedure's figure of ${usd(cents(p.approval_over))} and ${approved.has(r.id) ? "the mayor's written approval is on file" : "the mayor's written approval is not on file"}` : ""}` };
+        const over = !!rule && amount > rule.over;
+        return { id: r.id, since: madeAt(r), amount, line: `${r.id}: invoice from ${r.speaks_for ?? r.author} for ${usd(amount)}, dated ${whenWords(madeAt(r))}, not paid${over ? `; it is over the payments procedure's figure of ${usd(rule!.over)} and ${approved.has(r.id) ? "the mayor's written approval is on file" : "the mayor's written approval is not on file"}` : ""}` };
       });
       // ---- wages: the standing payments on file, by the agreement each rests on ----
       const orders = new Map<string, StatementRecord[]>(); // agreement -> its standing payments, not withdrawn

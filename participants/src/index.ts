@@ -24,6 +24,7 @@ export { linesInWords, tabledLines, votedWords, yearInDays } from "./behaviour/g
 export { Roster, type RosterNow } from "./behaviour/roster";
 export { Tally, type BallotCount } from "./behaviour/tally";
 export { DayBook, DAYBOOK_MAX, LISTED_DAYS } from "./behaviour/daybook";
+export { decisionLaw, decisionsInWords, KIND as DECISION_KIND, Reconsiderations, Waits, type DecisionLaw, type Need as DecisionNeed } from "./behaviour/decisions";
 export { planLaw, planLawWords, POSSESSION_ANSWER, possessionOrderFor } from "./behaviour/papers";
 import type { BehaviourModule } from "./module";
 import { answering } from "./behaviour/common";

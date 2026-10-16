@@ -18,6 +18,7 @@ import type { StatementRecord } from "../contracts";
 import { cents } from "../money";
 import type { Rng } from "../rng";
 import { because, type Book, DAY, Occurrences, pay, say, type Step, usd } from "./common";
+import { KIND } from "./decisions";
 import type { Org } from "./orgwants";
 import { swayed } from "./wants";
 
@@ -37,7 +38,7 @@ export const arises = (rng: Rng, perYearBps: number, days: number, dialBps: numb
  * names the form an application to it is made on. */
 export const PAPER = {
   /** To the other side: put this right. */
-  request: "remedy_request",
+  request: KIND.request,
   /** Their answer. */
   answer: "remedy_answer",
   /** To a venue that hears the matter (unless its `hears` names another form). */
@@ -122,6 +123,9 @@ export class Respondent {
       cost?: (m: Matter) => number;
       /** Forms of the venues it is answerable to, beyond the common ones (a tribunal's). */
       forms?: { notice: string; response: string; decision: string }[];
+      /** Whether it answers requests to put something right itself (default: it does). An office that looks at its own decisions again by the law's route
+       * (`Reconsiderations`, foundations F8) answers its requests there, and uses this for the venues' notices and orders only. */
+      requests?: boolean;
     },
   ) {
     this.p = respondParams(o.params);
@@ -144,7 +148,7 @@ export class Respondent {
     let left = balance;
     const mine = (r: StatementRecord) => (r.addressed_to ?? []).includes(this.me) && !this.handled.has(r.id);
     // ---- asked to put something right ----
-    for (const r of book.open(PAPER.request).filter(mine)) {
+    for (const r of this.o.requests === false ? [] : book.open(PAPER.request).filter(mine)) {
       this.handled.add(r.id);
       const m = (r.data ?? {}) as Matter;
       const from = r.speaks_for!;

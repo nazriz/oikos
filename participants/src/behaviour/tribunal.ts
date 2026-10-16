@@ -9,7 +9,7 @@ import { cites } from "../contracts";
 import { cents } from "../money";
 import { need, params, type BehaviourModule, type ParticipantContext } from "../module";
 import { because, Book, breaches, CounterWork, noting, DAY, say, StandingWork, type Step, usd, withdraw } from "./common";
-import { hearingNotice, Hearings, HEARING_DEFAULTS, type Hears } from "./desk";
+import { hearingNotices, Hearings, HEARING_DEFAULTS, type Hears } from "./desk";
 import { stepper } from "./firms";
 import * as P from "./papers";
 
@@ -27,7 +27,7 @@ export const member: BehaviourModule = {
       { kind: "tribunal_application", how: "taken in and listed; both sides are told, and the other side given the tribunal's time to answer. An application the tribunal does not hear is told so. The case is then the member's to decide" },
       { kind: "tribunal_response", how: "filed with its application, for the member who decides it" },
     ] }],
-  opens: (p, me) => ((p.hears ?? []).length && p.part !== "staff" ? [hearingNotice(me, "The tribunal hears", tribunalHears(p.hears), { fee: p.fee, account: p.account })] : []),
+  opens: (p, me) => ((p.hears ?? []).length && p.part !== "staff" ? hearingNotices(me, "The tribunal hears", tribunalHears(p.hears), { fee: p.fee, account: p.account }) : []),
   answers: {"office": "the tribunal", "acts": "What it acts on: an application made to it by a party to a dispute, which it hears and decides by the laws in force."},
   issues: P.TRIBUNAL_MEMBER,
   version: "0.7.0", // 0.7.0: decides an application for possession by a stated rule on the tenant's answer and the landlord's reply (left; a notice shorter than the law asks; nothing owed; a plan where the law has one and the offer clears what is owed; else possession), the law on plans read from the world's; 0.6.0: an application for possession of a home the tenant has left is dismissed, and one its maker withdraws is decided by nobody; cases its own file says are already listed are taken as they stand, never listed again; 0.5.0: where a model holds the member's chair in a living town, the tribunal's registry staff list each application and tell both sides, under a standing work order, and the member decides (docs/behaviour/justice.md, "The registry lists; the member decides"); its notice of what it hears is on file when a seat arrives; 0.4.0: hears applications for possession of a let home for arrears: a plan to pay, or possession on a date (docs/behaviour/justice.md, "Possession"); 0.3.0: lists (docs/behaviour/frictions.md): the matters the world says it hears beyond its own three, heard by the common procedure on its own forms, as far as its hearing days go; it says what it hears and what applying costs
@@ -75,8 +75,7 @@ export const member: BehaviourModule = {
         // ---- what it hears, said once, so that whoever has such a matter can bring it ----
         if (lists && !said && p.part !== "staff") {
           said = true;
-          const n = hearingNotice(me, "The tribunal hears", tribunalHears(p.hears), { fee: p.fee, account: p.account });
-          if (!book.open("hearing").some((r) => r.speaks_for === me)) steps.push(because("Saying what the tribunal hears, so that whoever has such a matter can bring it.", say(n.kind, n.text, { visible: "public", offer: n.offer, data: n.data as object })));
+          if (!book.open("hearing").some((r) => r.speaks_for === me)) for (const n of hearingNotices(me, "The tribunal hears", tribunalHears(p.hears), { fee: p.fee, account: p.account })) steps.push(because("Saying what the tribunal hears, so that whoever has such a matter can bring it.", say(n.kind, n.text, { visible: "public", offer: n.offer, data: n.data as object })));
         }
         if (lists && (lists_ || decides)) {
           const before = lists.counts.applications ?? 0;

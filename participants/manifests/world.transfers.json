@@ -1,6 +1,6 @@
 {
   "name": "world.transfers",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "doc": "docs/behaviour/boundary.md",
   "params": {
     "account": {
@@ -337,7 +337,7 @@
       "task": "pay_claims",
       "at": "office",
       "every": 1,
-      "what": "Each working day the office's staff decide the claims that have waited their time, the oldest first: a claim that meets the conditions the support law states for its payment is granted, in writing, and paid each period from then until the claimant asks for it to stop, dies, leaves, or its time runs out, which the staff tell them. A claim that does not meet the conditions, or that the staff could not verify, is not refused by the staff: it is put before whoever holds the office, as a note on the office's file saying what it fails on, and decided by them on the office's decision form; a claim they grant on that form is paid by the staff like any other. A request to review a refusal comes to the office-holder.",
+      "what": "Each working day the office's staff decide the claims that have waited their time, the oldest first: a claim that meets the conditions the support law states for its payment is granted, in writing, and paid each period from then until the claimant asks for it to stop, dies, leaves, or its time runs out, which the staff tell them. A claim that does not meet the conditions, or that the staff could not verify, is not refused by the staff: it is put before whoever holds the office, as a note on the office's file saying what it fails on, and decided by them on the office's decision form; a claim they grant on that form is paid by the staff like any other. A request to look at a decision again comes to the office-holder. What a claim waits for before it is decided (papers from the claimant, a confirmation from their last employer, within so many days) is the law's: the staff ask for it and the claim stays on their file until it has come or its time has run.",
       "papers": [
         {
           "kind": "benefit_claim",

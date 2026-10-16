@@ -169,6 +169,13 @@ What the code member decides is unchanged (the table above); a seat decides for 
 
 **Real-world basis.** A tribunal's registry receives and lists applications and sends notices of hearing; members hear and decide. A tribunal's daily cause list is a registry's paper, drawn up for the sitting (to confirm: common practice; no source opened). (To confirm: common practice; VCAT's and the First-tier Tribunal's published procedures not opened.) A landlord offering a plan before a claim: England's Pre-Action Protocol for Possession Claims by Social Landlords asks for it (to confirm; not opened; used only as the reason the form exists).
 
+## Appeals against an office's decision (foundations F8; docs/behaviour/decisions.md)
+
+The tribunal says it hears `claim_refused` (a refused claim for support) and can set the decision aside only where the profile's law has an appeal route for it. Its fee for that
+matter is the law's, not the tribunal's (it publishes one notice of what it hears for each fee). The days an appeal may be made in are the law's: from the decision, or from the answer to the review where
+the law makes a review come first; the applicant tenders both dates, and the tribunal turns away an application out of time or without the review (finding `rejected`, with the days). A decision set aside is put
+right by the office that made it.
+
 ## The parties
 
 - **Tenants** (citizen 0.26.0): given a notice of rent increase that breaks the law as they read it, they take it to the
