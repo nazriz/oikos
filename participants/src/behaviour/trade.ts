@@ -142,7 +142,7 @@ export interface SellingTerms { days: number; stop_after_days: number; claim_aft
 export interface Receivable { order: string; account: string; buyer: string; kind: string; quantity: number; amount: number; since: number; days: number }
 
 const INVOICE = /^Invoice (\S+?):/;
-const OTHER_ROLE = /^(Dividend|Income tax|Tax\b)/i; // (what a payment to the world's account says when it is paid to its shareholder or its collector)
+const OTHER_ROLE = /^(Dividend|Income tax|Tax\b|Capital\b)/i; // (what a payment to a seller's account says when it is paid to its shareholder or its collector, or is a founder's capital put into a business of their own)
 
 export class OrderBook {
   private readonly credit = new Map<string, number>(); // paying account -> money received not yet set against an order

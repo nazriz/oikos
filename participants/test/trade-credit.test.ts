@@ -259,6 +259,7 @@ test("a payment that says it is a dividend, or tax withheld, is not an order's p
   const paid = (memo: string) => { const o = mk(); o.take(obsOf(9 * DAY, "outside", { account: "acc-outside", transactions: [tx(9 * DAY, "acc-factory-9", "acc-outside", 500_000, memo)] }), "acc-outside"); return o.unclaimed(bookOf()); };
   expect(paid("Dividend")).toEqual([]);
   expect(paid("Income tax withheld from wages")).toEqual([]);
+  expect(paid("Capital.")).toEqual([]); // (a founder's capital put into their own business: bug hunt 2026-10-17, finding 9)
   expect(paid("Order: 5 goods.")).toEqual([["acc-factory-9", 500_000]]);
   expect(paid("")).toEqual([["acc-factory-9", 500_000]]);
   expect(paid("700 energy")).toEqual([["acc-factory-9", 500_000]]); // (a payment for goods nobody ordered is still a mistake)
