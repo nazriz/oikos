@@ -76,3 +76,25 @@ oikos run worlds/town-300.yaml --until 7776000 --log lean --record-observations 
   given). A before and after that is to say anything of towns in general is `--towns 3` on each side; `oikos diff` says
   on its first line what each side was (docs/measurement.md, "Running a batch").
 - Write to a folder outside `runs/` that you remove yourself; never remove anything under `runs/`.
+
+## Merging a branch: `scripts/merge.ts`
+
+```
+bun scripts/merge.ts <branch> [--message "..."] [--no-push]
+```
+
+What the maintainer does by hand, in a clean worktree of its own (`.claude/worktrees/merge-bot`, made if missing; never
+`merge-main`): fetch; reset to `origin/main`; `git merge --no-ff <branch>`; then `bun install`, `bun run kernel`,
+`bun run typecheck`, `cargo test` for the kernel, and `bun run test:all` (output in `merge-bot/merge-test.log`); restores
+`scripts/test-times.json`; pushes to `origin main` only if all passed; prints tests passed, time and the pushed sha.
+
+- **Conflicts:** only `docs/decisions.md` and `docs/research/references.md` are resolved (both sides kept, markers
+  stripped, the tree checked for any left). A conflict anywhere else aborts the merge and says which files.
+- **Flakes:** if the suite fails with exactly one failed test file and it is `scripts/slots.test.ts` or
+  `orchestrator/test/pilot-wave.test.ts` (timing under load), that file is rerun alone and accepted only if it passes.
+  Any other failure (a different file, two files, the kernel) stops it, with no push.
+- The merge commit message ends with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
+- `--no-push` does everything but the push: the merge stays in the merge-bot worktree for inspection.
+- It waits for slots like any heavy job, so on a busy machine it is slow; run it once per merge (the rule above).
+- Pure parts (keep-both, marker check, failure reading) are tested in `scripts/merge.test.ts`.
+- `.github/workflows/ci.yml` also runs the suite on every push and pull request, on a self-hosted runner: `docs/ci-runner.md`.
