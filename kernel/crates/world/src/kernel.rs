@@ -1323,10 +1323,10 @@ pub fn known_field(f: &str) -> bool {
 /// News the engine may wake someone for, which happens at no wake of anyone's (so an advance would carry the clock past it to the next
 /// wake, and whoever it reaches would meet it then, at a moment that turns on who else happens to wake): a letter delivered, a paper
 /// recorded (`News::Delivered`, `News::Recorded`), something that happened to a person's own body (a condition begun, ended or treated,
-/// or flooded out of where they were: `News::Body`), or a keeper's answer to an office's question (`News::Answered`, foundations F11).
+/// flooded out of where they were, or a death in the space they were in: `News::Body`), or a keeper's answer to an office's question (`News::Answered`, foundations F11).
 /// An advance that stops at it has the news met when it happens, whoever wakes next; the engine goes on at once where it woke nobody.
 pub fn is_body_news(b: &EventBody) -> bool {
-    matches!(b, EventBody::MessageDelivered { .. } | EventBody::Recorded { .. } | EventBody::ConditionBegan { .. } | EventBody::ConditionEnded { .. } | EventBody::ConditionTreated { .. } | EventBody::Vacated { reason: VacateReason::Flooded, .. } | EventBody::AskAnswered { position: Some(_), .. })
+    matches!(b, EventBody::MessageDelivered { .. } | EventBody::Recorded { .. } | EventBody::ConditionBegan { .. } | EventBody::ConditionEnded { .. } | EventBody::ConditionTreated { .. } | EventBody::Vacated { reason: VacateReason::Flooded | VacateReason::Died, .. } | EventBody::AskAnswered { position: Some(_), .. })
 }
 
 /// How a stretch of `secs` seconds run on from `start` falls on days: (day, seconds of it on that day).

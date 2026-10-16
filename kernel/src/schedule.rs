@@ -11,7 +11,7 @@
 //!   it (a person's own unit; the units holding an organisation's positions), never its author, and never a
 //!   language-model participant (it reads what's come in on its own cadence, and letters wake it). A unit busy with an
 //!   act isn't woken: it sees the news when its act is done. A change in one's own body (a condition begun, ended or
-//!   treated) wakes that person's own code unit.
+//!   treated) wakes that person's own code unit; so does a death in the space they are in (they are there, and know it).
 //! - **Guards:** at most three news wakes a unit a tick (then the next tick); more than `MAX_COHORTS_PER_MOMENT`
 //!   cohorts at one moment stops the run.
 
@@ -337,6 +337,16 @@ impl Scheduler {
                 // asking for themselves has it at their next wake. A wake at the moment it is done moved the hours a person wakes at.)
                 EventBody::AskAnswered { participant, position: Some(position), .. } => self.news(st, News::Answered { participant, capacity: position }, t),
                 EventBody::Vacated { occupant, reason: VacateReason::Flooded, .. } => self.news(st, News::Body(occupant), t),
+                // Someone dies where others are: they are there, and know it at once (those who were in the same space).
+                EventBody::Vacated { occupant, reason: VacateReason::Died, space, .. } => {
+                    if let Some(st) = st {
+                        let structure = space.split('/').next().unwrap_or_default();
+                        let present: Vec<String> = st.occupancy.get(structure).and_then(|m| m.get(space)).into_iter().flatten().filter(|b| *b != occupant).cloned().collect();
+                        for who in present {
+                            self.news(Some(st), News::Body(&who), t);
+                        }
+                    }
+                }
                 EventBody::ConditionBegan { person, .. } | EventBody::ConditionEnded { person, .. } | EventBody::ConditionTreated { person, .. } => self.news(st, News::Body(person), t),
                 EventBody::Recorded { record } => {
                     if st.is_some() {

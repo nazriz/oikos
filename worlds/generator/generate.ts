@@ -2926,8 +2926,13 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     // The authority a body's constitution names (the profile's `public_service.appointed_by`, here the town's council) fills a post of
     // the body when none of its own staff is left to: an appointments officer of the city, who looks at those posts and, where one has
     // stood vacant, seconds one of the city's own staff to it (docs/behaviour/staffing.md, "When nobody of a body is left").
-    if (PS.appointed_by && Object.values(PS.appointed_by).includes("council")) {
-      office("city-appointments", "city", "Appointments officer", undefined, [agreements, deaths, K.lookUp()], code("body.payroll", appointments));
+    // The town's own offices are the council's as well (nobody else could fill them), so the officer is always there; and where
+    // none of the city's staff is left to second, it recruits for the city through ordinary hiring (a posting, an applicant, an
+    // agreement, the wage as any of the city's staff is paid).
+    {
+      const cityBody = bodies.find((b) => b.entity === "city")!;
+      Object.assign(appointments, { workplace: "town-hall/workplace.1", role: cityBody.role, industry: "public_administration", wage: PS.wage_per_pay_period, period: PAY, payroll_office: "finance", staff_line: cityBody.line ?? "administration" });
+      office("city-appointments", "city", "Appointments officer", undefined, [agreements, deaths, K.lookUp(), mine("appointments-business"), civic("budgets", ["budget"])], code("body.payroll", appointments));
     }
   }
   const resolveHolders = () => {
@@ -2936,6 +2941,8 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       const id = x.post.id as string;
       const c = /^councillor-(\d+)$/.exec(id);
       if (id === "mayor") return [electedPool[0]!];
+      // (The council's own appointments officer is a councillor: the city's staff may be one person, whose death leaves no one to fill the city's offices.)
+      if (id === "city-appointments" && electedPool.length > 1) return [electedPool[1]!];
       if (c) return [electedPool[Number(c[1])]!];
       if (x.entity.startsWith("landlord-")) return managerPool.length ? managerPool : fallbackPool;
       const body = bodies.find((b) => b.entity === x.entity);
@@ -3077,7 +3084,13 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   }
   // Whose posts the council fills (the profile's constitution of each body): each such post names it as its authority, and the appointments officer watches it.
   {
-    const kindOf: { [entity: string]: string } = { tribunal: "courts", ombudsman: "oversight", "consumer-desk": "oversight", [ELECTORAL]: "elections", [LAND_REGISTRY]: "land_registry", "water-corp": "utilities", "energy-co": "utilities", bank: "banking", union: "union", paper: "press" };
+    // (The city's own offices: the council fills them, from the city's staff, and by hiring where none is left.)
+    for (const pos of positions) {
+      if (pos.entity !== "city" || /^(councillor-\d+|mayor|city-appointments)$/.test(pos.id) || String(pos.id).endsWith("-staff")) continue;
+      const h = participants.find((q) => q.id === pos.holder);
+      if (h?.kind === "person") { appointments.watch.push(pos.id); (appointments.own ??= []).push(pos.id); }
+    }
+    const kindOf: { [entity: string]: string } = { police: "police", tribunal: "courts", ombudsman: "oversight", "consumer-desk": "oversight", [ELECTORAL]: "elections", [LAND_REGISTRY]: "land_registry", "water-corp": "utilities", "energy-co": "utilities", bank: "banking", union: "union", paper: "press" };
     for (const pos of positions) {
       const k = kindOf[pos.entity];
       if (!k || PS.appointed_by?.[k as keyof typeof PS.staff_per_1000] !== "council") continue;

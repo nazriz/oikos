@@ -60,7 +60,8 @@ async function amendment(name: string, leaning: number) {
   });
   const out = join(root, "runs", `test-government-${name}`);
   rmSync(out, { recursive: true, force: true });
-  const s = await runWorld({ config, runId: name, outDir: out, until: 70 * DAY, adapter });
+  // (100 days, was 70: 2026-10-16, the profile source check: the au-vic-2026 profile's tribunal now takes 56 days to a hearing (was 49), so an application made after the amendment is heard after day 70. What is checked is the same.)
+  const s = await runWorld({ config, runId: name, outDir: out, until: 100 * DAY, adapter });
   expect(s.participantErrors).toBe(0);
   const recs = readFileSync(s.logPath, "utf8").trim().split("\n").map((l) => JSON.parse(l)).filter((e) => e.kind === "event" && e.body.event === "recorded").map((e) => e.body.record);
   return { recs, read: seen.join("\n"), kind: (k: string) => recs.filter((r) => r.kind === k) };
