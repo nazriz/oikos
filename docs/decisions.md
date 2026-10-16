@@ -5344,3 +5344,28 @@ Three pieces, one commit each: the twins (`b7cc750`), F7 (`6de312d`), F11 (this 
 - **Old logs.** Replay on `pre-foundations` (this changes the kernel and the log: `advance_to_news`, `ask_started`, `ask_answered`, an observation's `asking`); logs made after F1 and before this commit replay on a build of F6.
 - **What F8 needs.** (a) A decision that went wrong by a slip is today the module's memory (`wronglyRefused`), not a record; F8's generic reconsideration needs the author and performer of a decision on the record (F3 has them) and a way to say "this was reviewed", so that the office can answer a review from the log and not from its own head. (b) The venues' `set_aside` and the support office's review stand on that. (c) The slip rows are read by the module that draws, not by the review: a review that finds an error must not draw a second slip on the same case (the code today keeps a `reviewed` set; the generic route will need it as a record). (d) The gap named above: a decision that waits for evidence is law data (what it waits for, from whom, within how long), and is where review and appeal start. (e) Asks by a directory look-up (`who`) are still at once.
 - **Revisit if** the twin test fails again (a record or a message made by a scheduled item that no unit waits on is met at the next wake: stop the advance there too; the cost is one more command each); a registry should have staff to answer in a day and not in hours (the placeholder row, and its officer's own hours: an answer is placed behind whatever else the officer has, at any hour, not in office hours); a person asking for themselves should be woken (find why a wake moved births first); `NOTICE_LAG` is thought too coarse (a law that dates by the time the paper is on the record would let the act say so).
+
+## 2026-10-16 · The renderer: a plan, awaiting the owner (docs only; no code; no model called)
+
+- **What.** `docs/design/renderer.md`: the plan for V0's stage 3, of which nothing existed. A separate `renderer/`
+  package; Bun serves a Three.js client on WebGPU with WebGL 2 fallback, isometric orthographic camera, boxes and
+  markers. One read-only pass over a log makes a disposable **view index** (`runs/views/<run>.<head>/`: SQLite for
+  ids, kept lines, postings by id and month, and the causal chains; zstd frames of the kept lines; binary tracks of
+  where everyone is each midnight, each day's moves, balances weekly, and the overlays by day). Views: town, block,
+  parcel, citizen; organisation; office with staff now and backlog. The causal trace walks effect, action, act, who
+  decided (person, another person, an organisation's code system, a model seat, the world), why (transcript, decision
+  annotation, the record's stated reason), and the records it rested on (`basis`), to depth eight. Three overlays: who
+  decided (V0's one), where systems are deployed, hardship as the record has it (a raw variable, no composite). Live
+  attach by tailing the log. Build order V1 to V13, about 14 agent-days.
+- **Why these choices.** Fold the log in TypeScript, checked by the kernel's own record digests, money conservation
+  and capacity, rather than a kernel replay: the log alone rebuilds every register and the renderer needs a few kinds
+  of state; a kernel change would be the first thing the renderer needed. Daily keyframes of where people are (15 MB
+  a year at 10,000) make a year scrub with no fetch while dragging. Postings by any id found in a body, not per event
+  kind, so new events and records are indexed with no new code. The index lives outside the run's folder, so a run is
+  never written to; a test holds it.
+- **Awaits the owner:** when to build it (recommended: after the GD plan's R1 to R3), and whether "who decided"
+  classes by role in the world (recommended) rather than by what runs it.
+- **Revisit if** the TS folds disagree with the kernel (then `oikos-kernel replay --states`, verified by checkpoint
+  hashes); indexing a year at 10,000 takes over an hour (then by month in parallel); WebGPU and its fallback cannot draw
+  10,000 markers smoothly on the owner's machine (then points in one draw call); or compact logs land (then the
+  indexer reads `replay --emit` on a pipe).
