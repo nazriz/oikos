@@ -298,6 +298,9 @@ export interface Profile {
       wage_per_pay_period: number;
       staff_per_1000: { administration: number; courts: number; oversight: number; elections: number; land_registry: number; press: number; banking: number; utilities: number; union: number; property_management: number };
       licences: { payment_system: { per_resident_per_year: number; term_days: number } };
+      /** Who fills a post of a body when none of its own staff is left (its constitution): "council" (the town's council, which seconds
+       * one of its own staff to it). A body not named has none, and a post of it whose staff have all died stays empty. */
+      appointed_by?: { [kind in "administration" | "courts" | "oversight" | "elections" | "land_registry" | "press" | "banking" | "utilities" | "union" | "property_management"]?: "council" };
     };
     unions: { membership_bps: { [kind: string]: number }; dues_per_month: number; resignation_notice_days: number; claim_margin_bps: number; meeting_every_days?: number; teaching?: string };
     /** Social groups that meet (clubs, congregations): their kinds, how often and how long they meet, how many. */

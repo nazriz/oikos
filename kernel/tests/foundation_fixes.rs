@@ -246,3 +246,25 @@ fn f9_a_later_days_count_survives_work_placed_on_an_earlier_day() {
     tl.add_worked(4, -1_000);
     assert_eq!((tl.worked_on(5), tl.worked_on(4)), (24_000, 2_000));
 }
+
+/// Finding 6: a post's constitution may name who else fills it (an owner, a board, the council): that authority's own act
+/// appoints into it, and nobody else's does.
+#[test]
+fn f6_the_authority_a_post_names_may_appoint_into_it() {
+    let appoint = |by: (&str, &str)| cmd(by.0, Some(by.1), json!([{"block": "appoint", "position": "clerk", "participant": "alice-self"}]));
+    // Without a constitution naming devco, devco's system may not fill the city's clerk post.
+    let mut run = start(world(&default_params()));
+    assert_eq!(said(outcome(&mut run, &appoint(("developer-system", "developer")))), "not_theirs");
+    // With it, it may; the city still may, and a third body still may not.
+    let mut c = world(&default_params());
+    c["positions"].as_array_mut().unwrap().iter_mut().find(|p| p["id"] == "clerk").unwrap()["appointed_by"] = json!("devco");
+    let mut run = start(c);
+    assert_eq!(said(outcome(&mut run, &appoint(("builder-system", "builder")))), "not_theirs");
+    assert_eq!(said(outcome(&mut run, &appoint(("developer-system", "developer")))), "applied");
+    assert_eq!(run.kernel().state().positions["clerk"].holder.as_deref(), Some("alice-self"));
+    assert_eq!(said(outcome(&mut run, &appoint(("mayor-system", "mayor")))), "applied");
+    // An authority that is no entity does not load.
+    let mut bad = world(&default_params());
+    bad["positions"].as_array_mut().unwrap().iter_mut().find(|p| p["id"] == "clerk").unwrap()["appointed_by"] = json!("nobody");
+    assert!(Run::start(bad, "fixes", Vec::new(), None).is_err());
+}

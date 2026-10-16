@@ -2878,6 +2878,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   // from the staff when its holder dies (only a living holder of a post of an organisation can appoint into it). A body of one
   // has none: nobody is left to do it, and the missing law is an owner's or a board's power to appoint (docs/behaviour/staffing.md).
   const payrollPosts: { entity: string; officer?: string; deputy?: string; params: any[] }[] = [];
+  const appointments: any = { part: "appointer", watch: [] as string[], after_days: 14 };
   {
     const heldApart = new Map<string, string>(); // a deputy's post -> the post whose holder it must not share
     const staffN = (e: string) => staffAt.get(e)?.length ?? 0;
@@ -2913,6 +2914,12 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       payrollPosts.push({ entity: w.employer, deputy: id, params: [params] });
     }
     void heldApart;
+    // The authority a body's constitution names (the profile's `public_service.appointed_by`, here the town's council) fills a post of
+    // the body when none of its own staff is left to: an appointments officer of the city, who looks at those posts and, where one has
+    // stood vacant, seconds one of the city's own staff to it (docs/behaviour/staffing.md, "When nobody of a body is left").
+    if (PS.appointed_by && Object.values(PS.appointed_by).includes("council")) {
+      office("city-appointments", "city", "Appointments officer", undefined, [agreements, deaths, K.lookUp()], code("body.payroll", appointments));
+    }
   }
   const resolveHolders = () => {
     const todo = toHold.filter((x) => !x.post.holder);
@@ -3058,6 +3065,16 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     const office = positions.find((x) => x.holder === part.id)?.id;
     const effort = typeof spec.seat_effort === "string" ? spec.seat_effort : office ? spec.seat_effort?.[office] : undefined;
     part.controller.params = { ...part.controller.params, ...(spec.wake_on_papers === false ? { wake_on_papers: false } : {}), ...(effort ? { effort: String(effort) } : {}) };
+  }
+  // Whose posts the council fills (the profile's constitution of each body): each such post names it as its authority, and the appointments officer watches it.
+  {
+    const kindOf: { [entity: string]: string } = { tribunal: "courts", ombudsman: "oversight", "consumer-desk": "oversight", [ELECTORAL]: "elections", [LAND_REGISTRY]: "land_registry", "water-corp": "utilities", "energy-co": "utilities", bank: "banking", union: "union", paper: "press" };
+    for (const pos of positions) {
+      const k = kindOf[pos.entity];
+      if (!k || PS.appointed_by?.[k as keyof typeof PS.staff_per_1000] !== "council") continue;
+      pos.appointed_by = "city";
+      appointments.watch.push(pos.id);
+    }
   }
   // An office a model holds has its own stationery (docs/behaviour/office-papers.md): a form for each paper the
   // office issues, as its module says (`issues`), with what is the office's own filled in. Seen by its organisation

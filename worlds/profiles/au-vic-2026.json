@@ -779,6 +779,7 @@
         "union": 0.15,
         "property_management": 3.0
       },
+      "appointed_by": { "courts": "council", "oversight": "council", "elections": "council", "land_registry": "council", "utilities": "council" },
       "licences": {
         "payment_system": {
           "per_resident_per_year": 1500,
@@ -1198,6 +1199,7 @@
     "public_service.staff_per_1000.union": "[PLACEHOLDER] About 1.4m Victorian union members; roughly 1 paid officer or organiser per 1,500-2,000 members across unions gives about 700-900 staff, but local organisers are fewer. Set at 0.15 per 1,000; no source opened.",
     "public_service.licences.payment_system": "[PLACEHOLDER] A core-banking and payments platform costs a small bank an estimated A$10-20 per customer a year in vendor fees; taken as $15 (1,500 cents) per resident. No vendor price list found; honest guess.",
     "public_service.staff_per_1000.property_management": "[PLACEHOLDER] Carried over unchanged to every profile: property managers (people who run let homes for their owners) at about one to every 100 to 150 let homes is an industry rule of thumb (to confirm, not opened); a town here has about 380 homes for 1,000 people, so about 3 per 1,000 residents. A manager looks after the letting offices of several landlords.",
+    "public_service.appointed_by": "[PLACEHOLDER] Who fills the post of a public body when none of its own staff is left: the town's council, which seconds one of its own staff to it, as a local government assigns officers to bodies it runs. Real places mostly give these appointments to a state body, a minister or a board, none of which the town models, so the council stands in for them (to confirm per place). Bodies run on their own account (the bank, the union, the paper, landlords, shops) are not covered: their owners or members would appoint, and no owner's or member's office exists to do it.",
     "unions.membership_bps": "ABS, Trade union membership, August 2024: 13.1% of employees; by industry, manufacturing 9.0%, construction 11.7%, retail trade 7.0%, public administration and safety 23.1% (the industry figures to confirm against the release's tables); `other`, the overall rate. Keyed by the industries employers' postings name.",
     "unions.resignation_notice_days": "Fair Work (Registered Organisations) Act 2009 (Cth), s 174: a member may resign by written notice, which takes effect two weeks after it's received (or at once, if the member is no longer eligible; to confirm against the section). Written into each membership as the member's notice.",
     "groups.leave_notice_days": "Placeholder: a member may leave a club or congregation at once (a voluntary association; a club's own rules may ask for notice). Written into each membership as the member's notice.",

@@ -2002,10 +2002,12 @@ impl<'a> Exec<'a> {
             }
 
             Block::Appoint { position, participant } => {
-                let org = self.acting_org()?;
                 let position = self.r(position)?;
                 let x = self.st.positions.get(&position).ok_or_else(|| refuse(RefusalCode::UnknownPosition, format!("no position {position}")))?;
-                if x.entity != org {
+                // The post's own organisation fills it, or the authority its constitution names (an owner, a board, the council).
+                let authority = self.s.config.positions.iter().find(|c| c.id == position).and_then(|c| c.appointed_by.clone());
+                let org = if authority.as_deref() == Some(self.entity.as_str()) && self.entity != x.entity { self.entity.clone() } else { self.acting_org()? };
+                if x.entity != org && authority.as_deref() != Some(org.as_str()) {
                     return Err(refuse(RefusalCode::NotTheirs, format!("{position} is {}'s, not {org}'s", x.entity)));
                 }
                 let holder = self.ro(participant)?;
