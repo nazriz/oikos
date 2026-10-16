@@ -469,6 +469,29 @@ test("nothing came of looking into whole reports: no turn is taken to say so; th
   expect(await turn([use("w", "write", { to: ["clerk"], text: "Anything in?", as: "mayor" }), whole], looked(9 * HOUR, []))).toBe(2);
 });
 
+test("a sitting that found nothing new is not sent away for longer than its office's rhythm (the days it gave at its last were a plan for one thing), and takes its turn if something falls due on its books before then", async () => {
+  // (Pilot 7A: finance gave 17 days for a return due on day 51, was back on day 49, found nothing new, and was sent away
+  // 17 days more.)
+  const open = (days: number[]) => [{ record: "statement", kind: "office_books", id: "rec.b", author: "mayor-system", speaks_for: "city", at: 0, text: "The books of the office.", visible_to: "public", data: { office: "mayor", at: 0, open: days.map((d) => ({ what: "Returns", about: `r-${d}`, says: "A return.", due: d * DAY })) } }];
+  const sit = (t: number, days: number[]) => withChannels(t, { "mayor/books": cityBooks(), "mayor/office-books": { kind: "records", records: open(days) } as any });
+  const run = async (due: number[]) => {
+    const h = harness([[use("d", "done_for_now", { days: 17 })], [use("a", "look", { report: "mayor/files", current_only: true })], [use("d2", "done_for_now", { days: 1 })]], office);
+    await h.p.step(sit(9 * HOUR, due), ctx);
+    expect(await h.p.step(sit(17 * DAY + 9 * HOUR, due), ctx)).toMatchObject({ type: "look" });
+    return { h, end: await h.p.step(looked(17 * DAY + 9 * HOUR, []), ctx) };
+  };
+  // Nothing falls due: back after the office's rhythm (7 days), not 17 again.
+  const quietly = await run([]);
+  expect(quietly.end).toEqual({ type: "wait", until: 18 * DAY + 9 * HOUR });
+  expect(quietly.h.calls.length).toBe(2);
+  expect(quietly.h.notes.find((n) => n.no_turn)).toEqual({ no_turn: { looks_that_found_nothing: 1, back_after_days: 7 } });
+  // A return falls due in two days: no sitting ends on nothing new; the turn is taken.
+  const due = await run([19]);
+  expect(due.end).toMatchObject({ type: "wait" });
+  expect(due.h.calls.length).toBe(3);
+  expect(due.h.notes.find((n) => n.no_turn)).toBeUndefined();
+});
+
 test("the notebook is added to, or changed where a passage stands, without writing it all out; what wouldn't fit isn't put in, and it's told", async () => {
   const { editNotebook } = await import("../src/llm/participant");
   expect(editNotebook("", { add: "Day 1: nothing owing." })).toMatchObject({ text: "Day 1: nothing owing.", problems: [] });
