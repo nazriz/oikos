@@ -2089,7 +2089,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     if (kind) {
       systemsUsed.add(kind);
       const holder = sysId(id);
-      participants.push({ id: holder, kind: "system", owner: SYSTEM_KINDS[kind]!.owner ?? entity, template: kind, supplier: "outside", title, controller, framing: extra.framing ?? unstated, ...(extra.on_opt_out ? { on_opt_out: extra.on_opt_out } : {}) });
+      participants.push({ id: holder, kind: "system", owner: entity, template: kind, supplier: "outside", title, controller, framing: extra.framing ?? unstated, ...(extra.on_opt_out ? { on_opt_out: extra.on_opt_out } : {}) });
       positions.push({ id, entity, title, ...(role ? { role } : {}), channels, ...(job ? { role_module: job } : {}), holder });
       return;
     }
