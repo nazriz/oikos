@@ -18,7 +18,7 @@ const town = (over: object = {}) => ({ ...spec, seed: 2, citizens: 300, profile:
 // (The world as it was before the payments carried a budget line: the line the town's opening wage orders now name is left out, as
 // it was not there; docs/decisions.md, "Payments carry their budget line".)
 const worldHash = (c: any) => createHash("sha256").update(JSON.stringify(c.world, (k, v) => (k === "line" ? undefined : v))).digest("hex");
-const OTHERS = ["benefit_claim", "benefit_decision", "remedy_request", "application", "complaint_notice", "permit_application", "invoice", "loan_statement", "loan_arrears"];
+const OTHERS = ["benefit_claim", "benefit_decision", "review_request", "application", "complaint_notice", "permit_application", "invoice", "loan_statement", "loan_arrears"];
 const ofOthers = (c: any) => c.world.records.filter((r: any) => OTHERS.includes(r.kind) && r.data?.brought_forward);
 
 test("off, a town is unchanged to the state hash (the world as origin/main generated it); the option alone adds only the new offices' papers", () => {
@@ -26,9 +26,10 @@ test("off, a town is unchanged to the state hash (the world as origin/main gener
   // 2026-10-13, by generator 0.54.0: every town whose profile states one now publishes its law on cutting hours,
   // `law-cutting-hours`, and the modules' versions; docs/decisions.md, "Hours before heads". Nothing of the opening caseload in it.)
   // (Re-taken on 2026-10-16 at foundations F5: the town's offices are held by people, their staff hired, its systems delivered from templates that say what they do; 4e1e761a... until then.)
-  expect(worldHash(generate(town()))).toBe("02ce106fc0fad854af10575ef497e6074b265c775b1a98f9a1aecdb94d140c5a");
+  // (Re-taken on 2026-10-16 at foundations F8: the support office asks for papers before it decides, looks at a refusal again when asked, and the tribunal hears an appeal at the law's fee; the profile's routes are published as `law-decisions`; 02ce106f..., 0236786b... until then.)
+  expect(worldHash(generate(town()))).toBe("c1bfd56e1d03f571e98021b44b76c74a1a170fff36b4302d820e4f2f99207e87");
   // (Re-taken on 2026-10-16 at foundations F5: the town's offices are held by people, their staff hired, its systems delivered from templates that say what they do; f16bee9e... until then.)
-  expect(worldHash(generate(town({ profile: "ke-nakuru-2026" })))).toBe("0236786b8fedf668d1e6b649c860c0e197853ec952561d0774bfc54a0166ad05");
+  expect(worldHash(generate(town({ profile: "ke-nakuru-2026" })))).toBe("be56fcced3e09a27a95faece8ffdb1217cdca1222823fe0e7b06a4f2abe38c83");
   // (On, the landlords' and the tribunal's papers are as they were; a scale of nothing adds no paper to the other offices.)
   const POSS = ["rent_statement", "notice_to_vacate", "tribunal_application", "hearing_notice", "tribunal_order"];
   const possession = (c: any) => createHash("sha256").update(JSON.stringify(c.world.records.filter((r: any) => POSS.includes(r.kind)))).digest("hex");
@@ -79,10 +80,18 @@ test("code offices act on the opening papers as on papers made in a run: complai
   // Support: no claim is in hand when the year begins (the office decides what it has the day it sees it: foundations F6, which took out the
   // processing time that kept claims waiting); what is on its desk is the reviews asked for of refusals, below.
   expect(born.filter((r: any) => r.kind === "benefit_claim" && !born.some((d: any) => d.kind === "benefit_decision" && d.data.claim === r.id)).length).toBe(0);
-  // Support: a refusal asked about is answered; a refusal already decided is not decided again.
+  // Support: a refusal asked about is answered; a refusal already decided is not decided again, unless it is looked at again on the request (foundations F8:
+  // the office puts a refusal it finds wrong right itself, by a new decision on the same claim that says it is on review, and a record of the review).
   const refused = born.filter((r: any) => r.kind === "benefit_decision" && r.data.granted === false);
   expect(refused.length).toBeGreaterThan(3);
-  for (const d of refused) expect(recs.filter((r) => r.kind === "benefit_decision" && r.data?.claim === d.data.claim).length, d.id).toBe(0);
+  for (const d of refused) {
+    const again = recs.filter((r) => r.kind === "benefit_decision" && r.data?.claim === d.data.claim);
+    for (const a of again) expect(a.data.on_review, `${d.id}: decided again only on a review`).toBeDefined();
+    expect(again.length, d.id).toBeLessThanOrEqual(1);
+    // (Put right on a review, which is on record; or on a venue's setting the refusal aside, which is its decision.)
+    if (again.length) expect(recs.some((r) => (r.kind === "decision_review" && r.data?.decision === d.id && r.data?.outcome === "changed") || ((r.kind === "venue_decision" || r.kind === "tribunal_order") && r.data?.about === d.id && r.data?.finding === "set_aside")), `${d.id}: the review or the order that set it aside is on record`).toBe(true);
+  }
+  expect(recs.filter((r) => r.kind === "decision_review").length, "reviews were asked for and answered").toBeGreaterThan(0);
   // The desks: every application is decided once, after the time its notice gave the other side; nobody applies a second time.
   const apps = born.filter((r: any) => r.kind === "application");
   expect(apps.length).toBeGreaterThan(20);

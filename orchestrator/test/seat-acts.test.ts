@@ -138,9 +138,11 @@ test("in a living town the tribunal's registry staff list the cases and the memb
   // and the tribunal's notice of what it hears is on file, so that whoever has a matter can bring it.
   expect(config.positions.find((p: any) => p.id === "tribunal-member-staff").role_module).toMatchObject({ code: "tribunal.member", params: { part: "staff" } });
   expect(config.world.records.find((r: any) => r.id === "order-tribunal-member-answer")?.kind).toBe("work_order");
-  const hears = config.world.records.find((r: any) => r.id === "notice-tribunal-member-hearing");
-  expect(hears.visible_to).toBe("public");
-  expect(hears.offer.hears.map((h: any) => h.about)).toEqual(expect.arrayContaining(["possession", "arrears", "disrepair"]));
+  // (One notice for each fee it charges, foundations F8: a refused claim's appeal is the law's, at the law's fee, beside its other lists.)
+  const notices = config.world.records.filter((r: any) => /^notice-tribunal-member-hearing(-\d+)?$/.test(r.id));
+  expect(notices.length).toBeGreaterThan(0);
+  for (const hears of notices) expect(hears.visible_to).toBe("public");
+  expect(notices.flatMap((n: any) => n.offer.hears.map((h: any) => h.about))).toEqual(expect.arrayContaining(["possession", "arrears", "disrepair", "claim_refused"]));
   const { recs, acts } = await run("seat-acts-registry", config, 200);
   expect(recs.filter((r) => r.kind === "hearing" && r.speaks_for === "tribunal").length).toBe(0); // on file from the start, and not said again
   const app = recs.find((r) => r.kind === "tribunal_application" && r.data?.kind === "possession" && r.data.about === alone.id);
@@ -159,7 +161,7 @@ test("in a living town the tribunal's registry staff list the cases and the memb
   expect(member.forms.get("possession_order")).toBeGreaterThan(0);
   expect(recs.some((r) => r.kind === "staff_report" && r.in_position === "tribunal-member-staff" && /answered at the counter: \d+ tribunal application/.test(r.text))).toBe(true);
   // The landlord's seat asked for the rent on its form before it gave notice (a living town's landlord does).
-  const asked = recs.find((r) => r.kind === "remedy_request" && r.data?.matter === "arrears" && r.data.about === alone.id);
+  const asked = recs.find((r) => r.kind === "review_request" && r.data?.matter === "arrears" && r.data.about === alone.id);
   expect(asked.author).toBe(`${seats[0]}-system`);
   expect(did(acts, seats[0]!).forms.get("rent_reminder")).toBeGreaterThan(0);
   expect(offForm(acts, seats)).toEqual([]);

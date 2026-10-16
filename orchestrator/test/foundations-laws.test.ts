@@ -219,6 +219,64 @@ test("F7: law 5: a living town's slips are rows of its table, each with a source
 });
 
 // ---------------------------------------------------------------------------------------------------------------------
+// Law 5 and law 6 (F8): what a decision waits for, review and appeal, and who approves, refuses and removes: law as data.
+// ---------------------------------------------------------------------------------------------------------------------
+
+test("F8: law 5: every profile states what a decision on a claim waits for and its review and appeal routes as data, each with a source, for every payment it has", () => {
+  for (const profile of profiles) {
+    const P = loadProfile(profile);
+    const rules = P.values.decisions ?? [];
+    const payments = P.values.support.payments.map((x: any) => x.id as string);
+    for (const id of payments) {
+      const r = rules.filter((x: any) => x.kind === "benefit_decision" && (x.payments ?? payments).includes(id));
+      expect(r.length, `${profile}: a rule for payment ${id}`).toBe(1);
+      expect(String(P.sources[`decisions.benefit_decision.${id}`] ?? "").length, `${profile}: its source`).toBeGreaterThan(40);
+      expect(P.sources[`decisions.benefit_decision.${id}`], `${profile}: honest about what is recalled or a placeholder`).toMatch(/recalled|opened|PLACEHOLDER|Not opened/i);
+      const rule = r[0]!;
+      for (const n of rule.needs ?? []) { expect(n.within_days, `${profile}: ${id} ${n.id}`).toBeGreaterThan(0); expect(["claimant", "employer"]).toContain(n.from); }
+      if (rule.appeal) expect(rule.appeal.within_days, `${profile}: ${id} appeal`).toBeGreaterThan(0);
+      if (rule.review?.required) expect(rule.appeal, `${profile}: ${id}: a review that must come first leads to an appeal`).toBeDefined();
+    }
+    // The routes differ: no place's figure is the code's.
+  }
+  const days = new Set(profiles.map((p) => JSON.stringify(loadProfile(p).values.decisions?.map((x: any) => [x.review?.within_days, x.appeal?.within_days]))));
+  expect(days.size, "the places' routes are their own, not one default").toBeGreaterThan(4);
+});
+
+test("F8: law 5 and 6: a town publishes the decisions law, the payments procedure names its approver, the possession law its enforcer, and the code holds none of them", () => {
+  for (const profile of ["au-vic-2026", "gb-eng-2026", "ke-nakuru-2026"]) {
+    const c = small(profile);
+    const rec = (id: string) => c.world.records.find((r: any) => r.id === id);
+    const law = rec("law-decisions");
+    expect(law, `${profile}: the decisions law`).toBeDefined();
+    expect(law.visible_to).toBe("public");
+    expect(law.data.decisions.length).toBeGreaterThan(0);
+    expect(rec("proc-payments").data.approval).toMatchObject({ by: "mayor" });
+    expect(Number.isSafeInteger(rec("proc-payments").data.approval.over)).toBe(true);
+    if (rec("law-possession")) expect(typeof rec("law-possession").data.enforced_by).toBe("string");
+    // The finance office is handed no approver or sum as a parameter: it reads the procedure.
+    const fin = c.positions.find((p: any) => p.id === "finance");
+    expect(Object.keys(fin.role_module.params ?? {}).filter((k) => /approval_over|mayor_position/.test(k))).toEqual([]);
+  }
+});
+
+test("F8: law 5: the support office is shown the papers its claims wait for (the claimant's and an employer's), and the planning office the requests to look at a refusal again; without them a claim would wait out its days", () => {
+  const c = small("au-vic-2026");
+  const kindsOf = (id: string) => new Set(c.positions.find((p: any) => p.id === id).channels.flatMap((ch: any) => ch.match?.statement_kinds ?? []));
+  const support = c.positions.find((p: any) => p.entity === "outside" && p.role_module?.code === "world.transfers")!;
+  const seen = new Set(support.channels.flatMap((ch: any) => ch.match?.statement_kinds ?? []));
+  for (const k of ["evidence", "confirmation_answer", "benefit_claim", "review_request"]) expect(seen.has(k), `the support office is shown ${k}`).toBe(true);
+  expect(kindsOf("planning").has("review_request")).toBe(true);
+});
+
+test("F8: law 5: a decision of a kind with a review route is asked to be looked at again by the one request every grievance has, and no special kind is left for the review of a refused claim", () => {
+  const BEHAVIOUR = join(root, "participants/src/behaviour");
+  const found: string[] = [];
+  for (const f of readdirSync(BEHAVIOUR).filter((n) => n.endsWith(".ts"))) readFileSync(join(BEHAVIOUR, f), "utf8").split("\n").forEach((l, i) => { if (l.includes('"remedy_request"')) found.push(`${f}:${i + 1}`); });
+  expect(found).toEqual([]);
+});
+
+// ---------------------------------------------------------------------------------------------------------------------
 // Law 2 (table): every record kind a module or form writes has a row in the work table. F2 defines the table's shape
 // and F10 owns the real check (it needs the table to exist), so there is nothing to run before then.
 // ---------------------------------------------------------------------------------------------------------------------
@@ -266,11 +324,9 @@ test("every special case in the inventory still stands where it says, as many ti
   for (const s of inv.stays) expect(stands(s.file, s.find).length, s.what).toBeGreaterThan(0);
 });
 
-test("the inventory covers the plan's deletions: F8 still has entries, and every kernel one is in the kernel", () => {
-  const steps = new Set(inv.entries.map((e) => e.step));
-  // (A step that is built has taken its entries out with the code: F1 to F7 have none left but history.)
-  for (const s of ["F8"]) expect(steps.has(s), s).toBe(true);
-  for (const s of ["F1", "F2", "F3", "F4", "F5", "F6", "F7"]) expect(inv.entries.filter((e) => e.step === s && e.kind !== "history").map((e) => e.id), `${s} is built: nothing of it is left`).toEqual([]);
+test("the inventory covers the plan's deletions: every step is built and has nothing left but history, and every kernel entry is in the kernel", () => {
+  // (A step that is built has taken its entries out with the code: F1 to F8 have none left but history.)
+  for (const s of ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8"]) expect(inv.entries.filter((e) => e.step === s && e.kind !== "history").map((e) => e.id), `${s} is built: nothing of it is left`).toEqual([]);
   for (const e of inv.entries.filter((x) => x.id.startsWith("k-"))) expect(e.file, e.id).toMatch(/^kernel\//);
 });
 

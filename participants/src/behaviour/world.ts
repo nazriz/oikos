@@ -16,6 +16,7 @@ import { forAge, supportLaw, type Declared, type PaymentRule } from "./payments"
 import { incomeTaxLaw, withholding } from "./tax";
 import { Respondent } from "./frictions";
 import { slip } from "../slip";
+import { decisionLaw, Reconsiderations, Waits } from "./decisions";
 
 export const exportDemand: BehaviourModule = {
   name: "world.export_demand",
@@ -252,10 +253,10 @@ export const transfers: BehaviourModule = {
   answers: {"office": "the support office", "acts": "What it acts on: a claim for a payment under the support law, made by the person it is for."},
   // The office's routine, where a model holds the office (docs/behaviour/standing-work.md, "The support office"): what
   // the support law's own conditions settle is the staff's; a refusal, a doubt and a review are the office-holder's.
-  routines: [{ task: "pay_claims", at: "office", every: 1, what: "Each working day the office's staff decide the claims that have waited their time, the oldest first: a claim that meets the conditions the support law states for its payment is granted, in writing, and paid each period from then until the claimant asks for it to stop, dies, leaves, or its time runs out, which the staff tell them. A claim that does not meet the conditions, or that the staff could not verify, is not refused by the staff: it is put before whoever holds the office, as a note on the office's file saying what it fails on, and decided by them on the office's decision form; a claim they grant on that form is paid by the staff like any other. A request to review a refusal comes to the office-holder.",
+  routines: [{ task: "pay_claims", at: "office", every: 1, what: "Each working day the office's staff decide the claims that have waited their time, the oldest first: a claim that meets the conditions the support law states for its payment is granted, in writing, and paid each period from then until the claimant asks for it to stop, dies, leaves, or its time runs out, which the staff tell them. A claim that does not meet the conditions, or that the staff could not verify, is not refused by the staff: it is put before whoever holds the office, as a note on the office's file saying what it fails on, and decided by them on the office's decision form; a claim they grant on that form is paid by the staff like any other. A request to look at a decision again comes to the office-holder. What a claim waits for before it is decided (papers from the claimant, a confirmation from their last employer, within so many days) is the law's: the staff ask for it and the claim stays on their file until it has come or its time has run.",
     papers: [{ kind: "benefit_claim", how: "decided by the support law's conditions: granted and paid if it meets them, put before the office-holder if it does not or could not be verified" }, { kind: "benefit_change", how: "a claimant's own request to stop their payment: it is stopped" }] }],
   issues: [...P.SUPPORT, P.REMEDY_ANSWER, ...P.VENUE_ANSWERS],
-  version: "0.9.0", // 0.9.0: the wrong refusals are a slip at the rate of the world's table of slips (foundations F7), not a parameter; 0.8.0: no processing time, daily capacity or doubled errors under backlog: it decides every claim it has, and how many is the hours of whoever decides (foundations F6); 0.7.0: a claim made before the year began and still waiting (an opening caseload) is decided when its processing time from that day has run; a claim refused before it is decided; a refusal asked about that the paper says could not be verified is found wrong on review; 0.6.0: payments in force before the year (grants brought forward on paper) are taken up when the file is first opened and paid from the day each names; 0.5.0: run in parts where a model holds the office (part): the staff decide and pay what the law's conditions settle under a standing order (pay_claims) and put a refusal or a doubt before the office-holder, who decides it on the office's decision form and answers reviews; a town run by code is unchanged; 0.4.0: a claim may wait to be decided (processing_days), the staff decide so many a day (capacity_per_day), and some qualifying claims are wrongly refused, more while a backlog stands (error_bps, at the friction dial); asked to review a refusal found wrong, the office decides the next claim on its facts
+  version: "0.10.0", // 0.10.0: a claim waits for what the law says it needs (papers from the claimant, a confirmation from the last employer, within so many days: foundations F8), is looked at again when asked inside the law's days (a review, recorded), and a refusal found wrong is put right by the office or on a venue's setting it aside; the staff refuse nothing only where the law says the head alone does; 0.9.0: the wrong refusals are a slip at the rate of the world's table of slips (foundations F7), not a parameter; 0.8.0: no processing time, daily capacity or doubled errors under backlog: it decides every claim it has, and how many is the hours of whoever decides (foundations F6); 0.7.0: a claim made before the year began and still waiting (an opening caseload) is decided when its processing time from that day has run; a claim refused before it is decided; a refusal asked about that the paper says could not be verified is found wrong on review; 0.6.0: payments in force before the year (grants brought forward on paper) are taken up when the file is first opened and paid from the day each names; 0.5.0: run in parts where a model holds the office (part): the staff decide and pay what the law's conditions settle under a standing order (pay_claims) and put a refusal or a doubt before the office-holder, who decides it on the office's decision form and answers reviews; a town run by code is unchanged; 0.4.0: a claim may wait to be decided (processing_days), the staff decide so many a day (capacity_per_day), and some qualifying claims are wrongly refused, more while a backlog stands (error_bps, at the friction dial); asked to review a refusal found wrong, the office decides the next claim on its facts
   doc: "docs/behaviour/boundary.md",
   cadence: () => DAY,
   firstWake: () => 0,
@@ -284,9 +285,9 @@ export const transfers: BehaviourModule = {
     const seen = new Set<string>(); // cases the office-holder has decided
     let granted = 0, putBefore = 0, payments = 0; // since the staff last reported
     const lately: string[] = [];
-    const wronglyRefused = new Set<string>(); // claims refused though the claimant qualified
     const claimNth = new Occurrences(); // which claim each is: this person's nth for this payment, not its number on file
-    const reviewed = new Set<string>(); // person|payment: a refusal reviewed and found wrong, so the next claim is decided on its facts
+    const waits = new Waits(me); // what a claim waits for before it is decided (the law's `needs`: foundations F8)
+    const recon = new Reconsiderations(me, ["benefit_decision"]); // a decision of ours looked at again when asked (the law's `review`)
     type Paying = { person: string; account: string; payment: string; from: string; amount: number; every: number; next: number; until?: number; then?: string };
     const paying = new Map<string, Paying>(); // claim -> what we pay under it
     let opened = false; // our file has been opened once (payments in force before the year are taken up then)
@@ -338,20 +339,40 @@ export const transfers: BehaviourModule = {
       const until = Math.min(...ends);
       return { ok: true, amount, ...(until < Infinity ? { until } : {}) };
     };
-    // What the office's own books say of a refusal asked about: whether the claim was refused though the claimant qualified.
+    /** A claim granted on the office's second look (a review, or a venue setting its refusal aside): the office decides again on the facts it has now,
+     * as it decides any claim, without a slip, and puts right what it finds wrong itself: the new decision, and the payments under it. */
+    const decideAgain = (refusal: StatementRecord, t: number, because_: string, basis: string): { changed: boolean; found: string; steps: Step[] } => {
+      const claim = typeof refusal.data?.claim === "string" ? (book.records.get(refusal.data.claim) as StatementRecord | undefined) : undefined;
+      const rule = rules().find((r) => r.id === String(refusal.data?.payment));
+      if (!claim || claim.record !== "statement" || !rule) return { changed: false, found: "the claim is not on our file", steps: [] };
+      const d = decide(rule, claim, t);
+      if (!d.ok) return { changed: false, found: d.why ?? "it does not meet the conditions the support law states for the payment", steps: [] };
+      const who = claim.speaks_for!;
+      for (const [id, x] of paying) if (x.person === who && x.payment === rule.id) paying.delete(id);
+      paying.set(claim.id, { person: who, account: claim.data!.account as string, payment: rule.id, from: rule.account || p.account, amount: d.amount, every: rule.every_days * DAY, next: t + rule.every_days * DAY, ...(d.until !== undefined ? { until: d.until } : {}), ...(rule.lasts?.then ? { then: rule.lasts.then } : {}) });
+      const lasting = d.until !== undefined ? ` until day ${Math.floor(d.until / DAY)}` : "";
+      return { changed: true, found: "the claim met the conditions the support law states for the payment when it was decided", steps: [because(`${because_}: the claim ${claim.id} qualifies; granting it.`,
+        say("benefit_decision", `Claim ${claim.id} granted on a second look: ${usd(d.amount)} every ${rule.every_days} days${lasting}.`, { to: [who], visible: [who, me], basis: claim.id,
+          data: { claim: claim.id, payment: rule.id, granted: true, amount: d.amount, every: rule.every_days * DAY, ...(d.until !== undefined ? { until: d.until } : {}), on_review: basis, replaces: refusal.id } }))] };
+    };
+    // What the office's own books say of a refusal asked about at a venue: whether the claim qualified when decided. (Its requests to look again are the
+    // generic route's, `recon` below; this answers a venue's notice and puts right what a venue sets aside.)
     const resp = new Respondent(ctx.rng, me, null, {
       params: p.respond,
-      truth: (m, from, bk) => {
+      requests: false,
+      truth: (m, from, bk, tNow) => {
         if (m.matter !== "claim_refused" || !m.about) return undefined;
-        const d = bk.records.get(m.about) as any;
-        if (!d || d.speaks_for !== me || d.kind !== "benefit_decision" || !(d.addressed_to ?? []).includes(from) || typeof d.data?.claim !== "string") return undefined;
-        return { wrong: wronglyRefused.has(d.data.claim) || (d.data.brought_forward === true && d.data.could_not_verify === true) };
+        const d = bk.records.get(m.about) as StatementRecord | undefined;
+        if (!d || d.record !== "statement" || d.speaks_for !== me || d.kind !== "benefit_decision" || !(d.addressed_to ?? []).includes(from) || typeof d.data?.claim !== "string") return undefined;
+        if (d.data?.granted === true) return { wrong: false };
+        const claim = bk.records.get(d.data.claim) as StatementRecord | undefined;
+        const rule = rules().find((r) => r.id === String(d.data?.payment));
+        return { wrong: !!claim && claim.record === "statement" && !!rule && decide(rule, claim, tNow).ok };
       },
-      // (A review puts nothing in the claimant's account: they claim again, and the claim is decided on its facts.)
-      remedy: (m, from) => {
-        const d = m.about ? (book.records.get(m.about) as any) : undefined;
-        if (d && typeof d.data?.payment === "string") reviewed.add(`${from}|${d.data.payment}`);
-        return [];
+      // A venue sets a refusal aside: the claim is decided again, as for a review.
+      remedy: (m, _from, t, why, basis) => {
+        const d = m.about ? (book.records.get(m.about) as StatementRecord | undefined) : undefined;
+        return d && d.record === "statement" && d.speaks_for === me && d.kind === "benefit_decision" && d.data?.granted === false ? decideAgain(d, t, why, basis).steps : [];
       },
     });
     return stepper(
@@ -391,7 +412,6 @@ export const transfers: BehaviourModule = {
             seen.add(n.id);
             const d = n.data ?? {};
             if (typeof d.claim !== "string" || typeof d.claimant !== "string") continue;
-            if (d.doubt) wronglyRefused.add(d.claim);
             const why = String(d.fails ?? "");
             steps.push(because(`A claim the staff put before us (${d.claim}): refused${why ? `: ${why}` : ""}.`,
               say("benefit_decision", `Claim ${d.claim} refused${why ? `: ${why}` : ""}.`, { to: [d.claimant], visible: [d.claimant, me], basis: d.claim, data: { claim: d.claim, payment: d.payment, granted: false, ...(why ? { reason: why } : {}) } })));
@@ -399,23 +419,32 @@ export const transfers: BehaviourModule = {
         }
         const waiting = !working ? [] : book.open("benefit_claim").filter((r) => (r.addressed_to ?? []).includes(me) && !decided.has(r.id)).sort((a, b) => madeAt(a) - madeAt(b) || (a.id < b.id ? -1 : 1));
         for (const c of waiting) {
-          decided.add(c.id);
           const who = c.speaks_for!;
           const payment = String(c.data?.payment);
           const rule = ours.find((r) => r.id === payment);
           const age = Number.isInteger(c.data?.born_at) ? Math.floor((t - (c.data!.born_at as number)) / p.year) : -1;
-          let d = decide(rule, c, t);
-          // A claim that qualifies may be wrongly refused (a record not matched, a form read wrongly), unless the refusal of
-          // this person's claim for this payment has already been reviewed and found wrong.
-          // (A slip of whoever decides: the world's table of slips has its rate for a decision on a claim, foundations F7.)
-          if (d.ok && !reviewed.has(`${who}|${payment}`) && slip(ctx, "publish/benefit_decision", claimNth.key(c.id, who, payment))) {
+          // What the claim waits for before it is decided is the law's (foundations F8): papers from the claimant, a confirmation from
+          // their last employer, within so many days, and what comes of it when they do not come. We ask once, for each; the claim stays
+          // on our file until it has come, or its time has run. (A claim made before the year opened, brought forward on paper, is decided.)
+          const law = decisionLaw(book, "benefit_decision", payment);
+          const wait = c.data?.brought_forward ? undefined : waits.state(book, law, c, t);
+          if (wait) steps.push(...wait.steps);
+          if (wait?.state === "waiting") continue;
+          decided.add(c.id);
+          let d = wait?.state === "lapsed" ? { ok: false as const, why: wait.why } : decide(rule, c, t);
+          // A claim that qualifies may be wrongly refused (a record not matched, a form read wrongly): a slip of whoever decides, at the
+          // rate of the world's table of slips for a decision on a claim (foundations F7). It is put right when the decision is looked at
+          // again (a review, or a venue): the office decides it again on the facts, without a slip, as `decideAgain` has it.
+          let slipped = false;
+          if (d.ok && slip(ctx, "publish/benefit_decision", claimNth.key(c.id, who, payment))) {
             d = { ok: false, why: "the claim could not be verified" };
-            wronglyRefused.add(c.id);
+            slipped = true;
           }
-          // The staff refuse nothing: a claim that does not meet the conditions, or that they could not verify, is
-          // put before whoever holds the office, with what it fails on (and, for a doubt, what it would be paid).
-          if (staff && !d.ok) {
-            const doubt = wronglyRefused.delete(c.id);
+          // Who may refuse is the office's procedure's (the law's `refused_by`, foundations F8): where the head alone does, the staff put a claim that does
+          // not meet the conditions, or that they could not verify, before whoever holds the office, with what it fails on (and, for a doubt, what it
+          // would be paid). Where the staff may refuse, they decide it as the whole office does.
+          if (staff && !d.ok && law?.refused_by !== "staff") {
+            const doubt = slipped;
             const would = doubt ? decide(rule, c, t) : undefined;
             const why = d.why ?? "it does not meet the conditions the support law states for the payment";
             put.set(c.id, { doubt, why });
@@ -436,15 +465,23 @@ export const transfers: BehaviourModule = {
               to: [who], visible: [who, me], basis: c.id, data: { claim: c.id, payment, granted: d.ok, ...(d.ok ? { amount: d.amount, every: rule!.every_days * DAY, ...(d.until !== undefined ? { until: d.until } : {}) } : d.why ? { reason: d.why } : {}) },
             })));
         }
-        // Asked to review a refusal (the claimant's request): answered from the office's own books. Never the staff's.
-        if (!staff) steps.push(...resp.steps(book, t, p.account, 1e15));
+        // Asked to look at a decision again (the claimant's request, inside the days the law gives): the office decides it again on the facts, and
+        // records that it did. Never the staff's where there is a head to do it. A venue's notice of an application against us is answered
+        // from the books (`resp`).
+        if (!staff) {
+          steps.push(...recon.steps(book, t, (dec, req) => {
+            if (dec.data?.granted !== false) return { changed: false, found: "the claim was granted", steps: [] };
+            return decideAgain(dec, t, `Asked by ${req.speaks_for} to look at our refusal ${dec.id} again`, req.id);
+          }));
+          steps.push(...resp.steps(book, t, p.account, 1e15));
+        }
         // A claim the office-holder granted on the office's decision form is paid by the staff like any other: from
         // the decision's own figures, the first payment one period on.
         if (staff && working) for (const d of book.all("benefit_decision")) {
           if (taken.has(d.id) || d.speaks_for !== me) continue;
           taken.add(d.id);
           const claim = typeof d.data?.claim === "string" ? (book.records.get(d.data.claim) as StatementRecord | undefined) : undefined;
-          if (!claim || !put.has(claim.id) || d.data?.granted !== true || paying.has(claim.id)) continue;
+          if (!claim || d.data?.granted !== true || paying.has(claim.id)) continue;
           const amount = Math.floor(Number(d.data.amount)), every = Math.floor(Number(d.data.every));
           if (!(amount > 0) || !(every > 0) || typeof claim.data?.account !== "string") continue;
           const rule = ours.find((r) => r.id === String(claim.data!.payment));

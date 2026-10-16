@@ -762,3 +762,18 @@ No document was opened for this step; the entries are named from memory and are 
 
 - **A slip is an execution error by someone who meant well; a mistake is a plan that was wrong.** Reason (1990) and Norman (1981), cited under Foundations above. Used: `slip()` (participants/src/slip.ts) is the only place a module draws a wrong decision by chance; the rate is a row of the world's table of slips (`orchestration.slip`) for the kind of performer, with its source. Mistakes of rule, record or time come from the procedure, the data and the hours, never from a draw.
 - **The time a register takes to answer is the time of the clerk (or the system) who answers, and a queue grows where arrivals outrun it.** Little (1961), cited under Foundations above. Used: a question put to a register's keeper takes its performer's time on their timeline (`ask_started`, `ask_answered`), so one clerk answers one at a time (docs/design/knowing.md, section 12).
+
+## Foundations F8: what a decision waits for, and how it is looked at again (docs/behaviour/decisions.md; docs/decisions.md, "Foundations F8")
+
+No document was opened for this step; every route below is named from memory and is **(to confirm)**. Used: each profile's `values.decisions` and its `sources["decisions..."]`.
+
+- **Internal review then appeal, Australia (a claim for the Age Pension or JobSeeker Payment):** review by an authorised review officer within 13 weeks, then the Administrative Review Tribunal within 13 weeks of that, free. Social Security (Administration) Act 1999 (Cth) ss 111, 129, 142; Administrative Review Tribunal Act 2024 (Cth). (To confirm.)
+- **Mandatory reconsideration then First-tier Tribunal, England (State Pension, Universal Credit):** a month to ask, a month to appeal after the notice, free. Social Security and Child Support (Decisions and Appeals) Regulations 2013 (SI 2013/381), reg 7; gov.uk guidance on mandatory reconsideration. (To confirm.)
+- **Reconsideration then administrative law judge, United States (Social Security):** 60 days (+5) each. 20 CFR 404.909 and 404.933. **Ohio unemployment:** 21 days to appeal or ask for redetermination. Ohio Revised Code 4141.281. (To confirm.)
+- **Widerspruch then social court, Germany:** a month to object, a month to sue, free of court fees for recipients. Sozialgerichtsgesetz (SGG) ss 78, 84, 87, 183; employer's employment certificate: SGB III s 312; duty to supply what is asked: SGB I s 60. (To confirm.)
+- **Request for examination, Japan:** three months to the social insurance (or employment insurance) examiner, a body apart from the office. Administrative Complaint Review Act art 18; National Pension Act art 101; Employment Insurance Act art 69; the separation certificate within 10 days: Employment Insurance Act Enforcement Regulations art 7. (To confirm.)
+- **Recurso to the board of appeals, Brazil (INSS):** 30 days. Decreto 3.048/1999 art 305. (To confirm.)
+- **Recurso de revisión, Mexico:** 15 working days. Ley Federal de Procedimiento Administrativo art 85; the suit to the administrative court 30 working days, Ley Federal de Procedimiento Contencioso Administrativo art 13. (To confirm.)
+- **Challenging an administrative action, Kenya:** 90 days. Fair Administrative Action Act 2015. (To confirm.) **India (Tamil Nadu):** nothing found; a placeholder.
+- **A review is the work done again, by someone who was not the one who slipped:** Reason, *Human Error* (1990), cited under Foundations above (an error found by checking, not by the one who made it). Used: the office decides a refusal again on the facts, without a second slip on the same case (docs/behaviour/decisions.md). The sim's second look is by the same office (the post has one holder); that is a known simplification.
+

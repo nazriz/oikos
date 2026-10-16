@@ -26,8 +26,9 @@ const job = (id: string, at: number, worker: string) => ({ ...employment(id, at,
 const invoice = (id: string, at: number, amount: number) => statement(id, at, "invoice", { speaks_for: "builder", author: "builder-system", addressed_to: ["city"], visible_to: ["city", "builder"], data: { outcome: { money: { to: "acc-builder", amount: String(amount) } } } });
 
 test("finance: an invoice addressed to the town is open until a payment of ours settles it, and says when it needs the mayor's approval", () => {
-  const b = financeBooks(context("fin", "city", {}, { position: "finance" }));
-  feed(b, "city", 5 * DAY, [invoice("inv-1", 4 * DAY, 800_000), invoice("inv-2", 4 * DAY, 9_000_000)]);
+  // (Who approves a payment over what sum is the payments procedure's, on file: foundations F8, law 6.)
+  const b = financeBooks(context("fin", "city", { procedure: "proc-payments" }, { position: "finance" }));
+  feed(b, "city", 5 * DAY, [statement("proc-payments", 0, "procedure", { data: { approval: { by: "mayor", over: 5_000_000 } } }), invoice("inv-1", 4 * DAY, 800_000), invoice("inv-2", 4 * DAY, 9_000_000)]);
   const open = find(b.open(6 * DAY), "Invoices addressed to the town, not paid");
   expect(open.map((i) => i.id)).toEqual(["inv-1", "inv-2"]);
   expect(open[0]).toMatchObject({ since: 4 * DAY, amount: 800_000 });

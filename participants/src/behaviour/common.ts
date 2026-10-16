@@ -1283,6 +1283,17 @@ export class Directions {
 export interface WorkOrder { id: string; task: string; at?: string; on?: string[]; by?: string[]; units?: number; every: number; schedule?: string; from: number; until?: number }
 
 /**
+ * Who approves a payment over what sum, as the town's payments procedure states it (foundations F8, law 6: who may do what
+ * is law and contract, as data). The record is the procedure's `data.approval`: `by` the post (whoever holds it) and `over` the
+ * sum in cents. None where the procedure is not on file, is withdrawn with nothing in its place, or states no approval.
+ */
+export function approvalOf(book: Book, procedure: string): { by: string; over: number } | undefined {
+  if (!procedure || book.repealed(procedure)) return undefined;
+  const a = (book.records.get(procedure) as StatementRecord | undefined)?.data?.approval;
+  return a && typeof a.by === "string" && Number.isSafeInteger(a.over) ? { by: a.by, over: a.over } : undefined;
+}
+
+/**
  * Standing work (docs/behaviour/standing-work.md). An office's routine work is its staff's: they follow the
  * organisation's standing work orders (statements of kind `work_order` on its own file: what task, where, how often,
  * and perhaps on what, by whom, from when and until when), each time one falls due, in their own hours, until it is

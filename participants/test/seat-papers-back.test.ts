@@ -100,7 +100,7 @@ test("a tenant's letter to a landlord (to stay on, for time, for a repair) is th
   const office = { participant: "landlord-1-office-system", entity: "landlord-1", title: "Letting office", ownAuthors: ["landlord-1-office-staff-system"] };
   const { p, calls } = harness([[use("d", "done_for_now", { days: 14 })]], { ...office, trays: { ...trays, sole: true } });
   await p.step(letting(9 * HOUR), ctx);
-  await p.step(letting(DAY + 14 * HOUR, [from("rec.7", "variation_request", DAY + 14 * HOUR, "Request: please let us stay on at apts-1/dwelling.4."), from("rec.8", "remedy_request", DAY + 14 * HOUR, "Request: the roof leaks; please repair it.")]), ctx);
+  await p.step(letting(DAY + 14 * HOUR, [from("rec.7", "variation_request", DAY + 14 * HOUR, "Request: please let us stay on at apts-1/dwelling.4."), from("rec.8", "review_request", DAY + 14 * HOUR, "Request: the roof leaks; please repair it.")]), ctx);
   expect(calls.length).toBe(1);
   await p.step(letting(2 * DAY + 9 * HOUR), ctx);
   expect(calls.length).toBe(2);

@@ -1,6 +1,6 @@
 // The support office (docs/behaviour/boundary.md, "Mistakes"): every claim it has is decided the day it is seen, oldest first
 // (until foundations F6 a processing time and a daily capacity made a wave of claims wait), and some wrongly refused at the
-// friction dial; a refusal asked about and found wrong is reviewed, and the claimant's next claim is decided on its facts.
+// friction dial; a refusal asked about and found wrong is reviewed, and put right by the office (foundations F8).
 import { expect, test } from "bun:test";
 import { inCurrency } from "../src/money";
 import { transfers } from "../src/behaviour/world";
@@ -48,17 +48,20 @@ test("claims are decided the day they are seen, every one the office has, with n
   expect(decisions(p.at(0, [claim("z", 0, "a"), claim("a", DAY, "b")])).map((x: any) => x.claim)).toEqual(["z", "a"]);
 });
 
-const request = (id: string, at: number, who: string, about: string) => statement(id, at, "remedy_request", { speaks_for: who, addressed_to: ["outside"], visible_to: [who, "outside"], data: { matter: "claim_refused", against: "outside", about, seeks: "review" } });
+const request = (id: string, at: number, who: string, about: string) => statement(id, at, "review_request", { speaks_for: who, addressed_to: ["outside"], visible_to: [who, "outside"], data: { matter: "claim_refused", against: "outside", about, seeks: "review" } });
 
-test("a qualifying claim wrongly refused at the dial is reviewed when asked about; the next claim is granted; a rightly refused claim is answered no", () => {
+test("a qualifying claim wrongly refused at the dial is reviewed when asked about (inside the law's days) and put right by the office; a rightly refused claim is answered no", () => {
+  // (What the law says of a review is the decisions law's, foundations F8: 90 days here. Docs: docs/behaviour/decisions.md; the office's whole route is in decisions.test.ts.)
+  const routes = statement("law-decisions", 0, "law", { speaks_for: "outside", data: { decisions: [{ kind: "benefit_decision", name: "a decision on a claim", review: { within_days: 90, grounds: "any" } }] } });
   const o = office({ error_bps: 10_000, respond: { grant_bps: { claim_refused: 10_000 } } }, 10_000);
-  const first = o.at(0, [claim("c1", 0, "a")]);
+  const first = o.at(0, [routes, claim("c1", 0, "a")]);
   expect(decisions(first)).toMatchObject([{ claim: "c1", granted: false, reason: "the claim could not be verified" }]);
   const decision = o.seen.find((r) => r.kind === "benefit_decision")!;
   const asked = o.at(DAY, [request("q1", DAY, "a", decision.id)]);
-  expect(asked.of("statement", "remedy_answer").map((c) => c.args.data)).toMatchObject([{ granted: true, matter: "claim_refused" }]);
+  expect(asked.of("statement", "remedy_answer").map((c) => c.args.data)).toMatchObject([{ granted: true, matter: "claim_refused", review: "changed" }]);
+  // The office puts it right itself: the claim is granted on its second look, and nothing else is paid out of the review.
+  expect(decisions(asked)).toMatchObject([{ claim: "c1", granted: true, amount: 50_000, on_review: "q1" }]);
   expect(asked.of("money").length).toBe(0);
-  expect(decisions(o.at(2 * DAY, [claim("c2", 2 * DAY, "a")]))).toMatchObject([{ claim: "c2", granted: true, amount: 50_000 }]);
   // A claim refused rightly (too young) is answered no when asked about.
   const young = statement("c3", 3 * DAY, "benefit_claim", { speaks_for: "b", addressed_to: ["outside"], visible_to: ["b", "outside"], data: { payment: "pension", account: "acc-b", born_at: 3 * DAY - 30 * YEAR } });
   expect(decisions(o.at(3 * DAY, [young]))).toMatchObject([{ claim: "c3", granted: false }]);

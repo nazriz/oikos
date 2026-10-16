@@ -25,6 +25,7 @@ import { nextReturn, returnsOf, type ReturnRule } from "./returns";
 import { message, broughtForward } from "./common";
 import { PAPER, Respondent, type RespondParams } from "./frictions";
 import { slip } from "../slip";
+import { KIND as DECISION } from "./decisions";
 import { swayed } from "./wants";
 import { advertisedJob, ask, Asked, startsOn, because, between, Book, firstDue, PAYEE_DIED, PAYMENT_FAILED, breaches, noting, callAction, usd, cellsOf, commitmentOf, DAY, jobTerms, leaseTerms, MONTH, notice, offer, ownAccount, pay, publishedPrice, say, stoodEmpty, structureOf, withdraw, type Step } from "./common";
 import * as P from "./papers";
@@ -1227,6 +1228,29 @@ export class Staffing {
     }
   }
 
+  private readonly confirmed = new Set<string>(); // requests for a confirmation of someone's employment, answered
+  /** The employment of a person as our own agreements show it: with us now (and since when), ended (and on what day), or no record of it. */
+  private employment(book: Book, t: number, who: string): { employed: boolean; known: boolean; ended_on?: number } {
+    const mine = this.contracts(book).filter((a) => a.terms.parties[1] === who && book.signedBy(a.id, who));
+    if (!mine.length) return { employed: false, known: false };
+    if (mine.some((a) => book.inForce(a.id) && t < this.endOf(book, a))) return { employed: true, known: true };
+    const last = Math.max(...mine.map((a) => Math.min(t, this.endOf(book, a))));
+    return { employed: false, known: true, ended_on: last };
+  }
+  private confirm(book: Book, t: number): Step[] {
+    const steps: Step[] = [];
+    for (const r of book.open(DECISION.confirmation_request).filter((x) => (x.addressed_to ?? []).includes(this.me) && !this.confirmed.has(x.id)).sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : 1))) {
+      this.confirmed.add(r.id);
+      const who = String(r.data?.about ?? ""), office = r.speaks_for;
+      if (!who || !office || typeof r.data?.claim !== "string") continue;
+      const e = this.employment(book, t, who);
+      steps.push(because(`${office} asks us to confirm the employment of ${who} for their claim ${r.data.claim}: answering from our books.`,
+        say(DECISION.confirmation, `Answer to your request ${r.id}: ${e.employed ? `${who} is in our employment` : e.known ? `${who}'s employment with us ended on day ${Math.floor((e.ended_on ?? t) / DAY)}` : `we have no record of ${who} in our employment`}.`,
+          { to: [office], visible: [office, this.me], basis: r.id, data: { claim: r.data.claim, need: r.data.need, request: r.id, subject: who, ...e } })));
+    }
+    return steps;
+  }
+
   private contracts(book: Book): any[] {
     return book.ofType("agreement").filter((r) => r.record === "agreement" && r.terms.template === "employment" && r.terms.parties[0] === this.me && this.ours(this.roleOf(r, book)));
   }
@@ -1319,6 +1343,9 @@ export class Staffing {
     const steps: Step[] = [];
     let offersNow = 0;
     const doesPay = this.o.does?.pay !== false;
+    // An office that waits to decide a claim of one of our people asks us to confirm it (the law's, foundations F8): we answer from our own books, once, as
+    // an employer does a request from the payments office for a separation certificate. Whoever of our offices runs the payroll answers.
+    if (doesPay) steps.push(...this.confirm(book, t));
     // (Directed not to recruit: its advertisements come down, and nothing below that hires is done.)
     const recruiting = want.recruit !== false;
     const doesHire = this.o.does?.hire !== false && recruiting;

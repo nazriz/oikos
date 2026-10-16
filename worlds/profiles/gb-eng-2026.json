@@ -1354,6 +1354,72 @@
    "spin_up_years": 10
   },
   "founding": {"registered_per_100000_per_year": 9, "informal_multiple": 5, "chance_bps": 130, "shared_min": 2, "rest_days": 365, "dues_minutes_of_pay": [0, 10, 30, 60], "every_days": [14, 7, 28], "starts_in_days": [7, 3, 14], "lasts_minutes": [90, 60, 120], "lapse_days": 120, "min_members": 2, "leave_after_days": 90, "hall_hire_hours_of_pay": 2, "fund": {"qualify_days": 60, "draw_months": 6, "every_days": 180}, "cause": {"case_hours": 6, "hours_per_member_month": 2}},
+  "decisions": [
+    {
+      "kind": "permit_decision",
+      "name": "A decision on a planning permit",
+      "review": {
+        "within_days": 30,
+        "grounds": "any: the office looks at its decision again on the application and the laws in force"
+      }
+    },
+    {
+      "kind": "benefit_decision",
+      "name": "A decision on a claim for support",
+      "payments": [
+        "pension"
+      ],
+      "refused_by": "office-holder",
+      "needs": [
+        {
+          "id": "papers",
+          "from": "claimant",
+          "what": "proof of who you are and of the details of your claim",
+          "within_days": 14,
+          "else": "refuse"
+        }
+      ],
+      "review": {
+        "within_days": 30,
+        "grounds": "any: the decision is reconsidered by another decision maker of the Department (a mandatory reconsideration)",
+        "required": true
+      },
+      "appeal": {
+        "matter": "claim_refused",
+        "within_days": 30,
+        "grounds": "any error of fact or law in the decision as reconsidered",
+        "fee_hours_of_pay": 0
+      }
+    },
+    {
+      "kind": "benefit_decision",
+      "name": "A decision on a claim for support",
+      "payments": [
+        "unemployment"
+      ],
+      "refused_by": "office-holder",
+      "needs": [
+        {
+          "id": "papers",
+          "from": "claimant",
+          "what": "proof of who you are, to be verified",
+          "within_days": 14,
+          "else": "refuse"
+        }
+      ],
+      "review": {
+        "within_days": 30,
+        "grounds": "any: the decision is reconsidered by another decision maker of the Department (a mandatory reconsideration)",
+        "required": true
+      },
+      "appeal": {
+        "matter": "claim_refused",
+        "within_days": 30,
+        "grounds": "any error of fact or law in the decision as reconsidered",
+        "fee_hours_of_pay": 0
+      }
+    }
+  ],
   "frictions": {
    "per_adult_bps_per_year": {
     "landlord": 460,
@@ -1420,6 +1486,10 @@
   }
  },
  "sources": {
+   "decisions.permit_decision": "PLACEHOLDER: an office's own second look at a planning decision within 30 days of it; the place's appeal route for a permit (to a tribunal or an inspectorate) is not built, since no one in the town yet brings a permit to a body that hears it. No source was opened for the days.",
+   "decisions": "Review and appeal of a decision on a claim for support, and what the decision waits for (docs/behaviour/decisions.md; foundations F8). Recalled, not opened: each key says what is recalled and what is a placeholder.",
+   "decisions.benefit_decision.pension": "A mandatory reconsideration is asked for within one month of the decision (Social Security and Child Support (Decisions and Appeals) Regulations 2013, reg 7: recalled from gov.uk guidance, to confirm; late requests up to 13 months for good reason are not built); an appeal to the First-tier Tribunal (Social Entitlement Chamber) within one month of the reconsideration notice, no fee, and only after it (recalled, to confirm). The 14 days for documents a claim needs is a PLACEHOLDER.",
+   "decisions.benefit_decision.unemployment": "As the State Pension. Identity must be verified for a Universal Credit claim: 7 days to do it, with the claim closed after a month (recalled from gov.uk guidance, to confirm); 14 days is used, a PLACEHOLDER. No employer confirmation: earnings reach the Department from employers' real-time returns (HMRC PAYE RTI), which the sim's pay reports already are.",
     "culture.conducts": "What people start out holding right, for the four conducts where a figure in this profile's own outlook speaks to it (the rest start from values alone: no figure was opened). approves_bps is the national share with 'a great deal' or 'quite a lot' of confidence, as `outlook.trust` has it (World Values Survey and European Values Study, joint wave 7, as Our World in Data publishes it; opened 2026-10-11, to confirm against the survey's tables; see sources.outlook for the country and the items). Mapping, ours: answer_tribunal and take_to_tribunal <- confidence in the courts (a person who trusts the courts approves of answering a case there and of taking a wrong to it); complain <- confidence in the civil service (writing to the town is approved where the town's officers are trusted to answer); join_union <- confidence in labour unions. Weak: confidence in an institution is not approval of an act toward it, and the share above a threshold is read as a mean, as outlook does; the figure sets where people start (their own lean and their picture of what others approve), nothing else, and the lean is measured from it, so the rates stay the calibrated ones. No figure for strike, take_in, stay_past_notice, take_from_employer or an organisation's conduct (the survey's items on joining strikes and on the justifiability of stealing property were not opened); no figure by origin group (no source found that gives one). National, not the place's. does_bps is never given: a conduct's own rate in the profile.",
     "culture.origin": "PLACE: England (not a town; the profile is of England), Census 2021, ethnic group (the census's own classes; chosen over country of birth because the census publishes the partnership table for it). groups: ONS, 'Ethnic group, England and Wales: Census 2021', https://www.ons.gov.uk/peoplepopulationandcommunity/culturalidentity/ethnicity/bulletins/ethnicgroupenglandandwales/census2021 , OPENED 2026-10-13: England White 81.0%, Asian 9.6%, Black 4.2%, Mixed 3.0%, Other 2.2%. (Country of birth, ONS 'International migration, England and Wales: Census 2021', OPENED 2026-10-13: 83.2% born in the UK, 16.8% not; England and Wales together.) same_household_bps: 8900 DERIVED, (to confirm). From the same ONS bulletin, OPENED: 'ethnic groups differ within partnerships' in 5.7% = 1.4 million households of England and Wales (E&W, not England). The number of couples comes from a search result that was NOT opened (Census 2021 table of living arrangements: 19,678,295 people married or in a civil partnership and 6,338,032 cohabiting, E&W, about 13.0 million couples): 1.4m of about 13.0m is about 10.8% mixed, so about 89% of couples are of one group. Households are not couples (a household may hold more than one partnership), so the figure is rough. homophily_bps: PLACEHOLDER 5000 (a close tie is half again as likely within a group as by chance). No survey of close ties or friendship by group for this place was found and opened; McPherson, Smith-Lovin and Cook 2001 ('Birds of a feather', Annual Review of Sociology 27) gives the general fact, not this place's figure. CHILDREN: the census has a Mixed or Multiple category that a child of a mixed couple may be given (a child's group is answered by a parent), so the generator's rule (either parent's group) does not fit this source; a mixed child is often counted as Mixed.",
     "tenancy.rent_share_of_income": "PLACEHOLDER bands around a mean read from a summary: private renters in England spent on average 34% of gross household income on rent counting housing support as income, 39% without it; by income fifth 63, 40, 28, 21 and 17%; 71% of private renters in the lowest two fifths spent over 30% (MHCLG, English Housing Survey 2023-24, headline findings chapter 2 and the rented sectors report, https://www.gov.uk/government/statistics/chapters-for-english-housing-survey-2023-to-2024-headline-findings-on-demographics-and-household-resilience/chapter-2-housing-costs-and-affordability, read through a fetch summary on 2026-10-12: to confirm; one fetch gave other figures). No bands are published in the chapters; the bands here (24% under a fifth, 26% a fifth to three tenths, 32% three tenths to a half, 18% over a half) are a placeholder shaped to that mean. To replace from the survey's annex tables. HOW IT IS USED (docs/behaviour/generator.md, \"Homes by income\"): each renting household of a new town draws its share from these bands (evenly within a band; the open band from its lower bound to twice it, at most everything), which gives the rent it carries; households and let homes are matched by it. A target as well: the town's own distribution at the start is reported beside it and is not fitted to it.",

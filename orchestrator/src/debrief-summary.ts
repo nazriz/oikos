@@ -114,7 +114,7 @@ export function namedBy(blocks: unknown, own: Set<string>): string[] {
   return [...out].sort();
 }
 /** Kinds of paper that ask something of whoever they are put before. */
-const ASKS = /^(petition|application|complaint|claim|proposal|request|appeal|remedy_request|tribunal_application|enforcement_request)$/;
+const ASKS = /^(petition|application|complaint|claim|proposal|request|appeal|review_request|tribunal_application|enforcement_request)$/;
 const kindsOf = (blocks: any[]) => [...new Set(blocks.map((b) => `${b?.block ?? "?"}${b?.kind ? `/${b.kind}` : ""}`))];
 const DIRECTION = /^(direction|work_order|standing_order|instruction|order)$/;
 const grantedOf = (blocks: any[]): boolean | undefined => {
@@ -265,7 +265,7 @@ export const ACT_SORTS: { [rank: number]: string[] } = {
     "loan_decision", "budget", "proposal", "law", "amendment", "direction", "work_order", "standing_order", "instruction", "nomination", "election_notice",
     "appoint", "give_notice", "propose_agreement", "sign_agreement", "vacate", "retire", "demolish", "release_claim", "create_position"],
   2: ["plan_offer", "payment_plan_offer", "remedy_answer", "petition_response", "complaint_response", "enforcement_decline", "answer", "hearing_notice"],
-  3: ["rent_increase", "remedy_request", "rent_reminder", "complaint_notice", "message"],
+  3: ["rent_increase", "review_request", "rent_reminder", "complaint_notice", "message"],
   4: ["rental_listing", "job_posting", "listing", "request", "withholding_report", "withholding_return", "return", "report", "accounts", "invoice", "charge", "payment", "pay", "rates", "levy", "transfer", "open_account", "close_account", "withdraw"],
 };
 const SORT_OF = new Map<string, number>(Object.entries(ACT_SORTS).flatMap(([rank, kinds]) => kinds.map((k) => [k, Number(rank)] as const)));

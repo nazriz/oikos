@@ -210,8 +210,8 @@ test("offices that apply a law or a procedure by its id stop once it's withdrawn
 
   // The finance office: an invoice over the approval limit waits for the mayor's approval while the payments procedure
   // stands; once the procedure is withdrawn, the rule goes with it (the budget still bounds it).
-  const finance = financeOfficer.create(ctx("finance-system", { procedure: "proc-payments", approval_over: 5_000_000 }, "finance"));
-  const procedure = stmt("proc-payments", 0, "procedure", {});
+  const finance = financeOfficer.create(ctx("finance-system", { procedure: "proc-payments" }, "finance"));
+  const procedure = stmt("proc-payments", 0, "procedure", { data: { approval: { by: "mayor", over: 5_000_000 } } });
   const budget = stmt("budget-1", 0, "budget", { data: { year: 1, lines: { parks: 20_000_000 } } });
   const invoice = stmt("inv-1", DAY, "invoice", { author: "builder", speaks_for: "builder", addressed_to: ["city"], data: { outcome: { money: { to: "acc-builder", amount: "6000000" } } } });
   expect(run(finance, obs(DAY, [procedure, budget, invoice], account))).not.toContain("money(");

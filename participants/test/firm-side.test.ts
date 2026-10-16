@@ -153,7 +153,7 @@ test("a wage the account could not cover on its day is owed in the employer's bo
   // Nothing in the bank to pay it with: nothing paid, and it stands in the books.
   expect(short.said.filter((c) => c.fn === "money" && /late/.test(String(c.args.for)))).toEqual([]);
   // Asked what is owed under the agreement, its books say the missed pay.
-  const asked = at(16 * DAY, 50_000, [{ id: "r1", at: 16 * DAY, record: "statement", kind: "remedy_request", author: "c1-self", speaks_for: "c1", addressed_to: [id], visible_to: ["c1", id], basis: "J1", text: "r1",
+  const asked = at(16 * DAY, 50_000, [{ id: "r1", at: 16 * DAY, record: "statement", kind: "review_request", author: "c1-self", speaks_for: "c1", addressed_to: [id], visible_to: ["c1", id], basis: "J1", text: "r1",
     data: { matter: "underpaid", against: id, about: "J1", amount: 1, account: "acc-c1" } }]);
   const answer = asked.of("statement", "remedy_answer")[0];
   expect(answer === undefined || answer.args.data.granted === false || answer.args.data.amount === 200_000).toBe(true);

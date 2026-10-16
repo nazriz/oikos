@@ -112,7 +112,7 @@ test("a budget made on the council proposal form is for the year the form names,
 });
 
 test("the finance office pays within the year's adopted budget; while the year has none, under the budget last adopted at a twelfth a month; and what it paid in the meantime counts against the year's budget once adopted", () => {
-  const finance = financeOfficer.create(ctx("finance-system", { approval_over: 100_000_00 }, "finance"));
+  const finance = financeOfficer.create(ctx("finance-system", {}, "finance"));
   const first = budget(1, 0, { parks: 12_000_00 });
   // Year 1: within the adopted budget's total, and not beyond it.
   expect(run(finance, obs(DAY, [first, invoice("inv-1", DAY, 9_000_00)], account(100_000_00)))).toContain("settles=inv-1");
@@ -123,7 +123,7 @@ test("the finance office pays within the year's adopted budget; while the year h
   expect(run(finance, obs(366 * DAY, [], account(100_000_00)))).toContain("settles=inv-2");
 
   // A town whose year 2 has no budget: a twelfth of year 1's a month.
-  const interim = financeOfficer.create(ctx("finance-system", { approval_over: 100_000_00 }, "finance"));
+  const interim = financeOfficer.create(ctx("finance-system", {}, "finance"));
   run(interim, obs(DAY, [first], account(100_000_00)));
   const day = (n: number) => 365 * DAY + n * DAY;
   // In the first month 1,000.00 may be paid: 600.00 is, and 700.00 more is not.

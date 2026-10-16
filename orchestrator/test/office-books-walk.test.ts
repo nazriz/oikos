@@ -22,7 +22,7 @@ const living = { ...spec, citizens: 300, profile: "ke-nakuru-2026", opening_case
 
 /** What an office's act of each kind rests on: the field of its paper that names the paper it answers, pays or decides. */
 const RESTS_ON: { [kind: string]: (r: any) => string | undefined } = {
-  remedy_request: (r) => (r.data?.matter === "arrears" ? r.data.about : undefined),
+  review_request: (r) => (r.data?.matter === "arrears" ? r.data.about : undefined),
   notice_to_vacate: (r) => r.data?.lease,
   tribunal_application: (r) => (r.data?.kind === "possession" || r.data?.kind === "arrears" ? r.data.about : undefined),
   remedy_answer: (r) => r.data?.request,

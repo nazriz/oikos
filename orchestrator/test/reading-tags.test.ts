@@ -51,7 +51,7 @@ test("the reader is shown tagged words and never a name or a sum; forty refusals
   const reader: Reader = { model: "mock/spy", version: "1", read: async (q) => { seen.push(q); return { reading: PLAIN, phrases: { reason: q.paper.split(/\s+/).slice(0, 5).join(" "), answers: q.paper.split(/\s+/).slice(0, 5).join(" ") } }; } };
   const filed: any[] = [];
   const desk = new ReadingDesk({ dial, reader, table: TABLE, bySeat: () => true, tag: () => new Tagger(WORLD), file: async (x) => { filed.push(x); } });
-  await desk.onStatement({ id: "r1", author: "c1-self", kind: "remedy_request", text: "Odo Prentiss asks for §900.00 back.", data: {} });
+  await desk.onStatement({ id: "r1", author: "c1-self", kind: "review_request", text: "Odo Prentiss asks for §900.00 back.", data: {} });
   // (Forty refusals to the same person, for different sums: the words are the same once tagged.)
   for (let i = 0; i < 40; i++) await desk.onStatement(refusal(`a-${i}`, "Odo Prentiss", i % 3 ? "§1,200.00" : "§85.50"));
   // Forty papers, one reading (two askings): the cache is by the tagged words, not by who or how much.

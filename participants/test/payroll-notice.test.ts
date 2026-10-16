@@ -104,11 +104,11 @@ test("the hiring office sends a notice of a leaver once the employment has an en
 });
 
 test("the finance office asks the mayor, once, for the written approval an invoice over the procedure's figure needs", () => {
-  const m = financeOfficer.create(context("finance-system", "city", { approval_over: 5_000_000, procedure: "proc-payments" }, { position: "finance" }));
+  const m = financeOfficer.create(context("finance-system", "city", { procedure: "proc-payments" }, { position: "finance" }));
   const treasury = { kind: "accounts", transactions: [], accounts: [{ account: "acc-city", holder: "city", custodian: "bank", currency: "AUD", balance: "900000000" }] };
   const budget = statement("budget-1", 0, "budget", { data: { year: 1, lines: { parks: 20_000_000 } } });
   const invoice = statement("inv-1", 5 * DAY, "invoice", { author: "builder-system", speaks_for: "builder", addressed_to: ["city"], data: { outcome: { money: { to: "acc-builder", amount: "12000000", for: "a park" } } } });
-  const first = wake(m, 6 * DAY, { papers: { kind: "records", records: [budget, statement("proc-payments", 0, "procedure"), invoice] }, treasury }, { entity: "city" }).said;
+  const first = wake(m, 6 * DAY, { papers: { kind: "records", records: [budget, statement("proc-payments", 0, "procedure", { data: { approval: { by: "mayor", over: 5_000_000 } } }), invoice] }, treasury }, { entity: "city" }).said;
   expect(first.filter((c) => c.fn === "money")).toEqual([]);
   const asked = first.filter((c) => c.fn === "message");
   expect(asked.map((c) => [c.args.to, c.args.re])).toEqual([[["mayor"], "inv-1"]]);

@@ -7,7 +7,7 @@ import { CATCHING_UP, citizen } from "../src/behaviour/citizen";
 import { cultureDial } from "../src/behaviour/culture";
 import { EVENT_KINDS, rowStrengthPct, TOWN_WORDS, TownMemory } from "../src/behaviour/townmemory";
 import { RECORD } from "../src/module";
-import { DAY, person } from "./stepping";
+import { DAY, person, statement } from "./stepping";
 
 const dial = () => cultureDial({ dials: { culture: {} } })!;
 const mem = () => new TownMemory(dial().params);
@@ -89,7 +89,12 @@ function watched(params: object, dials: object | false = { culture: {} }) {
     const m = citizen.create(ctx);
     return { step: async (o: any, c: any) => { const a: any = await m.step(o, c); if (a[RECORD]) Object.assign(kept.record, a[RECORD].set); return a; } };
   } };
-  return { p: person(module, params, dials ? { dials } : {}), kept };
+  // (Who carries out a removal is the law on possession's, which the town publishes: foundations F8, law 6. Every wake is shown it, as a person is, once it is on file.)
+  const law = statement("law-possession", 0, "law", { speaks_for: "outside", data: { tenancy: "possession", enforced_by: "police" } });
+  const p = person(module, params, dials ? { dials } : {});
+  const wake = p.wake.bind(p);
+  p.wake = (t: number, w: any = {}) => wake(t, { ...w, records: [law, ...(w.records ?? [])] });
+  return { p, kept };
 }
 const values = Object.fromEntries(["self_direction", "stimulation", "hedonism", "achievement", "power", "security", "conformity", "tradition", "benevolence", "universalism"].map((v) => [v, 5_000]));
 const PARAMS = { own_values: values, possession: { stay_bps: 2_000, obey_bps: 5_000, answer_bps: 6_000 }, welfare: { police: "police", channel: "x", found_after: [] } };

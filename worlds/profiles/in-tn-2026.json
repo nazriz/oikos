@@ -1349,6 +1349,39 @@
       "spin_up_years": 10
     },
     "founding": {"registered_per_100000_per_year": 16, "informal_multiple": 5, "chance_bps": 232, "shared_min": 2, "rest_days": 365, "dues_minutes_of_pay": [0, 10, 30, 60], "every_days": [14, 7, 28], "starts_in_days": [7, 3, 14], "lasts_minutes": [90, 60, 120], "lapse_days": 120, "min_members": 2, "leave_after_days": 90, "hall_hire_hours_of_pay": 2, "fund": {"qualify_days": 60, "draw_months": 6, "every_days": 180}, "cause": {"case_hours": 6, "hours_per_member_month": 2}},
+    "decisions": [
+      {
+        "kind": "permit_decision",
+        "name": "A decision on a planning permit",
+        "review": {
+          "within_days": 30,
+          "grounds": "any: the office looks at its decision again on the application and the laws in force"
+        }
+      },
+      {
+        "kind": "benefit_decision",
+        "name": "A decision on a claim for support",
+        "payments": [
+          "pension"
+        ],
+        "refused_by": "office-holder",
+        "needs": [
+          {
+            "id": "papers",
+            "from": "claimant",
+            "what": "proof of who you are and of the details of your claim",
+            "within_days": 14,
+            "else": "refuse"
+          }
+        ],
+        "appeal": {
+          "matter": "claim_refused",
+          "within_days": 30,
+          "grounds": "any error in the decision, heard on appeal to the revenue officer above the deciding office",
+          "fee_hours_of_pay": 0
+        }
+      }
+    ],
     "frictions": {
       "per_adult_bps_per_year": {
         "landlord": 90,
@@ -1405,6 +1438,9 @@
     }
   },
   "sources": {
+    "decisions.permit_decision": "PLACEHOLDER: an office's own second look at a planning decision within 30 days of it; the place's appeal route for a permit (to a tribunal or an inspectorate) is not built, since no one in the town yet brings a permit to a body that hears it. No source was opened for the days.",
+    "decisions": "Review and appeal of a decision on a claim for support, and what the decision waits for (docs/behaviour/decisions.md; foundations F8). Not opened.",
+    "decisions.benefit_decision.pension": "PLACEHOLDER: an appeal within 30 days, no fee, no review first (the state's old age pension scheme's own appeal rules were not found). 14 days for documents is a PLACEHOLDER.",
     "culture.conducts": "What people start out holding right, for the four conducts where a figure in this profile's own outlook speaks to it (the rest start from values alone: no figure was opened). approves_bps is the national share with 'a great deal' or 'quite a lot' of confidence, as `outlook.trust` has it (World Values Survey and European Values Study, joint wave 7, as Our World in Data publishes it; opened 2026-10-11, to confirm against the survey's tables; see sources.outlook for the country and the items). Mapping, ours: answer_tribunal and take_to_tribunal <- confidence in the courts (a person who trusts the courts approves of answering a case there and of taking a wrong to it); complain <- confidence in the civil service (writing to the town is approved where the town's officers are trusted to answer); join_union <- confidence in labour unions. Weak: confidence in an institution is not approval of an act toward it, and the share above a threshold is read as a mean, as outlook does; the figure sets where people start (their own lean and their picture of what others approve), nothing else, and the lean is measured from it, so the rates stay the calibrated ones. No figure for strike, take_in, stay_past_notice, take_from_employer or an organisation's conduct (the survey's items on joining strikes and on the justifiability of stealing property were not opened); no figure by origin group (no source found that gives one). National, not the place's. does_bps is never given: a conduct's own rate in the profile.",
     "culture.origin": "PLACE: Tamil Nadu (state), Census of India 2011 (the 2011 census counts Scheduled Castes and Scheduled Tribes; it does not count other castes). groups: Statistical Hand Book of Tamil Nadu 2020-21, table 1.1, Department of Economics and Statistics, Government of Tamil Nadu, https://des.tn.gov.in/sites/default/files/2023-05/areaandpopulation.pdf , OPENED 2026-10-13: total 72,147,030 (rural 37,229,590 + urban 34,917,440); Scheduled Castes 14,438,445 (20.01%); Scheduled Tribes 794,697 (1.10%); Others is the remainder (78.89%). The groups are the census's classes, not birthplace or the place's other communities. same_household_bps: 9418 = 100% less 5.82%, the share of inter-caste marriages in India, IHDS-II 2011-12, as quoted in 'Whose education matters? An analysis of inter-caste marriages in India', Ideas for India, https://www.ideasforindia.in/topics/social-identity/whose-education-matters-an-analysis-of-inter-caste-marriages-in-india , OPENED 2026-10-13 (no Tamil Nadu figure given). National, and by caste (jati), which is finer than these three census classes, so couples across these three classes are rarer than 5.82% (the same share here is probably higher: to confirm). homophily_bps: PLACEHOLDER 5000 (a close tie is half again as likely within a group as by chance). No survey of close ties or friendship by group for this place was found and opened; McPherson, Smith-Lovin and Cook 2001 ('Birds of a feather', Annual Review of Sociology 27) gives the general fact, not this place's figure. CHILDREN: the pages opened do not say which group a child of a mixed couple is counted in (to confirm); the generator's either-parent rule is unverified for this source.",
     "tenancy.rent_share_of_income": "PLACEHOLDER: nothing was found. India surveys no household income, and the consumption survey (MoSPI, HCES 2023-24) gives rent only as a share of all urban households' non-food spending, not for renting households and not by band. The bands are borrowed from ke-nakuru-2026's, themselves a placeholder around Nakuru's opened mean of 33.3% of expenditure. To source: NSS 76th round (housing condition), rent of renting households against their monthly consumer expenditure. HOW IT IS USED (docs/behaviour/generator.md, \"Homes by income\"): each renting household of a new town draws its share from these bands (evenly within a band; the open band from its lower bound to twice it, at most everything), which gives the rent it carries; households and let homes are matched by it. A target as well: the town's own distribution at the start is reported beside it and is not fitted to it.",

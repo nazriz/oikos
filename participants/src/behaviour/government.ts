@@ -11,7 +11,7 @@ import { dateWords } from "../forms";
 import type { SiteStructure, StatementRecord } from "../contracts";
 import { basesOf, channels, cites } from "../contracts";
 import { need, params, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
-import { billSettled, nextLook, because, Book, cellsOf, DAY, draftLaw, figureGiven, figureWords, heldValue, jobTerms, Letters, lotOf, message, MONTH, ownAccount, pay, publishedCount, publishedPrice, record, say, type LawFigure, type LawSchedule, type Step, usd, variableToday, vote, withdraw, outOfTime, team, lookUp, goSee, visited, VISIT_MAX, Directions, StandingWork, CounterWork } from "./common";
+import { billSettled, nextLook, because, Book, cellsOf, DAY, draftLaw, figureGiven, figureWords, heldValue, jobTerms, Letters, lotOf, message, MONTH, ownAccount, pay, publishedCount, publishedPrice, record, say, type LawFigure, type LawSchedule, type Step, usd, variableToday, vote, withdraw, outOfTime, team, lookUp, goSee, visited, VISIT_MAX, Directions, StandingWork, CounterWork, approvalOf } from "./common";
 import { Staffing, staffingForm, staffingUnder, stepper } from "./firms";
 import { incomeTaxLaw, withholding } from "./tax";
 import { ownLand } from "./institutions";
@@ -545,8 +545,8 @@ export const financeOfficer: BehaviourModule = {
   doc: "docs/behaviour/government.md",
   cadence: () => 3 * DAY,
   create(ctx: ParticipantContext) {
-    const p = params({ approval_over: 5_000_000, compliance_bps: 10_000, mayor_position: "mayor", budget_lines: {} as Record<string, string>, period: 14 * DAY, notice_days: 14,
-      procedure: "", // the record its approval rule comes from, if the world names one: withdrawn, the rule no longer applies
+    const p = params({ compliance_bps: 10_000, budget_lines: {} as Record<string, string>, period: 14 * DAY, notice_days: 14,
+      procedure: "", // the record its approval rule comes from (who approves a payment over what sum: its `data.approval`); withdrawn, or none, and no approval is asked
       payroll_wait_days: 3, // how long it waits for the hiring office's notice of a new starter before setting the wage up from the agreement on file
       // The line of the adopted budget an invoice is drawn on, where the office's brief says which line pays for what
       // (docs/behaviour/government.md, "Payments carry their budget line"): by the kind of building the invoice is for, and by
@@ -608,20 +608,20 @@ export const financeOfficer: BehaviourModule = {
           if (paid.has(inv.id) || !(inv.addressed_to ?? []).includes(me)) continue;
           const owed = inv.data?.outcome?.money;
           const amount = cents(owed?.amount);
-          // Approved in writing by the mayor: made in the mayor's position, whoever holds it.
-          const approved = book.open("approval").some((a) => a.data?.invoice === inv.id && a.in_position === p.mayor_position);
-          // (The approval rule is the payments procedure's: once that's withdrawn, with nothing in its place, it no longer
-          // applies. Paying within the adopted budget is the charter's, and stays.)
-          const approvalRule = !(p.procedure && book.repealed(p.procedure));
-          const withinProcedure = spent + wages() + amount <= limit && (!approvalRule || amount <= p.approval_over || approved);
+          // Approved in writing by the post the payments procedure names, whoever holds it. (The approval rule is the procedure's,
+          // foundations F8: its post and its sum are in the record, not in this module; once it is withdrawn, with nothing in its
+          // place, or where it states none, no approval is asked. Paying within the adopted budget is the charter's, and stays.)
+          const rule = approvalOf(book, p.procedure);
+          const approved = !!rule && book.open("approval").some((a) => a.data?.invoice === inv.id && a.in_position === rule.by);
+          const withinProcedure = spent + wages() + amount <= limit && (!rule || amount <= rule.over || approved);
           const follows = ctx.rng(`procedure-${inv.id}`).below(10_000) < p.compliance_bps;
           if (!withinProcedure && follows) {
             // Within the budget and over the procedure's figure, with no approval on file: the mayor is asked for one,
             // once (nobody else tells the mayor that a payment is waiting on it).
-            if (approvalRule && amount > p.approval_over && !approved && spent + wages() + amount <= limit && !approvalAsked.has(inv.id)) {
+            if (rule && amount > rule.over && !approved && spent + wages() + amount <= limit && !approvalAsked.has(inv.id)) {
               approvalAsked.add(inv.id);
               steps.push(because(`Invoice ${inv.id} is over the payments procedure's figure and has no written approval on file: asking the mayor for one.`,
-                message([p.mayor_position], `From the finance office: your written approval is needed for invoice ${inv.id} (${usd(amount)}, payable to ${owed.to}): it is within the budget and over ${usd(p.approval_over)}, and the payments procedure asks for the mayor's approval of such a payment. It will be paid once an approval of it is on the town's file.`, inv.id)));
+                message([rule!.by], `From the finance office: your written approval is needed for invoice ${inv.id} (${usd(amount)}, payable to ${owed.to}): it is within the budget and over ${usd(rule!.over)}, and the payments procedure asks for the mayor's approval of such a payment. It will be paid once an approval of it is on the town's file.`, inv.id)));
             }
             continue; // wait (approval may come), or never (over budget)
           }

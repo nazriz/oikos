@@ -20,7 +20,7 @@ test("only a seat's decision with words of its own is read; it is read asked twi
   const asked: ReadRequest[] = [];
   const spy: Reader = { ...curtestReader(), read: async (q) => { asked.push(q); return curtestReader().read(q); } };
   const { d, filed } = desk(spy);
-  await d.onStatement({ id: "r1", author: "c1-self", kind: "remedy_request", text: "Please repair the heater in the front room.", data: { matter: "heater" } });
+  await d.onStatement({ id: "r1", author: "c1-self", kind: "review_request", text: "Please repair the heater in the front room.", data: { matter: "heater" } });
   await d.onStatement(refusal("a-code", "landlord-code")); // a code office: the plain paper, never read
   await d.onStatement(refusal("a-bare", "seat-1", { granted: false })); // a seat's, with no words of its own
   await d.onStatement({ id: "n", author: "seat-1", kind: "note_to_file", text: "Words.", data: { reason: "not a decision" } }); // not a kind of decision

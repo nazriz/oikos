@@ -66,7 +66,7 @@ test("a landlord's seat is shown who is behind with the rent before its code twi
   for (const b of books) expect(b.visible_to).toEqual([b.speaks_for]);
   // What the code twin acts on: each letter asking a tenant for rent owed. The clerk had put that lease in the books, as
   // rent in arrears, no later; and the seat's folder had shown it.
-  const asked = statements.filter((r) => r.kind === "remedy_request" && r.data?.matter === "arrears");
+  const asked = statements.filter((r) => r.kind === "review_request" && r.data?.matter === "arrears");
   expect(asked.length).toBeGreaterThan(0);
   for (const a of asked) {
     const lease = String(a.data.about);
@@ -76,7 +76,9 @@ test("a landlord's seat is shown who is behind with the rent before its code twi
     expect(shown(office).some((s) => s.t <= a.at && s.input.includes("Rent in arrears") && s.input.includes(lease))).toBe(true);
   }
   // The folder's line says what changed; the list is in the paper, read by its id.
-  const lines = landlords.flatMap((id) => shown(id).flatMap((s) => s.input.split("\n").filter((l) => l.includes("] office books from"))));
+  // (A look shows at most so many characters and says "Cut short here" where it stops: a books line that is the last one shown of such a look is cut
+  // with it and carries no pointer. Foundations F8: a town of more papers per office reached the limit in one seat's look; docs/decisions.md, "Foundations F8".)
+  const lines = landlords.flatMap((id) => shown(id).flatMap((s) => { const all = s.input.split("\n"); return all.filter((l, i) => l.includes("] office books from") && !all[i + 1]?.startsWith("(Cut short here")); }));
   expect(lines.length).toBeGreaterThan(0);
   for (const l of lines) {
     expect(l).not.toContain('"says"');

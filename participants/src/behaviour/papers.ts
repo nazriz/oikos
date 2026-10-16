@@ -7,6 +7,7 @@
 // Nothing here is read by a code office: it goes on making its papers as it did.
 
 import type { FormField, Issued } from "../module";
+import { KIND } from "./decisions";
 
 const f = (type: string, description: string, o: { required?: boolean; options?: string[] } = {}): FormField => ({ type, ...(o.required ? { required: true } : {}), ...(o.options ? { options: o.options } : {}), description });
 const req = { required: true };
@@ -278,7 +279,7 @@ export const LANDLORD: Issued[] = [
     writes: { sends: [{ to: ["@city"], why: "The town's registrar registers deaths, on a notification." }], kind: "death_notification", text: "Notification of a death: {deceased}.", to: ["@city"], data: { deceased: "=deceased" } } },
   { form: "rent_reminder", title: "Request to a tenant for rent owed", does: "Asks a tenant in writing for rent that is owed, with the sum and the account. It ends nothing and moves no money.",
     fields: { tenant: f("entity", "The tenant.", req), lease: f("record", "The lease.", req), amount: f("amount", "How much is owed.", req), account: f("account", "The account it is to be paid into.") },
-    writes: { kind: "remedy_request", text: "Request: the rent for your home is {amount} in arrears. Please pay it.", basis: "=lease", to: ["=tenant"], visible: ["=self", "=tenant"], data: { matter: "arrears", against: "=tenant", about: "=lease", amount: "#amount", account: "=account" } } },
+    writes: { kind: KIND.request, text: "Request: the rent for your home is {amount} in arrears. Please pay it.", basis: "=lease", to: ["=tenant"], visible: ["=self", "=tenant"], data: { matter: "arrears", against: "=tenant", about: "=lease", amount: "#amount", account: "=account" } } },
   { form: "payment_plan_offer", title: "Offer to a tenant of a plan to pay rent owed", does: "Offers a tenant behind with the rent a plan: the rent as it falls due, and a sum a month toward what is owed. The tenant answers on the offer whether the household can pay it, and what it could pay. It ends nothing and binds nobody: a plan agreed is kept, or not, by the tenant's payments.",
     fields: { tenant: f("entity", "The tenant.", req), lease: f("record", "The lease.", req), owed: f("amount", "How much is owed.", req), instalment: f("amount", "The sum a month toward what is owed, beyond the rent.", req), account: f("account", "The account it is to be paid into.") },
     writes: { kind: "plan_offer", text: "Offer of a plan: pay the rent as it falls due and {instalment} a month toward the {owed} owed under {lease}. Please answer whether you can.", basis: "=lease", to: ["=tenant"], visible: ["=self", "=tenant"], data: { lease: "=lease", owed: "#owed", instalment: "#instalment", account: "=account" } } },
