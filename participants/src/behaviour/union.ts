@@ -84,7 +84,7 @@ export const organiser: BehaviourModule = {
     const handled = new Set<string>();
     // A member's grievance taken up with their employer: put to the employer, and what the union then says should
     // be done is a recommendation with the union behind it, not an order.
-    const cases = p.hears.length ? new Hearings(me, ctx.rng, { ...HEARING_DEFAULTS, hears: p.hears.map((h) => ({ ...h, can: ["represent"] as Hears["can"] })), answer_days: p.answer_days }) : undefined;
+    const cases = p.hears.length ? new Hearings(me, ctx, { ...HEARING_DEFAULTS, hears: p.hears.map((h) => ({ ...h, can: ["represent"] as Hears["can"] })), answer_days: p.answer_days }) : undefined;
     let saidHears = false;
     // When each workplace's first claim is due: those known at our first plan are spread over `first_claim_days`; one
     // we learn of later (a member starts there, or joins from there), from then.

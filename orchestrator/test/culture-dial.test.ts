@@ -48,7 +48,8 @@ const cfgHash = (c: unknown) => new Bun.CryptoHasher("sha256").update(JSON.strin
 // (Re-taken on 2026-10-16 at foundations F5: the town's offices are held by people, their staff hired, its systems delivered from templates that say what they do; 1f5ef6f6... until then.)
 // (Re-taken on 2026-10-16 at foundations F5: the town's offices are held by people, their staff hired, its systems delivered from templates that say what they do; 66456d26... until then.)
 // (Re-taken on 2026-10-16 at foundations F5: the town's offices are held by people, their staff hired, its systems delivered from templates that say what they do; 2ecddd70... until then.)
-const CONFIG_BEFORE: { [profile: string]: string } = { "au-vic-2026": "be6ff50f04ebe630", "gb-eng-2026": "266c7a18b5b4ce70", "ke-nakuru-2026": "443497751c4210fc" };
+// (Re-taken on 2026-10-16 at foundations F7: the generator's version moved with the table of slips; be6ff50f..., 266c7a18... and 44349775... until then. The states did not move.)
+const CONFIG_BEFORE: { [profile: string]: string } = { "au-vic-2026": "a84328b79b62d5e6", "gb-eng-2026": "e0d58af70e141ab2", "ke-nakuru-2026": "6e9f53acb17da533" };
 
 test("the dial in the world config is a schema-valid setting; a size that would break the arithmetic is refused when the run starts", async () => {
   const v = ajv.getSchema(`${NS}:world-config`)!;

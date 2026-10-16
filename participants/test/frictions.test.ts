@@ -81,8 +81,11 @@ test("told of a complaint it answers a venue from its books; ordered to pay, one
 const application = (id: string, at: number, data: object, from = "c1", to = "desk-1") => statement(id, at, PAPER.application, { author: `${from}-self`, speaks_for: from, addressed_to: [to], visible_to: [from, to], data });
 const response = (id: string, at: number, about: string, data: object, from = "shop-1", to = "desk-1") => statement(id, at, PAPER.response, { author: `${from}-x`, speaks_for: from, addressed_to: [to], visible_to: [from, to], basis: about, data: { application: about, ...data } });
 /** A venue's hearings over the days given, each day shown what has newly come; what it said, by day. */
+/** Whoever hears, with the venue's rate of finding for an applicant with nothing to show as the world's table of slips has it (foundations F7). */
+const hearer = (bps = 5_000) => ({ rng, world: { slip: { person: { "publish/venue_decision": { bps } } } } });
 function heard(p: object, days: [number, any[]][], until = 40) {
-  const h = new Hearings("desk-1", rng, { ...HEARING_DEFAULTS, hears: [{ about: "underpaid", can: ["recommend"] }, { about: "goods", can: ["recommend"] }, { about: "disrepair", can: ["order"] }], ...p });
+  const { uphold_bps, ...rest } = p as { uphold_bps?: { other: number } };
+  const h = new Hearings("desk-1", hearer(uphold_bps?.other), { ...HEARING_DEFAULTS, hears: [{ about: "underpaid", can: ["recommend"] }, { about: "goods", can: ["recommend"] }, { about: "disrepair", can: ["order"] }], ...rest });
   const b = new Book();
   const out: { day: number; kind: string; data: any; to: string[] }[] = [];
   for (let d = 0; d <= until; d++) {
@@ -225,8 +228,8 @@ test("a home whose disrepair has reached the level that needs repair is the land
 });
 
 test("with someone in the office, its staff settle what the record settles and put the rest before the office-holder, who decides it", () => {
-  const p = { ...HEARING_DEFAULTS, hears: [{ about: "goods", can: ["recommend" as const] }], uphold_bps: { other: 10_000 } };
-  const staff = new Hearings("desk-1", rng, p), seat = new Hearings("desk-1", rng, p);
+  const p = { ...HEARING_DEFAULTS, hears: [{ about: "goods", can: ["recommend" as const] }] };
+  const staff = new Hearings("desk-1", hearer(10_000), p), seat = new Hearings("desk-1", hearer(10_000), p);
   const b = new Book();
   const day = (d: number, records: any[], h: Hearings, part: "staff" | "seat") => {
     b.absorb({ t: d * DAY, entity: "desk-1", participant: "x", channels: { mine: { kind: "records", records } }, inbox: [], outcomes: [], woke_for: "cadence" } as any);
@@ -254,8 +257,11 @@ import { retailer } from "../src/behaviour/retailer";
 /** A shop with one assistant, woken week by week with what the test shows it; its calls each week. */
 function shop(params: object, dial: number | undefined) {
   const id = "shop-1";
-  const ctx: any = context(`${id}-manager-system`, id, { premises: id, workplace: `${id}/workplace.1`, suppliers: [], demand: 200, wage: 200_000, ...params }, { position: `${id}-manager` });
+  // (How often pay comes short is the world's table of slips, foundations F7: `short_pay.per_year_bps` here stands for its row.)
+  const { short_pay, ...rest } = params as { short_pay?: { per_year_bps: number; by_bps: number } };
+  const ctx: any = context(`${id}-manager-system`, id, { premises: id, workplace: `${id}/workplace.1`, suppliers: [], demand: 200, wage: 200_000, ...rest, ...(short_pay ? { short_pay: { by_bps: short_pay.by_bps } } : {}) }, { position: `${id}-manager` });
   if (dial !== undefined) ctx.world = { ...ctx.world, dials: { friction_bps: dial } };
+  if (short_pay) ctx.world = { ...ctx.world, slip: { person: { "transfer/wages": { bps: short_pay.per_year_bps, per: "year", friction: true } } } };
   const m = retailer.create(ctx);
   const ids = { n: 0 };
   const own: any[] = [];

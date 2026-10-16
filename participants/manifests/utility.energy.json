@@ -1,6 +1,6 @@
 {
   "name": "utility.energy",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "doc": "docs/behaviour/utilities.md",
   "params": {
     "bill_every_days": {
@@ -9,13 +9,6 @@
       },
       "unit": "days",
       "default": 30,
-      "source": "placeholder"
-    },
-    "billing_error_bps_per_year": {
-      "schema": {
-        "type": "integer"
-      },
-      "default": 0,
       "source": "placeholder"
     },
     "billing_over_bps": {

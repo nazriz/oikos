@@ -76,7 +76,8 @@ test("a spec without `living` generates what it generated before (byte for byte)
   // (publish/<kind of record>) and their sources. Nothing of `living` in it.
   // (Re-taken on 2026-10-15 at foundations F4: the generated systems name a template and a supplier and the world says where work is done; 3facfdc8... until then.)
   // (Re-taken on 2026-10-16 at foundations F5: the town's offices are held by people, their staff hired, its systems delivered from templates that say what they do; 1f5ef6f6... until then.)
-  expect(hash(c)).toBe("be6ff50f04ebe630d56b61a36429c8ce788f1c3ddb72cfb00ff651a14dae6c3f");
+  // (Re-taken on 2026-10-16 at foundations F7: the generator's version moved with the table of slips, which a spec without `living` does not have; be6ff50f... until then.)
+  expect(hash(c)).toBe("a84328b79b62d5e6e9f3ee32e27ce5f6af6593a7fa24cf771a79e03cc26ef607");
   const text = JSON.stringify(c);
   expect(text).not.toContain('"started"');
   expect(text).not.toContain("attach_mean");
@@ -153,12 +154,14 @@ test("a living town where things go wrong (docs/behaviour/frictions.md): homes w
   expect(module("tribunal.member")[0].hears.map((h: any) => h.about)).toEqual(["disrepair", "underpaid", "goods", "bill", "arrears", "claim_refused", "possession"]);
   expect(module("tribunal.member")[0].hearing_after_days).toBe(F.venues.tribunal_days);
   expect(module("union.organiser")[0].hears).toEqual([{ about: "underpaid" }]);
-  expect(module("firm.retailer")[0].short_pay.by_bps).toBe(F.pay_short_by_bps);
   expect(module("firm.landlord")[0].respond.grant_bps).toEqual(F.put_right_on_asking_bps);
   expect(module("firm.landlord")[0].repair.units).toBe(F.repair_hours);
   expect(module("firm.builder")[0].repair_task).toBe("repair");
-  expect(module("utility.energy")[0].billing_error_bps_per_year).toBe(F.per_adult_bps_per_year.bill);
-  expect(module("world.transfers")[0]).toMatchObject({ error_bps: F.support.wrong_refusal_bps });
+  // (How often things go wrong is the world's table of slips, with the profile's notes as sources: foundations F7.)
+  expect(c.orchestration.slip.person["publish/invoice/metered_bill"]).toEqual({ bps: F.per_adult_bps_per_year.bill, per: "year", friction: true });
+  expect(c.orchestration.slip.person["publish/benefit_decision"]).toEqual({ bps: F.support.wrong_refusal_bps, friction: true });
+  expect(c.orchestration.slip.person["publish/venue_decision"]).toEqual({ bps: F.venues.uphold_without_proof_bps });
+  expect(module("firm.retailer")[0].short_pay).toEqual({ by_bps: F.pay_short_by_bps });
   expect(c.knowing.published.some((x: any) => x.what === "has:hears")).toBe(true);
   expect(c.participants.find((x: any) => x.controller?.impl === "citizen.default").channels.some((ch: any) => ch.match?.has?.includes("hears"))).toBe(true);
   // Twice as much goes wrong: the dial says so, and a home wears twice as fast.

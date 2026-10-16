@@ -985,6 +985,45 @@
             }
           }
         },
+        "slip": {
+          "description": "How often those who do a kind of work get it wrong, by chance (docs/design/foundations.md law 5; foundations F7): the one table the platform's `slip()` reads, keyed as the work table is (`publish/<kind of record>`, `transfer/<what>`, ... any label the module that draws names), by the kind of performer (a person; a system delivered from a template). A task with no row has no slip (0 where nothing is sourced). Each row: `bps` of the acts of that kind (`per: \"act\"`, the default) or of the exposed in a year (`per: \"year\"`); `friction`: whether the world's friction dial (`dials.friction_bps`) scales it. The kernel does not read it (it never judges content); the modules draw from a stream named for who, what and the case. Each figure sourced or a placeholder (sources, keyed `person.<row>` or `system.<row>`).",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "person": {
+              "type": "object",
+              "additionalProperties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["bps"],
+              "properties": {
+                "bps": { "type": "integer", "minimum": 0, "maximum": 10000 },
+                "per": { "enum": ["act", "year"] },
+                "friction": { "type": "boolean" }
+              }
+            }
+            },
+            "system": {
+              "type": "object",
+              "additionalProperties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["bps"],
+              "properties": {
+                "bps": { "type": "integer", "minimum": 0, "maximum": 10000 },
+                "per": { "enum": ["act", "year"] },
+                "friction": { "type": "boolean" }
+              }
+            }
+            },
+            "sources": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "urn:oikos:contracts:0.8:common#/$defs/Text"
+              }
+            }
+          }
+        },
         "thinking": {
           "description": "With thinking_time costs_world_time (docs/design/rebuild.md 6.4): how long deciding takes, by controller: models by tokens (deterministic, logged), humans by the wall clock (world_seconds_per_thinking_second), code a fixed time.",
           "type": "object",

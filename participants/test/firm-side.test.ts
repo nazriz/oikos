@@ -67,7 +67,7 @@ test("the law on possession is read from the world's record; a lease's words say
 
 /** A tribunal's list hearing possession over the days given, each day shown what has newly come: what it counted. */
 function heard(days: [number, any[]][], until = 40) {
-  const h = new Hearings("tribunal", rng, { ...HEARING_DEFAULTS, hears: [{ about: "possession", can: ["order"] }], answer_days: 21, possession: { days: 14, plan_months: 6 } },
+  const h = new Hearings("tribunal", { rng, world: {} }, { ...HEARING_DEFAULTS, hears: [{ about: "possession", can: ["order"] }], answer_days: 21, possession: { days: 14, plan_months: 6 } },
     { application: ["tribunal_application"], notice: "hearing_notice", response: "tribunal_response", decision: "tribunal_order" });
   const b = new Book();
   for (let d = 0; d <= until; d++) {

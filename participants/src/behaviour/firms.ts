@@ -23,7 +23,8 @@ import { distribute } from "./lengnick";
 import { dayPayPeriod, incomeTaxLaw, withheld, type Charge } from "./tax";
 import { nextReturn, returnsOf, type ReturnRule } from "./returns";
 import { message, broughtForward } from "./common";
-import { chancePpm, frictionDial, PAPER, Respondent, type RespondParams } from "./frictions";
+import { PAPER, Respondent, type RespondParams } from "./frictions";
+import { slip } from "../slip";
 import { swayed } from "./wants";
 import { advertisedJob, ask, Asked, because, between, Book, firstDue, PAYEE_DIED, PAYMENT_FAILED, breaches, noting, callAction, usd, cellsOf, commitmentOf, DAY, jobTerms, leaseTerms, MONTH, notice, offer, ownAccount, pay, publishedPrice, say, stoodEmpty, structureOf, withdraw, type Step } from "./common";
 import * as P from "./papers";
@@ -1125,7 +1126,7 @@ export class Staffing {
   /** `registered_bps`: of the jobs this employer fills, the share it puts on its payroll returns (10,000, or nothing
    * said: all of them). A job it does not register is paid whole: nothing is withheld from it and no report names
    * its worker (docs/behaviour/firms.md, "Jobs an employer does not register"). */
-  constructor(private readonly ctx: ParticipantContext, private readonly me: string, private readonly o: { period: number; notice_days: number; workplace?: string; role: string; industry?: string; does?: { hire?: boolean; pay?: boolean }; own?: "role" | "role_or_unnamed"; payroll?: string; /** The line of the organisation's adopted budget this office's posts are paid from: said on its payroll notices, so that the paying office knows which line a wage is on. */ line?: string; notice_wait?: number; registered_bps?: number; casual_bps?: number; day_wage?: number; work_days?: number; week_days?: number; short?: { per_year_bps: number; by_bps: number }; /** How often the office wakes (seconds; absent: daily): a return falling due before its next look is filed at this one. */ wakes?: number }) {}
+  constructor(private readonly ctx: ParticipantContext, private readonly me: string, private readonly o: { period: number; notice_days: number; workplace?: string; role: string; industry?: string; does?: { hire?: boolean; pay?: boolean }; own?: "role" | "role_or_unnamed"; payroll?: string; /** The line of the organisation's adopted budget this office's posts are paid from: said on its payroll notices, so that the paying office knows which line a wage is on. */ line?: string; notice_wait?: number; registered_bps?: number; casual_bps?: number; day_wage?: number; work_days?: number; week_days?: number; short?: { by_bps: number }; /** How often the office wakes (seconds; absent: daily): a return falling due before its next look is filed at this one. */ wakes?: number }) {}
   /** When we last let someone go because we could not pay them (from then we take on only with more in hand: the module asks). */
   cashLayoffAt = -Infinity;
   /** Redundancy pay (and pay in lieu of notice the agreement fell short of) owed at the end of a job we ended for redundancy: agreement -> the sum. */
@@ -1666,7 +1667,7 @@ export class Staffing {
   org?: Org;
 
   // Pay that comes short (docs/behaviour/frictions.md, "Pay"): each year, of the people an employer pays, the share
-  // it begins to pay less than it agreed (`short.per_year_bps`: the world's, at the world's dial), by `short.by_bps`
+  // it begins to pay less than it agreed (a slip, `transfer/wages` in the world's table of slips, at the world's dial), by `short.by_bps`
   // of the pay; more often the more its character would pay less, and twice as often while it has less in the bank
   // than two pay periods' wages. What it has kept back from each, pay by pay, is on its own books: it knows what
   // it owes, and says so truthfully to a venue that asks; what it may do is not pay.
@@ -1675,16 +1676,17 @@ export class Staffing {
   private shortWeek = -1;
   /** The week's look at whom we begin to pay short (at most once a week, each on their own draw). */
   shortening(book: Book, t: number, account: string, balance: number): Step[] {
-    const s = this.o.short, dial = frictionDial(this.ctx.world), week = Math.floor(t / (7 * DAY));
-    if (!s || !(s.per_year_bps > 0) || !(s.by_bps > 0) || dial <= 0 || week === this.shortWeek) return [];
+    const s = this.o.short, week = Math.floor(t / (7 * DAY));
+    if (!s || !(s.by_bps > 0) || week === this.shortWeek) return [];
     this.shortWeek = week;
     const staff = this.staff(book, t).filter((a) => this.orders.has(a.id) && !this.skim.has(a.id) && !this.stopped.has(a.id) && !this.noticed.has(a.id) && !byTheDay(a));
     const bill = staff.reduce((x, a) => x + this.wageOf(a), 0);
-    const rate = swayed(s.per_year_bps, this.org?.lively ? this.org.character.pay_less : 0, 1) * (balance < 2 * bill ? 2 : 1);
+    // (More often the more its character would pay less, and twice as often while it is short of cash: the performer's lean on the row's rate.)
+    const lean = (bps: number) => swayed(bps, this.org?.lively ? this.org.character.pay_less : 0, 1) * (balance < 2 * bill ? 2 : 1);
     const law = incomeTaxLaw(book);
     const steps: Step[] = [];
     for (const a of staff) {
-      if (this.ctx.rng(`short-pay-${a.terms.parties[1]}-${week}`).below(1_000_000) >= chancePpm(rate, 7, dial)) continue;
+      if (!slip(this.ctx, "transfer/wages", `${a.terms.parties[1]}-${week}`, { days: 7, lean })) continue;
       const wage = this.wageOf(a), period = jobTerms(a, a.terms.parties[1]).period;
       const net = wage - (this.offBooks.has(a.id) ? 0 : withheld(law, wage, period).total);
       const short = Math.floor((net * s.by_bps) / 10_000);

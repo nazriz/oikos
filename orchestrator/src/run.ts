@@ -464,11 +464,12 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   };
   const ctxFor = (pid: string, cap: string, entity: string, params: any): ParticipantContext => ({
     participant: pid,
+    ...(parts.get(pid)?.kind === "system" ? { kind: "system" as const } : {}),
     entity,
     ...(cap === "self" ? {} : { position: cap }),
     rng: (purpose) => drawFor(pid, cap, stablePurpose(`${pid}/${cap}`, purpose)),
     chance: (purpose) => randomness.stream(["chance", purpose]),
-    world: { tickSeconds: tick, runEnd, currency, ...(cfg.dials ? { dials: cfg.dials } : {}) },
+    world: { tickSeconds: tick, runEnd, currency, ...(cfg.dials ? { dials: cfg.dials } : {}), ...(cfg.orchestration?.slip ? { slip: cfg.orchestration.slip } : {}) },
     ...(consult ? { consult } : {}),
     ...(composer ? { compose: composer } : {}),
     ...(readingCfg ? { read: (paper: string, standing: readingNs.Standing) => desk?.lookup(paper, standing) } : {}),

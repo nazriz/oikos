@@ -2,6 +2,7 @@ export * from "./contracts";
 export * from "./module";
 export { manifests, paramErrors, type Manifest } from "./manifests";
 export * from "./rng";
+export { slip, slipPpm, slipRow, type SlipRow, type SlipTable, type Slipper, type SlipOptions } from "./slip";
 export * from "./law";
 export * from "./canon";
 export * from "./money";
