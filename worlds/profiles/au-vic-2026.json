@@ -779,7 +779,7 @@
         "union": 0.15,
         "property_management": 3.0
       },
-      "appointed_by": { "courts": "council", "oversight": "council", "elections": "council", "land_registry": "council", "utilities": "council" },
+      "appointed_by": { "courts": "council", "oversight": "council", "elections": "council", "land_registry": "council", "utilities": "council", "police": "council" },
       "licences": {
         "payment_system": {
           "per_resident_per_year": 1500,

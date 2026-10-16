@@ -63,8 +63,6 @@ test("owners own their houses, repay their mortgages, pay rates, and pass their 
   const config = generate({ ...spec, years: 1 });
   // Far more deaths than life, so a year of a small town has owners' deaths to follow.
   config.life.other_causes.by_age = [{ from: 0, bps: 0 }, { from: 25, bps: 5000 }];
-  // (2026-10-16, the profile source check: the rates office is a system here. With the au-vic-2026 profile's students per teacher at 11.9 the draws moved and the rates clerk, a resident, died before the first levy; the post stayed vacant for the year (the council has two staff, and the office is its own: nothing fills it), so no owner was levied. A town whose one rates clerk dying ends its levy is recorded in docs/decisions.md; the subject here is that owners are levied and pay, not who holds the post.)
-  systemAt(config, "rates");
   const { titles, owned, lived } = ownership(config);
   // Owner-occupied: each owner lives in the house on the lot they hold, and is the head of the household there.
   for (const o of owned) expect({ holder: o.holder, livesOn: o.livesOn, heads: o.heads }).toEqual({ holder: o.holder, livesOn: o.lot, heads: true });

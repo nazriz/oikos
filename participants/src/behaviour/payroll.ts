@@ -25,7 +25,7 @@ const LOOK_EVERY = 3 * DAY;
 export const bodyPayroll: BehaviourModule = {
   name: "body.payroll",
   answers: { office: "the payroll office", acts: "What it acts on: the employment agreements of its organisation's staff and the standing payments that pay them; the tax withheld from wages, paid over on the law's days; and a member of staff who has died." },
-  version: "0.3.0", // 0.3.0: an appointer (the authority a body's constitution names fills a post that has stood vacant); 0.2.0: deaf to news, on a round of its own
+  version: "0.4.0", // 0.4.0: an appointer that finds none of the staff to second hires for the body; 0.3.0: an appointer (the authority a body's constitution names fills a post that has stood vacant); 0.2.0: deaf to news, on a round of its own
   deaf: true,
   doc: "docs/behaviour/staffing.md",
   cadence: () => 3 * DAY,
@@ -38,11 +38,14 @@ export const bodyPayroll: BehaviourModule = {
       role: "", // when the organisation's own module employs others (the clinic's doctors), the role of the staff this payroll pays: absent, all of the organisation's
       watch: [] as string[], // the organisation's posts a person holds, which this post keeps filled
       who: "who", // its channel onto who's who
+      // An appointer that recruits (the city's: where no staff is left to second, it hires for the body it is part of, through ordinary hiring).
+      workplace: "", industry: "", wage: 0, payroll_office: "", staff_line: "",
+      own: [] as string[], // an appointer: the posts of its own body (no deputy keeps them filled, so it need not wait for one)
     }, ctx.params);
     const me = ctx.entity;
     const book = new Book();
     const asked = new Asked();
-    const staffing = new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, role: p.role || "staff", does: { hire: false, pay: p.part === "officer" }, ...(p.role ? { own: "role" as const } : {}), wakes: 3 * DAY });
+    const staffing = new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, role: p.role || "staff", does: { hire: !!(p.part === "appointer" && p.workplace), pay: p.part === "officer" }, ...(p.role ? { own: "role" as const } : {}), ...(p.part === "appointer" && p.workplace ? { workplace: p.workplace, ...(p.industry ? { industry: p.industry } : {}), ...(p.payroll_office ? { payroll: p.payroll_office, line: p.staff_line } : {}) } : {}), wakes: 3 * DAY });
     const filled = new Set<string>(); // posts we have appointed into, once
     const vacantSince = new Map<string, number>(); // an appointer: a post -> when we first saw it vacant
     let turn = 0; // an appointer: where in the watch list this round's looks begin
@@ -53,6 +56,7 @@ export const bodyPayroll: BehaviourModule = {
       const deaths = new Set(book.all("death_registration").map((r) => r.data?.deceased as string));
       return staffing.staff(book, t).map((a) => a.terms.parties[1] as string).filter((w) => !dead.has(w) && !deaths.has(w) && !gone.has(w));
     };
+    const waits = (post: string) => (p.own.includes(post) ? 0 : p.after_days * DAY); // (a body's own posts have no deputy to give a few days to)
     const vacant = (post: string) => book.positions.has(post) && !book.positions.get(post)!.holder;
     const participantOf = (person: string) => [...book.participantPerson].find(([, who]) => who === person)?.[0];
     // The round is the payroll's own: every few days on a day of its own, whatever else wakes it. A paper addressed to the organisation wakes everyone who acts
@@ -81,10 +85,17 @@ export const bodyPayroll: BehaviourModule = {
         }
         // A vacant post of the organisation's: one of its living staff takes it.
         const candidates = living(t);
+        // An appointer where none of the staff is left to second: it hires for the body, through the ordinary hiring (a posting, an
+        // applicant, an agreement, a wage as the body's staff are paid), and seconds whoever is hired at the next round.
+        if (p.part === "appointer" && p.workplace && !candidates.length) {
+          const stale = p.watch.filter((post) => vacant(post) && t - (vacantSince.get(post) ?? t) >= waits(post));
+          if (stale.length) steps.push(...staffing.routine(obs, book, "", { target: staffing.workers(book, t).length + 1, wage: p.wage, canPost: true,
+            why: `${stale.join(", ")} stand${stale.length === 1 ? "s" : ""} vacant and none of our staff is left to fill ${stale.length === 1 ? "it" : "them"}: posting a job, to fill ${stale.length === 1 ? "it" : "them"} from whoever is hired.` }));
+        }
         for (const post of p.watch) {
           if (!vacant(post) || filled.has(`${post}@${asked.since("posts")}`) || !candidates.length) continue;
           // (The authority acts only on a post that has stood vacant: its body's own deputy fills one from its staff within days.)
-          if (p.part === "appointer" && t - (vacantSince.get(post) ?? t) < p.after_days * DAY) continue;
+          if (p.part === "appointer" && t - (vacantSince.get(post) ?? t) < waits(post)) continue;
           const choice = ctx.rng(`succeed-${post}-${Math.floor(t / DAY)}`).pick(candidates);
           const participant = participantOf(choice);
           if (!participant) continue;
