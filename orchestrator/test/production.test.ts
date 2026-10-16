@@ -159,11 +159,13 @@ test("Lengnick: with too little demand a factory lets workers go and stops makin
   // The world market wants little of what the factories can make, and the town's shops take only part of the rest.
   const slack = generate({ ...base, citizens: 120, exports_per_month: 2_000_000 });
   // (Seven months where it was five, 2026-10-12, "Returns on the law's days": a payroll now holds what it withheld until the law's day, some days longer, so the cash probably runs out later (not traced).)
-  // (Run seed 3, 2026-10-12, draws named for the day or the matter: in the generated seed's run nobody was let go in seven months, or in ten;
-  // of seeds 2 to 5 the runs from 3, 4 and 5 have one let go in the seven.)
-  // (Run seed 5 since F6, 2026-10-16: shops serve in their staff's hours and the draws moved; nobody was let go from seed 3's run in seven months; seeds 2 and 5 pass (seed 4 lets someone go but its count of notices differs from its count of reasons, not traced).)
-  // (Run seed 3 since F11, 2026-10-16: slips are drawn through one helper, a register's keeper answers in its own time and an office's slip rates are its systems' too, so the draws moved again; seeds 2 and 5 give notices of redundancy that the rule's two reasons do not account for (not traced), and seed 4 did before the last change; seed 3 passes.)
-  const { ev: e1, cmds: c1 } = await run("slack", { ...slack, seed: 3 }, 7 * MONTH + DAY);
+  // (Traced, review of foundations finding 10, 2026-10-16: the "redundancy the rule's two reasons do not account for" in seeds 2 and 5 is
+  // a third reason, not a fault: a firm wound up (insolvent, or closed by its owners) lets everyone go "Redundancy: the business is being wound up."
+  // (participants/src/behaviour/firms.ts, `letGoAll` after "Winding up", docs/behaviour/insolvency.md). The test counted the two reasons of the
+  // rule of labour only. In the generated seed's run on this code nobody is let go by the rule in seven months, and factory-2 is wound up at
+  // day 154; so the town is held to it as it is drawn, every notice accounted for, and the rule itself is held in seed 2 below, where factory-2
+  // lets two go for want of wages before it is wound up. Seed 3, then 5, had been chosen to find a run with a layoff by the rule.)
+  const { ev: e1, cmds: c1 } = await run("slack", slack, 7 * MONTH + DAY);
   const letGo = c1.filter((c) => c.as?.startsWith("factory-") && /letting one worker go/.test(c.reasoning ?? ""));
   // Staff leave both ways: let go, or leaving for a better-paid job on their own (citizen 0.13.0).
   const factoryJobs = new Set([...slack.world.records, ...e1.filter((e) => e.event === "recorded").map((e) => e.record)].filter((r: any) => r.record === "agreement" && r.terms.template === "employment" && r.terms.parties[0].startsWith("factory-")).map((r: any) => r.id));
@@ -173,7 +175,9 @@ test("Lengnick: with too little demand a factory lets workers go and stops makin
   // (Since shops stopped ordering all from one factory, 2026-10-08, a factory's orders are steadier and its making stops
   // at its band's top before its stock passes last month's demand: in this town the staff go for want of the wages,
   // not by the month's-end rule. Either is the factory letting workers go for too little demand.)
-  expect(letGo.length + cashLetGo.length).toBeGreaterThanOrEqual(1);
+  // ... or the firm is wound up and lets everyone go (insolvent in a slump, or closed by its owners): a third reason, with its own command.
+  const windUp = c1.filter((c) => c.as?.startsWith("factory-") && /^Winding up: letting everyone go/.test(c.reasoning ?? ""));
+  expect(letGo.length + cashLetGo.length + windUp.length).toBeGreaterThanOrEqual(1);
   // (How many go is not held. It was "at least four", then "at least two" counting those who left for other jobs, each
   // true of the town it was written against; in the town drawn since 2026-10-08 one goes in five months, of thirty-one
   // with work for a fifth of them. The rule is slow by its own terms: making stops at the band's top, so stock never
@@ -181,9 +185,23 @@ test("Lengnick: with too little demand a factory lets workers go and stops makin
   // the export slump). A count here would hold the town to an outcome; what is held is that someone goes, that every
   // redundancy the factories give is for one of the rule's two reasons, and that making stops at the band's top.)
   const given = e1.filter((e) => e.event === "recorded" && e.record.record === "notice" && factoryJobs.has(e.record.agreement) && String(e.record.text).startsWith("Redundancy"));
-  expect(given.length).toBe(letGo.length + cashLetGo.length);
-  for (const n of given) expect(["Redundancy: we're making more than we sell.", "Redundancy: we can't cover the wage bill."]).toContain(n.record.text);
+  // Every notice of redundancy a factory gives is for one of three reasons, and a notice of the third (the business wound up) follows a command
+  // of that factory's manager to wind up, at the same moment: never one without it.
+  const windUpNotices = given.filter((n) => n.record.text === "Redundancy: the business is being wound up.");
+  expect(given.length - windUpNotices.length).toBe(letGo.length + cashLetGo.length);
+  for (const n of given) expect(["Redundancy: we're making more than we sell.", "Redundancy: we can't cover the wage bill.", "Redundancy: the business is being wound up."]).toContain(n.record.text);
+  for (const n of windUpNotices) expect(windUp.some((c) => c.as === `${n.record.as}-manager` && c.t <= n.t && n.t - c.t <= 3_600)).toBe(true);
   void quit;
+  // The rule's own two reasons, held in a run where it lays off (seed 2: factory-2 cannot cover its wages and lets two go, then is wound up):
+  // every notice of a factory is for one of the three, and those by the rule are as many as the manager's commands for them.
+  const { ev: e2, cmds: k2 } = await run("slack-2", { ...slack, seed: 2 }, 7 * MONTH + DAY);
+  const jobs2 = new Set([...slack.world.records, ...e2.filter((e) => e.event === "recorded").map((e) => e.record)].filter((r: any) => r.record === "agreement" && r.terms.template === "employment" && r.terms.parties[0].startsWith("factory-")).map((r: any) => r.id));
+  const by2 = (re: RegExp) => k2.filter((c) => c.as?.startsWith("factory-") && re.test(c.reasoning ?? "")).length;
+  const given2 = e2.filter((e) => e.event === "recorded" && e.record.record === "notice" && jobs2.has(e.record.agreement) && String(e.record.text).startsWith("Redundancy"));
+  const rule2 = by2(/letting one worker go/) + by2(/Can't cover the next pay period/);
+  expect(rule2).toBeGreaterThanOrEqual(1);
+  expect(given2.filter((n) => n.record.text !== "Redundancy: the business is being wound up.").length).toBe(rule2);
+  for (const n of given2) expect(["Redundancy: we're making more than we sell.", "Redundancy: we can't cover the wage bill.", "Redundancy: the business is being wound up."]).toContain(n.record.text);
   expect(e1.filter((e) => e.event === "recorded" && e.record.record === "notice" && e.record.text?.startsWith("Redundancy: we're making more")).length).toBe(letGo.length);
   // Beyond the top of Lengnick's band (last month's demand: the shops' orders, and its share of the world market's
   // offer) a factory makes nothing, though its staff could make far more: a day's making never takes its stock past
@@ -227,4 +245,4 @@ test("Lengnick: with too little demand a factory lets workers go and stops makin
   // people of households that opened without a home they could pay for; traced before and after.)
   // (And the headcount sought is above the staff there are: a works with nobody seeks one.)
   for (const c of posts) { const m = /\((\d+) of (\d+)/.exec(c.reasoning ?? ""); expect(Number(m?.[2])).toBeGreaterThan(Number(m?.[1])); }
-}, 300_000);
+}, 600_000);
