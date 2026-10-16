@@ -96,6 +96,10 @@ pub struct State {
     /// Goods taken without consent (world-expansion 7.3): the truth, which investigation can find.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub takings: Vec<Taking>,
+    /// Questions put to a register's keeper that nobody was there to answer (no one of its posts present and on duty), in
+    /// the order asked: taken up, one after another, when someone is (checked each hour while any are held).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub asks_held: Vec<HeldAsk>,
     /// Each entity's own record (docs/design/ai-citizens.md 10d): who they are and how things stand with them, as
     /// their mind keeps it. Held here and written only here (the `entity_record` command); bounded in size
     /// (`caps.entity_record_bytes`), so it never grows. The kernel reads none of it: its sections are opaque.
@@ -687,9 +691,21 @@ impl<'a> IntoIterator for &'a Timeline {
     }
 }
 
+/// A question a keeper has not yet taken up (State::asks_held).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HeldAsk {
+    pub participant: Id,
+    #[serde(default, rename = "as", skip_serializing_if = "Option::is_none")]
+    pub position: Option<Id>,
+    pub keeper: Id,
+    pub look: crate::config::LookRequest,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Sched {
+    /// Held questions looked at again: is someone there now to answer them?
+    HeldAsks,
     StructureComplete { structure: Id },
     /// Nature's day (docs/design/world-expansion.md 2): covers, fields and populations stepped.
     NatureDay { day: i64 },

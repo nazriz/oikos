@@ -818,7 +818,7 @@ pub fn scheduled(s: &Statics, st: &mut State, item: Scheduled) -> Vec<Timed> {
             die(s, st, &person, cause)
         }
         // (Acts in progress are the kernel's to apply: Kernel::advance.)
-        Sched::Act { .. } | Sched::Start { .. } => vec![],
+        Sched::Act { .. } | Sched::Start { .. } | Sched::HeldAsks => vec![],
         Sched::Answer { participant, position, look } => {
             if !st.participants.get(&participant).is_some_and(|p| p.status == crate::state::ParticipantStatus::Active) {
                 return vec![];

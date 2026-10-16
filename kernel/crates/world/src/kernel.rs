@@ -280,6 +280,7 @@ impl World {
             totals: c.catalogue.counters.iter().map(|x| (x.id.clone(), 0)).collect(),
             flooded: Default::default(),
             takings: vec![],
+            asks_held: vec![],
             entity_records: Default::default(),
         };
         for p in &c.positions {
@@ -1067,6 +1068,7 @@ impl World {
             match item.what {
                 crate::state::Sched::Act { action, participant, position, blocks, by, placed } => events.extend(self.act(action, &participant, position.as_deref(), &blocks, &by, placed).events),
                 crate::state::Sched::Start { action, participant, position, done, seq, checks, placed } => events.extend(self.start_check(action, &participant, position.as_deref(), done, seq, &checks, &placed).events),
+                crate::state::Sched::HeldAsks => events.extend(self.take_up_held()),
                 _ => events.extend(scheduled(&self.s, &mut self.state, item)),
             }
             if stop_at_body_news && news_at.is_none() && events[from..].iter().any(|e| is_body_news(&e.event.body)) {
@@ -1136,12 +1138,79 @@ impl World {
         events
     }
 
-    /// The questions a look puts to a register's keeper (a channel of `way: ask` whose keeper is an organisation with
-    /// someone to answer, and a row in the world's table of work for answering; foundations F11): each is answered by the
-    /// keeper's performer, in the keeper's time, and its asker is given the answer with the observation after it is done.
-    /// A question the keeper cannot be said to take time over (no one in its posts who can answer, no row for the kind of
-    /// performer it has) is answered at once, as before. Returns the events, and which of `looks` are put off (they are
-    /// not answered now).
+    /// Does the world's table of work say what answering a question on this channel takes (for a person or a system)?
+    fn ask_has_row(&self, id: &str) -> bool {
+        [oikos_time::Actor::Person, oikos_time::Actor::System].into_iter().any(|a| self.s.act_times.row(a, &format!("answer/{id}")).or_else(|| self.s.act_times.row(a, "answer")).is_some_and(|s| s > 0))
+    }
+
+    /// The keeper's performer for a question now: of those who hold its posts and can answer, the one who is done soonest. A
+    /// person must be alive, there (at work, as the world says work is done) and have room in their working day; a system in
+    /// service. None: nobody is there to answer.
+    fn ask_performer(&self, keeper: &str, id: &str) -> Option<(Id, i64)> {
+        let t = self.state.t;
+        let mut best: Option<(i64, Id, i64)> = None; // (done, performer, seconds)
+        for post in self.state.positions_of.get(keeper).into_iter().flatten() {
+            let Some(holder) = self.state.positions.get(post).and_then(|x| x.holder.clone()) else { continue };
+            let Some(p) = self.state.participants.get(&holder) else { continue };
+            if p.status != ParticipantStatus::Active {
+                continue;
+            }
+            let (tl_key, lanes, actor) = match p.kind {
+                ParticipantKind::Person => {
+                    let Some(person) = p.person.clone() else { continue };
+                    if crate::exec::check_at_work(&self.s, &self.state, &person, None, None).is_err() {
+                        continue;
+                    }
+                    (person, 1, oikos_time::Actor::Person)
+                }
+                ParticipantKind::System => (holder.clone(), p.def.lanes.unwrap_or(1) as usize, oikos_time::Actor::System),
+            };
+            let seconds = self.s.act_times.row(actor, &format!("answer/{id}")).or_else(|| self.s.act_times.row(actor, "answer"));
+            let Some(seconds) = seconds.filter(|s| *s > 0) else { continue };
+            let mut lanes_now = self.state.timelines.get(&tl_key).map(|x| x.lanes.clone()).unwrap_or_default();
+            let (start, done) = oikos_time::place(&mut lanes_now, lanes, t, seconds);
+            if actor == oikos_time::Actor::Person && self.over_the_day(&BTreeMap::from([(tl_key.clone(), seconds)]), start).is_some() {
+                continue; // (their working day is full: not on duty)
+            }
+            if best.as_ref().is_none_or(|b| (done, &holder) < (b.0, &b.1)) {
+                best = Some((done, holder, seconds));
+            }
+        }
+        best.map(|(_, h, s)| (h, s))
+    }
+
+    /// A question taken up by the keeper's performer: put on their timeline (a person's seconds count against their working day),
+    /// to be answered when done.
+    fn place_ask(&mut self, participant: &str, position: Option<Id>, look: &crate::config::LookRequest, keeper: Id, performer: Id, seconds: i64) -> Timed {
+        let t = self.state.t;
+        let p = &self.state.participants[&performer];
+        let (tl_key, lanes, person) = match p.kind {
+            ParticipantKind::Person => (p.person.clone().unwrap_or_else(|| performer.clone()), 1, true),
+            ParticipantKind::System => (performer.clone(), p.def.lanes.unwrap_or(1) as usize, false),
+        };
+        let mut timeline = self.state.timelines.get(&tl_key).cloned().unwrap_or_default();
+        let (starts, done) = oikos_time::place(&mut timeline.lanes, lanes, t, seconds);
+        if person {
+            for (d, take) in day_portions(starts, seconds) {
+                timeline.add_worked(d, take);
+            }
+        }
+        self.state.timelines.insert(tl_key, timeline);
+        self.state.schedule(done, crate::state::Sched::Answer { participant: participant.into(), position: position.clone(), look: look.clone() });
+        let key = position.clone().unwrap_or_else(|| SELF.to_string());
+        let pending = Arc::make_mut(self.state.participants.get_mut(participant).unwrap()).pending.entry(key).or_default();
+        if !pending.asked.contains(&look.channel) {
+            pending.asked.push(look.channel.clone());
+        }
+        Timed::new(t, EventBody::AskStarted { participant: participant.into(), position, channel: look.channel.clone(), keeper, by: performer, starts, done })
+    }
+
+    /// The questions a look puts to a register's keeper (a channel of `way: ask` whose keeper is an organisation with posts, and a
+    /// row in the world's table of work for answering; foundations F11): each is answered by the keeper's performer, in the
+    /// keeper's time, and its asker is given the answer with the observation after it is done. A performer must be there and on
+    /// duty (a person at work with room in their day, or a system in service); if nobody is, the question is held and taken up,
+    /// in the order asked, when someone is (looked at each hour). A keeper with no posts at all, or a world with no row for
+    /// answering, answers at once, as before. Returns the events, and which of `looks` are put off (not answered now).
     pub fn begin_asks(&mut self, participant: &str, looks: &[crate::config::LookRequest]) -> (Vec<Timed>, Vec<bool>) {
         use crate::config::{ChannelKind as K, Way};
         let mut events = vec![];
@@ -1155,49 +1224,45 @@ impl World {
                 },
             };
             let Some(K::Records { way: Way::Ask, of: Some(keeper), .. }) = channels.iter().find(|c| c.id == id).map(|c| c.kind.clone()) else { continue };
-            // The keeper's performer: of those who hold its posts and are there to answer, the one who is done soonest.
-            let t = self.state.t;
-            let mut best: Option<(i64, i64, Id, i64)> = None; // (done, start, performer, seconds)
-            for post in self.state.positions_of.get(&keeper).into_iter().flatten() {
-                let Some(holder) = self.state.positions.get(post).and_then(|x| x.holder.clone()) else { continue };
-                let Some(p) = self.state.participants.get(&holder) else { continue };
-                if p.status != ParticipantStatus::Active {
-                    continue;
-                }
-                let (tl_key, lanes, actor) = match p.kind {
-                    ParticipantKind::Person => {
-                        let Some(person) = p.person.clone() else { continue };
-                        if !self.state.body(&person).is_some_and(|b| b.alive) {
-                            continue;
-                        }
-                        (person, 1, oikos_time::Actor::Person)
+            if !self.ask_has_row(id) || self.state.positions_of.get(&keeper).is_none_or(|p| p.is_empty()) {
+                continue;
+            }
+            let position = (key != SELF).then(|| key.clone());
+            match self.ask_performer(&keeper, id) {
+                Some((performer, seconds)) => events.push(self.place_ask(participant, position, l, keeper, performer, seconds)),
+                None => {
+                    let first = self.state.asks_held.is_empty();
+                    self.state.asks_held.push(crate::state::HeldAsk { participant: participant.into(), position, keeper, look: l.clone() });
+                    let pending = Arc::make_mut(self.state.participants.get_mut(participant).unwrap()).pending.entry(key).or_default();
+                    pending.asked.push(l.channel.clone());
+                    if first {
+                        self.state.schedule(self.state.t + 3_600, crate::state::Sched::HeldAsks);
                     }
-                    ParticipantKind::System => (holder.clone(), p.def.lanes.unwrap_or(1) as usize, oikos_time::Actor::System),
-                };
-                let seconds = self.s.act_times.row(actor, &format!("answer/{id}")).or_else(|| self.s.act_times.row(actor, "answer"));
-                let Some(seconds) = seconds.filter(|s| *s > 0) else { continue };
-                let mut lanes_now = self.state.timelines.get(&tl_key).map(|x| x.lanes.clone()).unwrap_or_default();
-                let (start, done) = oikos_time::place(&mut lanes_now, lanes, t, seconds);
-                if best.as_ref().is_none_or(|b| (done, &holder) < (b.0, &b.2)) {
-                    best = Some((done, start, holder, seconds));
                 }
             }
-            let Some((_, _, performer, seconds)) = best else { continue };
-            let p = &self.state.participants[&performer];
-            let (tl_key, lanes) = match p.kind {
-                ParticipantKind::Person => (p.person.clone().unwrap_or_else(|| performer.clone()), 1),
-                ParticipantKind::System => (performer.clone(), p.def.lanes.unwrap_or(1) as usize),
-            };
-            let mut timeline = self.state.timelines.get(&tl_key).cloned().unwrap_or_default();
-            let (starts, done) = oikos_time::place(&mut timeline.lanes, lanes, t, seconds);
-            self.state.timelines.insert(tl_key, timeline);
-            let position = (key != SELF).then(|| key.clone());
-            self.state.schedule(done, crate::state::Sched::Answer { participant: participant.into(), position: position.clone(), look: l.clone() });
-            Arc::make_mut(self.state.participants.get_mut(participant).unwrap()).pending.entry(key.clone()).or_default().asked.push(l.channel.clone());
-            events.push(Timed::new(t, EventBody::AskStarted { participant: participant.into(), position, channel: l.channel.clone(), keeper, by: performer, starts, done }));
             put_off[i] = true;
         }
         (events, put_off)
+    }
+
+    /// Held questions looked at again: each whose keeper now has someone there to answer is taken up (in the order asked).
+    fn take_up_held(&mut self) -> Vec<Timed> {
+        let held = std::mem::take(&mut self.state.asks_held);
+        let mut events = vec![];
+        for h in held {
+            if self.state.participants.get(&h.participant).is_none_or(|p| p.status != ParticipantStatus::Active) {
+                continue;
+            }
+            let id = h.look.channel.rsplit('/').next().unwrap_or_default().to_string();
+            match self.ask_performer(&h.keeper, &id) {
+                Some((performer, seconds)) => events.push(self.place_ask(&h.participant, h.position.clone(), &h.look, h.keeper.clone(), performer, seconds)),
+                None => self.state.asks_held.push(h),
+            }
+        }
+        if !self.state.asks_held.is_empty() {
+            self.state.schedule(self.state.t + 3_600, crate::state::Sched::HeldAsks);
+        }
+        events
     }
 
     /// The questions to a register's keeper that have been answered for a participant (in the capacities it would observe in),

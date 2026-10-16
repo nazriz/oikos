@@ -409,3 +409,71 @@ fn an_advance_to_news_stops_where_a_keeper_answers_an_office() {
     run.command(&Command::AdvanceToNews { to: 10_000 }).unwrap();
     assert_eq!(run.kernel().t(), 10_000);
 }
+
+/// Review of the foundations, finding 4: an answer needs a performer who is there and on duty, and counts against their working
+/// day; a keeper with nobody in post does not answer at once and for free.
+#[test]
+fn an_answer_needs_a_performer_present_and_on_duty_and_counts_against_the_day() {
+    let titles = json!({"id": "titles", "kind": "records", "way": "ask", "of": "city", "by": ["holder", "id"], "match": {"records": ["claim"]}, "on_request": true});
+    let got = |o: &Observation| match o.channels.get("developer/titles") {
+        Some(ChannelData::Records { records, .. }) => records.iter().map(|r| r.id.clone()).collect::<Vec<_>>(),
+        _ => vec![],
+    };
+    let ask = |run: &mut Run<Vec<u8>>| {
+        let looks = serde_json::from_value(json!([{"channel": "developer/titles", "query": {"where": [{"field": "holder", "op": "=", "value": "city"}], "order": {"field": "id"}, "limit": 200}}])).unwrap();
+        let out = run.command(&Command::Look { participant: "developer-system".into(), only: None, looks }).unwrap();
+        let started = out.events.iter().filter(|e| matches!(e.body, EventBody::AskStarted { .. })).count();
+        (out.observation.unwrap(), started)
+    };
+    let observe = |run: &mut Run<Vec<u8>>| run.command(&Command::Observe { participant: "developer-system".into(), only: None }).unwrap().observation.unwrap();
+    // One clerk holds every post of the city; the world says work is done in a workplace; an answer is ten minutes of hers.
+    let mut c = with_channel(Some("developer"), titles);
+    c["orchestration"]["act_time"]["person"]["answer"] = json!(600);
+    c["orchestration"]["performers_in"] = json!("workplace");
+    for s in ["mayor-system", "finance-system"] {
+        c["participants"].as_array_mut().unwrap().retain(|p| p["id"] != s);
+    }
+    for pos in c["positions"].as_array_mut().unwrap().iter_mut().filter(|p| p["entity"] == "city") {
+        pos["holder"] = json!("alice-self");
+    }
+    let mut run = Run::start(c, "knowing-ask-3", Vec::new(), None).unwrap();
+    // She is at home, not at work: nobody answers. The question is held, not answered at once.
+    let (o, started) = ask(&mut run);
+    assert_eq!(started, 0, "nobody was on duty to start it");
+    assert!(got(&o).is_empty(), "answered at once with nobody there");
+    assert_eq!(o.asking, ["developer/titles"]);
+    run.command(&Command::Advance { to: 5 * 3_600 }).unwrap();
+    assert!(got(&observe(&mut run)).is_empty(), "still nobody there");
+    // She goes to a workplace: the next hour's look takes the question up, and ten minutes later it is answered.
+    run.command(&direct("alice-self", None, serde_json::from_value(json!([{"block": "vacate", "occupant": "alice", "from": "s-house"}, {"block": "occupy", "space": "s-shop/workplace.1", "who": "alice"}])).unwrap()).unwrap()).unwrap();
+    run.command(&Command::Advance { to: 5 * 3_600 + 3_600 + 3_600 }).unwrap();
+    let o = observe(&mut run);
+    assert_eq!(got(&o), ["title-lot-a", "title-lot-d", "title-lot-g"], "answered once she was there: {:?}", o.asking);
+    // Her answers count against her working day (eight hours here): the 48th is the last it has room for, the next is held.
+    let mut answered = 0;
+    for _ in 0..60 {
+        let (_, started) = ask(&mut run);
+        if started == 0 {
+            break;
+        }
+        answered += 1;
+    }
+    assert_eq!(answered, 47, "the 48th answer of ten minutes fills eight hours with the first: the rest wait");
+    assert_eq!(run.kernel().state().timelines["alice"].worked, Some((0, 8 * 3_600)), "and they were counted against her day");
+}
+
+/// Review of the foundations, finding 4: a registry whose posts have fallen vacant is not faster than a staffed one.
+#[test]
+fn a_keeper_with_every_post_vacant_does_not_answer_at_once() {
+    let titles = json!({"id": "titles", "kind": "records", "way": "ask", "of": "city", "by": ["holder", "id"], "match": {"records": ["claim"]}, "on_request": true});
+    let mut c = with_channel(Some("developer"), titles);
+    c["orchestration"]["act_time"]["system"]["answer"] = json!(120);
+    for pos in c["positions"].as_array_mut().unwrap().iter_mut().filter(|p| p["entity"] == "city") {
+        pos.as_object_mut().unwrap().remove("holder");
+    }
+    let mut run = Run::start(c, "knowing-ask-4", Vec::new(), None).unwrap();
+    let looks = serde_json::from_value(json!([{"channel": "developer/titles", "query": {"where": [{"field": "holder", "op": "=", "value": "city"}], "order": {"field": "id"}, "limit": 200}}])).unwrap();
+    let o = run.command(&Command::Look { participant: "developer-system".into(), only: None, looks }).unwrap().observation.unwrap();
+    assert!(!matches!(o.channels.get("developer/titles"), Some(ChannelData::Records { records, .. }) if !records.is_empty()), "answered at once with nobody in post");
+    assert_eq!(o.asking, ["developer/titles"]);
+}
