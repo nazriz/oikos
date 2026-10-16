@@ -222,6 +222,23 @@
           "type": "object",
           "required": [
             "command",
+            "to"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "command": {
+              "const": "advance_to_news"
+            },
+            "to": {
+              "description": "Advance the clock towards this time as `advance` does, but stop at the moment something happens to a person's body (a condition begun, ended or treated; one flooded out of where they were), after everything scheduled for that moment: the clock is then at that moment, not at `to`. The engine uses it to move on to the next wake, so that news of a body reaches the person when it happens (foundations F7).",
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/SimTime"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "command",
             "participant"
           ],
           "additionalProperties": false,

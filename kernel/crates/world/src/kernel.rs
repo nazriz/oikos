@@ -12,7 +12,7 @@
 use crate::blocks::{Block, Id};
 use crate::canon;
 use crate::config::{cell_id, terrain_at, LoadedConfig, ParticipantKind, SELF};
-use crate::events::{EventBody, RefusalCode, Timed};
+use crate::events::{EventBody, RefusalCode, Timed, VacateReason};
 use crate::exec::{can_act, exec_action, refuse, schedule_birthday, scheduled, Refusal};
 use crate::rng::Randomness;
 use crate::state::{Account, Body, Cell, Counters, Entity, Outcome, OutcomeStatus, Participant, ParticipantDef, ParticipantStatus, Position, RefusalInfo, State, Structure};
@@ -45,6 +45,13 @@ pub enum Command {
         thinking: Option<i64>,
     },
     Advance {
+        to: i64,
+    },
+    /// `Advance`, but it stops at the moment something happens to a person's body (a condition begun, ended or
+    /// treated, or one flooded out of where they were), after everything scheduled for that moment: the clock is
+    /// then at that moment, not at `to`. So the news reaches the person when it happens, whoever else happens to
+    /// wake next (foundations F7: a pilot and its code twin differ only where a seat decides differently).
+    AdvanceToNews {
         to: i64,
     },
     Observe {
@@ -576,7 +583,7 @@ impl World {
                     }
                 }
             }
-            Command::Advance { to } => {
+            Command::Advance { to } | Command::AdvanceToNews { to } => {
                 if *to < self.state.t {
                     return perr(format!("cannot advance to {to}: the clock is at {}", self.state.t));
                 }
@@ -619,7 +626,8 @@ impl World {
     pub fn apply_prechecked(&mut self, cmd: &Command) -> Result<Output, ProtocolError> {
         Ok(match cmd {
             Command::Act { participant, position, blocks, by, thinking, .. } => self.begin(participant, position.as_deref(), blocks, by, thinking.unwrap_or(0)),
-            Command::Advance { to } => self.advance(*to),
+            Command::Advance { to } => self.advance(*to, false),
+            Command::AdvanceToNews { to } => self.advance(*to, true),
             // (What a participant perceives is perception's to build, read-only; the engine then has the world deliver it.)
             Command::Observe { .. } | Command::Look { .. } => return perr("observing is the engine's: perception builds it, and the world delivers it"),
             Command::EntityRecord { participant, entity, set, because } => {
@@ -1008,16 +1016,29 @@ impl World {
         Output { events: vec![ev] }
     }
 
-    fn advance(&mut self, to: i64) -> Output {
+    fn advance(&mut self, to: i64, stop_at_body_news: bool) -> Output {
         let mut events = vec![];
+        // (The moment body news came at, in an advance that stops there: what is scheduled for that moment is still done.)
+        let mut news_at: Option<i64> = None;
         while self.state.schedule.first().is_some_and(|x| x.at <= to) {
+            if news_at.is_some_and(|n| self.state.schedule.first().is_some_and(|x| x.at > n)) {
+                return Output { events };
+            }
             let item = self.state.schedule.pop_first().unwrap();
             self.state.t = item.at;
+            let from = events.len();
             match item.what {
                 crate::state::Sched::Act { action, participant, position, blocks, by, placed } => events.extend(self.act(action, &participant, position.as_deref(), &blocks, &by, placed).events),
                 crate::state::Sched::Start { action, participant, position, done, seq, checks, placed } => events.extend(self.start_check(action, &participant, position.as_deref(), done, seq, &checks, &placed).events),
                 _ => events.extend(scheduled(&self.s, &mut self.state, item)),
             }
+            if stop_at_body_news && news_at.is_none() && events[from..].iter().any(|e| is_body_news(&e.event.body)) {
+                news_at = Some(self.state.t);
+            }
+        }
+        if let Some(n) = news_at {
+            self.state.t = n;
+            return Output { events };
         }
         self.state.t = to;
         Output { events }
@@ -1099,6 +1120,12 @@ impl World {
 pub fn known_field(f: &str) -> bool {
     matches!(f, "id" | "record" | "kind" | "at" | "author" | "speaks_for" | "basis" | "claim" | "holder")
         || f.strip_prefix("data.").or_else(|| f.strip_prefix("about.")).is_some_and(|p| !p.is_empty() && p.split('.').all(|x| !x.is_empty()))
+}
+
+/// Something happened to a person's own body: a condition begun, ended or treated, or flooded out of where they were.
+/// The engine wakes the person's own unit for it (kernel/src/schedule.rs, `News::Body`).
+pub fn is_body_news(b: &EventBody) -> bool {
+    matches!(b, EventBody::ConditionBegan { .. } | EventBody::ConditionEnded { .. } | EventBody::ConditionTreated { .. } | EventBody::Vacated { reason: VacateReason::Flooded, .. })
 }
 
 /// Each performer's hours in the work an act did (one `Worked` event each, a share a performer: the labour split

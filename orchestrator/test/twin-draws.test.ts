@@ -221,12 +221,11 @@ test("a year with one office in a mock seat that sits at other hours and files p
   console.log(`twin moments, a seat that deals with nobody (${papers} papers of its own): draws ${share(draws)}; decisions ${share(decided)}; acts ${share(acted)}`);
   expect(draws.apart).toEqual([]);
   expect(decided.apart).toEqual([]);
-  // (Foundations F6: not act for act, by a hair. Someone asleep when their body gives news (an injury in the small hours) is woken at the first cohort the engine has
-  // after it, and in a quiet stretch that is the ombudsman's own unit's, which in the town with the seat sits at other hours than in the twin: eleven seconds apart,
-  // so the care they ask for is asked eleven seconds later and the papers they write carry another second. 6 acts of 122,000, from day 203; every draw and every
-  // decision above is exactly the same, and no answer or price below differs. The engine's reaction to body news at the next cohort, not when it happens, is an
-  // old property of the schedule (kernel/src/schedule.rs, `Next::Advance`), seen here because the extra posts of F6 moved which unit wakes first after it.)
-  expect(acted.apart.length).toBeLessThanOrEqual(Math.ceil(acted.all / 10_000));
+  // (Foundations F7: act for act. Until then 6 acts of 122,000 differed by seconds from day 203: someone asleep when their body gave news (an injury in the
+  // small hours) was met at the first cohort the engine had after it, and in a quiet stretch that was the ombudsman's own unit's, which in the town with the
+  // seat sits at other hours than in the twin. The engine's advance now stops at the moment of body news (`advance_to_news`, kernel/src/schedule.rs), so the
+  // news reaches the person when it happens, whoever wakes next.)
+  expect(acted.apart).toEqual([]);
   expect(decided.all).toBeGreaterThan(5_000);
   expect([...answers(seat.records, new Set()).entries()].sort()).toEqual([...answers(twin.records, new Set()).entries()].sort());
   const prices = (rs: any[]) => rs.filter((r) => r.kind === "price_list" && /at world prices/.test(String(r.text))).map((r) => `${Math.floor(r.at / (30 * DAY))} ${String(r.text).replace(/rec\.[0-9]+/g, "rec")}`);

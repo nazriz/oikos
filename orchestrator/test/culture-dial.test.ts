@@ -35,7 +35,8 @@ const check = (ref: string, row: unknown) => {
 // (au-vic-2026 re-taken on 2026-10-15 at foundations F1, as living-dial.test.ts's step 1; the other two profiles as the run gives them, below.)
 const BEFORE: { [profile: string]: { days: number; state: string } } = {
   // (Re-taken on 2026-10-16 at foundations F5: the town's offices are held by people, their staff hired, its systems delivered from templates that say what they do; 3fdeff6a... until then.)
-  "au-vic-2026": { days: 60, state: "5e3c3fcb40fa49995b7779324d06e5b97c50daf026b2c0fee09e629df1bcefc5" },
+  // (Re-taken on 2026-10-16 at foundations F7: news of a person's body reaches them when it happens, not at the next wake; 5e3c3fcb... until then. gb-eng and ke-nakuru did not move in 30 days.)
+  "au-vic-2026": { days: 60, state: "88f2e1f7de436937f1c181e994184dc41d4eab89822fe42cad4ddfdc58cb3fb7" },
   // (Re-taken on 2026-10-16 at foundations F5: the town's offices are held by people, their staff hired, its systems delivered from templates that say what they do; 3b4bc97e... until then.)
   "gb-eng-2026": { days: 30, state: "fe18427c0b689914613850f66fc714e75078cc8fcbd1c76f9809da0d1d2f28ae" },
   // (Re-taken on 2026-10-16 at foundations F5: the town's offices are held by people, their staff hired, its systems delivered from templates that say what they do; ab25cb7d... until then.)
