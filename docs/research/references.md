@@ -777,3 +777,15 @@ No document was opened for this step; every route below is named from memory and
 - **Challenging an administrative action, Kenya:** 90 days. Fair Administrative Action Act 2015. (To confirm.) **India (Tamil Nadu):** nothing found; a placeholder.
 - **A review is the work done again, by someone who was not the one who slipped:** Reason, *Human Error* (1990), cited under Foundations above (an error found by checking, not by the one who made it). Used: the office decides a refusal again on the facts, without a second slip on the same case (docs/behaviour/decisions.md). The sim's second look is by the same office (the post has one holder); that is a known simplification.
 
+## The renderer (docs/design/renderer.md; plan, 2026-10-16)
+
+| Idea | Citation | Used in |
+|---|---|---|
+| A WebGPU renderer for the browser that falls back to WebGL 2 where WebGPU is missing; instanced meshes; an orthographic camera; ray picking that returns an instance | three.js (MIT), `three/webgpu` `WebGPURenderer`, `InstancedMesh`, `OrthographicCamera`, `Raycaster`, threejs.org documentation **(to confirm: the release in use when built)**; W3C, *WebGPU*, Candidate Recommendation **(to confirm)** | the client scene (sections 1, 4) |
+| True isometric projection: the view 45 degrees round and arctan(1/sqrt 2), about 35.26 degrees, down, so the three axes are drawn equally foreshortened | standard axonometric projection, e.g. Carlbom and Paciorek (1978), "Planar geometric projections and viewing transformations", *ACM Computing Surveys* 10(4) **(to confirm)** | the camera (section 4) |
+| Small, fast time-series charts in the browser | uPlot (MIT), github.com/leeoniya/uPlot **(to confirm)** | money and acts by week in the organisation and office panels (section 4) |
+| Postings lists: for each term, the ordered list of where it occurs, stored as gaps in variable-length integers | Zobel and Moffat (2006), "Inverted files for text search engines", *ACM Computing Surveys* 38(2) **(to confirm)** | `postings` in the view index: every id's lines, month by month (section 3) |
+| Keyframes and deltas: a full picture at intervals and the changes between them, so any moment is a nearby keyframe plus a few changes | the intra-coded and predicted frames of video coding, e.g. ITU-T H.264 (2003) **(to confirm)** | `where-days` and `moves`, `money-weeks` and transfers (section 3) |
+| Independently compressed frames so one record can be read without decompressing the whole | Collet and Kucherawy (2021), *Zstandard Compression*, RFC 8878 (frames) **(to confirm)** | `frames/` in the view index (section 3) |
+| Provenance as a graph of entities, the activities that made them and the agents responsible | W3C (2013), *PROV-DM: The PROV Data Model* **(to confirm)** | the causal trace: an effect, the act that made it, who decided, what it rested on (section 5) |
+| Who decided, human or system, as the thing to watch in gradual disempowerment | Kulveit et al. (2025), cited under "Gradual disempowerment" above | the "who decided" and "where systems are deployed" overlays (section 6) |

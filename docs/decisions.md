@@ -5364,3 +5364,27 @@ Plan: `docs/design/foundations.md` (row F8; laws 5 and 6). The behaviour is in `
 - **Twins.** `twin-draws.test.ts` passes exactly: every act, draw and decision of a year equal, with the kind renamed. Old logs replay on `pre-foundations` or the build of their version: nothing in the kernel or the log changed here; the logs made before this change hold `remedy_request`.
 - **What F9 needs.** F9 (the seat's diary in its books, outcomes with times, `by` from the roster, a 60-day mock seat) should show the office-holder of the support office *what is waiting on its file* (claims with a request out, with its days), since that is now the office's own work and a seat that does it all itself will fall behind on it; and a claimant's seat needs the forms `evidence` and `review_request` before it can answer a letter. The second look is by the same post (one holder); a second officer for a review (a different performer from the one who decided) is a roster matter F9 can give it.
 - **Revisit if** the 4-to-7-day tail is thought too long or too short against a place's real wait (it is the citizens' rhythm, not a figure of the law); a place's real routes are opened (every figure here is recalled); a review should be done by another officer; or lending, landlords' variation answers or funds should have routes (give each a `redo`; the class is general).
+## 2026-10-16 · The renderer: a plan, awaiting the owner (docs only; no code; no model called)
+
+- **What.** `docs/design/renderer.md`: the plan for V0's stage 3, of which nothing existed. A separate `renderer/`
+  package; Bun serves a Three.js client on WebGPU with WebGL 2 fallback, isometric orthographic camera, boxes and
+  markers. One read-only pass over a log makes a disposable **view index** (`runs/views/<run>.<head>/`: SQLite for
+  ids, kept lines, postings by id and month, and the causal chains; zstd frames of the kept lines; binary tracks of
+  where everyone is each midnight, each day's moves, balances weekly, and the overlays by day). Views: town, block,
+  parcel, citizen; organisation; office with staff now and backlog. The causal trace walks effect, action, act, who
+  decided (person, another person, an organisation's code system, a model seat, the world), why (transcript, decision
+  annotation, the record's stated reason), and the records it rested on (`basis`), to depth eight. Three overlays: who
+  decided (V0's one), where systems are deployed, hardship as the record has it (a raw variable, no composite). Live
+  attach by tailing the log. Build order V1 to V13, about 14 agent-days.
+- **Why these choices.** Fold the log in TypeScript, checked by the kernel's own record digests, money conservation
+  and capacity, rather than a kernel replay: the log alone rebuilds every register and the renderer needs a few kinds
+  of state; a kernel change would be the first thing the renderer needed. Daily keyframes of where people are (15 MB
+  a year at 10,000) make a year scrub with no fetch while dragging. Postings by any id found in a body, not per event
+  kind, so new events and records are indexed with no new code. The index lives outside the run's folder, so a run is
+  never written to; a test holds it.
+- **Awaits the owner:** when to build it (recommended: after the GD plan's R1 to R3), and whether "who decided"
+  classes by role in the world (recommended) rather than by what runs it.
+- **Revisit if** the TS folds disagree with the kernel (then `oikos-kernel replay --states`, verified by checkpoint
+  hashes); indexing a year at 10,000 takes over an hour (then by month in parallel); WebGPU and its fallback cannot draw
+  10,000 markers smoothly on the owner's machine (then points in one draw call); or compact logs land (then the
+  indexer reads `replay --emit` on a pipe).
