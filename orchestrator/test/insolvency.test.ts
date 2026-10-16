@@ -27,6 +27,8 @@ test("a factory with no customers and no credit is wound up: everyone let go, wh
   // order, not all the first by name: so its list asks more than anyone pays (three times the imports' price).
   const own = [...config.participants, ...(config.positions ?? [])].flatMap((p: any) => [p.controller?.params, p.role_module?.params]).find((prm: any) => prm?.works === "factory-2-works");
   own.price = 3 * own.price;
+  // (2026-10-16, the profile source check: with the au-vic-2026 profile's students per teacher at 11.9 the school takes a fourth teacher from the pool and factory-2, which began with one worker, begins with none; its owners then closed it for being idle (the voluntary "closing" record), before it could be insolvent. This test is of insolvency, so the owners are given no such patience to lose: the idle limit is out of reach.)
+  own.idle_days = 100_000;
   // ... and nothing in stock to sell (a firm with goods to sell can still pay).
   config.world.holdings = config.world.holdings.filter((h: any) => h.holder !== "factory-2");
   const out = join(root, "runs", "test-insolvency");

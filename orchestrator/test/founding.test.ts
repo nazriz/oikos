@@ -91,7 +91,8 @@ const LIVING = "living.initiative_bps=10000";
 // (Re-taken on 2026-10-16 at foundations F8: the support office asks for papers before it decides, looks at a refusal again when asked, and the tribunal hears an appeal at the law's fee; the profile's routes are published as `law-decisions`; f28ffd82... until then.)
 // (Re-taken on 2026-10-16, pilot 7 fixes: applications carry their particulars, and the opening caseload's say so in words; 2c3cfde9... until then.)
 // (Re-taken again on 2026-10-16 at the review of the foundations, finding 6: the council's appointments officer is an office of the town, its posts name their authority, and every generated system is owned by the organisation whose post it holds; e5a4d08a... until then, on main's pilot 7 fixes and these.)
-const STEP_2B = "46a26c4ca5c21cedc2ce7c283e6fb24fe1967cb8909d569c61684a57318953fe";
+// (Re-taken on 2026-10-16 at the profile source check, on the merged foundations review: the au-vic-2026 profile's tribunal and hearing times, fee, rent bands, students per teacher and kin ceiling changed; 46a26c4c... until then.)
+const STEP_2B = "b805a01520b90c6a87899730e5c613f313c3a118ffcc6b1023685f4da52b0247";
 
 test("with founding off a living town is step 2b's town, to the state hash; turned on with no shape to found, nobody does anything they did not do before", async () => {
   const out = mkdtempSync(join(tmpdir(), "oikos-founding-"));
@@ -134,7 +135,8 @@ test("founding in code: with the composer off no model is called; a founded thin
     // (Seed 3 from 2026-10-16, foundations F7: news of a body reaches a person when it happens, so the course differs again; of seeds 1 to 16 only 3, 10 and 11 have two who share the want that founds.)
     // (Seed 2 from 2026-10-16, foundations F11: a register's keeper answers in its own time, and an office's slip rates are its systems' too, so the course differs; of seeds 1 to 16 only 2 and 5 have two who share the want that founds. Seed 3 held through foundations F7.)
     // (Why a hop and not a fault, 2026-10-16: two who share the want that founds is one town in eight or fewer before foundations F5 (only seed 6 of 1 to 8) and two of sixteen after (2 and 5); the rate is the same, only the seed moves. Seed 6, the original, has one who shares it on the foundations-review branch, and the test needs two.)
-    const s = await runWorld({ config: { ...config, seed: 2 }, runId: "code", outDir: out, until: 205 * DAY, recordObservations: "none" });
+    // (Seed 3 from 2026-10-16, the profile source check, on the merged foundations review: the au-vic-2026 profile changed and in seed 2 nothing is founded in 205 days; of seeds 1 to 9 only 3 and 5 found something with two who share the want. Which seed has it is a matter of draws, not of the rule.)
+    const s = await runWorld({ config: { ...config, seed: 3 }, runId: "code", outDir: out, until: 205 * DAY, recordObservations: "none" });
     expect(s.composer).toBeUndefined();
     const log = readFileSync(s.logPath, "utf8");
     // No model anywhere: not a usage entry, not a transcript.
