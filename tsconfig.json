@@ -18,6 +18,7 @@
     "orchestrator",
     "worlds",
     "measure",
+    "pilot-view",
     "contracts/test",
     "docs/research/cel-check"
   ],
