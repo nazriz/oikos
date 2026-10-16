@@ -39,7 +39,7 @@ const lastText = (r: LlmRequest) => { const c = r.messages.at(-1)!.content; retu
  * is shown. Returns the adapter, what each seat asked for, what each was shown at the start of each sitting, and the
  * preview of each draft.
  */
-export function scriptedSeats(seats: { [office: string]: Sitting[] }) {
+export function scriptedSeats(seats: { [office: string]: Sitting[] }, o: { most?: number } = {}) {
   let n = 0;
   const use = (name: string, input: object) => ({ type: "tool_use" as const, id: `t${++n}`, name, input });
   const programs = new Map<string, string>();
@@ -74,7 +74,7 @@ export function scriptedSeats(seats: { [office: string]: Sitting[] }) {
         st.asked = day;
         for (const a of asks) programs.set(a.what, a.program);
         st.made.push(...asks);
-        return asks.slice(0, 8).map((a) => use("do", { what: a.what, as: office }));
+        return asks.slice(0, o.most ?? 8).map((a) => use("do", { what: a.what, as: office }));
       }
       const next = st.todo[0];
       return [use("done_for_now", { days: next ? Math.max(1, next.day - day) : 7 })];

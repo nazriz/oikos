@@ -279,7 +279,14 @@ export function supportBooks(ctx: ParticipantContext): OfficeBooks {
       const cases = book.open("case_for_decision").filter((r) => r.speaks_for === me && typeof r.data?.claim === "string" && !decided.has(r.data.claim))
         .map((r): OpenItem => ({ id: r.data!.claim as string, since: r.at, ...(r.data?.amount !== undefined ? { amount: cents(r.data.amount) } : {}),
           line: `${r.data!.claim}: ${r.data?.claimant}'s claim for ${r.data?.payment} support, put before the office-holder ${dateWords(r.at)} (${r.id}): ${r.data?.fails}; not decided` }));
-      return [...heading("Claims the staff have put before the office-holder, not decided", cases),
+      // What a claim waits for (foundations F8): the papers and confirmations the office has asked for, not yet come, with the day each is due by.
+      const came = new Set(["evidence", "confirmation_answer"].flatMap((k) => book.open(k)).filter((r) => (r.addressed_to ?? []).includes(me) && typeof r.data?.claim === "string").map((r) => `${r.data!.claim}|${r.data!.need}`));
+      const waiting = ["evidence_request", "confirmation_request"].flatMap((k) => book.open(k)).filter((r) => r.speaks_for === me && typeof r.data?.claim === "string" && !decided.has(r.data.claim) && !came.has(`${r.data.claim}|${r.data.need}`))
+        .sort((a, b) => Number(a.data?.by ?? 0) - Number(b.data?.by ?? 0) || (a.id < b.id ? -1 : 1))
+        .map((r): OpenItem => ({ id: r.id, since: r.at, ...(Number.isFinite(Number(r.data?.by)) ? { due: Number(r.data!.by) } : {}),
+          line: `${r.data!.claim}: ${r.kind === "evidence_request" ? "the claimant" : String(r.addressed_to?.[0] ?? "the last employer")} was asked ${dateWords(r.at)} for ${r.data?.what} (${r.id}), due by ${Number.isFinite(Number(r.data?.by)) ? dateWords(Number(r.data!.by)) : "no day given"}; not yet answered` }));
+      return [...heading("Claims waiting for papers or a confirmation asked for, not yet come", waiting),
+        ...heading("Claims the staff have put before the office-holder, not decided", cases),
         ...askedOfUs(book, me, money, [{ notice: "hearing_notice", response: "tribunal_response", decision: "tribunal_order" }])];
     },
   };

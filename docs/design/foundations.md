@@ -3,7 +3,7 @@
 **Status:** a plan, approved by the owner (Naz, 2026-10-15): the three questions in section 8 are answered, all yes
 (decisions log, 2026-10-15, "Foundations: approved"). Step F0 is built (the laws as tests, and the inventory of what is
 deleted: `kernel/tests/foundations.rs`, `orchestrator/test/foundations-laws.test.ts`, `orchestrator/test/fixtures/foundations-inventory.json`);
-F1 to F8 and F11 are built (decisions log, 2026-10-15 and 16, "Foundations F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8"); F9 and F10 are not. Earlier: the kernel changes in it come back to him before any code is written. His direction (Naz, 2026-10-15, close to his words): the platform must be very generalisable; stop
+F1 to F11 are built (decisions log, 2026-10-15 to 17, "Foundations F1" to "F8", "F9 and F10"). Earlier: the kernel changes in it come back to him before any code is written. His direction (Naz, 2026-10-15, close to his words): the platform must be very generalisable; stop
 fixing one case at a time ("office work doesn't cost staff time", "systems can't do tasks", "no vendors or
 tenders"); "every single piece of work should cost time, and that should be enforced at the kernel level or the
 platform level ... it should just be at the foundational level how the world operates". He agreed to an audit and a
@@ -281,6 +281,8 @@ appear (`docs/real-models.md`, "What a seat is told").
 - **Welfare** (VISION 15). A backlog is pressure. A seat's caseload is set by the town as for its code twin, never
   raised to provoke; the debrief asks how the workload felt. A seat as the system itself (machine speed, lanes) is a
   later, separate experiment (GD plan, question 1).
+
+**Built (F9, 2026-10-17).** A seat is shown its office's diary (its own time, its staff's hours), told when what it asked for will be done, shown what waits for papers on the support office's books, may name who does it (`done_by`), and has the forms `evidence`, `confirmation_answer` and `review_request`; decisions log, "Foundations F9 and F10". A seat that sits as its code twin does is exactly its twin for a year (`mock.twin`); the world beside a post does not depend on whether a seat or code holds it, except through the acts its holder takes. The seat's sittings are its own and stay so for a real model.
 
 ## 5. Performance and determinism at 10,000 people over years
 
