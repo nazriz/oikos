@@ -1,6 +1,6 @@
 {
   "name": "tribunal.member",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "doc": "docs/behaviour/justice.md",
   "params": {
     "account": {

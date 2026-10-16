@@ -176,6 +176,16 @@ matter is the law's, not the tribunal's (it publishes one notice of what it hear
 the law makes a review come first; the applicant tenders both dates, and the tribunal turns away an application out of time or without the review (finding `rejected`, with the days). A decision set aside is put
 right by the office that made it.
 
+## Particulars (2026-10-16; `particularsOf` and `hasParticulars` in `frictions.ts`, `Hearings` in `desk.ts`, citizen 0.57.0)
+
+**What was wrong.** In living pilots 7A and 7B a model member dismissed 13 of 15 applications because they "named no particulars, amount or evidence", and the code member, given the same papers, ordered the respondent to put it right in 13 of 15. Traced: a citizen who applies states what the grievance holds (a paper, a place, a sum, what is sought), and a grievance brought forward from before the year (an opening caseload: every goods and bill matter, and some disrepair) holds only the matter and the other side. So the application said "goods against shop-21; we asked them 14 days ago and had no answer" and nothing more. The member judged that as a member would; the code member's rule ("no answer: the applicant's account stands") never looked.
+
+**What a real applicant writes.** Every tribunal's and ombudsman's application form asks for the same things: what the dispute is about, the other side, the sum or what is wanted, the dates (when it arose, when the other side was asked, what came of it), and any paper relied on. A person has those from their own record and knows them without a paper: what they bought and when it failed, what they were billed, what they asked and the answer. An application carries them in `data.particulars`, in words (`particularsOf`: the dispute, the paper or place it is about, what is sought, the sum if the person's record shows one, when it arose, when and with what answer they asked, the day made). No sum is made up where the record has none: a bill disputed with no sum known says so by leaving the sum out.
+
+**What the member does with an application that says nothing.** A member (VCAT's Registrar or member, the First-tier Tribunal's registry and judge: to confirm; their published rules were not opened) turns away an application that does not say what it is about, with leave to apply again with its particulars: it cannot be heard, and it is not decided against the applicant on the merits. The code member now does the same, by the same test as the rule a seat may apply: `hasParticulars` (a `particulars` text, or a named paper, place, sum, thing sought, or evidence). The order is `dismissed` with `no_particulars`, "the applicant may apply again with them", before any draw, so a run and its code twin are the same in it. An application with particulars is decided as before (the answer, the record, failure of proof). Not applied to possession, whose application carries the notice, the sum and the dates by its own form.
+
+**Real-world basis.** (To confirm: that a tribunal turns away an application without particulars; common practice, no source opened. The particulars asked for are those any small-claims or consumer-dispute form asks: nature of the dispute, amount, dates, steps taken.)
+
 ## The parties
 
 - **Tenants** (citizen 0.26.0): given a notice of rent increase that breaks the law as they read it, they take it to the

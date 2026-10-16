@@ -18,6 +18,7 @@ import type { StatementRecord } from "../contracts";
 import { cents } from "../money";
 import type { Rng } from "../rng";
 import { because, type Book, DAY, Occurrences, pay, say, type Step, usd } from "./common";
+import { dateWords } from "../forms";
 import { KIND } from "./decisions";
 import type { Org } from "./orgwants";
 import { swayed } from "./wants";
@@ -215,6 +216,24 @@ export class Respondent {
 
 /** The copy of a paper tendered to a venue that cannot see what passed between the parties. */
 export const tendered = (r: any): unknown => (r ? { id: r.id, record: r.record, kind: r.kind, at: r.at, speaks_for: r.speaks_for, addressed_to: r.addressed_to, data: r.data } : undefined);
+
+/**
+ * What a person who applies to a venue states about what they apply for, from their own record: the dispute (what it
+ * is, against whom, about which paper or place), the sum if their record shows one, what they seek, and the dates (when it
+ * arose, when they asked the other side and what came of it). A real application form asks for exactly this, and a
+ * venue turns away one that says nothing (docs/behaviour/justice.md, "Particulars"). A sum is stated only where the
+ * person's record has one: nothing is made up for them.
+ */
+export function particularsOf(g: { matter: string; party: string; since: number; about?: string; amount?: number; structure?: string; seeks?: string; asked?: { t: number }; answer?: string }, t: number): string {
+  const words = g.matter.replace(/_/g, " ");
+  const arose = g.since < 0 ? `${Math.ceil(-g.since / DAY)} days before the year began` : `on ${dateWords(g.since)}`;
+  const asked = g.asked ? `we asked them ${g.asked.t < 0 ? `${Math.ceil(-g.asked.t / DAY)} days before the year began` : `on ${dateWords(g.asked.t)}`}${g.answer === "refused" ? " and they refused" : g.answer === "ignored" ? " and they have not answered" : g.answer === "granted" ? " and they agreed, but it is not done" : ""}` : "we have not yet asked them";
+  return `${words} against ${g.party}${g.about ? `, about ${g.about}` : ""}${g.structure ? `, at ${g.structure}` : ""}${g.seeks ? `; what we seek: ${g.seeks.replace(/_/g, " ")}` : ""}${g.amount ? `; the sum: ${usd(g.amount)}` : ""}; it arose ${arose}; ${asked}; made on ${dateWords(t)}.`;
+}
+
+/** Whether an application says what it is about: it gives its particulars, or names a paper, a place, a sum, what is sought, or evidence. */
+export const hasParticulars = (d: { [k: string]: any } | undefined): boolean =>
+  !!d && ((typeof d.particulars === "string" && d.particulars.trim() !== "") || d.about !== undefined || d.structure !== undefined || d.seeks !== undefined || Number(d.amount) > 0 || d.evidence !== undefined);
 
 /** Whether a response on file answers an application (the latest from the respondent). */
 export const responseTo = (book: Book, kind: string, application: string, from: string): StatementRecord | undefined =>

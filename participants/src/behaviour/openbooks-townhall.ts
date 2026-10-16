@@ -10,7 +10,7 @@ import type { OfficeBooks, OpenHeading, OpenItem, ParticipantContext } from "../
 import { cents } from "../money";
 import { approvalOf, Book, commitmentOf, DAY, Directions, jobTerms, madeAt, ownAccount, usd, whenWords } from "./common";
 import { Staffing, staffingUnder } from "./firms";
-import { dueFrom, returnsOf } from "./returns";
+import { dueFrom, nextReturn, returnsOf, type ReturnDue } from "./returns";
 import { incomeTaxLaw, withheld } from "./tax";
 
 const YEAR = 365 * DAY;
@@ -197,17 +197,37 @@ export function financeBooks(ctx: ParticipantContext): OfficeBooks {
       if (law) {
         const orderEvery = (order: string): number => { const r = book.records.get(order); return r?.record === "statement" && Number(r.data?.every) > 0 ? Number(r.data?.every) : p.period; };
         for (const rule of returnsOf(law)) {
-          const next = dueFrom(rule, t);
-          const filed = reports.filter((r) => r.data?.return === rule.id).reduce((m, r) => Math.max(m, Number(r.data?.period_end ?? r.at)), -1);
+          // A return is made when a report of ours says so: the code's names the return and the day it was due; one made on the
+          // office's form (`withholding_return`) names neither, only the day the period ended, and covers every period that ended
+          // on or before it. A return made stands no longer among those falling due, whatever day it was due by: until
+          // 2026-10-16 it did, "none yet" and due in a week, for a return the seat had filed (pilot 7B, day 44 to 52).
+          const first = dueFrom(rule, t);
+          const covers = (r: StatementRecord, n: ReturnDue): boolean => r.data?.return !== undefined && r.data.return !== rule.id ? false : r.data?.return !== undefined && r.data.due !== undefined ? Number(r.data.due) === n.due : Number(r.data?.period_end) >= n.to - DAY;
+          let next = first;
+          while (reports.some((r) => covers(r, next))) next = nextReturn(rule, next.due);
+          const filed = reports.filter((r) => (r.data?.return !== undefined ? r.data.return === rule.id : Number(r.data?.period_end) >= first.to - DAY)).reduce((m, r) => Math.max(m, Number(r.data?.period_end ?? r.at)), -1);
           // (What each pay withheld under this return's charges, as the law reckons it from the gross: the pay as paid, and what was held.)
-          let sum = 0;
-          for (const x of money.byOrder) {
-            if (x.t <= filed) continue;
-            const hold = held.get(x.order) ?? 0;
-            const parts = withheld(law, x.amount + hold, orderEvery(x.order)).parts;
-            const all = parts.reduce((n, c) => n + c.amount, 0);
-            const mine = parts.filter((c) => rule.charges === undefined || rule.charges.includes(c.charge.id)).reduce((n, c) => n + c.amount, 0);
-            sum += all > 0 ? Math.round((hold * mine) / all) : 0;
+          const heldBetween = (after: number, before: number): number => {
+            let sum = 0;
+            for (const x of money.byOrder) {
+              if (x.t <= after || x.t >= before) continue;
+              const hold = held.get(x.order) ?? 0;
+              const parts = withheld(law, x.amount + hold, orderEvery(x.order)).parts;
+              const all = parts.reduce((n, c) => n + c.amount, 0);
+              const mine = parts.filter((c) => rule.charges === undefined || rule.charges.includes(c.charge.id)).reduce((n, c) => n + c.amount, 0);
+              sum += all > 0 ? Math.round((hold * mine) / all) : 0;
+            }
+            return sum;
+          };
+          const sum = heldBetween(filed, Infinity);
+          // A return whose day has passed and that no report of ours covers is still owed: it stays on the books, said to be overdue
+          // (until 2026-10-16 it dropped off the day after its due day, as if it had been made: pilot 7A, a return missed on day 51).
+          for (let o = nextReturn(rule, -1); o.due < first.due; o = nextReturn(rule, o.due)) {
+            if (reports.some((r) => covers(r, o))) continue;
+            const owedThen = heldBetween(o.from - 1, o.to);
+            if (owedThen <= 0) continue;
+            falling.push({ id: `${rule.id}-${o.due}`, due: o.due, amount: owedThen,
+              line: `${rule.name ?? "Return of tax withheld from wages"}, under ${law.id}: was due on ${dateWords(o.due)} for pay from ${dateWords(o.from)} to ${dateWords(o.to - 1)}, and no report has been made for it; ${usd(owedThen)} was withheld from that pay` });
           }
           const names = (rule.charges ?? law.charges.map((c) => c.id)).map((id) => law.charges.find((c) => c.id === id)?.name ?? id).join(", ");
           const days = Math.round((next.due - Math.floor(t / DAY) * DAY) / DAY);

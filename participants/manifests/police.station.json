@@ -443,7 +443,7 @@
           "required": true,
           "description": "The report."
         },
-        "to": {
+        "reporter": {
           "type": "entity",
           "required": true,
           "description": "Who reported it."
@@ -463,11 +463,11 @@
         "text": "Report {report}: closed; solved {solved}.",
         "basis": "=report",
         "to": [
-          "=to"
+          "=reporter"
         ],
         "visible": [
           "=self",
-          "=to"
+          "=reporter"
         ],
         "data": {
           "report": "=report",

@@ -117,6 +117,12 @@ test("a living town: the housed have a place, the employed a trade, children nei
   expect(c.dials).toEqual({ friction_bps: 10_000 });
 });
 
+test("the support office's books carry what it has answered, so that a request or a venue's notice it has answered is not open (pilot 7: complaints answered stood open for 12 days)", () => {
+  const c = generate({ ...small, living: {} }) as any;
+  const kinds = JSON.stringify(c).match(/"id":"reviews","kind":"records","way":"mine","match":\{"statement_kinds":\[([^\]]*)\]/)![1]!;
+  for (const k of ["remedy_answer", "complaint_response", "tribunal_response"]) expect(kinds).toContain(`"${k}"`);
+});
+
 test("`living` with the starting attachment off gives no started; the initiative dial is written when given", () => {
   const c = generate({ ...small, living: { starting_attachment: false, initiative_bps: 2500 } }) as any;
   expect(JSON.stringify(c)).not.toContain('"started"');

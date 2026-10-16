@@ -17,7 +17,7 @@ import { slip, type Slipper } from "../slip";
 import { appealLaw } from "./decisions";
 import { because, Book, CounterWork, DAY, noting, Occurrences, say, StandingWork, type Step, usd } from "./common";
 import { stepper } from "./firms";
-import { PAPER, responseTo, type Finding, type Matter } from "./frictions";
+import { hasParticulars, PAPER, responseTo, type Finding, type Matter } from "./frictions";
 import * as P from "./papers";
 
 /** What a venue says it hears (the contract's Offer.hears), with how it goes about it. */
@@ -231,6 +231,13 @@ export class Hearings {
       const x = (r?.data ?? {}) as { owed?: number; done?: boolean; wrong?: boolean; known?: boolean; agrees?: boolean; paid?: number };
       const claimed = c.data.amount !== undefined ? cents(c.data.amount) : 0;
       const verb = binding ? "is to" : "should";
+      // An application that says nothing of what it is about (no dispute stated, no paper, place, sum, or thing sought, no
+      // evidence) is turned away with leave to apply again with its particulars, as a member would (docs/behaviour/justice.md,
+      // "Particulars"). Before any draw: the same in a run and its twin.
+      if (c.matter !== "possession" && !hasParticulars(c.data)) {
+        say2(c, "dismissed", `the application states no particulars (what it is about, the sum, the dates); dismissed. ${c.applicant} may apply again with them.`, { no_particulars: true }, `The application says nothing of what it is about: dismissed, with leave to apply again with its particulars.`, binding);
+        continue;
+      }
       if (can.includes("mediate") && !binding) {
         // Bringing the two together: nothing comes of it unless the other side will.
         if (x.agrees) say2(c, "settled", `${c.applicant} and ${c.against} met with us and came to an understanding.`, {}, `${c.against} agreed to meet ${c.applicant}: they came to an understanding.`, false);
@@ -341,7 +348,7 @@ export const desk: BehaviourModule = {
     ] }],
   answers: { office: "the desk", acts: "What it acts on: an application made to it about something it has said it hears, which it puts to the other side and decides by its procedure." },
   issues: P.DESK,
-  version: "0.1.2", // 0.1.2: as the tribunal: a withdrawn application is no case, and cases already listed on its own file are taken as they stand; 0.1.1: what the record cannot settle is drawn by who applied against whom about what, not by the application's number on file; its notice of what it hears is on file when a seat arrives; 0.1.0: a body that hears grievances (docs/behaviour/frictions.md)
+  version: "0.2.0", // 0.2.0: an application that states no particulars (nothing of what it is about) is dismissed with leave to apply again, as a member would (docs/behaviour/justice.md, "Particulars"); 0.1.2: as the tribunal: a withdrawn application is no case, and cases already listed on its own file are taken as they stand; 0.1.1: what the record cannot settle is drawn by who applied against whom about what, not by the application's number on file; its notice of what it hears is on file when a seat arrives; 0.1.0: a body that hears grievances (docs/behaviour/frictions.md)
   doc: "docs/behaviour/frictions.md",
   cadence: () => DAY,
   firstWake: (ctx) => 9 * 3600 + ctx.rng("first-wake").below(3600),
