@@ -727,15 +727,18 @@ impl World {
     /// A performer whose working day (`catalogue.working_day`) has no room for this share of work on that day: the hours
     /// are counted on the person's own timeline, where the work is placed.
     /// (Said as the refusal has always said it, which is what a participant reads the hours left from.)
-    fn over_the_day(&self, shares: &BTreeMap<Id, i64>, day_idx: i64) -> Option<String> {
+    fn over_the_day(&self, shares: &BTreeMap<Id, i64>, start: i64) -> Option<String> {
         let day = self.s.config.catalogue.working_day?;
         shares.iter().find_map(|(p, share)| {
             // (A working day is a body's: a system in service does not tire.)
             if self.state.participants.get(p).is_some_and(|x| x.kind == ParticipantKind::System) {
                 return None;
             }
-            let used = self.state.timelines.get(p).map_or(0, |tl| tl.worked_on(day_idx));
-            (used + share > day).then(|| format!("{p} has {} s of work left today; this needs {share}", (day - used).max(0)))
+            // (Work that runs past midnight is counted on each day it is done on.)
+            day_portions(start, *share).into_iter().find_map(|(d, take)| {
+                let used = self.state.timelines.get(p).map_or(0, |tl| tl.worked_on(d));
+                (used + take > day).then(|| format!("{p} has {} s of work left today; this needs {share}", (day - used).max(0)))
+            })
         })
     }
 
@@ -770,7 +773,7 @@ impl World {
         }
         let mut scratch = self.state.clone();
         Ok(match exec_action(&self.s, &mut scratch, participant, position, blocks, &[]) {
-            Ok(res) => match self.over_the_day(&work_shares(&res.events), crate::exec::day_of(self.state.t)) {
+            Ok(res) => match self.over_the_day(&work_shares(&res.events), self.state.t) {
                 Some(d) => Check { ok: false, refusal: Some(refusal_info(&refuse(RefusalCode::NoTimeLeft, d))) },
                 None => Check { ok: true, refusal: None },
             },
@@ -866,7 +869,7 @@ impl World {
         // A performer's working day: what is already placed on it, and this act's share, within the day's hours.
         let mut start = start;
         let mut day_idx = crate::exec::day_of(start);
-        let mut over = self.over_the_day(&shares, day_idx).or(refused_to_place);
+        let mut over = self.over_the_day(&shares, start).or(refused_to_place);
         if over.is_some() {
             // (No room in their day: the act is refused, and its actor hears so now, not when the crew would have been free.)
             shares.clear();
@@ -891,13 +894,15 @@ impl World {
             v.extend(others.iter().map(|w| crate::state::WorkCheck { who: w.clone(), at: None, space: None }));
             v
         };
-        let placed = crate::state::Placed { over, day: day_idx, hours: shares.clone(), seen: self.seen_at_order(blocks), late };
+        let placed = crate::state::Placed { over, day: day_idx, from: start, hours: shares.clone(), seen: self.seen_at_order(blocks), late };
         let mut done = start;
         let place = |state: &mut State, who: &Id, lanes: usize, secs: i64, work: i64| {
             let mut tl = state.timelines.get(who).cloned().unwrap_or_default();
             let (_, d) = oikos_time::place(&mut tl.lanes, lanes, start, secs);
-            if work > 0 {
-                tl.worked = Some((day_idx, tl.worked_on(day_idx) + work));
+            for (d, take) in day_portions(start, work) {
+                if take > 0 {
+                    tl.add_worked(d, take);
+                }
             }
             state.timelines.insert(who.clone(), tl);
             d
@@ -948,7 +953,7 @@ impl World {
                 // could not be checked.)
                 Ok((scratch, res)) if placed.late => {
                     late_shares = work_shares(&res.events);
-                    match self.over_the_day(&late_shares, crate::exec::day_of(t)) {
+                    match self.over_the_day(&late_shares, t) {
                         Some(d) => {
                             late_shares.clear();
                             Err(Refusal { block: blocks.iter().position(|b| matches!(b, Block::Work { .. })), ..refuse(RefusalCode::NoTimeLeft, d) })
@@ -959,19 +964,18 @@ impl World {
                 other => other,
             }
         };
-        // (Hours given back for work that was not done: they were not worked, so they do not count against the day.)
-        if result.is_err() {
-            self.give_back(&placed);
-        }
+        // (Work refused when it is done was begun, and its performers' lanes were held until now: the hours were spent, and count
+        // against the day. Only work that never began gives its hours back: `start_check`.)
         let pos = position.map(String::from);
         let (events, outcome) = match result {
             Ok((scratch, res)) => {
                 self.state = scratch;
-                let day = crate::exec::day_of(t);
                 for (who, secs) in &late_shares {
                     let mut tl = self.state.timelines.get(who).cloned().unwrap_or_default();
                     oikos_time::place(&mut tl.lanes, 1, t, *secs);
-                    tl.worked = Some((day, tl.worked_on(day) + secs));
+                    for (d, take) in day_portions(t, *secs) {
+                        tl.add_worked(d, take);
+                    }
                     self.state.timelines.insert(who.clone(), tl);
                 }
                 let created = (!res.created.is_empty()).then_some(res.created);
@@ -1015,8 +1019,9 @@ impl World {
     fn give_back(&mut self, placed: &crate::state::Placed) {
         for (who, secs) in &placed.hours {
             if let Some(tl) = self.state.timelines.get_mut(who) {
-                if tl.worked.is_some_and(|(d, _)| d == placed.day) {
-                    tl.worked = Some((placed.day, (tl.worked_on(placed.day) - secs).max(0)));
+                let from = if placed.from != 0 { placed.from } else { placed.day * 86_400 };
+                for (d, take) in day_portions(from, *secs) {
+                    tl.add_worked(d, -take);
                 }
             }
         }
@@ -1256,6 +1261,20 @@ pub fn known_field(f: &str) -> bool {
 /// has the news met when it happens, whoever wakes next.
 pub fn is_body_news(b: &EventBody) -> bool {
     matches!(b, EventBody::ConditionBegan { .. } | EventBody::ConditionEnded { .. } | EventBody::ConditionTreated { .. } | EventBody::Vacated { reason: VacateReason::Flooded, .. } | EventBody::AskAnswered { position: Some(_), .. })
+}
+
+/// How a stretch of `secs` seconds run on from `start` falls on days: (day, seconds of it on that day).
+fn day_portions(start: i64, secs: i64) -> Vec<(i64, i64)> {
+    let mut out = vec![];
+    let (mut at, mut left) = (start, secs);
+    while left > 0 {
+        let day = crate::exec::day_of(at);
+        let take = left.min((day + 1) * 86_400 - at);
+        out.push((day, take));
+        at += take;
+        left -= take;
+    }
+    out
 }
 
 /// Each performer's hours in the work an act did (one `Worked` event each, a share a performer: the labour split

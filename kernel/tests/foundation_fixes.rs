@@ -189,3 +189,60 @@ fn f2_work_that_could_not_be_checked_when_ordered_takes_effect_after_its_hours()
     // The hours are carol's, from when the work could begin.
     assert!(run.kernel().state().timelines["carol"].iter().copied().max().unwrap() >= done + 4 * 1_800);
 }
+
+fn make16() -> Command {
+    // Sixteen units at 1,800 s: eight hours of carol's, the whole of a working day.
+    cmd("developer-system", Some("developer"), json!([{"block": "work", "task": "make", "units": 16, "at": "s-shop", "performers": ["carol"]}]))
+}
+
+fn code_of(r: &oikos_kernel::run::Response) -> Option<String> {
+    r.events.iter().find_map(|e| match &e.body {
+        EventBody::ActionRefused { code, .. } => Some(serde_json::to_value(code).unwrap().as_str().unwrap().to_string()),
+        _ => None,
+    })
+}
+
+/// Finding 9a: work refused when it is done, after its performers' lanes were held for its hours, was given back to the
+/// day; so a crew could be given another full day's work on the same day. The hours were spent: they count.
+#[test]
+fn f9_work_refused_at_its_end_still_counts_against_the_day() {
+    let mut run = start(world(&default_params()));
+    run.command(&make16()).unwrap();
+    // The developer sends the materials away before the work ends: it is refused when done.
+    run.command(&cmd("developer-system", Some("developer"), json!([{"block": "move_goods", "kind": "materials", "quantity": "1000", "from_at": "s-shop", "to": "alice", "to_at": "s-house"}]))).unwrap();
+    let r = run.command(&Command::Advance { to: 8 * 3600 + 10 }).unwrap();
+    assert_eq!(code_of(&r).as_deref(), Some("insufficient_quantity"), "{:?}", r.events);
+    // The same day (carol's eight hours are gone): the developer cannot have another day's work from her.
+    run.command(&cmd("alice-self", None, json!([{"block": "move_goods", "kind": "materials", "quantity": "1000", "from_at": "s-house", "to": "devco", "to_at": "s-shop"}]))).ok();
+    let again = run.command(&make16());
+    let r = run.command(&Command::Advance { to: 8 * 3600 + 20 }).unwrap();
+    let refused = again.ok().and_then(|a| code_of(&a)).or_else(|| code_of(&r));
+    assert_eq!(refused.as_deref(), Some("no_time_left"), "a second full day's work on the same day");
+}
+
+/// Finding 9b: work that runs past midnight is counted on each day it is done on, not all on the day it began.
+#[test]
+fn f9_work_past_midnight_counts_on_the_next_day() {
+    let mut run = start(world(&default_params()));
+    run.command(&Command::Advance { to: 20 * 3600 }).unwrap();
+    // Eight hours from 20:00: four on this day, four on the next.
+    let r = run.command(&make16()).unwrap();
+    assert!(r.events.iter().any(|e| matches!(e.body, EventBody::ActionStarted { .. })), "{:?}", r.events);
+    // Six hours more at once: the next day has four used, and six more is over its eight.
+    let six = cmd("developer-system", Some("developer"), json!([{"block": "work", "task": "make", "units": 12, "at": "s-shop", "performers": ["carol"]}]));
+    let r = run.command(&six).unwrap();
+    let r2 = run.command(&Command::Advance { to: 20 * 3600 + 20 }).unwrap();
+    assert!(code_of(&r).or_else(|| code_of(&r2)).as_deref() == Some("no_time_left"), "{:?} {:?}", r.events, r2.events);
+}
+
+/// Finding 9c: work placed on an earlier day than one already counted does not wipe that day's count.
+#[test]
+fn f9_a_later_days_count_survives_work_placed_on_an_earlier_day() {
+    let mut tl = oikos_kernel::state::Timeline::default();
+    tl.add_worked(5, 20_000);
+    tl.add_worked(4, 3_000);
+    assert_eq!((tl.worked_on(5), tl.worked_on(4)), (20_000, 3_000));
+    tl.add_worked(5, 4_000);
+    tl.add_worked(4, -1_000);
+    assert_eq!((tl.worked_on(5), tl.worked_on(4)), (24_000, 2_000));
+}

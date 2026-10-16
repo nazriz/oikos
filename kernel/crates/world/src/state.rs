@@ -600,6 +600,10 @@ pub struct Timeline {
     /// (day, seconds of work placed on it), for a body that has worked.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub worked: Option<(i64, i64)>,
+    /// The day before `worked`'s that work was placed on, when work was placed on an earlier day than one already counted
+    /// (work queued ahead on a later day, then work placed today): so that neither day's count is lost.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub worked_before: Option<(i64, i64)>,
 }
 
 /// What an act's `work` took of its performers' time when the act began: the day it was counted on and the seconds of
@@ -611,6 +615,9 @@ pub struct Placed {
     pub over: Option<String>,
     #[serde(default)]
     pub day: i64,
+    /// When the work's hours were placed from (they run on, and may cross midnight: each day is counted its own part).
+    #[serde(default, skip_serializing_if = "is_zero_i64")]
+    pub from: i64,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub hours: BTreeMap<Id, i64>,
     /// Who was where when the work was ordered (see `Exec::seen`): what it is on -> the bodies there.
@@ -642,7 +649,26 @@ impl Placed {
 impl Timeline {
     /// Seconds of work already placed on this day.
     pub fn worked_on(&self, day: i64) -> i64 {
-        self.worked.filter(|(d, _)| *d == day).map_or(0, |(_, s)| s)
+        self.worked.into_iter().chain(self.worked_before).find(|(d, _)| *d == day).map_or(0, |(_, s)| s)
+    }
+
+    /// Seconds of work placed on a day (negative: given back). Two days are kept, the latest and the one before it.
+    pub fn add_worked(&mut self, day: i64, secs: i64) {
+        match (self.worked, self.worked_before) {
+            (Some((d, s)), _) if d == day => self.worked = Some((d, (s + secs).max(0))),
+            (_, Some((d, s))) if d == day => self.worked_before = Some((d, (s + secs).max(0))),
+            (Some((d, _)), _) if day < d => {
+                if secs > 0 {
+                    self.worked_before = Some((day, secs));
+                }
+            }
+            _ => {
+                if secs > 0 {
+                    self.worked_before = self.worked;
+                    self.worked = Some((day, secs));
+                }
+            }
+        }
     }
 }
 
