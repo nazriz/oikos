@@ -35,6 +35,7 @@ test("a failed shop's premises are bought by someone who founds a new shop there
   // premises by day 300; seeds 2, 3 and 4 have it trade.)
   // (Run seed 3, 2026-10-16, foundations F6: the world differs again and in seed 2 the new shop hired and did not serve by day 300; seeds 3 to 6 have it trade.)
   // (Run seed 4, 2026-10-16, foundations F7 and F11: slips are drawn through one helper and a register's keeper answers in its own time, so the draws moved again; in seed 3 the new shop did not serve after the sale; seeds 2, 4 and 6 have it trade, seed 5 does not.)
+  // (Why a hop and not a fault, 2026-10-16, measured on the foundations-review branch, seeds 1 to 6: the new shop serves by day 300 in seeds 1, 3, 4 and 6; in seed 5 it is sold on day 156 and hires on day 255; in seed 2, the original seed, its one hire leaves town four days after being hired (day 91) and the reposted post draws no applicant in 200 days, so the shop never serves. Who applies and who leaves is a draw; the founder, the sale and the first hire are the same in every seed. Seed 4 kept.)
   const s = await runWorld({ config: { ...config, seed: 4 }, runId: "entry", outDir: out, until: 300 * DAY });
   const log = readFileSync(s.logPath, "utf8").trim().split("\n").map((l) => JSON.parse(l));
   expect(log.filter((e) => e.kind === "annotation" && (e.body.data?.call_unresolved || e.body.data?.call_unreadable)).map((e) => e.body.data)).toEqual([]);

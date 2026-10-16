@@ -83,6 +83,19 @@ fn cmd_by(participant: &str, position: Option<&str>, blocks: Value, by: &[&str])
     }
 }
 
+
+/// devco employs carol: an employment agreement both have signed (what lets devco name her in `by`: finding 5 of the review).
+fn employ(run: &mut R, employer: &str, employer_participant: &str, position: Option<&str>, worker: &str) {
+    let propose = cmd(employer_participant, position, json!([{"block": "propose_agreement", "terms": {"parties": [employer, worker], "commitments": [{"who": employer, "does": {"outcome": {"money": {"to": format!("acc-{worker}"), "amount": "100"}}}, "every": 2_592_000}]}, "speaks_for": employer}]));
+    let r = step(run, &propose).expect("accepted");
+    let _ = r;
+    let id = run.kernel().state().record_order.iter().rev().find(|id| run.kernel().state().records[*id].record.body.kind_name() == "agreement").cloned().expect("an agreement");
+    let sign_worker = cmd(&format!("{worker}-self"), None, json!([{"block": "sign_agreement", "agreement": id, "as": worker}]));
+    step(run, &sign_worker).expect("accepted");
+    let sign_employer = cmd(employer_participant, position, json!([{"block": "sign_agreement", "agreement": id, "as": employer}]));
+    step(run, &sign_employer).expect("accepted");
+}
+
 fn msg(from: &str) -> Command {
     cmd(from, None, json!([{"block": "message", "to": ["bob-self"], "text": "hi"}]))
 }
@@ -498,6 +511,8 @@ fn law5_a_performer_who_is_not_there_cannot_do_the_work() {
     let mut c = world(&default_params());
     c["orchestration"]["performers_in"] = json!("workplace");
     let mut run = start(c);
+    employ(&mut run, "devco", "developer-system", Some("developer"), "alice");
+    employ(&mut run, "devco", "developer-system", Some("developer"), "carol");
     let hi = json!([{"block": "message", "to": ["bob-self"], "text": "hi"}]);
     assert_eq!(outcome(&mut run, &cmd_by("developer-system", Some("developer"), hi.clone(), &["alice"])).as_deref(), Some("not_at_work"));
     assert_eq!(outcome(&mut run, &cmd_by("developer-system", Some("developer"), hi, &["carol"])), None);
@@ -530,10 +545,14 @@ fn law5_an_act_naming_performers_takes_their_time_shared() {
     c["orchestration"]["act_time"] = json!({"person": {"message": 600}, "system": {"message": 1_200}});
     c["orchestration"]["performers_in"] = json!("workplace");
     let mut run = start(c);
+    employ(&mut run, "devco", "developer-system", Some("developer"), "carol");
+    let t0 = run.kernel().state().t;
     let m = cmd_by("developer-system", Some("developer"), json!([{"block": "message", "to": ["bob-self"], "text": "hi"}]), &["carol"]);
     let (s, d) = begun(&mut run, &m);
-    assert_eq!((s, d), (0, 1_200), "a system's message is 1,200 s; carol alone does it");
-    assert_eq!(run.kernel().state().timelines["carol"].lanes.iter().copied().max(), Some(1_200));
+    // Carol does the work, so it takes her own row's time (a person's message is 600 s), not the system's 1,200 (finding 8).
+    assert_eq!(d - s, 600, "carol is charged a person's 600 s for a message, not the ordering system's 1,200 s");
+    assert!(s >= t0);
+    assert_eq!(run.kernel().state().timelines["carol"].lanes.iter().copied().max(), Some(d));
     let e = applied(&mut run, &m);
     assert_eq!(e["by"], json!(["carol"]));
 }
@@ -544,6 +563,7 @@ fn law5_a_record_names_who_made_it_when_not_its_author() {
     let mut c = world(&default_params());
     c["orchestration"]["performers_in"] = json!("workplace");
     let mut run = start(c);
+    employ(&mut run, "devco", "developer-system", Some("developer"), "carol");
     let publish = |by: &[&str]| cmd_by("developer-system", Some("developer"), json!([{"block": "publish", "kind": "notice", "text": "x"}]), by);
     let by_of = |run: &mut R, c: &Command| {
         let r = step(run, c).unwrap();

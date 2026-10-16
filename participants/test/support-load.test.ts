@@ -48,6 +48,13 @@ test("claims are decided the day they are seen, every one the office has, with n
   expect(decisions(p.at(0, [claim("z", 0, "a"), claim("a", DAY, "b")])).map((x: any) => x.claim)).toEqual(["z", "a"]);
 });
 
+test("claims filed in one moment are decided in the order they were filed, not the order of their ids as text (review of the foundations, finding 11)", () => {
+  // `rec.1000` was made after `rec.999`; as text it sorts before it.
+  const o = office({}, 10_000);
+  const decided = decisions(o.at(0, [claim("rec.1000", 0, "a"), claim("rec.999", 0, "b"), claim("rec.1001", 0, "c")])).map((x: any) => x.claim);
+  expect(decided).toEqual(["rec.999", "rec.1000", "rec.1001"]);
+});
+
 const request = (id: string, at: number, who: string, about: string) => statement(id, at, "review_request", { speaks_for: who, addressed_to: ["outside"], visible_to: [who, "outside"], data: { matter: "claim_refused", against: "outside", about, seeks: "review" } });
 
 test("a qualifying claim wrongly refused at the dial is reviewed when asked about (inside the law's days) and put right by the office; a rightly refused claim is answered no", () => {

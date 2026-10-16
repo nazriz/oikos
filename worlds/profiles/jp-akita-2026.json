@@ -932,7 +932,8 @@
       "upkeep_hours_per_week_per_asset": 4,
       "complain_bps": 3000
     },
-    "public_service": {"wage_per_pay_period": 196500, "staff_per_1000": {"administration": 5.5, "courts": 0.12, "oversight": 0.03, "elections": 0.02, "land_registry": 0.04, "press": 0.15, "banking": 2.5, "utilities": 1.8, "union": 0.15, "property_management": 3.0}, "licences": {"payment_system": {"per_resident_per_year": 1500, "term_days": 365}}},
+    "public_service": {"wage_per_pay_period": 196500, "staff_per_1000": {"administration": 5.5, "courts": 0.12, "oversight": 0.03, "elections": 0.02, "land_registry": 0.04, "press": 0.15, "banking": 2.5, "utilities": 1.8, "union": 0.15, "property_management": 3.0}, "appointed_by": { "courts": "council", "oversight": "council", "elections": "council", "land_registry": "council", "utilities": "council" },
+      "licences": {"payment_system": {"per_resident_per_year": 1500, "term_days": 365}}},
     "unions": {
       "membership_bps": {
         "manufacturing": 2640,
@@ -1573,6 +1574,7 @@
     "public_service.staff_per_1000.union": "[PLACEHOLDER] Estimated: Japanese union density about 16% (MHLW Basic Survey on Labour Unions); full-time officials roughly 1 per 1,000 members in enterprise unions, so about 0.15 per 1,000 residents in a town. Not from an opened source (to confirm).",
     "public_service.licences.payment_system": "[PLACEHOLDER] Core-banking and payment platform fee per resident served: shared regional-bank core systems cost on the order of tens of billions of yen a year across millions of customers, about 1,000-2,000 yen per customer a year; set 1,500. Estimated, not from an opened source (to confirm).",
     "public_service.staff_per_1000.property_management": "[PLACEHOLDER] Carried over unchanged to every profile: property managers (people who run let homes for their owners) at about one to every 100 to 150 let homes is an industry rule of thumb (to confirm, not opened); a town here has about 380 homes for 1,000 people, so about 3 per 1,000 residents. A manager looks after the letting offices of several landlords.",
+    "public_service.appointed_by": "[PLACEHOLDER] Who fills the post of a public body when none of its own staff is left: the town's council, which seconds one of its own staff to it, as a local government assigns officers to bodies it runs. Real places mostly give these appointments to a state body, a minister or a board, none of which the town models, so the council stands in for them (to confirm per place). Bodies run on their own account (the bank, the union, the paper, landlords, shops) are not covered: their owners or members would appoint, and no owner's or member's office exists to do it.",
     "unions.membership_bps": "Ministry of Health, Labour and Welfare, Basic Survey on Labour Unions 2025 (as at 30 June 2025), table 3, unionisation rate by industry (https://www.mhlw.go.jp/toukei/itiran/roudou/roushi/kiso/25/dl/gaikyou.pdf, opened 2026-10-08): manufacturing 26.4%, wholesale and retail 16.4%, construction 20.2%, public administration 28.1%, all industries 15.9% (used for 'other'). National, not Akita: Akita's rates are not published in this survey. STRUCTURAL GAP: Japanese unions are mostly enterprise unions (one per firm), not industry-wide.",
     "unions.resignation_notice_days": "PLACEHOLDER carried over (14 days).",
     "groups.leave_notice_days": "PLACEHOLDER (0: a person may leave a club or association at any time).",

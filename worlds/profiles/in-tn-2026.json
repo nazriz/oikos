@@ -923,7 +923,8 @@
       "upkeep_hours_per_week_per_asset": 4,
       "complain_bps": 3000
     },
-    "public_service": {"wage_per_pay_period": 1750000, "staff_per_1000": {"administration": 1.5, "courts": 0.1, "oversight": 0.03, "elections": 0.03, "land_registry": 0.05, "press": 0.05, "banking": 1.5, "utilities": 1.5, "union": 0.1, "property_management": 3.0}, "licences": {"payment_system": {"per_resident_per_year": 15000, "term_days": 365}}},
+    "public_service": {"wage_per_pay_period": 1750000, "staff_per_1000": {"administration": 1.5, "courts": 0.1, "oversight": 0.03, "elections": 0.03, "land_registry": 0.05, "press": 0.05, "banking": 1.5, "utilities": 1.5, "union": 0.1, "property_management": 3.0}, "appointed_by": { "courts": "council", "oversight": "council", "elections": "council", "land_registry": "council", "utilities": "council" },
+      "licences": {"payment_system": {"per_resident_per_year": 15000, "term_days": 365}}},
     "unions": {
       "membership_bps": {
         "manufacturing": 1000,
@@ -1549,6 +1550,7 @@
     "public_service.staff_per_1000.union": "[PLACEHOLDER] 0.1 FTE per 1,000: full-time union officers are a small fraction of members; Tamil Nadu's trade unions (CITU, AITUC, LPF and others) have many part-time office holders. A rough estimate, not sourced.",
     "public_service.licences.payment_system": "[PLACEHOLDER] 15,000 paise (Rs 150) per resident per year: a core-banking and payment platform costs a small Indian bank on the order of Rs 100 to 300 per customer a year (vendor licence and processing; estimated, no source opened, to confirm). 2026-10-16: no per-account price found; the Reserve Bank's scheme for urban co-operative banks pays Rs 15,000 per branch per month for core banking (taxheal.com, summary), which cannot be turned into a per-resident figure.",
     "public_service.staff_per_1000.property_management": "[PLACEHOLDER] Carried over unchanged to every profile: property managers (people who run let homes for their owners) at about one to every 100 to 150 let homes is an industry rule of thumb (to confirm, not opened); a town here has about 380 homes for 1,000 people, so about 3 per 1,000 residents. A manager looks after the letting offices of several landlords.",
+    "public_service.appointed_by": "[PLACEHOLDER] Who fills the post of a public body when none of its own staff is left: the town's council, which seconds one of its own staff to it, as a local government assigns officers to bodies it runs. Real places mostly give these appointments to a state body, a minister or a board, none of which the town models, so the council stands in for them (to confirm per place). Bodies run on their own account (the bank, the union, the paper, landlords, shops) are not covered: their owners or members would appoint, and no owner's or member's office exists to do it.",
     "unions.membership_bps": "PLACEHOLDERS, to source: Labour Bureau, Trade Union Statistics (the last verified-membership report is for 2012-13); most workers are informal and unorganised (PLFS 2023-24 informal share; to confirm). Government employees' associations are the most organised, retail and construction the least. `other`, the overall rate.",
     "unions.dues_per_month": "PLACEHOLDER, ₹30 a month: trade union dues in India are nominal (the Trade Unions Act 1926 sets a minimum subscription of 25 paise a month for registered unions; to confirm).",
     "unions.resignation_notice_days": "Trade Unions Act 1926 (to confirm the section): a member may resign on notice in writing to the secretary, effective on receipt: 0 days.",

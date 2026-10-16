@@ -79,8 +79,8 @@ test("a spec without `living` generates what it generated before (byte for byte)
   // (Re-taken on 2026-10-16 at foundations F7: the generator's version moved with the table of slips, which a spec without `living` does not have; be6ff50f... until then.)
   // (Re-taken on 2026-10-16 at foundations F11: the work table has a row for a keeper's answer (`answer`); a84328b7... until then.)
   // (Re-taken on 2026-10-16 at foundations F8: the support office asks for papers before it decides, looks at a refusal again when asked, and the tribunal hears an appeal at the law's fee; the profile's routes are published as `law-decisions`; d60a26bc... until then.)
-  // (Re-taken on 2026-10-16 at the profile source check: the au-vic-2026 profile's tribunal time, fee, rent bands, students per teacher and kin ceiling changed (docs/decisions.md, 2026-10-16); 8dc56724... until then.)
-  expect(hash(c)).toBe("bcae48315f2d7c49c70fec0f03ac44ebe23ccd4d37fbfaf5dc583d984f2a41bc");
+  // (Re-taken on 2026-10-16 at the review of the foundations, finding 6: the council's appointments officer is an office of the town, its posts name their authority (`appointed_by`), and every generated system is owned by the organisation whose post it holds; 8dc56724... until then.)
+  expect(hash(c)).toBe("033bebfc8c9fdee58b03d7025b4a052b05ba614588ae930b21e4c5f6a560176d");
   const text = JSON.stringify(c);
   expect(text).not.toContain('"started"');
   expect(text).not.toContain("attach_mean");

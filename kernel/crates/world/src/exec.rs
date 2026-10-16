@@ -153,6 +153,26 @@ pub fn check_system_does(s: &Statics, st: &State, sys: &str, org: Option<&str>, 
     Ok(())
 }
 
+/// Whether an organisation may direct a person's time: the person is it (its own, a sole trader's), holds one of its
+/// posts, or is party, with it, to an agreement in force or ending (an employment). The kernel reads the agreement by its
+/// terms only (`oikos_terms::read`); whether it is a good one is for the world.
+pub fn may_direct(st: &State, entity: &str, person: &str) -> bool {
+    if entity == person {
+        return true;
+    }
+    let holds = st.positions_of.get(entity).into_iter().flatten().any(|pos| {
+        st.positions.get(pos).and_then(|x| x.holder.as_ref()).and_then(|h| st.participants.get(h)).is_some_and(|p| p.person.as_deref() == Some(person))
+    });
+    holds
+        || st.agreements_of.get(person).into_iter().flatten().any(|id| {
+            let Some(RecordBody::Agreement { terms }) = st.records.get(id).map(|r| &r.record.body) else { return false };
+            terms.parties.iter().any(|p| p == entity) && {
+                let m = st.marks.get(id).cloned().unwrap_or_default();
+                matches!(oikos_terms::read(terms, &m.signatures, &m.notices, st.t).status, "in_force" | "ending")
+            }
+        })
+}
+
 /// What `exec_action` takes besides the blocks, for an act whose work was ordered earlier: `seen` says who was where
 /// when it was; `by` is who the action named; `started` that the performers' being there was looked at when the work
 /// began (so it is not looked at again when it ends).
@@ -171,15 +191,25 @@ pub fn exec_action_seen(s: &Statics, st: &mut State, participant: &str, position
         }
         None => p.person.clone().ok_or_else(|| refuse(RefusalCode::NotInPosition, format!("{participant} is a system: it acts only in a position")))?,
     };
-    // A system acts only within its template.
+    // A person's participant acts through a body that lives.
+    if p.kind == ParticipantKind::Person {
+        if let Some(who) = &p.person {
+            if st.body(who).is_some_and(|b| !b.alive) {
+                return Err(refuse(RefusalCode::Dead, format!("{who} has died")));
+            }
+        }
+    }
+    // A system acts only within its template, and for the organisation it belongs to.
     if p.kind == ParticipantKind::System {
-        check_system_does(s, st, participant, None, blocks)?;
+        check_system_does(s, st, participant, Some(&entity), blocks)?;
     }
     for w in by {
         if w != participant && p.person.as_deref() != Some(w.as_str()) {
             if st.participants.get(w).is_some_and(|x| x.kind == ParticipantKind::System) {
                 // (A system named to do the act's work: the organisation's own, and the act within its template.)
                 check_system_does(s, st, w, Some(&entity), blocks)?;
+            } else if !may_direct(st, &entity, w) {
+                return Err(refuse(RefusalCode::NotTheirs, format!("{w} isn't someone {entity} may direct (not its own, nor in its posts, nor employed by it)")));
             } else if started {
                 // (Looked at when the work began; here only that they are alive.)
                 st.body(w).filter(|b| b.alive).ok_or_else(|| refuse(RefusalCode::Dead, format!("{w} has died")))?;
@@ -375,6 +405,9 @@ fn die(s: &Statics, st: &mut State, person: &str, cause: DeathCause) -> Vec<Time
         return vec![];
     }
     let participant = b.participant.clone();
+    // Whoever acts through this body goes with it: its own participant, and every seat sharing it (a model in one of the
+    // person's posts). Their posts fall vacant.
+    let seats: Vec<Id> = st.participants.iter().filter(|(id, p)| p.person.as_deref() == Some(person) && participant.as_deref() != Some(id.as_str()) && p.status != ParticipantStatus::Ended).map(|(id, _)| id.clone()).collect();
     let mut events = vacate_all(s, st, person, VacateReason::Died, None);
     if let Some(b) = st.entities.get_mut(person).and_then(|e| e.body.as_mut()) {
         b.alive = false;
@@ -383,6 +416,9 @@ fn die(s: &Statics, st: &mut State, person: &str, cause: DeathCause) -> Vec<Time
     events.push(Timed::new(t, EventBody::PersonDied { person: person.into(), died_of: cause }));
     if let Some(p) = participant {
         events.extend(end_participant(st, &p, EndReason::Died));
+    }
+    for seat in seats {
+        events.extend(end_participant(st, &seat, EndReason::Died));
     }
     events
 }
@@ -782,7 +818,7 @@ pub fn scheduled(s: &Statics, st: &mut State, item: Scheduled) -> Vec<Timed> {
             die(s, st, &person, cause)
         }
         // (Acts in progress are the kernel's to apply: Kernel::advance.)
-        Sched::Act { .. } | Sched::Start { .. } => vec![],
+        Sched::Act { .. } | Sched::Start { .. } | Sched::HeldAsks => vec![],
         Sched::Answer { participant, position, look } => {
             if !st.participants.get(&participant).is_some_and(|p| p.status == crate::state::ParticipantStatus::Active) {
                 return vec![];
@@ -1966,10 +2002,12 @@ impl<'a> Exec<'a> {
             }
 
             Block::Appoint { position, participant } => {
-                let org = self.acting_org()?;
                 let position = self.r(position)?;
                 let x = self.st.positions.get(&position).ok_or_else(|| refuse(RefusalCode::UnknownPosition, format!("no position {position}")))?;
-                if x.entity != org {
+                // The post's own organisation fills it, or the authority its constitution names (an owner, a board, the council).
+                let authority = self.s.config.positions.iter().find(|c| c.id == position).and_then(|c| c.appointed_by.clone());
+                let org = if authority.as_deref() == Some(self.entity.as_str()) && self.entity != x.entity { self.entity.clone() } else { self.acting_org()? };
+                if x.entity != org && authority.as_deref() != Some(org.as_str()) {
                     return Err(refuse(RefusalCode::NotTheirs, format!("{position} is {}'s, not {org}'s", x.entity)));
                 }
                 let holder = self.ro(participant)?;
@@ -1977,6 +2015,10 @@ impl<'a> Exec<'a> {
                     let p = self.st.participants.get(h).ok_or_else(|| refuse(RefusalCode::UnknownParticipant, format!("no participant {h}")))?;
                     if p.status == ParticipantStatus::Ended {
                         return Err(refuse(RefusalCode::ParticipantInactive, format!("{h} no longer acts")));
+                    }
+                    // A system works only for the organisation it was delivered to: it is not appointed to another's post.
+                    if p.kind == ParticipantKind::System && p.owner.as_deref() != Some(x.entity.as_str()) {
+                        return Err(refuse(RefusalCode::NotTheirs, format!("{h} is a system belonging to {}: it doesn't work for {}", p.owner.as_deref().unwrap_or("nobody"), x.entity)));
                     }
                 }
                 let c = self.st.stamp();

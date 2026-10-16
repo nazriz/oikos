@@ -101,15 +101,12 @@ test("a death is seen, reported, registered, and the world's people act on it", 
     // dividend say, the bank passes on to the heirs.)
     const wageOrders = new Set(ev.filter((e) => e.event === "recorded" && e.record.kind === "request" && /^Wages for /.test(e.record.data?.outcome?.money?.for ?? "")).map((e) => e.record.id));
     for (const o of config.world.records) if (o.kind === "request" && o.data?.outcome?.money?.for === "wages") wageOrders.add(o.id);
-    // Wages stop for every employer that has anyone left to stop them (foundations F6): a body's payroll officer does what any employer's
-    // payroll does, and a post whose holder has died is filled from the body's own staff (participants/src/behaviour/payroll.ts). Left out
-    // here: an employer whose only employee was the one who died. Nobody of the organisation is left to act in it, and the law that is
-    // missing is an owner's or a board's power to appoint (docs/behaviour/staffing.md, "What is not done").
-    const job = config.world.records.find((x: any) => x.record === "agreement" && x.terms.template === "employment" && x.terms.parties[1] === who);
-    const employees = config.world.records.filter((x: any) => x.record === "agreement" && x.terms.template === "employment" && x.terms.parties[0] === job?.terms?.parties?.[0]).length;
+    // Wages stop for every employer (foundations F6): a body's payroll officer does what any employer's payroll does, a post whose holder
+    // has died is filled from the body's own staff (participants/src/behaviour/payroll.ts), and where none of its own staff is left the authority
+    // its constitution names (the council) seconds one of its own (review of the foundations, finding 6). (A post held by the dead is empty for a
+    // few days until the body fills it, and the new holder then hears of the death at the next pay day: a pay period more.)
     const heldAPost = config.positions.some((x: any) => x.holder === `${who}-self`);
-    // (A post held by the dead is empty for a few days until the body fills it, and the new holder then hears of the death at the next pay day: a pay period more.)
-    if (!(heldAPost && employees <= 1)) expect(after.filter((x) => holder.get(x.to) === who && x.t > r.t + (heldAPost ? 35 : 15) * DAY && wageOrders.has(x.per_instruction)).length).toBe(0);
+    expect(after.filter((x) => holder.get(x.to) === who && x.t > r.t + (heldAPost ? 35 : 15) * DAY && wageOrders.has(x.per_instruction)).length).toBe(0);
   }
   // An estate is left with nothing: what was there, and what comes in later (a dividend), goes on to the heirs, but
   // for anything that came in the last few days.

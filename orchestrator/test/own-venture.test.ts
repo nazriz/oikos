@@ -100,6 +100,7 @@ test("a founding's draw of the shape \"business\" reaches the business of one: s
   // gives a want up and when; of seeds 1 to 5 the runs from 1 and 4 have such an occasion, those from 2, 3 and 5 none.)
   // (The run's seed is 4 since F6 (2026-10-16: shops serve in their staff's hours; the draws moved: of seeds 3 and 4 the run from 3 has no occasion in 600 days, that from 4 has.)
   // (The run's seed was 3 since foundations F5 (2026-10-16): offices are held by people and the town's layout and draws moved again; of seeds 1 to 4 the runs from 1 and 2 have no occasion in 600 days, those from 3 and 4 have.)
+  // (Why a hop and not a fault, 2026-10-16, run as this test runs it for seeds 1 to 8, 600 days: before foundations F5 (24c14ea) someone meant a business in 7 of 8 seeds and one started in 6 of 8 (1, 3, 4, 5, 7, 8); now someone means one in 7 of 8 and one starts in 5 of 8 (2, 3, 4, 6, 7). Seed 1, the original, has the draw and nobody starts: that is the rule (a home and the money), not what is tested. The rate is the same before and after; which seed has the occasion is a matter of draws. Seed 4 kept.)
   const out = join(root, "runs", "test-own-venture-meant");
   rmSync(out, { recursive: true, force: true });
   const s = await runWorld({ config: { ...config, seed: 4 }, runId: "meant", outDir: out, until: 600 * DAY, recordObservations: "none" });

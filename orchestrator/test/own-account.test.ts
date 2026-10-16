@@ -116,8 +116,14 @@ test("they sell to households by their own hours, draw what the business clears,
     expect(w.performers.length).toBe(1);
     expect(owners.has(w.performers[0])).toBe(true);
     expect(places.has(w.at) || recs.some((r) => r.kind === "trading_from" && r.speaks_for === w.performers[0] && r.data?.structure === w.at)).toBe(true);
-    const k = `${w.performers[0]}|${Math.floor(startOf.get(w)! / DAY)}`;
-    perDay.set(k, (perDay.get(k) ?? 0) + w.labour);
+    // (A work that runs past midnight counts on each day it is done on: review of the foundations, finding 9.)
+    for (let at = startOf.get(w)!, left = w.labour; left > 0;) {
+      const day = Math.floor(at / DAY), take = Math.min(left, (day + 1) * DAY - at);
+      const k = `${w.performers[0]}|${day}`;
+      perDay.set(k, (perDay.get(k) ?? 0) + take);
+      at += take;
+      left -= take;
+    }
   }
   expect(Math.max(...perDay.values())).toBeLessThanOrEqual(config.catalogue.working_day);
   expect(sold.some((w) => w.at === market)).toBe(true);

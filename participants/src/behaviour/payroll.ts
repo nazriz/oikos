@@ -25,7 +25,7 @@ const LOOK_EVERY = 3 * DAY;
 export const bodyPayroll: BehaviourModule = {
   name: "body.payroll",
   answers: { office: "the payroll office", acts: "What it acts on: the employment agreements of its organisation's staff and the standing payments that pay them; the tax withheld from wages, paid over on the law's days; and a member of staff who has died." },
-  version: "0.2.0", // 0.2.0: deaf to news, on a round of its own
+  version: "0.3.0", // 0.3.0: an appointer (the authority a body's constitution names fills a post that has stood vacant); 0.2.0: deaf to news, on a round of its own
   deaf: true,
   doc: "docs/behaviour/staffing.md",
   cadence: () => 3 * DAY,
@@ -33,7 +33,8 @@ export const bodyPayroll: BehaviourModule = {
   create(ctx: ParticipantContext) {
     const p = params({
       period: 14 * DAY, notice_days: 14,
-      part: "officer" as "officer" | "deputy", // the officer runs the payroll; the deputy keeps the officer's post filled
+      part: "officer" as "officer" | "deputy" | "appointer", // the officer runs the payroll; the deputy keeps the officer's post filled; the appointer is the authority a body's constitution names, which fills a post of that body when none of its own staff is left to
+      after_days: 14, // an appointer: how long a post has stood vacant before the authority fills it (the body's own deputy has its few days first)
       role: "", // when the organisation's own module employs others (the clinic's doctors), the role of the staff this payroll pays: absent, all of the organisation's
       watch: [] as string[], // the organisation's posts a person holds, which this post keeps filled
       who: "who", // its channel onto who's who
@@ -43,6 +44,8 @@ export const bodyPayroll: BehaviourModule = {
     const asked = new Asked();
     const staffing = new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, role: p.role || "staff", does: { hire: false, pay: p.part === "officer" }, ...(p.role ? { own: "role" as const } : {}), wakes: 3 * DAY });
     const filled = new Set<string>(); // posts we have appointed into, once
+    const vacantSince = new Map<string, number>(); // an appointer: a post -> when we first saw it vacant
+    let turn = 0; // an appointer: where in the watch list this round's looks begin
     const gone = new Set<string>(); // staff we found had died when we tried to appoint them (nobody is told us by the registry)
     /** The people of the organisation's staff we may appoint: those in force and not known to have died. */
     const living = (t: number): string[] => {
@@ -72,15 +75,21 @@ export const bodyPayroll: BehaviourModule = {
         const steps: Step[] = [];
         const acc = ownAccount(obs);
         if (p.part === "officer" && acc) steps.push(...staffing.routine(obs, book, acc.account, { target: 0, wage: 0, canPost: false }));
+        // An appointer keeps the vacancies it has seen: a post seen full is forgotten, one seen vacant is dated.
+        if (p.part === "appointer") for (const post of p.watch) if (book.positions.has(post)) {
+          if (vacant(post)) { if (!vacantSince.has(post)) vacantSince.set(post, t); } else vacantSince.delete(post);
+        }
         // A vacant post of the organisation's: one of its living staff takes it.
         const candidates = living(t);
         for (const post of p.watch) {
           if (!vacant(post) || filled.has(`${post}@${asked.since("posts")}`) || !candidates.length) continue;
+          // (The authority acts only on a post that has stood vacant: its body's own deputy fills one from its staff within days.)
+          if (p.part === "appointer" && t - (vacantSince.get(post) ?? t) < p.after_days * DAY) continue;
           const choice = ctx.rng(`succeed-${post}-${Math.floor(t / DAY)}`).pick(candidates);
           const participant = participantOf(choice);
           if (!participant) continue;
           filled.add(`${post}@${asked.since("posts")}`);
-          const step = because(`The ${post} post of ours is empty (its holder has died or gone): appointing ${choice}, of our staff, to it.`, C.call("position", { appoint: post, to: participant }));
+          const step = because(p.part === "appointer" ? `The ${post} post has stood vacant for ${Math.floor((t - (vacantSince.get(post) ?? t)) / DAY)} days and nobody of its body is left to fill it: as the authority that fills it, seconding ${choice}, of our staff, to it.` : `The ${post} post of ours is empty (its holder has died or gone): appointing ${choice}, of our staff, to it.`, C.call("position", { appoint: post, to: participant }));
           // (Refused because they have died too, and nobody told us: they are not asked again, and the next look names another.)
           step.then = (o) => { if (o.status === "refused") gone.add(choice); };
           steps.push(step);
@@ -95,6 +104,16 @@ export const bodyPayroll: BehaviourModule = {
         // Every few days: who holds each of the posts we keep filled.
         if (p.watch.length && (asked.since("posts") < 0 || t - asked.since("posts") >= LOOK_EVERY)) {
           asked.again("posts", t);
+          if (p.part === "appointer") {
+            // (Those seen vacant are looked at every round; the rest take turns.)
+            const suspects = p.watch.filter((post) => vacantSince.has(post)).slice(0, LOOKS_MAX);
+            const rest = p.watch.filter((post) => !vacantSince.has(post));
+            const room = LOOKS_MAX - suspects.length;
+            const take = Array.from({ length: Math.min(room, rest.length) }, (_, i) => rest[(turn + i) % rest.length]!);
+            turn = rest.length ? (turn + take.length) % rest.length : 0;
+            for (const post of [...suspects, ...take]) out.push(lookUp.position(p.who, post));
+            return out;
+          }
           for (const post of p.watch.slice(0, LOOKS_MAX)) out.push(lookUp.position(p.who, post));
           return out;
         }

@@ -87,6 +87,10 @@ fn predict(run: &Run<Vec<u8>>, participant: &str, position: Option<&str>, b: &Bl
         None => p.person.clone()?,
     };
     let me_person = position.is_none();
+    // A system works only for the organisation it belongs to.
+    if p.owner.as_deref().is_some_and(|o| o != me) {
+        return Some(Err(RefusalCode::NotTheirs));
+    }
     let types = &s.types;
     Some(match b {
         Block::Transfer { from, to, amount, settles: None, per_instruction: None, .. } => {
@@ -285,6 +289,8 @@ fn predict(run: &Run<Vec<u8>>, participant: &str, position: Option<&str>, b: &Bl
                     Some(_) => match to.as_ref().map(|t| st.participants.get(t)) {
                         Some(None) => Err(RefusalCode::UnknownParticipant),
                         Some(Some(q)) if q.status == ParticipantStatus::Ended => Err(RefusalCode::ParticipantInactive),
+                        // (A system works only for the organisation it belongs to.)
+                        Some(Some(q)) if q.owner.is_some() && q.owner.as_deref() != Some(me.as_str()) => Err(RefusalCode::NotTheirs),
                         _ => Ok(()),
                     },
                 }
@@ -406,20 +412,26 @@ fn check(ops: &[Op]) -> Result<BTreeMap<String, usize>, TestCaseError> {
         prop_assert!(after.whereabouts.values().all(|s| !s.is_empty()), "the lookup keeps a body that is nowhere");
 
         // 2. A refused action changes nothing (beyond minting its action id and queuing its outcome).
+        let quiet = resp.events.iter().all(|e| matches!(e.body, EventBody::ActionStarted { .. } | EventBody::ActionRefused { .. } | EventBody::ActionApplied { .. }));
         if let Some(EventBody::ActionRefused { code, .. }) = resp.events.first().map(|e| &e.body) {
-            // (Besides its start: acts take effect when done.)
-            prop_assert_eq!(resp.events.iter().filter(|e| !matches!(e.body, EventBody::ActionStarted { .. })).count(), 1);
-            prop_assert_eq!(&before.accounts, &after.accounts);
-            prop_assert_eq!(&before.structures, &after.structures);
-            prop_assert_eq!(&before.occupancy, &after.occupancy);
-            prop_assert_eq!(&before.entities, &after.entities);
-            prop_assert_eq!(&before.records, &after.records);
-            prop_assert_eq!(&before.positions, &after.positions);
-            prop_assert_eq!(&before.schedule, &after.schedule);
-            if let Some(p) = &prediction {
+            // (An act takes time: if something else scheduled happens while it waits, its response carries that too (a crew member dies during an
+            // eight-hour work, a building completes), and the world differs for that reason and not the refusal's. Found by the property test: only
+            // an act with nothing else in its response can be held to "nothing changed".)
+            if quiet {
+                prop_assert_eq!(resp.events.iter().filter(|e| !matches!(e.body, EventBody::ActionStarted { .. })).count(), 1);
+                prop_assert_eq!(&before.accounts, &after.accounts);
+                prop_assert_eq!(&before.structures, &after.structures);
+                prop_assert_eq!(&before.occupancy, &after.occupancy);
+                prop_assert_eq!(&before.entities, &after.entities);
+                prop_assert_eq!(&before.records, &after.records);
+                prop_assert_eq!(&before.positions, &after.positions);
+                prop_assert_eq!(&before.schedule, &after.schedule);
+            }
+            // (The oracle looks at the world as it was ordered: not judged when the world moved during the wait.)
+            if let Some(p) = prediction.as_ref().filter(|_| quiet) {
                 prop_assert_eq!(p, &Err(*code), "oracle disagreed on {:?}", cmd);
             }
-        } else if let (Some(p), Command::Act { .. }, Some(EventBody::ActionApplied { .. })) = (&prediction, &cmd, resp.events.first().map(|e| &e.body)) {
+        } else if let (Some(p), Command::Act { .. }, Some(EventBody::ActionApplied { .. }), true) = (&prediction, &cmd, resp.events.first().map(|e| &e.body), true) {
             // (An act that couldn't be done before the run's end never took effect: nothing to judge.)
             prop_assert_eq!(p, &Ok(()), "oracle expected a refusal for {:?}", cmd);
         }

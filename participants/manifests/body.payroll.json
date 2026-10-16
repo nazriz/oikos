@@ -1,8 +1,17 @@
 {
   "name": "body.payroll",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "doc": "docs/behaviour/staffing.md",
   "params": {
+    "after_days": {
+      "schema": {
+        "type": "integer",
+        "description": "an appointer: how long a post has stood vacant before the authority fills it (the body's own deputy has its few days first)"
+      },
+      "unit": "days",
+      "default": 14,
+      "source": "placeholder"
+    },
     "notice_days": {
       "schema": {
         "type": "integer"
@@ -14,7 +23,7 @@
     "part": {
       "schema": {
         "type": "string",
-        "description": "the officer runs the payroll; the deputy keeps the officer's post filled"
+        "description": "the officer runs the payroll; the deputy keeps the officer's post filled; the appointer is the authority a body's constitution names, which fills a post of that body when none of its own staff is left to"
       },
       "default": "officer",
       "source": "placeholder"
