@@ -131,6 +131,7 @@ test("founding in code: with the composer off no model is called; a founded thin
     // (Seed 1 from 2026-10-16, foundations F6: the world differs again; of seeds 1 to 16 only 1 and 3 have two who share the want that founds. Every other has one.)
     // (Seed 3 from 2026-10-16, foundations F7: news of a body reaches a person when it happens, so the course differs again; of seeds 1 to 16 only 3, 10 and 11 have two who share the want that founds.)
     // (Seed 2 from 2026-10-16, foundations F11: a register's keeper answers in its own time, and an office's slip rates are its systems' too, so the course differs; of seeds 1 to 16 only 2 and 5 have two who share the want that founds. Seed 3 held through foundations F7.)
+    // (Why a hop and not a fault, 2026-10-16: two who share the want that founds is one town in eight or fewer before foundations F5 (only seed 6 of 1 to 8) and two of sixteen after (2 and 5); the rate is the same, only the seed moves. Seed 6, the original, has one who shares it on the foundations-review branch, and the test needs two.)
     const s = await runWorld({ config: { ...config, seed: 2 }, runId: "code", outDir: out, until: 205 * DAY, recordObservations: "none" });
     expect(s.composer).toBeUndefined();
     const log = readFileSync(s.logPath, "utf8");
