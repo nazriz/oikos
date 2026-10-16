@@ -1138,6 +1138,7 @@ export const citizen: BehaviourModule = {
     let payToldAs = "";
     // Deaths in the household: those we've seen (in our own home, someone leaving because they died).
     const mourned = new Set<string>();
+    const hostSawDeath = new Map<string, number>(); // a guest's death: when we first saw it, and left it to their own to report
     let wasLeaseholder: boolean | null = null;
     let askedForCare = false;
     // A death at home we were told of by a child of the household (nobody grown was there to see it), and, as that
@@ -1635,6 +1636,11 @@ export const citizen: BehaviourModule = {
         const here = street.cells.flatMap((c) => c.structure?.spaces ?? []).filter((sp) => sp.space === ourHome);
         if (here.some((sp) => (sp.occupants ?? []).includes(me))) for (const l of here.flatMap((sp) => sp.left ?? [])) {
           if (l.reason !== "died" || mourned.has(l.occupant) || household?.members.some((m) => m.person === l.occupant)) continue;
+          // (A guest's or lodger's death, with others who came with them in the home now (not of our household, and not
+          // the dead): their family reports it, and says who the family is, and we leave it to them for a day from when we saw it: a host
+          // who writes first sends an estate to the town that has heirs at the door. Where none is home, we do.)
+          const theirs = here.flatMap((sp) => sp.occupants ?? []).filter((o) => o !== me && o !== l.occupant && !household?.members.some((m) => m.person === o));
+          if (theirs.length && t - (hostSawDeath.get(l.occupant) ?? hostSawDeath.set(l.occupant, t).get(l.occupant)!) < DAY) continue;
           mourned.add(l.occupant);
           steps.push(because(`${l.occupant}, who lived where we live and is not of our household, has died here: reporting it to the registry.`,
             say("death_notification", `${l.occupant} has died at ${ourHome}.`, { to: [p.registry], data: { deceased: l.occupant, found_at: ourHome } })));

@@ -92,7 +92,8 @@ const LIVING = "living.initiative_bps=10000";
 // (Re-taken on 2026-10-16, pilot 7 fixes: applications carry their particulars, and the opening caseload's say so in words; 2c3cfde9... until then.)
 // (Re-taken again on 2026-10-16 at the review of the foundations, finding 6: the council's appointments officer is an office of the town, its posts name their authority, and every generated system is owned by the organisation whose post it holds; e5a4d08a... until then, on main's pilot 7 fixes and these.)
 // (Re-taken on 2026-10-16 at the profile source check, on the merged foundations review: the au-vic-2026 profile's tribunal and hearing times, fee, rent bands, students per teacher and kin ceiling changed; 46a26c4c... until then.)
-const STEP_2B = "b805a01520b90c6a87899730e5c613f313c3a118ffcc6b1023685f4da52b0247";
+// (Re-taken on 2026-10-17 at the housing and vacant-post faults (fix-housing): the council's appointments officer is a councillor's post, watches the city's own offices and hires for the city where none of its staff is left to second; au-vic names the police among the posts the council fills; a death wakes those in the same space; b805a015... until then.)
+const STEP_2B = "6fb51f0837b2f0beeb6f63f04475976393c22a97626625219aa3eb8d80fc0e04";
 
 test("with founding off a living town is step 2b's town, to the state hash; turned on with no shape to found, nobody does anything they did not do before", async () => {
   const out = mkdtempSync(join(tmpdir(), "oikos-founding-"));
