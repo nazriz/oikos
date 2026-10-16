@@ -43,10 +43,10 @@ test("a tenant who cannot pay and will not go is put out by the police on the tr
   who.controller = { ...who.controller, params: { ...who.controller.params, in_labour_force: false, possession: { stay_bps: 10_000, obey_bps: 0 }, leave_after_homeless_days: 9_999 } };
   const out = join(root, "runs", "test-possession");
   rmSync(out, { recursive: true, force: true });
+  // (Seed 3 since 2026-10-17: the tenant put out on the warrant is recorded as put out ("evicted", and their notice on the lease) where the warrant's paper is read, and not only at the leaving step, which a home cleared by the next turn never reaches. In this seed the warrant's paper is read and the leaving step never comes; in seeds 1 and 4 both come, and the record is made once. Seed 2, the seed this test had, now has the tenant leave town the morning the officer comes: a different course, not this one.)
   // (The run's seed is pinned: in the generated seed's run, with draws named for the day (2026-10-12), the station's officers did not
   // get to the warrant in the six days it ran and it lapsed, which the office does and says; this test is of one carried out.)
-  // (Seed 1 from 2026-10-16, the profile source check: in seed 2 the tenant was put out on the warrant and has "put_out" on their record but never "evicted". Traced: the citizen's last turn at home (day 189.35) still held the tenant's own stay-on-the-order paper (stays: true); the warrant's paper was read after the leaving step of that turn was checked, and by the next turn the home had been vacated and cleared, so the leaving step, which is where "evicted" is made, never ran with the put-out paper. A race of turn order in participants/src/behaviour/citizen.ts (the warrant_executed read and the leaving step), not fixed here: recording "evicted" at the read as well would double it on the paths that now reach the leaving step, and move every pin; docs/decisions.md. Seeds 1, 3 and 4 of 1 to 6 carry the whole chain; what is asserted is the same.)
-  const s = await runWorld({ config: { ...config, seed: 1, log: { ...config.log, detail: "lean" } }, runId: "possession", outDir: out, until: 200 * DAY, recordObservations: "none" });
+  const s = await runWorld({ config: { ...config, seed: 3, log: { ...config.log, detail: "lean" } }, runId: "possession", outDir: out, until: 200 * DAY, recordObservations: "none" });
   const ev = readFileSync(s.logPath, "utf8").trim().split("\n").filter((l) => l.includes('"event"')).map((l) => JSON.parse(l)).filter((e) => e.kind === "event").map((e) => ({ t: e.t, ...e.body }));
   const recs = ev.filter((e) => e.event === "recorded").map((e) => e.record);
   const mine = (kind: string) => recs.filter((r) => r.kind === kind && JSON.stringify(r).includes(alone.id));
@@ -86,7 +86,7 @@ test("a tenant who cannot pay and will not go is put out by the police on the tr
   const memories: string[] = [];
   for await (const c of recordChanges(s.logPath)) if (c.entity === tenant) for (const b of (c.because ?? []) as any[]) memories.push(b.what);
   expect(memories).toContain("put_out");
-  expect(memories).toContain("evicted");
+  expect(memories.filter((m) => m === "evicted").length).toBe(1); // (once: at the warrant's paper, and not again at the leaving step where that comes too)
   expect(memories).not.toContain("left_on_order");
 }, 900_000);
 

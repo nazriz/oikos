@@ -168,7 +168,7 @@ interface Home {
   /** Told to leave it for arrears (docs/behaviour/justice.md, "Possession"): by the landlord's notice to vacate, by
    * the tribunal's order for possession (`ordered`), or put out on its warrant (`removed`); by when; and whether we
    * mean to stay past that. */
-  vacate?: { paper: string; by: number; stays: boolean; ordered?: boolean; removed?: boolean };
+  vacate?: { paper: string; by: number; stays: boolean; ordered?: boolean; removed?: boolean; recorded?: boolean };
 }
 interface Job { /** A change of our pay the employer's paper told us of (hours cut or restored, docs/behaviour/firms.md, "Hours before heads"): from when, and the wage then. */ coming?: { at: number; wage: number }; /** The wage before such a change, still taken as our pay for a few days after it (the employer changes the order on its own day). */ prev?: { wage: number; until: number }; /** The account our pay has come from, as we have seen it come. */ paidFrom?: string; /** What our pay has come short of what was agreed, in all, and not yet put right. */ short?: number; agreement: string; employer: string; wage: number; period: number; workplace?: string; since: number; /** When we walked out (unpaid), whatever the terms say. */ leftAt?: number; paidAt?: number; claimed?: boolean }
 
@@ -1842,18 +1842,25 @@ export const citizen: BehaviourModule = {
         for (const x of home.retiring.filter((x) => t >= x.at)) steps.push(because("The old rent's last payment is made: stopping its order; the new one takes over.", withdraw(x.order, "Replaced by a new standing order.")));
         home.retiring = home.retiring.filter((x) => t < x.at);
       }
+      // Leaving a home we were told to leave, or were put out of, on our record: once. (The leaving step below does it where the
+      // home is still ours at its date; the paper of a warrant carried out does it where it is read, because by the next turn the
+      // home is cleared and the leaving step never comes: the tenant put out then had "put_out" and never "evicted".)
+      const recordLeaving = (h: Home, put: NonNullable<Home["vacate"]>): Step[] => {
+        if (put.recorded) return [];
+        put.recorded = true;
+        outcome({ t, domain: "home", option: h.space, kind: "evicted", way: "mine", from: h.landlord, facts: { how: put.removed ? "removed" : put.ordered ? "left_on_order" : "left_on_notice" } });
+        // (What it is called on the record: put out on a warrant, or given notice and gone, is "evicted"; gone on the
+        // tribunal's order with no warrant carried out is its own kind, which dents and shocks as "evicted" does.)
+        inner.happened(put.ordered && !put.removed ? "left_on_order" : "evicted", t, { about: h.landlord });
+        // (Ours to end on the record too, if nobody has: we are gone.)
+        if (endsAt(h) === Number.MAX_SAFE_INTEGER || t < endsAt(h)) if (!(book.notices.get(h.agreement) ?? []).some((n) => n.as === me)) return [because(put.removed ? "We have been put out of our home on the tribunal's warrant." : put.ordered ? "The tribunal has ordered us out of our home, and its date has come: leaving." : "We cannot pay what is owed and have been given notice to vacate: leaving.", notice(h.agreement, "Leaving: told to vacate for arrears."))];
+        return [];
+      };
       // A tenancy that has ended: move out and stop paying rent. (Told to leave for arrears: at the date we were
       // given, if we mean to go; one who means to stay is there until the tribunal's date, or until put out.)
       const put = home?.vacate;
       if (home && (put ? (!put.stays && t >= put.by) || (!put.stays && t >= endsAt(home)) : t >= endsAt(home))) {
-        if (put) {
-          outcome({ t, domain: "home", option: home.space, kind: "evicted", way: "mine", from: home.landlord, facts: { how: put.removed ? "removed" : put.ordered ? "left_on_order" : "left_on_notice" } });
-          // (What it is called on the record: put out on a warrant, or given notice and gone, is "evicted"; gone on the
-          // tribunal's order with no warrant carried out is its own kind, which dents and shocks as "evicted" does.)
-          inner.happened(put.ordered && !put.removed ? "left_on_order" : "evicted", t, { about: home.landlord });
-          // (Ours to end on the record too, if nobody has: we are gone.)
-          if (endsAt(home) === Number.MAX_SAFE_INTEGER || t < endsAt(home)) if (!(book.notices.get(home.agreement) ?? []).some((n) => n.as === me)) steps.push(because(put.removed ? "We have been put out of our home on the tribunal's warrant." : put.ordered ? "The tribunal has ordered us out of our home, and its date has come: leaving." : "We cannot pay what is owed and have been given notice to vacate: leaving.", notice(home.agreement, "Leaving: told to vacate for arrears.")));
-        }
+        if (put) steps.push(...recordLeaving(home, put));
         // Looking for somewhere cheaper (a goal's method): for the first month of the hunt, only homes that beat this rent.
         if (pursuing("cheaper home")) cheaperThan = { rent: Math.floor((home.rent * p.goals.cheaper_bps) / 10_000), until: t + MONTH };
         if (!home.owned) outcome({ t, domain: "home", option: home.space, kind: "ended", way: "mine", facts: { by: endedBy(home.agreement), rent: home.rent, ...(book.signedAt(home.agreement) !== undefined ? { held_days: Math.floor((t - book.signedAt(home.agreement)!) / DAY) } : {}) } });
@@ -3089,6 +3096,7 @@ export const citizen: BehaviourModule = {
           }
         } else if (r.kind === "warrant_executed" && r.data?.lease === home.agreement) {
           home.vacate = { paper: r.id, by: t, stays: false, ordered: true, removed: true };
+          steps.push(...recordLeaving(home, home.vacate));
           // (Put out by an officer: on our record with who did it.)
           if (r.speaks_for) { inner.happened("put_out", t, { about: r.speaks_for }); inner.experience(r.speaks_for, kindOf(r.speaks_for), false, t, { weight: 2 }); if (mem) mem.saw("put_out", r.speaks_for, t, t); }
         }
