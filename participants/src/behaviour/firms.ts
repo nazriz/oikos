@@ -1116,6 +1116,13 @@ export class Staffing {
   // Pay that's changed since hiring (an enterprise agreement), and pay stopped (a strike: no pay for time on strike).
   private readonly gross = new Map<string, number>(); // agreement -> the wage now
   private readonly stopped = new Map<string, { since: number; lastDue: number }>(); // agreement -> its pay stopped when, and the pay day before
+  // The one rule for any change of pay (a rise, a stop, a restart, a death, an end of employment): the pay run is the unit,
+  // and what an order actually paid is what the books say it paid. Withdrawing an order takes the manager's time (the act
+  // waits for them), and an order withdrawn after its pay moment still pays it. So an order we have withdrawn stays on
+  // our books (what it pays in that time is booked, with its tax), the pay moments it paid are read from its payments
+  // (`paidTo`), and a change that can be held to a pay run is (`heldToRun`, `holdRise`, `PAY_CUTOFF`).
+  private readonly withdrawn = new Map<string, { agreement: string; at: number }>(); // a standing order we have withdrawn -> its agreement, and when we decided to
+  private readonly paidTo = new Map<string, number>(); // agreement -> the latest pay moment a withdrawn order of it paid
 
   /**
    * `does`: which half of it this office does. Most employers do both; an organisation where one office hires and
@@ -1217,9 +1224,13 @@ export class Staffing {
       this.pendingWithhold.delete(ref);
     }
     // Wages paid by our standing orders: what each withheld is now owed to the collector.
-    const ours = new Map([...this.orders].map(([agreement, order]) => [order, agreement]));
+    const ours = new Map<string, string>([...[...this.orders].map(([agreement, order]) => [order, agreement] as [string, string]), ...[...this.withdrawn].map(([order, w]) => [order, w.agreement] as [string, string])]);
     for (const tx of channels.transactions(obs)) {
       if (!tx.per_instruction || !ours.has(tx.per_instruction)) continue;
+      // (A withdrawn order pays only inside the act that withdraws it, which waits a couple of days at most: a payment later than that is not its.)
+      const gone = this.withdrawn.get(tx.per_instruction);
+      if (gone && tx.t > gone.at + 2 * DAY) continue;
+      if (gone) this.paidTo.set(ours.get(tx.per_instruction)!, Math.max(this.paidTo.get(ours.get(tx.per_instruction)!) ?? 0, tx.t));
       const w = this.withholds.get(tx.per_instruction) ?? NOTHING_WITHHELD;
       if (!this.offBooks.has(ours.get(tx.per_instruction)!)) this.owe(this.lawId, w, ours.get(tx.per_instruction), cents(tx.amount) + w.total);
       this.wagesPaid += cents(tx.amount) + w.total;
@@ -1453,15 +1464,13 @@ export class Staffing {
       const ended = (book.notices.get(a.id) ?? []).some((n) => n.as === me);
       const s: Step = because(`${who}, who worked for us, has died: stopping their wages.`, ...(underNotice || ended ? [] : [notice(a.id, "The employee has died.")]));
       if (this.orders.has(a.id)) {
-        s.push(withdraw(this.orders.get(a.id)!, "The employee has died; stop wages."));
-        this.orders.delete(a.id);
+        s.push(this.retire(a.id, "The employee has died; stop wages.", t));
       }
       steps.push(s);
     }
     // Ended (notice served): stop the wages.
     for (const a of doesPay ? contracts : []) if (book.concluded(a.id) && t >= this.endOf(book, a) && this.orders.has(a.id)) {
-      steps.push(because("Employment has ended: stopping the wages.", withdraw(this.orders.get(a.id)!, "Employment ended; stop wages.")));
-      this.orders.delete(a.id);
+      steps.push(because("Employment has ended: stopping the wages.", this.retire(a.id, "Employment ended; stop wages.", t)));
     }
     // Ended for redundancy, with pay owed under the law: owed in our books from the day the job ends, and paid with
     // the wages we owe (at once if the account covers it; late if not).
@@ -1662,16 +1671,15 @@ export class Staffing {
       // manager's time (the act waits for them), and an order withdrawn after its pay moment still pays it, so a pay
       // moment inside the act would be paid by the old order and again by the new. Within the cut-off before a pay run
       // the change is held until the run has been made, and then made for the run after it.
-      const next = this.nextDue(book, order, t);
-      if (next - t < Math.min(PAY_CUTOFF, Math.floor(period / 2))) {
-        this.holdRise(a.id, next, wage, why, one?.short);
+      const run = this.heldToRun(book, order, period, t);
+      if (run !== undefined) {
+        this.holdRise(a.id, run, wage, why, one?.short);
         continue;
       }
       const tax = this.offBooks.has(a.id) ? NOTHING_WITHHELD : withheld(law, wage, period);
       const ref = `wo${this.n++}`;
-      lines.push(withdraw(order, "Superseded: a new wage."), [ref, pay(to, wage - tax.total - (one?.short ?? 0), { from: account, every: period, first: Math.max(DAY, this.nextDue(book, order, t) - t), basis: a.id, for: `Wages for ${a.terms.parties[1]}.` })] as any);
+      lines.push(this.retire(a.id, "Superseded: a new wage.", t), [ref, pay(to, wage - tax.total - (one?.short ?? 0), { from: account, every: period, first: Math.max(DAY, this.nextDue(book, order, t) - t), basis: a.id, for: `Wages for ${a.terms.parties[1]}.` })] as any);
       refs.push([ref, a.id, tax]);
-      this.orders.delete(a.id);
     }
     for (const [ref, id, tax] of refs) {
       this.pendingOrder.set(ref, id);
@@ -1681,6 +1689,20 @@ export class Staffing {
     const out: Step[] = [];
     for (let i = 0; i < lines.length; i += 30) out.push(because(why, ...lines.slice(i, i + 30)));
     return out;
+  }
+
+  /** Withdraw an agreement's wage order; it stays on our books until its payments are seen (see `withdrawn`). */
+  private retire(agreement: string, why: string, t: number): C.Call {
+    const order = this.orders.get(agreement)!;
+    this.withdrawn.set(order, { agreement, at: t });
+    this.orders.delete(agreement);
+    return withdraw(order, why);
+  }
+
+  /** The pay run a change of pay must wait for, if the next one is within the cut-off (else it may be made now). */
+  private heldToRun(book: Book, order: string, period: number, t: number): number | undefined {
+    const next = this.nextDue(book, order, t);
+    return next - t < Math.min(PAY_CUTOFF, Math.floor(period / 2)) ? next : undefined;
   }
 
   private isReplacing(agreement: string, t: number): boolean {
@@ -1824,8 +1846,8 @@ export class Staffing {
       if (!order) continue;
       const period = jobTerms(a, a.terms.parties[1]).period;
       this.stopped.set(a.id, { since: t, lastDue: this.nextDue(book, order, t) - period });
-      this.orders.delete(a.id);
-      lines.push(withdraw(order, "Stopped: on strike."));
+      this.paidTo.delete(a.id);
+      lines.push(this.retire(a.id, "Stopped: on strike.", t));
     }
     const out: Step[] = [];
     for (let i = 0; i < lines.length; i += 30) out.push(because(why, ...lines.slice(i, i + 30)));
@@ -1846,7 +1868,12 @@ export class Staffing {
       if (!to) continue;
       const period = jobTerms(a, a.terms.parties[1]).period;
       const wage = this.wageOf(a);
-      const earned = Math.max(0, Math.floor((wage * Math.min(period, Math.max(0, since - lastDue))) / period));
+      // (What the order actually paid, not what we decided when we withdrew it: a pay moment inside the act is paid by the
+      // old order. Paid through that moment, nothing before the strike is owed again; and the strike days it paid are
+      // taken off the first pay after the return, by starting it that many seconds later: a pay covers the period before it.)
+      const paidThrough = Math.max(lastDue, this.paidTo.get(a.id) ?? 0);
+      const over = Math.min(period, Math.max(0, paidThrough - since));
+      const earned = Math.max(0, Math.floor((wage * Math.min(period, Math.max(0, since - paidThrough))) / period));
       const each = this.offBooks.has(a.id) ? NOTHING_WITHHELD : withheld(law, wage, period), perPay = each.total;
       // (For the part of a pay period worked: that part of what a whole pay withholds, charge by charge.)
       const tax = Math.floor((perPay * earned) / Math.max(1, wage));
@@ -1858,7 +1885,7 @@ export class Staffing {
       this.pendingOrder.set(ref, a.id);
       if (perPay > 0) this.pendingWithhold.set(ref, each);
       if (earned - tax > 0) lines.push(pay(to, earned - tax, { from: account, for: `Wages for ${a.terms.parties[1]} to the strike.` }));
-      lines.push([ref, pay(to, wage - perPay, { from: account, every: period, first: period, basis: a.id, for: `Wages for ${a.terms.parties[1]}.` })]);
+      lines.push([ref, pay(to, wage - perPay, { from: account, every: period, first: period + over, basis: a.id, for: `Wages for ${a.terms.parties[1]}.` })]);
     }
     // (Batched: a program has at most 32 lines, and a wake only so many actions.)
     const steps: Step[] = [];

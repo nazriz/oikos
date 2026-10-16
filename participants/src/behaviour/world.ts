@@ -6,7 +6,7 @@ import * as C from "../calls";
 import { channels, type LookRequest, type ParticipantAction, type StatementRecord } from "../contracts";
 import { DAY, need, params, wait, type BehaviourModule } from "../module";
 import { cents } from "../money";
-import { ask, because, Book, callAction, madeAt, MONTH, Occurrences, pay, publishedPrice, say, StandingWork, usd, withdraw, type Step, Asked, lookUp, LOOKS_MAX } from "./common";
+import { ask, because, Book, callAction, filedBefore, madeAt, MONTH, Occurrences, pay, publishedPrice, say, StandingWork, usd, withdraw, type Step, Asked, lookUp, LOOKS_MAX } from "./common";
 import * as P from "./papers";
 import { stepper } from "./firms";
 import { declineOnTerms, fill, held, OrderBook, priceList } from "./trade";
@@ -417,7 +417,7 @@ export const transfers: BehaviourModule = {
               say("benefit_decision", `Claim ${d.claim} refused${why ? `: ${why}` : ""}.`, { to: [d.claimant], visible: [d.claimant, me], basis: d.claim, data: { claim: d.claim, payment: d.payment, granted: false, ...(why ? { reason: why } : {}) } })));
           }
         }
-        const waiting = !working ? [] : book.open("benefit_claim").filter((r) => (r.addressed_to ?? []).includes(me) && !decided.has(r.id)).sort((a, b) => madeAt(a) - madeAt(b) || (a.id < b.id ? -1 : 1));
+        const waiting = !working ? [] : book.open("benefit_claim").filter((r) => (r.addressed_to ?? []).includes(me) && !decided.has(r.id)).sort((a, b) => madeAt(a) - madeAt(b) || filedBefore(a, b));
         for (const c of waiting) {
           const who = c.speaks_for!;
           const payment = String(c.data?.payment);

@@ -771,6 +771,10 @@ pub struct PositionCfg {
     /// The bookkeeping of this post (its `role_module.code`) keeps the record of the organisation it belongs to.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub keeps_record: bool,
+    /// Who else may fill this post (an owner, a board, the council: the body's constitution, as the world's data says): an
+    /// organisation, or a person, who may `appoint` into it as well as the post's own organisation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub appointed_by: Option<Id>,
 }
 
 impl PositionCfg {
@@ -2099,6 +2103,9 @@ pub fn validate(c: &Config) -> Result<(), String> {
             }
         }
         check_channels(&format!("position {}", p.id), &p.channels, &seat!(Some(p.entity.as_str())))?;
+        if let Some(a) = &p.appointed_by {
+            entity(a).map_err(|e| format!("position {}: its appointing authority: {e}", p.id))?;
+        }
         if p.keeps_record && p.record_keeper_name().is_none() {
             return Err(format!("position {}: keeps_record needs a role_module with a code", p.id));
         }
@@ -2236,6 +2243,10 @@ pub fn validate(c: &Config) -> Result<(), String> {
         let h = participants[pos.holder.as_deref().unwrap_or_default()];
         if h.kind == ParticipantKind::System && (h.template.is_none() || h.supplier.is_none()) {
             return Err(format!("position {} is held by {}, a system nobody supplied (it names its template and supplier)", pos.id, h.id));
+        }
+        // A system works for the organisation it was delivered to (law 3): not for another's.
+        if h.kind == ParticipantKind::System && h.owner.as_deref() != Some(pos.entity.as_str()) {
+            return Err(format!("position {} (of {}) is held by {}, a system that belongs to {}: a system works only for the organisation it was delivered to", pos.id, pos.entity, h.id, h.owner.as_deref().unwrap_or("nobody")));
         }
     }
 

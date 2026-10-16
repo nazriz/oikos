@@ -94,8 +94,8 @@ test("a landlord, the tribunal's member and its registrar in seats take a tenanc
     expect(config.positions.find((p: any) => p.id === office).channels.some((c: any) => c.id === "standing")).toBe(true);
   }
   expect(config.world.records.find((r: any) => r.id === "proc-tribunal-member-possession").text).toMatch(/given when it is on the record.*asks no further proof/);
-  // (Run seed 2 from 2026-10-16, F6: in seed 1 the station's one officer leaves town on day 113 with the draws of a pay change at a pay run, nobody is in to carry the warrant out in its six days, and the tenancy stops at the warrant; a matter of draws, as the chain is the same in seeds 2 to 4.)
-  const { ev, recs, acts } = await run("seat-acts-possession", { ...config, seed: 2 }, 200);
+  // (Seed 1 again, 2026-10-16: it was moved to 2 at F6 because the station's one officer left town on day 113 and nobody was in to carry the warrant out, which the review of foundations found was a fault, not a draw: a body whose only staff left stood headless. The council now seconds one of its staff after 14 days (foundations review, finding 6), and the test passes at seed 1.)
+  const { ev, recs, acts } = await run("seat-acts-possession", { ...config, seed: 1 }, 200);
   const mine = (kind: string) => recs.filter((r) => r.kind === kind && JSON.stringify(r).includes(alone.id));
   // The same chain as with code in every office, paper for paper.
   const ntv = mine("notice_to_vacate")[0];

@@ -96,6 +96,10 @@ pub struct State {
     /// Goods taken without consent (world-expansion 7.3): the truth, which investigation can find.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub takings: Vec<Taking>,
+    /// Questions put to a register's keeper that nobody was there to answer (no one of its posts present and on duty), in
+    /// the order asked: taken up, one after another, when someone is (checked each hour while any are held).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub asks_held: Vec<HeldAsk>,
     /// Each entity's own record (docs/design/ai-citizens.md 10d): who they are and how things stand with them, as
     /// their mind keeps it. Held here and written only here (the `entity_record` command); bounded in size
     /// (`caps.entity_record_bytes`), so it never grows. The kernel reads none of it: its sections are opaque.
@@ -600,6 +604,10 @@ pub struct Timeline {
     /// (day, seconds of work placed on it), for a body that has worked.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub worked: Option<(i64, i64)>,
+    /// The day before `worked`'s that work was placed on, when work was placed on an earlier day than one already counted
+    /// (work queued ahead on a later day, then work placed today): so that neither day's count is lost.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub worked_before: Option<(i64, i64)>,
 }
 
 /// What an act's `work` took of its performers' time when the act began: the day it was counted on and the seconds of
@@ -611,6 +619,9 @@ pub struct Placed {
     pub over: Option<String>,
     #[serde(default)]
     pub day: i64,
+    /// When the work's hours were placed from (they run on, and may cross midnight: each day is counted its own part).
+    #[serde(default, skip_serializing_if = "is_zero_i64")]
+    pub from: i64,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub hours: BTreeMap<Id, i64>,
     /// Who was where when the work was ordered (see `Exec::seen`): what it is on -> the bodies there.
@@ -642,7 +653,26 @@ impl Placed {
 impl Timeline {
     /// Seconds of work already placed on this day.
     pub fn worked_on(&self, day: i64) -> i64 {
-        self.worked.filter(|(d, _)| *d == day).map_or(0, |(_, s)| s)
+        self.worked.into_iter().chain(self.worked_before).find(|(d, _)| *d == day).map_or(0, |(_, s)| s)
+    }
+
+    /// Seconds of work placed on a day (negative: given back). Two days are kept, the latest and the one before it.
+    pub fn add_worked(&mut self, day: i64, secs: i64) {
+        match (self.worked, self.worked_before) {
+            (Some((d, s)), _) if d == day => self.worked = Some((d, (s + secs).max(0))),
+            (_, Some((d, s))) if d == day => self.worked_before = Some((d, (s + secs).max(0))),
+            (Some((d, _)), _) if day < d => {
+                if secs > 0 {
+                    self.worked_before = Some((day, secs));
+                }
+            }
+            _ => {
+                if secs > 0 {
+                    self.worked_before = self.worked;
+                    self.worked = Some((day, secs));
+                }
+            }
+        }
     }
 }
 
@@ -661,9 +691,21 @@ impl<'a> IntoIterator for &'a Timeline {
     }
 }
 
+/// A question a keeper has not yet taken up (State::asks_held).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HeldAsk {
+    pub participant: Id,
+    #[serde(default, rename = "as", skip_serializing_if = "Option::is_none")]
+    pub position: Option<Id>,
+    pub keeper: Id,
+    pub look: crate::config::LookRequest,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Sched {
+    /// Held questions looked at again: is someone there now to answer them?
+    HeldAsks,
     StructureComplete { structure: Id },
     /// Nature's day (docs/design/world-expansion.md 2): covers, fields and populations stepped.
     NatureDay { day: i64 },
