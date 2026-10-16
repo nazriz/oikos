@@ -122,12 +122,13 @@ function answers(records: any[], dealtWith: Set<string>) {
   return out;
 }
 
-test("papers of no effect, filed by an office that deals with nobody, change no answer and no decision anywhere in the town", async () => {
-  // (The ombudsman's office, where it was the registry's until foundations F5: the registry answers the town's deaths at the second, and in this
-  // town one citizen's day moved by twenty seconds with the registry's scribbling, whose cause was not found; with this office, which deals with nobody, nothing moves.)
+for (const post of ["registry", "ombudsman-officer"]) test(`papers of no effect, filed by the ${post}, held by a system, change no answer and no decision anywhere in the town`, async () => {
+  // (Restored to the registry, review of foundations finding 10. The office is a system's, as the registry was until foundations F5, so the
+  // papers take no person's time: nothing moves. With a person in the post the same papers move the days of the offices that person holds:
+  // the next test, traced.)
   // The office files two entries on the town's own file every day it has nothing else to do: several hundred
   // records the twin has none of, so that almost every later paper of the town has another number.
-  const [twin, pilot] = await Promise.all([run("twin-draws-code", {}, undefined, "ombudsman-officer"), run("twin-draws-scribe", {}, "ombudsman-officer", "ombudsman-officer")]);
+  const [twin, pilot] = await Promise.all([run("twin-draws-code", {}, undefined, post), run("twin-draws-scribe", {}, post, post)]);
   const extra = pilot.filter((r) => r.kind === "entry" && /^(Nothing to enter at|Nor here)/.test(r.text)).length;
   expect(extra).toBeGreaterThan(50);
   const idsOf = (rs: any[]) => rs.filter((r) => r.kind === "review_request").map((r) => r.id).join(",");
@@ -140,6 +141,38 @@ test("papers of no effect, filed by an office that deals with nobody, change no 
   // And the town beside them is the same town: every paper but the entries, in the same order, with the same words.
   const said = (rs: any[]) => rs.filter((r) => r.kind !== "entry").map((r) => `${r.at} ${r.kind} ${r.speaks_for} ${r.text.replace(/rec\.[0-9]+/g, "rec")}`);
   expect(said(pilot)).toEqual(said(twin));
+}, 900_000);
+
+test("papers of no effect, filed by the registry's holder, a person of the town, cost that person's time and nothing else: what moves starts with the offices the person holds", async () => {
+  // (Traced, review of foundations finding 10. The registry's holder is a citizen who also holds planning, inspection, finance, works and
+  // the environment office. Each day the two entries take that person's time (one account for a person, foundations F1), so the
+  // papers of those offices that day come later, by no more than the entries' time; what depends on them moves with them. It is not the
+  // papers' numbers: the same registry held by a system moves nothing (the test before). Seen in the town of 120 days: the first paper to
+  // move is the city's permit decision at 92400, 300 s late, from the entries begun at 86400.)
+  const [twin, pilot] = await Promise.all([town("twin-draws-person-code", {}), town("twin-draws-person-scribe", {}, "registry")]);
+  const holder = twin.holders.registry!;
+  expect(holder).toMatch(/^c\d+-self$/);
+  expect(Object.values(twin.holders).filter((h) => h === holder).length).toBeGreaterThan(2);
+  const key = (rs: any[]) => { const n = new Map<string, number>(); return rs.filter((r) => r.kind !== "entry").map((r) => { const k = `${r.kind}|${r.speaks_for}|${r.text.replace(/rec\.[0-9]+/g, "rec")}`; n.set(k, (n.get(k) ?? 0) + 1); return [`${k}#${n.get(k)}`, r.at] as [string, number]; }); };
+  const A = new Map(key(twin.records)), B = new Map(key(pilot.records));
+  const entries = pilot.records.filter((r) => r.kind === "entry" && /^(Nothing to enter at|Nor here)/.test(r.text)).sort((x, y) => x.at - y.at);
+  expect(entries.length).toBeGreaterThan(50);
+  const begun = Number(/at (\d+)\./.exec(entries[0].text)![1]);
+  const takes = entries[0].at - begun;
+  const moved = [...A].filter(([k, t]) => B.has(k) && B.get(k) !== t).sort((x, y) => x[1] - y[1]);
+  console.log(`twin draws, a person at the registry: ${moved.length} of ${A.size} papers moved; the first at ${moved[0]?.[1]} by ${B.get(moved[0]![0])! - moved[0]![1]}s; the entries take ${takes}s from ${begun}`);
+  expect(moved.length).toBeGreaterThan(0);
+  // Nothing moves before the first entries were begun; the first paper to move is an office of the holder's, late by no more than the entries took.
+  expect(moved[0]![1]).toBeGreaterThanOrEqual(begun);
+  const shift = B.get(moved[0]![0])! - moved[0]![1];
+  expect(shift).toBeGreaterThan(0);
+  expect(shift).toBeLessThanOrEqual(takes);
+  expect(moved[0]![0].split("|")[1]).toBe("city");
+  // The same words come, at nearly the same count; a consequence on another day may be one paper more or fewer.
+  expect([...A.keys()].filter((k) => !B.has(k)).length).toBeLessThanOrEqual(Math.ceil(A.size * 0.02));
+  expect(Math.abs(A.size - B.size)).toBeLessThanOrEqual(Math.ceil(A.size * 0.02));
+  // A part of the town, not the town: under 10% of its papers are at another second (4.8% when traced).
+  expect(moved.length / A.size).toBeLessThan(0.1);
 }, 900_000);
 
 test("with an office in a mock seat, the same requests still get the same answers from those the seat did not deal with", async () => {
