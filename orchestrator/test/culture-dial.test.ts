@@ -38,11 +38,14 @@ const BEFORE: { [profile: string]: { days: number; state: string } } = {
   // (Re-taken on 2026-10-16 at foundations F7: news of a person's body reaches them when it happens, not at the next wake; 5e3c3fcb... until then. gb-eng and ke-nakuru did not move in 30 days.)
   // (Re-taken on 2026-10-16 at foundations F11: a register's keeper answers in its own time; 88f2e1f7..., fe18427c... and 03864d04... until then.)
   // (Re-taken on 2026-10-16 at foundations F8: the support office asks for papers before it decides, looks at a refusal again when asked, and the tribunal hears an appeal at the law's fee; the profile's routes are published as `law-decisions`; 79ea9459..., 5d8c73f8..., bf808d07..., d60a26bc..., 1af6423e..., 40d2f316... until then.)
-  "au-vic-2026": { days: 60, state: "c5a5a00f14ee6503b84be3d764f3020c956b87b31db645771e2fafac879dd026" },
+  // (Re-taken on 2026-10-16 at the review of the foundations, finding 6: the council's appointments officer is an office of the town, its posts name their authority, and every generated system is owned by the organisation whose post it holds; c5a5a00f... until then.)
+  "au-vic-2026": { days: 60, state: "f54352a25b18d69dfd45771b04245e613e562806f74862974e7c019b7c893c0d" },
   // (Re-taken on 2026-10-16 at foundations F5: the town's offices are held by people, their staff hired, its systems delivered from templates that say what they do; 3b4bc97e... until then.)
-  "gb-eng-2026": { days: 30, state: "c1ae5e74a1b6d5a0fb2f194000258d8d48278ef6f27a989dca6495721e272421" },
+  // (Re-taken on 2026-10-16 at the review of the foundations, finding 6: the council's appointments officer is an office of the town, its posts name their authority, and every generated system is owned by the organisation whose post it holds; c1ae5e74... until then.)
+  "gb-eng-2026": { days: 30, state: "29f53e5fbb3f7cffcb52792a75aa893132b9543144af83a34463a0419ae12d05" },
   // (Re-taken on 2026-10-16 at foundations F5: the town's offices are held by people, their staff hired, its systems delivered from templates that say what they do; ab25cb7d... until then.)
-  "ke-nakuru-2026": { days: 30, state: "66ba5ea859c1062a512db1dbfd37b23b54acb3cebf5118540f664c831a0de918" },
+  // (Re-taken on 2026-10-16 at the review of the foundations, finding 6: the council's appointments officer is an office of the town, its posts name their authority, and every generated system is owned by the organisation whose post it holds; 66ba5ea8... until then.)
+  "ke-nakuru-2026": { days: 30, state: "11a014cc07d3468be5bb57e6cb7f291fe9bc9dc32ef4cf34b67e7a96bb9e32dc" },
 };
 // (Re-taken once more at foundations F4, 2026-10-15: a generated town's systems name their template and supplier, and its world names where work is done (`performers_in`): the config hashes and the states move, the draws and the town's life do not.)
 // (The config hashes were re-taken on 2026-10-15 at foundations F2: the world's act-time table gained rows by what an act makes. The states did not move.)
@@ -52,7 +55,8 @@ const cfgHash = (c: unknown) => new Bun.CryptoHasher("sha256").update(JSON.strin
 // (Re-taken on 2026-10-16 at foundations F5: the town's offices are held by people, their staff hired, its systems delivered from templates that say what they do; 2ecddd70... until then.)
 // (Re-taken on 2026-10-16 at foundations F11, states and these hashes both: a register's keeper answers in its own time, so the registry's officers have work and the asker's answer comes later; a84328b7..., e0d58af7... and 6e9f53ac... until then.)
 // (Re-taken on 2026-10-16 at foundations F7: the generator's version moved with the table of slips; be6ff50f..., 266c7a18... and 44349775... until then. The states did not move.)
-const CONFIG_BEFORE: { [profile: string]: string } = { "au-vic-2026": "8dc56724cb6ab0ff", "gb-eng-2026": "02ba69459f6da047", "ke-nakuru-2026": "08e63b3c5aa7d908" };
+// (Re-taken on 2026-10-16 at the review of the foundations, finding 6, config and states both: the council's appointments officer, the posts' `appointed_by`, and every generated system owned by the organisation whose post it holds; 8dc56724..., 02ba6945... and 08e63b3c... until then.)
+const CONFIG_BEFORE: { [profile: string]: string } = { "au-vic-2026": "033bebfc8c9fdee5", "gb-eng-2026": "d2d9fdb0611ae83c", "ke-nakuru-2026": "9430b5b65b15834d" };
 
 test("the dial in the world config is a schema-valid setting; a size that would break the arithmetic is refused when the run starts", async () => {
   const v = ajv.getSchema(`${NS}:world-config`)!;
