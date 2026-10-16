@@ -30,7 +30,7 @@ import { besideOf, largest, leftAlone, renderSummary, SUMMARY_MAX } from "./debr
 import { readForEnd } from "./run-end";
 import { ReadingDesk, type DeskCounts } from "./reading";
 import { culture as cultureNs, reading as readingNs } from "@oikos/participants";
-import { DayBook, calls, canonical, DECISIONS, OUTCOMES, RECORD, WORDS, type Words, inCurrency, paramErrors, modules as builtin, Randomness, Roster, slice, Tally, View, type BehaviourModule, type Controller, type Currency, type DecisionRecord, type OutcomeRecord, type RecordChange, formatMoney, type LookRequest, type Observation, type ParticipantAction, type ParticipantContext } from "@oikos/participants";
+import { DayBook, calls, canonical, diaryText, forms, DECISIONS, OUTCOMES, RECORD, WORDS, type Words, inCurrency, paramErrors, modules as builtin, Randomness, Roster, slice, Tally, View, type BehaviourModule, type Controller, type Currency, type DecisionRecord, type OutcomeRecord, type RecordChange, formatMoney, type LookRequest, type Observation, type ParticipantAction, type ParticipantContext } from "@oikos/participants";
 import { lexiconReader, READING_TABLE, Tagger, READING_VERSION, type Reader, type ReadingTable } from "@oikos/participants/llm";
 import { ACCOUNT_TOKENS, ACCOUNT_VERSION, ACCOUNTS_DEFAULT, ACCOUNTS_MOST, darkAccount, DEBRIEF_ANSWER_TOKENS, DEBRIEF_VERSION, endNeedMicroUsd, keptBackFor, reckonedEndMicroUsd, type EndCosts, type MockPolicy, mockAccount, sampleAccounts, stepsOf, writeAccount, type AccountBrief, type AccountCounts, type DebriefInput, type DebriefWording, COMPOSE_VERSION, createCompose, mockCompose, type ComposerConfig, CONSULT_VERSION, createConsult, createLlmParticipant, LLM_PARTICIPANT_VERSION, MOCK_VERSION, MockAdapter, mockPolicies, PRICES, ModelCallFailed, ModelUnreachable, SpendingLimitReached, type Budget, type LlmAdapter, type LlmController, type LlmIO, type MockBrain, type Price } from "@oikos/participants/llm";
 import { createArrangement, createTranslator, draftText, Knowledge, RESOLVER, resolve, TRANSLATOR_VERSION, type Draft, type Resolution, type Route, NOT_CHECKED } from "@oikos/translator";
@@ -576,7 +576,10 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     // A seat that keeps its body's ballots, or votes on them (the world says which: `ballot_count`), has the count of
     // each ballot not yet declared, or its own vote on file, set out from the votes it has been shown (behaviour/tally.ts).
     const tally = office && (pp.ballot_count === "keeper" || pp.ballot_count === "member") ? new Tally(entity, pp.ballot_count === "member" ? office.id : undefined) : undefined;
-    const setOut = (at: number) => [roster ? roster.text(at, office!.title ?? office!.id, (id: string) => whoIs(id)?.name) : "", tally ? tally.text(at, office!.title ?? office!.id) : ""].filter(Boolean).join("\n\n");
+    // And its diary (behaviour/diary.ts): how long its own work takes it and what its staff have in a week, the town's practice as the town states it.
+    const times: { [row: string]: number } = cfg.orchestration?.act_time?.person ?? {};
+    const diary = (at: number) => office && Object.keys(times).length ? diaryText({ title: office.title ?? office.id, times, issues: mods[office.role_module?.code ?? ""]?.issues ?? [], ...(cfg.catalogue?.working_day ? { workday: cfg.catalogue.working_day } : {}), ...(roster ? { staff: roster.now(at) } : {}) }) : undefined;
+    const setOut = (at: number) => [roster ? roster.text(at, office!.title ?? office!.id, (id: string) => whoIs(id)?.name) : "", tally ? tally.text(at, office!.title ?? office!.id) : "", diary(at) ?? ""].filter(Boolean).join("\n\n");
     // Its in-trays (what a paper filed with its office comes into): its own papers of some kinds only, or a folder of
     // some kinds; and the folders that hold every paper of its organisation's. And whose papers are its office's own
     // doing: its own, and its staff's where they are a post of their own.
@@ -593,7 +596,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     const officeModule = office ? mods[office.role_module?.code ?? ""] : undefined;
     const dayBook = new DayBook({ entity, authors: [p.id, ...ownAuthors], name: (id: string) => whoIs(id)?.name,
       ...(office && officeModule?.books ? { books: officeModule.books(ctxFor(p.id, office.id, entity, sortedKeys(office.role_module?.params ?? {}) as any)) } : {}) });
-    const config = { dayBook: { text: (at: number) => dayBook.text(at, office?.title ?? entityName ?? "The office") }, ...(pp.mock?.debrief ? { mockDebrief: pp.mock.debrief } : {}), trays, ownAuthors, ...(pp.wake_on_papers === false ? { wakeOnPapers: false } : {}), ...(typeof pp.effort === "string" && pp.effort ? { effort: pp.effort } : {}), ...(roster || tally ? { staff: { text: setOut } } : {}), whoIs, participant: p.id, entity, entityName, onRequest, kinds, ways, title: office?.title ?? p.title, role: office?.role, framing: p.framing, standing: standingIds, titles, cadenceDays: pp.cadence_days ?? 7, draftText,
+    const config = { dayBook: { text: (at: number) => dayBook.text(at, office?.title ?? entityName ?? "The office") }, ...(pp.mock?.debrief ? { mockDebrief: pp.mock.debrief } : {}), trays, ownAuthors, ...(pp.wake_on_papers === false ? { wakeOnPapers: false } : {}), ...(typeof pp.effort === "string" && pp.effort ? { effort: pp.effort } : {}), ...(roster || tally || (office && Object.keys(times).length) ? { staff: { text: setOut } } : {}), whoIs, participant: p.id, entity, entityName, onRequest, kinds, ways, title: office?.title ?? p.title, role: office?.role, framing: p.framing, standing: standingIds, titles, cadenceDays: pp.cadence_days ?? 7, draftText,
       ...(pp.sessions && !twin ? { sessions: pp.sessions } : {}), ...(twin ? { exactBack: true } : {}), ...(pp.max_actions ? { maxActions: pp.max_actions } : {}),
       // Folders that hold some kinds of paper only (by the channel's own id, as `standing` is given), and the most a prompt may be.
       ...(pp.folders ? { folders: new Map<string, string[]>(Object.entries(pp.folders as { [id: string]: string[] }).flatMap(([id, kinds]) => chans.filter((x) => x.path === id || x.path.endsWith(`/${id}`)).map((x) => [x.path, kinds] as [string, string[]]))) } : {}),
@@ -661,7 +664,39 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     const r = await k.tryRequest({ op: "check", participant, ...(position ? { as: position } : {}), blocks });
     return r === null ? { ok: false, error: "the blocks could not be read" } : r.check;
   };
-  const engineResolver: Parameters<typeof createTranslator>[5] = RESOLVER_MODE === "ts" ? undefined : async (req, program) => {
+  /**
+   * Who in the office does it (foundations F9: "the resolver fills `by` from the roster"). A request that names `done_by` on any call (not `by`: a
+   * form may have a field of that name, a notice's day, and `work` and `structure` have a `by` of their own) asks for it to be done by a person on its office's staff, or by "the clerk" (its staff's role) where
+   * one is in post, and on their time: the roster, from the office's own papers, says who they are. A name that is no one of its staff, or a role
+   * with several in post, is a question back to the seat in the town's words; nothing is done for it. The kernel refuses anyone but
+   * the office's own employees as performers all the same (`by`, foundations F3).
+   */
+  const performersOf = (participant: string, program: calls.Program): { program: calls.Program; by?: string[]; told?: string[] } => {
+    const u = units.get(participant);
+    if (!u?.llm || !("lines" in program)) return { program };
+    const asked = program.lines.filter((l) => l.call.args.done_by !== undefined);
+    if (!asked.length) return { program };
+    const listOf = (v: calls.Value): string[] => ("id" in v ? [v.id] : "text" in v ? v.text.split(/[,;]|\band\b/).map((x) => x.trim()).filter(Boolean) : "json" in v && Array.isArray(v.json) ? v.json.map(String) : []);
+    const named = [...new Set(asked.flatMap((l) => listOf(l.call.args.done_by!)))];
+    const staff = u.llm.roster?.now(t);
+    const held = staff?.held.map((h) => h.person) ?? [];
+    const role = staff?.role?.toLowerCase();
+    const told: string[] = [];
+    const by: string[] = [];
+    for (const x of named) {
+      const w = x.toLowerCase().replace(/^the\s+/, "");
+      if (held.includes(x)) by.push(x);
+      else if (role && (w === role || w === `${role}s` || w === "staff")) {
+        if (held.length === 1) by.push(held[0]!);
+        else told.push(held.length ? `"${x}" could be any of the ${held.length} in post in your office (${held.join(", ")}): say which, by their id.` : `Nobody is in post to do that: your office has no ${staff!.role} in post.`);
+      } else told.push(`${x} is not one of your staff${held.length ? ` (those in post: ${held.join(", ")})` : " (nobody is in post)"}, so it cannot be done by them.`);
+    }
+    return { program: { lines: program.lines.map((l) => (l.call.args.done_by !== undefined ? { ...l, call: { ...l.call, args: Object.fromEntries(Object.entries(l.call.args).filter(([name]) => name !== "done_by")) } } : l)) }, ...(by.length ? { by: [...new Set(by)] } : {}), ...(told.length ? { told } : {}) };
+  };
+  const engineResolver: Parameters<typeof createTranslator>[5] = RESOLVER_MODE === "ts" ? undefined : async (req, program0) => {
+    const named = performersOf(req.participant, program0);
+    if (named.told?.length) return { ok: false, questions: named.told } as Resolution;
+    const program = named.program;
     // (A language-model seat perceives all its capacities: its knowledge is the engine's under its participant.)
     const e = await k.request({ op: "resolve", participant: req.participant, ...(req.only ? { only: req.only } : {}), ...(req.as ? { as: req.as } : {}), program: calls.programText(program) });
     return (e.blocks ? { ok: true, blocks: e.blocks } : { ok: false, questions: e.questions, ...(e.invalid ? { invalid: e.invalid } : {}) }) as Resolution;
@@ -797,6 +832,10 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     return rs;
   };
 
+  /** A moment as a clock shows it, and in words (the day too where it is not today): what a seat is told of when its work will be done. */
+  const clock = (x: number) => { const s = ((x % DAY) + DAY) % DAY; return `${String(Math.floor(s / 3_600)).padStart(2, "0")}:${String(Math.floor((s % 3_600) / 60)).padStart(2, "0")}`; };
+  const momentWords = (x: number) => (Math.floor(x / DAY) === Math.floor(t / DAY) ? `at ${clock(x)}` : `on ${forms.dateWords(x)} at ${clock(x)}`);
+
   /** The capacity a language-model participant's acts are made in: its one position, or itself. (Several: see the resolver, D47.) */
   const capacityOf = (u: Unit) => (u.capacity && u.capacity !== "self" ? u.capacity : held(u.participant).length === 1 && (parts.get(u.participant)?.kind === "system" || parts.get(u.participant)?.shares_body) ? held(u.participant)[0]!.id : undefined);
 
@@ -822,6 +861,14 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       b.acts++;
       b.waited += waited;
       b.longest = Math.max(b.longest, waited);
+      // A seat is told when its work comes out: a person writing a letter or deciding a case takes the time the town's practice gives it, after what
+      // it has begun already, and it is done then and not at once (foundations F9, "outcomes with times").
+      if (u.llm) {
+        const blocks = ((cmd as any).blocks ?? []) as { block?: string }[];
+        const letter = blocks.length > 0 && blocks.every((x) => x.block === "message");
+        const later = started.starts > t + thinking ? ` It begins ${momentWords(started.starts)}: you have other work before it.` : "";
+        u.notices.push({ t, text: letter ? `Your letter will be written and sent ${momentWords(started.done)}.${later}` : `What you did will be done ${momentWords(started.done)}.${later}` });
+      }
     }
     return r;
   };
@@ -845,7 +892,10 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     arranged?.signed(d.id, decision);
     if (decision !== "accept") return;
     const as = d.as ?? capacityOf(u);
-    const r = await begin(u, { command: "act", participant: u.participant, ...(as ? { as } : {}), blocks: d.blocks,
+    // (Done by whom, where the request named someone of its staff: the roster says who they are, as it did when the request was drawn up.)
+    let by: string[] | undefined;
+    if (d.call) try { by = performersOf(u.participant, calls.parseProgram(d.call)).by; } catch { /* (a call that does not read has no one named) */ }
+    const r = await begin(u, { command: "act", participant: u.participant, ...(as ? { as } : {}), blocks: d.blocks, ...(by?.length ? { by } : {}),
       provenance: { via: "translator", proposal: d.proposal, draft: d.id, draft_hash: p.hash, translator: d.translator, call: d.call, resolver: d.resolver }, ...(p.reasoning ? { reasoning: p.reasoning } : {}) });
     if (r === null) await notSent(u, "confirmed", `What you confirmed (${d.id}) could not be put into effect as it was drawn up, and nothing was done. You could ask for it again, in other words.`, { rejected_draft: d.id });
     // A standing work order of an office with nobody in post: on file, and said plainly with its result that nobody

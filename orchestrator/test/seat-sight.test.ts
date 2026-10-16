@@ -44,8 +44,8 @@ test("a seat that looks into its office's papers at every sitting is shown lists
   const finance = prompts.filter((p) => p.seat === "finance-system");
   expect(finance.length).toBeGreaterThan(8);
   // No prompt of either seat is more than a few tens of thousands of characters.
-  const largest = Math.max(...prompts.map((p) => p.size));
-  expect(largest).toBeLessThan(70_000); // (70,000 since 2026-10-16, foundations F8, where it was 68,000: the town's law on decisions (what a decision waits for, its review and appeal, for each payment and for planning), a public law the mayor's file holds, 68,369; the mayor's, most of it what is on file for the office: its laws and forms; 62,000 since 2026-10-12, where it was 60,000: the form for answering a petition, 60,803; 64,000 later that day: that form's `answer` and the words added to the forms that say something, 62,367)
+  const largest = Math.max(...prompts.map((p) => p.size)); 
+  expect(largest).toBeLessThan(75_000); // (75,000 since 2026-10-17, foundations F9, where it was 70,000: three more public forms the town publishes for what a person files with an office that decides (a claimant's papers, an employer's confirmation, a request to look at a decision again), 2.7 thousand characters of fields in the forms a seat is shown and 0.7 in the list of what is on file, and the office's diary (460 characters); the largest was 74,552 with them and 68,835 without. 70,000 since 2026-10-16, foundations F8, where it was 68,000: the town's law on decisions (what a decision waits for, its review and appeal, for each payment and for planning), a public law the mayor's file holds, 68,369; the mayor's, most of it what is on file for the office: its laws and forms; 62,000 since 2026-10-12, where it was 60,000: the form for answering a petition, 60,803; 64,000 later that day: that form's `answer` and the words added to the forms that say something, 62,367)
   // (68,000 since foundations F5, where it was 64,000: the mayor's file now holds the town's administrative staff's employment agreements, signatures and standing payments, a hundred papers more; the largest prompt was 66,162.)
   // (45,000 since 2026-10-11, where it was 40,000: the town's law book gained its laws on ending a job and on possession,
   // and the payments procedure says which line a wage is on; the largest finance prompt was 40,505.)
@@ -57,7 +57,7 @@ test("a seat that looks into its office's papers at every sitting is shown lists
   // characters (docs/decisions.md, "What a seat carries between sittings"); the largest finance prompt was 52,193.)
   // (63,000 since 2026-10-16, foundations F8, where it was 56,000: the finance office reads the payments procedure for who approves a payment over what sum, no longer a
   // parameter, and is shown the town's procedures to do it (4,648 characters), and the town's law on decisions is in the laws it is shown (3,581); the largest finance prompt was 61,229.)
-  expect(Math.max(...finance.map((p) => p.size))).toBeLessThan(63_000);
+  expect(Math.max(...finance.map((p) => p.size))).toBeLessThan(66_000); // (66,000 since 2026-10-17, foundations F9, where it was 63,000: the same three forms and the diary; the largest finance prompt was 64,654, and 61,615 without them.)
   // The folder named for payroll holds the employment agreements, a line each; the files, everything, as a list.
   const second = finance[1]!.text;
   expect(second).toContain("## Finance officer: Payroll: what you looked up (");
