@@ -398,6 +398,11 @@ fn end_participant(st: &mut State, participant: &str, reason: EndReason) -> Vec<
     events
 }
 
+/// Every seat sharing a person's body (a model in one of the person's posts), apart from the person's own participant.
+fn seats_of(st: &State, person: &str, own: Option<&str>) -> Vec<Id> {
+    st.participants.iter().filter(|(id, p)| p.person.as_deref() == Some(person) && own != Some(id.as_str()) && p.status != ParticipantStatus::Ended).map(|(id, _)| id.clone()).collect()
+}
+
 fn die(s: &Statics, st: &mut State, person: &str, cause: DeathCause) -> Vec<Timed> {
     let t = st.t;
     let Some(b) = st.body(person) else { return vec![] };
@@ -405,9 +410,7 @@ fn die(s: &Statics, st: &mut State, person: &str, cause: DeathCause) -> Vec<Time
         return vec![];
     }
     let participant = b.participant.clone();
-    // Whoever acts through this body goes with it: its own participant, and every seat sharing it (a model in one of the
-    // person's posts). Their posts fall vacant.
-    let seats: Vec<Id> = st.participants.iter().filter(|(id, p)| p.person.as_deref() == Some(person) && participant.as_deref() != Some(id.as_str()) && p.status != ParticipantStatus::Ended).map(|(id, _)| id.clone()).collect();
+    let seats = seats_of(st, person, participant.as_deref());
     let mut events = vacate_all(s, st, person, VacateReason::Died, None);
     if let Some(b) = st.entities.get_mut(person).and_then(|e| e.body.as_mut()) {
         b.alive = false;
@@ -1929,11 +1932,21 @@ impl<'a> Exec<'a> {
                     None => self.s.boundary().to_string(),
                 };
                 self.living_present(&who)?;
+                let own = self.st.body(&who).and_then(|b| b.participant.clone());
+                let seats = seats_of(self.st, &who, own.as_deref());
                 let events = vacate_all(self.s, self.st, &who, VacateReason::Departed, Some(self.participant));
                 self.emit_all(events);
                 self.st.entities.get_mut(&who).unwrap().body.as_mut().unwrap().present = false;
                 self.st.moved(&who);
                 self.emit(EventBody::PersonLeft { person: who, to, by: self.participant.into() });
+                // Someone who has gone from the world holds no post in it: their posts fall vacant for whoever appoints to them
+                // to fill, and every seat sharing their body ends (a model in one of their posts goes with the post). Their
+                // own participant lives on for their own affairs abroad (their money, their words) and for a return.
+                let mut ended = own.map(|p| vacate_positions(self.st, &p)).unwrap_or_default();
+                for seat in seats {
+                    ended.extend(end_participant(self.st, &seat, EndReason::Departed));
+                }
+                self.emit_all(ended);
                 Ok(())
             }
 
