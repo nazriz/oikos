@@ -24,7 +24,7 @@ const head = (h: OpenHeading[], what: string) => h.find((x) => x.what === what);
 
 // ------------------------------------------------------------------ the paper
 
-test("the clerk's paper: the first lists what stands open; a later one says what is new, changed and no longer open; a running figure alone files nothing; it files on its round, not at any other wake", () => {
+test("the clerk's paper: the first lists what stands open; a later one says what is new, changed and no longer open; a running figure alone files nothing; it keeps the books on its round, a day", () => {
   let open: OpenHeading[] = [];
   const clerk = new Clerk("landlord-1", "landlord-1-office", { absorb() {}, open: () => open });
   const said = (t: number) => { const a: any = clerk.due(t); return a ? String(a.calls?.[0]?.args?.text ?? JSON.stringify(a)) : undefined; };
@@ -47,7 +47,7 @@ test("the clerk's paper: the first lists what stands open; a later one says what
   expect(second).toContain("what has changed since the clerk's last paper");
   // The same day again, changed again: it waits for the next day.
   open = [{ what: "Rent in arrears", items: [{ id: "lease-c", line: "lease-c: c is 5 behind" }] }];
-  expect(clerk.due(5 * DAY + 3_600, "news")).toBeUndefined(); // (woken by a paper, not its round: foundations F6 made the daily limit the round)
+  expect(clerk.due(5 * DAY + 3_600)).toBeUndefined(); // (the same day again: the round is a day)
   expect(said(6 * DAY)).toContain("new: lease-c");
   // Everything settled: one last paper says so.
   open = [];

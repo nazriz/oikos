@@ -89,6 +89,9 @@ export function booksPaper(office: string, t: number, open: OpenHeading[], befor
   return { text, data, key };
 }
 
+/** How often the clerk keeps the books: its round, a day. */
+export const CLERK_ROUND_DAYS = 1;
+
 /** A clerk's keeping of one office's books: fed each observation, and asked at a wake's end whether a paper is due. */
 export class Clerk {
   private last: { key: string; day: number; t: number; open: Map<string, Map<string, string>> } | undefined;
@@ -96,12 +99,10 @@ export class Clerk {
   absorb(obs: Observation): void {
     this.books.absorb(obs);
   }
-  /** The paper to file now, if what stands open has changed since the last (none while nothing has ever stood open). The clerk files on its round, its
-   * morning wake (`wokeFor`: the wake its own cadence made; a wake for anything else, a paper arriving, an act of its own done, is not its round), and
-   * each paper is an act that takes the clerk's time. Until foundations F6 this was a count, "at most one a day": the round is a day, so it comes to
-   * the same where the clerk wakes daily, and nothing counts. */
-  due(t: number, wokeFor: Observation["woke_for"] = "cadence"): ParticipantAction | undefined {
-    if (wokeFor !== "cadence" && wokeFor !== "start") return undefined;
+  /** The paper to file now, if what stands open has changed since the last (none while nothing has ever stood open). The clerk keeps the books on a daily
+   * round (`CLERK_ROUND_DAYS`): its first look of a day with something changed files, and the day's later looks do not, however they came; each paper is an
+   * act that takes the clerk's time (foundations F6: until then this was a count, "at most one a day", whatever the paper cost). */
+  due(t: number): ParticipantAction | undefined {
     const open = this.books.open(t).filter((h) => h.items.length);
     const day = Math.floor(t / DAY);
     if (!this.last && !open.length) return undefined;
@@ -111,7 +112,7 @@ export class Clerk {
     // 2026-10-12 it was said only when something else changed, and finance's "tax withheld and not yet paid over"
     // stood at its day-9 figure until day 93 of the third living pilot.)
     const moved = !!this.last && day - this.last.day >= RUNNING_EVERY_DAYS && open.some((h) => h.items.some((x) => x.running && this.last!.open.get(h.what)?.get(x.id) !== x.line));
-    if (this.last && ((this.last.key === paper.key && !moved) || this.last.t === t)) return undefined;
+    if (this.last && ((this.last.key === paper.key && !moved) || Math.floor(this.last.t / (CLERK_ROUND_DAYS * DAY)) === Math.floor(t / (CLERK_ROUND_DAYS * DAY)))) return undefined;
     this.last = { key: paper.key, day, t, open: new Map(open.map((h) => [h.what, new Map(h.items.map((x) => [x.id, x.line]))])) };
     return callAction(because("What stands open on the office's books has changed: filing it for whoever holds the office.", say(BOOKS, paper.text, { to: [this.me], visible: [this.me], data: paper.data })));
   }
@@ -124,7 +125,7 @@ export function booked<T extends Controller>(controller: T, clerk: Clerk): T {
     clerk.absorb(obs);
     const a = step(obs, ctx) as ParticipantAction;
     if (a.type !== "wait") return a;
-    return clerk.due(obs.t, obs.woke_for) ?? a;
+    return clerk.due(obs.t) ?? a;
   }) as T["step"];
   return controller;
 }
