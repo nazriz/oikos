@@ -2237,6 +2237,10 @@ pub fn validate(c: &Config) -> Result<(), String> {
         if h.kind == ParticipantKind::System && (h.template.is_none() || h.supplier.is_none()) {
             return Err(format!("position {} is held by {}, a system nobody supplied (it names its template and supplier)", pos.id, h.id));
         }
+        // A system works for the organisation it was delivered to (law 3): not for another's.
+        if h.kind == ParticipantKind::System && h.owner.as_deref() != Some(pos.entity.as_str()) {
+            return Err(format!("position {} (of {}) is held by {}, a system that belongs to {}: a system works only for the organisation it was delivered to", pos.id, pos.entity, h.id, h.owner.as_deref().unwrap_or("nobody")));
+        }
     }
 
     Ok(())

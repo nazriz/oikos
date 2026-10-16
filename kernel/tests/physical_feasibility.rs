@@ -87,6 +87,10 @@ fn predict(run: &Run<Vec<u8>>, participant: &str, position: Option<&str>, b: &Bl
         None => p.person.clone()?,
     };
     let me_person = position.is_none();
+    // A system works only for the organisation it belongs to.
+    if p.owner.as_deref().is_some_and(|o| o != me) {
+        return Some(Err(RefusalCode::NotTheirs));
+    }
     let types = &s.types;
     Some(match b {
         Block::Transfer { from, to, amount, settles: None, per_instruction: None, .. } => {
@@ -285,6 +289,8 @@ fn predict(run: &Run<Vec<u8>>, participant: &str, position: Option<&str>, b: &Bl
                     Some(_) => match to.as_ref().map(|t| st.participants.get(t)) {
                         Some(None) => Err(RefusalCode::UnknownParticipant),
                         Some(Some(q)) if q.status == ParticipantStatus::Ended => Err(RefusalCode::ParticipantInactive),
+                        // (A system works only for the organisation it belongs to.)
+                        Some(Some(q)) if q.owner.is_some() && q.owner.as_deref() != Some(me.as_str()) => Err(RefusalCode::NotTheirs),
                         _ => Ok(()),
                     },
                 }

@@ -171,9 +171,17 @@ pub fn exec_action_seen(s: &Statics, st: &mut State, participant: &str, position
         }
         None => p.person.clone().ok_or_else(|| refuse(RefusalCode::NotInPosition, format!("{participant} is a system: it acts only in a position")))?,
     };
-    // A system acts only within its template.
+    // A person's participant acts through a body that lives.
+    if p.kind == ParticipantKind::Person {
+        if let Some(who) = &p.person {
+            if st.body(who).is_some_and(|b| !b.alive) {
+                return Err(refuse(RefusalCode::Dead, format!("{who} has died")));
+            }
+        }
+    }
+    // A system acts only within its template, and for the organisation it belongs to.
     if p.kind == ParticipantKind::System {
-        check_system_does(s, st, participant, None, blocks)?;
+        check_system_does(s, st, participant, Some(&entity), blocks)?;
     }
     for w in by {
         if w != participant && p.person.as_deref() != Some(w.as_str()) {
@@ -375,6 +383,9 @@ fn die(s: &Statics, st: &mut State, person: &str, cause: DeathCause) -> Vec<Time
         return vec![];
     }
     let participant = b.participant.clone();
+    // Whoever acts through this body goes with it: its own participant, and every seat sharing it (a model in one of the
+    // person's posts). Their posts fall vacant.
+    let seats: Vec<Id> = st.participants.iter().filter(|(id, p)| p.person.as_deref() == Some(person) && participant.as_deref() != Some(id.as_str()) && p.status != ParticipantStatus::Ended).map(|(id, _)| id.clone()).collect();
     let mut events = vacate_all(s, st, person, VacateReason::Died, None);
     if let Some(b) = st.entities.get_mut(person).and_then(|e| e.body.as_mut()) {
         b.alive = false;
@@ -383,6 +394,9 @@ fn die(s: &Statics, st: &mut State, person: &str, cause: DeathCause) -> Vec<Time
     events.push(Timed::new(t, EventBody::PersonDied { person: person.into(), died_of: cause }));
     if let Some(p) = participant {
         events.extend(end_participant(st, &p, EndReason::Died));
+    }
+    for seat in seats {
+        events.extend(end_participant(st, &seat, EndReason::Died));
     }
     events
 }
@@ -1977,6 +1991,10 @@ impl<'a> Exec<'a> {
                     let p = self.st.participants.get(h).ok_or_else(|| refuse(RefusalCode::UnknownParticipant, format!("no participant {h}")))?;
                     if p.status == ParticipantStatus::Ended {
                         return Err(refuse(RefusalCode::ParticipantInactive, format!("{h} no longer acts")));
+                    }
+                    // A system works only for the organisation it was delivered to: it is not appointed to another's post.
+                    if p.kind == ParticipantKind::System && p.owner.as_deref() != Some(x.entity.as_str()) {
+                        return Err(refuse(RefusalCode::NotTheirs, format!("{h} is a system belonging to {}: it doesn't work for {}", p.owner.as_deref().unwrap_or("nobody"), x.entity)));
                     }
                 }
                 let c = self.st.stamp();
