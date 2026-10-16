@@ -348,12 +348,13 @@ test("everyone waking at the same moment sees the same state; what they decide i
   // Round 2: each sees the round before.
   expect(seen["mayor-system"]![1]).toContain("Hello mayor.");
   expect(seen["planning-system"]![1]).toContain("Hello planning.");
-  // The log: at t=0, the mayor's act before planning's, and the mayor's model calls recorded first too.
+  // The log: at t=0, planning's act before the mayor's (the cohort's order, below), and planning's model calls recorded first too.
   const log = lines(s.logPath).filter((e) => e.t === 0);
   const acts = log.filter((e) => e.kind === "command" && e.body.command === "act" && ["mayor-system", "planning-system"].includes(e.body.participant)).map((e) => e.body.participant);
-  expect(acts.slice(0, 2)).toEqual(["mayor-system", "planning-system"]);
+  // (A seat stands in the cohort where its person's own unit for the post would, since foundations F9, so that a seat and its code twin act in one order: the mayor is c0046 and planning c0008, so planning's act comes first; it was the seats' own names, mayor before planning, until then.)
+  expect(acts.slice(0, 2)).toEqual(["planning-system", "mayor-system"]);
   const usage = log.filter((e) => e.kind === "annotation" && e.body.annotation === "usage").map((e) => e.body.subject);
-  expect(usage.slice(0, 2)).toEqual(["mayor-system", "planning-system"]);
+  expect(usage.slice(0, 2)).toEqual(["planning-system", "mayor-system"]);
 }, 300_000);
 
 test("a round's requests are translated at once, and recorded in the cohort's order whichever comes back first", async () => {
@@ -377,7 +378,7 @@ test("a round's requests are translated at once, and recorded in the cohort's or
   const adapter = { provider: inner.provider, model: inner.model, complete: async (req: LlmRequest) => {
     if (req.purpose !== "translator") return inner.complete(req);
     most = Math.max(most, ++inFlight);
-    await Bun.sleep(String(req.context.proposal).includes("From mayor") ? 60 : 5);
+    await Bun.sleep(String(req.context.proposal).includes("From mayor") ? 5 : 60); // (planning is the slower: it stands first in the cohort and comes back last)
     inFlight--;
     order.push(String(req.context.proposal).includes("From mayor") ? "mayor" : "planning");
     return inner.complete(req);
@@ -387,15 +388,15 @@ test("a round's requests are translated at once, and recorded in the cohort's or
     delete officeAt(c, "mayor").holder.controller.params.sessions;
   });
   const s = await run("translate-at-once", config(), 2 * DAY, { adapter });
-  // Both were being translated at the same time, and planning's came back first.
+  // Both were being translated at the same time, and the mayor's came back first.
   expect(most).toBe(2);
-  expect(order.slice(0, 2)).toEqual(["planning", "mayor"]);
+  expect(order.slice(0, 2)).toEqual(["mayor", "planning"]);
   // The log has them in the cohort's order all the same: each draft, with its translator's calls just before it.
   const ann = lines(s.logPath).filter((e) => e.kind === "annotation").map((e) => e.body);
   const drafts = ann.filter((a) => a.annotation === "draft").map((a) => a.draft.participant);
-  expect(drafts.slice(0, 2)).toEqual(["mayor-system", "planning-system"]);
+  expect(drafts.slice(0, 2)).toEqual(["planning-system", "mayor-system"]); // (the cohort's order, as above)
   const refs = ann.filter((a) => a.annotation === "transcript" && a.data.purpose === "translator").map((a) => a.data.ref);
-  expect(refs.slice(0, 2)).toEqual(["draft.mayor-system.1", "draft.planning-system.1"]);
+  expect(refs.slice(0, 2)).toEqual(["draft.planning-system.1", "draft.mayor-system.1"]);
   // And the run is the same run made again (the other way round in time, the same in the log).
   inFlight = 0; asked.clear(); order.length = 0;
   const again = await run("translate-at-once-again", config(), 2 * DAY, { adapter });

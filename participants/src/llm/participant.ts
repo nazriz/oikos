@@ -12,7 +12,7 @@
 // It can always stop taking part (VISION §15), which is not the same as
 // stepping down from an office: that is an act in the world like any other.
 
-import type { Observation, ParticipantAction } from "../contracts";
+import type { LookRequest, Observation, ParticipantAction } from "../contracts";
 import type { ParticipantContext } from "../module";
 import { inCurrency } from "../money";
 import type { ContentBlock, LlmMessage, ToolSpec } from "./adapter";
@@ -79,6 +79,8 @@ export interface LlmParticipantConfig {
    * at the next working day's sitting after the paper came, never at once, so that a day's papers are one sitting.
    * A real office opens its in-tray every working day. The seat can say which kinds may wait (`done_for_now`, hold). */
   wakeOnPapers?: boolean;
+  /** A mock seat that sits as its code twin does: what it says it is done for is a time of the second, not days (mock.ts). */
+  exactBack?: boolean;
   /** Its office's in-trays (by channel path): its own papers of some kinds only (`true`: whatever comes there; a list:
    * those kinds, as a folder holds them), and the folders that hold every paper of its organisation's (`all`), where
    * only what is addressed to its own post, or comes from outside an organisation with no in-tray, is its to open. */
@@ -673,7 +675,14 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
     return until !== undefined ? { type: "wait", until } : { type: "wait" };
   };
   /** Done for now, for the days given (none: its usual rhythm): back then, or at the next sitting if someone writes. */
+  let exactTo: number | null | undefined; // (a twin's: the time it said it is back at, none: its brain's own rhythm)
   const leave = (t: number, given?: number): ParticipantAction => {
+    if (exactTo !== undefined) {
+      const to = exactTo;
+      exactTo = undefined;
+      backAt = to ?? 0;
+      return away(to ?? undefined);
+    }
     const days = given ?? (S ? c.cadenceDays : undefined);
     backAt = days ? (S ? sittingStart(Math.floor(t / DAYS) + days) : t + days * DAYS) : 0;
     return away(S ? Math.min(backAt || Infinity, nextSitting(t + 1)) : days ? t + days * DAYS : undefined);
@@ -838,6 +847,9 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
       return { what, action: { type: "message", to, text: words, ...as, ...(re ? { re } : {}) }, label: `Your letter to ${to.join(", ")}${about && !re ? ` (headed "About: ${about.length > 80 ? `${about.slice(0, 80)}…` : about}": what it is about is not one id, so it heads the letter)` : ""}`,
         ...(about && !re ? { subject: about } : {}) };
     }
+    // A mock seat that sits as its code twin does asks for what its brain asked for in one look, as the code unit asks: all of it in one command, at
+    // its place in the moment's order (a model's looks are one report at a time, each a turn of its own).
+    if (use.name === "look" && c.exactBack && Array.isArray(i.raw) && i.raw.length) return { what, action: { type: "look", looks: i.raw as LookRequest[] } };
     if (use.name === "look" && reports.size) {
       if (!text(i.report)) return no("it didn't say which report");
       const kind = reports.get(i.report);
@@ -1385,10 +1397,11 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
         // nothing said about being done: if there's nothing in any of them, nothing came of the answer.
         const lookUses = uses.filter((u) => u.name === "look");
         trays = lookUses.length > 0 && queue.length === lookUses.length && !notDone.size && uses.every((u) => u.name === "notebook" || u.name === "look")
-          && lookUses.every((u) => (u.input.find === undefined || (Array.isArray(u.input.find) && !u.input.find.length)) && u.input.named === undefined && u.input.measure === undefined && u.input.paper === undefined && u.input.about === undefined && u.input.since === undefined && u.input.words === undefined && u.input.from_entry === undefined);
+          && lookUses.every((u) => u.input.raw === undefined && (u.input.find === undefined || (Array.isArray(u.input.find) && !u.input.find.length)) && u.input.named === undefined && u.input.measure === undefined && u.input.paper === undefined && u.input.about === undefined && u.input.since === undefined && u.input.words === undefined && u.input.from_entry === undefined);
         const done = uses.find((x) => x.name === "done_for_now");
         const days = Number.isInteger(done?.input?.days) && done!.input.days > 0 ? { days: done!.input.days as number } : {};
         if (done) lastDays = days.days;
+        if (done && c.exactBack) exactTo = Number.isInteger(done.input?.at) ? (done.input.at as number) : null;
         // Kinds of paper that may wait for the sitting it sets: as it says, until it says again.
         if (done && papersBack && Array.isArray(done.input?.hold)) {
           hold = new Set((done.input.hold as unknown[]).filter(text).map((k) => kindSaid(k)));

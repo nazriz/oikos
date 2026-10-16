@@ -243,6 +243,12 @@ interface Unit {
    * (kernel/src/schedule.rs), which decides every wake from then on. */
   cadence: number;
   firstWake: number;
+  /** A seat that sits as its code twin does (a mock's, `mock.twin`): woken by papers as a code unit of its post is. */
+  hears?: boolean;
+  /** Where it stands among those woken together (the engine's `sort`): a seat stands where its person's own unit for the post would. */
+  sort?: string;
+  /** The participant whose body a twin seat sits in (the engine's `body`). */
+  body?: string;
   /** Truth audits: the divergences found at its last audit, by belief, and when each was first found. */
   diverged?: Map<string, number>;
   /** Why the current wake happened (contracts 0.7: woke_for), and how long since the last (the engine says). */
@@ -538,6 +544,10 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   const llmUnit = async (p: Part, wakeAt?: number): Promise<Unit> => {
     const c = p.controller;
     const pp = c.params ?? {};
+    // A mock seat that sits as its code twin does (mock.twin, docs/design/foundations.md section 4): no office hours of its own, back when its
+    // brain's module would be, woken by what wakes a code unit of its post. What a steward does differently from its code twin is then the
+    // steward's decisions only, never when it sits (the world is the same, but for what the seat does).
+    const twin = !o.adapter && !!pp.mock?.twin && !!pp.mock?.brain;
     const cadence = (pp.cadence_days ?? 7) * DAY;
     const mine = held(p.id);
     // Channel paths as the kernel names them: its own, and each held position's as <position>/<channel>.
@@ -584,7 +594,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     const dayBook = new DayBook({ entity, authors: [p.id, ...ownAuthors], name: (id: string) => whoIs(id)?.name,
       ...(office && officeModule?.books ? { books: officeModule.books(ctxFor(p.id, office.id, entity, sortedKeys(office.role_module?.params ?? {}) as any)) } : {}) });
     const config = { dayBook: { text: (at: number) => dayBook.text(at, office?.title ?? entityName ?? "The office") }, ...(pp.mock?.debrief ? { mockDebrief: pp.mock.debrief } : {}), trays, ownAuthors, ...(pp.wake_on_papers === false ? { wakeOnPapers: false } : {}), ...(typeof pp.effort === "string" && pp.effort ? { effort: pp.effort } : {}), ...(roster || tally ? { staff: { text: setOut } } : {}), whoIs, participant: p.id, entity, entityName, onRequest, kinds, ways, title: office?.title ?? p.title, role: office?.role, framing: p.framing, standing: standingIds, titles, cadenceDays: pp.cadence_days ?? 7, draftText,
-      ...(pp.sessions ? { sessions: pp.sessions } : {}), ...(pp.max_actions ? { maxActions: pp.max_actions } : {}),
+      ...(pp.sessions && !twin ? { sessions: pp.sessions } : {}), ...(twin ? { exactBack: true } : {}), ...(pp.max_actions ? { maxActions: pp.max_actions } : {}),
       // Folders that hold some kinds of paper only (by the channel's own id, as `standing` is given), and the most a prompt may be.
       ...(pp.folders ? { folders: new Map<string, string[]>(Object.entries(pp.folders as { [id: string]: string[] }).flatMap(([id, kinds]) => chans.filter((x) => x.path === id || x.path.endsWith(`/${id}`)).map((x) => [x.path, kinds] as [string, string[]]))) } : {}),
       ...(pp.prompt_max ? { promptMax: pp.prompt_max } : {}) };
@@ -600,15 +610,21 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       if (b && !brainModule) throw new Error(`participant ${p.id}: no behaviour module "${b}" for its mock brain`);
       if (brainModule) {
         await hashSource(brainModule);
-        const bctx = { ...ctx, params: sortedKeys(pp.mock?.params ?? {}) as any };
-        brains.set(p.id, { controller: brainModule.create(bctx), ctx: bctx, capacity: office?.id ?? "self", cadence: brainModule.cadence(bctx), rejectBps: pp.mock?.reject_bps, optOutAt: pp.mock?.opt_out_at, ...(pp.mock?.back_days ? { backDays: pp.mock.back_days } : {}) });
+        // (A twin's brain is its person's own code unit for the post: the same name for what it draws, so that it draws as its twin does.)
+        const asPerson = twin && office ? cfg.participants.find((x: any) => x.person && x.person === p.person && x.id !== p.id && !x.shares_body)?.id : undefined;
+        const bctx = asPerson ? ctxFor(asPerson, office!.id, entity, pp.mock?.params ?? {}) : { ...ctx, params: sortedKeys(pp.mock?.params ?? {}) as any };
+        brains.set(p.id, { controller: brainModule.create(bctx), ctx: bctx, capacity: office?.id ?? "self", cadence: brainModule.cadence(bctx), rejectBps: pp.mock?.reject_bps, ...(twin ? { twin: true } : {}), optOutAt: pp.mock?.opt_out_at, ...(pp.mock?.back_days ? { backDays: pp.mock.back_days } : {}) });
         bindings[p.id] = { ...bindings[p.id], mock_brain: b };
       }
     }
+    const brain = twin ? brains.get(p.id) : undefined;
+    // (Where the person's own unit for this post would stand in a moment's wakes: the same key, so that a seat and its code twin act in one order.)
+    const codeTwin = cfg.participants.find((x: any) => x.person && x.person === p.person && x.id !== p.id && !x.shares_body)?.id;
     return {
       key: p.id, participant: p.id, entity, module, controller: controller as unknown as Controller, ctx,
       llm: { controller, config: p, drafts: [], drafted: 0, ...(roster ? { roster } : {}), ...(tally ? { tally } : {}), ...(dayBook ? { dayBook } : {}) },
-      cadence: ceilTo(cadence, tick), firstWake: wakeAt ?? 0, wokeFor: "start", since: 0,
+      ...(codeTwin && office ? { sort: `${codeTwin}|${office.id}` } : {}), ...(brain ? { hears: true, ...(codeTwin ? { body: codeTwin } : {}) } : {}),
+      cadence: ceilTo(brain?.cadence ?? cadence, tick), firstWake: wakeAt ?? (brain ? ceilTo(mods[pp.mock.brain]!.firstWake?.(brain.ctx) ?? 0, tick) : 0), wokeFor: "start", since: 0,
       knowledge: new Knowledge(currency), view: new View(new Set(standingIds)), notices: [],
     };
   };
@@ -637,7 +653,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
         added.push(u);
       }
     }
-    if (added.length) await k.request({ op: "units_add", units: added.map((u) => ({ key: u.key, participant: u.participant, ...(u.llm ? { llm: true } : { capacity: u.capacity }), cadence: u.cadence, next_wake: u.firstWake, ...(u.module?.deaf ? { deaf: true } : {}) })) });
+    if (added.length) await k.request({ op: "units_add", units: added.map((u) => ({ key: u.key, participant: u.participant, ...(u.llm ? { llm: true } : { capacity: u.capacity }), cadence: u.cadence, next_wake: u.firstWake, ...(u.module?.deaf ? { deaf: true } : {}), ...(u.hears ? { hears: true } : {}), ...(u.body ? { body: u.body } : {}), ...(u.sort ? { sort: u.sort } : {}) })) });
   };
   for (const pid of [...parts.keys()].sort()) await syncUnits(pid);
 
@@ -800,6 +816,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     if (started) {
       u.acted = true; // (its wake goes on when the act is done: the engine's schedule)
       if (!u.llm) u.controller.sent?.(started.action); // (so that it can tell which act an outcome is of)
+      else if (u.hears) brains.get(u.participant)?.controller.sent?.(started.action); // (a twin seat's brain too: it is its code unit)
       const b = (backlog[u.module.name] ??= { acts: 0, waited: 0, longest: 0 });
       const waited = started.starts - (t + thinking);
       b.acts++;
@@ -1229,12 +1246,15 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       // Rounds: everyone still awake looks (so all see the same state), all decide (model calls at once), then what
       // they decided is carried out in key order, never in the order decisions came back. Those whose wakes go on
       // look again in the next round, and see the round before.
-      let awake = cohort.map((u) => ({ u, n: 0 }));
       let rounds = 0;
-      while (awake.length) {
+      // (A round: those awake look, decide, and what they decided is carried out in key order. `nested`: a seat that sits as its code twin does has
+      // its request drafted and confirmed inside its place in this round, so that its act begins where its twin's would, in the moment's one order.)
+      const round = async (awake: { u: Unit; n: number }[], nested: boolean): Promise<{ u: Unit; n: number }[]> => {
         // Acting always moves time on, so rounds at one moment are only looking, drafting and asking: many means a loop.
-        roundFailures = 0;
-        unwritten.length = 0;
+        if (!nested) {
+          roundFailures = 0;
+          unwritten.length = 0;
+        }
         if (++rounds > MAX_COHORTS_PER_MOMENT)
           throw new RunStuck(`participants went on without acting at t=${t} (${MAX_COHORTS_PER_MOMENT} rounds in one moment): ${awake[0]!.u.key} among them`);
         const looking: { u: Unit; n: number; obs: Observation }[] = [];
@@ -1334,13 +1354,19 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
           if (units.get(x.u.key) !== x.u) continue;
           // It began an act: its wake goes on when the act is done. If it goes on otherwise (it looked, drafted), it does
           // so in the next round, at this moment. Either way, or waiting, the engine sets its next wake.
-          if (goesOn && !x.u.acted) next.push({ u: x.u, n: x.n + 1 });
-          else await k.request({ op: "finished", key: x.u.key, ...(x.u.waitUntil !== undefined ? { until: x.u.waitUntil } : {}) });
+          if (goesOn && !x.u.acted) {
+            if (x.u.hears && (r.value as ParticipantAction)?.type === "propose") next.push(...(await round([{ u: x.u, n: x.n + 1 }], true)));
+            else next.push({ u: x.u, n: x.n + 1 });
+          } else await k.request({ op: "finished", key: x.u.key, ...(x.u.waitUntil !== undefined ? { until: x.u.waitUntil } : {}) });
         }
-        awake = next;
-        roundFailures = 0;
-        unwritten.length = 0;
-      }
+        if (!nested) {
+          roundFailures = 0;
+          unwritten.length = 0;
+        }
+        return next;
+      };
+      let awake = cohort.map((u) => ({ u, n: 0 }));
+      while (awake.length) awake = await round(awake, false);
     }
   } catch (e) {
     if (!(e instanceof SpendingLimitReached)) throw e;
