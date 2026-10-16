@@ -138,6 +138,33 @@ test("finance: the returns the law lists, which falls due next and when, under w
   expect(find(b.open(41 * DAY + 100), "Returns of tax withheld from wages falling due, and the day each is due by").find((i) => i.id.startsWith("nssf"))!.line).toContain("(today)");
 });
 
+test("finance: a return made on the office's own form is made: it no longer falls due, whatever day it was due by; one not made stays on the books once its day has passed", () => {
+  const b = financeBooks(context("fin", "city", {}, { position: "finance" }));
+  const a = job("job-1", 2 * DAY, "c1");
+  const law = statement("law-income-tax", 0, "law", { speaks_for: "outside", visible_to: "public", data: { tax: "income",
+    charges: [{ id: "income-tax", name: "Income tax", schedule: [{ from: 0, rate_bps: 1000 }], collector: "outside", account: "acc-outside" }],
+    returns: [{ id: "paye", name: "PAYE return", charges: ["income-tax"], day: 9 }] } });
+  // (A report on the form names no return and no due day: only the day the period ended, and the law.)
+  const report = (id: string, at: number, periodEnd: number) => statement(id, at, "withholding_report", { addressed_to: ["outside"], speaks_for: "city", data: { withheld: 10_000, paid: 10_000, period_end: periodEnd } });
+  const pay = (t: number) => ({ t, from: "acc-city", to: "acc-c1", amount: "270000", currency: "AUD", by: "fin", per_instruction: "ord-1" });
+  const base = [law, ...signed(a, 3 * DAY), standingOrder("ord-1", 4 * DAY, "city", "acc-c1", 270_000, { basis: "job-1", every: PERIOD })];
+  const falling = (x: ReturnType<typeof financeBooks>, t: number) => find(x.open(t), "Returns of tax withheld from wages falling due, and the day each is due by");
+  // Day 38: the return for pay to the end of day 30 (due day 39) is not made: it is due tomorrow.
+  feed(b, "city", 37 * DAY, base, { transactions: [pay(20 * DAY), pay(35 * DAY)] });
+  expect(falling(b, 37 * DAY).map((i) => i.id)).toEqual([`paye-${38 * DAY}`]);
+  expect(falling(b, 37 * DAY)[0].line).toContain("falls due on year 1, day 39 (tomorrow), for pay from year 1, day 1 to year 1, day 30; the last was none yet");
+  // Made on day 38 (the period ended on day 30): the next to fall due is the next month's.
+  feed(b, "city", 37 * DAY + 100, [report("wr-1", 37 * DAY + 50, 29 * DAY)]);
+  expect(falling(b, 37 * DAY + 100)[0].line).toContain("falls due on year 1, day 69 (in 31 days), for pay from year 1, day 31 to year 1, day 60");
+  // Not made at all by the day after its due day: it stays, as overdue, beside the next.
+  const c = financeBooks(context("fin", "city", {}, { position: "finance" }));
+  feed(c, "city", 45 * DAY, base, { transactions: [pay(20 * DAY), pay(35 * DAY)] });
+  expect(falling(c, 45 * DAY).map((i) => i.line.replace(/ \(.*$/, ""))).toEqual([expect.stringContaining("was due on year 1, day 39 for pay from year 1, day 1 to year 1, day 30, and no report has been made for it"), expect.stringContaining("PAYE return")]);
+  // A late return that covers both periods closes both.
+  feed(c, "city", 80 * DAY, [report("wr-2", 79 * DAY, 78 * DAY)]);
+  expect(falling(c, 80 * DAY).map((i) => i.id)).toEqual([`paye-${98 * DAY}`]);
+});
+
 // ---------------------------------------------------------------- mayor
 
 const petition = (id: string, at: number) => statement(id, at, "petition", { speaks_for: "org", author: "org-x", addressed_to: ["city"], data: { demand: { text: "Fix the rent rules" } } });

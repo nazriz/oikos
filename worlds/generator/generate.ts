@@ -2828,7 +2828,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   office("outside-support", "outside", "Support payments", undefined,
     [{ id: "ledger", kind: "accounts" }, K.mine("claims", ["benefit_claim", "benefit_change", "benefit_decision", "case_for_decision", DECISION_KIND.evidence, DECISION_KIND.confirmation]),
       // (And, where things go wrong: what is asked of it, and what a body that hears such things tells it and decides.)
-      ...(FR ? [K.mine("reviews", [DECISION_KIND.request, DECISION_KIND.review, "complaint_notice", "venue_decision", "hearing_notice", "tribunal_order", "benefit_decision"])] : []),
+      ...(FR ? [K.mine("reviews", [DECISION_KIND.request, DECISION_KIND.review, "complaint_notice", "venue_decision", "hearing_notice", "tribunal_order", "benefit_decision", DECISION_KIND.answer, "complaint_response", "tribunal_response"])] : []),
       K.mine("gone", ["death_registration", "departure"]), lawBook,
       ...(PAYMENTS.some((r) => r.who?.record || "share_bps" in r.amount) || DECISIONS.some((d) => d.needs?.some((n) => n.from === "employer")) ? [K.mine("contributions", ["withholding_report"])] : [])],
     code("world.transfers", { account: "acc-outside", publish_every_days: 30,
