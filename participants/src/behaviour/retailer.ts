@@ -293,6 +293,8 @@ export const retailer: BehaviourModule = {
         const t = obs.t;
         const acc = ownAccount(obs);
         const steps: Step[] = [];
+        // Nothing goes to our shareholders while wages are owed, staff are under notice, or a debt recorded against us stands unpaid.
+        const strained = (): string => staffing.strained(book, t) || (() => { const owing = winding.debts(book); return owing.length ? `${owing.length} debt${owing.length > 1 ? "s" : ""} recorded against us ${owing.length > 1 ? "are" : "is"} unpaid (${usd(owing.reduce((x, d) => x + cents(d.about.amount), 0))})` : ""; })();
         if (acc && winding.state === "closed") {
           const where = premisesOf(obs);
           const worth = where ? buildingPrice(book, p.builder, where.type) : undefined;
@@ -303,8 +305,10 @@ export const retailer: BehaviourModule = {
         if (!acc) return steps;
         if (winding.due(t)) {
           // (What we owe our suppliers for goods delivered on their terms is paid first, as the debts recorded against us are.)
-          const owed = payables.settle(t, acc.account, acc.balance);
-          return [...owed.steps, ...winding.finish(t, book, acc.account, acc.balance - owed.paid, (x) => distribute(book, me, acc, x, "Wound up: what's left, to our shareholders by their shares").steps)];
+          // (Wages and redundancy pay owed, and the tax withheld from wages, come first: before suppliers, other debts and shareholders.)
+          const staffOwed = staffing.windUpOwed(book, t, acc.account, acc.balance);
+          const owed = payables.settle(t, acc.account, acc.balance - staffOwed.paid);
+          return [...staffOwed.steps, ...owed.steps, ...winding.finish(t, book, acc.account, acc.balance - staffOwed.paid - owed.paid, (x) => distribute(book, me, acc, x, "Wound up: what's left, to our shareholders by their shares").steps)];
         }
         const trading = winding.state === "trading";
         const workers = staffing.workers(book, t);
@@ -404,7 +408,7 @@ export const retailer: BehaviourModule = {
           // (And what we owe our suppliers for stock delivered on their terms: a dividend must not take the money its invoices are paid from.)
           const buffer = bill + stockFor(lastDemand) * unitCost + Math.floor((bill * p.chi_bps) / 10_000) + payables.owing;
           // (Nothing is paid out while wages are owed or anyone is under notice: docs/behaviour/firms.md, "Before a dividend".)
-          const out = p.draw_days > 0 ? { steps: [], paid: 0 } : staffing.strained(book, t) ? { steps: [because(`Month's end: ${staffing.strained(book, t)}, so nothing is paid out to our shareholders.`)], paid: 0 } : payOut(book, me, acc, acc.balance, buffer, acc.balance - monthStart, `a month's wages and stock, and ${p.chi_bps / 100}% of the wage bill`);
+          const out = p.draw_days > 0 ? { steps: [], paid: 0 } : strained() ? { steps: [because(`Month's end: ${strained()}, so nothing is paid out to our shareholders.`)], paid: 0 } : payOut(book, me, acc, acc.balance, buffer, acc.balance - monthStart, `a month's wages and stock, and ${p.chi_bps / 100}% of the wage bill`);
           monthStart = acc.balance - out.paid;
           steps.push(...out.steps);
         }

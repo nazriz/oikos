@@ -1840,6 +1840,31 @@ export class Staffing {
     }
     return lines.length ? [because(`Owed in our books to people who work or worked for us (wages not paid on their day, redundancy pay): paying ${lines.length} of them now.`, ...lines)] : [];
   }
+  /** Winding up: what we owe our staff, and what we withheld from their wages and have not paid over, come before our
+   * shareholders (and our other creditors): wages and redundancy pay owed in our books, then the tax withheld, paid
+   * from `balance` as far as it goes. What was paid is returned beside the steps. */
+  windUpOwed(book: Book, t: number, account: string, balance: number): { steps: Step[]; paid: number } {
+    const steps: Step[] = [];
+    let paid = 0;
+    for (let round = 0; round < 20; round++) {
+      const before = this.wagesOwed();
+      const s = this.latePay(book, t, account, balance - paid, 0);
+      if (!s.length) break;
+      steps.push(...s);
+      paid += before - this.wagesOwed();
+    }
+    const lines: C.Call[] = [];
+    for (const x of [...this.owed.values()]) {
+      if (!(x.amount > 0) || !x.charge.account) continue;
+      const amount = Math.min(x.amount, balance - paid);
+      if (amount <= 0) continue;
+      this.owed.set(x.charge.id, { ...x, amount: x.amount - amount });
+      paid += amount;
+      lines.push(pay(x.charge.account, amount, { from: account, for: "Winding up: tax withheld from wages, paid over." }));
+    }
+    if (lines.length) steps.push(because("Winding up: the tax we withheld from wages and had not paid over comes before our shareholders.", ...lines));
+    return { steps, paid };
+  }
   /** Putting short pay right from here on: their wage order replaced by one at the wage agreed. (What was kept back
    * is paid by whoever answers for us.) */
   payInFull(book: Book, t: number, account: string, agreement: string, why: string): Step[] {
