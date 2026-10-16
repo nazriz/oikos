@@ -66,6 +66,8 @@ test("owners own their houses, repay their mortgages, pay rates, and pass their 
   // (The land registry's registrar is a system here, as every office was until foundations F5: with deaths this many its person, who is a resident,
   // dies too, and the post stands vacant, since nothing yet appoints a successor (F6). The subject here is the transmission of titles, not the post.)
   systemAt(config, "land-registrar");
+  // (2026-10-16, the profile source check: the same for the rates office. With the au-vic-2026 profile's students per teacher at 11.9 the draws moved and the rates clerk, a resident, died before the first levy; the post stood vacant and no owner was levied. The subject here is that owners are levied and pay, not who holds the post.)
+  systemAt(config, "rates");
   const { titles, owned, lived } = ownership(config);
   // Owner-occupied: each owner lives in the house on the lot they hold, and is the head of the household there.
   for (const o of owned) expect({ holder: o.holder, livesOn: o.livesOn, heads: o.heads }).toEqual({ holder: o.holder, livesOn: o.lot, heads: true });

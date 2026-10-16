@@ -194,7 +194,8 @@ test("bills go out one period after a standing billing order is made; the staff 
   // (Some report of theirs, not the first: the town's one doctor is now someone whose first working day is the
   // fourth, and the first report says, rightly, that nobody was at the clinic when it opened.)
   expect(of("clinic-manager").some((r) => /^Report of the clinic's doctors, .*treat \(rec\.\d+, every 1 day\): (carried out: \d+ patients seen|in force; nothing fell due).* In post \d+: c\d+ /.test(r.text))).toBe(true);
-  expect(of("principal").find((r) => /teach \(rec\.\d+, every 1 day\): carried out/.test(r.text))!.text).toMatch(/^Report of the school's teachers, .*teach \(rec\.\d+, every 1 day\): carried out: \d+ lessons.* In post \d+: c\d+ last worked year 1, day \d+ \(teach\)/);
+  // (2026-10-16, the profile source check: on the first day the first teacher on the list may not have come in (the au-vic-2026 profile's students per teacher moved who is posted): the report then names who has not, before those who last worked; what it says of each is as before.)
+  expect(of("principal").find((r) => /teach \(rec\.\d+, every 1 day\): carried out/.test(r.text))!.text).toMatch(/^Report of the school's teachers, .*teach \(rec\.\d+, every 1 day\): carried out: \d+ lessons.* In post \d+: (c\d+ has not come in to work; )*c\d+ last worked year 1, day \d+ \(teach\)/);
   // And the seats that have a roster see it there: when each last worked, and each order as reported.
   const roster = seats.shown.filter((x) => x.seat === "principal" && x.text.includes("Staff of your office")).at(-1)!.text;
   expect(roster).toMatch(/last at work year 1, day \d+ \(teach\)/);

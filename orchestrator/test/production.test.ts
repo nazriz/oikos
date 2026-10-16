@@ -41,8 +41,9 @@ test("goods are made from inputs by workers' hours, exported within each factory
   // Nothing refused but same-moment races (D58; and a new employer naming, on their first day, someone who has
   // already worked a full day at the job they just left: acts take time, so starting the new job is a moment of its own), and households moving into homes still being left.
   // (And a person who has moved by the time an act reaches the one it is for, "X isn't near Y", since foundations F5 (2026-10-16): people hold the offices now and are busier, so more acts wait; the same class as not_present, and as in clinic-school and deaths.)
+  // ("flooded" added 2026-10-16, the profile source check: an act reaching a building the flood has emptied is refused by the world's physics, as deaths.test.ts already allows. Every seed floods within 300 days; which building and whom it catches moved with the au-vic-2026 profile's school staffing (students per teacher 11.9), here the school.)
   const partnerGone = (e: any) => e.code === "too_far" && / isn't near /.test(e.detail ?? "");
-  expect(ev.filter((e) => e.event === "action_refused" && !partnerGone(e) && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left", "insufficient_quantity", "dead"].includes(e.code))).toEqual([]);
+  expect(ev.filter((e) => e.event === "action_refused" && !partnerGone(e) && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left", "insufficient_quantity", "dead", "flooded"].includes(e.code))).toEqual([]);
   // Making: at the works, by the factory's own employees, never more than a working day each.
   const employees = new Map<string, Set<string>>();
   for (const a of [...config.world.records, ...recs].filter((r: any) => r.record === "agreement" && r.terms.template === "employment")) {

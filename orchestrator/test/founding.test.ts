@@ -90,7 +90,8 @@ const LIVING = "living.initiative_bps=10000";
 // (Re-taken again on 2026-10-16 at foundations F11: a register's keeper answers in its own time; e52dc970... until then.)
 // (Re-taken on 2026-10-16 at foundations F8: the support office asks for papers before it decides, looks at a refusal again when asked, and the tribunal hears an appeal at the law's fee; the profile's routes are published as `law-decisions`; f28ffd82... until then.)
 // (Re-taken on 2026-10-16, pilot 7 fixes: applications carry their particulars, and the opening caseload's say so in words; 2c3cfde9... until then.)
-const STEP_2B = "e5a4d08af8d54171ac37e993a98e5868d8124de38e7f4687ccb1f089b04f9eca";
+// (Re-taken on 2026-10-16 at the profile source check: the au-vic-2026 profile's tribunal and hearing times, fee, rent bands, students per teacher and kin ceiling changed (docs/decisions.md, 2026-10-16); e5a4d08a... until then.)
+const STEP_2B = "fc0757ebdb2896944513ea6ae3aa49d2e7c6c9f0bcb86742c0ec738821420aee";
 
 test("with founding off a living town is step 2b's town, to the state hash; turned on with no shape to found, nobody does anything they did not do before", async () => {
   const out = mkdtempSync(join(tmpdir(), "oikos-founding-"));
@@ -132,7 +133,8 @@ test("founding in code: with the composer off no model is called; a founded thin
     // (Seed 1 from 2026-10-16, foundations F6: the world differs again; of seeds 1 to 16 only 1 and 3 have two who share the want that founds. Every other has one.)
     // (Seed 3 from 2026-10-16, foundations F7: news of a body reaches a person when it happens, so the course differs again; of seeds 1 to 16 only 3, 10 and 11 have two who share the want that founds.)
     // (Seed 2 from 2026-10-16, foundations F11: a register's keeper answers in its own time, and an office's slip rates are its systems' too, so the course differs; of seeds 1 to 16 only 2 and 5 have two who share the want that founds. Seed 3 held through foundations F7.)
-    const s = await runWorld({ config: { ...config, seed: 2 }, runId: "code", outDir: out, until: 205 * DAY, recordObservations: "none" });
+    // (Seed 5 from 2026-10-16, the profile source check: the au-vic-2026 profile changed, so the course differs; of seeds 1 to 9 only 5 has two who share the want that founds (seed 4 did not finish in the search). The rule is unchanged: which seed has two or more is a matter of draws.)
+    const s = await runWorld({ config: { ...config, seed: 5 }, runId: "code", outDir: out, until: 205 * DAY, recordObservations: "none" });
     expect(s.composer).toBeUndefined();
     const log = readFileSync(s.logPath, "utf8");
     // No model anywhere: not a usage entry, not a transcript.

@@ -38,9 +38,11 @@ const BEFORE: { [profile: string]: { days: number; state: string } } = {
   // (Re-taken on 2026-10-16 at foundations F7: news of a person's body reaches them when it happens, not at the next wake; 5e3c3fcb... until then. gb-eng and ke-nakuru did not move in 30 days.)
   // (Re-taken on 2026-10-16 at foundations F11: a register's keeper answers in its own time; 88f2e1f7..., fe18427c... and 03864d04... until then.)
   // (Re-taken on 2026-10-16 at foundations F8: the support office asks for papers before it decides, looks at a refusal again when asked, and the tribunal hears an appeal at the law's fee; the profile's routes are published as `law-decisions`; 79ea9459..., 5d8c73f8..., bf808d07..., d60a26bc..., 1af6423e..., 40d2f316... until then.)
-  "au-vic-2026": { days: 60, state: "c5a5a00f14ee6503b84be3d764f3020c956b87b31db645771e2fafac879dd026" },
+  // (Re-taken on 2026-10-16 at the profile source check: the au-vic-2026 profile's tribunal and hearing times, fee, rent bands, students per teacher and kin ceiling changed (docs/decisions.md, 2026-10-16); c5a5a00f... until then.)
+  "au-vic-2026": { days: 60, state: "054a9b02ea4043c0c8343986e976b01215c7f03a3931ee53db058f9b2cbf9ffa" },
   // (Re-taken on 2026-10-16 at foundations F5: the town's offices are held by people, their staff hired, its systems delivered from templates that say what they do; 3b4bc97e... until then.)
-  "gb-eng-2026": { days: 30, state: "c1ae5e74a1b6d5a0fb2f194000258d8d48278ef6f27a989dca6495721e272421" },
+  // (Re-taken on 2026-10-16 at the profile source check: the gb-eng-2026 profile's tribunal and hearing times, ground 8 arrears and residence bands changed (docs/decisions.md, 2026-10-16); c1ae5e74... until then.)
+  "gb-eng-2026": { days: 30, state: "2fb288866f9d3058dc27dad49ca8ef16e376662f0ee9aae9986d5da5f0248ed0" },
   // (Re-taken on 2026-10-16 at foundations F5: the town's offices are held by people, their staff hired, its systems delivered from templates that say what they do; ab25cb7d... until then.)
   "ke-nakuru-2026": { days: 30, state: "66ba5ea859c1062a512db1dbfd37b23b54acb3cebf5118540f664c831a0de918" },
 };
@@ -52,7 +54,8 @@ const cfgHash = (c: unknown) => new Bun.CryptoHasher("sha256").update(JSON.strin
 // (Re-taken on 2026-10-16 at foundations F5: the town's offices are held by people, their staff hired, its systems delivered from templates that say what they do; 2ecddd70... until then.)
 // (Re-taken on 2026-10-16 at foundations F11, states and these hashes both: a register's keeper answers in its own time, so the registry's officers have work and the asker's answer comes later; a84328b7..., e0d58af7... and 6e9f53ac... until then.)
 // (Re-taken on 2026-10-16 at foundations F7: the generator's version moved with the table of slips; be6ff50f..., 266c7a18... and 44349775... until then. The states did not move.)
-const CONFIG_BEFORE: { [profile: string]: string } = { "au-vic-2026": "8dc56724cb6ab0ff", "gb-eng-2026": "02ba69459f6da047", "ke-nakuru-2026": "08e63b3c5aa7d908" };
+// (Config hashes re-taken on 2026-10-16 at the profile source check: the au-vic-2026 and gb-eng-2026 profiles changed; 8dc56724... and 02ba6945... until then.)
+const CONFIG_BEFORE: { [profile: string]: string } = { "au-vic-2026": "bcae48315f2d7c49", "gb-eng-2026": "545d3d0359742055", "ke-nakuru-2026": "08e63b3c5aa7d908" };
 
 test("the dial in the world config is a schema-valid setting; a size that would break the arithmetic is refused when the run starts", async () => {
   const v = ajv.getSchema(`${NS}:world-config`)!;
