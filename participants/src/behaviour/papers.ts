@@ -497,6 +497,48 @@ export const POSSESSION_ANSWER: Issued = {
       claim: "=claim", claim_on: "=claim_on", ill: "?ill", people: "=people", children: "=children", ages: "=ages", lived_days: "=lived_days", go_to: "=go_to" } },
 };
 
+// ------------------------------------------------------------------ what a decision waits for, and asking it to be looked at again (foundations F8, F9)
+
+/**
+ * The papers a person of the town files with an office that decides, as forms published for whoever is asked: a claimant's papers for
+ * a claim that waits for them, an employer's confirmation, and a request that an office look at what it decided again (or put right
+ * what went wrong at its hands). A code citizen writes the same statements from its own record (citizen.ts, decisions.ts, firms.ts);
+ * a model in the chair needs a form to write them (foundations F9). Each is a paper of the one who files it, to the office, and of no
+ * one else's. The translator's next round has to learn their names (docs/decisions.md, "Foundations F9").
+ */
+export const CLAIM_EVIDENCE: Issued = {
+  form: "evidence", title: "Papers for a claim that is waiting for them",
+  does: "Answers an office's request for papers for your claim: what you send, and who your last employer was where it asks. Goes to the office by the day its request gives.",
+  fields: {
+    office: f("entity", "The office that asked.", req), claim: f("record", "Your claim, as the request names it.", req), need: f("text", "What it asks for, as it names it.", req),
+    request: f("record", "The request this answers.", req), what: f("text", "What you send, in words.", req),
+    last_employer: f("entity", "Your last employer, where it asks."),
+  },
+  writes: { kind: "evidence", text: "For my claim {claim}: {what}", basis: "=request", to: ["=office"], visible: ["=self", "=office"],
+    data: { claim: "=claim", need: "=need", request: "=request", last_employer: "=last_employer" } },
+};
+export const CONFIRMATION_ANSWER: Issued = {
+  form: "confirmation_answer", title: "An employer's answer to an office that asks it to confirm a worker's employment",
+  does: "Answers an office's request to confirm what your books show of a person who worked for you, by the day it gives. Say only what your own books show.",
+  fields: {
+    office: f("entity", "The office that asked.", req), claim: f("record", "The claim it is about.", req), need: f("text", "What it asks to be confirmed, as it names it.", req),
+    request: f("record", "The request this answers.", req), subject: f("entity", "The person it asks about.", req), what: f("text", "What your books show, in words.", req),
+    employed: f("choice", "Yes: in your employment now.", { options: YES_NO }), known: f("choice", "Yes: your books have them, now or before.", { options: YES_NO }), ended_on: f("date", "Where it ended: the day."),
+  },
+  writes: { kind: "confirmation_answer", text: "Answer to your request {request}: {what}", basis: "=request", to: ["=office"], visible: ["=self", "=office"],
+    data: { claim: "=claim", need: "=need", request: "=request", subject: "=subject", employed: "?employed", known: "?known", ended_on: "=ended_on" } },
+};
+export const REVIEW_REQUEST: Issued = {
+  form: "review_request", title: "A request to look at a decision again, or to put something right",
+  does: "Asks the office or body to look again at what it decided, or to put right what went wrong at its hands, inside the days the law gives where it gives any.",
+  fields: {
+    office: f("entity", "The office or body asked.", req), matter: f("text", "What went wrong, in a word or two (claim_refused).", req), about: f("record", "The paper it is about."),
+    particulars: f("text", "Anything the office should know."), seeks: f("text", "What you ask for."),
+  },
+  writes: { kind: "review_request", text: "Request: please put this right ({matter}).", basis: "=about", to: ["=office"], visible: ["=self", "=office"],
+    data: { matter: "=matter", against: "=office", about: "=about", particulars: "=particulars", seeks: "=seeks" } },
+};
+
 /** What a place's law says of a plan to pay in place of possession, as typed fields (the profile's; no place's figures
  * here): whether the tribunal may set one, must consider one, or has none; where it is taken away; and where paying
  * everything owed within a time ends the claim. */

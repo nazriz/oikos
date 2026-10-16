@@ -10,7 +10,7 @@ import { cents, moneyNow } from "../money";
 import type { Observation, StatementRecord } from "../contracts";
 import type { BehaviourModule, ParticipantContext } from "../module";
 import { Book, DAY } from "./common";
-import { Staffing } from "./firms";
+import { hoursLaw, ordinaryHours, Staffing } from "./firms";
 
 const YEAR = 365 * DAY;
 type Staffed = ReturnType<NonNullable<BehaviourModule["staffed"]>>;
@@ -22,7 +22,7 @@ export interface RosterNow {
   /** What one of the staff is called, and several. */
   role: string;
   /** Those in post: who, since when, under which agreement. */
-  held: { person: string; since?: number; agreement: string }[];
+  held: { person: string; since?: number; agreement: string; /** Their ordinary week, in hours, as their agreement has it (or the law's ordinary week). */ hours?: number }[];
   /** How many posts the office has, and by what; undefined where nothing on its file says (no budget adopted). */
   posts?: number;
   /** Why that many, in words. */
@@ -47,7 +47,11 @@ export class Roster {
 
   now(t: number): RosterNow {
     const role = this.staffed.role;
-    const held = this.staffing.staff(this.book, t).map((a: any) => ({ person: String(a.terms.parties[1]), ...(this.book.signedAt(a.id) !== undefined ? { since: this.book.signedAt(a.id)! } : {}), agreement: String(a.id) }));
+    const law = hoursLaw(this.book);
+    const held = this.staffing.staff(this.book, t).map((a: any) => {
+      const hours = ordinaryHours(a, String(a.terms.parties[1]), law);
+      return { person: String(a.terms.parties[1]), ...(this.book.signedAt(a.id) !== undefined ? { since: this.book.signedAt(a.id)! } : {}), agreement: String(a.id), ...(hours > 0 ? { hours } : {}) };
+    });
     const form = this.book.open("form").find((f) => f.data?.office === this.office && f.data?.form === "job_advertisement")?.id;
     const p = this.staffed.posts;
     if ("establishment" in p) return { role, held, posts: p.establishment, by: "the office's establishment", ...(form ? { form } : {}) };
@@ -103,7 +107,7 @@ export class Roster {
     return [
       `## ${title}: Staff of your office`,
       `Posts (${r.role}): ${r.posts === undefined ? `not set (${r.by})` : `${r.posts} (${r.by})`}.`,
-      n ? `In post (${n}): ${r.held.map((h) => `${who(h.person)}${h.since !== undefined ? `, since ${dated(h.since)}` : ""}, under ${h.agreement}${did(h.person)}`).join("; ")}.` : "In post: nobody.",
+      n ? `In post (${n}): ${r.held.map((h) => `${who(h.person)}${h.since !== undefined ? `, since ${dated(h.since)}` : ""}, under ${h.agreement}${h.hours ? `, ${h.hours} hours a week` : ""}${did(h.person)}`).join("; ")}.` : "In post: nobody.",
       ...(vacant !== undefined ? [`Vacant: ${vacant}.${r.posts !== undefined && n > r.posts ? ` (${n - r.posts} more in post than there are posts.)` : ""}`] : []),
       ...(n ? [] : [`There is nobody in post, so the work that is the staff's is done by nobody.${r.form ? ` The office takes on its own staff, beginning with an advertisement on its job advertisement form (${r.form}).` : ""}`]),
       ...(orders.length ? [`Your standing work orders${report && n ? `, as your staff reported on ${dated(report.at)} (${report.id})` : ""}:`, ...orders.map((o) => `- ${o.order}, ${o.task} ${o.schedule ? `as ${o.schedule} sets` : `every ${Math.round(o.every / DAY) || "?"} day${Math.round(o.every / DAY) === 1 ? "" : "s"}`}: ${o.says}.`)] : []),

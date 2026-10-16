@@ -139,6 +139,23 @@ test("the support office's books: a claim its staff put before the office-holder
   expect(b.open(6 * DAY)).toEqual([]);
 });
 
+test("the support office's books: a claim waiting for papers or a confirmation it asked for, with the day each is due, until it comes or the claim is decided (foundations F8, F9)", () => {
+  const b = supportBooks(ctx("outside"));
+  const ask = (id: string, at: number, kind: string, to: string, data: object) => st(id, at, kind, "outside", { addressed_to: [to], data: { claim: "rec.4", need: "papers", ...data } });
+  b.absorb(obs(3 * DAY, "outside", [ask("rec.7", 3 * DAY, "evidence_request", "c0001", { what: "proof of who you are", by: 17 * DAY }), ask("rec.8", 3 * DAY, "confirmation_request", "shop-3", { need: "employer", what: "that c0001 worked there", by: 17 * DAY })]));
+  const open = b.open(4 * DAY);
+  const waiting = open.find((x) => x.what === "Claims waiting for papers or a confirmation asked for, not yet come")!;
+  expect(waiting.items.map((i) => i.id)).toEqual(["rec.7", "rec.8"]);
+  expect(waiting.items[0]).toMatchObject({ since: 3 * DAY, due: 17 * DAY });
+  expect(waiting.items[0]!.line).toMatch(/^rec\.4: the claimant was asked year 1, day 4 for proof of who you are \(rec\.7\), due by year 1, day 18; not yet answered$/);
+  expect(waiting.items[1]!.line).toContain("shop-3 was asked");
+  // The papers come: that one is gone, the other stands. The claim decided: nothing waits.
+  b.absorb(obs(5 * DAY, "outside", [st("rec.9", 5 * DAY, "evidence", "c0001", { addressed_to: ["outside"], basis: "rec.7", data: { claim: "rec.4", need: "papers", request: "rec.7" } })]));
+  expect(b.open(6 * DAY).find((x) => x.what.startsWith("Claims waiting"))!.items.map((i) => i.id)).toEqual(["rec.8"]);
+  b.absorb(obs(7 * DAY, "outside", [st("rec.10", 7 * DAY, "benefit_decision", "outside", { addressed_to: ["c0001"], basis: "rec.4", data: { claim: "rec.4", granted: true } })]));
+  expect(b.open(8 * DAY)).toEqual([]);
+});
+
 // ------------------------------------------------------------------ a direction and the staff's post
 
 test("a direction on an office's form binds its staff's post as it binds the office", () => {

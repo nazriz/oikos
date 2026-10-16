@@ -37,6 +37,10 @@ export interface MockBrain {
   cadence?: number;
   /** Opt out at the first wake at or after this time (seconds), to exercise opting out. */
   optOutAt?: number;
+  /** Sits as its code twin does: it says when it is back to the second, as the module asked (a code unit's own wait), not in days. */
+  twin?: boolean;
+  /** (A twin's) it has asked for a paper and not yet confirmed it. */
+  busy?: boolean;
   /** Days it says it is back after, whatever its brain would: a seat that chooses to come back in a week, as real ones have. */
   backDays?: number;
 }
@@ -185,13 +189,18 @@ export function mockPolicies(brains: Map<string, MockBrain>): { participant: Moc
     }
     see(id, brain.capacity, obs);
     inCurrency(brain.ctx.world.currency);
-    const a = (await brain.controller.step(slice(obs, brain.capacity, brain.ctx.entity), brain.ctx)) as ParticipantAction;
+    // (A seat that sits as its code twin does takes a step of its brain where the code unit does: at each wake, and after a look it made. Not on the
+    // turns between its asking for a paper and confirming it: those are the seat's plumbing, and the code unit has no step there, being busy with its act.)
+    const midAct = !!brain.twin && brain.busy === true && !!obs.drafts[0];
+    const a = midAct ? ({ type: "wait" } as ParticipantAction) : ((await brain.controller.step(slice(obs, brain.capacity, brain.ctx.entity), brain.ctx)) as ParticipantAction);
     if (a.type === "call" || a.type === "message") q.push(a);
     if (a.type === "opt_out") return [tool("opt_out", { statement: a.statement })];
     // What the brain wants to find out before it goes on: looked for through the seat's own look, as a model would
     // (the answer is in the next report, which the brain reads like any other).
     const wanted = [...(owed.get(id) ?? []), ...(a.type === "look" ? a.looks : [])].filter((l, i, all) => all.findIndex((x) => JSON.stringify(x) === JSON.stringify(l)) === i);
     owed.delete(id);
+    // (A seat that sits as its code twin does looks as its code unit does: all it asks for in one look.)
+    if (wanted.length && brain.twin) return [tool("look", { raw: wanted.map((l) => (brain.capacity === "self" || l.channel.includes("/") ? l : { ...l, channel: `${brain.capacity}/${l.channel}` })) })];
     if (wanted.length) {
       // (Several look-ups of who's who through one report are one look that names them all, as the seat's tool takes them.)
       const tools: { [k: string]: any }[] = [];
@@ -214,6 +223,7 @@ export function mockPolicies(brains: Map<string, MockBrain>): { participant: Moc
       const asked = draft.proposal.startsWith(PREFIX) ? programText(parseProgram(draft.proposal.slice(PREFIX.length))) : undefined;
       const faithful = asked !== undefined && asked === draft.call;
       const accept = faithful && brain.ctx.rng(`mock-sign-${draft.id}`).below(10_000) >= (brain.rejectBps ?? 0);
+      brain.busy = false;
       return [tool("confirm", { ref: draft.id, decision: accept ? "confirm" : "decline", note: faithful ? (accept ? "As I asked." : "(mock) Declined to exercise the path.") : "That isn't what I asked for." })];
     }
     const next = q.shift();
@@ -223,9 +233,11 @@ export function mockPolicies(brains: Map<string, MockBrain>): { participant: Moc
       // A paper of the office's own is asked for on the office's form for it, as whoever holds the office would.
       inCurrency(brain.ctx.world.currency);
       const said = onOwnForms(next.call, [...(stationery.get(id)?.values() ?? [])].sort((x, y) => (x.form < y.form ? -1 : 1)), { self: brain.ctx.entity, now: obs.t, currency: brain.ctx.world.currency });
+      brain.busy = true;
       return [tool("notebook", { text: `Last request on day ${Math.floor(obs.t / 86_400)}.` }), tool("do", { what: PREFIX + said.program, ...as })];
     }
     // Done for now: back when the brain itself would next look in (the time it gave, or its module's own rhythm).
+    if (brain.twin) return [tool("done_for_now", a.type === "wait" && a.until !== undefined && a.until > obs.t ? { at: a.until } : {})];
     const until = brain.backDays ? brain.backDays * 86_400 : a.type === "wait" && a.until !== undefined && a.until > obs.t ? a.until - obs.t : brain.cadence;
     return [tool("done_for_now", until ? { days: Math.max(1, Math.ceil(until / 86_400)) } : {})];
   };

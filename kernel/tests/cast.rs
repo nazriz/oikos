@@ -531,7 +531,7 @@ fn an_advance_to_news_stops_at_the_moment_a_body_gives_news_and_not_at_the_next_
         let r = stops.command(&Command::AdvanceToNews { to: far }).unwrap();
         let t = stops.kernel().t();
         assert!(t > now || t == far, "time moves on");
-        let began: Vec<i64> = r.events.iter().filter(|e| matches!(e.body, EventBody::ConditionBegan { .. } | EventBody::ConditionEnded { .. })).map(|_| t).collect();
+        let began: Vec<i64> = r.events.iter().filter(|e| matches!(e.body, EventBody::ConditionBegan { .. } | EventBody::ConditionEnded { .. } | EventBody::ConditionTreated { .. } | EventBody::MessageDelivered { .. } | EventBody::Recorded { .. })).map(|_| t).collect();
         news += began.len();
         if t < far {
             stopped_early += 1;
@@ -544,5 +544,34 @@ fn an_advance_to_news_stops_at_the_moment_a_body_gives_news_and_not_at_the_next_
     // The same town, advanced plainly, comes to the same end state: the stops lose and add nothing.
     let mut plain = many(300, life, false);
     plain.command(&Command::Advance { to: far }).unwrap();
+    assert_eq!(stops.kernel().state_hash().unwrap(), plain.kernel().state_hash().unwrap());
+}
+
+#[test]
+fn an_advance_to_news_stops_at_a_letters_delivery_and_a_papers_recording_not_at_the_next_wake() {
+    // Foundations F9 (twins with a live seat). Whom a letter or a paper reaches is woken when it arrives, and the moment that is must not
+    // turn on who else happens to wake next (a seat sits at other hours than its code twin): an advance stops at it, after all that
+    // is scheduled for that moment. `Advance` still goes to the time asked, and the same state comes of both.
+    let far = 30 * DAY;
+    let start = |run: &mut Run<Vec<u8>>| {
+        run.command(&Command::Act { participant: "alice-self".into(), position: None, blocks: serde_json::from_value(json!([{"block": "message", "to": ["bob"], "text": "Hello."}])).unwrap(), by: vec![], provenance: json!({"via": "direct"}), reasoning: None, thinking: None }).unwrap()
+    };
+    let mut stops = town();
+    let begun = start(&mut stops);
+    let done = begun.events.iter().find_map(|e| match &e.body { EventBody::ActionStarted { done, .. } => Some(*done), _ => None }).expect("the act began");
+    assert!(done > 0 && done < far);
+    let r = stops.command(&Command::AdvanceToNews { to: far }).unwrap();
+    assert_eq!(stops.kernel().t(), done, "it stops where the letter is delivered, not at {far}");
+    assert!(r.events.iter().any(|e| matches!(e.body, EventBody::MessageDelivered { .. })));
+    let mut stopped = 1;
+    while stops.kernel().t() < far {
+        stops.command(&Command::AdvanceToNews { to: far }).unwrap();
+        stopped += 1;
+    }
+    assert!(stopped >= 1 && stops.kernel().t() == far, "and goes on to the time asked");
+    let mut plain = town();
+    start(&mut plain);
+    plain.command(&Command::Advance { to: far }).unwrap();
+    assert_eq!(plain.kernel().t(), far);
     assert_eq!(stops.kernel().state_hash().unwrap(), plain.kernel().state_hash().unwrap());
 }

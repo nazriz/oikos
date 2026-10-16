@@ -217,9 +217,22 @@ fn next(session: &mut Session, req: &Value) -> Result<Reply, String> {
         crate::schedule::Next::Advance { to } => {
             // (Time moves on to the next wake, or to the moment something happens to a person's body if that comes first: the
             // news reaches them then, not at whichever wake follows.)
-            let resp = r.command(&Command::AdvanceToNews { to }).map_err(|e| e.to_string())?;
+            // (Each stop is at a moment something reached somebody, and what it reached is noted at that moment: whoever it wakes wakes then. A
+            // stop that wakes nobody goes on towards `to` in the same reply.)
+            let (mut seq, mut events, mut logged) = (0, vec![], vec![]);
+            loop {
+                let resp = r.command(&Command::AdvanceToNews { to }).map_err(|e| e.to_string())?;
+                let now = r.kernel().t();
+                s.note_events(Some(r.kernel().state()), &resp.events, now);
+                seq = seq.max(resp.seq);
+                events.extend(resp.events);
+                logged.extend(resp.logged);
+                if now >= to || s.due_by(now) {
+                    break;
+                }
+            }
+            let resp = crate::run::Response { seq, events, observation: None, logged };
             let to = r.kernel().t();
-            s.note_events(Some(r.kernel().state()), &resp.events, to);
             let mut line = Vec::with_capacity(64 + resp.logged.iter().map(|b| b.len() + 1).sum::<usize>());
             line.extend_from_slice(format!("{{\"advanced\":{to},\"events\":").as_bytes());
             write_events(&resp, &mut line)?;

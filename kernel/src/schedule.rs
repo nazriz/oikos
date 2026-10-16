@@ -31,6 +31,15 @@ struct Unit {
     llm: bool,
     /// A unit that hears no news: it is woken by its cadence and what it asks for, never by a record or a message (foundations F6: a payroll's round is its own).
     deaf: bool,
+    /// A language-model unit that is woken by papers and answers as a code unit of the same post is (foundations F9, twins: a seat that sits
+    /// as its code twin does, with no office hours of its own; only a mock's, where the brain is the code).
+    hears: bool,
+    /// The participant whose body it sits in, where that is not its own (a seat's person): what is delivered to the person reaches the seat's unit
+    /// as it reaches the person's own unit for the same post. Only a `hears` unit has one.
+    body: Option<String>,
+    /// Where it stands among those that wake together: its key by default; a seat stands where the person it acts through would (the
+    /// order of a moment's wakes, and so of the acts of one moment, does not turn on whether a post is held by a seat or by code).
+    sort: String,
     cadence: i64,
     next_wake: i64,
     wake_for: &'static str,
@@ -59,8 +68,8 @@ pub struct Scheduler {
     /// participant -> the keys of its units, in key order (kept with `units`): who news reaches is found without
     /// going through every unit.
     by_participant: BTreeMap<String, BTreeSet<String>>,
-    /// (next wake, key): the queue.
-    queue: BTreeSet<(i64, String)>,
+    /// (next wake, sort key, key): the queue.
+    queue: BTreeSet<(i64, String, String)>,
     moment_at: i64,
     cohorts_now: u32,
 }
@@ -117,10 +126,10 @@ impl Scheduler {
 
     fn set_wake(&mut self, key: &str, at: i64, why: &'static str) {
         if let Some(u) = self.units.get_mut(key) {
-            self.queue.remove(&(u.next_wake, key.to_string()));
+            self.queue.remove(&(u.next_wake, u.sort.clone(), key.to_string()));
             u.next_wake = at;
             u.wake_for = why;
-            self.queue.insert((at, key.to_string()));
+            self.queue.insert((at, u.sort.clone(), key.to_string()));
         }
     }
 
@@ -134,6 +143,9 @@ impl Scheduler {
                 capacity: u["capacity"].as_str().map(String::from),
                 llm: u["llm"].as_bool().unwrap_or(false),
                 deaf: u["deaf"].as_bool().unwrap_or(false),
+                hears: u["hears"].as_bool().unwrap_or(false),
+                body: u["body"].as_str().map(String::from),
+                sort: u["sort"].as_str().unwrap_or(&key).to_string(),
                 cadence: u["cadence"].as_i64().filter(|c| *c > 0).ok_or("a unit needs a cadence (seconds)")?,
                 next_wake,
                 wake_for: "start",
@@ -144,15 +156,16 @@ impl Scheduler {
                 news_wakes: 0,
                 done_at: None,
             };
-            self.by_participant.entry(unit.participant.clone()).or_default().insert(key.clone());
-            let participant = unit.participant.clone();
+            let names: Vec<String> = [Some(unit.participant.clone()), unit.body.clone()].into_iter().flatten().collect();
             if let Some(old) = self.units.insert(key.clone(), unit) {
-                self.queue.remove(&(old.next_wake, key.clone()));
-                if old.participant != participant {
-                    self.forget(&old.participant, &key);
-                }
+                self.queue.remove(&(old.next_wake, old.sort.clone(), key.clone()));
+                self.forget_all(&old, &key);
             }
-            self.queue.insert((next_wake, key));
+            for n in names {
+                self.by_participant.entry(n).or_default().insert(key.clone());
+            }
+            let sort = self.units[&key].sort.clone();
+            self.queue.insert((next_wake, sort, key));
         }
         Ok(())
     }
@@ -160,9 +173,17 @@ impl Scheduler {
     pub fn remove(&mut self, keys: &[String]) {
         for k in keys {
             if let Some(u) = self.units.remove(k) {
-                self.queue.remove(&(u.next_wake, k.clone()));
-                self.forget(&u.participant, k);
+                self.queue.remove(&(u.next_wake, u.sort.clone(), k.clone()));
+                self.forget_all(&u, k);
             }
+        }
+    }
+
+    /// A unit is no longer anyone's.
+    fn forget_all(&mut self, u: &Unit, key: &str) {
+        self.forget(&u.participant, key);
+        if let Some(b) = &u.body {
+            self.forget(b, key);
         }
     }
 
@@ -204,9 +225,14 @@ impl Scheduler {
         }
     }
 
+    /// Is a unit due at or before `t`?
+    pub fn due_by(&self, t: i64) -> bool {
+        self.queue.first().is_some_and(|x| x.0 <= t)
+    }
+
     /// What's next, at or before `until`.
     pub fn next(&mut self, t: i64, until: i64) -> Result<Next, String> {
-        let Some((first, _)) = self.queue.first().cloned() else { return Ok(Next::End) };
+        let Some((first, _, _)) = self.queue.first().cloned() else { return Ok(Next::End) };
         if first > until {
             return Ok(Next::End);
         }
@@ -218,7 +244,7 @@ impl Scheduler {
             if self.cohorts_now > MAX_COHORTS_PER_MOMENT {
                 return Err(format!(
                     "participants kept waking each other at t={t} ({MAX_COHORTS_PER_MOMENT} rounds of wakes in one moment): {} was next",
-                    self.queue.first().map(|x| x.1.as_str()).unwrap_or("?")
+                    self.queue.first().map(|x| x.2.as_str()).unwrap_or("?")
                 ));
             }
         } else {
@@ -226,17 +252,17 @@ impl Scheduler {
             self.cohorts_now = 1;
         }
         let tick_now = t.div_euclid(self.tick);
-        let due: Vec<(i64, String)> = self.queue.iter().take_while(|(w, _)| *w <= t).cloned().collect();
+        let due: Vec<(i64, String, String)> = self.queue.iter().take_while(|(w, _, _)| *w <= t).cloned().collect();
         let mut cohort = vec![];
-        for (w, key) in due {
-            self.queue.remove(&(w, key.clone()));
+        for (w, sort, key) in due {
+            self.queue.remove(&(w, sort, key.clone()));
             let u = self.units.get_mut(&key).expect("queued units exist");
             // Units writing to each other: at most three news wakes a tick, then the next tick.
             if u.wake_for == "news" {
                 if u.news_tick == tick_now && u.news_wakes >= 3 {
                     u.next_wake = (tick_now + 1) * self.tick;
                     u.wake_for = "cadence";
-                    self.queue.insert((u.next_wake, key));
+                    self.queue.insert((u.next_wake, u.sort.clone(), key));
                     continue;
                 }
                 u.news_wakes = if u.news_tick == tick_now { u.news_wakes + 1 } else { 1 };
@@ -255,7 +281,7 @@ impl Scheduler {
                     u.next_wake = (t.div_euclid(self.tick) + 1 + Self::draw(p.seed ^ 1, &key, t, ticks - 1) as i64) * self.tick;
                 }
             }
-            self.queue.insert((u.next_wake, key.clone()));
+            self.queue.insert((u.next_wake, u.sort.clone(), key.clone()));
             cohort.push((key, u.woke_for, u.since));
         }
         Ok(Next::Cohort(cohort))
@@ -343,12 +369,14 @@ impl Scheduler {
                 }
             }
             News::Answered { participant, capacity } => {
-                let keys = self.units_of(participant).filter(|(_, u)| u.capacity.as_deref() == Some(capacity) && u.next_wake > t && !Self::busy(u, t)).map(|(k, _)| k.clone()).collect();
+                let keys = self.units_of(participant).filter(|(_, u)| (u.capacity.as_deref() == Some(capacity) || (u.hears && u.participant == participant)) && u.next_wake > t && !Self::busy(u, t)).map(|(k, _)| k.clone()).collect();
                 self.wake_now(keys, t);
             }
             News::Delivered(to) => {
                 for to in to {
-                    let keys = self.units_of(to).filter(|(_, u)| u.next_wake > t && !Self::busy(u, t)).map(|(k, _)| k.clone()).collect();
+                    // (A letter to a seat is a letter to the person it sits beside, and one to the person reaches the seat: one body, whoever it was addressed to.)
+                    let bodies: BTreeSet<&str> = std::iter::once(to).chain(self.units_of(to).filter_map(|(_, u)| u.body.as_deref())).collect();
+                    let keys = bodies.into_iter().flat_map(|b| self.units_of(b)).filter(|(_, u)| u.next_wake > t && !Self::busy(u, t)).map(|(k, _)| k.clone()).collect::<BTreeSet<_>>().into_iter().collect();
                     self.wake_now(keys, t);
                 }
             }
@@ -379,11 +407,16 @@ impl Scheduler {
         }
     }
 
+    /// Whose body a participant acts through: its person's, or itself (a seat and the person it sits beside are one body: what one writes is not news to the other).
+    fn body_of<'a>(st: &'a State, participant: &'a str) -> &'a str {
+        st.participants.get(participant).and_then(|p| p.person.as_deref()).unwrap_or(participant)
+    }
+
     /// Code units acting for an entity now, not the author's: its person's own unit, or the units holding its positions.
     fn acting_for(&self, st: &State, entity: &str, author: &str, t: i64) -> Vec<String> {
-        let wakeable = |u: &Unit| !u.llm && u.next_wake > t && !Self::busy(u, t);
+        let wakeable = |u: &Unit| (!u.llm || u.hears) && u.next_wake > t && !Self::busy(u, t);
         if let Some(pid) = st.entities.get(entity).and_then(|e| e.body.as_ref()).and_then(|b| b.participant.as_deref()) {
-            if pid == author {
+            if pid == author || Self::body_of(st, author) == Self::body_of(st, pid) {
                 return vec![];
             }
             return self.units_of(pid).filter(|(_, u)| u.capacity.as_deref() == Some("self") && wakeable(u)).map(|(k, _)| k.clone()).collect();
@@ -393,10 +426,10 @@ impl Scheduler {
         let mut keys = vec![];
         for id in st.positions_of.get(entity).into_iter().flatten() {
             let Some(holder) = st.positions.get(id).and_then(|x| x.holder.as_deref()) else { continue };
-            if holder == author {
+            if holder == author || Self::body_of(st, holder) == Self::body_of(st, author) {
                 continue;
             }
-            keys.extend(self.units_of(holder).filter(|(_, u)| u.capacity.as_deref() == Some(id.as_str()) && wakeable(u)).map(|(k, _)| k.clone()));
+            keys.extend(self.units_of(holder).filter(|(_, u)| (u.capacity.as_deref() == Some(id.as_str()) || u.hears) && wakeable(u)).map(|(k, _)| k.clone()));
         }
         keys
     }
@@ -457,6 +490,55 @@ mod tests {
         s.note(None, answered(Some("desk")).as_array().unwrap(), 100);
         let Next::Cohort(c) = s.next(100, 1_000_000).unwrap() else { panic!("the office is woken") };
         assert_eq!(c.iter().map(|x| (x.0.as_str(), x.1)).collect::<Vec<_>>(), vec![("p|desk", "news")]);
+    }
+
+    #[test]
+    fn a_seat_that_hears_is_woken_as_the_code_unit_of_its_post_would_be_and_stands_where_that_unit_would() {
+        // Foundations F9 (twins with a live seat): a seat of a mock that sits as its code twin does is woken by what is delivered to its person
+        // (as the person's unit for the post is), by the answer to its own question and by no other's; and a moment's wakes are in the order
+        // of the person's unit's key, not the seat's own.
+        let mut s = Scheduler::new(3600);
+        let mut seat = json!({ "key": "zz-seat", "participant": "zz-seat", "llm": true, "cadence": 86_400, "next_wake": 0, "hears": true, "body": "person-self", "sort": "person-self|post" });
+        let mut quiet = seat.clone();
+        quiet["key"] = json!("aa-quiet");
+        quiet["participant"] = json!("aa-quiet");
+        quiet["hears"] = json!(false);
+        quiet.as_object_mut().unwrap().remove("body");
+        quiet["sort"] = json!("aa-quiet");
+        seat["next_wake"] = json!(0);
+        s.add(&[quiet, seat, unit("person-self|self", 86_400, 0), unit("person-self|post", 86_400, 90_000)]).unwrap();
+        s.add(&[unit("person-self|other", 86_400, 0)]).unwrap();
+        let Next::Cohort(c) = s.next(0, 1_000_000).unwrap() else { panic!() };
+        // (Sorted by where each stands: the seat is among the person's units, not at its own name's place.)
+        assert_eq!(c.iter().map(|x| x.0.as_str()).collect::<Vec<_>>(), vec!["aa-quiet", "person-self|other", "zz-seat", "person-self|self"]);
+        for (k, _, _) in &c {
+            s.finished(k, None, 0);
+        }
+        // A letter to the person: its units wake, and so does the seat that sits in its body; a seat that does not hear does not.
+        s.note(None, &[json!({ "event": "message_delivered", "to": ["person-self", "aa-quiet"] })], 100);
+        let Next::Cohort(c) = s.next(100, 1_000_000).unwrap() else { panic!() };
+        assert_eq!(c.iter().map(|x| (x.0.as_str(), x.1)).collect::<Vec<_>>(), vec![("aa-quiet", "news"), ("person-self|other", "news"), ("person-self|post", "news"), ("zz-seat", "news"), ("person-self|self", "news")]);
+        for (k, _, _) in &c {
+            s.finished(k, None, 100);
+        }
+        // An answer to a question the seat put is its own wake; one put by the person in another capacity is not.
+        s.note(None, &[json!({ "event": "ask_answered", "participant": "person-self", "as": "other" })], 200);
+        let Next::Cohort(c) = s.next(200, 1_000_000).unwrap() else { panic!() };
+        assert_eq!(c.iter().map(|x| x.0.as_str()).collect::<Vec<_>>(), vec!["person-self|other"]);
+        for (k, _, _) in &c {
+            s.finished(k, None, 200);
+        }
+        s.note(None, &[json!({ "event": "ask_answered", "participant": "zz-seat", "as": "post" })], 300);
+        let Next::Cohort(c) = s.next(300, 1_000_000).unwrap() else { panic!() };
+        assert_eq!(c.iter().map(|x| x.0.as_str()).collect::<Vec<_>>(), vec!["zz-seat"]);
+        for (k, _, _) in &c {
+            s.finished(k, None, 300);
+        }
+        // A letter to the seat itself (a post's holder is the seat): the person's own units wake too, as a letter to the post's holder wakes them when a
+        // person holds it.
+        s.note(None, &[json!({ "event": "message_delivered", "to": ["zz-seat"] })], 400);
+        let Next::Cohort(c) = s.next(400, 1_000_000).unwrap() else { panic!() };
+        assert_eq!(c.iter().map(|x| x.0.as_str()).collect::<Vec<_>>(), vec!["person-self|other", "person-self|post", "zz-seat", "person-self|self"]);
     }
 
     #[test]

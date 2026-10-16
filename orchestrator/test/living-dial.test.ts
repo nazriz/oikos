@@ -74,9 +74,9 @@ const TOWN = join(root, "worlds/town.yaml");
 // (Re-taken on 2026-10-16 at foundations F11: a register's keeper answers in its own time; 88f2e1f7... until then.)
 // (Re-taken on 2026-10-16 at foundations F8: the support office asks for papers before it decides, looks at a refusal again when asked, and the tribunal hears an appeal at the law's fee; the profile's routes are published as `law-decisions`; 79ea9459... until then.)
 // (Re-taken on 2026-10-16 at the review of the foundations, finding 6: the council's appointments officer is an office of the town, its posts name their authority, and every generated system is owned by the organisation whose post it holds; c5a5a00f... until then.)
-// (Re-taken on 2026-10-16 at the profile source check, on the merged foundations review: the au-vic-2026 profile's tribunal and hearing times, fee, rent bands, students per teacher and kin ceiling changed; f54352a2... until then.)
-// (Re-taken on 2026-10-17 at the housing and vacant-post faults (fix-housing): the council's appointments officer is a councillor's post, watches the city's own offices and hires for the city where none of its staff is left to second; au-vic names the police among the posts the council fills; a death wakes those in the same space; 5e9aaf1e... until then.)
-const STEP_1 = "50bc350c9628612a79ea0c296113244b244f9b37b0abc9ebf56a37f94d5ff484";
+// (Re-taken on 2026-10-17 at foundations F9 and F10: three public forms and a row for `take` in the generated town, and the engine's advance stopping where a letter is delivered or a paper recorded, so that news reaches a person when it happens and not at the next wake of anyone; f54352a2... until then.)
+// (Re-taken on 2026-10-17 at the housing and vacant-post faults (fix-housing), on the merge with the seated twins: the council's appointments officer is a councillor's post, watches the city's own offices and hires for the city where none of its staff is left to second; au-vic names the police among the posts the council fills; a death wakes those in the same space; 12df1060... until then.)
+const STEP_1 = "02577eca986e7020a9f12114ddda245e73f22707be55c94ec84c689e470be023";
 
 test("with the dial absent or at 0 a town is step 1's town, to the state hash", async () => {
   const out = mkdtempSync(join(tmpdir(), "oikos-dial-"));

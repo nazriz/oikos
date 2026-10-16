@@ -27,16 +27,17 @@ test("off, a town is unchanged to the state hash (the world as origin/main gener
   // `law-cutting-hours`, and the modules' versions; docs/decisions.md, "Hours before heads". Nothing of the opening caseload in it.)
   // (Re-taken on 2026-10-16 at foundations F5: the town's offices are held by people, their staff hired, its systems delivered from templates that say what they do; 4e1e761a... until then.)
   // (Re-taken on 2026-10-16 at foundations F8: the support office asks for papers before it decides, looks at a refusal again when asked, and the tribunal hears an appeal at the law's fee; the profile's routes are published as `law-decisions`; 02ce106f..., 0236786b... until then.)
-  // (Re-taken on 2026-10-16 at the profile source check: the au-vic-2026 profile's tribunal time, fee, rent bands, students per teacher and kin ceiling changed (docs/decisions.md, 2026-10-16); c1bfd56e... until then.)
-  expect(worldHash(generate(town()))).toBe("84c6b020c68e143f9a56642be8e1b3966858b27bb1daf803064b7ecdeb579df0");
+  // (Re-taken on 2026-10-17 at foundations F9 and F10: three public forms for what a person files with an office that decides, and a row of the table of work for `take`; c1bfd56e... and be56fcce... until then.)
+//   (Re-taken on 2026-10-17 at the housing and vacant-post faults (fix-housing), on the merge with the seated twins: the council's appointments officer is a councillor's post, watches the city's own offices and hires for the city where none of its staff is left to second; au-vic names the police among the posts the council fills; a death wakes those in the same space; 2d57fb3a... until then.)
+  expect(worldHash(generate(town()))).toBe("0c54931f9be69c608a74d5cf80b27074508b0696791429f167226c961171a381");
   // (Re-taken on 2026-10-16 at foundations F5: the town's offices are held by people, their staff hired, its systems delivered from templates that say what they do; f16bee9e... until then.)
-  expect(worldHash(generate(town({ profile: "ke-nakuru-2026" })))).toBe("be56fcced3e09a27a95faece8ffdb1217cdca1222823fe0e7b06a4f2abe38c83");
+  expect(worldHash(generate(town({ profile: "ke-nakuru-2026" })))).toBe("25c61c59e45327d6d7dd016aaa003baf5c0269814a9f76092388a94b2bf1ca02");
   // (On, the landlords' and the tribunal's papers are as they were; a scale of nothing adds no paper to the other offices.)
   const POSS = ["rent_statement", "notice_to_vacate", "tribunal_application", "hearing_notice", "tribunal_order"];
   const possession = (c: any) => createHash("sha256").update(JSON.stringify(c.world.records.filter((r: any) => POSS.includes(r.kind)))).digest("hex");
   expect(possession(generate(town({ opening_caseload: true })))).toBe("4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945");
   // (Re-taken on 2026-10-16 at foundations F5: the town's offices are held by people, their staff hired, its systems delivered from templates that say what they do; e07d6054... until then.)
-  // (Re-taken on 2026-10-16 at the profile source check: the tribunal's time in the ke-nakuru-2026 profile, 42 to 53 days, is in its possession papers; 8694a655... until then.)
+  // (Re-taken on 2026-10-17 on the merge of the profile source check (ke-nakuru-2026's possession papers changed with its figures) with the seated twins; 8694a655... until then.)
   expect(possession(generate(town({ profile: "ke-nakuru-2026", opening_caseload: true })))).toBe("799dd850d4754a0483f3274b4dd2f0fce6e6b0c98644d400bb6d924d724392e0");
   const nothing = generate(town({ opening_caseload: true, opening_caseload_scale_bps: 0 })) as any;
   expect(ofOthers(nothing).filter((r: any) => !r.id.startsWith("claim-") && !r.id.startsWith("grant-"))).toEqual([]);

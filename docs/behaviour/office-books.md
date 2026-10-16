@@ -187,3 +187,32 @@ needs the papers it sent more than 40 days ago, which are on its file and can be
 A seat is not shown its office's past practice as counts. It goes and looks in the office's own files, by kind of paper and
 by date, as any holder of papers of its own can (docs/behaviour/culture.md, "An office's practice"). The books and the
 office's own file above are unchanged by it.
+
+## The diary: its own time and its staff's (2026-10-17, foundations F9)
+
+A person in an office knows how long a letter takes to write and a decision to make, and how many hours the clerks they
+employ have in a week. A seat that did not could not tell that it was falling behind, or what its staff could do for it.
+Its standing set of staff papers (shown when first and when changed) now ends with **Your time, and your staff's**, by code
+from the office's own papers and the town's practice (`participants/src/behaviour/diary.ts`):
+
+- *Your own time:* a working day is so long, yours and each of your staff's; what your own acts take you, one by one:
+  a letter, each kind of paper the office writes on its own forms, any other paper. The seconds are the town's table of
+  work for a person (the table itself is never named). What you do yourself comes out of your day.
+- *Your staff's time:* those in post, and the hours their agreements give them in a week between them (or that the
+  agreements state none); what you ask them to do, by a standing work order or by naming one of them, comes out of their
+  hours and not yours.
+- *What waits* is the office's books, as before (above): the support office's now include the claims that wait for papers or
+  a confirmation it asked for, each with the day it is due by.
+
+**When what you asked will be done.** After each act a seat has begun it is told when it will be done (the clock, and the day
+where it is not today) and, where the actor had other work first, when it begins: "Your letter will be written and sent at
+15:40", "What you did will be done at 15:21. It begins at 15:06: you have other work before it." (`orchestrator/src/run.ts`,
+`begin`.)
+
+**Who does it.** A request may say who in the office does it (`done_by=`, on any call: contracts/calls.md):
+a person on its staff, or "the clerk" where exactly one is in post. The roster says who they are; a name that is not one of
+them is a question back; the act is done on that person's time, and the kernel refuses a performer who is not at work.
+Nothing is done for it by the platform's own choosing: who does what is the seat's.
+
+Test: `orchestrator/test/seat-diary.test.ts` (a works seat for 60 days: its diary, its outcomes with times, forty notices a
+day written by itself in more than nine hours against the crew's in less than three, `by` a stranger a question back).

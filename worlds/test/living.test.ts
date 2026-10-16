@@ -80,9 +80,9 @@ test("a spec without `living` generates what it generated before (byte for byte)
   // (Re-taken on 2026-10-16 at foundations F11: the work table has a row for a keeper's answer (`answer`); a84328b7... until then.)
   // (Re-taken on 2026-10-16 at foundations F8: the support office asks for papers before it decides, looks at a refusal again when asked, and the tribunal hears an appeal at the law's fee; the profile's routes are published as `law-decisions`; d60a26bc... until then.)
   // (Re-taken on 2026-10-16 at the review of the foundations, finding 6: the council's appointments officer is an office of the town, its posts name their authority (`appointed_by`), and every generated system is owned by the organisation whose post it holds; 8dc56724... until then.)
-// (Re-taken on 2026-10-16 at the profile source check, on the merged foundations review: the au-vic-2026 profile's tribunal and hearing times, fee, rent bands, students per teacher and kin ceiling changed; 033bebfc... until then.)
-// (Re-taken on 2026-10-17 at the housing and vacant-post faults (fix-housing): the council's appointments officer is a councillor's post, watches the city's own offices and hires for the city where none of its staff is left to second; au-vic names the police among the posts the council fills; a death wakes those in the same space; 6f93c7b4... until then.)
-  expect(hash(c)).toBe("42f5c15eb2a2a2ef74ed6382e070ead615ba87860d87fb0f1997d209a8dc308c");
+  // (Re-taken on 2026-10-17 at foundations F9 and F10: three public forms for what a person files with an office that decides (generator 0.60.0) and a row of the table of work for `take`, which had none; 033bebfc... until then.)
+// (Re-taken on 2026-10-17 at the housing and vacant-post faults (fix-housing), on the merge with the seated twins: the council's appointments officer is a councillor's post, watches the city's own offices and hires for the city where none of its staff is left to second; au-vic names the police among the posts the council fills; a death wakes those in the same space; e82365d7... until then.)
+  expect(hash(c)).toBe("640002cd9f8730df0af3361082fa2ee2d2ed462cdd2d6abc035b06e945886109");
   const text = JSON.stringify(c);
   expect(text).not.toContain('"started"');
   expect(text).not.toContain("attach_mean");

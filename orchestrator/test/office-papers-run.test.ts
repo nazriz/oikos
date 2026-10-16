@@ -24,7 +24,7 @@ test("seats in the registry, the works office, a letting office and the lender i
   config.life.other_causes.by_age = [{ from: 0, bps: 0 }, { from: 25, bps: 2500 }];
   for (const x of officesBy(config, "city.council_clerk")) Object.assign(x.params, { vote_days: 5 });
   // Each seat has its office's stationery on file, seen by its organisation alone; a code office has none.
-  const forms = (config.world.records as any[]).filter((r) => r.kind === "form" && r.data?.writes);
+  const forms = (config.world.records as any[]).filter((r) => r.kind === "form" && r.data?.writes && r.data?.office !== undefined); // (the town's public forms that write a paper, foundations F9, are no office's own: they name none)
   expect(forms.filter((f) => f.data.office === "registry").map((f) => f.data.form)).toEqual(["death_registration", "death_certificate", "birth_registration", "transmission_application"]);
   expect(forms.every((f) => SEATS.includes(f.data.office) && f.visible_to.length === 1)).toBe(true);
   const kinds = new Map(SEATS.map((id) => [`${id}-system`, new Set((modules[config.positions.find((p: any) => p.id === id).role_module.code]!.issues ?? []).map((x) => x.writes.kind))]));

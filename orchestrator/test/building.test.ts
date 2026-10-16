@@ -70,11 +70,12 @@ test("the builder buys materials from outside, and its crew's hours finish each 
   }
   // No one works more than a working day in a day.
   const perDay = new Map<string, number>();
-  // (A working day is counted on the day the work starts: it takes the crew's hours, so it takes effect hours later; F1.)
+  // (A working day is counted on each day the work is done on: it takes the crew's hours, so it takes effect hours later (F1), and work that begins
+  // before midnight and runs past it counts on both days, as the kernel counts it (the review of foundations, finding 9; before it, on the day it began).)
   const startOf = workStarts(ev);
   for (const w of ev.filter((e) => e.event === "worked")) for (const p of w.performers) {
-    // (A work that runs past midnight counts on each day it is done on, as the kernel counts it: review of the foundations, finding 9.)
-    for (let at = startOf.get(w)!, left = Math.ceil(w.labour / w.performers.length); left > 0;) {
+    let at = startOf.get(w)!, left = Math.ceil(w.labour / w.performers.length);
+    while (left > 0) {
       const day = Math.floor(at / DAY), take = Math.min(left, (day + 1) * DAY - at);
       const k = `${p}|${day}`;
       perDay.set(k, (perDay.get(k) ?? 0) + take);
