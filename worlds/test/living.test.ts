@@ -80,7 +80,8 @@ test("a spec without `living` generates what it generated before (byte for byte)
   // (Re-taken on 2026-10-16 at foundations F11: the work table has a row for a keeper's answer (`answer`); a84328b7... until then.)
   // (Re-taken on 2026-10-16 at foundations F8: the support office asks for papers before it decides, looks at a refusal again when asked, and the tribunal hears an appeal at the law's fee; the profile's routes are published as `law-decisions`; d60a26bc... until then.)
   // (Re-taken on 2026-10-16 at the review of the foundations, finding 6: the council's appointments officer is an office of the town, its posts name their authority (`appointed_by`), and every generated system is owned by the organisation whose post it holds; 8dc56724... until then.)
-  expect(hash(c)).toBe("033bebfc8c9fdee58b03d7025b4a052b05ba614588ae930b21e4c5f6a560176d");
+  // (Re-taken on 2026-10-17 at foundations F9 and F10: three public forms for what a person files with an office that decides (generator 0.60.0) and a row of the table of work for `take`, which had none; 033bebfc... until then.)
+  expect(hash(c)).toBe("e82365d7e47002d0dc3f58e95cf194677dbee08cac639b4d8fe15836bce9ef12");
   const text = JSON.stringify(c);
   expect(text).not.toContain('"started"');
   expect(text).not.toContain("attach_mean");

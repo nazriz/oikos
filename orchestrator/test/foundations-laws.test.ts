@@ -281,9 +281,7 @@ test("F8: law 5: a decision of a kind with a review route is asked to be looked 
 // and F10 owns the real check (it needs the table to exist), so there is nothing to run before then.
 // ---------------------------------------------------------------------------------------------------------------------
 
-test.todo("F10: law 2: every record kind any module or form writes has a row in the world's work table (or is named in a short, reasoned list of free acts)", () => {
-  throw new Error("not written: the work table is F2's, and the check is F10's");
-});
+// (F10: every act and every kind of paper has a row, and the table has no default: `all-work-takes-time.test.ts`, `unpricedWork` and `unpricedPapers`.)
 
 // ---------------------------------------------------------------------------------------------------------------------
 // The backstop inventory: every special case the plan deletes or replaces, where it stands.
@@ -330,7 +328,4 @@ test("the inventory covers the plan's deletions: every step is built and has not
   for (const e of inv.entries.filter((x) => x.id.startsWith("k-"))) expect(e.file, e.id).toMatch(/^kernel\//);
 });
 
-test.todo("F10: the foundations are in: nothing the inventory lists is left (every `delete` and `replace` entry stands nowhere; `history` entries excepted)", () => {
-  const left = inv.entries.filter((e) => e.kind !== "history").flatMap((e) => stands(e.file, e.find).map((l) => `${e.id} (${e.step}): ${l}`));
-  expect(left).toEqual([]);
-});
+// (F10: nothing the inventory lists is left: `all-work-takes-time.test.ts`, `specialCasesLeft`.)

@@ -74,7 +74,8 @@ const TOWN = join(root, "worlds/town.yaml");
 // (Re-taken on 2026-10-16 at foundations F11: a register's keeper answers in its own time; 88f2e1f7... until then.)
 // (Re-taken on 2026-10-16 at foundations F8: the support office asks for papers before it decides, looks at a refusal again when asked, and the tribunal hears an appeal at the law's fee; the profile's routes are published as `law-decisions`; 79ea9459... until then.)
 // (Re-taken on 2026-10-16 at the review of the foundations, finding 6: the council's appointments officer is an office of the town, its posts name their authority, and every generated system is owned by the organisation whose post it holds; c5a5a00f... until then.)
-const STEP_1 = "f54352a25b18d69dfd45771b04245e613e562806f74862974e7c019b7c893c0d";
+// (Re-taken on 2026-10-17 at foundations F9 and F10: three public forms and a row for `take` in the generated town, and the engine's advance stopping where a letter is delivered or a paper recorded, so that news reaches a person when it happens and not at the next wake of anyone; f54352a2... until then.)
+const STEP_1 = "12df10602f21fdf3310947c77c4d30b38a24a98c640420248a1934367c9c6f50";
 
 test("with the dial absent or at 0 a town is step 1's town, to the state hash", async () => {
   const out = mkdtempSync(join(tmpdir(), "oikos-dial-"));
