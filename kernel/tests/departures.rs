@@ -65,3 +65,29 @@ fn a_person_who_leaves_the_world_no_longer_holds_their_own_post() {
     let say = cmd("alice-self", Some("clerk"), json!([{"block": "message", "to": ["bob-self"], "text": "as clerk, from abroad"}]));
     assert_ne!(outcome(&mut run, &say), None, "acted in a post they no longer hold");
 }
+
+/// Finding 2: an office's books stay with the office. A new holder is told of the payments made while the post was held by
+/// another and while it was vacant, as the payments it has not yet seen.
+#[test]
+fn a_new_holder_of_a_post_is_told_of_the_payments_the_office_has_had() {
+    let mut c = world(&default_params());
+    c["positions"].as_array_mut().unwrap().push(json!({"id": "devco-office", "entity": "devco", "title": "office", "channels": [{"id": "money", "kind": "accounts"}], "role_module": {"code": "test"}, "holder": "bob-self"}));
+    let mut run = Run::start(c, "ledger", Vec::new(), None).unwrap();
+    let told = |run: &mut R, who: &str| -> usize {
+        let o = run.command(&Command::Observe { participant: who.into(), only: Some("devco-office".into()) }).unwrap().observation.unwrap();
+        match o.channels.get("devco-office/money") {
+            Some(oikos_kernel::observe::ChannelData::Accounts { transactions, .. }) => transactions.len(),
+            other => panic!("no accounts channel: {other:?}"),
+        }
+    };
+    let pay = cmd("carol-self", None, json!([{"block": "transfer", "from": "acc-carol", "to": "acc-devco", "amount": "5"}]));
+    assert_eq!(outcome(&mut run, &pay), None);
+    assert_eq!(told(&mut run, "bob-self"), 1);
+    // The post falls vacant; another payment is made; alice takes the post.
+    let vacate = cmd("developer-system", Some("developer"), json!([{"block": "appoint", "position": "devco-office"}]));
+    assert_eq!(outcome(&mut run, &vacate), None);
+    assert_eq!(outcome(&mut run, &pay), None);
+    let appoint = cmd("developer-system", Some("developer"), json!([{"block": "appoint", "position": "devco-office", "participant": "alice-self"}]));
+    assert_eq!(outcome(&mut run, &appoint), None);
+    assert_eq!(told(&mut run, "alice-self"), 2, "the new holder was told of nothing the office had had");
+}

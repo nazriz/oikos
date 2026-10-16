@@ -116,7 +116,7 @@ test("on polling day the office counts each elector's last formal vote by instan
   expect(counted.said.map((c) => c.fn)).toEqual(["statement", "position"]);
   const result = counted.said[0]!.args;
   expect(result).toMatchObject({ kind: "ballot_result", visible: "public", basis: b });
-  expect(result.data).toEqual({ ballot: b, office: "mayor", winner: "c2-self", formal: 9, electors: 10, turnout_bps: 9000,
+  expect(result.data).toEqual({ ballot: b, office: "mayor", poll_at: POLL, winner: "c2-self", formal: 9, electors: 10, turnout_bps: 9000,
     rounds: [{ "c1-self": 4, "c2-self": 3, "mayor-system": 2 }, { "c1-self": 4, "c2-self": 5 }] });
   expect(result.text).toBe("Election result, Mayor: c2 elected; 9 formal votes of 10 on the roll (turnout 90%).");
   expect(counted.said[1]!.args).toEqual({ appoint: "mayor", to: "c2-self" });
@@ -176,4 +176,39 @@ test("instant runoff: those tied for last go out together, unless that's everyon
   expect(instantRunoff(["a", "b"], [["a"], ["b"]])).toEqual({ winner: "b", rounds: [{ a: 1, b: 1 }, { b: 1 }] });
   // No ballots at all: no winner.
   expect(instantRunoff(["a", "b"], [])).toEqual({ rounds: [{ a: 0, b: 0 }] });
+});
+
+// Bug hunt 2026-10-17, finding 2: the office's knowledge lives with the office, not its holder.
+test("a successor to the electoral office reads the election from the office's file: no notice for a poll already held, and no old nomination declared", () => {
+  const first = office();
+  const records = [...PEOPLE.map((p) => enrolment(p)), nomination("nom-2", 46 * DAY, "c2-self")];
+  first(40 * DAY, records.filter((r) => r.at < 40 * DAY));
+  first(CLOSE, records.filter((r) => r.at >= 40 * DAY)); // elected unopposed on day 70; the file holds the result
+  // A new holder, from scratch, shown the office's whole file on day 200.
+  const file: any[] = [];
+  const probe = electoralOffice.create(context("electoral-system-2", "city", { ...PARAMS }, { position: "electoral" }));
+  const ids = { n: 100 };
+  const wake1 = (t: number, extra: any[] = []) => wake(probe, t, { roll: { kind: "records", records: [...file, ...extra] } }, { entity: "city", as: { participant: "electoral-system-2", position: "electoral" }, ids });
+  // (Rebuild the first holder's file: its own statements, as records in the position.)
+  const holder = office();
+  const h1 = holder(40 * DAY, records.filter((r) => r.at < 40 * DAY));
+  const h2 = holder(CLOSE, records.filter((r) => r.at >= 40 * DAY));
+  file.push(...records, ...h1.made, ...h2.made);
+  expect(wake1(200 * DAY).said).toEqual([]);
+  expect(wake1(300 * DAY).said).toEqual([]);
+  // The next election is still a term after the last: its notice on day 440.
+  expect(wake1(439 * DAY).said).toEqual([]);
+  expect(wake1(440 * DAY).of("statement", "election_notice")[0]!.args.data).toMatchObject({ poll_at: 500 * DAY });
+});
+
+test("an election whose notice or ballot was refused is tried again, not left stuck", () => {
+  const m = electoralOffice.create(context("electoral-system", "city", { ...PARAMS }, { position: "electoral" }));
+  const ids = { n: 0 };
+  const recs = [...PEOPLE.map((p) => enrolment(p)), nomination("nom-2", 46 * DAY, "c2-self"), nomination("nom-3", 47 * DAY, "c3-self")];
+  const as = { participant: "electoral-system", position: "electoral" };
+  const refuse = (c: any) => c.args.kind === "ballot";
+  expect(wake(m, 40 * DAY, { roll: { kind: "records", records: [] } }, { entity: "city", as, ids }).of("statement", "election_notice").length).toBe(1);
+  expect(wake(m, CLOSE, { roll: { kind: "records", records: recs } }, { entity: "city", as, ids, refuse }).of("statement", "ballot").length).toBe(1);
+  // The ballot was refused: the next day it is put up again.
+  expect(wake(m, CLOSE + DAY, { roll: { kind: "records", records: [] } }, { entity: "city", as, ids }).of("statement", "ballot").length).toBe(1);
 });

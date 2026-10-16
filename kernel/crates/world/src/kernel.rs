@@ -274,6 +274,7 @@ impl World {
             positions: Default::default(),
             positions_of: Default::default(),
             held: Default::default(),
+            ledgers: Default::default(),
             schedule: Default::default(),
             timelines: Default::default(),
             nature: None,

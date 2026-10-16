@@ -1477,6 +1477,11 @@ impl<'a> Exec<'a> {
                     told.insert((p, transactions_key(&cap, e)));
                 }
             }
+            // An office keeps its payments on file whoever holds the post, or nobody does (a new holder is handed them).
+            let posts: Vec<Id> = self.st.positions_of.get(e).into_iter().flatten().filter(|id| self.st.sees_accounts("", id)).cloned().collect();
+            for post in posts {
+                self.st.ledgers.entry(transactions_key(&post, e)).or_default().push_back(tx.clone());
+            }
         }
         for (p, key) in told {
             if let Some(x) = self.st.participants.get_mut(&p) {

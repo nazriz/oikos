@@ -77,6 +77,12 @@ pub struct State {
     pub positions_of: Map<Id, BTreeSet<Id>>,
     #[serde(skip)]
     pub held: Map<Id, BTreeSet<Id>>,
+    /// What an office keeps on file: every transaction on its organisation's accounts that a post with an accounts channel
+    /// would have been told of, by `transactions_key(post, organisation)`, whoever held the post then (or nobody). A new
+    /// holder is handed it as the payments it has not yet been told of, so it reads its office's books and not an empty
+    /// memory. Derived from the log (never serialised, so the state and its hash are unchanged).
+    #[serde(skip)]
+    pub ledgers: Map<String, imbl::Vector<Transaction>>,
     /// Future physical effects and acts in progress, sorted by (at, seq).
     pub schedule: Schedule,
     /// Each actor's timeline (docs/design/rebuild.md 6.3): when each of its lanes is next free. A person's is keyed by
@@ -1002,7 +1008,14 @@ impl State {
             }
         }
         if let Some(h) = holder {
-            self.held.entry(h).or_default().insert(position.to_string());
+            self.held.entry(h.clone()).or_default().insert(position.to_string());
+            // The office's file goes with the post: the new holder is told of every payment it has seen, as of any it has not.
+            let key = transactions_key(position, &self.positions[position].entity);
+            if let Some(ledger) = self.ledgers.get(&key) {
+                if let Some(p) = self.participants.get_mut(&h) {
+                    Arc::make_mut(p).new_transactions.insert(key, ledger.clone());
+                }
+            }
         }
     }
 }

@@ -184,3 +184,18 @@ test("every direction a module declares has a form's shape: a name, a title, fie
     expect(`${t.title} ${t.follows}`).not.toMatch(/\$|dollar/i);
   }
 });
+
+// Bug hunt 2026-10-17, finding 2: a rates officer's successor carries on from the office's file and the payments it has had.
+test("a new rates officer, shown the office's file, levies no instalment out of turn and charges no interest on a paid notice", () => {
+  const law = statement("law-rates", 0, "law", { data: { tax: "rates", rate_ppm: 5000, instalments: 4, due_days: 30, penalty_interest_bps: 1000 } });
+  const valuation = statement("val-1", 5 * DAY, "valuation", { data: { lot: "lot-1", owner: "landlord-1", value: 24_000_000 } });
+  const notice = statement("rec.19", 30 * DAY, "rates_notice", { author: "rates-system", in_position: "rates", addressed_to: ["landlord-1"], visible_to: ["city", "landlord-1"], data: { amount: 120_000, lots: ["lot-1"], due: 60 * DAY, account: "acc-city" } });
+  const claim = { id: "rec.20", at: 30 * DAY, record: "claim", author: "rates-system", in_position: "rates", speaks_for: "city", position: "right", holder: "city", counterparty: "landlord-1", visible_to: ["city", "landlord-1"], about: { kind: "rates", amount: 120_000, account: "acc-city", due: 60 * DAY, lots: ["lot-1"] } };
+  // The payment of day 40 was made while another held the post; the new holder is told of it as of any payment.
+  const treasury = { treasury: { kind: "accounts", transactions: [{ t: 40 * DAY, from: "acc-landlord-1", to: "acc-city", amount: "120000", settles: "rec.20" }], accounts: [{ account: "acc-city", holder: "city", custodian: "bank", balance: "1000000", currency: "XYZ" }] } };
+  const rates = () => modules["city.rates_officer"]!.create(context("rates-successor", "city", { first_day: 30 }, { position: "rates" }));
+  const w = wake(rates(), 100 * DAY, { ...records(law, valuation, notice, claim), ...treasury }, { entity: "city", as: { participant: "rates-successor", position: "rates" } });
+  expect(w.of("statement", "rates_notice")).toEqual([]); // the next instalment is not due until day 121
+  expect(w.of("claim").filter((c) => c.args.about?.kind === "rates_interest")).toEqual([]);
+  expect(wake(rates(), 122 * DAY, { ...records(law, valuation, notice, claim), ...treasury }, { entity: "city" }).of("statement", "rates_notice").length).toBe(1);
+});
