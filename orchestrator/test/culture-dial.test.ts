@@ -46,7 +46,8 @@ const BEFORE: { [profile: string]: { days: number; state: string } } = {
   // (Re-taken on 2026-10-16 at the review of the foundations, finding 6: the council's appointments officer is an office of the town, its posts name their authority, and every generated system is owned by the organisation whose post it holds; c1ae5e74... until then.)
   // (Re-taken on 2026-10-17 at foundations F9 and F10; 29f53e5f... until then.)
 //   (Re-taken on 2026-10-17 at the housing and vacant-post faults (fix-housing), on the merge with the seated twins: the council's appointments officer is a councillor's post, watches the city's own offices and hires for the city where none of its staff is left to second; au-vic names the police among the posts the council fills; a death wakes those in the same space; 5400d29a... until then.)
-  "gb-eng-2026": { days: 30, state: "33189d5c2028be0648ae17148fac9cc37db1398de15c72f05e707b65b5f7e165" },
+  // (Re-taken on 2026-10-17, twin-fix: someone who dies where others work is reported to the registry by the first of those present, citizen 0.58.0; 33189d5c... until then. The other two profiles did not move.)
+  "gb-eng-2026": { days: 30, state: "9da9b07952cc7e2de860ea24762fe90dc56f49090379f8bb057b9aa1a4a4b764" },
   // (Re-taken on 2026-10-16 at foundations F5: the town's offices are held by people, their staff hired, its systems delivered from templates that say what they do; ab25cb7d... until then.)
   // (Re-taken on 2026-10-16 at the review of the foundations, finding 6: the council's appointments officer is an office of the town, its posts name their authority, and every generated system is owned by the organisation whose post it holds; 66ba5ea8... until then.)
   // (Re-taken on 2026-10-17 at foundations F9 and F10; 11a014cc... until then.)

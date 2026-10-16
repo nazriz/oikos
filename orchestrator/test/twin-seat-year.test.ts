@@ -7,7 +7,7 @@
 // must be the same, but for the names of the seats. A seated resident who dies must take the seat with them (the seat
 // ends and the post falls vacant at that moment, in both towns): finding 1 was a seat that outlived its body.
 //
-// The first test holds two seats of posts with no work that die early. The second holds the case the first could not (the review's
+// The first test holds two seats, sitting as their code twins do (since 2026-10-17, fix-housing: a land registrar who lives to transfer a title, and a councillor who lives to vote, do so at another hour than their twin when they keep office hours, and that is a seat's decision and not a fault: the profile figures that let them live moved the draws), one of whom dies early. The second holds the case the first could not (the review's
 // finding 10: a seat that stays alive did not give the twin act for act): nineteen live seats in posts that have work, each a mock that
 // sits as its code twin does (`mock.twin`: back when its brain's module would be, woken by what wakes the code unit of its post, drawing
 // as the person does, one step of its brain where the code unit takes one, and its looks in one look), for a year with deaths. Every act
@@ -58,7 +58,7 @@ async function town(name: string, seats: string[], o: { days?: number; deaths?: 
 
 test("a year of the town with seats beside their people is the town without them, act for act, and a seated resident who dies takes the seat with them", async () => {
   const t0 = Date.now();
-  const [twin, pilot] = await Promise.all([town("twin-seat-code", []), town("twin-seat-mock", SEATS)]);
+  const [twin, pilot] = await Promise.all([town("twin-seat-code", []), town("twin-seat-mock", SEATS, { twin: true })]);
   // A seat's name is the name of the person it sits beside, whose acts they are (the twin's participant for them).
   const names = new Map<string, string>(SEATS.map((id) => [`${id}-system`, `${twin.held.get(id)!}-self`]));
   const plain = (x: string) => { let y = x; for (const [a, b] of names) y = y.split(a).join(b); return y; };
@@ -66,7 +66,7 @@ test("a year of the town with seats beside their people is the town without them
   // (Every act in order: when, by whom, doing what. Not by the day: to the second.)
   const acts = (r: typeof twin) => rows(r.lines, "command").filter((l) => l.body.command === "act").map((l) => plain(`${l.t}|${l.body.participant}|${JSON.stringify(l.body.blocks)}`));
   // (Every event of the world but the seats' own coming and going.)
-  const events = (r: typeof twin) => rows(r.lines, "event").filter((l) => !names.has(l.body.participant) && l.body.event !== "observation").map((l) => plain(`${l.t}|${JSON.stringify({ ...l.body, cause: undefined })}`)).sort();
+  const events = (r: typeof twin) => rows(r.lines, "event").filter((l) => l.body.event !== "observation" && !(l.body.event === "participant_ended" && names.has(l.body.participant))).map((l) => plain(`${l.t}|${JSON.stringify({ ...l.body, cause: undefined })}`)).sort();
   const a = acts(twin), b = acts(pilot);
   console.log(`twin seats: ${a.length} acts in the twin, ${b.length} beside the seats; ${events(twin).length} events; ${((Date.now() - t0) / 60_000).toFixed(1)} min`);
   expect(a.length).toBeGreaterThan(10_000);
