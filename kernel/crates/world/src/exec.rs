@@ -783,6 +783,19 @@ pub fn scheduled(s: &Statics, st: &mut State, item: Scheduled) -> Vec<Timed> {
         }
         // (Acts in progress are the kernel's to apply: Kernel::advance.)
         Sched::Act { .. } | Sched::Start { .. } => vec![],
+        Sched::Answer { participant, position, look } => {
+            if !st.participants.get(&participant).is_some_and(|p| p.status == crate::state::ParticipantStatus::Active) {
+                return vec![];
+            }
+            let channel = look.channel.clone();
+            let key = position.clone().unwrap_or_else(|| crate::config::SELF.to_string());
+            let pending = std::sync::Arc::make_mut(st.participants.get_mut(&participant).unwrap()).pending.entry(key).or_default();
+            if let Some(i) = pending.asked.iter().position(|c| *c == look.channel) {
+                pending.asked.remove(i);
+            }
+            pending.asks.push(look);
+            vec![Timed::new(t, EventBody::AskAnswered { participant, position, channel })]
+        }
         Sched::Visit { participant, position, channel, places, cells, names } => crate::sites::end(s, st, &participant, position.as_deref(), &channel, places, &cells, names),
         Sched::BirthDue { parents, name, template } => {
             let Some(b) = st.body(&parents[0]) else { return vec![] };

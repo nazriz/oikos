@@ -26,7 +26,7 @@ import { message, broughtForward } from "./common";
 import { PAPER, Respondent, type RespondParams } from "./frictions";
 import { slip } from "../slip";
 import { swayed } from "./wants";
-import { advertisedJob, ask, Asked, because, between, Book, firstDue, PAYEE_DIED, PAYMENT_FAILED, breaches, noting, callAction, usd, cellsOf, commitmentOf, DAY, jobTerms, leaseTerms, MONTH, notice, offer, ownAccount, pay, publishedPrice, say, stoodEmpty, structureOf, withdraw, type Step } from "./common";
+import { advertisedJob, ask, Asked, startsOn, because, between, Book, firstDue, PAYEE_DIED, PAYMENT_FAILED, breaches, noting, callAction, usd, cellsOf, commitmentOf, DAY, jobTerms, leaseTerms, MONTH, notice, offer, ownAccount, pay, publishedPrice, say, stoodEmpty, structureOf, withdraw, type Step } from "./common";
 import * as P from "./papers";
 import { firstDueOf } from "./openbooks";
 
@@ -79,6 +79,12 @@ export function stepper(absorb: (obs: Observation) => void, plan: (obs: Observat
         if (x.step.then) follow.push(...(x.step.then(o) ?? []));
       }
       absorb(obs);
+      // A question put to a register's keeper is not yet answered (foundations F11): what it would be judged on is not known, so it is not judged.
+      // The keeper's answer wakes it, and it goes on from there as it always did (so it must not ask twice for what a look didn't find).
+      if (obs.asking?.length) {
+        carried = follow;
+        return wait(until?.(obs));
+      }
       // A plan is made when a wake begins; woken because an act of ours is done, we carry on with it (acts take time:
       // docs/design/rebuild.md 6.3), never planning again what's still to do. With nothing left, it's a new moment: we
       // plan afresh (what's due now may not have been when the wake began).
@@ -687,7 +693,6 @@ export const landlord: BehaviourModule = {
         // An increase starts with a day: the first to begin once the notice has run. (Until 2026-10-05 it started to the
         // second, the notice counted from when we decided; the notice is on the record a moment later, so one given on
         // exactly the law's period was short of it by that moment, and invalid before the tribunal.)
-        const startsOn = (at: number, lead: number) => (Math.floor((at + lead) / DAY) + 1) * DAY;
         let lead = noticeDays * DAY;
         let broken = breaches(book, act(startsOn(t, lead)), me, t);
         while (broken.length && lead < (noticeDays + 182) * DAY) broken = breaches(book, act(startsOn(t, (lead += 7 * DAY))), me, t);

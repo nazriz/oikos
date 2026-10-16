@@ -209,7 +209,13 @@ test("F7: law 5: a living town's slips are rows of its table, each with a source
     expect(String(slip.sources[`person.${t}`] ?? "").length, `${t}: its source`).toBeGreaterThan(20);
   }
   expect(Object.keys(slip.person).sort()).toEqual([...tasks].sort());
-  expect(slip.system, "a system's slips are unsourced: none").toBeUndefined();
+  // An office's decisions go wrong at the office's sourced rate whoever or whatever makes them (the support agency of the outside world is a system, and
+  // its wrong refusals are what the profile's figure is of); pay come short is an employer's, a person's.
+  expect(Object.keys(slip.system).sort()).toEqual(tasks.filter((x) => x !== "transfer/wages").sort());
+  for (const t of Object.keys(slip.system)) {
+    expect(slip.system[t], t).toEqual(slip.person[t]);
+    expect(String(slip.sources[`system.${t}`] ?? "").length, `${t}: its source for a system`).toBeGreaterThan(20);
+  }
 });
 
 // ---------------------------------------------------------------------------------------------------------------------

@@ -54,6 +54,16 @@ impl ActTimes {
         makes.and_then(|m| table.get(m).copied()).unwrap_or_else(|| self.of(actor, block))
     }
 
+    /// A row of the table by its key, as the table has it (none: the table says nothing of it, and no default stands in).
+    pub fn row(&self, actor: Actor, key: &str) -> Option<i64> {
+        match actor {
+            Actor::Person => &self.person,
+            Actor::System => &self.system,
+        }
+        .get(key)
+        .copied()
+    }
+
     /// How long a program of several steps takes: the sum of its steps' times, each a block and what it makes if the
     /// block says (never less than a second, so acting always moves time on).
     pub fn program(&self, actor: Actor, steps: impl IntoIterator<Item = (&'static str, Option<String>)>) -> i64 {

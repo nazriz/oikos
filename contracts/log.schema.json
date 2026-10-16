@@ -1863,6 +1863,36 @@
           }
         },
         {
+          "description": "Someone put a question to a register's keeper (a look through a channel of `way: ask`, answered in the keeper's time: foundations F11): the keeper's performer `by` is busy answering it from `starts` until `done`.",
+          "type": "object",
+          "required": ["event", "cause", "participant", "channel", "keeper", "by", "starts", "done"],
+          "additionalProperties": false,
+          "properties": {
+            "event": { "const": "ask_started" },
+            "cause": { "description": "seq of the command entry that caused this event.", "$ref": "urn:oikos:contracts:0.8:common#/$defs/Count" },
+            "participant": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id" },
+            "as": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id" },
+            "channel": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/ChannelPath" },
+            "keeper": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id" },
+            "by": { "description": "The participant of the keeper's whose time it takes.", "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id" },
+            "starts": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/SimTime" },
+            "done": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/SimTime" }
+          }
+        },
+        {
+          "description": "The keeper answered: the answer is the asker's to see at their next observation.",
+          "type": "object",
+          "required": ["event", "cause", "participant", "channel"],
+          "additionalProperties": false,
+          "properties": {
+            "event": { "const": "ask_answered" },
+            "cause": { "description": "seq of the command entry that caused this event.", "$ref": "urn:oikos:contracts:0.8:common#/$defs/Count" },
+            "participant": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id" },
+            "as": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id" },
+            "channel": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/ChannelPath" }
+          }
+        },
+        {
           "description": "An entity's own record was set: its n-th change; `chain`, the hash of this change (t, set, because, in canonical JSON) over the chain before it ('oikos.entity_record.v1\\n' + previous chain + change; the first has no previous); `digest`, the hash of the record's sections as they now stand. With these the record can be rebuilt from the log and checked (`oikos record`).",
           "type": "object",
           "required": [
@@ -1943,6 +1973,8 @@
         "flood_receded",
         "visit_started",
         "visited",
+        "ask_started",
+        "ask_answered",
         "entity_recorded"
       ]
     },

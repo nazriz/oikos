@@ -328,3 +328,84 @@ fn a_visit_is_the_same_every_time() {
     };
     assert_eq!(go(), go());
 }
+
+#[test]
+fn a_keeper_answers_in_its_own_time_a_clerk_slowly_and_a_system_fast() {
+    // Foundations F11 (docs/design/foundations.md law 7): a question put to a register's keeper is its performer's work, and
+    // takes the performer's time. The world's table of work names the seconds an answer takes (`answer`), for a person and for
+    // a system; the keeper's own posts say who answers. A world with no row for it is answered at once, as it always was.
+    let titles = json!({"id": "titles", "kind": "records", "way": "ask", "of": "city", "by": ["holder", "id"], "match": {"records": ["claim"]}, "on_request": true});
+    let ask = |a: &str| json!([{"channel": "developer/titles", "query": {"where": [{"field": "holder", "op": "=", "value": a}], "order": {"field": "id"}, "limit": 200}}]);
+    let got = |o: &Observation| match o.channels.get("developer/titles") {
+        Some(ChannelData::Records { records, .. }) => records.iter().map(|r| r.id.clone()).collect::<Vec<_>>(),
+        _ => vec![],
+    };
+    let asked = |run: &mut Run<Vec<u8>>| -> (Observation, Vec<(i64, i64, String)>) {
+        let looks = serde_json::from_value(ask("city")).unwrap();
+        let out = run.command(&Command::Look { participant: "developer-system".into(), only: None, looks }).unwrap();
+        let by = out.events.iter().filter_map(|e| match &e.body { EventBody::AskStarted { starts, done, by, .. } => Some((*starts, *done, by.clone())), _ => None }).collect();
+        (out.observation.unwrap(), by)
+    };
+    // No row: at once.
+    let mut run = Run::start(with_channel(Some("developer"), titles.clone()), "knowing-ask-0", Vec::new(), None).unwrap();
+    let (o, by) = asked(&mut run);
+    assert!(by.is_empty());
+    assert_eq!(got(&o), ["title-lot-a", "title-lot-d", "title-lot-g"]);
+    // The keeper's posts are held by systems that answer in two minutes: nothing now, the answer at two minutes, once.
+    let mut c = with_channel(Some("developer"), titles.clone());
+    c["orchestration"]["act_time"]["system"]["answer"] = json!(120);
+    let mut run = Run::start(c, "knowing-ask-1", Vec::new(), None).unwrap();
+    let (o, by) = asked(&mut run);
+    assert_eq!(by.len(), 1);
+    assert_eq!((by[0].0, by[0].1), (0, 120));
+    assert!(got(&o).is_empty(), "not answered yet");
+    assert_eq!(o.asking, ["developer/titles"], "and it says a question is out");
+    run.command(&Command::Advance { to: 119 }).unwrap();
+    let o = run.command(&Command::Observe { participant: "developer-system".into(), only: None }).unwrap().observation.unwrap();
+    assert!(got(&o).is_empty());
+    assert_eq!(o.asking, ["developer/titles"]);
+    let r = run.command(&Command::Advance { to: 120 }).unwrap();
+    assert!(r.events.iter().any(|e| matches!(&e.body, EventBody::AskAnswered { participant, .. } if participant == "developer-system")));
+    let o = run.command(&Command::Observe { participant: "developer-system".into(), only: None }).unwrap().observation.unwrap();
+    assert_eq!(got(&o), ["title-lot-a", "title-lot-d", "title-lot-g"], "as the register is when it is answered");
+    assert!(o.asking.is_empty());
+    let o = run.command(&Command::Observe { participant: "developer-system".into(), only: None }).unwrap().observation.unwrap();
+    assert!(got(&o).is_empty(), "given once");
+    // Two questions together: the keeper's two systems answer one each, at once; a third waits behind the first free.
+    let (_, a) = asked(&mut run);
+    let (_, b) = asked(&mut run);
+    let (_, c3) = asked(&mut run);
+    let ends: Vec<i64> = [&a, &b, &c3].iter().map(|x| x[0].1).collect();
+    assert_eq!(ends, vec![240, 240, 360]);
+    // One clerk, a person, who is paid for ten minutes an answer: the second question waits for the first.
+    let mut c = with_channel(Some("developer"), titles);
+    c["orchestration"]["act_time"]["person"]["answer"] = json!(600);
+    for s in ["mayor-system", "finance-system"] {
+        c["participants"].as_array_mut().unwrap().retain(|p| p["id"] != s);
+    }
+    let mut c = c;
+    for pos in c["positions"].as_array_mut().unwrap().iter_mut().filter(|p| p["entity"] == "city") {
+        pos["holder"] = json!("alice-self");
+    }
+    let mut run = Run::start(c, "knowing-ask-2", Vec::new(), None).unwrap();
+    let (_, a) = asked(&mut run);
+    let (_, b) = asked(&mut run);
+    assert_eq!((a[0].0, a[0].1, a[0].2.as_str()), (0, 600, "alice-self"));
+    assert_eq!((b[0].0, b[0].1), (600, 1200), "one clerk answers one at a time");
+}
+
+#[test]
+fn an_advance_to_news_stops_where_a_keeper_answers_an_office() {
+    // Foundations F11: an answer comes at no one's wake, so the clock must stop at it for the office that asked to be woken then (and not at
+    // whichever wake comes next, which in a pilot and in its twin is another unit's, at another second).
+    let titles = json!({"id": "titles", "kind": "records", "way": "ask", "of": "city", "by": ["holder", "id"], "match": {"records": ["claim"]}, "on_request": true});
+    let mut c = with_channel(Some("developer"), titles);
+    c["orchestration"]["act_time"]["system"]["answer"] = json!(120);
+    let mut run = Run::start(c, "knowing-ask-news", Vec::new(), None).unwrap();
+    let looks = serde_json::from_value(json!([{"channel": "developer/titles", "query": {"where": [{"field": "holder", "op": "=", "value": "city"}], "limit": 200}}])).unwrap();
+    run.command(&Command::Look { participant: "developer-system".into(), only: None, looks }).unwrap();
+    run.command(&Command::AdvanceToNews { to: 10_000 }).unwrap();
+    assert_eq!(run.kernel().t(), 120, "it stops where the answer is");
+    run.command(&Command::AdvanceToNews { to: 10_000 }).unwrap();
+    assert_eq!(run.kernel().t(), 10_000);
+}

@@ -290,11 +290,11 @@ work is in flight on them): the README carries a dated change note, and the renu
 ## 12. What this leaves out (said, not hidden)
 
 - **Fees.** A title search costs money in the profile's place. The figure is in the profile; nobody is charged, and
-  the registry does no work for a search (the kernel answers from the register). Charging it needs the registry to
+  the registry's work for a search is its performer's time since F11 (below), not yet a fee. Charging it needs the registry to
   bill, which is behaviour for a later change.
 - **An office's visit is the office's time**, not a named employee's working hours. Where an office has staff in the
   world (the police, the works crew), a visit does not use up an officer's day as their other work does.
-- **Asking takes no time**, though a real search takes minutes and a real enquiry days.
+- **Asking takes the keeper's time (foundations F11, 2026-10-16).** A look through a `way: ask` records channel whose keeper (`of`) has posts held by someone who can answer, and a row for answering in the world's table of work (`answer/<channel>` or `answer`, seconds, for a person and for a system), is put to the keeper's performer: of those who hold its posts, the one who is done soonest, on their own timeline, so one clerk answers one question at a time and a system answers in its seconds. The asker is given the answer, as the register is then, with the observation after it is done (`ask_started`, `ask_answered`; the observation says `asking` while a question is out, an office that asked is woken when the answer is done, and a person asking for themselves has it at their next wake; a module that plans on what it asks, as the platform's `stepper` does, waits for it. Found on the way: waking every person who had asked, at the moment their answer was done, moved the hours they wake at, and a test town's births of a year began on day 121 instead of day 37, which is why a person is not woken). With no row, or nobody in the keeper's posts, it is answered at once as before. Not done: a directory's look-up (`who`) is still at once, and a board's search is not an ask; a real enquiry that takes days (to another office, or waiting on evidence) is not modelled.
 - **A look-up by name is exact.** There is no "someone called something like".
 - **A view built from many asks.** Each ask is capped; nothing counts how many a seat makes. The log has every look.
 

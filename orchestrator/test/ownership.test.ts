@@ -103,7 +103,9 @@ test("owners own their houses, repay their mortgages, pay rates, and pass their 
   for (const l of loans) {
     if (dead.has(l.terms.parties[1])) continue;
     const paid = ev.filter((e) => e.event === "transfer" && orders.get(e.per_instruction) === l.id).length;
-    expect(paid).toBeGreaterThanOrEqual(Math.floor((300 * DAY) / MONTH) - 1);
+    // (A mortgage the household pays off is collected until then: 2026-10-16, foundations F11, in a run a household with the money paid its off on day 234 and the bank had eight of nine.)
+    const off = ev.find((e) => e.event === "recorded" && String(e.record.text).startsWith("Mortgage paid off") && JSON.stringify(e.record).includes(l.id));
+    expect(paid).toBeGreaterThanOrEqual(Math.floor(((off ? off.t : 300 * DAY)) / MONTH) - 1);
   }
   // Owners are levied rates, and pay them.
   const owners = new Set(titles.map((x: any) => x.holder));

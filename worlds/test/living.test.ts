@@ -77,7 +77,8 @@ test("a spec without `living` generates what it generated before (byte for byte)
   // (Re-taken on 2026-10-15 at foundations F4: the generated systems name a template and a supplier and the world says where work is done; 3facfdc8... until then.)
   // (Re-taken on 2026-10-16 at foundations F5: the town's offices are held by people, their staff hired, its systems delivered from templates that say what they do; 1f5ef6f6... until then.)
   // (Re-taken on 2026-10-16 at foundations F7: the generator's version moved with the table of slips, which a spec without `living` does not have; be6ff50f... until then.)
-  expect(hash(c)).toBe("a84328b79b62d5e6e9f3ee32e27ce5f6af6593a7fa24cf771a79e03cc26ef607");
+  // (Re-taken on 2026-10-16 at foundations F11: the work table has a row for a keeper's answer (`answer`); a84328b7... until then.)
+  expect(hash(c)).toBe("d60a26bc115d836cfdde371e5f8ada5dcc6f71c7b89ac9dca57dcd3e6c5730e9");
   const text = JSON.stringify(c);
   expect(text).not.toContain('"started"');
   expect(text).not.toContain("attach_mean");

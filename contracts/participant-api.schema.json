@@ -62,6 +62,13 @@
         "t": {
           "$ref": "urn:oikos:contracts:0.8:common#/$defs/SimTime"
         },
+        "asking": {
+          "description": "The channels this participant (in the capacities the observation covers) has put a question to a register's keeper through that is not yet answered (foundations F11; a look through a channel of way `ask` whose keeper takes time to answer). Absent: none. The answer comes with an observation of its own, when the keeper has done it; a participant that needs it waits for that.",
+          "type": "array",
+          "items": {
+            "$ref": "urn:oikos:contracts:0.8:common#/$defs/ChannelPath"
+          }
+        },
         "status": {
           "enum": [
             "active",

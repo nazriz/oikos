@@ -421,6 +421,26 @@ pub enum EventBody {
         channel: Id,
         places: Vec<Id>,
     },
+    /// Someone has put a question to a register's keeper (a look through a channel of `way: ask`: docs/design/knowing.md
+    /// section 5; foundations F11): the keeper's performer `by` is busy answering it from `starts` until `done`, when the
+    /// asker is given the answer with their next observation.
+    AskStarted {
+        participant: Id,
+        #[serde(default, rename = "as", skip_serializing_if = "Option::is_none")]
+        position: Option<Id>,
+        channel: Id,
+        keeper: Id,
+        by: Id,
+        starts: i64,
+        done: i64,
+    },
+    /// The keeper has answered: the answer is the asker's to see at their next observation.
+    AskAnswered {
+        participant: Id,
+        #[serde(default, rename = "as", skip_serializing_if = "Option::is_none")]
+        position: Option<Id>,
+        channel: Id,
+    },
     ParticipantOptedOut {
         participant: Id,
         statement: String,
@@ -482,6 +502,8 @@ impl EventBody {
             EventBody::Observation { .. } => "observation",
             EventBody::VisitStarted { .. } => "visit_started",
             EventBody::Visited { .. } => "visited",
+            EventBody::AskStarted { .. } => "ask_started",
+            EventBody::AskAnswered { .. } => "ask_answered",
             EventBody::ParticipantOptedOut { .. } => "participant_opted_out",
             EventBody::EntityRecorded { .. } => "entity_recorded",
         }
