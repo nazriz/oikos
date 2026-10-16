@@ -6,7 +6,7 @@
 // support payments, industry shares...) comes from the spec's profile (worlds/profiles/, docs/profiles.md), and what
 // isn't there is derived from it here by general formulas, or is a placeholder of the town's own shape.
 
-import { DECISION_KIND, decisionsInWords, returnsOf, returnsInWords, BOOKS, drawValues, raisedValues, UPBRINGING, adultAgeBands, bedroomsNeeded, declarationFor, drawHousehold, drawSavings, formatMoney, inCurrency, planLaw, planLawWords, POSSESSION_ANSWER, possessionOrderFor, forms as formWords, modules, votedWords, Randomness, chargesInWords, dayPayPeriod, forAge, forOutOfWork, linesInWords, paymentsInWords, tabledLines, yearInDays, stopsWorkAt, withholding, withholdingInWords, yearsOfSchooling, draftLaw, type HouseholdSpec, type IncomeTaxLaw, type Issued, type LawSchedule, type PaymentRule, type DecisionLaw, type Taken } from "@oikos/participants";
+import { particularsOf, DECISION_KIND, decisionsInWords, returnsOf, returnsInWords, BOOKS, drawValues, raisedValues, UPBRINGING, adultAgeBands, bedroomsNeeded, declarationFor, drawHousehold, drawSavings, formatMoney, inCurrency, planLaw, planLawWords, POSSESSION_ANSWER, possessionOrderFor, forms as formWords, modules, votedWords, Randomness, chargesInWords, dayPayPeriod, forAge, forOutOfWork, linesInWords, paymentsInWords, tabledLines, yearInDays, stopsWorkAt, withholding, withholdingInWords, yearsOfSchooling, draftLaw, type HouseholdSpec, type IncomeTaxLaw, type Issued, type LawSchedule, type PaymentRule, type DecisionLaw, type Taken } from "@oikos/participants";
 import law from "../law/basic.json";
 import schedules from "../law/schedules.json";
 import { loadProfile, type Profile } from "./profile";
@@ -1628,7 +1628,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
         const by = (days - ago) * DAY + 9 * 3600;
         paper(id, "application", applicant, [venue], [applicant, venue, against], undefined,
           `Application: ${matter.replace(/_/g, " ")} against ${against}${extra.structure ? `; at ${extra.structure}` : ""}; we asked them first and it was not put right.`,
-          { kind: matter, matter, against, ...extra, request: "asked before the year began" }, ago);
+          { kind: matter, matter, against, ...extra, particulars: particularsOf({ matter, party: against, since: -ago * DAY, ...extra, asked: { t: -ago * DAY } }, 0), request: "asked before the year began" }, ago);
         paper(`notice-${id}`, "complaint_notice", venue, [applicant, against], [applicant, against, venue], id,
           `${applicant} has applied to us about ${matter.replace(/_/g, " ")} (application ${id}). You may answer by ${formWords.dateWords(by)}.`,
           { application: id, kind: matter, matter, applicant, against, hearing_at: by, answer_by: by, ...(extra.about ? { about: extra.about } : {}), ...(extra.structure ? { structure: extra.structure } : {}), ...(extra.seeks ? { seeks: extra.seeks } : {}) }, ago);

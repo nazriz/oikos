@@ -1,6 +1,6 @@
 {
   "name": "office.desk",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "doc": "docs/behaviour/frictions.md",
   "params": {
     "account": {
