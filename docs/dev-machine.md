@@ -112,3 +112,13 @@ What the maintainer does by hand, in a clean worktree of its own (`.claude/workt
 - It waits for slots like any heavy job, so on a busy machine it is slow; run it once per merge (the rule above).
 - Pure parts (keep-both, marker check, failure reading) are tested in `scripts/merge.test.ts`.
 - `.github/workflows/ci.yml` also runs the suite on every push and pull request, on a self-hosted runner: `docs/ci-runner.md`.
+## Time-saving (2026-10-17)
+
+- **`bun scripts/test.ts --affected [--base REF] [--list]`** is the merge's selection (`--list` prints the choice and stops). The whole suite when
+  the change touches `kernel/`, the contracts (not their notes), `package.json`, `bun.lock`, `bunfig.toml`, a tsconfig, the runner or the
+  slots; documents only: the tests that read documents (`docs/` in them or their imports) and the backstops; anything else: the fast tier, the
+  tests changed, importing a changed file, naming a changed data file or its folder, or naming a script (`cli.ts`) that imports one, and the
+  backstops (generality, no-god-view, contracts) always. Over-choosing is the safe way to be wrong: it only costs time. Proved in
+  `scripts/test-runner.test.ts` (a planted kernel change chooses everything). The whole suite, `bun run test:all`, is for a schedule.
+- The kernel's cargo tests now run alongside the test files (before, a suite sat idle until it had seven tokens), with four tokens.
+  `bun run kernel` takes four tokens, not half the cores: 41 s against 35 s cold at 7 jobs, and a queue of minutes shorter.

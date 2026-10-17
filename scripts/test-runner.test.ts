@@ -111,3 +111,44 @@ test("--changed picks the tests that are changed, import a changed file (however
     expect(out).toMatch(/^4 pass, 0 fail across 4 files, .*\(fast tier and what changed\), 0 passed on rerun$/m);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }, 120_000);
+
+test("--affected: a planted change in a kernel file chooses the whole suite; a document only the tests that read documents; code the tests that reach it, through a spawned script too, and the backstops always", async () => {
+  const dir = fixtures({
+    "orchestrator/test/generality.test.ts": `test("g", () => expect(1).toBe(1));`,
+    "t/unit.test.ts": `import { one } from "../lib/a";\ntest("u", () => expect(one()).toBe(1));`,
+    "t/spawns.test.ts": `test("s", () => { Bun.spawnSync(["bun", "orchestrator/src/cli.ts"]); });`,
+    "t/docs.test.ts": `import { readFileSync } from "node:fs";\ntest("d", () => { readFileSync("docs/x.md"); });`,
+    "t/scans.test.ts": `import { readdirSync } from "node:fs";\ntest("w", () => { readdirSync("worlds/profiles/"); });`,
+    "t/other.test.ts": `test("o", () => expect(1).toBe(1));`,
+  });
+  const git = (...a: string[]) => { const p = Bun.spawnSync(["git", "-c", "user.name=t", "-c", "user.email=t@t", ...a], { cwd: dir, stdout: "pipe", stderr: "pipe" }); if (p.exitCode !== 0) throw new Error(p.stderr.toString()); };
+  const chosen = async () => (await runner_(dir, "--affected", "--list", "--base", "base")).out.split("\n").filter((l) => /\.test\.ts$/.test(l)).sort();
+  const everything = ["orchestrator/test/generality.test.ts", "t/docs.test.ts", "t/other.test.ts", "t/scans.test.ts", "t/spawns.test.ts", "t/unit.test.ts"];
+  try {
+    for (const d of ["lib", "kernel/src", "docs", "worlds/profiles", "orchestrator/src"]) mkdirSync(join(dir, d), { recursive: true });
+    writeFileSync(join(dir, "lib/a.ts"), `export const one = () => 1;\n`);
+    writeFileSync(join(dir, "kernel/src/lib.rs"), "// kernel\n");
+    writeFileSync(join(dir, "docs/x.md"), "x\n");
+    writeFileSync(join(dir, "docs/y.md"), "y\n");
+    writeFileSync(join(dir, "worlds/profiles/p.yaml"), "a: 1\n");
+    writeFileSync(join(dir, "orchestrator/src/run.ts"), "export const run = 1;\n");
+    writeFileSync(join(dir, "orchestrator/src/cli.ts"), `import { run } from "./run";\nconsole.log(run);\n`);
+    git("init", "-q", "-b", "main"); git("add", "."); git("commit", "-q", "-m", "base"); git("tag", "base");
+    // A planted change in a kernel file: the whole suite (and the kernel's tests).
+    writeFileSync(join(dir, "kernel/src/lib.rs"), "// kernel changed\n");
+    expect(await chosen()).toEqual(everything);
+    git("checkout", "-q", "."); 
+    // A document: the tests that read documents, and the backstop; not the rest.
+    writeFileSync(join(dir, "docs/y.md"), "changed\n");
+    expect(await chosen()).toEqual(["orchestrator/test/generality.test.ts", "t/docs.test.ts"]);
+    git("checkout", "-q", ".");
+    // A file a test does not import but a spawned script does, two imports down from a test that names the script.
+    writeFileSync(join(dir, "orchestrator/src/run.ts"), "export const run = 2;\n");
+    expect(await chosen()).toContain("t/spawns.test.ts");
+    expect(await chosen()).not.toContain("t/docs.test.ts");
+    git("checkout", "-q", ".");
+    // Data in a folder a test scans without naming the file.
+    writeFileSync(join(dir, "worlds/profiles/p.yaml"), "a: 2\n");
+    expect(await chosen()).toEqual(expect.arrayContaining(["orchestrator/test/generality.test.ts", "t/scans.test.ts"]));
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+}, 120_000);

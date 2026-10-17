@@ -13,6 +13,12 @@
 // Heavy work goes through the machine's slots (scripts/slots.ts): one token for each test file running, half the cores
 // for the kernel's tests, so several suites on one machine share the cores. Under that, how many files run at once
 // still follows the load average (work that takes no slot counts too).
+// `--affected [--base REF]` is for the merge: everything the change could affect, and no more. A change to the kernel,
+// the contracts, the manifests or the runner itself (see FULL_ON) chooses the whole suite; a change of documents only
+// chooses the tests that read documents, plus the backstops; any other change chooses the fast tier, the tests that
+// are changed, import a changed file or name a changed data file or its folder, and the backstops (BACKSTOPS: the
+// invariant tests, always). The whole suite stays for a schedule (`bun run test:all`). `--list` prints the choice and
+// stops. The kernel's own tests (cargo) run alongside the test files, not before them.
 // `--root DIR` runs the *.test.ts under DIR instead of the repo (used by scripts/test-runner.test.ts; no preconditions).
 
 import { Glob } from "bun";
@@ -32,9 +38,16 @@ const jobsFlag = flag("jobs");
 const fast = bool("fast");
 const timeNew = bool("time-new");
 const noBuild = bool("no-build");
-const changed = bool("changed");
+const affected = bool("affected");
+const list = bool("list");
+const changed = bool("changed") || affected;
 const base = flag("base") ?? "origin/main";
 const filters = args;
+/** A change to any of these could reach any test: the whole suite. */
+const FULL_ON = [/^kernel\//, /^contracts\/(?!.*\.md$)/, /^(package\.json|bun\.lock|bunfig\.toml|tsconfig.*\.json)$/, /^scripts\/(test|slots|slots-preload)\.ts$/, /^\.github\//];
+/** Always run under --affected: the invariants and backstops. */
+const BACKSTOPS = ["orchestrator/test/generality.test.ts", "orchestrator/test/no-god-view.test.ts", "contracts/test/contracts.test.ts", "orchestrator/test/invariants.test.ts"]; // (the last from the test audit; used once on main)
+const isDoc = (f: string) => /\.md$/.test(f) || (f.startsWith("docs/") && /\.(txt|png|svg|jpg)$/.test(f));
 
 const cores = cpus().length;
 const maxJobs = jobsFlag ? Number(jobsFlag) : Math.max(2, cores - 2);
@@ -104,14 +117,27 @@ function importsOf(file: string, text: string): string[] {
   }
   return out;
 }
+let nameIndex: Map<string, string[]> | undefined;
+/** Every script of the repo by file name (for --affected). */
+function byName(): Map<string, string[]> {
+  if (!nameIndex) {
+    nameIndex = new Map();
+    for (const f of new Glob("**/*.{ts,sh}").scanSync({ cwd: root })) {
+      if (f.includes("node_modules") || f.startsWith("runs/") || f.startsWith("kernel/target") || f.startsWith(".claude/")) continue;
+      const b = f.split("/").pop()!;
+      nameIndex.set(b, [...(nameIndex.get(b) ?? []), f]);
+    }
+  }
+  return nameIndex;
+}
 /** For each test file, why it is chosen (undefined: it is not): itself changed, a changed import, a changed data file named. */
-function reasons(tests: string[]): { why: Map<string, string>; changedFiles: string[]; kernel: boolean; unreached: string[] } {
+function reasons(tests: string[], deep = false): { why: Map<string, string>; changedFiles: string[]; kernel: boolean; unreached: string[] } {
   const git = (...a: string[]) => { const p = Bun.spawnSync(["git", ...a], { cwd: root, stdout: "pipe", stderr: "pipe" }); if (p.exitCode !== 0) stop(`git ${a.join(" ")} failed: ${p.stderr.toString().trim()} (--changed compares with ${base}: fetch it, or name another with --base)`); return p.stdout.toString().trim(); };
   const from = git("merge-base", base, "HEAD");
   const changedFiles = [...new Set([...git("diff", "--name-only", from).split("\n"), ...git("ls-files", "--others", "--exclude-standard").split("\n")].filter(Boolean))].sort();
   const set = new Set(changedFiles);
   // (Data a test reads by name, not by import: a world, a profile, a schema. Named by its file name in the test or what it imports.)
-  const data = changedFiles.filter((f) => /\.(ya?ml|json|cel|sql|txt|py)$/.test(f) && !/(^|\/)(package|tsconfig|test-times)\.json$/.test(f) && !f.startsWith("kernel/"));
+  const data = changedFiles.filter((f) => (deep && isDoc(f)) || /\.(ya?ml|json|cel|sql|txt|py)$/.test(f) && !/(^|\/)(package|tsconfig|test-times)\.json$/.test(f) && !f.startsWith("kernel/"));
   const seen = new Map<string, { imports: string[]; text: string }>();
   const load = (f: string) => { let e = seen.get(f); if (!e) { let text = ""; try { text = readFileSync(join(root, f), "utf8"); } catch {} e = { imports: /\.(ts|tsx|js|mjs)$/.test(f) ? importsOf(f, text) : [], text }; seen.set(f, e); } return e; };
   const why = new Map<string, string>();
@@ -124,15 +150,23 @@ function reasons(tests: string[]): { why: Map<string, string>; changedFiles: str
     for (let f = queue.shift(); f !== undefined; f = queue.shift()) {
       const d = depth.get(f)!;
       if (f !== t && set.has(f)) { reached.add(f); if (!why.has(t)) why.set(t, `imports ${f}${d > 1 ? ` (${d} imports down)` : ""}`); }
-      const named = data.find((c) => load(f!).text.includes(c.split("/").pop()!));
+      // (--affected also takes a test that names the changed file's folder, or any document for a changed document: a
+      // test that scans a folder or reads "docs/" never names the file.)
+      const named = data.find((c) => { const txt = load(f!).text; return txt.includes(c.split("/").pop()!) || (deep && (txt.includes(dirname(c) + "/") || (isDoc(c) && txt.includes("docs/")))); });
       if (named) { reached.add(named); if (!why.has(t)) why.set(t, `names ${named}${f === t ? "" : ` (in ${f})`}`); }
-      for (const i of load(f).imports) if (!depth.has(i)) { depth.set(i, d + 1); queue.push(i); }
+      // (--affected: a test that starts a script by its name -- the command line, a pilot's queue -- reaches what the script imports.)
+      const spawned = deep ? [...new Set(load(f).text.match(/[\w-]+\.(?:ts|sh)\b/g) ?? [])].flatMap((b) => byName().get(b) ?? []) : [];
+      for (const i of [...load(f).imports, ...spawned]) if (!depth.has(i)) { depth.set(i, d + 1); queue.push(i); }
     }
   }
   return { why, changedFiles, kernel: changedFiles.some((f) => f.startsWith("kernel/")), unreached: changedFiles.filter((f) => !reached.has(f) && !f.startsWith("kernel/") && !/\.md$/.test(f)) };
 }
-const pick = changed ? reasons(all) : undefined;
-if (pick) {
+const pick = changed ? reasons(all, affected) : undefined;
+const fullWhy = affected && pick ? pick.changedFiles.find((f) => FULL_ON.some((r) => r.test(f))) : undefined;
+const docsOnly = affected && !!pick && !fullWhy && pick.changedFiles.length > 0 && pick.changedFiles.every(isDoc);
+const sel = fullWhy || !pick ? undefined : pick;
+if (affected) console.log(fullWhy ? `--affected: ${fullWhy} changed, which could reach any test: the whole suite.` : docsOnly ? "--affected: documents only: the tests that read documents, and the backstops." : "");
+if (sel) {
   const isFast = (f: string) => (times[f] ?? Infinity) < FAST_SECONDS;
   const extra = all.filter((f) => pick.why.has(f) && !isFast(f));
   const slow = all.filter((f) => !isFast(f));
@@ -143,10 +177,11 @@ if (pick) {
   if (slow.length && extra.length > slow.length / 2) console.log(`  (${extra.length} of the ${slow.length} slow files: this change reaches most of the suite. To run less, name the tests that cover it: bun scripts/test.ts <filter>...)`);
 }
 const files = all
-  .filter((f) => !pick || (times[f] ?? Infinity) < FAST_SECONDS || pick.why.has(f))
+  .filter((f) => !sel || (affected && BACKSTOPS.includes(f)) || (!docsOnly && (times[f] ?? Infinity) < FAST_SECONDS) || sel.why.has(f))
   .filter((f) => !fast || (times[f] ?? Infinity) < FAST_SECONDS)
   .filter((f) => !timeNew || times[f] === undefined)
   .sort((a, b) => (times[b] ?? 1e9) - (times[a] ?? 1e9) || (a < b ? -1 : 1));
+if (list) { console.log(files.join("\n")); process.exit(0); }
 if (untimed.length && !custom && !timeNew && !changed) {
   console.log(`NOTE ${untimed.length} test file${untimed.length > 1 ? "s" : ""} never timed, counted as slow${fast ? " and left out of the fast tier" : ""}: ${untimed.join(", ")}`);
   console.log(`     run \`bun scripts/test.ts --time-new\` to time ${untimed.length > 1 ? "them" : "it"} and record that in scripts/test-times.json`);
@@ -164,9 +199,12 @@ for (const sig of ["SIGTERM", "SIGINT", "SIGHUP"] as const) process.on(sig, () =
 
 const t0 = performance.now();
 let failed = 0;
-if (!filters.length && !custom && !timeNew && (!pick || pick.kernel)) {
-  const slot = await take(Math.ceil(cores / 2), "the kernel's tests (cargo test)");
-  const k = Bun.spawn(["cargo", "test", "--release", "--manifest-path", "kernel/Cargo.toml", "--workspace", "-q"], { cwd: repo, stdout: "pipe", stderr: "pipe", env: { ...insideSlot(Math.ceil(cores / 2)), ...(slot?.weight ? { CARGO_BUILD_JOBS: String(slot.weight) } : {}) } });
+// (Started now and awaited after the files: it used to run first and alone, and a suite waited for it, at four times
+// the slots it needs, before its first file started. Four tokens compile as fast as seven within a few seconds.)
+const kernelTests = !filters.length && !custom && !timeNew && (!sel || sel.kernel) ? kernelCargoTests() : Promise.resolve();
+async function kernelCargoTests() {
+  const slot = await take(4, "the kernel's tests (cargo test)");
+  const k = Bun.spawn(["cargo", "test", "--release", "--manifest-path", "kernel/Cargo.toml", "--workspace", "-q"], { cwd: repo, stdout: "pipe", stderr: "pipe", env: { ...insideSlot(4), ...(slot?.weight ? { CARGO_BUILD_JOBS: String(slot.weight) } : {}) } });
   children.add(k);
   const out = (await Promise.all([new Response(k.stdout).text(), new Response(k.stderr).text()])).join("");
   const ok = (await k.exited) === 0;
@@ -217,7 +255,7 @@ async function worker() {
     if (r.code !== 0) { failed++; bad.push(tail(f, r.text)); }
   }
 }
-await Promise.all(Array.from({ length: Math.max(1, Math.min(maxJobs, files.length)) }, worker));
+await Promise.all([kernelTests, ...Array.from({ length: Math.max(1, Math.min(maxJobs, files.length)) }, worker)]);
 
 // Files that only timed out run again, one at a time, with the machine to themselves as far as this run goes.
 for (const f of lateTimeouts) {
