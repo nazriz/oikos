@@ -1,0 +1,108 @@
+{
+  "name": "firm.newspaper",
+  "version": "0.1.0",
+  "doc": "docs/behaviour/news.md",
+  "params": {
+    "every_days": {
+      "schema": {
+        "type": "integer",
+        "description": "its rhythm: an edition a week, by an editor and reporters who are paid and whose time it takes"
+      },
+      "unit": "days",
+      "default": 7,
+      "source": "placeholder"
+    },
+    "items_per_edition": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 5,
+      "source": "placeholder"
+    },
+    "leaning_bps": {
+      "schema": {
+        "type": "integer",
+        "description": "-10,000 against the town's government to 10,000 for it (placeholder: none)"
+      },
+      "unit": "bps",
+      "default": 0,
+      "source": "-10,000 against the town's government to 10,000 for it (placeholder: none)"
+    },
+    "town": {
+      "schema": {
+        "type": "string",
+        "description": "the government it reports on (the world must say)"
+      },
+      "default": "",
+      "required": true,
+      "source": "the government it reports on (the world must say)"
+    }
+  },
+  "perceives": [],
+  "state": "none",
+  "issues": [
+    {
+      "form": "news_item",
+      "title": "An item in the paper",
+      "fields": {
+        "headline": {
+          "type": "text",
+          "required": true,
+          "description": "What the item says."
+        },
+        "source": {
+          "type": "record",
+          "required": true,
+          "description": "The record it reports."
+        },
+        "kind": {
+          "type": "text",
+          "required": true,
+          "description": "What kind of record that is."
+        },
+        "tone": {
+          "type": "choice",
+          "required": true,
+          "options": [
+            "-1",
+            "0",
+            "1"
+          ],
+          "description": "How it reads for the town's government: -1 against, 0 neither, 1 for."
+        },
+        "about_office": {
+          "type": "choice",
+          "required": true,
+          "options": [
+            "yes",
+            "no"
+          ],
+          "description": "Whether it is about an office up for election."
+        },
+        "edition": {
+          "type": "count",
+          "required": true,
+          "description": "The edition it is in."
+        }
+      },
+      "writes": {
+        "kind": "news",
+        "text": "{headline}",
+        "basis": "=source",
+        "visible": "public",
+        "assertion": {
+          "that": "=headline",
+          "about": [
+            "@town"
+          ]
+        },
+        "data": {
+          "kind": "=kind",
+          "tone": "#tone",
+          "about_office": "?about_office",
+          "edition": "=edition"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,106 @@
+{
+  "name": "bank.payment_system",
+  "version": "0.17.1",
+  "doc": "docs/behaviour/bank-payment-system.md",
+  "params": {
+    "amount": {
+      "schema": {},
+      "source": "the world gives it (no default)"
+    },
+    "courts": {
+      "schema": {
+        "description": "whose garnishee orders it carries out (the world's tribunals and courts)"
+      },
+      "source": "the world gives it (no default)"
+    },
+    "from": {
+      "schema": {},
+      "source": "the world gives it (no default)"
+    },
+    "hold_notice": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 86400,
+      "source": "placeholder"
+    },
+    "instruction": {
+      "schema": {},
+      "source": "the world gives it (no default)"
+    },
+    "letter_lists": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 40,
+      "source": "placeholder"
+    },
+    "line": {
+      "schema": {},
+      "source": "the world gives it (no default)"
+    },
+    "max_batch": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 32,
+      "source": "placeholder"
+    },
+    "memo": {
+      "schema": {},
+      "source": "the world gives it (no default)"
+    },
+    "review_all": {
+      "schema": {
+        "type": "boolean"
+      },
+      "default": false,
+      "source": "placeholder"
+    },
+    "settles": {
+      "schema": {},
+      "source": "the world gives it (no default)"
+    },
+    "statement_lists": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 40,
+      "source": "placeholder"
+    },
+    "to": {
+      "schema": {},
+      "source": "the world gives it (no default)"
+    },
+    "town": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
+      "source": "placeholder"
+    },
+    "verify_author": {
+      "schema": {
+        "type": "boolean"
+      },
+      "default": true,
+      "source": "placeholder"
+    },
+    "who": {
+      "schema": {},
+      "source": "the world gives it (no default)"
+    }
+  },
+  "perceives": [],
+  "state": "none",
+  "keeps": [
+    {
+      "what": "request",
+      "why": "A bank keeps its own customers' instructions: every standing order and payment request it is asked to carry out is addressed to it."
+    },
+    {
+      "what": "accounts",
+      "why": "The ledger is the bank's own book: it keeps its customers' accounts, and pays from them as they instruct."
+    }
+  ]
+}

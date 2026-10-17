@@ -21,8 +21,11 @@
 #![forbid(unsafe_code)]
 #![deny(clippy::float_arithmetic, clippy::float_cmp)]
 
+pub mod bargaining;
 pub mod calendar;
+pub mod decisions;
 pub mod forms;
 pub mod identity;
 pub mod law;
 pub mod slip;
+pub mod words;

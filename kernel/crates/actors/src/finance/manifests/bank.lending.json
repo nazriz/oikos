@@ -1,0 +1,403 @@
+{
+  "name": "bank.lending",
+  "version": "0.5.0",
+  "doc": "docs/behaviour/credit.md",
+  "params": {
+    "arrears_days": {
+      "schema": {
+        "type": "integer",
+        "description": "this far behind: arrears (a notice)"
+      },
+      "unit": "days",
+      "default": 30,
+      "source": "placeholder"
+    },
+    "buffer_bps": {
+      "schema": {
+        "type": "integer",
+        "description": "assessed at the rate plus this (serviceability)"
+      },
+      "unit": "bps",
+      "default": 300,
+      "source": "placeholder"
+    },
+    "default_days": {
+      "schema": {
+        "type": "integer",
+        "description": "this far behind: default"
+      },
+      "unit": "days",
+      "default": 90,
+      "source": "placeholder"
+    },
+    "funding_from": {
+      "schema": {
+        "description": "who lends the bank money when it's short (an entity outside)"
+      },
+      "default": null,
+      "source": "placeholder"
+    },
+    "funding_rate_bps": {
+      "schema": {
+        "type": "integer",
+        "description": "what that funding costs, a year"
+      },
+      "unit": "bps",
+      "default": 500,
+      "source": "placeholder"
+    },
+    "max_lvr_bps": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "bps",
+      "default": 8000,
+      "source": "placeholder"
+    },
+    "max_months": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "months",
+      "default": 60,
+      "source": "placeholder"
+    },
+    "max_share_bps": {
+      "schema": {
+        "type": "object",
+        "description": "of monthly income, for repayments"
+      },
+      "unit": "bps",
+      "default": {
+        "person": 3000,
+        "organisation": 2000
+      },
+      "source": "placeholder"
+    },
+    "mortgage_max_months": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "months",
+      "default": 360,
+      "source": "placeholder"
+    },
+    "mortgage_rate_bps": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "bps",
+      "default": 0,
+      "source": "placeholder"
+    },
+    "notice_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 14,
+      "source": "placeholder"
+    },
+    "part": {
+      "schema": {},
+      "source": "the world gives it (no default)"
+    },
+    "pay_staff": {
+      "schema": {
+        "type": "boolean"
+      },
+      "default": false,
+      "source": "placeholder"
+    },
+    "period": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 1209600,
+      "source": "placeholder"
+    },
+    "rate_bps": {
+      "schema": {
+        "type": "object",
+        "description": "lending rates, a year"
+      },
+      "unit": "bps",
+      "default": {
+        "person": 1200,
+        "organisation": 800
+      },
+      "source": "placeholder"
+    },
+    "reserve": {
+      "schema": {
+        "type": "integer",
+        "description": "kept in the bank's own account, cents"
+      },
+      "default": 5000000,
+      "source": "placeholder"
+    },
+    "who": {
+      "schema": {
+        "type": "string",
+        "description": "its channel onto who's who, where it looks up what kind of applicant it has (\"\": it knows what it is shown)"
+      },
+      "default": "",
+      "source": "placeholder"
+    }
+  },
+  "perceives": [],
+  "state": "none",
+  "keeps": [
+    {
+      "what": "request",
+      "why": "The bank's own files: its customers' instructions, among them the repayments of the loans this office made."
+    },
+    {
+      "what": "accounts",
+      "why": "The bank's own ledger: it keeps its customers' accounts, and a lending office reads what an applicant holds with it."
+    }
+  ],
+  "issues": [
+    {
+      "form": "loan_decision",
+      "title": "Decision on a loan application",
+      "fields": {
+        "application": {
+          "type": "record",
+          "required": true,
+          "description": "The application decided."
+        },
+        "applicant": {
+          "type": "entity",
+          "required": true,
+          "description": "Who applied."
+        },
+        "approved": {
+          "type": "choice",
+          "required": true,
+          "options": [
+            "yes",
+            "no"
+          ],
+          "description": "Whether it is approved."
+        },
+        "reason": {
+          "type": "text",
+          "description": "Why not, where it is declined."
+        },
+        "amount": {
+          "type": "amount",
+          "description": "Where approved: how much is lent."
+        },
+        "months": {
+          "type": "count",
+          "description": "Where approved: over how many months."
+        },
+        "rate_bps": {
+          "type": "count",
+          "description": "Where approved: the yearly rate, in hundredths of a percent."
+        },
+        "payment": {
+          "type": "amount",
+          "description": "Where approved: the monthly repayment."
+        }
+      },
+      "writes": {
+        "kind": "loan_decision",
+        "text": "Loan application {application}: approved {approved}.",
+        "basis": "=application",
+        "to": [
+          "=applicant"
+        ],
+        "visible": [
+          "=applicant",
+          "=self"
+        ],
+        "data": {
+          "application": "=application",
+          "approved": "?approved",
+          "reason": "=reason",
+          "amount": "#amount",
+          "months": "=months",
+          "rate_bps": "=rate_bps",
+          "payment": "#payment"
+        }
+      }
+    },
+    {
+      "form": "loan_payout",
+      "title": "Advice that a loan has been paid out",
+      "fields": {
+        "loan": {
+          "type": "record",
+          "required": true,
+          "description": "The loan agreement."
+        },
+        "borrower": {
+          "type": "entity",
+          "required": true,
+          "description": "The borrower."
+        },
+        "request": {
+          "type": "record",
+          "required": true,
+          "description": "The request for the payout."
+        },
+        "amount": {
+          "type": "amount",
+          "required": true,
+          "description": "How much was paid out."
+        },
+        "account": {
+          "type": "account",
+          "required": true,
+          "description": "The account it was paid into."
+        }
+      },
+      "writes": {
+        "kind": "loan_payout",
+        "text": "Loan {loan}: {amount} paid out into {account}.",
+        "basis": "=request",
+        "to": [
+          "=borrower"
+        ],
+        "visible": [
+          "=borrower",
+          "=self"
+        ],
+        "data": {
+          "loan": "=loan",
+          "amount": "#amount",
+          "account": "=account"
+        }
+      }
+    },
+    {
+      "form": "funding_draw",
+      "title": "A draw on the bank's wholesale funding",
+      "fields": {
+        "amount": {
+          "type": "amount",
+          "required": true,
+          "description": "How much is drawn."
+        },
+        "account": {
+          "type": "account",
+          "required": true,
+          "description": "The account it is to be paid into."
+        },
+        "rate_bps": {
+          "type": "count",
+          "required": true,
+          "description": "The yearly rate, in hundredths of a percent."
+        }
+      },
+      "writes": {
+        "sends": [
+          {
+            "to": [
+              "@funder"
+            ],
+            "why": "The funder is who the draw is made on: it pays it."
+          }
+        ],
+        "kind": "funding_draw",
+        "text": "Funding drawn: {amount} into {account}.",
+        "to": [
+          "@funder"
+        ],
+        "visible": [
+          "=self",
+          "@funder"
+        ],
+        "data": {
+          "amount": "#amount",
+          "account": "=account",
+          "rate_bps": "=rate_bps"
+        }
+      }
+    },
+    {
+      "form": "loan_arrears",
+      "title": "Letter to a borrower behind with a loan",
+      "does": "Tells a borrower in writing that a loan is behind, and by how much. It changes nothing of the loan.",
+      "fields": {
+        "loan": {
+          "type": "record",
+          "required": true,
+          "description": "The loan agreement."
+        },
+        "borrower": {
+          "type": "entity",
+          "required": true,
+          "description": "The borrower."
+        },
+        "behind": {
+          "type": "amount",
+          "required": true,
+          "description": "How much is behind."
+        }
+      },
+      "writes": {
+        "kind": "loan_arrears",
+        "text": "Loan {loan}: {behind} behind. Please pay.",
+        "basis": "=loan",
+        "to": [
+          "=borrower"
+        ],
+        "visible": [
+          "=borrower",
+          "=self"
+        ],
+        "data": {
+          "loan": "=loan",
+          "behind": "#behind"
+        }
+      }
+    },
+    {
+      "form": "loan_default",
+      "title": "Notice to a borrower that a loan is in default",
+      "does": "Tells a borrower in writing that a loan is in default: how much is behind and how much is owing in all. It moves nothing by itself.",
+      "fields": {
+        "loan": {
+          "type": "record",
+          "required": true,
+          "description": "The loan agreement."
+        },
+        "borrower": {
+          "type": "entity",
+          "required": true,
+          "description": "The borrower."
+        },
+        "behind": {
+          "type": "amount",
+          "required": true,
+          "description": "How much is behind."
+        },
+        "outstanding": {
+          "type": "amount",
+          "required": true,
+          "description": "How much is owing in all."
+        }
+      },
+      "writes": {
+        "kind": "loan_default",
+        "text": "Loan {loan} is in default: {behind} behind, {outstanding} owing.",
+        "basis": "=loan",
+        "to": [
+          "=borrower"
+        ],
+        "visible": [
+          "=borrower",
+          "=self"
+        ],
+        "data": {
+          "loan": "=loan",
+          "behind": "#behind",
+          "outstanding": "#outstanding"
+        }
+      }
+    }
+  ]
+}

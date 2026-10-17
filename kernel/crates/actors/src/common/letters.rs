@@ -146,6 +146,11 @@ impl Letters {
     pub fn is_empty(&self) -> bool {
         self.pending.is_empty()
     }
+    /// The letters in, taken whole (an office whose report needs its own state to write, and so cannot be a `Fn` handed to
+    /// `answer`: the bank's statements record where each ledger stood). Added by lane D.
+    pub fn drain(&mut self) -> Vec<Letter> {
+        std::mem::take(&mut self.pending)
+    }
 }
 
 fn news_of_our_request(m: &Message, pic: &Picture, book: &Book) -> bool {

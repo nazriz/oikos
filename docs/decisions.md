@@ -5671,3 +5671,72 @@ entry called a "market check" was found on gd-adoption; C1 and C2 ask its owner 
 10,000 people are too large for memory (then the engine hands books a shared index; no lane's code changes); the
 seam's `Other` variants carry most of the traffic by the end of step 2 (then the seam was cut in the wrong place and
 A1 and A2 redraw it together); or the forms catalogue and papers.ts drift before the cut-over (the test fails first).
+
+## 2026-10-17 · Lane D: the bank, credit, the fund, the union, the paper, frictions and decisions in Rust (docs/port-guide.md section 8; no model called)
+
+**What was done.** `kernel/crates/actors/src/finance/`: `bank.payment_system` 0.18.0, `bank.lending` 0.6.0 (with `Borrowing`, the
+borrower's side the citizen and the firms hold), `fund.retirement` 0.1.0, `firm.newspaper` 0.2.0, `union.organiser` 0.8.0, and two
+libraries every organisation uses: `frictions` (the dial, a rate as a chance, `Respondent`: what an organisation does when asked to
+put something right, told of a complaint or ordered to) and `decisions` (`Waits`: what a decision waits for; `Reconsiderations`: an
+office looking at its own decision again). In `oikos-rules`: `decisions` (the law's routes as data), `bargaining` (what a stoppage
+costs each side), `words` (a refusal in the world's words). Rewritten, not transliterated: the rules and parameters are TS's;
+integers throughout (no float is left in the lane: the determinism lint bans the word, and a fraction a profile writes is read as the
+digits it was written in). Manifests are the TS files (copied into `finance/manifests/`, held by `kernel/tests/d_bank.rs`) but for
+what the port changed. 161 unit tests in `oikos-actors` and `oikos-rules` (the TS tests of bank, holds, statements, fund, news,
+frictions, decisions, lending ported, and the new ones below); `kernel/tests/d_bank.rs` runs the bank in the engine (standing order
+paid on its due dates, the same log and state on 1 and 14 threads, a death settling an estate, save and restore, manifests).
+
+**Faults fixed, each with its real-world basis (docs/risks.md updated).**
+- *A strike is won in full after three stoppages* (PB-9, A-2). Ported from `gd-adoption` as it stands (union 0.7.0; not merged): the
+  union weighs what the next stoppage costs its members against what the rest of the gap would add over a year (`stops_striking`),
+  and stops: takes the best offer standing, or lets the dispute rest. The employer's side (`concession_bps`, `Takings`) is in
+  `oikos_rules::bargaining` for lane C1's firms to call. Hicks 1932; Kennan and Wilson 1993; Card 1990. The owner's ruling of the
+  same day (a one-off cost against a year's flow concedes little) stands; **revisit if** disputes end almost never, or always in the
+  claim: look at the comparison first.
+- *Whether people break the law is a coin flip* (PB-16, A-7), the union's part. `compliance_bps` is gone. Where waiting a day at a
+  time mends a notice it waits; where nothing does (the ballot does not meet the law) it weighs the 90 days of the claimed rise it
+  would lose by keeping to the law against the chance of being pursued times the penalty, the chance learnt from what it has seen
+  from the profile's prior, and does what the weighing says. No measure given, it keeps to the law. Becker 1968; Tyler 1990; the
+  Fair Work Act's protected-action provisions. **Revisit if** no world writes the decisions it learns from (`venue_decision` against
+  the union, matter `industrial_action`): then the chance never moves from the prior, and the tribunal's lane should write them.
+  Planning, the inspector, landlords and directions keep their coin (lanes E and C1).
+- *The paper prints only bad news for the government* (PC-7, A-3). The tone is the record's, one rule for every kind: a request met
+  or turned down, a service delivered or not, a species falling or recovering; `petition_response` is a kind it now reports. The
+  leaning no longer decides a neutral item's tone by a draw. The size of negative news's premium (`negativity_bps`) is nought: the
+  direction is sourced (Soroka and McAdams 2015), the size for a local paper is not. **Revisit if** the code-only town's approval
+  still drifts down: the cause is then in the town, or the premium wants sourcing.
+- *The bank and a dead customer* (the test audit found nothing caught it). Written down in `docs/behaviour/bank-payment-system.md`
+  and tested: the dead person's standing orders are ended, not gone through again every day for ever; their one-offs lapse; the
+  account pays out only to the estate; the estate goes to the partner, else the children, else the town, and is kept and looked at
+  again, not given up for good, if nobody can yet receive it (the bank used to remember "no heirs" for ever); the payer into a dead
+  person's account is told at each payment and the record of it no longer grows with every payment. New risk **PB-18**: the estate
+  passes to its heirs before its debts.
+- *A fault in the frame, found by the bank's tests*: `Book` took in a directory it was shown only if its lists' addresses differed
+  from the last it took, so a new directory allocated where a freed one had been was never read; the bank was deaf to a directory in
+  some allocation patterns and not others (a test passed alone and failed in the group). The book now holds the lists and compares
+  them by identity. In `common/book.rs`, which is lane 1b's; one line of the guide to tell the integration agent. `Letters::drain`
+  was added beside it (the bank's report needs its own state to write, so it cannot be a `Fn` handed to `answer`).
+
+**Decided fresh.** A raw `Actor` for the bank (a queue of payments, not a plan of steps), its unsent letters kept as notes, saved with
+the actor; a standing order due is kept in an ordered set (TS: a heap); "what the checks read has changed" is a comparison of what
+was read, not an object identity; a repayment is the credit-foncier payment in 128-bit fixed point (twelve places), which may differ
+by a cent from TS's float in a rare case; the first wake and a paper's first edition are spread by who the actor is (no stream
+exists before an actor runs); the order of rates in a lender's public notice is person, organisation, others (a JSON object has no
+order here). The fund's and lender's `Answering` wrapper is the TS `answering`.
+
+**Seams the integration step wires (not done here).** (1) The lending office's staff payroll (`pay_staff`: an employer's routine, C1's
+`Staffing`): `credit::StaffPayroll`, handed to the kind as `Lending { payroll: Some(maker) }` in `finance/mod.rs`. Until wired, the
+generated towns' bank pays its staff nothing. (2) The union taking up a member's grievance (`hears`): `union::Grievances`,
+`Organiser { grievances: Some(maker) }`, for lane E's `Hearings`. (3) `Respondent` takes the organisation's character as the trait
+`frictions::Character` (C1's `Org` implements it) and its books as `frictions::Answerer`. (4) `decisions::{Waits, Reconsiderations}`
+are for the offices that decide claims (lane E). (5) The employer's side of the strike: `rules::bargaining::{concession_bps,
+Takings}`; `gd-adoption`'s `firms.ts` shows the hooks (`takingsPerDay`, `systemShare`).
+
+**Not done.** The lender still reads income as the least that came in over any of the last three months and draws funding without
+limit (ME-8); unions still bargain only where members are (PB-17); the estate does not pay its debts first (PB-18); the translator
+and forms catalogue are untouched. No scenario test ran: they run against the all-Rust world at integration. The TS tests of
+Respondent that exercise a venue (`Hearings`) belong to lane E.
+
+**Revisit if** the integration gate finds the bank's payments differ from the TS twin's (the likeliest cause is a one-cent
+repayment rounding or the order of two payments due together, which sort by due time then filing order as before); a lane needs the
+`kit` of test support (`finance/kit.rs`, cfg(test)) moved somewhere shared.
