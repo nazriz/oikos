@@ -21,11 +21,15 @@ import { Staffing, stepper } from "./firms";
 
 /** How often the officers look at the organisation's posts (seconds): a post empty is filled within a few days. */
 const LOOK_EVERY = 3 * DAY;
+/** The rounds in which an appointer has looked at every post it watches that it has not seen vacant. */
+const WATCH_ROUNDS = 6;
+/** The round, of WATCH_ROUNDS, on which a post is looked at: from its name alone. */
+const slotOf = (post: string): number => { let h = 2166136261; for (let i = 0; i < post.length; i++) h = Math.imul(h ^ post.charCodeAt(i), 16777619) >>> 0; return h % WATCH_ROUNDS; };
 
 export const bodyPayroll: BehaviourModule = {
   name: "body.payroll",
   answers: { office: "the payroll office", acts: "What it acts on: the employment agreements of its organisation's staff and the standing payments that pay them; the tax withheld from wages, paid over on the law's days; and a member of staff who has died." },
-  version: "0.4.0", // 0.4.0: an appointer that finds none of the staff to second hires for the body; 0.3.0: an appointer (the authority a body's constitution names fills a post that has stood vacant); 0.2.0: deaf to news, on a round of its own
+  version: "0.4.1", // 0.4.1: an appointer looks at each post it has not seen vacant once in six rounds, on a round of the post's own (from its name), not by a turn kept in the holder's memory, so a vacancy is found on the same round whatever else is watched (bug hunt 2026-10-17); 0.4.0: an appointer that finds none of the staff to second hires for the body; 0.3.0: an appointer (the authority a body's constitution names fills a post that has stood vacant); 0.2.0: deaf to news, on a round of its own
   deaf: true,
   doc: "docs/behaviour/staffing.md",
   cadence: () => 3 * DAY,
@@ -48,7 +52,6 @@ export const bodyPayroll: BehaviourModule = {
     const staffing = new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, role: p.role || "staff", does: { hire: !!(p.part === "appointer" && p.workplace), pay: p.part === "officer" }, ...(p.role ? { own: "role" as const } : {}), ...(p.part === "appointer" && p.workplace ? { workplace: p.workplace, ...(p.industry ? { industry: p.industry } : {}), ...(p.payroll_office ? { payroll: p.payroll_office, line: p.staff_line } : {}) } : {}), wakes: 3 * DAY });
     const filled = new Set<string>(); // posts we have appointed into, once
     const vacantSince = new Map<string, number>(); // an appointer: a post -> when we first saw it vacant
-    let turn = 0; // an appointer: where in the watch list this round's looks begin
     const gone = new Set<string>(); // staff we found had died when we tried to appoint them (nobody is told us by the registry)
     /** The people of the organisation's staff we may appoint: those in force and not known to have died. */
     const living = (t: number): string[] => {
@@ -120,8 +123,11 @@ export const bodyPayroll: BehaviourModule = {
             const suspects = p.watch.filter((post) => vacantSince.has(post)).slice(0, LOOKS_MAX);
             const rest = p.watch.filter((post) => !vacantSince.has(post));
             const room = LOOKS_MAX - suspects.length;
-            const take = Array.from({ length: Math.min(room, rest.length) }, (_, i) => rest[(turn + i) % rest.length]!);
-            turn = rest.length ? (turn + take.length) % rest.length : 0;
+            // (Which of the rest are looked at in a round is a matter of the post and the round: each is looked at once in WATCH_ROUNDS rounds, on a round of its
+            // own, never of where it stands in a list or how many looks this holder has made. So a town with one more post watched, or a post that changed
+            // hands, finds a vacancy on the same round as the town without: the order of finding two vacancies is not a matter of the list's length.)
+            const due = rest.filter((post) => (roundOf(t) + slotOf(post)) % WATCH_ROUNDS === 0).sort();
+            const take = due.slice(0, Math.max(0, room));
             for (const post of [...suspects, ...take]) out.push(lookUp.position(p.who, post));
             return out;
           }
