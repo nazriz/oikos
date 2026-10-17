@@ -1,0 +1,52 @@
+{
+  "name": "world.grants",
+  "version": "0.3.0",
+  "doc": "docs/behaviour/public-finance.md",
+  "params": {
+    "account": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
+      "source": "placeholder"
+    },
+    "every_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 91,
+      "source": "placeholder"
+    },
+    "first_day": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 30,
+      "source": "placeholder"
+    },
+    "per_resident_per_year": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 0,
+      "source": "placeholder"
+    },
+    "to": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
+      "source": "placeholder"
+    },
+    "to_account": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
+      "source": "placeholder"
+    }
+  },
+  "perceives": [],
+  "state": "none"
+}

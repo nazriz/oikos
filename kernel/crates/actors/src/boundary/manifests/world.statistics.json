@@ -1,0 +1,42 @@
+{
+  "name": "world.statistics",
+  "version": "0.2.0",
+  "doc": "docs/behaviour/boundary.md",
+  "params": {
+    "adverts": {
+      "schema": {
+        "type": "string",
+        "description": "its channel onto what sellers advertise, searched (the world must say)"
+      },
+      "default": "",
+      "required": true,
+      "source": "its channel onto what sellers advertise, searched (the world must say)"
+    },
+    "every_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 30,
+      "source": "placeholder"
+    },
+    "population": {
+      "schema": {
+        "type": "integer",
+        "description": "how many lived in the town at the last census (a count; none: no estimate is published)"
+      },
+      "default": 0,
+      "source": "how many lived in the town at the last census (a count; none: no estimate is published)"
+    },
+    "sample": {
+      "schema": {
+        "type": "integer",
+        "description": "outlets priced a month, at most (placeholder: what one search reads)"
+      },
+      "default": 200,
+      "source": "outlets priced a month, at most (placeholder: what one search reads)"
+    }
+  },
+  "perceives": [],
+  "state": "none"
+}
