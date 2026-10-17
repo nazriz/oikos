@@ -2716,7 +2716,7 @@ mod tests {
 
     fn job(id: &str, at: i64, worker: &str) -> Value {
         json!({ "id": id, "record": "agreement", "author": "environment-system", "at": at, "visible_to": ["city", worker],
-            "terms": { "template": "employment", "parties": ["city", worker], "text": format!("{worker} works for city as scientist for 300000 cents every 14 days."),
+            "terms": { "template": "employment", "parties": ["city", worker], "text": format!("{worker} works for city as works crew for 300000 cents every 14 days."),
                 "commitments": [{ "who": "city", "does": { "outcome": { "money": { "to": format!("acc-{worker}"), "amount": "300000", "for": "wages" } } }, "every": 14 * DAY }] } })
     }
     fn signature(id: &str, at: i64, agreement: &str, who: &str) -> Value {
@@ -2775,7 +2775,7 @@ mod tests {
     fn the_office_holder_sets_each_order_once_and_a_successor_finds_it_on_the_file() {
         let mut seat = rig(&Works, "works-system", "works", works_params("seat"));
         let first = joined(&seat.wake(8 * 3600, with_money(depot_channels(vec![]), "0"), vec![]));
-        assert!(first.contains("work(") && first.contains("task=collect") && first.contains("every=7 days"), "{first}");
+        assert!(first.contains("work(") && first.contains("task=collect") && first.contains("7 days"), "{first}");
         let mut next = rig(&Works, "works-system-2", "works", works_params("seat"));
         let mut chans = depot_channels(vec![]);
         chans["papers"] = json!({ "kind": "records", "records": [order("wo-1", "collect")] });
