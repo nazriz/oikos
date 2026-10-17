@@ -491,6 +491,10 @@ impl Book {
     pub fn person_of(&self, participant: &str) -> Option<&str> {
         self.participant_person.get(participant).map(String::as_str)
     }
+    /// A participant that acts as this person, if one has been looked up (the first in id order).
+    pub fn participant_of(&self, person: &str) -> Option<&str> {
+        self.participant_person.iter().find(|(_, who)| who.as_str() == person).map(|(p, _)| p.as_str())
+    }
     pub fn entity_kind(&self, entity: &str) -> Option<&str> {
         self.entity_kind.get(entity).map(String::as_str)
     }

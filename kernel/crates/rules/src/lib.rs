@@ -22,8 +22,14 @@
 #![deny(clippy::float_arithmetic, clippy::float_cmp)]
 
 pub mod calendar;
+pub mod entry;
 pub mod forms;
 pub mod household;
 pub mod identity;
+pub mod labour;
 pub mod law;
+pub mod rent;
+pub mod returns;
 pub mod slip;
+pub mod support;
+pub mod withholding;

@@ -20,6 +20,16 @@
    If someone else buys the premises first, the new shop returns the capital and closes.
 5. **It trades.** It then trades like any shop (docs/behaviour/retailer.md): it starts by hiring its minimum staff, stocks up and publishes its price.
 
+## Entry follows expected profit (lane C1, Rust port, 2026-10-17; risks A-1, ME-1)
+
+**The fault.** A person started a business with a monthly chance (`found_own_ppm`) derived from the profile's national entry rate on the town's businesses, whatever the market held: the same number of births with every shop empty or full, and a business of one never took on a hand.
+
+**The rule now** (`rules::entry`, pure and integer; a citizen calls it with what they have seen). The founder judges the business as a person does: the price and what the goods cost to bring in (price lists they have read), the households they could serve and what their own household buys of it, the sellers they know are there, what one person's time can serve, the going wage for a hand, the rent of premises, and what they earn otherwise. Sales are shared equally between the sellers there are and the entrant (Cournot-style free entry: Mankiw and Whinston 1986); alone they serve what one person's time allows; **a hand is taken on for each further `units_per_worker` while the items they would serve earn more than their pay**, so a start-up employs when, and only when, demand outruns one person and the margin pays a wage. The chance to start is nothing unless the profit beats what the founder earns otherwise, and rises with the excess return (Orr 1974; Siegfried and Evans 1994) from nothing to a cap (four times the profile's rate). The profile's business birth rate still calibrates the scale, as the chance at the reference excess return (`reference_bps`, 50%, a placeholder). Nothing in it reads the world whole: every figure is something the person has seen.
+
+**Employing start-ups** are possible once the founder's business reaches a lot where hired hands pay; premises are still the founder's home or a pitch until commercial leasing exists, and a lease of premises would be the `fixed` cost.
+
+**Revisit if** the entry that results is wildly out of the profile's range once measured (a response too weak or too strong is a calibration of `reference_bps`, not a fault), or when commercial leasing arrives.
+
 ## Starting a business of one (2026-10-11; citizen 0.48.0, firm.retailer 0.12.0)
 
 **The fault.** Nobody founded a business in a year of the 1,000-person town. The only venture was a shop in premises bought from a closed firm: about $365,000 for the premises and $91,000 of capital, where nobody of working age holds a tenth of that and no firm closes in the year. The monthly chance was never reached. Real business births are mostly not that: in Australia about 65% of businesses have no employees (ABS, Counts of Australian Businesses, June 2026), and most new ones start small, from home, on their owner's savings.

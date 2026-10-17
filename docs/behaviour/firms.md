@@ -49,6 +49,14 @@ The tenant pays the new rent from when it starts, or gives notice (docs/behaviou
 
 **The owners' draw (landlord 0.7.0):** monthly, 60% of rent received goes to the landlord's owners. With a `shareholders` register, it's paid to those on it by their shares, and they spend it as they will. In the generated town a landlord is held by one household or a few, or from outside ([firm-ownership.md](firm-ownership.md); until 2026-10-08 every household held a part of every landlord). Without one, the old money-only stand-in (spent at a local shop) remains. 20% goes on upkeep bought from outside (maintenance comes in phase C).
 
+## Rent reviews follow the market (lane C1, Rust port, 2026-10-17; risks ME-14, A-4)
+
+**The fault.** A review set a sitting tenant's rent to the landlord's own going rents plus a fixed 5% (`markup_bps`) and never lowered it, so each review raised the next whatever the market did.
+
+**The rule now** (`rules::rent`, pure and integer; the landlord calls it at each review). The landlord reads the evidence it has about comparable homes (same kind and size): rents they were **let** at lately, rents they are **asking** now, and how many of them stand empty. The market rent is the median of recent lets, or of asking rents where nothing has let. A sitting tenant's rent moves part of the way to it: a share of the gap upward (`pass_up_bps`, half), and downward only where the homes like theirs are empty (vacancy at or above `soft_vacancy_bps`) and then a smaller share (`pass_down_bps`). With no evidence the rent stays: nothing indexes it. A rent that already matches the market never moves, however many reviews pass: no ratchet. A rise is given by notice (the `rent_increase` paper, checked against the law as before); a fall cannot be a "rent increase", so it is offered when the lease is renewed, in the new lease. The evidence comes from the landlord's own lets and listings and from the market evidence C2 publishes (a `rental_evidence` paper); the landlord reads only what is published to it. The three shares are placeholders to calibrate against a profile's rent index; the markup of a new listing (`markup_bps`) is unchanged.
+
+**Revisit if** a code-only year shows rents drifting against the profile's index, or if falls for sitting tenants should be allowed by notice.
+
 ## `firm.employer`: a manager with a fixed headcount
 
 How any employer hires and pays (postings, offers, standing orders, notice, a worker's death) is shared code, `Staffing` in `participants/src/behaviour/firms.ts`. Factories ([producer.md](producer.md)) and the builder use it too, each with its own rule for how many staff to have and at what wage. `firm.employer`'s rule is the simple one below: a fixed target headcount at a fixed wage. The generated town no longer uses it (its shops are `firm.retailer`s), but a researcher can put it in any seat (the migration test does).
