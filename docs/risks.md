@@ -193,6 +193,7 @@ scale 5. Assumptions audit: 31, of which 8 are outcomes built in.
 - **Effect:** Job creation cannot emerge from entry. Any experiment where a steward's policy should create or destroy
   jobs is biased towards stasis or displacement; the number of births is fixed by the profile whatever the steward does.
 - **L / I:** high / high · **Status:** to fix
+- **Port note:** Rust port, lane C1 (2026-10-17): entry now follows expected profit (`rules::entry`) and a start-up employs when demand outruns one person and the margin pays a wage; citizens (lane A1) call it in place of `found_own_ppm`. Premises are still the founder's home until commercial leasing exists.
 - **Notice by:** `economy/businesses`: no employing firm is born in a run.
 - **Fix when:** before any employment-effect or gradual-disempowerment experiment.
 
@@ -204,6 +205,7 @@ scale 5. Assumptions audit: 31, of which 8 are outcomes built in.
 - **Effect:** Labour-market, wage, support-claim and re-employment results are biased towards quick matching;
   displacement looks cheaper than it is.
 - **L / I:** high / high · **Status:** to fix (the mechanism: matching by trade, postings that close)
+- **Port note:** Rust port, lane C1 (2026-10-17): staff follow the trade expected (`rules::labour`); matching by trade and closing postings are not yet built.
 - **Notice by:** hires, time to fill, job-change and business-death rates against `calibration.md`.
 - **Fix when:** before a labour-market steward study.
 
@@ -308,6 +310,7 @@ scale 5. Assumptions audit: 31, of which 8 are outcomes built in.
 - **Effect:** Rent inflation decoupled from vacancy is built in; rent stress, arrears, notices and petitions grow
   over long runs whatever the steward does, and rent caps look more effective than they would be.
 - **L / I:** high / high · **Status:** to fix (the reference should be the market: new lets and vacancy)
+- **Port note:** Rust port, lane C1 (2026-10-17): rents at review follow comparable lets and asking rents, sitting tenants part of the way, falls only in a soft market (`rules::rent`); no fixed markup, no ratchet.
 - **Notice by:** yearly rent growth in a code-only town against the profile's rent index.
 - **Fix when:** before any run past a year or any housing experiment.
 

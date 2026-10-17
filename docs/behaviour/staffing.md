@@ -101,3 +101,9 @@ still has no `to`, so a seat that tries to deploy a system is refused `not_suppl
 - the paper's advertising is to be done by its staff;
 - one person holding ten posts is thought too few (the rate is the profile's; a post nobody can staff should be said by the place);
 - a system's work should have its own seconds (a payments platform at a second a payment is not a figure anyone sourced).
+
+## Hiring follows need (lane C1, Rust port, 2026-10-17; risk ME-2)
+
+`rules::labour::staff_needed`: a firm has the staff the trade it expects can pay: takings smoothed over the horizon, less what is bought in, divided by a worker's pay with a margin (`required_margin_bps`), within what its premises hold and never below the least it runs with; before it has a trade record, the staff it opened with. It posts a job only while short of that, and does not replace those who leave once over it (existing `LabourPlan`). The ceiling is physical capacity, not a target: a firm no longer hires to a fixed headcount whatever it sells. Basis: Hamermesh 1993 (demand for labour is the marginal revenue product), Holt et al. 1960 (smoothing). Callers: the employer module computes it; retailer and producer (lane C2) may call it in place of their stock-against-demand headcount.
+
+**Owner's posts** (decided 2026-10-17; `bugfix` branch builds it in TS): a firm's owner (or the owner's estate) fills a vacant post of the firm wherever the owner lives, through ordinary hiring, when none of the staff is left (`body.payroll` 0.5.0, params `owner`, `owner_participant`). **Dead owner**: a firm never pays a dead owner or member of staff: when the only post-holder dies the payroll stops their wage orders on the death record.
