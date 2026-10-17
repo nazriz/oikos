@@ -91,3 +91,19 @@ fn a_new_holder_of_a_post_is_told_of_the_payments_the_office_has_had() {
     assert_eq!(outcome(&mut run, &appoint), None);
     assert_eq!(told(&mut run, "alice-self"), 2, "the new holder was told of nothing the office had had");
 }
+
+/// Finding 13: nobody removes another person from the world, or from a place, unless acting for an organisation through one
+/// of its posts.
+#[test]
+fn a_person_cannot_remove_another_person() {
+    let mut run = Run::start(world(&default_params()), "removal", Vec::new(), None).unwrap();
+    let leave = cmd("alice-self", None, json!([{"block": "leave", "person": "bob"}]));
+    assert_eq!(outcome(&mut run, &leave).as_deref(), Some("not_theirs"));
+    assert!(run.kernel().state().body("bob").unwrap().present);
+    let vacate = cmd("alice-self", None, json!([{"block": "vacate", "occupant": "bob", "from": "s-flats"}]));
+    assert_eq!(outcome(&mut run, &vacate).as_deref(), Some("not_theirs"));
+    // An organisation's post may take someone out.
+    let by_post = cmd("mayor-system", Some("mayor"), json!([{"block": "leave", "person": "bob"}]));
+    assert_eq!(outcome(&mut run, &by_post), None);
+    assert!(!run.kernel().state().body("bob").unwrap().present);
+}

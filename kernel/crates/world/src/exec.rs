@@ -1866,6 +1866,10 @@ impl<'a> Exec<'a> {
             Block::Vacate { occupant, from } => {
                 let (occupant, from) = (self.r(occupant)?, self.r(from)?);
                 self.entity_exists(&occupant)?;
+                // Only an organisation, acting through one of its posts, puts someone else out of a place.
+                if occupant != self.entity {
+                    self.acting_org().map_err(|_| refuse(RefusalCode::NotTheirs, format!("{occupant} is not yours to put out")))?;
+                }
                 let sid = split_space(&from).map_or(from.as_str(), |(s, _)| s).to_string();
                 // From the space named, or (a structure named) from every space of it.
                 let only = (sid != from).then_some(from.as_str());
@@ -1930,6 +1934,11 @@ impl<'a> Exec<'a> {
                     Some(p) => self.r(p)?,
                     None => self.acting_person()?,
                 };
+                // Only an organisation, acting through one of its posts, takes someone else out of the world (a child with no
+                // adult taken into care): a person, or a seat acting as one, takes only themselves.
+                if who != self.entity {
+                    self.acting_org().map_err(|_| refuse(RefusalCode::NotTheirs, format!("{who} is not yours to take out of the world")))?;
+                }
                 // Which edge they leave by: named, or the default.
                 let to = match to {
                     Some(e) if self.s.is_boundary(e) => e.clone(),
