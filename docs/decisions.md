@@ -5743,7 +5743,7 @@ empty on the Rust world. A fork of a JSONL-logged run must log in binary (it nam
 the state as deltas of the persistent maps); JSON snapshots take over a second at 10,000 people (a self-describing
 binary format, or `Value`s out of the state); or a lane's actor memory does not round-trip through JSON (its save is
 then wrong, and the snapshot test catches it once the lane adds its kind to a snapshot test).
-=======
+
 ## 2026-10-17: the pilot explorer, the first real renderer (`oikos explore`; no model called)
 
 **Why.** After the first pilot viewer Naz asked for "something way way more exciting, visual, innovative", to see each
@@ -5782,4 +5782,3 @@ two by the tests.
 digests, a parcel view, live attach, a year at 10,000, a mock-pilot test of the whole page. **Revisit if** indexing a
 year at 10,000 takes over an hour, a fold disagrees with the kernel, or the owner finds the people-as-roof-lights
 metaphor misleads (then markers beside buildings, as the plan had).
->>>>>>> explorer
