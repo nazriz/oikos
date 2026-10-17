@@ -68,6 +68,8 @@ export const PUBLISHED: { what: string; why: string; board?: true; most?: number
   { what: "petition_response", why: "A public body's answer to a petition is given in public." },
   { what: "permit_decision", why: "Planning decisions are entered in a register open to the public." },
   { what: "environment_report", why: "The environment office publishes its report." },
+  { what: "audit_request", why: "The audit office asks a body for a named item in public, as the law that empowers it is public: the body it names reads the request, and so may anyone." },
+  { what: "audit_report", why: "The audit office's reports are public, as the law says: whoever has a stake in a body, and the council, may read what was found." },
   { what: "support_statistics", why: "Published statistics of who is paid support." },
   { what: "price_index", why: "Published statistics of prices." },
   { what: "population_estimate", why: "Published statistics of how many live in the town." },

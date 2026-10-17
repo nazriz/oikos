@@ -16,6 +16,7 @@ import { Staffing, staffingForm, staffingUnder, stepper } from "./firms";
 import { incomeTaxLaw, withholding } from "./tax";
 import { ownLand } from "./institutions";
 import * as P from "./papers";
+import { Audited } from "./auditor";
 
 const YEAR = 365 * DAY;
 
@@ -539,7 +540,7 @@ export const councillor: BehaviourModule = {
  */
 export const financeOfficer: BehaviourModule = {
   name: "city.finance_officer",
-  issues: P.FINANCE,
+  issues: [...P.FINANCE, P.AUDIT_ANSWER],
   answers: {"office": "the finance office", "acts": "What it acts on: an invoice addressed to the town, paid within the adopted budget (over the payments procedure's figure, once the mayor's written approval is on file); a payroll notice from an office that has taken someone on or is losing someone; and the tax withheld from wages, paid over each month. It does not start, stop or change a payment on a letter.", "forms": [{"about": ["approv"], "say": "An approval of an invoice is the mayor's to give, in writing, naming the invoice."}], "report": true},
   version: "0.10.1", // 0.10.1: returns of tax withheld are filed on the days the law states (docs/behaviour/firms.md, "Returns on the law's days"); 0.10.0: 0.10.0: sets a new starter's wage up on the hiring office's payroll notice, from the first pay day it gives (with none after payroll_wait_days, from the agreement on file); asks the mayor, once, for the written approval an invoice over the procedure's figure needs. 0.9.0: pays within the adopted budget of the year it is in; while the year has none, under the budget last adopted at a twelfth a month (the charter's interim rule); spending is reckoned by the year
   doc: "docs/behaviour/government.md",
@@ -555,6 +556,10 @@ export const financeOfficer: BehaviourModule = {
     }, ctx.params);
     const book = new Book();
     const paid = new Set<string>();
+    // Our books of what we paid against an invoice, and the bank's record of it as the account shows it (the audit office asks for both: docs/behaviour/auditor.md).
+    const booked = new Map<string, { amount: number; at: number }>();
+    const banked = new Map<string, { amount: number; t: number }>();
+    const audited = new Audited(ctx.entity);
     let spent = 0;
     let budgetYear = -1;
     // The town's payroll (docs/behaviour/services.md): wages for those the town employs (its works office hires them),
@@ -574,6 +579,7 @@ export const financeOfficer: BehaviourModule = {
         if (mine) for (const x of channels.transactions(obs)) {
           if (x.to === mine && x.from !== mine) flows.push({ t: x.t, amount: cents(x.amount), party: x.from });
           if (x.from === mine && x.to !== mine) flows.push({ t: x.t, amount: -cents(x.amount), party: x.to });
+          if (x.from === mine && x.to !== mine && x.settles) banked.set(x.settles, { amount: cents(x.amount), t: x.t });
         }
       },
       (obs) => {
@@ -627,10 +633,12 @@ export const financeOfficer: BehaviourModule = {
           }
           if (acc.balance < amount) continue;
           paid.add(inv.id);
+          booked.set(inv.id, { amount, at: obs.t });
           spent += amount;
           steps.push(because(!withinProcedure ? "Paying an invoice outside the procedure." : adopted ? "Paying an invoice within the adopted budget (with the mayor's approval where needed)." : `Year ${year} has no adopted budget yet: paying an invoice within a twelfth a month of the budget last adopted, as the charter allows (with the mayor's approval where needed).`,
             pay(owed.to, amount, { from: acc.account, for: `Paying invoice ${inv.id}.`, settles: inv.id, ...(lineOf(inv) ? { line: lineOf(inv)! } : {}) })));
         }
+        steps.push(...audited.steps(book, { statement: () => ({ books: [...booked].map(([id, x]) => ({ id, ...x })), bank: [...banked].map(([id, x]) => ({ id, ...x })) }) }));
         steps.push(...letters.answer(() => {
           const unpaid = book.open("invoice").filter((i) => (i.addressed_to ?? []).includes(me) && !paid.has(i.id));
           const lines = budget ? Object.entries(budget.data?.lines ?? {}).map(([k, v]) => `${k} ${usd(v as number)}`).join(", ") : "";

@@ -172,6 +172,16 @@ export interface Profile {
     frictions?: { per_adult_bps_per_year: { landlord: number; wages: number; bill: number; benefits: number; goods: number }; put_right_on_asking_bps: { [matter: string]: number };
       pay_short_by_bps: number; bill_over_bps: number; goods_faulty_share_bps: number; repair_hours: number; support: { wrong_refusal_bps: number };
       venues: { answer_days: number; tribunal_days: number; tribunal_fee_hours_of_pay: number; uphold_without_proof_bps: number } };
+    /** The auditor (docs/behaviour/auditor.md; foundations B9): an office that examines other bodies' accounts and decisions as the place's law says, on a sample, and
+     * publishes a report. `office`: what it is called here (a neutral name). `answer_within_days`: how long a body has to answer a request for one named item (the
+     * law's power to ask). `report_within_days`: how soon after a period ends the law says the report is due (the office's work decides when it is). `bodies`: whom it
+     * audits, each a role the generator knows: "support" (the office that decides claims for support and pays them) and "town_finance" (the town's finance office).
+     * For each: `checks` ("decisions": a sample of the period's decisions re-decided from the file under the law and the procedure published for the kind; "accounts":
+     * the period's payments in the body's books against the bank's record of them), `every_days` (the period; period n is days (n-1)*every to n*every of the run) and,
+     * for decisions, `sample`: `share_bps` of the period's decisions of the kind, no fewer than `least`, no more than `most`. Each with its source in
+     * `sources["audit.*"]`, or marked "PLACEHOLDER" or "(to confirm)". A place whose law has no such audit leaves `audit` out, and has no auditor. */
+    audit?: { office: string; answer_within_days: number; report_within_days: number;
+      bodies: { body: "support" | "town_finance"; every_days: number; checks: ("decisions" | "accounts")[]; sample?: { share_bps: number; least: number; most: number } }[] };
     /** What a decision waits for, and how it is reviewed and appealed (docs/behaviour/decisions.md; foundations F8): a list of rules, each for a kind of
      * decision (the kind of statement the office makes: `benefit_decision`) and, where the place's law differs by payment, for named payments only.
      * `needs`: what the decision waits for before it is made (papers from the claimant, a confirmation from their last employer), within so many days,
@@ -296,11 +306,13 @@ export interface Profile {
      * source in `sources["public_service.*"]`, or is marked a placeholder. */
     public_service: {
       wage_per_pay_period: number;
-      staff_per_1000: { administration: number; courts: number; oversight: number; elections: number; land_registry: number; press: number; banking: number; utilities: number; union: number; property_management: number };
+      staff_per_1000: { administration: number; courts: number; oversight: number; elections: number; land_registry: number; press: number; banking: number; utilities: number; union: number; property_management: number;
+        /** The auditor's staff (docs/behaviour/auditor.md): full-time equivalents per 1,000 residents, as any body's (a body keeps at least one). */
+        audit?: number };
       licences: { payment_system: { per_resident_per_year: number; term_days: number } };
       /** Who fills a post of a body when none of its own staff is left (its constitution): "council" (the town's council, which seconds
        * one of its own staff to it). A body not named has none, and a post of it whose staff have all died stays empty. */
-      appointed_by?: { [kind in "administration" | "courts" | "oversight" | "elections" | "land_registry" | "press" | "banking" | "utilities" | "union" | "property_management" | "police"]?: "council" };
+      appointed_by?: { [kind in "administration" | "audit" | "courts" | "oversight" | "elections" | "land_registry" | "press" | "banking" | "utilities" | "union" | "property_management" | "police"]?: "council" };
     };
     unions: { membership_bps: { [kind: string]: number }; dues_per_month: number; resignation_notice_days: number; claim_margin_bps: number; meeting_every_days?: number; teaching?: string };
     /** Social groups that meet (clubs, congregations): their kinds, how often and how long they meet, how many. */

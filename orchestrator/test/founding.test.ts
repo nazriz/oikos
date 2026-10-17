@@ -94,7 +94,8 @@ const LIVING = "living.initiative_bps=10000";
 // (Re-taken on 2026-10-16 at the profile source check, on the merged foundations review: the au-vic-2026 profile's tribunal and hearing times, fee, rent bands, students per teacher and kin ceiling changed; 46a26c4c... until then.)
 // (Re-taken on 2026-10-17 at the housing and vacant-post faults (fix-housing): the council's appointments officer is a councillor's post, watches the city's own offices and hires for the city where none of its staff is left to second; au-vic names the police among the posts the council fills; a death wakes those in the same space; b805a015... until then.)
 // (Re-taken on 2026-10-17 at the housing and vacant-post faults (fix-housing), on the merge with the seated twins: the council's appointments officer is a councillor's post, watches the city's own offices and hires for the city where none of its staff is left to second; au-vic names the police among the posts the council fills; a death wakes those in the same space; 6fb51f08... until then.)
-const STEP_2B = "a6c71654c710ee11431590d967a1addb2c04dc27dc5f7abd7791b0d641bd53d6";
+// (Re-taken on 2026-10-17 at the auditor (docs/behaviour/auditor.md; docs/decisions.md, "The auditor"): every town whose profile has an audit law has an audit office, a body of one resident taken on from those without work, a grant to pay them, and a public audit law; a6c71654... until then.)
+const STEP_2B = "1632973ffb4aa061a1475045ab3d87c47aba74577edff5299ee02921b33b8ec1";
 
 test("with founding off a living town is step 2b's town, to the state hash; turned on with no shape to found, nobody does anything they did not do before", async () => {
   const out = mkdtempSync(join(tmpdir(), "oikos-founding-"));
@@ -138,7 +139,8 @@ test("founding in code: with the composer off no model is called; a founded thin
     // (Seed 2 from 2026-10-16, foundations F11: a register's keeper answers in its own time, and an office's slip rates are its systems' too, so the course differs; of seeds 1 to 16 only 2 and 5 have two who share the want that founds. Seed 3 held through foundations F7.)
     // (Why a hop and not a fault, 2026-10-16: two who share the want that founds is one town in eight or fewer before foundations F5 (only seed 6 of 1 to 8) and two of sixteen after (2 and 5); the rate is the same, only the seed moves. Seed 6, the original, has one who shares it on the foundations-review branch, and the test needs two.)
     // (Seed 3 from 2026-10-16, the profile source check, on the merged foundations review: the au-vic-2026 profile changed and in seed 2 nothing is founded in 205 days; of seeds 1 to 9 only 3 and 5 found something with two who share the want. Which seed has it is a matter of draws, not of the rule.)
-    const s = await runWorld({ config: { ...config, seed: 3 }, runId: "code", outDir: out, until: 205 * DAY, recordObservations: "none" });
+    // (Seed 4 from 2026-10-17, the auditor: the generated town has one resident more at work, drawn by a stream of its own, and the course differs; of seeds 1 to 10 only 4 has two who share the want that founds in the first thing founded. A hop, as each of the above, not a fault.)
+    const s = await runWorld({ config: { ...config, seed: 4 }, runId: "code", outDir: out, until: 205 * DAY, recordObservations: "none" });
     expect(s.composer).toBeUndefined();
     const log = readFileSync(s.logPath, "utf8");
     // No model anywhere: not a usage entry, not a transcript.

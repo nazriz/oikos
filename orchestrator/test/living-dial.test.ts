@@ -76,7 +76,8 @@ const TOWN = join(root, "worlds/town.yaml");
 // (Re-taken on 2026-10-16 at the review of the foundations, finding 6: the council's appointments officer is an office of the town, its posts name their authority, and every generated system is owned by the organisation whose post it holds; c5a5a00f... until then.)
 // (Re-taken on 2026-10-17 at foundations F9 and F10: three public forms and a row for `take` in the generated town, and the engine's advance stopping where a letter is delivered or a paper recorded, so that news reaches a person when it happens and not at the next wake of anyone; f54352a2... until then.)
 // (Re-taken on 2026-10-17 at the housing and vacant-post faults (fix-housing), on the merge with the seated twins: the council's appointments officer is a councillor's post, watches the city's own offices and hires for the city where none of its staff is left to second; au-vic names the police among the posts the council fills; a death wakes those in the same space; 12df1060... until then.)
-const STEP_1 = "02577eca986e7020a9f12114ddda245e73f22707be55c94ec84c689e470be023";
+// (Re-taken on 2026-10-17 at the auditor (docs/behaviour/auditor.md; docs/decisions.md, "The auditor"): every town whose profile has an audit law has an audit office, a body of one resident taken on from those without work, a grant to pay them, and a public audit law; 02577eca... until then.)
+const STEP_1 = "f00913930d60adbec0287d68b76346c9097d96c5fcf1ae48a8068be22070d874";
 
 test("with the dial absent or at 0 a town is step 1's town, to the state hash", async () => {
   const out = mkdtempSync(join(tmpdir(), "oikos-dial-"));

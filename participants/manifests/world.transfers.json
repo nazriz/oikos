@@ -330,6 +330,69 @@
           "statement": "=statement"
         }
       }
+    },
+    {
+      "form": "audit_answer",
+      "title": "Answer to the audit office's request for a named item",
+      "does": "Answers the audit office's public request under the audit law, by the day it gives: the count of your decisions of a kind in a period, one of them by its number with its file, or your payments for the period against the bank's record. Say only what your books show. It does nothing else by itself.",
+      "fields": {
+        "request": {
+          "type": "record",
+          "required": true,
+          "description": "The request this answers."
+        },
+        "auditor": {
+          "type": "entity",
+          "required": true,
+          "description": "The audit office."
+        },
+        "audit": {
+          "type": "text",
+          "required": true,
+          "description": "The audit's key, as the request gives it."
+        },
+        "ask": {
+          "type": "choice",
+          "required": true,
+          "options": [
+            "count",
+            "nth",
+            "statement"
+          ],
+          "description": "What was asked for."
+        },
+        "nth": {
+          "type": "count",
+          "description": "For a decision by its number: which."
+        },
+        "count": {
+          "type": "count",
+          "description": "For a count: how many."
+        },
+        "statement": {
+          "type": "text",
+          "description": "The books' entries asked for, in words."
+        }
+      },
+      "writes": {
+        "kind": "audit_answer",
+        "text": "Answer to audit request {request}: {statement}",
+        "basis": "=request",
+        "to": [
+          "=auditor"
+        ],
+        "visible": [
+          "=auditor",
+          "=self"
+        ],
+        "data": {
+          "request": "=request",
+          "audit": "=audit",
+          "ask": "=ask",
+          "nth": "=nth",
+          "count": "=count"
+        }
+      }
     }
   ],
   "routines": [
