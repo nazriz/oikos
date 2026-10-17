@@ -307,17 +307,21 @@ scale 5. Assumptions audit: 31, of which 8 are outcomes built in.
 - **Where:** `participants/src/behaviour/firms.ts` (rent review, about line 685); `generate.ts` (review period); `docs/behaviour/firms.md` "Rent reviews".
 - **Effect:** Rent inflation decoupled from vacancy is built in; rent stress, arrears, notices and petitions grow
   over long runs whatever the steward does, and rent caps look more effective than they would be.
-- **L / I:** high / high · **Status:** to fix (the reference should be the market: new lets and vacancy)
+- **L / I:** high / high · **Status:** built in Rust (C1's rule reads C2's evidence)
 - **Notice by:** yearly rent growth in a code-only town against the profile's rent index.
 - **Fix when:** before any run past a year or any housing experiment.
+- **Port note (lane C2, 2026-10-18):** `world.rent_portal` publishes `rental_evidence` and `market::rents` reads listings and days on market; the landlord's review rule is lane C1's and reads it through `oikos_rules::rent`. Not yet measured: a code-only town's yearly rent growth against vacancy is the check (docs/behaviour/prices.md).
+
 
 ### ME-15 · The town's exports are fixed at its opening output
 - **Gap:** World demand for the factories' goods is set to what their opening staff make less the town's own
   purchases, as a fixed quota split among the factories that exist at the start; a new factory cannot export.
 - **Where:** `participants/src/behaviour/world.ts`; `docs/calibration.md` "Chosen, not sourced"; `boundary.md`.
 - **Effect:** The employment base is pinned; development policy cannot raise it; job losses come only from inside.
-- **L / I:** high / high · **Status:** accepted (a boundary), to revisit
+- **L / I:** high / high · **Status:** built in Rust (exports from demand)
 - **Fix when:** an experiment on growth, competitiveness or firm entry.
+- **Port note (lane C2, 2026-10-18):** The outside's appetite is open to every seller, taken in arrival order, optionally elastic in the world price; a factory exports while the world price covers its marginal cost and learns its room from what is sent back. Gate check: a new factory exports; employment responds to cost. The aggregate size of the appetite (`per_month`) is still the profile's.
+
 
 ### ME-16 · Prices and payouts follow one stylised macro model
 - **Gap:** Firms price within 2.5 to 15% over cost and change price or wage monthly by Lengnick's (2013) rules, built to
@@ -326,7 +330,9 @@ scale 5. Assumptions audit: 31, of which 8 are outcomes built in.
 - **Where:** `participants/src/behaviour/lengnick.ts`, `retailer.ts`, `producer.ts`; `docs/behaviour/insolvency.md`.
 - **Effect:** Firms are fragile (a likely cause of ME-2 and ME-3); no gouging, monopoly pricing or deep discounting;
   workers lose more when firms fail.
-- **L / I:** high / medium · **Status:** to fix (mechanism, not a target)
+- **L / I:** high / medium · **Status:** built in Rust (prices from supply and demand)
+- **Port note (lane C2, 2026-10-18):** Lengnick's price bounds are gone; prices follow imbalance, rivals seen and cost (docs/behaviour/prices.md). Wage rule and dividend are still Lengnick's; insolvency ranking is unchanged (lane C1). Expect gouging where scarcity has no rival; that is an outcome, not a bug.
+
 
 ### ME-17 · Incomes, jobs and savings are drawn independently
 - **Gap:** One wage per kind of work; who is in work and who has savings are separate draws per person, unrelated to
