@@ -184,3 +184,70 @@ impl Plan for DeskPlan {
         steps
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::super::testing::{st, Rig, DAY};
+    use super::*;
+
+    fn rig(extra: Value) -> Rig {
+        let mut p = json!({ "title": "complaints desk", "hears": [{ "about": "billing", "can": ["order"] }, { "about": "noise", "can": ["recommend"] }], "answer_days": 14, "within_days": 28 });
+        if let (Some(o), Some(e)) = (p.as_object_mut(), extra.as_object()) {
+            o.extend(e.clone());
+        }
+        Rig::new(&Desk, "desk", Some("complaints"), p)
+    }
+    fn apply(id: &str, at: i64, data: Value) -> Value {
+        st(id, at, "application", "c0001", &["desk"], data)
+    }
+
+    #[test]
+    fn it_says_what_it_hears_once_then_takes_in_an_application_and_tells_the_other_side() {
+        let mut d = rig(json!({}));
+        let first = d.day(0, &[apply("rec.1", 0, json!({ "matter": "billing", "against": "firm-1", "amount": 5000, "account": "acc.c1" }))]).join("\n");
+        assert!(first.contains("kind=hearing") && first.contains("complaints desk hears: billing, noise"), "{first}");
+        assert!(first.contains("kind=complaint_notice"), "{first}");
+        assert!(d.day(DAY, &[]).is_empty(), "nothing more until the time to answer has run");
+    }
+
+    #[test]
+    fn with_no_answer_the_applicants_account_stands_and_the_decision_orders_payment() {
+        let mut d = rig(json!({}));
+        d.day(0, &[apply("rec.1", 0, json!({ "matter": "billing", "against": "firm-1", "amount": 5000, "account": "acc.c1", "evidence": { "id": "rec.0" } }))]);
+        let out = d.day(15 * DAY, &[]).join("\n");
+        assert!(out.contains("kind=venue_decision") && out.contains("\"finding\":\"pay\"") && out.contains("\"amount\":5000"), "{out}");
+        assert!(d.day(16 * DAY, &[]).is_empty(), "decided once");
+    }
+
+    #[test]
+    fn an_application_it_does_not_hear_or_with_no_particulars_is_turned_away() {
+        let mut d = rig(json!({}));
+        let out = d.day(0, &[apply("rec.1", 0, json!({ "matter": "gossip", "against": "firm-1" })), apply("rec.2", 0, json!({ "matter": "billing", "against": "firm-1" }))]).join("\n");
+        assert!(out.contains("\"finding\":\"rejected\""), "{out}");
+        let later = d.day(15 * DAY, &[]).join("\n");
+        assert!(later.contains("no particulars") && later.contains("\"finding\":\"dismissed\""), "{later}");
+    }
+
+    #[test]
+    fn a_recommending_desk_recommends_and_a_new_holder_does_not_decide_a_decided_case_again() {
+        let mut d = rig(json!({}));
+        d.day(0, &[apply("rec.1", 0, json!({ "matter": "noise", "against": "firm-1", "seeks": "stop", "evidence": { "id": "rec.0" } }))]);
+        let out = d.day(15 * DAY, &[]).join("\n");
+        assert!(out.contains("should put it right") && out.contains("\"binding\":false"), "{out}");
+        // The decision is on the desk's file: a successor, shown the file, decides nothing again.
+        let mut dec = st("rec.9", 15 * DAY, "venue_decision", "desk", &["c0001", "firm-1"], json!({ "application": "rec.1", "finding": "do" }));
+        dec["in_position"] = json!("complaints");
+        let mut s = rig(json!({}));
+        let again = s.day(16 * DAY, &[apply("rec.1", 0, json!({ "matter": "noise", "against": "firm-1", "seeks": "stop" })), dec]).join("\n");
+        assert!(!again.contains("venue_decision"), "{again}");
+    }
+
+    #[test]
+    fn the_manifest_is_the_one_the_ts_module_wrote() {
+        let ts: Value = serde_json::from_slice(&std::fs::read(format!("{}/../../../participants/manifests/office.desk.json", env!("CARGO_MANIFEST_DIR"))).unwrap()).unwrap();
+        let rust = Desk.manifest();
+        for (k, v) in ts.as_object().unwrap() {
+            assert_eq!(&rust[k], v, "{k}");
+        }
+    }
+}
