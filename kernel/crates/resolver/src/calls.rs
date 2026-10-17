@@ -744,6 +744,12 @@ pub enum When {
 /// days from now"). Bare digits are neither. (participants/src/calls.ts `parseWhen` is the same, step for step;
 /// contracts/test/when.json holds what both must read and refuse.)
 pub fn parse_when(s: &str, now: i64) -> Result<When, UnitError> {
+    parse_when_in(s, now, None)
+}
+
+/// `parse_when`, where the world has a calendar: a date as the place writes one ("12 March 2026", "15 April" of this
+/// year, ISO) is read first; the old "year N, day D" is read always.
+pub fn parse_when_in(s: &str, now: i64, dated: Option<&oikos_rules::calendar::Dated>) -> Result<When, UnitError> {
     const YEAR: i64 = 365 * DAY;
     let err = || UnitError(format!("not a date or a duration: {s}"));
     let mut t = s.trim().to_lowercase().split_whitespace().collect::<Vec<_>>().join(" ");
@@ -766,6 +772,9 @@ pub fn parse_when(s: &str, now: i64) -> Result<When, UnitError> {
     }
     if t == "tomorrow" {
         return Ok(When::At((now.div_euclid(DAY) + 1) * DAY));
+    }
+    if let Some(at) = dated.and_then(|d| d.read(&t, now)) {
+        return Ok(When::At(at));
     }
     // A date: "year N", "day D", or both, with a comma or a space between (or neither).
     let digits = |rest: &str, max: usize| -> Option<(i64, usize)> {

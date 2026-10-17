@@ -9,6 +9,7 @@
 use serde_json::{json, Map, Value as Json};
 
 use crate::resolve::duration_words;
+use oikos_rules::calendar::Dated;
 
 const DAY: i64 = 86_400;
 const YEAR: i64 = 365 * DAY;
@@ -16,6 +17,22 @@ const YEAR: i64 = 365 * DAY;
 /// A date in words, as a report gives one ("year 1, day 12"). The world has no calendar: a year is 365 days.
 pub fn date_words(t: i64) -> String {
     format!("year {}, day {}", t.div_euclid(YEAR) + 1, t.rem_euclid(YEAR) / DAY + 1)
+}
+
+/// A date in words in the world's calendar ("12 March 2026"), or as `date_words` writes one where it has none.
+pub fn date_words_in(t: i64, dated: Option<&Dated>) -> String {
+    dated.and_then(|d| d.words(t, false)).unwrap_or_else(|| date_words(t))
+}
+
+/// `parse_date`, reading the world's calendar first ("12 March 2026", ISO), then the old "year N, day D".
+pub fn parse_date_in(s: &str, now: i64, dated: Option<&Dated>) -> Result<i64, String> {
+    if let Some(t) = dated.and_then(|d| d.read(s, now)) {
+        return Ok(t);
+    }
+    parse_date(s).map_err(|e| match dated.and_then(|d| d.words(now, false)) {
+        Some(example) => format!("not a date: {s}. A date is written like \"{example}\"."),
+        None => e,
+    })
 }
 
 fn not_a_date(s: &str) -> String {
@@ -125,6 +142,7 @@ struct Env<'a> {
     fields: &'a Map<String, Json>,
     me: &'a str,
     now: i64,
+    dated: Option<&'a Dated>,
 }
 
 /// A template filled from the fields; None: it stands for a field not given.
@@ -185,7 +203,7 @@ fn unique(v: Option<Json>) -> Vec<String> {
 type Money<'a> = &'a dyn Fn(&str) -> Result<String, String>;
 
 /// A field in words, for a paper's text.
-fn words(v: Option<&Json>, ty: Option<&str>, money: Money) -> Result<String, String> {
+fn words(v: Option<&Json>, ty: Option<&str>, money: Money, dated: Option<&Dated>) -> Result<String, String> {
     Ok(match (v, ty) {
         (None, _) => "none".to_string(),
         (Some(Json::Array(a)), _) => {
@@ -197,7 +215,7 @@ fn words(v: Option<&Json>, ty: Option<&str>, money: Money) -> Result<String, Str
         }
         (Some(Json::String(s)), Some("amount")) => money(s)?,
         (Some(Json::Number(n)), Some("duration")) if n.as_i64().is_some() => duration_words(n.as_i64().unwrap_or_default()),
-        (Some(Json::Number(n)), Some("date")) if n.as_i64().is_some() => date_words(n.as_i64().unwrap_or_default()),
+        (Some(Json::Number(n)), Some("date")) if n.as_i64().is_some() => date_words_in(n.as_i64().unwrap_or_default(), dated),
         (Some(Json::String(s)), _) => s.clone(),
         (Some(x), _) => x.to_string(),
     })
@@ -216,7 +234,7 @@ fn fill_text(template: &str, spec_fields: &Json, env: &Env, money: Money) -> Res
                 if name == "self" {
                     out.push_str(env.me);
                 } else {
-                    out.push_str(&words(env.fields.get(name), spec_fields[name]["type"].as_str(), money)?);
+                    out.push_str(&words(env.fields.get(name), spec_fields[name]["type"].as_str(), money, env.dated)?);
                 }
                 rest = &after[j + 1..];
             }
@@ -277,7 +295,7 @@ pub fn write_claim(spec: &Json, fields: &Map<String, Json>, me: &str, now: i64) 
         let with = if said.is_empty() { String::new() } else { format!(", with {},", said.join(" and ")) };
         return Err(format!("The {form}{with} needs: {}. They say what the {} it records is.", missing.join(", "), claim_word(position)));
     }
-    let env = Env { fields, me, now };
+    let env = Env { fields, me, now, dated: None };
     let Some(holder @ Json::String(_)) = fill(&c["holder"], &env)? else {
         return Err(format!("The {form} can't say who holds the {} it records.", claim_word(position)));
     };
@@ -294,9 +312,9 @@ pub fn write_claim(spec: &Json, fields: &Map<String, Json>, me: &str, now: i64) 
 /// What a form with `writes` makes of its fields: the paper, as the keys of the act that publishes it (without the
 /// block, the speaker or a reference). `text`: the paper's own words, where whoever fills it in gives them. An error
 /// is a question back.
-pub fn write_paper(spec: &Json, fields: &Map<String, Json>, me: &str, now: i64, money: Money, text: Option<&str>) -> Result<Map<String, Json>, String> {
+pub fn write_paper(spec: &Json, fields: &Map<String, Json>, me: &str, now: i64, money: Money, dated: Option<&Dated>, text: Option<&str>) -> Result<Map<String, Json>, String> {
     let w = &spec["writes"];
-    let env = Env { fields, me, now };
+    let env = Env { fields, me, now, dated };
     let text = match text {
         Some(t) => t.to_string(),
         None => fill_text(w["text"].as_str().unwrap_or_default(), &spec["fields"], &env, money)?,
@@ -334,4 +352,31 @@ pub fn write_paper(spec: &Json, fields: &Map<String, Json>, me: &str, now: i64, 
         out.insert("assertion".into(), a);
     }
     Ok(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::calls::{parse_when_in, When};
+
+    /// A world with a calendar reads and writes the place's dates, and still reads the old ones.
+    #[test]
+    fn dates_in_the_worlds_calendar() {
+        let table: Json = serde_json::from_str(include_str!("../../../../contracts/test/dates.json")).unwrap();
+        let dated = Dated::from_config(Some(&table["calendars"]["dmy"])).unwrap();
+        let day = 86_400;
+        let now = 21 * day; // 2 April 2026
+        assert_eq!(date_words_in(0, Some(&dated)), "12 March 2026");
+        assert_eq!(date_words_in(0, None), "year 1, day 1");
+        assert_eq!(parse_date_in("15 April 2026", now, Some(&dated)), Ok(34 * day));
+        assert_eq!(parse_date_in("year 1, day 22", now, Some(&dated)), Ok(21 * day), "an old paper still reads");
+        assert_eq!(parse_date_in("15 April", now, Some(&dated)), Ok(34 * day), "this year's");
+        assert_eq!(parse_date_in("31 February 2026", now, Some(&dated)).unwrap_err(), "not a date: 31 February 2026. A date is written like \"2 April 2026\".");
+        assert!(parse_date_in("15 April 2026", now, None).is_err(), "no calendar: no such dates");
+        assert_eq!(parse_when_in("from 15 April 2026", now, Some(&dated)), Ok(When::At(34 * day)));
+        assert_eq!(parse_when_in("on the 3rd of May", now, Some(&dated)), Ok(When::At(52 * day)));
+        assert_eq!(parse_when_in("in 14 days", now, Some(&dated)), Ok(When::In(14 * day)));
+        assert_eq!(parse_when_in("a fortnight", now, Some(&dated)), Ok(When::In(14 * day)));
+        assert_eq!(parse_when_in("year 1, day 40", now, Some(&dated)), Ok(When::At(39 * day)));
+    }
 }

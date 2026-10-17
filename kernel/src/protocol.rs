@@ -38,6 +38,8 @@ pub struct Session {
     types: std::collections::BTreeMap<String, Value>,
     /// How the world's money is written (its config's first currency): how the resolver reads and writes amounts.
     currency: Option<oikos_resolver::calls::Currency>,
+    /// The world's calendar and the words its dates are written in (its config's `calendar`), for the same.
+    dated: Option<oikos_rules::calendar::Dated>,
     /// The registers of lots seats have been shown whole, held once between them (never part of what a seat knows).
     registers: oikos_resolver::knowledge::Registers,
 }
@@ -149,7 +151,7 @@ enum Reply {
 /// observation is most of what crosses to the host, and it has been serialised once already, for its hash in the log;
 /// those bytes are the reply's.
 fn command(session: &mut Session, req: &Value) -> Result<String, String> {
-    let Session { run, sched, knowledge, currency, registers, .. } = session;
+    let Session { run, sched, knowledge, currency, dated, registers, .. } = session;
     let r = run.as_mut().ok_or("no run started")?;
     let cmd: Command = serde_json::from_value(req.get("command").cloned().ok_or("missing command")?).map_err(|e| format!("bad command: {e}"))?;
     let mut resp = r.command(&cmd).map_err(|e| e.to_string())?;
@@ -160,7 +162,7 @@ fn command(session: &mut Session, req: &Value) -> Result<String, String> {
     // What the seat now knows: each observation delivered to it, as it received it.
     if let (Command::Observe { participant, only } | Command::Look { participant, only, .. }, Some(o), Some(obs)) = (&cmd, &observed, &resp.observation) {
         let key = only.as_ref().map_or_else(|| participant.clone(), |o| format!("{participant}|{o}"));
-        knowledge.entry(key).or_insert_with(|| oikos_resolver::Knowledge::new(currency.clone())).absorb_seen(&crate::kernel::seen(obs), &o.shown, registers);
+        knowledge.entry(key).or_insert_with(|| oikos_resolver::Knowledge::new(currency.clone()).with_dated(dated.clone())).absorb_seen(&crate::kernel::seen(obs), &o.shown, registers);
     }
     if let Some(s) = sched.as_mut() {
         s.note_events(Some(r.kernel().state()), &resp.events, r.kernel().t());
@@ -249,7 +251,7 @@ fn structure_types(config: &Value) -> std::collections::BTreeMap<String, Value> 
 
 /// Starts a session's run from a config (the request's, handed over), with what the session keeps of it.
 fn start(session: &mut Session, req: &Value, config: Option<Value>, structure_types: std::collections::BTreeMap<String, Value>, money: Option<oikos_resolver::calls::Currency>) -> Result<Value, String> {
-    let Session { run, sched, knowledge, types, currency, registers } = session;
+    let Session { run, sched, knowledge, types, currency, dated, registers } = session;
     let str_field = |k: &str| req.get(k).and_then(Value::as_str).ok_or(format!("missing {k}"));
     if run.is_some() {
         return Err("a run is already started".into());
@@ -260,6 +262,7 @@ fn start(session: &mut Session, req: &Value, config: Option<Value>, structure_ty
         None => None,
     };
     let config = config.ok_or("missing config")?;
+    *dated = oikos_rules::calendar::Dated::from_config(config.get("calendar"));
     let mut r = Run::start(config, str_field("run_id")?, BufWriter::new(log), anchors).map_err(|e| e.to_string())?;
     // A host that keeps the records it's handed asks for each one whole once, and by its id from then on.
     if req.get("record_refs").and_then(Value::as_bool) == Some(true) {
@@ -283,7 +286,7 @@ fn handle(session: &mut Session, req: &Value) -> Result<Value, String> {
         let currency = oikos_resolver::calls::Currency::from_config(&req["config"]["world"]["currencies"][0]);
         return start(session, req, req.get("config").cloned(), types, currency);
     }
-    let Session { run, sched, knowledge, types, currency, .. } = session;
+    let Session { run, sched, knowledge, types, currency, dated, .. } = session;
     let r = run.as_mut().ok_or("no run started")?;
     match op {
         // A call to the seat's own acts (the resolver, from what the seat knows): blocks, or questions for the seat.
@@ -291,7 +294,7 @@ fn handle(session: &mut Session, req: &Value) -> Result<Value, String> {
             let participant = str_field("participant")?;
             let key = req["only"].as_str().map_or_else(|| participant.to_string(), |o| format!("{participant}|{o}"));
             let program = oikos_resolver::calls::parse_program(str_field("program")?).map_err(|e| format!("the call doesn't parse: {}", e.0))?;
-            let empty = oikos_resolver::Knowledge::new(currency.clone());
+            let empty = oikos_resolver::Knowledge::new(currency.clone()).with_dated(dated.clone());
             let k = knowledge.get(&key).unwrap_or(&empty);
             let type_of = |t: &str| types.get(t).cloned();
             Ok(match oikos_resolver::resolve(&program, k, &type_of, req["as"].as_str()) {

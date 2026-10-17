@@ -52,6 +52,8 @@ export interface Filled { [field: string]: FieldValue }
 /** What a form with `writes` makes of its fields: a statement, as the act that publishes it has it. */
 export interface Paper { kind: string; text: string; data?: unknown; addressed_to?: string[]; visible_to?: "public" | string[]; basis?: string; offer?: unknown; assertion?: unknown }
 
+import { calendarNow, calendarWords, readCalendarDate } from "./calendar";
+
 export class FormError extends Error {}
 
 /** A length of time in words, as people say one: whole days where it is whole days ("14 days", "1 day"); else whole
@@ -66,23 +68,30 @@ export function durationWords(seconds: number): string {
   return n(seconds, "second");
 }
 
-/** A date in words, as a report gives one ("year 1, day 12"). The world has no calendar: a year is 365 days. */
-export function dateWords(t: number): string {
+/** A date in words, as a report gives one. With a calendar (the world now being stepped: `inCalendar`) the place's way,
+ * "12 March 2026" (docs/design/names-and-dates.md); without, "year 1, day 12", a year of 365 days. */
+export function dateWords(t: number, long = false): string {
+  const cal = calendarNow();
+  if (cal) return calendarWords(cal, t, long);
   return `year ${Math.floor(t / YEAR) + 1}, day ${Math.floor((t % YEAR) / DAY) + 1}`;
 }
 
-/** A date as written ("year 2, day 40", or "day 40" of the first year): the moment that day begins. */
-export function parseDate(s: string): number {
+/** A date as written ("year 2, day 40", or "day 40" of the first year; with a calendar also the place's: "12 March 2026"):
+ * the moment that day begins. `now` is the moment it is read at (a date with no year is this year's). */
+export function parseDate(s: string, now = 0): number {
   // (A moment as a record has it, in seconds: bare digits.)
   if (/^\s*[0-9]{1,15}\s*$/.test(s)) return Number(s.trim());
+  const cal = calendarNow();
+  const civil = cal ? readCalendarDate(cal, s, now) : undefined;
+  if (civil !== undefined) return civil;
   // (A day may be followed by a time of day, as the town's own papers write a moment: "year 1, day 289, 13:00". A
   // registrar copying a birth notification's "born at" wrote it so, with and without the commas, and was told it was
   // not a date: wave 2c's review, fault 10.)
   const m = /^\s*(?:year\s*([0-9]{1,6}))?\s*,?\s*(?:day\s*([0-9]{1,3})(?:\s*,?\s*([0-9]{1,2}):([0-9]{2})(?::([0-9]{2}))?)?)?\s*$/i.exec(s);
-  if (!m || (m[1] === undefined && m[2] === undefined)) throw new FormError(`not a date: ${s}. A date is written like "year 1, day 12".`);
+  if (!m || (m[1] === undefined && m[2] === undefined)) throw new FormError(`not a date: ${s}. A date is written like "${cal ? calendarWords(cal, now) : "year 1, day 12"}".`);
   const year = Number(m[1] ?? 1), day = Number(m[2] ?? 1);
   const hour = Number(m[3] ?? 0), minute = Number(m[4] ?? 0), second = Number(m[5] ?? 0);
-  if (year < 1 || day < 1 || day > 365 || hour > 23 || minute > 59 || second > 59) throw new FormError(`not a date: ${s}. A date is written like "year 1, day 12".`);
+  if (year < 1 || day < 1 || day > 365 || hour > 23 || minute > 59 || second > 59) throw new FormError(`not a date: ${s}. A date is written like "${cal ? calendarWords(cal, now) : "year 1, day 12"}".`);
   return ((year - 1) * 365 + (day - 1)) * DAY + hour * 3_600 + minute * 60 + second;
 }
 

@@ -15,6 +15,7 @@
 import type { LookRequest, Observation, ParticipantAction } from "../contracts";
 import type { ParticipantContext } from "../module";
 import { inCurrency } from "../money";
+import { inCalendar } from "../calendar";
 import type { ContentBlock, LlmMessage, ToolSpec } from "./adapter";
 import { CounterWatch } from "./counter";
 import { callModel, ModelCallFailed, promptTooLong, type LlmIO } from "./call";
@@ -978,6 +979,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
   return {
     async step(given, ctx) {
       inCurrency(ctx.world.currency);
+      inCalendar(ctx.world.calendar);
       // An office's books, and its staff's report of their work, are the office's own: another office of the same
       // organisation is not shown them, and they do not bring it back (docs/behaviour/office-books.md). An organisation's
       // papers reach every office of it that reads papers of that kind, so those naming another office are left out here.

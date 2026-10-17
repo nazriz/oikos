@@ -298,11 +298,11 @@ impl Resolver<'_> {
     fn when(&self, c: &Call, key: &str) -> R<Option<calls::When>> {
         match Self::str_(c, key)? {
             None => Ok(None),
-            Some(s) => match unit(calls::parse_when(&s, self.k.t))? {
+            Some(s) => match unit(calls::parse_when_in(&s, self.k.t, self.k.dated.as_ref()))? {
                 calls::When::At(at) if at + 86_400 <= self.k.t => ask(format!(
                     "{} is already past: today is {}. Give today's date or a later one, or a length of time from now.",
-                    forms::date_words(at),
-                    forms::date_words(self.k.t)
+                    forms::date_words_in(at, self.k.dated.as_ref()),
+                    forms::date_words_in(self.k.t, self.k.dated.as_ref())
                 )),
                 w => Ok(Some(w)),
             },
@@ -556,12 +556,12 @@ impl Resolver<'_> {
         }
         text.push_str(&format!(", {rhythm}"));
         match first {
-            Some(calls::When::At(at)) => text.push_str(&format!(", the first on {}", forms::date_words(at))),
+            Some(calls::When::At(at)) => text.push_str(&format!(", the first on {}", forms::date_words_in(at, self.k.dated.as_ref()))),
             Some(calls::When::In(f)) => text.push_str(&format!(", the first in {}", duration_words(f))),
             None => {}
         }
         match until {
-            Some(calls::When::At(at)) => text.push_str(&format!(", until the end of {}", forms::date_words(at))),
+            Some(calls::When::At(at)) => text.push_str(&format!(", until the end of {}", forms::date_words_in(at, self.k.dated.as_ref()))),
             Some(calls::When::In(u)) => text.push_str(&format!(", for {}", duration_words(u))),
             None => {}
         }
@@ -688,7 +688,7 @@ impl Resolver<'_> {
             "Please pay {} from {from} to {to}{}{}{}.",
             calls::format_money(&amount, self.currency()?),
             every.map(|e| format!(" every {} days", nearest_days(e))).unwrap_or_default(),
-            first_at.map(|at| format!(", the first on {}", forms::date_words(at))).unwrap_or_default(),
+            first_at.map(|at| format!(", the first on {}", forms::date_words_in(at, self.k.dated.as_ref()))).unwrap_or_default(),
             purpose.as_ref().map(|p| format!(", for {p}")).unwrap_or_default()
         );
         let mut money = out.clone();
@@ -1289,7 +1289,7 @@ impl Resolver<'_> {
                 "list" => self.ids(c, field)?.map(|v| json!(v)),
                 "date" => match Self::str_(c, field)? {
                     None => None,
-                    Some(s) => Some(json!(forms::parse_date(&s).map_err(Stop::Ask)?)),
+                    Some(s) => Some(json!(forms::parse_date_in(&s, self.k.t, self.k.dated.as_ref()).map_err(Stop::Ask)?)),
                 },
                 "text" | "structure_type" => Self::str_(c, field)?.map(Json::from),
                 "choice" => {
@@ -1326,7 +1326,7 @@ impl Resolver<'_> {
                     Stop::Ask(m) | Stop::Unit(m) => m,
                 })
             };
-            let paper = forms::write_paper(spec, &data, &me, self.k.t, &money, own.as_deref()).map_err(Stop::Ask)?;
+            let paper = forms::write_paper(spec, &data, &me, self.k.t, &money, self.k.dated.as_ref(), own.as_deref()).map_err(Stop::Ask)?;
             let mut block = Map::new();
             block.insert("block".into(), json!("publish"));
             for (k, v) in paper {

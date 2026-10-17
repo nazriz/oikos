@@ -898,6 +898,7 @@ name = "oikos-resolver"
 version = "0.7.0"
 dependencies = [
  "imbl",
+ "oikos-rules",
  "serde_json",
 ]
 

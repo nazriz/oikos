@@ -60,6 +60,9 @@ pub struct WorldInfo {
     /// The world's calendar (the config's `calendar`: docs/design/names-and-dates.md section 5), where it has one:
     /// civil dates, working days and calendar months. Absent: the old towns, whose dates are "year N, day D".
     pub calendar: Option<oikos_rules::calendar::Calendar>,
+    /// How the place writes a date (the same `calendar` section's `format`, `long_format`, `months`, `weekdays`): absent, an
+    /// ISO date. Read through `common::when_words`, the one place a date is written in words.
+    pub date_style: Option<oikos_rules::calendar::DateStyle>,
 }
 
 /// Where an actor runs: which participant, acting for which entity, in which position (absent: as itself), and its

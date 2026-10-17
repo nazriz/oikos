@@ -8,5 +8,7 @@ rust-version = "1.85"
 
 [dependencies]
 serde_json = { workspace = true }
+# The world's calendar and the words its dates are written in (docs/design/names-and-dates.md section 5).
+oikos-rules = { path = "../rules" }
 # A persistent map: a town's register of lots, known to every seat that has read it, is held once between them.
 imbl = "7.0.2"

@@ -285,6 +285,22 @@ test("an id written in quotes is that id (a letter to \"planning\", the post)", 
   expect(resolve(calls.parseProgram('message(to="nobody at all", text="Hello.")'), fixture(), () => undefined, "mayor").ok).toBe(false);
 });
 
+test("a person's name among those the seat has been shown: as written, then without its marks if that finds one person; a collision is a question", () => {
+  const k = new Knowledge(TOWN_MONEY);
+  k.absorb({ participant: "me-system", t: 0, status: "active", entity: "me", outcomes: [], inbox: [], drafts: [], channels: { who: { kind: "directory",
+    entities: [{ entity: "c0001", kind: "person", name: "José Muñoz García" }, { entity: "c0002", kind: "person", name: "Mary Wanjiru" }, { entity: "c0003", kind: "person", name: "Mary Wanjiru" },
+      { entity: "c0004", kind: "person", name: "Hanna Müller" }, { entity: "c0005", kind: "person", name: "Hanna Muller" }], positions: [] } } } as any);
+  // (The engine's resolver has the same cases: kernel/crates/resolver/src/knowledge.rs.)
+  expect(k.byName("José Muñoz García")).toEqual(["c0001"]);
+  expect(k.byName("Jose Munoz Garcia")).toEqual(["c0001"]);
+  expect(k.byName("jose  munoz garcia")).toEqual(["c0001"]);
+  expect(k.byName("Mary Wanjiru")).toEqual(["c0002", "c0003"]);
+  expect(k.byName("Hanna Müller")).toEqual(["c0004"]);
+  expect(k.byName("Hanna Muller")).toEqual(["c0005"]);
+  expect(k.byName("Hanna Mueller")).toEqual([]);
+  expect(k.byName("Jose Garcia")).toEqual([]);
+});
+
 test("a name as written, then a description: the builder, the bank, a post by its title or role", () => {
   const k = new Knowledge(TOWN_MONEY);
   k.absorb({ participant: "mayor-system", t: 0, status: "active", entity: "city", outcomes: [], inbox: [], drafts: [], channels: { who: { kind: "directory",
