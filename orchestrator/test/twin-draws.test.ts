@@ -285,3 +285,30 @@ test("no module names a draw for a moment", () => {
   }
   expect(found).toEqual([]);
 });
+
+// Bug hunt 2026-10-17, finding 14: a draw about a lease (or any paper) is never keyed on the paper's number in the world's
+// file, whether it is drawn on the participant's stream or on the run's stream for one thing (`ctx.chance`).
+test("a draw on the run's stream for one thing is named for which paper it is, never for the paper's number", async () => {
+  const probing = (inner: string): BehaviourModule => ({
+    ...builtin[inner]!,
+    name: `test.probing.${inner.replace(/\./g, "_")}`,
+    create(ctx) {
+      ctx.chance!("probe-rec.77777").below(100);
+      ctx.rng("probe-rec.88888").below(100);
+      return builtin[inner]!.create(ctx);
+    },
+  });
+  const dir = mkdtempSync(join(tmpdir(), "oikos-chance-keys-"));
+  try {
+    const config = generate({ ...living, citizens: 60 });
+    const part = officeAt(config, "mayor");
+    const wrapped = probing(part.impl);
+    part.run(wrapped.name);
+    const keys: string[] = [];
+    await runWorld({ config, runId: "chance-keys", outDir: dir, until: 2 * DAY, logDetail: "lean", recordObservations: "none", drawTrace: (k: readonly string[]) => { keys.push(k.join("|")); }, modules: { [wrapped.name]: wrapped } } as any);
+    const probes = keys.filter((k) => k.includes("probe-"));
+    expect(probes.length).toBeGreaterThanOrEqual(2);
+    expect(probes.filter((k) => /rec\.[0-9]+/.test(k))).toEqual([]);
+    expect(probes.some((k) => k.startsWith("chance|") && k.includes("probe-paper#1"))).toBe(true);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+}, 300_000);
