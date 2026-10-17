@@ -150,7 +150,8 @@ test("a death is seen, reported, registered, and the world's people act on it", 
   // and a partner gone to work while a conception was under way, "isn't near". Both turned up when the run became a
   // different one, 2026-10-08.)
   // (Or a body's deputy appointing one of its staff who had died too, in the days before anyone told it: the next look names another. Foundations F6.)
-  const diedDoing = (e: any) => e.code === "participant_inactive" && (/-(deputy|payroll)(-deputy)?$/.test(e.as ?? "") || (diedAt.has(String(e.participant).replace(/-self$/, "")) && e.t >= diedAt.get(String(e.participant).replace(/-self$/, ""))!));
+  // ("-owners" added 2026-10-17, the bug hunt: a firm owner's appointer who has died and does not yet know it is refused when it appoints itself, as a deputy is.)
+  const diedDoing = (e: any) => e.code === "participant_inactive" && (/-(deputy|payroll|owners)(-deputy)?$/.test(e.as ?? "") || (diedAt.has(String(e.participant).replace(/-self$/, "")) && e.t >= diedAt.get(String(e.participant).replace(/-self$/, ""))!));
   const partnerGone = (e: any) => e.code === "too_far" && / isn't near /.test(e.detail ?? "");
   // (And, when the run's course changed again on 2026-10-08: someone on their way home, brought there meanwhile by
   // another of the household moving them in; their own arrival finds them already there.)
