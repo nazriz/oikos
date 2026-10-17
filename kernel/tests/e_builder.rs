@@ -12,6 +12,9 @@ fn world() -> Value {
     let mut c = common::riverbend();
     c["clock"]["run_seconds"] = json!(20 * DAY);
     for p in c["participants"].as_array_mut().unwrap() {
+        if p["id"] == "builder-system" {
+            p["controller"] = json!({ "type": "code", "impl": "idle" });
+        }
         if p["id"] == "finance-system" {
             p["controller"] = json!({ "type": "code", "impl": "firm.builder", "params": {
                 "supplier": "outside", "yard": "yard",
