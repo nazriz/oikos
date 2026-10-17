@@ -22,8 +22,7 @@ const withDial = (config: any, reading: object = { reader: "mock" }) => ({ ...co
 const out = () => mkdtempSync(join(tmpdir(), "oikos-reading-"));
 const notes = (path: string) => readFileSync(path, "utf8").trim().split("\n").filter((l) => l.includes('"annotation":"note"')).map((l) => JSON.parse(l).body);
 
-// The same pinned hash living-dial.test.ts holds for the town without any dial (so this test cannot drift from it).
-const STEP_1 = /const STEP_1 = "([0-9a-f]{64})"/.exec(readFileSync(join(root, "orchestrator/test/living-dial.test.ts"), "utf8"))![1]!;
+// (Until 2026-10-18 this also checked the dial-off state against living-dial.test.ts's pinned STEP_1; the test audit replaced that pin with the property it stood for, so the check here is the property itself: dial on equals dial off.)
 
 test("the dial in the world config is a schema-valid setting, and a setting that would let words outweigh a decision is refused when the run starts", async () => {
   const ajv = new Ajv2020({ strict: true, strictRequired: false, allErrors: true });
@@ -41,7 +40,7 @@ test("the dial in the world config is a schema-valid setting, and a setting that
   } finally { rmSync(d, { recursive: true, force: true }); }
 }, 120_000);
 
-test("dial on, in any town whose papers are all code-written: the same world, to the state hash, on three profiles; and town.yaml is the pinned world", async () => {
+test("dial on, in any town whose papers are all code-written: the same world, to the state hash, on three profiles; dial on equals dial off", async () => {
   const d = out();
   try {
     for (const [profile, days] of [["au-vic-2026", 60], ["gb-eng-2026", 30], ["ke-nakuru-2026", 30]] as const) {
@@ -51,7 +50,6 @@ test("dial on, in any town whose papers are all code-written: the same world, to
       expect(on.stateHash, profile).toBe(off.stateHash);
       // Nothing was asked of any reader: no paper in the town is a seat's.
       expect(on.reading, profile).toMatchObject({ asked: 0, calls: 0 });
-      if (profile === "au-vic-2026") expect(off.stateHash).toBe(STEP_1);
       expect(notes(on.logPath).some((n) => n.data?.reading?.reader === "mock/lexicon")).toBe(true);
     }
   } finally { rmSync(d, { recursive: true, force: true }); }
