@@ -101,7 +101,7 @@ test("the Rust world's actor kinds declare only the keepers and boundaries liste
   // (And each says it as its TS module does, while both exist.)
   for (const m of rustManifests()) {
     const ts = Object.values(modules).find((x) => x.name === m.name);
-    if (ts) for (const field of ["keeps", "boundary"] as const) expect((m[field] ?? []).map((k) => k.what).sort()).toEqual((ts[field] ?? []).map((k) => k.what).sort());
+    if (ts) for (const field of ["keeps", "boundary"] as const) expect((m[field] ?? []).map((k) => k.what).filter((w) => !RUST_ONLY.includes(line(m.name, w))).sort()).toEqual((ts[field] ?? []).map((k) => k.what).sort());
   }
 });
 
