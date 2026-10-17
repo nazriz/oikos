@@ -62,3 +62,7 @@ The same helper (`Borrowing`) for households and firms:
 - mortgages, which need a housing sales market (held for Naz: docs/design/phase-c-stakes.md);
 - credit cards;
 - the bank creating deposits when it lends (a physics question, held for Naz).
+
+## The bank's own staff (Rust, 2026-10-18)
+
+With `pay_staff` the lending office does the payroll of the bank's own people as any employer's payroll is done, by lane C1's `Staffing` (`finance::staff_payroll`): their wages by standing order through the bank, tax withheld and paid over, a death stopping a wage, returns on the days the law states. It hires nobody. Without `pay_staff` the bank pays its staff nothing.
