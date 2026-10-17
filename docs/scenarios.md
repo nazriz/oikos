@@ -175,7 +175,7 @@ not the town's calm: in the code town those acts are other offices' and resident
 | `goods` | Firms. | Stores the town holds for an emergency (proposed below). |
 | `presence`, `take` | The outside world's migration office; an offender. | Neither is an office's act; no scenario should aim at them. |
 
-Proposed, not built: each needs a mechanism that isn't there.
+Proposed, not built (ME-11, WM-2): each needs a mechanism that isn't there.
 
 1. **A post unfilled** (`position`, `agreement`): the town's inspector, or its works manager, has left and nobody
    holds the post on day 0. Needs: the generator able to leave a position of the town's unheld (a description field),

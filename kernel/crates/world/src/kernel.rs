@@ -281,7 +281,7 @@ impl World {
             totals: c.catalogue.counters.iter().map(|x| (x.id.clone(), 0)).collect(),
             flooded: Default::default(),
             takings: vec![],
-            asks_held: vec![],
+            asks_held: Default::default(),
             entity_records: Default::default(),
         };
         for p in &c.positions {
@@ -1233,7 +1233,7 @@ impl World {
                 Some((performer, seconds)) => events.push(self.place_ask(participant, position, l, keeper, performer, seconds)),
                 None => {
                     let first = self.state.asks_held.is_empty();
-                    self.state.asks_held.push(crate::state::HeldAsk { participant: participant.into(), position, keeper, look: l.clone() });
+                    Arc::make_mut(&mut self.state.asks_held).push(crate::state::HeldAsk { participant: participant.into(), position, keeper, look: l.clone() });
                     let pending = Arc::make_mut(self.state.participants.get_mut(participant).unwrap()).pending.entry(key).or_default();
                     pending.asked.push(l.channel.clone());
                     if first {
@@ -1249,6 +1249,7 @@ impl World {
     /// Held questions looked at again: each whose keeper now has someone there to answer is taken up (in the order asked).
     fn take_up_held(&mut self) -> Vec<Timed> {
         let held = std::mem::take(&mut self.state.asks_held);
+        let held = Arc::try_unwrap(held).unwrap_or_else(|shared| (*shared).clone());
         let mut events = vec![];
         for h in held {
             if self.state.participants.get(&h.participant).is_none_or(|p| p.status != ParticipantStatus::Active) {
@@ -1257,7 +1258,7 @@ impl World {
             let id = h.look.channel.rsplit('/').next().unwrap_or_default().to_string();
             match self.ask_performer(&h.keeper, &id) {
                 Some((performer, seconds)) => events.push(self.place_ask(&h.participant, h.position.clone(), &h.look, h.keeper.clone(), performer, seconds)),
-                None => self.state.asks_held.push(h),
+                None => Arc::make_mut(&mut self.state.asks_held).push(h),
             }
         }
         if !self.state.asks_held.is_empty() {

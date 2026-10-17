@@ -2201,7 +2201,7 @@ joining the union is weighed by workmates, and the imitating mind counts how man
 2. **Nothing may be the town's.** A number for "the norm here" would be a god's view and the first step to a
    judgement. Every figure below is one person's belief or one organisation's own history. What the town holds in
    common is read from logs, outside (14h).
-3. **Tipping is not built; it is looked for.** People who differ, watching only those near them, already give
+3. **Tipping is not built (PC-14); it is looked for.** People who differ, watching only those near them, already give
    thresholds and cascades. A tipping parameter would be an outcome tuned in.
 
 ### 14a. What culture is here, and the smallest set that gives it

@@ -42,7 +42,7 @@ A grievance meets openings as any want does. None is a list attached to the grie
 
 **What comes back moves the record** (step 1). Granted: asking is learned to work, the sense of agency rises, trust in the other side rises. Refused, or no answer in `answer_days` (14): the reverse, and the mind looks again at once. A promise not kept in `promise_days` (45) counts as worse than a refusal. A venue that finds for a person raises trust in its kind of institution and the sense of agency; one that dismisses, or whose decision the other side ignores, lowers them. A grievance with nothing in train for a year is let go, and the record keeps it as given up. **A grievance with no venue stays in the record.**
 
-**Getting even** is not built beyond what step 2 has (a want long unmet with little trust and agency sways the chance of taking from an employer).
+**Getting even** is not built (PC-14) beyond what step 2 has (a want long unmet with little trust and agency sways the chance of taking from an employer).
 
 ## How the other side answers
 

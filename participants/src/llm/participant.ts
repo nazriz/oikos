@@ -100,11 +100,13 @@ export const PROMPT_MAX = 150_000;
 export const PROMPT_MIN = 12_000;
 /** What stands where a look's result was, once it has been left out. */
 export const LOOK_LEFT_OUT = "(What this look showed is no longer set out here: there was more than can be read at once, and the oldest of what you looked up was left out first. Look again for what you need.)";
+/** A standing part longer than this is bulk: left out before the seat's own look-ups when a prompt is over. */
+export const BULK_PART = 20_000;
 const LOOKED_SECTION = /^## (Looked up for you|.*: (what you looked up|what you looked at|who you looked for|what was found there|the paper |new since you last looked))/;
 
 /**
- * A prompt within the most one may come to. What is over is left out in this order, each with a line saying so: the
- * results of looks, the oldest first; then, of what was set out in words, the parts that were looked up, then the other
+ * A prompt within the most one may come to. What is over is left out in this order, each with a line saying so: first
+ * any long standing part (over BULK_PART) that was not looked up, the longest first; the results of looks, the oldest first; then, of what was set out in words, the parts that were looked up, then the other
  * parts, the oldest first (the opening lines, with the notebook, stay); and only if that is not enough, the longest
  * text is cut. `left`: what was left out, if anything was.
  */
@@ -116,6 +118,26 @@ export function fitPrompt(system: string, messages: LlmMessage[], max: number, l
   let ms = messages.map((m) => ({ ...m, content: typeof m.content === "string" ? m.content : m.content.map((c) => ({ ...c })) })) as LlmMessage[];
   let now = before;
   const left = { looks: 0, parts: 0, cut: false, characters_before: before };
+  // 0. A bulk part that is shown standing, not looked up (a lender's whole book of loans, say), goes before anything the
+  // seat looked up itself: its own look-ups and recent results are what it is working from. Largest first.
+  const bulk: { m: LlmMessage; get: () => string; set: (s: string) => void }[] = [];
+  const cands = (m: LlmMessage) => (typeof m.content === "string" ? [{ m, get: () => m.content as string, set: (s: string) => void (m.content = s) }]
+    : m.content.flatMap((c) => (c.type === "text" ? [{ m, get: () => c.text, set: (s: string) => void (c.text = s) }] : [])));
+  for (const m of ms) bulk.push(...cands(m));
+  for (let guard = 0; now > max && guard < 64; guard++) {
+    let best: { part: string; at: number; c: (typeof bulk)[number] } | undefined;
+    for (const c of bulk) c.get().split("\n\n## ").forEach((x, n) => {
+      const part = n ? `## ${x}` : x;
+      if (n > 0 && part.length > BULK_PART && !LOOKED_SECTION.test(part) && !part.startsWith("## Waiting for you to confirm") && !part.startsWith("## Letters") && !part.startsWith("(Left out here") && (!best || part.length > best.part.length)) best = { part, at: n, c };
+    });
+    if (!best) break;
+    const line = "(Left out here, so that this is not more than can be read at once: a long part of what you had been shown. Look again for what you need.)";
+    const parts = best.c.get().split("\n\n## ").map((x, n) => (n ? `## ${x}` : x));
+    parts[best.at] = line;
+    now -= best.part.length - line.length;
+    best.c.set(parts.join("\n\n"));
+    left.parts++;
+  }
   // 1. What looks showed, the oldest first.
   for (const m of ms) {
     if (typeof m.content === "string") continue;

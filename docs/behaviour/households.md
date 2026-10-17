@@ -137,7 +137,7 @@ Nothing in the citizen was changed for extended households except the standard i
 
 - **Values.** Someone living with their parents has values partly theirs ("Upbringing"): the generator gives them when the town is made; someone born in a run asks their parents on coming of age.
 - **A death at home** is each member's bereavement (their meaning, belonging and values), and whoever sees it tells those they are closest to outside the household.
-- **A household's wants** are not built (docs/design/ai-citizens.md 10a, the next step). The record has the place for them: a want held together is in each member's own record, naming the household's record (`with`), each with their own weight; nothing is kept on the household's record itself, which stays a statement of who lives together. So two of a household can want the same thing unequally, and one can give it up.
+- **A household's wants** are not built (PC-13; docs/design/ai-citizens.md 10a, the next step). The record has the place for them: a want held together is in each member's own record, naming the household's record (`with`), each with their own weight; nothing is kept on the household's record itself, which stays a statement of who lives together. So two of a household can want the same thing unequally, and one can give it up.
 - **Not built:** a household member's lost job reaching the others beyond the income (Marcus 2013 finds a spouse's mental health falls almost as far).
 
 ## Homes

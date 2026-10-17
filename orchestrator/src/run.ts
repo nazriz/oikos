@@ -26,7 +26,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { appendFileSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { debriefsBeside } from "./logs";
 import { join } from "node:path";
-import { besideOf, largest, leftAlone, renderSummary, SUMMARY_MAX } from "./debrief-summary";
+import { actedOn, besideOf, drawTies, largest, leftAlone, renderSummary, SUMMARY_MAX } from "./debrief-summary";
 import { readForEnd } from "./run-end";
 import { ReadingDesk, type DeskCounts } from "./reading";
 import { culture as cultureNs, reading as readingNs } from "@oikos/participants";
@@ -1490,6 +1490,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     await k.request({ op: "annotate", annotation: { annotation: "note", subject: "orchestrator", data: { debriefs: { version: DEBRIEF_VERSION, wording, seats: seatList.map((x) => x.id) } } } });
     for (const d of debriefs.values()) {
       const r = atEnd.seats.of.get(d.part.id)!;
+      drawTies(r, randomness.stream(["debrief", "choice", d.part.id]));
       const decisions = r.left ? [] : largest(r).map((c) => ({ day: Math.floor(c.t / DAY) + 1, fact: `"${c.preview.replace(/\s+/g, " ").trim().slice(0, 600)}"`, ids: besideOf(c) }));
       const after = d.part.on_opt_out && typeof d.part.on_opt_out === "object" ? "After you left, the routine work of your seat was carried on by code" : "After you left, your seat stood empty";
       const input: DebriefInput = { wording, town: String(cfg.meta?.name ?? o.runId), ended: { how, day, of }, others: { models: debriefs.size - 1, ...(composerCfg ? { composer: true } : {}) },
@@ -1515,7 +1516,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       const agencies = people.map((p) => Number(p.record.agency?.now)).filter((x) => Number.isFinite(x));
       const mean = agencies.reduce((a, b) => a + b, 0) / Math.max(1, agencies.length);
       const sd = Math.sqrt(agencies.reduce((a, b) => a + (b - mean) ** 2, 0) / Math.max(1, agencies.length)) || 1;
-      const sample = sampleAccounts(people, accountsN, randomness.stream(["accounts", "sample"]));
+      const sample = sampleAccounts(people, accountsN, randomness.stream(["accounts", "sample"]), actedOn(atEnd.seats.of.values()));
       const seen = new Set<string>();
       for (const who of sample) {
         const p = people.find((x) => x.person === who.person)!;
