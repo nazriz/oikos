@@ -1,0 +1,1507 @@
+{
+ "description": "Claims decided by the TS support office (world.transfers) on a rule, with what the claimant stated and the pay reported for them (newest first, within the rule's window), plus the TS declarations, words and stopping ages: the answers the Rust oikos_rules::support gives too (scripts/port-support-cases.ts).",
+ "tax": {
+  "tax": "income",
+  "charges": [
+   {
+    "id": "tax",
+    "schedule": [
+     {
+      "from": 0,
+      "rate_bps": 2000
+     }
+    ],
+    "collector": "outside",
+    "account": "acc-o"
+   }
+  ]
+ },
+ "decisions": [
+  {
+   "name": "flat pension in its ages",
+   "rule": {
+    "id": "pension",
+    "payer": "outside",
+    "account": "acc-o",
+    "every_days": 14,
+    "who": {
+     "from_age": 67
+    },
+    "amount": {
+     "flat": 50000
+    }
+   },
+   "t": 0,
+   "born_at": -2207606400,
+   "reports": [],
+   "expect": {
+    "amount": 50000,
+    "granted": true
+   }
+  },
+  {
+   "name": "flat pension too young",
+   "rule": {
+    "id": "pension",
+    "payer": "outside",
+    "account": "acc-o",
+    "every_days": 14,
+    "who": {
+     "from_age": 67
+    },
+    "amount": {
+     "flat": 50000
+    }
+   },
+   "t": 0,
+   "born_at": -946166400,
+   "reports": [],
+   "expect": {
+    "granted": false
+   }
+  },
+  {
+   "name": "ten months where twelve asked",
+   "rule": {
+    "id": "insurance",
+    "payer": "outside",
+    "account": "acc-o",
+    "every_days": 30,
+    "who": {
+     "out_of_work": true,
+     "record": {
+      "months": 12,
+      "within_months": 30
+     }
+    },
+    "amount": {
+     "flat": 10000
+    }
+   },
+   "t": 25920000,
+   "born_at": -1235606400,
+   "reports": [
+    300000,
+    300000,
+    300000,
+    300000,
+    300000,
+    300000,
+    300000,
+    300000,
+    300000,
+    300000
+   ],
+   "expect": {
+    "granted": false,
+    "reason": "contributions are on our record for 10 months, and the payment asks for 12"
+   }
+  },
+  {
+   "name": "twelve months asked and had",
+   "rule": {
+    "id": "insurance",
+    "payer": "outside",
+    "account": "acc-o",
+    "every_days": 30,
+    "who": {
+     "out_of_work": true,
+     "record": {
+      "months": 12,
+      "within_months": 30
+     }
+    },
+    "amount": {
+     "flat": 10000
+    }
+   },
+   "t": 31104000,
+   "born_at": -1230422400,
+   "reports": [
+    300000,
+    300000,
+    300000,
+    300000,
+    300000,
+    300000,
+    300000,
+    300000,
+    300000,
+    300000,
+    300000,
+    300000
+   ],
+   "expect": {
+    "amount": 10000,
+    "granted": true
+   }
+  },
+  {
+   "name": "twelve months too long ago",
+   "rule": {
+    "id": "insurance",
+    "payer": "outside",
+    "account": "acc-o",
+    "every_days": 30,
+    "who": {
+     "out_of_work": true,
+     "record": {
+      "months": 12,
+      "within_months": 30
+     }
+    },
+    "amount": {
+     "flat": 10000
+    }
+   },
+   "t": 116640000,
+   "born_at": -1239494400,
+   "reports": [],
+   "expect": {
+    "granted": false,
+    "reason": "contributions are on our record for 0 months, and the payment asks for 12"
+   }
+  },
+  {
+   "name": "share of gross pay",
+   "rule": {
+    "id": "insurance",
+    "payer": "outside",
+    "account": "acc-o",
+    "every_days": 30,
+    "who": {
+     "out_of_work": true,
+     "record": {}
+    },
+    "amount": {
+     "share_bps": 6000,
+     "of": "gross"
+    }
+   },
+   "t": 5184000,
+   "born_at": -1256342400,
+   "reports": [
+    320000,
+    280000
+   ],
+   "expect": {
+    "amount": 180000,
+    "granted": true
+   }
+  },
+  {
+   "name": "share of net pay",
+   "rule": {
+    "id": "insurance",
+    "payer": "outside",
+    "account": "acc-o",
+    "every_days": 30,
+    "who": {
+     "out_of_work": true,
+     "record": {}
+    },
+    "amount": {
+     "share_bps": 6000,
+     "of": "net"
+    }
+   },
+   "t": 5184000,
+   "born_at": -1256342400,
+   "reports": [
+    320000,
+    280000
+   ],
+   "expect": {
+    "amount": 144000,
+    "granted": true
+   }
+  },
+  {
+   "name": "share of net pay with a child",
+   "rule": {
+    "id": "insurance",
+    "payer": "outside",
+    "account": "acc-o",
+    "every_days": 30,
+    "who": {
+     "out_of_work": true,
+     "record": {}
+    },
+    "amount": {
+     "share_bps": 6000,
+     "of": "net",
+     "with_child_bps": 6700
+    }
+   },
+   "t": 5184000,
+   "born_at": -1256342400,
+   "declares": {
+    "children_born_at": [
+     -152496000
+    ]
+   },
+   "reports": [
+    320000,
+    280000
+   ],
+   "expect": {
+    "amount": 160800,
+    "granted": true
+   }
+  },
+  {
+   "name": "share of net pay with no child",
+   "rule": {
+    "id": "insurance",
+    "payer": "outside",
+    "account": "acc-o",
+    "every_days": 30,
+    "who": {
+     "out_of_work": true,
+     "record": {}
+    },
+    "amount": {
+     "share_bps": 6000,
+     "of": "net",
+     "with_child_bps": 6700
+    }
+   },
+   "t": 5184000,
+   "born_at": -1256342400,
+   "declares": {
+    "children_born_at": []
+   },
+   "reports": [
+    320000,
+    280000
+   ],
+   "expect": {
+    "amount": 144000,
+    "granted": true
+   }
+  },
+  {
+   "name": "share with a least",
+   "rule": {
+    "id": "insurance",
+    "payer": "outside",
+    "account": "acc-o",
+    "every_days": 30,
+    "who": {
+     "out_of_work": true,
+     "record": {}
+    },
+    "amount": {
+     "share_bps": 6000,
+     "of": "gross",
+     "least": 200000
+    }
+   },
+   "t": 5184000,
+   "born_at": -1256342400,
+   "reports": [
+    320000,
+    280000
+   ],
+   "expect": {
+    "amount": 200000,
+    "granted": true
+   }
+  },
+  {
+   "name": "share capped by age 25",
+   "rule": {
+    "id": "insurance",
+    "payer": "outside",
+    "account": "acc-o",
+    "every_days": 30,
+    "who": {
+     "out_of_work": true,
+     "record": {}
+    },
+    "amount": {
+     "share_bps": 6000,
+     "of": "gross",
+     "most": [
+      {
+       "from_age": 0,
+       "amount": 100000
+      },
+      {
+       "from_age": 30,
+       "amount": 150000
+      },
+      {
+       "from_age": 60,
+       "amount": 120000
+      }
+     ]
+    }
+   },
+   "t": 5184000,
+   "born_at": -783302400,
+   "reports": [
+    320000,
+    280000
+   ],
+   "expect": {
+    "amount": 100000,
+    "granted": true
+   }
+  },
+  {
+   "name": "share capped by age 40",
+   "rule": {
+    "id": "insurance",
+    "payer": "outside",
+    "account": "acc-o",
+    "every_days": 30,
+    "who": {
+     "out_of_work": true,
+     "record": {}
+    },
+    "amount": {
+     "share_bps": 6000,
+     "of": "gross",
+     "most": [
+      {
+       "from_age": 0,
+       "amount": 100000
+      },
+      {
+       "from_age": 30,
+       "amount": 150000
+      },
+      {
+       "from_age": 60,
+       "amount": 120000
+      }
+     ]
+    }
+   },
+   "t": 5184000,
+   "born_at": -1256342400,
+   "reports": [
+    320000,
+    280000
+   ],
+   "expect": {
+    "amount": 150000,
+    "granted": true
+   }
+  },
+  {
+   "name": "share capped by age 62",
+   "rule": {
+    "id": "insurance",
+    "payer": "outside",
+    "account": "acc-o",
+    "every_days": 30,
+    "who": {
+     "out_of_work": true,
+     "record": {}
+    },
+    "amount": {
+     "share_bps": 6000,
+     "of": "gross",
+     "most": [
+      {
+       "from_age": 0,
+       "amount": 100000
+      },
+      {
+       "from_age": 30,
+       "amount": 150000
+      },
+      {
+       "from_age": 60,
+       "amount": 120000
+      }
+     ]
+    }
+   },
+   "t": 5184000,
+   "born_at": -1950134400,
+   "reports": [
+    320000,
+    280000
+   ],
+   "expect": {
+    "amount": 120000,
+    "granted": true
+   }
+  },
+  {
+   "name": "a share with a most of one sum",
+   "rule": {
+    "id": "insurance",
+    "payer": "outside",
+    "account": "acc-o",
+    "every_days": 30,
+    "who": {
+     "out_of_work": true,
+     "record": {}
+    },
+    "amount": {
+     "share_bps": 6000,
+     "of": "gross",
+     "most": 90000
+    }
+   },
+   "t": 5184000,
+   "born_at": -1256342400,
+   "reports": [
+    320000,
+    280000
+   ],
+   "expect": {
+    "amount": 90000,
+    "granted": true
+   }
+  },
+  {
+   "name": "share every 14 days",
+   "rule": {
+    "id": "insurance",
+    "payer": "outside",
+    "account": "acc-o",
+    "every_days": 14,
+    "who": {
+     "out_of_work": true,
+     "record": {}
+    },
+    "amount": {
+     "share_bps": 6000,
+     "of": "gross"
+    }
+   },
+   "t": 5184000,
+   "born_at": -1256342400,
+   "reports": [
+    320000,
+    280000
+   ],
+   "expect": {
+    "amount": 84000,
+    "granted": true
+   }
+  },
+  {
+   "name": "share with no pay on file",
+   "rule": {
+    "id": "insurance",
+    "payer": "outside",
+    "account": "acc-o",
+    "every_days": 30,
+    "who": {
+     "out_of_work": true,
+     "record": {}
+    },
+    "amount": {
+     "share_bps": 6000,
+     "of": "gross"
+    }
+   },
+   "t": 5184000,
+   "born_at": -1256342400,
+   "reports": [],
+   "expect": {
+    "granted": false,
+    "reason": "contributions are on our record for 0 months, and the payment asks for 1"
+   }
+  },
+  {
+   "name": "a share over seven months of uneven pay",
+   "rule": {
+    "id": "insurance",
+    "payer": "outside",
+    "account": "acc-o",
+    "every_days": 7,
+    "who": {
+     "out_of_work": true,
+     "record": {}
+    },
+    "amount": {
+     "share_bps": 6000,
+     "of": "gross"
+    }
+   },
+   "t": 20736000,
+   "born_at": -1240790400,
+   "reports": [
+    80009,
+    250003,
+    123457,
+    7,
+    300001,
+    99999,
+    100001
+   ],
+   "expect": {
+    "amount": 19069,
+    "granted": true
+   }
+  },
+  {
+   "name": "lasts sixty days",
+   "rule": {
+    "id": "insurance",
+    "payer": "outside",
+    "account": "acc-o",
+    "every_days": 30,
+    "who": {
+     "out_of_work": true
+    },
+    "amount": {
+     "flat": 10000
+    },
+    "lasts": {
+     "days": 60,
+     "then": "basic"
+    }
+   },
+   "t": 0,
+   "born_at": -1261526400,
+   "reports": [],
+   "expect": {
+    "amount": 10000,
+    "granted": true,
+    "until": 5184000
+   }
+  },
+  {
+   "name": "lasts until sixty",
+   "rule": {
+    "id": "bridge",
+    "payer": "outside",
+    "account": "acc-o",
+    "every_days": 30,
+    "amount": {
+     "flat": 1000
+    },
+    "lasts": {
+     "until_age": 60
+    }
+   },
+   "t": 0,
+   "born_at": -1860710400,
+   "reports": [],
+   "expect": {
+    "amount": 1000,
+    "granted": true,
+    "until": 31449600
+   }
+  },
+  {
+   "name": "family payment within the line",
+   "rule": {
+    "id": "family",
+    "payer": "outside",
+    "account": "acc-o",
+    "every_days": 30,
+    "who": {
+     "income_under": {
+      "amount": 20000,
+      "per": "head"
+     },
+     "children": {
+      "least": 1,
+      "under_age": 18
+     }
+    },
+    "amount": {
+     "household": 60000,
+     "per_member": 1000,
+     "per_child": {
+      "under_age": 6,
+      "amount": 15000
+     }
+    }
+   },
+   "t": 0,
+   "born_at": -1103846400,
+   "declares": {
+    "household_income": 70000,
+    "household_members": 4,
+    "children_born_at": [
+     -94608000,
+     -315360000
+    ]
+   },
+   "reports": [],
+   "expect": {
+    "amount": 79000,
+    "granted": true
+   }
+  },
+  {
+   "name": "family payment over the line",
+   "rule": {
+    "id": "family",
+    "payer": "outside",
+    "account": "acc-o",
+    "every_days": 30,
+    "who": {
+     "income_under": {
+      "amount": 20000,
+      "per": "head"
+     },
+     "children": {
+      "least": 1,
+      "under_age": 18
+     }
+    },
+    "amount": {
+     "household": 60000,
+     "per_member": 1000,
+     "per_child": {
+      "under_age": 6,
+      "amount": 15000
+     }
+    }
+   },
+   "t": 0,
+   "born_at": -1103846400,
+   "declares": {
+    "household_income": 80000,
+    "household_members": 4,
+    "children_born_at": [
+     -94608000,
+     -315360000
+    ]
+   },
+   "reports": [],
+   "expect": {
+    "granted": false,
+    "reason": "the household's income as stated is not under XTS 200.00 a head"
+   }
+  },
+  {
+   "name": "family payment no child",
+   "rule": {
+    "id": "family",
+    "payer": "outside",
+    "account": "acc-o",
+    "every_days": 30,
+    "who": {
+     "income_under": {
+      "amount": 20000,
+      "per": "head"
+     },
+     "children": {
+      "least": 1,
+      "under_age": 18
+     }
+    },
+    "amount": {
+     "household": 60000,
+     "per_member": 1000,
+     "per_child": {
+      "under_age": 6,
+      "amount": 15000
+     }
+    }
+   },
+   "t": 0,
+   "born_at": -1103846400,
+   "declares": {
+    "household_income": 10000,
+    "household_members": 2,
+    "children_born_at": []
+   },
+   "reports": [],
+   "expect": {
+    "granted": false,
+    "reason": "the household as stated has fewer than 1 child under 18"
+   }
+  },
+  {
+   "name": "family payment nothing declared",
+   "rule": {
+    "id": "family",
+    "payer": "outside",
+    "account": "acc-o",
+    "every_days": 30,
+    "who": {
+     "income_under": {
+      "amount": 20000,
+      "per": "head"
+     },
+     "children": {
+      "least": 1,
+      "under_age": 18
+     }
+    },
+    "amount": {
+     "household": 60000,
+     "per_member": 1000,
+     "per_child": {
+      "under_age": 6,
+      "amount": 15000
+     }
+    }
+   },
+   "t": 0,
+   "born_at": -1103846400,
+   "reports": [],
+   "expect": {
+    "granted": false,
+    "reason": "the claim doesn't state the household's income"
+   }
+  },
+  {
+   "name": "pension for those with no other, declared",
+   "rule": {
+    "id": "social",
+    "payer": "outside",
+    "account": "acc-o",
+    "every_days": 30,
+    "who": {
+     "from_age": 70,
+     "no_other_pension": true
+    },
+    "amount": {
+     "flat": 2000
+    }
+   },
+   "t": 0,
+   "born_at": -2270678400,
+   "declares": {
+    "other_pension": false
+   },
+   "reports": [],
+   "expect": {
+    "amount": 2000,
+    "granted": true
+   }
+  },
+  {
+   "name": "pension for those with no other, declared otherwise",
+   "rule": {
+    "id": "social",
+    "payer": "outside",
+    "account": "acc-o",
+    "every_days": 30,
+    "who": {
+     "from_age": 70,
+     "no_other_pension": true
+    },
+    "amount": {
+     "flat": 2000
+    }
+   },
+   "t": 0,
+   "born_at": -2270678400,
+   "declares": {
+    "other_pension": true
+   },
+   "reports": [],
+   "expect": {
+    "granted": false,
+    "reason": "the claim doesn't state that no other pension is paid"
+   }
+  },
+  {
+   "name": "pension for those with no other, not stated",
+   "rule": {
+    "id": "social",
+    "payer": "outside",
+    "account": "acc-o",
+    "every_days": 30,
+    "who": {
+     "from_age": 70,
+     "no_other_pension": true
+    },
+    "amount": {
+     "flat": 2000
+    }
+   },
+   "t": 0,
+   "born_at": -2270678400,
+   "reports": [],
+   "expect": {
+    "granted": false,
+    "reason": "the claim doesn't state that no other pension is paid"
+   }
+  }
+ ],
+ "declarations": [
+  {
+   "name": "family",
+   "rule": {
+    "id": "family",
+    "payer": "outside",
+    "account": "acc-o",
+    "every_days": 30,
+    "who": {
+     "income_under": {
+      "amount": 20000,
+      "per": "head"
+     },
+     "children": {
+      "least": 1,
+      "under_age": 18
+     }
+    },
+    "amount": {
+     "household": 60000,
+     "per_member": 1000,
+     "per_child": {
+      "under_age": 6,
+      "amount": 15000
+     }
+    }
+   },
+   "facts": {
+    "household_income": 70000,
+    "household_members": 3,
+    "children_born_at": [
+     -94608000
+    ],
+    "other_pension": false
+   },
+   "declares": {
+    "household_income": 70000,
+    "household_members": 3,
+    "children_born_at": [
+     -94608000
+    ]
+   }
+  },
+  {
+   "name": "insurance",
+   "rule": {
+    "id": "insurance",
+    "payer": "outside",
+    "account": "acc-o",
+    "every_days": 30,
+    "who": {
+     "out_of_work": true,
+     "record": {
+      "months": 12,
+      "within_months": 30
+     }
+    },
+    "amount": {
+     "flat": 10000
+    }
+   },
+   "facts": {
+    "household_income": 70000,
+    "household_members": 3,
+    "children_born_at": [
+     -94608000
+    ],
+    "other_pension": false
+   },
+   "declares": null
+  },
+  {
+   "name": "insurance",
+   "rule": {
+    "id": "insurance",
+    "payer": "outside",
+    "account": "acc-o",
+    "every_days": 30,
+    "who": {
+     "out_of_work": true,
+     "record": {}
+    },
+    "amount": {
+     "share_bps": 6000,
+     "of": "net",
+     "with_child_bps": 6700,
+     "least": 5,
+     "most": [
+      {
+       "from_age": 0,
+       "amount": 100
+      },
+      {
+       "from_age": 30,
+       "amount": 150
+      }
+     ]
+    }
+   },
+   "facts": {
+    "household_income": 70000,
+    "household_members": 3,
+    "children_born_at": [
+     -94608000
+    ],
+    "other_pension": false
+   },
+   "declares": {
+    "children_born_at": [
+     -94608000
+    ]
+   }
+  },
+  {
+   "name": "social",
+   "rule": {
+    "id": "social",
+    "payer": "outside",
+    "account": "acc-o",
+    "every_days": 30,
+    "who": {
+     "from_age": 70,
+     "no_other_pension": true
+    },
+    "amount": {
+     "flat": 2000
+    }
+   },
+   "facts": {
+    "household_income": 70000,
+    "household_members": 3,
+    "children_born_at": [
+     -94608000
+    ],
+    "other_pension": false
+   },
+   "declares": {
+    "other_pension": false
+   }
+  },
+  {
+   "name": "insurance",
+   "rule": {
+    "id": "insurance",
+    "name": "Insurance",
+    "payer": "outside",
+    "account": "acc-o",
+    "every_days": 30,
+    "who": {
+     "out_of_work": true,
+     "to_age": 66
+    },
+    "amount": {
+     "flat": 10000
+    },
+    "lasts": {
+     "days": 60,
+     "until_age": 67,
+     "then": "basic"
+    }
+   },
+   "facts": {
+    "household_income": 70000,
+    "household_members": 3,
+    "children_born_at": [
+     -94608000
+    ],
+    "other_pension": false
+   },
+   "declares": null
+  },
+  {
+   "name": "basic",
+   "rule": {
+    "id": "basic",
+    "name": "Basic support",
+    "payer": "outside",
+    "account": "acc-o",
+    "every_days": 30,
+    "who": {
+     "out_of_work": true
+    },
+    "amount": {
+     "flat": 4000
+    }
+   },
+   "facts": {
+    "household_income": 70000,
+    "household_members": 3,
+    "children_born_at": [
+     -94608000
+    ],
+    "other_pension": false
+   },
+   "declares": null
+  }
+ ],
+ "words": [
+  {
+   "rules": [
+    {
+     "id": "family",
+     "payer": "outside",
+     "account": "acc-o",
+     "every_days": 30,
+     "who": {
+      "income_under": {
+       "amount": 20000,
+       "per": "head"
+      },
+      "children": {
+       "least": 1,
+       "under_age": 18
+      }
+     },
+     "amount": {
+      "household": 60000,
+      "per_member": 1000,
+      "per_child": {
+       "under_age": 6,
+       "amount": 15000
+      }
+     }
+    }
+   ],
+   "words": "family: to a person whose household's income for a month is under 20000 a head, with at least 1 child under 18 in the household, 60000 a household, and 1000 for each member, and 15000 for each child under 6 every 30 days; paid by outside from acc-o"
+  },
+  {
+   "rules": [
+    {
+     "id": "family",
+     "payer": "outside",
+     "account": "acc-o",
+     "every_days": 30,
+     "who": {
+      "income_under": {
+       "amount": 20000,
+       "per": "head"
+      },
+      "children": {
+       "least": 1,
+       "under_age": 18
+      }
+     },
+     "amount": {
+      "household": 60000,
+      "per_member": 1000,
+      "per_child": {
+       "under_age": 6,
+       "amount": 15000
+      }
+     }
+    },
+    {
+     "id": "insurance",
+     "payer": "outside",
+     "account": "acc-o",
+     "every_days": 30,
+     "who": {
+      "out_of_work": true,
+      "record": {
+       "months": 12,
+       "within_months": 30
+      }
+     },
+     "amount": {
+      "flat": 10000
+     }
+    },
+    {
+     "id": "insurance",
+     "payer": "outside",
+     "account": "acc-o",
+     "every_days": 30,
+     "who": {
+      "out_of_work": true,
+      "record": {}
+     },
+     "amount": {
+      "share_bps": 6000,
+      "of": "net",
+      "with_child_bps": 6700,
+      "least": 5,
+      "most": [
+       {
+        "from_age": 0,
+        "amount": 100
+       },
+       {
+        "from_age": 30,
+        "amount": 150
+       }
+      ]
+     }
+    },
+    {
+     "id": "social",
+     "payer": "outside",
+     "account": "acc-o",
+     "every_days": 30,
+     "who": {
+      "from_age": 70,
+      "no_other_pension": true
+     },
+     "amount": {
+      "flat": 2000
+     }
+    },
+    {
+     "id": "insurance",
+     "name": "Insurance",
+     "payer": "outside",
+     "account": "acc-o",
+     "every_days": 30,
+     "who": {
+      "out_of_work": true,
+      "to_age": 66
+     },
+     "amount": {
+      "flat": 10000
+     },
+     "lasts": {
+      "days": 60,
+      "until_age": 67,
+      "then": "basic"
+     }
+    },
+    {
+     "id": "basic",
+     "name": "Basic support",
+     "payer": "outside",
+     "account": "acc-o",
+     "every_days": 30,
+     "who": {
+      "out_of_work": true
+     },
+     "amount": {
+      "flat": 4000
+     }
+    }
+   ],
+   "words": "family: to a person whose household's income for a month is under 20000 a head, with at least 1 child under 18 in the household, 60000 a household, and 1000 for each member, and 15000 for each child under 6 every 30 days; paid by outside from acc-o. insurance: to a person out of work and looking for it, with contributions reported for them in at least 12 months of the last 30, 10000 every 30 days; paid by outside from acc-o. insurance: to a person out of work and looking for it, with contributions reported for them in at least 1 month, 60% (67% with a child) of their previous pay after what is withheld from it, at least 5, at most 100 from age 0, 150 from age 30 every 30 days; paid by outside from acc-o. social: to a person aged 70 or over, paid no other pension, 2000 every 30 days; paid by outside from acc-o. Insurance: to a person aged 66 or under, out of work and looking for it, 10000 every 30 days, for 60 days, until the age of 67, after which Basic support may be claimed; paid by outside from acc-o. Basic support: to a person out of work and looking for it, 4000 every 30 days; paid by outside from acc-o"
+  }
+ ],
+ "stops_work": [
+  {
+   "curve": [
+    {
+     "from": 25,
+     "bps": 8000
+    },
+    {
+     "from": 55,
+     "bps": 6000
+    },
+    {
+     "from": 60,
+     "bps": 4000
+    },
+    {
+     "from": 65,
+     "bps": 1000
+    }
+   ],
+   "draws": [
+    [
+     0,
+     null
+    ],
+    [
+     1,
+     null
+    ],
+    [
+     1249,
+     null
+    ],
+    [
+     1250,
+     65
+    ],
+    [
+     2499,
+     65
+    ],
+    [
+     2500,
+     65
+    ],
+    [
+     4999,
+     65
+    ],
+    [
+     5000,
+     60
+    ],
+    [
+     7499,
+     60
+    ],
+    [
+     7500,
+     55
+    ],
+    [
+     8749,
+     55
+    ],
+    [
+     8750,
+     55
+    ],
+    [
+     9999,
+     55
+    ]
+   ]
+  },
+  {
+   "curve": [
+    {
+     "from": 25,
+     "bps": 8000
+    },
+    {
+     "from": 55,
+     "bps": 9000
+    },
+    {
+     "from": 60,
+     "bps": 4000
+    }
+   ],
+   "draws": [
+    [
+     0,
+     null
+    ],
+    [
+     1,
+     null
+    ],
+    [
+     1249,
+     null
+    ],
+    [
+     1250,
+     null
+    ],
+    [
+     2499,
+     null
+    ],
+    [
+     2500,
+     null
+    ],
+    [
+     4999,
+     null
+    ],
+    [
+     5000,
+     60
+    ],
+    [
+     7499,
+     60
+    ],
+    [
+     7500,
+     60
+    ],
+    [
+     8749,
+     60
+    ],
+    [
+     8750,
+     60
+    ],
+    [
+     9999,
+     60
+    ]
+   ]
+  },
+  {
+   "curve": [
+    {
+     "from": 25,
+     "bps": 8000
+    },
+    {
+     "from": 65,
+     "bps": 5000
+    },
+    {
+     "from": 70,
+     "bps": 0
+    }
+   ],
+   "draws": [
+    [
+     0,
+     70
+    ],
+    [
+     1,
+     70
+    ],
+    [
+     1249,
+     70
+    ],
+    [
+     1250,
+     70
+    ],
+    [
+     2499,
+     70
+    ],
+    [
+     2500,
+     70
+    ],
+    [
+     4999,
+     70
+    ],
+    [
+     5000,
+     70
+    ],
+    [
+     7499,
+     65
+    ],
+    [
+     7500,
+     65
+    ],
+    [
+     8749,
+     65
+    ],
+    [
+     8750,
+     65
+    ],
+    [
+     9999,
+     65
+    ]
+   ]
+  },
+  {
+   "curve": [
+    {
+     "from": 25,
+     "bps": 0
+    }
+   ],
+   "draws": [
+    [
+     0,
+     25
+    ],
+    [
+     1,
+     25
+    ],
+    [
+     1249,
+     25
+    ],
+    [
+     1250,
+     25
+    ],
+    [
+     2499,
+     25
+    ],
+    [
+     2500,
+     25
+    ],
+    [
+     4999,
+     25
+    ],
+    [
+     5000,
+     25
+    ],
+    [
+     7499,
+     25
+    ],
+    [
+     7500,
+     25
+    ],
+    [
+     8749,
+     25
+    ],
+    [
+     8750,
+     25
+    ],
+    [
+     9999,
+     25
+    ]
+   ]
+  },
+  {
+   "curve": [],
+   "draws": [
+    [
+     0,
+     null
+    ],
+    [
+     1,
+     null
+    ],
+    [
+     1249,
+     null
+    ],
+    [
+     1250,
+     null
+    ],
+    [
+     2499,
+     null
+    ],
+    [
+     2500,
+     null
+    ],
+    [
+     4999,
+     null
+    ],
+    [
+     5000,
+     null
+    ],
+    [
+     7499,
+     null
+    ],
+    [
+     7500,
+     null
+    ],
+    [
+     8749,
+     null
+    ],
+    [
+     8750,
+     null
+    ],
+    [
+     9999,
+     null
+    ]
+   ]
+  }
+ ]
+}
