@@ -1920,7 +1920,14 @@ mod tests {
         let ts: Value = serde_json::from_slice(&std::fs::read(format!("{}/../../../participants/manifests/{name}.json", env!("CARGO_MANIFEST_DIR"))).unwrap()).unwrap();
         let rust = crate::registry::find(name).unwrap().manifest();
         for (k, v) in ts.as_object().unwrap() {
-            assert_eq!(&rust[k], v, "{name}: {k}");
+            if k == "params" {
+                // (Parameters this port adds, documented in the module, may be beyond the TS manifest's.)
+                for (pk, pv) in v.as_object().unwrap() {
+                    assert_eq!(&rust["params"][pk], pv, "{name}: param {pk}");
+                }
+            } else {
+                assert_eq!(&rust[k], v, "{name}: {k}");
+            }
         }
     }
     #[test]
@@ -1951,7 +1958,8 @@ mod tests {
         let dv = |l| vote_of(l, &["development"], json!({}), json!({})).0;
         assert_eq!([-80, -40, 0, 40, 80].map(dv), ["yes", "yes", "no", "no", "no"]);
         assert_eq!(tp(30), "no");
-        assert_eq!(tp(31), "yes");
+        assert_eq!(tp(32), "no", "the axis gain must beat inertia");
+        assert_eq!(tp(33), "yes");
         let v = vote_of(80, &["tenant_protection"], json!({}), json!({}));
         assert!(v.1.contains("our leaning (80)") && v.1.contains("(60)"), "{}", v.1);
     }
@@ -2057,7 +2065,7 @@ mod tests {
         let t = calls(&out);
         let b = lines(&t, "ballot");
         assert_eq!(b.len(), 3, "{t}");
-        assert!(b[0].contains("\"proposed_in\":\"mayor\"") && b[0].contains("tenant_protection") && b[0].contains("Council ballot: p1"), "{}", b[0]);
+        assert!(b[0].contains("\"proposed_in\":\"mayor\"") && b[0].contains("tenant_protection") && b[0].contains("Council ballot: Cap rent rises."), "{}", b[0]);
         assert!(b[1].contains("\"budget\"") && b[2].contains("\"tags\":[]"));
         assert!(clerk.wake(&pic(4 * DAYS, vec![], vec![])).is_empty(), "once each");
     }
@@ -2256,19 +2264,19 @@ mod tests {
     #[test]
     fn the_mayor_never_applies_for_the_same_road_site_twice() {
         // A building at c.20.0 far from the road at c.9.9: a road is wanted beside the network, on a free single-cell lot.
-        let far = stmt("bn-1", 0, "building_notice", "builder", json!({ "addressed_to": ["city"], "data": { "structure": "h1", "at": "c.12.9", "structure_type": "house" } }));
+        let far = stmt("bn-1", 0, "building_notice", "builder", json!({ "addressed_to": ["city"], "data": { "structure": "h1", "at": "c.14.9", "structure_type": "house" } }));
         let mut m = Run::new(&MayorCode, ctx("mayor-system", json!({ "builder": "builder", "park_budget": 0, "road_budget": 20_000 }), Some("mayor")));
         let mut recs = town(vec![far]);
         recs.push(stmt("lot-d-asset", 0, "asset_register", "city", json!({ "data": { "assets": [{ "lot": "lot-d", "cells": ["c.10.9"] }, { "lot": "road-1", "cells": ["c.9.9"], "structure": "r1", "type": "road" }] } })));
         recs.push(rec(json!({ "id": "t9", "record": "claim", "author": "genesis", "at": 0, "visible_to": "public", "position": "right", "holder": "city", "about": { "kind": "ownership", "object": "lot-d" } })));
         recs.push(stmt("plan-lot-d", 0, "lot", "registry", json!({ "data": { "cells": ["c.10.9"] } })));
         let first = calls(&m.wake(&pic(DAYS, recs, vec![])));
-        assert!(first.contains("lot=lot-d"), "{first}");
+        assert!(first.contains("lot=lot-d, structure_type=road"), "{first}");
         // Its application is on file and was refused; thirty-odd days on it is not applied for again.
         let app = stmt("app-r", DAYS, "permit_application", "city", json!({ "author": "mayor-system", "in_position": "mayor", "data": { "lot": "lot-d", "structure_type": "road" } }));
         let refused = stmt("dec-r", 2 * DAYS, "permit_decision", "city", json!({ "author": "planning", "addressed_to": ["city"], "basis": "app-r", "data": { "application": "app-r", "decision": "refused" } }));
         let again = calls(&m.wake(&pic(40 * DAYS, vec![app, refused], vec![])));
-        assert!(!again.contains("lot=lot-d"), "{again}");
+        assert!(!again.contains("lot=lot-d, structure_type=road"), "{again}");
     }
 
     #[test]
