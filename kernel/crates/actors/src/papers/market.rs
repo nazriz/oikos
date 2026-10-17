@@ -35,6 +35,7 @@ pub const KINDS: &[&str] = &[
     "population_estimate",
     "price_index",
     "price_list",
+    "rental_evidence",
     "shareholders",
     "support_statistics",
     "system_delivery",
@@ -248,6 +249,32 @@ pub struct BuyingOffer {
 }
 impl Paper for BuyingOffer {
     const KIND: &'static str = "buying_offer";
+}
+
+/// What homes of a kind let for and stand empty at, as a letting portal publishes it for landlords at a rent review
+/// (docs/risks.md ME-14), one statement per comparable type (`type`, `bedrooms`). It counts only what the portal has been
+/// shown: public rental listings and when each came down. `lets` are the asking rents (cents a month) of homes let in
+/// the last `window_days`; `asking` those of homes still standing; `homes` the homes it has seen listed; `vacant` the
+/// ones standing now.
+///
+/// Written by: market/rent_portal.rs (`world.rent_portal`). Public. Read by: firms.ts (`Landlord`, at a rent review, into
+/// `oikos_rules::rent::{Evidence, reviewed}`).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RentalEvidence {
+    #[serde(rename = "type")]
+    pub type_: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bedrooms: Option<i64>,
+    #[serde(default)]
+    pub lets: Vec<i64>,
+    #[serde(default)]
+    pub asking: Vec<i64>,
+    pub homes: i64,
+    pub vacant: i64,
+    pub window_days: i64,
+}
+impl Paper for RentalEvidence {
+    const KIND: &'static str = "rental_evidence";
 }
 
 // ------------------------------------------------------------------ a shop
@@ -786,7 +813,7 @@ mod tests {
     fn kinds_match_impls() {
         assert!(KINDS.windows(2).all(|w| w[0] < w[1]), "KINDS in name order");
         assert!(KINDS.contains(&PriceList::KIND) && KINDS.contains(&Bid::KIND));
-        assert_eq!(KINDS.len(), 27);
+        assert_eq!(KINDS.len(), 28);
     }
 
     #[test]

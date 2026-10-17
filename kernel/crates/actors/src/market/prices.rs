@@ -283,6 +283,11 @@ impl ExportRoom {
         let cap = self.room.unwrap_or(offer_quantity).min(offer_quantity);
         (cap - self.shipped).max(0)
     }
+    /// The share of the offer a seller plans on: the room it has found, else the share the offer names for it, else the
+    /// whole offer.
+    pub fn share(&self, offer_quantity: i64, named: Option<i64>) -> i64 {
+        self.room.or(named).unwrap_or(offer_quantity).min(offer_quantity).max(0)
+    }
     pub fn found(&self) -> Option<i64> {
         self.room
     }
