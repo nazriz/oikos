@@ -76,20 +76,21 @@ const TOWN = join(root, "worlds/town.yaml");
 // (Re-taken on 2026-10-16 at the review of the foundations, finding 6: the council's appointments officer is an office of the town, its posts name their authority, and every generated system is owned by the organisation whose post it holds; c5a5a00f... until then.)
 // (Re-taken on 2026-10-17 at foundations F9 and F10: three public forms and a row for `take` in the generated town, and the engine's advance stopping where a letter is delivered or a paper recorded, so that news reaches a person when it happens and not at the next wake of anyone; f54352a2... until then.)
 // (Re-taken on 2026-10-17 at the housing and vacant-post faults (fix-housing), on the merge with the seated twins: the council's appointments officer is a councillor's post, watches the city's own offices and hires for the city where none of its staff is left to second; au-vic names the police among the posts the council fills; a death wakes those in the same space; 12df1060... until then.)
-const STEP_1 = "02577eca986e7020a9f12114ddda245e73f22707be55c94ec84c689e470be023";
+// (Until 2026-10-17 the state was pinned here, as STEP_1, and re-taken at nearly every change to what every town runs
+// (seventeen times above). culture-dial.test.ts pins the same state of the same world; here the test says what it
+// stands for: absent, at 0, and at 0 with frictions at 0 are one and the same town. docs/testing.md, "Change detectors".)
 
-test("with the dial absent or at 0 a town is step 1's town, to the state hash", async () => {
+test("with the dial absent or at 0 a town is one and the same town, to the state hash", async () => {
   const out = mkdtempSync(join(tmpdir(), "oikos-dial-"));
   try {
     const plain = (await loadWorld(TOWN)).config;
     expect(plain.dials).toBeUndefined();
     const absent = await runWorld({ config: lean(plain), runId: "absent", outDir: out, until: 60 * DAY, recordObservations: "none" });
-    expect(absent.stateHash).toBe(STEP_1);
     const zero = await runWorld({ config: { ...lean(plain), dials: { initiative_bps: 0 } }, runId: "zero", outDir: out, until: 60 * DAY, recordObservations: "none" });
-    expect(zero.stateHash).toBe(STEP_1);
+    expect(zero.stateHash).toBe(absent.stateHash);
     // (And with the dial for how much goes wrong at 0 beside it: frictions belong to a living town.)
     const both = await runWorld({ config: { ...lean(plain), dials: { initiative_bps: 0, friction_bps: 0 } }, runId: "both", outDir: out, until: 60 * DAY, recordObservations: "none" });
-    expect(both.stateHash).toBe(STEP_1);
+    expect(both.stateHash).toBe(absent.stateHash);
   } finally {
     rmSync(out, { recursive: true, force: true });
   }
@@ -108,7 +109,6 @@ test("with the dial on, people and organisations hold wants in their own records
     const a = await runWorld({ config: lean(config), runId: "a", outDir: out, until: 120 * DAY, recordObservations: "none" });
     const b = await runWorld({ config: lean(await world()), runId: "b", outDir: out, until: 120 * DAY, recordObservations: "none" });
     expect(b.stateHash).toBe(a.stateHash);
-    expect(a.stateHash).not.toBe(STEP_1);
     // Every record, a person's or an organisation's, rebuilds from the log with its chain whole and fits its shape.
     const built = new Records();
     const wanted = new Set<string>();
