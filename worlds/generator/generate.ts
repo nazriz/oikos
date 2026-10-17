@@ -11,6 +11,7 @@ import { draftLaw, planLaw, planLawWords, possessionOrderFor } from "./rules";
 import law from "../law/basic.json";
 import schedules from "../law/schedules.json";
 import { loadProfile, type Profile } from "./profile";
+import { hasShopTable, shopMix, type ShopKind } from "./shopmix";
 import { landscape } from "./nature";
 import { buildingAddress, calendarConfig, institutionName, nameOrganisations, namePeople, unitAddress } from "./names";
 import { chooseWeather, drawWeather, type WeatherChoice } from "./weather";
@@ -142,6 +143,11 @@ export interface TownSpec {
   apartment_blocks: number; // 12 homes each
   houses: number;
   shops: number;
+  /** Divide the town's shops among the kinds the profile's expenditure survey names (food, clothing, eating out, ...), each selling
+   * its kind, instead of one kind of shop that sells `goods` (docs/behaviour/demand.md, "A town's mix of shops"). Off unless true; with
+   * true and a profile that has no table of kinds, the town is as before. The TS world's modules buy only `goods`: the mix is for the
+   * Rust world. */
+  shop_mix?: boolean;
   factories: number;
   landlords: number;
   hall_capacity?: number; // the town hall's hall: how many a gathering can hold (default 200)
@@ -611,6 +617,16 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   // A shop's item: bought at the retail purchases share of its price; served in its labour share of the price, in hours at the shop wage.
   const RETAIL_PRICE = Math.ceil((WORLD.goods_export * 10_000) / V.industry.retail_purchases_share_bps);
   const SERVE = Math.round((share(V.industry.retail_labour_share_bps, RETAIL_PRICE) / hourly(wages.shop)) * HOUR);
+  // A mix of shops (docs/behaviour/demand.md): the kinds the town's shops sell, each kind's unit being what SERVE seconds of staff
+  // time serves (so its price follows from its labour share), and which kind each shop sells. `goods` stands for what the factories make.
+  const MIX: ShopKind[] | undefined = spec.shop_mix === true && hasShopTable(V) ? shopMix(V, shops.length, { price: RETAIL_PRICE, wholesale: WORLD.goods_import }, (SERVE * hourly(wages.shop)) / HOUR) : undefined;
+  const KIND_OF = new Map<string, ShopKind | undefined>();
+  if (MIX) { let i = 0; for (const k of MIX) for (let j = 0; j < k.shops; j++) KIND_OF.set(shops[i++]!, k); }
+  const GOODS_KIND = MIX?.find((k) => k.kind === "goods");
+  const MIX_TOTAL_BPS = MIX ? MIX.reduce((a, k) => a + k.share_bps, 0) : 0;
+  /** What a shop sells and for how much; its expected sales a month (set once the households are drawn). */
+  const shopSells = (s: string) => { const k = KIND_OF.get(s); return k ? { kind: k.kind, price: k.price, wholesale: k.wholesale, stockUnit: k.kind === "goods" ? WORLD.goods_export : k.wholesale } : { kind: "goods", price: RETAIL_PRICE, wholesale: WORLD.goods_import, stockUnit: WORLD.goods_export }; };
+  const SHOP_DEMAND = new Map<string, number>(); // (a month's units, shop by shop; the same for all of a kind)
   // The unit must be one whole numbers can carry: work is counted in seconds and inputs in whole units, so an item too
   // small makes its labour or its inputs round to something else (a share of output the profile never gave), and one
   // that takes more than a day's work can't be made in a day. A fault of the stated unit, said here, not found later
@@ -1052,7 +1068,10 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
         return band ? x + employedShare * beyond((q) => drawSavings(band.pct, q), wage) + (1 - employedShare) * beyond((q) => drawSavings(band.pct, q), benefit) : x;
       }, 0) : 0);
     const spend = Math.max(0, fromIncome + (excess * V.spending.wealth_effect_bps_per_year) / 12 / 10_000);
-    SHOP.demand = Math.max(20, Math.floor(spend / RETAIL_PRICE / Math.max(1, shops.length)));
+    // (With a mix, goods are the share of the town's spending that goes to the shops that sell them.)
+    const GOODS_BPS = GOODS_KIND ? Math.round((GOODS_KIND.share_bps * 10_000) / MIX_TOTAL_BPS) : 10_000;
+    const GOODS_SHOPS = GOODS_KIND ? GOODS_KIND.shops : shops.length;
+    SHOP.demand = Math.max(20, Math.floor((spend * GOODS_BPS) / 10_000 / RETAIL_PRICE / Math.max(1, GOODS_SHOPS)));
     DEMAND_REF.budget = Math.round(spend / Math.max(1, workers + retirees + (inLabourForce - workers) + Math.max(0, ofWorkingAge.length - inLabourForce)));
     const hoursPerWorkerMonth = ((WORKING_DAY * SHOP_DAYS) / 7) * 30; // a shop opens 6 days of 7 (with the round, its staff's 5)
     // With people trading on their own account, the town's custom is shared with them. What is expected at the start:
@@ -1061,19 +1080,21 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     // the margin on that, and the town's spending is reckoned again with it (once: it moves little after).
     if (ownWorkers > 0) {
       const hands = Math.floor((hoursPerWorkerMonth * SHOP_UTILISATION_BPS) / 10_000 / SERVE);
-      const each = (items: number) => Math.max(1, Math.min(hands, Math.floor(items / (shops.length + ownWorkers))));
-      const first = each(spend / RETAIL_PRICE);
+      const each = (items: number) => Math.max(1, Math.min(hands, Math.floor(items / (GOODS_SHOPS + ownWorkers))));
+      const first = each((spend * GOODS_BPS) / 10_000 / RETAIL_PRICE);
       const again = Math.max(0, fromIncomeWith(first * (RETAIL_PRICE - WORLD.goods_export)) + (excess * V.spending.wealth_effect_bps_per_year) / 12 / 10_000) / RETAIL_PRICE;
-      OWN.sales = each(again);
+      OWN.sales = each((again * GOODS_BPS) / 10_000);
       OWN.monthly = OWN.sales * (RETAIL_PRICE - WORLD.goods_export);
-      SHOP.demand = Math.max(20, Math.floor((again - ownWorkers * OWN.sales) / Math.max(1, shops.length)));
+      SHOP.demand = Math.max(20, Math.floor(((again * GOODS_BPS) / 10_000 - ownWorkers * OWN.sales) / Math.max(1, GOODS_SHOPS)));
     }
+    // (Each other kind's shops expect their kind's share of the spending, at the kind's price.)
+    for (const s of shops) { const k = KIND_OF.get(s); SHOP_DEMAND.set(s, !k || k.kind === "goods" ? SHOP.demand : Math.max(20, Math.floor((spend * k.share_bps) / MIX_TOTAL_BPS / k.price / k.shops))); }
     // (And one more seller, for someone who starts trading on their own account in the run: the same share of the
     // town's custom as each of the sellers there are and one, no more than one pair of hands can serve.)
-    OWN_NEW.sales = Math.max(1, Math.min(Math.floor((hoursPerWorkerMonth * SHOP_UTILISATION_BPS) / 10_000 / SERVE), Math.floor(spend / RETAIL_PRICE / (shops.length + ownWorkers + 1))));
+    OWN_NEW.sales = Math.max(1, Math.min(Math.floor((hoursPerWorkerMonth * SHOP_UTILISATION_BPS) / 10_000 / SERVE), Math.floor((spend * GOODS_BPS) / 10_000 / RETAIL_PRICE / (GOODS_SHOPS + ownWorkers + 1))));
     OWN_NEW.monthly = OWN_NEW.sales * (RETAIL_PRICE - WORLD.goods_export);
     // (At the shops' planned utilisation of their staff's hours: docs/behaviour/retailer.md.)
-    for (const w of workplaces) if (w.employer.startsWith("shop-")) w.start = Math.min(w.capacity, Math.max(1, Math.ceil((SHOP.demand * SERVE * 10_000) / (hoursPerWorkerMonth * SHOP_UTILISATION_BPS))));
+    for (const w of workplaces) if (w.employer.startsWith("shop-")) w.start = Math.min(w.capacity, Math.max(1, Math.ceil((SHOP_DEMAND.get(w.employer)! * SERVE * 10_000) / (hoursPerWorkerMonth * SHOP_UTILISATION_BPS))));
     // Where some work for themselves, fewer hold jobs: the factories open with the staff that leaves them, spread evenly
     // (filled one after another, the last would stand empty and close).
     if (ownWorkers > 0 && factories.length) {
@@ -1085,7 +1106,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     // month's stock at the wholesale price and three months' wages for its opening staff.
     for (const a of accounts) {
       const w = workplaces.find((x) => `acc-${x.employer}` === a.id && x.employer.startsWith("shop-"));
-      if (w) a.balance = SHOP.demand * WORLD.goods_export + 3 * Math.floor((wages.shop * MONTH) / PAY) * (w.start ?? 1);
+      if (w) a.balance = SHOP_DEMAND.get(w.employer)! * shopSells(w.employer).stockUnit + 3 * Math.floor((wages.shop * MONTH) / PAY) * (w.start ?? 1);
     }
   }
   // (The audit office's staff are not among the jobs the town's adults fill in turn: they are taken on from those without work, below, so that a body added to a town moves no one else's job.)
@@ -1923,7 +1944,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       : Math.floor((wages.factory * MONTH) / PAY) + first * MAKE.inputs * WORLD.inputs;
     factoryStock.push({ kind: "inputs", holder: f, at: `${f}-works`, quantity: String(month * MAKE.inputs) }, { kind: "goods", holder: f, at: `${f}-works`, quantity: String(Math.floor(month / 4)) });
   }
-  for (const s of shops) factoryStock.push({ kind: "goods", holder: s, at: `${s}-premises`, quantity: String(Math.floor(SHOP.demand / 2)) });
+  for (const s of shops) factoryStock.push({ kind: shopSells(s).kind, holder: s, at: `${s}-premises`, quantity: String(Math.floor(SHOP_DEMAND.get(s)! / 2)) });
   for (const firm of firmIds) {
     const holders = registers.get(firm)!;
     records.push({ id: `shareholders-${firm}`, record: "statement", author: "genesis", at: 0, visible_to: [firm, ...holders.map((h) => h.holder)], speaks_for: firm, kind: "shareholders",
@@ -1941,7 +1962,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   }
 
   const opening = factories.reduce((x, f) => x + Math.floor(((staffCount.get(f) ?? 0) * WORKING_DAY * WORK_DAYS * 30) / 7 / MAKE.labour), 0);
-  const exportUnits = spec.exports_per_month !== undefined ? Math.floor(spec.exports_per_month / WORLD.goods_export) : Math.max(0, opening - SHOP.demand * shops.length - OWN.sales * ownBusinesses.length); // (less what the town's own sellers are expected to buy: its shops, and those trading on their own account)
+  const exportUnits = spec.exports_per_month !== undefined ? Math.floor(spec.exports_per_month / WORLD.goods_export) : Math.max(0, opening - SHOP.demand * (GOODS_KIND ? GOODS_KIND.shops : shops.length) - OWN.sales * ownBusinesses.length); // (less what the town's own sellers are expected to buy: its shops, and those trading on their own account)
   // Each factory's export customers, in proportion to the size of its works.
   const room = new Map(workplaces.map((w) => [w.employer, w.capacity]));
   const totalRoom = factories.reduce((x, f) => x + (room.get(f) ?? 0), 0);
@@ -2273,7 +2294,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   office("bank-payments", "bank", "Bank payment system", undefined, [{ id: "ledger", kind: "accounts" }, K.mine("instructions", { records: ["statement", "withdrawal"] }), K.lookUp(), deaths], code("bank.payment_system", { who: "who", town: "city", ...(JU ? { courts: ["tribunal"] } : {}) }));
   // The outside world as a trader (world.trade): it sells at world prices to whoever orders and pays.
   office("outside-trade", "outside", "The world market", undefined, [{ id: "ledger", kind: "accounts" }, K.mine("orders", ["order", "invoice", "invoice_declined", "delivery_note", "buying_offer"]), { id: "stock", kind: "holdings" }],
-    code("world.trade", { account: "acc-outside", ...(V.business?.trade_credit_days ? { terms_days: V.business.trade_credit_days } : {}), sells: { materials: MATERIALS_PRICE, inputs: WORLD.inputs, goods: WORLD.goods_import, ...(UT ? { energy: UT.energy.grid_price_per_kwh } : {}) },
+    code("world.trade", { account: "acc-outside", ...(V.business?.trade_credit_days ? { terms_days: V.business.trade_credit_days } : {}), sells: { materials: MATERIALS_PRICE, inputs: WORLD.inputs, goods: WORLD.goods_import, ...Object.fromEntries((MIX ?? []).filter((k) => k.kind !== "goods").map((k) => [k.kind, k.wholesale])), ...(UT ? { energy: UT.energy.grid_price_per_kwh } : {}) },
       price_process: V.world_price_process, shocks: spec.shocks ?? [],
       // The world market's demand for the town's goods, split among the factories by the size of their works (each
       // factory's export customers).
@@ -2631,10 +2652,11 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     }
     // A shop: it buys from the factories or the world market, whichever is cheaper, and serves whoever orders.
     const cell = structures.find((x) => x.id === w.structure)!.at;
-    const price = RETAIL_PRICE;
+    const sells = shopSells(w.employer);
+    const price = sells.price;
     office(`${w.employer}-manager`, w.employer, "Manager", undefined, [{ id: "books", kind: "accounts" }, mine(), deaths, market("outside", "builder"), ...shopBoards, lawBook, { id: "stock", kind: "holdings" }, K.premises("premises", [cell])],
       code("firm.retailer", { premises: w.structure, workplace: w.space, max_staff: w.capacity, wage: w.wage, period: PAY, working_day: WORKING_DAY, serve_labour: SHOP.serve, industry: w.industry, lender: "bank", builder: "builder",
-        suppliers: ["outside"], ...shopLooks, price, demand: SHOP.demand, shopfront: true, ...look, ...(RD ? { work_days: SHOP_DAYS, open_from: RD.work_start_hour * HOUR, open_until: RD.work_end_hour * HOUR } : {}), ...(CR ? { police: "police" } : {}), ...informalOf(w) }));
+        suppliers: ["outside"], ...shopLooks, ...(MIX ? { kind: sells.kind } : {}), price, demand: SHOP_DEMAND.get(w.employer)!, shopfront: true, ...look, ...(RD ? { work_days: SHOP_DAYS, open_from: RD.work_start_hour * HOUR, open_until: RD.work_end_hour * HOUR } : {}), ...(CR ? { police: "police" } : {}), ...informalOf(w) }));
   }
   // People working for themselves: each holds the only position of their business, and runs a shop's rules in it
   // alone. It sees its own books, papers and stock, its supplier's prices and what producers advertise to the trade.
@@ -2729,7 +2751,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     ...(UT ? { utilities: { energy: "energy-co" } } : {}),
     // (How a household divides its spending among the kinds on offer, where the profile has its expenditure survey: docs/behaviour/demand.md.
     // Only the kinds the town's sellers sell to households by order are named: today's shops sell goods; energy and water are billed.)
-    ...(V.spending.demand ? { demand: { kinds: V.spending.demand.kinds.filter((k) => k.kind === "goods"), frisch_bps: V.spending.demand.frisch_bps, reference_budget: DEMAND_REF.budget, reference_prices: { goods: RETAIL_PRICE } } } : {}),
+    ...(V.spending.demand ? { demand: { kinds: V.spending.demand.kinds.filter((k) => (MIX ? MIX.some((m) => m.kind === k.kind) : k.kind === "goods")).map(({ seller, ...k }) => k), frisch_bps: V.spending.demand.frisch_bps, reference_budget: DEMAND_REF.budget, reference_prices: { goods: RETAIL_PRICE, ...Object.fromEntries((MIX ?? []).filter((k) => k.kind !== "goods").map((k) => [k.kind, k.price])) } } } : {}),
     // (A home next door that someone went into and has not come out of: whom to ask to call there, and how long such
     // a silence goes unremarked, the profile's figure. docs/behaviour/deaths.md.)
     ...(CR && V.life.found_alone_after ? { welfare: { police: "police", channel: "next-door", found_after: V.life.found_alone_after } } : {}),
@@ -3416,7 +3438,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
         // (Every building floods with water above the profile's depth on its cells.)
         ...(HZ && L ? { floods: { field: "water", above: HZ.flood_above_kl } } : {}),
         ...(L ? { terrains: L.buildable, ...(t.id === "park" ? { cover: L.default_cover } : {}) } : {}) })),
-      resources: [{ id: "goods", unit: "item" }, { id: "inputs", unit: "kg" }, { id: "materials", unit: "kg" }, { id: "waste", unit: "kg" }, ...(UT ? [{ id: "energy", unit: "kWh" }] : [])],
+      resources: [{ id: "goods", unit: "item" }, ...(MIX ?? []).filter((k) => k.kind !== "goods").map((k) => ({ id: k.kind, unit: "item" })), { id: "inputs", unit: "kg" }, { id: "materials", unit: "kg" }, { id: "waste", unit: "kg" }, ...(UT ? [{ id: "energy", unit: "kWh" }] : [])],
       // What builds up and wears out (docs/behaviour/services.md): waste in homes (grams), by the people living there;
       // wear on the town's parks and hall (0 to 100,000 over their life).
       variables: [
@@ -3438,6 +3460,8 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
         ...(MARKET || foundOwnPpm > 0 ? [{ id: "sell", labour: skillWork ? skillWork.scale(SHOP.serve) : SHOP.serve, ...(skillWork ? { labour_by: skillWork.labour_by } : {}) }] : []),
         // Using things up: a household's goods, an item at a time; it takes no one's time.
         { id: "consume", labour: 0, consumes: { goods: "1" } },
+        // (And each other kind the town's shops sell, the same: the citizen uses a kind up by the task `consume-<kind>`.)
+        ...(MIX ?? []).filter((k) => k.kind !== "goods").map((k) => ({ id: `consume-${k.kind}`, labour: 0, consumes: { [k.kind]: "1" } })),
         // The works crew's: collecting 10 kg of a home's waste (to the depot), and an hour's upkeep of an asset.
         { id: "collect", labour: V.services.collect_seconds_per_10kg, in: "workplace", produces: { waste: "10" }, changes: { waste: -10_000 } },
         { id: "maintain", labour: upkeep.labour, in: "workplace", changes: { wear: -upkeep.per_unit } },

@@ -346,7 +346,9 @@ The mechanism:
   business that makes what it sells is not built.
 - **Where:** `docs/behaviour/entry.md`; `docs/design/phase-b-production.md` §7.
 - **Effect:** Demand shocks and service-sector employment are thin; most of the real economy of a small town is services.
-- **L / I:** medium / medium · **Status:** accepted
+- **L / I:** medium / medium · **Status:** partly built (2026-10-18, the generator's `shop_mix`, which is off by default and
+  is for the Rust world: shops of several kinds, among them eating out and personal services, in the three profiles with
+  a table; see ME-19)
 - **Notice by:** No household spending on services in the log; a service firm with no customer.
 - **Fix when:** an experiment on local demand or services.
 
@@ -409,6 +411,28 @@ The mechanism:
 - **L / I:** medium / medium · **Status:** to confirm (the law is built; figures to source per place)
 - **Notice by:** budget shares of a multi-kind town against the survey's at the mean income.
 - **Fix when:** Before any study that offers a second kind (services, new products) or compares spending across places.
+- **Update 2026-10-18:** the kinds are now food, clothing, household goods, transport, eating out, personal services and
+  recreation (and energy, billed by the utilities), for au-vic-2026, gb-eng-2026 and ke-nakuru-2026; every share is
+  regrouped from memory of the published groups, not read from the tables (to confirm), and the Kenyan ones are placeholders.
+
+### ME-19 · A town's mix of shops is sized from regrouped shares and placeholder seller figures
+- **Gap:** With the generator's `shop_mix` on, a town's shops are divided among the kinds of the profile's
+  `spending.demand` by their shares of spending (business counts by industry are supported but entered in no profile:
+  not sourced). What a seller of each kind is like (`seller.wholesale_bps`, `labour_bps`) is a placeholder, from
+  memory of ABS Australian Industry industry-level shares for au-vic-2026, carried to gb-eng-2026 and adjusted for
+  ke-nakuru-2026. A unit of each kind is what the same staff time serves, so its size and price follow from the labour
+  share; factories still make one kind (`goods`, standing for household goods and other goods) and the outside world
+  sells every kind wholesale. Only these three profiles have the table: the other six keep the single `goods` town.
+  The flag is off by default, because the TS world's modules buy only `goods`.
+- **Where:** `worlds/profiles/{au-vic,gb-eng,ke-nakuru}-2026.json` (`spending.demand.kinds[].seller`);
+  `worlds/generator/shopmix.ts`, `generate.ts`; docs/behaviour/demand.md ("A town's mix of shops").
+- **Effect:** Each kind's margin, staffing and the share of the town's shops are the profile's guesses; a kind with many
+  customers for its shops may be short of staff (a shop has room for six); a service sells units that are stocked and
+  used up like goods (no appointments, no time of day).
+- **L / I:** medium / medium · **Status:** to confirm (figures to source per place); built, flag off
+- **Notice by:** a shop of one kind with unserved orders all run, or at a loss; shares of businesses by industry against the
+  place's counts.
+- **Fix when:** the flag is turned on for a study, or the other six profiles are given the table.
 
 ---
 

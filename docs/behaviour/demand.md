@@ -37,9 +37,38 @@ rich countries, larger in poorer ones).
 
 Shares are renormalised over the kinds on offer to this household. A town whose sellers sell one kind gives that kind
 the whole budget, as before the rule; a test asserts this (`with_only_goods_on_offer_the_demand_system_changes_nothing`).
-Today's generated towns sell only `goods`, so the rule takes effect when a world offers a second kind: a seller whose
-price list names it. Every other kind has its own shop choice, carried money and use, and the world must define a
+Generated towns sell only `goods` unless the spec sets `shop_mix` (below), so the rule takes effect when a world offers a
+second kind: a seller whose price list names it. Every other kind has its own shop choice, carried money and use, and the world must define a
 task `consume-<kind>` for it.
+
+## A town's mix of shops
+
+A real town does not have one kind of shop. With the generator's `shop_mix` on (a flag of the spec, off unless set; the
+TS world's modules buy only `goods`, so it is for the Rust world), and a profile that has the table, the town's shops
+are divided among the kinds of the profile's `spending.demand`, and each sells its kind (`firm.retailer`'s `kind`).
+
+- **The table.** Each kind in `spending.demand.kinds` has its survey `share_bps` and `income_elasticity_bps`, and a kind
+  that shops sell has a `seller`: `wholesale_bps` (what the shop pays for a unit, as a share of its price; a service such
+  as hairdressing buys little), `labour_bps` (what its staff cost for a unit as a share of the price) and, where counts
+  by industry are sourced, `business_share_bps`. Energy has none: the utilities bill it. A profile without a kind besides
+  `goods` that has a `seller` keeps the single `goods` town (docs/risks.md, ME-19).
+- **How many shops of each kind.** The town's shops are divided by largest remainder: by the kinds' shares of
+  businesses where every kind has one, otherwise by their shares of spending. `goods` always keeps one shop.
+- **What a unit is.** Every kind's unit is what the same staff time serves (the profile's `industry.retail_labour_share_bps`
+  for goods), so a kind with a larger labour share has a smaller unit and a lower price: price = the cost of that time over
+  the kind's `labour_bps`. A service's unit is a smaller piece of work. The outside world sells each kind wholesale at
+  the price times `wholesale_bps`; `goods` keeps the figures it has without a mix.
+- **Sizing.** A shop expects its kind's share of what the town spends (the reckoning that sizes a shop of goods), at
+  the kind's price, shared among the shops of the kind; it is staffed, stocked and given working capital from that, as a
+  shop of goods is.
+- **Using a kind up.** The world's work table has a task `consume-<kind>` for each kind, and a resource of the kind.
+- **What stays one kind.** The factories make `goods`, which stands for household goods and other goods; people trading
+  on their own account and a shop founded in the run sell `goods` (ME-13, ME-19).
+- **Who knows what.** A household sees the prices posted at shops near it and looks up others, as before; a kind none of
+  its known shops sells gets no spending that trip, and the shares are renormalised over those it can buy.
+
+Tests: `worlds/test/shop-mix.test.ts` and `kernel/tests/c2_shop_mix.rs` (a generated town run 60 days, households buying
+five kinds, the same hash on one thread and on fourteen).
 
 ## What it does not do yet
 
@@ -47,4 +76,4 @@ task `consume-<kind>` for it.
 - Energy and water are billed by the utilities at a fixed use, not bought by price list, so they are not yet among the
   kinds a household weighs. The survey's energy share is there for when they are.
 - The survey figures and elasticities are marked "(to confirm)" in each profile's sources.
-  Risk register: ME-18.
+  Risk register: ME-18, ME-19.
