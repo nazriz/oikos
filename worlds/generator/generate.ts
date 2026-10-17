@@ -3099,7 +3099,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     const { impl, params } = part.kind === "person" ? { impl: pos.role_module.code, params: pos.role_module.params } : part.controller;
     const entityName = entities.find((e) => e.id === pos.entity)?.name ?? pos.entity;
     part.controller = { type: "llm", impl: "anthropic", model: "claude-sonnet-5",
-      params: { cadence_days: 7, standing: ["laws", "forms", "prices"], ...(RD ? { sessions: { start: RD.work_start_hour * HOUR, end: RD.work_end_hour * HOUR, days: RD.work_days } } : {}),
+      params: { cadence_days: 7, standing: ["laws", "forms", "prices", ...(AUTO?.offers.length && pos.channels.some((c: any) => c.id === "vendors") ? ["vendors"] : [])], ...(RD ? { sessions: { start: RD.work_start_hour * HOUR, end: RD.work_end_hour * HOUR, days: RD.work_days } } : {}),
         // (What a folder holds, for whoever reads it: the code in the office reads every paper of the organisation's own
         // through its payroll channel; a person is shown the employment agreements under that name and the standing
         // payments that pay them, and finds the rest in the office's files. Until 2026-10-11 it was the agreements

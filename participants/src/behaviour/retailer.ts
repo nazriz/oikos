@@ -427,7 +427,7 @@ export const retailer: BehaviourModule = {
           // Systems on offer: whether to take one for serving, or to end a licence that has run its term (docs/behaviour/automation.md).
           if (p.automation && !p.operator) {
             const monthly = Math.floor((wage * MONTH) / p.period);
-            steps.push(...adoption.review(book, t, { task: p.serve_task, staff: workers.length, account: acc.account, balance: acc.balance, keep: 2 * workers.length * monthly + payables.owing,
+            steps.push(...adoption.review(book, t, { at: at.premises, task: p.serve_task, staff: workers.length, account: acc.account, balance: acc.balance, keep: 2 * workers.length * monthly + payables.owing,
               breaks: (f) => breaches(book, { block: "deploy", task: f.task, offer: f.id, vendor: f.vendor }, me, t).map((l) => l.id), complies: (why) => ctx.rng(`comply-${why}`).below(10_000) < (p.automation?.compliance_bps ?? 10_000),
               facts: { units: expected, labour: p.serve_labour, wage_month: monthly, seconds_per_worker_month: hoursPerWorkerMonth, utilisation_bps: p.utilisation_bps, unit_price: price, hiring_cost_weeks: p.adjust.hiring_cost_weeks } }));
           }

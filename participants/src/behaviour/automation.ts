@@ -416,7 +416,7 @@ export class Adoption {
   horizon(staff: number): number { return staff >= this.a.large_from ? this.a.payback_months.large : this.a.payback_months.small; }
 
   /** What it does at a review: end a licence that has run its term and does not pay, or take the best system on offer for its task. */
-  review(book: Book, t: number, o: { task: string; facts: Task; staff: number; account: string; balance: number; keep: number; breaks?: (offer: Offer) => string[]; complies?: (purpose: string) => boolean }): Step[] {
+  review(book: Book, t: number, o: { at?: string; task: string; facts: Task; staff: number; account: string; balance: number; keep: number; breaks?: (offer: Offer) => string[]; complies?: (purpose: string) => boolean }): Step[] {
     const steps: Step[] = [];
     const horizon = this.horizon(o.staff);
     for (const l of this.fleet.inService(o.task)) {
@@ -439,7 +439,7 @@ export class Adoption {
     if (!top) return steps;
     const { offer: f, x } = top;
     this.placed.add(f.id);
-    const st = order({ me: this.me, seller: f.vendor, sellerAccount: f.account, kind: ORDER_KIND(f.id), quantity: x.n, unitPrice: f.setup, at: "", from: o.account,
+    const st = order({ me: this.me, seller: f.vendor, sellerAccount: f.account, kind: ORDER_KIND(f.id), quantity: x.n, unitPrice: f.setup, at: o.at ?? this.me, from: o.account,
       why: `Taking ${x.n} ${f.title}: they would do ${x.units} of the ${o.facts.units} ${o.task} units a month, freeing ${x.hands.toFixed(1)} hands (${usd(x.saving)} a month) for ${usd(x.running)} a month in fees, oversight and errors, and ${usd(x.n * f.setup)} to set up and ${usd(f.exit)} to leave, spread over ${horizon} months (${usd(x.amortised)} a month): worth it by ${(x.saving * 100 / Math.max(1, x.running + x.amortised) - 100).toFixed(0)}%, where ${(x.hurdle_bps / 100).toFixed(0)}% is asked (${f.references} clients so far).` });
     st.then = (out) => { if (out.status !== "applied") this.placed.delete(f.id); };
     steps.push(st);
@@ -541,7 +541,7 @@ export class OfficeAdoption {
 
   private order(f: Offer, x: Appraisal, facts: Task, horizon: number, account: string, what: string): Step[] {
     this.placed = true;
-    const st = order({ me: this.me, seller: f.vendor, sellerAccount: f.account, kind: ORDER_KIND(f.id), quantity: x.n, unitPrice: f.setup, at: "", from: account,
+    const st = order({ me: this.me, seller: f.vendor, sellerAccount: f.account, kind: ORDER_KIND(f.id), quantity: x.n, unitPrice: f.setup, at: this.me, from: account,
       why: `${what}: they would write ${x.units} of the ${Math.round(facts.units)} papers a month, freeing ${x.hands.toFixed(2)} of a clerk (${usd(x.saving)} a month) for ${usd(x.running)} a month in fees, oversight and mistakes, and ${usd(x.n * f.setup)} to set up and ${usd(f.exit)} to leave, spread over ${horizon} months (${usd(x.amortised)} a month).` });
     st.then = (out) => { if (out.status !== "applied") this.placed = false; };
     return [st];

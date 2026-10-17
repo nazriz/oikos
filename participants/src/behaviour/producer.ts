@@ -300,7 +300,7 @@ export const producer: BehaviourModule = {
           // Systems on offer: whether to take one for making, or to end a licence that has run its term (docs/behaviour/automation.md).
           if (p.automation) {
             const monthly = Math.floor((wage * MONTH) / p.period);
-            steps.push(...adoption.review(book, t, { task: p.task, staff: workers.length, account: acc.account, balance: acc.balance, keep: 2 * workers.length * monthly + payables.owing + monthlyUnits(workers.length) * inputCost,
+            steps.push(...adoption.review(book, t, { at: p.works, task: p.task, staff: workers.length, account: acc.account, balance: acc.balance, keep: 2 * workers.length * monthly + payables.owing + monthlyUnits(workers.length) * inputCost,
               breaks: (f) => breaches(book, { block: "deploy", task: f.task, offer: f.id, vendor: f.vendor }, me, t).map((l) => l.id), complies: (why) => ctx.rng(`comply-${why}`).below(10_000) < (p.automation?.compliance_bps ?? 10_000),
               facts: { units: expected, labour: p.labour_per_unit, wage_month: monthly, seconds_per_worker_month: (p.working_day * p.work_days * 30) / 7, utilisation_bps: UTILISATION, unit_price: price, hiring_cost_weeks: p.adjust.hiring_cost_weeks } }));
           }
