@@ -397,6 +397,19 @@ The mechanism:
 - **Fix when:** Before any study of inequality, poverty or who is hit by a shock; sourced joint distributions (income, job, savings).
 - **Notice by:** income Gini and jobless-household share against the census.
 
+### ME-18 · Household demand is calibrated from regrouped surveys and literature elasticities
+- **Gap:** The demand system (docs/behaviour/demand.md) reads each profile's budget shares for goods, services and
+  energy, regrouped by hand from the place's household expenditure survey, and income elasticities and Frisch's
+  parameter from the cross-country literature (Lluch, Powell and Williams 1977), not estimated for the place; the
+  Kenyan shares are placeholders. Today's towns sell one kind, so the rule changes nothing until a second is offered.
+- **Where:** `worlds/profiles/*.json` (`spending.demand`); `kernel/crates/rules/src/demand.rs`;
+  `kernel/crates/actors/src/citizen/money.rs`.
+- **Effect:** Once a town sells more than one kind, how spending shifts when prices or incomes change follows these
+  figures; wrong elasticities move spending the wrong way between goods and services.
+- **L / I:** medium / medium · **Status:** to confirm (the law is built; figures to source per place)
+- **Notice by:** budget shares of a multi-kind town against the survey's at the mean income.
+- **Fix when:** Before any study that offers a second kind (services, new products) or compares spending across places.
+
 ---
 
 ## Public bodies and law

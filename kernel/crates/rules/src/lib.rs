@@ -15,6 +15,8 @@
 //!   the catalogue's content from then on.
 //! - `law`: reading a law's formal condition against an act (oikos-law), and writing a law from its figures by a
 //!   schedule (common.ts `draftLaw`). Step 1b.
+//! - `demand`: how a household divides its spending among the kinds on offer, by price and need (the linear
+//!   expenditure system; docs/behaviour/demand.md). Integration step.
 //! - `staffing`: how many clerks a keeper's counter needs for the people who ask it (PB-19). Lane E.
 //! - `calendar`, `identity`: the world's civil dates and what things are called (docs/design/names-and-dates.md): the
 //!   types and the date arithmetic are in the frame; names, references and dates in words are lane N's.
@@ -26,6 +28,7 @@ pub mod bargaining;
 pub mod calendar;
 pub mod entry;
 pub mod decisions;
+pub mod demand;
 pub mod forms;
 pub mod household;
 pub mod identity;

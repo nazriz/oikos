@@ -27,6 +27,7 @@ fn landlord_world() -> Value {
                 "spend_share_bps": 0, "upkeep_share_bps": 0 } });
         }
     }
+    common::alone(&mut c, &["firm.landlord"]);
     c
 }
 

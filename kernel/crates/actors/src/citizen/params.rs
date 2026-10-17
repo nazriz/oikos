@@ -51,6 +51,9 @@ pub struct Params {
     pub started: Option<Started>,
     pub essentials_units: i64,
     pub goods: String,
+    /// How a household divides its spending among the kinds on offer (the linear expenditure system: the profile's
+    /// household expenditure survey; `oikos_rules::demand`, docs/behaviour/demand.md). None: the one kind, `goods`.
+    pub demand: Option<Demand>,
     pub leave_after_homeless_days: i64,
     pub stay: Stay,
     pub leave_after_jobless_days: i64,
@@ -147,6 +150,7 @@ impl Default for Params {
             started: None,
             essentials_units: 10,
             goods: "goods".into(),
+            demand: None,
             leave_after_homeless_days: 90,
             stay: Stay::default(),
             leave_after_jobless_days: 180,
@@ -428,6 +432,20 @@ impl Default for Civic {
     fn default() -> Self {
         Civic { turnout_bps: 9_000, stand_bps: 30, reads_news_bps: 5_000, approval_memory_weeks: 26, news_weight_bps: 1_500, platform_weight_bps: 2_500 }
     }
+}
+
+/// The household demand system's figures (the generator writes them from the profile's `spending.demand`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(default)]
+pub struct Demand {
+    /// Each kind the survey describes: its average budget share and its income elasticity.
+    pub kinds: Vec<oikos_rules::demand::Survey>,
+    /// Frisch's money flexibility (negative basis points).
+    pub frisch_bps: i64,
+    /// A spender's mean month of spending in the town at the start (cents): where the survey's shares hold.
+    pub reference_budget: i64,
+    /// Each kind's price at the start (cents a unit): where the survey's shares hold.
+    pub reference_prices: std::collections::BTreeMap<String, i64>,
 }
 
 #[cfg(test)]

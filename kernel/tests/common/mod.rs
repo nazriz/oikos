@@ -818,3 +818,15 @@ pub fn step<W: std::io::Write>(run: &mut Run<W>, cmd: &Command) -> Option<Respon
 pub fn all_blocks() -> Value {
     json!([{"block": "transfer"},{"block": "move_goods"},{"block": "take"},{"block": "work"},{"block": "open_account"},{"block": "close_account"},{"block": "construct"},{"block": "demolish"},{"block": "occupy"},{"block": "vacate"},{"block": "arrive"},{"block": "leave"},{"block": "birth"},{"block": "harm"},{"block": "create_position"},{"block": "appoint"},{"block": "deploy"},{"block": "retire"},{"block": "create_entity"},{"block": "record_claim"},{"block": "transfer_claim"},{"block": "release_claim"},{"block": "propose_agreement"},{"block": "sign_agreement"},{"block": "give_notice"},{"block": "publish"},{"block": "withdraw"},{"block": "vote"},{"block": "message"}])
 }
+
+/// Riverbend with only these kinds of actor running: every other code participant idles. (Riverbend's offices and
+/// firms are real kinds now and need the parameters a generated world gives them; a test of one kind runs it alone.)
+#[allow(dead_code)]
+pub fn alone(c: &mut Value, kinds: &[&str]) {
+    for p in c["participants"].as_array_mut().into_iter().flatten() {
+        let imp = p["controller"]["impl"].as_str().unwrap_or("").to_string();
+        if p["controller"]["type"] == "code" && !kinds.contains(&imp.as_str()) && !["idle", "stub.script", "mock"].contains(&imp.as_str()) {
+            p["controller"] = serde_json::json!({ "type": "code", "impl": "idle" });
+        }
+    }
+}

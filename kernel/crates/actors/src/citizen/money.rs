@@ -316,6 +316,27 @@ pub struct Money {
     pub fault_seen: i64,
     /// A shop -> our latest decision that chose it (an outcome names it as `of`).
     pub chose: BTreeMap<String, u64>,
+    /// The kinds on offer besides `goods`, each with its own shop, service and money carried (docs/behaviour/demand.md).
+    #[serde(default)]
+    pub others: BTreeMap<String, Basket>,
+    /// When the other kinds are next used up.
+    #[serde(default)]
+    pub next_use_others: i64,
+}
+
+/// What we keep of one kind we buy besides `goods`: where we buy it, how fully it served us, and money carried over.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Basket {
+    pub favourite: Option<String>,
+    pub last_served: i64,
+    pub carried: i64,
+    pub deferred: i64,
+}
+
+impl Default for Basket {
+    fn default() -> Self {
+        Basket { favourite: None, last_served: 10_000, carried: 0, deferred: 0 }
+    }
 }
 
 impl Money {
@@ -346,6 +367,8 @@ impl Money {
             spoiled: 0,
             fault_seen: 0,
             chose: BTreeMap::new(),
+            others: BTreeMap::new(),
+            next_use_others: 0,
         }
     }
 }
@@ -378,6 +401,8 @@ impl Default for Money {
             spoiled: 0,
             fault_seen: 0,
             chose: BTreeMap::new(),
+            others: BTreeMap::new(),
+            next_use_others: 0,
         }
     }
 }
@@ -1000,6 +1025,12 @@ impl Person {
     /// An order for goods, paid with the order (trade.ts `order`), the trip's shops tried noted; false if it can't be
     /// placed (nowhere to put them, or nothing to buy).
     fn buy(&mut self, w: &mut Week, s: &Shop, q: i64, why: String, retry_of: Option<String>) -> bool {
+        let goods = self.p.goods.clone();
+        self.buy_kind(w, &goods, s, q, why, retry_of)
+    }
+
+    /// `buy`, of a kind we name.
+    fn buy_kind(&mut self, w: &mut Week, goods: &str, s: &Shop, q: i64, why: String, retry_of: Option<String>) -> bool {
         let Some(place) = self.home_at(w.pic).or(s.at.clone()) else { return false };
         if q < 1 {
             return false;
@@ -1012,9 +1043,8 @@ impl Person {
         let for_days = ceil_div(self.money.next_shop - w.t, DAY).max(1);
         let total = q * s.price;
         let world = &w.cx.ctx.world;
-        let goods = &self.p.goods;
         let words = format!("Order: {q} {goods} at {} each ({}), delivered to {} at {place}. Paid with this order.", money_words(s.price, world), money_words(total, world), self.me);
-        let o = Order { kind: goods.clone(), quantity: q, unit_price: s.price, deliver_to: Some(self.me.clone()), at: place, account: acc.account.clone(), pay_in_days: None, retry_of, for_days: Some(for_days) };
+        let o = Order { kind: goods.to_string(), quantity: q, unit_price: s.price, deliver_to: Some(self.me.clone()), at: place, account: acc.account.clone(), pay_in_days: None, retry_of, for_days: Some(for_days) };
         let order = say("order", &words, Say { to: Some(vec![s.shop.clone()]), visible: Some(Visible::Only(vec![self.me.clone(), s.shop.clone()])), data: Some(crate::papers::data(&o)), ..Default::default() });
         let p = pay(&s.account, total, Pay { from: Some(acc.account), for_: Some(format!("Order: {q} {goods}.")), ..Default::default() }, w.cx);
         w.push(step_of_lines(why, vec![bound("order", order), oikos_sight::calls::Line { bind: None, call: p }]));
@@ -1046,6 +1076,26 @@ impl Person {
                 self.s.inflows.push((t, -refund)); // (a refund isn't income)
             }
             let short = ordered - delivered;
+            // (Another kind we buy, by the demand system: what we learn of its shop, and what came back for next time.)
+            if let Some(k) = d.s("kind").filter(|k| *k != self.p.goods.as_str() && self.money.others.contains_key(*k)).map(String::from) {
+                if ordered <= 0 {
+                    continue;
+                }
+                let served = half_up(delivered * 10_000, ordered);
+                let mut facts: BTreeMap<String, Value> = [("ordered".to_string(), json!(ordered)), ("delivered".to_string(), json!(delivered)), ("kind".to_string(), json!(k))].into();
+                if let Some(o) = &order {
+                    facts.insert("order".into(), json!(o));
+                }
+                let of = self.money.chose.get(&seller).copied();
+                self.tell(w, Outcome { domain: "shop".into(), option: seller.clone(), kind: "served".into(), way: Way::Mine, facts, payoff: Some(served), of, paper: Some(n.id.clone()), ..Default::default() });
+                if let Some(b) = self.money.others.get_mut(&k) {
+                    if b.favourite.as_deref() == Some(seller.as_str()) {
+                        b.last_served = served;
+                    }
+                    b.deferred += refund.max(0);
+                }
+                continue;
+            }
             if d.s("kind") != Some(self.p.goods.as_str()) || ordered <= 0 {
                 continue;
             }
@@ -1117,7 +1167,104 @@ impl Person {
         };
         self.money.last_shop = Some(t);
         let bal = w.acc.as_ref().map_or(0, |a| a.balance);
-        let budget = bal.min((self.monthly_spend(w) * since).div_euclid(MONTH) + self.money.carried + self.money.deferred);
+        let base = (self.monthly_spend(w) * since).div_euclid(MONTH);
+        // The other kinds on offer (docs/behaviour/demand.md): with none, the trip's whole budget is for goods, as it
+        // always was; with some, the budget is divided among the kinds by the demand system, by price and need.
+        let others = self.others_on_offer();
+        if others.is_empty() {
+            let budget = bal.min(base + self.money.carried + self.money.deferred);
+            self.goods_trip(w, &list, budget);
+            return;
+        }
+        let held: i64 = self.money.carried + self.money.deferred + others.iter().map(|(k, _)| self.money.others.get(k).map_or(0, |b| b.carried + b.deferred)).sum::<i64>();
+        let total = bal.min(base + held).max(0);
+        let Some(d) = self.p.demand.clone() else { return };
+        let price_of = |favourite: Option<&String>, shops: &[Shop]| -> i64 {
+            favourite.and_then(|f| shops.iter().find(|x| &x.shop == f)).map_or_else(|| shops.iter().map(|x| x.price).min().unwrap_or(0), |x| x.price)
+        };
+        let mut offer: Vec<(String, i64, i64)> = vec![];
+        let goods_price = price_of(self.money.favourite.as_ref(), &list);
+        offer.push((self.p.goods.clone(), d.reference_prices.get(&self.p.goods).copied().unwrap_or(goods_price), goods_price));
+        for (k, shops) in &others {
+            let p = price_of(self.money.others.get(k).and_then(|b| b.favourite.as_ref()), shops);
+            offer.push((k.clone(), d.reference_prices.get(k).copied().unwrap_or(p), p));
+        }
+        let b0 = (d.reference_budget * since).div_euclid(MONTH);
+        let lines = oikos_rules::demand::lines(&d.kinds, b0, d.frisch_bps, &offer);
+        let parts = oikos_rules::demand::divide(total, &lines);
+        let part = |k: &str| lines.iter().position(|l| l.kind == k).map_or(0, |i| parts[i]);
+        self.money.carried = 0;
+        self.money.deferred = 0;
+        for b in self.money.others.values_mut() {
+            b.carried = 0;
+            b.deferred = 0;
+        }
+        let goods_part = part(&self.p.goods);
+        self.goods_trip(w, &list, goods_part);
+        for (k, shops) in others {
+            let p = part(&k);
+            self.other_trip(w, &k, &shops, p);
+        }
+    }
+
+    /// The kinds the demand system names besides goods that some shop we know offers, each with its shops, in kind
+    /// order (docs/behaviour/demand.md). Each is given a basket of its own the first time.
+    fn others_on_offer(&mut self) -> Vec<(String, Vec<Shop>)> {
+        let Some(d) = self.p.demand.as_ref() else { return vec![] };
+        let mut kinds: Vec<String> = d.kinds.iter().map(|k| k.kind.clone()).filter(|k| *k != self.p.goods).collect();
+        kinds.sort();
+        kinds.dedup();
+        let out: Vec<(String, Vec<Shop>)> = kinds.into_iter().map(|k| { let sh = shops(&self.book, &k); (k, sh) }).filter(|(_, sh)| !sh.is_empty()).collect();
+        for (k, _) in &out {
+            self.money.others.entry(k.clone()).or_default();
+        }
+        out
+    }
+
+    /// A trip's buying of another kind: the mind's choice among the shops that offer it, and an order for what its
+    /// part of the budget buys there (what is left under one unit's price is carried to the next trip).
+    fn other_trip(&mut self, w: &mut Week, kind: &str, list: &[Shop], budget: i64) {
+        let t = w.t;
+        let basket = self.money.others.get(kind).cloned().unwrap_or_default();
+        let price_at = |s: &str| list.iter().find(|x| x.shop == s).cloned();
+        let options: Vec<Choice> = list
+            .iter()
+            .map(|x| {
+                let units = budget.max(0) / x.price;
+                let facts = shop_offer(&self.book, &x.shop).map_or(Facts { money_per_month: -units * x.price, goods_per_month: Some(units), ..Default::default() }, |o| facts_of(o, units));
+                Choice { key: x.shop.clone(), facts: Some(facts), ..Default::default() }
+            })
+            .collect();
+        let current = basket.favourite.clone().filter(|f| price_at(f).is_some());
+        let life = self.life(w.pic, t, w.acc.as_ref().map(|a| a.balance));
+        let d = self.mind.decide(
+            w.cx,
+            &life,
+            Decide { domain: "shop".into(), options, current, satisfied_here: Some(basket.last_served), purpose: Some("shopping".into()), bedrooms_needed: life.bedrooms_needed, ..Default::default() },
+        );
+        let fav = d.key.clone().filter(|k| price_at(k).is_some()).unwrap_or_else(|| list[w.cx.rng(&format!("shopping-{kind}")).below(list.len() as u64) as usize].shop.clone());
+        if let Some(n) = d.n {
+            self.money.chose.insert(fav.clone(), n);
+        }
+        let Some(s) = price_at(&fav) else { return };
+        let q = budget.max(0) / s.price;
+        let b = self.money.others.entry(kind.to_string()).or_default();
+        b.favourite = Some(fav.clone());
+        b.carried = (budget - q * s.price).min(s.price).max(0);
+        let world = &w.cx.ctx.world;
+        let words = format!(
+            "Shopping for the fortnight: our {kind}, its part of what we spend (by what we need of it and what it costs), is {}: {q} at {} ({} each).",
+            money_words(budget, world),
+            s.shop,
+            money_words(s.price, world),
+        );
+        self.buy_kind(w, kind, &s, q, words, None);
+    }
+
+    /// A trip's buying of goods, for this budget: the shop the mind chooses among their offers, and the order.
+    fn goods_trip(&mut self, w: &mut Week, list: &[Shop], budget: i64) {
+        let t = w.t;
+        let price_at = |s: &str| list.iter().find(|x| x.shop == s).cloned();
         // Which shop: the mind's decision among the shops' offers, each for what the trip's budget buys there. (Those we
         // know who shop there are the mind's to count: word of mouth is its own.)
         let options: Vec<Choice> = list
@@ -1176,6 +1323,13 @@ impl Person {
     /// bring home what's elsewhere; without one, we use what a shop keeps for us, there.
     pub fn use_up(&mut self, w: &mut Week) {
         let t = w.t;
+        if t >= self.money.next_use_others && !self.money.others.is_empty() {
+            self.money.next_use_others = t + 7 * DAY;
+            let kinds: Vec<String> = self.money.others.keys().cloned().collect();
+            for k in kinds {
+                self.use_up_kind(w, &k);
+            }
+        }
         let home_at = self.home_at(w.pic);
         let pickups: BTreeSet<String> = shops(&self.book, &self.p.goods).into_iter().filter_map(|s| s.at).collect();
         let mut had: Vec<(String, i64)> = w
@@ -1230,6 +1384,44 @@ impl Person {
     }
 }
 
+impl Person {
+    /// Using up another kind we buy (docs/behaviour/demand.md): what we hold of it, spread over the weeks until the
+    /// next trip, where it is (at home, or kept for us at a shop), by the world's task `consume-<kind>`.
+    fn use_up_kind(&mut self, w: &mut Week, kind: &str) {
+        let t = w.t;
+        let home_at = self.home_at(w.pic);
+        let pickups: BTreeSet<String> = shops(&self.book, kind).into_iter().filter_map(|s| s.at).collect();
+        let mut had: Vec<(String, i64)> = w
+            .pic
+            .channels
+            .values()
+            .flat_map(|c| match c {
+                Seen::Holdings { holdings } => holdings.iter().filter(|h| h.kind == kind).map(|h| (h.at.clone(), crate::common::money::cents(h.quantity))).collect::<Vec<_>>(),
+                _ => vec![],
+            })
+            .filter(|(at, q)| *q > 0 && (home_at.as_ref() == Some(at) || pickups.contains(at)))
+            .collect();
+        had.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+        let total: i64 = had.iter().map(|h| h.1).sum();
+        if total <= 0 {
+            return;
+        }
+        let weeks = ceil_div(self.money.next_shop - t, 7 * DAY).max(1);
+        let mut left = ceil_div(total, weeks);
+        let each = left;
+        let task = format!("consume-{kind}");
+        let mut lines = vec![];
+        for (at, q) in &had {
+            let u = left.min(*q);
+            if u <= 0 {
+                break;
+            }
+            lines.push(call("work", vec![("task", Some(arg(&task))), ("units", Some(text(u.to_string()))), ("at", Some(arg(at)))]));
+            left -= u;
+        }
+        w.push(because(format!("Using up {each} of the {total} {kind} we have, until we shop again."), lines));
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -1430,6 +1622,58 @@ mod tests {
         assert_eq!((again[0]["quantity"].as_i64().unwrap(), again[0]["retry_of"].as_str()), (((q - 10) * 1_000) / 1_200, Some("rec.8")));
         assert_eq!(p.s.inflows.last(), Some(&(2 * DAY, -(q - 10) * 1_000)), "a refund isn't income");
         assert_eq!(p.money.last_served, half_up(10 * 10_000, q));
+    }
+
+    fn list_of(id: &str, shop: &str, kind: &str, price: i64) -> Arc<Record> {
+        st(id, 0, "price_list", shop, &[], json!({ "goods": { kind: price }, "account": format!("acc-{shop}"), "at": format!("{shop}-premises") }))
+    }
+
+    /// A trip in a town that sells goods and services, at these prices: what each order spends.
+    fn two_kinds(goods: i64, services: i64, balance: i64, essentials: i64) -> (i64, i64) {
+        // (Figures for the test only: a necessity at 60% and a luxury at 40% of spending, at a mean of 40,000 a month.)
+        let demand = json!({ "kinds": [{ "kind": "goods", "share_bps": 6_000, "income_elasticity_bps": 7_000 }, { "kind": "services", "share_bps": 4_000, "income_elasticity_bps": 14_500 }],
+            "frisch_bps": -20_000, "reference_budget": 40_000, "reference_prices": { "goods": 1_000, "services": 2_000 } });
+        let c = ctx(json!({ "saving_bps": 0, "wealth_effect_bps_per_year": 0, "shop_every_days": 14, "income_window_days": 90, "essentials": essentials, "demand": demand }));
+        let mut p = Person::new(&c).unwrap();
+        p.money.next_shop = 0;
+        let seen = [list_of("rec.1", "s1", "goods", goods), list_of("rec.2", "h1", "services", services)];
+        let trip = run(&mut p, &c, DAY, 40, balance, &seen, Person::shopping);
+        let orders = said(&trip, "order");
+        let spent = |k: &str| orders.iter().filter(|o| o["kind"] == json!(k)).map(|o| o["quantity"].as_i64().unwrap() * o["unit_price"].as_i64().unwrap()).sum::<i64>();
+        (spent("goods"), spent("services"))
+    }
+
+    #[test]
+    fn the_trips_budget_is_divided_among_the_kinds_on_offer_by_price_and_need() {
+        // At the reference prices and the mean budget: the survey's shares (each order rounds down to whole units).
+        let budget = 40_000 * 14 * DAY / MONTH;
+        let (g, sv) = two_kinds(1_000, 2_000, 1_000_000, 40_000);
+        assert!((g - budget * 6 / 10).abs() <= 1_000 && (sv - budget * 4 / 10).abs() <= 2_000, "{g} {sv} of {budget}");
+        // Goods a fifth cheaper: less is spent on them, more on services, and more goods are bought all the same.
+        let (g2, sv2) = two_kinds(800, 2_000, 1_000_000, 40_000);
+        assert!(g2 < g && sv2 > sv, "spending shifts: goods {g} -> {g2}, services {sv} -> {sv2}");
+        assert!(g2 / 800 > g / 1_000);
+        // A richer household (twice the budget) puts a larger share into the luxury.
+        let (g3, sv3) = two_kinds(1_000, 2_000, 1_000_000, 80_000);
+        assert!(sv3 * 10_000 / (g3 + sv3) > sv * 10_000 / (g + sv));
+    }
+
+    #[test]
+    fn with_only_goods_on_offer_the_demand_system_changes_nothing() {
+        let demand = json!({ "kinds": [{ "kind": "goods", "share_bps": 6_000, "income_elasticity_bps": 7_000 }, { "kind": "services", "share_bps": 4_000, "income_elasticity_bps": 14_500 }],
+            "frisch_bps": -20_000, "reference_budget": 40_000, "reference_prices": { "goods": 1_000 } });
+        let trip_of = |extra: Value| {
+            let mut e = json!({ "saving_bps": 0, "wealth_effect_bps_per_year": 0, "shop_every_days": 14, "income_window_days": 90 });
+            for (k, v) in extra.as_object().unwrap() {
+                e[k] = v.clone();
+            }
+            let c = ctx(e);
+            let mut p = Person::new(&c).unwrap();
+            p.money.next_shop = 0;
+            let trip = run(&mut p, &c, DAY, 40, 100_000, &[price_list("rec.1", "s1", 1_000), price_list("rec.2", "s2", 1_200)], Person::shopping);
+            serde_json::to_string(&said(&trip, "order")).unwrap()
+        };
+        assert_eq!(trip_of(json!({ "demand": demand })), trip_of(json!({})));
     }
 
     #[test]

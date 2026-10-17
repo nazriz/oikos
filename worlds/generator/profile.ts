@@ -203,7 +203,9 @@ export interface Profile {
      * area, which differs by place. Left out: the generator's own (generous) figures. What is suitable is not this but
      * the occupancy standard (`households.occupancy`). */
     homes?: { bodies_per_bedroom: number; bodies_besides: number };
-    spending: { saving_bps: number; wealth_effect_bps_per_year: number; essentials_per_month: number; shops_known: number; shop_search_bps_per_month: number };
+    spending: { saving_bps: number; wealth_effect_bps_per_year: number; essentials_per_month: number; shops_known: number; shop_search_bps_per_month: number;
+      /** The household demand system (docs/behaviour/demand.md): each kind's average share of spending and its income elasticity from the place's household expenditure survey, and Frisch's money flexibility. */
+      demand?: { frisch_bps: number; kinds: { kind: string; share_bps: number; income_elasticity_bps: number }[] } };
     /** An adult's savings (cash and deposits), by age: percentiles 10, 25, 50, 75, 90 (cents). */
     savings_by_age?: { from: number; pct: [number, number, number, number, number] }[];
     /** The age people here stop work, where the profile gives one age for everyone; with `labour_force_share_by_age`,

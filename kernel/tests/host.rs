@@ -18,6 +18,7 @@ fn world() -> Value {
             p["controller"] = json!({ "type": "code", "impl": "world.weather", "params": { "events": [{ "kind": "heatwave", "from_day": 6, "days": 3 }, { "kind": "storm", "from_day": 20, "days": 2 }], "lead_days": 2 } });
         }
     }
+    common::alone(&mut c, &["world.weather"]);
     c
 }
 

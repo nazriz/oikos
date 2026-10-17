@@ -51,6 +51,7 @@ fn world(shape: &str, lapse_days: i64) -> Value {
                 { "at": 3 * DAY, "call": application("carol", "acc-carol") } ] } });
         }
     }
+    common::alone(&mut c, &["group.founded"]);
     c
 }
 

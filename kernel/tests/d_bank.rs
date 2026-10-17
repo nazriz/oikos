@@ -40,6 +40,7 @@ fn world(dead_on: Option<i64>) -> Value {
             p["controller"] = json!({ "type": "code", "impl": "stub.script", "params": { "script": script } });
         }
     }
+    common::alone(&mut c, &["bank.payment_system"]);
     c
 }
 

@@ -35,6 +35,7 @@ fn payroll_world(part: &str) -> Value {
             _ => {}
         }
     }
+    common::alone(&mut c, &["body.payroll"]);
     c
 }
 

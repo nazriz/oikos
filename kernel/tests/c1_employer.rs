@@ -21,6 +21,7 @@ fn world() -> Value {
             p["controller"] = json!({ "type": "code", "impl": "firm.employer", "params": { "wage": 140000, "target_staff": 3, "buffer_periods": 1 } });
         }
     }
+    common::alone(&mut c, &["firm.employer"]);
     c
 }
 

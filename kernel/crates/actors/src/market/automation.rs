@@ -767,7 +767,7 @@ fn tenths(milli: i64) -> String {
 /// The behaviour doc. `docs/behaviour/automation.md` exists only on gd-adoption (unmerged), and the backstop wants the
 /// doc to exist, so this points at the outside world's doc until that branch merges: **at integration, change it to
 /// `docs/behaviour/automation.md`** (it is what the TS manifest names).
-const MANIFEST_DOC: &str = "docs/behaviour/boundary.md";
+const MANIFEST_DOC: &str = "docs/behaviour/automation.md";
 
 const OUTSIDE: &str = "The technology on offer is the outside world's: which tasks systems can do, at what price, in what time, with what error and what terms, as vendors beyond the town sell them. It is a fact about the world beyond the town, as world prices are, held in the profile with its source; this module stands for it at the world's edge. Nothing in the town can know or change it otherwise, and nothing here sets an adoption rate.";
 

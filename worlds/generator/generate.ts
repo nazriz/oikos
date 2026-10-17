@@ -711,6 +711,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     return { labour_by: { variable: "skill", at_max_bps: atMax }, scale: (labour: number) => Math.round(labour / f(mean)) };
   })() : undefined;
   const SHOP = { serve: SERVE, demand: 0 }; // demand: set once the households are drawn
+  const DEMAND_REF = { budget: 0 }; // a spender's mean month of spending at the start (the demand system's reference: docs/behaviour/demand.md)
   const OWN = { sales: 0, monthly: 0 }; // what someone trading on their own account is expected to sell and to clear, a month
   const OWN_NEW = { sales: 0, monthly: 0 }; // and someone who starts doing so in the run: one more seller sharing the town's custom
   for (let i = 0; i < spec.apartment_blocks; i++) {
@@ -1052,6 +1053,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       }, 0) : 0);
     const spend = Math.max(0, fromIncome + (excess * V.spending.wealth_effect_bps_per_year) / 12 / 10_000);
     SHOP.demand = Math.max(20, Math.floor(spend / RETAIL_PRICE / Math.max(1, shops.length)));
+    DEMAND_REF.budget = Math.round(spend / Math.max(1, workers + retirees + (inLabourForce - workers) + Math.max(0, ofWorkingAge.length - inLabourForce)));
     const hoursPerWorkerMonth = ((WORKING_DAY * SHOP_DAYS) / 7) * 30; // a shop opens 6 days of 7 (with the round, its staff's 5)
     // With people trading on their own account, the town's custom is shared with them. What is expected at the start:
     // each seller, a shop or a trader, the same custom (households deal with the few sellers they know, at one price to
@@ -2725,6 +2727,8 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     ...(HE && ED ? { school: { entity: "school", building: "school-building", ages: ED.school_ages },
       care: { entity: "clinic", waiting: "clinic-centre/waiting.1", seek_bps: HE.seek_care_bps, severities: [...new Set(HE.treats.map((x) => x.severity).filter((x): x is string => !!x))], off_work: HE.off_work_severities, wait_days: 2 } } : {}),
     ...(UT ? { utilities: { energy: "energy-co" } } : {}),
+    // (How a household divides its spending among the kinds on offer, where the profile has its expenditure survey: docs/behaviour/demand.md.)
+    ...(V.spending.demand ? { demand: { kinds: V.spending.demand.kinds, frisch_bps: V.spending.demand.frisch_bps, reference_budget: DEMAND_REF.budget, reference_prices: { goods: RETAIL_PRICE } } } : {}),
     // (A home next door that someone went into and has not come out of: whom to ask to call there, and how long such
     // a silence goes unremarked, the profile's figure. docs/behaviour/deaths.md.)
     ...(CR && V.life.found_alone_after ? { welfare: { police: "police", channel: "next-door", found_after: V.life.found_alone_after } } : {}),
