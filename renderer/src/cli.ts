@@ -1,10 +1,12 @@
 // `oikos explore <run-dir> [--port N] [--prefix /explore]`: index a run once (beside the runs, never inside one) and
 // serve the explorer on 127.0.0.1. `oikos explore --all [--runs DIR] [more run dirs...]`: every run with a pilot, picked in
 // the page, each indexed when first opened. `oikos explore index <run-dir> [--rebuild]`: the index only.
+// `--rust` (with either): the built Rust data layer (kernel/crates/explore) answers the API instead of the TS index.
 
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { pilotRuns, type RunEntry } from "./paths";
+import { startRust } from "./rust";
 import { openIndex, serve } from "./server";
 
 const REPO = resolve(import.meta.dir, "..", "..");
@@ -27,7 +29,7 @@ export async function runExplore(argv: string[]): Promise<void> {
   const take = (name: string) => { const i = args.indexOf(`--${name}`); return i >= 0 ? args.splice(i, 2)[1] : undefined; };
   const has = (name: string) => { const i = args.indexOf(`--${name}`); if (i < 0) return false; args.splice(i, 1); return true; };
   const port = Number(take("port") ?? 4321), prefix = take("prefix") ?? "", runsDir = resolve(take("runs") ?? process.env.OIKOS_RUNS ?? defaultRuns());
-  const all = has("all"), rebuild = has("rebuild");
+  const all = has("all"), rebuild = has("rebuild"), rust = has("rust");
   const say = (s: string) => console.error(s);
   if (args[0] === "index") {
     const dir = args[1];
@@ -48,7 +50,9 @@ export async function runExplore(argv: string[]): Promise<void> {
     single = runs[0]!.key;
     if (rebuild) await openIndex(runs[0]!, { log: say, rebuild: true });
   }
-  const { url } = await serve({ port, prefix: prefix.replace(/\/+$/, ""), runs, single, log: say });
+  // (--rust: the Rust data layer answers /api; the TS index is not built. Default until the cut-over: the TS index.)
+  const layer = rust ? await startRust(runs, { log: say }) : undefined;
+  const { url } = await serve({ port, prefix: prefix.replace(/\/+$/, ""), runs, single, log: say, api: layer?.api });
   console.log(`explorer: ${url}${single ? "" : ` (${runs.length} runs)`}`);
 }
 

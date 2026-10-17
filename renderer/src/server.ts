@@ -12,7 +12,10 @@ import { assertOutside, indexDirOf, indexIsCurrent, logOfRun, type RunEntry } fr
 import { Store } from "./store";
 import { trace, eventRow } from "./trace";
 
-export interface ServeOptions { port: number; prefix: string; runs: RunEntry[]; log?: (s: string) => void; single?: string }
+/** `api`: the base URL of the Rust data layer (`oikos-explore serve`, kernel/crates/explore). When it is set (here, or by the
+ * environment's OIKOS_EXPLORE_API) every `/api/*` request is answered by it, byte for byte, and the TS index is not built;
+ * otherwise the TS index below answers (the default until the cut-over, docs/explorer.md). */
+export interface ServeOptions { port: number; prefix: string; runs: RunEntry[]; log?: (s: string) => void; single?: string; api?: string }
 
 interface Open { entry: RunEntry; dir?: string; store?: Store; pilot?: any; state: "none" | "indexing" | "ready" | "failed"; message?: string; started?: number }
 
@@ -71,6 +74,8 @@ export async function serve(o: ServeOptions) {
       .catch((e) => { r.state = "failed"; r.message = (e as Error).message; say(`${r.entry.name}: ${(e as Error).stack}`); });
   };
   const binCache = new Map<string, Uint8Array>();
+  const rustApi = (o.api ?? process.env.OIKOS_EXPLORE_API ?? "").replace(/\/+$/, "");
+  if (rustApi && !/^http:\/\/(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/.test(rustApi)) throw new Error(`the Rust data layer is only reached on this machine (127.0.0.1), not at ${rustApi}`);
 
   const server = Bun.serve({
     hostname: "127.0.0.1",
@@ -85,6 +90,13 @@ export async function serve(o: ServeOptions) {
       if (path === "/" || path === "/index.html") return new Response(pageHtml(prefix), { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-cache" } });
       if (path === "/app.js") return gz(req, client.js, "text/javascript; charset=utf-8");
       if (path === "/app.css") return gz(req, client.css, "text/css; charset=utf-8");
+      if (rustApi && path.startsWith("/api/")) {
+        // The Rust service answers every route of this file's /api, with the same shapes; it is only asked, never told.
+        try {
+          const r = await fetch(`${rustApi}${path}${url.search}`);
+          return new Response(await r.arrayBuffer(), { status: r.status, headers: { "content-type": r.headers.get("content-type") ?? "application/octet-stream", "cache-control": "no-cache" } });
+        } catch (e) { return new Response(`the Rust data layer did not answer: ${(e as Error).message}`, { status: 502 }); }
+      }
       if (path === "/api/runs") return json(req, { single: o.single ?? null, runs: [...runs.values()].map((r) => ({ key: r.entry.key, name: r.entry.name, note: r.entry.note, pilot: r.entry.pilot, mtime: r.entry.mtime, state: r.state })) });
       const m = /^\/api\/r\/([^/]+)\/(.*)$/.exec(path);
       if (!m) return new Response("not found", { status: 404 });
@@ -135,7 +147,7 @@ export async function serve(o: ServeOptions) {
       return new Response("not found", { status: 404 });
     },
   });
-  for (const r of runs.values()) if (o.single === r.entry.key) start(r);
+  if (!rustApi) for (const r of runs.values()) if (o.single === r.entry.key) start(r);
   return { server, url: `http://127.0.0.1:${server.port}${prefix}/`, runs };
 }
 

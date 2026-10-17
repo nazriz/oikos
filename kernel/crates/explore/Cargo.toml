@@ -6,6 +6,16 @@ license = "Apache-2.0"
 description = "The explorer's data layer (docs/port-guide.md, \"The explorer's data layer\"): a run's index, its causal trace and who decided, read from the log. Read-only."
 rust-version = "1.85"
 
+[lib]
+name = "oikos_explore"
+path = "src/lib.rs"
+
+[[bin]]
+name = "oikos-explore"
+path = "src/bin/oikos-explore.rs"
+
 [dependencies]
 serde = { workspace = true }
 serde_json = { workspace = true }
+# Kept lines are held zstd-compressed in frames, and `.jsonl.zst` logs are read (as kernel/Cargo.toml has it).
+zstd = { version = "0.13", default-features = false }
