@@ -46,7 +46,7 @@ const filters = args;
 /** A change to any of these could reach any test: the whole suite. */
 const FULL_ON = [/^kernel\//, /^contracts\/(?!.*\.md$)/, /^(package\.json|bun\.lock|bunfig\.toml|tsconfig.*\.json)$/, /^scripts\/(test|slots|slots-preload)\.ts$/, /^\.github\//];
 /** Always run under --affected: the invariants and backstops. */
-const BACKSTOPS = ["orchestrator/test/generality.test.ts", "orchestrator/test/no-god-view.test.ts", "contracts/test/contracts.test.ts"];
+const BACKSTOPS = ["orchestrator/test/generality.test.ts", "orchestrator/test/no-god-view.test.ts", "contracts/test/contracts.test.ts", "orchestrator/test/invariants.test.ts"]; // (the last from the test audit; used once on main)
 const isDoc = (f: string) => /\.md$/.test(f) || (f.startsWith("docs/") && /\.(txt|png|svg|jpg)$/.test(f));
 
 const cores = cpus().length;
