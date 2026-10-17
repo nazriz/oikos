@@ -288,25 +288,25 @@ test("an invoice that comes when the landlord is short stays open, and is paid w
   expect(short.payments.map((c) => [c.args.settles, amountOf(c), c.t])).toEqual([[short.invoices[0]!.id, PRICE, t0 + 11 * WEEK]]);
 });
 
-// Bug hunt 2026-10-17, finding 3: a tenant who dies, and the household still living there.
-test("a tenant seen to die: notice on the lease, the tenancy offered to the household member still there, and no possession sought against the dead", () => {
+// Bug hunt 2026-10-17, finding 3: a tenant who dies, and the household still living there. Read from the papers the landlord has, not from who
+// was seen where when it looked.
+test("a tenant whose death is registered: notice on the lease, the tenancy offered to the household member, and no possession sought against the dead", () => {
   const m = landlord.create(ctx({ develop: false, renew: true, min_term_months: 12, max_term_months: 12, arrears_months_before_notice: 2, spend_share_bps: 0, upkeep_share_bps: 0, base_rent: { house: RENT }, landlord_notice_days: 60,
     possession: { tribunal: "tribunal" } }));
+  const base = lease("L1-a", 0, "ann", "s1/home");
   const genesis = [
     { id: "lot-1", at: 0, author: "genesis", record: "statement", kind: "lot", speaks_for: "city", visible_to: "public", text: "Lot 1.", data: { cells: ["c1"] } },
     { id: "own-1", at: 0, author: "genesis", record: "claim", position: "right", holder: ME, about: { kind: "ownership", object: "lot-1" }, visible_to: "public" },
-    lease("L1-a", 0, "ann", "s1/home", { terms: undefined }), ...signed("L1-a", 0, "ann"),
+    { ...base, terms: { ...base.terms, text: "ann rents home s1/home from landlord-1 for 1500.00 a month, to live there with their household: ann, pat." } }, ...signed("L1-a", 0, "ann"),
   ];
-  genesis[2] = { ...lease("L1-a", 0, "ann", "s1/home"), terms: { ...lease("L1-a", 0, "ann", "s1/home").terms, text: "ann rents home s1/home from landlord-1 for 1500.00 a month, to live there with their household: ann, pat." } } as any;
-  const dwelling = (died: boolean) => ({ cell: "c1", structure: { structure: "s1", type: "house", complete: true, spaces: [{ space: "s1/home", kind: "dwelling", capacity: 6, count: died ? 1 : 2, occupants: died ? ["pat"] : ["ann", "pat"], attrs: { bedrooms: 2 },
-    ...(died ? { left: [{ occupant: "ann", reason: "died", at: 30 * DAY }] } : {}) }] } });
+  const death = statement("rec.d1", 5 * WEEK, "death_registration", { speaks_for: "city", addressed_to: [ME], visible_to: [ME, "city"], data: { deceased: "ann", partner: "pat", children: [] } });
+  const cells = [{ cell: "c1", structure: { structure: "s1", type: "house", complete: true, spaces: [{ space: "s1/home", kind: "dwelling", capacity: 6, count: 1, attrs: { bedrooms: 2 } }] } }];
   const said: { t: number; call: string }[] = [];
   const readings = { "L1-a": { of: "agreement", status: "in_force", ends_at: 12 * MONTH } };
   for (let t = 0; t <= 20 * WEEK; t += WEEK) {
-    const died = t >= 5 * WEEK;
     let o = { t, entity: ME, woke_for: "cadence", outcomes: [], readings, channels: {
-      mine: { kind: "records", records: t === 0 ? genesis : [] },
-      sites: { kind: "sites", cells: [dwelling(died)] },
+      mine: { kind: "records", records: t === 0 ? genesis : t === 5 * WEEK ? [death] : [] },
+      sites: { kind: "sites", cells },
       bank: { kind: "accounts", accounts: [{ account: "acc-landlord", holder: ME, custodian: "bank", currency: "AUD", balance: "100000000" }], transactions: [] },
     } } as unknown as Observation;
     for (let i = 0; i < 50; i++) {
@@ -318,6 +318,6 @@ test("a tenant seen to die: notice on the lease, the tenancy offered to the hous
   }
   const after = said.filter((c) => c.t >= 5 * WEEK).map((c) => c.call).join("\n");
   expect(after).toMatch(/agreement\(notice=L1-a/);
-  expect(after).toMatch(/agreement\(.*pat/s); // the tenancy offered to the one still living there
+  expect(after).toMatch(/agreement\(.*pat/s); // the tenancy offered to the one still there
   expect(after).not.toMatch(/tribunal_application|notice_to_vacate/);
 });
