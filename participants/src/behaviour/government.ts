@@ -763,7 +763,7 @@ export const ratesOfficer: BehaviourModule = {
   takes: [{ form: "rates_recovery", title: "Recovery direction to the rates officer",
     fields: { interest: { type: "choice", options: ["yes", "no"], required: true, description: "Whether rates left unpaid after their due date are charged the law's penalty interest: yes, as the office does of its own accord; no, none is added." } },
     follows: "While a direction with interest no stands, the rates officer adds no penalty interest to overdue rates and writes to nobody about them. The rates themselves are still levied and still owed, and interest already recorded stays on record." }],
-  version: "0.4.2", // 0.4.2: a direction on its recovery form reaches its staff's post; 0.4.1: a payment that names the rates notice pays the claim recorded with it; 0.4.0: its clerks report to the rates officer the notices sent under the standing order and when the next go out; 0.3.0: takes a written direction on penalty interest (docs/behaviour/directions.md)
+  version: "0.4.3", // 0.4.3: when the last notices went out, and the interest charged on each claim, are read from the office's own file, so a new holder carries on (bug hunt 2026-10-17); 0.4.2: a direction on its recovery form reaches its staff's post; 0.4.1: a payment that names the rates notice pays the claim recorded with it; 0.4.0: its clerks report to the rates officer the notices sent under the standing order and when the next go out; 0.3.0: takes a written direction on penalty interest (docs/behaviour/directions.md)
   doc: "docs/behaviour/public-finance.md",
   cadence: () => DAY,
   create(ctx: ParticipantContext) {
