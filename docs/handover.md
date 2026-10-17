@@ -204,6 +204,7 @@ Costs and counts are in the reviews. The wave-2 plan is `docs/waves/wave-2/plan.
 
 ## 8. Known weak spots: do not trust these
 
+- **The risk register, `docs/risks.md`,** is the one place gaps and doubtful assumptions live (2026-10-17), with what each could do to an experiment; read its summary before planning one. The lines below are a short list from before it.
 - **Sources marked "(to confirm)"** in profiles and `docs/research/references.md`. Search for the phrase; several
   profiles' tax returns, rents and possession figures are recalled, not opened. Only some profiles have sourced
   possession figures (`justice.md`, "The profiles' figures").
