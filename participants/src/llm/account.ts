@@ -21,7 +21,7 @@ import { callModel, ModelCallFailed, SpendingLimitReached, type LlmIO } from "./
 import type { ContentBlock, LlmAdapter, LlmMessage, MockPolicy } from "./adapter";
 import { COMPOSE_FOLLOW_UP, recordLines, type ComposerConfig } from "./compose";
 
-export const ACCOUNT_VERSION = "0.2.1"; // 0.2.0: people and bodies by the names the world gives them, where it gives one; 0.2.1: also a body founded in the run (dotted id, e.g. ent.32), by the name its founder gave it
+export const ACCOUNT_VERSION = "0.2.2"; // 0.2.2: the sample takes first, round after round, people the seats' acts reached (stratum `acted_on`, given by the caller from the log) before the other strata (SF-11); // 0.2.0: people and bodies by the names the world gives them, where it gives one; 0.2.1: also a body founded in the run (dotted id, e.g. ent.32), by the name its founder gave it
 /** The most one account may be (tokens). */
 export const ACCOUNT_TOKENS = 700;
 /** How many people a run's accounts are of, where the composer's dial does not say; and the most a world may ask. */
@@ -96,10 +96,10 @@ export function darkAccount(record: { [section: string]: any }, zAgency: number)
  * little happened, where the town has them. People are taken in the order of their ids before the draw, so the same
  * run gives the same sample.
  */
-export function sampleAccounts(records: { person: string; record: { [section: string]: any } }[], n: number, rng: Rng): { person: string; strata: string[] }[] {
-  const adults = records.filter((r) => r.record.needs && r.record.circumstances).sort((a, b) => (a.person < b.person ? -1 : 1)).map((r) => ({ person: r.person, strata: strataOf(r.record) }));
+export function sampleAccounts(records: { person: string; record: { [section: string]: any } }[], n: number, rng: Rng, actedOn: ReadonlySet<string> = new Set()): { person: string; strata: string[] }[] {
+  const adults = records.filter((r) => r.record.needs && r.record.circumstances).sort((a, b) => (a.person < b.person ? -1 : 1)).map((r) => ({ person: r.person, strata: [...strataOf(r.record), ...(actedOn.has(r.person) ? ["acted_on"] : [])] }));
   // (After the strata, everyone in none of them: so a sample is filled where the strata are thin.)
-  const pools = [...STRATA.map((s) => adults.filter((a) => a.strata.includes(s))), adults.filter((a) => !a.strata.length)];
+  const pools = [adults.filter((a) => a.strata.includes("acted_on")), ...STRATA.map((s) => adults.filter((a) => a.strata.includes(s))), adults.filter((a) => a.strata.every((x) => x === "acted_on"))];
   const taken = new Set<string>();
   const out: { person: string; strata: string[] }[] = [];
   for (let round = 0; out.length < n && round < n + 1; round++) {

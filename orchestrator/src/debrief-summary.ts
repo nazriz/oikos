@@ -63,6 +63,8 @@ export class SeatRecord {
   left?: { t: number; statement: string };
   /** Papers that were put before it (shown to it, and addressed to it or of a kind that asks something), by others outside its own organisation. */
   reached = new Map<string, { id: string; t: number; kind: string; from: string; text: string; money: number; named: string[] }>();
+  /** A draw per carried act (by command seq), made on the run's own stream: it breaks ties between acts equal in every stated measure, so that the earliest does not always win (MT-13). Unset: the earliest. */
+  tie?: Map<number, number>;
   private current?: Sitting;
   constructor(readonly id: string, /** Every id it may be written to by: its own, its posts', its organisation's. */ readonly known: Set<string>,
     /** The ids that are its alone (itself, its posts): a paper addressed to one of these was put before it, where one addressed to its whole organisation may be any office's. */ readonly direct: Set<string> = new Set([id])) {}
@@ -282,10 +284,23 @@ export function actRank(c: Carried): { rank: number; paper: string } {
 }
 /** A seat's acts by size, those alike taken once, with how many more there were like each: first by the sort of act
  * (the rank above), then by how many people and bodies it names, then by the money it names, then the earliest. */
+/** Give a seat's acts their tie-break draws, in the order of their command seq so that the same run draws the same. */
+export function drawTies(r: SeatRecord, rng: { below(n: number): number }): void {
+  r.tie = new Map([...r.carried].sort((a, b) => a.seq - b.seq).map((c) => [c.seq, rng.below(1 << 30)] as const));
+}
+/** Everyone the seats' acts reached: named in what a seat carried out, or written to by a letter that arrived. */
+export function actedOn(seats: Iterable<SeatRecord>): Set<string> {
+  const out = new Set<string>();
+  for (const r of seats) {
+    for (const c of r.carried) for (const n of c.named) out.add(n);
+    for (const l of r.sent) if (l.delivered) for (const n of l.to) out.add(n);
+  }
+  return out;
+}
 export function bySize(r: SeatRecord): { c: Carried; more: number }[] {
   const out = new Map<string, { c: Carried; more: number }>();
   const key = (c: Carried) => actRank(c).rank;
-  for (const c of [...r.carried].sort((a, b) => key(a) - key(b) || b.named.length - a.named.length || b.money - a.money || a.seq - b.seq)) {
+  for (const c of [...r.carried].sort((a, b) => key(a) - key(b) || b.named.length - a.named.length || b.money - a.money || (r.tie?.get(a.seq) ?? 0) - (r.tie?.get(b.seq) ?? 0) || a.seq - b.seq)) {
     const k = alike(c), x = out.get(k);
     if (x) x.more++; else out.set(k, { c, more: 0 });
   }

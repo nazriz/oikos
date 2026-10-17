@@ -105,7 +105,7 @@ In a town where things go wrong the tribunal also hears, on the same forms: a ho
 | gb-eng-2026 | **may**; not where 2 months' rent or more is owed on the day | Housing Act 1988 s 9, **opened**; ground 8 recalled, to confirm |
 | de-ni-2026 | **none**; paying everything within 60 days of the application ends the claim | BGB s 569(3) no. 2, **opened** |
 | br-mg-2026 | **none**; paying everything within 15 days ends the claim | Lei 8.245/1991 art 62: recalled, to confirm |
-| us-oh-2026 | **none** | Recalled, to confirm; court mediation is not built |
+| us-oh-2026 | **none** | Recalled, to confirm; court mediation is not built (PB-18) |
 | in-tn, jp-akita, ke-nakuru, mx-jal | **may**; 3, 6, 3, 3 months | **Placeholders** |
 
 Where the law has no plan, the member's order form has no plan on it (its choices are dismissed and possession; no instalment field), and says what the law has in its stead.

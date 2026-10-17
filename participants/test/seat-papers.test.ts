@@ -281,3 +281,14 @@ test("a prompt its model would not take is noted, told to the seat, and never se
   for (let k = 1; k < sizes.length; k++) expect(sizes[k]! < sizes[k - 1]! || sizes[k]! <= PROMPT_MIN).toBe(true);
   expect(again.notes.filter((n) => n.prompt_too_long).at(-1).prompt_too_long.limit_now).toBe(PROMPT_MIN);
 });
+
+test("risk SF-2: a long standing part (a lender's book) goes before the seat's own look-ups", () => {
+  const opening = `Your notebook: mine\n\n## Letters\n- From clerk: "Hi."\n\n## The book of loans\n${"L".repeat(60_000)}\n\n## Treasury\n- acc-city: 1`;
+  const messages = [{ role: "user" as const, content: opening }, { role: "assistant" as const, content: [{ type: "tool_use" as const, id: "k1", name: "look", input: {} }] }, { role: "user" as const, content: [{ type: "tool_result" as const, tool_use_id: "k1", content: "mine ".repeat(2_000) }] }] as any;
+  const fit = fitPrompt("system", messages, 40_000, new Set(["k1"]));
+  expect(fit.characters).toBeLessThanOrEqual(40_000);
+  expect(fit.left).toMatchObject({ looks: 0, parts: 1, cut: false });
+  expect(fit.messages[2]!.content[0].content).toBe("mine ".repeat(2_000));
+  expect(fit.messages[0]!.content).toContain("## Treasury");
+  expect(fit.messages[0]!.content).not.toContain("LLLL");
+});

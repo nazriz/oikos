@@ -1,0 +1,586 @@
+{
+  "about": "Gap markers (placeholder, (to confirm), not built, known gap, ...) in the docs and profiles that are covered by a register entry at the level of the file, not the line. A marker with a register id on its line or in its paragraph needs no entry here. 'risks' are the register ids (docs/risks.md) whose entries these markers belong to; 'untagged' is the most untagged markers the file may hold: a new marker in a file raises the count and fails the freshness test (orchestrator/test/risks.test.ts) until it is tagged with an id (best) or the number is raised here with a reason in the review. Lower the number when markers are tagged or removed (bun scripts/risks.ts shows the slack). History files (decisions.md, research/references.md, gaps.md) are exempt; see scripts/risks-lib.ts.",
+  "files": {
+    "CLAUDE.md": {
+      "risks": [
+        "PS-1"
+      ],
+      "untagged": 2
+    },
+    "docs/all-work-takes-time.md": {
+      "risks": [
+        "WM-1",
+        "SF-10"
+      ],
+      "untagged": 2
+    },
+    "docs/behaviour/README.md": {
+      "risks": [
+        "PS-1"
+      ],
+      "untagged": 2
+    },
+    "docs/behaviour/bank-payment-system.md": {
+      "risks": [
+        "PB-8"
+      ],
+      "untagged": 1
+    },
+    "docs/behaviour/boundary.md": {
+      "risks": [
+        "WM-3",
+        "ME-15"
+      ],
+      "untagged": 5
+    },
+    "docs/behaviour/building.md": {
+      "risks": [
+        "PB-11"
+      ],
+      "untagged": 3
+    },
+    "docs/behaviour/citizen.md": {
+      "risks": [
+        "WM-8",
+        "ME-7",
+        "PC-8",
+        "PC-9",
+        "PC-10"
+      ],
+      "untagged": 40
+    },
+    "docs/behaviour/credit.md": {
+      "risks": [
+        "ME-8"
+      ],
+      "untagged": 1
+    },
+    "docs/behaviour/crime.md": {
+      "risks": [
+        "WM-2"
+      ],
+      "untagged": 3
+    },
+    "docs/behaviour/culture.md": {
+      "risks": [
+        "PC-3"
+      ],
+      "untagged": 19
+    },
+    "docs/behaviour/daily-round.md": {
+      "risks": [
+        "WM-1"
+      ],
+      "untagged": 1
+    },
+    "docs/behaviour/decisions.md": {
+      "risks": [
+        "PB-4"
+      ],
+      "untagged": 6
+    },
+    "docs/behaviour/education.md": {
+      "risks": [
+        "PS-3"
+      ],
+      "untagged": 3
+    },
+    "docs/behaviour/elections.md": {
+      "risks": [
+        "PB-10"
+      ],
+      "untagged": 3
+    },
+    "docs/behaviour/entry.md": {
+      "risks": [
+        "ME-1",
+        "ME-13"
+      ],
+      "untagged": 6
+    },
+    "docs/behaviour/environment.md": {
+      "risks": [
+        "WM-2"
+      ],
+      "untagged": 3
+    },
+    "docs/behaviour/firm-ownership.md": {
+      "risks": [
+        "ME-6"
+      ],
+      "untagged": 8
+    },
+    "docs/behaviour/firm-wants.md": {
+      "risks": [
+        "ME-7"
+      ],
+      "untagged": 4
+    },
+    "docs/behaviour/firms.md": {
+      "risks": [
+        "ME-2",
+        "ME-3",
+        "ME-10",
+        "ME-14"
+      ],
+      "untagged": 12
+    },
+    "docs/behaviour/floods.md": {
+      "risks": [
+        "WM-2"
+      ],
+      "untagged": 1
+    },
+    "docs/behaviour/founding.md": {
+      "risks": [
+        "PC-4",
+        "PC-11"
+      ],
+      "untagged": 12
+    },
+    "docs/behaviour/frictions.md": {
+      "risks": [
+        "WM-11",
+        "PB-2"
+      ],
+      "untagged": 13
+    },
+    "docs/behaviour/generator.md": {
+      "risks": [
+        "ME-11",
+        "PS-1"
+      ],
+      "untagged": 5
+    },
+    "docs/behaviour/government.md": {
+      "risks": [
+        "PB-11",
+        "PB-14"
+      ],
+      "untagged": 3
+    },
+    "docs/behaviour/health.md": {
+      "risks": [
+        "WM-2"
+      ],
+      "untagged": 5
+    },
+    "docs/behaviour/households.md": {
+      "risks": [
+        "PC-6",
+        "ME-17"
+      ],
+      "untagged": 14
+    },
+    "docs/behaviour/insolvency.md": {
+      "risks": [
+        "ME-16"
+      ],
+      "untagged": 5
+    },
+    "docs/behaviour/justice.md": {
+      "risks": [
+        "PB-1",
+        "PB-2",
+        "PB-3",
+        "MT-12"
+      ],
+      "untagged": 34
+    },
+    "docs/behaviour/knowing.md": {
+      "risks": [
+        "WM-5"
+      ],
+      "untagged": 6
+    },
+    "docs/behaviour/letters.md": {
+      "risks": [
+        "PB-7"
+      ],
+      "untagged": 1
+    },
+    "docs/behaviour/life.md": {
+      "risks": [
+        "WM-13",
+        "WM-8"
+      ],
+      "untagged": 3
+    },
+    "docs/behaviour/nature.md": {
+      "risks": [
+        "WM-2"
+      ],
+      "untagged": 7
+    },
+    "docs/behaviour/news.md": {
+      "risks": [
+        "PC-7"
+      ],
+      "untagged": 2
+    },
+    "docs/behaviour/ownership.md": {
+      "risks": [
+        "ME-6",
+        "ME-7"
+      ],
+      "untagged": 9
+    },
+    "docs/behaviour/reading.md": {
+      "risks": [
+        "PC-1",
+        "PC-12"
+      ],
+      "untagged": 3
+    },
+    "docs/behaviour/retailer.md": {
+      "risks": [
+        "ME-16",
+        "ME-5"
+      ],
+      "untagged": 2
+    },
+    "docs/behaviour/services.md": {
+      "risks": [
+        "WM-2"
+      ],
+      "untagged": 4
+    },
+    "docs/behaviour/staffing.md": {
+      "risks": [
+        "WM-7",
+        "PB-6"
+      ],
+      "untagged": 7
+    },
+    "docs/behaviour/standing-work.md": {
+      "risks": [
+        "WM-1",
+        "SF-9"
+      ],
+      "untagged": 1
+    },
+    "docs/behaviour/trade.md": {
+      "risks": [
+        "ME-4"
+      ],
+      "untagged": 3
+    },
+    "docs/behaviour/unions.md": {
+      "risks": [
+        "PB-9",
+        "PB-17"
+      ],
+      "untagged": 6
+    },
+    "docs/behaviour/utilities.md": {
+      "risks": [
+        "WM-12"
+      ],
+      "untagged": 7
+    },
+    "docs/behaviour/weather.md": {
+      "risks": [
+        "WM-3",
+        "WM-13"
+      ],
+      "untagged": 4
+    },
+    "docs/calibration.md": {
+      "risks": [
+        "MT-8",
+        "ME-15",
+        "PC-10"
+      ],
+      "untagged": 10
+    },
+    "docs/checkpoints/stage-2.md": {
+      "risks": [
+        "WM-1"
+      ],
+      "untagged": 1
+    },
+    "docs/checkpoints/v0.4-review.md": {
+      "risks": [
+        "PS-1"
+      ],
+      "untagged": 2
+    },
+    "docs/design/ai-citizens.md": {
+      "risks": [
+        "SF-1",
+        "SF-3",
+        "PC-5",
+        "PB-7"
+      ],
+      "untagged": 40
+    },
+    "docs/design/call-language-gaps.md": {
+      "risks": [
+        "SF-1",
+        "PB-7"
+      ],
+      "untagged": 1
+    },
+    "docs/design/contracts-0.7.md": {
+      "risks": [
+        "WM-1"
+      ],
+      "untagged": 2
+    },
+    "docs/design/foundation-for-scale.md": {
+      "risks": [
+        "SC-1"
+      ],
+      "untagged": 1
+    },
+    "docs/design/foundations.md": {
+      "risks": [
+        "WM-4",
+        "WM-1"
+      ],
+      "untagged": 3
+    },
+    "docs/design/gradual-disempowerment.md": {
+      "risks": [
+        "MT-11",
+        "SC-1"
+      ],
+      "untagged": 5
+    },
+    "docs/design/knowing.md": {
+      "risks": [
+        "WM-5"
+      ],
+      "untagged": 1
+    },
+    "docs/design/municipal-economy.md": {
+      "risks": [
+        "ME-11"
+      ],
+      "untagged": 2
+    },
+    "docs/design/names-and-dates.md": {
+      "risks": [
+        "PS-6",
+        "PS-1"
+      ],
+      "untagged": 35
+    },
+    "docs/design/phase-c-stakes.md": {
+      "risks": [
+        "ME-11",
+        "WM-1"
+      ],
+      "untagged": 3
+    },
+    "docs/design/profile-depth.md": {
+      "risks": [
+        "PS-3",
+        "PB-13",
+        "PS-2"
+      ],
+      "untagged": 22
+    },
+    "docs/design/rebuild.md": {
+      "risks": [
+        "WM-1",
+        "MT-8"
+      ],
+      "untagged": 10
+    },
+    "docs/design/translator-v2.md": {
+      "risks": [
+        "TR-3"
+      ],
+      "untagged": 1
+    },
+    "docs/design/v0.4-cast-and-land.md": {
+      "risks": [
+        "ME-13",
+        "WM-1"
+      ],
+      "untagged": 1
+    },
+    "docs/design/world-expansion.md": {
+      "risks": [
+        "PS-1"
+      ],
+      "untagged": 2
+    },
+    "docs/handover.md": {
+      "risks": [
+        "WM-1",
+        "ME-10",
+        "PS-1"
+      ],
+      "untagged": 6
+    },
+    "docs/measurement.md": {
+      "risks": [
+        "MT-1",
+        "PS-2"
+      ],
+      "untagged": 2
+    },
+    "docs/profiles.md": {
+      "risks": [
+        "PS-1",
+        "PS-2",
+        "PS-4"
+      ],
+      "untagged": 40
+    },
+    "docs/real-models.md": {
+      "risks": [
+        "SF-5",
+        "TR-1"
+      ],
+      "untagged": 1
+    },
+    "docs/scenarios.md": {
+      "risks": [
+        "ME-11",
+        "WM-2"
+      ],
+      "untagged": 9
+    },
+    "docs/translator-pipeline.md": {
+      "risks": [
+        "TR-2",
+        "TR-4"
+      ],
+      "untagged": 2
+    },
+    "docs/waves/wave-2/matrix.md": {
+      "risks": [
+        "MT-1",
+        "PS-10"
+      ],
+      "untagged": 2
+    },
+    "docs/waves/wave-2/plan.md": {
+      "risks": [
+        "MT-1"
+      ],
+      "untagged": 1
+    },
+    "worlds/profiles/au-vic-2026.json": {
+      "risks": [
+        "PS-1",
+        "PS-2",
+        "PS-3",
+        "PS-4",
+        "PB-1",
+        "PB-3",
+        "PB-6",
+        "WM-1"
+      ],
+      "untagged": 132
+    },
+    "worlds/profiles/br-mg-2026.json": {
+      "risks": [
+        "PS-1",
+        "PS-2",
+        "PS-3",
+        "PS-4",
+        "PB-1",
+        "PB-3",
+        "PB-6",
+        "WM-1"
+      ],
+      "untagged": 172
+    },
+    "worlds/profiles/de-ni-2026.json": {
+      "risks": [
+        "PS-1",
+        "PS-2",
+        "PS-3",
+        "PS-4",
+        "PB-1",
+        "PB-3",
+        "PB-6",
+        "WM-1"
+      ],
+      "untagged": 158
+    },
+    "worlds/profiles/gb-eng-2026.json": {
+      "risks": [
+        "PS-1",
+        "PS-2",
+        "PS-3",
+        "PS-4",
+        "PB-1",
+        "PB-3",
+        "PB-6",
+        "WM-1"
+      ],
+      "untagged": 156
+    },
+    "worlds/profiles/in-tn-2026.json": {
+      "risks": [
+        "PS-1",
+        "PS-2",
+        "PS-3",
+        "PS-4",
+        "PB-1",
+        "PB-3",
+        "PB-6",
+        "WM-1"
+      ],
+      "untagged": 160
+    },
+    "worlds/profiles/jp-akita-2026.json": {
+      "risks": [
+        "PS-1",
+        "PS-2",
+        "PS-3",
+        "PS-4",
+        "PB-1",
+        "PB-3",
+        "PB-6",
+        "WM-1"
+      ],
+      "untagged": 137
+    },
+    "worlds/profiles/ke-nakuru-2026.json": {
+      "risks": [
+        "PS-1",
+        "PS-2",
+        "PS-3",
+        "PS-4",
+        "PB-1",
+        "PB-3",
+        "PB-6",
+        "WM-1",
+        "PS-5"
+      ],
+      "untagged": 279
+    },
+    "worlds/profiles/mx-jal-2026.json": {
+      "risks": [
+        "PS-1",
+        "PS-2",
+        "PS-3",
+        "PS-4",
+        "PB-1",
+        "PB-3",
+        "PB-6",
+        "WM-1"
+      ],
+      "untagged": 157
+    },
+    "worlds/profiles/us-oh-2026.json": {
+      "risks": [
+        "PS-1",
+        "PS-2",
+        "PS-3",
+        "PS-4",
+        "PB-1",
+        "PB-3",
+        "PB-6",
+        "WM-1"
+      ],
+      "untagged": 134
+    }
+  }
+}
