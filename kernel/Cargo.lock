@@ -906,6 +906,7 @@ name = "oikos-rules"
 version = "0.7.0"
 dependencies = [
  "oikos-core",
+ "oikos-law",
  "serde",
  "serde_json",
 ]

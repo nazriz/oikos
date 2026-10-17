@@ -226,6 +226,8 @@ impl<W: Write> Engine<W> {
                 .map(|s| serde_json::from_value(s.clone()))
                 .transpose()
                 .map_err(|e| format!("orchestration.slip: {e}"))?,
+            // (The config's calendar, where a world has one: lane N writes the section; docs/port-guide.md, step 1b.)
+            calendar: config.get("calendar").map(|c| serde_json::from_value(c.clone())).transpose().map_err(|e| format!("calendar: {e}"))?,
         });
         let mut parts = BTreeMap::new();
         for p in config["participants"].as_array().into_iter().flatten() {

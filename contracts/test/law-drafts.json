@@ -1,0 +1,648 @@
+{
+ "description": "Laws written from their figures by a schedule: the TS draftLaw's answers, which the Rust draft_law gives too (scripts/port-law-cases.ts).",
+ "cases": [
+  {
+   "schedule": "schedule-rent-increases",
+   "data": {
+    "title": "the law on rent increases",
+    "form": "amend_rent_increases",
+    "figures": {
+     "review": {
+      "type": "duration",
+      "unit": "months",
+      "optional": true,
+      "label": "least time between increases",
+      "description": "The least time between one increase of a tenancy's rent and the next."
+     },
+     "notice": {
+      "type": "duration",
+      "unit": "days",
+      "optional": true,
+      "label": "notice of an increase",
+      "description": "The least written notice a tenant must have of an increase."
+     }
+    },
+    "text": "<< ;;A residential rent may be increased no more than once every {review}.;;A residential rent may be increased only on written notice to the tenant of at least {notice}.>> Or else: the increase is invalid.",
+    "adico": {
+     "attribute": "landlords",
+     "deontic": "must_not",
+     "aim": "increase a tenancy's rent",
+     "condition": "<<, or ;;more than once in {review};;on written notice of less than {notice}>>",
+     "or_else": "the increase is invalid"
+    },
+    "formal": "block.block == 'publish' && block.kind == 'rent_increase' && (<< || ;;block.data.from - now < {notice:seconds};;block.data.from - block.data.last_from < {review:seconds}>>)"
+   },
+   "values": {
+    "review": 2592000,
+    "notice": 3888000
+   },
+   "out": {
+    "text": "A residential rent may be increased no more than once every 1 month. A residential rent may be increased only on written notice to the tenant of at least 45 days. Or else: the increase is invalid.",
+    "adico": {
+     "attribute": "landlords",
+     "deontic": "must_not",
+     "aim": "increase a tenancy's rent",
+     "condition": "more than once in 1 month, or on written notice of less than 45 days",
+     "or_else": "the increase is invalid"
+    },
+    "formal": {
+     "language": "cel",
+     "condition": "block.block == 'publish' && block.kind == 'rent_increase' && (block.data.from - now < 3888000 || block.data.from - block.data.last_from < 2592000)"
+    },
+    "data": {
+     "schedule": "schedule-rent-increases",
+     "figures": {
+      "review": {
+       "value": 2592000,
+       "unit": "seconds"
+      },
+      "notice": {
+       "value": 3888000,
+       "unit": "seconds"
+      }
+     }
+    }
+   }
+  },
+  {
+   "schedule": "schedule-rent-increases",
+   "data": {
+    "title": "the law on rent increases",
+    "form": "amend_rent_increases",
+    "figures": {
+     "review": {
+      "type": "duration",
+      "unit": "months",
+      "optional": true,
+      "label": "least time between increases",
+      "description": "The least time between one increase of a tenancy's rent and the next."
+     },
+     "notice": {
+      "type": "duration",
+      "unit": "days",
+      "optional": true,
+      "label": "notice of an increase",
+      "description": "The least written notice a tenant must have of an increase."
+     }
+    },
+    "text": "<< ;;A residential rent may be increased no more than once every {review}.;;A residential rent may be increased only on written notice to the tenant of at least {notice}.>> Or else: the increase is invalid.",
+    "adico": {
+     "attribute": "landlords",
+     "deontic": "must_not",
+     "aim": "increase a tenancy's rent",
+     "condition": "<<, or ;;more than once in {review};;on written notice of less than {notice}>>",
+     "or_else": "the increase is invalid"
+    },
+    "formal": "block.block == 'publish' && block.kind == 'rent_increase' && (<< || ;;block.data.from - now < {notice:seconds};;block.data.from - block.data.last_from < {review:seconds}>>)"
+   },
+   "values": {
+    "notice": 3888000
+   },
+   "out": {
+    "text": "A residential rent may be increased only on written notice to the tenant of at least 45 days. Or else: the increase is invalid.",
+    "adico": {
+     "attribute": "landlords",
+     "deontic": "must_not",
+     "aim": "increase a tenancy's rent",
+     "condition": "on written notice of less than 45 days",
+     "or_else": "the increase is invalid"
+    },
+    "formal": {
+     "language": "cel",
+     "condition": "block.block == 'publish' && block.kind == 'rent_increase' && (block.data.from - now < 3888000)"
+    },
+    "data": {
+     "schedule": "schedule-rent-increases",
+     "figures": {
+      "notice": {
+       "value": 3888000,
+       "unit": "seconds"
+      }
+     }
+    }
+   }
+  },
+  {
+   "schedule": "schedule-rent-increases",
+   "data": {
+    "title": "the law on rent increases",
+    "form": "amend_rent_increases",
+    "figures": {
+     "review": {
+      "type": "duration",
+      "unit": "months",
+      "optional": true,
+      "label": "least time between increases",
+      "description": "The least time between one increase of a tenancy's rent and the next."
+     },
+     "notice": {
+      "type": "duration",
+      "unit": "days",
+      "optional": true,
+      "label": "notice of an increase",
+      "description": "The least written notice a tenant must have of an increase."
+     }
+    },
+    "text": "<< ;;A residential rent may be increased no more than once every {review}.;;A residential rent may be increased only on written notice to the tenant of at least {notice}.>> Or else: the increase is invalid.",
+    "adico": {
+     "attribute": "landlords",
+     "deontic": "must_not",
+     "aim": "increase a tenancy's rent",
+     "condition": "<<, or ;;more than once in {review};;on written notice of less than {notice}>>",
+     "or_else": "the increase is invalid"
+    },
+    "formal": "block.block == 'publish' && block.kind == 'rent_increase' && (<< || ;;block.data.from - now < {notice:seconds};;block.data.from - block.data.last_from < {review:seconds}>>)"
+   },
+   "values": {
+    "review": 2592000
+   },
+   "out": {
+    "text": "A residential rent may be increased no more than once every 1 month. Or else: the increase is invalid.",
+    "adico": {
+     "attribute": "landlords",
+     "deontic": "must_not",
+     "aim": "increase a tenancy's rent",
+     "condition": "more than once in 1 month",
+     "or_else": "the increase is invalid"
+    },
+    "formal": {
+     "language": "cel",
+     "condition": "block.block == 'publish' && block.kind == 'rent_increase' && (block.data.from - block.data.last_from < 2592000)"
+    },
+    "data": {
+     "schedule": "schedule-rent-increases",
+     "figures": {
+      "review": {
+       "value": 2592000,
+       "unit": "seconds"
+      }
+     }
+    }
+   }
+  },
+  {
+   "schedule": "schedule-industrial-action",
+   "data": {
+    "title": "the law on industrial action",
+    "form": "amend_industrial_action",
+    "figures": {
+     "turnout": {
+      "type": "count",
+      "unit": "percent",
+      "held_in": "basis points",
+      "per_unit": 100,
+      "optional": true,
+      "label": "turnout a ballot needs",
+      "description": "The least share of the members concerned who must vote, in percent, as a whole number."
+     },
+     "majority": {
+      "type": "count",
+      "unit": "percent",
+      "held_in": "basis points",
+      "per_unit": 100,
+      "optional": true,
+      "label": "share of the votes that must be exceeded",
+      "description": "The share of the votes cast that the yes votes must exceed, in percent, as a whole number."
+     },
+     "notice": {
+      "type": "duration",
+      "unit": "days",
+      "optional": true,
+      "label": "notice to the employer",
+      "description": "The least written notice the employer must have of the action."
+     }
+    },
+    "text": "Industrial action is protected only where each of these holds. << ;;At least {turnout}% of the members concerned have voted in a ballot on it.;;More than {majority}% of the votes in a ballot of the members concerned are for it.;;The employer has had written notice of it of at least {notice}.>>",
+    "adico": {
+     "attribute": "unions",
+     "deontic": "must_not",
+     "aim": "take industrial action",
+     "condition": "<<, or ;;without at least {turnout}% of the members concerned voting in a ballot on it;;without more than {majority}% of a ballot's votes for it;;without written notice to the employer of at least {notice}>>",
+     "or_else": "the action is unprotected"
+    },
+    "formal": "block.block == 'publish' && block.kind == 'industrial_action' && (<< || ;;block.data.from - now < {notice:seconds};;block.data.voted * 10000 < {turnout:basis_points} * block.data.eligible;;block.data.yes * 10000 <= {majority:basis_points} * block.data.voted>>)"
+   },
+   "values": {
+    "turnout": 500,
+    "majority": 1200,
+    "notice": 5184000
+   },
+   "out": {
+    "text": "Industrial action is protected only where each of these holds. At least 5% of the members concerned have voted in a ballot on it. More than 12% of the votes in a ballot of the members concerned are for it. The employer has had written notice of it of at least 60 days.",
+    "adico": {
+     "attribute": "unions",
+     "deontic": "must_not",
+     "aim": "take industrial action",
+     "condition": "without at least 5% of the members concerned voting in a ballot on it, or without more than 12% of a ballot's votes for it, or without written notice to the employer of at least 60 days",
+     "or_else": "the action is unprotected"
+    },
+    "formal": {
+     "language": "cel",
+     "condition": "block.block == 'publish' && block.kind == 'industrial_action' && (block.data.from - now < 5184000 || block.data.voted * 10000 < 500 * block.data.eligible || block.data.yes * 10000 <= 1200 * block.data.voted)"
+    },
+    "data": {
+     "schedule": "schedule-industrial-action",
+     "figures": {
+      "turnout": {
+       "value": 500,
+       "unit": "basis points"
+      },
+      "majority": {
+       "value": 1200,
+       "unit": "basis points"
+      },
+      "notice": {
+       "value": 5184000,
+       "unit": "seconds"
+      }
+     }
+    }
+   }
+  },
+  {
+   "schedule": "schedule-industrial-action",
+   "data": {
+    "title": "the law on industrial action",
+    "form": "amend_industrial_action",
+    "figures": {
+     "turnout": {
+      "type": "count",
+      "unit": "percent",
+      "held_in": "basis points",
+      "per_unit": 100,
+      "optional": true,
+      "label": "turnout a ballot needs",
+      "description": "The least share of the members concerned who must vote, in percent, as a whole number."
+     },
+     "majority": {
+      "type": "count",
+      "unit": "percent",
+      "held_in": "basis points",
+      "per_unit": 100,
+      "optional": true,
+      "label": "share of the votes that must be exceeded",
+      "description": "The share of the votes cast that the yes votes must exceed, in percent, as a whole number."
+     },
+     "notice": {
+      "type": "duration",
+      "unit": "days",
+      "optional": true,
+      "label": "notice to the employer",
+      "description": "The least written notice the employer must have of the action."
+     }
+    },
+    "text": "Industrial action is protected only where each of these holds. << ;;At least {turnout}% of the members concerned have voted in a ballot on it.;;More than {majority}% of the votes in a ballot of the members concerned are for it.;;The employer has had written notice of it of at least {notice}.>>",
+    "adico": {
+     "attribute": "unions",
+     "deontic": "must_not",
+     "aim": "take industrial action",
+     "condition": "<<, or ;;without at least {turnout}% of the members concerned voting in a ballot on it;;without more than {majority}% of a ballot's votes for it;;without written notice to the employer of at least {notice}>>",
+     "or_else": "the action is unprotected"
+    },
+    "formal": "block.block == 'publish' && block.kind == 'industrial_action' && (<< || ;;block.data.from - now < {notice:seconds};;block.data.voted * 10000 < {turnout:basis_points} * block.data.eligible;;block.data.yes * 10000 <= {majority:basis_points} * block.data.voted>>)"
+   },
+   "values": {
+    "majority": 1200,
+    "notice": 5184000
+   },
+   "out": {
+    "text": "Industrial action is protected only where each of these holds. More than 12% of the votes in a ballot of the members concerned are for it. The employer has had written notice of it of at least 60 days.",
+    "adico": {
+     "attribute": "unions",
+     "deontic": "must_not",
+     "aim": "take industrial action",
+     "condition": "without more than 12% of a ballot's votes for it, or without written notice to the employer of at least 60 days",
+     "or_else": "the action is unprotected"
+    },
+    "formal": {
+     "language": "cel",
+     "condition": "block.block == 'publish' && block.kind == 'industrial_action' && (block.data.from - now < 5184000 || block.data.yes * 10000 <= 1200 * block.data.voted)"
+    },
+    "data": {
+     "schedule": "schedule-industrial-action",
+     "figures": {
+      "majority": {
+       "value": 1200,
+       "unit": "basis points"
+      },
+      "notice": {
+       "value": 5184000,
+       "unit": "seconds"
+      }
+     }
+    }
+   }
+  },
+  {
+   "schedule": "schedule-industrial-action",
+   "data": {
+    "title": "the law on industrial action",
+    "form": "amend_industrial_action",
+    "figures": {
+     "turnout": {
+      "type": "count",
+      "unit": "percent",
+      "held_in": "basis points",
+      "per_unit": 100,
+      "optional": true,
+      "label": "turnout a ballot needs",
+      "description": "The least share of the members concerned who must vote, in percent, as a whole number."
+     },
+     "majority": {
+      "type": "count",
+      "unit": "percent",
+      "held_in": "basis points",
+      "per_unit": 100,
+      "optional": true,
+      "label": "share of the votes that must be exceeded",
+      "description": "The share of the votes cast that the yes votes must exceed, in percent, as a whole number."
+     },
+     "notice": {
+      "type": "duration",
+      "unit": "days",
+      "optional": true,
+      "label": "notice to the employer",
+      "description": "The least written notice the employer must have of the action."
+     }
+    },
+    "text": "Industrial action is protected only where each of these holds. << ;;At least {turnout}% of the members concerned have voted in a ballot on it.;;More than {majority}% of the votes in a ballot of the members concerned are for it.;;The employer has had written notice of it of at least {notice}.>>",
+    "adico": {
+     "attribute": "unions",
+     "deontic": "must_not",
+     "aim": "take industrial action",
+     "condition": "<<, or ;;without at least {turnout}% of the members concerned voting in a ballot on it;;without more than {majority}% of a ballot's votes for it;;without written notice to the employer of at least {notice}>>",
+     "or_else": "the action is unprotected"
+    },
+    "formal": "block.block == 'publish' && block.kind == 'industrial_action' && (<< || ;;block.data.from - now < {notice:seconds};;block.data.voted * 10000 < {turnout:basis_points} * block.data.eligible;;block.data.yes * 10000 <= {majority:basis_points} * block.data.voted>>)"
+   },
+   "values": {
+    "turnout": 500,
+    "notice": 5184000
+   },
+   "out": {
+    "text": "Industrial action is protected only where each of these holds. At least 5% of the members concerned have voted in a ballot on it. The employer has had written notice of it of at least 60 days.",
+    "adico": {
+     "attribute": "unions",
+     "deontic": "must_not",
+     "aim": "take industrial action",
+     "condition": "without at least 5% of the members concerned voting in a ballot on it, or without written notice to the employer of at least 60 days",
+     "or_else": "the action is unprotected"
+    },
+    "formal": {
+     "language": "cel",
+     "condition": "block.block == 'publish' && block.kind == 'industrial_action' && (block.data.from - now < 5184000 || block.data.voted * 10000 < 500 * block.data.eligible)"
+    },
+    "data": {
+     "schedule": "schedule-industrial-action",
+     "figures": {
+      "turnout": {
+       "value": 500,
+       "unit": "basis points"
+      },
+      "notice": {
+       "value": 5184000,
+       "unit": "seconds"
+      }
+     }
+    }
+   }
+  },
+  {
+   "schedule": "schedule-industrial-action",
+   "data": {
+    "title": "the law on industrial action",
+    "form": "amend_industrial_action",
+    "figures": {
+     "turnout": {
+      "type": "count",
+      "unit": "percent",
+      "held_in": "basis points",
+      "per_unit": 100,
+      "optional": true,
+      "label": "turnout a ballot needs",
+      "description": "The least share of the members concerned who must vote, in percent, as a whole number."
+     },
+     "majority": {
+      "type": "count",
+      "unit": "percent",
+      "held_in": "basis points",
+      "per_unit": 100,
+      "optional": true,
+      "label": "share of the votes that must be exceeded",
+      "description": "The share of the votes cast that the yes votes must exceed, in percent, as a whole number."
+     },
+     "notice": {
+      "type": "duration",
+      "unit": "days",
+      "optional": true,
+      "label": "notice to the employer",
+      "description": "The least written notice the employer must have of the action."
+     }
+    },
+    "text": "Industrial action is protected only where each of these holds. << ;;At least {turnout}% of the members concerned have voted in a ballot on it.;;More than {majority}% of the votes in a ballot of the members concerned are for it.;;The employer has had written notice of it of at least {notice}.>>",
+    "adico": {
+     "attribute": "unions",
+     "deontic": "must_not",
+     "aim": "take industrial action",
+     "condition": "<<, or ;;without at least {turnout}% of the members concerned voting in a ballot on it;;without more than {majority}% of a ballot's votes for it;;without written notice to the employer of at least {notice}>>",
+     "or_else": "the action is unprotected"
+    },
+    "formal": "block.block == 'publish' && block.kind == 'industrial_action' && (<< || ;;block.data.from - now < {notice:seconds};;block.data.voted * 10000 < {turnout:basis_points} * block.data.eligible;;block.data.yes * 10000 <= {majority:basis_points} * block.data.voted>>)"
+   },
+   "values": {
+    "turnout": 500,
+    "majority": 1200
+   },
+   "out": {
+    "text": "Industrial action is protected only where each of these holds. At least 5% of the members concerned have voted in a ballot on it. More than 12% of the votes in a ballot of the members concerned are for it.",
+    "adico": {
+     "attribute": "unions",
+     "deontic": "must_not",
+     "aim": "take industrial action",
+     "condition": "without at least 5% of the members concerned voting in a ballot on it, or without more than 12% of a ballot's votes for it",
+     "or_else": "the action is unprotected"
+    },
+    "formal": {
+     "language": "cel",
+     "condition": "block.block == 'publish' && block.kind == 'industrial_action' && (block.data.voted * 10000 < 500 * block.data.eligible || block.data.yes * 10000 <= 1200 * block.data.voted)"
+    },
+    "data": {
+     "schedule": "schedule-industrial-action",
+     "figures": {
+      "turnout": {
+       "value": 500,
+       "unit": "basis points"
+      },
+      "majority": {
+       "value": 1200,
+       "unit": "basis points"
+      }
+     }
+    }
+   }
+  },
+  {
+   "schedule": "schedule-tenancy",
+   "data": {
+    "title": "the law on ending a tenancy",
+    "form": "amend_tenancy",
+    "figures": {
+     "notice": {
+      "type": "duration",
+      "unit": "days",
+      "optional": true,
+      "label": "a landlord's notice to end a tenancy",
+      "description": "The least written notice a landlord must give to end a tenancy."
+     },
+     "tenant_notice": {
+      "type": "duration",
+      "unit": "days",
+      "optional": true,
+      "label": "a tenant's notice to leave",
+      "description": "The notice a tenant may leave on."
+     }
+    },
+    "text": "<< ;;A landlord may end a tenancy only by giving written notice of at least {notice}, and may not remove a tenant before the notice has run out. Or else: the removal is unlawful and the tenant may return.;;A tenant may leave on notice of {tenant_notice}.>>",
+    "adico": {
+     "attribute": "landlords",
+     "deontic": "must_not",
+     "aim": "remove a tenant",
+     "condition": "<<;;before written notice of at least {notice} has run out>>",
+     "or_else": "the removal is unlawful; the tenant may return"
+    }
+   },
+   "values": {
+    "notice": 2592000,
+    "tenant_notice": 3888000
+   },
+   "out": {
+    "text": "A landlord may end a tenancy only by giving written notice of at least 30 days, and may not remove a tenant before the notice has run out. Or else: the removal is unlawful and the tenant may return. A tenant may leave on notice of 45 days.",
+    "adico": {
+     "attribute": "landlords",
+     "deontic": "must_not",
+     "aim": "remove a tenant",
+     "condition": "before written notice of at least 30 days has run out",
+     "or_else": "the removal is unlawful; the tenant may return"
+    },
+    "data": {
+     "schedule": "schedule-tenancy",
+     "figures": {
+      "notice": {
+       "value": 2592000,
+       "unit": "seconds"
+      },
+      "tenant_notice": {
+       "value": 3888000,
+       "unit": "seconds"
+      }
+     }
+    }
+   }
+  },
+  {
+   "schedule": "schedule-tenancy",
+   "data": {
+    "title": "the law on ending a tenancy",
+    "form": "amend_tenancy",
+    "figures": {
+     "notice": {
+      "type": "duration",
+      "unit": "days",
+      "optional": true,
+      "label": "a landlord's notice to end a tenancy",
+      "description": "The least written notice a landlord must give to end a tenancy."
+     },
+     "tenant_notice": {
+      "type": "duration",
+      "unit": "days",
+      "optional": true,
+      "label": "a tenant's notice to leave",
+      "description": "The notice a tenant may leave on."
+     }
+    },
+    "text": "<< ;;A landlord may end a tenancy only by giving written notice of at least {notice}, and may not remove a tenant before the notice has run out. Or else: the removal is unlawful and the tenant may return.;;A tenant may leave on notice of {tenant_notice}.>>",
+    "adico": {
+     "attribute": "landlords",
+     "deontic": "must_not",
+     "aim": "remove a tenant",
+     "condition": "<<;;before written notice of at least {notice} has run out>>",
+     "or_else": "the removal is unlawful; the tenant may return"
+    }
+   },
+   "values": {
+    "tenant_notice": 3888000
+   },
+   "out": {
+    "text": "A tenant may leave on notice of 45 days.",
+    "adico": {
+     "attribute": "landlords",
+     "deontic": "must_not",
+     "aim": "remove a tenant",
+     "or_else": "the removal is unlawful; the tenant may return"
+    },
+    "data": {
+     "schedule": "schedule-tenancy",
+     "figures": {
+      "tenant_notice": {
+       "value": 3888000,
+       "unit": "seconds"
+      }
+     }
+    }
+   }
+  },
+  {
+   "schedule": "schedule-tenancy",
+   "data": {
+    "title": "the law on ending a tenancy",
+    "form": "amend_tenancy",
+    "figures": {
+     "notice": {
+      "type": "duration",
+      "unit": "days",
+      "optional": true,
+      "label": "a landlord's notice to end a tenancy",
+      "description": "The least written notice a landlord must give to end a tenancy."
+     },
+     "tenant_notice": {
+      "type": "duration",
+      "unit": "days",
+      "optional": true,
+      "label": "a tenant's notice to leave",
+      "description": "The notice a tenant may leave on."
+     }
+    },
+    "text": "<< ;;A landlord may end a tenancy only by giving written notice of at least {notice}, and may not remove a tenant before the notice has run out. Or else: the removal is unlawful and the tenant may return.;;A tenant may leave on notice of {tenant_notice}.>>",
+    "adico": {
+     "attribute": "landlords",
+     "deontic": "must_not",
+     "aim": "remove a tenant",
+     "condition": "<<;;before written notice of at least {notice} has run out>>",
+     "or_else": "the removal is unlawful; the tenant may return"
+    }
+   },
+   "values": {
+    "notice": 2592000
+   },
+   "out": {
+    "text": "A landlord may end a tenancy only by giving written notice of at least 30 days, and may not remove a tenant before the notice has run out. Or else: the removal is unlawful and the tenant may return.",
+    "adico": {
+     "attribute": "landlords",
+     "deontic": "must_not",
+     "aim": "remove a tenant",
+     "condition": "before written notice of at least 30 days has run out",
+     "or_else": "the removal is unlawful; the tenant may return"
+    },
+    "data": {
+     "schedule": "schedule-tenancy",
+     "figures": {
+      "notice": {
+       "value": 2592000,
+       "unit": "seconds"
+      }
+     }
+    }
+   }
+  }
+ ]
+}

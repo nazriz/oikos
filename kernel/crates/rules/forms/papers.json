@@ -1,0 +1,4541 @@
+{
+ "CLAIM_EVIDENCE": {
+  "form": "evidence",
+  "title": "Papers for a claim that is waiting for them",
+  "does": "Answers an office's request for papers for your claim: what you send, and who your last employer was where it asks. Goes to the office by the day its request gives.",
+  "fields": {
+   "office": {
+    "type": "entity",
+    "required": true,
+    "description": "The office that asked."
+   },
+   "claim": {
+    "type": "record",
+    "required": true,
+    "description": "Your claim, as the request names it."
+   },
+   "need": {
+    "type": "text",
+    "required": true,
+    "description": "What it asks for, as it names it."
+   },
+   "request": {
+    "type": "record",
+    "required": true,
+    "description": "The request this answers."
+   },
+   "what": {
+    "type": "text",
+    "required": true,
+    "description": "What you send, in words."
+   },
+   "last_employer": {
+    "type": "entity",
+    "description": "Your last employer, where it asks."
+   }
+  },
+  "writes": {
+   "kind": "evidence",
+   "text": "For my claim {claim}: {what}",
+   "basis": "=request",
+   "to": [
+    "=office"
+   ],
+   "visible": [
+    "=self",
+    "=office"
+   ],
+   "data": {
+    "claim": "=claim",
+    "need": "=need",
+    "request": "=request",
+    "last_employer": "=last_employer"
+   }
+  }
+ },
+ "CONFIRMATION_ANSWER": {
+  "form": "confirmation_answer",
+  "title": "An employer's answer to an office that asks it to confirm a worker's employment",
+  "does": "Answers an office's request to confirm what your books show of a person who worked for you, by the day it gives. Say only what your own books show.",
+  "fields": {
+   "office": {
+    "type": "entity",
+    "required": true,
+    "description": "The office that asked."
+   },
+   "claim": {
+    "type": "record",
+    "required": true,
+    "description": "The claim it is about."
+   },
+   "need": {
+    "type": "text",
+    "required": true,
+    "description": "What it asks to be confirmed, as it names it."
+   },
+   "request": {
+    "type": "record",
+    "required": true,
+    "description": "The request this answers."
+   },
+   "subject": {
+    "type": "entity",
+    "required": true,
+    "description": "The person it asks about."
+   },
+   "what": {
+    "type": "text",
+    "required": true,
+    "description": "What your books show, in words."
+   },
+   "employed": {
+    "type": "choice",
+    "options": [
+     "yes",
+     "no"
+    ],
+    "description": "Yes: in your employment now."
+   },
+   "known": {
+    "type": "choice",
+    "options": [
+     "yes",
+     "no"
+    ],
+    "description": "Yes: your books have them, now or before."
+   },
+   "ended_on": {
+    "type": "date",
+    "description": "Where it ended: the day."
+   }
+  },
+  "writes": {
+   "kind": "confirmation_answer",
+   "text": "Answer to your request {request}: {what}",
+   "basis": "=request",
+   "to": [
+    "=office"
+   ],
+   "visible": [
+    "=self",
+    "=office"
+   ],
+   "data": {
+    "claim": "=claim",
+    "need": "=need",
+    "request": "=request",
+    "subject": "=subject",
+    "employed": "?employed",
+    "known": "?known",
+    "ended_on": "=ended_on"
+   }
+  }
+ },
+ "COUNCIL_CLERK": [
+  {
+   "form": "council_ballot",
+   "title": "A ballot of the council on a proposal",
+   "does": "Puts a proposal to the vote of the councillors, each in their own post, for as long as it says. The latest vote of each post cast while it is open is the one that counts.",
+   "fields": {
+    "proposal": {
+     "type": "record",
+     "required": true,
+     "description": "The proposal put to the vote."
+    },
+    "open_for": {
+     "type": "duration",
+     "required": true,
+     "description": "How long the ballot stays open."
+    },
+    "tags": {
+     "type": "list",
+     "description": "What the proposal is about, a word each (budget, tenant_protection, development)."
+    }
+   },
+   "writes": {
+    "kind": "ballot",
+    "text": "Ballot of the council on {proposal}, open for {open_for}.",
+    "basis": "=proposal",
+    "data": {
+     "proposal": "=proposal",
+     "options": [
+      "yes",
+      "no"
+     ],
+     "closes_at": "+open_for",
+     "electorate": "council",
+     "tags": "=tags"
+    }
+   }
+  },
+  {
+   "form": "council_result",
+   "title": "The result of a ballot of the council",
+   "does": "Declares how a ballot went, from the count of every vote on file, naming who voted which way. Declaring a result does not by itself change a law: a passed proposal made on a law's amendment form is written into that law by the office's drafters, under its standing work order for enact; a law proposed in words, or a budget, the clerk publishes.",
+   "fields": {
+    "ballot": {
+     "type": "record",
+     "required": true,
+     "description": "The ballot counted."
+    },
+    "yes": {
+     "type": "count",
+     "required": true,
+     "description": "Votes for."
+    },
+    "no": {
+     "type": "count",
+     "required": true,
+     "description": "Votes against."
+    },
+    "passed": {
+     "type": "choice",
+     "required": true,
+     "options": [
+      "yes",
+      "no"
+     ],
+     "description": "Whether it passed."
+    },
+    "voted_for": {
+     "type": "list",
+     "description": "The councillors' posts that voted for (a council's votes are public record)."
+    },
+    "voted_against": {
+     "type": "list",
+     "description": "The councillors' posts that voted against."
+    }
+   },
+   "writes": {
+    "kind": "ballot_result",
+    "text": "Result of {ballot}: {yes} for, {no} against.",
+    "basis": "=ballot",
+    "data": {
+     "ballot": "=ballot",
+     "yes": "=yes",
+     "no": "=no",
+     "passed": "?passed",
+     "voted_for": "=voted_for",
+     "voted_against": "=voted_against"
+    }
+   }
+  },
+  {
+   "form": "adopted_budget",
+   "title": "The budget as the council adopted it",
+   "fields": {
+    "year": {
+     "type": "count",
+     "required": true,
+     "description": "The year the budget is for."
+    },
+    "ballot": {
+     "type": "record",
+     "required": true,
+     "description": "The ballot that adopted it."
+    }
+   },
+   "writes": {
+    "kind": "budget",
+    "text": "The town's budget for year {year}.",
+    "basis": "=ballot",
+    "data": {
+     "year": "=year",
+     "lines": {}
+    }
+   }
+  }
+ ],
+ "DESK": [
+  {
+   "form": "complaint_notice",
+   "title": "Notice of an application to the one it is against",
+   "does": "Tells the one an application is against what is said of them, and by when they may answer. It decides nothing.",
+   "fields": {
+    "application": {
+     "type": "record",
+     "required": true,
+     "description": "The application."
+    },
+    "matter": {
+     "type": "text",
+     "required": true,
+     "description": "What it is about, in the word the application uses."
+    },
+    "applicant": {
+     "type": "entity",
+     "required": true,
+     "description": "Who applied."
+    },
+    "against": {
+     "type": "entity",
+     "required": true,
+     "description": "Whom it is against."
+    },
+    "answer_by": {
+     "type": "date",
+     "required": true,
+     "description": "The day they may answer by."
+    },
+    "about": {
+     "type": "record",
+     "description": "The paper the application is about, where it names one."
+    },
+    "amount": {
+     "type": "amount",
+     "description": "The sum the application seeks, where it gives one."
+    },
+    "structure": {
+     "type": "structure",
+     "description": "The building, where the application names one."
+    },
+    "seeks": {
+     "type": "text",
+     "description": "What the application seeks, where it says."
+    }
+   },
+   "writes": {
+    "kind": "complaint_notice",
+    "text": "{applicant} has applied to us about {matter} (application {application}). You may answer by {answer_by}.",
+    "basis": "=application",
+    "to": [
+     "=applicant",
+     "=against"
+    ],
+    "visible": [
+     "=applicant",
+     "=against",
+     "=self"
+    ],
+    "data": {
+     "application": "=application",
+     "kind": "=matter",
+     "matter": "=matter",
+     "applicant": "=applicant",
+     "against": "=against",
+     "answer_by": "=answer_by",
+     "hearing_at": "=answer_by",
+     "about": "=about",
+     "amount": "#amount",
+     "structure": "=structure",
+     "seeks": "=seeks"
+    }
+   }
+  },
+  {
+   "form": "venue_decision",
+   "title": "Decision on an application",
+   "does": "Says what is decided on an application, to both sides. It moves no money and does nothing by itself: an order or a recommendation is words, which the other side follows or does not.",
+   "fields": {
+    "application": {
+     "type": "record",
+     "required": true,
+     "description": "The application decided."
+    },
+    "matter": {
+     "type": "text",
+     "required": true,
+     "description": "What it was about, in the word the application uses."
+    },
+    "applicant": {
+     "type": "entity",
+     "required": true,
+     "description": "Who applied."
+    },
+    "against": {
+     "type": "entity",
+     "description": "Whom it was against."
+    },
+    "finding": {
+     "type": "choice",
+     "required": true,
+     "options": [
+      "pay",
+      "do",
+      "set_aside",
+      "settled",
+      "dismissed",
+      "rejected",
+      "referred"
+     ],
+     "description": "What is decided: pay (money to the applicant), do (put it right), set_aside (a paper), settled (the two agreed), dismissed, rejected (not something heard here), referred (passed to whoever must act)."
+    },
+    "binding": {
+     "type": "choice",
+     "required": true,
+     "options": [
+      "yes",
+      "no"
+     ],
+     "description": "Whether it is an order (yes) or a recommendation (no)."
+    },
+    "amount": {
+     "type": "amount",
+     "description": "For pay: how much."
+    },
+    "pay_into": {
+     "type": "account",
+     "description": "For pay: the account it is paid into."
+    },
+    "due": {
+     "type": "date",
+     "description": "For pay or do: the day it is due by."
+    },
+    "about": {
+     "type": "record",
+     "description": "The paper the application is about, where it names one."
+    },
+    "structure": {
+     "type": "structure",
+     "description": "The building, where the application names one."
+    },
+    "seeks": {
+     "type": "text",
+     "description": "What the application sought, where it said."
+    },
+    "waited_days": {
+     "type": "count",
+     "description": "Days from the application to this decision, for the office's own figures."
+    },
+    "reason": {
+     "type": "text",
+     "description": "The reasons for the decision, in words."
+    }
+   },
+   "writes": {
+    "kind": "venue_decision",
+    "text": "Decision on {application}: {finding}.",
+    "basis": "=application",
+    "to": [
+     "=applicant",
+     "=against"
+    ],
+    "visible": [
+     "=applicant",
+     "=against",
+     "=self"
+    ],
+    "data": {
+     "application": "=application",
+     "kind": "=matter",
+     "matter": "=matter",
+     "applicant": "=applicant",
+     "against": "=against",
+     "finding": "=finding",
+     "binding": "?binding",
+     "waited_days": "=waited_days",
+     "about": "=about",
+     "structure": "=structure",
+     "seeks": "=seeks",
+     "amount": "#amount",
+     "to": "=pay_into",
+     "due": "=due",
+     "reason": "=reason"
+    }
+   }
+  }
+ ],
+ "EDITOR": [
+  {
+   "form": "news_item",
+   "title": "An item in the paper",
+   "fields": {
+    "headline": {
+     "type": "text",
+     "required": true,
+     "description": "What the item says."
+    },
+    "source": {
+     "type": "record",
+     "required": true,
+     "description": "The record it reports."
+    },
+    "kind": {
+     "type": "text",
+     "required": true,
+     "description": "What kind of record that is."
+    },
+    "tone": {
+     "type": "choice",
+     "required": true,
+     "options": [
+      "-1",
+      "0",
+      "1"
+     ],
+     "description": "How it reads for the town's government: -1 against, 0 neither, 1 for."
+    },
+    "about_office": {
+     "type": "choice",
+     "required": true,
+     "options": [
+      "yes",
+      "no"
+     ],
+     "description": "Whether it is about an office up for election."
+    },
+    "edition": {
+     "type": "count",
+     "required": true,
+     "description": "The edition it is in."
+    }
+   },
+   "writes": {
+    "kind": "news",
+    "text": "{headline}",
+    "basis": "=source",
+    "visible": "public",
+    "assertion": {
+     "that": "=headline",
+     "about": [
+      "@town"
+     ]
+    },
+    "data": {
+     "kind": "=kind",
+     "tone": "#tone",
+     "about_office": "?about_office",
+     "edition": "=edition"
+    }
+   }
+  }
+ ],
+ "ELECTORAL": [
+  {
+   "form": "election_notice",
+   "title": "Notice of an election",
+   "fields": {
+    "office": {
+     "type": "entity",
+     "required": true,
+     "description": "The office to be filled (the post, by its id)."
+    },
+    "poll_at": {
+     "type": "date",
+     "required": true,
+     "description": "Polling day."
+    },
+    "nominations_close_at": {
+     "type": "date",
+     "required": true,
+     "description": "When nominations close."
+    },
+    "method": {
+     "type": "choice",
+     "required": true,
+     "options": [
+      "preferential",
+      "plurality"
+     ],
+     "description": "How the votes are counted."
+    }
+   },
+   "writes": {
+    "kind": "election_notice",
+    "text": "Election for {office}: nominations close {nominations_close_at}; polling {poll_at}.",
+    "visible": "public",
+    "data": {
+     "office": "=office",
+     "poll_at": "=poll_at",
+     "nominations_close_at": "=nominations_close_at",
+     "method": "=method"
+    }
+   }
+  }
+ ],
+ "ENVIRONMENT": [
+  {
+   "form": "habitat_register",
+   "title": "Register of the lots where a listed species was found",
+   "does": "Publishes the lots where a survey found a listed species: the planning office refuses permits on them.",
+   "fields": {
+    "round": {
+     "type": "count",
+     "required": true,
+     "description": "The survey round it is from."
+    },
+    "lots": {
+     "type": "list",
+     "required": true,
+     "description": "The lots."
+    }
+   },
+   "writes": {
+    "sends": [
+     {
+      "to": [
+       "@planning"
+      ],
+      "why": "The planning office decides permits, and refuses them on the lots the register lists."
+     }
+    ],
+    "kind": "habitat_register",
+    "text": "Habitat register, round {round}: {lots}.",
+    "to": [
+     "@planning"
+    ],
+    "visible": "public",
+    "data": {
+     "round": "=round",
+     "lots": "=lots"
+    }
+   }
+  }
+ ],
+ "FINANCE": [
+  {
+   "form": "withholding_return",
+   "title": "Return of tax withheld from wages, to a collector",
+   "does": "Reports to a collector what has been withheld from the wages paid in a period and what is paid over with it. It moves no money: what is paid over is paid besides, by a payment to each collector's account. The office's books count what is withheld and not yet paid over from the day of the last return. The law on tax from pay lists its returns and the day each falls due by; one return reports the charges the law names for it, and the books say which return falls due next.",
+   "fields": {
+    "collector": {
+     "type": "entity",
+     "required": true,
+     "description": "The collector reported to."
+    },
+    "account": {
+     "type": "account",
+     "required": true,
+     "description": "The account the wages were paid from."
+    },
+    "period_end": {
+     "type": "date",
+     "required": true,
+     "description": "The day the period ended."
+    },
+    "withheld": {
+     "type": "amount",
+     "required": true,
+     "description": "What was withheld in the period, in all."
+    },
+    "paid": {
+     "type": "amount",
+     "required": true,
+     "description": "What is paid over now, in all."
+    },
+    "law": {
+     "type": "record",
+     "description": "The law it is withheld under: the tax law that lists the return (it names the charges each return reports; report them in that return, not in another)."
+    }
+   },
+   "writes": {
+    "kind": "withholding_report",
+    "text": "Withheld from wages, owed: {withheld}; paid now: {paid}.",
+    "basis": "=law",
+    "to": [
+     "=collector"
+    ],
+    "visible": [
+     "=self",
+     "=collector"
+    ],
+    "data": {
+     "account": "=account",
+     "paid": "#paid",
+     "period_end": "=period_end",
+     "withheld": "#withheld"
+    }
+   }
+  }
+ ],
+ "INSPECTOR": [
+  {
+   "form": "valuation_request",
+   "title": "Request to the valuer for a supplementary valuation",
+   "does": "Asks the valuer to value a lot again after building work, so that its rates follow what now stands on it.",
+   "fields": {
+    "notice": {
+     "type": "record",
+     "required": true,
+     "description": "The notice of building work it follows from."
+    },
+    "lot": {
+     "type": "lot",
+     "description": "The lot."
+    },
+    "structure": {
+     "type": "structure",
+     "description": "What was built."
+    },
+    "structure_type": {
+     "type": "structure_type",
+     "description": "The kind of building."
+    },
+    "removed": {
+     "type": "structure",
+     "description": "What was demolished."
+    }
+   },
+   "writes": {
+    "sends": [
+     {
+      "to": [
+       "@valuer"
+      ],
+      "why": "The valuer values the town's lots: the request is the valuer's to act on."
+     }
+    ],
+    "kind": "valuation_request",
+    "text": "Supplementary valuation asked for, on notice {notice}.",
+    "basis": "=notice",
+    "to": [
+     "@valuer"
+    ],
+    "data": {
+     "lot": "=lot",
+     "structure": "=structure",
+     "structure_type": "=structure_type",
+     "removed": "=removed"
+    }
+   }
+  },
+  {
+   "form": "demolition_order",
+   "title": "Order to demolish a building",
+   "does": "Orders an owner to take down a building put up in breach of a law.",
+   "fields": {
+    "owner": {
+     "type": "entity",
+     "required": true,
+     "description": "The owner ordered to demolish it."
+    },
+    "structure": {
+     "type": "structure",
+     "required": true,
+     "description": "The building."
+    },
+    "law": {
+     "type": "record",
+     "required": true,
+     "description": "The law it was built in breach of."
+    },
+    "lot": {
+     "type": "lot",
+     "description": "The lot it stands on."
+    }
+   },
+   "writes": {
+    "kind": "demolition_order",
+    "text": "Order: demolish {structure}, built in breach of {law}.",
+    "basis": "=law",
+    "to": [
+     "=owner"
+    ],
+    "data": {
+     "structure": "=structure",
+     "lot": "=lot",
+     "law": "=law"
+    }
+   }
+  }
+ ],
+ "JOB_ADVERTISEMENT": {
+  "form": "job_advertisement",
+  "title": "Job advertisement",
+  "does": "How the office takes on staff of its own: it puts the posts on the jobs board at the wage given, for people to apply, and the office then offers employment to those it takes on. It commits no money until someone is taken on.",
+  "fields": {
+   "wage": {
+    "type": "amount",
+    "required": true,
+    "description": "The wage for each pay period."
+   },
+   "period": {
+    "type": "duration",
+    "required": true,
+    "description": "The pay period: how often the wage is paid."
+   },
+   "posts": {
+    "type": "count",
+    "required": true,
+    "description": "How many posts this advertisement is for."
+   },
+   "account": {
+    "type": "account",
+    "description": "The account the wages are paid from, where the office itself pays them."
+   }
+  },
+  "writes": {
+   "kind": "job_posting",
+   "text": "Hiring: {wage} every {period}.",
+   "data": {
+    "wage": "#wage",
+    "period": "=period",
+    "role": "@role",
+    "industry": "@industry",
+    "workplace": "@workplace_structure",
+    "space": "@workplace"
+   },
+   "offer": {
+    "by": "=self",
+    "to": {
+     "min_age_years": 18
+    },
+    "take_up": "apply",
+    "available": "=posts",
+    "terms": {
+     "template": "employment",
+     "commitments": [
+      {
+       "who": "=self",
+       "does": {
+        "outcome": {
+         "money": {
+          "from": "=account",
+          "amount": "=wage",
+          "for": "wages"
+         }
+        }
+       },
+       "every": "=period"
+      },
+      "@occupancy"
+     ],
+     "termination": "@termination"
+    }
+   }
+  }
+ },
+ "LANDLORD": [
+  {
+   "form": "rental_listing",
+   "title": "A home advertised to let",
+   "fields": {
+    "structure": {
+     "type": "structure",
+     "required": true,
+     "description": "The building."
+    },
+    "space": {
+     "type": "space",
+     "required": true,
+     "description": "The home in it."
+    },
+    "type": {
+     "type": "structure_type",
+     "required": true,
+     "description": "The kind of building."
+    },
+    "rent": {
+     "type": "amount",
+     "required": true,
+     "description": "The rent a month."
+    },
+    "account": {
+     "type": "account",
+     "required": true,
+     "description": "The account the rent is paid into."
+    },
+    "bedrooms": {
+     "type": "count",
+     "description": "How many bedrooms."
+    },
+    "then": {
+     "type": "choice",
+     "options": [
+      "periodic"
+     ],
+     "description": "What follows the lease's term: periodic, if it continues until ended by notice."
+    }
+   },
+   "writes": {
+    "kind": "rental_listing",
+    "text": "To let: {space}, {rent} a month.",
+    "data": {
+     "structure": "=structure",
+     "space": "=space",
+     "type": "=type",
+     "bedrooms": "=bedrooms",
+     "rent": "#rent"
+    },
+    "offer": {
+     "by": "=self",
+     "take_up": "apply",
+     "available": 1,
+     "terms": {
+      "template": "lease",
+      "then": "=then",
+      "commitments": [
+       {
+        "who": "=self",
+        "does": {
+         "outcome": {
+          "occupancy": {
+           "in": "=space"
+          }
+         }
+        }
+       },
+       {
+        "who": "taker",
+        "does": {
+         "outcome": {
+          "money": {
+           "to": "=account",
+           "amount": "=rent",
+           "for": "rent"
+          }
+         }
+        },
+        "every": 2592000
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "form": "rent_increase",
+   "title": "Notice of a rent increase",
+   "fields": {
+    "lease": {
+     "type": "record",
+     "required": true,
+     "description": "The lease."
+    },
+    "tenant": {
+     "type": "entity",
+     "required": true,
+     "description": "The tenant."
+    },
+    "rent": {
+     "type": "amount",
+     "required": true,
+     "description": "The new rent a month."
+    },
+    "was": {
+     "type": "amount",
+     "required": true,
+     "description": "The rent now."
+    },
+    "from": {
+     "type": "date",
+     "required": true,
+     "description": "The day the new rent starts."
+    },
+    "last_from": {
+     "type": "date",
+     "required": true,
+     "description": "The day the rent now paid started."
+    }
+   },
+   "writes": {
+    "kind": "rent_increase",
+    "text": "Notice of rent increase: {rent} a month from {from} (now {was}).",
+    "basis": "=lease",
+    "to": [
+     "=tenant"
+    ],
+    "visible": [
+     "=self",
+     "=tenant"
+    ],
+    "data": {
+     "lease": "=lease",
+     "rent": "#rent",
+     "from": "=from",
+     "was": "#was",
+     "last_from": "=last_from"
+    }
+   }
+  },
+  {
+   "form": "tax_report",
+   "title": "Return of rent received, to the town",
+   "fields": {
+    "rent_received": {
+     "type": "amount",
+     "required": true,
+     "description": "The rent received in the period."
+    },
+    "account": {
+     "type": "account",
+     "required": true,
+     "description": "The account it was received into."
+    },
+    "period_end": {
+     "type": "date",
+     "required": true,
+     "description": "The day the period ended."
+    }
+   },
+   "writes": {
+    "sends": [
+     {
+      "to": [
+       "@city"
+      ],
+      "why": "The return is made to the town, which the rent is reported to."
+     }
+    ],
+    "kind": "tax_report",
+    "text": "Rent received this month: {rent_received}.",
+    "to": [
+     "@city"
+    ],
+    "data": {
+     "period_end": "=period_end",
+     "rent_received": "#rent_received",
+     "account": "=account"
+    }
+   }
+  },
+  {
+   "form": "death_notification",
+   "title": "Notification of a death, to the registrar",
+   "fields": {
+    "deceased": {
+     "type": "entity",
+     "required": true,
+     "description": "Who has died."
+    }
+   },
+   "writes": {
+    "sends": [
+     {
+      "to": [
+       "@city"
+      ],
+      "why": "The town's registrar registers deaths, on a notification."
+     }
+    ],
+    "kind": "death_notification",
+    "text": "Notification of a death: {deceased}.",
+    "to": [
+     "@city"
+    ],
+    "data": {
+     "deceased": "=deceased"
+    }
+   }
+  },
+  {
+   "form": "rent_reminder",
+   "title": "Request to a tenant for rent owed",
+   "does": "Asks a tenant in writing for rent that is owed, with the sum and the account. It ends nothing and moves no money.",
+   "fields": {
+    "tenant": {
+     "type": "entity",
+     "required": true,
+     "description": "The tenant."
+    },
+    "lease": {
+     "type": "record",
+     "required": true,
+     "description": "The lease."
+    },
+    "amount": {
+     "type": "amount",
+     "required": true,
+     "description": "How much is owed."
+    },
+    "account": {
+     "type": "account",
+     "description": "The account it is to be paid into."
+    }
+   },
+   "writes": {
+    "kind": "review_request",
+    "text": "Request: the rent for your home is {amount} in arrears. Please pay it.",
+    "basis": "=lease",
+    "to": [
+     "=tenant"
+    ],
+    "visible": [
+     "=self",
+     "=tenant"
+    ],
+    "data": {
+     "matter": "arrears",
+     "against": "=tenant",
+     "about": "=lease",
+     "amount": "#amount",
+     "account": "=account"
+    }
+   }
+  },
+  {
+   "form": "payment_plan_offer",
+   "title": "Offer to a tenant of a plan to pay rent owed",
+   "does": "Offers a tenant behind with the rent a plan: the rent as it falls due, and a sum a month toward what is owed. The tenant answers on the offer whether the household can pay it, and what it could pay. It ends nothing and binds nobody: a plan agreed is kept, or not, by the tenant's payments.",
+   "fields": {
+    "tenant": {
+     "type": "entity",
+     "required": true,
+     "description": "The tenant."
+    },
+    "lease": {
+     "type": "record",
+     "required": true,
+     "description": "The lease."
+    },
+    "owed": {
+     "type": "amount",
+     "required": true,
+     "description": "How much is owed."
+    },
+    "instalment": {
+     "type": "amount",
+     "required": true,
+     "description": "The sum a month toward what is owed, beyond the rent."
+    },
+    "account": {
+     "type": "account",
+     "description": "The account it is to be paid into."
+    }
+   },
+   "writes": {
+    "kind": "plan_offer",
+    "text": "Offer of a plan: pay the rent as it falls due and {instalment} a month toward the {owed} owed under {lease}. Please answer whether you can.",
+    "basis": "=lease",
+    "to": [
+     "=tenant"
+    ],
+    "visible": [
+     "=self",
+     "=tenant"
+    ],
+    "data": {
+     "lease": "=lease",
+     "owed": "#owed",
+     "instalment": "#instalment",
+     "account": "=account"
+    }
+   }
+  },
+  {
+   "form": "arrears_application",
+   "title": "Application for an order that a tenant pay rent owed",
+   "does": "Applies to a body that says it hears rent in arrears (its notice of what it hears, and what applying costs, is public) for an order that the tenant pay. The body tells the tenant, gives them time to answer and decides. A fee, where the body has one, is paid with it, by a payment. It ends no tenancy.",
+   "fields": {
+    "venue": {
+     "type": "entity",
+     "required": true,
+     "description": "The body applied to."
+    },
+    "hearing": {
+     "type": "record",
+     "description": "Its notice of what it hears."
+    },
+    "tenant": {
+     "type": "entity",
+     "required": true,
+     "description": "The tenant."
+    },
+    "lease": {
+     "type": "record",
+     "required": true,
+     "description": "The lease."
+    },
+    "amount": {
+     "type": "amount",
+     "required": true,
+     "description": "How much is owed."
+    },
+    "account": {
+     "type": "account",
+     "required": true,
+     "description": "The account it is to be paid into."
+    }
+   },
+   "writes": {
+    "kind": "tribunal_application",
+    "text": "Application: {tenant} owes us {amount} in rent under {lease}.",
+    "basis": "=hearing",
+    "to": [
+     "=venue"
+    ],
+    "visible": [
+     "=self",
+     "=venue",
+     "=tenant"
+    ],
+    "data": {
+     "kind": "arrears",
+     "matter": "arrears",
+     "against": "=tenant",
+     "about": "=lease",
+     "amount": "#amount",
+     "account": "=account",
+     "evidence": {
+      "id": "=lease",
+      "record": "agreement"
+     }
+    }
+   }
+  },
+  {
+   "form": "notice_to_vacate",
+   "title": "Notice to a tenant to vacate for rent owed",
+   "does": "Gives a tenant written notice to leave the home by a day, for rent owed. It ends nothing by itself and puts nobody out: if the rent owed is paid before the day the notice is spent (withdraw it); if the tenant is still there after the day, the landlord may apply to the tribunal for possession. How long rent must have been owed before it may be given, and how many days it must run, are in the law on possession. A notice is given when it is on the record, addressed to the tenant: that is how papers are served here.",
+   "fields": {
+    "tenant": {
+     "type": "entity",
+     "required": true,
+     "description": "The tenant."
+    },
+    "lease": {
+     "type": "record",
+     "required": true,
+     "description": "The lease."
+    },
+    "arrears": {
+     "type": "amount",
+     "required": true,
+     "description": "The rent owed."
+    },
+    "by": {
+     "type": "date",
+     "required": true,
+     "description": "The day the tenant is to leave by."
+    },
+    "law": {
+     "type": "record",
+     "description": "The law the notice is given under."
+    }
+   },
+   "writes": {
+    "kind": "notice_to_vacate",
+    "text": "Notice to vacate: the rent under {lease} is {arrears} in arrears. You are to leave the home by {by}. If the arrears are paid before then, this notice lapses. If you are still there after it, we may apply to the tribunal for possession.",
+    "basis": "=lease",
+    "to": [
+     "=tenant"
+    ],
+    "visible": [
+     "=self",
+     "=tenant"
+    ],
+    "data": {
+     "lease": "=lease",
+     "reason": "arrears",
+     "arrears": "#arrears",
+     "by": "=by",
+     "law": "=law"
+    }
+   }
+  },
+  {
+   "form": "possession_application",
+   "title": "Application to the tribunal for possession of a let home",
+   "does": "Applies to the tribunal for possession of a home whose tenant is behind with the rent and has not left on a notice to vacate that has run out. It states the lease, the rent, what is owed, the home and who lives there by the lease, and the notice relied on: which paper, the day it was given and the day it gave. The tribunal tells the tenant, who may answer, and decides: a plan to pay, possession on a day, or dismissal. The tribunal's fee, where it has one, is paid with it, by a payment. It ends no tenancy and puts nobody out.",
+   "fields": {
+    "tenant": {
+     "type": "entity",
+     "required": true,
+     "description": "The tenant."
+    },
+    "lease": {
+     "type": "record",
+     "required": true,
+     "description": "The lease."
+    },
+    "owed": {
+     "type": "amount",
+     "required": true,
+     "description": "The rent owed."
+    },
+    "rent": {
+     "type": "amount",
+     "description": "The rent a month."
+    },
+    "account": {
+     "type": "account",
+     "description": "The account rent is paid into."
+    },
+    "home": {
+     "type": "space",
+     "description": "The home."
+    },
+    "building": {
+     "type": "structure",
+     "description": "The building it is in."
+    },
+    "household": {
+     "type": "list",
+     "description": "Who lives there by the lease: the tenant first."
+    },
+    "notice": {
+     "type": "record",
+     "description": "The notice to vacate relied on."
+    },
+    "notice_given": {
+     "type": "date",
+     "description": "The day that notice was given."
+    },
+    "notice_by": {
+     "type": "date",
+     "description": "The day that notice gave to leave by."
+    },
+    "plan_broken": {
+     "type": "choice",
+     "options": [
+      "yes",
+      "no"
+     ],
+     "description": "Yes, where the tribunal set a plan to pay and it has not been kept."
+    }
+   },
+   "writes": {
+    "sends": [
+     {
+      "to": [
+       "@tribunal"
+      ],
+      "why": "The tribunal hears applications for possession."
+     }
+    ],
+    "kind": "tribunal_application",
+    "text": "Application for possession: {tenant} is {owed} behind with the rent under {lease} and has not left on our notice to vacate.",
+    "basis": "=lease",
+    "to": [
+     "@tribunal"
+    ],
+    "visible": [
+     "=self",
+     "@tribunal",
+     "=tenant"
+    ],
+    "data": {
+     "kind": "possession",
+     "matter": "possession",
+     "against": "=tenant",
+     "about": "=lease",
+     "amount": "#owed",
+     "rent": "#rent",
+     "account": "=account",
+     "breach": "?plan_broken",
+     "space": "=home",
+     "structure": "=building",
+     "household": "=household",
+     "notice": "=notice",
+     "notice_given": "=notice_given",
+     "notice_by": "=notice_by",
+     "evidence": {
+      "id": "=lease",
+      "record": "agreement"
+     }
+    }
+   }
+  },
+  {
+   "form": "possession_reply",
+   "title": "Reply to a tenant's answer to an application for possession",
+   "does": "Replies to what a tenant has answered the tribunal on an application of this office's for possession: what the rent book shows owed on the day of the reply, and whether a plan the tenant offers would be taken. It goes to the tribunal, for the member who decides, and to the tenant. It withdraws nothing and decides nothing.",
+   "fields": {
+    "application": {
+     "type": "record",
+     "required": true,
+     "description": "The application for possession."
+    },
+    "tenant": {
+     "type": "entity",
+     "required": true,
+     "description": "The tenant."
+    },
+    "owed": {
+     "type": "amount",
+     "required": true,
+     "description": "What the rent book shows owed on the day of this reply."
+    },
+    "takes_plan": {
+     "type": "choice",
+     "options": [
+      "yes",
+      "no"
+     ],
+     "description": "Whether the plan the tenant offers would be taken."
+    },
+    "words": {
+     "type": "text",
+     "description": "Anything else for the tribunal, in words."
+    }
+   },
+   "writes": {
+    "sends": [
+     {
+      "to": [
+       "@tribunal"
+      ],
+      "why": "The tribunal's member decides the application, on what both sides have said."
+     }
+    ],
+    "kind": "tribunal_reply",
+    "text": "Reply on application {application}: our rent book shows {owed} owed by {tenant} today.",
+    "basis": "=application",
+    "to": [
+     "@tribunal",
+     "=tenant"
+    ],
+    "visible": [
+     "=self",
+     "@tribunal",
+     "=tenant"
+    ],
+    "data": {
+     "application": "=application",
+     "against": "=tenant",
+     "owed": "#owed",
+     "takes_plan": "?takes_plan",
+     "words": "=words"
+    }
+   }
+  },
+  {
+   "form": "warrant_request",
+   "title": "Request to the tribunal's registrar for a warrant of possession",
+   "does": "Asks the tribunal's registrar for a warrant on an order for possession whose day has passed with the tenant still there. The registrar issues it to whoever carries the tribunal's warrants out; the landlord puts nobody out. The fee, where there is one, is paid with it, by a payment. A warrant not carried out by its last day lapses, and another is asked for.",
+   "fields": {
+    "order": {
+     "type": "record",
+     "required": true,
+     "description": "The tribunal's order for possession."
+    }
+   },
+   "writes": {
+    "sends": [
+     {
+      "to": [
+       "@tribunal"
+      ],
+      "why": "The tribunal's registrar issues its warrants."
+     }
+    ],
+    "kind": "warrant_request",
+    "text": "Request for a warrant of possession under order {order}: the tenant has not left.",
+    "basis": "=order",
+    "to": [
+     "@tribunal"
+    ],
+    "visible": [
+     "=self",
+     "@tribunal"
+    ],
+    "data": {
+     "order": "=order"
+    }
+   }
+  },
+  {
+   "form": "repair_order",
+   "title": "Order to the builder for a repair, paid with the order",
+   "does": "Orders the repair of a building of the landlord's from the builder, who does it when its price has come into the builder's account: the price is paid with the order, by a payment. The builder says when it is done, or that it cannot be.",
+   "fields": {
+    "building": {
+     "type": "structure",
+     "required": true,
+     "description": "The building to repair."
+    },
+    "units": {
+     "type": "count",
+     "required": true,
+     "description": "How many units of repair work."
+    },
+    "account": {
+     "type": "account",
+     "required": true,
+     "description": "The account the price is paid from."
+    }
+   },
+   "writes": {
+    "sends": [
+     {
+      "to": [
+       "@builder"
+      ],
+      "why": "The builder does the repair."
+     }
+    ],
+    "kind": "repair_order",
+    "text": "Order: the repair of {building} ({units} units of work), paid with this order.",
+    "to": [
+     "@builder"
+    ],
+    "visible": [
+     "=self",
+     "@builder"
+    ],
+    "data": {
+     "structure": "=building",
+     "units": "=units",
+     "account": "=account"
+    }
+   }
+  },
+  {
+   "form": "variation_answer",
+   "title": "Answer to a tenant's request to vary a tenancy",
+   "does": "Answers a tenant who has asked in writing to vary something of the tenancy (to stay on, for time): yes or no. It changes no lease by itself: what is agreed is then done (a new lease offered, a notice withdrawn).",
+   "fields": {
+    "request": {
+     "type": "record",
+     "required": true,
+     "description": "The request answered."
+    },
+    "tenant": {
+     "type": "entity",
+     "required": true,
+     "description": "The tenant."
+    },
+    "about": {
+     "type": "text",
+     "required": true,
+     "description": "What was asked, as the request names it."
+    },
+    "granted": {
+     "type": "choice",
+     "required": true,
+     "options": [
+      "yes",
+      "no"
+     ],
+     "description": "Whether it is agreed."
+    },
+    "reason": {
+     "type": "text",
+     "description": "What else is said to the tenant: on what terms it is agreed, or why not."
+    }
+   },
+   "writes": {
+    "kind": "variation_answer",
+    "text": "Answer to your request {request}: {granted}.",
+    "basis": "=request",
+    "to": [
+     "=tenant"
+    ],
+    "visible": [
+     "=self",
+     "=tenant"
+    ],
+    "data": {
+     "about": "=about",
+     "granted": "?granted",
+     "reason": "=reason"
+    }
+   }
+  },
+  {
+   "form": "remedy_answer",
+   "title": "Answer to a request to put something right",
+   "does": "Answers someone who has asked the office in writing to put something right: yes or no, and where money is owed them and paid, how much. It does nothing by itself: what puts the thing right (a payment, a repair ordered, a paper withdrawn) is done besides.",
+   "fields": {
+    "request": {
+     "type": "record",
+     "required": true,
+     "description": "The request answered."
+    },
+    "asker": {
+     "type": "entity",
+     "required": true,
+     "description": "Who asked."
+    },
+    "matter": {
+     "type": "text",
+     "required": true,
+     "description": "What it is about, in the word the request uses."
+    },
+    "granted": {
+     "type": "choice",
+     "required": true,
+     "options": [
+      "yes",
+      "no"
+     ],
+     "description": "Whether it will be put right."
+    },
+    "amount": {
+     "type": "amount",
+     "description": "Where money is owed them and paid: how much."
+    },
+    "reason": {
+     "type": "text",
+     "description": "Where it is refused: why."
+    }
+   },
+   "writes": {
+    "kind": "remedy_answer",
+    "text": "Answer to your request {request}: {granted}.",
+    "basis": "=request",
+    "to": [
+     "=asker"
+    ],
+    "visible": [
+     "=asker",
+     "=self"
+    ],
+    "data": {
+     "request": "=request",
+     "matter": "=matter",
+     "granted": "?granted",
+     "amount": "#amount",
+     "reason": "=reason"
+    }
+   }
+  },
+  {
+   "form": "complaint_answer",
+   "title": "Answer to a desk's notice of an application against the office",
+   "does": "Answers a body that has told the office of an application against it, from the office's own books: what they show is owed, whether the thing is done, whether the paper complained of was wrong. The body decides on it when the time to answer has run; with no answer it decides in default.",
+   "fields": {
+    "application": {
+     "type": "record",
+     "required": true,
+     "description": "The application answered."
+    },
+    "venue": {
+     "type": "entity",
+     "required": true,
+     "description": "The body that sent the notice."
+    },
+    "applicant": {
+     "type": "entity",
+     "description": "Who applied."
+    },
+    "known": {
+     "type": "choice",
+     "required": true,
+     "options": [
+      "yes",
+      "no"
+     ],
+     "description": "Whether the office's books say anything of it."
+    },
+    "owed": {
+     "type": "amount",
+     "description": "What the books show is owed the applicant (nought: nothing)."
+    },
+    "done": {
+     "type": "choice",
+     "options": [
+      "yes",
+      "no"
+     ],
+     "description": "For a thing to be put right: whether it is done."
+    },
+    "wrong": {
+     "type": "choice",
+     "options": [
+      "yes",
+      "no"
+     ],
+     "description": "For a paper complained of: whether it was wrong."
+    },
+    "statement": {
+     "type": "text",
+     "description": "What the office says in answer, in its own words, where these do not say it (what it disputes, and why)."
+    }
+   },
+   "writes": {
+    "kind": "complaint_response",
+    "text": "Answer on {application}.",
+    "basis": "=application",
+    "to": [
+     "=venue"
+    ],
+    "visible": [
+     "=venue",
+     "=self",
+     "=applicant"
+    ],
+    "data": {
+     "application": "=application",
+     "owed": "#owed",
+     "done": "?done",
+     "wrong": "?wrong",
+     "known": "?known",
+     "statement": "=statement"
+    }
+   }
+  },
+  {
+   "form": "tribunal_answer",
+   "title": "Answer to the tribunal's notice of an application against the office",
+   "does": "Answers a body that has told the office of an application against it, from the office's own books: what they show is owed, whether the thing is done, whether the paper complained of was wrong. The body decides on it when the time to answer has run; with no answer it decides in default.",
+   "fields": {
+    "application": {
+     "type": "record",
+     "required": true,
+     "description": "The application answered."
+    },
+    "venue": {
+     "type": "entity",
+     "required": true,
+     "description": "The body that sent the notice."
+    },
+    "applicant": {
+     "type": "entity",
+     "description": "Who applied."
+    },
+    "known": {
+     "type": "choice",
+     "required": true,
+     "options": [
+      "yes",
+      "no"
+     ],
+     "description": "Whether the office's books say anything of it."
+    },
+    "owed": {
+     "type": "amount",
+     "description": "What the books show is owed the applicant (nought: nothing)."
+    },
+    "done": {
+     "type": "choice",
+     "options": [
+      "yes",
+      "no"
+     ],
+     "description": "For a thing to be put right: whether it is done."
+    },
+    "wrong": {
+     "type": "choice",
+     "options": [
+      "yes",
+      "no"
+     ],
+     "description": "For a paper complained of: whether it was wrong."
+    },
+    "statement": {
+     "type": "text",
+     "description": "What the office says in answer, in its own words, where these do not say it (what it disputes, and why)."
+    }
+   },
+   "writes": {
+    "kind": "tribunal_response",
+    "text": "Answer on {application}.",
+    "basis": "=application",
+    "to": [
+     "=venue"
+    ],
+    "visible": [
+     "=venue",
+     "=self",
+     "=applicant"
+    ],
+    "data": {
+     "application": "=application",
+     "owed": "#owed",
+     "done": "?done",
+     "wrong": "?wrong",
+     "known": "?known",
+     "statement": "=statement"
+    }
+   }
+  }
+ ],
+ "LENDING": [
+  {
+   "form": "loan_decision",
+   "title": "Decision on a loan application",
+   "fields": {
+    "application": {
+     "type": "record",
+     "required": true,
+     "description": "The application decided."
+    },
+    "applicant": {
+     "type": "entity",
+     "required": true,
+     "description": "Who applied."
+    },
+    "approved": {
+     "type": "choice",
+     "required": true,
+     "options": [
+      "yes",
+      "no"
+     ],
+     "description": "Whether it is approved."
+    },
+    "reason": {
+     "type": "text",
+     "description": "Why not, where it is declined."
+    },
+    "amount": {
+     "type": "amount",
+     "description": "Where approved: how much is lent."
+    },
+    "months": {
+     "type": "count",
+     "description": "Where approved: over how many months."
+    },
+    "rate_bps": {
+     "type": "count",
+     "description": "Where approved: the yearly rate, in hundredths of a percent."
+    },
+    "payment": {
+     "type": "amount",
+     "description": "Where approved: the monthly repayment."
+    }
+   },
+   "writes": {
+    "kind": "loan_decision",
+    "text": "Loan application {application}: approved {approved}.",
+    "basis": "=application",
+    "to": [
+     "=applicant"
+    ],
+    "visible": [
+     "=applicant",
+     "=self"
+    ],
+    "data": {
+     "application": "=application",
+     "approved": "?approved",
+     "reason": "=reason",
+     "amount": "#amount",
+     "months": "=months",
+     "rate_bps": "=rate_bps",
+     "payment": "#payment"
+    }
+   }
+  },
+  {
+   "form": "loan_payout",
+   "title": "Advice that a loan has been paid out",
+   "fields": {
+    "loan": {
+     "type": "record",
+     "required": true,
+     "description": "The loan agreement."
+    },
+    "borrower": {
+     "type": "entity",
+     "required": true,
+     "description": "The borrower."
+    },
+    "request": {
+     "type": "record",
+     "required": true,
+     "description": "The request for the payout."
+    },
+    "amount": {
+     "type": "amount",
+     "required": true,
+     "description": "How much was paid out."
+    },
+    "account": {
+     "type": "account",
+     "required": true,
+     "description": "The account it was paid into."
+    }
+   },
+   "writes": {
+    "kind": "loan_payout",
+    "text": "Loan {loan}: {amount} paid out into {account}.",
+    "basis": "=request",
+    "to": [
+     "=borrower"
+    ],
+    "visible": [
+     "=borrower",
+     "=self"
+    ],
+    "data": {
+     "loan": "=loan",
+     "amount": "#amount",
+     "account": "=account"
+    }
+   }
+  },
+  {
+   "form": "funding_draw",
+   "title": "A draw on the bank's wholesale funding",
+   "fields": {
+    "amount": {
+     "type": "amount",
+     "required": true,
+     "description": "How much is drawn."
+    },
+    "account": {
+     "type": "account",
+     "required": true,
+     "description": "The account it is to be paid into."
+    },
+    "rate_bps": {
+     "type": "count",
+     "required": true,
+     "description": "The yearly rate, in hundredths of a percent."
+    }
+   },
+   "writes": {
+    "sends": [
+     {
+      "to": [
+       "@funder"
+      ],
+      "why": "The funder is who the draw is made on: it pays it."
+     }
+    ],
+    "kind": "funding_draw",
+    "text": "Funding drawn: {amount} into {account}.",
+    "to": [
+     "@funder"
+    ],
+    "visible": [
+     "=self",
+     "@funder"
+    ],
+    "data": {
+     "amount": "#amount",
+     "account": "=account",
+     "rate_bps": "=rate_bps"
+    }
+   }
+  },
+  {
+   "form": "loan_arrears",
+   "title": "Letter to a borrower behind with a loan",
+   "does": "Tells a borrower in writing that a loan is behind, and by how much. It changes nothing of the loan.",
+   "fields": {
+    "loan": {
+     "type": "record",
+     "required": true,
+     "description": "The loan agreement."
+    },
+    "borrower": {
+     "type": "entity",
+     "required": true,
+     "description": "The borrower."
+    },
+    "behind": {
+     "type": "amount",
+     "required": true,
+     "description": "How much is behind."
+    }
+   },
+   "writes": {
+    "kind": "loan_arrears",
+    "text": "Loan {loan}: {behind} behind. Please pay.",
+    "basis": "=loan",
+    "to": [
+     "=borrower"
+    ],
+    "visible": [
+     "=borrower",
+     "=self"
+    ],
+    "data": {
+     "loan": "=loan",
+     "behind": "#behind"
+    }
+   }
+  },
+  {
+   "form": "loan_default",
+   "title": "Notice to a borrower that a loan is in default",
+   "does": "Tells a borrower in writing that a loan is in default: how much is behind and how much is owing in all. It moves nothing by itself.",
+   "fields": {
+    "loan": {
+     "type": "record",
+     "required": true,
+     "description": "The loan agreement."
+    },
+    "borrower": {
+     "type": "entity",
+     "required": true,
+     "description": "The borrower."
+    },
+    "behind": {
+     "type": "amount",
+     "required": true,
+     "description": "How much is behind."
+    },
+    "outstanding": {
+     "type": "amount",
+     "required": true,
+     "description": "How much is owing in all."
+    }
+   },
+   "writes": {
+    "kind": "loan_default",
+    "text": "Loan {loan} is in default: {behind} behind, {outstanding} owing.",
+    "basis": "=loan",
+    "to": [
+     "=borrower"
+    ],
+    "visible": [
+     "=borrower",
+     "=self"
+    ],
+    "data": {
+     "loan": "=loan",
+     "behind": "#behind",
+     "outstanding": "#outstanding"
+    }
+   }
+  }
+ ],
+ "MAYOR": [
+  {
+   "form": "invoice_approval",
+   "title": "The mayor's written approval of an invoice",
+   "fields": {
+    "invoice": {
+     "type": "record",
+     "required": true,
+     "description": "The invoice approved for payment."
+    }
+   },
+   "writes": {
+    "kind": "approval",
+    "text": "Approved for payment: {invoice}.",
+    "basis": "=invoice",
+    "to": [
+     "=self"
+    ],
+    "data": {
+     "invoice": "=invoice"
+    }
+   }
+  },
+  {
+   "form": "nomination",
+   "title": "Nomination for an office at an election",
+   "fields": {
+    "office": {
+     "type": "entity",
+     "required": true,
+     "description": "The office stood for (the post, by its id)."
+    },
+    "name": {
+     "type": "text",
+     "required": true,
+     "description": "The name to go on the ballot."
+    },
+    "platform": {
+     "type": "text",
+     "required": true,
+     "description": "What the candidate puts to the electors."
+    },
+    "incumbent": {
+     "type": "choice",
+     "options": [
+      "yes",
+      "no"
+     ],
+     "description": "Whether the candidate holds the office now."
+    },
+    "values": {
+     "type": "list",
+     "description": "What the candidate stands for, in a word or two each."
+    }
+   },
+   "writes": {
+    "sends": [
+     {
+      "to": [
+       "@electoral"
+      ],
+      "why": "The body that runs the election takes the nominations and puts the names on the ballot paper."
+     }
+    ],
+    "kind": "nomination",
+    "text": "Nomination for {office}: {name}. {platform}",
+    "to": [
+     "@electoral"
+    ],
+    "visible": "public",
+    "assertion": {
+     "that": "=platform"
+    },
+    "data": {
+     "office": "=office",
+     "name": "=name",
+     "incumbent": "?incumbent",
+     "values": "=values"
+    }
+   }
+  },
+  {
+   "form": "petition_response",
+   "title": "Answer to a petition",
+   "does": "Answers a petition publicly, to its organiser: what has been done about what it asks (put to the council, or not, and why). The answer is written in full on the form (`answer`): what has been done about what the petition asks, or why not, in the mayor's own words; it is the paper's text. It puts nothing to the council by itself: that is the council proposal form, or a law's amendment form.",
+   "fields": {
+    "petition": {
+     "type": "record",
+     "required": true,
+     "description": "The petition answered."
+    },
+    "organiser": {
+     "type": "entity",
+     "description": "Its organiser."
+    },
+    "answer": {
+     "type": "text",
+     "required": true,
+     "description": "What is answered, in full: what has been done about what the petition asks, or why not."
+    }
+   },
+   "writes": {
+    "kind": "petition_response",
+    "text": "Answer to petition {petition}: {answer}",
+    "basis": "=petition",
+    "to": [
+     "=organiser"
+    ],
+    "visible": "public",
+    "data": {
+     "petition": "=petition",
+     "answer": "=answer"
+    }
+   }
+  }
+ ],
+ "ORDER": {
+  "form": "order",
+  "title": "An order to a supplier, paid with the order",
+  "does": "How the office buys from a supplier, the outside world's market among them: it places the order at the seller's listed price. The form pays nothing by itself: pay the whole sum into the account the seller's price list names, at the same sitting. The seller delivers once an order is paid in full, sends back money that comes with no order waiting for it, and declines an order unpaid after a week.",
+  "fields": {
+   "seller": {
+    "type": "entity",
+    "required": true,
+    "description": "Whom it is ordered from."
+   },
+   "kind": {
+    "type": "text",
+    "required": true,
+    "description": "What is ordered."
+   },
+   "quantity": {
+    "type": "count",
+    "required": true,
+    "description": "How many."
+   },
+   "unit_price": {
+    "type": "amount",
+    "required": true,
+    "description": "The price of each, as the seller advertises it."
+   },
+   "deliver_to": {
+    "type": "entity",
+    "required": true,
+    "description": "Who is to receive them."
+   },
+   "at": {
+    "type": "structure",
+    "required": true,
+    "description": "Where they are to be delivered."
+   },
+   "account": {
+    "type": "account",
+    "required": true,
+    "description": "The account the order is paid from."
+   },
+   "retry_of": {
+    "type": "record",
+    "description": "An earlier order this one repeats."
+   },
+   "for_days": {
+    "type": "count",
+    "description": "How many days the order may be served over."
+   }
+  },
+  "writes": {
+   "kind": "order",
+   "text": "Order: {quantity} {kind} at {unit_price} each, delivered to {deliver_to} at {at}. Paid with this order.",
+   "to": [
+    "=seller"
+   ],
+   "visible": [
+    "=self",
+    "=seller"
+   ],
+   "data": {
+    "kind": "=kind",
+    "quantity": "=quantity",
+    "unit_price": "#unit_price",
+    "deliver_to": "=deliver_to",
+    "at": "=at",
+    "account": "=account",
+    "retry_of": "=retry_of",
+    "for_days": "=for_days"
+   }
+  }
+ },
+ "PAYROLL": [
+  {
+   "form": "payroll_starter",
+   "title": "Payroll notice of a new starter, to the office that pays the organisation's staff",
+   "does": "Tells the office that pays the organisation's staff that someone has been taken on, with what it needs to set their wage up. It pays nobody by itself: the paying office sets the payment up. Write to that office too, naming the notice: a paper on the organisation's own file is not put in front of it.",
+   "fields": {
+    "employee": {
+     "type": "entity",
+     "required": true,
+     "description": "Who has been taken on."
+    },
+    "post": {
+     "type": "text",
+     "required": true,
+     "description": "The post they hold."
+    },
+    "agreement": {
+     "type": "record",
+     "required": true,
+     "description": "The employment agreement, signed by both."
+    },
+    "wage": {
+     "type": "amount",
+     "required": true,
+     "description": "The wage for each pay period, before tax."
+    },
+    "period": {
+     "type": "duration",
+     "required": true,
+     "description": "The pay period."
+    },
+    "first_pay": {
+     "type": "date",
+     "required": true,
+     "description": "The first pay day (a pay period after both signed, unless the agreement says otherwise)."
+    },
+    "account": {
+     "type": "account",
+     "required": true,
+     "description": "The account the wage is paid into."
+    }
+   },
+   "writes": {
+    "kind": "payroll_notice",
+    "text": "Payroll notice, new starter: {employee}, {post}, under employment agreement {agreement}. Pay: {wage} every {period} before tax, into {account}; first pay day {first_pay}, then every {period}. The post is one of those the {@budget_line} line of the adopted budget pays for: the wage is on that line. For the {@payroll_office} office: the wage payment is to be set up from that day.",
+    "basis": "=agreement",
+    "to": [
+     "=self"
+    ],
+    "visible": [
+     "=self"
+    ],
+    "data": {
+     "notice": "starter",
+     "office": "@payroll_office",
+     "employee": "=employee",
+     "post": "=post",
+     "agreement": "=agreement",
+     "wage": "=wage",
+     "period": "=period",
+     "first_pay": "=first_pay",
+     "account": "=account",
+     "line": "@budget_line"
+    }
+   }
+  },
+  {
+   "form": "payroll_leaver",
+   "title": "Payroll notice of a leaver, to the office that pays the organisation's staff",
+   "does": "Tells the office that pays the organisation's staff that someone's employment is ending and when, so that their wage payment ends then. It ends no employment and stops no payment by itself. Write to that office too, naming the notice.",
+   "fields": {
+    "employee": {
+     "type": "entity",
+     "required": true,
+     "description": "Who is leaving."
+    },
+    "post": {
+     "type": "text",
+     "required": true,
+     "description": "The post they held."
+    },
+    "agreement": {
+     "type": "record",
+     "required": true,
+     "description": "The employment agreement that is ending."
+    },
+    "last_day": {
+     "type": "date",
+     "required": true,
+     "description": "The last day of the employment."
+    },
+    "reason": {
+     "type": "choice",
+     "required": true,
+     "options": [
+      "notice",
+      "died"
+     ],
+     "description": "Why it ends."
+    }
+   },
+   "writes": {
+    "kind": "payroll_notice",
+    "text": "Payroll notice, leaver: {employee}, {post}, employment agreement {agreement} ends on {last_day} ({reason}). For the {@payroll_office} office: pay is due to that day, and the wage payment under the agreement is to end then.",
+    "basis": "=agreement",
+    "to": [
+     "=self"
+    ],
+    "visible": [
+     "=self"
+    ],
+    "data": {
+     "notice": "leaver",
+     "office": "@payroll_office",
+     "employee": "=employee",
+     "post": "=post",
+     "agreement": "=agreement",
+     "last_day": "=last_day",
+     "reason": "=reason"
+    }
+   }
+  }
+ ],
+ "PLANNING": [
+  {
+   "form": "permit_decision",
+   "title": "Decision on a planning permit application",
+   "does": "Decides a permit application (granted, refused, or sent back as incomplete) and tells the applicant. A decision to grant records the permission with it: the applicant's liberty to build that kind of building on that lot, which the building inspector reads. So a grant says the lot and the kind of building, as the application gives them.",
+   "fields": {
+    "application": {
+     "type": "record",
+     "required": true,
+     "description": "The application decided."
+    },
+    "applicant": {
+     "type": "entity",
+     "required": true,
+     "description": "Who applied: the decision is sent to them."
+    },
+    "decision": {
+     "type": "choice",
+     "required": true,
+     "options": [
+      "granted",
+      "refused",
+      "incomplete"
+     ],
+     "description": "Granted, refused, or sent back as incomplete."
+    },
+    "lot": {
+     "type": "lot",
+     "description": "For a grant: the lot the permission is for, as the application names it."
+    },
+    "structure_type": {
+     "type": "structure_type",
+     "description": "For a grant: the kind of building permitted, as the application names it."
+    },
+    "law": {
+     "type": "record",
+     "description": "The law the building would breach, if any."
+    },
+    "missing": {
+     "type": "list",
+     "description": "For an incomplete application: what it does not say (lot, structure_type)."
+    },
+    "reason": {
+     "type": "text",
+     "description": "Why it is decided so, in words, where the law named does not say it (a refusal, or what to send in)."
+    }
+   },
+   "writes": {
+    "kind": "permit_decision",
+    "text": "Permit {decision}: application {application}.",
+    "basis": "=application",
+    "to": [
+     "=applicant"
+    ],
+    "data": {
+     "application": "=application",
+     "decision": "=decision",
+     "law": "=law",
+     "missing": "=missing",
+     "reason": "=reason"
+    },
+    "claim": {
+     "when": {
+      "decision": "granted"
+     },
+     "position": "liberty",
+     "holder": "=applicant",
+     "about": {
+      "action": "build",
+      "object": "=lot",
+      "structure_type": "=structure_type"
+     },
+     "basis": "=application"
+    }
+   }
+  }
+ ],
+ "POLICE": [
+  {
+   "form": "charge",
+   "title": "A charge laid before the tribunal",
+   "does": "Lays a charge before the tribunal against someone, on a report of a crime and the evidence found.",
+   "fields": {
+    "against": {
+     "type": "entity",
+     "required": true,
+     "description": "Who is charged."
+    },
+    "victim": {
+     "type": "entity",
+     "required": true,
+     "description": "Who was wronged."
+    },
+    "report": {
+     "type": "record",
+     "required": true,
+     "description": "The report it comes from."
+    },
+    "amount": {
+     "type": "amount",
+     "required": true,
+     "description": "The value of what was taken."
+    },
+    "account": {
+     "type": "account",
+     "required": true,
+     "description": "The account the victim is to be paid into."
+    },
+    "found": {
+     "type": "entity",
+     "description": "The evidence: who was found with the goods."
+    },
+    "found_at": {
+     "type": "structure",
+     "description": "The evidence: where."
+    },
+    "goods": {
+     "type": "text",
+     "description": "The evidence: what goods."
+    }
+   },
+   "writes": {
+    "sends": [
+     {
+      "to": [
+       "@tribunal"
+      ],
+      "why": "The tribunal hears the charge."
+     }
+    ],
+    "kind": "tribunal_application",
+    "text": "Charge against {against}, on report {report}.",
+    "basis": "=report",
+    "to": [
+     "@tribunal"
+    ],
+    "visible": [
+     "=self",
+     "@tribunal",
+     "=against"
+    ],
+    "data": {
+     "kind": "charge",
+     "against": "=against",
+     "victim": "=victim",
+     "report": "=report",
+     "amount": "#amount",
+     "account": "=account",
+     "evidence": {
+      "found": "=found",
+      "at": "=found_at",
+      "goods": "=goods"
+     }
+    }
+   }
+  },
+  {
+   "form": "death_notification",
+   "title": "Notification of a death, to the registrar",
+   "does": "Tells the registrar of a death the police have found, so that it can be registered.",
+   "fields": {
+    "deceased": {
+     "type": "entity",
+     "required": true,
+     "description": "Who has died."
+    },
+    "found_at": {
+     "type": "space",
+     "description": "Where they were found."
+    }
+   },
+   "writes": {
+    "sends": [
+     {
+      "to": [
+       "@registry"
+      ],
+      "why": "The registrar registers deaths, on a notification."
+     }
+    ],
+    "kind": "death_notification",
+    "text": "Notification of a death: {deceased}.",
+    "to": [
+     "@registry"
+    ],
+    "data": {
+     "deceased": "=deceased",
+     "found_at": "=found_at"
+    }
+   }
+  },
+  {
+   "form": "warrant_executed",
+   "title": "A warrant of possession carried out",
+   "does": "Says, to the tenant and the landlord, that a warrant of the tribunal has been carried out and possession is the landlord's, and how many of the household were there and were put out (none, where nobody was there: possession is given all the same, and nobody was removed). It is the paper of what officers have done at the home, not the doing of it.",
+   "fields": {
+    "warrant": {
+     "type": "record",
+     "required": true,
+     "description": "The warrant."
+    },
+    "lease": {
+     "type": "record",
+     "required": true,
+     "description": "The lease."
+    },
+    "tenant": {
+     "type": "entity",
+     "required": true,
+     "description": "The tenant."
+    },
+    "landlord": {
+     "type": "entity",
+     "required": true,
+     "description": "The landlord."
+    },
+    "home": {
+     "type": "space",
+     "required": true,
+     "description": "The home."
+    },
+    "household": {
+     "type": "list",
+     "required": true,
+     "description": "The household the warrant names."
+    },
+    "removed": {
+     "type": "count",
+     "required": true,
+     "description": "How many of the household were there and were put out (nobody there: 0)."
+    }
+   },
+   "writes": {
+    "kind": "warrant_executed",
+    "text": "Warrant {warrant} has been carried out at {home}: of {tenant} and their household, {removed} were there and were put out. Possession is {landlord}'s.",
+    "basis": "=warrant",
+    "to": [
+     "=tenant",
+     "=landlord"
+    ],
+    "visible": [
+     "=self",
+     "=tenant",
+     "=landlord",
+     "=household"
+    ],
+    "data": {
+     "warrant": "=warrant",
+     "lease": "=lease",
+     "tenant": "=tenant",
+     "space": "=home",
+     "household": "=household",
+     "removed": "=removed"
+    }
+   }
+  },
+  {
+   "form": "warrant_lapsed",
+   "title": "A warrant of possession not carried out in its time",
+   "does": "Tells the landlord that a warrant ran out before an officer could carry it out, and has lapsed: the landlord may ask the tribunal's registrar for another.",
+   "fields": {
+    "warrant": {
+     "type": "record",
+     "required": true,
+     "description": "The warrant."
+    },
+    "lease": {
+     "type": "record",
+     "required": true,
+     "description": "The lease."
+    },
+    "landlord": {
+     "type": "entity",
+     "required": true,
+     "description": "The landlord."
+    }
+   },
+   "writes": {
+    "kind": "warrant_lapsed",
+    "text": "Warrant {warrant} was not carried out by its last day, and has lapsed.",
+    "basis": "=warrant",
+    "to": [
+     "=landlord"
+    ],
+    "visible": [
+     "=self",
+     "=landlord"
+    ],
+    "data": {
+     "warrant": "=warrant",
+     "lease": "=lease"
+    }
+   }
+  },
+  {
+   "form": "investigation_closed",
+   "title": "An investigation closed",
+   "does": "Tells whoever reported a crime that its investigation is closed, and whether it was solved.",
+   "fields": {
+    "report": {
+     "type": "record",
+     "required": true,
+     "description": "The report."
+    },
+    "reporter": {
+     "type": "entity",
+     "required": true,
+     "description": "Who reported it."
+    },
+    "solved": {
+     "type": "choice",
+     "required": true,
+     "options": [
+      "yes",
+      "no"
+     ],
+     "description": "Whether it was solved."
+    }
+   },
+   "writes": {
+    "kind": "investigation_closed",
+    "text": "Report {report}: closed; solved {solved}.",
+    "basis": "=report",
+    "to": [
+     "=reporter"
+    ],
+    "visible": [
+     "=self",
+     "=reporter"
+    ],
+    "data": {
+     "report": "=report",
+     "solved": "?solved"
+    }
+   }
+  }
+ ],
+ "POSSESSION_ANSWER": {
+  "form": "possession_answer",
+  "title": "Answer to an application for possession of the home you rent",
+  "does": "For a tenant told by the tribunal that their landlord has applied for possession of their home: what the tenant wants the tribunal to know before it decides. It is filed with the tribunal by the day the notice of hearing gives, and a copy goes to the landlord, who may reply. Nothing on it need be filled in but the application; what is left out is not held against anyone.",
+  "fields": {
+   "application": {
+    "type": "record",
+    "required": true,
+    "description": "The application answered, as the notice of hearing names it."
+   },
+   "landlord": {
+    "type": "entity",
+    "required": true,
+    "description": "The landlord who applied, as the notice of hearing names them: a copy goes to them."
+   },
+   "left": {
+    "type": "choice",
+    "options": [
+     "yes",
+     "no"
+    ],
+    "description": "Yes, where you have left the home."
+   },
+   "left_on": {
+    "type": "date",
+    "description": "The day you left."
+   },
+   "owes": {
+    "type": "amount",
+    "description": "What you say is owed today."
+   },
+   "disputes_sum": {
+    "type": "choice",
+    "options": [
+     "yes",
+     "no"
+    ],
+    "description": "Yes, where you say less is owed than the landlord says."
+   },
+   "disputes_notice": {
+    "type": "choice",
+    "options": [
+     "yes",
+     "no"
+    ],
+    "description": "Yes, where you say the notice to vacate did not give the days the law asks."
+   },
+   "can_pay": {
+    "type": "amount",
+    "description": "What the household could pay a month toward what is owed, beyond the rent (nothing: 0)."
+   },
+   "every": {
+    "type": "duration",
+    "description": "How often that could be paid."
+   },
+   "out_of_work_since": {
+    "type": "date",
+    "description": "Where someone in the home is out of work: since when."
+   },
+   "pay_short": {
+    "type": "choice",
+    "options": [
+     "yes",
+     "no"
+    ],
+    "description": "Yes, where pay has come short of what was agreed."
+   },
+   "claim": {
+    "type": "choice",
+    "options": [
+     "refused",
+     "pending"
+    ],
+    "description": "A claim for support: refused, or made and not yet decided."
+   },
+   "claim_on": {
+    "type": "date",
+    "description": "The day it was refused or made."
+   },
+   "ill": {
+    "type": "choice",
+    "options": [
+     "yes",
+     "no"
+    ],
+    "description": "Yes, where someone in the home is ill."
+   },
+   "people": {
+    "type": "count",
+    "description": "How many people live in the home."
+   },
+   "children": {
+    "type": "count",
+    "description": "How many of them are children."
+   },
+   "ages": {
+    "type": "list",
+    "description": "Their ages."
+   },
+   "lived_days": {
+    "type": "count",
+    "description": "How many days you have lived there."
+   },
+   "go_to": {
+    "type": "choice",
+    "options": [
+     "nowhere",
+     "someone_to_ask",
+     "means_for_another"
+    ],
+    "description": "Whether you have anywhere to go."
+   }
+  },
+  "writes": {
+   "kind": "tribunal_response",
+   "text": "Answer to application {application}.",
+   "basis": "=application",
+   "to": [
+    "@tribunal",
+    "=landlord"
+   ],
+   "visible": [
+    "=self",
+    "@tribunal",
+    "=landlord"
+   ],
+   "data": {
+    "application": "=application",
+    "left": "?left",
+    "left_at": "=left_on",
+    "owes": "#owes",
+    "disputes_sum": "?disputes_sum",
+    "disputes_notice": "?disputes_notice",
+    "offer": "#can_pay",
+    "every": "=every",
+    "out_of_work_since": "=out_of_work_since",
+    "pay_short": "?pay_short",
+    "claim": "=claim",
+    "claim_on": "=claim_on",
+    "ill": "?ill",
+    "people": "=people",
+    "children": "=children",
+    "ages": "=ages",
+    "lived_days": "=lived_days",
+    "go_to": "=go_to"
+   }
+  }
+ },
+ "REGISTRY": [
+  {
+   "form": "death_registration",
+   "title": "Entry in the register of deaths",
+   "does": "Registers a death on the notification of it: the entry is what a bank, the land registry and the family act on, and it is sent to whoever reported the death.",
+   "fields": {
+    "deceased": {
+     "type": "entity",
+     "required": true,
+     "description": "Who has died."
+    },
+    "notification": {
+     "type": "record",
+     "required": true,
+     "description": "The notification of the death that the entry is made on."
+    },
+    "reported_by": {
+     "type": "entity",
+     "required": true,
+     "description": "Who reported the death: they are sent the entry."
+    },
+    "partner": {
+     "type": "entity",
+     "description": "The dead person's partner, if the notification names one."
+    },
+    "children": {
+     "type": "list",
+     "description": "The dead person's children, as the notification names them."
+    },
+    "without_adult": {
+     "type": "list",
+     "description": "Children left with no adult at home, as the notification names them."
+    },
+    "tell": {
+     "type": "list",
+     "description": "Those the notification asks to be told, who are sent the entry too."
+    },
+    "estate": {
+     "type": "list",
+     "description": "Those written to where nobody of the family reported the death and the estate is to be administered."
+    }
+   },
+   "writes": {
+    "sends": [
+     {
+      "to": [
+       "@feeds"
+      ],
+      "why": "They are sent every entry in the register of deaths as of right, to keep their own records by: whoever keeps a roll of electors takes the dead off it, and whoever pays someone a pension or support stops paying it."
+     }
+    ],
+    "kind": "death_registration",
+    "text": "Death registered: {deceased}.",
+    "basis": "=notification",
+    "to": [
+     "=reported_by",
+     "=tell",
+     "@feeds",
+     "=estate"
+    ],
+    "visible": [
+     "=self",
+     "=reported_by",
+     "=tell",
+     "@feeds",
+     "=estate"
+    ],
+    "data": {
+     "deceased": "=deceased",
+     "reported_by": "=reported_by",
+     "partner": "=partner",
+     "children": "=children",
+     "without_adult": "=without_adult"
+    }
+   }
+  },
+  {
+   "form": "death_certificate",
+   "title": "Certified copy of an entry of death",
+   "does": "Gives whoever asks a certified copy of a death already registered.",
+   "fields": {
+    "deceased": {
+     "type": "entity",
+     "required": true,
+     "description": "Who has died."
+    },
+    "registration": {
+     "type": "record",
+     "required": true,
+     "description": "The entry in the register."
+    },
+    "informant": {
+     "type": "entity",
+     "required": true,
+     "description": "Whom the copy is for."
+    }
+   },
+   "writes": {
+    "kind": "death_certificate",
+    "text": "Death of {deceased}: registered (entry {registration}).",
+    "basis": "=registration",
+    "to": [
+     "=informant"
+    ],
+    "data": {
+     "deceased": "=deceased",
+     "registration": "=registration"
+    }
+   }
+  },
+  {
+   "form": "birth_registration",
+   "title": "Entry in the register of births",
+   "does": "Registers a birth on the notification of it, and sends the entry to whoever reported it.",
+   "fields": {
+    "child": {
+     "type": "entity",
+     "required": true,
+     "description": "The child."
+    },
+    "notification": {
+     "type": "record",
+     "required": true,
+     "description": "The notification of the birth."
+    },
+    "reported_by": {
+     "type": "entity",
+     "required": true,
+     "description": "Who reported the birth: they are sent the entry."
+    },
+    "born_at": {
+     "type": "date",
+     "description": "When the child was born, as the notification gives it."
+    },
+    "mother": {
+     "type": "entity",
+     "description": "The child's mother."
+    }
+   },
+   "writes": {
+    "sends": [
+     {
+      "to": [
+       "@feeds"
+      ],
+      "why": "They are sent every entry in the register of births as of right, to keep their own records by."
+     }
+    ],
+    "kind": "birth_registration",
+    "text": "Birth registered: {child}.",
+    "basis": "=notification",
+    "to": [
+     "=reported_by",
+     "@feeds"
+    ],
+    "visible": [
+     "=self",
+     "=reported_by",
+     "@feeds"
+    ],
+    "data": {
+     "child": "=child",
+     "born_at": "=born_at",
+     "mother": "=mother"
+    }
+   }
+  },
+  {
+   "form": "transmission_application",
+   "title": "Application to the land registry for a dead owner's land to pass",
+   "does": "Asks the land registry to pass a dead owner's land to the heir the law of succession names.",
+   "fields": {
+    "deceased": {
+     "type": "entity",
+     "required": true,
+     "description": "The owner who has died."
+    },
+    "heir": {
+     "type": "entity",
+     "required": true,
+     "description": "Whom the land passes to, as the law of succession says."
+    },
+    "notification": {
+     "type": "record",
+     "required": true,
+     "description": "The notification of the death."
+    }
+   },
+   "writes": {
+    "sends": [
+     {
+      "to": [
+       "@land_registry"
+      ],
+      "why": "The land registry keeps the titles to land: passing a dead owner's land is its to do."
+     }
+    ],
+    "kind": "transmission_application",
+    "text": "Transmission on death: whatever land {deceased} held passes to {heir}.",
+    "basis": "=notification",
+    "to": [
+     "@land_registry"
+    ],
+    "data": {
+     "deceased": "=deceased",
+     "heir": "=heir"
+    }
+   }
+  }
+ ],
+ "REMEDY_ANSWER": {
+  "form": "remedy_answer",
+  "title": "Answer to a request to put something right",
+  "does": "Answers someone who has asked the office in writing to put something right: yes or no, and where money is owed them and paid, how much. It does nothing by itself: what puts the thing right (a payment, a repair ordered, a paper withdrawn) is done besides.",
+  "fields": {
+   "request": {
+    "type": "record",
+    "required": true,
+    "description": "The request answered."
+   },
+   "asker": {
+    "type": "entity",
+    "required": true,
+    "description": "Who asked."
+   },
+   "matter": {
+    "type": "text",
+    "required": true,
+    "description": "What it is about, in the word the request uses."
+   },
+   "granted": {
+    "type": "choice",
+    "required": true,
+    "options": [
+     "yes",
+     "no"
+    ],
+    "description": "Whether it will be put right."
+   },
+   "amount": {
+    "type": "amount",
+    "description": "Where money is owed them and paid: how much."
+   },
+   "reason": {
+    "type": "text",
+    "description": "Where it is refused: why."
+   }
+  },
+  "writes": {
+   "kind": "remedy_answer",
+   "text": "Answer to your request {request}: {granted}.",
+   "basis": "=request",
+   "to": [
+    "=asker"
+   ],
+   "visible": [
+    "=asker",
+    "=self"
+   ],
+   "data": {
+    "request": "=request",
+    "matter": "=matter",
+    "granted": "?granted",
+    "amount": "#amount",
+    "reason": "=reason"
+   }
+  }
+ },
+ "REVIEW_REQUEST": {
+  "form": "review_request",
+  "title": "A request to look at a decision again, or to put something right",
+  "does": "Asks the office or body to look again at what it decided, or to put right what went wrong at its hands, inside the days the law gives where it gives any.",
+  "fields": {
+   "office": {
+    "type": "entity",
+    "required": true,
+    "description": "The office or body asked."
+   },
+   "matter": {
+    "type": "text",
+    "required": true,
+    "description": "What went wrong, in a word or two (claim_refused)."
+   },
+   "about": {
+    "type": "record",
+    "description": "The paper it is about."
+   },
+   "particulars": {
+    "type": "text",
+    "description": "Anything the office should know."
+   },
+   "seeks": {
+    "type": "text",
+    "description": "What you ask for."
+   }
+  },
+  "writes": {
+   "kind": "review_request",
+   "text": "Request: please put this right ({matter}).",
+   "basis": "=about",
+   "to": [
+    "=office"
+   ],
+   "visible": [
+    "=self",
+    "=office"
+   ],
+   "data": {
+    "matter": "=matter",
+    "against": "=office",
+    "about": "=about",
+    "particulars": "=particulars",
+    "seeks": "=seeks"
+   }
+  }
+ },
+ "SUPPORT": [
+  {
+   "form": "benefit_decision",
+   "title": "Decision on a claim for support",
+   "does": "Says what is decided on a claim, to the claimant. A claim granted on it is paid by the office's staff each period from then, at the sum and for the time the decision gives, while the office's standing order for paying claims is in force; a claim refused on it is not paid. It moves no money by itself.",
+   "fields": {
+    "claim": {
+     "type": "record",
+     "required": true,
+     "description": "The claim decided."
+    },
+    "claimant": {
+     "type": "entity",
+     "required": true,
+     "description": "Who made the claim."
+    },
+    "payment": {
+     "type": "text",
+     "required": true,
+     "description": "Which payment of the support law the claim is for, as the claim names it."
+    },
+    "granted": {
+     "type": "choice",
+     "required": true,
+     "options": [
+      "yes",
+      "no"
+     ],
+     "description": "Whether it is granted."
+    },
+    "reason": {
+     "type": "text",
+     "description": "Why not, where it is refused."
+    },
+    "amount": {
+     "type": "amount",
+     "description": "Where granted: the sum paid each period."
+    },
+    "every": {
+     "type": "duration",
+     "description": "Where granted: the period it is paid by."
+    },
+    "until": {
+     "type": "date",
+     "description": "Where granted for a time: the day the payment ends."
+    }
+   },
+   "writes": {
+    "kind": "benefit_decision",
+    "text": "Claim {claim}: granted {granted}.",
+    "basis": "=claim",
+    "to": [
+     "=claimant"
+    ],
+    "visible": [
+     "=claimant",
+     "=self"
+    ],
+    "data": {
+     "claim": "=claim",
+     "payment": "=payment",
+     "granted": "?granted",
+     "reason": "=reason",
+     "amount": "#amount",
+     "every": "=every",
+     "until": "=until"
+    }
+   }
+  }
+ ],
+ "TRADE": [
+  {
+   "form": "order",
+   "title": "An order to a supplier, paid with the order",
+   "does": "How the office buys from a supplier, the outside world's market among them: it places the order at the seller's listed price. The form pays nothing by itself: pay the whole sum into the account the seller's price list names, at the same sitting. The seller delivers once an order is paid in full, sends back money that comes with no order waiting for it, and declines an order unpaid after a week.",
+   "fields": {
+    "seller": {
+     "type": "entity",
+     "required": true,
+     "description": "Whom it is ordered from."
+    },
+    "kind": {
+     "type": "text",
+     "required": true,
+     "description": "What is ordered."
+    },
+    "quantity": {
+     "type": "count",
+     "required": true,
+     "description": "How many."
+    },
+    "unit_price": {
+     "type": "amount",
+     "required": true,
+     "description": "The price of each, as the seller advertises it."
+    },
+    "deliver_to": {
+     "type": "entity",
+     "required": true,
+     "description": "Who is to receive them."
+    },
+    "at": {
+     "type": "structure",
+     "required": true,
+     "description": "Where they are to be delivered."
+    },
+    "account": {
+     "type": "account",
+     "required": true,
+     "description": "The account the order is paid from."
+    },
+    "retry_of": {
+     "type": "record",
+     "description": "An earlier order this one repeats."
+    },
+    "for_days": {
+     "type": "count",
+     "description": "How many days the order may be served over."
+    }
+   },
+   "writes": {
+    "kind": "order",
+    "text": "Order: {quantity} {kind} at {unit_price} each, delivered to {deliver_to} at {at}. Paid with this order.",
+    "to": [
+     "=seller"
+    ],
+    "visible": [
+     "=self",
+     "=seller"
+    ],
+    "data": {
+     "kind": "=kind",
+     "quantity": "=quantity",
+     "unit_price": "#unit_price",
+     "deliver_to": "=deliver_to",
+     "at": "=at",
+     "account": "=account",
+     "retry_of": "=retry_of",
+     "for_days": "=for_days"
+    }
+   }
+  },
+  {
+   "form": "delivery_note",
+   "title": "A delivery note for an order served",
+   "fields": {
+    "order": {
+     "type": "record",
+     "required": true,
+     "description": "The order."
+    },
+    "buyer": {
+     "type": "entity",
+     "required": true,
+     "description": "Who ordered."
+    },
+    "kind": {
+     "type": "text",
+     "required": true,
+     "description": "What was ordered."
+    },
+    "ordered": {
+     "type": "count",
+     "required": true,
+     "description": "How many were ordered."
+    },
+    "delivered": {
+     "type": "count",
+     "required": true,
+     "description": "How many were delivered."
+    },
+    "refund": {
+     "type": "amount",
+     "required": true,
+     "description": "What was refunded for those not delivered."
+    },
+    "declined": {
+     "type": "choice",
+     "options": [
+      "unpaid"
+     ],
+     "description": "Where nothing was delivered because it was not paid for."
+    }
+   },
+   "writes": {
+    "kind": "delivery_note",
+    "text": "Delivered: {delivered} of {ordered} {kind} (order {order}).",
+    "basis": "=order",
+    "to": [
+     "=buyer"
+    ],
+    "visible": [
+     "=buyer",
+     "=self"
+    ],
+    "data": {
+     "order": "=order",
+     "kind": "=kind",
+     "ordered": "=ordered",
+     "delivered": "=delivered",
+     "refund": "#refund",
+     "declined": "=declined"
+    }
+   }
+  },
+  {
+   "form": "wage_offer",
+   "title": "An answer to a union's wage claim",
+   "fields": {
+    "union": {
+     "type": "entity",
+     "required": true,
+     "description": "The union that made the claim."
+    },
+    "claim": {
+     "type": "record",
+     "required": true,
+     "description": "The claim answered."
+    },
+    "rise_bps": {
+     "type": "count",
+     "required": true,
+     "description": "The rise offered, in hundredths of a percent."
+    },
+    "why": {
+     "type": "text",
+     "description": "Why that much."
+    }
+   },
+   "writes": {
+    "kind": "wage_offer",
+    "text": "We offer a rise of {rise_bps} hundredths of a percent, in answer to {claim}.",
+    "basis": "=claim",
+    "to": [
+     "=union"
+    ],
+    "visible": [
+     "=self",
+     "=union"
+    ],
+    "data": {
+     "employer": "=self",
+     "claim": "=claim",
+     "rise_bps": "=rise_bps",
+     "why": "=why"
+    }
+   }
+  },
+  {
+   "form": "export_invoice",
+   "title": "An invoice for goods sent to a buyer",
+   "fields": {
+    "buyer": {
+     "type": "entity",
+     "required": true,
+     "description": "Who is invoiced."
+    },
+    "offer": {
+     "type": "record",
+     "description": "The buyer's standing offer it is sent under."
+    },
+    "kind": {
+     "type": "text",
+     "required": true,
+     "description": "What was sent."
+    },
+    "quantity": {
+     "type": "count",
+     "required": true,
+     "description": "How many."
+    },
+    "from_at": {
+     "type": "structure",
+     "required": true,
+     "description": "Where they were sent from."
+    },
+    "amount": {
+     "type": "amount",
+     "required": true,
+     "description": "The sum invoiced."
+    },
+    "account": {
+     "type": "account",
+     "required": true,
+     "description": "The account it is to be paid into."
+    },
+    "memo": {
+     "type": "text",
+     "required": true,
+     "description": "What the payment is for, in a few words."
+    }
+   },
+   "writes": {
+    "kind": "invoice",
+    "text": "Invoice: {quantity} {kind}, {amount}.",
+    "basis": "=offer",
+    "to": [
+     "=buyer"
+    ],
+    "visible": [
+     "=self",
+     "=buyer"
+    ],
+    "data": {
+     "kind": "=kind",
+     "quantity": "=quantity",
+     "from_at": "=from_at",
+     "outcome": {
+      "money": {
+       "to": "=account",
+       "amount": "=amount",
+       "for": "=memo"
+      }
+     }
+    }
+   }
+  },
+  {
+   "form": "crime_report",
+   "title": "A report of goods taken, to the police",
+   "fields": {
+    "kind": {
+     "type": "text",
+     "required": true,
+     "description": "What was taken."
+    },
+    "quantity": {
+     "type": "count",
+     "required": true,
+     "description": "How many."
+    },
+    "at": {
+     "type": "structure",
+     "required": true,
+     "description": "Where from."
+    },
+    "value": {
+     "type": "amount",
+     "required": true,
+     "description": "What it was worth."
+    },
+    "account": {
+     "type": "account",
+     "required": true,
+     "description": "The account to be paid into if it is recovered."
+    }
+   },
+   "writes": {
+    "sends": [
+     {
+      "to": [
+       "@police"
+      ],
+      "why": "The police investigate what is reported to them."
+     }
+    ],
+    "kind": "crime_report",
+    "text": "Report: {quantity} {kind} taken from {at}.",
+    "to": [
+     "@police"
+    ],
+    "visible": [
+     "=self",
+     "@police"
+    ],
+    "data": {
+     "kind": "=kind",
+     "quantity": "=quantity",
+     "at": "=at",
+     "value": "#value",
+     "account": "=account"
+    }
+   }
+  }
+ ],
+ "TRIBUNAL_MEMBER": [
+  {
+   "form": "hearing_listing",
+   "title": "Notice of hearing: a rent increase, a debt or a charge",
+   "does": "Lists an application about a notice of rent increase, a debt or a charge for a hearing on a day, and tells both sides; the respondent may answer before then. It decides nothing. (An application on the tribunal's other lists is listed on the notice of hearing form.)",
+   "fields": {
+    "application": {
+     "type": "record",
+     "required": true,
+     "description": "The application listed."
+    },
+    "kind": {
+     "type": "choice",
+     "required": true,
+     "options": [
+      "rent_increase",
+      "debt",
+      "charge"
+     ],
+     "description": "What the application is."
+    },
+    "applicant": {
+     "type": "entity",
+     "required": true,
+     "description": "Who applied."
+    },
+    "against": {
+     "type": "entity",
+     "required": true,
+     "description": "Whom it is against."
+    },
+    "hearing": {
+     "type": "date",
+     "required": true,
+     "description": "The day of the hearing."
+    }
+   },
+   "writes": {
+    "kind": "hearing_notice",
+    "text": "Notice of hearing: application {application} ({kind}) by {applicant} against {against}, to be heard on {hearing}. The respondent may answer before then.",
+    "basis": "=application",
+    "to": [
+     "=applicant",
+     "=against"
+    ],
+    "visible": [
+     "=applicant",
+     "=against",
+     "=self"
+    ],
+    "data": {
+     "application": "=application",
+     "kind": "=kind",
+     "applicant": "=applicant",
+     "against": "=against",
+     "hearing_at": "=hearing"
+    }
+   }
+  },
+  {
+   "form": "hearing_notice",
+   "title": "Notice of hearing on the tribunal's lists",
+   "does": "Lists an application on the tribunal's lists (possession of a let home, rent in arrears, a home in disrepair, pay come short, faulty goods, a wrong bill, a refused claim) and tells both sides: what is said, and the day the other side may answer by. The other side answers a notice on this form, and no letter. It decides nothing. A case already listed is put off (adjourned) by a fresh notice with a later day.",
+   "fields": {
+    "application": {
+     "type": "record",
+     "required": true,
+     "description": "The application listed."
+    },
+    "matter": {
+     "type": "text",
+     "required": true,
+     "description": "What it is about, in the word the application uses (possession, arrears, disrepair ...)."
+    },
+    "applicant": {
+     "type": "entity",
+     "required": true,
+     "description": "Who applied."
+    },
+    "against": {
+     "type": "entity",
+     "required": true,
+     "description": "Whom it is against."
+    },
+    "answer_by": {
+     "type": "date",
+     "required": true,
+     "description": "The day the other side may answer by: the case is decided on or after it."
+    },
+    "about": {
+     "type": "record",
+     "description": "The lease or other paper the application is about, where it names one (a tenant answers a notice about possession only if it names the lease)."
+    },
+    "amount": {
+     "type": "amount",
+     "description": "The sum the application says is owed, where it gives one."
+    },
+    "structure": {
+     "type": "structure",
+     "description": "The building, where the application names one."
+    },
+    "seeks": {
+     "type": "text",
+     "description": "What the application seeks, where it says."
+    }
+   },
+   "writes": {
+    "kind": "hearing_notice",
+    "text": "{applicant} has applied to us about {matter} (application {application}). You may answer by {answer_by}.",
+    "basis": "=application",
+    "to": [
+     "=applicant",
+     "=against"
+    ],
+    "visible": [
+     "=applicant",
+     "=against",
+     "=self"
+    ],
+    "data": {
+     "application": "=application",
+     "kind": "=matter",
+     "matter": "=matter",
+     "applicant": "=applicant",
+     "against": "=against",
+     "hearing_at": "=answer_by",
+     "answer_by": "=answer_by",
+     "about": "=about",
+     "amount": "#amount",
+     "structure": "=structure",
+     "seeks": "=seeks"
+    }
+   }
+  },
+  {
+   "form": "possession_order",
+   "title": "Order on an application for possession of a let home",
+   "does": "Decides an application for possession of a let home for rent owed, and tells landlord and tenant: dismissed (the tenant stays, and the notice to vacate is spent); a plan (the tenant stays, paying the rent and a sum a month toward what is owed; a plan not kept, the landlord may apply again); or possession on a day (the tenant and household are to leave by it). It moves nobody: a tenant still there after the day is put out only on a warrant the landlord asks the tribunal's registrar for, by whoever carries its warrants out. What the law asks before an order, how long a plan may run and how many days on the day for possession falls are in the law on possession and the tribunal's procedure.",
+   "fields": {
+    "application": {
+     "type": "record",
+     "required": true,
+     "description": "The application decided."
+    },
+    "landlord": {
+     "type": "entity",
+     "required": true,
+     "description": "The landlord who applied."
+    },
+    "tenant": {
+     "type": "entity",
+     "required": true,
+     "description": "The tenant."
+    },
+    "lease": {
+     "type": "record",
+     "required": true,
+     "description": "The lease."
+    },
+    "finding": {
+     "type": "choice",
+     "required": true,
+     "options": [
+      "dismissed",
+      "plan",
+      "possession"
+     ],
+     "description": "What is ordered."
+    },
+    "owed": {
+     "type": "amount",
+     "description": "The rent found owed (a plan, or possession)."
+    },
+    "instalment": {
+     "type": "amount",
+     "description": "For a plan: the sum a month toward what is owed, beyond the rent."
+    },
+    "pay_into": {
+     "type": "account",
+     "description": "For a plan: the account it is paid into."
+    },
+    "date": {
+     "type": "date",
+     "description": "For possession: the day the tenant is to leave by."
+    },
+    "home": {
+     "type": "space",
+     "description": "The home, as the application names it (needed for a warrant to be issued on the order)."
+    },
+    "building": {
+     "type": "structure",
+     "description": "The building it is in."
+    },
+    "household": {
+     "type": "list",
+     "description": "Who lives there by the lease, as the application names them."
+    },
+    "waited_days": {
+     "type": "count",
+     "description": "Days from the application to this order, for the tribunal's own figures."
+    },
+    "reason": {
+     "type": "text",
+     "description": "The tribunal's reasons for the order, in words."
+    }
+   },
+   "writes": {
+    "kind": "tribunal_order",
+    "text": "Order on {application}: {finding}.",
+    "basis": "=application",
+    "to": [
+     "=landlord",
+     "=tenant"
+    ],
+    "visible": [
+     "=landlord",
+     "=tenant",
+     "=self"
+    ],
+    "data": {
+     "application": "=application",
+     "kind": "possession",
+     "matter": "possession",
+     "applicant": "=landlord",
+     "against": "=tenant",
+     "finding": "=finding",
+     "binding": true,
+     "waited_days": "=waited_days",
+     "about": "=lease",
+     "amount": "#owed",
+     "instalment": "#instalment",
+     "to": "=pay_into",
+     "due": "=date",
+     "space": "=home",
+     "structure": "=building",
+     "household": "=household",
+     "reason": "=reason"
+    }
+   }
+  },
+  {
+   "form": "tribunal_order",
+   "title": "Order of the tribunal on an application",
+   "does": "Decides an application before the tribunal (anything but possession of a let home, which has its own form) and tells both sides: what is found, and for an order to pay, how much, into which account and by when; for a thing to be put right, by when. It moves no money and does nothing by itself: an order to pay left unpaid is enforced by the registrar, when the one owed asks.",
+   "fields": {
+    "application": {
+     "type": "record",
+     "required": true,
+     "description": "The application decided."
+    },
+    "kind": {
+     "type": "text",
+     "required": true,
+     "description": "What the application was, in the word it uses (rent_increase, debt, charge; or the matter on the tribunal's lists: arrears, disrepair, bill ...)."
+    },
+    "applicant": {
+     "type": "entity",
+     "required": true,
+     "description": "Who applied."
+    },
+    "against": {
+     "type": "entity",
+     "description": "Whom it was against."
+    },
+    "finding": {
+     "type": "choice",
+     "required": true,
+     "options": [
+      "dismissed",
+      "rejected",
+      "pay",
+      "do",
+      "set_aside",
+      "invalid",
+      "valid",
+      "paid"
+     ],
+     "description": "What is found: dismissed; rejected (not something the tribunal hears); pay (money to the applicant); do (put it right); set_aside (a paper); for a rent increase, invalid or valid; for a debt already paid, paid."
+    },
+    "matter": {
+     "type": "text",
+     "description": "For a case on the tribunal's lists: the matter, in the same word as the application's (those ordered act on an order only with it)."
+    },
+    "binding": {
+     "type": "choice",
+     "options": [
+      "yes",
+      "no"
+     ],
+     "description": "For a case on the tribunal's lists: yes (an order of the tribunal binds)."
+    },
+    "notice": {
+     "type": "record",
+     "description": "For a rent increase: the notice challenged."
+    },
+    "laws": {
+     "type": "list",
+     "description": "The laws the notice breaches, where it is found invalid."
+    },
+    "claim": {
+     "type": "record",
+     "description": "For a debt: the claim."
+    },
+    "amount": {
+     "type": "amount",
+     "description": "For an order to pay: how much."
+    },
+    "pay_into": {
+     "type": "account",
+     "description": "For an order to pay: the account it is paid into."
+    },
+    "due": {
+     "type": "date",
+     "description": "For an order to pay or to put right: the day it is due by."
+    },
+    "victim": {
+     "type": "entity",
+     "description": "For a charge: who was wronged."
+    },
+    "report": {
+     "type": "record",
+     "description": "For a charge: the report it came from."
+    },
+    "paid": {
+     "type": "amount",
+     "description": "For a debt found paid: how much was paid."
+    },
+    "about": {
+     "type": "record",
+     "description": "The paper the application is about, where it names one."
+    },
+    "structure": {
+     "type": "structure",
+     "description": "The building, where the application names one."
+    },
+    "seeks": {
+     "type": "text",
+     "description": "What the application sought, where it said."
+    },
+    "waited_days": {
+     "type": "count",
+     "description": "Days from the application to this order, for the tribunal's own figures."
+    },
+    "reason": {
+     "type": "text",
+     "description": "The tribunal's reasons for what it found, in words."
+    }
+   },
+   "writes": {
+    "kind": "tribunal_order",
+    "text": "Order on {application}: {finding}.",
+    "basis": "=application",
+    "to": [
+     "=applicant",
+     "=against"
+    ],
+    "visible": [
+     "=applicant",
+     "=against",
+     "=self"
+    ],
+    "data": {
+     "application": "=application",
+     "kind": "=kind",
+     "matter": "=matter",
+     "applicant": "=applicant",
+     "against": "=against",
+     "finding": "=finding",
+     "binding": "?binding",
+     "waited_days": "=waited_days",
+     "about": "=about",
+     "structure": "=structure",
+     "seeks": "=seeks",
+     "notice": "=notice",
+     "laws": "=laws",
+     "claim": "=claim",
+     "amount": "#amount",
+     "to": "=pay_into",
+     "due": "=due",
+     "victim": "=victim",
+     "report": "=report",
+     "paid": "#paid",
+     "reason": "=reason"
+    }
+   }
+  }
+ ],
+ "TRIBUNAL_REGISTRAR": [
+  {
+   "form": "garnishee_order",
+   "title": "Order to a debtor's bank to pay an unpaid order of the tribunal",
+   "does": "Has the banks pay an order of the tribunal left unpaid, from what the debtor holds with them.",
+   "fields": {
+    "order": {
+     "type": "record",
+     "required": true,
+     "description": "The tribunal's order left unpaid."
+    },
+    "debtor": {
+     "type": "entity",
+     "required": true,
+     "description": "Who owes."
+    },
+    "creditor": {
+     "type": "entity",
+     "required": true,
+     "description": "Who is owed."
+    },
+    "amount": {
+     "type": "amount",
+     "required": true,
+     "description": "How much."
+    },
+    "pay_into": {
+     "type": "account",
+     "required": true,
+     "description": "The account it is to be paid into."
+    },
+    "claim": {
+     "type": "record",
+     "description": "The claim it settles, if the order names one."
+    }
+   },
+   "writes": {
+    "sends": [
+     {
+      "to": [
+       "@banks"
+      ],
+      "why": "The banks hold what the debtor has: the order is theirs to pay."
+     }
+    ],
+    "kind": "garnishee_order",
+    "text": "Order to pay {amount} from what {debtor} holds, into {pay_into}, under {order}.",
+    "basis": "=order",
+    "to": [
+     "@banks"
+    ],
+    "visible": [
+     "@banks",
+     "=self",
+     "=debtor",
+     "=creditor"
+    ],
+    "data": {
+     "order": "=order",
+     "debtor": "=debtor",
+     "amount": "#amount",
+     "to": "=pay_into",
+     "claim": "=claim"
+    }
+   }
+  },
+  {
+   "form": "warrant",
+   "title": "Warrant of possession",
+   "does": "Issued on a landlord's request, on an order of the tribunal for possession whose day has passed with the tenant still there: it names the home, the tenant and the household, and the days between which it is to be carried out. It goes to whoever carries the tribunal's warrants out, and the tenant and the landlord see it. It moves nobody by itself: someone must go, and a warrant not carried out by its last day lapses. How much notice of the day the tenant must have, and how long a warrant runs, are in the law on possession.",
+   "fields": {
+    "order": {
+     "type": "record",
+     "required": true,
+     "description": "The tribunal's order for possession."
+    },
+    "lease": {
+     "type": "record",
+     "required": true,
+     "description": "The lease."
+    },
+    "tenant": {
+     "type": "entity",
+     "required": true,
+     "description": "The tenant."
+    },
+    "landlord": {
+     "type": "entity",
+     "required": true,
+     "description": "The landlord."
+    },
+    "home": {
+     "type": "space",
+     "required": true,
+     "description": "The home."
+    },
+    "building": {
+     "type": "structure",
+     "description": "The building it is in."
+    },
+    "household": {
+     "type": "list",
+     "required": true,
+     "description": "Who is to be removed: the tenant and those living there by the lease."
+    },
+    "not_before": {
+     "type": "date",
+     "required": true,
+     "description": "The first day it may be carried out (after the notice of the day the law gives the tenant)."
+    },
+    "until": {
+     "type": "date",
+     "required": true,
+     "description": "Its last day: after it, it has lapsed."
+    }
+   },
+   "writes": {
+    "sends": [
+     {
+      "to": [
+       "@enforcer"
+      ],
+      "why": "They carry the tribunal's warrants out: nobody else may."
+     }
+    ],
+    "kind": "warrant",
+    "text": "Warrant of possession under order {order}: {tenant} and their household are to be removed from {home}, and possession given to {landlord}. To be carried out no sooner than {not_before} and by {until}.",
+    "basis": "=order",
+    "to": [
+     "@enforcer"
+    ],
+    "visible": [
+     "@enforcer",
+     "=self",
+     "=tenant",
+     "=landlord"
+    ],
+    "data": {
+     "order": "=order",
+     "lease": "=lease",
+     "tenant": "=tenant",
+     "landlord": "=landlord",
+     "space": "=home",
+     "structure": "=building",
+     "household": "=household",
+     "not_before": "=not_before",
+     "until": "=until"
+    }
+   }
+  },
+  {
+   "form": "enforcement_decline",
+   "title": "A request to enforce, declined",
+   "does": "Tells whoever asked for an order to be enforced, or for a warrant, that it is declined: there is no such order to them to enforce. It does nothing else.",
+   "fields": {
+    "request": {
+     "type": "record",
+     "required": true,
+     "description": "The request declined."
+    },
+    "asker": {
+     "type": "entity",
+     "required": true,
+     "description": "Who asked."
+    }
+   },
+   "writes": {
+    "kind": "enforcement_decline",
+    "text": "Declined: no such order to you to enforce (request {request}).",
+    "basis": "=request",
+    "to": [
+     "=asker"
+    ],
+    "visible": [
+     "=asker",
+     "=self"
+    ]
+   }
+  }
+ ],
+ "UNION": [
+  {
+   "form": "wage_claim",
+   "title": "A wage claim on an employer",
+   "fields": {
+    "employer": {
+     "type": "entity",
+     "required": true,
+     "description": "The employer."
+    },
+    "rise_bps": {
+     "type": "count",
+     "required": true,
+     "description": "The rise claimed, in hundredths of a percent."
+    },
+    "members": {
+     "type": "count",
+     "required": true,
+     "description": "How many members work there."
+    }
+   },
+   "writes": {
+    "kind": "wage_claim",
+    "text": "Wage claim on {employer}: a rise of {rise_bps} hundredths of a percent.",
+    "to": [
+     "=employer"
+    ],
+    "visible": [
+     "=self",
+     "=employer"
+    ],
+    "data": {
+     "employer": "=employer",
+     "rise_bps": "=rise_bps",
+     "members": "=members"
+    }
+   }
+  },
+  {
+   "form": "offer_accepted",
+   "title": "Acceptance of an employer's wage offer",
+   "fields": {
+    "employer": {
+     "type": "entity",
+     "required": true,
+     "description": "The employer."
+    },
+    "offer": {
+     "type": "record",
+     "required": true,
+     "description": "The offer accepted."
+    },
+    "claim": {
+     "type": "record",
+     "required": true,
+     "description": "The claim it answers."
+    },
+    "rise_bps": {
+     "type": "count",
+     "required": true,
+     "description": "The rise accepted, in hundredths of a percent."
+    }
+   },
+   "writes": {
+    "kind": "offer_accepted",
+    "text": "Offer {offer} accepted.",
+    "basis": "=offer",
+    "to": [
+     "=employer"
+    ],
+    "visible": [
+     "=self",
+     "=employer"
+    ],
+    "data": {
+     "employer": "=employer",
+     "claim": "=claim",
+     "rise_bps": "=rise_bps"
+    }
+   }
+  },
+  {
+   "form": "action_ballot",
+   "title": "A ballot of members on industrial action",
+   "fields": {
+    "employer": {
+     "type": "entity",
+     "required": true,
+     "description": "The employer."
+    },
+    "claim": {
+     "type": "record",
+     "description": "The claim in dispute."
+    },
+    "closes": {
+     "type": "date",
+     "required": true,
+     "description": "The day the ballot closes."
+    },
+    "members": {
+     "type": "list",
+     "required": true,
+     "description": "The members it concerns."
+    }
+   },
+   "writes": {
+    "kind": "action_ballot",
+    "text": "Ballot on industrial action at {employer}, closing {closes}.",
+    "to": [
+     "=members"
+    ],
+    "visible": [
+     "=self",
+     "=members"
+    ],
+    "data": {
+     "employer": "=employer",
+     "claim": "=claim",
+     "closes": "=closes"
+    }
+   }
+  },
+  {
+   "form": "industrial_action",
+   "title": "Notice of industrial action",
+   "fields": {
+    "employer": {
+     "type": "entity",
+     "required": true,
+     "description": "The employer."
+    },
+    "from": {
+     "type": "date",
+     "required": true,
+     "description": "The day it starts."
+    },
+    "until": {
+     "type": "date",
+     "required": true,
+     "description": "The day it ends."
+    },
+    "members": {
+     "type": "list",
+     "required": true,
+     "description": "The members it concerns."
+    },
+    "ballot": {
+     "type": "record",
+     "required": true,
+     "description": "The ballot that approved it."
+    },
+    "voted": {
+     "type": "count",
+     "required": true,
+     "description": "How many voted."
+    },
+    "yes": {
+     "type": "count",
+     "required": true,
+     "description": "How many voted for."
+    },
+    "eligible": {
+     "type": "count",
+     "required": true,
+     "description": "How many could vote."
+    }
+   },
+   "writes": {
+    "kind": "industrial_action",
+    "text": "Industrial action at {employer} from {from} until {until}.",
+    "to": [
+     "=employer",
+     "=members"
+    ],
+    "visible": "public",
+    "data": {
+     "employer": "=employer",
+     "from": "=from",
+     "until": "=until",
+     "members": "=members",
+     "ballot": "=ballot",
+     "voted": "=voted",
+     "yes": "=yes",
+     "eligible": "=eligible"
+    }
+   }
+  },
+  {
+   "form": "stop_work",
+   "title": "Call to stop work",
+   "fields": {
+    "employer": {
+     "type": "entity",
+     "required": true,
+     "description": "The employer."
+    },
+    "until": {
+     "type": "date",
+     "required": true,
+     "description": "The day work resumes."
+    },
+    "members": {
+     "type": "list",
+     "required": true,
+     "description": "The members it concerns."
+    }
+   },
+   "writes": {
+    "kind": "stop_work",
+    "text": "Stop work at {employer} until {until}.",
+    "to": [
+     "=employer",
+     "=members"
+    ],
+    "visible": [
+     "=self",
+     "=employer",
+     "=members"
+    ],
+    "data": {
+     "employer": "=employer",
+     "until": "=until",
+     "members": "=members"
+    }
+   }
+  },
+  {
+   "form": "return_to_work",
+   "title": "Call to return to work",
+   "fields": {
+    "employer": {
+     "type": "entity",
+     "required": true,
+     "description": "The employer."
+    },
+    "members": {
+     "type": "list",
+     "required": true,
+     "description": "The members it concerns."
+    }
+   },
+   "writes": {
+    "kind": "return_to_work",
+    "text": "Return to work at {employer}.",
+    "to": [
+     "=employer",
+     "=members"
+    ],
+    "visible": [
+     "=self",
+     "=employer",
+     "=members"
+    ],
+    "data": {
+     "employer": "=employer",
+     "members": "=members"
+    }
+   }
+  },
+  {
+   "form": "ballot_result",
+   "title": "Result of a ballot of members on industrial action",
+   "does": "Declares the result of a ballot of members on industrial action, to the employer and the members: how many could vote, how many did, how many said yes, and whether it is approved. Action may be notified only on a ballot that meets what the law on industrial action asks.",
+   "fields": {
+    "ballot": {
+     "type": "record",
+     "description": "The ballot."
+    },
+    "employer": {
+     "type": "entity",
+     "required": true,
+     "description": "The employer."
+    },
+    "members": {
+     "type": "list",
+     "required": true,
+     "description": "The members balloted."
+    },
+    "eligible": {
+     "type": "count",
+     "required": true,
+     "description": "How many could vote."
+    },
+    "voted": {
+     "type": "count",
+     "required": true,
+     "description": "How many voted."
+    },
+    "yes": {
+     "type": "count",
+     "required": true,
+     "description": "How many voted yes."
+    },
+    "passed": {
+     "type": "choice",
+     "required": true,
+     "options": [
+      "yes",
+      "no"
+     ],
+     "description": "Whether it is approved."
+    }
+   },
+   "writes": {
+    "kind": "ballot_result",
+    "text": "Protected action ballot at {employer}: {voted} of {eligible} members voted, {yes} yes; approved {passed}.",
+    "basis": "=ballot",
+    "to": [
+     "=employer",
+     "=members"
+    ],
+    "visible": [
+     "=self",
+     "=employer",
+     "=members"
+    ],
+    "data": {
+     "employer": "=employer",
+     "ballot": "=ballot",
+     "voted": "=voted",
+     "yes": "=yes",
+     "eligible": "=eligible",
+     "passed": "?passed"
+    }
+   }
+  }
+ ],
+ "VENUE_ANSWERS": [
+  {
+   "form": "complaint_answer",
+   "title": "Answer to a desk's notice of an application against the office",
+   "does": "Answers a body that has told the office of an application against it, from the office's own books: what they show is owed, whether the thing is done, whether the paper complained of was wrong. The body decides on it when the time to answer has run; with no answer it decides in default.",
+   "fields": {
+    "application": {
+     "type": "record",
+     "required": true,
+     "description": "The application answered."
+    },
+    "venue": {
+     "type": "entity",
+     "required": true,
+     "description": "The body that sent the notice."
+    },
+    "applicant": {
+     "type": "entity",
+     "description": "Who applied."
+    },
+    "known": {
+     "type": "choice",
+     "required": true,
+     "options": [
+      "yes",
+      "no"
+     ],
+     "description": "Whether the office's books say anything of it."
+    },
+    "owed": {
+     "type": "amount",
+     "description": "What the books show is owed the applicant (nought: nothing)."
+    },
+    "done": {
+     "type": "choice",
+     "options": [
+      "yes",
+      "no"
+     ],
+     "description": "For a thing to be put right: whether it is done."
+    },
+    "wrong": {
+     "type": "choice",
+     "options": [
+      "yes",
+      "no"
+     ],
+     "description": "For a paper complained of: whether it was wrong."
+    },
+    "statement": {
+     "type": "text",
+     "description": "What the office says in answer, in its own words, where these do not say it (what it disputes, and why)."
+    }
+   },
+   "writes": {
+    "kind": "complaint_response",
+    "text": "Answer on {application}.",
+    "basis": "=application",
+    "to": [
+     "=venue"
+    ],
+    "visible": [
+     "=venue",
+     "=self",
+     "=applicant"
+    ],
+    "data": {
+     "application": "=application",
+     "owed": "#owed",
+     "done": "?done",
+     "wrong": "?wrong",
+     "known": "?known",
+     "statement": "=statement"
+    }
+   }
+  },
+  {
+   "form": "tribunal_answer",
+   "title": "Answer to the tribunal's notice of an application against the office",
+   "does": "Answers a body that has told the office of an application against it, from the office's own books: what they show is owed, whether the thing is done, whether the paper complained of was wrong. The body decides on it when the time to answer has run; with no answer it decides in default.",
+   "fields": {
+    "application": {
+     "type": "record",
+     "required": true,
+     "description": "The application answered."
+    },
+    "venue": {
+     "type": "entity",
+     "required": true,
+     "description": "The body that sent the notice."
+    },
+    "applicant": {
+     "type": "entity",
+     "description": "Who applied."
+    },
+    "known": {
+     "type": "choice",
+     "required": true,
+     "options": [
+      "yes",
+      "no"
+     ],
+     "description": "Whether the office's books say anything of it."
+    },
+    "owed": {
+     "type": "amount",
+     "description": "What the books show is owed the applicant (nought: nothing)."
+    },
+    "done": {
+     "type": "choice",
+     "options": [
+      "yes",
+      "no"
+     ],
+     "description": "For a thing to be put right: whether it is done."
+    },
+    "wrong": {
+     "type": "choice",
+     "options": [
+      "yes",
+      "no"
+     ],
+     "description": "For a paper complained of: whether it was wrong."
+    },
+    "statement": {
+     "type": "text",
+     "description": "What the office says in answer, in its own words, where these do not say it (what it disputes, and why)."
+    }
+   },
+   "writes": {
+    "kind": "tribunal_response",
+    "text": "Answer on {application}.",
+    "basis": "=application",
+    "to": [
+     "=venue"
+    ],
+    "visible": [
+     "=venue",
+     "=self",
+     "=applicant"
+    ],
+    "data": {
+     "application": "=application",
+     "owed": "#owed",
+     "done": "?done",
+     "wrong": "?wrong",
+     "known": "?known",
+     "statement": "=statement"
+    }
+   }
+  }
+ ],
+ "WORKS": [
+  {
+   "form": "disposal_docket",
+   "title": "Docket for waste delivered to the landfill",
+   "does": "Goes with a load of waste taken to the landfill: what was delivered and how much, which the landfill charges by.",
+   "fields": {
+    "kind": {
+     "type": "text",
+     "required": true,
+     "description": "What was delivered."
+    },
+    "quantity": {
+     "type": "count",
+     "required": true,
+     "description": "How much of it."
+    }
+   },
+   "writes": {
+    "sends": [
+     {
+      "to": [
+       "@landfill"
+      ],
+      "why": "The landfill takes the load and charges by the docket."
+     }
+    ],
+    "kind": "disposal_docket",
+    "text": "Delivered: {quantity} of {kind}.",
+    "to": [
+     "@landfill"
+    ],
+    "visible": [
+     "=self",
+     "@landfill"
+    ],
+    "data": {
+     "kind": "=kind",
+     "quantity": "=quantity"
+    }
+   }
+  }
+ ]
+}

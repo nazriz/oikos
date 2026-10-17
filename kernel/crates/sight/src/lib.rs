@@ -24,7 +24,7 @@ pub use oikos_perception::{
 pub use oikos_terms::Reading;
 /// Records and blocks (contracts/blocks.schema.json), ids, money, look requests.
 pub use oikos_world::blocks::{Block, Id, Record, RecordBody};
-pub use oikos_world::config::{LookRequest, Query, Who};
+pub use oikos_world::config::{CmpOp, Condition, LookRequest, Order, Query, Visit as Going, Who};
 pub use oikos_world::money::Money;
 pub use oikos_world::state::{Message, Outcome, OutcomeStatus, ParticipantStatus, RefusalInfo, Transaction};
 /// The call language (contracts/calls.md): what a code actor writes its acts in. The engine's resolver turns a call

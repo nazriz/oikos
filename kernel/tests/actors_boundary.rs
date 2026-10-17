@@ -4,7 +4,7 @@
 //!   rules, and on nothing that holds or reads the world;
 //! - `oikos-sight` re-exports values only, never the state, the world, perception's functions or the resolver's
 //!   knowledge;
-//! - the rules crate depends on the core alone;
+//! - the rules crate depends on the core and the law reader alone;
 //! - the actors' code keeps the determinism rules: no clock, no I/O, no threads of its own, no global state, no
 //!   iterated `HashMap`, no randomness but the kernel's streams.
 
@@ -41,7 +41,8 @@ fn an_actor_depends_on_what_it_is_shown_and_never_on_the_world() {
         dependencies("crates/actors/Cargo.toml"),
         ["oikos-contracts", "oikos-core", "oikos-rules", "oikos-sight", "serde", "serde_json"]
     );
-    assert_eq!(dependencies("crates/rules/Cargo.toml"), ["oikos-core", "serde", "serde_json"]);
+    // (The law reader is pure: a condition, an act and claims in, a verdict out.)
+    assert_eq!(dependencies("crates/rules/Cargo.toml"), ["oikos-core", "oikos-law", "serde", "serde_json"]);
 }
 
 #[test]
