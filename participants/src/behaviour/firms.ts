@@ -2057,18 +2057,64 @@ export class Staffing {
 }
 
 /**
+ * What a firm has taken in, as it sees it from its own books: money a customer paid for what it sells. A month of it,
+ * per day, is what a day without its work costs it in sales (`Bargaining`).
+ */
+export class Takings {
+  private log: [number, number][] = [];
+  private first = Infinity;
+  add(t: number, cents: number): void {
+    if (!(cents > 0)) return;
+    if (this.log.length && this.log[0]![0] < t - 2 * MONTH) this.log = this.log.filter(([at]) => at >= t - 2 * MONTH);
+    this.log.push([t, cents]);
+    this.first = Math.min(this.first, t);
+  }
+  /** The last month's takings per day (over the days it has been taking, if fewer), in the smallest unit. */
+  perDay(t: number): number {
+    const sum = this.log.reduce((x, [at, c]) => (at > t - MONTH && at <= t ? x + c : x), 0);
+    return Math.floor(sum / Math.min(MONTH / DAY, Math.max(1, (t - this.first) / DAY)));
+  }
+}
+
+/**
+ * What an employer will concede after a stoppage (docs/behaviour/unions.md, "Concession"): the rise, in basis points,
+ * whose year's cost is what holding out against another stoppage would cost it in sales. That is the share of its work
+ * the strikers did (`strikersBps` of its hours of work, over whatever systems do of the work: `systemBps`) times its
+ * takings a day, for the days of another stoppage a day longer than the last. The cost of a stoppage is lost sales;
+ * the wages not paid to strikers are not netted off. Zero where it has no takings or no wage bill. Rounded down to a
+ * tenth of a percent.
+ */
+export function concessionBps(o: { strikersBps: number; systemBps: number; takingsPerDay: number; lastDays: number; yearBill: number }): { riseBps: number; cost: number } {
+  const lostBps = Math.floor((o.strikersBps * (10_000 - Math.min(10_000, Math.max(0, o.systemBps)))) / 10_000);
+  const cost = Math.floor((lostBps * Math.max(0, o.takingsPerDay) * (o.lastDays + 1)) / 10_000);
+  return { cost, riseBps: o.yearBill > 0 ? Math.floor((cost * 10_000) / o.yearBill / 10) * 10 : 0 };
+}
+
+/**
  * An employer's side of bargaining with a union (docs/behaviour/unions.md). A wage claim gets an offer by the firm's
  * capacity to pay: all of the claim if what it holds beyond a month's wages covers twice the claim's cost for a
  * year, less in proportion if not. An offer the union accepts becomes an enterprise agreement (published) and a rise
  * for all staff. Workers on strike aren't paid for the time (as labour law commonly has it): their pay stops, and restarts
- * when they're back. After each stoppage the offer rises by half the gap to the claim (the employer's concession
- * rising with the cost of holding out, after Hicks 1932), and to all of it after `concede_after` stoppages.
+ * when they're back.
+ *
+ * After a stoppage the employer knows what it cost it: the share of its work the strikers' hours were of all the hours
+ * of its work (less what systems do of it: `systemShare`), times its takings for the days stopped. It will concede, in
+ * a year's cost, up to what holding out against another stoppage a day longer than the last would cost, as the union's
+ * stoppages lengthen (Hicks 1932, the concession curve: it meets the resistance curve where yielding costs no more than
+ * resisting). Its offer rises to that, never above the claim, never below what it offered. No schedule, no settlement
+ * is set: how far it goes follows what the stoppages cost.
  */
 export class Bargaining {
   private readonly handled = new Set<string>();
-  private open: { claim: string; union: string; claimBps: number; offerBps: number; stoppages: number } | null = null;
+  private open: { claim: string; union: string; claimBps: number; offerBps: number; stoppages: number; lastDays: number } | null = null;
   private strikers: string[] = [];
-  constructor(private readonly me: string, private readonly p: { concede_after: number } = { concede_after: 3 }) {}
+  private stoppage: { at: number; days: number; shareBps: number } | null = null; // the stoppage in hand: when it began, how long, the share of our hours it took
+  constructor(private readonly me: string, private readonly hooks: {
+    /** The firm's takings per day, as it keeps them (a month's, per day). None: it counts no cost, and concedes nothing beyond its capacity. */
+    takingsPerDay?: (t: number) => number;
+    /** The share (0 to 1) of the firm's work that systems do, not people. Supplied by whatever puts systems to work; none: 0. */
+    systemShare?: (t: number) => number;
+  } = {}) {}
 
   steps(book: Book, t: number, staffing: Staffing, account: string, balance: number, onRaise: (riseBps: number) => void): Step[] {
     const me = this.me;
@@ -2083,10 +2129,15 @@ export class Bargaining {
     };
     const offer = (why: string) => say("wage_offer", `We offer a rise of ${this.open!.offerBps / 100}% (the claim was ${this.open!.claimBps / 100}%).`,
       { to: [this.open!.union], visible: [me, this.open!.union], basis: this.open!.claim, data: { employer: me, claim: this.open!.claim, rise_bps: this.open!.offerBps, why } });
+    // Hours of work: each person's, as their agreement states them (else alike), as they stand now.
+    // (An agreement that does not state its hours is taken at the mean of those that do: some do, some do not, in one workplace.)
+    const stated = staff.map((a) => jobTerms(a, a.terms.parties[1]).hours).filter((h): h is number => h !== undefined);
+    const usual = stated.length ? stated.reduce((x, h) => x + h, 0) / stated.length : 1;
+    const hoursOf = (a: any) => (jobTerms(a, a.terms.parties[1]).hours ?? usual) * staffing.hoursBpsAt(a.terms.parties[1], t);
     for (const c of book.open("wage_claim").filter(mine)) {
       this.handled.add(c.id);
       const claimBps = Math.max(0, Math.floor(Number(c.data?.rise_bps) || 0));
-      this.open = { claim: c.id, union: c.speaks_for!, claimBps, offerBps: Math.min(claimBps, offerFor(claimBps)), stoppages: 0 };
+      this.open = { claim: c.id, union: c.speaks_for!, claimBps, offerBps: Math.min(claimBps, offerFor(claimBps)), stoppages: 0, lastDays: 0 };
       steps.push(because(`A wage claim from ${c.speaks_for} for ${claimBps / 100}%: offering ${this.open.offerBps / 100}%, as far as what we hold beyond a month's wages (${usd(Math.max(0, balance - monthBill))}) covers twice its cost for a year.`,
         offer("capacity to pay")));
     }
@@ -2105,6 +2156,14 @@ export class Bargaining {
       this.handled.add(s.id);
       // No work, no pay (and, where the law says so, an employer mustn't pay for time on strike).
       this.strikers = ((s.data?.members as string[]) ?? []).filter((w) => staff.some((a) => a.terms.parties[1] === w));
+      // What the stoppage takes of our work: the strikers' hours of all our hours, and how long the notice says it lasts.
+      const total = staff.reduce((x, a) => x + hoursOf(a), 0);
+      const out = staff.filter((a) => this.strikers.includes(a.terms.parties[1])).reduce((x, a) => x + hoursOf(a), 0);
+      // (How long it is: the notice the union gave us says from when to when; the stoppage's own record comes some time after it begins.)
+      const until = Number(s.data?.until);
+      const notice = book.open("industrial_action").filter((n) => n.data?.employer === me && n.data?.until === until).sort((a, b) => b.at - a.at)[0];
+      const length = notice ? Number(notice.data?.until) - Number(notice.data?.from) : until - s.at;
+      this.stoppage = { at: s.at, days: Number.isFinite(length) ? Math.max(1, Math.round(length / DAY)) : 1, shareBps: total > 0 ? Math.floor((out * 10_000) / total) : 0 };
       steps.push(...staffing.stop(book, t, this.strikers, `A strike by ${s.speaks_for}'s members: no pay for the time on strike.`));
     }
     for (const r of book.open("return_to_work").filter(mine)) {
@@ -2112,9 +2171,19 @@ export class Bargaining {
       steps.push(...staffing.resume(book, t, account, this.strikers, "Back from the strike: paying what they earned before it, and restarting their wages."));
       this.strikers = [];
       if (this.open) {
-        this.open.stoppages++;
-        this.open.offerBps = this.open.stoppages >= this.p.concede_after ? this.open.claimBps : this.open.offerBps + Math.ceil((this.open.claimBps - this.open.offerBps) / 2 / 10) * 10;
-        steps.push(because(`After ${this.open.stoppages} stoppage${this.open.stoppages > 1 ? "s" : ""}: improving our offer to ${this.open.offerBps / 100}%.`, offer("after a stoppage")));
+        const o = this.open;
+        o.stoppages++;
+        const was = this.stoppage;
+        this.stoppage = null;
+        if (was) o.lastDays = was.days;
+        // What holding out another stoppage, a day longer than the last, would cost us: the sales lost with the work the
+        // strikers do (people's work only: systems go on), over the days. A year's cost of a rise we'd pay up to that.
+        const sysBps = Math.round(Math.min(1, Math.max(0, this.hooks.systemShare?.(t) ?? 0)) * 10_000);
+        const perDay = Math.max(0, this.hooks.takingsPerDay?.(t) ?? 0);
+        const { cost: willing, riseBps } = concessionBps({ strikersBps: was?.shareBps ?? 0, systemBps: sysBps, takingsPerDay: perDay, lastDays: o.lastDays, yearBill: monthBill * 12 });
+        const before = o.offerBps;
+        o.offerBps = Math.min(o.claimBps, Math.max(o.offerBps, riseBps));
+        steps.push(because(`After ${o.stoppages} stoppage${o.stoppages > 1 ? "s" : ""}, the last of ${o.lastDays} day${o.lastDays > 1 ? "s" : ""} with ${(was?.shareBps ?? 0) / 100}% of our hours out${sysBps ? ` and systems doing ${sysBps / 100}% of our work` : ""}, against takings of ${usd(perDay)} a day: another a day longer would cost us ${usd(willing)}, which a year's cost covers a rise of ${riseBps / 100}%. ${o.offerBps > before ? `Improving our offer to ${o.offerBps / 100}%.` : `Our offer stays at ${o.offerBps / 100}%.`}`, offer("after a stoppage")));
       }
     }
     return steps;

@@ -94,7 +94,8 @@ const LIVING = "living.initiative_bps=10000";
 // (Re-taken on 2026-10-16 at the profile source check, on the merged foundations review: the au-vic-2026 profile's tribunal and hearing times, fee, rent bands, students per teacher and kin ceiling changed; 46a26c4c... until then.)
 // (Re-taken on 2026-10-17 at the housing and vacant-post faults (fix-housing): the council's appointments officer is a councillor's post, watches the city's own offices and hires for the city where none of its staff is left to second; au-vic names the police among the posts the council fills; a death wakes those in the same space; b805a015... until then.)
 // (Re-taken on 2026-10-17 at the housing and vacant-post faults (fix-housing), on the merge with the seated twins: the council's appointments officer is a councillor's post, watches the city's own offices and hires for the city where none of its staff is left to second; au-vic names the police among the posts the council fills; a death wakes those in the same space; 6fb51f08... until then.)
-const STEP_2B = "a6c71654c710ee11431590d967a1addb2c04dc27dc5f7abd7791b0d641bd53d6";
+// (Re-taken on 2026-10-17 at the strikes by cost (gd-strikes): the union organiser is given each industry's day's pay (`pay_per_day`, generator), so the generated config moves, and with it the state; a6c71654... until then.)
+const STEP_2B = "0d210aadb5dd6e72b54bdd95fb532323edb56eb1f54b022916d7f3cb73a8f68a";
 
 test("with founding off a living town is step 2b's town, to the state hash; turned on with no shape to found, nobody does anything they did not do before", async () => {
   const out = mkdtempSync(join(tmpdir(), "oikos-founding-"));

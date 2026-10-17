@@ -9,7 +9,7 @@ import type { Observation } from "../contracts";
 import { channels } from "../contracts";
 import { need, params, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
 import { breaches, nextLook, because, Book, publishedPrice as buildingPrice, DAY, MONTH, ownAccount, Pace, pay, say, type Step, usd, withdraw, outOfTime, team } from "./common";
-import { type AdjustParams, Bargaining, LabourPlan, Staffing, stepper, terminationLaw, WindingUp } from "./firms";
+import { type AdjustParams, Bargaining, LabourPlan, Takings, Staffing, stepper, terminationLaw, WindingUp } from "./firms";
 import { Borrowing } from "./credit";
 import { distribute, LENGNICK, movePrice, moveWage, payOut } from "./lengnick";
 import { Committed, declineOnTerms, Deliveries, fill, goodsPrices, held, order, OrderBook, Payables, priceList } from "./trade";
@@ -28,7 +28,7 @@ export const producer: BehaviourModule = {
   name: "firm.producer",
   issues: [P.JOB_ADVERTISEMENT, ...P.TRADE, P.REMEDY_ANSWER, ...P.VENUE_ANSWERS],
   issuesWith: (p) => ({ ...P.staffingOwn({ role: p.role ?? "factory worker", industry: p.industry, workplace: p.workplace, notice_days: p.notice_days ?? 14 }) }),
-  version: "0.9.0", // 0.9.0: over its stock band, where the world's law lets an employer cut hours, it cuts everyone's hours by a hand's worth before it lets anyone go, and makes in its staff's hours (docs/behaviour/firms.md, "Hours before heads"); 0.8.0: 0.8.0: buys its inputs on the supplier's terms where it states them, and sells to shops on terms of its own where its world gives them (docs/behaviour/trade.md, "Trade credit"); makes and buys to what it can sell, and none while a unit loses money before wages (docs/behaviour/producer.md, "Inputs bought to what can be sold"); borrows again as its bank allows; no dividend while wages are owed or anyone is under notice (docs/behaviour/firms.md, "Before a dividend"); 0.7.1: returns of tax withheld are filed on the days the law states (docs/behaviour/firms.md, "Returns on the law's days"); 0.7.0: 0.7.0: adjusts its staff as firms do (docs/behaviour/firms.md, "Adjusting labour"): demand smoothed over months, people held while it makes less, let go only when the surplus has lasted what ending the job costs, redundancy pay under the world's law, no recruiting after letting someone go for want of money; 0.6.0: everyday frictions (docs/behaviour/frictions.md): pay that comes short, at the world's rate and its character's; asked, told or ordered to put it right; 0.5.0: wants of its own (docs/behaviour/firm-wants.md): a character from its owner's values, which answers a worker who asks for a rise, and a record of its own; 0.4.5: money promised in orders the bank has not yet paid out is not spent again by the next wake (one works placed the same order 40 times in a day); 0.4.4: 0.4.4: takes on the share of its hands the world gives by the day; 0.4.3: registers the share of its jobs the world gives for its kind
+  version: "0.10.0", // 0.10.0: after a stoppage its offer follows what the stoppage cost it in output sold, not a fixed share of the gap (docs/behaviour/unions.md, "Concession"); 0.9.0: over its stock band, where the world's law lets an employer cut hours, it cuts everyone's hours by a hand's worth before it lets anyone go, and makes in its staff's hours (docs/behaviour/firms.md, "Hours before heads"); 0.8.0: 0.8.0: buys its inputs on the supplier's terms where it states them, and sells to shops on terms of its own where its world gives them (docs/behaviour/trade.md, "Trade credit"); makes and buys to what it can sell, and none while a unit loses money before wages (docs/behaviour/producer.md, "Inputs bought to what can be sold"); borrows again as its bank allows; no dividend while wages are owed or anyone is under notice (docs/behaviour/firms.md, "Before a dividend"); 0.7.1: returns of tax withheld are filed on the days the law states (docs/behaviour/firms.md, "Returns on the law's days"); 0.7.0: 0.7.0: adjusts its staff as firms do (docs/behaviour/firms.md, "Adjusting labour"): demand smoothed over months, people held while it makes less, let go only when the surplus has lasted what ending the job costs, redundancy pay under the world's law, no recruiting after letting someone go for want of money; 0.6.0: everyday frictions (docs/behaviour/frictions.md): pay that comes short, at the world's rate and its character's; asked, told or ordered to put it right; 0.5.0: wants of its own (docs/behaviour/firm-wants.md): a character from its owner's values, which answers a worker who asks for a rise, and a record of its own; 0.4.5: money promised in orders the bank has not yet paid out is not spent again by the next wake (one works placed the same order 40 times in a day); 0.4.4: 0.4.4: takes on the share of its hands the world gives by the day; 0.4.3: registers the share of its jobs the world gives for its kind
   doc: "docs/behaviour/producer.md",
   cadence: () => DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(24) * 3600,
@@ -119,7 +119,8 @@ export const producer: BehaviourModule = {
       truth: (m) => (m.matter === "underpaid" && m.about ? { owed: staffing.owedShort(m.about) } : undefined),
       remedy: (m, _from, t, why) => (m.matter === "underpaid" && m.about && payAccount ? staffing.payInFull(book, t, payAccount, m.about, why) : undefined) });
     const borrowing = new Borrowing(me, p.lender, p.borrow_again_days >= 0 ? { again_days: p.borrow_again_days } : {});
-    const bargaining = new Bargaining(me);
+    const takings = new Takings(); // what buyers have paid us and what we have invoiced the world market for: what a day without our work costs in output sold (Bargaining)
+    const bargaining = new Bargaining(me, { takingsPerDay: (t) => takings.perDay(t), systemShare: (t) => (lastDemand > 0 ? Math.min(1, systemUnits(lastDemand) / lastDemand) : 0) });
     const fleet = new Fleet(me); // the systems delivered to us, and their licences
     const adoption = new Adoption(me, fleet, { ...ADOPTION, ...(p.automation ?? {}) });
     const sysUsed = new Map<string, number>(); // system -> seconds of today it has been given
@@ -488,6 +489,7 @@ export const producer: BehaviourModule = {
           const q = ok ? Math.min(o.quantity, left) : 0;
           left -= q;
           domestic += o.quantity;
+          if (ok) takings.add(t, q * o.unitPrice);
           const filled = fill(o, q, p.works, acc.account, !ok ? `An order ${o.kind !== p.output ? `for ${o.kind}, which we don't sell` : o.quantity < p.min_order ? `for fewer than ${p.min_order}` : "below our price"}: refunding it.` : q === o.quantity ? `An order paid in full: delivering ${q} ${o.kind}.` : `An order paid in full: we have ${q} of the ${o.quantity}; delivering them and refunding the rest.`);
           // (On terms, what is delivered is billed once the goods have gone.)
           if (o.terms && q > 0) { const was = filled.then; filled.then = (out) => { if (out.status === "applied") orders.bill(o, q, t); return was?.(out); }; }
@@ -518,6 +520,7 @@ export const producer: BehaviourModule = {
                 data: { kind: p.output, quantity: q, from_at: p.works, outcome: { money: { to: acc.account, amount: String(q * unit), for: `${q} ${p.output} exported` } } } })]);
             st.then = (out) => {
               if (!out.created?.invoice) exported -= q; // not shipped after all
+              else takings.add(t, q * unit); // (sold: what it is invoiced for is what a day without our work loses, as any sale)
             };
             steps.push(st);
           }
