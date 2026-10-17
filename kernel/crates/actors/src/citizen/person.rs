@@ -747,7 +747,10 @@ impl Person {
         }
         // The daily round: a wake only for going somewhere just takes us where we belong.
         // (A gathering to go to is the mind's: it plans the going; life wakes on its round and its week.)
-        let practice_wake: Option<i64> = self.s.mind_wake_at.filter(|w| *w > t);
+        // (The time the mind asked to be woken for, a gathering's start: reached, the week is planned now, so the mind can go;
+        // TS's `practiceWake`, compared before any filter. Filtering it to the future here sent every gathering's wake into
+        // the daily round, and almost nobody went: integration, 2026-10-18.)
+        let practice_wake: Option<i64> = self.s.mind_wake_at;
         if self.p.round.is_some()
             && t < self.s.next_plan_at
             && self.todo.is_empty()
@@ -758,7 +761,7 @@ impl Person {
             if let Some(go) = self.go_where_we_belong(pic, cx) {
                 return self.send_go(go, cx);
             }
-            return self.wait(self.next_change(t).min(self.s.next_plan_at).min(practice_wake.unwrap_or(i64::MAX)));
+            return self.wait(self.next_change(t).min(self.s.next_plan_at).min(practice_wake.filter(|p| *p > t).unwrap_or(i64::MAX)));
         }
         // Planned when a wake begins; woken because an act of ours is done, we carry on with the plan.
         if self.s.planned_at != t && (pic.woke_for != "done" || self.todo.is_empty()) {
@@ -792,7 +795,7 @@ impl Person {
         }
         if self.todo.is_empty() {
             self.s.last_was_move = false;
-            let pw = practice_wake;
+            let pw = self.s.mind_wake_at.filter(|p| *p > t);
             return match self.p.round {
                 Some(_) => self.wait(pw.unwrap_or(i64::MAX).min(self.s.next_plan_at).min(self.next_change(t))),
                 None => match pw {
