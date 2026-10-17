@@ -836,3 +836,8 @@ No document was opened for this step; every entry below is named from memory and
 - **Nakuru, Kenya:** Constitution of Kenya 2010 art 229; Public Audit Act 2015 (Office of the Auditor-General). Used: ke-nakuru `audit.*`. (To confirm.)
 - **Jalisco, Mexico:** Constitucion Politica art 79 (Auditoria Superior de la Federacion) and art 116; the audit law of Jalisco (Auditoria Superior del Estado de Jalisco). Used: mx-jal `audit.*`. (To confirm.)
 - **Ohio, United States:** Ohio Revised Code chapter 117 (Auditor of State: audits of every public office, local governments included). Used: us-oh `audit.*`. (To confirm.)
+## The citizen's life in Rust (lane A1, 2026-10-17; docs/decisions.md)
+
+| Idea | Citation | Used in |
+|---|---|---|
+| Take-up of support is well under full | DWP, "Income-related benefits: estimates of take-up", financial year ending 2018 (Pension Credit about 60% by caseload, 70% by expenditure) **(to confirm)**; Hernanz, Malherbet and Pellizzari (2004), "Take-up of welfare benefits in OECD countries: a review of the evidence", OECD Social, Employment and Migration Working Paper 17 (40 to 80%) **(to confirm)** | `take_up_bps` (kernel/crates/actors/src/citizen/money.rs); docs/behaviour/citizen.md "Taking up support" |

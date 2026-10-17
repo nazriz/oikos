@@ -6114,3 +6114,51 @@ mind/tests.rs). `kernel/tests/a2_founded.rs` runs the founded kind alone and giv
 the wrong place); a measure of wants, founding or culture moves beyond seed noise at the gate, traced to the order
 in which trust entries are kept or to the words route for names; or `CitizenMind`'s saved state at 10,000 people is
 too large (then its cold parts move behind the engine's shared index).
+
+## 2026-10-17 · Port lane A1: the citizen's life in Rust (docs/port-guide.md section 8; no model called)
+
+**What.** `kernel/crates/actors/src/citizen/` holds citizen.ts's life half as `citizen.default`: `params.rs` (every
+parameter as TS names it, with TS's defaults), `person.rs` (what a person remembers, the `Life` the mind is told, the
+wake, leaving town), `plan.rs` (the week's parts in TS's order, then the mind's half once through the seam, its first
+steps put before all others), and one file per part: `absorb` (what every observation brings), `housing` (tenancy, a
+rent rise, possession, moving in, staying with someone, hunting, the land register, buying and selling), `work`
+(pay and its shortfalls, jobs ending and starting, the strike stoppage, hours, retiring, looking, working for oneself
+and starting a business, taking), `money` (claims for support, borrowing, orders and charges, spending, shopping),
+`lifecycle` (births, deaths at home and at work, a silent home next door, leaving town, a child's wake, school and
+care, the daily round), `recourse` (grievances, what was asked and answered, an opening caseload, disrepair,
+complaints, the tribunal, the openings life offers for a want and carrying out the way the mind chose). `household.rs`
+is the household's sayings; `oikos_rules::household` the occupancy standard and drawing a household (for the
+generator, which lane F wires); `health.rs` the clinic (`clinic.practice`). 131 unit tests in the crate (the lane's
+about 75), and `kernel/tests/a1_citizen.rs`: a generated town (`orchestrator/test/lib/write-town.ts`) of citizens with
+the plain mind, everything else idle, the same log on 1 and 14 threads, 439 acts in three weeks, none refused.
+Built by the lead and six helper agents, a part each, against one frame; the seam settled with lane A2 (four seam
+commits taken from lane-a2).
+
+**Fixed as we went (real-world basis, each in docs/behaviour/citizen.md):**
+- *A tenant's death* (bug hunt 2026-10-17, finding 3; the landlord's half is firm.landlord 0.20.0 on `bugfix`): the
+  survivor living in the home is not homeless and signs the tenancy the landlord offers (a lease citing the old one,
+  for the space they live in), staying put; the death is reported to the registry by whoever of the household sees it,
+  naming the landlord where the household knows it, so the registry's entry is what tells the landlord.
+- *Take-up of support* (risks A-30, PB-13): `take_up_bps`, the share of the entitled who claim, drawn once a payment a
+  spell, keyed to the person and the payment. No default (None: everyone claims, as before); to source per profile.
+
+**Decided fresh** (each said where it is in the code): integers throughout (z-scores in hundredths, float params read
+once as thousandths, half away from zero or half up where TS rounded a non-negative value); ties by id and record
+order by `filed_before`; the first wake drawn at the start on the person's own stream (`Kind::first_wake` has none);
+a household member's trouble goes to the mind when heard, not at the next plan; grievances walked in key order; of
+two laws made at once the later filed is in force; whether a rent rise breaks the law read once a week.
+
+**Not done, for integration and the other lanes:**
+- Stand-ins in place of other lanes' rules: the support law's claimant reading (`money.rs`, for C1's `rules::support`),
+  tax withholding (`absorb.rs`, for C1's `rules::withholding`); the clinic hires nobody (C1's `Staffing`).
+- Left to the mind or needing the seam: signing a petition and standing chosen as ways (`s.sign_now`, `s.stand_now`
+  are recorded, A2 carries them out); word of mouth about shops and employers (the seam has no "heard of"); a want's
+  growth for taking (WantView has no grown/tried); a venture's `{values}`; culture's lean on taking someone in; the
+  complaint's tone; the founding consult.
+- `citizen.default`'s manifest is still the TS one (no `take_up_bps` row yet; lane F's manifests to JSON).
+- Business births at a set rate (A-1, ME-1) kept as TS has them: C1's native entry replaces the draw.
+- Not yet run against the TS scenario tests (deaths, housing, recourse): they need the offices, landlords and
+  employers in Rust; the integration step runs them.
+
+**Revisit if** a scenario test at integration fails in a part (it is that part's file); the seam's `Other` events
+carry much of the traffic; or a profile states a take-up figure and claims fall more than the source says.
