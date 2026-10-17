@@ -1,6 +1,6 @@
 {
   "name": "city.electoral_office",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "doc": "docs/behaviour/elections.md",
   "params": {
     "first_poll_day": {
