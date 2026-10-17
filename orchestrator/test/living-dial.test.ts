@@ -77,7 +77,7 @@ const TOWN = join(root, "worlds/town.yaml");
 // (Re-taken on 2026-10-17 at foundations F9 and F10: three public forms and a row for `take` in the generated town, and the engine's advance stopping where a letter is delivered or a paper recorded, so that news reaches a person when it happens and not at the next wake of anyone; f54352a2... until then.)
 // (Re-taken on 2026-10-17 at the housing and vacant-post faults (fix-housing), on the merge with the seated twins: the council's appointments officer is a councillor's post, watches the city's own offices and hires for the city where none of its staff is left to second; au-vic names the police among the posts the council fills; a death wakes those in the same space; 12df1060... until then.)
 // (Re-taken on 2026-10-17 at the strikes by cost (gd-strikes): the union organiser is given each industry's day's pay (`pay_per_day`, generator), so the generated config moves, and with it the state; 02577eca... until then.)
-const STEP_1 = "6dc3a1034f91b02a190c63c7ee0d5a3fb2d949b38f5f746ad5f417c8ff587607";
+const STEP_1 = "f22e6dee9a823f9561c2f1f8053bbe856e1562dd629d66e942e97a84103da447";
 
 test("with the dial absent or at 0 a town is step 1's town, to the state hash", async () => {
   const out = mkdtempSync(join(tmpdir(), "oikos-dial-"));
