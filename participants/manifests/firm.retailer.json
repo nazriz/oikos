@@ -1,6 +1,6 @@
 {
   "name": "firm.retailer",
-  "version": "0.16.0",
+  "version": "0.18.0",
   "doc": "docs/behaviour/retailer.md",
   "params": {
     "adjust": {
@@ -11,6 +11,11 @@
         "smooth_months": 3,
         "hiring_cost_weeks": 8
       },
+      "source": "placeholder"
+    },
+    "automation": {
+      "schema": {},
+      "default": null,
       "source": "placeholder"
     },
     "bank": {

@@ -52,7 +52,7 @@ Each function names a physical outcome. The resolver decides nothing on the part
 | `take` | `kind*`, `quantity*`, `from*` (whose), `at*` (where: a structure the body is in) | `take`: goods another holds, without their consent (crime) |
 | `harm` | `who*` | `harm`: its own body harms someone near it |
 | `position` | `title`, `role`, `channels`, `role_module`, `appoint`, `to`, `vacate` | `create_position` (a new position of the organisation it acts for); `appoint=<position>, to=<participant>` → `appoint`; `vacate=<position>` → `appoint` of nobody |
-| `system` | `template`, `title`, `retire` | `deploy` a system participant from a template / `retire` one |
+| `system` | `template`, `title`, `to`, `retire` | `deploy` a system participant from a template / `retire` one |
 
 **Common argument meanings:**
 - `for`: whose name the act is in (`speaks_for`); records are in the name of the entity it acts for unless `for` says otherwise. On `money`, `for` is the payment's purpose (its memo).

@@ -574,3 +574,34 @@ export function possessionOrderFor(law: { plan_consider: "may" | "must" | "none"
   const barred = law.plan_barred_rent_months ? `, which the law does not allow where ${law.plan_barred_rent_months} months' rent or more is owed on the day of the order` : "";
   return { ...x, does: `${head}dismissed (the tenant stays, and the notice to vacate is spent); a plan (the tenant stays, paying the rent and a sum a month toward what is owed, over no more than ${planMonths} months${barred}; a plan not kept, the landlord may apply again); or possession on a day (the tenant and household are to leave by it). ${law.plan_consider === "must" ? "The law asks the tribunal to consider a plan before it orders possession." : "The law allows a plan in place of possession."}${cure}${tail}` };
 }
+
+// ------------------------------------------------------------------ the audit office (auditor.ts; docs/behaviour/auditor.md)
+
+/** A body's answer to the audit office's request, from its own books: the thing asked for and nothing else. */
+export const AUDIT_ANSWER: Issued = {
+  form: "audit_answer", title: "Answer to the audit office's request for a named item",
+  does: "Answers the audit office's public request under the audit law, by the day it gives: the count of your decisions of a kind in a period, one of them by its number with its file, or your payments for the period against the bank's record. Say only what your books show. It does nothing else by itself.",
+  fields: { request: f("record", "The request this answers.", req), auditor: f("entity", "The audit office.", req), audit: f("text", "The audit's key, as the request gives it.", req), ask: f("choice", "What was asked for.", { ...req, options: ["count", "nth", "statement"] }),
+    nth: f("count", "For a decision by its number: which."), count: f("count", "For a count: how many."), statement: f("text", "The books' entries asked for, in words.") },
+  writes: { kind: "audit_answer", text: "Answer to audit request {request}: {statement}", basis: "=request", to: ["=auditor"], visible: ["=auditor", "=self"],
+    data: { request: "=request", audit: "=audit", ask: "=ask", nth: "=nth", count: "=count" } },
+};
+
+export const AUDIT: Issued[] = [
+  { form: "audit_request", title: "Audit request to a body, for one named item",
+    does: "Asks, in public, a body the audit law names for one thing: the count of its decisions of a kind in a period, one of them by its number, or its statement of payments for the period. The body must answer by the day given; asking for more than one thing is more than one request. It examines nothing by itself.",
+    fields: { body: f("entity", "The body asked.", req), audit: f("text", "The audit's key (the body, the check and the period).", req), ask: f("choice", "What is asked for.", { ...req, options: ["count", "nth", "statement"] }),
+      kind: f("text", "For decisions: the kind of decision."), nth: f("count", "For one decision: its number in the period (from 1)."), begins: f("date", "The period's first day.", req), ends: f("date", "The day the period ends.", req), answer_by: f("date", "The day the body must answer by.", req) },
+    writes: { kind: "audit_request", text: "Audit request: {ask} for the period from {begins} to {ends}. To be answered by {answer_by}.", visible: "public", data: { audit: "=audit", ask: "=ask", kind: "=kind", nth: "=nth", from: "=begins", to: "=ends", answer_by: "=answer_by" } } },
+  { form: "audit_finding", title: "Audit finding on one item (the audit office's working paper)",
+    does: "Records what the examination of one item found, in the law's terms: that the decision agrees or does not agree with the law and the procedure published for its kind, or that it cannot be told from the file. A finding is the audit office's own working paper; the report is what is published. It reverses and fines nothing.",
+    fields: { body: f("entity", "The body.", req), audit: f("text", "The audit's key.", req), item: f("record", "The decision or statement examined.", req), nth: f("count", "Its number in the period."), agrees: f("choice", "Whether it agrees with the law.", { options: YES_NO }), says: f("text", "What was found, in the law's terms.", req) },
+    writes: { kind: "audit_finding", text: "Audit finding on {item}: {says}.", basis: "=item", visible: ["=self"], data: { audit: "=audit", item: "=item", nth: "=nth", agrees: "?agrees", says: "=says" } } },
+  { form: "audit_report", title: "Audit report on a body for a period (public)",
+    does: "Publishes what the audit of a body for a period found: how many decisions there were, how many were examined, how many agree with the law and how many do not (with the particulars of each, as the findings give them), or whether the accounts reconcile. It is public, by the law; the council, the bodies that hear complaints and the body audited read it. It reverses and fines nothing: what follows is for people, by the review and appeal the law already gives.",
+    fields: { body: f("entity", "The body audited.", req), audit: f("text", "The audit's key.", req), check: f("choice", "What was checked.", { ...req, options: ["decisions", "accounts"] }), period: f("count", "The period's number.", req), begins: f("date", "The period's first day.", req), ends: f("date", "The day it ends.", req),
+      population: f("count", "For decisions: how many were made in the period."), sample: f("count", "For decisions: how many were examined."), agreed: f("count", "How many agree with the law."), not_agreed: f("count", "How many do not."), not_checked: f("count", "How many could not be told from the file."),
+      particulars: f("text", "Where any do not agree: each decision and what was found, in the law's terms.") },
+    writes: { kind: "audit_report", text: "Audit of {body}, {check}, {begins} to {ends}: {population} made, {sample} examined; {agreed} agree with the law, {not_agreed} do not, {not_checked} could not be told from the file. {particulars}", visible: "public",
+      data: { body: "=body", audit: "=audit", check: "=check", period: "#period", from: "=begins", to: "=ends", population: "#population", sample: "#sample", agreed: "#agreed", not_agreed: "#not_agreed", not_checked: "#not_checked" } } },
+];

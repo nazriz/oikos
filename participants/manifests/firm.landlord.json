@@ -44,10 +44,6 @@
       "default": 10000,
       "source": "placeholder"
     },
-    "concede_after": {
-      "schema": {},
-      "source": "the world gives it (no default)"
-    },
     "cut_bps": {
       "schema": {
         "type": "integer",

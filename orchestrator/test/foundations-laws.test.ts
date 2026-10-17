@@ -66,7 +66,10 @@ test("law 3 (F5): a system is delivered from a template that says what it does; 
     expect(c.templates.some((t: any) => t.id === "genesis-system"), `${profile}: the placeholder template`).toBe(false);
     for (const t of c.templates.filter((x: any) => x.kind === "system")) {
       expect(Array.isArray(t.does) && t.does.length > 0, `${profile}: template ${t.id} says what it does`).toBe(true);
-      expect(t.does.some((r: any) => r.block === "work" || r.block === "construct" || r.block === "harm" || r.block === "vote"), `${profile}: template ${t.id} is software: it does no physical work`).toBe(false);
+      // (The outside world\'s own kinds are software. A system a vendor sells a business does the one task it is sold for (adoption: docs/behaviour/automation.md), and no other work.)
+      const sold = t.supplier === "vendors";
+      expect(t.does.some((r: any) => r.block === "construct" || r.block === "harm" || r.block === "vote" || (!sold && r.block === "work")), `${profile}: template ${t.id} is software: it does no physical work`).toBe(false);
+      if (sold) expect(t.does.filter((r: any) => r.block === "work").every((r: any) => typeof r.task === "string" && r.seconds > 0), `${profile}: ${t.id} does one named task, in the seconds the offer gives`).toBe(true);
     }
     for (const p of c.participants.filter((x: any) => x.kind === "system")) expect(templates.get(p.template)?.kind, `${profile}: ${p.id} names a system template`).toBe("system");
   }
@@ -78,7 +81,7 @@ test("law 3 (F5): the posts of the town's own bodies are held by people of the t
     const byId = new Map<string, any>(c.participants.map((p: any) => [p.id, p]));
     const persons = new Set(c.world.entities.filter((e: any) => e.kind === "person").map((e: any) => e.id));
     const systems = c.positions.filter((p: any) => byId.get(p.holder)?.kind === "system").map((p: any) => `${p.entity}/${p.id}`);
-    expect(systems.filter((x: string) => !x.startsWith("outside/") && !/^bank\/bank-payments$|^fund\//.test(x)), `${profile}: posts held by a system`).toEqual([]);
+    expect(systems.filter((x: string) => !x.startsWith("outside/") && !x.startsWith("vendors/") && !/^bank\/bank-payments$|^fund\//.test(x)), `${profile}: posts held by a system`).toEqual([]);
     for (const p of c.positions.filter((x: any) => byId.get(x.holder)?.kind === "person")) expect(persons.has(byId.get(p.holder).person), `${profile}: ${p.id} is held by a resident`).toBe(true);
     // every post has a holder, and no person holds a seat's post along with another (none is a seat here)
     expect(c.positions.filter((p: any) => !p.holder).map((p: any) => p.id), `${profile}: posts nobody holds`).toEqual([]);
@@ -211,8 +214,14 @@ test("F7: law 5: a living town's slips are rows of its table, each with a source
   expect(Object.keys(slip.person).sort()).toEqual([...tasks].sort());
   // An office's decisions go wrong at the office's sourced rate whoever or whatever makes them (the support agency of the outside world is a system, and
   // its wrong refusals are what the profile's figure is of); pay come short is an employer's, a person's.
-  expect(Object.keys(slip.system).sort()).toEqual(tasks.filter((x) => x !== "transfer/wages").sort());
-  for (const t of Object.keys(slip.system)) {
+  // (And the rate at which each system the vendor sells gets a unit wrong, by the offer\'s id, with the offer\'s source: adoption, docs/behaviour/automation.md.)
+  const sold = c.templates.filter((x: any) => x.supplier === "vendors").map((x: any) => x.id);
+  expect(Object.keys(slip.system).filter((k) => !sold.includes(k)).sort()).toEqual(tasks.filter((x) => x !== "transfer/wages").sort());
+  for (const id of sold) {
+    expect(slip.system[id]?.bps, `${id}: its rate`).toBeGreaterThanOrEqual(0);
+    expect(String(slip.sources[`system.${id}`] ?? "").length, `${id}: its source`).toBeGreaterThan(20);
+  }
+  for (const t of Object.keys(slip.system).filter((k) => !sold.includes(k))) {
     expect(slip.system[t], t).toEqual(slip.person[t]);
     expect(String(slip.sources[`system.${t}`] ?? "").length, `${t}: its source for a system`).toBeGreaterThan(20);
   }

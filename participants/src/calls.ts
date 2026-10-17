@@ -166,7 +166,10 @@ export function parseProgram(text: string): Program {
  * names the line it is charged to carries it. It is in `ARGS` now, so a translator is taught and shown it. The
  * mechanism stays for an argument that must again be code's alone.
  */
-export const CODE_ARGS: { [fn: string]: Set<string> } = {};
+export const CODE_ARGS: { [fn: string]: Set<string> } = {
+  // (The client a vendor delivers a system to: only the vendor's code does that, as the supplier, and no request in words does: docs/behaviour/automation.md.)
+  system: new Set(["to"]),
+};
 
 /** Per function: the arguments it takes (undefined: any, as with a form's fields) and the ones it needs. Read from contracts/calls.schema.json, so it can't drift from the contract. Not the arguments only code writes (`CODE_ARGS`). */
 export const ARGS: { [fn: string]: { allowed?: Set<string>; required: string[] } } = Object.fromEntries(

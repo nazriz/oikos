@@ -1,0 +1,219 @@
+{
+  "name": "office.auditor",
+  "version": "0.1.0",
+  "doc": "docs/behaviour/auditor.md",
+  "params": {
+    "year": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 31536000,
+      "source": "placeholder"
+    }
+  },
+  "perceives": [],
+  "state": "none",
+  "issues": [
+    {
+      "form": "audit_request",
+      "title": "Audit request to a body, for one named item",
+      "does": "Asks, in public, a body the audit law names for one thing: the count of its decisions of a kind in a period, one of them by its number, or its statement of payments for the period. The body must answer by the day given; asking for more than one thing is more than one request. It examines nothing by itself.",
+      "fields": {
+        "body": {
+          "type": "entity",
+          "required": true,
+          "description": "The body asked."
+        },
+        "audit": {
+          "type": "text",
+          "required": true,
+          "description": "The audit's key (the body, the check and the period)."
+        },
+        "ask": {
+          "type": "choice",
+          "required": true,
+          "options": [
+            "count",
+            "nth",
+            "statement"
+          ],
+          "description": "What is asked for."
+        },
+        "kind": {
+          "type": "text",
+          "description": "For decisions: the kind of decision."
+        },
+        "nth": {
+          "type": "count",
+          "description": "For one decision: its number in the period (from 1)."
+        },
+        "begins": {
+          "type": "date",
+          "required": true,
+          "description": "The period's first day."
+        },
+        "ends": {
+          "type": "date",
+          "required": true,
+          "description": "The day the period ends."
+        },
+        "answer_by": {
+          "type": "date",
+          "required": true,
+          "description": "The day the body must answer by."
+        }
+      },
+      "writes": {
+        "kind": "audit_request",
+        "text": "Audit request: {ask} for the period from {begins} to {ends}. To be answered by {answer_by}.",
+        "visible": "public",
+        "data": {
+          "audit": "=audit",
+          "ask": "=ask",
+          "kind": "=kind",
+          "nth": "=nth",
+          "from": "=begins",
+          "to": "=ends",
+          "answer_by": "=answer_by"
+        }
+      }
+    },
+    {
+      "form": "audit_finding",
+      "title": "Audit finding on one item (the audit office's working paper)",
+      "does": "Records what the examination of one item found, in the law's terms: that the decision agrees or does not agree with the law and the procedure published for its kind, or that it cannot be told from the file. A finding is the audit office's own working paper; the report is what is published. It reverses and fines nothing.",
+      "fields": {
+        "body": {
+          "type": "entity",
+          "required": true,
+          "description": "The body."
+        },
+        "audit": {
+          "type": "text",
+          "required": true,
+          "description": "The audit's key."
+        },
+        "item": {
+          "type": "record",
+          "required": true,
+          "description": "The decision or statement examined."
+        },
+        "nth": {
+          "type": "count",
+          "description": "Its number in the period."
+        },
+        "agrees": {
+          "type": "choice",
+          "options": [
+            "yes",
+            "no"
+          ],
+          "description": "Whether it agrees with the law."
+        },
+        "says": {
+          "type": "text",
+          "required": true,
+          "description": "What was found, in the law's terms."
+        }
+      },
+      "writes": {
+        "kind": "audit_finding",
+        "text": "Audit finding on {item}: {says}.",
+        "basis": "=item",
+        "visible": [
+          "=self"
+        ],
+        "data": {
+          "audit": "=audit",
+          "item": "=item",
+          "nth": "=nth",
+          "agrees": "?agrees",
+          "says": "=says"
+        }
+      }
+    },
+    {
+      "form": "audit_report",
+      "title": "Audit report on a body for a period (public)",
+      "does": "Publishes what the audit of a body for a period found: how many decisions there were, how many were examined, how many agree with the law and how many do not (with the particulars of each, as the findings give them), or whether the accounts reconcile. It is public, by the law; the council, the bodies that hear complaints and the body audited read it. It reverses and fines nothing: what follows is for people, by the review and appeal the law already gives.",
+      "fields": {
+        "body": {
+          "type": "entity",
+          "required": true,
+          "description": "The body audited."
+        },
+        "audit": {
+          "type": "text",
+          "required": true,
+          "description": "The audit's key."
+        },
+        "check": {
+          "type": "choice",
+          "required": true,
+          "options": [
+            "decisions",
+            "accounts"
+          ],
+          "description": "What was checked."
+        },
+        "period": {
+          "type": "count",
+          "required": true,
+          "description": "The period's number."
+        },
+        "begins": {
+          "type": "date",
+          "required": true,
+          "description": "The period's first day."
+        },
+        "ends": {
+          "type": "date",
+          "required": true,
+          "description": "The day it ends."
+        },
+        "population": {
+          "type": "count",
+          "description": "For decisions: how many were made in the period."
+        },
+        "sample": {
+          "type": "count",
+          "description": "For decisions: how many were examined."
+        },
+        "agreed": {
+          "type": "count",
+          "description": "How many agree with the law."
+        },
+        "not_agreed": {
+          "type": "count",
+          "description": "How many do not."
+        },
+        "not_checked": {
+          "type": "count",
+          "description": "How many could not be told from the file."
+        },
+        "particulars": {
+          "type": "text",
+          "description": "Where any do not agree: each decision and what was found, in the law's terms."
+        }
+      },
+      "writes": {
+        "kind": "audit_report",
+        "text": "Audit of {body}, {check}, {begins} to {ends}: {population} made, {sample} examined; {agreed} agree with the law, {not_agreed} do not, {not_checked} could not be told from the file. {particulars}",
+        "visible": "public",
+        "data": {
+          "body": "=body",
+          "audit": "=audit",
+          "check": "=check",
+          "period": "#period",
+          "from": "=begins",
+          "to": "=ends",
+          "population": "#population",
+          "sample": "#sample",
+          "agreed": "#agreed",
+          "not_agreed": "#not_agreed",
+          "not_checked": "#not_checked"
+        }
+      }
+    }
+  ]
+}

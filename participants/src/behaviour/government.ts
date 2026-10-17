@@ -15,7 +15,9 @@ import { billSettled, nextLook, because, Book, cellsOf, DAY, draftLaw, figureGiv
 import { Staffing, staffingForm, staffingUnder, stepper } from "./firms";
 import { incomeTaxLaw, withholding } from "./tax";
 import { ownLand } from "./institutions";
+import { OfficeDesk } from "./automation";
 import * as P from "./papers";
+import { Audited } from "./auditor";
 
 const YEAR = 365 * DAY;
 
@@ -539,7 +541,7 @@ export const councillor: BehaviourModule = {
  */
 export const financeOfficer: BehaviourModule = {
   name: "city.finance_officer",
-  issues: P.FINANCE,
+  issues: [...P.FINANCE, P.AUDIT_ANSWER],
   answers: {"office": "the finance office", "acts": "What it acts on: an invoice addressed to the town, paid within the adopted budget (over the payments procedure's figure, once the mayor's written approval is on file); a payroll notice from an office that has taken someone on or is losing someone; and the tax withheld from wages, paid over each month. It does not start, stop or change a payment on a letter.", "forms": [{"about": ["approv"], "say": "An approval of an invoice is the mayor's to give, in writing, naming the invoice."}], "report": true},
   version: "0.10.1", // 0.10.1: returns of tax withheld are filed on the days the law states (docs/behaviour/firms.md, "Returns on the law's days"); 0.10.0: 0.10.0: sets a new starter's wage up on the hiring office's payroll notice, from the first pay day it gives (with none after payroll_wait_days, from the agreement on file); asks the mayor, once, for the written approval an invoice over the procedure's figure needs. 0.9.0: pays within the adopted budget of the year it is in; while the year has none, under the budget last adopted at a twelfth a month (the charter's interim rule); spending is reckoned by the year
   doc: "docs/behaviour/government.md",
@@ -555,6 +557,10 @@ export const financeOfficer: BehaviourModule = {
     }, ctx.params);
     const book = new Book();
     const paid = new Set<string>();
+    // Our books of what we paid against an invoice, and the bank's record of it as the account shows it (the audit office asks for both: docs/behaviour/auditor.md).
+    const booked = new Map<string, { amount: number; at: number }>();
+    const banked = new Map<string, { amount: number; t: number }>();
+    const audited = new Audited(ctx.entity);
     let spent = 0;
     let budgetYear = -1;
     // The town's payroll (docs/behaviour/services.md): wages for those the town employs (its works office hires them),
@@ -574,6 +580,7 @@ export const financeOfficer: BehaviourModule = {
         if (mine) for (const x of channels.transactions(obs)) {
           if (x.to === mine && x.from !== mine) flows.push({ t: x.t, amount: cents(x.amount), party: x.from });
           if (x.from === mine && x.to !== mine) flows.push({ t: x.t, amount: -cents(x.amount), party: x.to });
+          if (x.from === mine && x.to !== mine && x.settles) banked.set(x.settles, { amount: cents(x.amount), t: x.t });
         }
       },
       (obs) => {
@@ -627,10 +634,12 @@ export const financeOfficer: BehaviourModule = {
           }
           if (acc.balance < amount) continue;
           paid.add(inv.id);
+          booked.set(inv.id, { amount, at: obs.t });
           spent += amount;
           steps.push(because(!withinProcedure ? "Paying an invoice outside the procedure." : adopted ? "Paying an invoice within the adopted budget (with the mayor's approval where needed)." : `Year ${year} has no adopted budget yet: paying an invoice within a twelfth a month of the budget last adopted, as the charter allows (with the mayor's approval where needed).`,
             pay(owed.to, amount, { from: acc.account, for: `Paying invoice ${inv.id}.`, settles: inv.id, ...(lineOf(inv) ? { line: lineOf(inv)! } : {}) })));
         }
+        steps.push(...audited.steps(book, { statement: () => ({ books: [...booked].map(([id, x]) => ({ id, ...x })), bank: [...banked].map(([id, x]) => ({ id, ...x })) }) }));
         steps.push(...letters.answer(() => {
           const unpaid = book.open("invoice").filter((i) => (i.addressed_to ?? []).includes(me) && !paid.has(i.id));
           const lines = budget ? Object.entries(budget.data?.lines ?? {}).map(([k, v]) => `${k} ${usd(v as number)}`).join(", ") : "";
@@ -775,8 +784,12 @@ export const ratesOfficer: BehaviourModule = {
       // "seat" the rates officer alone, who sets the standing work order; "staff" the rates clerks, who follow it.
       part: "" as "" | "seat" | "staff",
       office: "", // where its clerks work, as a standing order names it (none given: the office itself)
+      // Systems it may take up to write its notices (docs/behaviour/automation.md): how it weighs them, the law on public buying,
+      // and what its papers take its clerks (the world's figures). None: it looks at none.
+      automation: null as import("./automation").AdoptionParams | null, procurement: null as import("./automation").Procurement | null, casework: null as import("./automation").Casework | null,
     }, ctx.params);
     const book = new Book();
+    const desk = new OfficeDesk(ctx.entity, p, ctx.rng);
     const letters = new Letters(ratesOfficer.answers);
     const directions = new Directions(ctx, { under: p.directed_under, compliance_bps: p.direction_compliance_bps, office_words: "the rates office" });
     const routines = new StandingWork(ctx.entity, p.part);
@@ -798,6 +811,7 @@ export const ratesOfficer: BehaviourModule = {
     return stepper(
       (obs) => {
         book.absorb(obs);
+        desk.absorb(book);
         letters.take(obs, book);
         const acc = ownAccount(obs);
         if (acc) for (const tx of channels.transactions(obs)) if (tx.to === acc.account && tx.settles) {
@@ -822,6 +836,7 @@ export const ratesOfficer: BehaviourModule = {
         const lastNotices = Math.max(-Infinity, ...book.open("rates_notice").filter(ours).map((n) => n.at));
         if (lastNotices > -Infinity) next = Math.max(next, lastNotices + everyInstalment);
         for (const r of book.ofType("claim") as any[]) if (r.record === "claim" && r.position === "right" && r.holder === me && r.about?.kind === "rates_interest" && ours(r)) for (const b of basesOf(r)) lastInterest.set(b, Math.max(lastInterest.get(b) ?? -Infinity, r.at));
+        if (p.part !== "staff") steps.push(...desk.steps(book, t, { account: acc.account, balance: acc.balance, staff: 1, keep: 0 }));
         steps.push(...routines.set(book, [{ task: "levy", at: p.office || ctx.position || "office", every: everyInstalment, why: "Setting the rates clerks' work: the notices sent at each instalment and interest added to what is overdue, as a standing work order." }]));
         const levying = routines.does(book, "levy", t, { every: DAY });
         // Notices: each owner's share of a year's rates on what they own, as last valued. (Not before there are valuations:
@@ -847,7 +862,11 @@ export const ratesOfficer: BehaviourModule = {
               record("right", me, { kind: "rates", amount: o.amount, account: acc.account, due, lots: o.lots }, { against: owner, basis: law.id }));
           }
           routines.did("levy", t, { units: lines.length / 2 });
-          for (let i = 0; i < lines.length; i += 30) steps.push(because(`The rates instalment: a ${instalments === 1 ? "year" : `${instalments}th of a year`}'s rates at the law's ${ratePpm / 10_000}% of each property's value.`, ...lines.slice(i, i + 30)));
+          for (let i = 0; i < lines.length; i += 30) {
+            const st = because(`The rates instalment: a ${instalments === 1 ? "year" : `${instalments}th of a year`}'s rates at the law's ${ratePpm / 10_000}% of each property's value.`, ...lines.slice(i, i + 30));
+            desk.assign(st, "rates_notice"); // (a system of ours that writes them does, if we hold one)
+            steps.push(st);
+          }
         }
         // The clerks' report to the rates officer, once a day (docs/behaviour/standing-work.md, "The staff's report").
         if (levying) routines.note("levy", !law || ratePpm <= 0 ? "the rating law on file sets no rate, so no notice is sent" : !book.open("valuation").length ? "no property has been valued yet: the first notices go out once the valuer has valued" : `the next notices go out on ${dated(next)}, as the rating law's instalments fall`);

@@ -12,11 +12,12 @@ import { stepper } from "./firms";
 import { declineOnTerms, fill, held, OrderBook, priceList } from "./trade";
 import { drawHousehold, drawSavings, type HouseholdSpec } from "./household";
 import { yearsOfSchooling, type SchoolingSpec } from "./school";
-import { forAge, supportLaw, type Declared, type PaymentRule } from "./payments";
+import { decideClaim, forAge, supportLaw, type Declared, type PaymentRule } from "./payments";
 import { incomeTaxLaw, withholding } from "./tax";
 import { Respondent } from "./frictions";
 import { slip } from "../slip";
 import { decisionLaw, Reconsiderations, Waits } from "./decisions";
+import { Audited, type Answerer, type DecisionFile } from "./auditor";
 
 export const exportDemand: BehaviourModule = {
   name: "world.export_demand",
@@ -255,7 +256,7 @@ export const transfers: BehaviourModule = {
   // the support law's own conditions settle is the staff's; a refusal, a doubt and a review are the office-holder's.
   routines: [{ task: "pay_claims", at: "office", every: 1, what: "Each working day the office's staff decide the claims that have waited their time, the oldest first: a claim that meets the conditions the support law states for its payment is granted, in writing, and paid each period from then until the claimant asks for it to stop, dies, leaves, or its time runs out, which the staff tell them. A claim that does not meet the conditions, or that the staff could not verify, is not refused by the staff: it is put before whoever holds the office, as a note on the office's file saying what it fails on, and decided by them on the office's decision form; a claim they grant on that form is paid by the staff like any other. A request to look at a decision again comes to the office-holder. What a claim waits for before it is decided (papers from the claimant, a confirmation from their last employer, within so many days) is the law's: the staff ask for it and the claim stays on their file until it has come or its time has run.",
     papers: [{ kind: "benefit_claim", how: "decided by the support law's conditions: granted and paid if it meets them, put before the office-holder if it does not or could not be verified" }, { kind: "benefit_change", how: "a claimant's own request to stop their payment: it is stopped" }] }],
-  issues: [...P.SUPPORT, P.REMEDY_ANSWER, ...P.VENUE_ANSWERS],
+  issues: [...P.SUPPORT, P.REMEDY_ANSWER, ...P.VENUE_ANSWERS, P.AUDIT_ANSWER],
   version: "0.10.0", // 0.10.0: a claim waits for what the law says it needs (papers from the claimant, a confirmation from the last employer, within so many days: foundations F8), is looked at again when asked inside the law's days (a review, recorded), and a refusal found wrong is put right by the office or on a venue's setting it aside; the staff refuse nothing only where the law says the head alone does; 0.9.0: the wrong refusals are a slip at the rate of the world's table of slips (foundations F7), not a parameter; 0.8.0: no processing time, daily capacity or doubled errors under backlog: it decides every claim it has, and how many is the hours of whoever decides (foundations F6); 0.7.0: a claim made before the year began and still waiting (an opening caseload) is decided when its processing time from that day has run; a claim refused before it is decided; a refusal asked about that the paper says could not be verified is found wrong on review; 0.6.0: payments in force before the year (grants brought forward on paper) are taken up when the file is first opened and paid from the day each names; 0.5.0: run in parts where a model holds the office (part): the staff decide and pay what the law's conditions settle under a standing order (pay_claims) and put a refusal or a doubt before the office-holder, who decides it on the office's decision form and answers reviews; a town run by code is unchanged; 0.4.0: a claim may wait to be decided (processing_days), the staff decide so many a day (capacity_per_day), and some qualifying claims are wrongly refused, more while a backlog stands (error_bps, at the friction dial); asked to review a refusal found wrong, the office decides the next claim on its facts
   doc: "docs/behaviour/boundary.md",
   cadence: () => DAY,
@@ -287,6 +288,10 @@ export const transfers: BehaviourModule = {
     const lately: string[] = [];
     const claimNth = new Occurrences(); // which claim each is: this person's nth for this payment, not its number on file
     const waits = new Waits(me); // what a claim waits for before it is decided (the law's `needs`: foundations F8)
+    // When we decided each claim, and which we refused for papers that did not come: our own record of the round a decision was made at, which the audit office's
+    // question "decided again as it was" needs (a decision's paper is stamped when it is done, which may be later than the round that made it). Not in the papers.
+    const decidedOn = new Map<string, number[]>();
+    const lapsedClaims = new Set<string>();
     const recon = new Reconsiderations(me, ["benefit_decision"]); // a decision of ours looked at again when asked (the law's `review`)
     type Paying = { person: string; account: string; payment: string; from: string; amount: number; every: number; next: number; until?: number; then?: string };
     const paying = new Map<string, Paying>(); // claim -> what we pay under it
@@ -297,47 +302,15 @@ export const transfers: BehaviourModule = {
     const reported = (who: string, since: number) => book.all("withholding_report").filter((r) => (r.addressed_to ?? []).includes(me) && r.at >= since && Array.isArray(r.data?.staff))
       .sort((a, b) => b.at - a.at || (a.id < b.id ? 1 : -1))
       .flatMap((r) => (r.data!.staff as { worker: string; gross: number }[]).filter((l) => l.worker === who).map((l) => ({ at: r.at, gross: Math.floor(Number(l.gross) || 0) })));
-    /** A claim under a rule: granted (with the sum and how long), or why not. */
+    /** A claim under a rule: granted (with the sum and how long), or why not (one reading of the law's conditions, `decideClaim`, shared with the auditor). */
     const decide = (rule: PaymentRule | undefined, c: StatementRecord, t: number): { ok: true; amount: number; until?: number } | { ok: false; why?: string } => {
-      if (!rule || typeof c.data?.account !== "string" || !Number.isInteger(c.data?.born_at)) return { ok: false };
       const who = c.speaks_for!;
-      const born = c.data.born_at as number;
-      const age = Math.floor((t - born) / p.year);
-      const w = rule.who ?? {};
-      const said: Declared = c.data?.declares ?? {};
-      if (age < (w.from_age ?? -Infinity) || age > (w.to_age ?? Infinity)) return { ok: false };
-      const members = Math.max(1, Math.floor(Number(said.household_members) || 1));
-      const children = (under: number) => (Array.isArray(said.children_born_at) ? said.children_born_at : []).filter((b) => Number.isInteger(b) && Math.floor((t - b) / p.year) < under).length;
-      const record = w.record || "share_bps" in rule.amount ? reported(who, w.record?.within_months ? t - w.record.within_months * MONTH : -Infinity) : [];
-      if (w.record && record.length < (w.record.months ?? 1)) return { ok: false, why: `contributions are on our record for ${record.length} month${record.length === 1 ? "" : "s"}, and the payment asks for ${w.record.months ?? 1}` };
-      if (w.income_under) {
-        if (!Number.isInteger(said.household_income)) return { ok: false, why: "the claim doesn't state the household's income" };
-        const income = w.income_under.per === "head" ? Math.floor(said.household_income! / members) : said.household_income!;
-        if (income >= w.income_under.amount) return { ok: false, why: `the household's income as stated is not under ${usd(w.income_under.amount)}${w.income_under.per === "head" ? " a head" : ""}` };
-      }
-      if (w.no_other_pension) {
-        if (said.other_pension !== false) return { ok: false, why: "the claim doesn't state that no other pension is paid" };
-        const ours = rules();
-        if ([...paying.values()].some((x) => x.person === who && x.payment !== rule.id && ours.some((r) => r.id === x.payment && forAge(r)))) return { ok: false, why: "we pay the claimant another pension" };
-      }
-      if (w.children && children(w.children.under_age) < w.children.least) return { ok: false, why: `the household as stated has fewer than ${w.children.least} child${w.children.least === 1 ? "" : "ren"} under ${w.children.under_age}` };
-      const a = rule.amount;
-      let amount: number;
-      if ("flat" in a) amount = a.flat;
-      else if ("share_bps" in a) {
-        // Their previous pay for as long as one payment covers: the mean of the monthly pay reported for them (the last
-        // twelve reports at most), before or after what the tax law withholds from such a pay.
-        const last = record.slice(0, 12);
-        if (!last.length) return { ok: false, why: "no pay is on our record for the claimant" };
-        const gross = Math.floor((last.reduce((x, l) => x + l.gross, 0) / last.length) * rule.every_days / 30);
-        const pay = a.of === "net" ? gross - withholding(incomeTaxLaw(book), gross, rule.every_days * DAY) : gross;
-        const most = a.most === undefined ? Infinity : typeof a.most === "number" ? a.most : [...a.most].sort((x, y) => y.from_age - x.from_age).find((b) => b.from_age <= age)?.amount ?? Infinity;
-        amount = Math.min(most, Math.max(a.least ?? 0, Math.floor((pay * (a.with_child_bps !== undefined && children(18) > 0 ? a.with_child_bps : a.share_bps)) / 10_000)));
-      } else amount = a.household + (a.per_member ?? 0) * members + (a.per_child ? a.per_child.amount * children(a.per_child.under_age) : 0);
-      if (!(amount > 0)) return { ok: false, why: "the payment comes to nothing" };
-      const ends = [rule.lasts?.days !== undefined ? t + rule.lasts.days * DAY : Infinity, rule.lasts?.until_age !== undefined ? born + rule.lasts.until_age * p.year : Infinity];
-      const until = Math.min(...ends);
-      return { ok: true, amount, ...(until < Infinity ? { until } : {}) };
+      return decideClaim(rule, c, t, {
+        year: p.year,
+        reported: (since) => reported(who, since),
+        paysOtherPension: () => !!rule && [...paying.values()].some((x) => x.person === who && x.payment !== rule.id && rules().some((r) => r.id === x.payment && forAge(r))),
+        withheld: (gross, seconds) => withholding(incomeTaxLaw(book), gross, seconds),
+      }, usd);
     };
     /** A claim granted on the office's second look (a review, or a venue setting its refusal aside): the office decides again on the facts it has now,
      * as it decides any claim, without a slip, and puts right what it finds wrong itself: the new decision, and the payments under it. */
@@ -348,6 +321,8 @@ export const transfers: BehaviourModule = {
       const d = decide(rule, claim, t);
       if (!d.ok) return { changed: false, found: d.why ?? "it does not meet the conditions the support law states for the payment", steps: [] };
       const who = claim.speaks_for!;
+      decidedOn.set(claim.id, [...(decidedOn.get(claim.id) ?? []), t]);
+      lapsedClaims.delete(claim.id);
       for (const [id, x] of paying) if (x.person === who && x.payment === rule.id) paying.delete(id);
       paying.set(claim.id, { person: who, account: claim.data!.account as string, payment: rule.id, from: rule.account || p.account, amount: d.amount, every: rule.every_days * DAY, next: t + rule.every_days * DAY, ...(d.until !== undefined ? { until: d.until } : {}), ...(rule.lasts?.then ? { then: rule.lasts.then } : {}) });
       const lasting = d.until !== undefined ? ` until day ${Math.floor(d.until / DAY)}` : "";
@@ -375,6 +350,29 @@ export const transfers: BehaviourModule = {
         return d && d.record === "statement" && d.speaks_for === me && d.kind === "benefit_decision" && d.data?.granted === false ? decideAgain(d, t, why, basis).steps : [];
       },
     });
+    // The audit office's questions to us (docs/behaviour/auditor.md): the decisions we made in a period, in the order they are numbered (by when,
+    // then by id), and one of them with the claim and the record it rests on. Decisions brought forward from before the year are not ours to make again.
+    const audited = new Audited(me);
+    const decisionsIn = (kind: string, from: number, to: number) => book.all(kind).filter((d) => d.speaks_for === me && !d.data?.brought_forward && typeof d.data?.claim === "string" && d.at >= from && d.at < to)
+      .sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : 1));
+    const answerer: Answerer = {
+      count: (kind, from, to) => decisionsIn(kind, from, to).length,
+      nth: (kind, from, to, nth): DecisionFile | undefined => {
+        const d = decisionsIn(kind, from, to)[nth - 1];
+        if (!d) return undefined;
+        const c = book.records.get(String(d.data!.claim)) as StatementRecord | undefined;
+        const rounds = (decidedOn.get(String(d.data!.claim)) ?? []).filter((x) => x <= d.at);
+        const on = rounds.length ? Math.max(...rounds) : d.at;
+        const decision = { id: d.id, at: d.at, on, granted: d.data?.granted === true, ...(Number.isFinite(Number(d.data?.amount)) ? { amount: Number(d.data!.amount) } : {}), ...(Number.isFinite(Number(d.data?.every)) ? { every: Number(d.data!.every) } : {}),
+          ...(Number.isFinite(Number(d.data?.until)) ? { until: Number(d.data!.until) } : {}), ...(typeof d.data?.reason === "string" ? { reason: d.data.reason } : {}), ...(d.data?.granted !== true && !d.data?.replaces && lapsedClaims.has(String(d.data!.claim)) ? { lapsed: true } : {}) };
+        if (!c || c.record !== "statement" || !c.speaks_for) return { decision, reported: [], pays_other: false };
+        const payment = String(d.data?.payment ?? c.data?.payment);
+        const rule = rules().find((r) => r.id === payment);
+        return { decision, reported: reported(c.speaks_for, -Infinity).filter((r) => r.at <= on).slice(0, 36),
+          pays_other: !!rule && [...paying.values()].some((x) => x.person === c.speaks_for && x.payment !== rule.id && rules().some((r) => r.id === x.payment && forAge(r))),
+          claim: { id: c.id, by: c.speaks_for, payment, born_at: Number(c.data?.born_at), account: String(c.data?.account ?? ""), declares: (c.data?.declares ?? {}) as Declared } };
+      },
+    };
     return stepper(
       (obs) => book.absorb(obs),
       (obs) => {
@@ -412,6 +410,7 @@ export const transfers: BehaviourModule = {
             seen.add(n.id);
             const d = n.data ?? {};
             if (typeof d.claim !== "string" || typeof d.claimant !== "string") continue;
+            decidedOn.set(d.claim, [...(decidedOn.get(d.claim) ?? []), t]);
             const why = String(d.fails ?? "");
             steps.push(because(`A claim the staff put before us (${d.claim}): refused${why ? `: ${why}` : ""}.`,
               say("benefit_decision", `Claim ${d.claim} refused${why ? `: ${why}` : ""}.`, { to: [d.claimant], visible: [d.claimant, me], basis: d.claim, data: { claim: d.claim, payment: d.payment, granted: false, ...(why ? { reason: why } : {}) } })));
@@ -431,6 +430,8 @@ export const transfers: BehaviourModule = {
           if (wait) steps.push(...wait.steps);
           if (wait?.state === "waiting") continue;
           decided.add(c.id);
+          decidedOn.set(c.id, [...(decidedOn.get(c.id) ?? []), t]);
+          if (wait?.state === "lapsed") lapsedClaims.add(c.id);
           let d = wait?.state === "lapsed" ? { ok: false as const, why: wait.why } : decide(rule, c, t);
           // A claim that qualifies may be wrongly refused (a record not matched, a form read wrongly): a slip of whoever decides, at the
           // rate of the world's table of slips for a decision on a claim (foundations F7). It is put right when the decision is looked at
@@ -465,6 +466,9 @@ export const transfers: BehaviourModule = {
               to: [who], visible: [who, me], basis: c.id, data: { claim: c.id, payment, granted: d.ok, ...(d.ok ? { amount: d.amount, every: rule!.every_days * DAY, ...(d.until !== undefined ? { until: d.until } : {}) } : d.why ? { reason: d.why } : {}) },
             })));
         }
+        // Asked by the audit office for a named item, under the audit law (docs/behaviour/auditor.md): answered from our books, by whoever does our
+        // paperwork (never the office-holder alone, whose part is the decisions the staff put before them).
+        if (p.part !== "seat") steps.push(...audited.steps(book, answerer));
         // Asked to look at a decision again (the claimant's request, inside the days the law gives): the office decides it again on the facts, and
         // records that it did. Never the staff's where there is a head to do it. A venue's notice of an application against us is answered
         // from the books (`resp`).

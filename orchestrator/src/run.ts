@@ -679,6 +679,12 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
    */
   const performersOf = (participant: string, program: calls.Program): { program: calls.Program; by?: string[]; told?: string[] } => {
     const u = units.get(participant);
+    // (A code unit names a system of its organisation by its id: the platform gives it to the act as `by`, and the kernel looks at whose it is.)
+    if (u && !u.llm && "lines" in program) {
+      const ids = [...new Set(program.lines.flatMap((l) => (l.call.args.done_by !== undefined && "id" in l.call.args.done_by ? [l.call.args.done_by.id] : [])))];
+      if (!ids.length) return { program };
+      return { program: { lines: program.lines.map((l) => (l.call.args.done_by !== undefined ? { ...l, call: { ...l.call, args: Object.fromEntries(Object.entries(l.call.args).filter(([name]) => name !== "done_by")) } } : l)) }, by: ids };
+    }
     if (!u?.llm || !("lines" in program)) return { program };
     const asked = program.lines.filter((l) => l.call.args.done_by !== undefined);
     if (!asked.length) return { program };
@@ -1066,6 +1072,9 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
         u.notices.push({ t, text: "That request couldn't be read. Could you say it more plainly?" });
         return true;
       }
+      // A code participant that names a system of its organisation to do the work (`done_by=<id>`): the act is done by it and on its time.
+      const system = u.llm ? undefined : performersOf(u.participant, program);
+      if (system?.by) program = system.program;
       // The resolver: the engine's (kernel/crates/resolver), from what the engine delivered to this seat; or, in
       // shadow mode (OIKOS_RESOLVER=shadow, while the engine's is checked against it), both, compared.
       const resolverMode = RESOLVER_MODE;
@@ -1091,7 +1100,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
         for (const q of res.questions) u.notices.push({ t, text: q });
         return true;
       }
-      const r = await begin(u, { command: "act", participant: u.participant, ...asField, blocks: res.blocks, provenance: { via: "call", call: written ? action.call : calls.programText(program), resolver: RESOLVER }, ...(action.reasoning && keepReasoning(u) ? { reasoning: action.reasoning } : {}) });
+      const r = await begin(u, { command: "act", participant: u.participant, ...asField, blocks: res.blocks, ...(system?.by?.length ? { by: system.by } : {}), provenance: { via: "call", call: written ? action.call : calls.programText(program), resolver: RESOLVER }, ...(action.reasoning && keepReasoning(u) ? { reasoning: action.reasoning } : {}) });
       if (r === null) await notSent(u, "act", "What you did could not be carried out as it was written, and nothing was done.", { rejected_action: JSON.stringify(res.blocks).slice(0, 4000), call: calls.programText(program) });
       return true;
     }

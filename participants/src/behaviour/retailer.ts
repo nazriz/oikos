@@ -8,12 +8,14 @@ import { cents } from "../money";
 import type { LookRequest, Observation, StatementRecord } from "../contracts";
 import { channels } from "../contracts";
 import { need, params, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
-import { ask, nextLook, because, Book, publishedPrice as buildingPrice, DAY, MONTH, ownAccount, Pace, pay, say, type Step, usd, withdraw, outOfTime, team } from "./common";
-import { type AdjustParams, Bargaining, LabourPlan, Staffing, stepper, terminationLaw, WindingUp } from "./firms";
+import { ask, breaches, nextLook, because, Book, publishedPrice as buildingPrice, DAY, MONTH, ownAccount, Pace, pay, say, type Step, usd, withdraw, outOfTime, team } from "./common";
+import { type AdjustParams, Bargaining, LabourPlan, Takings, Staffing, stepper, terminationLaw, WindingUp } from "./firms";
 import { Borrowing } from "./credit";
 import { distribute, LENGNICK, movePrice, moveWage, payOut } from "./lengnick";
 import { Deliveries, goodsPrices, held, order, OrderBook, Payables, priceList, UNDELIVERABLE, type Order } from "./trade";
 import * as P from "./papers";
+import { ADOPTION, Adoption, capacityOf, Fleet, type AdoptionParams } from "./automation";
+import { slip } from "../slip";
 
 /**
  * A shop. It buys goods from the cheapest of its suppliers (local factories' wholesale, or the world market's imports)
@@ -27,7 +29,7 @@ export const retailer: BehaviourModule = {
   name: "firm.retailer",
   issues: [P.JOB_ADVERTISEMENT, ...P.TRADE, P.REMEDY_ANSWER, ...P.VENUE_ANSWERS],
   issuesWith: (p) => ({ ...P.staffingOwn({ role: p.role ?? "shop assistant", industry: p.industry, workplace: p.workplace, notice_days: p.notice_days ?? 14 }), police: p.police }),
-  version: "0.16.0", // 0.16.0: no dividend while a debt recorded against it stands unpaid, and a winding-up pays wages owed and the tax withheld before anyone else (bug hunt 2026-10-17); 0.15.0: where the world's law lets an employer cut hours, a surplus of hands is met first by cutting everyone's hours to what the trade needs, by a paper to each worker, and a shop serves in its staff's hours (docs/behaviour/firms.md, "Hours before heads"); 0.14.0: reviews its staff and closes its month on a day of its own, not on one every shop shares, and expects at first the trade it was staffed for, not its first month's sales alone (docs/behaviour/firms.md, "When a shop reviews its staff"); 0.13.0: buys its stock on the supplier's terms where it states them (docs/behaviour/trade.md, "Trade credit"), so stock no longer competes with the wage bill in the week it is bought; borrows again as its bank allows; no dividend while wages are owed or anyone is under notice (docs/behaviour/firms.md, "Before a dividend"); 0.12.1: returns of tax withheld are filed on the days the law states (docs/behaviour/firms.md, "Returns on the law's days"); 0.12.0: 0.12.0: adjusts its staff as firms do (docs/behaviour/firms.md, "Adjusting labour"): sales smoothed over months, staff held through a dip and let go only when the surplus has lasted what ending the job costs, redundancy pay under the world's law; a business of one can be founded in a run and is closed when its owner gives it up (docs/behaviour/entry.md); 0.11.0: everyday frictions (docs/behaviour/frictions.md): pay that comes short, at the world's rate and its character's; asked, told or ordered to put right short pay or goods said to be faulty; 0.10.0: wants of its own (docs/behaviour/firm-wants.md): a character from its owner's values, which answers a worker who asks for a rise, and a record of its own; 0.9.1: a business of one buys stock when it runs low (daily), keeps its stock money at today's price, follows its owner's home, and closes when its owner has gone; 0.9.0: a business run by its owner alone (operator), stocked for a few days and drawn on by its owner; 0.8.4: takes on the share of its hands the world gives by the day; 0.8.3: registers the share of its jobs the world gives for shops (firms.md, "Jobs an employer does not register")
+  version: "0.18.0", // 0.18.0: no dividend while a debt recorded against it stands unpaid, and a winding-up pays wages owed and the tax withheld before anyone else (bug hunt 2026-10-17); 0.17.0: takes up systems the vendor offers for serving when the comparison favours it, serves part of each order by them, refunds what they get wrong (docs/behaviour/automation.md); a day's serving not got to by the next morning waits, it is not done at night; 0.16.0: after a stoppage its offer follows what the stoppage cost it in sales, not a fixed share of the gap (docs/behaviour/unions.md, "Concession"); 0.15.0: where the world's law lets an employer cut hours, a surplus of hands is met first by cutting everyone's hours to what the trade needs, by a paper to each worker, and a shop serves in its staff's hours (docs/behaviour/firms.md, "Hours before heads"); 0.14.0: reviews its staff and closes its month on a day of its own, not on one every shop shares, and expects at first the trade it was staffed for, not its first month's sales alone (docs/behaviour/firms.md, "When a shop reviews its staff"); 0.13.0: buys its stock on the supplier's terms where it states them (docs/behaviour/trade.md, "Trade credit"), so stock no longer competes with the wage bill in the week it is bought; borrows again as its bank allows; no dividend while wages are owed or anyone is under notice (docs/behaviour/firms.md, "Before a dividend"); 0.12.1: returns of tax withheld are filed on the days the law states (docs/behaviour/firms.md, "Returns on the law's days"); 0.12.0: 0.12.0: adjusts its staff as firms do (docs/behaviour/firms.md, "Adjusting labour"): sales smoothed over months, staff held through a dip and let go only when the surplus has lasted what ending the job costs, redundancy pay under the world's law; a business of one can be founded in a run and is closed when its owner gives it up (docs/behaviour/entry.md); 0.11.0: everyday frictions (docs/behaviour/frictions.md): pay that comes short, at the world's rate and its character's; asked, told or ordered to put right short pay or goods said to be faulty; 0.10.0: wants of its own (docs/behaviour/firm-wants.md): a character from its owner's values, which answers a worker who asks for a rise, and a record of its own; 0.9.1: a business of one buys stock when it runs low (daily), keeps its stock money at today's price, follows its owner's home, and closes when its owner has gone; 0.9.0: a business run by its owner alone (operator), stocked for a few days and drawn on by its owner; 0.8.4: takes on the share of its hands the world gives by the day; 0.8.3: registers the share of its jobs the world gives for shops (firms.md, "Jobs an employer does not register")
   doc: "docs/behaviour/retailer.md",
   cadence: () => DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(24) * 3600,
@@ -118,6 +120,9 @@ export const retailer: BehaviourModule = {
         // complaint, or ordered to (the world's rates; its character sways them).
         short_pay: null as { by_bps: number } | null,
         respond: {} as Partial<RespondParams>,
+        // Systems it may take up in place of some of its staff's work (docs/behaviour/automation.md): how it weighs them (the world's
+        // figures). None: it looks at none (a world with no vendor).
+        automation: null as AdoptionParams | null,
         ...LENGNICK, // Lengnick (2013), Table 1
       },
       ctx.params,
@@ -141,7 +146,15 @@ export const retailer: BehaviourModule = {
       remedy: (m, _from, t, why) => (m.matter === "underpaid" && m.about && payAccount ? staffing.payInFull(book, t, payAccount, m.about, why) : undefined) });
     const borrowing = new Borrowing(me, p.lender, p.borrow_again_days >= 0 ? { again_days: p.borrow_again_days } : {});
     const payables = new Payables(me); // what we owe suppliers for stock delivered on their terms
-    const bargaining = new Bargaining(me);
+    const takings = new Takings(); // what customers have paid us: what a day without our work costs in sales (Bargaining)
+    const bargaining = new Bargaining(me, { takingsPerDay: (t) => takings.perDay(t), systemShare: (t) => (lastDemand > 0 ? Math.min(1, systemUnits(lastDemand) / lastDemand) : 0) });
+    const fleet = new Fleet(me); // the systems delivered to us, and their licences
+    const adoption = new Adoption(me, fleet, { ...ADOPTION, ...(p.automation ?? {}) });
+    const faulty = new Map<string, Set<string>>(); // order -> the items a system of ours got wrong, to be refunded
+    const faultyOf = (o: Order) => faulty.get(o.id)?.size ?? 0;
+    const sysUsed = new Map<string, number>(); // system -> seconds of today it has been given
+    let sysCredit = 0; // the units of customers' orders the systems are owed, as the share of them they can do
+    const systemsCtx = Object.create(ctx, { kind: { value: "system" } }) as typeof ctx;
     const winding = new WindingUp(me, { short_days: p.short_days, wind_up_days: p.wind_up_days, idle_days: p.idle_days, reprice_days: p.reprice_days, reprice_bps: p.reprice_bps });
     // Our premises, as the sites we see show them (for selling them if we close).
     const premisesOf = (obs: Observation) => {
@@ -204,6 +217,14 @@ export const retailer: BehaviourModule = {
       return sp ? sp.capacity - Math.max(sp.count, staff) : p.max_staff;
     };
     const hourly = () => Math.ceil((wage * 3600) / ((p.period / DAY) * (p.work_days / 7) * p.working_day));
+    /** What our systems do of `units` a month: the share they can do, as far as their month's seconds go. */
+    const systemUnits = (units: number) => {
+      const w = p.automation ? fleet.working(p.serve_task) : [];
+      if (!w.length) return 0;
+      const cap = w.reduce((x, s) => x + capacityOf(s.seconds, p.utilisation_bps), 0);
+      return Math.min(Math.floor((units * Math.max(...w.map((s) => s.scope_bps))) / 10_000), cap);
+    };
+    const systemFees = () => fleet.inService(p.serve_task).reduce((x, l) => x + l.fee_month * l.systems.length, 0);
 
     /** Setting up a shop just founded: an account at the bank; the founder's capital; our shareholders (the founder);
      * the premises bought from the property listing. If someone else buys them first, the capital goes back and we close. */
@@ -267,6 +288,7 @@ export const retailer: BehaviourModule = {
       (obs) => {
         book.absorb(obs);
         staffing.absorb(obs);
+        if (p.automation) { fleet.absorb(book); adoption.delivered(); }
         winding.absorb(obs, ownAccount(obs)?.account);
         // What our looks found: producers advertising to the trade; our premises' listings and sale.
         const found = (id: string) => { const ch = id ? obs.channels[id] : undefined; return ch?.kind === "records" && ch.search ? (ch.records as StatementRecord[]) : undefined; };
@@ -347,7 +369,10 @@ export const retailer: BehaviourModule = {
           .map((x) => ({ seller: x.seller, account: x.account!, unit: x.prices[p.kind]!, min: x.min_order ?? 1, terms: x.terms_days ?? 0 }))
           .sort((a, b) => Number(t - (shortAt.get(a.seller) ?? -Infinity) < 7 * DAY) - Number(t - (shortAt.get(b.seller) ?? -Infinity) < 7 * DAY) || a.unit - b.unit || standingOf(a.seller) - standingOf(b.seller) || (a.seller < b.seller ? -1 : 1));
         if (!unitCost && offers.length) unitCost = offers[0]!.unit;
-        const marginalCost = unitCost + Math.ceil((hourly() * p.serve_labour) / 3600);
+        // (What serving costs a unit: its hours at the wage, and where systems do some, their fees spread over the units they do.)
+        const labourCost = Math.ceil((hourly() * p.serve_labour) / 3600);
+        const byUs = systemUnits(lastDemand);
+        const marginalCost = unitCost + (byUs > 0 && lastDemand > 0 ? Math.ceil(((lastDemand - byUs) * labourCost + systemFees()) / lastDemand) : labourCost);
 
         // ---- the month's end: Lengnick's rules ----
         const m = Math.floor((t - reviewDay) / MONTH);
@@ -378,7 +403,8 @@ export const retailer: BehaviourModule = {
           // ours to bear), replace nobody who leaves, and let the most recent hire go only once the surplus has
           // lasted as long as ending the job and hiring again would cost (docs/behaviour/firms.md, "Adjusting labour").
           const expected = labour.expect(lastDemand);
-          const needed = p.operator ? 0 : Math.min(p.max_staff, Math.max(p.min_staff, Math.ceil((expected * p.serve_labour * 10_000) / (hoursPerWorkerMonth * p.utilisation_bps))));
+          // (What systems of ours do, our people need not: docs/behaviour/automation.md.)
+          const needed = p.operator ? 0 : Math.min(p.max_staff, Math.max(p.min_staff, Math.ceil(((expected - systemUnits(expected)) * p.serve_labour * 10_000) / (hoursPerWorkerMonth * p.utilisation_bps))));
           const trade = p.adjust.smooth_months > 1 ? `the trade we expect (${expected} a month; last month ${lastDemand})` : `last month's sales (${lastDemand})`;
           headcount = workers.length;
           headcountWhy = why.length ? `; ${why.join("; ")}` : "";
@@ -402,6 +428,13 @@ export const retailer: BehaviourModule = {
             if (m.letGo) steps.push(...staffing.letGo(book, t, `Month's end: ${trade} needed ${needed} hands to serve, and we have ${workers.length}${waits > 1 ? `, as for ${waits} months now` : ""}: letting one go.`, "Redundancy: there isn't the trade."));
             else steps.push(because(`Month's end: ${trade} needed ${needed} hands to serve, and we have ${workers.length}: keeping them for now (${m.lasted} of the ${waits} months such a surplus must last before letting someone go is worth what it costs), and replacing nobody who leaves.`));
           } else labour.month(false, 1);
+          // Systems on offer: whether to take one for serving, or to end a licence that has run its term (docs/behaviour/automation.md).
+          if (p.automation && !p.operator) {
+            const monthly = Math.floor((wage * MONTH) / p.period);
+            steps.push(...adoption.review(book, t, { at: at.premises, task: p.serve_task, staff: workers.length, account: acc.account, balance: acc.balance, keep: 2 * workers.length * monthly + payables.owing,
+              breaks: (f) => breaches(book, { block: "deploy", task: f.task, offer: f.id, vendor: f.vendor }, me, t).map((l) => l.id), complies: (why) => ctx.rng(`comply-${why}`).below(10_000) < (p.automation?.compliance_bps ?? 10_000),
+              facts: { units: expected, labour: p.serve_labour, wage_month: monthly, seconds_per_worker_month: hoursPerWorkerMonth, utilisation_bps: p.utilisation_bps, unit_price: price, hiring_cost_weeks: p.adjust.hiring_cost_weeks } }));
+          }
           // Out of the month's earnings, what we hold beyond the buffer goes to the shareholders: a month's wages, a
           // month's stock at cost, and Lengnick's chi of the wage bill.
           const bill = Math.floor((Math.max(workers.length, headcount) * wage * MONTH) / p.period);
@@ -417,6 +450,7 @@ export const retailer: BehaviourModule = {
         // Bargaining with a union (docs/behaviour/unions.md): a claim answered, an agreement's rise, a strike.
         steps.push(...bargaining.steps(book, t, staffing, acc.account, acc.balance, (rise) => { wage = Math.floor((wage * (10_000 + rise)) / 10_000); }));
         steps.push(...staffing.asked(book, t, acc.account, acc.balance));
+        if (p.automation) steps.push(...fleet.paperwork(book, t, acc.account));
         payAccount = acc.account;
         steps.push(...answering.steps(book, t, acc.account, acc.balance));
         steps.push(...staffing.shortening(book, t, acc.account, acc.balance));
@@ -536,6 +570,7 @@ export const retailer: BehaviourModule = {
         if (day !== usedDay) {
           usedDay = day;
           used.clear();
+          sysUsed.clear();
         }
         const mine = new Set(p.operator ? [p.operator] : workers);
         // (Its owner, where they work from: the room of their home, their pitch.)
@@ -556,6 +591,7 @@ export const retailer: BehaviourModule = {
             continue;
           }
           sold += o.quantity;
+          takings.add(t, o.quantity * o.unitPrice);
           queue.push({ o, served: 0, since: t });
         }
         // Each worker's time left today; serving is shared evenly among those here, as the work is.
@@ -565,13 +601,33 @@ export const retailer: BehaviourModule = {
         let left = Math.max(0, stock - reserved);
         for (const x of [...queue]) {
           const want = x.o.quantity - x.served;
+          // Systems of ours take the share of an order they can do, as far as their own day goes (a system works whatever the hour).
+          const bySystem: { id: string; offer: string; units: number }[] = [];
+          if (p.automation && left > 0) {
+            const w = fleet.working(p.serve_task);
+            if (w.length) {
+              sysCredit += (want * Math.max(...w.map((s) => s.scope_bps))) / 10_000;
+              let owed = Math.min(Math.floor(sysCredit), want, left);
+              for (const sy of w) {
+                const room = Math.floor((DAY - (sysUsed.get(sy.id) ?? 0)) / Math.max(1, sy.seconds));
+                const units = Math.min(owed, room);
+                if (units <= 0) continue;
+                owed -= units;
+                sysCredit -= units;
+                sysUsed.set(sy.id, (sysUsed.get(sy.id) ?? 0) + units * sy.seconds);
+                bySystem.push({ id: sy.id, offer: sy.lot.offer, units });
+              }
+            }
+          }
+          const qs = bySystem.reduce((n, b) => n + b.units, 0);
           const minRoom = crew.length ? Math.min(...crew.map(room)) : 0;
-          const q = Math.min(want, left, Math.floor((minRoom * crew.length) / pace.perUnit(crew)));
+          const qc = Math.min(want - qs, left - qs, Math.floor((minRoom * crew.length) / pace.perUnit(crew)));
+          const q = qs + qc;
           // (An order for a fortnight's shopping is served over the fortnight: it's what the household uses until then.)
           const within = x.o.forDays ?? p.serve_within_days;
           const out = left === 0 || (q === want) ? "done" : t - x.since >= within * DAY ? "late" : "wait";
           if (q === 0 && out === "wait") break; // no hands left today: the rest wait their turn
-          const share = q ? Math.ceil((q * pace.perUnit(crew)) / crew.length) : 0;
+          const share = qc ? Math.ceil((qc * pace.perUnit(crew)) / crew.length) : 0;
           left -= q;
           for (const w of crew) if (share) used.set(w, (used.get(w) ?? 0) + share);
           const before = x.served;
@@ -582,18 +638,27 @@ export const retailer: BehaviourModule = {
             : x.served === x.o.quantity ? `Serving an order paid in full: ${x.served} ${x.o.kind}${before ? " (the last of it)" : ""}.`
             : left === 0 && out !== "late" ? `Out of stock: served ${x.served} of the ${x.o.quantity} ordered; refunding the rest.`
             : `We couldn't serve all of an order within ${within} days: served ${x.served} of the ${x.o.quantity}; refunding the rest.`;
-          const st = fillWith(x.o, q, finished ? x.served : -1, q ? crew : [], why);
+          // (A system slips at the rate its supplier's offer gives, in the world's table of slips; an item it got wrong is refunded.)
+          { let n = before;
+            for (const b of bySystem) for (let k = 0; k < b.units; k++, n++) if (slip(systemsCtx, b.offer, `${x.o.id}.${n}`)) { if (!faulty.has(x.o.id)) faulty.set(x.o.id, new Set()); faulty.get(x.o.id)!.add(`${n}`); } }
+          const st = fillWith(x.o, q, finished ? x.served : -1, qc ? crew : [], why, qc, bySystem);
           // (Orders are sent one at a time, each when the last is done, and a delivery takes the crew out: one that comes up after the
           // close finds the crew gone, so it is not sent: it waits for tomorrow, as an order not got to in the day does.)
-          if (q && !p.operator && p.open_until) st.lapsed = (now) => now - Math.floor(now / DAY) * DAY >= p.open_until && Math.floor(now / DAY) === day;
+          if (q && !p.operator && p.open_until) st.lapsed = (now) => Math.floor(now / DAY) !== day || now - Math.floor(now / DAY) * DAY >= p.open_until; // (a day\'s serving not got to by the close, or by the next morning, waits: it is never done at night)
           reserved += q;
           st.then = (res) => {
             reserved = Math.max(0, reserved - q);
             if (res.status === "applied") {
               books.out += q;
-              return void (q && pace.done(crew, Math.floor(t / DAY)));
+              return void (qc && pace.done(crew, Math.floor(t / DAY)));
             }
-            if (q) pace.refused(res, q, crew);
+            // (A system the world refuses is switched off, or not ours: not counted on again.)
+            if (bySystem.length) {
+              sysCredit += qs;
+              for (const b of bySystem) sysUsed.set(b.id, Math.max(0, (sysUsed.get(b.id) ?? 0) - b.units * (fleet.working(p.serve_task).find((s) => s.id === b.id)?.seconds ?? 0)));
+              if (res.refusal?.code === "not_capable" || res.refusal?.code === "participant_inactive" || res.refusal?.code === "unknown_participant" || res.refusal?.code === "not_theirs") for (const b of bySystem) fleet.gone(b.id);
+            }
+            if (qc) pace.refused(res, qc, crew);
             for (const w of crew) if (share) used.set(w, Math.max(0, (used.get(w) ?? 0) - share));
             // Someone's day is fuller than our count of it (work elsewhere today): the world's count, from now on.
             const short = outOfTime(res);
@@ -625,11 +690,16 @@ export const retailer: BehaviourModule = {
 
         /** Serving (part of) an order: the hours of serving and the goods to the customer; once it's finished (`total`
          * served, all told), a refund for what we couldn't serve and a note saying so. */
-        function fillWith(o: Order, q: number, total: number, staff: string[], why: string): Step {
+        function fillWith(o: Order, q: number, total: number, staff: string[], why: string, byStaff = q, bySystem: { id: string; units: number }[] = []): Step {
           const s: Step = because(why);
-          if (q > 0) s.push(C.call("work", { task: p.serve_task, units: C.text(String(q)), at: at.premises, by: C.json(staff) }), C.call("goods", { kind: o.kind, quantity: C.text(String(q)), to: o.to, at: o.at, from_at: at.premises }));
+          if (q > 0) {
+            if (byStaff > 0) s.push(C.call("work", { task: p.serve_task, units: C.text(String(byStaff)), at: at.premises, by: C.json(staff) }));
+            for (const b of bySystem) s.push(C.call("work", { task: p.serve_task, units: C.text(String(b.units)), at: at.premises, by: C.json([b.id]) }));
+            s.push(C.call("goods", { kind: o.kind, quantity: C.text(String(q)), to: o.to, at: o.at, from_at: at.premises }));
+          }
           if (total < 0) return s;
-          const refund = (o.quantity - total) * o.unitPrice;
+          const refund = (o.quantity - total + Math.min(total, faultyOf(o))) * o.unitPrice;
+          faulty.delete(o.id);
           if (refund > 0) s.push(pay(o.account, refund, { from: acc!.account, for: `Refund: ${o.quantity - total} ${o.kind} we couldn't sell you.` }));
           s.push(say("delivery_note", total === o.quantity ? `Served: ${total} ${o.kind} to ${o.to} at ${o.at}.` : `Served ${total} of the ${o.quantity} ${o.kind} ordered${refund ? `; ${usd(refund)} refunded` : ""}.`, {
             to: [o.buyer], visible: [o.buyer, me], basis: o.id, data: { order: o.id, kind: o.kind, ordered: o.quantity, delivered: total, refund },

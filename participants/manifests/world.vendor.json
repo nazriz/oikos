@@ -1,0 +1,79 @@
+{
+  "name": "world.vendor",
+  "version": "0.1.0",
+  "doc": "docs/behaviour/automation.md",
+  "params": {
+    "account": {
+      "schema": {
+        "type": "string",
+        "description": "the outside's account it is paid into (the world must say)"
+      },
+      "default": "",
+      "source": "the outside's account it is paid into (the world must say)"
+    },
+    "automation": {
+      "schema": {},
+      "source": "the world gives it (no default)"
+    },
+    "casework": {
+      "schema": {},
+      "source": "the world gives it (no default)"
+    },
+    "change_bps_per_year": {
+      "schema": {
+        "type": "integer",
+        "description": "how its prices move a year (negative: fall); 0: today's prices held"
+      },
+      "default": 0,
+      "source": "placeholder"
+    },
+    "grace_days": {
+      "schema": {
+        "type": "integer",
+        "description": "a licence unpaid this long (two months' fees and a fortnight) lets the vendor switch the system off"
+      },
+      "unit": "days",
+      "default": 75,
+      "source": "placeholder"
+    },
+    "most_systems": {
+      "schema": {
+        "type": "integer",
+        "description": "the most it delivers to one order"
+      },
+      "default": 40,
+      "source": "placeholder"
+    },
+    "offers": {
+      "schema": {
+        "type": "array"
+      },
+      "default": [],
+      "source": "placeholder"
+    },
+    "procurement": {
+      "schema": {},
+      "source": "the world gives it (no default)"
+    },
+    "sign_days": {
+      "schema": {
+        "type": "integer",
+        "description": "a system whose licence its client has not signed this long is switched off"
+      },
+      "unit": "days",
+      "default": 30,
+      "source": "placeholder"
+    },
+    "unpaid_days": {
+      "schema": {
+        "type": "integer",
+        "description": "an order unpaid this long is declined"
+      },
+      "unit": "days",
+      "default": 7,
+      "source": "placeholder"
+    }
+  },
+  "perceives": [],
+  "state": "none"
+}

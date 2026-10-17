@@ -20,6 +20,19 @@
       ],
       "untagged": 2
     },
+    "docs/behaviour/auditor.md": {
+      "risks": [
+        "PS-1"
+      ],
+      "untagged": 5
+    },
+    "docs/behaviour/automation.md": {
+      "risks": [
+        "WM-1",
+        "SF-10"
+      ],
+      "untagged": 2
+    },
     "docs/behaviour/bank-payment-system.md": {
       "risks": [
         "PB-8"
@@ -270,7 +283,7 @@
         "PB-9",
         "PB-17"
       ],
-      "untagged": 6
+      "untagged": 7
     },
     "docs/behaviour/utilities.md": {
       "risks": [
@@ -428,7 +441,7 @@
         "PS-2",
         "PS-4"
       ],
-      "untagged": 40
+      "untagged": 41
     },
     "docs/real-models.md": {
       "risks": [
@@ -475,7 +488,7 @@
         "PB-6",
         "WM-1"
       ],
-      "untagged": 132
+      "untagged": 152
     },
     "worlds/profiles/br-mg-2026.json": {
       "risks": [
@@ -488,7 +501,7 @@
         "PB-6",
         "WM-1"
       ],
-      "untagged": 172
+      "untagged": 194
     },
     "worlds/profiles/de-ni-2026.json": {
       "risks": [
@@ -501,7 +514,7 @@
         "PB-6",
         "WM-1"
       ],
-      "untagged": 158
+      "untagged": 180
     },
     "worlds/profiles/gb-eng-2026.json": {
       "risks": [
@@ -514,7 +527,7 @@
         "PB-6",
         "WM-1"
       ],
-      "untagged": 156
+      "untagged": 178
     },
     "worlds/profiles/in-tn-2026.json": {
       "risks": [
@@ -527,7 +540,7 @@
         "PB-6",
         "WM-1"
       ],
-      "untagged": 160
+      "untagged": 183
     },
     "worlds/profiles/jp-akita-2026.json": {
       "risks": [
@@ -540,7 +553,7 @@
         "PB-6",
         "WM-1"
       ],
-      "untagged": 137
+      "untagged": 159
     },
     "worlds/profiles/ke-nakuru-2026.json": {
       "risks": [
@@ -554,7 +567,7 @@
         "WM-1",
         "PS-5"
       ],
-      "untagged": 279
+      "untagged": 302
     },
     "worlds/profiles/mx-jal-2026.json": {
       "risks": [
@@ -567,7 +580,7 @@
         "PB-6",
         "WM-1"
       ],
-      "untagged": 157
+      "untagged": 179
     },
     "worlds/profiles/us-oh-2026.json": {
       "risks": [
@@ -580,7 +593,7 @@
         "PB-6",
         "WM-1"
       ],
-      "untagged": 134
+      "untagged": 156
     }
   }
 }

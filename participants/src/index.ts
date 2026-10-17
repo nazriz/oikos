@@ -38,6 +38,7 @@ import { citizen } from "./behaviour/citizen";
 import { employer, landlord } from "./behaviour/firms";
 import { producer } from "./behaviour/producer";
 import { retailer } from "./behaviour/retailer";
+import { vendor } from "./behaviour/automation";
 import { builder, childProtection, inspector, landRegistry, planningOfficer, registry } from "./behaviour/institutions";
 import { councilClerk, councillor, financeOfficer, mayorCode, ratesOfficer, taxClerk, works } from "./behaviour/government";
 import { environment } from "./behaviour/environment";
@@ -48,6 +49,7 @@ import { principal } from "./behaviour/school";
 import { practice } from "./behaviour/health";
 import { member, registrar } from "./behaviour/tribunal";
 import { desk } from "./behaviour/desk";
+import { auditor } from "./behaviour/auditor";
 import { founded } from "./behaviour/founded";
 import { energy, water } from "./behaviour/utilities";
 import { station } from "./behaviour/police";
@@ -109,6 +111,7 @@ export const modules: { [name: string]: BehaviourModule & { source: string } } =
       [employer, "behaviour/firms.ts"],
       [producer, "behaviour/producer.ts"],
       [retailer, "behaviour/retailer.ts"],
+      [vendor, "behaviour/automation.ts"],
       [planningOfficer, "behaviour/institutions.ts"],
       [inspector, "behaviour/institutions.ts"],
       [builder, "behaviour/institutions.ts"],
@@ -131,6 +134,7 @@ export const modules: { [name: string]: BehaviourModule & { source: string } } =
       [member, "behaviour/tribunal.ts"],
       [registrar, "behaviour/tribunal.ts"],
       [desk, "behaviour/desk.ts"],
+      [auditor, "behaviour/auditor.ts"],
       [founded, "behaviour/founded.ts"],
       [water, "behaviour/utilities.ts"],
       [energy, "behaviour/utilities.ts"],

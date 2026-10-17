@@ -653,7 +653,9 @@ class Resolver {
     if (retire) return [{ block: "retire", participant: retire }];
     const template = this.str(c, "template");
     if (!template) throw new Ask("Which kind of system (its template)?");
-    return [{ block: "deploy", template, ...(this.str(c, "title") ? { title: this.str(c, "title") } : {}), ...(bind ? { ref: bind } : {}) }];
+    // (The client, if the supplier delivers it to another organisation: `to`. Absent: the supplier itself.)
+    const to = this.id(c, "to");
+    return [{ block: "deploy", template, ...(to ? { to: this.k.entityOf(to) } : {}), ...(this.str(c, "title") ? { title: this.str(c, "title") } : {}), ...(bind ? { ref: bind } : {}) }];
   }
 
   private claim(c: Call, bind?: string): Block[] {

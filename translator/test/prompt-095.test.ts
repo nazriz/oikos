@@ -35,7 +35,8 @@ test("0.9.5: the sentences are there, in general words", () => {
   ]) expect(system).toContain(said);
   // `line` is taught: it is in the functions' list, and nothing is code's alone now.
   expect(system).toMatch(/- money\(to\*, amount\*, from, every, first, for, settles, basis, per_request, line\)/);
-  expect(calls.CODE_ARGS).toEqual({});
+  // (Since 2026-10-17 one argument is code's alone: `system(..., to=)`, the client a vendor delivers a system to; nothing else, and none the prompt shows.)
+  expect(Object.fromEntries(Object.entries(calls.CODE_ARGS).map(([k, v]) => [k, [...v]]))).toEqual({ system: ["to"] });
 });
 
 test("0.9.5: every new worked example is a program of the contract, and the line, hours, practice and offer are in them", () => {

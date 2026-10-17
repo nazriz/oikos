@@ -19,6 +19,7 @@ import * as K from "./knowing";
  * town's: docs/behaviour/knowing.md, section 1). */
 const LAND_REGISTRY = "land-registry";
 const ELECTORAL = "electoral-commission";
+const AUDITOR = "auditor";
 
 /** What a seat's reports call its look-up of who's who. */
 const WHO = "Who's who (look someone up: a person, an organisation or a post, by name or id)";
@@ -84,10 +85,13 @@ const WORK_TIME = {
     "publish/evidence_request": 300, "publish/evidence": 900, "publish/confirmation_request": 300, "publish/confirmation_answer": 600, "publish/decision_review": 1200,
     // A keeper's answer to a question put to its register (foundations F11): the time of whoever answers, per question.
     answer: 600,
+    // The audit office's papers (docs/behaviour/auditor.md): a request for one named item, the examination of one item on the file it is answered with
+    // (a decision decided again under the law), the report on a body for a period, and a body's answer from its own books.
+    "publish/audit_request": 300, "publish/audit_finding": 1800, "publish/audit_report": 7200, "publish/audit_answer": 900,
   },
   // What a system does takes it a second: it is software that was delivered to do just that (foundations F5: there is no default
   // for a block a system's template does not list, because it cannot do it).
-  system: { message: 1, publish: 1, transfer: 1, open_account: 1, close_account: 1, arrive: 1, move_goods: 1, withdraw: 1, record_claim: 1, transfer_claim: 1, answer: 2 },
+  system: { message: 1, publish: 1, "publish/audit_answer": 120, transfer: 1, open_account: 1, close_account: 1, arrive: 1, move_goods: 1, withdraw: 1, record_claim: 1, transfer_claim: 1, answer: 2, work: 1, deploy: 1, retire: 1, propose_agreement: 1, sign_agreement: 1 },
   sources: {
     person: "Placeholder: minutes for a person's act (5 for a message, 15 to fill in or go somewhere, 30 to draft an agreement, an hour to leave or arrive), to be sourced (time-use surveys, the Oikos time model: docs/design/rebuild.md 6.3).",
     "person.take": "Placeholder: five minutes to take goods by hand where they are kept (what a theft is), to be sourced; before foundations F10 the table had no row for it and the platform's one second stood in.",
@@ -109,13 +113,18 @@ const WORK_TIME = {
     "person.publish/confirmation_request": "Placeholder: five minutes to write to an employer for a confirmation, to be sourced.",
     "person.publish/confirmation_answer": "Placeholder: ten minutes for an employer to find a worker's record and answer, to be sourced.",
     "person.publish/decision_review": "Placeholder: twenty minutes to look at a decision again on its file, as long as to decide it (publish/benefit_decision), to be sourced.",
+    "person.publish/audit_request": "Placeholder: five minutes to write to a body for one named item, to be sourced (audit working practice: ISA 530 sample selection and requests for documents; to confirm).",
+    "person.publish/audit_finding": "Placeholder: half an hour to decide one decision again on its file under the law and write what was found, to be sourced (audit working papers: re-performance of a sampled item; to confirm).",
+    "person.publish/audit_report": "Placeholder: two hours to write up a body's period: the counts, the particulars of each disagreement, to be sourced (audit reporting practice; to confirm).",
+    "person.publish/audit_answer": "Placeholder: a quarter of an hour for a body's officer to find the item asked for in its books and set it out, to be sourced.",
+    "system.publish/audit_answer": "Placeholder: two minutes for a delivered system to assemble the item asked for from its records.",
     "person.answer": "Placeholder: ten minutes for an officer of a register's keeper to find and read out the entry asked about by name (a title, a lot, the dealings in a title), to be sourced (registry service standards; to confirm).",
     "system.answer": "Placeholder: two seconds for a delivered system to look up and return the entry asked about by name.",
     system: "Placeholder: a second for each act a delivered system does (software).",
   },
 };
 
-export const GENERATOR_VERSION = "0.60.0"; // 0.60.0: foundations F9: the forms for a claimant's papers (`evidence`), an employer's confirmation (`confirmation_answer`) and a request to look at a decision again or put something right (`review_request`) are published, public, where a place has decisions that wait or are reviewed; 0.59.0: 0.59.0: foundations F8, law as data: the profile's `decisions` (what a decision waits for; review and appeal routes; who refuses) are published as `law-decisions`, the payments procedure carries who approves a payment over what sum (`data.approval`), the tribunal hears a refused claim only where the law has an appeal and at the law's fee, the request every grievance uses is `review_request`, and the work table has rows for the new papers; 0.58.0: foundations F11 and the office's slip rows for systems too: a table of work row for a keeper's answer to a question put to its register (`answer`, a placeholder: ten minutes for a person, two seconds for a system); 0.57.0: foundations F7: how often a decision, a bill or a pay goes wrong is a row of the world's table of slips (`orchestration.slip`), each with the profile's note as its source, and no longer a parameter of the module (error_bps, uphold_bps, billing_error_bps_per_year, short_pay.per_year_bps); 0.56.0: foundations F6: every body that employs people has a payroll officer and a deputy from its staff (a firm's manager a deputy), the bank's lending office pays the bank's staff, no venue or support office has a throughput or delay dial, paperwork has rows in the table; 0.55.0: foundations F5: the posts of the town's own bodies are held by people hired from the town at the profile's staffing rates and pay (`public_service`), the bank's payment platform is a licensed system, every system comes from a template that says what it does, and a seat is a person with a post of its own (docs/behaviour/staffing.md); 0.54.0: a profile's employment.hours is published as the law on cutting hours (law-cutting-hours) and its firms' hours step reaches them (docs/behaviour/firms.md, "Hours before heads"); 0.53.0: `opening_caseload` reaches the other offices (support claims in hand and refusals asked about, complaints before the town's desks, permit applications before planning, invoices unpaid at finance, loans behind at the bank), each from the town's own flow times the days a matter stands open; `opening_caseload_scale_bps` thickens them (docs/decisions.md, 2026-10-12, "Opening caseloads of the other offices"); 0.52.0: a profile's ordinary terms of trade credit (business.trade_credit_days) reach the factories that sell to shops and the world market that sells inputs to factories (docs/behaviour/trade.md, "Trade credit"); 0.51.0: the tax law lists its returns, from the profile's public_finance.returns (docs/decisions.md, 2026-10-12, "Returns on the law's days"): which charges each reports and the day of the month it falls due by, as words and as data; 0.50.0: the law on possession says what the place's law has of a plan to pay (may, must consider, none; where it is taken away; where paying in full ends the claim), the tribunal's form for a tenant's answer is published, the possession order form offers only what that law has, and people are given their place's rate of answering an application; 0.49.0: homes by income (docs/decisions.md, 2026-10-12, "Homes by income"): where the profile states its renters' rent as a share of income, a town's first tenancies are dealt by what each household has coming in, people with nothing coming in live with kin, owners are chosen by the head's age where the profile has it, and the payments its support law already owes are in payment from the first day by the profile's take-up; 0.48.0: `opening_caseload`: a town may open in the middle of things, its landlords' rent books and its tribunal's list as an ordinary day would have them (off unless set); a landlord's and the member's procedure say what the law has for a home the tenant has left; 0.47.0: an office a model holds opens with its institution's standing notices on file (what a body that hears grievances says it hears), its procedure under the law on possession (a landlord, the tribunal's member and registrar: what each form is for and what the law asks before each step, from the profile's figures) and what becomes of a letter to a person; the tribunal has registry staff in a living town (docs/decisions.md, 2026-10-12, "What the third living pilot found"); 0.46.0: the firm and landlord side (docs/decisions.md, 2026-10-11, "Four faults"): the place's laws on ending a job and on possession published from the profile; how firms adjust; a business of one as a venture, its chance derived from the place's business birth rate; short pay's chance over the jobs exposed; 0.45.4: the planning office's decision form records the liberty to build beside a grant (the form's own declaration: FormWrites `claim`); 0.45.3: a payroll folder holds the standing payments beside the employment agreements; an office's routines procedure says who makes a standing work order and how; the permit decision form says what records the permission; 0.45.2: the council's standing orders are a published procedure of the town's (proc-council), and a councillor's or a clerk's post held by a model has the council's papers on its desk (the charter, the standing orders, the laws, the forms, proposals and ballots as papers of its own body, petitions, budgets and results); 0.45.1: the tax law says, step by step and with each rounding, how what is withheld from a pay is reckoned (the one function every payroll uses), where it said "reckoned as a year's pay"; 0.45.0: a seat with routine work is shown its staff's reports on the work under its standing orders, and its procedure says they are made; 0.44.0: main's 0.39.1 (an office's own form says what issuing it does) with the institutions' opening papers (0.43.0)
+export const GENERATOR_VERSION = "0.61.0"; // 0.61.0: the auditor (docs/behaviour/auditor.md): where the profile has `audit`, a body of the town (staffed by residents, paid by a grant) examines the support office's decisions and the town finance office's accounts on a sample as the audit law (published) says, and publishes a report; 0.60.0: foundations F9: the forms for a claimant's papers (`evidence`), an employer's confirmation (`confirmation_answer`) and a request to look at a decision again or put something right (`review_request`) are published, public, where a place has decisions that wait or are reviewed; 0.59.0: 0.59.0: foundations F8, law as data: the profile's `decisions` (what a decision waits for; review and appeal routes; who refuses) are published as `law-decisions`, the payments procedure carries who approves a payment over what sum (`data.approval`), the tribunal hears a refused claim only where the law has an appeal and at the law's fee, the request every grievance uses is `review_request`, and the work table has rows for the new papers; 0.58.0: foundations F11 and the office's slip rows for systems too: a table of work row for a keeper's answer to a question put to its register (`answer`, a placeholder: ten minutes for a person, two seconds for a system); 0.57.0: foundations F7: how often a decision, a bill or a pay goes wrong is a row of the world's table of slips (`orchestration.slip`), each with the profile's note as its source, and no longer a parameter of the module (error_bps, uphold_bps, billing_error_bps_per_year, short_pay.per_year_bps); 0.56.0: foundations F6: every body that employs people has a payroll officer and a deputy from its staff (a firm's manager a deputy), the bank's lending office pays the bank's staff, no venue or support office has a throughput or delay dial, paperwork has rows in the table; 0.55.0: foundations F5: the posts of the town's own bodies are held by people hired from the town at the profile's staffing rates and pay (`public_service`), the bank's payment platform is a licensed system, every system comes from a template that says what it does, and a seat is a person with a post of its own (docs/behaviour/staffing.md); 0.54.0: a profile's employment.hours is published as the law on cutting hours (law-cutting-hours) and its firms' hours step reaches them (docs/behaviour/firms.md, "Hours before heads"); 0.53.0: `opening_caseload` reaches the other offices (support claims in hand and refusals asked about, complaints before the town's desks, permit applications before planning, invoices unpaid at finance, loans behind at the bank), each from the town's own flow times the days a matter stands open; `opening_caseload_scale_bps` thickens them (docs/decisions.md, 2026-10-12, "Opening caseloads of the other offices"); 0.52.0: a profile's ordinary terms of trade credit (business.trade_credit_days) reach the factories that sell to shops and the world market that sells inputs to factories (docs/behaviour/trade.md, "Trade credit"); 0.51.0: the tax law lists its returns, from the profile's public_finance.returns (docs/decisions.md, 2026-10-12, "Returns on the law's days"): which charges each reports and the day of the month it falls due by, as words and as data; 0.50.0: the law on possession says what the place's law has of a plan to pay (may, must consider, none; where it is taken away; where paying in full ends the claim), the tribunal's form for a tenant's answer is published, the possession order form offers only what that law has, and people are given their place's rate of answering an application; 0.49.0: homes by income (docs/decisions.md, 2026-10-12, "Homes by income"): where the profile states its renters' rent as a share of income, a town's first tenancies are dealt by what each household has coming in, people with nothing coming in live with kin, owners are chosen by the head's age where the profile has it, and the payments its support law already owes are in payment from the first day by the profile's take-up; 0.48.0: `opening_caseload`: a town may open in the middle of things, its landlords' rent books and its tribunal's list as an ordinary day would have them (off unless set); a landlord's and the member's procedure say what the law has for a home the tenant has left; 0.47.0: an office a model holds opens with its institution's standing notices on file (what a body that hears grievances says it hears), its procedure under the law on possession (a landlord, the tribunal's member and registrar: what each form is for and what the law asks before each step, from the profile's figures) and what becomes of a letter to a person; the tribunal has registry staff in a living town (docs/decisions.md, 2026-10-12, "What the third living pilot found"); 0.46.0: the firm and landlord side (docs/decisions.md, 2026-10-11, "Four faults"): the place's laws on ending a job and on possession published from the profile; how firms adjust; a business of one as a venture, its chance derived from the place's business birth rate; short pay's chance over the jobs exposed; 0.45.4: the planning office's decision form records the liberty to build beside a grant (the form's own declaration: FormWrites `claim`); 0.45.3: a payroll folder holds the standing payments beside the employment agreements; an office's routines procedure says who makes a standing work order and how; the permit decision form says what records the permission; 0.45.2: the council's standing orders are a published procedure of the town's (proc-council), and a councillor's or a clerk's post held by a model has the council's papers on its desk (the charter, the standing orders, the laws, the forms, proposals and ballots as papers of its own body, petitions, budgets and results); 0.45.1: the tax law says, step by step and with each rounding, how what is withheld from a pay is reckoned (the one function every payroll uses), where it said "reckoned as a year's pay"; 0.45.0: a seat with routine work is shown its staff's reports on the work under its standing orders, and its procedure says they are made; 0.44.0: main's 0.39.1 (an office's own form says what issuing it does) with the institutions' opening papers (0.43.0)
 const DAY = 86_400;
 const MONTH = 30 * DAY;
 const YEAR = 365 * DAY;
@@ -462,8 +471,11 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   };
 
   // ---- entities ----
+  const AUTO = V.automation; // the systems the outside world sells (docs/behaviour/automation.md)
   const entities: any[] = [
     { id: "outside", kind: "boundary", name: "The outside world" },
+    // (The vendors of systems are the outside world\'s too, and their own seller: an order is addressed to the seller it is for.)
+    ...(AUTO?.offers.length ? [{ id: "vendors", kind: "boundary", name: "The vendors of systems" }] : []),
     { id: "city", kind: "government", name: `Town of ${spec.name}` },
     { id: "bank", kind: "bank", name: `${spec.name} Savings Bank` },
     { id: "builder", kind: "builder", name: `${spec.name} Builders` },
@@ -804,6 +816,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     { id: "acc-outside", holder: "outside", custodian: "outside", balance: 0 },
     // (The higher government's named funds: accounts of the outside world's, each its own.)
     ...FUNDS.map((f) => ({ id: `acc-outside-${f.id}`, holder: "outside", custodian: "outside", balance: 0 })),
+    ...(AUTO?.offers.length ? [{ id: "acc-vendors", holder: "vendors", custodian: "vendors", balance: 0 }] : []),
     { id: "acc-bank", holder: "bank", custodian: "bank", balance: V.opening.bank },
     { id: "acc-union", holder: "union", custodian: "bank", balance: 0 },
     { id: "acc-city", holder: "city", custodian: "bank", balance: V.opening.town },
@@ -868,6 +881,9 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     { entity: "union", role: "union officer", n: heads(SR.union), where: "offices", paidBy: "own" },
     ...(UT ? [{ entity: "water-corp", role: "utility officer", n: heads(SR.utilities, 2), where: "offices" as const, paidBy: "own" as const }, { entity: "energy-co", role: "utility officer", n: heads(SR.utilities, 2), where: "offices" as const, paidBy: "own" as const }] : []),
   ];
+  // The audit office, where the profile has an audit law (docs/behaviour/auditor.md): a body like the ombudsman, staffed by residents, paid by a grant.
+  const AUDL = V.audit && PS.staff_per_1000.audit !== undefined ? V.audit : undefined;
+  if (AUDL) bodiesPlan.push({ entity: AUDITOR, role: "audit officer", n: heads(SR.audit!), where: "hall", paidBy: "grant" });
   const bodies = bodiesPlan;
   // (Property managers run the letting offices of several landlords; each is employed by one of them.)
   const managers = landlords.length ? Math.min(landlords.length, heads(SR.property_management)) : 0;
@@ -882,7 +898,8 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     ...managerEmployers.map((l) => ({ employer: l, structure: "town-offices", space: "town-offices/workplace.1", wage: PS.wage_per_pay_period, capacity: 1, start: 1, industry: "other", role: "property manager" })));
   // (The bodies that exist only to be staffed: made here, with an account to pay from.)
   for (const x of [...(JU ? [{ id: "tribunal", kind: "tribunal", name: "Civil and Administrative Tribunal" }] : []), ...(FR ? [{ id: "ombudsman", kind: "ombudsman", name: "Ombudsman" }, { id: "consumer-desk", kind: "consumer_desk", name: "Consumer Affairs" }] : []),
-    ...(E ? [{ id: ELECTORAL, kind: "electoral_commission", name: "Electoral commission" }, { id: "paper", kind: "firm", name: `The ${spec.name} Times` }] : [])]) {
+    ...(E ? [{ id: ELECTORAL, kind: "electoral_commission", name: "Electoral commission" }, { id: "paper", kind: "firm", name: `The ${spec.name} Times` }] : []),
+    ...(AUDL ? [{ id: AUDITOR, kind: "audit_office", name: AUDL.office.charAt(0).toUpperCase() + AUDL.office.slice(1) }] : [])]) {
     entities.push(x);
     accounts.push({ id: `acc-${x.id}`, holder: x.id, custodian: "bank", balance: 0 });
   }
@@ -1015,7 +1032,8 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       if (w) a.balance = SHOP.demand * WORLD.goods_export + 3 * Math.floor((wages.shop * MONTH) / PAY) * (w.start ?? 1);
     }
   }
-  const jobSlots = workplaces.flatMap((w) => Array.from({ length: w.start ?? w.capacity }, () => w));
+  // (The audit office's staff are not among the jobs the town's adults fill in turn: they are taken on from those without work, below, so that a body added to a town moves no one else's job.)
+  const jobSlots = workplaces.filter((w) => w.employer !== AUDITOR).flatMap((w) => Array.from({ length: w.start ?? w.capacity }, () => w));
   // Jobs an employer does not register (docs/behaviour/firms.md): of the jobs at employers of a kind, the profile's
   // share is registered; the rest are paid whole, and the employer's own note of each is all that says so.
   const regPick = rng("registered");
@@ -1033,6 +1051,62 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   const outOfLabourForce = new Set<string>();
   const inTrade = new Set<string>(); // (in work, their own or an employer's: for a starting attachment to the trade)
   const inGroup = new Set<string>(); // (members of a group at the start)
+  /** A job as the town opens: the agreement and its standing instruction to the bank, the worker's place, and (for a job on the books) their union dues. */
+  const employ = (c: Person, w: (typeof workplaces)[number], byDay: boolean, offBooks: boolean, draws: { below(n: number): number } = pick) => {
+    staffCount.set(w.employer, (staffCount.get(w.employer) ?? 0) + 1);
+    staffAt.set(w.employer, [...(staffAt.get(w.employer) ?? []), c.id]);
+    if (w.role) staffOf.set(`${w.employer}|${w.role}`, [...(staffOf.get(`${w.employer}|${w.role}`) ?? []), c.id]);
+    const ag = `job-${c.id}`;
+    // Work by the day: a day's pay for each day worked, paid that day by the employer (no standing order); either
+    // side ends it without notice.
+    if (byDay) records.push({ id: ag, record: "agreement", author: "genesis", at: 0, visible_to: [w.employer, c.id], terms: {
+      template: "employment", parties: [w.employer, c.id],
+      commitments: [
+        { who: w.employer, does: { outcome: { money: { to: `acc-${c.id}`, amount: String(dayWage(w)), for: "a day's work" } } }, every: DAY },
+        { who: c.id, does: { outcome: { occupancy: { who: c.id, in: w.space } } } },
+      ],
+      termination: [{ party: w.employer, notice: 1 }, { party: c.id, notice: 1 }],
+      text: `${c.id} works for ${w.employer} by the day, for ${asWritten(dayWage(w))} for each day worked; either may end it at once.` } });
+    else records.push({ id: ag, record: "agreement", author: "genesis", at: 0, visible_to: [w.employer, c.id], terms: {
+      template: "employment", parties: [w.employer, c.id],
+      // Commitments in the standard encoding (outcomes, docs/design/translator-and-resolver.md §9.2).
+      commitments: [
+        { who: w.employer, does: { outcome: { money: { to: `acc-${c.id}`, amount: String(w.wage), for: "wages" } } }, every: PAY },
+        { who: c.id, does: { outcome: { occupancy: { who: c.id, in: w.space } } } },
+      ],
+      termination: [{ party: w.employer, notice: 14 * DAY }, { party: c.id, notice: 14 * DAY }],
+      // (A post with a role of its own says so, as the office that hires it writes it: the town's crew, who have none, are the works office's.)
+      ...(w.role ? { text: `${c.id} works for ${w.employer} as ${w.role} for ${asWritten(w.wage)} every ${V.pay_period_days} days.` } : {}) } });
+    // (The town's side is signed by the office that takes its crew on: its works manager; its administrative staff's, by its finance officer.)
+    for (const party of [w.employer, c.id]) records.push({ id: `${ag}-sig-${party}`, record: "signature", author: "genesis", at: 0, visible_to: [w.employer, c.id], speaks_for: party, ...(party === "city" ? { in_position: w.role ? "finance" : "works" } : {}), agreement: ag, as: party });
+    // (The town's wages are instructed by its finance officer, the signatory the bank knows.)
+    // The instruction says of itself who gave it and when, under whose authority, which agreement it pays under and
+    // how its sum comes from the agreed wage (docs/behaviour/bank-payment-system.md, "The instructions a town opens with").
+    // (A job paid by the day has no standing instruction; one its employer does not register is paid whole.)
+    if (!byDay) {
+      const firstPay = (1 + draws.below(V.pay_period_days)) * DAY, taxWithheld = offBooks ? 0 : withholding(taxLaw, w.wage, PAY);
+      const sumWords = `${asWritten(w.wage - taxWithheld)}${taxWithheld > 0 ? ` (the agreed ${asWritten(w.wage)} less ${asWritten(taxWithheld)} withheld under ${taxLaw.id})` : ""}`;
+      records.push({ id: `${ag}-wages`, record: "statement", author: "genesis", at: 0, visible_to: [...new Set([w.employer, "bank"])], speaks_for: w.employer, ...(w.employer === "city" ? { in_position: "finance" } : {}), kind: "request", addressed_to: ["bank"], basis: ag,
+        text: `Standing instruction to the bank, given ${w.employer === "city" ? "for the town by its finance officer, the signatory the town has named for its account (signatories-city)," : `by ${w.employer}`} before the year began: pay ${c.id}'s wages under employment agreement ${ag}, ${sumWords} every ${V.pay_period_days} days, first on ${formWords.dateWords(firstPay)}.`,
+        data: { outcome: { money: { from: `acc-${w.employer}`, to: `acc-${c.id}`, amount: String(w.wage - taxWithheld), for: "wages", ...(w.employer === "city" ? { line: w.line ?? "staff" } : {}) } }, every: PAY, first: firstPay } });
+    }
+    if (offBooks) records.push({ id: `off-books-${c.id}`, record: "statement", author: "genesis", at: 0, visible_to: [w.employer], speaks_for: w.employer, kind: "off_books", basis: ag,
+      text: `Not on our payroll returns: ${ag}.`, data: { agreement: ag } });
+    if (!RD) occupancy.push({ occupant: c.id, space: w.space }); // (with the round, at home at the start: they go to work at its hour)
+    // Union members at the start: the profile's membership rate for the work's industry, dues by standing order.
+    if (unionPick.below(10_000) < (U.membership_bps[w.industry] ?? U.membership_bps.other ?? 0)) {
+      const mem = `member-${c.id}`;
+      unionMembers.push({ member: c.id, employer: w.employer, industry: w.industry });
+      records.push({ id: mem, record: "agreement", author: "genesis", at: 0, visible_to: ["union", c.id], terms: {
+        template: "membership", parties: ["union", c.id],
+        commitments: [{ who: "union", does: { text: `The union represents ${c.id} at work, and bargains for them.` } },
+          { who: c.id, does: { outcome: { money: { to: "acc-union", amount: String(U.dues_per_month), for: "Union dues." } } }, every: MONTH }],
+        termination: [{ party: "union", notice: MONTH }, { party: c.id, notice: Math.max(1, U.resignation_notice_days * DAY) }] } });
+      for (const party of ["union", c.id]) records.push({ id: `${mem}-sig-${party}`, record: "signature", author: "genesis", at: 0, visible_to: ["union", c.id], speaks_for: party, agreement: mem, as: party });
+      records.push({ id: `${mem}-dues`, record: "statement", author: "genesis", at: 0, visible_to: [c.id, "bank"], speaks_for: c.id, kind: "request", addressed_to: ["bank"], basis: mem,
+        text: `Standing instruction to the bank, given by ${c.id} before the year began: pay my union dues under membership agreement ${mem} every month.`, data: { outcome: { money: { from: `acc-${c.id}`, to: "acc-union", amount: String(U.dues_per_month), for: "Union dues." } }, every: MONTH, first: (1 + unionPick.below(30)) * DAY } });
+    }
+  };
   for (const c of everyone.filter((m) => m.adult)) {
     // Retired (at the profile's retirement age): savings to live on, and no job.
     if (!CURVE && !working(c)) {
@@ -1070,59 +1144,23 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     const saved = !working(c) ? lo + Math.floor((pick.below(10_001) * (hi - lo)) / 10_000)
       : band ? drawSavings(band.pct, pick.below(10_000)) : monthly * (spec.savings_months[0] + pick.below(spec.savings_months[1] - spec.savings_months[0] + 1));
     accounts.push({ id: `acc-${c.id}`, holder: c.id, custodian: "bank", balance: !working(c) ? saved : Math.max(V.opening.person_min_savings, saved) });
-    if (!w) continue;
-    staffCount.set(w.employer, (staffCount.get(w.employer) ?? 0) + 1);
-    staffAt.set(w.employer, [...(staffAt.get(w.employer) ?? []), c.id]);
-    if (w.role) staffOf.set(`${w.employer}|${w.role}`, [...(staffOf.get(`${w.employer}|${w.role}`) ?? []), c.id]);
-    const ag = `job-${c.id}`;
-    // Work by the day: a day's pay for each day worked, paid that day by the employer (no standing order); either
-    // side ends it without notice.
-    if (byDay) records.push({ id: ag, record: "agreement", author: "genesis", at: 0, visible_to: [w.employer, c.id], terms: {
-      template: "employment", parties: [w.employer, c.id],
-      commitments: [
-        { who: w.employer, does: { outcome: { money: { to: `acc-${c.id}`, amount: String(dayWage(w)), for: "a day's work" } } }, every: DAY },
-        { who: c.id, does: { outcome: { occupancy: { who: c.id, in: w.space } } } },
-      ],
-      termination: [{ party: w.employer, notice: 1 }, { party: c.id, notice: 1 }],
-      text: `${c.id} works for ${w.employer} by the day, for ${asWritten(dayWage(w))} for each day worked; either may end it at once.` } });
-    else records.push({ id: ag, record: "agreement", author: "genesis", at: 0, visible_to: [w.employer, c.id], terms: {
-      template: "employment", parties: [w.employer, c.id],
-      // Commitments in the standard encoding (outcomes, docs/design/translator-and-resolver.md §9.2).
-      commitments: [
-        { who: w.employer, does: { outcome: { money: { to: `acc-${c.id}`, amount: String(w.wage), for: "wages" } } }, every: PAY },
-        { who: c.id, does: { outcome: { occupancy: { who: c.id, in: w.space } } } },
-      ],
-      termination: [{ party: w.employer, notice: 14 * DAY }, { party: c.id, notice: 14 * DAY }],
-      // (A post with a role of its own says so, as the office that hires it writes it: the town's crew, who have none, are the works office's.)
-      ...(w.role ? { text: `${c.id} works for ${w.employer} as ${w.role} for ${asWritten(w.wage)} every ${V.pay_period_days} days.` } : {}) } });
-    // (The town's side is signed by the office that takes its crew on: its works manager; its administrative staff's, by its finance officer.)
-    for (const party of [w.employer, c.id]) records.push({ id: `${ag}-sig-${party}`, record: "signature", author: "genesis", at: 0, visible_to: [w.employer, c.id], speaks_for: party, ...(party === "city" ? { in_position: w.role ? "finance" : "works" } : {}), agreement: ag, as: party });
-    // (The town's wages are instructed by its finance officer, the signatory the bank knows.)
-    // The instruction says of itself who gave it and when, under whose authority, which agreement it pays under and
-    // how its sum comes from the agreed wage (docs/behaviour/bank-payment-system.md, "The instructions a town opens with").
-    // (A job paid by the day has no standing instruction; one its employer does not register is paid whole.)
-    if (!byDay) {
-      const firstPay = (1 + pick.below(V.pay_period_days)) * DAY, taxWithheld = offBooks ? 0 : withholding(taxLaw, w.wage, PAY);
-      const sumWords = `${asWritten(w.wage - taxWithheld)}${taxWithheld > 0 ? ` (the agreed ${asWritten(w.wage)} less ${asWritten(taxWithheld)} withheld under ${taxLaw.id})` : ""}`;
-      records.push({ id: `${ag}-wages`, record: "statement", author: "genesis", at: 0, visible_to: [...new Set([w.employer, "bank"])], speaks_for: w.employer, ...(w.employer === "city" ? { in_position: "finance" } : {}), kind: "request", addressed_to: ["bank"], basis: ag,
-        text: `Standing instruction to the bank, given ${w.employer === "city" ? "for the town by its finance officer, the signatory the town has named for its account (signatories-city)," : `by ${w.employer}`} before the year began: pay ${c.id}'s wages under employment agreement ${ag}, ${sumWords} every ${V.pay_period_days} days, first on ${formWords.dateWords(firstPay)}.`,
-        data: { outcome: { money: { from: `acc-${w.employer}`, to: `acc-${c.id}`, amount: String(w.wage - taxWithheld), for: "wages", ...(w.employer === "city" ? { line: w.line ?? "staff" } : {}) } }, every: PAY, first: firstPay } });
-    }
-    if (offBooks) records.push({ id: `off-books-${c.id}`, record: "statement", author: "genesis", at: 0, visible_to: [w.employer], speaks_for: w.employer, kind: "off_books", basis: ag,
-      text: `Not on our payroll returns: ${ag}.`, data: { agreement: ag } });
-    if (!RD) occupancy.push({ occupant: c.id, space: w.space }); // (with the round, at home at the start: they go to work at its hour)
-    // Union members at the start: the profile's membership rate for the work's industry, dues by standing order.
-    if (unionPick.below(10_000) < (U.membership_bps[w.industry] ?? U.membership_bps.other ?? 0)) {
-      const mem = `member-${c.id}`;
-      unionMembers.push({ member: c.id, employer: w.employer, industry: w.industry });
-      records.push({ id: mem, record: "agreement", author: "genesis", at: 0, visible_to: ["union", c.id], terms: {
-        template: "membership", parties: ["union", c.id],
-        commitments: [{ who: "union", does: { text: `The union represents ${c.id} at work, and bargains for them.` } },
-          { who: c.id, does: { outcome: { money: { to: "acc-union", amount: String(U.dues_per_month), for: "Union dues." } } }, every: MONTH }],
-        termination: [{ party: "union", notice: MONTH }, { party: c.id, notice: Math.max(1, U.resignation_notice_days * DAY) }] } });
-      for (const party of ["union", c.id]) records.push({ id: `${mem}-sig-${party}`, record: "signature", author: "genesis", at: 0, visible_to: ["union", c.id], speaks_for: party, agreement: mem, as: party });
-      records.push({ id: `${mem}-dues`, record: "statement", author: "genesis", at: 0, visible_to: [c.id, "bank"], speaks_for: c.id, kind: "request", addressed_to: ["bank"], basis: mem,
-        text: `Standing instruction to the bank, given by ${c.id} before the year began: pay my union dues under membership agreement ${mem} every month.`, data: { outcome: { money: { from: `acc-${c.id}`, to: "acc-union", amount: String(U.dues_per_month), for: "Union dues." } }, every: MONTH, first: (1 + unionPick.below(30)) * DAY } });
+    if (w) employ(c, w, byDay, offBooks);
+  }
+  // The audit office's staff: taken on (docs/behaviour/auditor.md), at the body's rate and the profile's pay, as any body's are.
+  if (AUDL) {
+    const wp = workplaces.find((w) => w.employer === AUDITOR);
+    // (Taken from the adults of working age outside the labour force, who look for no work: a body added to a town takes no one from a firm, from the market in which jobseekers and
+    // employers meet or from any other body, and moves no other resident's job or post. Drawn by a stream of its own, as is the day of their first pay, so that no other draw of the town
+    // moves. The stream `audit-staff` gave a town whose seated twin was not exact (the person taken is a draw, and a town is a draw of its own); `audit-staff1` to `audit-staff6` all gave exact twins and the year of the mayor's seat, and `audit-staff2` and `audit-staff5` held the twin draws entirely; the fifth is the one used: docs/decisions.md, "The auditor".)
+    const pool = everyone.filter((m) => m.adult && working(m) && outOfLabourForce.has(m.id) && !inTrade.has(m.id)).map((m) => m.id).sort(), draw = rng("audit-staff5");
+    const hired: string[] = [];
+    for (let i = 0; i < (wp?.start ?? 0) && pool.length; i++) hired.push(pool.splice(draw.below(pool.length), 1)[0]!);
+    for (const id of hired) {
+      const c = everyone.find((m) => m.id === id)!;
+      inTrade.add(id);
+      monthlyPay.set(id, Math.floor((wp!.wage * MONTH) / PAY));
+      netPay.set(id, Math.floor(((wp!.wage - withholding(taxLaw, wp!.wage, PAY)) * MONTH) / PAY));
+      employ(c, wp!, false, false, draw);
     }
   }
   // The town's children, at the same participation once they're adults (drawn now: whether they'll look for work).
@@ -1973,6 +2011,18 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     const { office: _office, ...data } = form.data;
     records.push({ ...form, id: `form-${x.form.replace(/_/g, "-")}`, visible_to: "public", text: `${x.title}. ${x.does}`, data });
   }
+  // The audit law (docs/behaviour/auditor.md): whom the audit office audits, how often, on what sample, and how long a body has to answer it. Public, with the other laws;
+  // the audit office reads it as the office reads any law it works under, and a body it names reads it to know it must answer. The profile's roles are named here for the
+  // town's own bodies: the support office is the payer's (the outside world's agency), the town's finance office is the town's.
+  type AuditEntry = { body: string; entity: string; every_days: number; checks: string[]; kind?: string; sample?: { share_bps: number; least: number; most: number } };
+  const AUDIT_BODIES: AuditEntry[] = AUDL ? AUDL.bodies.flatMap((b): AuditEntry[] => {
+    if (b.body === "support") return PAYMENTS.length && b.checks.includes("decisions") ? [{ body: b.body, entity: "outside", every_days: b.every_days, checks: ["decisions"], kind: "benefit_decision", sample: b.sample ?? { share_bps: 1_000, least: 5, most: 20 } }] : [];
+    return b.checks.includes("accounts") ? [{ body: b.body, entity: "city", every_days: b.every_days, checks: ["accounts"] }] : [];
+  }) : [];
+  if (AUDL && AUDIT_BODIES.length) records.push({ id: "law-audit", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "outside", kind: "law", basis: "law-charter",
+    text: `Audit. The ${AUDL.office} examines the bodies named here on a sample, as often as is stated for each: ${AUDIT_BODIES.map((b) => b.body === "support" ? `the decisions of the office that decides claims for support (${b.sample!.share_bps / 100}% of each ${b.every_days} days' decisions, no fewer than ${b.sample!.least} and no more than ${b.sample!.most}, decided again from the file under the law and the procedure published for them)` : `the accounts of the town's finance office (each ${b.every_days} days: its payments in its books against the bank's record of them)`).join("; ")}. A body asked for a named item by the ${AUDL.office} must answer within ${AUDL.answer_within_days} days. The ${AUDL.office} publishes a report on each body for each period within ${AUDL.report_within_days} days of its end. The report states what was found; it reverses, fines and orders nothing.`,
+    adico: { attribute: "a body named in this law", deontic: "must", aim: "answer the audit office's request for a named item", condition: `within ${AUDL.answer_within_days} days of the request` },
+    data: { audit: { auditor: AUDITOR, office: AUDL.office, answer_within_days: AUDL.answer_within_days, report_within_days: AUDL.report_within_days, bodies: AUDIT_BODIES } } });
   // (A place that charges no interest on overdue rates states none, and its law says nothing of it.)
   const ratesInterest = V.public_finance.rates_penalty_interest_bps ?? 0;
   records.push({ id: "law-rates", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", kind: "law", basis: "law-charter",
@@ -2083,9 +2133,10 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     "payment-system": { title: "A payment platform", does: ["message", "publish", "transfer", "open_account", "close_account"] },
     "agency-system": { title: "An agency's case and payments system", does: ["message", "publish", "transfer", "arrive"], owner: "outside" },
     "market-system": { title: "A market's trading system", does: ["message", "publish", "transfer", "move_goods", "withdraw", "record_claim", "transfer_claim"], owner: "outside" },
+    "vendor-system": { title: "A vendor's sales and delivery system", does: ["message", "publish", "withdraw", "transfer", "deploy", "retire", "propose_agreement", "sign_agreement"], owner: "outside" },
   };
   const systemKindOf = (entity: string, controller: any): string | undefined =>
-    controller.type !== "code" ? undefined : controller.impl === "bank.payment_system" ? "payment-system" : controller.impl === "world.trade" ? "market-system" : entity === "outside" || controller.impl === "fund.retirement" ? "agency-system" : undefined;
+    controller.type !== "code" ? undefined : controller.impl === "bank.payment_system" ? "payment-system" : controller.impl === "world.trade" ? "market-system" : controller.impl === "world.vendor" ? "vendor-system" : entity === "outside" || controller.impl === "fund.retirement" ? "agency-system" : undefined;
   /** The systems of each kind in use, for the templates. */
   const systemsUsed = new Set<string>();
   const sysId = (post: string) => `${post}-system`;
@@ -2167,6 +2218,28 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       // The world market's demand for the town's goods, split among the factories by the size of their works (each
       // factory's export customers).
       buys: { goods: { unit_price: WORLD.goods_export, per_month: exportUnits, from: exportShares } } }));
+  // A person\'s seconds for a paper of a kind (the table\'s row for what is made, else for the block), and what a system of an office offer takes
+  // for it: the offer\'s speed against that. The table of work carries the system\'s row, so that a paper a system writes takes the time it says.
+  const personTable: { [k: string]: number } = { ...WORK_TIME.person, ...V.work_time?.person };
+  const personPaper = (kind: string) => personTable[`publish/${kind}`] ?? personTable.publish!;
+  var officeRows: { rows: { [k: string]: number }; sources: { [k: string]: string } } | undefined;
+  for (const o of AUTO?.offers ?? []) if (o.for === "offices") {
+    officeRows ??= { rows: {}, sources: {} };
+    for (const kind of o.kinds ?? []) {
+      officeRows.rows[`publish/${kind}`] = Math.max(1, Math.round((personPaper(kind) * o.speed_bps) / 10_000));
+      officeRows.sources[`system.publish/${kind}`] = `Placeholder: a system of the offer ${o.id} writes a ${kind} in ${o.speed_bps / 100}% of the time a person takes (the offer\'s speed; ${P.sources["automation"] ?? "no source given"}).`;
+    }
+  }
+  // The outside world as a seller of systems (docs/behaviour/automation.md): what it sells, at what prices, and the licence. Its
+  // takings leave the town. Where the profile has no automation, there is none.
+  if (AUTO?.offers.length) {
+    const secondsOf = (o: { task?: string; kinds?: string[]; speed_bps: number; for: string }) => o.for === "firms" ? Math.max(1, Math.round(((o.task === "make" ? MAKE.labour : SHOP.serve) * o.speed_bps) / 10_000))
+      : Math.max(1, Math.round(((o.kinds ?? []).reduce((x, k) => x + personPaper(k), 0) / Math.max(1, (o.kinds ?? []).length) * o.speed_bps) / 10_000));
+    office("outside-vendor", "vendors", "Vendor of systems", undefined, [{ id: "ledger", kind: "accounts" }, K.mine(), K.published("tenders", ["tender"])],
+      code("world.vendor", { account: "acc-vendors", change_bps_per_year: -AUTO.price_fall_bps_per_year,
+        offers: AUTO.offers.map((o) => ({ id: o.id, title: o.title, for: o.for, ...(o.task ? { task: o.task } : {}), ...(o.kinds ? { kinds: o.kinds } : {}), template: o.id, seconds: secondsOf(o), speed_bps: o.speed_bps, scope_bps: o.scope_bps,
+          setup: o.setup, fee_per_year: o.fee_per_year, exit: o.exit, term_days: o.term_days, notice_days: o.notice_days, oversight_hours_per_month: o.oversight_hours_per_month })) }));
+  }
   // The foreman looks up in the register the plan of a lot it is asked to build on (nobody has the register by heart),
   // and goes to see the ground before building there, to know where on a lot a building goes. It gives notice of
   // building work as it begins: to the town (whose inspector comes) and, where there is one, the water corporation
@@ -2316,7 +2389,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   office("union-organiser", "union", "Organiser", "organiser", [mine("union-business"), votes, K.published("prices", ["price_index"]), { id: "dues", kind: "accounts" }, lawBook,
     K.published("closures", ["closure"])],
     // (It bargains where its members work, as its register and they tell it: nobody hands it the town's employers.)
-    code("union.organiser", { ...(FR ? { hears: [{ about: "underpaid" }], answer_days: FR.venues.answer_days } : {}), industries: [...new Set(workplaces.filter((w) => /^(factory|shop)-/.test(w.employer) || w.employer === "builder").map((w) => w.industry))].sort(), claim_margin_bps: V.unions.claim_margin_bps, dues: V.unions.dues_per_month, resignation_notice_days: V.unions.resignation_notice_days, dues_account: "acc-union" }));
+    code("union.organiser", { ...(FR ? { hears: [{ about: "underpaid" }], answer_days: FR.venues.answer_days } : {}), industries: [...new Set(workplaces.filter((w) => /^(factory|shop)-/.test(w.employer) || w.employer === "builder").map((w) => w.industry))].sort(), pay_per_day: Object.fromEntries([...new Map(workplaces.filter((w) => /^(factory|shop)-/.test(w.employer) || w.employer === "builder").map((w) => [w.industry, Math.floor(w.wage / V.pay_period_days)] as const))].sort(([a], [b]) => (a < b ? -1 : 1))), claim_margin_bps: V.unions.claim_margin_bps, dues: V.unions.dues_per_month, resignation_notice_days: V.unions.resignation_notice_days, dues_account: "acc-union" }));
   // The statistician (the outside world's): prices a sample of outlets each month and publishes the mean, which is what
   // the union's claims follow.
   // (And estimates the town's population from the census count and what reaches it since: births and deaths as
@@ -2726,6 +2799,26 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     const m = pos.role_module;
     if (m && (m.code === "firm.retailer" || m.code === "firm.producer")) Object.assign(m.params, { adjust: { smooth_months: ADJ.smooth_months ?? 3, hiring_cost_weeks: ADJ.hiring_cost_weeks ?? 8, ...(ADJ.hours_step_bps ? { hours_step_bps: ADJ.hours_step_bps } : {}) } });
   }
+  // Systems on offer (docs/behaviour/automation.md): every business with staff weighs them as the profile says, shown what the
+  // vendor publishes; the rate at which each gets a unit wrong is a row of the world's table of slips, with the offer's source.
+  if (AUTO?.offers.length) {
+    for (const pos of positions) {
+      const m = pos.role_module;
+      if (!m || (m.code !== "firm.retailer" && m.code !== "firm.producer") || m.params.operator) continue;
+      Object.assign(m.params, { automation: AUTO.firms });
+      if (Array.isArray(pos.channels)) pos.channels.push(K.from("vendors", ["vendors"], ["system_offer"], { title: "What vendors sell to businesses" }));
+    }
+    // The town\'s offices that write papers in numbers: they weigh a system for them too, and above the law\'s threshold put the contract to tender.
+    const staffMonth = Math.round((PS.wage_per_pay_period * 30 * DAY) / PAY);
+    for (const pos of positions) {
+      const m = pos.role_module;
+      const kinds = m?.code === "city.rates_officer" ? ["rates_notice"] : m?.code === "city.planning_officer" ? ["permit_decision"] : undefined;
+      if (!m || !kinds || !AUTO.offers.some((o) => o.for === "offices" && kinds.every((k) => o.kinds?.includes(k)))) continue;
+      Object.assign(m.params, { automation: AUTO.firms, ...(AUTO.procurement ? { procurement: AUTO.procurement } : {}),
+        casework: { kinds, person_seconds: Object.fromEntries(kinds.map((k) => [k, personPaper(k)])), wage_month: staffMonth, seconds_per_worker_month: Math.round((WORKING_DAY * WORK_DAYS * 30) / 7), utilisation_bps: 8_000 } });
+      if (Array.isArray(pos.channels)) pos.channels.push(K.from("vendors", ["vendors"], ["system_offer"], { title: "What vendors sell to offices" }));
+    }
+  }
   // Trade credit, where the profile states the place's ordinary terms (docs/behaviour/trade.md, "Trade credit"): a factory gives them to the
   // shops that buy from it, and the world market to the factories that buy inputs; both buyers take them when the list says so.
   const TCD = V.business?.trade_credit_days;
@@ -2823,6 +2916,10 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     // it does and nothing more. The bank's payment platform is under licence, paid for in the bank's own account; the
     // outside world's own are its own. docs/behaviour/staffing.md.)
     ...[...systemsUsed].sort().map((k) => ({ id: k, kind: "system", title: SYSTEM_KINDS[k]!.title, supplier: "outside", does: SYSTEM_KINDS[k]!.does.map((block) => ({ block })), controller: code("system.genesis"), framing: unstated })),
+    // (And what the outside world\'s vendor sells: a kind of system for each offer, which does the task it is for and nothing else.)
+    ...(AUTO?.offers ?? []).map((o) => ({ id: o.id, kind: "system", title: o.title, supplier: "vendors",
+      does: o.for === "firms" ? [{ block: "work", task: o.task, seconds: Math.max(1, Math.round(((o.task === "make" ? MAKE.labour : SHOP.serve) * o.speed_bps) / 10_000)) }] : [...(o.kinds ?? []).map((kind) => ({ block: "publish", kind })), { block: "record_claim" }, { block: "message" }],
+      controller: code("system.genesis"), framing: unstated })),
     ...["newcomer", "child"].map((id) => ({ id, kind: "person", channels: citizenChannels, controller: citizenController, framing: unstated })),
     ...["newcomer-outside-lf", "child-outside-lf"].map((id) => ({ id, kind: "person", channels: citizenChannels, controller: outsideLabourForce, framing: unstated }))];
   if (spec.migration !== false) {
@@ -2842,6 +2939,9 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       ...(PAYMENTS.some((r) => r.who?.record || "share_bps" in r.amount) || DECISIONS.some((d) => d.needs?.some((n) => n.from === "employer")) ? [K.mine("contributions", ["withholding_report"])] : [])],
     code("world.transfers", { account: "acc-outside", publish_every_days: 30,
       ...(FR ? { respond: { grant_bps: FR.put_right_on_asking_bps } } : {}) }));
+  // The audit office (docs/behaviour/auditor.md): a code office like the ombudsman's, staffed by residents. Its papers are the answers addressed to it; it reads the laws
+  // it works under (the audit law, the support law it decides again under, the tax law that a payment reckoned on pay needs); its reports are public.
+  if (AUDL && AUDIT_BODIES.length) office("auditor-officer", AUDITOR, "Audit officer", "audit_officer", [mine("auditor-business"), K.mine("audit", ["audit_answer"]), lawBook], code("office.auditor", {}));
   // The retirement fund's trustee (docs/behaviour/firm-ownership.md): takes in what the fund's holdings pay, pays its
   // costs (its administrator is outside the town), and pays its retired members their pensions.
   if (FUND) office("fund-trustee", FUND, "Trustee", undefined,
@@ -2849,6 +2949,20 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     code("fund.retirement", { administrator_account: "acc-outside", cost_bps_of_income: RF!.cost_bps_of_income, pay_every_days: RF!.pension_every_days,
       access_age: V.retirement_age, drawdown_bps_by_age: RF!.drawdown_bps_by_age, report_every_days: 365 }));
 
+  // Who reads the audit reports (public, as the law says): the town's council through its mayor, the bodies that hear complaints and appeals, the body audited.
+  // The finance office is audited and is told by a request addressed to it.
+  if (AUDL && AUDIT_BODIES.length) {
+    const readers = new Set(["mayor", "ombudsman-officer", "tribunal-member", "outside-support", "finance"]);
+    for (const pos of positions) {
+      if (!readers.has(pos.id) || !Array.isArray(pos.channels) || pos.channels.some((c: any) => c.id === "audit_reports")) continue;
+      pos.channels = [...pos.channels, K.published("audit_reports", ["audit_report"])];
+    }
+    // (The audit office's requests are public too, addressed to no one, so that no organisation's posts are woken by one; a body reads them as it reads the law.)
+    for (const [post, body] of [["outside-support", "support"], ["finance", "town_finance"]] as const) {
+      const pos = positions.find((x) => x.id === post);
+      if (pos && AUDIT_BODIES.some((b) => b.body === body)) pos.channels = [...pos.channels, K.published("audit_requests", ["audit_request"])];
+    }
+  }
   // ---- naming each post's holder (see `office`) ----
   // (Someone who runs a business of their own alone already holds its post: a person holds no other post with it.)
   const ownsAlone = new Set(ownBusinesses.map((b) => b.person));
@@ -3001,7 +3115,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     const { impl, params } = part.kind === "person" ? { impl: pos.role_module.code, params: pos.role_module.params } : part.controller;
     const entityName = entities.find((e) => e.id === pos.entity)?.name ?? pos.entity;
     part.controller = { type: "llm", impl: "anthropic", model: "claude-sonnet-5",
-      params: { cadence_days: 7, standing: ["laws", "forms", "prices"], ...(RD ? { sessions: { start: RD.work_start_hour * HOUR, end: RD.work_end_hour * HOUR, days: RD.work_days } } : {}),
+      params: { cadence_days: 7, standing: ["laws", "forms", "prices", ...(AUTO?.offers.length && pos.channels.some((c: any) => c.id === "vendors") ? ["vendors"] : [])], ...(RD ? { sessions: { start: RD.work_start_hour * HOUR, end: RD.work_end_hour * HOUR, days: RD.work_days } } : {}),
         // (What a folder holds, for whoever reads it: the code in the office reads every paper of the organisation's own
         // through its payroll channel; a person is shown the employment agreements under that name and the standing
         // payments that pay them, and finds the rest in the office's files. Until 2026-10-11 it was the agreements
@@ -3106,7 +3220,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       const h = participants.find((q) => q.id === pos.holder);
       if (h?.kind === "person") { appointments.watch.push(pos.id); (appointments.own ??= []).push(pos.id); }
     }
-    const kindOf: { [entity: string]: string } = { police: "police", tribunal: "courts", ombudsman: "oversight", "consumer-desk": "oversight", [ELECTORAL]: "elections", [LAND_REGISTRY]: "land_registry", "water-corp": "utilities", "energy-co": "utilities", bank: "banking", union: "union", paper: "press" };
+    const kindOf: { [entity: string]: string } = { [AUDITOR]: "oversight", police: "police", tribunal: "courts", ombudsman: "oversight", "consumer-desk": "oversight", [ELECTORAL]: "elections", [LAND_REGISTRY]: "land_registry", "water-corp": "utilities", "energy-co": "utilities", bank: "banking", union: "union", paper: "press" };
     for (const pos of positions) {
       const k = kindOf[pos.entity];
       if (!k || PS.appointed_by?.[k as keyof typeof PS.staff_per_1000] !== "council") continue;
@@ -3281,7 +3395,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
           from_covers: { ...Object.fromEntries([...L.land_covers.map((c: any) => c.id), V.nature!.river_cover].map((c) => [c, CL.heat_units])), built: CL.built_heat_units, ...(RDS ? { road: CL.built_heat_units } : {}) },
           source_by_day: W.heat }] : [])] } : {}),
     },
-    world: { boundaries: ["outside"], currencies: [V.currency], ground: L ? L.ground : { w: spec.grid.w, h: spec.grid.h },
+    world: { boundaries: ["outside", ...(AUTO?.offers.length ? ["vendors"] : [])], currencies: [V.currency], ground: L ? L.ground : { w: spec.grid.w, h: spec.grid.h },
       // The places (D58): the town, detailed, covering its ground; with nature, within its district, the landscape.
       places: L ? L.places : [{ id: "town", kind: "town", name: spec.name, area: { x: 0, y: 0, w: spec.grid.w, h: spec.grid.h }, detailed: true }],
       ...(L ? { populations: L.populations, flows: L.flows, ...(V.nature!.spin_up_years ? { nature_spin_up_days: Math.round(V.nature!.spin_up_years * 365) } : {}) } : {}), entities, accounts: accounts.map((a) => ({ ...a, balance: String(a.balance) })), structures, occupancy, records,
@@ -3296,8 +3410,16 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     knowing: K.knowing(positions, { holderSearch: [], dealings: 20, ...(V.knowing ? { visit_seconds: V.knowing.visit_seconds } : {}), ...(FR ? { hearings: true } : {}), ...(FND ? { founding: true } : {}) }),
     // (Work is done in a workplace: a person named to do an act's work must be in one. `by` is F3's; the generator names none yet.)
     orchestration: { thinking_time: "free", performers_in: "workplace", act_time: {
-      ...WORK_TIME, person: { ...WORK_TIME.person, ...V.work_time?.person }, ...(V.work_time?.system ? { system: V.work_time.system } : {}),
-      sources: { ...WORK_TIME.sources, ...V.work_time?.sources } },
-      ...(slips ? { slip: slips } : {}) },
+      ...WORK_TIME, person: { ...WORK_TIME.person, ...V.work_time?.person }, ...(V.work_time?.system || officeRows ? { system: { ...(V.work_time?.system ?? WORK_TIME.system), ...(officeRows?.rows ?? {}) } } : {}),
+      sources: { ...WORK_TIME.sources, ...V.work_time?.sources, ...(officeRows?.sources ?? {}) } },
+      ...(slips || AUTO?.offers.length ? { slip: ((): NonNullable<typeof slips> => {
+        // (The rate at which each system on offer gets a unit wrong: a row of the table for a system, as the offer states it.)
+        const t: NonNullable<typeof slips> = slips ?? { person: {}, system: {}, sources: {} };
+        for (const o of AUTO?.offers ?? []) {
+          t.system[o.id] = { bps: o.error_bps };
+          t.sources[`system.${o.id}`] = `The vendor's stated rate for ${o.title}: ${o.error_bps / 100}% of the units it does come out wrong (a placeholder; no measured figure for software of this kind was found). ${P.sources["automation"] ?? ""}`;
+        }
+        return t;
+      })() } : {}) },
   };
 }

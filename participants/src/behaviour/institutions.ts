@@ -14,8 +14,9 @@ import { standingClaims } from "../law";
 import { need, params, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
 import { ask, Asked, Directions, goSee, ownerLooks, visited, VISIT_MAX, nextLook, because, Book, prohibitions, holdsOf, noting, cellsOf, commitmentOf, DAY, Letters, lotOf, ownAccount, record, say, sign, type Step, usd, withdraw, outOfTime, team, StandingWork, CounterWork } from "./common";
 import { Deliveries, goodsPrices, held, order } from "./trade";
-import { Bargaining, receipts, Staffing, stepper, WindingUp } from "./firms";
+import { Bargaining, receipts, Staffing, Takings, stepper, WindingUp } from "./firms";
 import * as P from "./papers";
+import { OfficeDesk } from "./automation";
 
 /** Who the registry says owns a lot: the latest standing ownership claim, following transfers. */
 export function ownerOf(book: Book, lot: string): string | undefined {
@@ -86,8 +87,12 @@ export const planningOfficer: BehaviourModule = {
     const p = params({ compliance_bps: 10_000, town: ctx.entity, // (the town: the office's own)
       // A law against building where a listed species lives, if the world has one: applied by the latest habitat
       // register the environment office publishes (the lots it found them on).
-      habitat_law: "" }, ctx.params);
+      habitat_law: "",
+      // Systems it may take up to write its decisions (docs/behaviour/automation.md): how it weighs them, the law on public buying, and
+      // what its papers take its staff (the world's figures). None: it looks at none.
+      automation: null as import("./automation").AdoptionParams | null, procurement: null as import("./automation").Procurement | null, casework: null as import("./automation").Casework | null }, ctx.params);
     const book = new Book();
+    const desk = new OfficeDesk(ctx.entity, p, ctx.rng);
     const decided = new Set<string>();
     const decided_: { application: string; decision: "granted" | "refused" | "incomplete"; law?: string }[] = [];
     const letters = new Letters(planningOfficer.answers);
@@ -95,11 +100,14 @@ export const planningOfficer: BehaviourModule = {
     return noting(book, stepper(
       (obs) => {
         book.absorb(obs);
+        desk.absorb(book);
         letters.take(obs, book);
       },
       (obs) => {
         const me = obs.entity;
         const steps: Step[] = [];
+        const acc = ownAccount(obs);
+        if (acc) steps.push(...desk.steps(book, obs.t, { account: acc.account, balance: acc.balance, staff: 1, keep: 0 }));
         const apps = book.open("permit_application").filter((a) => (a.addressed_to ?? []).includes(me) && !decided.has(a.id));
         for (const app of apps.sort((a, b) => (a.id < b.id ? -1 : 1))) {
           decided.add(app.id);
@@ -128,6 +136,7 @@ export const planningOfficer: BehaviourModule = {
             refuse ? `Refusing: granting it would breach ${breached!.id}, and we follow the law.` : breached ? `Granting, although it breaches ${breached.id} (we don't always follow the law).` : "Granting: no law we know of forbids it.",
             decision);
           if (!refuse) step.unshift(record("liberty", applicant, { action: "build", object: app.data?.lot, structure_type: app.data?.structure_type }, { basis: app.id }));
+          desk.assign(step, "permit_decision"); // (a system of ours that writes decisions does, if we hold one)
           steps.push(step);
         }
         // Asked to look at a refusal again: the law applied once more to the application as it stands, with the laws now in force, without the draw of
@@ -323,7 +332,7 @@ export const builder: BehaviourModule = {
   answers: {"office": "the builder's office", "acts": "What it acts on: a construction agreement signed with it, built once a permit for the site is in force and invoiced as agreed. Its prices are published.", "report": true},
   issues: [P.JOB_ADVERTISEMENT, P.ORDER],
   issuesWith: (p) => P.staffingOwn({ role: "construction worker", industry: p.industry, workplace: p.workplace, notice_days: p.notice_days ?? 14 }),
-  version: "0.13.1", // 0.13.1: returns of tax withheld are filed on the days the law states (docs/behaviour/firms.md, "Returns on the law's days"); 0.13.0: 0.13.0: takes repair orders from a client who has paid for them (`repair_task`; none by default: nothing changes), done by its crew in its own hours, oldest first; 0.12.3: takes on the share of its hands the world gives by the day, and pays them for the days there is building to do; 0.12.2: registers the share of its jobs the world gives for its kind; 0.12.1: with what 0.11.2 changed; 0.12.0: goes to a lot before building on it, sees its sites as its crew works on them, and gives notice of building work; no longer shown the town
+  version: "0.14.0", // 0.14.0: after a stoppage its offer follows what the stoppage cost it in takings, not a fixed share of the gap (docs/behaviour/unions.md, "Concession"); 0.13.1: returns of tax withheld are filed on the days the law states (docs/behaviour/firms.md, "Returns on the law's days"); 0.13.0: 0.13.0: takes repair orders from a client who has paid for them (`repair_task`; none by default: nothing changes), done by its crew in its own hours, oldest first; 0.12.3: takes on the share of its hands the world gives by the day, and pays them for the days there is building to do; 0.12.2: registers the share of its jobs the world gives for its kind; 0.12.1: with what 0.11.2 changed; 0.12.0: goes to a lot before building on it, sees its sites as its crew works on them, and gives notice of building work; no longer shown the town
   doc: "docs/behaviour/institutions.md",
   cadence: () => DAY,
   create(ctx: ParticipantContext) {
@@ -428,7 +437,8 @@ export const builder: BehaviourModule = {
     const repairs: { id: string; orderer: string; structure: string; units: number; left: number; at: number; refused: number; flying?: number }[] = [];
     // Hourly pay: the wage over the hours it pays for (working days in the period x the working day).
     let wage: number = p.wage; // (an enterprise agreement raises it)
-    const bargaining = new Bargaining(ctx.entity);
+    const takings = new Takings(); // money paid into our account by others: what a day without our crew costs us (Bargaining)
+    const bargaining = new Bargaining(ctx.entity, { takingsPerDay: (t) => takings.perDay(t) });
     const hourly = () => Math.ceil((wage * 3600) / ((p.period / DAY) * (p.work_days / 7) * p.working_day));
     return Object.assign(stepper(
       (obs) => {
@@ -438,6 +448,7 @@ export const builder: BehaviourModule = {
         letters.take(obs, book);
         const own = p.repair_task ? ownAccount(obs) : undefined;
         if (own) for (const [from, c] of receipts(obs, own.account)) paidIn.set(from, (paidIn.get(from) ?? 0) + c);
+        { const acc = ownAccount(obs); if (acc) for (const [, c] of receipts(obs, acc.account)) takings.add(obs.t, c); }
         // (The register's answer comes with the observation after we ask: a lot it has no plan of is not on it.)
         for (const lot of plansOut) if (!book.records.has(lot)) noPlan.add(lot);
         plansOut.clear();

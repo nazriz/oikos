@@ -46,7 +46,8 @@ test("households buy from shops and use their goods up; shops serve with their s
   expect(served.length).toBeGreaterThan(100);
   const labourOf = skillClock(config, ev);
   for (const w of served) {
-    expect(w.performers.every((p: string) => employees.get(w.at.replace("-premises", ""))?.has(p))).toBe(true);
+    // (By its own staff, or by a system it was delivered, which works whatever the hour: docs/behaviour/automation.md.)
+    expect(w.performers.every((p: string) => /^par\./.test(p) || employees.get(w.at.replace("-premises", ""))?.has(p))).toBe(true);
     const want = labourOf(w, serve);
     if (want !== undefined) expect(w.labour).toBe(want);
   }
@@ -59,7 +60,11 @@ test("households buy from shops and use their goods up; shops serve with their s
     const o = orders.get(n.data.order)!;
     expect(n.data.ordered).toBe(o.data.quantity);
     // (An order its buyer's bank never paid is declined: nothing to refund.)
-    expect(n.data.refund).toBe(n.data.declined === "unpaid" ? 0 : (o.data.quantity - n.data.delivered) * o.data.unit_price);
+    // (And an item a system of the shop got wrong is refunded too, at the price paid: a whole number of items more.)
+    const owed = n.data.declined === "unpaid" ? 0 : (o.data.quantity - n.data.delivered) * o.data.unit_price;
+    expect(n.data.refund).toBeGreaterThanOrEqual(owed);
+    expect((n.data.refund - owed) % o.data.unit_price).toBe(0);
+    if (n.data.declined === "unpaid") expect(n.data.refund).toBe(0);
   }
   // Goods go where the order says: home, or kept at the shop.
   const shopPlaces = new Set(config.world.structures.filter((s: any) => s.type === "shop").map((s: any) => s.id));
@@ -90,6 +95,7 @@ test("a shop with no staff serves nobody: what it can't serve within three days 
   config.world.occupancy = config.world.occupancy.filter((o: any) => !(staff.has(o.occupant) && o.space.startsWith("shop-1-")));
   // ... and doesn't hire before the month's end (people in work look for better jobs, so it could otherwise).
   officeAt(config, "shop-1-manager").params.min_staff = 0;
+  officeAt(config, "shop-1-manager").params.automation = null; // (this is about a shop with no hands: a system it might take would serve in their place)
   const { ev, recs } = await run("unstaffed", config, 20 * DAY);
   expect(ev.some((e) => e.event === "worked" && e.task === "serve" && e.at === "shop-1-premises")).toBe(false);
   const notes = recs.filter((r) => r.kind === "delivery_note" && r.speaks_for === "shop-1");
@@ -134,8 +140,8 @@ test("a shop serves in its staff's working hours: nothing is ordered for staff o
   rmSync(out, { recursive: true, force: true });
   const s = await runWorld({ config, runId: "hours", outDir: out, until: 45 * DAY });
   const log = readFileSync(s.logPath, "utf8").trim().split("\n").map((l) => JSON.parse(l));
-  const serving = log.filter((e) => e.kind === "command" && e.body.command === "act" && /^shop-\d+-manager$/.test(e.body.as ?? "") && (e.body.blocks ?? []).some((b: any) => b.block === "work" && b.task === "serve"));
-  expect(serving.length).toBeGreaterThan(50);
+  const serving = log.filter((e) => e.kind === "command" && e.body.command === "act" && /^shop-\d+-manager$/.test(e.body.as ?? "") && (e.body.blocks ?? []).some((b: any) => b.block === "work" && b.task === "serve") && !(e.body.blocks ?? []).some((b: any) => (b.performers ?? []).some((p: string) => /^par\./.test(p))));
+  expect(serving.length).toBeGreaterThan(50); // (the staff\'s serving: a system the shop holds works whatever the hour)
   for (const c of serving) {
     expect(Math.floor(c.t / DAY) % 7).toBeLessThan(work_days);
     expect(c.t % DAY).toBeGreaterThanOrEqual(open_from);

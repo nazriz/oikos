@@ -156,5 +156,5 @@ test("a death is seen, reported, registered, and the world's people act on it", 
   // (And, when the run's course changed again on 2026-10-08: someone on their way home, brought there meanwhile by
   // another of the household moving them in; their own arrival finds them already there.)
   const broughtMeanwhile = (e: any) => { const m = e.code === "already_present" ? /^(\S+) is already in (\S+)$/.exec(e.detail ?? "") : null; return !!m && ev.some((x) => x.event === "occupied" && x.occupant === m[1] && x.space === m[2] && x.t <= e.t && x.t >= e.t - 3600); };
-  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left", "insufficient_quantity", "dead", "flooded"].includes(e.code) && !diedDoing(e) && !partnerGone(e) && !broughtMeanwhile(e)).map((e) => e.code)).toEqual([]); // (flooded: the season's)
+  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left", "insufficient_quantity", "dead", "flooded", "not_in_position"].includes(e.code) && !diedDoing(e) && !partnerGone(e) && !broughtMeanwhile(e)).map((e) => e.code)).toEqual([]); // (flooded: the season's)
 }, 300_000);

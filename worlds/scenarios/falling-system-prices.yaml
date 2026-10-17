@@ -1,0 +1,17 @@
+# Falling system prices: the outside world's prices for the systems it sells to businesses and offices fall by half a year, every
+# year, from the first day. What any business or office does about it, and whether any takes a system, is its own.
+id: falling-system-prices
+about: The outside world's prices for systems (set-up, licence, exit) fall by half every year from the first day.
+bears_on: [vendor, shop-manager, factory-manager, finance, planning]
+changes:
+  - in: profile
+    path: automation.price_fall_bps_per_year
+    set: 5000
+    basis: >-
+      A placeholder for the pace of a falling price, chosen well short of the measured fall in the price of the AI language
+      model service systems like these are built on: the price of a given level of language-model performance fell between
+      9 and 900 times a year in 2023 to 2025 (Epoch AI, "LLM inference prices have fallen rapidly but unequally across
+      tasks", 2025; read in a summary only, to confirm), and the price of a unit of intelligence about 10 times a year
+      (a16z, "LLMflation", 2024; to confirm). A system's price is a licence and an installation, not only a call to a model,
+      so it is taken to fall far more slowly: by half a year (an eighth of the pace of the slowest fall named). A condition
+      of the outside world as the run finds it on its first day, a rate and not an event.
