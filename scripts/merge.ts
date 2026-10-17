@@ -122,7 +122,8 @@ async function main() {
   }
 
   const suite = await stream(wt, ["bun", "run", "test:all"], log);
-  const tail = suite.text.trim().split("\n").pop() ?? "";
+  const lines = suite.text.trim().split("\n");
+  const tail = [...lines].reverse().find((l) => /\d+ pass, \d+ fail/.test(l)) ?? lines.pop() ?? "";
   let summary = tail;
   if (suite.code !== 0) {
     const f = readFailures(suite.text);
@@ -132,7 +133,7 @@ async function main() {
     if (again.code !== 0) stop(`${flake} failed, and failed again alone; log: ${log}`);
     summary += ` (accepted after rerun alone: ${flake})`;
   }
-  g("checkout", "--", "scripts/test-times.json");
+  g("checkout", "--", "scripts/test-times.json", "bun.lock");
 
   const sha = g("rev-parse", "HEAD").out.trim();
   if (noPush) { console.log(`NOT PUSHED (--no-push). ${summary}\nmerge ${sha.slice(0, 8)} in ${wt}, ${Math.round((Date.now() - t0) / 1000)}s`); return; }
