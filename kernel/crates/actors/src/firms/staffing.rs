@@ -1859,6 +1859,40 @@ impl Staffing {
         }
     }
 
+    /// Winding up: what we owe our staff, and what we withheld from their wages and have not paid over, come before our
+    /// shareholders (and our other creditors): wages and redundancy pay owed in our books, then the tax withheld, paid
+    /// from `balance` as far as it goes (firms.ts `windUpOwed`, bug hunt 2026-10-17). Returns the steps and what they pay.
+    pub fn wind_up_owed<T>(&mut self, book: &Book, t: i64, cx: &mut Cx, account: &str, balance: i64) -> (Vec<Step<T>>, i64) {
+        let mut steps: Vec<Step<T>> = vec![];
+        let mut paid = 0;
+        for _ in 0..20 {
+            let before = self.wages_owed();
+            let s = self.late_pay(book, t, cx, account, Some(balance - paid), 0);
+            if s.is_empty() {
+                break;
+            }
+            steps.extend(s);
+            paid += before - self.wages_owed();
+        }
+        let mut lines: Vec<Call> = vec![];
+        for x in self.owed.iter_mut() {
+            if x.amount <= 0 || x.charge.account.is_empty() {
+                continue;
+            }
+            let amount = x.amount.min(balance - paid);
+            if amount <= 0 {
+                continue;
+            }
+            x.amount -= amount;
+            paid += amount;
+            lines.push(pay(&x.charge.account, amount, Pay { from: Some(account.to_string()), for_: Some("Winding up: tax withheld from wages, paid over.".into()), ..Default::default() }, cx));
+        }
+        if !lines.is_empty() {
+            steps.push(step("Winding up: the tax we withheld from wages and had not paid over comes before our shareholders.", lines));
+        }
+        (steps, paid)
+    }
+
     /// Putting short pay right from here on: their wage order replaced by one at the wage agreed. (What was kept back
     /// is paid by whoever answers for us.)
     pub fn pay_in_full<T>(&mut self, book: &Book, t: i64, cx: &mut Cx, account: &str, agreement: &str, why: &str) -> Vec<Step<T>> {

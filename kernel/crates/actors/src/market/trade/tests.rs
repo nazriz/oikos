@@ -107,7 +107,8 @@ fn an_order_on_terms_is_supplied_then_billed_and_a_buyer_that_does_not_pay_is_re
     let steps = b.collect::<TradeThen>(100 + (14 + 30) * DAY + 1, "acc-mill", &cx);
     assert_eq!(steps.len(), 1);
     let words = text(&steps[0]);
-    assert!(words.starts_with("claim(") && words.contains("kind") && words.contains("against=shop") && words.contains("basis=rec.1"), "{words}");
+    // (Bound as `claim`, so the world's answer carries the claim's id and a payment that settles it is known for what it is.)
+    assert!(words.starts_with("claim = claim(") && words.contains("kind") && words.contains("against=shop") && words.contains("basis=rec.1"), "{words}");
     // A buyer that paid its invoice owes nothing.
     let mut b = OrderBook::new("mill", None, Some(terms));
     b.bill(&Order { id: "rec.9".into(), seller: "mill".into(), buyer: "shop".into(), kind: "flour".into(), quantity: 5, unit_price: 100, to: "shop".into(), at: "x".into(), account: "acc-shop".into(), placed: 0, for_days: None, terms: Some(14) }, 5, 0);

@@ -4,6 +4,7 @@
 pub mod bargaining;
 pub mod decimal;
 pub mod employer;
+pub mod firm_body;
 pub mod landlord;
 pub mod orgwants;
 pub mod payments;

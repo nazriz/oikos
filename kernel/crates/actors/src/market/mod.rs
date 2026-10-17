@@ -21,4 +21,4 @@ pub mod trade;
 pub mod testkit;
 
 /// Every kind of this lane, in name order.
-pub static KINDS: &[&dyn Kind] = &[&producer::Producer, &rent_portal::RentPortal, &retailer::Retailer, &automation::Vendor];
+pub static KINDS: &[&dyn Kind] = &[&producer::FirmProducer, &rent_portal::RentPortal, &retailer::FirmRetailer, &automation::Vendor];

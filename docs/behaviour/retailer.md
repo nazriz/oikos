@@ -90,3 +90,7 @@ With these, a 200-person town's shops need about 30 staff at full demand. Retail
 ## Hours before heads (0.15.0, 2026-10-13)
 
 At its month's end a shop with more staff than its smoothed trade needs cuts everyone's hours first, where the world's law lets an employer (firms.md, "Hours before heads"), and lets someone go only for what hours cannot absorb; it serves in its staff's hours (the day's time of a worker on cut hours is the share of the working day). Parameter: `adjust.hours_step_bps` (1,000).
+
+## In the Rust world (integration, 2026-10-18)
+
+The shop is the market lane's retailer over the firm body of lane C1 (`firms::firm_body`): its staff, its dealings with a union, its bank and its creditors, and its closing are the body's; what it buys, charges and serves is the shop's. The month's staff decision is the body's `review` (hours before heads; the most recent hire is let go only when a surplus of hands has lasted what ending the job costs); a shop whose premises were sold to someone else before it opened is told it is closed (`Body::close`) and does nothing more. A debt recorded against it stands in the way of a dividend, and a winding-up pays its staff and the tax withheld from their wages first (0.18.0). Systems it takes up for serving (0.17.0, automation.md) serve their share of each order first. What the Rust decides differently from the TS: the systems' licence paperwork follows the union, bank and staff dealings in a wake (the TS interleaved them); the hands the trade needs are counted on a floor of the seconds in a month.

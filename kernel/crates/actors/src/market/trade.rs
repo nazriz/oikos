@@ -312,6 +312,8 @@ fn other_role(memo: &str) -> bool {
     m.starts_with("dividend")
         || m.starts_with("income tax")
         || (m.starts_with("tax") && !m[3..].chars().next().is_some_and(|c| c.is_alphanumeric() || c == '_'))
+        // (A founder's capital put into a business of their own is the founder's, not an order's payment: 2aacc8d8.)
+        || (m.starts_with("capital") && !m[7..].chars().next().is_some_and(|c| c.is_alphanumeric() || c == '_'))
 }
 
 /// A seller's order book. `take` reads each observation (payments into our account); `due` says which orders are now
@@ -441,19 +443,19 @@ impl OrderBook {
                 money_words(owing, &cx.ctx.world),
                 (t - r.since) / DAY - r.days
             );
-            let mut s = because(
-                why,
-                vec![call(
-                    "claim",
-                    vec![
-                        ("position", Some(arg("right"))),
-                        ("holder", Some(arg(&self.me))),
-                        ("about", Some(json(json!({ "kind": "debt", "amount": owing, "account": seller_account, "for": format!("{} {} delivered on terms, order {}: unpaid.", r.quantity, r.kind, r.order) })))),
-                        ("against", Some(arg(&r.buyer))),
-                        ("basis", Some(arg(&r.order))),
-                    ],
-                )],
+            // (Bound as `claim`, so the world tells us the claim's id: a payment that settles it is then known for what it is.)
+            let record = call(
+                "claim",
+                vec![
+                    ("position", Some(arg("right"))),
+                    ("holder", Some(arg(&self.me))),
+                    ("about", Some(json(json!({ "kind": "debt", "amount": owing, "account": seller_account, "for": format!("{} {} delivered on terms, order {}: unpaid.", r.quantity, r.kind, r.order) })))),
+                    ("against", Some(arg(&r.buyer))),
+                    ("basis", Some(arg(&r.order))),
+                ],
             );
+            let mut s = Step::new(vec![Line { bind: Some("claim".into()), call: record }]);
+            s.why = Some(why);
             s.then = Some(TradeThen::Claimed { account: r.account.clone() }.into());
             steps.push(s);
         }
