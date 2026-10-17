@@ -23,6 +23,7 @@
 
 pub mod calendar;
 pub mod forms;
+pub mod household;
 pub mod identity;
 pub mod law;
 pub mod slip;
