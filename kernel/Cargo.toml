@@ -22,6 +22,9 @@ oikos-time = { path = "crates/time" }
 oikos-resolver = { path = "crates/resolver" }
 oikos-world = { path = "crates/world" }
 oikos-perception = { path = "crates/perception" }
+oikos-sight = { path = "crates/sight" }
+oikos-actors = { path = "crates/actors" }
+oikos-rules = { path = "crates/rules" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
@@ -39,7 +42,7 @@ sha2 = { workspace = true, features = ["asm"] }
 # The platform core, as a workspace (docs/design/rebuild.md section 4): this crate is the kernel (the only
 # writer); crates/ holds what it and every other consumer share.
 [workspace]
-members = [".", "crates/core", "crates/contracts", "crates/terms", "crates/time", "crates/resolver", "crates/world", "crates/perception", "crates/napi", "crates/law", "crates/nature"]
+members = [".", "crates/core", "crates/contracts", "crates/terms", "crates/time", "crates/resolver", "crates/world", "crates/perception", "crates/napi", "crates/law", "crates/nature", "crates/sight", "crates/rules", "crates/actors", "crates/explore"]
 resolver = "2"
 
 [workspace.dependencies]

@@ -11,6 +11,7 @@
 #![forbid(unsafe_code)]
 #![deny(clippy::float_arithmetic, clippy::float_cmp)]
 
+pub mod engine;
 pub mod kernel;
 pub mod log;
 pub mod protocol;

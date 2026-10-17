@@ -1,0 +1,11 @@
+[package]
+name = "oikos-explore"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "The explorer's data layer (docs/port-guide.md, \"The explorer's data layer\"): a run's index, its causal trace and who decided, read from the log. Read-only."
+rust-version = "1.85"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
