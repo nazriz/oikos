@@ -10,8 +10,8 @@
 //! 1993). Its offer rises to that, never above the claim, never below what it offered. The old rule (half the gap, all of
 //! it after three stoppages whatever a stoppage cost) is gone: how far it goes follows what the stoppages cost.
 //!
-//! `concession_bps` is the same pure function as lane D's `oikos_rules::bargaining::concession_bps`; integration keeps
-//! one of them (this one is the employer's, the union's side is D's).
+//! The arithmetic (`concession_bps`, `Takings`) is `oikos_rules::bargaining`'s alone, shared with the union's side (lane D);
+//! this is the employer's dealings with it.
 
 use super::decimal::{fmt_dec, round_div};
 use super::staffing::Staffing;
@@ -19,46 +19,16 @@ use crate::common::{data, money_words, Fields, MONTH};
 use crate::papers::agreements::job_terms;
 use crate::steps::{because, say, Say, Step, Visible};
 use crate::{Cx, DAY};
+use oikos_rules::bargaining::concession_bps;
 use oikos_sight::Record;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
-/// What a firm has taken in, as it sees it from its own books: money a customer paid for what it sells.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct Takings {
-    log: Vec<(i64, i64)>,
-    first: Option<i64>,
-}
-
-impl Takings {
-    pub fn add(&mut self, t: i64, cents: i64) {
-        if cents <= 0 {
-            return;
-        }
-        if self.log.first().is_some_and(|(at, _)| *at < t - 2 * MONTH) {
-            self.log.retain(|(at, _)| *at >= t - 2 * MONTH);
-        }
-        self.log.push((t, cents));
-        self.first = Some(self.first.map_or(t, |f| f.min(t)));
-    }
-    /// The last month's takings per day (over the days it has been taking, if fewer).
-    pub fn per_day(&self, t: i64) -> i64 {
-        let sum: i64 = self.log.iter().filter(|(at, _)| *at > t - MONTH && *at <= t).map(|(_, c)| c).sum();
-        let days = ((t - self.first.unwrap_or(t)) / DAY).clamp(1, MONTH / DAY);
-        sum / days
-    }
-}
-
-/// The rise (basis points, to a tenth of a percent) whose year's cost is what another stoppage a day longer than the
-/// last would cost: the strikers' share of the work, less what systems do, times takings a day for those days.
-pub fn concession_bps(strikers_bps: i64, system_bps: i64, takings_per_day: i64, last_days: i64, year_bill: i64) -> (i64, i64) {
-    let lost = strikers_bps * (10_000 - system_bps.clamp(0, 10_000)) / 10_000;
-    let cost = lost * takings_per_day.max(0) * (last_days + 1) / 10_000;
-    let rise = if year_bill > 0 { cost * 10_000 / year_bill / 10 * 10 } else { 0 };
-    (rise, cost)
-}
+/// What a firm has taken in, and what a stoppage costs it: the pure arithmetic is `oikos_rules::bargaining` (one place, shared
+/// with the union's side).
+pub use oikos_rules::bargaining::Takings;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct Dispute {
@@ -193,14 +163,16 @@ impl Bargaining {
                 o.last_days = w.days;
             }
             let share = was.as_ref().map_or(0, |w| w.share_bps);
-            let (rise, willing) = concession_bps(share, system_bps, takings_per_day, o.last_days, month_bill * 12);
+            let oikos_rules::bargaining::Concession { rise_bps: rise, cost: willing } = concession_bps(share, system_bps, takings_per_day, o.last_days, month_bill * 12);
+            let before = o.offer_bps;
             o.offer_bps = o.claim_bps.min(o.offer_bps.max(rise));
             steps.push(because(
                 format!(
-                    "After {} stoppage{}, the last of {} day{} with {}% of our hours out{}, against takings of {} a day: another a day longer would cost us {}, which a year's cost covers a rise of {}%: offering {}%.",
+                    "After {} stoppage{}, the last of {} day{} with {}% of our hours out{}, against takings of {} a day: another a day longer would cost us {}, which a year's cost covers a rise of {}%. {}",
                     o.stoppages, if o.stoppages > 1 { "s" } else { "" }, o.last_days, if o.last_days > 1 { "s" } else { "" }, fmt_dec(share, 100),
                     if system_bps > 0 { format!(" and systems doing {}% of our work", fmt_dec(system_bps, 100)) } else { String::new() },
-                    usd(takings_per_day.max(0)), usd(willing), fmt_dec(rise, 100), fmt_dec(o.offer_bps, 100)
+                    usd(takings_per_day.max(0)), usd(willing), fmt_dec(rise, 100),
+                    if o.offer_bps > before { format!("Improving our offer to {}%.", fmt_dec(o.offer_bps, 100)) } else { format!("Our offer stays at {}%.", fmt_dec(o.offer_bps, 100)) }
                 ),
                 vec![offer(&o, "after a stoppage")],
             ));
@@ -210,29 +182,3 @@ impl Bargaining {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn concession_follows_the_cost_of_holding_out_not_a_schedule() {
-        // 30% of hours out, systems do none, takings 1,000,000 a day, last stoppage 2 days: 3 days' lost sales.
-        let (rise, cost) = concession_bps(3_000, 0, 1_000_000, 2, 60_000_000_000);
-        assert_eq!(cost, 900_000 * 1);
-        assert_eq!(cost, 3_000 * 1_000_000 * 3 / 10_000);
-        assert_eq!(rise, cost * 10_000 / 60_000_000_000 / 10 * 10);
-        // Systems doing half the work halve what a stoppage costs.
-        let (_, half) = concession_bps(3_000, 5_000, 1_000_000, 2, 60_000_000_000);
-        assert_eq!(half * 2, cost);
-        // No takings, no cost, no concession beyond capacity.
-        assert_eq!(concession_bps(3_000, 0, 0, 2, 100).0, 0);
-    }
-
-    #[test]
-    fn takings_are_a_months_per_day() {
-        let mut k = Takings::default();
-        k.add(DAY, 600_000);
-        k.add(2 * DAY, 600_000);
-        assert_eq!(k.per_day(3 * DAY), 600_000);
-    }
-}
