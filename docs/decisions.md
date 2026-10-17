@@ -6073,3 +6073,44 @@ is wanted (then snapshot the host's state beside the engine's), or a run's arms 
 (16), `renderer/test/` (11, with the Rust-against-TS comparison); `cargo test`, `bun run typecheck`,
 `bun run test:fast`.
 
+
+## 2026-10-17 · The citizen's mind in Rust (lane A2 of the port; no model called)
+
+**What.** citizen.ts's deciding half, mind.ts, inner.ts, wants.ts, culture.ts, townmemory.ts, reading.ts, founding.ts
+and founded.ts are in `kernel/crates/actors/src/mind/`, behind the seam `actors::citizen::mind::Mind` that lane A1's
+life calls. `CitizenMind` (citizen.rs) holds the person, record, feelings, ties, wants, culture, town memory,
+belief, goals, gatherings, groups, civic life, petitions and talk as one saved `State`. It writes the decision and
+outcome records as citizen.ts wrote them. The week's mind half is in plan.rs. voice.rs has events, talk, civic life,
+petitions, word of mouth and the person's record. talk.rs has the citizen's phrasing, byte for byte. The founded
+group's post is the kind `group.founded`. The model questions are `Question` kinds the host answers by the next wake:
+`consult`, `compose`, `reading` and `words` (a founding's name through the translator).
+
+**The seam, settled with A1.** Every TS outcome goes through `Mind::outcome`, and the mind appraises it there. An
+`Event` is only what is not an outcome: a household death, conception, leaving a home, a notice first seen, being
+ordered out or put out, a rent rise (pursued at once), a grievance arising, a service not done, a household's
+trouble, and talk. Life offers its own acts as `Opening`s with an `Intent`. The mind adds its own ways, weighs all of
+them and chooses, and life carries out the choice.
+
+**Decided fresh.**
+- **Determinism.** State is integers (fixed point where TS kept a fraction that mattered). `exp` and `ln` are
+  written with IEEE basic operations (math.rs), so every machine gives the same bits. `Math.round` is half up
+  throughout. Ties are broken by id.
+- **Trust while weighing.** The ways are weighed with trust read without keeping an entry. The parties weighed are
+  then kept, as TS's reads kept them; only the order of keeping can differ.
+- **Petitions (risks PC-8).** A tenants' petition asks for what the world's `petition_demand` gives, and never names
+  one place's figures.
+- **No propose action.** A composed founding name is drafted through the translator as a `words` question, not a
+  `propose` action, because a code actor's steps are calls. founded.rs writes a composer's words by code.
+
+**Tests.** 118 in `mind::` (the leaf modules' TS unit tests ported, and a harness driving `Mind` with `Life`s alone,
+mind/tests.rs). `kernel/tests/a2_founded.rs` runs the founded kind alone and gives the same hash on 1 and 14 threads.
+
+**Not done.**
+- The citizen's scenario tests against a Rust world wait for A1's life.
+- `petition_demand` is not yet written by the generator.
+- `Openings::for_want` must give the grievance venue ways TS built from `book.hearings()`; that is A1's to do.
+
+**Revisit if** the seam's `Event::Other` or `Intent::Other` carries real traffic at integration (the seam was cut in
+the wrong place); a measure of wants, founding or culture moves beyond seed noise at the gate, traced to the order
+in which trust entries are kept or to the words route for names; or `CitizenMind`'s saved state at 10,000 people is
+too large (then its cold parts move behind the engine's shared index).
