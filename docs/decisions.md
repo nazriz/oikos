@@ -5528,3 +5528,42 @@ The profile-sources merge was held back for three failing tests and left four fa
 ## 2026-10-17: `oikos pilot-view`, a pilot as one page for a person
 
 **Why.** Naz asked for a way to see what seats and actors did in a pilot without reading markdown or logs, ahead of the full renderer. **What.** A new package `pilot-view/` and one CLI command (`oikos pilot-view <run-dir> [--out f.html]`, docs/pilot-view.md) that folds a finished run's log once and writes a single self-contained page (overview, per seat timeline with the seat's own words, translator draft, confirm/decline and outcome, notebook and debrief; seat vs code twin; actors; town measures). **Choices.** (1) The log is folded in TypeScript in one streaming pass, as the renderer plan does for its index, so the pass and its `ViewData` carry over; the page is plain DOM and can be replaced. (2) Read-only: no file in the run is opened for writing and the output path may not be inside the run; a test holds it. (3) Debriefs use the orchestrator's `isKeptBack`; what a seat kept back is never shown, and debrief transcripts are not read. (4) The twin is matched by parties and kind of matter, not paper number (papers are numbered differently once the runs diverge); twin acts of kinds the seat never made are counted, not listed. (5) The root `package.json` workspaces and `tsconfig.json` include the package; no kernel, participant or world code is touched. **Revisit if** the renderer lands (the page becomes its seat panels), a run is large enough that the 10 MB cap cuts excerpts too hard, or the twin match proves misleading on pilots with many same-kind matters.
+
+## 2026-10-17: the pilot explorer, the first real renderer (`oikos explore`; no model called)
+
+**Why.** After the first pilot viewer Naz asked for "something way way more exciting, visual, innovative", to see each
+pilot's actions and look at different citizens and institutions, with a simple renderer and WebGPU if it helps. The
+approved plan (docs/design/renderer.md) already had the shape; this builds a first version of it and merges the pilot
+viewer into it. **What.** A new workspace `renderer/` and `oikos explore <run-dir> | --all | index <run-dir>`
+(docs/explorer.md): one streaming pass to a view index beside the runs (`runs/views/<run>.<head hash>/`, never inside a
+run), Bun serving it on 127.0.0.1 under a path prefix, and a Three.js client on WebGPU (WebGL 2 where it is missing):
+the town as an isometric scene with day and night, people as lights hopping between the buildings they are in, seats'
+acts as arcs from the office to where they land, consequential changes as rings by who decided, a timeline with a rail
+per seat, panels for a person, an organisation, a building and a seat's act (its words, the draft, sign-off, outcome,
+twin, sitting and causal trace), two overlays (who decided; hardship from people's own records), search, a linkable URL.
+
+**Choices.** (1) The index is files and Bun's SQLite, not the plan's varint postings: simpler, 180 MB for a 3,000-person
+90-day pilot. (2) No WASM: indexing is bounded by reading the log (about 50 s of 70 to 130 s), and nothing on the
+client needs it. (3) People drawn one by one at every zoom, on the roof of the building they are in (the owner asked to
+see people move); the hop between buildings is drawn over the travel time and is not a route (the log has none). (4) The
+pilot viewer's fold is reused whole for seats (`buildView`, with a new `debriefs: false`, and each twin act's `seq`), so
+the two views cannot disagree; the explorer reads no debrief, and its index drops debrief annotations. (5) The
+consequential-acts list lives in `measure/src/consequential.ts`, as the plan asked, for M1 to share. (6) "Who decided"
+is by role (a person, an organisation's system, a model seat, the world); a standing payment is decided by whoever gave
+the instruction; an effect with no act is the world's.
+
+**Measured.** Indexing: 1,000 people for 90 days (code only) 12 to 14 s; the 3,000-person pilots lv-07a and lv-07b 70 to
+130 s each with their twins (about 50 s of it reading the log), 1 GB of memory at peak. Client: 1.06 MB of script; at
+3,000 people the script's own frame time is 1.2 to 2.6 ms (positions, colours, rings, labels), the same order at 1,000;
+headless Chrome draws 10 to 20 frames a second whatever the size (its own limit, on WebGPU and on WebGL 2 alike), so
+frame rate on a real screen was not measured here.
+
+**Found on the way.** A seat's act was counted beside the changes it made (a person's "who decided" counted the order
+and its effects); the trace named a standing instruction "basis" when it was carried in an act's block; a person with no
+home on record was drawn at the town's edge; an office's own reports to itself filled its backlog. All fixed, the first
+two by the tests.
+
+**Not done** (docs/design/renderer.md 11): money checked by week for conservation in real runs, the record's kernel
+digests, a parcel view, live attach, a year at 10,000, a mock-pilot test of the whole page. **Revisit if** indexing a
+year at 10,000 takes over an hour, a fold disagrees with the kernel, or the owner finds the people-as-roof-lights
+metaphor misleads (then markers beside buildings, as the plan had).
