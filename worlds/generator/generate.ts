@@ -2727,8 +2727,9 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     ...(HE && ED ? { school: { entity: "school", building: "school-building", ages: ED.school_ages },
       care: { entity: "clinic", waiting: "clinic-centre/waiting.1", seek_bps: HE.seek_care_bps, severities: [...new Set(HE.treats.map((x) => x.severity).filter((x): x is string => !!x))], off_work: HE.off_work_severities, wait_days: 2 } } : {}),
     ...(UT ? { utilities: { energy: "energy-co" } } : {}),
-    // (How a household divides its spending among the kinds on offer, where the profile has its expenditure survey: docs/behaviour/demand.md.)
-    ...(V.spending.demand ? { demand: { kinds: V.spending.demand.kinds, frisch_bps: V.spending.demand.frisch_bps, reference_budget: DEMAND_REF.budget, reference_prices: { goods: RETAIL_PRICE } } } : {}),
+    // (How a household divides its spending among the kinds on offer, where the profile has its expenditure survey: docs/behaviour/demand.md.
+    // Only the kinds the town's sellers sell to households by order are named: today's shops sell goods; energy and water are billed.)
+    ...(V.spending.demand ? { demand: { kinds: V.spending.demand.kinds.filter((k) => k.kind === "goods"), frisch_bps: V.spending.demand.frisch_bps, reference_budget: DEMAND_REF.budget, reference_prices: { goods: RETAIL_PRICE } } } : {}),
     // (A home next door that someone went into and has not come out of: whom to ask to call there, and how long such
     // a silence goes unremarked, the profile's figure. docs/behaviour/deaths.md.)
     ...(CR && V.life.found_alone_after ? { welfare: { police: "police", channel: "next-door", found_after: V.life.found_alone_after } } : {}),

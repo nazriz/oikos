@@ -704,6 +704,10 @@ impl Person {
             let at = if t == 0 { cx.rng("first-wake").below(7) as i64 * DAY } else { t };
             self.s.first_wake = Some(at);
             if at > t {
+                // (What this first look showed is taken in now: the kernel hands a participant its records once, as
+                // they come, so the world's opening papers, our home, job and household among them, are not shown
+                // again at the day drawn. TS's first wake was the scheduler's, before any look.)
+                self.absorb(pic, cx);
                 return self.wait(at);
             }
         }
