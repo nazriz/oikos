@@ -3,6 +3,7 @@
 
 pub mod bargaining;
 pub mod employer;
+pub mod landlord;
 pub mod orgwants;
 pub mod payments;
 pub mod payroll;
@@ -17,4 +18,4 @@ pub mod testkit;
 use crate::Kind;
 
 /// Every kind of this lane, in name order.
-pub static KINDS: &[&dyn Kind] = &[&employer::Employer, &payroll::PAYROLL];
+pub static KINDS: &[&dyn Kind] = &[&employer::Employer, &landlord::LANDLORD, &payroll::PAYROLL];
