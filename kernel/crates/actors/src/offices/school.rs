@@ -435,7 +435,7 @@ mod tests {
 
     #[test]
     fn the_manifest_is_the_one_the_ts_module_wrote() {
-        let ts: Value = serde_json::from_slice(&std::fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "/../../../participants/manifests/school.principal.json")).unwrap()).unwrap();
+        let ts: Value = crate::offices::testing::ts_manifest("school.principal");
         let rust = Principal.manifest();
         for (k, v) in ts.as_object().unwrap() {
             assert_eq!(&rust[k], v, "{k}");

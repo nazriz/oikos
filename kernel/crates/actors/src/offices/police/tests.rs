@@ -142,7 +142,7 @@ fn station() -> Driver {
 
 #[test]
 fn the_manifest_is_the_one_the_ts_module_wrote() {
-    let ts: Value = serde_json::from_slice(&std::fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "/../../../participants/manifests/police.station.json")).unwrap()).unwrap();
+    let ts: Value = crate::offices::testing::ts_manifest("police.station");
     let rust = Station.manifest();
     for (k, v) in ts.as_object().unwrap() {
         assert_eq!(&rust[k], v, "{k}");

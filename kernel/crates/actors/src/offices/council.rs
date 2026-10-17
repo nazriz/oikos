@@ -1917,7 +1917,7 @@ mod tests {
     // ---- manifests
 
     fn manifest_is_the_ts(name: &str) {
-        let ts: Value = serde_json::from_slice(&std::fs::read(format!("{}/../../../participants/manifests/{name}.json", env!("CARGO_MANIFEST_DIR"))).unwrap()).unwrap();
+        let ts: Value = crate::offices::testing::ts_manifest(name);
         let rust = crate::registry::find(name).unwrap().manifest();
         for (k, v) in ts.as_object().unwrap() {
             if k == "params" {

@@ -1257,7 +1257,7 @@ mod tests {
 
     #[test]
     fn the_manifest_is_the_ts_one() {
-        let ts: Value = serde_json::from_slice(&std::fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "/../../../participants/manifests/firm.builder.json")).unwrap()).unwrap();
+        let ts: Value = crate::offices::testing::ts_manifest("firm.builder");
         let rust = Builder.manifest();
         for (k, v) in ts.as_object().unwrap() {
             assert_eq!(&rust[k], v, "{k}");

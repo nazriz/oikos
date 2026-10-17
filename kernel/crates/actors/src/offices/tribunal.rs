@@ -701,7 +701,7 @@ mod tests {
     #[test]
     fn the_manifests_are_the_ones_the_ts_modules_wrote() {
         for (kind, name) in [(&Member as &dyn Kind, "tribunal.member"), (&Registrar as &dyn Kind, "tribunal.registrar")] {
-            let ts: Value = serde_json::from_slice(&std::fs::read(format!("{}/../../../participants/manifests/{name}.json", env!("CARGO_MANIFEST_DIR"))).unwrap()).unwrap();
+            let ts: Value = crate::offices::testing::ts_manifest(name);
             let rust = kind.manifest();
             for (k, v) in ts.as_object().unwrap() {
                 assert_eq!(&rust[k], v, "{name}: {k}");

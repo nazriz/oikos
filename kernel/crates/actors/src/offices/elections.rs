@@ -556,7 +556,7 @@ mod tests {
 
     #[test]
     fn the_manifest_is_the_one_the_ts_module_wrote() {
-        let ts: Value = serde_json::from_slice(&std::fs::read(format!("{}/../../../participants/manifests/city.electoral_office.json", env!("CARGO_MANIFEST_DIR"))).unwrap()).unwrap();
+        let ts: Value = crate::offices::testing::ts_manifest("city.electoral_office");
         let rust = ElectoralOffice.manifest();
         for (k, v) in ts.as_object().unwrap() {
             // (The Rust is 0.7.0, the bug-fix branch's version; the manifest on this branch is the TS before it.)

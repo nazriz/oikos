@@ -16,7 +16,7 @@ fn world(procedure: bool) -> Value {
             "planning-system" => p["controller"] = json!({ "type": "code", "impl": "city.planning_officer" }),
             "developer-system" => {
                 p["controller"] = json!({ "type": "code", "impl": "stub.script", "params": { "script": [
-                    { "at": 3600, "call": "statement(kind=permit_application, text=\"Application to build.\", to=[city], data={\"lot\":\"lot-1\",\"structure_type\":\"house\"})" },
+                    { "at": 3600, "call": "statement(kind=permit_application, text=\"Application to build.\", to=[\"city\"], data={\"lot\":\"lot-1\",\"structure_type\":\"house\"})" },
                 ] } })
             }
             "mayor-system" if procedure => {

@@ -106,6 +106,36 @@ pub mod testing {
 
     pub const DAY: i64 = 86_400;
 
+    /// A TS module's manifest, as participants/manifests/<name>.json holds it (compiled in, so no test reads a file).
+    pub fn ts_manifest(name: &str) -> Value {
+        let text: &str = match name {
+            "city.child_protection" => include_str!("../../../../../participants/manifests/city.child_protection.json"),
+            "city.council_clerk" => include_str!("../../../../../participants/manifests/city.council_clerk.json"),
+            "city.councillor" => include_str!("../../../../../participants/manifests/city.councillor.json"),
+            "city.electoral_office" => include_str!("../../../../../participants/manifests/city.electoral_office.json"),
+            "city.finance_officer" => include_str!("../../../../../participants/manifests/city.finance_officer.json"),
+            "city.inspector" => include_str!("../../../../../participants/manifests/city.inspector.json"),
+            "city.mayor_code" => include_str!("../../../../../participants/manifests/city.mayor_code.json"),
+            "city.planning_officer" => include_str!("../../../../../participants/manifests/city.planning_officer.json"),
+            "city.rates_officer" => include_str!("../../../../../participants/manifests/city.rates_officer.json"),
+            "city.registry" => include_str!("../../../../../participants/manifests/city.registry.json"),
+            "city.tax_clerk" => include_str!("../../../../../participants/manifests/city.tax_clerk.json"),
+            "city.works" => include_str!("../../../../../participants/manifests/city.works.json"),
+            "firm.builder" => include_str!("../../../../../participants/manifests/firm.builder.json"),
+            "land.registry" => include_str!("../../../../../participants/manifests/land.registry.json"),
+            "office.clerk" => include_str!("../../../../../participants/manifests/office.clerk.json"),
+            "office.desk" => include_str!("../../../../../participants/manifests/office.desk.json"),
+            "police.station" => include_str!("../../../../../participants/manifests/police.station.json"),
+            "school.principal" => include_str!("../../../../../participants/manifests/school.principal.json"),
+            "tribunal.member" => include_str!("../../../../../participants/manifests/tribunal.member.json"),
+            "tribunal.registrar" => include_str!("../../../../../participants/manifests/tribunal.registrar.json"),
+            "utility.energy" => include_str!("../../../../../participants/manifests/utility.energy.json"),
+            "utility.water" => include_str!("../../../../../participants/manifests/utility.water.json"),
+            other => panic!("no TS manifest for {other}"),
+        };
+        serde_json::from_str(text).expect("a manifest")
+    }
+
     /// A statement as the world would record it.
     pub fn st(id: &str, at: i64, kind: &str, speaks_for: &str, to: &[&str], data: Value) -> Value {
         let mut r = json!({ "id": id, "record": "statement", "author": "p.x", "speaks_for": speaks_for, "at": at, "visible_to": "public", "kind": kind, "text": kind, "data": data });

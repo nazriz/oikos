@@ -1100,7 +1100,7 @@ mod tests {
     #[test]
     fn manifests_are_the_ts_modules() {
         for k in [&PlanningOfficer as &dyn Kind, &Inspector] {
-            let ts: Value = serde_json::from_slice(&std::fs::read(format!("{}/../../../participants/manifests/{}.json", env!("CARGO_MANIFEST_DIR"), k.name())).unwrap()).unwrap();
+            let ts: Value = crate::offices::testing::ts_manifest(k.name());
             let rust = k.manifest();
             for (key, v) in ts.as_object().unwrap() {
                 assert_eq!(&rust[key], v, "{} {key}", k.name());

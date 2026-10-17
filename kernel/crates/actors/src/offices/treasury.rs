@@ -2577,7 +2577,7 @@ mod tests {
     #[test]
     fn the_manifests_are_the_ones_the_ts_modules_wrote() {
         for (kind, file) in [("city.finance_officer", "finance_officer"), ("city.tax_clerk", "tax_clerk"), ("city.rates_officer", "rates_officer"), ("city.works", "works")] {
-            let ts: Value = serde_json::from_slice(&std::fs::read(format!("{}/../../../participants/manifests/city.{file}.json", env!("CARGO_MANIFEST_DIR"))).expect("the TS manifest")).expect("json");
+            let ts: Value = crate::offices::testing::ts_manifest(&format!("city.{file}"));
             let rust = crate::registry::find(kind).expect("registered").manifest();
             for (k, v) in ts.as_object().expect("an object") {
                 assert_eq!(&rust[k], v, "{kind}: {k}");

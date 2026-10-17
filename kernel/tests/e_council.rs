@@ -17,6 +17,11 @@ fn council_world() -> Value {
         { "id": "business", "kind": "records", "way": "mine", "match": {} },
         { "id": "who", "kind": "directory", "way": "ask", "on_request": true }
     ]);
+    for p in c["participants"].as_array_mut().unwrap() {
+        if p["id"] == "builder-system" || p["id"] == "inspector-system" {
+            p["controller"] = json!({ "type": "code", "impl": "idle" });
+        }
+    }
     let mut add_participant = |id: &str, title: &str, imp: &str, params: Value| {
         c["participants"].as_array_mut().unwrap().push(json!({
             "id": id, "kind": "system", "owner": "city", "title": title,

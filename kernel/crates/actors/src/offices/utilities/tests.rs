@@ -28,7 +28,7 @@ fn roll() -> Vec<Arc<Record>> {
 }
 
 fn ts_manifest_holds(file: &str, rust: Value) {
-    let ts: Value = serde_json::from_slice(&std::fs::read(format!("{}/../../../participants/manifests/{file}.json", env!("CARGO_MANIFEST_DIR"))).unwrap()).unwrap();
+    let ts: Value = crate::offices::testing::ts_manifest(&file);
     for (k, v) in ts.as_object().unwrap() {
         if k == "params" {
             // (Each of the TS module's parameters is as it was; this port adds the response parameters of WM-12.)

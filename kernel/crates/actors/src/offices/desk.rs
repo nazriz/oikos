@@ -244,7 +244,7 @@ mod tests {
 
     #[test]
     fn the_manifest_is_the_one_the_ts_module_wrote() {
-        let ts: Value = serde_json::from_slice(&std::fs::read(format!("{}/../../../participants/manifests/office.desk.json", env!("CARGO_MANIFEST_DIR"))).unwrap()).unwrap();
+        let ts: Value = crate::offices::testing::ts_manifest("office.desk");
         let rust = Desk.manifest();
         for (k, v) in ts.as_object().unwrap() {
             assert_eq!(&rust[k], v, "{k}");
