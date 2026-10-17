@@ -38,7 +38,7 @@ Close behind: placeholders shared by all nine profiles that make places look ali
 (PS-1, PB-1); possession cases in which the tribunal has no real choice (PB-3); words a seat writes that nobody reads
 (PC-1).
 
-**Counts (2026-10-17):** 111 risk entries and 3 planned. World mechanics 13, markets and economy 17, public bodies and law 18, people
+**Counts (2026-10-17):** 112 risk entries and 3 planned. World mechanics 13, markets and economy 17, public bodies and law 19, people
 and culture 14, seats and framing 13, translator 6, measurement and twins 15, profiles and sources 10, performance and
 scale 5. Assumptions audit: 31, of which 8 are outcomes built in.
 
@@ -561,6 +561,16 @@ The mechanism:
 - **L / I:** medium / medium · **Status:** accepted
 - **Notice by:** Orders per application against a place's court statistics, where mediation is a step.
 - **Fix when:** A study of tenancy or small-claims outcomes in a place that mediates; mediation as a venue in the law data.
+
+### PB-19 · At 10,000 people, thousands of held questions pile up with nobody at the keeper's post
+- **Gap:** In the 10,000-person, 30-day perf run, thousands of held questions (asked of a keeper) were found waiting
+  at the end. Not investigated. Likely staffing that does not scale with the population, or a post left empty (see
+  WM-7); found by the perf agent while profiling.
+- **Where:** `runs/perf-2026-10-17/STATUS`; `docs/behaviour/staffing.md`; the held questions in `kernel/` state.
+- **Effect:** At that scale offices silently do not answer, so service, records and any seat-against-twin result from a 10,000-person run rest on keepers who are not there.
+- **L / I:** high / high · **Status:** to fix
+- **Notice by:** Held questions per keeper and the age of the oldest at the end of a large run; posts with no holder.
+- **Fix when:** Before any 10,000-person run is read; trace which posts are empty, then scale staffing with the population as law data.
 
 ---
 
