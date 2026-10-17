@@ -63,7 +63,7 @@ entries.
 - **Deterministic**: the same spec gives the same numbers for any number of workers or engine threads (tested: in-process
   against two workers). Mock models draw nothing.
 - **Costs**: each model arm's seat records usage (`annotation: usage`: tokens and `cost_microusd`) in its log as every run
-  does; the report reads them back from the log. Mock prices are placeholders given in the spec (`prices`).
+  does; the report reads them back from the log. Mock prices are placeholders (ME-16) given in the spec (`prices`).
 
 ## Stewards
 

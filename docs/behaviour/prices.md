@@ -25,7 +25,7 @@ sticky):
    scarcity with no rival to undercut lets a seller charge what the market bears (gouging emerges), and nothing else does.
 
 Parameters keep the TS names (`phi_*`, `theta_bps`, `vartheta_bps`, `price_up_bound_bps`); `price_down_bound_bps` is no
-longer used. New, all placeholders: `price_adjust_bps`, `rival_weight_bps`, `clearance_cover_bps`, `clearance_floor_bps`,
+longer used. New, all placeholders (ME-16): `price_adjust_bps`, `rival_weight_bps`, `clearance_cover_bps`, `clearance_floor_bps`,
 `rival_days` (60), and for a shop `rivals_board` (what sellers advertise to households; searched monthly).
 
 ## Sources (docs/research/references.md)

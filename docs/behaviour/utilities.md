@@ -107,4 +107,4 @@ The figures (the slip row, `billing_over_bps`, `respond`) are the profile's, wit
 - Restrictions on water use: Melbourne's 2007-09 stage 3 and 3a restrictions saw use fall by a fifth or more (Water
   Services Association of Australia; Melbourne Water reports; to confirm).
 - A retailer refunds an overcharge it has found: Australia, National Energy Retail Rules r.21; UK, Ofgem standards of
-  conduct (to confirm).
+  conduct (to confirm; PS-2).

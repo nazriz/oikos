@@ -227,9 +227,9 @@
     },
     "docs/behaviour/news.md": {
       "risks": [
-        "PC-7"
+        "PS-2"
       ],
-      "untagged": 2
+      "untagged": 4
     },
     "docs/behaviour/ownership.md": {
       "risks": [

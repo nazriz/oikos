@@ -96,7 +96,7 @@ The generator then: draws that share of people in work into businesses of one; g
 
 ## Firms that close without failing
 
-A firm nobody has worked for in `idle_days` (90, a placeholder) is closed by its owners: a voluntary winding up, said publicly (`closing`). The trigger is a firm that can't staff itself, and so can't trade. It then winds up as an insolvent firm does (docs/behaviour/insolvency.md): it pays its debts, passes what's left to its shareholders, closes, and sells its premises.
+A firm nobody has worked for in `idle_days` (90, a placeholder; ME-1) is closed by its owners: a voluntary winding up, said publicly (`closing`). The trigger is a firm that can't staff itself, and so can't trade. It then winds up as an insolvent firm does (docs/behaviour/insolvency.md): it pays its debts, passes what's left to its shareholders, closes, and sells its premises.
 
 Most businesses that close in the real world aren't insolvent: their owners stop. Without this rule, a shop that lets each new hire go before payday never runs up unpaid debts, never counts as insolvent, and sits for months with stock and no staff, turning customers away.
 

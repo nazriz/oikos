@@ -92,7 +92,7 @@ run, by default). `--port 0` picks a free port; `--watch-stdin` makes it exit wh
 
 The existing Three.js client reads it unchanged, through the Bun server:
 - `OIKOS_EXPLORE_API=http://127.0.0.1:4322 oikos explore <run-dir>`: `server.ts` answers the page and the client and passes
-  every `/api/*` request to the Rust service (the TS index is not built); or
+  every `/api/*` request to the Rust service (the TS index is not built; PL-2); or
 - `oikos explore --rust <run-dir>` (or `--all --rust`): starts the built `oikos-explore` (`kernel/target/release`, else
   `debug`) with the runs' logs, makes each pilot's `pilot.json` with the existing `pilotDataOf` into the views folder
   (beside the runs, never inside one), and proxies. `renderer/src/rust.ts` is the one place the package starts a process.

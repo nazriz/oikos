@@ -26,10 +26,9 @@ have been mended under other words. Correct it here when you find that.
 3. **The baseline is a set of unsourced rules.** The code mayor, a code council that votes on one line, and a code
    tribunal member harsher than au-vic's own law are what a seat is compared with; a difference measures distance
    from those rules, not from a real office. (MT-12, PB-14, PB-3)
-4. **Outcomes built in that move whatever the steward does.** The paper prints only bad news for the government;
-   rents ratchet 5% at each review; strikes are always won in full; business births run at a set rate and employing
-   start-ups cannot happen; exports are fixed at the start; compliance is a coin flip. (PC-7, ME-14, PB-9, ME-1,
-   ME-15, PB-16)
+4. **Outcomes built in that move whatever the steward does.** Rents ratchet 5% at each review; strikes are always won in full; business births run at a set rate and employing
+   start-ups cannot happen; exports are fixed at the start; compliance is a coin flip. (ME-14, PB-9, ME-1,
+   ME-15, PB-16; the paper that printed only bad news, once here, is fixed)
 5. **How long work takes is guessed.** Every act time is a placeholder in minutes and a system takes one second;
    staff counts and grants are state averages applied to a small town. Delays, backlogs and any comparison of people
    with systems rest on these. (WM-1, PB-6, PS-10)
@@ -621,11 +620,12 @@ The mechanism:
 - **Fix when:** Before any 10,000-person run is read; trace which posts are empty, then scale staffing with the population as law data.
 
 
-### PB-18 · An estate passes to its heirs before its debts
+### PB-20 · An estate passes to its heirs before its debts
 - **Gap:** When a death reaches the bank it pays the dead person's whole balance to the partner, else the adult children, else the town, at once. A real estate pays its debts first (a lender in default has a claim recorded against the dead, and nothing sets it off), and probate takes months. Found by lane D's tests of the dead customer's account (2026-10-17).
 - **Where:** `bank.payment_system` (`settle_estates`); `docs/behaviour/bank-payment-system.md`, "A dead customer".
 - **Effect:** Debt in a household ends with its holder's death; lenders' defaults are understated; inheritance arrives faster than real.
 - **L / I:** medium / low · **Status:** to fix (an administrator's order: debts, then heirs)
+- **Notice by:** A death in a household with a loan in default: the lender's claim recorded and unpaid while the heirs hold the whole balance.
 - **Fix when:** a lending or inheritance experiment.
 
 ---
@@ -693,7 +693,7 @@ The mechanism:
 - **Where:** `participants/src/behaviour/news.ts`; `citizen.ts` (news weight, election score); `environment.ts`.
 - **Effect:** A drift against incumbents built in; a steward who generates paperwork (petitions answered, complaints
   heard) loses approval for it. Biases every approval and election measure.
-- **L / I:** high / high · **Status:** fixed in the Rust port (2026-10-17: firm.newspaper 0.2.0 decides the tone by what the record shows, one rule for every kind, and a recovery, a petition taken up and a permit granted are good news; the leaning no longer decides a neutral item's tone by a draw; `negativity_bps` is the premium for bad news, nought until the profile sources its size: docs/behaviour/news.md). `citizen.ts`'s approval step (15% of its range per item) is lane A's.
+- **L / I:** high / high · **Status:** fixed, decisions 2026-10-17, Lane D: the bank, credit, the fund, the union, the paper, frictions and decisions in Rust (2026-10-17: firm.newspaper 0.2.0 decides the tone by what the record shows, one rule for every kind, and a recovery, a petition taken up and a permit granted are good news; the leaning no longer decides a neutral item's tone by a draw; `negativity_bps` is the premium for bad news, nought until the profile sources its size: docs/behaviour/news.md). `citizen.ts`'s approval step (15% of its range per item) is lane A's.
 - **Notice by:** mean approval trending down in a code-only town.
 - **Fix when:** Before any election, approval or trust result is read; the paper reports good news too, by cause, with a source for tone.
 
@@ -1077,6 +1077,21 @@ The mechanism:
 - **Notice by:** A debrief's people all among those the seat acted on first.
 - **Fix when:** When debriefs feed a study; sample by random draw.
 - **Evidence:** The debrief's choice among equal orders is a seeded draw on the stream `["debrief","choice",seat]` (script 0.4.1, `drawTies`), not the earliest; tests in `participants/test/debrief.test.ts` and `orchestrator/test/debrief.test.ts`. The exit-account half is SF-11.
+
+### MT-16 · The Rust world is not yet the TS world within seed noise
+- **Gap:** At the port's gate (2026-10-18, integration; docs/decisions.md "Port step 3"), a year of the 1,000-person
+  living town on the all-Rust world differs from the TS world beyond three standard errors in every profile: people
+  take part in gatherings far more (au-vic 46% to 64%, above the profile's 50%), religious affiliation reads higher,
+  slightly more people arrive and stay, gb-eng's unemployment is about 10% against the TS world's 2% with construction
+  2.7 times as high, and households going without (`demand_unmet_pct`) is a new health breach. Each is untraced to its
+  module; native market rules (entry, hiring by need, prices, exports, rents, strikes by cost) are meant to move some.
+- **Where:** `kernel/crates/actors/src/mind/` (gatherings, belief), `citizen/` (arrivals, staying), `firms/` and
+  `market/` (hiring, construction, shops' supply); `scripts/port-gate.ts`.
+- **Effect:** Any run on the Rust world is not comparable with the TS world's baselines and calibration notes; a steward
+  experiment would read the port's differences as the steward's.
+- **L / I:** high / high · **Status:** to fix before the TS actors are deleted
+- **Notice by:** `bun scripts/port-gate.ts` (runs/port-gate/gate.json).
+- **Fix when:** Before phase 4 (deleting the TS actors) and before any pilot on the Rust world.
 
 ---
 

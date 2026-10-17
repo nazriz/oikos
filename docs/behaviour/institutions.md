@@ -123,7 +123,7 @@ At 10,000 people a perf run found thousands of questions asked of keepers held a
 time of whoever holds its posts (foundations F11: `answer` in the table of work), one question at a time, in working
 hours; the questions grow with the people who ask, and the posts did not. A real registry is staffed to its caseload.
 Each keeper now declares in its manifest a `capacity` (the asks it expects per 1,000 residents a year, and the seconds an
-answer takes: placeholders, to source), and `oikos_rules::staffing::clerks_needed` is the sum the generator calls to give
+answer takes: placeholders, to source; PB-6), and `oikos_rules::staffing::clerks_needed` is the sum the generator calls to give
 the counter as many staff as that needs (1 clerk at 1,000 people, 5 at 10,000, 42 at 100,000 on the placeholder
 figures). The generator change itself (lane F, which owns it) is not made here.
 Revisit when: the asks per resident are measured from a run (the figures are guesses), or when a keeper's load turns
