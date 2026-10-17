@@ -96,8 +96,23 @@ export const CLERK_ROUND_DAYS = 1;
 export class Clerk {
   private last: { key: string; day: number; t: number; open: Map<string, Map<string, string>> } | undefined;
   constructor(private readonly me: string, private readonly office: string, private readonly books: OfficeBooks) {}
+  /** The latest paper of these books on the organisation's file, as a new clerk finds it: what stood open at the last paper is the office's, not the holder's memory. */
+  private filed: { t: number; open: Map<string, Map<string, string>> } | undefined;
   absorb(obs: Observation): void {
     this.books.absorb(obs);
+    for (const ch of Object.values(obs.channels ?? {}) as any[]) {
+      if (ch?.kind !== "records") continue;
+      for (const r of ch.records ?? []) {
+        if (r.record !== "statement" || r.kind !== BOOKS || r.data?.office !== this.office || !Array.isArray(r.data?.open)) continue;
+        if (this.filed && this.filed.t >= (r.data.at ?? r.at)) continue;
+        const open = new Map<string, Map<string, string>>();
+        for (const x of r.data.open as { what: string; about: string; says: string }[]) {
+          if (!open.has(x.what)) open.set(x.what, new Map());
+          open.get(x.what)!.set(String(x.about), String(x.says));
+        }
+        this.filed = { t: r.data.at ?? r.at, open };
+      }
+    }
   }
   /** The paper to file now, if what stands open has changed since the last (none while nothing has ever stood open). The clerk keeps the books on a daily
    * round (`CLERK_ROUND_DAYS`): its first look of a day with something changed files, and the day's later looks do not, however they came; each paper is an
@@ -105,8 +120,14 @@ export class Clerk {
   due(t: number): ParticipantAction | undefined {
     const open = this.books.open(t).filter((h) => h.items.length);
     const day = Math.floor(t / DAY);
+    // (A new holder of the post carries on from the paper on the organisation's file, never from an empty memory: what the last paper listed, and what has left the list since, is said.)
+    if (!this.last && this.filed) this.last = { key: "", day: Math.floor(this.filed.t / DAY), t: this.filed.t, open: this.filed.open };
     if (!this.last && !open.length) return undefined;
     const paper = booksPaper(this.office, t, open, this.last?.open);
+    if (this.last && this.last.key === "") {
+      const same = open.length === this.last.open.size && open.every((h) => h.items.length === (this.last!.open.get(h.what)?.size ?? -1) && h.items.every((x) => this.last!.open.get(h.what)?.get(x.id) === x.line));
+      if (same) this.last.key = paper.key;
+    }
     // (A figure that moves with every payment is no reason for a paper each time it moves; but it is not left to
     // stand for months either: where one has moved and the last paper is a week old, a paper is filed. Until
     // 2026-10-12 it was said only when something else changed, and finance's "tax withheld and not yet paid over"
@@ -140,7 +161,7 @@ export const keepers = new Map<string, BehaviourModule>();
  */
 export const clerk: BehaviourModule = {
   name: "office.clerk",
-  version: "0.3.0", // 0.3.0: the paper's words set out every case whose day has come in full (up to sixty; twelve before), and say how many are on the day's list for the first time (`data.list`: `ripe`, `new`), which is what brings a seat back; 0.2.0: what waits on the office-holder with its day come is named first in every paper, however long it has stood; what moves heading is not said to be closed; a list too long says what it leaves out; 0.1.1: a running figure that has moved is filed once the last paper is a week old; 0.1.0: keeps the books of an office a model holds, and files what has changed
+  version: "0.3.1", // 0.3.1: a new clerk carries on from the last paper of the books on the organisation's file, so what left the list since is said (bug hunt 2026-10-17); 0.3.0: the paper's words set out every case whose day has come in full (up to sixty; twelve before), and say how many are on the day's list for the first time (`data.list`: `ripe`, `new`), which is what brings a seat back; 0.2.0: what waits on the office-holder with its day come is named first in every paper, however long it has stood; what moves heading is not said to be closed; a list too long says what it leaves out; 0.1.1: a running figure that has moved is filed once the last paper is a week old; 0.1.0: keeps the books of an office a model holds, and files what has changed
   doc: "docs/behaviour/office-books.md",
   cadence: () => DAY,
   firstWake: (ctx) => 6 * 3_600 + ctx.rng("first-wake").below(3 * 3_600),

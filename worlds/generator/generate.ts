@@ -2966,6 +2966,22 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     }
   };
   resolveHolders();
+  // A firm's owner keeps its posts filled, wherever they live (docs/behaviour/staffing.md, "An owner's power to appoint"): the principal
+  // shareholder who is a person of the town has a post of the firm, the owner's, which stays theirs if they leave the world (`holds_abroad`:
+  // they act by letter, and appointing takes their time like any act). It looks at the firm's other posts and, where one stands vacant and none of
+  // the firm's staff is left to fill it, fills it with the owner. A firm held from outside, or by the fund, has no such owner here.
+  {
+    const inTown = new Set(everyone.map((m) => m.id));
+    const personHeld = (pos: any) => { const h = participants.find((q) => q.id === pos.holder); return !!h && h.kind === "person"; };
+    for (const firm of firmIds) {
+      const owner = [...(registers.get(firm) ?? [])].filter((h) => inTown.has(h.holder)).sort((a, b) => b.shares - a.shares || (a.holder < b.holder ? -1 : 1))[0];
+      if (!owner) continue;
+      const watch = positions.filter((q) => q.entity === firm && personHeld(q) && !String(q.id).endsWith("-staff")).map((q) => q.id);
+      if (!watch.length) continue;
+      const params = { part: "appointer", watch, after_days: 14, owner: owner.holder, owner_participant: `${owner.holder}-self` };
+      positions.push({ id: `${firm}-owners`, entity: firm, title: "Owner", channels: [K.mine("payroll", { records: ["agreement", "signature", "notice"] }), deaths, K.lookUp()], role_module: { code: "body.payroll", params }, holder: `${owner.holder}-self`, holds_abroad: true });
+    }
+  }
   // An office with no routine work for a staff still has someone who keeps its books (docs/behaviour/office-books.md):
   // a clerk, a post of its own, who reads what the office reads and files what stands open when that has changed.
   const clerkFor = (id: string, pos: any, part: any, impl: string, params: object) => {

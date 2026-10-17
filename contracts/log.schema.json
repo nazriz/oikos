@@ -1588,7 +1588,8 @@
             "reason": {
               "enum": [
                 "died",
-                "retired"
+                "retired",
+                "departed"
               ]
             }
           }

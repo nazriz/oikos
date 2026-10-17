@@ -137,7 +137,7 @@ export const landlord: BehaviourModule = {
   name: "firm.landlord",
   issues: P.LANDLORD,
   issuesWith: (p) => ({ city: p.city, tribunal: p.possession?.tribunal, builder: p.repair?.builder }),
-  version: "0.19.0", // 0.19.0: draws are named for the day and which time that is, never the hour or the moment (docs/reliability.md, "Draws and the moment"); 0.18.0: replies to a tenant's answer to its application with what its rent book shows owed; withdraws an application once the rent owed is paid; withdraws its request for a warrant when the tenant has gone; 0.17.0: an application for possession of a home the tenant has since left is withdrawn; rent owed as the year began (its statement of the rent account) is owed with the rest; tenancies already under notice or before the tribunal when its files are first opened are taken up where their papers put them; 0.16.2: an application for possession names the notice to vacate it relies on, the day it was given and the day it gave; its answers to requests, notices and decisions are drawn by who asked and what about, not by a paper's number on file (docs/decisions.md, 2026-10-12); 0.16.1: rent under a lease is counted from the lease's own rent day where it names one (attrs.first_due), and arrears are taken up on the office's own day of the week for its rent book; 0.16.0: possession under the world's law (docs/behaviour/justice.md, "Possession"): a notice to vacate, an application to the tribunal, a warrant, never putting anyone out itself; 0.15.0: everyday frictions (docs/behaviour/frictions.md): a home of ours in disrepair is repaired by the builder when we are asked or ordered and will, at its price; we answer a venue from our books; rent owed us is asked for and then taken to a body that hears arrears; 0.14.0: wants of its own (docs/behaviour/firm-wants.md), for one the world's dial gives initiative: a character from its owner's values, which answers a tenant who asks it to hold a rent or to stay on, sways its markup and its patience with arrears, and a record of its own; 0.13.4: main's 0.13.3 (the builder's answer read with the week's post; what is owed counted before building or asking) with a certified copy of a registration made on someone else's report counting as the registration
+  version: "0.20.0", // 0.20.0: a tenant whose death is on record with us ends the lease by our notice, the tenancy is offered to the household member the lease names or the partner the entry names, and nothing is asked of the dead (no arrears chase, no application for possession; one pending is withdrawn), all read from papers and not from who was seen where; 0.19.0: draws are named for the day and which time that is, never the hour or the moment (docs/reliability.md, "Draws and the moment"); 0.18.0: replies to a tenant's answer to its application with what its rent book shows owed; withdraws an application once the rent owed is paid; withdraws its request for a warrant when the tenant has gone; 0.17.0: an application for possession of a home the tenant has since left is withdrawn; rent owed as the year began (its statement of the rent account) is owed with the rest; tenancies already under notice or before the tribunal when its files are first opened are taken up where their papers put them; 0.16.2: an application for possession names the notice to vacate it relies on, the day it was given and the day it gave; its answers to requests, notices and decisions are drawn by who asked and what about, not by a paper's number on file (docs/decisions.md, 2026-10-12); 0.16.1: rent under a lease is counted from the lease's own rent day where it names one (attrs.first_due), and arrears are taken up on the office's own day of the week for its rent book; 0.16.0: possession under the world's law (docs/behaviour/justice.md, "Possession"): a notice to vacate, an application to the tribunal, a warrant, never putting anyone out itself; 0.15.0: everyday frictions (docs/behaviour/frictions.md): a home of ours in disrepair is repaired by the builder when we are asked or ordered and will, at its price; we answer a venue from our books; rent owed us is asked for and then taken to a body that hears arrears; 0.14.0: wants of its own (docs/behaviour/firm-wants.md), for one the world's dial gives initiative: a character from its owner's values, which answers a tenant who asks it to hold a rent or to stay on, sways its markup and its patience with arrears, and a record of its own; 0.13.4: main's 0.13.3 (the builder's answer read with the week's post; what is owed counted before building or asking) with a certified copy of a registration made on someone else's report counting as the registration
   doc: "docs/behaviour/firms.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -434,6 +434,11 @@ export const landlord: BehaviourModule = {
       // (Registered, as far as we have been told: the entry sent to us, or a certified copy of one made on someone else's report.)
       const registered = new Set([...book.all("death_registration"), ...book.all("death_certificate")].map((r) => r.data?.deceased as string));
       const tenants = new Map(active.map((a) => [tenantOf(a) as string, a]));
+      // A tenant whose death is on record with us (the registry's entry, or a certified copy) is dead to the tenancy: the lease ends by our
+      // notice, and the household member the lease names, or the partner the entry names, who may still live there succeeds to the tenancy
+      // (a new lease on the same terms from when the old one ends), as a partner or household member who lived there does where the law lets
+      // them stay; nothing is asked of the dead, no arrears chase, no notice to vacate, no application to the tribunal (one pending is
+      // withdrawn). Read from papers only, never from who happened to be seen where when we looked: so it does not depend on our hours.
       for (const site of sites) for (const sp of site.structure?.spaces ?? []) for (const l of sp.left ?? []) {
         if (l.reason !== "died" || !tenants.has(l.occupant) || registered.has(l.occupant) || handled.has(`died-${l.occupant}`)) continue;
         if (!stoodEmpty(sp, t)) continue;
@@ -445,6 +450,27 @@ export const landlord: BehaviourModule = {
         if (!a || noticeGiven.has(a.id)) continue;
         noticeGiven.set(a.id, t);
         steps.push(because(`Our tenant ${who} has died (registered): giving notice on their lease.`, notice(a.id, "The tenant has died.")));
+        // The tenancy passes to the household member the lease names (else the partner the entry names), if they are alive as far as we know.
+        const lt = leaseTerms(a, who);
+        const entry = [...book.all("death_registration"), ...book.all("death_certificate")].find((r) => r.data?.deceased === who);
+        const named = ((a.terms.text as string | undefined)?.match(/household: (.*)\.$/)?.[1] ?? "").split(/[ ,]+/).filter((x) => x && x !== who && !registered.has(x));
+        const partner = typeof entry?.data?.partner === "string" && !registered.has(entry.data.partner) ? [entry.data.partner as string] : [];
+        const heir = [...named, ...partner].sort()[0];
+        if (heir && p.renew && lt.space && owned.some((o) => o.space === lt.space) && !renewed.has(a.id)) {
+          const ends = t + p.landlord_notice_days * DAY;
+          renewed.add(a.id);
+          renewsAt.set(a.id, ends);
+          const rent = rentAt(a, ends);
+          const months = between(p.min_term_months, p.max_term_months, ctx.rng(`succeed-${who}`).below(1_000_000) / 1_000_000);
+          steps.push(because(`${who} has died and ${heir}, of their household, may be living in ${lt.space}: offering ${heir} the tenancy, a new lease at ${usd(rent)} a month for ${months} months from when the old one ends.`,
+            ["lease", offer(heir, {
+              template: "lease", term: ends - t + months * MONTH, ...(p.after_term ? { then: p.after_term } : {}), ourNotice: p.landlord_notice_days * DAY, theirNotice: p.tenant_notice_days * DAY,
+              we: C.call("occupancy", { who: heir, in: lt.space }),
+              they: pay(acc.account, rent, { every: MONTH, for: "rent" }),
+              text: `${heir} rents home ${lt.space} from ${me} for ${moneyNow(rent)} a month, succeeding ${who} (lease ${a.id}) for ${months} months from day ${Math.floor(ends / DAY)}.`,
+              basis: a.id,
+            })]));
+        }
       }
 
       // Arrears: give notice after enough unpaid months (rent is due monthly in advance). Each tenant pays from the
@@ -473,6 +499,14 @@ export const landlord: BehaviourModule = {
         }
       }
       for (const a of active) {
+        // A tenant who has died is owed no arrears chase, and is not taken to the tribunal: what we had before it is withdrawn.
+        if (registered.has(tenantOf(a))) {
+          for (const app of book.open("tribunal_application").filter((r) => r.speaks_for === me && r.data?.kind === "possession" && r.data?.about === a.id && !handled.has(`withdrawn-${r.id}`))) {
+            handled.add(`withdrawn-${app.id}`);
+            steps.push(because(`${tenantOf(a)} has died: withdrawing our application for possession (${app.id}); nothing is asked of the dead.`, withdraw(app.id, "Withdrawn: the tenant has died.")));
+          }
+          continue;
+        }
         if (noticeGiven.has(a.id) && !ending.has(a.id)) continue;
         const tenant = tenantOf(a);
         const rent = rentAt(a, t);
@@ -1802,6 +1836,31 @@ export class Staffing {
       lines.push(pay(u.to, u.amount, { from: account, basis: u.agreement, for: u.what ? `${u.what} for ${worker}.` : `Wages for ${worker}, late: due ${dateWords(u.due)}.` }));
     }
     return lines.length ? [because(`Owed in our books to people who work or worked for us (wages not paid on their day, redundancy pay): paying ${lines.length} of them now.`, ...lines)] : [];
+  }
+  /** Winding up: what we owe our staff, and what we withheld from their wages and have not paid over, come before our
+   * shareholders (and our other creditors): wages and redundancy pay owed in our books, then the tax withheld, paid
+   * from `balance` as far as it goes. What was paid is returned beside the steps. */
+  windUpOwed(book: Book, t: number, account: string, balance: number): { steps: Step[]; paid: number } {
+    const steps: Step[] = [];
+    let paid = 0;
+    for (let round = 0; round < 20; round++) {
+      const before = this.wagesOwed();
+      const s = this.latePay(book, t, account, balance - paid, 0);
+      if (!s.length) break;
+      steps.push(...s);
+      paid += before - this.wagesOwed();
+    }
+    const lines: C.Call[] = [];
+    for (const x of [...this.owed.values()]) {
+      if (!(x.amount > 0) || !x.charge.account) continue;
+      const amount = Math.min(x.amount, balance - paid);
+      if (amount <= 0) continue;
+      this.owed.set(x.charge.id, { ...x, amount: x.amount - amount });
+      paid += amount;
+      lines.push(pay(x.charge.account, amount, { from: account, for: "Winding up: tax withheld from wages, paid over." }));
+    }
+    if (lines.length) steps.push(because("Winding up: the tax we withheld from wages and had not paid over comes before our shareholders.", ...lines));
+    return { steps, paid };
   }
   /** Putting short pay right from here on: their wage order replaced by one at the wage agreed. (What was kept back
    * is paid by whoever answers for us.) */

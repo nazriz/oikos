@@ -2736,6 +2736,10 @@
           "description": "Who else may fill this post, besides the organisation it belongs to: an entity (the council, an owner, a board) whose own act, through a post of its own or as itself, may `appoint` into it. The body's constitution, as the world's data says; the kernel only checks who is acting.",
           "$ref": "urn:oikos:contracts:0.8:common#/$defs/ConfigId"
         },
+        "holds_abroad": {
+          "description": "The post stays its holder's when they leave the world (default false): an owner's power to appoint to the organisation's posts is not lost by living elsewhere. Every other post falls vacant when its holder leaves.",
+          "type": "boolean"
+        },
         "keeps_record": {
           "description": "The bookkeeping of this post (its role_module.code) keeps the record of the organisation the post belongs to (default false). At most one position of an organisation has it, and it needs a role_module with a code. Whoever holds it may set that record through the entity_record command's `entity`.",
           "type": "boolean"

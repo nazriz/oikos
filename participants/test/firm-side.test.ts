@@ -188,7 +188,7 @@ test("what the law gives someone let go for redundancy: redundancy pay by servic
 // Before a dividend (docs/behaviour/firms.md): none while wages are owed in the books or anyone is under notice. Found in the
 // fifth living pilot's trace: a factory paid a dividend twenty days after it had given its whole staff notice.
 test("nothing is paid to the shareholders while wages are owed; with none owed, the month's earnings above the buffer are", () => {
-  const run = (owed: boolean) => {
+  const run = (owed: boolean, debt = false) => {
     const id = "shop-1";
     const ctx: any = context(`${id}-manager-system`, id, { premises: id, workplace: `${id}/workplace.1`, suppliers: [], demand: 20, wage: 200_000 }, { position: `${id}-manager` });
     const m = retailer.create(ctx);
@@ -211,9 +211,31 @@ test("nothing is paid to the shareholders while wages are owed; with none owed, 
       at(15 * DAY, 10_000, [asRecord], [{ from: "bank", re: orderId, text: PAYMENT_FAILED.note("$2,000.00", "acc-c1", orderId) }]);
     }
     // A month on, the shop holds far more than it did: the month's earnings.
-    const end = at(32 * DAY, 60_000_000);
+    // (A debt recorded against it, unpaid: bug hunt 2026-10-17, finding 10.)
+    const claim = { id: "rec.d1", at: 20 * DAY, record: "claim", author: "factory-1-system", speaks_for: "factory-1", position: "right", holder: "factory-1", counterparty: id, visible_to: ["factory-1", id], about: { kind: "debt", amount: 1_000_000, account: "acc-factory-1", for: "goods delivered on terms, unpaid." } };
+    const end = at(32 * DAY, 60_000_000, debt ? [claim] : []);
     return end.said.filter((c) => c.fn === "statement" && c.args.kind === "request" && /dividend/i.test(String(c.args.text)));
   };
   expect(run(false).length).toBe(1);
   expect(run(true)).toEqual([]);
+  expect(run(false, true)).toEqual([]);
+});
+
+// Bug hunt 2026-10-17, finding 11: winding up pays the staff and the tax withheld from them before anyone else.
+test("winding up: wages owed in the books, then the tax withheld, are paid from what is held, before the shareholders see any of it", () => {
+  const job = signed(employment("J1", 0, "works-1", "c1", 200_000));
+  const staffing: any = new Staffing(context("works-1-manager-system", "works-1", {}), "works-1", { period: 14 * DAY, notice_days: 14, role: "hand" });
+  staffing.unpaid.push({ agreement: "J1", to: "acc-c1", amount: 200_000, withheld: { total: 0, parts: [] }, due: DAY });
+  staffing.owed.set("tax", { charge: { id: "tax", account: "acc-tax", collector: "ato" }, law: "law-x", amount: 50_000 });
+  const r = staffing.windUpOwed(bookOf(...job), 20 * DAY, "acc-works", 230_000);
+  expect(r.paid).toBe(230_000);
+  const money = JSON.stringify(r.steps);
+  expect(money).toContain("acc-c1");
+  expect(money).toContain("acc-tax");
+  // With less than is owed, the wages come first and the tax gets the rest.
+  const s2: any = new Staffing(context("works-1-manager-system", "works-1", {}), "works-1", { period: 14 * DAY, notice_days: 14, role: "hand" });
+  s2.unpaid.push({ agreement: "J1", to: "acc-c1", amount: 200_000, withheld: { total: 0, parts: [] }, due: DAY });
+  s2.owed.set("tax", { charge: { id: "tax", account: "acc-tax", collector: "ato" }, law: "law-x", amount: 50_000 });
+  expect(s2.windUpOwed(bookOf(...job), 20 * DAY, "acc-works", 210_000).paid).toBe(210_000);
+  expect(s2.owed.get("tax").amount).toBe(40_000);
 });

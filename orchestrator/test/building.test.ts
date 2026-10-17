@@ -19,7 +19,7 @@ const base = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")
 const tight = { ...base, ownership: false, citizens: 120, apartment_blocks: 2, houses: 16, landlord_capital: 300_000_000, landlord_compliance_bps: 10_000 };
 
 /** Refusals from same-moment races (D58): someone who'd just left, named for work by a firm acting on what it saw. */
-const RACES = ["not_present", "not_at_work", "capacity_exceeded", "no_time_left", "insufficient_quantity", "dead", "too_far"]; // (too_far: a birth takes hours and the other parent went to work meanwhile, as in households and migration; F6, 2026-10-16. insufficient_quantity and dead: work takes the crew's hours, so it takes effect hours after it was ordered, and meanwhile the goods go to an earlier order or a performer dies; F1, 2026-10-15) and moving into a home still being left; a new job's first day after a full one at the old
+const RACES = ["not_present", "not_at_work", "capacity_exceeded", "no_time_left", "insufficient_quantity", "dead", "too_far", "not_in_position"]; // (not_in_position, 2026-10-17: a person who leaves town no longer keeps their posts, so an act on its way when they go is refused as one by the dead is; too_far: a birth takes hours and the other parent went to work meanwhile, as in households and migration; F6, 2026-10-16. insufficient_quantity and dead: work takes the crew's hours, so it takes effect hours after it was ordered, and meanwhile the goods go to an earlier order or a performer dies; F1, 2026-10-15) and moving into a home still being left; a new job's first day after a full one at the old
 
 async function run(name: string, config: any, until: number) {
   const out = join(root, "runs", `test-building-${name}`);

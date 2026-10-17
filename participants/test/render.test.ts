@@ -303,6 +303,10 @@ test("where a list of papers is cut, the seat is told how to see the rest; what 
   // A look that brought nothing new, or at a report that's no longer its own: said.
   expect(renderObservation(obs({ mine: { kind: "records", records: [] } }), { ...o, looked: new Map([["mine", {}]]) })).toContain("## Filings\nNothing new there since you last looked.");
   expect(renderObservation(obs({}), { ...o, looked: new Map([["mine", {}]]) })).toContain("## Filings\nNothing could be seen there.");
+  // A question still out to the keeper is not an empty answer (bug hunt 2026-10-17, finding 7).
+  const waiting = renderObservation({ ...obs({}), asking: ["office/mine"] } as any, { ...o, looked: new Map([["mine", {}]]) });
+  expect(waiting).toContain("## Filings\nYour question is still with the one who keeps this.");
+  expect(waiting).not.toContain("Nothing could be seen there.");
   // What was looked up whole doesn't leave the next report whole: a long text is cut again, with its mark.
   expect(renderObservation(obs({ mine: { kind: "records", records: [long] } }), o)).toContain("…");
 });

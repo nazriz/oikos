@@ -44,7 +44,7 @@ export const electoralOffice: BehaviourModule = {
     { what: "enrolment", why: "The electoral office keeps the roll: every elector's enrolment is lodged with it." },
     { what: "electoral_roll", why: "The roll it publishes at each election is its own." },
   ],
-  version: "0.6.0", // 0.6.0: a vote cast after the poll closed is answered (not counted, as before); 0.5.0: declares a result without seating the winner where the office is another body's (`seats`)
+  version: "0.7.0", // 0.7.0: where the election stands is read from the office's own file (a successor carries on; results carry their poll day), and a refused notice, ballot or result is tried again; 0.6.0: a vote cast after the poll closed is answered (not counted, as before); 0.5.0: declares a result without seating the winner where the office is another body's (`seats`)
   doc: "docs/behaviour/elections.md",
   cadence: () => DAY,
   firstWake: (ctx) => 9 * 3600 + ctx.rng("first-wake").below(3600),
@@ -69,6 +69,10 @@ export const electoralOffice: BehaviourModule = {
     let stage: "waiting" | "nominating" | "voting" = "waiting";
     let notice: string | undefined;
     let ballot: string | undefined;
+    // The office's own file: what it has put on record in this position, whoever held it then. Where the election stands is
+    // read from it, never kept only in a holder's memory, so whoever takes the office carries on where it left off.
+    const ours = (r: { author: string; in_position?: string }) => (ctx.position ? r.in_position === ctx.position : r.author === ctx.participant);
+    const filed = (kind: string) => book.open(kind).filter((r: any) => ours(r) && r.data?.office === p.office);
     // Its ballots that have closed, and when; and how many of the votes it has been shown it has looked at since (a
     // vote cast after the poll closed is not counted, and its caster is told so: nothing of how anyone voted).
     const pollsClosed = new Map<string, number>();
@@ -78,6 +82,20 @@ export const electoralOffice: BehaviourModule = {
       (obs) => {
         const t = obs.t;
         const steps: Step[] = [];
+        // ---- where the election stands, from the file: results declared move the poll on a term each; a notice or a
+        // ballot filed for this poll puts the office at that stage ----
+        const results = filed("ballot_result");
+        let filePoll = p.first_poll_day * DAY;
+        while (results.some((r: any) => r.data?.poll_at === filePoll)) filePoll += p.term_days * DAY;
+        if (filePoll > poll) { poll = filePoll; stage = "waiting"; notice = undefined; ballot = undefined; }
+        if (!notice) {
+          const n = filed("election_notice").filter((r: any) => r.data?.poll_at === poll).sort((a: any, x: any) => x.at - a.at)[0];
+          if (n) { notice = n.id; if (stage === "waiting") stage = "nominating"; }
+        }
+        if (!ballot) {
+          const b = filed("ballot").filter((r: any) => r.data?.closes_at === poll).sort((a: any, x: any) => x.at - a.at)[0];
+          if (b) { ballot = b.id; stage = "voting"; }
+        }
         // ---- the roll: those who've enrolled, less the dead and those who've left ----
         const dead = new Set(book.open("death_registration").map((r) => r.data?.deceased as string));
         const left = new Set(book.open("departure").map((r) => r.speaks_for as string));
@@ -85,11 +103,10 @@ export const electoralOffice: BehaviourModule = {
           .filter((x) => !dead.has(x) && !left.has(x)).sort();
 
         if (stage === "waiting" && t >= poll - p.nominations_open_days * DAY) {
-          stage = "nominating";
           const st = because(`An election for ${p.office_title || p.office} on day ${Math.floor(poll / DAY)}: giving notice, and opening nominations.`,
             ["notice", say("election_notice", `Election notice: the office of ${p.office_title || p.office} falls vacant on day ${Math.floor(poll / DAY)}. Nominations close on day ${Math.floor((poll - p.nominations_close_days * DAY) / DAY)}; voting is by ${p.method === "preferential" ? "preference (number every candidate)" : "a single choice"}, and compulsory for those on the roll. Nominate with a statement of kind nomination to the town.`,
               { visible: "public", data: { office: p.office, poll_at: poll, nominations_close_at: poll - p.nominations_close_days * DAY, method: p.method } })]);
-          st.then = (out) => { notice = out.created?.notice; };
+          st.then = (out) => { if (out.status === "applied") { stage = "nominating"; notice = out.created?.notice; } };
           steps.push(st);
         }
         if (stage === "nominating" && t >= poll - p.nominations_close_days * DAY) {
@@ -104,13 +121,12 @@ export const electoralOffice: BehaviourModule = {
             const who = names[0];
             steps.push(because(who ? `Nominations closed: one candidate, ${who.name}, elected unopposed.` : "Nominations closed: no candidates; no one is elected.",
               say("ballot_result", `Election result, ${p.office_title || p.office}: ${who ? `${who.name} elected unopposed` : "no one nominated; no one elected"}.`,
-                { visible: "public", data: { office: p.office, winner: who?.candidate, unopposed: !!who, candidates: names.length } }),
+                { visible: "public", data: { office: p.office, poll_at: poll, winner: who?.candidate, unopposed: !!who, candidates: names.length } }),
               ...(who && p.seats ? [C.call("position", { appoint: p.office, to: who.candidate })] : [])));
-            stage = "waiting";
-            poll += p.term_days * DAY;
+            // (The office moves on once the result is on record; a result refused is tried again.)
+            steps[steps.length - 1]!.then = (out) => { if (out.status === "applied") { stage = "waiting"; notice = undefined; poll += p.term_days * DAY; } };
             return steps;
           }
-          stage = "voting";
           const r = roll();
           const st = because(`Nominations closed: ${names.length} candidates. Publishing the roll (${r.length}) and the ballot.`,
             // (The roll is the office's own: it is kept here and votes are checked against it. Nobody is sent it; an elector
@@ -118,7 +134,7 @@ export const electoralOffice: BehaviourModule = {
             say("electoral_roll", `The electoral roll for the election on day ${Math.floor(poll / DAY)}: ${r.length} electors.`, { visible: [p.town], data: { electors: r, poll_at: poll } }),
             ["ballot", say("ballot", `Ballot: ${p.office_title || p.office}. Candidates: ${names.map((x) => `${x.number}. ${x.name}`).join(", ")}. ${p.method === "preferential" ? "Rank them, first to last, as the choice: their numbers, in order, joined by > (2>1>3)." : "Choose one, by number."} Voting closes on day ${Math.floor(poll / DAY)}.`,
               { visible: "public", data: { office: p.office, electorate: "roll", candidates: names, method: p.method, opens_at: poll - p.voting_days * DAY, closes_at: poll, options: names.map((x) => x.number) } })]);
-          st.then = (out) => { ballot = out.created?.ballot; };
+          st.then = (out) => { if (out.status === "applied") { stage = "voting"; ballot = out.created?.ballot; } };
           steps.push(st);
         }
         if (stage === "voting" && ballot && t >= poll) {
@@ -143,12 +159,17 @@ export const electoralOffice: BehaviourModule = {
           const turnout = electors.size ? Math.round((last.size * 10_000) / electors.size) : 0;
           steps.push(because(`Polling day: counting ${last.size} formal votes of ${electors.size} electors${winner ? `; ${who?.name ?? winner} is elected` : ": nobody is elected"}.`,
             say("ballot_result", `Election result, ${p.office_title || p.office}: ${winner ? `${who?.name ?? winner} elected` : "no one elected"}; ${last.size} formal votes of ${electors.size} on the roll (turnout ${turnout / 100}%).`,
-              { visible: "public", basis: ballot, data: { ballot, office: p.office, winner, rounds, formal: last.size, electors: electors.size, turnout_bps: turnout } }),
+              { visible: "public", basis: ballot, data: { ballot, office: p.office, poll_at: poll, winner, rounds, formal: last.size, electors: electors.size, turnout_bps: turnout } }),
             ...(winner && p.seats ? [C.call("position", { appoint: p.office, to: winner })] : [])));
-          pollsClosed.set(ballot, closes);
-          stage = "waiting";
-          ballot = undefined;
-          poll += p.term_days * DAY;
+          const counted_ballot = ballot;
+          steps[steps.length - 1]!.then = (out) => {
+            if (out.status !== "applied") return;
+            pollsClosed.set(counted_ballot, closes);
+            stage = "waiting";
+            ballot = undefined;
+            notice = undefined;
+            poll += p.term_days * DAY;
+          };
         }
         const votes = book.ofType("vote");
         for (const v of votes.slice(votesRead)) {

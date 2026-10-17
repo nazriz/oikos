@@ -775,6 +775,10 @@ pub struct PositionCfg {
     /// organisation, or a person, who may `appoint` into it as well as the post's own organisation.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub appointed_by: Option<Id>,
+    /// The post stays its holder's when they leave the world: an owner's power to appoint to the organisation's posts is not lost by
+    /// living elsewhere (they act by letter, and appointing takes their time like any act). Default false.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub holds_abroad: bool,
 }
 
 impl PositionCfg {

@@ -396,3 +396,24 @@ test("an agreement's hours term is a second commitment of the other side: work, 
   const without = blocks('agreement(with=greenco, template=employment, we_do=money(to=acc-greenco, amount="$2,000", every="14 days", from=acc-city))')[0] as any;
   expect(without.terms.commitments.length).toBe(1);
 });
+
+// Bug hunt 2026-10-17, finding 13: a seat acting as a person takes only itself out of the world; a post of an organisation takes others.
+test("presence(leave=yes, who=...) by a person's seat is a question; by a post it is the block", () => {
+  const person = new Knowledge(TOWN_MONEY);
+  person.absorb({ participant: "c1-self", t: 86_400, status: "active", entity: "c1", outcomes: [], inbox: [], drafts: [], channels: {} } as any);
+  const mine = resolve(calls.parseProgram("presence(leave=yes)"), person, typeOf);
+  expect(mine.ok && mine.blocks).toEqual([{ block: "leave" }]);
+  const other = resolve(calls.parseProgram("presence(who=c2, leave=yes)"), person, typeOf, undefined, { written: true });
+  // (A code parent taking its children out with it is not a seat's program.)
+  const parent = resolve(calls.parseProgram("presence(who=c2, leave=yes)"), person, typeOf);
+  expect(parent.ok && parent.blocks).toEqual([{ block: "leave", person: "c2" }]);
+  expect(other.ok).toBe(false);
+  expect(!other.ok && other.questions.join(" ")).toContain("only yourself");
+  const away = resolve(calls.parseProgram("occupancy(in=str.3, who=c2, leave=yes)"), person, typeOf, undefined, { written: true });
+  expect(away.ok).toBe(false);
+  expect(!away.ok && away.questions.join(" ")).toContain("only yourself");
+  const self = resolve(calls.parseProgram("occupancy(in=str.3, leave=yes)"), person, typeOf, undefined, { written: true });
+  expect(self.ok).toBe(true);
+  const post = resolve(calls.parseProgram("presence(who=c2, leave=yes)"), town(), typeOf, "mayor", { written: true });
+  expect(post.ok && post.blocks).toEqual([{ block: "leave", person: "c2" }]);
+});

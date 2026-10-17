@@ -72,7 +72,8 @@ test("unpaid long enough, the debt is recorded against the buyer, and its paymen
   expect(orders.collect(59 * DAY, "acc-factory-1")).toEqual([]);
   const steps = orders.collect(61 * DAY, "acc-factory-1");
   expect(steps.length).toBe(1);
-  const call: any = (steps[0] as any[])[0];
+  const [bound, call]: any = (steps[0] as any[])[0];
+  expect(bound).toBe("claim"); // (named, so the world's answer carries the claim's id: a payment settling it is then known)
   expect(call.fn).toBe("claim");
   expect(call.args.against.id ?? call.args.against).toBe("shop-1");
   expect(call.args.basis.id ?? call.args.basis).toBe("o1");
@@ -258,6 +259,7 @@ test("a payment that says it is a dividend, or tax withheld, is not an order's p
   const paid = (memo: string) => { const o = mk(); o.take(obsOf(9 * DAY, "outside", { account: "acc-outside", transactions: [tx(9 * DAY, "acc-factory-9", "acc-outside", 500_000, memo)] }), "acc-outside"); return o.unclaimed(bookOf()); };
   expect(paid("Dividend")).toEqual([]);
   expect(paid("Income tax withheld from wages")).toEqual([]);
+  expect(paid("Capital.")).toEqual([]); // (a founder's capital put into their own business: bug hunt 2026-10-17, finding 9)
   expect(paid("Order: 5 goods.")).toEqual([["acc-factory-9", 500_000]]);
   expect(paid("")).toEqual([["acc-factory-9", 500_000]]);
   expect(paid("700 energy")).toEqual([["acc-factory-9", 500_000]]); // (a payment for goods nobody ordered is still a mistake)

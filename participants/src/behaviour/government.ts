@@ -763,7 +763,7 @@ export const ratesOfficer: BehaviourModule = {
   takes: [{ form: "rates_recovery", title: "Recovery direction to the rates officer",
     fields: { interest: { type: "choice", options: ["yes", "no"], required: true, description: "Whether rates left unpaid after their due date are charged the law's penalty interest: yes, as the office does of its own accord; no, none is added." } },
     follows: "While a direction with interest no stands, the rates officer adds no penalty interest to overdue rates and writes to nobody about them. The rates themselves are still levied and still owed, and interest already recorded stays on record." }],
-  version: "0.4.2", // 0.4.2: a direction on its recovery form reaches its staff's post; 0.4.1: a payment that names the rates notice pays the claim recorded with it; 0.4.0: its clerks report to the rates officer the notices sent under the standing order and when the next go out; 0.3.0: takes a written direction on penalty interest (docs/behaviour/directions.md)
+  version: "0.4.3", // 0.4.3: when the last notices went out, and the interest charged on each claim, are read from the office's own file, so a new holder carries on (bug hunt 2026-10-17); 0.4.2: a direction on its recovery form reaches its staff's post; 0.4.1: a payment that names the rates notice pays the claim recorded with it; 0.4.0: its clerks report to the rates officer the notices sent under the standing order and when the next go out; 0.3.0: takes a written direction on penalty interest (docs/behaviour/directions.md)
   doc: "docs/behaviour/public-finance.md",
   cadence: () => DAY,
   create(ctx: ParticipantContext) {
@@ -787,6 +787,9 @@ export const ratesOfficer: BehaviourModule = {
     // review, fault 4).
     const paid = (book: Book, c: any): boolean => billSettled(book, c, settled);
     const lastInterest = new Map<string, number>(); // overdue claim -> when interest was last charged
+    // The office's own file (what it has put on record in this position, whoever held it then): when the last notices went
+    // out and when interest was last charged on each claim are read from it, not kept only in a holder's memory.
+    const ours = (r: { author: string; in_position?: string }) => (ctx.position ? r.in_position === ctx.position : r.author === ctx.participant);
     let next = p.first_day * DAY;
     let reportDay = -1;
     const dated = (x: number) => `year ${Math.floor(x / (365 * DAY)) + 1}, day ${Math.floor((x % (365 * DAY)) / DAY) + 1}`;
@@ -815,13 +818,17 @@ export const ratesOfficer: BehaviourModule = {
         const dueDays: number = terms.due_days ?? 30;
         const interestBps: number = terms.penalty_interest_bps ?? 0;
         if (!acc) return steps;
-        steps.push(...routines.set(book, [{ task: "levy", at: p.office || ctx.position || "office", every: Math.floor(365 / instalments) * DAY, why: "Setting the rates clerks' work: the notices sent at each instalment and interest added to what is overdue, as a standing work order." }]));
+        const everyInstalment = Math.floor(365 / instalments) * DAY;
+        const lastNotices = Math.max(-Infinity, ...book.open("rates_notice").filter(ours).map((n) => n.at));
+        if (lastNotices > -Infinity) next = Math.max(next, lastNotices + everyInstalment);
+        for (const r of book.ofType("claim") as any[]) if (r.record === "claim" && r.position === "right" && r.holder === me && r.about?.kind === "rates_interest" && ours(r)) for (const b of basesOf(r)) lastInterest.set(b, Math.max(lastInterest.get(b) ?? -Infinity, r.at));
+        steps.push(...routines.set(book, [{ task: "levy", at: p.office || ctx.position || "office", every: everyInstalment, why: "Setting the rates clerks' work: the notices sent at each instalment and interest added to what is overdue, as a standing work order." }]));
         const levying = routines.does(book, "levy", t, { every: DAY });
         // Notices: each owner's share of a year's rates on what they own, as last valued. (Not before there are valuations:
         // until 2026-10-02 the first instalment went out on the first morning, before the valuer had valued anything,
         // levied nothing, and the next waited a quarter.)
         if (levying && law && t >= next && ratePpm > 0 && book.open("valuation").length) {
-          next = t + Math.floor(365 / instalments) * DAY;
+          next = t + everyInstalment;
           const latest = new Map<string, StatementRecord>(); // lot -> its latest valuation
           for (const v of book.open("valuation").sort((a, b) => a.at - b.at)) latest.set(v.data?.lot, v);
           const byOwner = new Map<string, { lots: string[]; amount: number }>();

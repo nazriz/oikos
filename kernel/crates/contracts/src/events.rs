@@ -118,6 +118,7 @@ pub enum VacateReason {
 pub enum EndReason {
     Died,
     Retired,
+    Departed,
 }
 
 /// One event: the command that caused it, plus what happened.

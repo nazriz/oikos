@@ -142,7 +142,7 @@ export interface SellingTerms { days: number; stop_after_days: number; claim_aft
 export interface Receivable { order: string; account: string; buyer: string; kind: string; quantity: number; amount: number; since: number; days: number }
 
 const INVOICE = /^Invoice (\S+?):/;
-const OTHER_ROLE = /^(Dividend|Income tax|Tax\b)/i; // (what a payment to the world's account says when it is paid to its shareholder or its collector)
+const OTHER_ROLE = /^(Dividend|Income tax|Tax\b|Capital\b)/i; // (what a payment to a seller's account says when it is paid to its shareholder or its collector, or is a founder's capital put into a business of their own)
 
 export class OrderBook {
   private readonly credit = new Map<string, number>(); // paying account -> money received not yet set against an order
@@ -215,7 +215,8 @@ export class OrderBook {
       const owing = r.amount - (this.invoiced.get(r.order) ?? 0);
       this.claimedAccounts.set(r.account, (this.claimedAccounts.get(r.account) ?? 0) + 1);
       const st = because(`${r.buyer} has not paid for the ${r.quantity} ${r.kind} we delivered on terms (order ${r.order}, ${usd(owing)}), ${Math.floor((t - r.since) / DAY - r.days)} days past the day: recording the debt against them.`,
-        record("right", this.me, { kind: "debt", amount: owing, account: sellerAccount, for: `${r.quantity} ${r.kind} delivered on terms, order ${r.order}: unpaid.` }, { against: r.buyer, basis: r.order }));
+        // (Bound as `claim`, so the world tells us the claim's id: a payment that settles it is then known for what it is.)
+        ["claim", record("right", this.me, { kind: "debt", amount: owing, account: sellerAccount, for: `${r.quantity} ${r.kind} delivered on terms, order ${r.order}: unpaid.` }, { against: r.buyer, basis: r.order })]);
       st.then = (out) => { const id = out.created?.claim; if (id) this.claimed.set(id, r.account); };
       steps.push(st);
     }

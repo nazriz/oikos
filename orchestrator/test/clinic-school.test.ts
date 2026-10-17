@@ -107,8 +107,9 @@ test("children are taught, the ill stay home and are seen at the clinic", async 
   // Nothing refused but the usual races (and a patient who'd gone home before being seen; and a building under water,
   // in a spring flood: the weather's; and, as the households and deaths tests allow with the daily round, a partner
   // gone to work while a conception was under way, "isn't near": which couple and which morning is the town's draw).
+  // ("already_present" added 2026-10-17, the bug hunt: a child on its way home from school brought there by a parent meanwhile, as building.test.ts allows; the town's draw, moved by the owners' posts.)
   const partnerGone = (e: any) => e.code === "too_far" && / isn't near /.test(e.detail ?? "");
-  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left", "insufficient_quantity", "dead", "participant_inactive", "flooded"].includes(e.code) && !partnerGone(e)).map((e) => e.code)).toEqual([]);
+  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left", "insufficient_quantity", "dead", "participant_inactive", "flooded", "already_present"].includes(e.code) && !partnerGone(e)).map((e) => e.code)).toEqual([]);
 }, 2_400_000);
 
 test("with care in the world, treatable deaths come through severe illness, and with care as usual each age dies at the life table's rate", () => {

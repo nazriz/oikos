@@ -41,18 +41,18 @@ const BEFORE: { [profile: string]: { days: number; state: string } } = {
   // (Re-taken on 2026-10-16 at the review of the foundations, finding 6: the council's appointments officer is an office of the town, its posts name their authority, and every generated system is owned by the organisation whose post it holds; c5a5a00f... until then.)
   // (Re-taken on 2026-10-17 at foundations F9 and F10: see CONFIG_BEFORE below; f54352a2... until then.)
 //   (Re-taken on 2026-10-17 at the housing and vacant-post faults (fix-housing), on the merge with the seated twins: the council's appointments officer is a councillor's post, watches the city's own offices and hires for the city where none of its staff is left to second; au-vic names the police among the posts the council fills; a death wakes those in the same space; 12df1060... until then.)
-  "au-vic-2026": { days: 60, state: "02577eca986e7020a9f12114ddda245e73f22707be55c94ec84c689e470be023" },
+  "au-vic-2026": { days: 60, state: "37329d3b67351975f11cdf17fad0dd640c76688793b6e380d1ab828f32a16590" },
   // (Re-taken on 2026-10-16 at foundations F5: the town's offices are held by people, their staff hired, its systems delivered from templates that say what they do; 3b4bc97e... until then.)
   // (Re-taken on 2026-10-16 at the review of the foundations, finding 6: the council's appointments officer is an office of the town, its posts name their authority, and every generated system is owned by the organisation whose post it holds; c1ae5e74... until then.)
   // (Re-taken on 2026-10-17 at foundations F9 and F10; 29f53e5f... until then.)
 //   (Re-taken on 2026-10-17 at the housing and vacant-post faults (fix-housing), on the merge with the seated twins: the council's appointments officer is a councillor's post, watches the city's own offices and hires for the city where none of its staff is left to second; au-vic names the police among the posts the council fills; a death wakes those in the same space; 5400d29a... until then.)
   // (Re-taken on 2026-10-17, twin-fix: someone who dies where others work is reported to the registry by the first of those present, citizen 0.58.0; 33189d5c... until then. The other two profiles did not move.)
-  "gb-eng-2026": { days: 30, state: "9da9b07952cc7e2de860ea24762fe90dc56f49090379f8bb057b9aa1a4a4b764" },
+  "gb-eng-2026": { days: 30, state: "af8fc68634aadab3d1ed8187096fcdac20c540e9f7b4de6d6b1fd434b42c0e21" },
   // (Re-taken on 2026-10-16 at foundations F5: the town's offices are held by people, their staff hired, its systems delivered from templates that say what they do; ab25cb7d... until then.)
   // (Re-taken on 2026-10-16 at the review of the foundations, finding 6: the council's appointments officer is an office of the town, its posts name their authority, and every generated system is owned by the organisation whose post it holds; 66ba5ea8... until then.)
   // (Re-taken on 2026-10-17 at foundations F9 and F10; 11a014cc... until then.)
 //   (Re-taken on 2026-10-17 at the housing and vacant-post faults (fix-housing), on the merge with the seated twins: the council's appointments officer is a councillor's post, watches the city's own offices and hires for the city where none of its staff is left to second; au-vic names the police among the posts the council fills; a death wakes those in the same space; 372a8340... until then.)
-  "ke-nakuru-2026": { days: 30, state: "b077b1296d388d9feb7ad615a6aaf78933fb42d45e92f446a191d91cafca79ff" },
+  "ke-nakuru-2026": { days: 30, state: "4b10d2a891aaeb65f4a60f0eb63a96fb59787ac8f635e9bb261479e33efd1368" },
 };
 // (Re-taken once more at foundations F4, 2026-10-15: a generated town's systems name their template and supplier, and its world names where work is done (`performers_in`): the config hashes and the states move, the draws and the town's life do not.)
 // (The config hashes were re-taken on 2026-10-15 at foundations F2: the world's act-time table gained rows by what an act makes. The states did not move.)
@@ -65,7 +65,8 @@ const cfgHash = (c: unknown) => new Bun.CryptoHasher("sha256").update(JSON.strin
 // (Re-taken on 2026-10-16 at the review of the foundations, finding 6, config and states both: the council's appointments officer, the posts' `appointed_by`, and every generated system owned by the organisation whose post it holds; 8dc56724..., 02ba6945... and 08e63b3c... until then.)
 // (Re-taken on 2026-10-17 at foundations F9 and F10, config and states both: three public forms for what a person files with an office that decides, a row of the table of work for `take`, and the engine's advance stopping where a letter is delivered or a paper recorded, so that news reaches a person when it happens; 033bebfc..., d2d9fdb0... and 9430b5b6... until then.)
 // (Re-taken on 2026-10-17 at the housing and vacant-post faults (fix-housing), on the merge with the seated twins: the council's appointments officer is a councillor's post, watches the city's own offices and hires for the city where none of its staff is left to second; au-vic names the police among the posts the council fills; a death wakes those in the same space; e82365d7..., 0fb4991d... and 9679d7f3... until then.)
-const CONFIG_BEFORE: { [profile: string]: string } = { "au-vic-2026": "640002cd9f8730df", "gb-eng-2026": "0cc086d68cb6805b", "ke-nakuru-2026": "9be6db49076022c1" };
+// (Re-taken on 2026-10-17 at the bug hunt, a firm's owner's post: every firm with a principal shareholder of the town has an `-owners` post held abroad, so the config hashes and the states move; the towns' draws and life do not change for it before a holder leaves. 640002cd..., 0cc086d6... and 9be6db49... until then.)
+const CONFIG_BEFORE: { [profile: string]: string } = { "au-vic-2026": "93e473eb772ce5d5", "gb-eng-2026": "e861d6a04b948bb9", "ke-nakuru-2026": "ef1fa3d2dda68431" };
 
 test("the dial in the world config is a schema-valid setting; a size that would break the arithmetic is refused when the run starts", async () => {
   const v = ajv.getSchema(`${NS}:world-config`)!;

@@ -474,7 +474,13 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     entity,
     ...(cap === "self" ? {} : { position: cap }),
     rng: (purpose) => drawFor(pid, cap, stablePurpose(`${pid}/${cap}`, purpose)),
-    chance: (purpose) => randomness.stream(["chance", purpose]),
+    // (A draw about one thing, named for a paper in the file: the paper by which such paper it is, as every other draw, never
+    // by the number it was filed under: a lease signed one paper later in a run than in its twin is the same lease.)
+    chance: (purpose) => {
+      const key = ["chance", stablePurpose(pid, purpose)];
+      o.drawTrace?.(key);
+      return randomness.stream(key);
+    },
     world: { tickSeconds: tick, runEnd, currency, ...(cfg.dials ? { dials: cfg.dials } : {}), ...(cfg.orchestration?.slip ? { slip: cfg.orchestration.slip } : {}) },
     ...(consult ? { consult } : {}),
     ...(composer ? { compose: composer } : {}),

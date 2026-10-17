@@ -27,7 +27,7 @@ export const producer: BehaviourModule = {
   name: "firm.producer",
   issues: [P.JOB_ADVERTISEMENT, ...P.TRADE, P.REMEDY_ANSWER, ...P.VENUE_ANSWERS],
   issuesWith: (p) => ({ ...P.staffingOwn({ role: p.role ?? "factory worker", industry: p.industry, workplace: p.workplace, notice_days: p.notice_days ?? 14 }) }),
-  version: "0.9.0", // 0.9.0: over its stock band, where the world's law lets an employer cut hours, it cuts everyone's hours by a hand's worth before it lets anyone go, and makes in its staff's hours (docs/behaviour/firms.md, "Hours before heads"); 0.8.0: 0.8.0: buys its inputs on the supplier's terms where it states them, and sells to shops on terms of its own where its world gives them (docs/behaviour/trade.md, "Trade credit"); makes and buys to what it can sell, and none while a unit loses money before wages (docs/behaviour/producer.md, "Inputs bought to what can be sold"); borrows again as its bank allows; no dividend while wages are owed or anyone is under notice (docs/behaviour/firms.md, "Before a dividend"); 0.7.1: returns of tax withheld are filed on the days the law states (docs/behaviour/firms.md, "Returns on the law's days"); 0.7.0: 0.7.0: adjusts its staff as firms do (docs/behaviour/firms.md, "Adjusting labour"): demand smoothed over months, people held while it makes less, let go only when the surplus has lasted what ending the job costs, redundancy pay under the world's law, no recruiting after letting someone go for want of money; 0.6.0: everyday frictions (docs/behaviour/frictions.md): pay that comes short, at the world's rate and its character's; asked, told or ordered to put it right; 0.5.0: wants of its own (docs/behaviour/firm-wants.md): a character from its owner's values, which answers a worker who asks for a rise, and a record of its own; 0.4.5: money promised in orders the bank has not yet paid out is not spent again by the next wake (one works placed the same order 40 times in a day); 0.4.4: 0.4.4: takes on the share of its hands the world gives by the day; 0.4.3: registers the share of its jobs the world gives for its kind
+  version: "0.10.0", // 0.10.0: no dividend while a debt recorded against it stands unpaid, and a winding-up pays wages owed and the tax withheld before anyone else (bug hunt 2026-10-17); 0.9.0: over its stock band, where the world's law lets an employer cut hours, it cuts everyone's hours by a hand's worth before it lets anyone go, and makes in its staff's hours (docs/behaviour/firms.md, "Hours before heads"); 0.8.0: 0.8.0: buys its inputs on the supplier's terms where it states them, and sells to shops on terms of its own where its world gives them (docs/behaviour/trade.md, "Trade credit"); makes and buys to what it can sell, and none while a unit loses money before wages (docs/behaviour/producer.md, "Inputs bought to what can be sold"); borrows again as its bank allows; no dividend while wages are owed or anyone is under notice (docs/behaviour/firms.md, "Before a dividend"); 0.7.1: returns of tax withheld are filed on the days the law states (docs/behaviour/firms.md, "Returns on the law's days"); 0.7.0: 0.7.0: adjusts its staff as firms do (docs/behaviour/firms.md, "Adjusting labour"): demand smoothed over months, people held while it makes less, let go only when the surplus has lasted what ending the job costs, redundancy pay under the world's law, no recruiting after letting someone go for want of money; 0.6.0: everyday frictions (docs/behaviour/frictions.md): pay that comes short, at the world's rate and its character's; asked, told or ordered to put it right; 0.5.0: wants of its own (docs/behaviour/firm-wants.md): a character from its owner's values, which answers a worker who asks for a rise, and a record of its own; 0.4.5: money promised in orders the bank has not yet paid out is not spent again by the next wake (one works placed the same order 40 times in a day); 0.4.4: 0.4.4: takes on the share of its hands the world gives by the day; 0.4.3: registers the share of its jobs the world gives for its kind
   doc: "docs/behaviour/producer.md",
   cadence: () => DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(24) * 3600,
@@ -180,6 +180,8 @@ export const producer: BehaviourModule = {
         const t = obs.t;
         const acc = ownAccount(obs);
         const steps: Step[] = [];
+        // Nothing goes to our shareholders while wages are owed, staff are under notice, or a debt recorded against us stands unpaid.
+        const strained = (): string => staffing.strained(book, t) || (() => { const owing = winding.debts(book); return owing.length ? `${owing.length} debt${owing.length > 1 ? "s" : ""} recorded against us ${owing.length > 1 ? "are" : "is"} unpaid (${usd(owing.reduce((x, d) => x + cents(d.about.amount), 0))})` : ""; })();
         if (acc && winding.state === "closed") {
           const where = premisesOf(obs);
           const worth = where ? buildingPrice(book, p.builder, where.type) : undefined;
@@ -188,8 +190,10 @@ export const producer: BehaviourModule = {
         if (!acc) return steps;
         if (winding.due(t)) {
           // (What we owe our supplier for inputs delivered on its terms is paid first, as the debts recorded against us are.)
-          const owed = payables.settle(t, acc.account, acc.balance);
-          return [...owed.steps, ...winding.finish(t, book, acc.account, acc.balance - owed.paid, (x) => distribute(book, me, acc, x, "Wound up: what's left, to our shareholders by their shares").steps)];
+          // (Wages and redundancy pay owed, and the tax withheld from wages, come first: before suppliers, other debts and shareholders.)
+          const staffOwed = staffing.windUpOwed(book, t, acc.account, acc.balance);
+          const owed = payables.settle(t, acc.account, acc.balance - staffOwed.paid);
+          return [...staffOwed.steps, ...owed.steps, ...winding.finish(t, book, acc.account, acc.balance - staffOwed.paid - owed.paid, (x) => distribute(book, me, acc, x, "Wound up: what's left, to our shareholders by their shares").steps)];
         }
         const trading = winding.state === "trading";
         const workers = staffing.workers(book, t);
@@ -282,7 +286,7 @@ export const producer: BehaviourModule = {
           // (And what we owe our supplier for inputs delivered on its terms: a dividend must not take the money its invoices are paid from.)
           const buffer = bill + monthlyUnits(staffFor) * inputCost + Math.floor((bill * p.chi_bps) / 10_000) + payables.owing;
           // (Nothing is paid out while wages are owed or anyone is under notice: docs/behaviour/firms.md, "Before a dividend".)
-          const out = staffing.strained(book, t) ? { steps: [because(`Month's end: ${staffing.strained(book, t)}, so nothing is paid out to our shareholders.`)], paid: 0 } : payOut(book, me, acc, acc.balance, buffer, monthStart < 0 ? 0 : acc.balance - monthStart, `a month's wages and inputs, and ${p.chi_bps / 100}% of the wage bill`);
+          const out = strained() ? { steps: [because(`Month's end: ${strained()}, so nothing is paid out to our shareholders.`)], paid: 0 } : payOut(book, me, acc, acc.balance, buffer, monthStart < 0 ? 0 : acc.balance - monthStart, `a month's wages and inputs, and ${p.chi_bps / 100}% of the wage bill`);
           monthStart = acc.balance - out.paid;
           steps.push(...out.steps);
         }
