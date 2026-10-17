@@ -76,6 +76,24 @@ pub struct Life {
     pub deals_with: Vec<String>,
     /// The industry they work in, where they do.
     pub industry: Option<String>,
+    /// Holds the household's lease (or lives alone); the leaseholder, where another.
+    pub leaseholder: bool,
+    pub leaseholder_is: Option<String>,
+    /// The other adults of the household (by person), and the children (by person), sorted.
+    pub household_adults: Vec<String>,
+    /// The dwelling they live in now (their home, moved in, or where the household lives), and whether it is owned.
+    pub dwelling: Option<String>,
+    pub owned: bool,
+    /// Those seen living in the same building now (other dwellings), sorted: neighbours who share its state.
+    pub neighbours: Vec<String>,
+    /// The body's sex as the kernel shows it ("female", "male"), and whether they are on their way out of town.
+    pub sex: Option<String>,
+    pub leaving: bool,
+    /// The household's other income a month that the leaseholder budgets with (cents), counted in `monthly_income`.
+    /// A share of rent the person pays the leaseholder a month (not the leaseholder).
+    pub rent_share: Option<i64>,
+    /// Their account at a bank, where they have one (a want's acts that cost money need it).
+    pub account: Option<String>,
 }
 
 /// Where the person lives.
@@ -260,49 +278,66 @@ pub struct Treated {
     pub paper: Option<String>,
 }
 
-/// A thing that happened to the person or those close (inner.ts `happened`, and the events life detects that the
-/// mind turns into feelings, ties and wants). Life reports; the mind decides what follows.
+/// A thing that happened to the person or those close that is **not** an `Outcome` (inner.ts `happened`, citizen.ts
+/// `wantBorn` and `grieve` outside `appraised`). Settled with A1, 2026-10-17: everything citizen.ts recorded with
+/// `outcome`/`learn`/`hearOf` goes through `Mind::outcome` with TS's domain, kind and facts, and the mind appraises it
+/// there (citizen.ts `appraised`: job hired/paid/rise/unpaid/no_work/ended/told, home lease_signed/moved_in/renewed/
+/// rent_increase/notice_received, membership joined/rise_won, practice attended/turned_away, venture founded/refused);
+/// so a job ended, a hire, unpaid wages, a claim decided are outcomes, never events. An `Event` is the rest.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Event {
-    /// Someone close died (closeness basis points), or someone of the household.
-    Bereaved { who: String, closeness_bps: i64, household: bool },
-    /// A child was born to them.
-    ChildBorn { child: String },
-    /// They were put out of their home (by a warrant), or left on a notice.
-    Evicted { by: String, warrant: bool },
-    /// Their job ended: let go, or they left.
-    JobEnded { employer: String, let_go: bool },
-    /// They were taken on.
-    Hired { employer: String },
-    /// Pay came short, or not at all.
-    Unpaid { employer: String, short_by: i64 },
-    /// A rent rise was noticed (the paper and the new rent).
-    RentRise { landlord: String, notice: String, from: i64, rent: i64, was: i64 },
-    /// A notice to vacate, an order, a warrant, a demand: a paper against them (kind, id, by).
-    Against { kind: String, paper: String, by: String },
-    /// A claim for support decided.
-    ClaimDecided { office: String, claim: String, granted: bool },
-    /// Ruin: nothing left and nowhere to turn (savings gone, no income).
-    Ruined,
-    /// Took someone in, or was refused a stay.
-    TookIn { who: String },
-    StayRefused { by: String },
-    /// Words heard in passing, a letter of talk (citizen.ts 1440-1514): the mind takes it in; `Heard` says what of it
-    /// was the mind's.
-    Talk { from: String, text: String, letter: String },
+    /// Someone of the household died (citizen.ts 1680): grief, a want to mourn, the tie dropped. `adults`: the other
+    /// adults of the household, who mourn too. The mind answers `Heard::Mourn` with whom to tell (life sends
+    /// `MOURNING.tell`).
+    Bereaved { who: String, adults: Vec<String> },
+    /// A child conceived, with the partner there (citizen.ts 1858: `happened("child")`).
+    Conceived,
+    /// Gone from a home told to leave or put out (citizen.ts `recordLeaving`, 1879): `how` is `removed`,
+    /// `left_on_order` or `left_on_notice`.
+    LeftHome { by: String, how: String },
+    /// A notice to vacate for arrears first seen (citizen.ts 3012-3021): trust, tie, fear, a want, a trouble to tell.
+    NoticeSeen { by: String, lease: String },
+    /// The tribunal ordered possession against them (3108).
+    OrderedOut { by: String },
+    /// Put out by an officer on a warrant (3126).
+    PutOut { by: String },
+    /// A rent rise noticed that asks more (3222-3233): a want, pursued at once; `Heard::Took` says which way.
+    /// `share_bps`: the rise against the household's income a month (10,000 where none).
+    RentRise { landlord: String, notice: String, rent: i64, was: i64, share_bps: i64 },
+    /// Something gone wrong at someone's hands, newly held (citizen.ts `grieve`, docs/behaviour/frictions.md): life
+    /// keeps the grievance (and says it only the first time); the mind records it arising, trust and agency move,
+    /// and a want is born. `size_bps` 6,000 where TS gave none; `need` TS's (security where none).
+    Grieved { matter: String, party: String, about: Option<String>, amount: Option<i64>, structure: Option<String>, size_bps: i64, need: String, cause: Option<String> },
+    /// A service not done at home (the bin, citizen.ts 3502-3509): anger with whoever should do it, by how long
+    /// (`share_bps`: the anger TS computed, (days since emptied) x 5,000 / complain_after_days), and a want once it
+    /// is past bearing for a week. `complained`: this home is already complained of.
+    ServiceLapsed { whom: String, share_bps: i64, days: i64, complained: bool },
+    /// What befell another adult of the household, as they told it (`SAYING.trouble`, 2483): `what` is `let_go`,
+    /// `notice` or `rent_increase`; `with`: the household's leaseholder.
+    HouseholdTrouble { what: String, by: String, with: Option<String> },
+    /// A letter of talk (citizen.ts 1440-1514), after life has taken what is its own (a failed payment, the
+    /// household's sayings). The mind takes wrongs heard, upbringing, culture's words, mourning, catching up and news;
+    /// anything else is `Heard::NotMine` and life goes on with it (asking for a home or work, an office's letter, a
+    /// lead). `from`: the participant; `person`: whose person (the directory's); `re`: what it answers.
+    Talk { from: String, person: String, text: String, re: Option<String> },
     /// Anything else, named as TS named it, with its facts: a lane adds a variant for anything that recurs.
     Other { what: String, about: Option<String>, facts: BTreeMap<String, Value> },
 }
 
-/// What the mind made of a letter of talk.
+/// What the mind made of an event.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Heard {
-    /// Not talk the mind takes (life handles it: household sayings, a bank's note, asking for work or a home).
+    /// Not talk the mind takes (life handles it).
     NotMine,
     /// Taken in.
     Taken,
-    /// Someone asked how they are, or what they know (`ASKING`): life answers with `say_how`.
+    /// Someone asked how they are (`CATCHING_UP.ask`): the mind answers in its own talk at the next plan.
     Asked(String),
+    /// A death in the household: tell these (closest first), with `MOURNING.tell`.
+    Mourn(Vec<String>),
+    /// A want pursued at once (a rent rise): the way taken, which life carries out (its kind says what came of it:
+    /// `ask` and `desk` wait on the answer). Empty: waited.
+    Took(Vec<Chosen>),
 }
 
 // ------------------------------------------------------------------ wants, and the ways that open for them
@@ -321,56 +356,112 @@ pub struct WantView {
     pub since: i64,
 }
 
-/// A way open for a want (wants.ts `Opening`), as life sees it from what it has seen: the key and kind of way, the
-/// record it rests on, who offers it, what it would bring, what it could undo, whom it bears on, what it costs, and
-/// the act life would carry out if it is chosen. The mind weighs it (trust, agency, fear, culture's way, belief) and
-/// chooses; life carries the intent out.
+/// A way open for a want (wants.ts `Opening`, citizen.ts `waysFor`), as life sees it from what it has seen. Life
+/// offers the ways that are acts of its own (the boards, asking the other party, a desk, a petition, an election, a
+/// venue, telling others of a wrong); the mind adds its own (gatherings, the union, a founded group, spending less,
+/// catching up) and weighs every one (trust, fear, agency, culture's lean, belief, what the person heard others did),
+/// filters by what the want seeks (`meets`), and chooses; life carries the chosen intent out.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Opening {
+    /// `offer:employment`, `ask:<party>`, `desk:<desk>`, `petition:<id>`, `stand:<id>`, `tell` ...
     pub key: String,
+    /// `offer:employment`, `offer:lease`, `ask`, `desk`, `petition`, `stand`, `tell` (and the mind's own: `practice`,
+    /// `join`, `self`, `ties`).
     pub kind: String,
+    /// The record it is about (TS `id`).
     pub on: Option<String>,
     pub by: Option<String>,
     pub brings: Vec<String>,
-    pub undoes: Vec<String>,
-    pub bears: bool,
+    /// The record it could undo.
+    pub undoes: Option<String>,
+    /// Whom it bears on.
+    pub bears: Vec<String>,
+    /// What taking it up costs at once (cents).
     pub cost: Option<i64>,
-    pub others: i64,
+    /// How many others are known to take it, where life knows (a petition's signatures); none: the mind counts what
+    /// it heard.
+    pub others: Option<i64>,
+    /// The conduct culture names for it (`take_to_tribunal`, `complain`), for culture's lean.
+    pub conduct: Option<String>,
+    /// A venue for a matter asking did not settle (the bother of it counts against).
+    pub venue: bool,
     pub intent: Intent,
 }
 
-/// What life carries out when the mind chooses a way (citizen.ts `waysFor`'s acts, as data). Every `on` names a
-/// paper or party life already knows.
+/// What life carries out when the mind chooses a way (citizen.ts `waysFor`'s `act`s, as data), and the few things the
+/// mind's plan asks of life beyond its own steps (`Planned::intents`). Every `on` names a paper or party life knows.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "do", rename_all = "snake_case")]
 pub enum Intent {
-    /// Nothing: wait and see.
+    /// Nothing: wait and see (or the way is the mind's own: a gathering, catching up, spending less).
     #[default]
     Wait,
+    /// Look at the job board now, whatever the month's chance (`searchForced`).
     SearchJobs,
-    HuntHome { until: Option<i64> },
-    AskLandlord { about: String },
-    AskRise { employer: String },
+    /// Hunt for another home while housed, until then, beating this rent where that is the point (`moveHunt`).
+    HuntHome { until: i64, beat: Option<i64> },
+    /// Ask the landlord to hold the rent (`rise`) or let us stay, about the paper in the way.
+    AskLandlord { about: String, rise: bool },
+    /// Ask the employer for a rise, to this wage.
+    AskRise { agreement: String, wage: i64 },
+    /// Take a notice of rent increase to the tribunal.
     ChallengeRent { notice: String },
+    /// Take a debt owed us to the tribunal.
     ApplyDebt { claim: String },
-    Complain { against: String },
-    AskPutRight { against: String, matter: String },
-    Venue { venue: String, matter: String, hearing: Option<String> },
-    TellWronged { whom: String },
+    /// Complain to the town's desk now.
+    Complain,
+    /// Ask the other side of a grievance to put it right (the grievance's key).
+    AskPutRight { grievance: String },
+    /// Take a grievance to a venue that hears it, on its hearing offer, with its fee.
+    Venue { grievance: String, venue: String, hearing: String, cost: i64 },
+    /// Tell those we are closest to what was done (the grievance's key; the mind's `closest` says whom).
+    TellWronged { grievance: String, whom: Vec<String> },
     Sign { petition: String },
     Stand { notice: String },
-    JoinUnion { union: String },
-    JoinGroup { host: String },
-    StopLooking,
-    FoundBusiness { until: Option<i64> },
+    /// Join the union now (`joinNow`).
+    JoinUnion,
+    /// Join a founded group on its offer (the mind's own: it signs).
+    JoinGroup { host: String, offer: String },
+    /// Start a business: the venture hooks look now, until then (founding's `business` shape).
+    FoundBusiness { until: i64 },
+    /// Given up on finding work for now: say so, and stop looking until then (`discouragedUntil`).
+    StopLooking { until: i64 },
     /// A way a lane adds: named, with its facts.
     Other { what: String, on: Option<String> },
 }
 
-/// Life's side of wants: the ways open for a want, from what life has seen (citizen.ts `waysFor`, 2119-2298). The one
-/// place the mind asks life for something mid-call; a trait object, so neither side holds the other.
+/// A grievance as life holds it (citizen.ts `Grievance`), for the mind's weighing and founding's brief.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct GrievanceView {
+    pub key: String,
+    pub matter: String,
+    pub party: String,
+    pub since: i64,
+    pub amount: Option<i64>,
+    /// When asked to put it right, and what they said (`granted`, `refused`, `ignored`; none: no answer yet).
+    pub asked_at: Option<i64>,
+    pub answer: Option<String>,
+    pub venues: u32,
+    pub told: bool,
+}
+
+/// Life's side of wants: the ways open for a want, from what life has seen (citizen.ts `waysFor`, 2119-2298). The
+/// one place the mind asks life for something mid-call; a trait object, so neither side holds the other.
 pub trait Openings {
     fn for_want(&self, want: &WantView, t: i64) -> Vec<Opening>;
+    /// The grievance a want is about, where life holds one (keyed `matter:about-or-party`).
+    fn grievance(&self, want: &WantView) -> Option<GrievanceView>;
+}
+
+/// No openings at all (tests, and calls where life has none to give).
+pub struct NoOpenings;
+impl Openings for NoOpenings {
+    fn for_want(&self, _: &WantView, _: i64) -> Vec<Opening> {
+        vec![]
+    }
+    fn grievance(&self, _: &WantView) -> Option<GrievanceView> {
+        None
+    }
 }
 
 /// A way the mind chose for a want: the opening and why, in words for the act's reason.
@@ -388,6 +479,8 @@ pub struct Chosen {
 pub struct Planned {
     pub steps: Vec<Step<()>>,
     pub chosen: Vec<Chosen>,
+    /// What the plan asks of life beyond the ways chosen (`StopLooking`, `FoundBusiness`).
+    pub intents: Vec<Intent>,
 }
 
 // ------------------------------------------------------------------ what life may ask of the mind
@@ -421,9 +514,12 @@ pub trait Outlook {
     fn learned(&self, domain: &str, option: &str) -> Option<i64>;
     /// The person's wants as they stand, heaviest first.
     fn wants(&self) -> Vec<WantView>;
-    /// Whether the person has initiative (the dial, as drawn for them), and is pursuing a way of this kind now.
+    /// Whether the person has initiative (the dial, as drawn for them), and is pursuing a way of this kind now: a
+    /// goal's method (`spend less`, `better work`, `cheaper home`, `catch up more`, `try a gathering`) or, for one
+    /// who takes initiative, the want's way it maps to (`self`, `offer:employment`, `offer:lease`, `ties`,
+    /// `practice`): citizen.ts `pursuing`. Life asks by the goal's method name.
     fn initiative(&self) -> bool;
-    fn pursuing(&self, kind: &str) -> bool;
+    fn pursuing(&self, method: &str) -> bool;
     /// How patient with a hard situation before acting on it (days), as their attachments and temperament make them.
     fn patience_days(&self) -> i64;
     /// Life as a whole as the person rates it now (basis points), from `life`.
@@ -451,8 +547,8 @@ pub trait Mind: Outlook + Send {
     /// How someone treated the person: trust and agency move.
     fn treated(&mut self, cx: &mut Cx, t: Treated);
     /// Something happened: feelings, ties and wants follow, as the mind holds them. Talk returns what of it was the
-    /// mind's.
-    fn event(&mut self, cx: &mut Cx, life: &Life, e: Event) -> Heard;
+    /// mind's; a rent rise, the way taken (`ways`: life's openings, as `plan` has them).
+    fn event(&mut self, cx: &mut Cx, life: &Life, e: Event, ways: &dyn Openings) -> Heard;
     /// A full plan is due (citizen.ts `plan`'s mind half: upbringing, attachments, drift, views, goals, wants born and
     /// met, wants due and their ways, gatherings, founding and groups, civic acts, talk, thanks). `ways` is life's
     /// openings for each want.
@@ -559,7 +655,7 @@ impl Mind for Plain {
         }
     }
     fn treated(&mut self, _: &mut Cx, _: Treated) {}
-    fn event(&mut self, _: &mut Cx, _: &Life, e: Event) -> Heard {
+    fn event(&mut self, _: &mut Cx, _: &Life, e: Event, _: &dyn Openings) -> Heard {
         match e {
             Event::Talk { .. } => Heard::NotMine,
             _ => Heard::Taken,
