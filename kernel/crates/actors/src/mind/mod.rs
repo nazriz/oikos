@@ -27,6 +27,7 @@ pub mod inner;
 pub mod math;
 pub mod person;
 pub mod reading;
+pub mod talk;
 pub mod townmemory;
 pub mod wants;
 
