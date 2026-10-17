@@ -7,7 +7,7 @@
 import { expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { actRank, idsFrom, inOrder, largest, SeatRecord, type Carried } from "../src/debrief-summary";
+import { actRank, actedOn, drawTies, idsFrom, inOrder, largest, SeatRecord, type Carried } from "../src/debrief-summary";
 import { logLines } from "../src/logs";
 import { readForEnd } from "../src/run-end";
 
@@ -49,3 +49,14 @@ test.skipIf(!existsSync(LOG))("lv-04: the landlord is asked about a notice to va
   expect(mayor).toContain("publish/petition_response");
   expect(kinds("tribunal-member-system")).toEqual(["publish/tribunal_order"]);
 }, 120_000);
+
+test("acts equal in every stated measure are chosen by a seeded draw, not the earliest; the same run gives the same choice", async () => {
+  const { Randomness } = await import("../../participants/src/rng");
+  const build = () => { const r = new SeatRecord("s", new Set(["s"])); for (let i = 0; i < 12; i++) r.carried.push(act(100 + i, ["publish/notice_to_vacate"], [`c${i}`])); return r; };
+  const chosen = (seed: bigint) => { const r = build(); drawTies(r, new Randomness(seed).stream(["debrief", "choice", "s"])); return inOrder(r)[0]!.c.seq; };
+  expect(inOrder(build())[0]!.c.seq).toBe(100); // (no draw: the earliest)
+  expect(chosen(7n)).toBe(chosen(7n));
+  expect(new Set([1n, 2n, 3n, 4n, 5n, 6n, 7n, 8n].map(chosen)).size).toBeGreaterThan(1);
+  const r = build(); r.sent.push({ seq: 1, t: 1, to: ["x1"], text: "hi", calls: [], delivered: true }, { seq: 2, t: 2, to: ["x2"], text: "hi", calls: [] });
+  expect([...actedOn([r])].sort()).toEqual(["c0", "c1", "c10", "c11", "c2", "c3", "c4", "c5", "c6", "c7", "c8", "c9", "x1"]);
+});

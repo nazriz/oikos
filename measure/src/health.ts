@@ -22,6 +22,14 @@ export const TARGET_MEASURES: { what: string; query: string; column: string; key
   { what: "informal_employment_pct", query: "economy/work", column: "informal_employment_pct", tolerance: 5 },
   { what: "own_account_share_of_employment_pct", query: "economy/work", column: "own_account_pct", tolerance: 5 },
   { what: "renters_housing_costs_share_of_income_pct", query: "town/rent-stress", column: "median_rent_pct", tolerance: 3 },
+  // (Business births and deaths a year, as shares of the businesses there were at its start: the measure's own definition, docs/calibration.md.)
+  { what: "business_entry_rate_pct", query: "economy/businesses", column: "birth_rate_pct", tolerance: 5 },
+  { what: "business_exit_rate_pct", query: "economy/businesses", column: "death_rate_pct", tolerance: 5 },
+  // (Of people in a job at the end, the share in a job with another employer at some time in the year before.)
+  { what: "job_mobility_pct_of_employed_per_year", query: "economy/job-mobility", column: "job_mobility_pct", tolerance: 3 },
+  { what: "tenancy_tribunal_applications_per_1000_renting_households_per_year", query: "town/possession", column: "applications_per_1000", tolerance: 30 },
+  // (Affiliation as a census asks it, of the religious teacher's group, not the firmly-held share.)
+  { what: "christian_share_pct", query: "town/beliefs", column: "affiliated_last_pct", key: /^religious-/, tolerance: 10 },
   { what: "social_group_participation_pct", query: "town/gatherings", column: "took_part_pct", tolerance: 5 },
   // (A teacher whose group is of the religious kind: its generated id says so.)
   { what: "religious_affiliation_change_pts_per_year", query: "town/beliefs", column: "affiliated_change_per_year", key: /^religious-/, tolerance: 1 },

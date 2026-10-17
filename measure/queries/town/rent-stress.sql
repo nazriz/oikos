@@ -1,4 +1,4 @@
--- Rent against household income at the end of each run (households with a lease and someone earning): the median share, and the share of households paying over 30% of gross income ("rental stress"). Income is wages under employment agreements still in force, by the pay period each agreement states (work by the day: the day's pay for five days of each seven), and, for someone with a business of their own, what it paid them over the run's last 90 days, by the month; rent is the leaseholder's latest lease. Calibration targets: docs/calibration.md.
+-- Rent against household income at the end of each run (households with a lease and someone earning): the median share, and the share of households paying over 30% of gross income ("rental stress"); and the same share among lower-income renters, as surveys of housing costs report it: renters whose household income is in the lowest two quintiles (lowest 40%) of all the town's households with an income, renters or not. Income is wages under employment agreements still in force, by the pay period each agreement states (work by the day: the day's pay for five days of each seven), and, for someone with a business of their own, what it paid them over the run's last 90 days, by the month; rent is the leaseholder's latest lease. Calibration targets: docs/calibration.md.
 with signed as (select distinct json_extract_string(body, '$.agreement') as agreement, run_id from records where record = 'signature'),
 noticed as (select distinct json_extract_string(body, '$.agreement') as agreement, run_id from records where record = 'notice'),
 agreements as (
@@ -31,6 +31,10 @@ income as (
   group by all),
 shares as (
   select i.run_id, i.leaseholder, le.rent, i.monthly, 100.0 * le.rent / i.monthly as pct
-  from income i join leases le on le.run_id = i.run_id and le.tenant = i.leaseholder where i.monthly > 0)
-select r.run_id, r.seed, count(*) as households, round(median(s.pct), 1) as median_rent_pct, round(100.0 * count(*) filter (where s.pct > 30) / count(*), 1) as pct_over_30
-from runs r join shares s on s.run_id = r.run_id group by r.run_id, r.seed, r.world order by r.world, r.seed
+  from income i join leases le on le.run_id = i.run_id and le.tenant = i.leaseholder where i.monthly > 0),
+cut as (select run_id, quantile_cont(monthly, 0.4) as lower_cut from income where monthly > 0 group by all)
+select r.run_id, r.seed, count(*) as households, round(median(s.pct), 1) as median_rent_pct, round(100.0 * count(*) filter (where s.pct > 30) / count(*), 1) as pct_over_30,
+  count(*) filter (where s.monthly <= c.lower_cut) as lower_income_households,
+  round(100.0 * count(*) filter (where s.monthly <= c.lower_cut and s.pct > 30) / nullif(count(*) filter (where s.monthly <= c.lower_cut), 0), 1) as lower_income_pct_over_30,
+  round(median(s.pct) filter (where s.monthly <= c.lower_cut), 1) as lower_income_median_rent_pct
+from runs r join shares s on s.run_id = r.run_id join cut c on c.run_id = s.run_id group by r.run_id, r.seed, r.world order by r.world, r.seed

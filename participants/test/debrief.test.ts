@@ -262,6 +262,21 @@ test("the sample is seeded and drawn across the strata: evicted, bereaved, let g
   expect(draw(1n, 100).length).toBe(30);
 });
 
+test("the sample takes first the people the seats' acts reached (acted_on), seeded; with none reached it is unchanged", () => {
+  const people = [...Array.from({ length: 4 }, (_, i) => person(`e${i}`, [{ what: "evicted" }])), ...Array.from({ length: 4 }, (_, i) => person(`q${i}`, []))];
+  const draw = (seed: bigint, acted: string[]) => sampleAccounts(people, 3, new Randomness(seed).stream(["accounts", "sample"]), new Set(acted));
+  const none = draw(1n, []);
+  expect(none).toEqual(sampleAccounts(people, 3, new Randomness(1n).stream(["accounts", "sample"])));
+  const acted = draw(1n, ["q1", "q3", "nobody"]);
+  expect(["q1", "q3"]).toContain(acted[0]!.person); // (one from acted_on first in each round, then one from each other stratum)
+  expect(acted[0]!.strata).toEqual(["little", "acted_on"]);
+  expect(acted[1]!.strata).toContain("evicted");
+  expect(draw(1n, ["q1", "q3"])).toEqual(acted);
+  expect(draw(1n, ["q1", "q3"]).map((x) => x.person)).toContain(acted[0]!.person);
+  const six = sampleAccounts(people, 6, new Randomness(1n).stream(["accounts", "sample"]), new Set(["q1", "q3"]));
+  expect(six.filter((x) => x.strata.includes("acted_on")).length).toBe(2); // (both reached are in a sample of six)
+});
+
 test("the script is written once and documented in full: docs/behaviour/debrief.md holds every message, question, item and prompt as a seat or an author reads it", async () => {
   const doc = (await Bun.file(new URL("../../docs/behaviour/debrief.md", import.meta.url)).text()).replace(/^> ?/gm, "");
   const flat = doc.replace(/<br>/g, "\n");
