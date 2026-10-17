@@ -5555,6 +5555,7 @@ The profile-sources merge was held back for three failing tests and left four fa
 **CLAUDE.md's "Stack" line will change when the port lands** (to: Rust for the kernel and the world's built-in actors; TypeScript on Bun for seats, the translator's serving, orchestration, tools and config). It is not edited now.
 
 **Revisit if** phase 0 shows the boundary costs under a fifth of what the plan assumes; fewer than five of seven phase-1 agents pass their scenario tests in mixed mode; measures drift beyond noise for reasons that trace to faithful ports (checkpoint with the owner, don't tune); a single-threaded Rust 1,000-person year is under twice as fast as the TS one; or a pilot needs a behaviour change that cannot wait a week for the gate.
+
 ## 2026-10-17 · The port's frame: the engine runs the world's actors in Rust (step 1 of docs/design/rust-port.md; no model called)
 
 **What.** The frame the seven porting agents build on, with no TS actor changed. New crates: `oikos-sight` (what an
