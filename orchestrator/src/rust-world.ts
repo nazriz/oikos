@@ -88,6 +88,10 @@ export class RustWorld {
   snapshotToLog(): void {
     this.w.snapshotToLog();
   }
+  /** Write what the log holds so far to its file (before a snapshot of this run is resumed in another process). */
+  flush(): void {
+    this.w.flush();
+  }
   /** The live stream: log entries since last taken, and how many were missed. */
   events(max = 100_000): { entries: any[]; missed: number } {
     return JSON.parse(this.w.events(max));
@@ -111,7 +115,7 @@ export class RustWorld {
 export class DetachedActor {
   private a: any;
   /** `saved`: one as `save` left it (a fork's twin goes on as its parent's would). */
-  constructor(private spec: { kind: string; participant: string; capacity: string; entity: string; system?: boolean; params?: object; seed?: number; config: object; saved?: object }) {
+  constructor(readonly spec: { kind: string; participant: string; capacity: string; entity: string; system?: boolean; params?: object; seed?: number; config: object; saved?: object }) {
     this.a = new (need().Detached)(JSON.stringify(spec));
   }
   /** Its memory, view and draws. */
@@ -140,9 +144,10 @@ export function rustManifests(): { [name: string]: any } {
   return JSON.parse(need().manifests());
 }
 
-/** The twin brains of a world's mock seats: participant -> its brain, run detached. */
-function twinBrains(cfg: any): Map<string, DetachedActor> {
-  const brains = new Map<string, DetachedActor>();
+/** What a world's mock seats that sit as their code twins need to have a brain run detached: participant -> the spec of
+ * its brain (a `DetachedActor`'s; `saved` added when one is taken up again). */
+export function twinSpecs(cfg: any): Map<string, ConstructorParameters<typeof DetachedActor>[0]> {
+  const specs = new Map<string, ConstructorParameters<typeof DetachedActor>[0]>();
   for (const p of cfg.participants ?? []) {
     const pp = p.controller?.params ?? {};
     if (p.controller?.type !== "llm" || !pp.mock?.twin || !pp.mock?.brain) continue;
@@ -150,9 +155,14 @@ function twinBrains(cfg: any): Map<string, DetachedActor> {
     const office = held.length === 1 ? held[0] : undefined;
     // (A twin's brain is its person's own code unit for the post: it draws as that unit does.)
     const asPerson = office ? cfg.participants.find((x: any) => x.person && x.person === p.person && x.id !== p.id && !x.shares_body)?.id : undefined;
-    brains.set(p.id, new DetachedActor({ kind: pp.mock.brain, participant: asPerson ?? p.id, capacity: office?.id ?? "self", entity: office?.entity ?? p.person ?? "", system: p.kind === "system", params: pp.mock.params ?? {}, config: cfg }));
+    specs.set(p.id, { kind: pp.mock.brain, participant: asPerson ?? p.id, capacity: office?.id ?? "self", entity: office?.entity ?? p.person ?? "", system: p.kind === "system", params: pp.mock.params ?? {}, config: cfg });
   }
-  return brains;
+  return specs;
+}
+
+/** The twin brains of a world's mock seats: participant -> its brain, run detached. */
+export function twinBrains(cfg: any): Map<string, DetachedActor> {
+  return new Map([...twinSpecs(cfg)].map(([id, spec]) => [id, new DetachedActor(spec)]));
 }
 
 /** A run of a world on the Rust engine, to its end (or `until`): the same summary the TS host gives, where it has it. */

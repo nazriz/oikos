@@ -1,0 +1,18 @@
+{
+  "name": "tribunal-stewards",
+  "world": { "file": "worlds/town-300.yaml", "sets": ["years=1", "opening_caseload=true"] },
+  "post": "tribunal-member",
+  "seeds": [1, 2, 3, 4, 5],
+  "forkDay": 60,
+  "untilDay": 150,
+  "arms": [
+    { "name": "code", "steward": { "kind": "code" } },
+    { "name": "nobody", "steward": { "kind": "none" } },
+    { "name": "mock-diligent", "steward": { "kind": "model", "model": "mock/diligent" } },
+    { "name": "mock-5-days-late", "steward": { "kind": "model", "model": "mock/delay:5" } }
+  ],
+  "reference": "code",
+  "measures": ["acts", "records:tribunal_order", "records:hearing_notice", "first_record:tribunal_order", "first_act_day", "refused", "transfers_cents", "log_entries"],
+  "prices": { "mock/diligent": { "input": 3000000, "output": 15000000 }, "mock/delay:5": { "input": 3000000, "output": 15000000 } },
+  "threads": 1
+}

@@ -13,6 +13,44 @@
 //!
 //! A future engine (a Bevy viewer, in Rust, attached to a live run) uses the same trait in process; the HTTP service
 //! (`ROUTES`) serves it to the current client on 127.0.0.1.
+//!
+//! # Using it
+//!
+//! ```no_run
+//! use oikos_explore::{Index, RunIndex, Panel};
+//! let ix = Index::new();
+//! ix.load_path(std::path::Path::new("runs/town.seed1.jsonl.zst")).unwrap(); // a finished log
+//! // or a live run: ix.feed(&line) for each line the kernel's Stream::take hands out
+//! let meta = ix.meta();                       // run id, days, last moment, counts, state
+//! let ords = ix.postings("c0042");            // every kept line that names a person
+//! let links = ix.trace(ords[0], Some("c0042"), 8);   // the causal trace, newest first
+//! let panel = ix.panel(Panel::Person("c0042".into()), 90 * 86_400);
+//! ```
+//!
+//! `Index` is `Send + Sync`: feed from one thread (`feed`, `feed_all`, `load_path` each take the write lock for a
+//! batch) and query from any number, at any time. Every query is read-only and returns owned values. The kept lines
+//! are held zstd-compressed in frames of 4096, so memory stays bounded. `service::Service` serves the same index to
+//! the Three.js client over HTTP on 127.0.0.1; `oikos-explore` is the command line for both.
+//!
+//! What it never does: write to a run, take a debrief (VISION 15: debriefs and debrief annotations are dropped before
+//! anything is parsed into the index), or judge an outcome. Counts and sentences come from the log, as the log has them.
+
+// The explorer is outside the world (a read-only viewer's data layer): nothing it computes is read back, and its
+// outputs are ordered by vectors and sorted maps, so the world's determinism lints (kernel/clippy.toml) do not apply.
+#![allow(clippy::disallowed_types, clippy::disallowed_methods)]
+
+mod consequential;
+mod frames;
+mod index;
+pub mod inner;
+mod js;
+mod panels;
+pub mod service;
+mod trace;
+mod world;
+
+pub use index::{Index, INDEX_VERSION};
+pub use inner::{parse_line, Item};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -102,11 +140,13 @@ pub struct ActionRef {
 }
 
 /// A run's index: built once from its log (or kept up to date from a live run's stream), then only read.
-pub trait RunIndex {
+pub trait RunIndex: Send + Sync {
     /// The run's id, how many days it covers, its last moment, how many lines are kept.
     fn meta(&self) -> Value;
-    /// A kept line, as the log has it.
+    /// A kept line, as the log has it (parsed).
     fn line(&self, ord: Ord) -> Option<Value>;
+    /// A kept line's text, byte for byte as the log has it.
+    fn line_text(&self, ord: Ord) -> Option<String>;
     /// The kept lines that name an id (a person, an entity, a place, a record, an account, a participant), in order.
     fn postings(&self, id: &str) -> Vec<Ord>;
     /// The kept lines of a day (`[first, last)`).
@@ -132,16 +172,21 @@ pub enum Panel {
     TownPulse,
 }
 
-/// The HTTP service's routes, under `/api/<run>/`, as renderer/src/server.ts serves them (the client calls these).
+/// The HTTP service's routes (renderer/src/server.ts serves the same under `/api`; the client calls these). `<run>` is
+/// a run's key; `t` defaults to the run's last moment. 127.0.0.1 only, GET only; anything else is refused.
 pub const ROUTES: &[(&str, &str)] = &[
-    ("GET /api/runs", "the runs it can show, and which are indexed"),
-    ("GET /api/<run>/world", "the town: meta, structures, posts, persons, seats' acts, the town's pulse"),
-    ("GET /api/<run>/bin/<moves|where|pulses|money|agency>", "the binary tracks the scene draws from (int32 arrays)"),
-    ("GET /api/<run>/person/<id>?t=", "a person's panel at a moment"),
-    ("GET /api/<run>/org/<id>?t=", "an organisation's panel"),
-    ("GET /api/<run>/building/<n>?t=", "a building's panel"),
-    ("GET /api/<run>/act/<ord>", "a seat's act: its words, the draft, confirmed or not, what came of it, its twin's"),
-    ("GET /api/<run>/trace/<ord>?about=", "a kept line's row and its causal trace"),
-    ("GET /api/<run>/line/<ord>", "a kept line as the log has it"),
-    ("GET /api/<run>/seat/<id>", "a seat's sittings and notebook"),
+    ("GET /api/runs", "the runs it can show, and their state (none, indexing, ready, failed)"),
+    ("GET /api/r/<run>/status[?open=1]", "{state, message, seconds}; `open` starts indexing a run not yet opened"),
+    ("GET /api/r/<run>/world", "the town: meta, structures, posts, persons, seats' acts, the town's pulse"),
+    (
+        "GET /api/r/<run>/bin/<moves|where|pulses|money|agency>[?from=&to=]",
+        "the binary tracks the scene draws from (little-endian: moves, pulses int32; where uint32; money float64; agency int16)",
+    ),
+    ("GET /api/r/<run>/person/<id>?t=", "a person's panel at a moment"),
+    ("GET /api/r/<run>/org/<id>?t=", "an organisation's panel"),
+    ("GET /api/r/<run>/building/<n>?t=", "a building's panel"),
+    ("GET /api/r/<run>/act/<ord>", "a seat's act: its words, the draft, confirmed or not, what came of it, its twin's"),
+    ("GET /api/r/<run>/trace/<ord>?about=", "a kept line's row and its causal trace"),
+    ("GET /api/r/<run>/line/<ord>", "a kept line as the log has it"),
+    ("GET /api/r/<run>/seat/<id>", "a seat's sittings and notebook"),
 ];

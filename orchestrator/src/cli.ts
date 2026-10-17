@@ -196,7 +196,7 @@ const sets = () => [...flags("set"), ...(flag("scenario") ? [`scenario=${flag("s
 /** Where a batch under named starting conditions goes, unless told: a folder of its own beside the plain world's. */
 const scenarioOut = (world: string) => (flag("scenario") ? join("runs", `${world.split("/").at(-1)!.replace(/\.(json|ya?ml)$/, "")}.${flag("scenario")!.replace(/[^A-Za-z0-9+-]+/g, "+")}`) : undefined);
 /** Positional arguments: everything that isn't a flag or a flag's value. */
-const positional = () => rest.filter((x, i) => !x.startsWith("--") && !(i > 0 && rest[i - 1]!.startsWith("--") && !["--no-measure", "--list", "--compress", "--no-compress", "--actions", "--consult", "--overwrite", "--force", "--real", "--only-real", "--blind", "--briefs", "--no-spares", "--no-write", "--broad", "--write-only"].includes(rest[i - 1]!)));
+const positional = () => rest.filter((x, i) => !x.startsWith("--") && !(i > 0 && rest[i - 1]!.startsWith("--") && !["--no-measure", "--list", "--compress", "--no-compress", "--actions", "--consult", "--overwrite", "--force", "--real", "--only-real", "--blind", "--briefs", "--no-spares", "--no-write", "--no-slots", "--broad", "--write-only"].includes(rest[i - 1]!)));
 
 /** The measurement folder for a DIR: its measure/, exported from its logs if there isn't one yet. */
 async function measureDir(dir: string): Promise<string> {
@@ -230,7 +230,7 @@ function stopOnSignal(): StopSignal {
   return stop;
 }
 
-const usage = "usage: oikos run <world> [--seeds N (runs of one town)] [--towns T (different towns, each run --seeds times)] [--parallel P] [--out DIR] [--until S] [--set k=v] [--scenario NAME[+NAME]] [--modules FILE] [--translator-model m] [--translator-first decide/NAME [--translator-arrangement then|beside]] [--no-measure] [--overwrite] [--model provider/model --budget USD [--base-url URL]] | resume <log.jsonl[.zst]|DIR> [--until S] [--model ... as for run] | measure <DIR> [QUERY...] [--sql SQL] [--list] | diff <BASELINE> <CHANGE> [QUERY...] | health <DIR> [--profile NAME] | cost <DIR> [--translator-model m] | translator-eval --model provider/model [--budget USD] [--out FILE] [--real | --only-real] [--jobs N] | scenarios [--all] | pilot-report <DIR>... [--no-write] | pilot-view <DIR> [--out file.html] [--twin DIR | --no-twin] | explore <DIR> [--port N] [--prefix /explore] | explore --all [--runs DIR] | explore index <DIR> | debriefs <DIR|log>... [--json] | replay <log.jsonl> | story <log.jsonl> [participant] | record <log.jsonl[.zst]> <entity|participant> [--at S]";
+const usage = "usage: oikos run <world> [--seeds N (runs of one town)] [--towns T (different towns, each run --seeds times)] [--parallel P] [--out DIR] [--until S] [--set k=v] [--scenario NAME[+NAME]] [--modules FILE] [--translator-model m] [--translator-first decide/NAME [--translator-arrangement then|beside]] [--no-measure] [--overwrite] [--model provider/model --budget USD [--base-url URL]] | resume <log.jsonl[.zst]|DIR> [--until S] [--model ... as for run] | measure <DIR> [QUERY...] [--sql SQL] [--list] | diff <BASELINE> <CHANGE> [QUERY...] | health <DIR> [--profile NAME] | cost <DIR> [--translator-model m] | translator-eval --model provider/model [--budget USD] [--out FILE] [--real | --only-real] [--jobs N] | scenarios [--all] | pilot-report <DIR>... [--no-write] | pilot-view <DIR> [--out file.html] [--twin DIR | --no-twin] | experiment run <spec.json|yaml|ts> --out DIR [--parallel P] [--no-slots] | experiment report <DIR> | explore <DIR> [--port N] [--prefix /explore] | explore --all [--runs DIR] | explore index <DIR> | debriefs <DIR|log>... [--json] | replay <log.jsonl> | story <log.jsonl> [participant] | record <log.jsonl[.zst]> <entity|participant> [--at S]";
 
 try {
   if (cmd === "run" && positional()[0]) {
@@ -310,6 +310,19 @@ try {
     // A finished pilot as one self-contained HTML page (pilot-view/, docs/pilot-view.md). The run is only read.
     const { runPilotView } = await import("../../pilot-view/src/cli");
     console.log(await runPilotView(process.argv.slice(3)));
+  } else if (cmd === "experiment" && positional()[0] === "run" && positional()[1]) {
+    // The experiment harness (docs/experiments.md): a town run to a point, then forks with different stewards in one
+    // post, over several seeds, across cores; each fork's measures and seats' costs; a comparison report.
+    const { loadSpec, runExperiment } = await import("./experiment");
+    const file = positional()[1]!;
+    const { spec, factories } = await loadSpec(file);
+    const r = await runExperiment(spec, { out: flag("out") ?? `runs/experiment-${spec.name}`, parallel: flag("parallel") !== undefined ? Number(flag("parallel")) : undefined, specFile: file, factories, slots: !has("no-slots"), log: (s) => console.error(s) });
+    console.log(`\n${r.text}\n\nresults, the report and every fork's log: ${r.out}`);
+    if (r.results.some((x) => x.error)) process.exitCode = 1;
+  } else if (cmd === "experiment" && positional()[0] === "report" && positional()[1]) {
+    const { readFileSync } = await import("node:fs");
+    const { reportText } = await import("./experiment");
+    console.log(reportText(JSON.parse(readFileSync(`${positional()[1]}/report.json`, "utf8"))));
   } else if (cmd === "explore" && (positional()[0] || process.argv.includes("--all"))) {
     // The pilot explorer (renderer/, docs/explorer.md): a run's town, people, institutions and seats' acts, served on
     // 127.0.0.1 from an index built beside the runs. The run is only read; nothing is fed back.
