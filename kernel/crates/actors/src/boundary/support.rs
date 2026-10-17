@@ -8,6 +8,7 @@ use super::support_law::{
 };
 use crate::common::work::ReportOf;
 use crate::common::{addressed_to, data, filed_before, made_at, money_words, truthy, when_words, Book, Fields, Occurrences, Part, StandingWork, MONTH};
+use crate::offices::auditor::{Answerer, Audited, ClaimOn, DecisionFile, DecisionOn, Reported};
 use crate::papers::{self, market as m};
 use crate::steps::{because, pay, say, Pay, Plan, Say, Step, Visible};
 use crate::{Actor, Ctx, Cx, Kind, Picture, WorldInfo, DAY};
@@ -249,6 +250,9 @@ impl Kind for Transfers {
                 recon: Reconsiderations::new(&me, &["benefit_decision"]),
                 paying: BTreeMap::new(),
                 opened: false,
+                decided_on: BTreeMap::new(),
+                lapsed_claims: BTreeSet::new(),
+                audited: Audited::new(&me),
                 me,
             },
         )
@@ -322,6 +326,106 @@ struct Support {
     paying: BTreeMap<String, Paying>,
     /// Our file has been opened once (payments in force before the year are taken up then).
     opened: bool,
+    /// When we decided each claim (each round), and which we refused for papers that did not come: our own record of the round a
+    /// decision was made at, which the audit office's question "decided again as it was" needs (a decision's paper is stamped when
+    /// it is done, which may be later than the round that made it). Not in the papers.
+    decided_on: BTreeMap<String, Vec<i64>>,
+    lapsed_claims: BTreeSet<String>,
+    /// The audit office's questions to us (docs/behaviour/auditor.md).
+    audited: Audited,
+}
+
+/// A figure written in a decision's data as `Number(x)` would take it, if it is one (a number, or a number in a string): whole
+/// numbers, read by their digits.
+fn finite(v: Option<&Value>) -> Option<i64> {
+    crate::finance::floor_of(v?)
+}
+
+/// Our book of contributions for one person: the monthly pay employers reported for them, newest first.
+fn reported_of(me: &str, book: &Book, who: &str, since: i64) -> Vec<(i64, i64)> {
+    let mut reports: Vec<&Arc<Record>> =
+        book.all("withholding_report").filter(|r| addressed_to(r).iter().any(|a| a == me) && r.at >= since && data(r).get("staff").is_some_and(Value::is_array)).collect();
+    reports.sort_by(|a, b| b.at.cmp(&a.at).then_with(|| filed_before(&b.id, &a.id)));
+    reports
+        .iter()
+        .flat_map(|r| {
+            data(r)
+                .get("staff")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter(|l| l.s("worker") == Some(who))
+                .map(|l| (r.at, l.get("gross").and_then(Value::as_f64).map_or(0, |g| g.floor() as i64)))
+        })
+        .collect()
+}
+
+/// What the audit office may ask of us, answered from our books (docs/behaviour/auditor.md): the decisions we made in a period,
+/// in the order they are numbered (by when, then by filing), and one of them with the claim and the record it rests on.
+/// Decisions brought forward from before the year are not ours to make again.
+struct OurDecisions<'a> {
+    me: &'a str,
+    book: &'a Book,
+    rules: &'a [PaymentRule],
+    decided_on: &'a BTreeMap<String, Vec<i64>>,
+    lapsed: &'a BTreeSet<String>,
+    paying: &'a BTreeMap<String, Paying>,
+}
+
+impl OurDecisions<'_> {
+    fn decisions_in(&self, kind: &str, from: i64, to: i64) -> Vec<&Arc<Record>> {
+        let mut v: Vec<&Arc<Record>> = self
+            .book
+            .all(kind)
+            .filter(|d| d.speaks_for.as_deref() == Some(self.me) && !data(d).get("brought_forward").is_some_and(truthy) && data(d).s("claim").is_some() && d.at >= from && d.at < to)
+            .collect();
+        v.sort_by(|a, b| a.at.cmp(&b.at).then_with(|| filed_before(&a.id, &b.id)));
+        v
+    }
+}
+
+impl Answerer for OurDecisions<'_> {
+    fn count(&self, kind: &str, from: i64, to: i64) -> Option<i64> {
+        Some(self.decisions_in(kind, from, to).len() as i64)
+    }
+
+    fn nth(&self, kind: &str, from: i64, to: i64, nth: i64) -> Option<Option<DecisionFile>> {
+        let Some(d) = usize::try_from(nth - 1).ok().and_then(|i| self.decisions_in(kind, from, to).get(i).copied()) else { return Some(None) };
+        let dd = data(d);
+        let claim_id = dd.s("claim").unwrap_or("");
+        let c = self.book.get(claim_id).filter(|c| matches!(c.body, oikos_sight::RecordBody::Statement { .. }));
+        let on = self.decided_on.get(claim_id).into_iter().flatten().copied().filter(|x| *x <= d.at).max().unwrap_or(d.at);
+        let decision = DecisionOn {
+            id: d.id.clone(),
+            at: d.at,
+            on,
+            granted: dd.get("granted") == Some(&Value::Bool(true)),
+            amount: finite(dd.get("amount")),
+            every: finite(dd.get("every")),
+            until: finite(dd.get("until")),
+            reason: dd.s("reason").map(String::from),
+            lapsed: (dd.get("granted") != Some(&Value::Bool(true)) && !dd.get("replaces").is_some_and(truthy) && self.lapsed.contains(claim_id)).then_some(true),
+        };
+        let Some(c) = c.filter(|c| c.speaks_for.is_some()) else { return Some(Some(DecisionFile { decision, claim: None, reported: vec![], pays_other: false })) };
+        let who = c.speaks_for.clone().unwrap_or_default();
+        let payment = dd.s("payment").or_else(|| data(c).s("payment")).unwrap_or("").to_string();
+        let rule = self.rules.iter().find(|r| r.id == payment);
+        let reported = reported_of(self.me, self.book, &who, i64::MIN).into_iter().filter(|r| r.0 <= on).take(36).map(|(at, gross)| Reported { at, gross }).collect();
+        let pays_other = rule.is_some_and(|rule| self.paying.values().any(|x| x.person == who && x.payment != rule.id && self.rules.iter().any(|r| r.id == x.payment && r.for_age())));
+        Some(Some(DecisionFile {
+            decision,
+            claim: Some(ClaimOn {
+                id: c.id.clone(),
+                by: who,
+                payment,
+                born_at: data(c).get("born_at").and_then(Value::as_i64).unwrap_or(0),
+                account: data(c).s("account").unwrap_or("").to_string(),
+                declares: serde_json::from_value(data(c).get("declares").cloned().unwrap_or(Value::Null)).unwrap_or_default(),
+            }),
+            reported,
+            pays_other,
+        }))
+    }
 }
 
 type Steps = Vec<Step<()>>;
@@ -338,23 +442,7 @@ impl Support {
 
     /// Our book of contributions for one person: the monthly pay employers reported for them, newest first.
     fn reported(&self, book: &Book, who: &str, since: i64) -> Vec<(i64, i64)> {
-        let mut reports: Vec<&Arc<Record>> = book
-            .all("withholding_report")
-            .filter(|r| addressed_to(r).iter().any(|a| a == &self.me) && r.at >= since && data(r).get("staff").is_some_and(Value::is_array))
-            .collect();
-        reports.sort_by(|a, b| b.at.cmp(&a.at).then_with(|| filed_before(&b.id, &a.id)));
-        reports
-            .iter()
-            .flat_map(|r| {
-                data(r)
-                    .get("staff")
-                    .and_then(Value::as_array)
-                    .into_iter()
-                    .flatten()
-                    .filter(|l| l.s("worker") == Some(who))
-                    .map(|l| (r.at, l.get("gross").and_then(Value::as_f64).map_or(0, |g| g.floor() as i64)))
-            })
-            .collect()
+        reported_of(&self.me, book, who, since)
     }
 
     /// A claim under a rule: granted (with the sum and how long), or why not.
@@ -496,6 +584,8 @@ impl Support {
             Decided::Refused(w) => return Redone { changed: false, found: w.unwrap_or_else(|| NOT_MET.into()), steps: vec![] },
         };
         let who = claim.speaks_for.clone().unwrap_or_default();
+        self.decided_on.entry(claim.id.clone()).or_default().push(t);
+        self.lapsed_claims.remove(&claim.id);
         self.paying.retain(|_, x| !(x.person == who && x.payment == rule.id));
         let every = rule.every_days * DAY;
         self.start_paying(&claim, Some(rule), rule.id.clone(), amount, every, t + every, until);
@@ -595,6 +685,7 @@ impl Plan for Support {
                 self.seen.insert(n.id.clone());
                 let d = data(&n);
                 let (Some(claim), Some(claimant)) = (d.s("claim"), d.s("claimant")) else { continue };
+                self.decided_on.entry(claim.to_string()).or_default().push(t);
                 let why = d.s("fails").unwrap_or("");
                 let tail = if why.is_empty() { String::new() } else { format!(": {why}") };
                 let paper = m::BenefitDecision {
@@ -655,6 +746,10 @@ impl Plan for Support {
                 }
             }
             self.decided.insert(c.id.clone());
+            self.decided_on.entry(c.id.clone()).or_default().push(t);
+            if matches!(&wait, Some((Wait::Lapsed(_), _))) {
+                self.lapsed_claims.insert(c.id.clone());
+            }
             let mut d = match &wait {
                 Some((Wait::Lapsed(why), _)) => Decided::Refused(Some(why.clone())),
                 _ => self.decide(&self.book, rule, &ours, &c, t, &world),
@@ -777,6 +872,12 @@ impl Plan for Support {
                     },
                 )],
             ));
+        }
+        // Asked by the audit office for a named item, under the audit law (docs/behaviour/auditor.md): answered from our books, by whoever
+        // does our paperwork (never the office-holder alone, whose part is the decisions the staff put before them).
+        if self.part != Part::Seat {
+            let answerer = OurDecisions { me: &self.me, book: &self.book, rules: &ours, decided_on: &self.decided_on, lapsed: &self.lapsed_claims, paying: &self.paying };
+            steps.extend(self.audited.steps::<()>(&self.book, &answerer));
         }
         // Asked to look at a decision again (the claimant's request, inside the days the law gives): the office decides it again
         // on the facts, and records that it did. Never the staff's where there is a head to do it.
@@ -1046,6 +1147,36 @@ mod transfer_tests {
         let mut r = by();
         r.as_object_mut().unwrap().extend(extra.as_object().unwrap().clone());
         r
+    }
+
+    #[test]
+    fn the_audit_office_is_answered_from_the_offices_books_the_count_of_decisions_and_one_with_its_claim_and_the_record_it_rests_on() {
+        let mut m = office();
+        let pension = rule(json!({ "id": "pension", "account": "acc-fund", "every_days": 14, "who": { "from_age": 67 }, "amount": { "flat": 50_000 } }));
+        let audit_law = st("law-audit", 0, "law", "city", json!({ "audit": { "auditor": "audit", "office": "audit", "answer_within_days": 10, "report_within_days": 10, "bodies": [
+            { "body": "support", "entity": "outside", "every_days": 30, "checks": ["decisions"], "kind": "benefit_decision" }] } }));
+        // The office decided a claim on day 1 (the paper on file), the claimant having been reported by an employer.
+        let first = at(&mut m, DAY, vec![law(json!([pension])), claim("c1", DAY, "old", "pension", 70, None)]);
+        let made = decisions(&first);
+        assert_eq!(made.len(), 1, "one decision to be audited");
+        let decision = st_to("d1", DAY, "benefit_decision", "outside", &["old"], json!({ "claim": "c1", "payment": "pension", "granted": true, "amount": 50_000, "every": 14 * DAY }));
+        let ask = |id: &str, ask: &str, extra: Value| {
+            let mut d = json!({ "audit": "support|decisions|1", "body": "support", "ask": ask, "kind": "benefit_decision", "from": 0, "to": 30 * DAY, "answer_by": 50 * DAY });
+            d.as_object_mut().unwrap().extend(extra.as_object().unwrap().clone());
+            st_to(id, 35 * DAY, "audit_request", "audit", &[], d)
+        };
+        let out = at(&mut m, 36 * DAY, vec![audit_law, decision, ask("rec.90", "count", json!({})), ask("rec.91", "nth", json!({ "nth": 1 })), ask("rec.92", "nth", json!({ "nth": 2 }))]);
+        let answers: Vec<Value> = statements(&out).into_iter().filter(|s| s.kind == "audit_answer").map(|s| s.data).collect();
+        assert_eq!(answers.len(), 3, "each request answered once: {answers:?}");
+        assert_eq!(answers[0]["count"], 1, "{answers:?}");
+        assert_eq!(answers[1]["found"], true);
+        assert_eq!(answers[1]["file"]["decision"]["granted"], true);
+        assert_eq!(answers[1]["file"]["decision"]["on"], DAY, "the round it was made at: the office's own record of it");
+        assert_eq!(answers[1]["file"]["claim"]["by"], "old");
+        assert_eq!(answers[1]["file"]["claim"]["payment"], "pension");
+        assert_eq!(answers[2]["found"], false, "there is no second decision in the period");
+        let again = at(&mut m, 37 * DAY, vec![]);
+        assert!(statements(&again).iter().all(|s| s.kind != "audit_answer"), "answered once");
     }
 
     #[test]
