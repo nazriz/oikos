@@ -550,7 +550,12 @@ scale 5. Assumptions audit: 31, of which 8 are outcomes built in.
   `citizen.ts`; people petition for laws already in force.
 - **Where:** `participants/src/behaviour/citizen.ts` (about line 4194).
 - **Effect:** Civic pressure on a steward always points one way, in every place; likely a breach of the no-place-in-code rule the generality test does not catch.
-- **L / I:** high / medium · **Status:** to fix (what people ask for from what they want and the law in force)
+- **L / I:** high / medium · **Status:** partly fixed in the Rust mind (2026-10-17, decisions "The citizen's mind in
+  Rust"): the figures are out of the code. A petition asks for what the world's `petition_demand` says
+  (`notice_days`, `rise_cap_bps`, from the profile, with their source); with none it asks in words for longer notice
+  and limits on rises and names no figure or amendment. Still open: the generator does not yet write
+  `petition_demand` (the TS generator is frozen; integration or lane F adds it, au-vic's 90 days and 5% sourced in its
+  profile); and people still petition for one demand only, whatever the law in force already says.
 
 ### PC-9 · Close options are chosen almost at random
 - **Gap:** The learning rule (Camerer and Ho's EWA, estimated on lab games) chooses by a logit with λ = 4 over scores
@@ -983,7 +988,7 @@ are, and its register entry. "Read in code" means the line was opened, not only 
   pressure; Mincer earnings returns used as working speed. Sure: medium. PC-9, ME-16, PC-3.
 - **A-23 · Heat adds the same illness at every age**, from a heatwave whose harm fell on those over 75. Sure: medium-high. WM-13.
 - **A-24 · Victorian practice in module code:** water bills to owners (`utilities.ts`); the tenants' petition's 90 days
-  and 5% (`citizen.ts`). The generality rule says no place in the code; the test does not see these. Sure: high. WM-12, PC-8.
+  and 5% (`citizen.ts`; out of the code in the Rust mind, 2026-10-17: PC-8). The generality rule says no place in the code; the test does not see these. Sure: high. WM-12, PC-8.
 - **A-25 · Hiring cost (8 weeks), horizon (3 months) and hours consent (90%) the same everywhere,** including places where most work is informal. Sure: high that they are carried. ME-3, PS-1.
 
 **Time and work**
