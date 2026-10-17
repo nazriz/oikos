@@ -48,7 +48,7 @@ test("woken more often, the town does the same over time: nothing counts per wak
     // (Shop service moved wider since foundations F1, 2026-10-15: serving takes the crew's hours now, so what a shop serves in a
     // day turns on when in the day its orders are taken. Over the three perturbed runs goods to households were 8,962 to
     // 11,171 and served 8,390 to 9,667 against 8,656 and 7,961 in the base run: those two are held to 25%, the rest to 10%.)
-    // (Collected held to 15% on the merge of gd-adoption with the bug hunt's fixes, 2026-10-18: 2,102 in the base run, 2,329 over the three perturbed, 10.8%; draws alone, as with the two above, nothing counted per wake.)
+    // (Collected held to 15% on the merge of gd-adoption with the bug hunt's fixes, 2026-10-18: 2,102 in the base run, 2,329 over the three perturbed, 10.8%. Traced: the works office's crew round is weekly, about 170 units a round, so one round more or fewer in the window is 8% of the measure. In the base run the crew's one hand resigned on day 99.86 and their notice ended on day 113.86, so the round of day 114 found no crew; in the perturbed runs they resigned on day 101.86 (the day she looked at the jobs on offer moves with the wakes), served out on day 115.86 and the round was done. Not a count per wake: a round that falls on one side of a resignation or the other. The six perturbed runs we looked at gave 2,278 to 2,429 against 2,102.)
     .filter((x) => Math.abs(x.more_wakes - x.base) > (["goods_to_households", "served"].includes(x.measure) ? 0.25 : x.measure === "collected" ? 0.15 : 0.1) * Math.max(1, x.base));
   expect(off).toEqual([]);
 }, 600_000);

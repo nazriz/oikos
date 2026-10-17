@@ -644,3 +644,10 @@ No JSON Schema changed. A world file changes by the generator (three forms) and 
 - **Additive, profile:** `values.automation` (the outside world's offers, with sources; `price_fall_bps_per_year`, 0 by default; how a business weighs them; the law on public buying), and the scenario `falling-system-prices`. A world with a profile that has none has no vendor and nothing changes.
 - **Additive, world:** a boundary entity `vendors`, the vendor's office and account, a template for each offer (`does`: the work, or the papers), and rows of the table of work and of slips for them. Every generated town carries them, so every state hash and config hash moves.
 - **Breaking, replay:** logs made before this change replay only on a build of their version (`pre-foundations` for the earliest); the state hash of every generated town moves.
+
+## Change on the merge of gd-adoption with the bug hunt (2026-10-18)
+
+No JSON Schema changed.
+
+- **Additive, host protocol (not a schema):** a unit the host registers (`units_add`) may carry `post` (the post a `hears` seat sits in). A seat is woken by papers for that post, as its person's own unit for the post is, and no longer by papers for another post its person holds (a person who kept the builder's yard and a shop was seen by the seat of the shop woken at the yard's papers, and it paid an invoice 1,800 s before its code twin did). A seat with no `post` is woken for any post of its person's, as before.
+- **Breaking, kernel (a refusal's code, narrow):** an act by a participant that no longer acts, in a post it no longer holds, whose person has left the world (alive, not present) is refused `not_in_position` ("X doesn't hold P"), as the person's own participant (which lives on abroad) is, and not `participant_inactive`: the seat that ended with the departure said the second. A death, and every other case, is refused as before.

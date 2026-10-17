@@ -245,6 +245,8 @@ interface Unit {
   firstWake: number;
   /** A seat that sits as its code twin does (a mock's, `mock.twin`): woken by papers as a code unit of its post is. */
   hears?: boolean;
+  /** The post a twin seat sits in (the engine wakes it for papers to that post only). */
+  post?: string;
   /** Where it stands among those woken together (the engine's `sort`): a seat stands where its person's own unit for the post would. */
   sort?: string;
   /** The participant whose body a twin seat sits in (the engine's `body`). */
@@ -632,7 +634,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     return {
       key: p.id, participant: p.id, entity, module, controller: controller as unknown as Controller, ctx,
       llm: { controller, config: p, drafts: [], drafted: 0, ...(roster ? { roster } : {}), ...(tally ? { tally } : {}), ...(dayBook ? { dayBook } : {}) },
-      ...(codeTwin && office ? { sort: `${codeTwin}|${office.id}` } : {}), ...(brain ? { hears: true, ...(codeTwin ? { body: codeTwin } : {}) } : {}),
+      ...(codeTwin && office ? { sort: `${codeTwin}|${office.id}` } : {}), ...(brain ? { hears: true, ...(codeTwin ? { body: codeTwin } : {}), ...(office ? { post: office.id } : {}) } : {}),
       cadence: ceilTo(brain?.cadence ?? cadence, tick), firstWake: wakeAt ?? (brain ? ceilTo(mods[pp.mock.brain]!.firstWake?.(brain.ctx) ?? 0, tick) : 0), wokeFor: "start", since: 0,
       knowledge: new Knowledge(currency), view: new View(new Set(standingIds)), notices: [],
     };
@@ -662,7 +664,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
         added.push(u);
       }
     }
-    if (added.length) await k.request({ op: "units_add", units: added.map((u) => ({ key: u.key, participant: u.participant, ...(u.llm ? { llm: true } : { capacity: u.capacity }), cadence: u.cadence, next_wake: u.firstWake, ...(u.module?.deaf ? { deaf: true } : {}), ...(u.hears ? { hears: true } : {}), ...(u.body ? { body: u.body } : {}), ...(u.sort ? { sort: u.sort } : {}) })) });
+    if (added.length) await k.request({ op: "units_add", units: added.map((u) => ({ key: u.key, participant: u.participant, ...(u.llm ? { llm: true } : { capacity: u.capacity }), cadence: u.cadence, next_wake: u.firstWake, ...(u.module?.deaf ? { deaf: true } : {}), ...(u.hears ? { hears: true } : {}), ...(u.post ? { post: u.post } : {}), ...(u.body ? { body: u.body } : {}), ...(u.sort ? { sort: u.sort } : {}) })) });
   };
   for (const pid of [...parts.keys()].sort()) await syncUnits(pid);
 
@@ -697,7 +699,8 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     const by: string[] = [];
     for (const x of named) {
       const w = x.toLowerCase().replace(/^the\s+/, "");
-      if (held.includes(x)) by.push(x);
+      // (A system of the organisation named by its id is the office's own to name, as a code unit names one; the kernel looks at whose it is.)
+      if (held.includes(x) || parts.get(x)?.kind === "system") by.push(x);
       else if (role && (w === role || w === `${role}s` || w === "staff")) {
         if (held.length === 1) by.push(held[0]!);
         else told.push(held.length ? `"${x}" could be any of the ${held.length} in post in your office (${held.join(", ")}): say which, by their id.` : `Nobody is in post to do that: your office has no ${staff!.role} in post.`);

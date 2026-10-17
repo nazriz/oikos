@@ -37,6 +37,9 @@ struct Unit {
     /// The participant whose body it sits in, where that is not its own (a seat's person): what is delivered to the person reaches the seat's unit
     /// as it reaches the person's own unit for the same post. Only a `hears` unit has one.
     body: Option<String>,
+    /// The post a `hears` seat sits in: it is woken by papers for that post (as the person's own unit for the post is), not by papers for another
+    /// post its person holds. None: any post of its person's.
+    post: Option<String>,
     /// Where it stands among those that wake together: its key by default; a seat stands where the person it acts through would (the
     /// order of a moment's wakes, and so of the acts of one moment, does not turn on whether a post is held by a seat or by code).
     sort: String,
@@ -145,6 +148,7 @@ impl Scheduler {
                 deaf: u["deaf"].as_bool().unwrap_or(false),
                 hears: u["hears"].as_bool().unwrap_or(false),
                 body: u["body"].as_str().map(String::from),
+                post: u["post"].as_str().map(String::from),
                 sort: u["sort"].as_str().unwrap_or(&key).to_string(),
                 cadence: u["cadence"].as_i64().filter(|c| *c > 0).ok_or("a unit needs a cadence (seconds)")?,
                 next_wake,
@@ -429,7 +433,7 @@ impl Scheduler {
             if holder == author || Self::body_of(st, holder) == Self::body_of(st, author) {
                 continue;
             }
-            keys.extend(self.units_of(holder).filter(|(_, u)| (u.capacity.as_deref() == Some(id.as_str()) || u.hears) && wakeable(u)).map(|(k, _)| k.clone()));
+            keys.extend(self.units_of(holder).filter(|(_, u)| (u.capacity.as_deref() == Some(id.as_str()) || (u.hears && u.post.as_deref().map_or(true, |p| p == id.as_str()))) && wakeable(u)).map(|(k, _)| k.clone()));
         }
         keys
     }

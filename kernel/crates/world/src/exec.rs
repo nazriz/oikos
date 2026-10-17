@@ -175,13 +175,28 @@ pub fn may_direct(st: &State, entity: &str, person: &str) -> bool {
         })
 }
 
+/// Why a participant that no longer acts cannot act in `position`: it has ended, and that is all that is said, unless its person has left the
+/// world and with them the post (a seat ends with the post, but the person's own participant lives on and is told it does not hold it): then it is
+/// the post that is wrong, for the seat as for the person's own participant. (Death says the participant has ended, for the one as for the other.)
+pub fn inactive_refusal(st: &State, participant: &str, position: Option<&str>) -> Refusal {
+    let left = position.is_some_and(|pos| {
+        let holds = st.positions.get(pos).is_some_and(|x| x.holder.as_deref() == Some(participant));
+        let gone = st.participants.get(participant).and_then(|p| p.person.as_deref()).and_then(|who| st.body(who)).is_some_and(|b| b.alive && !b.present);
+        !holds && gone
+    });
+    match position {
+        Some(pos) if left => refuse(RefusalCode::NotInPosition, format!("{participant} doesn't hold {pos}")),
+        _ => refuse(RefusalCode::ParticipantInactive, format!("{participant} no longer acts")),
+    }
+}
+
 /// What `exec_action` takes besides the blocks, for an act whose work was ordered earlier: `seen` says who was where
 /// when it was; `by` is who the action named; `started` that the performers' being there was looked at when the work
 /// began (so it is not looked at again when it ends).
 pub fn exec_action_seen(s: &Statics, st: &mut State, participant: &str, position: Option<&str>, blocks: &[Block], by: &[Id], seen: Option<&BTreeMap<Id, Vec<Id>>>, started: bool) -> R<ExecResult> {
     let p = st.participants.get(participant).ok_or_else(|| refuse(RefusalCode::UnknownParticipant, format!("no participant {participant}")))?;
     if !can_act(p) {
-        return Err(refuse(RefusalCode::ParticipantInactive, format!("{participant} no longer acts")));
+        return Err(inactive_refusal(st, participant, position));
     }
     let entity = match position {
         Some(pos) => {

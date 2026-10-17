@@ -942,7 +942,7 @@ impl World {
         }
         let mut late_shares: BTreeMap<Id, i64> = BTreeMap::new();
         let result = if !can_act(&self.state.participants[participant]) {
-            Err(refuse(RefusalCode::ParticipantInactive, format!("{participant} no longer acts")))
+            Err(crate::exec::inactive_refusal(&self.state, participant, position))
         } else if let Some(d) = placed.over.clone() {
             let i = blocks.iter().position(|b| matches!(b, Block::Work { .. }));
             Err(Refusal { block: i, ..refuse(RefusalCode::NoTimeLeft, d) })

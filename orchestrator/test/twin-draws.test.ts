@@ -178,7 +178,11 @@ test("papers of no effect, filed by the registry's holder, a person of the town,
 test("with an office in a mock seat, the same requests still get the same answers from those the seat did not deal with", async () => {
   // (A seat is not its code twin: it sits in office hours and its acts land at other moments, so the two towns do
   // part, by what truly differs. What must not differ is the answer to a request that is the same in both.)
-  const [twin, pilot] = await Promise.all([run("twin-draws-code-2", {}), run("twin-draws-seat", { mayor: "llm" })]);
+  // (450 citizens, where the other tests here have 300, 2026-10-18: the seat parts from its twin on the first day (the mayor files its permit application
+  // on day 14 where the code does on day 1), so the requests the two towns share are those that nothing the seat did reached, and a town of 300 gave 7
+  // of 12 and 16 in the two branches before their merge, and 5 of 20 after it, by the draws alone. The floor below is the same; the sample it is
+  // taken from is larger: 16 of 27 in common at 450, all answered alike.)
+  const [twin, pilot] = await Promise.all([run("twin-draws-code-2", { citizens: 450 }), run("twin-draws-seat", { mayor: "llm", citizens: 450 })]);
   const books = pilot.filter((r) => r.kind === "office_books");
   expect(books.length).toBeGreaterThan(0);
   expect(twin.some((r) => r.kind === "office_books")).toBe(false);
