@@ -194,6 +194,12 @@ impl Host {
         Self::from_snapshot(&self.e.snapshot()?, &opts)
     }
 
+    /// What this run has written so far, on disk (a snapshot taken for another process to resume from carries on a log
+    /// that names this one: the experiment harness, orchestrator/src/experiment.ts).
+    pub fn flush(&mut self) -> Result<(), String> {
+        self.e.log_out().flush().map_err(|e| e.to_string())
+    }
+
     fn snapshot_due(&mut self) -> Result<(), String> {
         if let (Some(at), Some(every)) = (self.next_snapshot, self.snapshot_every) {
             if self.e.t() <= at {

@@ -130,6 +130,12 @@ impl World {
         Ok(self.host.snapshot().map_err(err)?.into())
     }
 
+    /// Write what the run's log holds so far to its file (before another process resumes from a snapshot of it).
+    #[napi]
+    pub fn flush(&mut self) -> napi::Result<()> {
+        self.host.flush().map_err(err)
+    }
+
     /// A snapshot into the run's binary log.
     #[napi]
     pub fn snapshot_to_log(&mut self) -> napi::Result<()> {
