@@ -20,9 +20,18 @@ test("no file of the package imports the kernel client, the run driver or a proc
   for (const f of readdirSync(src, { recursive: true }).map(String).filter((x) => x.endsWith(".ts"))) {
     const text = readFileSync(join(src, f), "utf8");
     expect(text, f).not.toMatch(/from ["'][^"']*orchestrator\/src\/(kernel|run|batch|resume|watchdog)["']/);
-    expect(text, f).not.toMatch(/node:child_process|Bun\.spawn|\bspawnSync\b|\bexecSync\b/);
+    // (the one exception: rust.ts starts the built Rust data layer, `oikos-explore`, and nothing else; checked below)
+    if (f !== "rust.ts") expect(text, f).not.toMatch(/node:child_process|Bun\.spawn|\bspawnSync\b|\bexecSync\b/);
     expect(text, f).not.toMatch(/writeFileSync\([^)]*run|rmSync\([^)]*entry\.dir/);
   }
+});
+
+test("the one process the package starts is the Rust data layer, with the runs' logs and nothing that writes", () => {
+  const text = readFileSync(join(import.meta.dir, "..", "src", "rust.ts"), "utf8");
+  expect(text.match(/Bun\.spawn\(/g)).toHaveLength(1);
+  expect(text).toMatch(/Bun\.spawn\(\[bin, \.\.\.args\]/);
+  expect(text).not.toMatch(/node:child_process|\bspawnSync\b|\bexecSync\b/);
+  expect(text).toContain("assertOutside(r.dir, out)"); // (the pilot's data goes beside the runs, never inside one)
 });
 
 test("indexing and serving a run changes nothing in its folder; the index lives beside it", async () => {
