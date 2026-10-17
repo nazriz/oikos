@@ -1,0 +1,518 @@
+{
+  "name": "union.organiser",
+  "version": "0.6.1",
+  "doc": "docs/behaviour/unions.md",
+  "params": {
+    "accept_share_bps": {
+      "schema": {
+        "type": "integer",
+        "description": "an offer of at least this share of the claim is accepted (placeholder)"
+      },
+      "unit": "bps",
+      "default": 5000,
+      "source": "an offer of at least this share of the claim is accepted (placeholder)"
+    },
+    "answer_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 14,
+      "source": "placeholder"
+    },
+    "ballot_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 10,
+      "source": "placeholder"
+    },
+    "ballot_pass_bps": {
+      "schema": {
+        "type": "integer",
+        "description": "more than this share of the votes yes"
+      },
+      "unit": "bps",
+      "default": 5000,
+      "source": "placeholder"
+    },
+    "ballot_turnout_bps": {
+      "schema": {
+        "type": "integer",
+        "description": "at least this share of the members voting"
+      },
+      "unit": "bps",
+      "default": 0,
+      "source": "placeholder"
+    },
+    "bargain_every_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 365,
+      "source": "placeholder"
+    },
+    "between_days": {
+      "schema": {
+        "type": "integer",
+        "description": "after a stoppage, an improved offer awaited this long before the next"
+      },
+      "unit": "days",
+      "default": 7,
+      "source": "placeholder"
+    },
+    "claim_margin_bps": {
+      "schema": {
+        "type": "integer",
+        "description": "claimed over the year's rise in prices (the world's profile)"
+      },
+      "unit": "bps",
+      "default": 0,
+      "source": "claimed over the year's rise in prices (the world's profile)"
+    },
+    "compliance_bps": {
+      "schema": {
+        "type": "integer",
+        "description": "how often it keeps to the law when the law forbids an action it would take"
+      },
+      "unit": "bps",
+      "default": 10000,
+      "source": "placeholder"
+    },
+    "dues": {
+      "schema": {
+        "type": "integer",
+        "description": "a month, in the smallest unit (the world's profile)"
+      },
+      "default": 0,
+      "source": "a month, in the smallest unit (the world's profile)"
+    },
+    "dues_account": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
+      "source": "placeholder"
+    },
+    "employers": {
+      "schema": {
+        "type": "array",
+        "description": "workplaces it is told of besides (none: it bargains where its members work, as it learns of them)"
+      },
+      "default": [],
+      "source": "placeholder"
+    },
+    "first_claim_days": {
+      "schema": {
+        "type": "integer",
+        "description": "its first claims, spread over this long (placeholder)"
+      },
+      "unit": "days",
+      "default": 60,
+      "source": "its first claims, spread over this long (placeholder)"
+    },
+    "hears": {
+      "schema": {
+        "type": "array"
+      },
+      "default": [],
+      "source": "placeholder"
+    },
+    "industries": {
+      "schema": {
+        "type": "array"
+      },
+      "default": [],
+      "source": "placeholder"
+    },
+    "notice_days": {
+      "schema": {
+        "type": "integer",
+        "description": "notice of action"
+      },
+      "unit": "days",
+      "default": 0,
+      "source": "placeholder"
+    },
+    "part": {
+      "schema": {},
+      "source": "the world gives it (no default)"
+    },
+    "price_kind": {
+      "schema": {
+        "type": "string",
+        "description": "prices tracked for the claim (the published index of this kind's price)"
+      },
+      "default": "goods",
+      "source": "placeholder"
+    },
+    "resignation_notice_days": {
+      "schema": {
+        "type": "integer",
+        "description": "a member's notice of resigning, written into each membership (the world's profile; 0: none written)"
+      },
+      "unit": "days",
+      "default": 0,
+      "source": "a member's notice of resigning, written into each membership (the world's profile; 0: none written)"
+    },
+    "respond_days": {
+      "schema": {
+        "type": "integer",
+        "description": "an offer awaited this long before balloting"
+      },
+      "unit": "days",
+      "default": 14,
+      "source": "placeholder"
+    },
+    "stoppage_days": {
+      "schema": {
+        "type": "array",
+        "description": "each stoppage, longer each time (placeholder)"
+      },
+      "unit": "days",
+      "default": [
+        1,
+        2,
+        3
+      ],
+      "source": "each stoppage, longer each time (placeholder)"
+    }
+  },
+  "perceives": [],
+  "beliefs": [
+    {
+      "name": "between",
+      "about": "agreement"
+    }
+  ],
+  "state": "none",
+  "issues": [
+    {
+      "form": "wage_claim",
+      "title": "A wage claim on an employer",
+      "fields": {
+        "employer": {
+          "type": "entity",
+          "required": true,
+          "description": "The employer."
+        },
+        "rise_bps": {
+          "type": "count",
+          "required": true,
+          "description": "The rise claimed, in hundredths of a percent."
+        },
+        "members": {
+          "type": "count",
+          "required": true,
+          "description": "How many members work there."
+        }
+      },
+      "writes": {
+        "kind": "wage_claim",
+        "text": "Wage claim on {employer}: a rise of {rise_bps} hundredths of a percent.",
+        "to": [
+          "=employer"
+        ],
+        "visible": [
+          "=self",
+          "=employer"
+        ],
+        "data": {
+          "employer": "=employer",
+          "rise_bps": "=rise_bps",
+          "members": "=members"
+        }
+      }
+    },
+    {
+      "form": "offer_accepted",
+      "title": "Acceptance of an employer's wage offer",
+      "fields": {
+        "employer": {
+          "type": "entity",
+          "required": true,
+          "description": "The employer."
+        },
+        "offer": {
+          "type": "record",
+          "required": true,
+          "description": "The offer accepted."
+        },
+        "claim": {
+          "type": "record",
+          "required": true,
+          "description": "The claim it answers."
+        },
+        "rise_bps": {
+          "type": "count",
+          "required": true,
+          "description": "The rise accepted, in hundredths of a percent."
+        }
+      },
+      "writes": {
+        "kind": "offer_accepted",
+        "text": "Offer {offer} accepted.",
+        "basis": "=offer",
+        "to": [
+          "=employer"
+        ],
+        "visible": [
+          "=self",
+          "=employer"
+        ],
+        "data": {
+          "employer": "=employer",
+          "claim": "=claim",
+          "rise_bps": "=rise_bps"
+        }
+      }
+    },
+    {
+      "form": "action_ballot",
+      "title": "A ballot of members on industrial action",
+      "fields": {
+        "employer": {
+          "type": "entity",
+          "required": true,
+          "description": "The employer."
+        },
+        "claim": {
+          "type": "record",
+          "description": "The claim in dispute."
+        },
+        "closes": {
+          "type": "date",
+          "required": true,
+          "description": "The day the ballot closes."
+        },
+        "members": {
+          "type": "list",
+          "required": true,
+          "description": "The members it concerns."
+        }
+      },
+      "writes": {
+        "kind": "action_ballot",
+        "text": "Ballot on industrial action at {employer}, closing {closes}.",
+        "to": [
+          "=members"
+        ],
+        "visible": [
+          "=self",
+          "=members"
+        ],
+        "data": {
+          "employer": "=employer",
+          "claim": "=claim",
+          "closes": "=closes"
+        }
+      }
+    },
+    {
+      "form": "industrial_action",
+      "title": "Notice of industrial action",
+      "fields": {
+        "employer": {
+          "type": "entity",
+          "required": true,
+          "description": "The employer."
+        },
+        "from": {
+          "type": "date",
+          "required": true,
+          "description": "The day it starts."
+        },
+        "until": {
+          "type": "date",
+          "required": true,
+          "description": "The day it ends."
+        },
+        "members": {
+          "type": "list",
+          "required": true,
+          "description": "The members it concerns."
+        },
+        "ballot": {
+          "type": "record",
+          "required": true,
+          "description": "The ballot that approved it."
+        },
+        "voted": {
+          "type": "count",
+          "required": true,
+          "description": "How many voted."
+        },
+        "yes": {
+          "type": "count",
+          "required": true,
+          "description": "How many voted for."
+        },
+        "eligible": {
+          "type": "count",
+          "required": true,
+          "description": "How many could vote."
+        }
+      },
+      "writes": {
+        "kind": "industrial_action",
+        "text": "Industrial action at {employer} from {from} until {until}.",
+        "to": [
+          "=employer",
+          "=members"
+        ],
+        "visible": "public",
+        "data": {
+          "employer": "=employer",
+          "from": "=from",
+          "until": "=until",
+          "members": "=members",
+          "ballot": "=ballot",
+          "voted": "=voted",
+          "yes": "=yes",
+          "eligible": "=eligible"
+        }
+      }
+    },
+    {
+      "form": "stop_work",
+      "title": "Call to stop work",
+      "fields": {
+        "employer": {
+          "type": "entity",
+          "required": true,
+          "description": "The employer."
+        },
+        "until": {
+          "type": "date",
+          "required": true,
+          "description": "The day work resumes."
+        },
+        "members": {
+          "type": "list",
+          "required": true,
+          "description": "The members it concerns."
+        }
+      },
+      "writes": {
+        "kind": "stop_work",
+        "text": "Stop work at {employer} until {until}.",
+        "to": [
+          "=employer",
+          "=members"
+        ],
+        "visible": [
+          "=self",
+          "=employer",
+          "=members"
+        ],
+        "data": {
+          "employer": "=employer",
+          "until": "=until",
+          "members": "=members"
+        }
+      }
+    },
+    {
+      "form": "return_to_work",
+      "title": "Call to return to work",
+      "fields": {
+        "employer": {
+          "type": "entity",
+          "required": true,
+          "description": "The employer."
+        },
+        "members": {
+          "type": "list",
+          "required": true,
+          "description": "The members it concerns."
+        }
+      },
+      "writes": {
+        "kind": "return_to_work",
+        "text": "Return to work at {employer}.",
+        "to": [
+          "=employer",
+          "=members"
+        ],
+        "visible": [
+          "=self",
+          "=employer",
+          "=members"
+        ],
+        "data": {
+          "employer": "=employer",
+          "members": "=members"
+        }
+      }
+    },
+    {
+      "form": "ballot_result",
+      "title": "Result of a ballot of members on industrial action",
+      "does": "Declares the result of a ballot of members on industrial action, to the employer and the members: how many could vote, how many did, how many said yes, and whether it is approved. Action may be notified only on a ballot that meets what the law on industrial action asks.",
+      "fields": {
+        "ballot": {
+          "type": "record",
+          "description": "The ballot."
+        },
+        "employer": {
+          "type": "entity",
+          "required": true,
+          "description": "The employer."
+        },
+        "members": {
+          "type": "list",
+          "required": true,
+          "description": "The members balloted."
+        },
+        "eligible": {
+          "type": "count",
+          "required": true,
+          "description": "How many could vote."
+        },
+        "voted": {
+          "type": "count",
+          "required": true,
+          "description": "How many voted."
+        },
+        "yes": {
+          "type": "count",
+          "required": true,
+          "description": "How many voted yes."
+        },
+        "passed": {
+          "type": "choice",
+          "required": true,
+          "options": [
+            "yes",
+            "no"
+          ],
+          "description": "Whether it is approved."
+        }
+      },
+      "writes": {
+        "kind": "ballot_result",
+        "text": "Protected action ballot at {employer}: {voted} of {eligible} members voted, {yes} yes; approved {passed}.",
+        "basis": "=ballot",
+        "to": [
+          "=employer",
+          "=members"
+        ],
+        "visible": [
+          "=self",
+          "=employer",
+          "=members"
+        ],
+        "data": {
+          "employer": "=employer",
+          "ballot": "=ballot",
+          "voted": "=voted",
+          "yes": "=yes",
+          "eligible": "=eligible",
+          "passed": "?passed"
+        }
+      }
+    }
+  ]
+}

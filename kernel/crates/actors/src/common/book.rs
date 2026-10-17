@@ -104,7 +104,10 @@ pub struct Book {
     unread_to_say: Vec<String>,
     /// The time of the latest observation.
     pub now: i64,
-    last_directory: Option<usize>,
+    /// The directory lists last taken in. Held (not just their addresses) so that a new list can never be mistaken for the
+    /// last one by being allocated where a freed one was: lane D found a bank deaf to a directory it had just been shown, in
+    /// some allocation patterns and not others.
+    last_directory: Option<(Arc<Vec<oikos_sight::EntityItem>>, Arc<Vec<oikos_sight::PositionItem>>)>,
 }
 
 /// What a book saves (`Book::save`).
@@ -159,11 +162,10 @@ impl Book {
         for ch in pic.channels.values() {
             if let Seen::Directory { entities, positions } = ch {
                 // (The view hands back the same lists until they change.)
-                let at = Arc::as_ptr(positions) as usize ^ Arc::as_ptr(entities) as usize;
-                if self.last_directory == Some(at) {
+                if self.last_directory.as_ref().is_some_and(|(e, p)| Arc::ptr_eq(e, entities) && Arc::ptr_eq(p, positions)) {
                     continue;
                 }
-                self.last_directory = Some(at);
+                self.last_directory = Some((entities.clone(), positions.clone()));
                 for p in positions.iter() {
                     self.positions
                         .insert(p.position.clone(), PositionSeen { entity: p.entity.clone(), role: p.role.clone(), holder: p.holder.clone() });

@@ -488,7 +488,7 @@ The mechanism:
   margin (2%) and acceptance threshold (half) are placeholders; the union's employers are those at the start, so a firm founded later is never bargained with.
 - **Where:** `participants/src/behaviour/union.ts`; `docs/behaviour/unions.md`.
 - **Effect:** Industrial-relations and wage experiments: strikes short, deadlock impossible.
-- **L / I:** medium / medium · **Status:** to fix (the list) and to source
+- **L / I:** medium / medium · **Status:** strike settlement fixed in the Rust port (2026-10-17: the union weighs what a stoppage costs its members against what the gap would add over a year, `oikos_rules::bargaining`, ported from `gd-adoption`; the employer's side, what holding out costs it in sales, is `firms`, lane C1); the list of employers (a firm founded later) and the placeholder margin and threshold remain, to fix and to source
 - **Notice by:** Every strike in a run ending in a full concession; no lockout, arbitration or settlement below the claim.
 - **Fix when:** an industrial-relations experiment.
 
@@ -550,7 +550,7 @@ The mechanism:
   at `compliance_bps` (50% for landlords in the example town). The laws of time say an error has a cause, never a per-case dial; compliance escaped that rule.
 - **Where:** `institutions.ts`, `firms.ts`, `union.ts`, `common.ts`.
 - **Effect:** Deterrence cannot change behaviour; enforcement experiments see a fixed rate whatever is enforced.
-- **L / I:** high / high (enforcement) · **Status:** to fix (non-compliance from detection, gain and history)
+- **L / I:** high / high (enforcement) · **Status:** the union's part fixed in the Rust port (2026-10-17: `compliance_bps` is gone; it weighs the gain of acting against the chance it is pursued, learnt from what it has seen, times the penalty, and keeps to the law where it has no measure: docs/behaviour/unions.md); planning, the inspector, landlords and directions remain (lanes E and C1), to fix (non-compliance from detection, gain and history)
 - **Notice by:** Compliance rates identical across offices and cases; none depends on detection or history.
 - **Fix when:** Before enforcement or deterrence is studied; replace each coin with a cause (detection, gain, history).
 
@@ -582,6 +582,14 @@ The mechanism:
 - **L / I:** high / high · **Status:** to fix
 - **Notice by:** Held questions per keeper and the age of the oldest at the end of a large run; posts with no holder.
 - **Fix when:** Before any 10,000-person run is read; trace which posts are empty, then scale staffing with the population as law data.
+
+
+### PB-18 · An estate passes to its heirs before its debts
+- **Gap:** When a death reaches the bank it pays the dead person's whole balance to the partner, else the adult children, else the town, at once. A real estate pays its debts first (a lender in default has a claim recorded against the dead, and nothing sets it off), and probate takes months. Found by lane D's tests of the dead customer's account (2026-10-17).
+- **Where:** `bank.payment_system` (`settle_estates`); `docs/behaviour/bank-payment-system.md`, "A dead customer".
+- **Effect:** Debt in a household ends with its holder's death; lenders' defaults are understated; inheritance arrives faster than real.
+- **L / I:** medium / low · **Status:** to fix (an administrator's order: debts, then heirs)
+- **Fix when:** a lending or inheritance experiment.
 
 ---
 
@@ -648,7 +656,7 @@ The mechanism:
 - **Where:** `participants/src/behaviour/news.ts`; `citizen.ts` (news weight, election score); `environment.ts`.
 - **Effect:** A drift against incumbents built in; a steward who generates paperwork (petitions answered, complaints
   heard) loses approval for it. Biases every approval and election measure.
-- **L / I:** high / high · **Status:** to fix
+- **L / I:** high / high · **Status:** fixed in the Rust port (2026-10-17: firm.newspaper 0.2.0 decides the tone by what the record shows, one rule for every kind, and a recovery, a petition taken up and a permit granted are good news; the leaning no longer decides a neutral item's tone by a draw; `negativity_bps` is the premium for bad news, nought until the profile sources its size: docs/behaviour/news.md). `citizen.ts`'s approval step (15% of its range per item) is lane A's.
 - **Notice by:** mean approval trending down in a code-only town.
 - **Fix when:** Before any election, approval or trust result is read; the paper reports good news too, by cause, with a source for tone.
 
@@ -1219,9 +1227,9 @@ are, and its register entry. "Read in code" means the line was opened, not only 
   the ABS rate counts registrations that never trade. *Mechanisms, not outcomes; market forces.* Sure: high. ME-1.
 - **A-2 · Every strike is won in full after three stoppages** (`firms.ts`, `concede_after` 3, read in code). Hicks's
   concession curve does not say every dispute ends at the claim; real ones end in lockouts, arbitration, a lower
-  settlement or closure. *Mechanisms, not outcomes.* Sure: high. PB-9.
+  settlement or closure. *Mechanisms, not outcomes.* Sure: high. PB-9. **Fixed in the Rust port, union side (2026-10-17); employer side with lane C1.**
 - **A-3 · The paper only ever hurts the government** (`news.ts`, read in code: no item kind has tone +1). Negativity
-  in news is real; a paper that never reports anything good is not. *Simulate the real world.* Sure: high. PC-7.
+  in news is real; a paper that never reports anything good is not. *Simulate the real world.* Sure: high. PC-7. **Fixed in the Rust port (firm.newspaper 0.2.0, 2026-10-17).**
 - **A-4 · Rents rise about 5% at every review, as often as the law allows, never down for a sitting tenant**
   (`firms.ts`, read in code). The Bank of England model's markup applies to listings; here the landlord's own rents are
   its reference, so it ratchets. Sitting tenants usually get smaller rises than new lets. *Mechanisms, not outcomes.* Sure: high on the mechanism. ME-14.
@@ -1231,7 +1239,7 @@ are, and its register entry. "Read in code" means the line was opened, not only 
 - **A-6 · Religious decline is fitted as individual fading** (3% a month, fitted to the census trend, which is mostly
   generational). A rate fitted to an outcome made by another mechanism. *Calibrate mechanisms.* Sure: medium-high. PC-10.
 - **A-7 · Compliance is a coin flip** (`compliance_bps` in planning, inspector, landlords, union, directions).
-  `all-work-takes-time.md` says an error has a cause, never a per-case dial; compliance escaped. *An error has a cause.* Sure: high. PB-16.
+  `all-work-takes-time.md` says an error has a cause, never a per-case dial; compliance escaped. *An error has a cause.* Sure: high. PB-16. **Union fixed in the Rust port (2026-10-17); the rest with lanes E and C1.**
 - **A-8 · Half of unproven claims are upheld, everywhere** (`uphold_without_proof_bps` 5,000, "no source anywhere").
   Sure: high. PB-2.
 

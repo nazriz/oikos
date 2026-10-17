@@ -1,4 +1,4 @@
-# `bank.payment_system` (v0.16.0)
+# `bank.payment_system` (v0.18.0)
 
 **Seat:** a bank's automated payment system (acts as the bank). **Source:** `participants/src/behaviour/bank.ts`.
 
@@ -137,3 +137,13 @@ A new request is gone through when it arrives. A standing order is gone through 
 ## Garnishee orders (v0.10.0; docs/behaviour/justice.md)
 
 A court's or tribunal's order to pay a debt from what the bank holds for the debtor (`garnishee_order`, from an entity in the world's `courts`): carried out once, from the debtor's accounts here in id order, up to the amount, to the creditor's account, settling the debt (the transfer names it). What the accounts don't hold isn't paid; the order isn't kept open.
+
+## A dead customer (v0.18.0, the Rust port, 2026-10-17; tests: `finance/bank.rs`, `kernel/tests/d_bank.rs`)
+
+The test audit found nothing caught a fault in how the bank treats a dead customer's instructions and account. Now written down and held:
+
+- **Told, then stopped.** A bank pays on its customer's instruction while the customer lives, and until it is told of the death (a payment that fell due before it was told is its to have made). From the day the registration reaches it, the dead person's standing orders are **ended and dropped**, not gone through again every day for ever; a one-off instruction not yet carried out lapses; nobody is told, since nobody is there to be. A withdrawal or a hold of theirs cannot arrive after.
+- **The account pays out only to settle the estate**, whoever instructs on it.
+- **The estate** goes as `law-succession` says: to the partner, else equally to the adult children (the first getting the remainder of a cent), else the town. A partner or a child who has also died is passed over (the account is looked for among the living). The heirs are settled once; what comes into the estate later (a dividend, a refund) goes to the same heirs. **An estate with nobody yet to receive it is kept and looked at again at each plan**, not given up for good (until 0.18.0 the bank remembered "no heirs" for ever, even when an adult child opened an account the next day).
+- **Whoever pays into a dead person's account** (a wage) is told at each payment that the holder has died, until they stop it; it is still paid, into the estate. Kept by instruction (the latest due date told), not by a set that grew with every payment.
+- **Known gap** (risk register, new): the estate passes to the heirs whole; a real estate pays its debts first (a lender in default has a claim recorded against the dead, and the bank does not set it off). Real probate takes months; here it is at once.

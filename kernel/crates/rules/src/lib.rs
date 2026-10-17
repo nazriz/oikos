@@ -21,8 +21,10 @@
 #![forbid(unsafe_code)]
 #![deny(clippy::float_arithmetic, clippy::float_cmp)]
 
+pub mod bargaining;
 pub mod calendar;
 pub mod entry;
+pub mod decisions;
 pub mod forms;
 pub mod household;
 pub mod identity;
@@ -33,3 +35,4 @@ pub mod returns;
 pub mod slip;
 pub mod support;
 pub mod withholding;
+pub mod words;
