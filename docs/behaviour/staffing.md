@@ -14,7 +14,7 @@ law 3 says only actors work: a person, or a system someone supplied.
 
 ## What a post is held by now
 
-- **A person of the town.** Each body of the town (the town's government, the tribunal, the ombudsman, the consumer desk, the electoral
+- **A person of the town.** Each body of the town (the town's government, the tribunal, the ombudsman, the consumer desk, the audit office (docs/behaviour/auditor.md), the electoral
   commission, the land registry, the paper, the bank, the union, the water and energy bodies, the police) has **staff hired from the
   town through the same jobs as anyone's**: an employment agreement, a standing wage from the body's account, taxed as any wage. The
   number is the profile's rate per 1,000 residents (`public_service.staff_per_1000`, full-time equivalents; a body keeps at least one),
@@ -49,7 +49,7 @@ law 3 says only actors work: a person, or a system someone supplied.
 | Body | Paid from | Where the money comes from |
 |---|---|---|
 | The town | its budget, a line of its own (`administration`) | the council adopts it; its yearly sum is the staff's wages |
-| The state's bodies (tribunal, ombudsman, consumer desk, electoral commission, land registry, the paper) | a grant from outside, to each body's account | sized to the wage bill, per home seen, as the police's and the clinic's are |
+| The state's bodies (tribunal, ombudsman, consumer desk, electoral commission, land registry, the paper, the audit office) | a grant from outside, to each body's account | sized to the wage bill, per home seen, as the police's and the clinic's are |
 | The police station's officer in charge | the police's grant | the grant is raised by one officer's pay |
 | The bank, the union, the water and energy bodies, the landlords | their own accounts | their takings; each starts with twelve weeks of the wage bill in hand |
 

@@ -2,7 +2,8 @@
 // (docs/behaviour/boundary.md, "world.transfers"). A payment is a rule in three parts: who qualifies, how much, for how
 // long. The law is a record its lawmaker publishes; nothing here holds any place's figures.
 
-import type { Book } from "./common";
+import type { StatementRecord } from "../contracts";
+import { DAY, MONTH, type Book } from "./common";
 
 /**
  * One payment of a support law. Sums are in the smallest unit of the world's money, for one payment (every
@@ -129,4 +130,57 @@ export function stopsWorkAt(curve: { from: number; bps: number }[], draw: number
     if (draw >= kept) return b.from;
   }
   return undefined;
+}
+
+/**
+ * What a claim for a payment comes to under its rule, on the facts the deciding office has: one function for the office that decides
+ * and for the auditor that decides again from the file (docs/behaviour/auditor.md), so that "the law's conditions" is one reading.
+ * `reported(since)`: the monthly pay reported for the claimant to the payer since a time, newest first; `paysOtherPension()`: whether the
+ * payer pays the claimant another payment for age; `tax`: what the tax law withholds from a gross sum over so many seconds.
+ */
+export interface SupportFacts {
+  year: number;
+  reported: (since: number) => { at: number; gross: number }[];
+  paysOtherPension: () => boolean;
+  withheld: (gross: number, seconds: number) => number;
+}
+export type SupportDecision = { ok: true; amount: number; until?: number } | { ok: false; why?: string };
+export function decideClaim(rule: PaymentRule | undefined, c: StatementRecord, t: number, facts: SupportFacts, usd: (cents: number) => string): SupportDecision {
+  if (!rule || typeof c.data?.account !== "string" || !Number.isInteger(c.data?.born_at)) return { ok: false };
+  const born = c.data.born_at as number;
+  const age = Math.floor((t - born) / facts.year);
+  const w = rule.who ?? {};
+  const said: Declared = c.data?.declares ?? {};
+  if (age < (w.from_age ?? -Infinity) || age > (w.to_age ?? Infinity)) return { ok: false };
+  const members = Math.max(1, Math.floor(Number(said.household_members) || 1));
+  const children = (under: number) => (Array.isArray(said.children_born_at) ? said.children_born_at : []).filter((b) => Number.isInteger(b) && Math.floor((t - b) / facts.year) < under).length;
+  const record = w.record || "share_bps" in rule.amount ? facts.reported(w.record?.within_months ? t - w.record.within_months * MONTH : -Infinity) : [];
+  if (w.record && record.length < (w.record.months ?? 1)) return { ok: false, why: `contributions are on our record for ${record.length} month${record.length === 1 ? "" : "s"}, and the payment asks for ${w.record.months ?? 1}` };
+  if (w.income_under) {
+    if (!Number.isInteger(said.household_income)) return { ok: false, why: "the claim doesn't state the household's income" };
+    const income = w.income_under.per === "head" ? Math.floor(said.household_income! / members) : said.household_income!;
+    if (income >= w.income_under.amount) return { ok: false, why: `the household's income as stated is not under ${usd(w.income_under.amount)}${w.income_under.per === "head" ? " a head" : ""}` };
+  }
+  if (w.no_other_pension) {
+    if (said.other_pension !== false) return { ok: false, why: "the claim doesn't state that no other pension is paid" };
+    if (facts.paysOtherPension()) return { ok: false, why: "we pay the claimant another pension" };
+  }
+  if (w.children && children(w.children.under_age) < w.children.least) return { ok: false, why: `the household as stated has fewer than ${w.children.least} child${w.children.least === 1 ? "" : "ren"} under ${w.children.under_age}` };
+  const a = rule.amount;
+  let amount: number;
+  if ("flat" in a) amount = a.flat;
+  else if ("share_bps" in a) {
+    // Their previous pay for as long as one payment covers: the mean of the monthly pay reported for them (the last
+    // twelve reports at most), before or after what the tax law withholds from such a pay.
+    const last = record.slice(0, 12);
+    if (!last.length) return { ok: false, why: "no pay is on our record for the claimant" };
+    const gross = Math.floor((last.reduce((x, l) => x + l.gross, 0) / last.length) * rule.every_days / 30);
+    const pay = a.of === "net" ? gross - facts.withheld(gross, rule.every_days * DAY) : gross;
+    const most = a.most === undefined ? Infinity : typeof a.most === "number" ? a.most : [...a.most].sort((x, y) => y.from_age - x.from_age).find((b) => b.from_age <= age)?.amount ?? Infinity;
+    amount = Math.min(most, Math.max(a.least ?? 0, Math.floor((pay * (a.with_child_bps !== undefined && children(18) > 0 ? a.with_child_bps : a.share_bps)) / 10_000)));
+  } else amount = a.household + (a.per_member ?? 0) * members + (a.per_child ? a.per_child.amount * children(a.per_child.under_age) : 0);
+  if (!(amount > 0)) return { ok: false, why: "the payment comes to nothing" };
+  const ends = [rule.lasts?.days !== undefined ? t + rule.lasts.days * DAY : Infinity, rule.lasts?.until_age !== undefined ? born + rule.lasts.until_age * facts.year : Infinity];
+  const until = Math.min(...ends);
+  return { ok: true, amount, ...(until < Infinity ? { until } : {}) };
 }

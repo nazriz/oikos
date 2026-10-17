@@ -49,6 +49,7 @@ import { principal } from "./behaviour/school";
 import { practice } from "./behaviour/health";
 import { member, registrar } from "./behaviour/tribunal";
 import { desk } from "./behaviour/desk";
+import { auditor } from "./behaviour/auditor";
 import { founded } from "./behaviour/founded";
 import { energy, water } from "./behaviour/utilities";
 import { station } from "./behaviour/police";
@@ -133,6 +134,7 @@ export const modules: { [name: string]: BehaviourModule & { source: string } } =
       [member, "behaviour/tribunal.ts"],
       [registrar, "behaviour/tribunal.ts"],
       [desk, "behaviour/desk.ts"],
+      [auditor, "behaviour/auditor.ts"],
       [founded, "behaviour/founded.ts"],
       [water, "behaviour/utilities.ts"],
       [energy, "behaviour/utilities.ts"],
