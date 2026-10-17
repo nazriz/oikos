@@ -5555,3 +5555,16 @@ The profile-sources merge was held back for three failing tests and left four fa
 **CLAUDE.md's "Stack" line will change when the port lands** (to: Rust for the kernel and the world's built-in actors; TypeScript on Bun for seats, the translator's serving, orchestration, tools and config). It is not edited now.
 
 **Revisit if** phase 0 shows the boundary costs under a fifth of what the plan assumes; fewer than five of seven phase-1 agents pass their scenario tests in mixed mode; measures drift beyond noise for reasons that trace to faithful ports (checkpoint with the owner, don't tune); a single-threaded Rust 1,000-person year is under twice as fast as the TS one; or a pilot needs a behaviour change that cannot wait a week for the gate.
+
+## Dev speed: merge selection, kernel tokens, one flake (2026-10-17)
+
+Owner: saving time is the most important thing. Measured on a machine at load 15-17 (STATUS in runs/devspeed-2026-10-17): a suite waited
+4+ minutes for seven tokens for cargo test before its first file started, and a fresh worktree's `bun run kernel` spent 173 of 217 s in the
+slot queue (cargo itself 44 s; jobs 2/4/7 cold: 74/41/35 s). Changes: cargo test runs concurrently with the files at four tokens;
+`bun run kernel` weighs four; `--affected` selection for merges (docs/dev-machine.md), with a test that a planted kernel change selects all.
+Also: culture.test.ts "sums to nothing" rebuilt 3,000 people for each of 8 conducts and timed out at the 5 s default under load; it draws
+the town once, assertions unchanged, with an explicit timeout. Not done: sharing year-long town results between test files (about 25 files
+run a 1-year default town with different options; unsafe without reading each assertion), splitting scenarios.test.ts (420 s, the critical
+path; four child towns under one token, so it also undercounts its load). Revisit if: merge.ts (branch ci-setup) should call `--affected`
+instead of the full suite with a nightly `test:all`; a hung weight-4 request starves the queue; selection ever misses a failure the full
+suite finds (then widen FULL_ON).

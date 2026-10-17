@@ -76,3 +76,14 @@ oikos run worlds/town-300.yaml --until 7776000 --log lean --record-observations 
   given). A before and after that is to say anything of towns in general is `--towns 3` on each side; `oikos diff` says
   on its first line what each side was (docs/measurement.md, "Running a batch").
 - Write to a folder outside `runs/` that you remove yourself; never remove anything under `runs/`.
+
+## Time-saving (2026-10-17)
+
+- **`bun scripts/test.ts --affected [--base REF] [--list]`** is the merge's selection (`--list` prints the choice and stops). The whole suite when
+  the change touches `kernel/`, the contracts (not their notes), `package.json`, `bun.lock`, `bunfig.toml`, a tsconfig, the runner or the
+  slots; documents only: the tests that read documents (`docs/` in them or their imports) and the backstops; anything else: the fast tier, the
+  tests changed, importing a changed file, naming a changed data file or its folder, or naming a script (`cli.ts`) that imports one, and the
+  backstops (generality, no-god-view, contracts) always. Over-choosing is the safe way to be wrong: it only costs time. Proved in
+  `scripts/test-runner.test.ts` (a planted kernel change chooses everything). The whole suite, `bun run test:all`, is for a schedule.
+- The kernel's cargo tests now run alongside the test files (before, a suite sat idle until it had seven tokens), with four tokens.
+  `bun run kernel` takes four tokens, not half the cores: 41 s against 35 s cold at 7 jobs, and a queue of minutes shorter.
