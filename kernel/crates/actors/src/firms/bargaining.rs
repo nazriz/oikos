@@ -13,6 +13,7 @@
 //! `concession_bps` is the same pure function as lane D's `oikos_rules::bargaining::concession_bps`; integration keeps
 //! one of them (this one is the employer's, the union's side is D's).
 
+use super::decimal::{fmt_dec, round_div};
 use super::staffing::Staffing;
 use crate::common::{data, money_words, Fields, MONTH};
 use crate::papers::agreements::job_terms;
@@ -122,7 +123,7 @@ impl Bargaining {
         let offer = |o: &Dispute, why: &str| {
             say(
                 "wage_offer",
-                &format!("We offer a rise of {}% (the claim was {}%).", o.offer_bps as f64 / 100.0, o.claim_bps as f64 / 100.0),
+                &format!("We offer a rise of {}% (the claim was {}%).", fmt_dec(o.offer_bps, 100), fmt_dec(o.claim_bps, 100)),
                 Say { to: Some(vec![o.union.clone()]), visible: Some(Visible::Only(vec![me.clone(), o.union.clone()])), basis: Some(o.claim.clone()), data: Some(json!({ "employer": me, "claim": o.claim, "rise_bps": o.offer_bps, "why": why })), ..Default::default() },
             )
         };
@@ -136,7 +137,7 @@ impl Bargaining {
             let claim_bps = data(&c).i("rise_bps").unwrap_or(0).max(0);
             let d = Dispute { claim: c.id.clone(), union: c.speaks_for.clone().unwrap_or_default(), claim_bps, offer_bps: claim_bps.min(offer_for(claim_bps)), stoppages: 0, last_days: 0 };
             steps.push(because(
-                format!("A wage claim from {} for {}%: offering {}%, as far as what we hold beyond a month's wages ({}) covers twice its cost for a year.", d.union, claim_bps as f64 / 100.0, d.offer_bps as f64 / 100.0, usd((balance - month_bill).max(0))),
+                format!("A wage claim from {} for {}%: offering {}%, as far as what we hold beyond a month's wages ({}) covers twice its cost for a year.", d.union, fmt_dec(claim_bps, 100), fmt_dec(d.offer_bps, 100), usd((balance - month_bill).max(0))),
                 vec![offer(&d, "capacity to pay")],
             ));
             self.open = Some(d);
@@ -149,14 +150,14 @@ impl Bargaining {
             self.open = None;
             raised.push(rise);
             steps.push(because(
-                format!("{union} accepted our offer: an enterprise agreement, a rise of {}% for all our staff.", rise as f64 / 100.0),
+                format!("{union} accepted our offer: an enterprise agreement, a rise of {}% for all our staff.", fmt_dec(rise, 100)),
                 vec![say(
                     "enterprise_agreement",
-                    &format!("Enterprise agreement between {me} and {union}: wages rise {}% from now.", rise as f64 / 100.0),
+                    &format!("Enterprise agreement between {me} and {union}: wages rise {}% from now.", fmt_dec(rise, 100)),
                     Say { visible: Some(Visible::Public), to: Some(vec![union.clone()]), basis: Some(a.id.clone()), data: Some(json!({ "employer": me, "union": union, "rise_bps": rise, "from": t })), ..Default::default() },
                 )],
             ));
-            steps.extend(staffing.raise(book, t, cx, account, rise, &format!("The enterprise agreement: everyone's wages up {}%, from their next pay.", rise as f64 / 100.0), None));
+            steps.extend(staffing.raise(book, t, cx, account, rise, &format!("The enterprise agreement: everyone's wages up {}%, from their next pay.", fmt_dec(rise, 100)), None));
         }
         let stops: Vec<Arc<Record>> = book.open("stop_work").filter(|r| mine(&self.handled, r)).cloned().collect();
         for s in stops {
@@ -175,7 +176,7 @@ impl Bargaining {
             };
             self.stoppage = Some(Stoppage {
                 at: s.at,
-                days: length.map_or(1, |l| ((l as f64 / DAY as f64).round() as i64).max(1)),
+                days: length.map_or(1, |l| (round_div(i128::from(l), i128::from(DAY)) as i64).max(1)),
                 share_bps: if total > 0 { (out * 10_000 / total) as i64 } else { 0 },
             });
             steps.extend(staffing.stop(book, t, &self.strikers, &format!("A strike by {}'s members: no pay for the time on strike.", s.speaks_for.clone().unwrap_or_default())));
@@ -197,9 +198,9 @@ impl Bargaining {
             steps.push(because(
                 format!(
                     "After {} stoppage{}, the last of {} day{} with {}% of our hours out{}, against takings of {} a day: another a day longer would cost us {}, which a year's cost covers a rise of {}%: offering {}%.",
-                    o.stoppages, if o.stoppages > 1 { "s" } else { "" }, o.last_days, if o.last_days > 1 { "s" } else { "" }, share as f64 / 100.0,
-                    if system_bps > 0 { format!(" and systems doing {}% of our work", system_bps as f64 / 100.0) } else { String::new() },
-                    usd(takings_per_day.max(0)), usd(willing), rise as f64 / 100.0, o.offer_bps as f64 / 100.0
+                    o.stoppages, if o.stoppages > 1 { "s" } else { "" }, o.last_days, if o.last_days > 1 { "s" } else { "" }, fmt_dec(share, 100),
+                    if system_bps > 0 { format!(" and systems doing {}% of our work", fmt_dec(system_bps, 100)) } else { String::new() },
+                    usd(takings_per_day.max(0)), usd(willing), fmt_dec(rise, 100), fmt_dec(o.offer_bps, 100)
                 ),
                 vec![offer(&o, "after a stoppage")],
             ));

@@ -14,7 +14,12 @@
 //!   that does only that, so an owner's appointer can keep a dead man off the payroll when the officer's post has
 //!   fallen vacant (docs/testing.md: "a shop whose only post-holder dies has nobody to stop the dead man's wages").
 //! - Where the TS compared record ids as strings, applications and requests are ordered by filing (`filed_before`).
+//! - No floating point (kernel/tests/determinism_lint.rs): service is seconds, a schedule's days are thousandths of a
+//!   day, the ordinary week is minutes, `hiring_cost_weeks` is read into thousandths of a week by its digits
+//!   (`decimal::scaled`), and redundancy pay is reckoned exactly in seconds of pay; percentages and weeks are written
+//!   back as short decimals (`decimal::fmt_dec`).
 
+use super::decimal::{fmt_dec, round_div, scaled};
 use super::orgwants::{Org, Wanting};
 use super::practice::PracticeOf;
 use super::returns::{due_on, return_rest, returns_of, ReturnRule};
@@ -62,45 +67,50 @@ pub fn staffing_under(direction: Option<&Record>) -> StaffingUnder {
     StaffingUnder { recruit: d.and_then(|d| d.get("recruit")).and_then(Value::as_str) != Some("no"), posts }
 }
 
-/// A schedule by service: from this many years, so many days of pay.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+/// A schedule by service: from this much service (seconds: years of 365 days), so many thousandths of a day of pay.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ByService {
-    pub from_years: f64,
-    pub days: f64,
+    pub from_service: i64,
+    pub milli_days: i64,
 }
 
 /// The law on ending a job for redundancy, as its lawmaker published it (docs/behaviour/firms.md, "Adjusting labour"):
 /// the least notice and the redundancy pay an employer owes, each by length of service, in days of pay (a week is
 /// seven); and the size of employer below which no redundancy pay is owed, where the law has one. A world with no such
 /// law owes what its agreements say and nothing more.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TerminationLaw {
     pub id: String,
     pub notice: Vec<ByService>,
     pub redundancy_pay: Vec<ByService>,
-    pub small_employer_under: Option<f64>,
+    /// The size of employer (thousandths of a member of staff) below which no redundancy pay is owed.
+    pub small_employer_under: Option<i64>,
 }
 
 fn schedule_of(v: Option<&Value>) -> Vec<ByService> {
     let mut steps: Vec<ByService> = v
         .and_then(Value::as_array)
-        .map(|a| a.iter().filter_map(|b| Some(ByService { from_years: b.get("from_years")?.as_f64()?, days: b.get("days")?.as_f64()? })).collect())
+        .map(|a| a.iter().filter_map(|b| Some(ByService { from_service: scaled(b.get("from_years")?, YEAR)?, milli_days: scaled(b.get("days")?, 1_000)? })).collect())
         .unwrap_or_default();
-    steps.sort_by(|a, b| a.from_years.total_cmp(&b.from_years));
+    steps.sort_by_key(|b| b.from_service);
     steps
 }
 
 pub fn termination_law(book: &Book) -> Option<TerminationLaw> {
     let l = super::tax::latest_law(book, |r| data(r).get("employment").and_then(Value::as_str) == Some("termination"))?;
     let d = data(l);
-    let under = d.get("small_employer_under").and_then(Value::as_f64).filter(|u| *u > 0.0);
+    let under = d.get("small_employer_under").and_then(|u| scaled(u, 1_000)).filter(|u| *u > 0);
     Some(TerminationLaw { id: l.id.clone(), notice: schedule_of(d.get("notice")), redundancy_pay: schedule_of(d.get("redundancy_pay")), small_employer_under: under })
 }
 
-/// A schedule by service (days of pay), read at a length of service as weeks of pay (the last step at or below it;
-/// before the first: nothing).
-pub fn weeks_at(steps: &[ByService], years: f64) -> f64 {
-    steps.iter().fold(0.0, |x, b| if years >= b.from_years { b.days } else { x }) / 7.0
+/// A schedule by service, read at a length of service (seconds) as thousandths of a day of pay (the last step at or
+/// below it; before the first: nothing). TS's `weeksAt` is this over 7,000.
+pub fn days_at(steps: &[ByService], service: i64) -> i64 {
+    steps.iter().fold(0, |x, b| if service >= b.from_service { b.milli_days } else { x })
+}
+
+fn small(law: &TerminationLaw, staff: i64) -> bool {
+    law.small_employer_under.is_some_and(|u| staff * 1_000 < u)
 }
 
 /// How the law lets an employer cut hours.
@@ -116,11 +126,12 @@ pub enum MayCut {
 /// whether an employer may reduce hours for want of work, the ordinary week, the notice, the least hours it may cut to
 /// (a share of the ordinary), the longest spell, and the pay owed for the hours not worked (a share of the pay for
 /// them, from an employer of that many staff). A world with no such law has firms that do not cut hours.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HoursLaw {
     pub id: String,
     pub may_cut: MayCut,
-    pub ordinary_week_hours: f64,
+    /// The ordinary week, in minutes.
+    pub ordinary_week_minutes: i64,
     pub notice_days: i64,
     pub floor_bps: i64,
     pub max_days: i64,
@@ -132,7 +143,7 @@ pub struct HoursLaw {
 pub fn hours_law(book: &Book) -> Option<HoursLaw> {
     let l = super::tax::latest_law(book, |r| data(r).get("employment").and_then(Value::as_str) == Some("hours"))?;
     let d = data(l);
-    let n = |k: &str, default: f64| d.get(k).and_then(Value::as_f64).filter(|x| *x >= 0.0).unwrap_or(default);
+    let n = |k: &str, scale: i64, default: i64| d.get(k).and_then(|v| scaled(v, scale)).filter(|x| *x >= 0).unwrap_or(default);
     let may_cut = match d.get("may_cut").and_then(Value::as_str) {
         Some("notice") => MayCut::Notice,
         Some("consent") => MayCut::Consent,
@@ -141,21 +152,21 @@ pub fn hours_law(book: &Book) -> Option<HoursLaw> {
     Some(HoursLaw {
         id: l.id.clone(),
         may_cut,
-        ordinary_week_hours: n("ordinary_week_hours", 40.0),
-        notice_days: n("notice_days", 0.0) as i64,
-        floor_bps: n("floor_bps", 0.0).min(10_000.0) as i64,
-        max_days: n("max_days", 0.0) as i64,
-        pay_bps: n("pay_bps", 0.0).min(10_000.0) as i64,
-        pay_owed_from: n("pay_owed_from", 0.0) as i64,
-        consent_bps: n("consent_bps", 10_000.0).min(10_000.0) as i64,
+        ordinary_week_minutes: n("ordinary_week_hours", 60, 40 * 60),
+        notice_days: n("notice_days", 1, 0),
+        floor_bps: n("floor_bps", 1, 0).min(10_000),
+        max_days: n("max_days", 1, 0),
+        pay_bps: n("pay_bps", 1, 0).min(10_000),
+        pay_owed_from: n("pay_owed_from", 1, 0),
+        consent_bps: n("consent_bps", 1, 10_000).min(10_000),
     })
 }
 
-/// The ordinary week of a job in hours: its agreement's hours term, else the law's ordinary week.
-pub fn ordinary_hours(a: Option<&Record>, worker: &str, law: Option<&HoursLaw>) -> f64 {
+/// The ordinary week of a job in minutes: its agreement's hours term, else the law's ordinary week.
+pub fn ordinary_minutes(a: Option<&Record>, worker: &str, law: Option<&HoursLaw>) -> i64 {
     match a.and_then(|a| job_terms(a, worker, None).hours) {
-        Some(h) => h as f64 / 3600.0,
-        None => law.map_or(0.0, |l| l.ordinary_week_hours),
+        Some(h) => h / 60,
+        None => law.map_or(0, |l| l.ordinary_week_minutes),
     }
 }
 
@@ -173,23 +184,18 @@ pub fn by_the_day(a: &Record) -> bool {
         && terms.commitments.iter().any(|c| terms.parties.first() == Some(&c.who) && c.every == Some(DAY) && c.does.get("outcome").is_some_and(|o| o.get("money").is_some()))
 }
 
-/// `Math.round`: half up.
-fn round_f(x: f64) -> i64 {
-    (x + 0.5).floor() as i64
-}
-
 /// How an employer adjusts its staff to its trade (docs/behaviour/firms.md, "Adjusting labour"). Three things real
 /// firms do, each with its source there: they plan on trade smoothed over a horizon, never on one month's (Holt,
 /// Modigliani, Muth and Simon 1960); they hold labour through a dip, because letting someone go and hiring again both
 /// cost (Oi 1962; Hamermesh 1989; Bentolila and Bertola 1990; Fay and Medoff 1985), so a worker is let go only once
 /// the surplus has lasted as long as letting them go and replacing them would cost in their pay; and while over their
 /// need they shed by not replacing those who leave (Davis, Faberman and Haltiwanger 2012).
-/// `smooth_months`: the horizon (0: last month's figure, the rule as it was). `hiring_cost_weeks`: what taking someone
-/// on costs, in weeks of their pay.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+/// `smooth_months`: the horizon (0: last month's figure, the rule as it was). `hiring_cost_milliweeks`: what taking
+/// someone on costs, in thousandths of a week of their pay (the world's `hiring_cost_weeks`, read by `decimal::scaled`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AdjustParams {
     pub smooth_months: i64,
-    pub hiring_cost_weeks: f64,
+    pub hiring_cost_milliweeks: i64,
     /// Hours before heads: the least change, in 10,000ths of the ordinary hours, worth a notice to the staff (a
     /// placeholder; left out: 1,000).
     pub hours_step_bps: Option<i64>,
@@ -226,13 +232,18 @@ impl LabourPlan {
     /// How many months a surplus must have lasted before the most recent hire is let go: what ending the job costs
     /// under the law (notice and redundancy pay for their service, where our size owes it) and hiring again, in weeks
     /// of pay, as months (never less than one: the month the surplus is first seen).
-    pub fn waits(&self, law: Option<&TerminationLaw>, staff: i64, years: f64, notice_days: i64) -> i64 {
-        let notice = law.map_or(0.0, |l| weeks_at(&l.notice, years)).max(notice_days as f64 / 7.0);
+    /// `service`: how long the one who would go has been with us (seconds).
+    pub fn waits(&self, law: Option<&TerminationLaw>, staff: i64, service: i64, notice_days: i64) -> i64 {
+        // All in thousandths of a day of pay: weeks are seven days.
+        let notice = law.map_or(0, |l| days_at(&l.notice, service)).max(notice_days * 1_000);
         let redundancy = match law {
-            Some(l) if !l.small_employer_under.is_some_and(|u| (staff as f64) < u) => weeks_at(&l.redundancy_pay, years),
-            _ => 0.0,
+            Some(l) if !small(l, staff) => days_at(&l.redundancy_pay, service),
+            _ => 0,
         };
-        (((notice + redundancy + self.p.hiring_cost_weeks.max(0.0)) * 12.0) / 52.0).ceil().max(1.0) as i64
+        let total = i128::from(notice + redundancy + self.p.hiring_cost_milliweeks.max(0) * 7);
+        // Weeks as months: twelve to fifty-two, rounded up.
+        let den = 52 * 7 * 1_000;
+        ((total * 12 + den - 1) / den).max(1) as i64
     }
     /// The month's look: `over` (more staff than the expected trade needs) or not. Returns whether to let one go now,
     /// and how long the surplus has lasted.
@@ -1398,7 +1409,7 @@ impl Staffing {
                 offers_now += 1;
                 continue;
             }
-            let hours = hours_law(book).filter(|l| l.ordinary_week_hours > 0.0).map(|l| (l.ordinary_week_hours * 3600.0) as i64);
+            let hours = hours_law(book).filter(|l| l.ordinary_week_minutes > 0).map(|l| l.ordinary_week_minutes * 60);
             let o = Offer {
                 template: "employment".into(),
                 our_notice: Some(self.o.notice_days * DAY),
@@ -1735,8 +1746,9 @@ impl Staffing {
     // ---- pay that comes short, and the wage ledger
 
     /// The week's look at whom we begin to pay short (at most once a week, each on their own draw). `pay_less`: how
-    /// far the organisation's character would pay less, in standard deviations (0 where it takes no initiative).
-    pub fn shortening<T>(&mut self, book: &Book, t: i64, cx: &mut Cx, account: &str, balance: i64, pay_less: f64) -> Vec<Step<T>> {
+    /// far the organisation's character would pay less, in ten-thousandths of a standard deviation (0 where it takes no
+    /// initiative).
+    pub fn shortening<T>(&mut self, book: &Book, t: i64, cx: &mut Cx, account: &str, balance: i64, pay_less: i64) -> Vec<Step<T>> {
         let week = t.div_euclid(7 * DAY);
         let by = self.o.short_by_bps.unwrap_or(0);
         if by <= 0 || self.short_week == Some(week) {
@@ -1751,7 +1763,7 @@ impl Staffing {
         let bill: i64 = staff.iter().map(|a| self.wage_of(a)).sum();
         // (More often the more its character would pay less, and twice as often while it is short of cash.)
         let double = balance < 2 * bill;
-        let lean = move |bps: i64| super::orgwants::swayed(bps, pay_less, 1.0) * if double { 2 } else { 1 };
+        let lean = move |bps: i64| super::orgwants::swayed(bps, pay_less, 10_000) * if double { 2 } else { 1 };
         let law = income_tax_law(book);
         let mut steps = vec![];
         for a in staff {
@@ -1901,20 +1913,21 @@ impl Staffing {
             };
             let bill: i64 = staff.iter().map(|s| self.wage_of(s)).sum();
             let can = wage > now && wage <= now * 2 && balance >= org.p.rise_cover_periods * (bill + wage - now);
-            let years = (t - book.signed_at(&a.id).unwrap_or(t)) as f64 / YEAR as f64;
+            // How much they are worth keeping: their years with us less one, held to one either way (ten-thousandths).
+            let worth = round_div(i128::from(t - book.signed_at(&a.id).unwrap_or(t) - YEAR) * 10_000, i128::from(YEAR)).clamp(-10_000, 10_000) as i64;
             let (granted, chance) = if can {
                 let mut rng = cx.rng(&format!("rise-{}", r.id));
-                org.grants(PracticeOf::Rise, &mut rng, (years - 1.0).clamp(-1.0, 1.0), t)
+                org.grants(PracticeOf::Rise, &mut rng, worth, t)
             } else {
                 (false, 0)
             };
             org.remember(t, if granted { "gave_rise" } else { "refused_rise" }, Some(&worker), 2_000);
             if granted {
-                let why = format!("{worker} asks for a rise, to {}: we would sooner keep them (for us, {}% of such requests): their wage is {} from the next pay day.", usd(wage), chance as f64 / 100.0, usd(wage));
+                let why = format!("{worker} asks for a rise, to {}: we would sooner keep them (for us, {}% of such requests): their wage is {} from the next pay day.", usd(wage), fmt_dec(chance, 100), usd(wage));
                 steps.extend(self.raise(book, t, cx, account, 0, &why, Some(One { agreement: &a.id, wage, short: None })));
                 steps.push(step(format!("Telling {worker} their rise is granted."), vec![reply(true, &format!("Granted: your pay is {} from the next pay day.", usd(wage)))]));
             } else {
-                let why = if can { format!("{worker} asks for a rise: no (for us, {}% of such requests are granted).", chance as f64 / 100.0) } else { format!("{worker} asks for a rise we cannot give.") };
+                let why = if can { format!("{worker} asks for a rise: no (for us, {}% of such requests are granted).", fmt_dec(chance, 100)) } else { format!("{worker} asks for a rise we cannot give.") };
                 steps.push(step(why, vec![reply(false, "Not granted: your pay stays as it is.")]));
             }
         }
@@ -2036,7 +2049,7 @@ impl Staffing {
             let period = a.map_or(14 * DAY, |a| job_terms(a, &c.worker, None).period);
             let text = format!(
                 "Your hours are back to the ordinary {} a week, and your pay with them: {} every {}.",
-                ordinary_hours(a.map(|a| &**a), &c.worker, law),
+                fmt_dec(ordinary_minutes(a.map(|a| &**a), &c.worker, law), 60),
                 money_words(c.full, &cx.ctx.world),
                 duration_words(period)
             );
@@ -2125,15 +2138,18 @@ impl Staffing {
             };
             let paid_bps = paid_share(goal, each);
             let wage = (i128::from(full) * i128::from(paid_bps)).div_euclid(10_000) as i64;
-            let ordinary = ordinary_hours(Some(a), &worker, Some(&law));
+            let ordinary_min = ordinary_minutes(Some(a), &worker, Some(&law));
+            let ordinary = fmt_dec(ordinary_min, 60);
             let notice_days = law.notice_days.max(HOURS_GRACE_DAYS);
             let since = now.as_ref().map_or(t, |c| c.since);
             let until = if law.max_days > 0 { since + law.max_days * DAY } else { t + 20 * 365 * DAY };
             let from = t + notice_days * DAY;
             let period = job_terms(a, &worker, None).period;
             let consent = law.may_cut == MayCut::Consent;
-            let hours = round_f(ordinary * goal as f64 / 100.0) as f64 / 100.0;
-            let owed = if law.pay_bps > 0 && each > 0 { format!(" (The law owes {}% of pay for hours not worked.)", law.pay_bps as f64 / 100.0) } else { String::new() };
+            // The hours cut to, in hundredths of an hour (TS: Math.round(hours * goal / 100) / 100).
+            let hours_x100 = round_div(i128::from(ordinary_min) * i128::from(goal), 6_000) as i64;
+            let hours = fmt_dec(hours_x100, 100);
+            let owed = if law.pay_bps > 0 && each > 0 { format!(" (The law owes {}% of pay for hours not worked.)", fmt_dec(law.pay_bps, 100)) } else { String::new() };
             let spell = if law.max_days > 0 { format!(" It is for at most {} days.", law.max_days) } else { String::new() };
             let text = format!(
                 "{} your hours from {ordinary} a week to {hours}, {}, because there is not the trade for everyone's full week. Your pay for them is {} every {}, where it was {}.{owed}{spell} We would sooner do this than let anyone go.",
@@ -2153,7 +2169,7 @@ impl Staffing {
                 self.due.push(DueChange { at: from, agreement: a.id.clone(), wage, why: format!("Hours cut to {hours} a week: {worker} on {} from the next pay.", money_words(wage, &world)), short: None, held: false });
             }
             steps.push(step(
-                format!("{} {worker}'s hours to {}% of the ordinary, in place of letting anyone go (docs/behaviour/firms.md, \"Hours before heads\").", if now.is_some() { "Changing" } else { "Cutting" }, goal as f64 / 100.0),
+                format!("{} {worker}'s hours to {}% of the ordinary, in place of letting anyone go (docs/behaviour/firms.md, \"Hours before heads\").", if now.is_some() { "Changing" } else { "Cutting" }, fmt_dec(goal, 100)),
                 vec![say(
                     "hours_notice",
                     &text,
@@ -2161,7 +2177,7 @@ impl Staffing {
                         to: Some(vec![worker.clone()]),
                         visible: Some(Visible::Only(vec![self.me.clone(), worker.clone()])),
                         basis: Some(a.id.clone()),
-                        data: Some(json!({ "employer": self.me, "agreement": a.id, "hours_bps": goal, "ordinary_week_hours": round_f(ordinary), "minutes_week": round_f(hours * 60.0), "wage": wage, "was": full,
+                        data: Some(json!({ "employer": self.me, "agreement": a.id, "hours_bps": goal, "ordinary_week_hours": round_div(i128::from(ordinary_min), 60) as i64, "minutes_week": round_div(i128::from(hours_x100) * 60, 100) as i64, "wage": wage, "was": full,
                             "from": from, "until": until, "consent": consent, "consent_bps": law.consent_bps, "law": law.id, "reply_by": reply_by })),
                         ..Default::default()
                     },
@@ -2170,7 +2186,7 @@ impl Staffing {
             changed += 1;
         }
         let achieved = self.achieved(&staff);
-        HoursReview { steps, achieved, why: if changed > 0 { format!("cut hours across our staff to {}% of the ordinary", goal as f64 / 100.0) } else { String::new() } }
+        HoursReview { steps, achieved, why: if changed > 0 { format!("cut hours across our staff to {}% of the ordinary", fmt_dec(goal, 100)) } else { String::new() } }
     }
 
     /// Agreements to cuts we put (an `hours_reply` of the worker's), and the wage changes whose day has come.
@@ -2235,39 +2251,39 @@ impl Staffing {
         vec![step(why, vec![notice(&last.id, reason)])]
     }
 
-    /// How long the most recent hire we are keeping has been with us, in years (nobody: 0).
-    pub fn last_hire_years(&self, book: &Book, t: i64) -> f64 {
+    /// How long the most recent hire we are keeping has been with us, in seconds (nobody: 0).
+    pub fn last_hire_service(&self, book: &Book, t: i64) -> i64 {
         let staff = self.staff(book, t);
-        self.latest_hire(book, &staff).map_or(0.0, |last| self.service_years(book, t, last))
+        self.latest_hire(book, &staff).map_or(0, |last| self.service(book, t, last))
     }
 
-    /// How long someone has worked for us under an agreement, in years (those we began with: as long as the run).
-    pub fn service_years(&self, book: &Book, t: i64, a: &Record) -> f64 {
-        ((t - book.signed_at(&a.id).unwrap_or(a.at)) as f64 / YEAR as f64).max(0.0)
+    /// How long someone has worked for us under an agreement, in seconds (those we began with: as long as the run).
+    pub fn service(&self, book: &Book, t: i64, a: &Record) -> i64 {
+        (t - book.signed_at(&a.id).unwrap_or(a.at)).max(0)
     }
 
     /// What the law on ending a job says we owe someone let go for redundancy, beyond their notice: redundancy pay for
     /// their service (unless we are smaller than the law's small employer), and pay for the notice the law gives them
-    /// beyond what their agreement does. In weeks of their pay. No such law in the world: nothing. Returns the sum, the
-    /// law and the words.
+    /// beyond what their agreement does. No such law in the world: nothing. Returns the sum, the law and the words.
+    /// Reckoned exactly in seconds of pay (the TS multiplied floating-point weeks); the words give the weeks.
     pub fn redundancy_owed(&self, book: &Book, t: i64, a: &Record, staff: i64) -> (i64, String, String) {
         let Some(law) = termination_law(book).filter(|_| !by_the_day(a)) else { return (0, String::new(), String::new()) };
         let terms = job_terms(a, worker_of(a), None);
-        let years = self.service_years(book, t, a);
-        let weekly = (self.full_wage_of(a) as f64 * (7 * DAY) as f64) / terms.period as f64;
-        let small = law.small_employer_under.is_some_and(|u| (staff as f64) < u);
-        let redundancy = if small { 0.0 } else { weeks_at(&law.redundancy_pay, years) };
-        let agreed = notice_of(a, &self.me).unwrap_or(0) as f64 / (7 * DAY) as f64;
-        let lieu = (weeks_at(&law.notice, years) - agreed).max(0.0);
-        let sum = (weekly * (redundancy + lieu)).floor() as i64;
+        let service = self.service(book, t, a);
+        // Thousandths of a day of pay.
+        let redundancy = if small(&law, staff) { 0 } else { days_at(&law.redundancy_pay, service) };
+        let agreed = i128::from(notice_of(a, &self.me).unwrap_or(0)) * 1_000 / i128::from(DAY);
+        let lieu = (i128::from(days_at(&law.notice, service)) - agreed).max(0) as i64;
+        let paid_days = i128::from(redundancy + lieu);
+        let sum = (i128::from(self.full_wage_of(a)) * paid_days * i128::from(DAY) / (1_000 * i128::from(terms.period.max(1)))) as i64;
         let bits: Vec<String> = [
-            (redundancy > 0.0).then(|| format!("{redundancy} weeks' redundancy pay")),
-            (lieu > 0.0).then(|| format!("{} weeks' pay for notice beyond the agreement's", (lieu * 10.0 + 0.5).floor() / 10.0)),
+            (redundancy > 0).then(|| format!("{} weeks' redundancy pay", fmt_dec(redundancy, 7_000))),
+            (lieu > 0).then(|| format!("{} weeks' pay for notice beyond the agreement's", fmt_dec(round_div(i128::from(lieu) * 10, 7_000) as i64, 10))),
         ]
         .into_iter()
         .flatten()
         .collect();
-        (sum, law.id, format!("{} for {} years' service", bits.join(" and "), years.floor()))
+        (sum, law.id, format!("{} for {} years' service", bits.join(" and "), service / YEAR))
     }
 
     /// Let everyone go, with the notice their contracts give (in batches: a program has at most 32 lines).
@@ -2440,7 +2456,7 @@ mod tests {
         records.extend(signatures(&a, 4 * DAY));
         wake(&mut office, &mut book, &c, 5 * DAY, records);
         // The worker gave notice: the agreement reads as ending on day 40.
-        let mut ending = |s: &mut Staffing, b: &mut Book, t: i64| {
+        let ending = |s: &mut Staffing, b: &mut Book, t: i64| {
             let mut p = picture(t, "city", vec![], &[("acc-city", "city", 900_000_000)], vec![]);
             p.readings.insert("job-9".into(), reading("ending", Some(40 * DAY)));
             b.absorb(&p);
@@ -2770,21 +2786,21 @@ mod tests {
 
     #[test]
     fn labour_adjusts_on_trade_smoothed_and_lets_go_only_after_a_surplus_has_lasted() {
-        let mut plan = LabourPlan::new(AdjustParams { smooth_months: 3, hiring_cost_weeks: 2.0, hours_step_bps: None }, Some(1_000));
+        let mut plan = LabourPlan::new(AdjustParams { smooth_months: 3, hiring_cost_milliweeks: 2_000, hours_step_bps: None }, Some(1_000));
         assert_eq!(plan.expected(), 1_000);
         // Halfway toward the new month over a horizon of three: (1000 + (2000 - 1000) * 2 / 4) = 1500.
         assert_eq!(plan.expect(2_000), 1_500);
-        assert_eq!(LabourPlan::new(AdjustParams { smooth_months: 0, hiring_cost_weeks: 0.0, hours_step_bps: None }, None).expect(700), 700);
-        let law = TerminationLaw { id: "t".into(), notice: vec![ByService { from_years: 0.0, days: 14.0 }], redundancy_pay: vec![ByService { from_years: 1.0, days: 28.0 }], small_employer_under: Some(10.0) };
+        assert_eq!(LabourPlan::new(AdjustParams { smooth_months: 0, hiring_cost_milliweeks: 0, hours_step_bps: None }, None).expect(700), 700);
+        let law = TerminationLaw { id: "t".into(), notice: vec![ByService { from_service: 0, milli_days: 14_000 }], redundancy_pay: vec![ByService { from_service: YEAR, milli_days: 28_000 }], small_employer_under: Some(10_000) };
         // Two weeks' notice and a fortnight of hiring cost: (2 + 2) * 12 / 52 = 0.92, at least one month.
-        assert_eq!(plan.waits(Some(&law), 5, 2.0, 0), 1);
+        assert_eq!(plan.waits(Some(&law), 5, 2 * YEAR, 0), 1);
         // A larger employer owes redundancy pay too: (2 + 4 + 2) * 12 / 52 = 1.85, two months.
-        assert_eq!(plan.waits(Some(&law), 12, 2.0, 0), 2);
+        assert_eq!(plan.waits(Some(&law), 12, 2 * YEAR, 0), 2);
         assert_eq!(plan.month(true, 2), (false, 1));
         assert_eq!(plan.month(true, 2), (true, 2));
         assert_eq!(plan.month(false, 2), (false, 0));
-        assert_eq!(weeks_at(&law.notice, 3.0), 2.0);
-        assert_eq!(weeks_at(&law.redundancy_pay, 0.5), 0.0);
+        assert_eq!(days_at(&law.notice, 3 * YEAR), 14_000);
+        assert_eq!(days_at(&law.redundancy_pay, YEAR / 2), 0);
         assert_eq!(paid_share(6_000, 7_500), 9_000);
     }
 

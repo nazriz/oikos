@@ -12,9 +12,11 @@
 //! Decided fresh: the wants book is lane A2's (`mind::wants::Wants`), which is not in this lane's tree; `Org<W>` holds
 //! any `W: Wanting` (the two things the organisation reads of it: the events since last asked, and its record
 //! section), and the integration step names `Org<mind::wants::Wants>` with a three-line `impl Wanting`. A character is
-//! a z-score in standard deviations (a plain `f64`; only `+ - * /` and `Math.round`'s half up are used, so it is the
-//! same on every machine), written to the record as basis points.
+//! a z-score in ten-thousandths of a standard deviation (an integer: the kernel has no floating point), rounded half away
+//! from nought where TS's real arithmetic had a fraction, written to the record as basis points. Shares (`answer`,
+//! `markup`, `patience_months`) are basis points, read from the world's decimals by their digits (`decimal::scaled`).
 
+use super::decimal::{round_div, scaled};
 use super::practice::{Practice, PracticeOf, PracticeParams, PracticeRow, PRACTICES};
 use crate::Cx;
 use oikos_core::rng::Rng;
@@ -25,19 +27,20 @@ use std::collections::{BTreeMap, VecDeque};
 
 pub const ORG_WANTS: [&str; 6] = ["keep_trading", "grow", "keep", "be_rid", "pay_less", "standing"];
 
-/// How much each standing want weighs with an organisation, in standard deviations from the town's mean owner.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
+/// How much each standing want weighs with an organisation, in ten-thousandths of a standard deviation from the town's
+/// mean owner (10,000: one standard deviation).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Character {
-    pub keep_trading: f64,
-    pub grow: f64,
-    pub keep: f64,
-    pub be_rid: f64,
-    pub pay_less: f64,
-    pub standing: f64,
+    pub keep_trading: i64,
+    pub grow: i64,
+    pub keep: i64,
+    pub be_rid: i64,
+    pub pay_less: i64,
+    pub standing: i64,
 }
 
 impl Character {
-    pub fn get(&self, want: &str) -> f64 {
+    pub fn get(&self, want: &str) -> i64 {
         match want {
             "keep_trading" => self.keep_trading,
             "grow" => self.grow,
@@ -62,30 +65,28 @@ pub struct Spread {
 /// conformity hold on to those it deals with; power without benevolence is rid of them; power and achievement without
 /// universalism or benevolence pay less; conformity, benevolence and universalism care how it is thought of.
 pub fn character_of(owner: Option<&BTreeMap<String, i64>>, pop: &BTreeMap<String, Spread>) -> Character {
-    let z = |v: &str| -> f64 {
-        let Some(x) = owner.and_then(|o| o.get(v)) else { return 0.0 };
+    let z = |v: &str| -> i128 {
+        let Some(x) = owner.and_then(|o| o.get(v)) else { return 0 };
         let d = pop.get(v).copied().unwrap_or(Spread { mean_bps: 5_000, sd_bps: 1_500 });
-        ((*x - d.mean_bps) as f64 / d.sd_bps.max(1) as f64).clamp(-3.0, 3.0)
+        round_div(i128::from(*x - d.mean_bps) * 10_000, i128::from(d.sd_bps.max(1))).clamp(-30_000, 30_000)
     };
+    let mean = |sum: i128, n: i128| round_div(sum, n) as i64;
     Character {
-        keep_trading: (z("security") + z("tradition")) / 2.0,
-        grow: (z("achievement") + z("stimulation") + z("power")) / 3.0,
-        keep: (z("benevolence") + z("conformity")) / 2.0,
-        be_rid: (z("power") - z("benevolence")) / 2.0,
-        pay_less: (z("power") + z("achievement") - z("universalism") - z("benevolence")) / 4.0,
-        standing: (z("conformity") + z("benevolence") + z("universalism")) / 3.0,
+        keep_trading: mean(z("security") + z("tradition"), 2),
+        grow: mean(z("achievement") + z("stimulation") + z("power"), 3),
+        keep: mean(z("benevolence") + z("conformity"), 2),
+        be_rid: mean(z("power") - z("benevolence"), 2),
+        pay_less: mean(z("power") + z("achievement") - z("universalism") - z("benevolence"), 4),
+        standing: mean(z("conformity") + z("benevolence") + z("universalism"), 3),
     }
 }
 
-/// `Math.round`: half up.
-fn round(x: f64) -> i64 {
-    (x + 0.5).floor() as i64
-}
-
-/// A rate swayed by where an organisation stands against its town: `z` standard deviations from the mean (held to
-/// three), `per` the share of the rate a standard deviation moves it. Symmetric, so the town's rate stays calibrated.
-pub fn swayed(bps: i64, z: f64, per: f64) -> i64 {
-    round(bps as f64 * (1.0 + per * z.clamp(-3.0, 3.0))).clamp(0, 10_000)
+/// A rate swayed by where an organisation stands against its town: `z` ten-thousandths of a standard deviation from
+/// the mean (held to three), `per_bps` the share of the rate a standard deviation moves it. Symmetric, so the town's
+/// rate stays calibrated.
+pub fn swayed(bps: i64, z: i64, per_bps: i64) -> i64 {
+    let z = i128::from(z.clamp(-30_000, 30_000));
+    (round_div(i128::from(bps) * (100_000_000 + i128::from(per_bps) * z), 100_000_000) as i64).clamp(0, 10_000)
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -97,11 +98,11 @@ pub struct OrgParams {
     pub rise_bps: i64,
     pub stay_bps: i64,
     /// How far a standard deviation of character sways those answers (a share of the rate). PLACEHOLDER.
-    pub answer: f64,
+    pub answer: i64,
     /// How far it sways a markup or a margin; and by how many months, a standard deviation, its patience with someone
     /// who owes it. PLACEHOLDERS.
-    pub markup: f64,
-    pub patience_months: f64,
+    pub markup: i64,
+    pub patience_months: i64,
     /// A rise is given only if what is in the bank covers this many pay periods of the new wage bill. PLACEHOLDER.
     pub rise_cover_periods: i64,
     /// The wants' own figures (`mind::wants::want_params` reads them).
@@ -110,7 +111,7 @@ pub struct OrgParams {
 
 impl Default for OrgParams {
     fn default() -> Self {
-        OrgParams { hold_bps: 3_000, rise_bps: 3_000, stay_bps: 3_000, answer: 0.5, markup: 0.3, patience_months: 0.5, rise_cover_periods: 3, wants: json!({}) }
+        OrgParams { hold_bps: 3_000, rise_bps: 3_000, stay_bps: 3_000, answer: 5_000, markup: 3_000, patience_months: 5_000, rise_cover_periods: 3, wants: json!({}) }
     }
 }
 
@@ -119,7 +120,7 @@ impl OrgParams {
     pub fn from_json(given: &Value) -> OrgParams {
         let mut p = OrgParams::default();
         let int = |k: &str| given.get(k).and_then(Value::as_i64);
-        let num = |k: &str| given.get(k).and_then(Value::as_f64);
+        let num = |k: &str| given.get(k).and_then(|v| scaled(v, 10_000));
         p.hold_bps = int("hold_bps").unwrap_or(p.hold_bps);
         p.rise_bps = int("rise_bps").unwrap_or(p.rise_bps);
         p.stay_bps = int("stay_bps").unwrap_or(p.stay_bps);
@@ -244,21 +245,21 @@ impl<W: Wanting + Serialize + DeserializeOwned> Org<W> {
             let mut practice = Practice::new(params, &given.practice);
             // (An office is never new on day 1: it opens with the habit its character gives, so at the opening nothing moves.)
             for k in PRACTICES {
-                practice.open(k, org.chance_of(k, 0.0), 0);
+                practice.open(k, org.chance_of(k, 0), 0);
             }
             org.practice = Some(practice);
         }
         org
     }
 
-    fn chance_of(&self, what: PracticeOf, worth: f64) -> i64 {
+    fn chance_of(&self, what: PracticeOf, worth: i64) -> i64 {
         let c = &self.character;
         let against = match what {
             PracticeOf::Rise => c.pay_less,
             PracticeOf::Stay => c.be_rid,
             PracticeOf::Hold => c.grow,
         };
-        let lean = (c.keep + c.standing) / 2.0 - against + worth;
+        let lean = round_div(i128::from(c.keep + c.standing), 2) as i64 - against + worth;
         let base = match what {
             PracticeOf::Hold => self.p.hold_bps,
             PracticeOf::Rise => self.p.rise_bps,
@@ -271,12 +272,12 @@ impl<W: Wanting + Serialize + DeserializeOwned> Org<W> {
     /// much the one asking is worth keeping, in standard deviations (a tenant who always paid, a hand long with us).
     /// Holding a rent or letting a tenant stay sets keeping them and being thought well of against growing; a rise
     /// sets them against paying less.
-    pub fn grants(&mut self, what: PracticeOf, rng: &mut Rng, worth: f64, t: i64) -> (bool, i64) {
+    pub fn grants(&mut self, what: PracticeOf, rng: &mut Rng, worth: i64, t: i64) -> (bool, i64) {
         let mut chance = self.chance_of(what, worth);
         // (Its habit, where the culture dial is on: the rate is drawn part of the way from what its character gives
         // toward what the office has in fact done. No draw is added.)
         if let Some(practice) = &self.practice {
-            chance = practice.pulled(what, chance, self.chance_of(what, 0.0));
+            chance = practice.pulled(what, chance, self.chance_of(what, 0));
         }
         let granted = self.lively && rng.below(10_000) < chance as u64;
         if let Some(practice) = &mut self.practice {
@@ -299,9 +300,9 @@ impl<W: Wanting + Serialize + DeserializeOwned> Org<W> {
     /// How many months it bears with someone who owes it before acting: longer for one that would keep them. Never
     /// shorter than its routine's: under that, its own books cannot tell a payment a few days late from one not made,
     /// so one that would be rid of a tenant acts when the routine does. (So this lever only lengthens.)
-    pub fn patience(&self, months: f64) -> f64 {
+    pub fn patience(&self, months: i64) -> i64 {
         if self.lively {
-            months.max(months + round(self.p.patience_months * (self.character.keep - self.character.be_rid)) as f64)
+            months.max(months + round_div(i128::from(self.p.patience_months) * i128::from(self.character.keep - self.character.be_rid), 100_000_000) as i64)
         } else {
             months
         }
@@ -347,7 +348,7 @@ impl<W: Wanting + Serialize + DeserializeOwned> Org<W> {
             self.told.push(e);
             self.noted(r);
         }
-        let bps = |z: f64| round(5_000.0 + 1_000.0 * z).clamp(0, 10_000);
+        let bps = |z: i64| (5_000 + round_div(i128::from(z), 10) as i64).clamp(0, 10_000);
         let mut counts: BTreeMap<String, i64> = self.counts.clone();
         counts.extend(circumstances.iter().map(|(k, v)| (k.clone(), *v)));
         let mut all = Map::new();
@@ -420,9 +421,9 @@ mod tests {
     #[test]
     fn character_follows_the_owners_values_about_the_towns_mean() {
         let (k, h) = (character_of(Some(&kind()), &BTreeMap::new()), character_of(Some(&hard()), &BTreeMap::new()));
-        assert!(k.keep > 0.0 && k.standing > 0.0 && k.pay_less < 0.0 && k.grow < 0.0);
+        assert!(k.keep > 0 && k.standing > 0 && k.pay_less < 0 && k.grow < 0);
         for w in ORG_WANTS {
-            assert!((h.get(w) + k.get(w)).abs() < 1e-9, "{w}");
+            assert_eq!(h.get(w), -k.get(w), "{w}");
         }
         assert_eq!(character_of(None, &BTreeMap::new()), Character::default());
     }
@@ -434,7 +435,7 @@ mod tests {
         assert_eq!(rows.iter().map(|r| r.of).collect::<Vec<_>>(), PRACTICES);
         assert!(rows.iter().all(|r| r.occasions == CULTURE.opening));
         let mut off = org(false, Some(kind()));
-        for worth in [-1.0, 0.0, 0.5] {
+        for worth in [-10_000, 0, 5_000] {
             for k in PRACTICES {
                 let (a, b) = (o.grants(k, &mut rng(), worth, 0).1, off.grants(k, &mut rng(), worth, 0).1);
                 assert!((a - b).abs() <= 30, "{k:?} {worth}: the rounding of a whole number of occasions");
@@ -456,7 +457,7 @@ mod tests {
             yes.practice.as_mut().unwrap().observe(PracticeOf::Stay, i * 86_400, true);
             no.practice.as_mut().unwrap().observe(PracticeOf::Stay, i * 86_400, false);
         }
-        assert!(yes.grants(PracticeOf::Stay, &mut rng(), 0.0, 70 * 86_400).1 > no.grants(PracticeOf::Stay, &mut rng(), 0.0, 70 * 86_400).1);
+        assert!(yes.grants(PracticeOf::Stay, &mut rng(), 0, 70 * 86_400).1 > no.grants(PracticeOf::Stay, &mut rng(), 0, 70 * 86_400).1);
     }
 
     #[test]
@@ -483,10 +484,12 @@ mod tests {
     fn the_two_owners_answer_differently_and_a_record_says_what_happened() {
         let (mut kind_org, mut hard_org) = (org(false, Some(kind())), org(false, Some(hard())));
         // Rates differ in the direction character gives.
-        let chance = |o: &mut Org<NoWants>| o.grants(PracticeOf::Hold, &mut rng(), 0.0, 0).1;
+        let chance = |o: &mut Org<NoWants>| o.grants(PracticeOf::Hold, &mut rng(), 0, 0).1;
         assert!(chance(&mut kind_org) > 3_000 && chance(&mut hard_org) < 3_000);
         assert!(kind_org.markup(1_000) < 1_000 && hard_org.markup(1_000) > 1_000);
-        assert!(kind_org.patience(2.0) >= 2.0);
+        assert!(kind_org.patience(2) >= 2);
+        assert_eq!(swayed(3_000, 10_000, 5_000), 4_500, "a standard deviation moves the rate by half");
+        assert_eq!(swayed(3_000, 90_000, 5_000), 7_500, "held to three");
         kind_org.remember(5, "held_rent", Some("ann"), 1_000);
         let c = kind_org.change(&BTreeMap::from([("homes".to_string(), 2)])).unwrap();
         assert!(c.set["character"]["keep"].as_i64().unwrap() > 5_000);
@@ -495,7 +498,7 @@ mod tests {
         // One that takes no initiative answers nothing and writes no record.
         let mut plain = Org::new(&mut Cx::new(0, &ctx(0), &mut Draws::default(), 7, vec![]), Given::default(), NoWants::default());
         assert!(!plain.lively && plain.change(&BTreeMap::new()).is_none());
-        assert!(!plain.grants(PracticeOf::Hold, &mut rng(), 0.0, 0).0);
+        assert!(!plain.grants(PracticeOf::Hold, &mut rng(), 0, 0).0);
         assert_eq!(plain.markup(1_234), 1_234);
     }
 }

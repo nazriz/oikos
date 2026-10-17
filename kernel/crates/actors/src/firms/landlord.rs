@@ -29,6 +29,7 @@
 //! - The first wake is a day of the week drawn from the participant's id (a kind cannot draw before it exists); the day
 //!   and hour of the rent book are drawn at the first wake from `cx.chance`.
 
+use super::decimal::{fmt_dec, round_div, scaled};
 use super::orgwants::{Given, Org, Spread, WantNote, Wanting};
 use super::practice::{PracticeOf, PracticeParams};
 use super::tax::latest_law;
@@ -75,7 +76,7 @@ pub struct PossessionLaw {
 pub fn possession_law(book: &Book) -> Option<PossessionLaw> {
     let l = latest_law(book, |r| data(r).get("tenancy").and_then(Value::as_str) == Some("possession"))?;
     let d = data(l);
-    let n = |k: &str| d.get(k).and_then(Value::as_f64).filter(|x| *x >= 0.0).map_or(0, |x| x as i64);
+    let n = |k: &str| d.get(k).and_then(|v| scaled(v, 1)).filter(|x| *x >= 0).unwrap_or(0);
     Some(PossessionLaw {
         id: l.id.clone(),
         arrears_days: n("arrears_days"),
@@ -715,15 +716,6 @@ fn whole(v: Option<&Value>) -> i64 {
     v.and_then(crate::papers::lenient::whole).unwrap_or(0)
 }
 
-/// A number as JavaScript writes it into words: whole numbers bare.
-fn num(x: f64) -> String {
-    if x.fract() == 0.0 {
-        format!("{}", x as i64)
-    } else {
-        format!("{x}")
-    }
-}
-
 fn occupancy(who: &str, space: &str) -> Call {
     call("occupancy", vec![("who", Some(arg(who))), ("in", Some(arg(space)))])
 }
@@ -1198,7 +1190,7 @@ impl Office {
                 let noise = 9_750 + cx.rng(&format!("price-{}", o.space)).below(501) as i128;
                 let rent = ((i128::from(reference) * i128::from(10_000 + markup) * noise) / 100_000_000) as i64;
                 let basis = if going.is_empty() { format!("the base rent for its size ({})", e.usd(reference)) } else { format!("what similar homes in the building let for ({})", e.usd(reference)) };
-                steps.push(step(format!("Listing a vacant home at {}% over {basis}.", num(markup as f64 / 100.0)), vec![listing(&o, rent, cx, &e.account)]));
+                steps.push(step(format!("Listing a vacant home at {}% over {basis}.", fmt_dec(markup, 100)), vec![listing(&o, rent, cx, &e.account)]));
             }
             // Unlet for a month: cut the asking rent (BoE: 5% a month).
             for l in listed {
@@ -1206,7 +1198,7 @@ impl Office {
                     let was = whole(data(l).get("rent"));
                     let rent = was * (10_000 - self.p.cut_bps) / 10_000;
                     steps.push(step(
-                        format!("Unlet for a month: cutting the asking rent {}%.", num(self.p.cut_bps as f64 / 100.0)),
+                        format!("Unlet for a month: cutting the asking rent {}%.", fmt_dec(self.p.cut_bps, 100)),
                         vec![withdraw(&l.id, Some("Relisting at a lower rent.")), listing(&o, rent, cx, &e.account)],
                     ));
                 }
@@ -1357,8 +1349,8 @@ impl Office {
             let paid: i64 = paying_account.get(&tenant).and_then(|acc| self.received.get(acc)).map_or(0, |v| v.iter().filter(|(at, _)| *at >= begins).map(|(_, amt)| amt).sum());
             // How long we bear with arrears is our practice, and our character's: one that would keep its tenants waits
             // longer than one that would be rid of them.
-            let months = self.p.arrears_months_before_notice as f64;
-            let bears = self.org().patience(months) as i64;
+            let months = self.p.arrears_months_before_notice;
+            let bears = self.org().patience(months);
             let behind = owed - paid;
             let routine_arrears = behind >= self.p.arrears_months_before_notice * rent;
             if self.org().lively && e.at_books {
@@ -1373,7 +1365,7 @@ impl Office {
                 }
                 if routine_arrears && t - self.late_since[&a.id] >= 7 * DAY && held.is_none() {
                     let c = self.org().character;
-                    let weight = ((5_000.0 + 1_000.0 * (c.be_rid - c.keep)) + 0.5).floor() as i64;
+                    let weight = 5_000 + round_div(i128::from(c.be_rid - c.keep), 10) as i64;
                     self.org().wants.born(&a.id, &tenant, weight, t);
                 } else if held.is_some() && behind < self.p.arrears_months_before_notice * rent {
                     self.org().wants.met(&a.id, t);
@@ -1851,7 +1843,7 @@ impl Office {
                     unit.space,
                     e.usd(market),
                     e.usd(now),
-                    (lead as f64 / DAY as f64).round() as i64
+                    round_div(i128::from(lead), i128::from(DAY)) as i64
                 ),
             };
             self.rent_changes.entry(a.id.clone()).or_default().push(RentChange { from: g.from, rent: market });
@@ -1903,8 +1895,8 @@ impl Office {
             calls.push(pay(&outside, upkeep, Pay { from: Some(e.account.clone()), for_: Some("Maintenance and repairs.".into()), ..Default::default() }, cx));
         }
         if !calls.is_empty() {
-            let locally = if shops.is_empty() { String::new() } else { format!(", and the owners spend {}% locally", num(self.p.spend_share_bps as f64 / 100.0)) };
-            steps.push(step(format!("Monthly: {}% of rent received goes on upkeep{locally}.", num(self.p.upkeep_share_bps as f64 / 100.0)), calls));
+            let locally = if shops.is_empty() { String::new() } else { format!(", and the owners spend {}% locally", fmt_dec(self.p.spend_share_bps, 100)) };
+            steps.push(step(format!("Monthly: {}% of rent received goes on upkeep{locally}.", fmt_dec(self.p.upkeep_share_bps, 100)), calls));
         }
     }
 }
@@ -2161,7 +2153,7 @@ impl Office {
             let reply = |granted: bool, words: &str| {
                 say("variation_answer", words, Say { to: Some(vec![tenant.clone()]), visible: visible(&[&me, &tenant]), basis: Some(r.id.clone()), data: Some(json!({ "about": about, "granted": granted })), ..Default::default() })
             };
-            let worth = if paid_up { 0.5 } else { -1.0 };
+            let worth = if paid_up { 5_000 } else { -10_000 };
             let rent_notice_paper = paper.as_ref().filter(|p| matches!(&p.body, RecordBody::Statement { kind, .. } if kind == "rent_increase") && p.speaks_for.as_deref() == Some(me.as_str()) && !self.book.withdrawn(&p.id));
             if let Some(paper) = rent_notice_paper {
                 let mut rng = cx.rng(&format!("vary-{}", r.id));
@@ -2173,11 +2165,11 @@ impl Office {
                         v.retain(|c| !(c.from == from && c.rent == rent));
                     }
                     steps.push(step(
-                        format!("{tenant} asks us to hold the rent: we would sooner keep them (for us, {}% of such requests): withdrawing the notice; the rent stays as it was.", num(chance as f64 / 100.0)),
+                        format!("{tenant} asks us to hold the rent: we would sooner keep them (for us, {}% of such requests): withdrawing the notice; the rent stays as it was.", fmt_dec(chance, 100)),
                         vec![withdraw(&paper.id, Some("Withdrawn at the tenant's request.")), reply(true, "Granted: the notice of rent increase is withdrawn; your rent stays as it was.")],
                     ));
                 } else {
-                    steps.push(step(format!("{tenant} asks us to hold the rent: no (for us, {}% of such requests are granted).", num(chance as f64 / 100.0)), vec![reply(false, "Not granted: the rent increase stands.")]));
+                    steps.push(step(format!("{tenant} asks us to hold the rent: no (for us, {}% of such requests are granted).", fmt_dec(chance, 100)), vec![reply(false, "Not granted: the rent increase stands.")]));
                 }
             } else if d.get("would").and_then(|w| w.get("does")).and_then(|w| w.get("outcome")).and_then(|o| o.get("occupancy")).is_some() && self.notice_given.contains_key(&a.id) && !self.renewed.contains(&a.id) {
                 let ends = self.book.ends_at(&a.id);

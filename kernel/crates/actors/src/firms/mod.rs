@@ -2,6 +2,7 @@
 //! `KINDS` (the registry reads it: no lane edits another's list).
 
 pub mod bargaining;
+pub mod decimal;
 pub mod employer;
 pub mod landlord;
 pub mod orgwants;

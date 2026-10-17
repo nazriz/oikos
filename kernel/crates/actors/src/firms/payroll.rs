@@ -548,7 +548,7 @@ mod tests {
     fn a_deputy_appoints_one_of_the_living_staff_to_an_empty_post_and_not_a_dead_one() {
         // Two on the staff, one dead: the living one is appointed; their participant is looked up first.
         let c = ctx_with("deputy", json!({}));
-        let mut staff_records = |d: i64| {
+        let staff_records = |d: i64| {
             if d > 0 {
                 return vec![statement("death-1", d * DAY, "death_registration", json!({ "deceased": "dead-one" }), "city")];
             }

@@ -14,6 +14,7 @@
 //! employer whose output is not sold through its own account) keeps its opening staff: no trade record, no change.
 //! Basis: Hamermesh 1993; Holt et al. 1960; Oi 1962 and Davis, Faberman and Haltiwanger 2012 (docs/research/references.md).
 
+use super::decimal::{fmt_dec, scaled};
 use super::staffing::{AdjustParams, LabourPlan, Staffing, StaffingOpts, Want};
 use crate::common::{own_account, receipts, Book, MONTH};
 use crate::steps::{because, pay, Done, Pay, Plan, Step, Stepper};
@@ -38,7 +39,8 @@ struct Params {
     workplace: Option<String>,
     role: String,
     smooth_months: i64,
-    hiring_cost_weeks: f64,
+    /// What taking someone on costs, in thousandths of a week of their pay (the world's `hiring_cost_weeks`).
+    hiring_cost_milliweeks: i64,
     required_margin_bps: i64,
 }
 
@@ -55,7 +57,7 @@ impl Params {
             workplace: ctx.param("workplace", None)?,
             role: ctx.param::<Option<String>>("role", None)?.unwrap_or_else(|| "staff".into()),
             smooth_months: ctx.param("smooth_months", 3)?,
-            hiring_cost_weeks: ctx.param("hiring_cost_weeks", 0.0)?,
+            hiring_cost_milliweeks: ctx.params.get("hiring_cost_weeks").and_then(|v| scaled(v, 1_000)).unwrap_or(0),
             required_margin_bps: ctx.param("required_margin_bps", 0)?,
         })
     }
@@ -98,7 +100,7 @@ impl Kind for Employer {
         let mut o = StaffingOpts::new(p.period, p.notice_days, &p.role);
         o.workplace = p.workplace.clone();
         o.wakes = Some(7 * DAY);
-        let adjust = AdjustParams { smooth_months: p.smooth_months, hiring_cost_weeks: p.hiring_cost_weeks, hours_step_bps: None };
+        let adjust = AdjustParams { smooth_months: p.smooth_months, hiring_cost_milliweeks: p.hiring_cost_milliweeks, hours_step_bps: None };
         Ok(Box::new(Stepper::new(Firm {
             staffing: Staffing::new(&ctx.entity, o),
             book: Book::new(),
@@ -193,9 +195,9 @@ impl Plan for Firm {
         } else if month_over && self.seen_takings {
             // Over what the trade needs for as long as ending a job and hiring again costs: the most recent hire goes.
             let over = keeping > need;
-            let years = self.staffing.last_hire_years(&self.book, t);
+            let service = self.staffing.last_hire_service(&self.book, t);
             let law = super::staffing::termination_law(&self.book);
-            let waits = self.labour.waits(law.as_ref(), keeping, years, self.p.notice_days);
+            let waits = self.labour.waits(law.as_ref(), keeping, service, self.p.notice_days);
             let (let_go, lasted) = self.labour.month(over, waits);
             if let_go {
                 let why = format!("Month's end: the trade we expect ({} a month) needs {need} staff and we have {keeping}, and it has lasted {lasted} months: letting the most recent hire go.", usd(self.labour.expected()));
@@ -209,7 +211,7 @@ impl Plan for Firm {
             self.revenue = 0;
             if let (true, Some(out)) = (due > 0, &self.p.outside_account) {
                 steps.push(because(
-                    format!("Monthly: paying suppliers {}% of revenue.", self.p.supplier_share_bps as f64 / 100.0),
+                    format!("Monthly: paying suppliers {}% of revenue.", fmt_dec(self.p.supplier_share_bps, 100)),
                     vec![pay(out, due, Pay { from: Some(acc.account.clone()), for_: Some("Suppliers.".into()), ..Default::default() }, cx)],
                 ));
             }
@@ -230,10 +232,10 @@ mod tests {
         let mut o = StaffingOpts::new(14 * DAY, 14, "staff");
         o.wakes = Some(7 * DAY);
         Firm {
-            p: Params { wage: 140_000, period: 14 * DAY, target_staff: target, notice_days: 14, supplier_share_bps: 4_000, buffer_periods: 2, outside_account: None, workplace: None, role: "staff".into(), smooth_months: 3, hiring_cost_weeks: 0.0, required_margin_bps: 0 },
+            p: Params { wage: 140_000, period: 14 * DAY, target_staff: target, notice_days: 14, supplier_share_bps: 4_000, buffer_periods: 2, outside_account: None, workplace: None, role: "staff".into(), smooth_months: 3, hiring_cost_milliweeks: 0, required_margin_bps: 0 },
             staffing: Staffing::new("firm", o),
             book: Book::new(),
-            labour: LabourPlan::new(AdjustParams { smooth_months: 3, hiring_cost_weeks: 0.0, hours_step_bps: None }, None),
+            labour: LabourPlan::new(AdjustParams { smooth_months: 3, hiring_cost_milliweeks: 0, hours_step_bps: None }, None),
             month_takings: 0,
             seen_takings: false,
             revenue: 0,
@@ -255,7 +257,7 @@ mod tests {
         f.labour.expect(1_800_000); // 1.08m after bought-in goods: 3 workers at 300k with margin 0 is 900k; 3.6 -> 3
         assert_eq!(f.needed(), 3);
         f.labour.expect(50_000_000);
-        f.labour = LabourPlan::new(AdjustParams { smooth_months: 0, hiring_cost_weeks: 0.0, hours_step_bps: None }, None);
+        f.labour = LabourPlan::new(AdjustParams { smooth_months: 0, hiring_cost_milliweeks: 0, hours_step_bps: None }, None);
         f.labour.expect(50_000_000);
         assert_eq!(f.needed(), 8, "the premises are a ceiling");
         f.labour.expect(10_000);
