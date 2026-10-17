@@ -3,5 +3,44 @@
 
 use crate::Kind;
 
+pub mod hearing;
+pub mod land;
+pub mod staff;
+pub mod books;
+pub mod builder;
+pub mod council;
+pub mod desk;
+pub mod elections;
+pub mod planning;
+pub mod police;
+pub mod registry;
+pub mod school;
+pub mod treasury;
+pub mod tribunal;
+pub mod utilities;
+
 /// Every kind of this lane, in name order.
-pub static KINDS: &[&dyn Kind] = &[];
+pub static KINDS: &[&dyn Kind] = &[
+    &registry::ChildProtection,
+    &council::CouncilClerk,
+    &council::Councillor,
+    &elections::ElectoralOffice,
+    &treasury::FinanceOfficer,
+    &planning::Inspector,
+    &council::MayorCode,
+    &planning::PlanningOfficer,
+    &treasury::RatesOfficer,
+    &registry::CityRegistry,
+    &treasury::TaxClerk,
+    &treasury::Works,
+    &builder::Builder,
+    &registry::LandRegistry,
+    &books::Clerk,
+    &desk::Desk,
+    &police::Station,
+    &school::Principal,
+    &tribunal::Member,
+    &tribunal::Registrar,
+    &utilities::Energy,
+    &utilities::Water,
+];
