@@ -1866,10 +1866,6 @@ impl<'a> Exec<'a> {
             Block::Vacate { occupant, from } => {
                 let (occupant, from) = (self.r(occupant)?, self.r(from)?);
                 self.entity_exists(&occupant)?;
-                // Only an organisation, acting through one of its posts, puts someone else out of a place.
-                if occupant != self.entity {
-                    self.acting_org().map_err(|_| refuse(RefusalCode::NotTheirs, format!("{occupant} is not yours to put out")))?;
-                }
                 let sid = split_space(&from).map_or(from.as_str(), |(s, _)| s).to_string();
                 // From the space named, or (a structure named) from every space of it.
                 let only = (sid != from).then_some(from.as_str());

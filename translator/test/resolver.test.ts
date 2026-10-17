@@ -409,6 +409,11 @@ test("presence(leave=yes, who=...) by a person's seat is a question; by a post i
   expect(parent.ok && parent.blocks).toEqual([{ block: "leave", person: "c2" }]);
   expect(other.ok).toBe(false);
   expect(!other.ok && other.questions.join(" ")).toContain("only yourself");
+  const away = resolve(calls.parseProgram("occupancy(in=str.3, who=c2, leave=yes)"), person, typeOf, undefined, { written: true });
+  expect(away.ok).toBe(false);
+  expect(!away.ok && away.questions.join(" ")).toContain("only yourself");
+  const self = resolve(calls.parseProgram("occupancy(in=str.3, leave=yes)"), person, typeOf, undefined, { written: true });
+  expect(self.ok).toBe(true);
   const post = resolve(calls.parseProgram("presence(who=c2, leave=yes)"), town(), typeOf, "mayor", { written: true });
   expect(post.ok && post.blocks).toEqual([{ block: "leave", person: "c2" }]);
 });

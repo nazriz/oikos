@@ -171,9 +171,6 @@ fn predict(run: &Run<Vec<u8>>, participant: &str, position: Option<&str>, b: &Bl
         Block::Vacate { occupant, from } => {
             if !st.entities.contains_key(occupant) {
                 Err(RefusalCode::UnknownEntity)
-            } else if *occupant != me && (position.is_none() || st.entities.get(&me).is_some_and(|e| e.body.is_some())) {
-                // (Only an organisation, through one of its posts, puts someone else out of a place: 2026-10-17.)
-                Err(RefusalCode::NotTheirs)
             } else {
                 let sid = split_space(from).map_or(from.as_str(), |(s, _)| s);
                 let there = st.occupancy.get(sid).is_some_and(|m| m.iter().any(|(sp, b)| (sp == from || sid == from) && b.contains(occupant)));

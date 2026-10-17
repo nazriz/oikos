@@ -586,7 +586,11 @@ class Resolver {
   private occupancy(c: Call): Block[] {
     const inside = this.need(c, "in", "Where?");
     const who = this.body(c);
-    if (this.yes(c, "leave")) return [{ block: "vacate", occupant: who, from: inside }];
+    if (this.yes(c, "leave")) {
+      // A seat acting as the person takes only itself out of a place; an organisation's post puts others out (the police on a warrant).
+      if (this.asWritten && who !== this.me && who !== this.k.entity && this.asPost === undefined) throw new Ask("You can take only yourself out of a place.");
+      return [{ block: "vacate", occupant: who, from: inside }];
+    }
     return [{ block: "occupy", space: this.space(inside), ...(who !== this.k.entity ? { who } : {}) }];
   }
 

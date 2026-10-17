@@ -91,13 +91,3 @@ fn a_new_holder_of_a_post_is_told_of_the_payments_the_office_has_had() {
     assert_eq!(outcome(&mut run, &appoint), None);
     assert_eq!(told(&mut run, "alice-self"), 2, "the new holder was told of nothing the office had had");
 }
-
-/// Finding 13: nobody puts another person out of a place unless acting for an organisation through one of its posts.
-/// (Taking another out of the world is a parent's for their household, so the kernel leaves it; a seat may take only itself,
-/// which the resolver holds: translator/test/resolver.test.ts.)
-#[test]
-fn a_person_cannot_put_another_person_out_of_a_place() {
-    let mut run = Run::start(world(&default_params()), "removal", Vec::new(), None).unwrap();
-    let vacate = cmd("alice-self", None, json!([{"block": "vacate", "occupant": "bob", "from": "s-flats"}]));
-    assert_eq!(outcome(&mut run, &vacate).as_deref(), Some("not_theirs"));
-}
