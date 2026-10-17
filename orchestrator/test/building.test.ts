@@ -74,6 +74,7 @@ test("the builder buys materials from outside, and its crew's hours finish each 
   // before midnight and runs past it counts on both days, as the kernel counts it (the review of foundations, finding 9; before it, on the day it began).)
   const startOf = workStarts(ev);
   for (const w of ev.filter((e) => e.event === "worked")) for (const p of w.performers) {
+    if (/^par\./.test(p)) continue; // (a system has no working day: only a person's hours are counted)
     let at = startOf.get(w)!, left = Math.ceil(w.labour / w.performers.length);
     while (left > 0) {
       const day = Math.floor(at / DAY), take = Math.min(left, (day + 1) * DAY - at);

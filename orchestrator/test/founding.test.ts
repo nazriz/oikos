@@ -95,7 +95,7 @@ const LIVING = "living.initiative_bps=10000";
 // (Re-taken on 2026-10-17 at the housing and vacant-post faults (fix-housing): the council's appointments officer is a councillor's post, watches the city's own offices and hires for the city where none of its staff is left to second; au-vic names the police among the posts the council fills; a death wakes those in the same space; b805a015... until then.)
 // (Re-taken on 2026-10-17 at the housing and vacant-post faults (fix-housing), on the merge with the seated twins: the council's appointments officer is a councillor's post, watches the city's own offices and hires for the city where none of its staff is left to second; au-vic names the police among the posts the council fills; a death wakes those in the same space; 6fb51f08... until then.)
 // (Re-taken on 2026-10-17 at the strikes by cost (gd-strikes): the union organiser is given each industry's day's pay (`pay_per_day`, generator), so the generated config moves, and with it the state; a6c71654... until then.)
-const STEP_2B = "ea0eb114f7e5d778fef650ee1f511c9c1493b2ce2eb7c005ed4a0aa90f35ca9f";
+const STEP_2B = "0a29aced83d87b11e9abf280d28f513b827edac8c51b4b89a517bbec18ffe039";
 
 test("with founding off a living town is step 2b's town, to the state hash; turned on with no shape to found, nobody does anything they did not do before", async () => {
   const out = mkdtempSync(join(tmpdir(), "oikos-founding-"));
@@ -139,8 +139,8 @@ test("founding in code: with the composer off no model is called; a founded thin
     // (Seed 2 from 2026-10-16, foundations F11: a register's keeper answers in its own time, and an office's slip rates are its systems' too, so the course differs; of seeds 1 to 16 only 2 and 5 have two who share the want that founds. Seed 3 held through foundations F7.)
     // (Why a hop and not a fault, 2026-10-16: two who share the want that founds is one town in eight or fewer before foundations F5 (only seed 6 of 1 to 8) and two of sixteen after (2 and 5); the rate is the same, only the seed moves. Seed 6, the original, has one who shares it on the foundations-review branch, and the test needs two.)
     // (Seed 3 from 2026-10-16, the profile source check, on the merged foundations review: the au-vic-2026 profile changed and in seed 2 nothing is founded in 205 days; of seeds 1 to 9 only 3 and 5 found something with two who share the want. Which seed has it is a matter of draws, not of the rule.)
-    // (Seed 22 from 2026-10-17, adoption, the auditor and strikes by cost: the world differs again; of run seeds 1 to 45 only 22, 26, 34, 39, 42 and 43 are among those with two who share the want that founds in 205 days. Which seed has two is a matter of draws, not of the rule.)
-    const s = await runWorld({ config: { ...config, seed: 22 }, runId: "code", outDir: out, until: 205 * DAY, recordObservations: "none" });
+    // (Seed 39 from 2026-10-17, adoption, the auditor and strikes by cost: the world differs again; of run seeds 1 to 45 only 22, 26, 34, 39, 42 and 43 had two who share the want that founds in 205 days before the shop's serving was held to the day (seed 22 then, 39 after). Which seed has two is a matter of draws, not of the rule.)
+    const s = await runWorld({ config: { ...config, seed: 39 }, runId: "code", outDir: out, until: 205 * DAY, recordObservations: "none" });
     expect(s.composer).toBeUndefined();
     const log = readFileSync(s.logPath, "utf8");
     // No model anywhere: not a usage entry, not a transcript.

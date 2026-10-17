@@ -42,7 +42,7 @@ const BEFORE: { [profile: string]: { days: number; state: string } } = {
   // (Re-taken on 2026-10-17 at foundations F9 and F10: see CONFIG_BEFORE below; f54352a2... until then.)
 //   (Re-taken on 2026-10-17 at the housing and vacant-post faults (fix-housing), on the merge with the seated twins: the council's appointments officer is a councillor's post, watches the city's own offices and hires for the city where none of its staff is left to second; au-vic names the police among the posts the council fills; a death wakes those in the same space; 12df1060... until then.)
   // (Re-taken on 2026-10-17 at the strikes by cost (gd-strikes): the union organiser is given each industry's day's pay (`pay_per_day`, generator), so the generated config moves, and with it the state; 02577eca... until then.)
-  "au-vic-2026": { days: 60, state: "f22e6dee9a823f9561c2f1f8053bbe856e1562dd629d66e942e97a84103da447" },
+  "au-vic-2026": { days: 60, state: "a8a7f61980b5694b1e93018f25a7734444aa5151091a3777957c026b15d71366" },
   // (Re-taken on 2026-10-16 at foundations F5: the town's offices are held by people, their staff hired, its systems delivered from templates that say what they do; 3b4bc97e... until then.)
   // (Re-taken on 2026-10-16 at the review of the foundations, finding 6: the council's appointments officer is an office of the town, its posts name their authority, and every generated system is owned by the organisation whose post it holds; c1ae5e74... until then.)
   // (Re-taken on 2026-10-17 at foundations F9 and F10; 29f53e5f... until then.)
