@@ -41,6 +41,17 @@ test("a notice paid shows as paid, with its day and what it settled; a request n
   expect(text).not.toContain("rec.21698; no payment"); // (the paid one is not also listed as waiting)
 });
 
+test("an office shown no bank account does not say that no payment has been seen leaving it", () => {
+  const d = mk();
+  const obs = seen(32 * DAY, [pay("rec.30000", 32 * DAY, "acc-city", 500_000, "rec.19400")]);
+  delete (obs.channels as any)[`${ME}-office/books`];
+  d.absorb(obs);
+  const text = d.text(33 * DAY, "Letting office");
+  expect(text).toContain("asked the bank to pay KSh 5,000.00 to the city, settling rec.19400 (rec.30000)");
+  expect(text).not.toContain("no payment out of the account seen yet");
+  expect(text).toContain("this office is not shown its bank account");
+});
+
 test("a case decided shows as decided with its date; what stands open shows as open, a few lines to a heading, the rest counted", () => {
   const open: OpenHeading[] = [{ what: "Rates and sums recorded against us, not paid", items: Array.from({ length: 5 }, (_, i) => ({ id: `rec.${i}`, line: `rec.${i}: rates of KSh 2,977.86 recorded against us, due year 1, day 61, not paid` })) }];
   const d = mk(() => open);

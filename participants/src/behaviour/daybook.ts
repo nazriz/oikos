@@ -133,7 +133,7 @@ export class DayBook {
         const m = (r.data as any).outcome.money;
         list.push({ at: paid?.t ?? r.at, kind: "payment", id: r.id, line: paid
           ? `${dateWords(paid.t)}: paid ${moneyNow(paid.amount)} to ${this.name(paid.with)}${paid.settles ? `, settling ${paid.settles}` : ""}${paid.memo ? ` ("${cut(paid.memo, 60)}")` : ""}; asked of the bank ${dateWords(r.at)} (${r.id})`
-          : `${dateWords(r.at)}: asked the bank to pay ${moneyNow(cents(m.amount))} to ${this.name(m.to)}${m.settles ? `, settling ${m.settles}` : ""} (${r.id}); no payment out of the account seen yet` });
+          : `${dateWords(r.at)}: asked the bank to pay ${moneyNow(cents(m.amount))} to ${this.name(m.to)}${m.settles ? `, settling ${m.settles}` : ""} (${r.id}); ${this.accounts.size ? "no payment out of the account seen yet" : "this office is not shown its bank account, so what came of it is not known to it"}` });
         continue;
       }
       const f = this.followed.get(r.id);
