@@ -276,10 +276,6 @@ fn predict(run: &Run<Vec<u8>>, participant: &str, position: Option<&str>, b: &Bl
                 None if me_person => me.clone(),
                 None => return Some(Err(RefusalCode::NotAPerson)),
             };
-            // Only an organisation, through one of its posts, takes someone else out of the world (2026-10-17).
-            if who != me && (position.is_none() || st.entities.get(&me).is_some_and(|e| e.body.is_some())) {
-                return Some(Err(RefusalCode::NotTheirs));
-            }
             // Leaving by something that isn't one of the world's edges is refused.
             if to.as_ref().is_some_and(|e| !s.is_boundary(e)) {
                 return Some(Err(RefusalCode::NotABoundary));

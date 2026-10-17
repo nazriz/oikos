@@ -1934,11 +1934,9 @@ impl<'a> Exec<'a> {
                     Some(p) => self.r(p)?,
                     None => self.acting_person()?,
                 };
-                // Only an organisation, acting through one of its posts, takes someone else out of the world (a child with no
-                // adult taken into care): a person, or a seat acting as one, takes only themselves.
-                if who != self.entity {
-                    self.acting_org().map_err(|_| refuse(RefusalCode::NotTheirs, format!("{who} is not yours to take out of the world")))?;
-                }
+                // A person may take out of the world those in their care (a parent, their children: the town's household model
+                // has them leave together, and newcomers' children have no parents on record here), so the kernel does not
+                // refuse a person who takes another; what a seat may ask for is the resolver's to limit (it takes only itself).
                 // Which edge they leave by: named, or the default.
                 let to = match to {
                     Some(e) if self.s.is_boundary(e) => e.clone(),

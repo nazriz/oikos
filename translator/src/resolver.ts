@@ -92,6 +92,7 @@ export function resolve(program: calls.Program, k: Knowledge, typeOf: (type: str
   if (invalid.length) return { ok: false, questions: [LABEL_TEXT.unclear], invalid };
   const r = new Resolver(k, program, k.actingFor(as));
   r.typeOf = typeOf;
+  r.asPost = as;
   r.asWritten = !!o.written;
   const blocks: Block[] = [];
   const questions: string[] = [];
@@ -112,6 +113,8 @@ export function resolve(program: calls.Program, k: Knowledge, typeOf: (type: str
 class Resolver {
   /** See `resolve`. */
   asWritten = false;
+  /** The post it acts in, if any (none: it acts as itself). */
+  asPost: string | undefined;
   private refs = new Set<string>();
   /** The names the program's own lines bind (`refs` also holds the ones made up here). */
   private bound = new Set<string>();
@@ -604,7 +607,11 @@ class Resolver {
   private presence(c: Call, bind?: string): Block[] {
     const who = this.id(c, "who");
     const person = who === undefined || who.startsWith("$") ? who : this.k.entityOf(who);
-    if (this.yes(c, "leave")) return [{ block: "leave", ...(person && person !== this.k.entity ? { person } : {}) }];
+    if (this.yes(c, "leave")) {
+      // A seat (a program written from words) acting as the person takes only itself out of the world; an organisation's post takes others (a child into care), and a parent's code takes its household's children.
+      if (this.asWritten && person && person !== this.me && this.asPost === undefined) throw new Ask("You can take only yourself out of the world.");
+      return [{ block: "leave", ...(person && person !== this.k.entity ? { person } : {}) }];
+    }
     if (person) return [{ block: "arrive", person }];
     const name = this.str(c, "name");
     const template = this.str(c, "template");
