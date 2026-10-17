@@ -49,3 +49,13 @@ a builder's labourer had tried the yard, which holds materials.
 ## When a model holds the station (2026-10-12)
 
 The officers' routine (warrants carried out on their day, reports looked into, homes called at) is theirs under standing work orders in force at the start, and the office-holder hires and makes the orders: docs/behaviour/standing-work.md, "The police station".
+
+## In the Rust port (2026-10-17, lane E)
+
+Where the Rust station decides fresh (police.station keeps version 0.6.0 in its manifest; the module is `offices/police.rs`):
+
+- **A successor carries on from the file.** A report is looked into unless a charge or a closure of the station's cites it; a warrant is carried out unless an executed or lapsed notice of the station's cites it; a death found is reported unless a notification of the station's names the dead. Before, a new holder of the post started with an empty memory and would look into every report again. What stays in memory: an investigation under way (its finding comes only to whoever ordered it, so a station changing hands mid-investigation looks into that report again), how many of a household were put out so far, and the homes a call found nobody dead at (nothing is written about a call that found nothing). *Revisit if* calls that find nothing need to be on record (a reply to the neighbour who asked would do it; it needs a paper kind).
+- **A tenant registered dead is not put out** (bug hunt 2026-10-17, finding 3). A warrant against a tenant whom the station's file shows dead, by an entry of the register of deaths or a certified copy of one, is not carried out; the landlord is told it lapsed, and why (`reason: tenant_dead`). Basis: a possession order is against a living party; the court officer serving it checks the party is alive (to confirm: the practice of bailiffs and sheriffs). The station does not itself ask the registry: the register is the registrar's, and it learns of a death by being sent the entry or a copy. *Revisit if* the register stops being sent to the station: it would then need to ask for a certified copy by name.
+- **A warrant not yet due no longer holds up the ones behind it.** The TS stopped at the first.
+- **No coin decides whether the station acts** (risk PB-16). Whether a warrant is carried out turns on a cause: an officer at the station with hours left in their working day, on a working day, within the warrant's days. There is no `compliance_bps` here; the coins of that name live in the planning officer, the inspector, landlords and the union.
+- The first wake is spread by a hash of the participant's id (there is no random stream at that point).

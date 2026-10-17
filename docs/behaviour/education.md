@@ -57,3 +57,7 @@ its teachers' wages. The land is exempt from rates. Who runs schools is the prof
 - Employers seeing certificates when hiring, or paying more for them. Skill already makes a worker quicker, but
   employers can't see it; screening on credentials (Spence 1973) is the next step.
 - Kindergartens and childcare (in Victoria, partly the council's).
+
+## In the Rust port (2026-10-17, lane E)
+
+`school.principal` is ported to `offices/school.rs` (the manifest keeps version 0.3.1). The school's roll is read from its own file each wake rather than kept in memory, so a new principal carries on: a pupil is on the roll while a place of the school's is on file for them, and off it when a certificate of the school's names them or their death is registered; an enrolment is answered when a place or a decline of the school's cites it. The certificate is not given twice, nor to someone who has died. What remains in memory: the day the lessons were set (no paper says a lesson was taught; a successor in the same morning could set them twice, and the world refuses a teacher more hours than the day has). A pupil with no birth on their enrolment stays on the roll (the TS dropped such a pupil from the leaving check the same way). `years_of_schooling` and `SchoolingSpec` are ported as they were.

@@ -14,7 +14,11 @@ Wakes weekly. For each permit application addressed to the town:
 
 It also reads **the town's own asset register** (0.9.0): the lots the town's titles say it holds, what its register says stood on each at the start, and the notices of building work the town has been given since (`ownLand`: docs/behaviour/ownership.md). Its report, sent in answer to any letter, lists how many lots the town owns and the ones with nothing built on them by that register, the first 40 by number, and says the register is paper: go and see a lot before relying on it. A real council keeps such a register, and "which vacant land do we own?" is a question it answers. Without it, a language-model mayor with a parks budget had no way to find a lot (pilot 6, docs/real-models.md). Until 0.9.0 the office was shown the whole land register and a monthly survey of every cell of the town (docs/no-god-view.md): it is shown neither now.
 
-**Parameters:** `compliance_bps` (default 10000) is how often it follows the law. Below 10000, some unlawful permits get granted: a lax or captured office. `town` (default `city`) is whose land the register lists.
+**Procedure (Rust port, PB-15).** Where the world states a planning procedure, the office no longer grants at its first look. A `procedure` record whose data carries `planning: { notice_days, objection_days?, decide_within_days? }` makes it (1) publish a notice of each complete application (`permit_notice`, public, citing the application); (2) hear objections (`permit_objection` statements naming the application, made within `objection_days` of the notice, default `notice_days`); (3) decide only after that period, naming the objections heard in the decision, which is sent to the objectors as well as the applicant; (4) say `late: true` in a decision made after `decide_within_days` of the application. With no procedure stated it decides at once, as before. The notice is published, not sent to the neighbours one by one: the office is not shown who the neighbours are, and a public notice is what it can give; revisit when it can ask the land register who holds the adjoining lots. Not modelled: weighing the merits of an objection, referral to a council (many authorities refer an application with more than a set number of objections to their members), conditions, and a deemed refusal or consent when the time runs out (what follows is the appeal venue's, by the law's own appeal route).
+Figures for a profile (each place's own, from its law): England, a site notice or neighbour letters for 21 days (Town and Country Planning (Development Management Procedure) (England) Order 2015, art. 15), 8 weeks to decide a minor application (art. 34); Victoria, notice to adjoining owners and occupiers with objections heard before the decision (Planning and Environment Act 1987 ss. 52 to 59), 60 prescribed days to decide before a failure-to-decide appeal (s. 79); New South Wales, a minimum 14 days' exhibition for notified development (Environmental Planning and Assessment Regulation 2021, to confirm). Cited in docs/research/references.md by the lane that adds the profile figures.
+
+**Parameters:** `compliance_bps` (default 10000) is no longer a per-case draw of whether the office follows the law (PB-16: breaking the law is not a coin flip, an error has a cause). The office refuses what a law in force forbids, always; a breach goes through only if the law cannot be read against the application (counted and said with its next act). `compliance_bps` is now the share of the waiting cases its staff can look into in one round, oldest first and at least one; the rest wait for the next round, and are late if a time limit is stated. Real basis: an under-resourced planning department misses its statutory time rather than approving what it has not read (the national planning performance returns in England record decisions out of time). A lax or captured office is a different office (a model seat, or a module with a stake), not a dial. `town` (default `city`) is whose land the register lists.
+Revisit if: an enforcement or capture experiment needs an office that can knowingly breach, which wants a stake (what it gains, what it loses if found, what it did before) rather than a rate.
 
 **Source:** administrative decision-making as procedure-following (MOISE+-style roles and procedures, borrowing survey §1). Discretion is a parameter rather than a mechanism.
 
@@ -31,7 +35,7 @@ What happens next is up to the owner, and to whoever else might enforce.
 
 **Parameters:**
 - `fine` (a module default of 5,000,000 of the smallest unit; the generated town gives the profile's `town_finance.unpermitted_building_fine`, the same sum its planning law names);
-- `compliance_bps` (default 10000): how often it acts on what it finds. Below 10000 it sometimes looks the other way;
+- `compliance_bps` (default 10000): in the Rust port (PB-16) not a draw of whether it acts on a breach it found: it always does (unless a standing direction says fines no), and the cause of a breach going unfound is capacity: it goes to so many notified sites in a round (this share of the waiting ones, oldest first, at least one). `direction_compliance_bps` is accepted and unused: a direction from a post the rule names, not on hold, is followed. Each inspection is put on file (`building_inspection`, the office's own), so a successor does not repeat it and the report is read from the file;
 - `sites`, `register`, `valuer`: the channel it goes to a site through, the land register's channels, and whom it tells.
 
 **Basis:** a builder "must ensure the relevant building surveyor is notified without delay of the completion of each mandatory notification stage", and the surveyor "must cause the building work to be inspected in person"; a surveyor may otherwise inspect only work "for which a permit has been issued", and work without a permit comes to a council by complaint (Building Act 1993 (Vic) ss 33 to 35: docs/behaviour/knowing.md, section 3). Deterrence depends on the probability of detection and the size of the sanction (Becker 1968): detection is now only of what is notified.
@@ -108,3 +112,19 @@ Someone with no home dies unseen, and nobody reports it (in reality, the police 
 
 On a registration naming children with no adult at home, or a child's own request for help (a `care_request`, made when every adult of their household has died), it takes them into care. The town has no foster homes yet, so care is elsewhere: they leave the town with the office's worker. Loosely after Victoria's child protection service; foster and kinship care in town are future work.
 
+
+## In Rust: the registries are keepers staffed to their load (PB-19, 2026-10-17)
+
+`land.registry`, `city.registry` and `city.child_protection` read what they have done from their own papers (the entries
+a registrar made, the notices of acquisition and transfers the land registry made), so a new holder neither registers a
+death twice nor applies again for a transmission.
+
+At 10,000 people a perf run found thousands of questions asked of keepers held at its end. Asking a keeper takes the
+time of whoever holds its posts (foundations F11: `answer` in the table of work), one question at a time, in working
+hours; the questions grow with the people who ask, and the posts did not. A real registry is staffed to its caseload.
+Each keeper now declares in its manifest a `capacity` (the asks it expects per 1,000 residents a year, and the seconds an
+answer takes: placeholders, to source), and `oikos_rules::staffing::clerks_needed` is the sum the generator calls to give
+the counter as many staff as that needs (1 clerk at 1,000 people, 5 at 10,000, 42 at 100,000 on the placeholder
+figures). The generator change itself (lane F, which owns it) is not made here.
+Revisit when: the asks per resident are measured from a run (the figures are guesses), or when a keeper's load turns
+out to follow something other than the population (the lots, the titles).

@@ -15,6 +15,10 @@ fn weather_world() -> Value {
     let mut c = common::riverbend();
     c["clock"]["run_seconds"] = json!(30 * DAY);
     for p in c["participants"].as_array_mut().unwrap() {
+        // (Kinds ported since the frame need the parameters a real world gives them: every other code participant idles.)
+        if p["controller"]["type"] == "code" && p["id"] != "inspector-system" {
+            p["controller"] = json!({ "type": "code", "impl": "idle" });
+        }
         if p["id"] == "inspector-system" {
             p["controller"] = json!({ "type": "code", "impl": "world.weather", "params": { "events": [{ "kind": "heatwave", "from_day": 10, "days": 5 }], "lead_days": 2 } });
         }
@@ -88,7 +92,9 @@ fn deciding_on_many_threads_puts_each_result_in_its_own_place() {
 
 #[test]
 fn a_world_naming_a_kind_the_engine_lacks_is_refused_unless_a_stand_in_is_named() {
-    let err = Engine::start(weather_world(), "missing", Vec::new(), None, EngineOptions { stand_in: None, ..opts(1) }).err().unwrap();
+    let mut w = weather_world();
+    w["participants"].as_array_mut().unwrap().iter_mut().find(|p| p["id"] == "developer-system").unwrap()["controller"] = json!({ "type": "code", "impl": "firm.not_a_kind" });
+    let err = Engine::start(w, "missing", Vec::new(), None, EngineOptions { stand_in: None, ..opts(1) }).err().unwrap();
     assert!(err.contains("no actor kind"), "{err}");
 }
 

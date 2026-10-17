@@ -216,3 +216,12 @@ Nothing is done for it by the platform's own choosing: who does what is the seat
 
 Test: `orchestrator/test/seat-diary.test.ts` (a works seat for 60 days: its diary, its outcomes with times, forty notices a
 day written by itself in more than nine hours against the crew's in less than three, `by` a stranger a question back).
+
+## In Rust: a new clerk carries on from the file (2026-10-17)
+
+The clerk (0.3.1 in behaviour) reads the last `office_books` paper on the organisation's file when it starts and takes
+what stood open at that paper as the last list, so what has left the list since is said and nothing is filed twice.
+The readers of each office's books (`openbooks*`, `daybook`, `roster`, `tally`, `diary`) are what the clerk reads
+through; the port plan leaves them in TypeScript, so in Rust a clerk starts only for a module that has a reader
+registered (`books::books_of`), and none is yet. Integration decides: port the readers (about 1,800 lines), or keep
+seat-held offices' clerks on the host.

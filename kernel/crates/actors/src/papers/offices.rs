@@ -26,6 +26,7 @@ pub const KINDS: &[&str] = &[
     "ballot_result",
     "birth_registration",
     "budget",
+    "building_inspection",
     "building_notice",
     "complaint_notice",
     "death_certificate",
@@ -50,6 +51,8 @@ pub const KINDS: &[&str] = &[
     "office_books",
     "permit_application",
     "permit_decision",
+    "permit_notice",
+    "permit_objection",
     "petition_response",
     "procedure",
     "proposal",
@@ -545,6 +548,10 @@ pub struct Procedure {
     pub plan_barred_rent_months: Option<i64>,
     #[serde(default, deserialize_with = "lenient::opt_int", skip_serializing_if = "Option::is_none")]
     pub cure_days: Option<i64>,
+    /// The planning office's procedure (PB-15): `{ notice_days, objection_days?, decide_within_days? }`, as the place's
+    /// planning law has it. Absent: the office decides at its weekly look, as before.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub planning: Option<Value>,
 }
 impl Paper for Procedure {
     const KIND: &'static str = "procedure";
@@ -942,6 +949,52 @@ pub struct PermitDecision {
 }
 impl Paper for PermitDecision {
     const KIND: &'static str = "permit_decision";
+}
+
+/// The planning office's public notice of a permit application, where the world's planning procedure asks for one: that
+/// objections may be made within `objection_days` of it. Nothing is decided inside that time.
+///
+/// Written by: institutions.ts (planning officer, Rust port, PB-15). Read by: whoever objects; the planning officer.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PermitNotice {
+    pub application: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lot: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub structure_type: Option<String>,
+    #[serde(default, deserialize_with = "lenient::opt_int", skip_serializing_if = "Option::is_none")]
+    pub objection_days: Option<i64>,
+}
+impl Paper for PermitNotice {
+    const KIND: &'static str = "permit_notice";
+}
+
+/// An objection to a noticed permit application, to the planning office, citing the application. Heard if made inside
+/// the notice's time; the decision names it.
+///
+/// Written by: anyone (a citizen, a neighbour, a body). Read by: the planning officer.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PermitObjection {
+    pub application: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub grounds: Option<String>,
+}
+impl Paper for PermitObjection {
+    const KIND: &'static str = "permit_objection";
+}
+
+/// The building inspector's note of a site it went to see, on its own file: which notice, which structure, what it
+/// found. The office's memory of what it has inspected (a successor reads it, and its report counts from it).
+///
+/// Written by: institutions.ts (inspector, Rust port). Read by: the inspector.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BuildingInspection {
+    pub notice: String,
+    pub structure: String,
+    pub found: String,
+}
+impl Paper for BuildingInspection {
+    const KIND: &'static str = "building_inspection";
 }
 
 /// A request to the valuer for a supplementary valuation: of a lot with a building newly built, or of a lot after one
@@ -1624,7 +1677,7 @@ mod tests {
     #[test]
     fn every_type_is_in_kinds() {
         let all = [
-            AcquisitionNotice::KIND, Approval::KIND, AssetRegister::KIND, Ballot::KIND, BallotResult::KIND,
+            AcquisitionNotice::KIND, Approval::KIND, AssetRegister::KIND, Ballot::KIND, BallotResult::KIND, BuildingInspection::KIND, PermitNotice::KIND, PermitObjection::KIND,
             BirthRegistration::KIND, Budget::KIND, BuildingNotice::KIND,
             ComplaintNotice::KIND, DeathCertificate::KIND,
             DeathRegistration::KIND, DemolitionOrder::KIND, Direction::KIND, DisposalDocket::KIND,
