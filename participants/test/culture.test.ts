@@ -52,14 +52,15 @@ test("a person starts with the profile's picture (the conduct's own rate where i
 
 test("with every figure at the profile's, the lean at a decision sums to nothing over a drawn town: the calibrated rates hold on day 1", () => {
   const N = 3_000;
+  const town = Array.from({ length: N }, (_, i) => someone(i)); // (drawn once: the same people for every conduct)
   for (const conduct of CONDUCTS.slice(0, 8)) {
     let sum = 0, sq = 0;
-    for (let i = 0; i < N; i++) { const l = someone(i).lean(conduct, 0); sum += l; sq += l * l; }
+    for (const p of town) { const l = p.lean(conduct, 0); sum += l; sq += l * l; }
     expect(Math.abs(sum / N), conduct).toBeLessThan(0.05);
     expect(Math.sqrt(sq / N), conduct).toBeGreaterThan(0.1); // (people differ: it is not zero for each)
     expect(Math.sqrt(sq / N), conduct).toBeLessThan(1.5);
   }
-});
+}, 60_000); // (3.5 s alone; the 5 s default timed out under a loaded full suite)
 
 test("a rate is swayed by the lean and held: bounded, the right way, and a person with no lean leaves it where it is", () => {
   const c = someone(3);
