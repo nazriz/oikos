@@ -6339,3 +6339,73 @@ The owner approved doing names and ordinary dates in the rebuild (2026-10-17). A
 **Tests.** `worlds/test/names.test.ts` (nine profiles well formed and sourced; named and dated towns valid for the world schema in all nine; a town not asked is as it was; names keyed on ids; customs; names no input to what is built; holidays), `participants/test/dates.test.ts`, the Rust tests of calendar, identity, forms and common.
 
 **Revisit if** a seat is shown a date it cannot write back (the resolver's reading is stricter than a person); two worlds interleave in one process; a profile's placeholders turn out to matter to what seats do (then source them first); the unstated framing decides a named town is not wanted for some experiments (a profile of the view: both stay possible).
+
+## 2026-10-18 · Port step 3: integration and the gate, first pass (no model called)
+
+**Joined.** The nine lanes are merged on `integrate`: lane F with lane G, then A2, A1, C1, C2, D, E and N; the decisions
+log, risks register and references were merged by union. The code conflicts were the engine's `Base` and the
+protocol session (now carrying lane N's calendar words) and the generator. The generator is 0.62.0, joining lane N's
+names with the auditor's 0.61.0. Two Sonnet helpers did the seams:
+- **Offices:** on C1's `Staffing` (`staff.rs` gone), with winding up, bargaining, trade, `Respondent` and decisions in
+  place of lane E's stand-ins; the union takes up grievances; `office.auditor` ported with typed papers; offices adopt
+  systems.
+- **Firms:** shops and works on a `FirmBody` over the real firm modules (retailer 0.18.0, producer 0.12.0, adoption
+  hooks, takings for strikes); one bargaining (`oikos_rules::bargaining`); the landlord reads typed `RentalEvidence`;
+  the bank's lending office pays its staff; the support office answers audits.
+
+**The household demand law.** `oikos_rules::demand` is the linear expenditure system (Stone 1954; Geary 1950;
+Deaton and Muellbauer 1980). A household covers its needs at today's prices, then divides what is left by marginal
+shares. It is calibrated as Lluch, Powell and Williams 1977 do, from each profile's household expenditure survey
+(budget shares, income elasticities, Frisch's parameter; "(to confirm)"). The citizen divides each trip's budget across
+the kinds on offer, each with its own shop, carried money and use (`consume-<kind>`). With one kind on offer the
+orders are byte-identical to before (a test). The owner then asked (2026-10-18) for the real mix of shops. A helper
+built it behind `shop_mix` (off by default, since the TS world buys goods only): food, clothing, transport, eating
+out, personal services, recreation and goods, sized from the survey's shares. The demand figures are written only
+for such a town. Docs: docs/behaviour/demand.md and generator.md; risks ME-18 and ME-19.
+
+**Faults found and fixed at integration** (each traced and tested):
+- **The first look.** A citizen slept on to its drawn first day without taking in its first look. The kernel hands
+  records once, so most people never saw their household, home or job. That caused the invariants' dead_not_paid,
+  posts_fall_vacant and no_act_by_absent.
+- **The water reader** went back to an unmetered building every second: a 16 GB log for a 60-person year.
+- **Exports.** An exporter's room ratcheted down on any month it shipped less for its own reasons: a gb-eng town's
+  exports fell to a third, and factory jobs from 314 to 184.
+- **A founder's `{values}`** was left as a string: a 1,000-person run stopped at its first moment.
+- **The demand figures** at first named energy, whose price list is a bill, not a shop.
+- **Kernel tests** that ran Riverbend with every kind live now run their kind alone (`common::alone`).
+
+**Backstops changed, each narrowly.**
+- **Generality:** Rust test files (`tests.rs`, the test kit) read as tests, as `.test.ts` are.
+- **No-god-view:** the Rust vendor's declared boundary is allowed, with its reason; the TS vendor held it undeclared.
+- **Observations:** the engine records code actors' observations when asked (`record_observations`).
+
+**The gate, first pass (runs/port-gate/gate.json).**
+- **Threads:** the state hash is the same on 1 and 14 threads in all three profiles.
+- **Invariants:** they hold on the Rust world in three profiles, two seeds each (60 people, a year).
+- **Backstops:** generality and no-god-view pass.
+- **Measures fail in every profile** (risk MT-16):
+  - Gatherings and taking part in them are far higher: au-vic 46% to 64%, against the profile's 50%.
+  - Religious affiliation is higher.
+  - Somewhat more people arrive and stay.
+  - In gb-eng, unemployment is about 10% against the TS world's 2%, and construction is 2.7 times as high.
+  - Households going without is a new health breach.
+  - None is traced yet. Some moves are meant by the native market rules (entry, hiring by need, prices, exports,
+    rents, strikes); none is yet judged against the real world.
+- **Scenario tests on `OIKOS_WORLD=rust`: 385 pass and 131 fail, in 65 files.**
+  - About 50 failures: `office.clerk` has no Rust reader of the books (lane E's note 2).
+  - 8 tests register TS test modules: TS-specific until ported.
+  - The rest are behaviour, twins (twin-draws, twin-seat-year), pins and invariance.
+
+**Revisit if** the traced causes keep landing on faithful ports, not bugs (then checkpoint with the owner, as
+rust-port.md says); or the shop mix changes measures the owner wants compared before it is on by default.
+
+**Speed** (au-vic, one seed, one run at a time, machine at load 5 to 8; the TS world on `merge-gd`):
+
+| Run | Rust world | TS world |
+|---|---|---|
+| 1,000 people, a year | 142 s, 10.2 GB peak | 160 s, 2.5 GB peak |
+| 10,000 people, a month | 83 s, 9.9 GB peak | 147 s, 7.7 GB peak |
+
+That is 1.1 times as fast at 1,000 and 1.8 times at 10,000, well short of the plan's 4 to 10 times, and using up to
+four times the memory at 1,000 (each actor's own book: port-guide 5.6, item 7). Not profiled yet; phase 3's work.
+rust-port.md's stop rule (a 1,000-person year under twice as fast) is met on this reading: profile before going on.
