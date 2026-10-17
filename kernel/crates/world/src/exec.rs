@@ -112,7 +112,9 @@ pub fn check_at_work(s: &Statics, st: &State, p: &str, at: Option<&str>, space: 
     let in_kind = |space: &str| kind.is_none_or(|k| split_space(space).is_some_and(|(_, local)| local.split('.').next() == Some(k)));
     let there = match at {
         Some(at) => st.occupancy.get(at).is_some_and(|m| m.iter().any(|(sp, bodies)| bodies.contains(p) && in_kind(sp))),
-        None => kind.is_none() || st.occupancy.values().any(|m| m.iter().any(|(sp, bodies)| bodies.contains(p) && in_kind(sp))),
+        // (Only the buildings the body is in are looked through, by `whereabouts`: every building in the town was, for each
+        // question to a register's keeper. The same answer: `structures_of` is checked against the scan in debug builds.)
+        None => kind.is_none() || st.structures_of(p).iter().any(|sid| st.occupancy.get(sid).is_some_and(|m| m.iter().any(|(sp, bodies)| bodies.contains(p) && in_kind(sp)))),
     };
     if !there {
         return Err(refuse(
