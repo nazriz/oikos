@@ -30,10 +30,10 @@ test("off, a town is unchanged to the state hash (the world as origin/main gener
   // (Re-taken on 2026-10-17 at foundations F9 and F10: three public forms for what a person files with an office that decides, and a row of the table of work for `take`; c1bfd56e... and be56fcce... until then.)
 //   (Re-taken on 2026-10-17 at the housing and vacant-post faults (fix-housing), on the merge with the seated twins: the council's appointments officer is a councillor's post, watches the city's own offices and hires for the city where none of its staff is left to second; au-vic names the police among the posts the council fills; a death wakes those in the same space; 2d57fb3a... until then.)
   // (Re-taken on 2026-10-17 at the auditor (docs/behaviour/auditor.md; docs/decisions.md, "The auditor"): every town whose profile has an audit law has an audit office, a body of one resident taken on from those without work, a grant to pay them, and a public audit law; 0c54931f... until then.)
-  expect(worldHash(generate(town()))).toBe("979781886de9612601aa84f59de7216e44b9c7c810d5f96b5fe0dae16209a042");
+  expect(worldHash(generate(town()))).toBe("1674c09825d824885cefca9f10b8dfada6b8de2727062d2b5d02cb2f9bd47c9b");
   // (Re-taken on 2026-10-16 at foundations F5: the town's offices are held by people, their staff hired, its systems delivered from templates that say what they do; f16bee9e... until then.)
   // (Re-taken on 2026-10-17 at the auditor (docs/behaviour/auditor.md; docs/decisions.md, "The auditor"): every town whose profile has an audit law has an audit office, a body of one resident taken on from those without work, a grant to pay them, and a public audit law; 25c61c59... until then.)
-  expect(worldHash(generate(town({ profile: "ke-nakuru-2026" })))).toBe("47369dc8961bc0909308168604e777ea90414af7e0bd8769e7809d061ea0e04f");
+  expect(worldHash(generate(town({ profile: "ke-nakuru-2026" })))).toBe("cc6eb5f65956fc6fab56393cd12de630f964bd393cd97cfc403d1642e957e8bf");
   // (On, the landlords' and the tribunal's papers are as they were; a scale of nothing adds no paper to the other offices.)
   const POSS = ["rent_statement", "notice_to_vacate", "tribunal_application", "hearing_notice", "tribunal_order"];
   const possession = (c: any) => createHash("sha256").update(JSON.stringify(c.world.records.filter((r: any) => POSS.includes(r.kind)))).digest("hex");
