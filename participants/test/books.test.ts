@@ -278,3 +278,22 @@ test("a tenant who goes on the notice to vacate: the tenancy is over in the land
   b.absorb(obs(126 * DAY, "landlord-1", [{ id: "rec.30", at: 126 * DAY, record: "withdrawal", withdraws: "rec.21", author: "landlord-1-office-system", visible_to: ["landlord-1", "tribunal"] }]));
   expect(head(at(127 * DAY), GONE)!.items[0]!.line).not.toContain("still stands at the tribunal");
 });
+
+// Bug hunt 2026-10-17, finding 2: a clerk who takes the books over carries on from the paper on the organisation's file.
+test("a new clerk of an office's books says what has left the list since the last paper on file, and files nothing when nothing has changed", () => {
+  const rec = (id: string, at: number, data: object) => ({ id, at, record: "statement", kind: "office_books", author: "clerk-1", speaks_for: "city", visible_to: ["city"], text: "The books.", data });
+  const filed = rec("b1", 10 * DAY, { office: "tribunal", at: 10 * DAY, open: [{ what: "Cases", about: "rec.1", says: "rec.1: a case" }, { what: "Cases", about: "rec.2", says: "rec.2: another" }] });
+  const open = (ids: string[]) => [{ what: "Cases", items: ids.map((id) => ({ id, line: id === "rec.1" ? "rec.1: a case" : `${id}: another` })) }];
+  const obs = (t: number): any => ({ t, entity: "city", participant: "x", inbox: [], outcomes: [], drafts: [], woke_for: "cadence", channels: { mine: { kind: "records", records: [filed] } } });
+  let now = open(["rec.2"]);
+  const books = { absorb() {}, open: () => now } as any;
+  const clerk = new Clerk("city", "tribunal", books);
+  clerk.absorb(obs(12 * DAY));
+  const a: any = clerk.due(12 * DAY);
+  expect(JSON.stringify(a)).toContain("no longer open: rec.1");
+  // Unchanged since the file's last paper: nothing filed.
+  now = open(["rec.1", "rec.2"]);
+  const same = new Clerk("city", "tribunal", books);
+  same.absorb(obs(12 * DAY));
+  expect(same.due(12 * DAY)).toBeUndefined();
+});

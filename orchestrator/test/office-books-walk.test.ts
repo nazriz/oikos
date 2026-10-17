@@ -55,7 +55,7 @@ test("what each office's code acts on was in that office's books, as its clerk k
   let recs: any[] = [];
   const withdrawals: any[] = []; // (a withdrawal is a record of its own, not a statement: `withdrawnAt` below looked among statements and could never find one, until the day a landlord withdrew a case the member had listed, 2026-10-12)
   try {
-    const s = await runWorld({ config: { ...config, log: { ...config.log, detail: "lean" } }, runId: "books-walk", outDir: out, until: Number(process.env.WALK_DAYS ?? 250) * DAY, recordObservations: "none" });
+    const s = await runWorld({ config: { ...config, log: { ...config.log, detail: "lean" } }, runId: "books-walk", outDir: out, until: Number(process.env.WALK_DAYS ?? 400) * DAY, recordObservations: "none" });
     expect(s.participantErrors).toBe(0);
     for (const l of readFileSync(s.logPath, "utf8").split("\n")) if (l.includes('"event":"recorded"')) { const r = JSON.parse(l).body.record; if (r?.record === "statement") recs.push(r); else if (r?.record === "withdrawal") withdrawals.push(r); }
   } finally { rmSync(out, { recursive: true, force: true }); }
@@ -152,6 +152,7 @@ test("what each office's code acts on was in that office's books, as its clerk k
     if (ripe) ripeCases++;
   }
   console.log(`  the tribunal's list: ${listed.length} cases listed, ${tribunal.length} papers; a case on a paper's list ${onList} times; ${ripeCases} cases stood with their day come at some paper, named there ${ripeNamed} times; faults ${missing.length}${missing.length ? ` (${missing.slice(0, 5).join("; ")})` : ""}`);
+  // (400 days where it was 250, 2026-10-17, the bug hunt, finding 3: a landlord no longer takes a dead tenant to the tribunal, so the one case that stood with its day come at 250 days in this town is gone; one does at 400, and nothing leaves a list unsaid at either, with the clerk of the books carrying on from the file when its holder changes.)
   // (250 days again, 2026-10-16: the moves to 400 and then 520 at foundations F5 and F6 are undone: with the fixes of the foundations review (found-fixes), at 250 days the walk now has one case with its day come, named at its paper (at 400 days, three). Measured on the foundations-review branch after its fixes.)
   // (520 days where it was 400 since foundations F6 (2026-10-16): the world differs again and in this town no case stood with its day come in 400 days; two do in 520.)
   // (400 days where it was 250 since foundations F5 (2026-10-16): the tribunal's staff are people now, each with a body's one timeline, and in this town no case stood with its day come in 250 days; one does in 400.)
