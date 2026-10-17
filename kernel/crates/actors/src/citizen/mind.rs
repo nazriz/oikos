@@ -174,6 +174,10 @@ pub struct Decide {
     pub satisfied_here: Option<i64>,
     /// Doubt beyond what is known of the options (basis points).
     pub doubt: Option<i64>,
+    /// The stream it draws on (TS `ctx.rng("home")`, `"job"`, `"shop"`...): none, the domain's name.
+    pub purpose: Option<String>,
+    /// Bedrooms the household needs, for a home (the decision's circumstances).
+    pub bedrooms_needed: Option<u32>,
     /// The decision this one follows up (the citizen's own count, `DecisionRecord.n`).
     pub follows: Option<u64>,
     /// Extra facts for the decision's record (an area's own: the shop's shortfall), as life has them.
@@ -193,22 +197,30 @@ pub struct Decision {
     pub n: Option<u64>,
 }
 
-/// A yes-or-no that a norm leans (citizen.ts `cul.term` / `reads` / `cul.act`): whether to stay past a notice, answer
-/// a tribunal, obey an order, take someone in, challenge a rent rise, apply for a debt, consent to hours, join a
-/// union, vote for a strike, complain, take what is not one's own. Life draws the chance; the mind leans it by what
-/// the person holds of the conduct and of whoever it concerns, and records the act against the norm.
+/// A yes-or-no that a norm leans (citizen.ts `reads`, `cul.act`, `cul.facts`, `cul.norm`): whether to stay past a
+/// notice, answer a tribunal, take someone in, challenge a rent rise, apply for a debt, complain, take what is not
+/// one's own. Life draws the chance; the mind leans it by trust and agency in whoever it concerns (for one who takes
+/// initiative) and by culture's lean, records the act against the norm, and gives the norm's facts for life's outcome.
 #[derive(Debug, Clone, Default)]
 pub struct ConductAsk {
-    /// The conduct, as culture names it (culture.ts `Conduct`: `stay_past_notice`, `join_union`, ...).
+    /// The conduct, as culture names it (culture.ts `Conduct`: `stay_past_notice`, `take_to_tribunal`, ...).
     pub conduct: String,
     /// The chance before any lean (basis points), as life's own rule gives it.
     pub base_bps: i64,
     /// Life's draw for it (basis points, 0..10,000), from its own stream: does = draw below the leaned chance.
     pub draw_bps: i64,
-    /// Whom it concerns, where someone (a landlord, an employer): trust and ties lean it too.
+    /// Whom it concerns, where TS read the chance through `reads(bps, who, conduct)` (trust and agency sway it);
+    /// none: culture's lean only (`cul.term`), or none at all where `lean` is false.
     pub who: Option<String>,
-    /// Whether it is recorded as a decision (`DecisionRecord`) or only as the outcome's facts.
-    pub recorded: bool,
+    /// Whether culture leans the chance at all (TS read some draws plain and only recorded the act).
+    pub lean: bool,
+    /// Already decided by something else (a want's way chose it: `complainNow`, `applyDebtNow`): does, whatever the draw.
+    pub forced: bool,
+    /// Whether the act is recorded against the norm (`cul.act`): TS skipped it in a few cases (a notice brought
+    /// forward from before the year; a debt applied for by a want's way).
+    pub act: bool,
+    /// Recorded as a decision (domain, the yes key, the no key), with the chance as scores and the norm.
+    pub record: Option<(String, String, String)>,
 }
 
 /// The mind's answer to a conduct.
@@ -530,7 +542,9 @@ pub trait Outlook {
     fn pursuing(&self, method: &str) -> bool;
     /// The space of the gathering they are at now, where they are at one (the daily round keeps them there).
     fn at_gathering(&self, t: i64) -> Option<String>;
-    /// How patient with a hard situation before acting on it (days), as their attachments and temperament make them.
+    /// How patient with a hard situation before acting on it, as their attachments and temperament make them:
+    /// citizen.ts's `patience` multiplier (about 0.5 to 1.8) in thousandths (life multiplies its days by it, as TS
+    /// did for leaving town).
     fn patience_days(&self) -> i64;
     /// Life as a whole as the person rates it now (basis points), from `life`.
     fn satisfaction(&self, life: &Life) -> i64;
@@ -627,7 +641,7 @@ impl Outlook for Plain {
         None
     }
     fn patience_days(&self) -> i64 {
-        30
+        1_000
     }
     fn satisfaction(&self, life: &Life) -> i64 {
         if life.housed == Housed::None || life.monthly_income + life.savings / 12 < life.essentials {
@@ -660,7 +674,7 @@ impl Mind for Plain {
         o.into_iter().max_by_key(|k| (self.learned(domain, k).unwrap_or(0), std::cmp::Reverse(k.clone())))
     }
     fn choose_conduct(&mut self, _: &mut Cx, _: &Life, c: ConductAsk) -> Conduct {
-        Conduct { does: c.draw_bps < c.base_bps, bps: c.base_bps, facts: BTreeMap::new() }
+        Conduct { does: c.forced || c.draw_bps < c.base_bps, bps: c.base_bps, facts: BTreeMap::new() }
     }
     fn outcome(&mut self, _: &mut Cx, _: &Life, o: Outcome) {
         if let (Some(p), false) = (o.payoff, o.heard) {
