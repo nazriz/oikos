@@ -50,14 +50,6 @@ pub struct Expected {
     pub profit: i64,
 }
 
-fn ceil_div(a: i64, b: i64) -> i64 {
-    if b <= 0 {
-        0
-    } else {
-        (a + b - 1) / b
-    }
-}
-
 /// The business as the founder expects it: sales are an equal share among sellers known and themselves, limited by
 /// what they can serve, with hands hired for each further `units_per_worker` while the margin on them pays the wage.
 pub fn expected(p: &Prospect) -> Expected {
