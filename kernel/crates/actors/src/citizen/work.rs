@@ -206,6 +206,22 @@ fn fill(x: &Value, with: &BTreeMap<&str, Value>, inline_structure: Option<&str>)
 // ------------------------------------------------------------------ the part's own helpers
 
 impl Person {
+
+    /// Our values in the town's terms (basis points, each from the population's spread the world gives, `values`), for
+    /// a business we found: its character is its owner's (firms::orgwants). Empty where the world gives no spread.
+    fn owner_values(&self, cx: &crate::Cx) -> Value {
+        let mut out = serde_json::Map::new();
+        // (A citizen's `values` param holds the population's spread under `values`, beside its own.)
+        let given = cx.ctx.params.get("values");
+        if let Some(pop) = given.and_then(|v| v.get("values")).or(given).and_then(Value::as_object) {
+            for (name, spread) in pop {
+                let (Some(mean), Some(sd)) = (spread.get("mean_bps").and_then(Value::as_i64), spread.get("sd_bps").and_then(Value::as_i64)) else { continue };
+                let z = self.mind.value_z(name);
+                out.insert(name.clone(), json!((mean + (z * sd).div_euclid(100)).clamp(0, 10_000)));
+            }
+        }
+        Value::Object(out)
+    }
     fn wk_usd(w: &Week, n: i64) -> String {
         money_words(n, &w.cx.ctx.world)
     }
@@ -735,9 +751,12 @@ impl Person {
         }
         self.work.venturing = None;
         let dwelling = dwelling.unwrap_or_default();
-        // (`{values}`: the person's values, which are the mind's; the seam does not give them, so the placeholder is
-        // left as written until it does.)
+        // (`{values}`: the person's values, which are the mind's: each read through the seam as how far it sits from the
+        // town's (hundredths of a standard deviation) and written back in the town's terms, basis points, as TS wrote
+        // `mind.person.values`.)
+        let owner_values = self.owner_values(w.cx);
         let with: BTreeMap<&str, Value> = [
+            ("{values}", owner_values),
             ("{structure}", json!(structure_of(&dwelling))),
             ("{home}", json!(dwelling)),
             ("{cell}", json!(cell)),
@@ -822,7 +841,9 @@ impl Person {
         let price = d.i("price").unwrap_or(0);
         let structure = d.s("structure").unwrap_or_default().to_string();
         let capital = price + v.capital;
+        let owner_values = self.owner_values(w.cx);
         let with: BTreeMap<&str, Value> = [
+            ("{values}", owner_values),
             ("{structure}", json!(structure)),
             ("{cell}", d.get("cell").cloned().unwrap_or(Value::Null)),
             ("{listing}", json!(l.id)),
