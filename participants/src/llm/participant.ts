@@ -1362,7 +1362,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
           }
           // An answer to a draft is an answer to what the seat has been shown of it: a draft asked for in this very answer, whose
           // number is easy to guess, has not been shown, and is not signed.
-          if (use.name === "confirm" && text(i?.ref) && !obs.drafts.some((d: any) => d?.id === draftRef(i.ref))) {
+          if (use.name === "confirm" && text(i?.ref) && (i.decision === "confirm" || i.decision === "decline") && !obs.drafts.some((d: any) => d?.id === draftRef(i.ref))) {
             notDone.set(use.id, { now: `Not done: ${quote(i.ref)} was not shown to you yet; you can answer it once you have seen what it would do (you are shown it next).`, later: `When you were last here, your answer on ${quote(i.ref)} was not taken: you had not seen what it would do.` });
             await note({ confirm_unseen: JSON.stringify(use).slice(0, 2000) });
             continue;
