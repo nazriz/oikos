@@ -3,4 +3,4 @@
 [test]
 timeout = 120000
 # Before the tests: one of the machine's slots for this process (scripts/slots.ts; nothing under the suite runner).
-preload = ["./scripts/slots-preload.ts"]
+preload = ["./scripts/slots-preload.ts", "./scripts/tmp-preload.ts"]
