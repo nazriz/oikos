@@ -489,7 +489,7 @@ impl<B: Body> Factory<B> {
                 steps.push(because(format!("Month's end: {strain}, so nothing is paid out to our shareholders."), vec![]));
                 0
             } else {
-                let (s, paid) = pay_out::<Then>(&self.book, &me, &Self::payer(&acct), acct.balance, buffer, if self.month_start < 0 { 0 } else { acct.balance - self.month_start }, &format!("a month's wages and inputs, and {}% of the wage bill", l.chi_bps as f64 / 100.0), &money);
+                let (s, paid) = pay_out::<Then>(&self.book, &me, &Self::payer(&acct), acct.balance, buffer, if self.month_start < 0 { 0 } else { acct.balance - self.month_start }, &format!("a month's wages and inputs, and {}% of the wage bill", super::lengnick::percent(l.chi_bps)), &money);
                 steps.extend(s);
                 paid
             };

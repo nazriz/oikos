@@ -77,6 +77,16 @@ impl Lengnick {
     }
 }
 
+/// Basis points as a percentage in words: 190 is "1.9", 2000 is "20", 1250 is "12.5".
+pub fn percent(bps: i64) -> String {
+    let (w, f) = (bps / 100, bps.abs() % 100);
+    match f {
+        0 => w.to_string(),
+        f if f % 10 == 0 => format!("{w}.{}", f / 10),
+        f => format!("{w}.{f:02}"),
+    }
+}
+
 /// What the wage rule heard this month.
 #[derive(Debug, Clone, Copy)]
 pub struct WageMonth {
@@ -98,7 +108,7 @@ pub fn move_wage(p: &Lengnick, rng: &mut Rng, wage: i64, o: WageMonth, money: &d
     if o.unfilled {
         let up = rng.below((p.delta_bps + 1) as u64) as i64;
         let next = wage * (10_000 + up) / 10_000;
-        return (next, 0, Some(format!("a job we posted has gone unfilled for a month: offering {}% more ({} a pay period)", up as f64 / 100.0, money(next))));
+        return (next, 0, Some(format!("a job we posted has gone unfilled for a month: offering {}% more ({} a pay period)", percent(up), money(next))));
     }
     if !o.posting && o.staffed {
         if o.full_months + 1 >= p.gamma_months {
@@ -107,7 +117,7 @@ pub fn move_wage(p: &Lengnick, rng: &mut Rng, wage: i64, o: WageMonth, money: &d
             return (
                 next,
                 0,
-                Some(format!("fully staffed for {} months: offering {}% less to new hires ({} a pay period)", p.gamma_months, down as f64 / 100.0, money(next))),
+                Some(format!("fully staffed for {} months: offering {}% less to new hires ({} a pay period)", p.gamma_months, percent(down), money(next))),
             );
         }
         return (wage, o.full_months + 1, None);
