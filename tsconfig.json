@@ -20,7 +20,8 @@
     "measure",
     "pilot-view",
     "contracts/test",
-    "docs/research/cel-check"
+    "docs/research/cel-check",
+    "renderer"
   ],
   "exclude": [
     "**/node_modules"

@@ -72,18 +72,19 @@ function maps(header: any) {
 
 const SEAT_TOOLS_HIDDEN = new Set(["notebook"]);
 
-export async function buildView(dir: string, opts: { twin?: string | false; caps?: Partial<Caps>; log?: (s: string) => void } = {}): Promise<ViewData> {
+export async function buildView(dir: string, opts: { twin?: string | false; caps?: Partial<Caps>; log?: (s: string) => void; debriefs?: false } = {}): Promise<ViewData> {
   const say = opts.log ?? (() => {});
   let caps: Caps = { ...CAPS, ...opts.caps };
   const log = logOf(dir);
   const pilotName = basename(resolve(dir));
-  const deb = new DebriefCollector(log);
+  // (The explorer passes debriefs: false: it reads no debrief, docs/design/renderer.md 1.)
+  const deb = opts.debriefs === false ? undefined : new DebriefCollector(log);
   // The header is needed before the pass (which seats sat), and is the log's first line.
   const first = await (async () => { const { logLines } = await import("../../orchestrator/src/logs"); for await (const l of logLines(log)) return JSON.parse(l); })();
   const m = maps(first.body);
   say(`reading ${basename(log)}`);
   const seatPositions = new Set([...m.positions].filter(([, p]) => p.holder && m.seats.includes(p.holder)).map(([id]) => id));
-  const raw = await ingest(log, { seats: new Set(m.seats), positions: seatPositions, entityOfPosition: m.entityOfPosition, holderOfAccount: m.holderOfAccount, full: true, debriefs: deb, wants: DebriefCollector.wants });
+  const raw = await ingest(log, { seats: new Set(m.seats), positions: seatPositions, entityOfPosition: m.entityOfPosition, holderOfAccount: m.holderOfAccount, full: true, ...(deb ? { debriefs: deb, wants: DebriefCollector.wants } : {}) });
   const days = Math.max(1, Math.ceil((raw.end?.t ?? raw.lastT) / 86_400));
   const cur = m.currency;
   const fmt = (x: any) => money(x, cur);
@@ -152,7 +153,7 @@ export async function buildView(dir: string, opts: { twin?: string | false; caps
   const mentionWeight = new Map<string, number>();
   const known = new Set<string>(m.entities.keys());
   const addMentions = (text: string, w = 1) => { for (const id of mentions(text, known)) mentionWeight.set(id, (mentionWeight.get(id) ?? 0) + w); };
-  const debriefOut = deb.finish();
+  const debriefOut = deb ? deb.finish() : { seats: [] as ReturnType<DebriefCollector["finish"]>["seats"], not_given: [] as ReturnType<DebriefCollector["finish"]>["not_given"] };
   const toolsLine = (o: any) => (o && typeof o === "object" ? o : {});
 
   for (const seat of m.seats) {
@@ -201,7 +202,7 @@ export async function buildView(dir: string, opts: { twin?: string | false; caps
       sittingList: sittings, notebook: { final: last ? (notebookAdds.length ? last.notebookBefore ?? "" : last.notebookBefore ?? "") : "", adds: notebookAdds },
       opted_out: raw.optOuts.find((o) => o.participant === seat) ?? null,
       debrief: dr ? debriefView(dr.record) : null,
-      debriefNote: dr ? undefined : debriefOut.not_given.find((x) => x.seat === seat)?.why ?? "no debrief on record",
+      debriefNote: !deb ? undefined : dr ? undefined : debriefOut.not_given.find((x) => x.seat === seat)?.why ?? "no debrief on record",
     });
   }
   // The notebook as the seat last saw it plus what it added after: the last opening is from before the last sitting's own
@@ -298,7 +299,7 @@ export async function buildView(dir: string, opts: { twin?: string | false; caps
         if (ks.every((k) => !seatKinds.has(k))) { for (const k of ks) otherWork[k] = (otherWork[k] ?? 0) + 1; return false; }
         return true;
       });
-      const view = (x?: { t: number; as: string; blocks: any[]; reasoning?: string }) => x && { day: dayOf(x.t), stamp: stamp(x.t), as: x.as, blocks: x.blocks.map((b: any) => ({ ...b, text: clip(b.text, 300) })), signature: decisionSignature(x.blocks), reasoning: clip(x.reasoning, 300) };
+      const view = (x?: { t: number; as: string; blocks: any[]; reasoning?: string; seq?: number }) => x && { seq: x.seq, t: x.t, day: dayOf(x.t), stamp: stamp(x.t), as: x.as, blocks: x.blocks.map((b: any) => ({ ...b, text: clip(b.text, 300) })), signature: decisionSignature(x.blocks), reasoning: clip(x.reasoning, 300) };
       per.push({
         seat, title: seatsOut.find((s) => s.id === seat)?.title, seatActs: mine.length, twinActs: theirs.length, matched: pairs.filter((p) => p.seat && p.twin).length, same: pairs.filter((p) => p.seat && p.twin && p.same).length,
         differ: pairs.filter((p) => p.seat && p.twin && !p.same).length, seatOnly: pairs.filter((p) => p.seat && !p.twin).length, twinOnly: pairs.filter((p) => !p.seat && p.twin).length,
