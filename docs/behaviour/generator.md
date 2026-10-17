@@ -39,6 +39,19 @@ Turns a short spec (`worlds/town.yaml`) and a **profile** (`worlds/profiles/`, d
 
 **Starting conditions (0.31.0).** A description may name scenarios (`scenario: wet-year+lean-council`): named shifts to the description and to the profile's figures, applied before anything is generated, and for the weather a choice among the climate's own years. With none (or `baseline`) the town is exactly as before. docs/scenarios.md.
 
+## A mix of shops (`shop_mix`, 2026-10-18)
+
+A spec may set `shop_mix: true` (or `--set shop_mix=true`; default off, because the TS world's modules buy only `goods`). Where
+the profile has the table (`spending.demand.kinds`, with a `seller` for each kind shops sell: docs/behaviour/demand.md,
+"A town's mix of shops"), the town's shops are divided among the kinds, each a `firm.retailer` with `kind` its kind. The
+division is by largest remainder (`worlds/generator/shopmix.ts`): by the kinds' shares of businesses where the profile gives
+them all, else by their shares of spending. Each kind's unit is what the same staff time serves, so its price follows from its
+labour share; the world market (`world.trade`) sells each kind at the price times `wholesale_bps`; a shop's expected sales,
+staff, opening stock and money are reckoned from its kind's share of the town's spending and its price. The work table has a
+task `consume-<kind>` and the resources a kind each, and the citizens' `demand` names every kind the town sells, with each
+kind's opening price. Factories still make `goods` (household goods and other goods); people trading on their own account and a
+shop founded in the run sell `goods`. Off, or a profile without the table, the town is as before. No place's figure is in code.
+
 ## Homes by income, and payments in force (generator 0.49.0, 2026-10-12)
 
 **What was wrong.** Homes were dealt by size alone: households sorted by the bedrooms they need, each given the smallest home that met the standard, its rent whatever that home's bedrooms cost. Income was never looked at, and what income there was counted wages only: a pensioner had nothing coming in until the claim made on the first morning was decided and a whole period had passed (14 to 61 days). In the 1,000-person town 73 of 239 leases (Victoria's profile) opened with no wage earner; in the 3,000-person town of the living pilots about 28% of let households opened in a home nobody in them could pay for, and most of a first year's arrears, notices and evictions were those households (docs/behaviour/justice.md, "Where arrears come from"). docs/decisions.md, 2026-10-12, "Homes by income".

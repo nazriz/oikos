@@ -205,7 +205,9 @@ export interface Profile {
     homes?: { bodies_per_bedroom: number; bodies_besides: number };
     spending: { saving_bps: number; wealth_effect_bps_per_year: number; essentials_per_month: number; shops_known: number; shop_search_bps_per_month: number;
       /** The household demand system (docs/behaviour/demand.md): each kind's average share of spending and its income elasticity from the place's household expenditure survey, and Frisch's money flexibility. */
-      demand?: { frisch_bps: number; kinds: { kind: string; share_bps: number; income_elasticity_bps: number }[] } };
+      demand?: { frisch_bps: number; kinds: { kind: string; share_bps: number; income_elasticity_bps: number;
+        /** What a shop that sells this kind is like (docs/behaviour/demand.md, "A town's mix of shops"): a kind with no `seller` is not sold by shops (energy is billed by the utilities). `wholesale_bps`: what the shop pays for a unit as a share of its retail price (left out for `goods`: the profile's `industry.retail_purchases_share_bps`); `labour_bps`: the staff's pay for serving a unit as a share of its price, which fixes the size of the unit (left out for `goods`: `industry.retail_labour_share_bps`); `business_share_bps`: the kind's share of the place's retail and service businesses, where counts by industry are sourced (left out: the shops are divided by spending). */
+        seller?: { wholesale_bps?: number; labour_bps?: number; business_share_bps?: number } }[] } };
     /** An adult's savings (cash and deposits), by age: percentiles 10, 25, 50, 75, 90 (cents). */
     savings_by_age?: { from: number; pct: [number, number, number, number, number] }[];
     /** The age people here stop work, where the profile gives one age for everyone; with `labour_force_share_by_age`,
