@@ -254,6 +254,19 @@ impl Default for AdoptionParams {
     }
 }
 
+/// A firm's `automation` parameter as the TS read it: `null` (a world with no vendor): the firm looks at no systems; an
+/// object: the profile's figures over the defaults, a key at a time (`{ ...ADOPTION, ...p.automation }`).
+pub fn params_from(given: &Value) -> Result<Option<AdoptionParams>, String> {
+    let Some(over) = given.as_object() else { return Ok(None) };
+    let mut base = serde_json::to_value(AdoptionParams::default()).map_err(|e| e.to_string())?;
+    if let Some(b) = base.as_object_mut() {
+        for (k, v) in over {
+            b.insert(k.clone(), v.clone());
+        }
+    }
+    serde_json::from_value(base).map(Some).map_err(|e| format!("automation: {e}"))
+}
+
 /// The facts of the task as the business does it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Task {

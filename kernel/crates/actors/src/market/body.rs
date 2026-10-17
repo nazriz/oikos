@@ -14,7 +14,7 @@ use crate::common::book::Book;
 use crate::common::OwnAccount;
 use crate::papers::agreements;
 use crate::steps::{Done, Step};
-use crate::{Belief, Cx, Picture};
+use crate::{Belief, Cx, Picture, WorldInfo};
 use oikos_sight::{Record, RecordBody};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -37,6 +37,8 @@ pub fn lift<T, U>(steps: Vec<Step<T>>, f: impl Fn(T) -> U) -> Vec<Step<U>> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Standing {
     Trading,
+    /// Being wound up: it trades no more, and lets its people go; it finishes when the winding-up has run its time.
+    Winding,
     /// Closed, its premises offered for sale (it still keeps an account).
     Closed,
 }
@@ -46,8 +48,13 @@ pub enum Standing {
 pub struct Want {
     pub target: i64,
     pub wage: i64,
+    /// Whether the market side judged it may post (money and room): a body that changes the wage in its dealings (a rise it
+    /// agreed with a union) judges the money again at the new wage, from `postable` (everything but the money).
     pub can_post: bool,
-    pub why: String,
+    pub postable: bool,
+    /// This month's headcount, and why it is what it is (the posting's reason is written from them and the wage then).
+    pub headcount: i64,
+    pub headcount_why: String,
 }
 
 /// The month's end, as the market side reads its trade for the labour decision.
@@ -63,6 +70,9 @@ pub struct Review {
     pub last_demand: i64,
     /// A shop reads a surplus of hands against its serving, a factory against its stock: which surplus rule applies.
     pub surplus: Surplus,
+    /// A factory's stock at the month's end, and the share of the expected demand below which it is low (bps).
+    pub stock: i64,
+    pub phi_low_bps: i64,
 }
 
 /// How the month's end reads too many hands.
@@ -93,14 +103,20 @@ pub struct House<'a> {
     pub trading: bool,
     /// Wages for the next pay period the market side keeps aside (what a dividend or an order must not take).
     pub workers: usize,
+    /// A business of one (its owner serves): it takes on nobody and is not idle for want of staff.
+    pub operator: bool,
+    /// What customers paid it, a day, over the last month (what a stoppage costs it in sales), and the share of its work
+    /// that systems do (bps): the employer's side of bargaining reads both.
+    pub takings_per_day: i64,
+    pub system_bps: i64,
 }
 
 /// What the routine dealings produced.
 #[derive(Debug, Default)]
 pub struct Dealt {
     pub steps: Vec<Step<BodyThen>>,
-    /// A rise in the wage offered (bps) the firm agreed with its union.
-    pub wage_rise_bps: Option<i64>,
+    /// Rises in the wage offered (bps) the firm agreed with its union, in the order agreed.
+    pub wage_rises: Vec<i64>,
     /// The headcount is cut to this (cash ran short and the most recent hire was let go).
     pub headcount_cap: Option<i64>,
     /// The firm found itself insolvent or idle and began to wind up: it trades no more.
@@ -124,7 +140,7 @@ pub struct Wind<'a> {
     pub premises: Option<(String, String, String)>,
     /// What the premises are offered at, if the firm can say (a share of what building them new costs).
     pub sale_price: Option<i64>,
-    /// What the market side already paid its suppliers (invoices), before the firm finishes.
+    /// What was already paid before the firm finishes: its staff's wages and withheld tax owed, and its suppliers (invoices).
     pub paid_suppliers: i64,
     pub staying: bool,
 }
@@ -142,7 +158,7 @@ pub trait Body: Serialize + DeserializeOwned + Send + Sized + 'static {
     /// A job posted that has stood a month unfilled; whether any job is posted now.
     fn vacancies(&self, book: &Book, t: i64) -> (bool, bool);
     /// Whether anyone is under notice or wages are owed (nothing is paid out to shareholders while it is true).
-    fn strained(&self, book: &Book, t: i64) -> Option<String>;
+    fn strained(&self, book: &Book, t: i64, world: &WorldInfo) -> Option<String>;
     /// The month's end for the staff: hours cut before heads, a hand taken on or let go.
     fn review(&mut self, book: &Book, t: i64, r: &Review, workers: i64, cx: &mut Cx) -> Staffed;
     /// The routine of an employer, borrower and union party, each wake while trading.
@@ -158,6 +174,15 @@ pub trait Body: Serialize + DeserializeOwned + Send + Sized + 'static {
     fn months_in_hand(&self, _book: &Book) -> i64 {
         1
     }
+    /// Winding up: what the firm owes its staff (wages and redundancy pay in its books) and the tax it withheld from their
+    /// wages come before its suppliers, its other creditors and its shareholders. The steps, and what they pay.
+    fn wind_up_owed(&mut self, _book: &Book, _t: i64, _acct: &OwnAccount, _cx: &mut Cx) -> (Vec<Step<BodyThen>>, i64) {
+        (vec![], 0)
+    }
+    /// The act that ends a wake: the organisation's record (its character and memory), if it has one to write.
+    fn keep(&mut self, _cx: &mut Cx) {}
+    /// The firm never opened (the premises it meant to buy went to someone else) and is closed: it trades no more.
+    fn close(&mut self) {}
     /// Closing and selling (`Stage::Closed`: sell the premises) and finishing (`Stage::Due`): the steps it sends.
     fn wind_up(&mut self, _w: &Wind, _cx: &mut Cx) -> Vec<Step<BodyThen>> {
         vec![]
@@ -204,7 +229,7 @@ impl Body for PlainBody {
         let posts: Vec<_> = book.open("job_posting").filter(|j| j.speaks_for.as_deref() == Some(self.me.as_str())).collect();
         (posts.iter().any(|x| t - x.at >= crate::common::MONTH), !posts.is_empty())
     }
-    fn strained(&self, _: &Book, _: i64) -> Option<String> {
+    fn strained(&self, _: &Book, _: i64, _: &WorldInfo) -> Option<String> {
         None
     }
     fn review(&mut self, _: &Book, _: i64, r: &Review, workers: i64, _: &mut Cx) -> Staffed {

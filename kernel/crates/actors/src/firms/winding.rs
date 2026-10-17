@@ -70,7 +70,7 @@ fn about_kind(r: &Record) -> &str {
         _ => "",
     }
 }
-fn about_amount(r: &Record) -> i64 {
+pub fn about_amount(r: &Record) -> i64 {
     match &r.body {
         RecordBody::Claim { about, .. } => match about.get("amount") {
             Some(Value::Number(n)) => n.as_i64().unwrap_or(0),

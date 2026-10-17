@@ -19,6 +19,7 @@ pub mod fund;
 #[cfg(test)]
 pub mod kit;
 pub mod news;
+pub mod staff_payroll;
 pub mod union;
 
 use crate::steps::{because, Step};
@@ -28,7 +29,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 /// Every kind of this lane, in name order.
-pub static KINDS: &[&dyn Kind] = &[&credit::Lending { payroll: None }, &bank::PaymentSystem, &news::Newspaper, &fund::Retirement, &union::Organiser { grievances: Some(crate::offices::hearing::union_cases) }];
+pub static KINDS: &[&dyn Kind] = &[&credit::Lending { payroll: Some(staff_payroll::MAKER) }, &bank::PaymentSystem, &news::Newspaper, &fund::Retirement, &union::Organiser { grievances: Some(crate::offices::hearing::union_cases) }];
 
 /// A manifest as the module file carries it (until the cut-over each equals `participants/manifests/<name>.json`).
 pub(crate) fn manifest_of(json: &str) -> Value {

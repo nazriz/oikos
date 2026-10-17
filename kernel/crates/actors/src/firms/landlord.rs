@@ -230,7 +230,7 @@ impl Params {
 
 /// The culture dial's practice figures, where the dial is on (docs/behaviour/culture.md): the dial's own keys over the
 /// defaults. Absent dial: none.
-fn practice_params(dials: &Value) -> Option<PracticeParams> {
+pub(crate) fn practice_params(dials: &Value) -> Option<PracticeParams> {
     let c = dials.get("culture").filter(|c| !c.is_null() && c.as_bool() != Some(false))?;
     let n = |k: &str, d: i64| c.get(k).and_then(Value::as_i64).unwrap_or(d);
     Some(PracticeParams { window_days: n("practice_window_days", 1_825), min_occasions: n("practice_min_occasions", 5), inertia_bps: n("practice_inertia_bps", 5_000), opening: n("practice_opening", 100) })

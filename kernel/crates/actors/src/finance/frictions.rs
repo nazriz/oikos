@@ -198,7 +198,7 @@ pub trait Answerer<T> {
     /// not answer, and not pay).
     fn truth(&mut self, m: &Matter, from: &str, book: &Book, t: i64) -> Option<Truth>;
     /// The steps that put a thing right other than by paying (a repair ordered, a bill corrected).
-    fn remedy(&mut self, _m: &Matter, _from: &str, _t: i64, _why: &str, _basis: &str) -> Option<Vec<Step<T>>> {
+    fn remedy(&mut self, _cx: &mut Cx, _m: &Matter, _from: &str, _t: i64, _why: &str, _basis: &str) -> Option<Vec<Step<T>>> {
         None
     }
     /// What putting it right would cost beyond what is owed (a repair to be paid for): done only if it can.
@@ -305,7 +305,7 @@ impl Respondent {
             let lean = Self::lean(&org);
             let granted = !nothing && self.draw(cx, &format!("remedy-{which}"), rate, lean) && (cost <= 0 || (account.is_some() && left >= cost));
             if granted {
-                let how = with.remedy(&m, &from, t, &format!("Asked by {from} to put right {}: doing it.", m.label()), &r.id).unwrap_or_default();
+                let how = with.remedy(cx, &m, &from, t, &format!("Asked by {from} to put right {}: doing it.", m.label()), &r.id).unwrap_or_default();
                 let mut calls = vec![say(
                     paper::ANSWER,
                     &format!("Answer to your request {}: yes{}.", r.id, if owed > 0 { format!(", {} is paid to you", usd(owed)) } else { String::new() }),
@@ -453,7 +453,7 @@ impl Respondent {
                 }
                 left -= amount;
                 // (And whatever puts it right from here on: the work done, the paper withdrawn, the pay set right.)
-                steps.extend(with.remedy(&m, &applicant, t, &why, &dr.id).unwrap_or_default());
+                steps.extend(with.remedy(cx, &m, &applicant, t, &why, &dr.id).unwrap_or_default());
                 let what = if binding { "order_obeyed" } else { "recommendation_heeded" };
                 self.count(&mut org, what);
                 if let Some(o) = &mut org {
