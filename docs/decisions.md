@@ -5671,3 +5671,54 @@ entry called a "market check" was found on gd-adoption; C1 and C2 ask its owner 
 10,000 people are too large for memory (then the engine hands books a shared index; no lane's code changes); the
 seam's `Other` variants carry most of the traffic by the end of step 2 (then the seam was cut in the wrong place and
 A1 and A2 redraw it together); or the forms catalogue and papers.ts drift before the cut-over (the test fails first).
+
+## 2026-10-17 · Port lane E: the public offices in Rust (no model called)
+
+**What.** The twenty kinds of government.ts, institutions.ts, police.ts, tribunal.ts, desk.ts, school.ts, elections.ts,
+utilities.ts and books.ts, in `kernel/crates/actors/src/offices/` (a file each: council, treasury, planning, builder,
+registry, police, school, utilities, tribunal, desk, elections, books; `hearing.rs` is desk.ts's `Hearings`, shared by
+the desk and the tribunal; `land.rs` is `ownerOf`/`ownLand`; `staff.rs` the employer's side an office uses). Manifests
+are the TS ones (versions unchanged, except the election and books versions, which are the bug-fix branch's 0.7.0 and
+0.3.1 in behaviour); papers.ts's forms are the catalogue 1b made, now also listed by name (`forms::group_names`) for the
+translator. Written by me for hearing, desk, tribunal, registries, elections, books, staff, land, and by five Sonnet
+subagents (council, treasury, planning with the inspector, builder, police with school and utilities), each in its own
+worktree and merged here. Tests: 171 unit tests in `oikos-actors`, 10 in `oikos-rules`, a scenario test file per
+group (`kernel/tests/e_*.rs`, same hash on 1 and 14 threads), and each manifest held equal to the TS one.
+
+**The bug-hunt corrections (runs/bughunt-2026-10-17.md), ported.** Every office reads what it did from its own file, not
+the holder's memory (a successor carries on): the election (a result's poll day, a notice, a ballot), the rates levy and
+its interest, the tribunal's listed and decided cases, the desk's, the registries' entries and transmissions, the
+books clerk (from the last paper filed), the inspector's inspections, the planning decisions. A stage moves on only when
+its act is applied (a refused notice, ballot or result is tried again: finding 15). The vacant-post appointer is
+payroll's (C1). Finding 3 (a dead sole tenant) is the landlord's rule (C1); the police and tribunal read the registry's
+entry or a certified copy only.
+
+**Risks fixed.** PB-19 (held questions piling up at 10,000 people): a keeper's post must be staffed to its load. Each
+keeper declares a `capacity` in its manifest and `rules::staffing::clerks_needed` sizes the counter from the people it
+serves (1 clerk at 1,000, 5 at 10,000 on placeholder figures); the generator must call it (lane F). PB-11 (the code mayor
+re-commissions the same site), PB-12 (a law withdrawn with no ballot), PB-14 (a code council on one axis, a 90% coin
+for budgets: a vote now has a cause, deference to the proposer and the councillor's values) in council.rs; PB-15
+(planning grants by default and hears nobody: a planning procedure on file gives notice, hears objections, decides
+after) and PB-16 (compliance a coin: it is now what the staff have the hours to look into) in planning.rs;
+WM-7/PB-6 (offices that stop when a holder goes) by the file-as-memory rule. The register is on `merge-main`, not on
+this branch: its entries for these ids should be updated there from the above; the subagents' replacement texts are in
+their doc sections (docs/behaviour/*.md).
+
+**What integration must know.**
+1. `Staff` (offices/staff.rs) and private stand-ins in treasury.rs, builder.rs and utilities stand in for C1's
+   `Staffing`, C1/tax withholding, C2's trade, D's decisions and frictions. Each is marked `stands in for lane X`.
+   Tokens cross as `StaffThen` (opaque JSON), so C1's `Staffing` slots in behind the same methods.
+2. `office.clerk` starts only for a module with a registered reader of its books; none is (the readers `openbooks*`,
+   `daybook`, `roster`, `tally`, `diary` stay TS). Port them to `books::OfficeBooks`, or keep seat-held offices' clerks on
+   the host.
+3. `Kind::first_wake` has no random stream: `offices::spread` (a hash of the participant id) replaces `rng("first-wake")`.
+4. The frame's engine tests now idle every code participant but the one they test, because Riverbend's real kinds need
+   the parameters a generated world gives them.
+5. Paper types added: `permit_notice`, `permit_objection`, `building_inspection`, `Procedure.planning`.
+6. A new holder's first look at an account must show past payments for the finance, tax and rates offices to avoid
+   charging interest on claims already paid (not verified; lane F).
+
+**Not done.** Referral and merits in planning; the inspector's whole-flow scenario; death-in-service and withholding in
+the stand-in employer; the register entries on `merge-main`; the profile-sourced asks per resident for PB-19.
+**Revisit if** the stand-ins diverge from C1's behaviour at integration, or the keepers' asks per resident measured in a
+run are far from the placeholder.
