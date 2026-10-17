@@ -36,7 +36,7 @@ use crate::{Ctx, Cx};
 use serde_json::Value;
 
 /// The mind's own kinds (a founded group's founder post: founded.ts), A2's, in name order.
-pub static KINDS: &[&dyn crate::Kind] = &[];
+pub static KINDS: &[&dyn crate::Kind] = &[&founded::Founded];
 
 /// A person's mind, drawn as the world's parameters and the person's own make it.
 pub fn make(_cx: &mut Cx, _born: &Born) -> Result<Box<dyn Mind>, String> {
