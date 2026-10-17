@@ -13,6 +13,11 @@
       },
       "source": "placeholder"
     },
+    "automation": {
+      "schema": {},
+      "default": null,
+      "source": "placeholder"
+    },
     "borrow_again_days": {
       "schema": {
         "type": "integer"

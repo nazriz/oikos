@@ -87,7 +87,7 @@ const WORK_TIME = {
   },
   // What a system does takes it a second: it is software that was delivered to do just that (foundations F5: there is no default
   // for a block a system's template does not list, because it cannot do it).
-  system: { message: 1, publish: 1, transfer: 1, open_account: 1, close_account: 1, arrive: 1, move_goods: 1, withdraw: 1, record_claim: 1, transfer_claim: 1, answer: 2 },
+  system: { message: 1, publish: 1, transfer: 1, open_account: 1, close_account: 1, arrive: 1, move_goods: 1, withdraw: 1, record_claim: 1, transfer_claim: 1, answer: 2, work: 1, deploy: 1, retire: 1, propose_agreement: 1, sign_agreement: 1 },
   sources: {
     person: "Placeholder: minutes for a person's act (5 for a message, 15 to fill in or go somewhere, 30 to draft an agreement, an hour to leave or arrive), to be sourced (time-use surveys, the Oikos time model: docs/design/rebuild.md 6.3).",
     "person.take": "Placeholder: five minutes to take goods by hand where they are kept (what a theft is), to be sourced; before foundations F10 the table had no row for it and the platform's one second stood in.",
@@ -462,8 +462,11 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   };
 
   // ---- entities ----
+  const AUTO = V.automation; // the systems the outside world sells (docs/behaviour/automation.md)
   const entities: any[] = [
     { id: "outside", kind: "boundary", name: "The outside world" },
+    // (The vendors of systems are the outside world\'s too, and their own seller: an order is addressed to the seller it is for.)
+    ...(AUTO?.offers.length ? [{ id: "vendors", kind: "boundary", name: "The vendors of systems" }] : []),
     { id: "city", kind: "government", name: `Town of ${spec.name}` },
     { id: "bank", kind: "bank", name: `${spec.name} Savings Bank` },
     { id: "builder", kind: "builder", name: `${spec.name} Builders` },
@@ -804,6 +807,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     { id: "acc-outside", holder: "outside", custodian: "outside", balance: 0 },
     // (The higher government's named funds: accounts of the outside world's, each its own.)
     ...FUNDS.map((f) => ({ id: `acc-outside-${f.id}`, holder: "outside", custodian: "outside", balance: 0 })),
+    ...(AUTO?.offers.length ? [{ id: "acc-vendors", holder: "vendors", custodian: "vendors", balance: 0 }] : []),
     { id: "acc-bank", holder: "bank", custodian: "bank", balance: V.opening.bank },
     { id: "acc-union", holder: "union", custodian: "bank", balance: 0 },
     { id: "acc-city", holder: "city", custodian: "bank", balance: V.opening.town },
@@ -2083,9 +2087,10 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     "payment-system": { title: "A payment platform", does: ["message", "publish", "transfer", "open_account", "close_account"] },
     "agency-system": { title: "An agency's case and payments system", does: ["message", "publish", "transfer", "arrive"], owner: "outside" },
     "market-system": { title: "A market's trading system", does: ["message", "publish", "transfer", "move_goods", "withdraw", "record_claim", "transfer_claim"], owner: "outside" },
+    "vendor-system": { title: "A vendor's sales and delivery system", does: ["message", "publish", "withdraw", "transfer", "deploy", "retire", "propose_agreement", "sign_agreement"], owner: "outside" },
   };
   const systemKindOf = (entity: string, controller: any): string | undefined =>
-    controller.type !== "code" ? undefined : controller.impl === "bank.payment_system" ? "payment-system" : controller.impl === "world.trade" ? "market-system" : entity === "outside" || controller.impl === "fund.retirement" ? "agency-system" : undefined;
+    controller.type !== "code" ? undefined : controller.impl === "bank.payment_system" ? "payment-system" : controller.impl === "world.trade" ? "market-system" : controller.impl === "world.vendor" ? "vendor-system" : entity === "outside" || controller.impl === "fund.retirement" ? "agency-system" : undefined;
   /** The systems of each kind in use, for the templates. */
   const systemsUsed = new Set<string>();
   const sysId = (post: string) => `${post}-system`;
@@ -2167,6 +2172,28 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       // The world market's demand for the town's goods, split among the factories by the size of their works (each
       // factory's export customers).
       buys: { goods: { unit_price: WORLD.goods_export, per_month: exportUnits, from: exportShares } } }));
+  // A person\'s seconds for a paper of a kind (the table\'s row for what is made, else for the block), and what a system of an office offer takes
+  // for it: the offer\'s speed against that. The table of work carries the system\'s row, so that a paper a system writes takes the time it says.
+  const personTable: { [k: string]: number } = { ...WORK_TIME.person, ...V.work_time?.person };
+  const personPaper = (kind: string) => personTable[`publish/${kind}`] ?? personTable.publish!;
+  var officeRows: { rows: { [k: string]: number }; sources: { [k: string]: string } } | undefined;
+  for (const o of AUTO?.offers ?? []) if (o.for === "offices") {
+    officeRows ??= { rows: {}, sources: {} };
+    for (const kind of o.kinds ?? []) {
+      officeRows.rows[`publish/${kind}`] = Math.max(1, Math.round((personPaper(kind) * o.speed_bps) / 10_000));
+      officeRows.sources[`system.publish/${kind}`] = `Placeholder: a system of the offer ${o.id} writes a ${kind} in ${o.speed_bps / 100}% of the time a person takes (the offer\'s speed; ${P.sources["automation"] ?? "no source given"}).`;
+    }
+  }
+  // The outside world as a seller of systems (docs/behaviour/automation.md): what it sells, at what prices, and the licence. Its
+  // takings leave the town. Where the profile has no automation, there is none.
+  if (AUTO?.offers.length) {
+    const secondsOf = (o: { task?: string; kinds?: string[]; speed_bps: number; for: string }) => o.for === "firms" ? Math.max(1, Math.round(((o.task === "make" ? MAKE.labour : SHOP.serve) * o.speed_bps) / 10_000))
+      : Math.max(1, Math.round(((o.kinds ?? []).reduce((x, k) => x + personPaper(k), 0) / Math.max(1, (o.kinds ?? []).length) * o.speed_bps) / 10_000));
+    office("outside-vendor", "vendors", "Vendor of systems", undefined, [{ id: "ledger", kind: "accounts" }, K.mine(), K.published("tenders", ["tender"])],
+      code("world.vendor", { account: "acc-vendors", change_bps_per_year: -AUTO.price_fall_bps_per_year,
+        offers: AUTO.offers.map((o) => ({ id: o.id, title: o.title, for: o.for, ...(o.task ? { task: o.task } : {}), ...(o.kinds ? { kinds: o.kinds } : {}), template: o.id, seconds: secondsOf(o), speed_bps: o.speed_bps, scope_bps: o.scope_bps,
+          setup: o.setup, fee_per_year: o.fee_per_year, exit: o.exit, term_days: o.term_days, notice_days: o.notice_days, oversight_hours_per_month: o.oversight_hours_per_month })) }));
+  }
   // The foreman looks up in the register the plan of a lot it is asked to build on (nobody has the register by heart),
   // and goes to see the ground before building there, to know where on a lot a building goes. It gives notice of
   // building work as it begins: to the town (whose inspector comes) and, where there is one, the water corporation
@@ -2726,6 +2753,26 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     const m = pos.role_module;
     if (m && (m.code === "firm.retailer" || m.code === "firm.producer")) Object.assign(m.params, { adjust: { smooth_months: ADJ.smooth_months ?? 3, hiring_cost_weeks: ADJ.hiring_cost_weeks ?? 8, ...(ADJ.hours_step_bps ? { hours_step_bps: ADJ.hours_step_bps } : {}) } });
   }
+  // Systems on offer (docs/behaviour/automation.md): every business with staff weighs them as the profile says, shown what the
+  // vendor publishes; the rate at which each gets a unit wrong is a row of the world's table of slips, with the offer's source.
+  if (AUTO?.offers.length) {
+    for (const pos of positions) {
+      const m = pos.role_module;
+      if (!m || (m.code !== "firm.retailer" && m.code !== "firm.producer") || m.params.operator) continue;
+      Object.assign(m.params, { automation: AUTO.firms });
+      if (Array.isArray(pos.channels)) pos.channels.push(K.from("vendors", ["vendors"], ["system_offer"], { title: "What vendors sell to businesses" }));
+    }
+    // The town\'s offices that write papers in numbers: they weigh a system for them too, and above the law\'s threshold put the contract to tender.
+    const staffMonth = Math.round((PS.wage_per_pay_period * 30 * DAY) / PAY);
+    for (const pos of positions) {
+      const m = pos.role_module;
+      const kinds = m?.code === "city.rates_officer" ? ["rates_notice"] : m?.code === "city.planning_officer" ? ["permit_decision"] : undefined;
+      if (!m || !kinds || !AUTO.offers.some((o) => o.for === "offices" && kinds.every((k) => o.kinds?.includes(k)))) continue;
+      Object.assign(m.params, { automation: AUTO.firms, ...(AUTO.procurement ? { procurement: AUTO.procurement } : {}),
+        casework: { kinds, person_seconds: Object.fromEntries(kinds.map((k) => [k, personPaper(k)])), wage_month: staffMonth, seconds_per_worker_month: Math.round((WORKING_DAY * WORK_DAYS * 30) / 7), utilisation_bps: 8_000 } });
+      if (Array.isArray(pos.channels)) pos.channels.push(K.from("vendors", ["vendors"], ["system_offer"], { title: "What vendors sell to offices" }));
+    }
+  }
   // Trade credit, where the profile states the place's ordinary terms (docs/behaviour/trade.md, "Trade credit"): a factory gives them to the
   // shops that buy from it, and the world market to the factories that buy inputs; both buyers take them when the list says so.
   const TCD = V.business?.trade_credit_days;
@@ -2823,6 +2870,10 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     // it does and nothing more. The bank's payment platform is under licence, paid for in the bank's own account; the
     // outside world's own are its own. docs/behaviour/staffing.md.)
     ...[...systemsUsed].sort().map((k) => ({ id: k, kind: "system", title: SYSTEM_KINDS[k]!.title, supplier: "outside", does: SYSTEM_KINDS[k]!.does.map((block) => ({ block })), controller: code("system.genesis"), framing: unstated })),
+    // (And what the outside world\'s vendor sells: a kind of system for each offer, which does the task it is for and nothing else.)
+    ...(AUTO?.offers ?? []).map((o) => ({ id: o.id, kind: "system", title: o.title, supplier: "vendors",
+      does: o.for === "firms" ? [{ block: "work", task: o.task, seconds: Math.max(1, Math.round(((o.task === "make" ? MAKE.labour : SHOP.serve) * o.speed_bps) / 10_000)) }] : [...(o.kinds ?? []).map((kind) => ({ block: "publish", kind })), { block: "record_claim" }, { block: "message" }],
+      controller: code("system.genesis"), framing: unstated })),
     ...["newcomer", "child"].map((id) => ({ id, kind: "person", channels: citizenChannels, controller: citizenController, framing: unstated })),
     ...["newcomer-outside-lf", "child-outside-lf"].map((id) => ({ id, kind: "person", channels: citizenChannels, controller: outsideLabourForce, framing: unstated }))];
   if (spec.migration !== false) {
@@ -3265,7 +3316,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
           from_covers: { ...Object.fromEntries([...L.land_covers.map((c: any) => c.id), V.nature!.river_cover].map((c) => [c, CL.heat_units])), built: CL.built_heat_units, ...(RDS ? { road: CL.built_heat_units } : {}) },
           source_by_day: W.heat }] : [])] } : {}),
     },
-    world: { boundaries: ["outside"], currencies: [V.currency], ground: L ? L.ground : { w: spec.grid.w, h: spec.grid.h },
+    world: { boundaries: ["outside", ...(AUTO?.offers.length ? ["vendors"] : [])], currencies: [V.currency], ground: L ? L.ground : { w: spec.grid.w, h: spec.grid.h },
       // The places (D58): the town, detailed, covering its ground; with nature, within its district, the landscape.
       places: L ? L.places : [{ id: "town", kind: "town", name: spec.name, area: { x: 0, y: 0, w: spec.grid.w, h: spec.grid.h }, detailed: true }],
       ...(L ? { populations: L.populations, flows: L.flows, ...(V.nature!.spin_up_years ? { nature_spin_up_days: Math.round(V.nature!.spin_up_years * 365) } : {}) } : {}), entities, accounts: accounts.map((a) => ({ ...a, balance: String(a.balance) })), structures, occupancy, records,
@@ -3280,8 +3331,16 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     knowing: K.knowing(positions, { holderSearch: [], dealings: 20, ...(V.knowing ? { visit_seconds: V.knowing.visit_seconds } : {}), ...(FR ? { hearings: true } : {}), ...(FND ? { founding: true } : {}) }),
     // (Work is done in a workplace: a person named to do an act's work must be in one. `by` is F3's; the generator names none yet.)
     orchestration: { thinking_time: "free", performers_in: "workplace", act_time: {
-      ...WORK_TIME, person: { ...WORK_TIME.person, ...V.work_time?.person }, ...(V.work_time?.system ? { system: V.work_time.system } : {}),
-      sources: { ...WORK_TIME.sources, ...V.work_time?.sources } },
-      ...(slips ? { slip: slips } : {}) },
+      ...WORK_TIME, person: { ...WORK_TIME.person, ...V.work_time?.person }, ...(V.work_time?.system || officeRows ? { system: { ...(V.work_time?.system ?? WORK_TIME.system), ...(officeRows?.rows ?? {}) } } : {}),
+      sources: { ...WORK_TIME.sources, ...V.work_time?.sources, ...(officeRows?.sources ?? {}) } },
+      ...(slips || AUTO?.offers.length ? { slip: ((): NonNullable<typeof slips> => {
+        // (The rate at which each system on offer gets a unit wrong: a row of the table for a system, as the offer states it.)
+        const t: NonNullable<typeof slips> = slips ?? { person: {}, system: {}, sources: {} };
+        for (const o of AUTO?.offers ?? []) {
+          t.system[o.id] = { bps: o.error_bps };
+          t.sources[`system.${o.id}`] = `The vendor's stated rate for ${o.title}: ${o.error_bps / 100}% of the units it does come out wrong (a placeholder; no measured figure for software of this kind was found). ${P.sources["automation"] ?? ""}`;
+        }
+        return t;
+      })() } : {}) },
   };
 }

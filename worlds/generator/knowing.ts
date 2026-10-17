@@ -71,6 +71,8 @@ export const PUBLISHED: { what: string; why: string; board?: true; most?: number
   { what: "support_statistics", why: "Published statistics of who is paid support." },
   { what: "price_index", why: "Published statistics of prices." },
   { what: "population_estimate", why: "Published statistics of how many live in the town." },
+  { what: "system_offer", why: "A vendor of systems advertises what it sells and at what price to the businesses and offices that might buy." },
+  { what: "tender", why: "A public body invites bids for a contract in public, so that any seller may bid." },
   { what: "closure", why: "A firm's winding up is given by public notice." },
   { what: "has:practice", why: "A notice of a gathering is put up for whoever may come." },
   { what: "has:assertion", why: "What is put forward to be believed (a teaching, a platform, a report) is addressed to the public." },

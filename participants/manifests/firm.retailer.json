@@ -13,6 +13,11 @@
       },
       "source": "placeholder"
     },
+    "automation": {
+      "schema": {},
+      "default": null,
+      "source": "placeholder"
+    },
     "bank": {
       "schema": {
         "type": "string",

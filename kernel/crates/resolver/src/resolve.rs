@@ -938,7 +938,9 @@ impl Resolver<'_> {
         }
         let Some(template) = Self::str_(c, "template")?.filter(|t| !t.is_empty()) else { return ask("Which kind of system (its template)?") };
         let title = Self::str_(c, "title")?.filter(|t| !t.is_empty());
-        Ok(vec![obj(vec![("block", some("deploy")), ("template", some(template)), ("title", title.map(Json::from)), ("ref", bind.map(Json::from))])])
+        // (The client, if the supplier delivers it to another organisation: `to`. Absent: the supplier itself.)
+        let to = self.id(c, "to")?.map(|t| self.k.entity_of(&t));
+        Ok(vec![obj(vec![("block", some("deploy")), ("template", some(template)), ("to", to.map(Json::from)), ("title", title.map(Json::from)), ("ref", bind.map(Json::from))])])
     }
 
     fn common(&self, c: &Call, bind: Option<&str>) -> R<Vec<(&'static str, Option<Json>)>> {

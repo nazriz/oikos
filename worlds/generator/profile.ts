@@ -302,6 +302,16 @@ export interface Profile {
        * one of its own staff to it). A body not named has none, and a post of it whose staff have all died stays empty. */
       appointed_by?: { [kind in "administration" | "courts" | "oversight" | "elections" | "land_registry" | "press" | "banking" | "utilities" | "union" | "property_management" | "police"]?: "council" };
     };
+    /** Automation (docs/behaviour/automation.md): the systems the outside world sells to businesses and offices, and how a business weighs them.
+     * The prices are the outside world's, like world prices: held at today's level (`price_fall_bps_per_year` 0) unless a scenario gives a
+     * yearly change. No figure here sets how many adopt or when. */
+    automation?: {
+      price_fall_bps_per_year: number;
+      offers: { id: string; title: string; for: "firms" | "offices"; task?: string; kinds?: string[]; speed_bps: number; scope_bps: number; setup: number; fee_per_year: number; exit: number; term_days: number; notice_days: number; oversight_hours_per_month: number; error_bps: number }[];
+      firms: { payback_months: { small: number; large: number }; large_from: number; hurdle_bps: number; reference_bps: number; on_cost_bps: number; most?: number };
+      /** The law on public buying: a contract worth more than the threshold (in the world\'s smallest unit) is put out to tender, and bids are open this long. */
+      procurement?: { threshold: number; bid_days: number };
+    };
     unions: { membership_bps: { [kind: string]: number }; dues_per_month: number; resignation_notice_days: number; claim_margin_bps: number; meeting_every_days?: number; teaching?: string };
     /** Social groups that meet (clubs, congregations): their kinds, how often and how long they meet, how many. */
     groups?: { kinds: { kind: string; name: string; every_days: number; lasts_minutes: number; teaching?: string; held_at_start_bps?: number }[]; per_kind_per_1000_people: number; taking_part_bps: number; leave_notice_days: number };

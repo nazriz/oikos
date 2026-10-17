@@ -713,6 +713,20 @@ A plan, nothing built. Opened on 2026-10-15: the Kulveit et al. abstract page an
 - **Taxation and representation.** Ross, M. L. (2004), "Does Taxation Lead to Representation?", *British Journal of Political Science* 34(2), 229–249 **(to confirm)**. Used: why the dependence of public revenue on residents is measured (M3), not built as a mechanism.
 - **Exit and voice.** Hirschman (1970), cited above. Used: the levers' table (2.5).
 
+## Adoption by the numbers (docs/behaviour/automation.md; docs/decisions.md, 2026-10-17, "Adoption by the numbers")
+
+Nothing was opened for this step; every figure and source below is named from memory or a search summary and is **(to confirm)** unless it is already cited above ("Gradual disempowerment").
+
+- **Automation as moving a task from labour to capital when that is cheaper.** Acemoglu and Restrepo (2019), cited above. Used: the comparison a business makes for a task (`appraise`): the labour saved at the wage against the system's running cost.
+- **Uptake: profit, imitation, S-curve.** Griliches (1957), Mansfield (1961), Rogers (2003), cited above. Used: the margin a business asks (`hurdle_bps`) is eased by each client the vendor names (`reference_bps`); no rate of uptake is set, the S-curve is a pattern to look for.
+- **Adoption costs beyond the price.** Bresnahan, Brynjolfsson and Hitt (2002), cited above. Used: set-up and exit costs, spread over the payback horizon.
+- **Payback.** Graham, J. R. and Harvey, C. R. (2001), "The theory and practice of corporate finance: evidence from the field", *Journal of Financial Economics* 60, 187-243: the payback period is one of the most used criteria, and firms commonly ask a few years. Used: `payback_months` (24 for a small business, 36 for a large; placeholders).
+- **Task exposure.** Eloundou, Manning, Mishkin and Rock (2023), cited above. Used: `scope_bps`, the share of a task's units an offer can do (placeholders in the range the exposure figures give).
+- **Prices of the systems.** A self-checkout bank's list price (US$15,000 to 25,000 installed; retail trade reports) and support contracts (10 to 20% a year); the installed cost of an industrial robot system (a few times the robot's price of about US$50,000; International Federation of Robotics, *World Robotics*). Used: the profile's offers, converted at approximate 2026 rates (not the place's own).
+- **A falling price of the systems built on language models.** Epoch AI, "LLM inference prices have fallen rapidly but unequally across tasks" (2025): the price of a given level of performance fell between 9 and 900 times a year (a search summary); a16z, "LLMflation" (2024): about 10 times a year. Used: only as an upper bound for the scenario `falling-system-prices`, which takes half a year (placeholder).
+- **Public procurement above a threshold is tendered.** Victoria: the *Local Government Act 2020* (Vic) s 108 (a council's procurement policy) and councils' thresholds; England: the *Procurement Act 2023* and its thresholds for sub-central authorities. Used: `automation.procurement` in each profile (two places with a figure from memory, the rest placeholders).
+- **What goes wrong when administration is automated.** Michigan Office of the Auditor General (2016) on MiDAS, cited above; Bovens and Zouridis (2002); Parasuraman and Manzey (2010), cited above. Used: an office's mistakes cost a second pair of eyes (ten times a paper's time; placeholder), and the auditor (docs/behaviour/auditor.md).
+
 ## Foundations: the laws of how the world works (docs/design/foundations.md; docs/decisions.md, 2026-10-15, "Foundations: plan")
 
 A plan, nothing built. Nothing new was opened on 2026-10-15: every source below is named from memory and is **(to

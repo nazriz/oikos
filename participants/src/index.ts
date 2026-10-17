@@ -38,6 +38,7 @@ import { citizen } from "./behaviour/citizen";
 import { employer, landlord } from "./behaviour/firms";
 import { producer } from "./behaviour/producer";
 import { retailer } from "./behaviour/retailer";
+import { vendor } from "./behaviour/automation";
 import { builder, childProtection, inspector, landRegistry, planningOfficer, registry } from "./behaviour/institutions";
 import { councilClerk, councillor, financeOfficer, mayorCode, ratesOfficer, taxClerk, works } from "./behaviour/government";
 import { environment } from "./behaviour/environment";
@@ -109,6 +110,7 @@ export const modules: { [name: string]: BehaviourModule & { source: string } } =
       [employer, "behaviour/firms.ts"],
       [producer, "behaviour/producer.ts"],
       [retailer, "behaviour/retailer.ts"],
+      [vendor, "behaviour/automation.ts"],
       [planningOfficer, "behaviour/institutions.ts"],
       [inspector, "behaviour/institutions.ts"],
       [builder, "behaviour/institutions.ts"],

@@ -15,6 +15,7 @@ import { billSettled, nextLook, because, Book, cellsOf, DAY, draftLaw, figureGiv
 import { Staffing, staffingForm, staffingUnder, stepper } from "./firms";
 import { incomeTaxLaw, withholding } from "./tax";
 import { ownLand } from "./institutions";
+import { OfficeDesk } from "./automation";
 import * as P from "./papers";
 
 const YEAR = 365 * DAY;
@@ -775,8 +776,12 @@ export const ratesOfficer: BehaviourModule = {
       // "seat" the rates officer alone, who sets the standing work order; "staff" the rates clerks, who follow it.
       part: "" as "" | "seat" | "staff",
       office: "", // where its clerks work, as a standing order names it (none given: the office itself)
+      // Systems it may take up to write its notices (docs/behaviour/automation.md): how it weighs them, the law on public buying,
+      // and what its papers take its clerks (the world's figures). None: it looks at none.
+      automation: null as import("./automation").AdoptionParams | null, procurement: null as import("./automation").Procurement | null, casework: null as import("./automation").Casework | null,
     }, ctx.params);
     const book = new Book();
+    const desk = new OfficeDesk(ctx.entity, p, ctx.rng);
     const letters = new Letters(ratesOfficer.answers);
     const directions = new Directions(ctx, { under: p.directed_under, compliance_bps: p.direction_compliance_bps, office_words: "the rates office" });
     const routines = new StandingWork(ctx.entity, p.part);
@@ -795,6 +800,7 @@ export const ratesOfficer: BehaviourModule = {
     return stepper(
       (obs) => {
         book.absorb(obs);
+        desk.absorb(book);
         letters.take(obs, book);
         const acc = ownAccount(obs);
         if (acc) for (const tx of channels.transactions(obs)) if (tx.to === acc.account && tx.settles) {
@@ -815,6 +821,7 @@ export const ratesOfficer: BehaviourModule = {
         const dueDays: number = terms.due_days ?? 30;
         const interestBps: number = terms.penalty_interest_bps ?? 0;
         if (!acc) return steps;
+        if (p.part !== "staff") steps.push(...desk.steps(book, t, { account: acc.account, balance: acc.balance, staff: 1, keep: 0 }));
         steps.push(...routines.set(book, [{ task: "levy", at: p.office || ctx.position || "office", every: Math.floor(365 / instalments) * DAY, why: "Setting the rates clerks' work: the notices sent at each instalment and interest added to what is overdue, as a standing work order." }]));
         const levying = routines.does(book, "levy", t, { every: DAY });
         // Notices: each owner's share of a year's rates on what they own, as last valued. (Not before there are valuations:
@@ -840,7 +847,11 @@ export const ratesOfficer: BehaviourModule = {
               record("right", me, { kind: "rates", amount: o.amount, account: acc.account, due, lots: o.lots }, { against: owner, basis: law.id }));
           }
           routines.did("levy", t, { units: lines.length / 2 });
-          for (let i = 0; i < lines.length; i += 30) steps.push(because(`The rates instalment: a ${instalments === 1 ? "year" : `${instalments}th of a year`}'s rates at the law's ${ratePpm / 10_000}% of each property's value.`, ...lines.slice(i, i + 30)));
+          for (let i = 0; i < lines.length; i += 30) {
+            const st = because(`The rates instalment: a ${instalments === 1 ? "year" : `${instalments}th of a year`}'s rates at the law's ${ratePpm / 10_000}% of each property's value.`, ...lines.slice(i, i + 30));
+            desk.assign(st, "rates_notice"); // (a system of ours that writes them does, if we hold one)
+            steps.push(st);
+          }
         }
         // The clerks' report to the rates officer, once a day (docs/behaviour/standing-work.md, "The staff's report").
         if (levying) routines.note("levy", !law || ratePpm <= 0 ? "the rating law on file sets no rate, so no notice is sent" : !book.open("valuation").length ? "no property has been valued yet: the first notices go out once the valuer has valued" : `the next notices go out on ${dated(next)}, as the rating law's instalments fall`);

@@ -16,6 +16,7 @@ import { ask, Asked, Directions, goSee, ownerLooks, visited, VISIT_MAX, nextLook
 import { Deliveries, goodsPrices, held, order } from "./trade";
 import { Bargaining, receipts, Staffing, stepper, WindingUp } from "./firms";
 import * as P from "./papers";
+import { OfficeDesk } from "./automation";
 
 /** Who the registry says owns a lot: the latest standing ownership claim, following transfers. */
 export function ownerOf(book: Book, lot: string): string | undefined {
@@ -86,8 +87,12 @@ export const planningOfficer: BehaviourModule = {
     const p = params({ compliance_bps: 10_000, town: ctx.entity, // (the town: the office's own)
       // A law against building where a listed species lives, if the world has one: applied by the latest habitat
       // register the environment office publishes (the lots it found them on).
-      habitat_law: "" }, ctx.params);
+      habitat_law: "",
+      // Systems it may take up to write its decisions (docs/behaviour/automation.md): how it weighs them, the law on public buying, and
+      // what its papers take its staff (the world's figures). None: it looks at none.
+      automation: null as import("./automation").AdoptionParams | null, procurement: null as import("./automation").Procurement | null, casework: null as import("./automation").Casework | null }, ctx.params);
     const book = new Book();
+    const desk = new OfficeDesk(ctx.entity, p, ctx.rng);
     const decided = new Set<string>();
     const decided_: { application: string; decision: "granted" | "refused" | "incomplete"; law?: string }[] = [];
     const letters = new Letters(planningOfficer.answers);
@@ -95,11 +100,14 @@ export const planningOfficer: BehaviourModule = {
     return noting(book, stepper(
       (obs) => {
         book.absorb(obs);
+        desk.absorb(book);
         letters.take(obs, book);
       },
       (obs) => {
         const me = obs.entity;
         const steps: Step[] = [];
+        const acc = ownAccount(obs);
+        if (acc) steps.push(...desk.steps(book, obs.t, { account: acc.account, balance: acc.balance, staff: 1, keep: 0 }));
         const apps = book.open("permit_application").filter((a) => (a.addressed_to ?? []).includes(me) && !decided.has(a.id));
         for (const app of apps.sort((a, b) => (a.id < b.id ? -1 : 1))) {
           decided.add(app.id);
@@ -128,6 +136,7 @@ export const planningOfficer: BehaviourModule = {
             refuse ? `Refusing: granting it would breach ${breached!.id}, and we follow the law.` : breached ? `Granting, although it breaches ${breached.id} (we don't always follow the law).` : "Granting: no law we know of forbids it.",
             decision);
           if (!refuse) step.unshift(record("liberty", applicant, { action: "build", object: app.data?.lot, structure_type: app.data?.structure_type }, { basis: app.id }));
+          desk.assign(step, "permit_decision"); // (a system of ours that writes decisions does, if we hold one)
           steps.push(step);
         }
         // Asked to look at a refusal again: the law applied once more to the application as it stands, with the laws now in force, without the draw of
