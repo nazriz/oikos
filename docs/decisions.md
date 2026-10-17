@@ -5621,3 +5621,44 @@ Naz: keep `docs/risks.md` updated and fresh, "bonus if we can mitigate the risks
 **Fixed, each with a test.** SF-2 (a bulk standing part over 20,000 characters is cut before a seat's own look-ups; `participants/test/seat-papers.test.ts`); MT-13 (the debrief breaks ties among equal orders by a seeded draw, script 0.4.1); SF-11, the account half (exit accounts take those the seats' acts reached first, account version 0.2.2; the queue half became SF-13); MT-8 (rent stress for lower-income renters; the Christian-share target read as census affiliation; residual MT-14). MT-4 is partly fixed (five targets wired: business entry and exit, job mobility, tenancy-tribunal applications, Christian share; residual MT-15). Tried and not done: SF-8 (needs forms filtered by office) and PS-10's double count (the crew figure waits on sourcing).
 
 **Revisit if** the marker list's file-level coverage lets a real gap hide (then tag by line, file by file); the test blocks other branches too often (then loosen to a report for docs only); or a lender seat is run and SF-2's cut loses what it needs.
+
+## 2026-10-17 · What the tests catch: mutation testing, invariants that read only the log, change detectors replaced (tests; no model called)
+
+**Why.** Naz: "I don't want slop tests, I want meaningful tests that would actually catch real shit." The suite had
+about 1,650 test cases and no measure of what they catch; pinned hashes were re-taken at nearly every change; the
+port of the built-in actors to Rust needs a referee that does not depend on the language.
+
+**Measured.** `scripts/mutate.ts` plants one bug at a time (`scripts/mutations.ts`: 49, of the kinds that have
+happened or would corrupt results: pay doubled or its sign flipped, cents rounded, the dead paid or acting, a register
+short of a person, work charged no time, an act by the absent, ids sorted as text, notice and due days a day out, a
+seat shown another's papers, draws keyed on the moment, refusals believed, a queue never drained, a slip drawn outside
+`slip()`, a law value from the wrong field, a module woken every tick; 36 in the TypeScript actors, 13 in the kernel)
+in a scratch copy, against main at ac99bbba: the 205 test files that take under 30 s, the slow files each bug names,
+the kernel's tests for a kernel bug, and the invariants. **32 of 49 caught by the existing tests; 32 with the
+invariants.** The invariants caught 10 (pays_as_instructed, integer_cents, dead_not_paid, one_household, one_place,
+no_act_by_dead, money_conserved, work_takes_time, queues_drain, notice_as_the_law_says), each also caught by an older
+test. 94 of 1,654 test cases caught at least one bug. Missed by everything: 17, listed in docs/testing.md "The gaps"
+(amounts the log cannot judge, a bank's handling of the dead, order and dates, refusals believed, a module's own view,
+wakes that only cost time).
+
+**Choices.** (1) The invariants (`orchestrator/src/invariants.ts`, `orchestrator/test/invariants.test.ts`) read the
+log alone, so they judge the Rust port as they judge the TypeScript; a year of 60-person towns of au-vic, gb-eng and
+ke-nakuru on two seeds each, two months of each with every observation recorded, and one town run twice. (2) Each rule
+was calibrated on unmutated towns and kept to what a real place does, never widened to pass: a payer has two pay
+periods to hear of a death; a worker who leaves is paid to the end of their notice; someone who has left may still
+write and pay, not work; a pay rise above the agreement is allowed (only "no more often" is held); a lease's rent may
+rise by notice. Where the world itself is short (a person in no space; a dead man's wages with nobody left to stop
+them), the case is counted, not failed, and written down as a gap. (3) A test timing out under load is not a catch
+(`culture.test.ts`'s day-1 calibration timed out under five unrelated bugs). (4) Change detectors: four pinned hashes
+replaced by the property they stood for (opening caseload, living dial, founding off, living off), the kernel's
+entity-record pin by a comparison; culture-dial's pins kept as the one deliberate alarm. Nothing deleted otherwise:
+no test was a pure duplicate, and a test that caught none of 49 bugs is not shown useless by that (translator,
+contract and pilot-view tests guard what no bug here touched).
+
+**Found in unmutated towns** (docs/testing.md): a notice to vacate dated from the decision, not from the record, so a
+day short once work takes time (firms.ts); newcomers and the evicted in no space; a sole post-holder's wages paid on
+after death; a person's own act placed during work an employer placed on their time; ke-nakuru wage orders 2% above
+their agreements. None fixed here; each is a finding for its module.
+
+**Revisit if** the Rust port lands (run the invariants and the mutations against it), a gap above gets its module test
+(re-run that bug), or an invariant fires on a town no bug was planted in (a finding first: then the world or the rule).
