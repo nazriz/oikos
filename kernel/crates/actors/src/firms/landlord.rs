@@ -38,6 +38,7 @@ use crate::common::{
     truthy, when_words, withdraw, Asked, Book, Fields, DAY, MONTH,
 };
 use crate::papers::agreements::{lease_terms, notice, offer, Offer};
+use crate::papers::market::RentalEvidence;
 use crate::steps::{arg, because, call, pay, say, Done, Pay, Plan, Say, Step, Stepper, Visible};
 use crate::{Action, Actor, Belief, Ctx, Cx, Kind, Picture};
 use oikos_rules::rent::{reviewed, Evidence, Review};
@@ -1741,17 +1742,17 @@ impl Office {
                 ev.asking.push(whole(d.get("rent")));
             }
         }
-        // The market office's published evidence, where there is any: a rents board for the kind of home.
+        // The market office's published evidence, where there is any: a rents board for the kind of home (the typed
+        // `RentalEvidence` paper `world.rent_portal` writes; a statement of that kind that does not read as one is not evidence).
         for b in self.book.open("rental_evidence") {
-            let d = data(b);
-            if d.s("type").is_some_and(|t| t != unit.type_) || d.s("structure").is_some_and(|s| s != unit.structure) || d.get("bedrooms").is_some() && d.i("bedrooms") != unit.bedrooms {
+            let Some(w) = crate::papers::read::<RentalEvidence>(b) else { continue };
+            if w.type_ != unit.type_ || w.bedrooms.is_some() && w.bedrooms != unit.bedrooms {
                 continue;
             }
-            let ints = |k: &str| d.get(k).and_then(Value::as_array).map(|a| a.iter().filter_map(crate::papers::lenient::whole).collect::<Vec<_>>()).unwrap_or_default();
-            ev.lets.extend(ints("lets"));
-            ev.asking.extend(ints("asking"));
-            ev.homes += d.i("homes").unwrap_or(0);
-            ev.vacant += d.i("vacant").unwrap_or(0);
+            ev.lets.extend(w.lets);
+            ev.asking.extend(w.asking);
+            ev.homes += w.homes;
+            ev.vacant += w.vacant;
         }
         ev
     }
@@ -2890,7 +2891,7 @@ mod tests {
                     records.extend(signed(id, 0, who));
                 }
                 // Published to it: comparable homes were let for 100,000 lately.
-                records.push(statement("ev-1", 0, "rental_evidence", json!({ "type": "house", "bedrooms": 2, "lets": [100_000, 100_000], "asking": [], "homes": 0, "vacant": 0 }), "market"));
+                records.push(statement("ev-1", 0, "rental_evidence", json!({ "type": "house", "bedrooms": 2, "lets": [100_000, 100_000], "asking": [], "homes": 0, "vacant": 0, "window_days": 90 }), "market"));
             }
             let mut txs = vec![];
             let mut due = 0;
