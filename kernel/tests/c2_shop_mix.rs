@@ -89,7 +89,7 @@ fn households_buy_several_kinds_over_sixty_days_and_the_world_is_the_same_on_one
     for l in &log {
         if l["kind"] == "event" && l["body"]["event"] == "recorded" && l["body"]["record"]["kind"] == "order" {
             let r = &l["body"]["record"];
-            if r["author"].as_str().is_some_and(|a| a.len() > 1 && a.starts_with('c') && a[1..].chars().all(|d| d.is_ascii_digit())) {
+            if r["author"].as_str().is_some_and(|a| { let a = a.strip_suffix("-self").unwrap_or(a); a.len() > 1 && a.starts_with('c') && a[1..].chars().all(|d| d.is_ascii_digit()) }) {
                 if let Some(k) = r["data"]["kind"].as_str() {
                     *bought.entry(k.to_string()).or_default() += 1;
                 }
