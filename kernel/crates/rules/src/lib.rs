@@ -15,6 +15,7 @@
 //!   the catalogue's content from then on.
 //! - `law`: reading a law's formal condition against an act (oikos-law), and writing a law from its figures by a
 //!   schedule (common.ts `draftLaw`). Step 1b.
+//! - `staffing`: how many clerks a keeper's counter needs for the people who ask it (PB-19). Lane E.
 //! - `calendar`, `identity`: the world's civil dates and what things are called (docs/design/names-and-dates.md): the
 //!   types and the date arithmetic are in the frame; names, references and dates in words are lane N's.
 
@@ -26,3 +27,4 @@ pub mod forms;
 pub mod identity;
 pub mod law;
 pub mod slip;
+pub mod staffing;

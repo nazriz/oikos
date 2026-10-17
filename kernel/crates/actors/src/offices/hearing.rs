@@ -740,10 +740,14 @@ impl Hearings {
         let barred = consider != "none" && pol.plan_barred_rent_months.is_some_and(|m| m > 0) && rent > 0 && arrears >= pol.plan_barred_rent_months.unwrap_or(0) * rent;
         let whose = if reply_owed.is_some() { "by the landlord's rent book" } else if stated.is_some() { "by the tenant's answer" } else { "by the application" };
         let home_words = space.unwrap_or("the home");
+        let short = match (gave, pol.notice_days.filter(|n| *n > 0)) {
+            (Some(g), Some(nd)) if g < nd => Some((g, nd)),
+            _ => None,
+        };
         let has_breach = c.data.get("breach").is_some_and(crate::common::truthy);
         if x.flag("left") {
             self.say2(steps, t, c, "dismissed", &format!("{ag} has left {home_words}; there is nothing left to order. Dismissed."), json!({ "left": true }), format!("{ag} answers that they have left the home: nothing to order; dismissed."), true);
-        } else if let (Some(g), Some(nd)) = (gave, pol.notice_days.filter(|n| *n > 0)).filter(|(g, nd)| g < nd) {
+        } else if let Some((g, nd)) = short {
             self.say2(steps, t, c, "dismissed", &format!("the notice to vacate relied on gave {g} days, and the law asks at least {nd}. Dismissed."), json!({ "notice_short": true }), format!("The notice relied on gave {g} days where the law asks {nd}: what the law asks before an order is not met; dismissed."), true);
         } else if arrears <= 0 {
             self.say2(steps, t, c, "dismissed", "the rent owed has been paid; dismissed.", json!({}), format!("Nothing is owed now ({whose}): dismissed."), true);
