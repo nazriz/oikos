@@ -30,7 +30,7 @@ import { formShown } from "@oikos/translator";
 import { PILOT_CASES } from "../../translator/eval/pilot-cases";
 import { blindRequests, type BlindAnswer } from "../../translator/train/blind";
 import { labelled, type LabelManifest, type Unlabelled } from "../../translator/train/readers";
-import { corpusReader, logsIn } from "./corpus";
+import { corpusReader, logsIn, type CorpusExample } from "./corpus";
 import { logLines, runOf } from "./logs";
 
 const DAY = 86_400;
@@ -152,6 +152,8 @@ export interface LogSituations {
   /** The test cases of this run found among the seats' requests, and those that weren't. */
   tests_found: number;
   tests_missing: string[];
+  /** The log's translator corpus (the translations it asked for), only where `keepCorpus` was asked for. */
+  corpus?: CorpusExample[];
 }
 
 /**
@@ -167,7 +169,7 @@ export const needsCorpus = (line: string): boolean =>
  * be), in order. `run`: the run's name (default: its folder, `runName`); `tests`: the test cases (default: the real
  * ones). The log is read once, a line at a time.
  */
-export async function situationsOf(logPath: string, o: { run?: string; tests?: TestRef[] } = {}): Promise<LogSituations> {
+export async function situationsOf(logPath: string, o: { run?: string; tests?: TestRef[]; keepCorpus?: boolean; onEntry?: (e: any) => void } = {}): Promise<LogSituations> {
   const run = o.run ?? runName(logPath);
   const tests = (o.tests ?? realTests()).filter((c) => c.run === run);
   const short = run.replace(/^runs\//, "");
@@ -201,6 +203,8 @@ export async function situationsOf(logPath: string, o: { run?: string; tests?: T
     if (!needsCorpus(line)) continue;
     const e = JSON.parse(line);
     const b = e.body ?? {};
+    // (`onEntry`: whoever reads a log for something else as well, in this one pass: the archive's extractor.)
+    o.onEntry?.(e);
     if (e.kind === "header") {
       currency = b.config?.world?.currencies?.[0];
       continue;
@@ -257,7 +261,8 @@ export async function situationsOf(logPath: string, o: { run?: string; tests?: T
   // form was shown without its record's id: it is put in from the forms the seat had been shown, by name and office.)
   const known = new Map<string, any>();
   for (const s of seats.values()) for (const f of s.forms.values()) known.set(formShown(f).replace(/, id .+?: fields /, ": fields "), f);
-  for (const row of corpus.rows()) {
+  const corpusRows = corpus.rows();
+  for (const row of corpusRows) {
     const asked = drafted.get(row.draft);
     const lines = formsShown(row.exchange[0]?.input);
     if (!asked || !lines) continue;
@@ -296,7 +301,7 @@ export async function situationsOf(logPath: string, o: { run?: string; tests?: T
   }
   const quoted = [...testStarts];
   for (const x of out) if (!x.test && quoted.some((q) => x.shown.includes(q))) x.test = true;
-  return { situations: out, no_system: noSystem, unmatched_drafts: unmatched, tests_found: found.size, tests_missing: tests.filter((c) => !found.has(c)).map((c) => c.draft) };
+  return { situations: out, no_system: noSystem, unmatched_drafts: unmatched, tests_found: found.size, tests_missing: tests.filter((c) => !found.has(c)).map((c) => c.draft), ...(o.keepCorpus ? { corpus: corpusRows } : {}) };
 }
 
 /**
