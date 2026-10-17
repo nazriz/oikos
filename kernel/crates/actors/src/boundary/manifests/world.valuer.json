@@ -1,0 +1,62 @@
+{
+  "name": "world.valuer",
+  "version": "0.2.0",
+  "doc": "docs/behaviour/public-finance.md",
+  "params": {
+    "builder": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
+      "source": "placeholder"
+    },
+    "every_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 365,
+      "source": "placeholder"
+    },
+    "exempt": {
+      "schema": {
+        "type": "array"
+      },
+      "default": [],
+      "source": "placeholder"
+    },
+    "land_value": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 0,
+      "source": "placeholder"
+    },
+    "rating": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
+      "source": "placeholder"
+    },
+    "roll": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "roll",
+      "source": "placeholder"
+    }
+  },
+  "perceives": [],
+  "state": "none",
+  "keeps": [
+    {
+      "what": "property_roll",
+      "why": "The valuation roll is the valuer's own: it makes an entry for each property it values."
+    },
+    {
+      "what": "acquisition_notice",
+      "why": "Each notice that land has changed hands is given to it, to keep its roll's owners by."
+    }
+  ]
+}

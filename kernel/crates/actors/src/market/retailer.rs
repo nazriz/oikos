@@ -1,0 +1,1348 @@
+//! firm.retailer: a shop, after Lengnick (2013), with wholesale buying and serving (phase B). Ported from
+//! participants/src/behaviour/retailer.ts (0.15.0) and rewritten for Rust; documented in docs/behaviour/retailer.md,
+//! with sources. Version 0.16.0: its price is formed from supply and demand, costs and the rivals it has been shown
+//! (prices.rs), not held between fixed bounds of cost.
+//!
+//! A shop buys goods from the cheapest of its suppliers (local factories' wholesale, or the world market's imports) to
+//! keep its stock within Lengnick's band of its sales, and sells them to whoever orders and pays. Selling takes its
+//! staff's time: each item is a unit of the task `serve`, by the staff at the shop, each up to a working day; what they
+//! cannot serve today waits for tomorrow. Monthly: its price moves, its headcount moves a worker at a time towards what
+//! its sales need, and what it holds beyond its buffer, out of the month's earnings, goes to its shareholders.
+//!
+//! What the shop does as an employer, borrower, union party and firm that can fail is its [`Body`] (body.rs): the
+//! shop is generic over it, and lane C1's real body drops in at integration. A shop just founded sets itself up first
+//! (an account, the founder's capital, its premises bought from the listing), as retailer.ts did.
+//!
+//! Decided fresh in the port (docs/port-guide.md section 2): the draws a shop made once from its own stream
+//! (`review-day`, its order of preference between suppliers at one price) are facts about the shop and are drawn from
+//! its identity, not from a stream consumed in order; a month is 30 days (`MONTH`); ties between suppliers fall to the
+//! supplier's id; every sum is `i64` with floor division, and a price rises by the ceiling of a step and falls by its
+//! floor, as the TS did.
+
+use super::body::{lift, Body, BodyThen, House, PlainBody, Review, Stage, Standing, Surplus, Want, Wind};
+use super::lengnick::{distribute, move_wage, pay_out, Expectation, From as Payer, Lengnick, WageMonth};
+use super::prices::{move_price, rivals_seen, Level, PriceFigures, Signals};
+use super::trade::{self, decline, goods_prices, held, order, price_list, send_back, Deliveries, Order, OrderBook, Ordering, Payables, TradeThen, UNDELIVERABLE};
+use crate::common::asking::{ask, Asked};
+use crate::common::{data, money_words, out_of_time, own_account, published_price, team, withdraw, Book, Fields, Pace, DAY, MONTH};
+use crate::papers::{self, market::CapitalCall};
+use crate::steps::{arg, because, call, json, pay, say, text, Done, Pay, Plan, Say, Step, Stepper, Visible};
+use crate::{Actor, Ctx, Cx, Kind, Picture};
+use oikos_sight::calls::Call;
+use oikos_sight::{LookRequest, OutcomeStatus, Seen};
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
+use std::collections::{BTreeMap, BTreeSet};
+
+const MANIFEST: &str = include_str!("../../../../../participants/manifests/firm.retailer.json");
+
+/// FNV-1a of who and what, for a draw that is a fact about the shop (see the module's doc).
+pub(crate) fn fact(who: &str, what: &str) -> u64 {
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    for b in who.bytes().chain([0xff]).chain(what.bytes()) {
+        h ^= u64::from(b);
+        h = h.wrapping_mul(0x0100_0000_01b3);
+    }
+    h ^ (h >> 29)
+}
+
+/// How a shop adjusts its staff (firms.md, "Adjusting labour"): AdjustParams.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct Adjust {
+    pub smooth_months: i64,
+    pub hiring_cost_weeks: i64,
+    #[serde(default)]
+    pub hours_step_bps: Option<i64>,
+}
+
+/// A shop just founded (entry.md): who founded it, the capital, the listing it buys its premises from, its bank.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct Founding {
+    pub founder: Option<String>,
+    pub capital: i64,
+    pub listing: Option<String>,
+    pub bank: String,
+}
+
+/// The shop's parameters (names unchanged from retailer.ts; defaults the TS's).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Params {
+    pub premises: String,
+    pub workplace: String,
+    pub role: String,
+    pub industry: String,
+    pub max_staff: i64,
+    pub min_staff: i64,
+    pub kind: String,
+    pub serve_task: String,
+    pub serve_labour: i64,
+    pub suppliers: Vec<String>,
+    pub wage: i64,
+    pub period: i64,
+    pub notice_days: i64,
+    pub working_day: i64,
+    pub work_days: i64,
+    pub police: String,
+    pub stocktake_days: i64,
+    pub look_at: i64,
+    pub look_days: i64,
+    pub price: i64,
+    pub demand: i64,
+    pub unpaid_days: i64,
+    pub serve_within_days: i64,
+    pub utilisation_bps: i64,
+    pub adjust: Adjust,
+    pub credit: bool,
+    pub builder: String,
+    pub premises_sale_bps: i64,
+    pub shopfront: bool,
+    pub trade_board: String,
+    pub sale_board: String,
+    pub sold_board: String,
+    /// What sellers advertise to households (a shop's rivals): searched monthly for the prices a shop is compared with.
+    pub rivals_board: String,
+    pub search_limit: u32,
+    pub operator: Option<String>,
+    pub stock_days: i64,
+    pub draw_days: i64,
+    pub premises_cell: String,
+    pub open_from: i64,
+    pub open_until: i64,
+    pub founding: Founding,
+    pub lengnick: Lengnick,
+    pub figures: PriceFigures,
+}
+
+impl Params {
+    pub fn read(ctx: &Ctx) -> Result<Params, String> {
+        let adjust: Adjust = ctx.param("adjust", Adjust { smooth_months: 3, hiring_cost_weeks: 8, hours_step_bps: None })?;
+        let p = Params {
+            premises: ctx.param("premises", String::new())?,
+            workplace: ctx.param("workplace", String::new())?,
+            role: ctx.param("role", "shop assistant".to_string())?,
+            industry: ctx.param("industry", String::new())?,
+            max_staff: ctx.param("max_staff", 6)?,
+            min_staff: ctx.param("min_staff", 1)?,
+            kind: ctx.param("kind", "goods".to_string())?,
+            serve_task: ctx.param("serve_task", "serve".to_string())?,
+            serve_labour: ctx.param("serve_labour", 5400)?,
+            suppliers: ctx.param("suppliers", vec![])?,
+            wage: ctx.param("wage", 120_000)?,
+            period: ctx.param("period", 14 * DAY)?,
+            notice_days: ctx.param("notice_days", 14)?,
+            working_day: ctx.param("working_day", 8 * 3600)?,
+            work_days: ctx.param("work_days", 6)?,
+            police: ctx.param("police", String::new())?,
+            stocktake_days: ctx.param("stocktake_days", 30)?,
+            look_at: ctx.param("look_at", 0)?,
+            look_days: ctx.param("look_days", 5)?,
+            price: ctx.param("price", 9000)?,
+            demand: ctx.param("demand", 250)?,
+            unpaid_days: ctx.param("unpaid_days", 7)?,
+            serve_within_days: ctx.param("serve_within_days", 3)?,
+            utilisation_bps: ctx.param("utilisation_bps", 8000)?,
+            adjust,
+            credit: ctx.param("credit", true)?,
+            builder: ctx.param("builder", String::new())?,
+            premises_sale_bps: ctx.param("premises_sale_bps", 5000)?,
+            shopfront: ctx.param("shopfront", false)?,
+            trade_board: ctx.param("trade_board", String::new())?,
+            sale_board: ctx.param("sale_board", String::new())?,
+            sold_board: ctx.param("sold_board", String::new())?,
+            rivals_board: ctx.param("rivals_board", String::new())?,
+            search_limit: ctx.param("search_limit", 20)?,
+            operator: ctx.param("operator", None)?,
+            stock_days: ctx.param("stock_days", 30)?,
+            draw_days: ctx.param("draw_days", 0)?,
+            premises_cell: ctx.param("premises_cell", String::new())?,
+            open_from: ctx.param("open_from", 0)?,
+            open_until: ctx.param("open_until", 0)?,
+            founding: Founding {
+                founder: ctx.param("founder", None)?,
+                capital: ctx.param("capital", 0)?,
+                listing: ctx.param("listing", None)?,
+                bank: ctx.param("bank", String::new())?,
+            },
+            lengnick: Lengnick::read(ctx)?,
+            figures: PriceFigures::read(ctx)?,
+        };
+        if p.founding.founder.is_some() && p.founding.bank.is_empty() {
+            return Err("firm.retailer: the world must say bank (a shop just founded opens its account here)".into());
+        }
+        Ok(p)
+    }
+    fn work_day(&self, t: i64) -> bool {
+        t.div_euclid(DAY).rem_euclid(7) < self.work_days
+    }
+    fn hours_per_worker_month(&self) -> i64 {
+        self.working_day * self.work_days * 30 / 7
+    }
+    /// A month's sales, as the days of them we stock and keep money for.
+    fn stock_for(&self, monthly: i64) -> i64 {
+        if self.stock_days == 30 {
+            monthly
+        } else {
+            (monthly * self.stock_days + 29).div_euclid(30)
+        }
+    }
+    fn hourly(&self, wage: i64) -> i64 {
+        let secs = (self.period / DAY) * self.work_days * self.working_day / 7;
+        (wage * 3600 + secs - 1).div_euclid(secs.max(1))
+    }
+}
+
+/// An order being served: what was paid for, how much has been served, since when.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+struct Queued {
+    o: Order,
+    served: i64,
+    since: i64,
+}
+
+/// What follows from a shop's steps.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum Then {
+    Trade(TradeThen),
+    Body(BodyThen),
+    /// A restocking order sent (its outcome names the order, or it was not made).
+    Restocked { seller: String, quantity: i64, unit: i64 },
+    /// Serving (part of) an order: what was sent, to whom, and what it took of the crew's day.
+    Served { order: Order, q: i64, share: i64, crew: Vec<String>, before: i64, finished: bool, since: i64, day: i64, t: i64 },
+}
+
+impl From<TradeThen> for Then {
+    fn from(t: TradeThen) -> Then {
+        Then::Trade(t)
+    }
+}
+impl From<BodyThen> for Then {
+    fn from(t: BodyThen) -> Then {
+        Then::Body(t)
+    }
+}
+
+/// A shop just founded, setting up.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct Setup {
+    account_asked: bool,
+    capital_called: bool,
+    founder_account: Option<String>,
+    registered: bool,
+    purchased: bool,
+    ready: bool,
+    asked: i64,
+    listings: Option<Vec<String>>,
+    sold: Option<Vec<String>>,
+    gone_since: Option<i64>,
+}
+
+/// A business of one: where it trades from now (its owner tells it when they move home), whether it has anywhere to,
+/// and whether its owner has gone from the town (it then closes: what it holds is its owner's).
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct At {
+    premises: String,
+    workplace: String,
+    cell: String,
+    nowhere: bool,
+    read: usize,
+    gone: bool,
+    closed: bool,
+    given_up: bool,
+}
+
+/// The stocktake's books (crime.md): what was counted, what came, what went.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct Books {
+    last: Option<i64>,
+    r#in: i64,
+    out: i64,
+    next: i64,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(bound = "B: Body")]
+pub struct Shop<B: Body> {
+    me: String,
+    p: Params,
+    book: Book,
+    body: B,
+    expectation: Expectation,
+    orders: OrderBook,
+    payables: Payables,
+    deliveries: Deliveries,
+    asked: Asked,
+    /// Goods ordered from suppliers, not yet delivered.
+    on_order: i64,
+    /// Our order -> (seller, quantity).
+    ours: BTreeMap<String, (String, i64)>,
+    /// Supplier -> when it last came up short.
+    short_at: BTreeMap<String, i64>,
+    suppliers: BTreeSet<String>,
+    next_trade_look: i64,
+    next_rival_look: i64,
+    unit_cost: i64,
+    /// Worker -> seconds worked today.
+    used: BTreeMap<String, i64>,
+    used_day: i64,
+    pace: Pace,
+    wage: i64,
+    price: i64,
+    published_price: i64,
+    price_why: String,
+    review_day: i64,
+    month: Option<i64>,
+    opened_at: i64,
+    reviewed: bool,
+    /// This month: items customers ordered and paid for (served or not).
+    sold: i64,
+    /// This month: items we could not serve (out of stock or out of hands, or a customer's order we refunded for it).
+    turned_away: i64,
+    /// Goods in orders sent to be served whose work has not taken effect yet.
+    reserved: i64,
+    queue: Vec<Queued>,
+    last_demand: i64,
+    last_turned_away: i64,
+    full_months: i64,
+    headcount: i64,
+    headcount_why: String,
+    month_start: i64,
+    next_restock: i64,
+    next_draw: i64,
+    at: At,
+    books: Books,
+    setup: Setup,
+    cash_layoff: bool,
+    /// Our account now (for a step's outcome to refund from).
+    account_now: Option<String>,
+}
+
+impl<B: Body> Shop<B> {
+    pub fn new(ctx: &Ctx, p: Params, body: B) -> Shop<B> {
+        let me = ctx.entity.clone();
+        let ready = p.founding.founder.is_none();
+        Shop {
+            expectation: Expectation::new(p.adjust.smooth_months, Some(p.demand)),
+            orders: OrderBook::new(&me, Some(p.unpaid_days), None),
+            payables: Payables::new(&me),
+            deliveries: Deliveries::default(),
+            asked: Asked::default(),
+            on_order: 0,
+            ours: BTreeMap::new(),
+            short_at: BTreeMap::new(),
+            suppliers: p.suppliers.iter().cloned().collect(),
+            next_trade_look: 0,
+            next_rival_look: 0,
+            unit_cost: 0,
+            used: BTreeMap::new(),
+            used_day: -1,
+            pace: Pace::new(p.serve_labour),
+            wage: p.wage,
+            price: p.price,
+            published_price: -1,
+            price_why: String::new(),
+            review_day: (fact(&me, "review-day") % (30 * 24)) as i64 * 3600,
+            month: None,
+            opened_at: -1,
+            reviewed: false,
+            sold: 0,
+            turned_away: 0,
+            reserved: 0,
+            queue: vec![],
+            last_demand: p.demand,
+            last_turned_away: 0,
+            full_months: 0,
+            headcount: -1,
+            headcount_why: String::new(),
+            month_start: -1,
+            next_restock: 0,
+            next_draw: -1,
+            at: At { premises: p.premises.clone(), workplace: p.workplace.clone(), cell: p.premises_cell.clone(), ..Default::default() },
+            books: Books::default(),
+            setup: Setup { ready, asked: -1, ..Default::default() },
+            cash_layoff: false,
+            account_now: None,
+            body,
+            book: Book::new(),
+            p,
+            me,
+        }
+    }
+
+    /// Between suppliers at one price, a shop has its own order of preference (its own, a fact about whom it happens to
+    /// deal with). By name, every shop in a town ordered from the same factory, which could fill a few of the orders
+    /// while the others' goods stood unsold.
+    fn standing_of(&self, seller: &str) -> u64 {
+        fact(&self.me, &format!("supplier-{seller}")) % 1_000_000_000
+    }
+
+    fn premises_of(&self, pic: &Picture) -> Option<(String, String, String)> {
+        sites(pic).find_map(|c| c.structure.as_ref().filter(|s| s.structure == self.p.premises).map(|s| (s.structure.clone(), s.structure_type.clone(), c.cell.clone())))
+    }
+
+    /// Room in our workplace: its capacity less our staff, or the bodies in it now if more.
+    fn room_at_work(&self, pic: &Picture, staff: i64) -> i64 {
+        let sp = sites(pic).find(|c| c.structure.as_ref().is_some_and(|s| s.structure == self.p.premises)).and_then(|c| c.structure.as_ref().and_then(|s| s.spaces.iter().find(|x| x.kind == "workplace").cloned()));
+        match sp {
+            Some(sp) => i64::from(sp.capacity) - i64::from(sp.count).max(staff),
+            None => self.p.max_staff,
+        }
+    }
+
+    /// Who is in the workplace now (those in its `workplace` spaces, by name).
+    fn present(&self, pic: &Picture, t: i64, workers: &[String]) -> Vec<String> {
+        let tod = t.rem_euclid(DAY);
+        if let Some(op) = &self.p.operator {
+            let open = self.p.open_until == 0 || (self.p.work_day(t) && tod >= self.p.open_from && tod < self.p.open_until);
+            return if open { vec![op.clone()] } else { vec![] };
+        }
+        if self.p.open_until > 0 && !(self.p.work_day(t) && tod >= self.p.open_from && tod < self.p.open_until) {
+            return vec![];
+        }
+        let mine: BTreeSet<&String> = workers.iter().collect();
+        let mut here: BTreeSet<String> = BTreeSet::new();
+        for c in sites(pic).filter(|c| c.structure.as_ref().is_some_and(|s| s.structure == self.p.premises)) {
+            for sp in c.structure.iter().flat_map(|s| s.spaces.iter()).filter(|sp| sp.kind == "workplace") {
+                for o in sp.occupants.iter().flatten() {
+                    if mine.contains(o) {
+                        here.insert(o.clone());
+                    }
+                }
+            }
+        }
+        here.into_iter().collect()
+    }
+
+    fn found(&self, pic: &Picture, channel: &str) -> Option<Vec<String>> {
+        if channel.is_empty() {
+            return None;
+        }
+        match pic.channels.get(channel) {
+            Some(Seen::Records { records, search: true }) => Some(records.iter().map(|r| r.id.clone()).collect()),
+            _ => None,
+        }
+    }
+
+    /// Setting up a shop just founded: an account at the bank; the founder's capital; our shareholders (the founder);
+    /// the premises bought from the property listing. If someone else buys them first, the capital goes back and we close.
+    fn setting_up(&mut self, pic: &Picture, acct: Option<&crate::common::OwnAccount>, cx: &Cx) -> Vec<Step<Then>> {
+        let money = |n| money_words(n, &cx.ctx.world);
+        let me = self.me.clone();
+        let founder = self.p.founding.founder.clone().unwrap_or_default();
+        let Some(acc) = acct else {
+            if self.setup.account_asked {
+                return vec![];
+            }
+            self.setup.account_asked = true;
+            return vec![because(
+                "A new shop: opening our account at the bank.",
+                vec![call("account", vec![("holder", Some(arg(&me))), ("at", Some(arg(&self.p.founding.bank)))])],
+            )];
+        };
+        if !self.setup.capital_called {
+            self.setup.capital_called = true;
+            let cap = self.p.founding.capital;
+            return vec![because(
+                format!("A new shop: asking our founder for the {} of capital they're putting in.", money(cap)),
+                vec![say(
+                    "capital_call",
+                    &format!("Please pay the {} of capital into {}.", money(cap), acc.account),
+                    Say {
+                        to: Some(vec![founder.clone()]),
+                        visible: Some(Visible::Only(vec![me.clone(), founder.clone()])),
+                        data: Some(papers::data(&CapitalCall { account: acc.account.clone(), amount: cap })),
+                        ..Default::default()
+                    },
+                )],
+            )];
+        }
+        let mut steps: Vec<Step<Then>> = vec![];
+        if self.setup.founder_account.is_some() && !self.setup.registered {
+            self.setup.registered = true;
+            steps.push(because(
+                "Our shareholders: our founder, who put in the capital.",
+                vec![say(
+                    "shareholders",
+                    &format!("The shareholders of {me}, and their shares."),
+                    Say {
+                        to: Some(vec![founder.clone()]),
+                        visible: Some(Visible::Only(vec![me.clone(), founder.clone()])),
+                        data: Some(json!({ "holders": [{ "holder": founder, "account": self.setup.founder_account, "shares": 10_000 }] })),
+                        ..Default::default()
+                    },
+                )],
+            ));
+        }
+        // (A business of one, founded to trade from its owner's home: no premises to buy. Once the capital is in, it trades.)
+        if self.p.operator.is_some() && self.p.founding.listing.is_none() {
+            if self.setup.founder_account.is_some() {
+                self.setup.ready = true;
+            }
+            return if self.setup.ready { [steps, vec![because("Our owner's capital is in: opening for trade, from their home.", vec![])]].concat() } else { steps };
+        }
+        let looked = !self.p.sale_board.is_empty();
+        if looked && self.setup.listings.is_none() {
+            return steps;
+        }
+        let first = self.p.founding.listing.as_deref().and_then(|l| self.book.get(l)).cloned();
+        let structure: Option<String> = if looked {
+            Some(self.p.premises.clone())
+        } else {
+            first.as_ref().and_then(|f| data(f).s("structure").map(str::to_string))
+        };
+        let standing: Vec<std::sync::Arc<oikos_sight::Record>> = if looked {
+            self.setup.listings.iter().flatten().filter_map(|id| self.book.get(id).cloned()).collect()
+        } else {
+            self.book.open("property_for_sale").cloned().collect()
+        };
+        let mut relisted: Vec<_> = standing.into_iter().filter(|r| data(r).s("structure") == structure.as_deref()).collect();
+        relisted.sort_by(|a, b| b.at.cmp(&a.at));
+        let listing = relisted.first().cloned().or(if looked { None } else { first.clone() });
+        let sold_rec = {
+            let pool: Vec<std::sync::Arc<oikos_sight::Record>> = if looked {
+                self.setup.sold.iter().flatten().filter_map(|id| self.book.get(id).cloned()).collect()
+            } else {
+                self.book.all("property_sold").cloned().collect()
+            };
+            pool.into_iter().find(|r| structure.is_some() && data(r).s("structure") == structure.as_deref())
+        };
+        if looked && sold_rec.is_none() {
+            if listing.is_some() {
+                self.setup.gone_since = None;
+            } else if *self.setup.gone_since.get_or_insert(pic.t) > pic.t - DAY {
+                return steps;
+            }
+        }
+        if let Some(s) = sold_rec.as_ref().filter(|s| data(s).s("buyer") == Some(me.as_str())) {
+            self.setup.ready = true;
+            steps.push(because(format!("Our premises ({}) are ours: opening for trade.", data(s).s("structure").unwrap_or_default()), vec![]));
+            return steps;
+        }
+        let taken_by_other = sold_rec.is_some()
+            || if looked { listing.is_none() } else { listing.as_ref().is_some_and(|l| self.book.withdrawn(&l.id)) };
+        if taken_by_other {
+            // Someone else bought them: the capital goes back, and we close.
+            let mut calls = vec![];
+            if let (Some(fa), true) = (&self.setup.founder_account, acc.balance > 0) {
+                calls.push(pay(fa, acc.balance, Pay { from: Some(acc.account.clone()), for_: Some("Capital returned: the venture didn't go ahead.".into()), ..Default::default() }, cx));
+            }
+            calls.push(say(
+                "closure",
+                &format!("{me} didn't open: its premises were sold to someone else."),
+                Say { visible: Some(Visible::Public), data: Some(json!({ "firm": me, "to_creditors": 0, "to_shareholders": acc.balance })), ..Default::default() },
+            ));
+            steps.push(because("The premises we meant to buy were sold to someone else: returning the capital, and closing.", calls));
+            self.setup.ready = true; // (the shop never trades: the body, told it is closed, winds it up)
+            self.setup.purchased = true;
+            return steps;
+        }
+        if let Some(l) = &listing {
+            let d = data(l);
+            if let (Some(price), false) = (d.i("price"), self.setup.purchased) {
+                if acc.balance >= price {
+                    self.setup.purchased = true;
+                    let structure = d.s("structure").unwrap_or_default().to_string();
+                    steps.push(because(
+                        format!("Buying our premises ({structure}) at the {} asked: publishing our purchase, and paying with it.", money(price)),
+                        vec![
+                            say(
+                                "property_purchase",
+                                &format!("Purchase of {structure}, as listed."),
+                                Say {
+                                    to: l.speaks_for.clone().map(|s| vec![s]),
+                                    visible: l.speaks_for.clone().map(|s| Visible::Only(vec![me.clone(), s])),
+                                    basis: Some(l.id.clone()),
+                                    data: Some(json!({ "listing": l.id, "account": acc.account })),
+                                    ..Default::default()
+                                },
+                            ),
+                            pay(d.s("account").unwrap_or_default(), price, Pay { from: Some(acc.account.clone()), for_: Some(format!("Premises: {structure}.")), ..Default::default() }, cx),
+                        ],
+                    ));
+                }
+            }
+        }
+        steps
+    }
+}
+
+/// The cells of the surroundings a shop's site channel shows.
+fn sites(pic: &Picture) -> impl Iterator<Item = &oikos_sight::SiteCell> {
+    pic.channels.values().flat_map(|c| match c {
+        Seen::Sites { cells, .. } => cells.iter(),
+        _ => [].iter(),
+    })
+}
+
+impl<B: Body> Plan for Shop<B> {
+    type Then = Then;
+
+    fn absorb(&mut self, pic: &Picture, cx: &mut Cx) {
+        self.book.absorb(pic);
+        self.body.absorb(pic, &self.book, cx);
+        let acct = own_account(pic);
+        let account = acct.as_ref().map(|a| a.account.as_str());
+        // What our looks found: producers advertising to the trade; our premises' listings and sale.
+        if let Some(ids) = self.found(pic, &self.p.trade_board) {
+            for id in ids {
+                if let Some(s) = self.book.get(&id).and_then(|r| r.speaks_for.clone()).filter(|s| *s != self.me) {
+                    self.suppliers.insert(s);
+                }
+            }
+        }
+        if self.setup.asked == pic.t {
+            if let Some(l) = self.found(pic, &self.p.sale_board) {
+                self.setup.listings = Some(l);
+            }
+            if let Some(l) = self.found(pic, &self.p.sold_board) {
+                self.setup.sold = Some(l);
+            }
+        }
+        // Setting up: the founder's capital, as it arrives (the account it comes from is theirs).
+        if !self.setup.ready && self.setup.capital_called && self.setup.founder_account.is_none() {
+            if let Some(mine) = account {
+                for tx in pic.transactions() {
+                    if tx.to == mine && tx.from != mine {
+                        self.setup.founder_account = Some(tx.from.clone());
+                        break;
+                    }
+                }
+            }
+        }
+        self.orders.take(pic, account);
+        self.payables.take(&self.book);
+        for d in self.deliveries.take(&self.book, &self.me) {
+            let Some((seller, quantity)) = self.ours.remove(&d.order) else { continue };
+            self.on_order = (self.on_order - quantity).max(0);
+            if d.delivered < quantity {
+                self.short_at.insert(seller, pic.t);
+            }
+            self.books.r#in += d.delivered;
+        }
+    }
+
+    fn looks(&mut self, pic: &Picture) -> Vec<LookRequest> {
+        let mut looks = vec![];
+        if !self.p.trade_board.is_empty() && self.setup.ready && pic.t >= self.next_trade_look {
+            self.next_trade_look = pic.t + 7 * DAY;
+            looks.push(ask::board(&self.p.trade_board, self.p.search_limit, vec![cond("data.min_order", ">", json!(1))], None));
+        }
+        if !self.p.rivals_board.is_empty() && self.setup.ready && pic.t >= self.next_rival_look {
+            self.next_rival_look = pic.t + 30 * DAY;
+            looks.push(ask::board(&self.p.rivals_board, self.p.search_limit, vec![cond("kind", "=", json!("price_list"))], None));
+        }
+        if !self.p.sale_board.is_empty() && !self.setup.ready && self.setup.capital_called && self.setup.asked != pic.t {
+            self.setup.asked = pic.t;
+            looks.push(ask::about(&self.p.sale_board, "data.structure", self.p.premises.clone(), ask::About { most: self.p.search_limit, standing: true, ..Default::default() }));
+            if !self.p.sold_board.is_empty() {
+                looks.push(ask::about(&self.p.sold_board, "data.structure", self.p.premises.clone(), ask::About { most: 1, newest: true, ..Default::default() }));
+            }
+        }
+        looks
+    }
+
+    fn until(&self, pic: &Picture) -> Option<i64> {
+        (self.p.look_at > 0).then(|| crate::common::next_look(pic.t, self.p.look_at, self.p.look_days))
+    }
+
+    fn then(&mut self, tok: &Then, done: Done, cx: &mut Cx) -> Vec<Step<Then>> {
+        match tok {
+            Then::Trade(t) => trade::then(t, done, &mut self.orders, cx),
+            Then::Body(b) => lift(self.body.then(b, done, cx), Then::Body),
+            Then::Restocked { seller, quantity, unit } => {
+                let id = match done {
+                    Done::Outcome(o) => o.created.as_ref().and_then(|c| c.get("order")).cloned(),
+                    _ => None,
+                };
+                match id {
+                    Some(id) => {
+                        self.ours.insert(id, (seller.clone(), *quantity));
+                        self.unit_cost = *unit;
+                    }
+                    None => self.on_order = (self.on_order - quantity).max(0),
+                }
+                vec![]
+            }
+            Then::Served { order, q, share, crew, before, finished, since, day, t } => self.served(order, *q, *share, crew, *before, *finished, *since, *day, *t, done, cx),
+        }
+    }
+
+    fn plan(&mut self, pic: &Picture, cx: &mut Cx) -> Vec<Step<Then>> {
+        self.run(pic, cx)
+    }
+}
+
+fn cond(field: &str, op: &str, value: Value) -> oikos_sight::Condition {
+    let op = serde_json::from_value(json!(op)).expect("an operator");
+    oikos_sight::Condition { field: field.into(), op, value }
+}
+
+impl<B: Body> Shop<B> {
+    /// Serving's outcome: the goods went, or the world refused (and the order waits, or is refunded).
+    #[allow(clippy::too_many_arguments)]
+    fn served(&mut self, o: &Order, q: i64, share: i64, crew: &[String], before: i64, finished: bool, since: i64, day: i64, t: i64, done: Done, cx: &mut Cx) -> Vec<Step<Then>> {
+        self.reserved = (self.reserved - q).max(0);
+        if let Done::Outcome(res) = done {
+            if res.status == OutcomeStatus::Applied {
+                self.books.out += q;
+                if q > 0 {
+                    self.pace.done(crew, t.div_euclid(DAY));
+                }
+                return vec![];
+            }
+            if q > 0 {
+                self.pace.refused(res, q, crew);
+            }
+        }
+        for w in crew {
+            if share > 0 {
+                let u = self.used.get(w).copied().unwrap_or(0);
+                self.used.insert(w.clone(), (u - share).max(0));
+            }
+        }
+        if let Done::Outcome(res) = done {
+            // Someone's day is fuller than our count of it (work elsewhere today): the world's count, from now on.
+            match out_of_time(res) {
+                Some((Some(who), left)) => {
+                    self.used.insert(who, self.p.working_day - left);
+                    for w in crew {
+                        let u = self.used.get(w).copied().unwrap_or(0);
+                        self.used.insert(w.clone(), u.max(self.p.working_day - left));
+                    }
+                }
+                Some((None, _)) => {
+                    for w in crew {
+                        self.used.insert(w.clone(), self.p.working_day);
+                    }
+                }
+                // (A business of one whose owner could not work where they trade, for whatever the world's reason: the
+                // place under water, the owner elsewhere. They see it, and try no more today.)
+                None => {
+                    if let (Some(op), true, true) = (self.p.operator.clone(), q > 0, res.status == OutcomeStatus::Refused) {
+                        self.used.insert(op.clone(), self.p.working_day);
+                        let detail = res.refusal.as_ref().and_then(|r| r.detail.clone()).unwrap_or_default();
+                        if detail.starts_with(&format!("{op} isn't in the world")) || detail.starts_with(&format!("{op} has died")) {
+                            self.at.gone = true;
+                        }
+                    }
+                }
+            }
+        }
+        let _ = day;
+        // Where it was to go, or whom to, is gone: refund what is left of it. Otherwise (someone left in the same
+        // moment, say) it waits its turn again.
+        let undeliverable = matches!(done, Done::Outcome(r) if r.refusal.as_ref().is_some_and(|f| UNDELIVERABLE.contains(&code_name(f).as_str())));
+        if let Some(x) = self.queue.iter_mut().find(|x| x.o.id == o.id) {
+            x.served = before;
+        }
+        if undeliverable {
+            self.queue.retain(|x| x.o.id != o.id);
+            let why = match done {
+                Done::Outcome(r) => r.refusal.as_ref().map(|f| f.detail.clone().unwrap_or_else(|| code_name(f))).unwrap_or_default(),
+                _ => String::new(),
+            };
+            let Some(acct) = self.account_now.clone() else { return vec![] };
+            return vec![self.fill_with(cx, o, 0, before, &[], &format!("We couldn't deliver order {} ({why}): refunding what's left of it.", o.id), &acct)];
+        }
+        if finished {
+            self.queue.insert(0, Queued { o: o.clone(), served: before, since });
+        }
+        vec![]
+    }
+}
+
+fn code_name(f: &oikos_sight::RefusalInfo) -> String {
+    serde_json::to_value(f.code).ok().and_then(|v| v.as_str().map(str::to_string)).unwrap_or_default()
+}
+
+enum Out {
+    Done,
+    Late,
+    Wait,
+}
+
+impl<B: Body> Shop<B> {
+    /// Serving (part of) an order: the hours of serving and the goods to the customer; once it is finished (`total`
+    /// served, all told; negative: not yet), a refund for what we could not serve and a note saying so.
+    fn fill_with(&self, cx: &Cx, o: &Order, q: i64, total: i64, staff: &[String], why: &str, account: &str) -> Step<Then> {
+        let money = |n| money_words(n, &cx.ctx.world);
+        let mut calls: Vec<Call> = vec![];
+        if q > 0 {
+            calls.push(call(
+                "work",
+                vec![("task", Some(arg(&self.p.serve_task))), ("units", Some(text(q.to_string()))), ("at", Some(arg(&self.at.premises))), ("by", Some(json(json!(staff))))],
+            ));
+            calls.push(call(
+                "goods",
+                vec![("kind", Some(arg(&o.kind))), ("quantity", Some(text(q.to_string()))), ("to", Some(arg(&o.to))), ("at", Some(arg(&o.at))), ("from_at", Some(arg(&self.at.premises)))],
+            ));
+        }
+        if total >= 0 {
+            let refund = (o.quantity - total) * o.unit_price;
+            if refund > 0 {
+                calls.push(pay(&o.account, refund, Pay { from: Some(account.to_string()), for_: Some(format!("Refund: {} {} we couldn't sell you.", o.quantity - total, o.kind)), ..Default::default() }, cx));
+            }
+            let words = if total == o.quantity {
+                format!("Served: {total} {} to {} at {}.", o.kind, o.to, o.at)
+            } else {
+                format!("Served {total} of the {} {} ordered{}.", o.quantity, o.kind, if refund > 0 { format!("; {} refunded", money(refund)) } else { String::new() })
+            };
+            calls.push(say(
+                "delivery_note",
+                &words,
+                Say {
+                    to: Some(vec![o.buyer.clone()]),
+                    visible: Some(Visible::Only(vec![o.buyer.clone(), self.me.clone()])),
+                    basis: Some(o.id.clone()),
+                    data: Some(json!({ "order": o.id, "kind": o.kind, "ordered": o.quantity, "delivered": total, "refund": refund })),
+                    ..Default::default()
+                },
+            ));
+        }
+        because(why, calls)
+    }
+
+    fn payer<'a>(acct: &'a crate::common::OwnAccount) -> Payer<'a> {
+        Payer { account: &acct.account, custodian: &acct.custodian }
+    }
+
+    #[allow(clippy::too_many_lines)]
+    fn run(&mut self, pic: &Picture, cx: &mut Cx) -> Vec<Step<Then>> {
+        let t = pic.t;
+        let acct = own_account(pic);
+        self.account_now = acct.as_ref().map(|a| a.account.clone());
+        let me = self.me.clone();
+        let world = cx.ctx.world.clone();
+        let money = move |n: i64| money_words(n, &world);
+        let mut steps: Vec<Step<Then>> = vec![];
+        if let (Some(a), Standing::Closed) = (&acct, self.body.standing()) {
+            let where_ = self.premises_of(pic);
+            let worth = where_.as_ref().and_then(|w| published_price(&self.book, &self.p.builder, &w.1, "prices"));
+            let sale_price = worth.map(|w| w * self.p.premises_sale_bps / 10_000);
+            let w = Wind { pic, book: &self.book, acct: a, stage: Stage::Closed, premises: where_, sale_price, paid_suppliers: 0, staying: false };
+            return lift(self.body.wind_up(&w, cx), Then::Body);
+        }
+        // A shop just founded sets itself up before it trades.
+        if !self.setup.ready {
+            return self.setting_up(pic, acct.as_ref(), cx);
+        }
+        let Some(acct) = acct else { return steps };
+        if self.body.winding_due(t) {
+            // (What we owe our suppliers for goods delivered on their terms is paid first, as the debts recorded against us are.)
+            let (mut owed, paid) = self.payables.settle::<Then>(t, &acct.account, acct.balance, None, cx);
+            let w = Wind { pic, book: &self.book, acct: &acct, stage: Stage::Due, premises: None, sale_price: None, paid_suppliers: paid, staying: false };
+            owed.extend(lift(self.body.wind_up(&w, cx), Then::Body));
+            return owed;
+        }
+        let mut trading = self.body.standing() == Standing::Trading;
+        let workers = self.body.workers(&self.book, t);
+        let operator = self.p.operator.is_some();
+        if self.headcount < 0 {
+            // (a new shop starts by hiring its minimum)
+            self.headcount = if operator { 0 } else { (workers.len() as i64).max(self.p.min_staff) };
+        }
+        let hands_bps: i64 = if operator { 10_000 } else { workers.iter().map(|w| self.body.hours_bps(w, t)).sum() };
+        if self.month_start < 0 {
+            self.month_start = acct.balance;
+        }
+        // (Its owner has moved home: it trades from there now, and takes its stock along.)
+        let moves: Vec<_> = if operator { self.book.all("trading_from").cloned().collect() } else { vec![] };
+        while self.at.read < moves.len() {
+            let r = &moves[self.at.read];
+            self.at.read += 1;
+            if r.speaks_for.as_deref() != self.p.operator.as_deref() || !crate::common::addressed_to(r).iter().any(|a| *a == me) {
+                continue;
+            }
+            let d = data(r);
+            self.published_price = -1; // (its prices go up where it now is, or come down)
+            if d.flag("nowhere") {
+                self.at.nowhere = true;
+                continue;
+            }
+            // (Its owner gives it up: it stops trading, refunds what it had not served, pays what it holds to its owner and says it has closed.)
+            if d.flag("closed") {
+                self.at.gone = true;
+                self.at.given_up = true;
+                continue;
+            }
+            let had = held(pic, &self.at.premises, &self.p.kind);
+            let to = d.s("structure").unwrap_or_default().to_string();
+            if had > 0 && to != self.at.premises {
+                steps.push(because(
+                    format!("Our owner lives at {} now: taking our stock there.", d.s("space").unwrap_or_default()),
+                    vec![call(
+                        "goods",
+                        vec![("kind", Some(arg(&self.p.kind))), ("quantity", Some(text(had.to_string()))), ("to", Some(arg(&me))), ("at", Some(arg(&to))), ("from_at", Some(arg(&self.at.premises)))],
+                    )],
+                ));
+            }
+            self.at.premises = to;
+            self.at.workplace = d.s("space").unwrap_or_default().to_string();
+            self.at.cell = d.s("cell").map(str::to_string).unwrap_or_else(|| self.at.cell.clone());
+            self.at.nowhere = false;
+        }
+        let stock = held(pic, &self.at.premises, &self.p.kind);
+        // The stocktake (crime: docs/behaviour/crime.md), monthly: what is here against our books (last count, what came,
+        // what we served). Short: reported to the police, with what it was worth at our price.
+        if !self.p.police.is_empty() && t >= self.books.next {
+            self.books.next = t + self.p.stocktake_days * DAY;
+            let expected = self.books.last.map(|l| l + self.books.r#in - self.books.out);
+            self.books.last = Some(stock);
+            self.books.r#in = 0;
+            self.books.out = 0;
+            if let Some(e) = expected.filter(|e| *e > stock) {
+                steps.push(because(
+                    format!("The stocktake: {stock} {} here, where our books say {e}. {} missing: reporting it to the police.", self.p.kind, e - stock),
+                    vec![say(
+                        "crime_report",
+                        &format!("Report: {} {} missing from {}, found at our stocktake.", e - stock, self.p.kind, self.p.premises),
+                        Say {
+                            to: Some(vec![self.p.police.clone()]),
+                            visible: Some(Visible::Only(vec![me.clone(), self.p.police.clone()])),
+                            data: Some(json!({ "kind": self.p.kind, "quantity": e - stock, "at": self.p.premises, "value": (e - stock) * self.price, "account": acct.account })),
+                            ..Default::default()
+                        },
+                    )],
+                ));
+            }
+        }
+        // Our suppliers' prices, cheapest first (those that came up short in the last week, last; at one price, in our own order).
+        struct Offer {
+            seller: String,
+            account: String,
+            unit: i64,
+            min: i64,
+            terms: i64,
+        }
+        let mut offers: Vec<Offer> = self
+            .suppliers
+            .iter()
+            .filter_map(|s| {
+                let g = goods_prices(&self.book, s);
+                let unit = *g.prices.get(&self.p.kind)?;
+                Some(Offer { seller: s.clone(), account: g.account?, unit, min: g.min_order.unwrap_or(1), terms: g.terms_days.unwrap_or(0) })
+            })
+            .collect();
+        offers.sort_by(|a, b| {
+            let short = |s: &str| self.short_at.get(s).is_some_and(|at| t - at < 7 * DAY);
+            short(&a.seller).cmp(&short(&b.seller)).then(a.unit.cmp(&b.unit)).then(self.standing_of(&a.seller).cmp(&self.standing_of(&b.seller))).then_with(|| a.seller.cmp(&b.seller))
+        });
+        if self.unit_cost == 0 {
+            if let Some(o) = offers.first() {
+                self.unit_cost = o.unit;
+            }
+        }
+        let labour_cost = (self.p.hourly(self.wage) * self.p.serve_labour + 3599).div_euclid(3600);
+        let marginal_cost = self.unit_cost + labour_cost;
+
+        // ---- the month's end: Lengnick's rules (the price rule is prices.rs's) ----
+        let m = (t - self.review_day).div_euclid(MONTH);
+        if trading && self.month.is_none() {
+            self.month = Some(m);
+            self.opened_at = t;
+        }
+        if self.month != Some(m) && trading && t - self.opened_at < MONTH {
+            // (a month's boundary before it has traded a whole month: it only starts counting)
+            self.month = Some(m);
+        } else if self.month != Some(m) && trading {
+            self.month = Some(m);
+            // (The first review looks at all the trade since opening, which is a month and some days, as a month's.)
+            let span = t - self.opened_at;
+            self.last_demand = if !self.reviewed && span > MONTH { (2 * self.sold * MONTH + span).div_euclid(2 * span) } else { self.sold };
+            self.last_turned_away = self.turned_away;
+            self.reviewed = true;
+            self.sold = 0;
+            self.turned_away = 0;
+            let mut rng = cx.rng(&format!("month-{m}"));
+            let mut why: Vec<String> = vec![];
+            let (unfilled, posting) = self.body.vacancies(&self.book, t);
+            let (wage, full, w_why) = move_wage(&self.p.lengnick, &mut rng, self.wage, WageMonth { unfilled, posting, staffed: !workers.is_empty(), full_months: self.full_months }, &money);
+            self.wage = wage;
+            self.full_months = full;
+            why.extend(w_why);
+            // Lengnick's firms deliver what their labour makes; a shop delivers what its staff's hours can serve. Short of
+            // hands for last month's demand, it is short as a firm short of stock is: it may raise its price, and never
+            // cuts it while it turns customers away.
+            let can_serve = hands_bps * self.p.hours_per_worker_month() / (10_000 * self.p.serve_labour.max(1));
+            let rivals = rivals_seen(&self.book, &me, &self.p.kind, Level::Retail, t, self.p.figures.rival_days * DAY);
+            let moved = move_price(
+                &self.p.lengnick,
+                &self.p.figures,
+                &mut rng,
+                &Signals { price: self.price, marginal_cost, demand: self.last_demand, turned_away: self.last_turned_away, stock, can_supply: Some(can_serve), rivals: &rivals },
+                &money,
+            );
+            self.price = moved.price;
+            if let Some(w) = moved.why {
+                self.price_why = w;
+            }
+            // Headcount: a worker at a time towards the hands the trade we expect needs: our sales smoothed over a few
+            // months, never one month's alone (docs/behaviour/firms.md, "Adjusting labour").
+            let expected = self.expectation.expect(self.last_demand);
+            let hpwm = self.p.hours_per_worker_month();
+            let needed = if operator {
+                0
+            } else {
+                self.p.max_staff.min(self.p.min_staff.max((expected * self.p.serve_labour * 10_000 + hpwm * self.p.utilisation_bps - 1).div_euclid(hpwm * self.p.utilisation_bps)))
+            };
+            let trade = if self.p.adjust.smooth_months > 1 { format!("the trade we expect ({expected} a month; last month {})", self.last_demand) } else { format!("last month's sales ({})", self.last_demand) };
+            let r = Review { needed, trade, notice_days: self.p.notice_days, expected, last_demand: self.last_demand, surplus: Surplus::OverStaffed };
+            let staffed = self.body.review(&self.book, t, &r, workers.len() as i64, cx);
+            self.headcount = staffed.headcount;
+            self.headcount_why = format!("{}{}", staffed.why, if why.is_empty() { String::new() } else { format!("; {}", why.join("; ")) });
+            steps.extend(lift(staffed.steps, Then::Body));
+            // Out of the month's earnings, what we hold beyond the buffer goes to the shareholders: a month's wages, a
+            // month's stock at cost, and Lengnick's chi of the wage bill.
+            let bill = (workers.len() as i64).max(self.headcount) * self.wage * MONTH / self.p.period;
+            // (And what we owe our suppliers for stock delivered on their terms: a dividend must not take the money its invoices are paid from.)
+            let buffer = bill + self.p.stock_for(self.last_demand) * self.unit_cost + bill * self.p.lengnick.chi_bps / 10_000 + self.payables.owing();
+            // (Nothing is paid out while wages are owed or anyone is under notice: docs/behaviour/firms.md, "Before a dividend".)
+            let paid = if self.p.draw_days > 0 {
+                0
+            } else if let Some(strain) = self.body.strained(&self.book, t) {
+                steps.push(because(format!("Month's end: {strain}, so nothing is paid out to our shareholders."), vec![]));
+                0
+            } else {
+                let (s, paid) = pay_out::<Then>(&self.book, &me, &Self::payer(&acct), acct.balance, buffer, acct.balance - self.month_start, &format!("a month's wages and stock, and {}% of the wage bill", super::lengnick::percent(self.p.lengnick.chi_bps)), &money);
+                steps.extend(s);
+                paid
+            };
+            self.month_start = acct.balance - paid;
+        }
+
+        // ---- staff, the bank, the union, debts: the body's routine ----
+        let months = self.body.months_in_hand(&self.book);
+        let can_post = trading
+            && !operator
+            && acct.balance >= months * ((workers.len() as i64 + 1) * self.wage * MONTH / self.p.period)
+            && self.room_at_work(pic, workers.len() as i64) > 0;
+        let want = Want {
+            target: if trading && !operator { self.p.max_staff.min(self.headcount) } else { 0 },
+            wage: self.wage,
+            can_post,
+            why: format!("Short of this month's headcount ({} of {}{}): posting a job at {} every {} days.", workers.len(), self.headcount, self.headcount_why, money(self.wage), self.p.period / DAY),
+        };
+        let dealt = self.body.dealings(&House { pic, book: &self.book, acct: &acct, want, trading, workers: workers.len() }, cx);
+        steps.extend(lift(dealt.steps, Then::Body));
+        if let Some(rise) = dealt.wage_rise_bps {
+            self.wage = self.wage * (10_000 + rise) / 10_000;
+        }
+        if let Some(cap) = dealt.headcount_cap {
+            self.headcount = self.headcount.min(cap);
+        }
+        if dealt.began {
+            trading = false;
+        }
+
+        // ---- our price list: where we are, and what we charge ----
+        // A business of one whose owner has gone from the town, or has nowhere to trade from: its prices come down, what
+        // it was to serve is refunded, and (gone) what it holds goes to its owner's account and it says it has closed.
+        if operator && (self.at.gone || self.at.nowhere) {
+            let old: Vec<_> = self.book.open("price_list").filter(|r| r.speaks_for.as_deref() == Some(&me)).map(|r| r.id.clone()).collect();
+            if !old.is_empty() {
+                let why = if self.at.given_up {
+                    "Our owner has given the business up: we have stopped trading."
+                } else if self.at.gone {
+                    "Our owner has gone: we have stopped trading."
+                } else {
+                    "Nowhere to trade from: our prices come down until there is."
+                };
+                steps.push(because(why, old.iter().map(|id| withdraw(id, Some("Not trading."))).collect()));
+            }
+            self.published_price = -1;
+            for x in std::mem::take(&mut self.queue) {
+                steps.push(self.fill_with(cx, &x.o, 0, x.served, &[], "We are not trading: refunding what we had not served.", &acct.account));
+            }
+            let due = self.orders.due(&self.book, t, |_| true);
+            for o in &due.paid {
+                steps.push(self.fill_with(cx, o, 0, 0, &[], "We are not trading: refunding the order.", &acct.account));
+            }
+            if self.at.gone && !self.at.closed {
+                self.at.closed = true;
+                // (A business that closes pays its suppliers what it owes them first, out of what it holds; the rest is its owner's.)
+                let (owed, paid) = self.payables.settle::<Then>(t, &acct.account, acct.balance, None, cx);
+                let why = if self.at.given_up { "Our owner has given the business up: what it holds is theirs" } else { "Our owner has gone from the town: what the business holds is theirs" };
+                let (out, outpaid) = distribute::<Then>(&self.book, &me, &Self::payer(&acct), acct.balance - paid, why, &money);
+                steps.extend(owed);
+                steps.extend(out);
+                let mut d = json!({ "firm": me, "to_creditors": 0, "to_shareholders": outpaid });
+                if self.at.given_up {
+                    d["given_up"] = json!(true);
+                }
+                steps.push(because(
+                    if self.at.given_up { "Closed: our owner has given the business up." } else { "Closed: our owner has gone." },
+                    vec![say(
+                        "closure",
+                        &format!("{me} has closed: its owner has {}.", if self.at.given_up { "given it up" } else { "gone" }),
+                        Say { visible: Some(Visible::Public), data: Some(d), ..Default::default() },
+                    )],
+                ));
+            }
+            return steps;
+        }
+        if self.price != self.published_price && trading {
+            let old: Vec<String> = self.book.open("price_list").filter(|r| r.speaks_for.as_deref() == Some(&me)).map(|r| r.id.clone()).collect();
+            self.published_price = self.price;
+            let on = if self.p.shopfront { self.premises_of(pic).map(|p| p.2).or_else(|| (!self.at.cell.is_empty()).then(|| self.at.cell.clone())) } else { None };
+            let mut prices = BTreeMap::new();
+            prices.insert(self.p.kind.clone(), self.price);
+            let words = format!("{} at {} each, at {}: delivered to your home, or kept here for you. Order and pay with the order.", self.p.kind, money(self.price), self.at.premises);
+            let mut calls: Vec<Call> = old.iter().map(|id| withdraw(id, Some("Superseded."))).collect();
+            calls.push(price_list(&prices, &acct.account, &words, json!({ "at": self.at.premises }), Some(&me), on.as_deref(), !self.p.shopfront));
+            let why = if old.is_empty() { "Publishing our price.".to_string() } else if self.price_why.is_empty() { format!("Our price is now {}.", money(self.price)) } else { self.price_why.clone() };
+            steps.push(because(why, calls));
+        }
+
+        // ---- what we owe our suppliers for stock delivered on their terms: paid on the day, wages first ----
+        if trading {
+            let keep = (workers.len() as i64).max(self.headcount) * self.wage;
+            steps.extend(self.payables.pay::<Then>(t, &acct.account, acct.balance, keep, None, false, cx));
+        }
+
+        // ---- restocking, weekly: below the middle of Lengnick's band of last month's sales, up to its top ----
+        if t >= self.next_restock && !offers.is_empty() && trading {
+            self.next_restock = t + if operator { 1 } else { 7 } * DAY; // (someone trading alone on a few days' stock buys when it runs low)
+            let l = self.p.lengnick;
+            let top = (l.phi_high_bps * self.p.stock_for(self.last_demand) + 9999).div_euclid(10_000);
+            let mid = ((l.phi_low_bps + l.phi_high_bps) * self.p.stock_for(self.last_demand) + 19_999).div_euclid(20_000);
+            let have = stock + self.on_order;
+            let best = &offers[0];
+            // As much as we can pay for, keeping the next pay period's wages aside (and at least the supplier's minimum).
+            // On the supplier's terms (if it states any, and we are not behind with it), what we can order is what we can
+            // pay for out of what we expect to sell in the time it gives, less what we already owe it: stock no longer
+            // comes out of the wage bill in the week it is bought (docs/behaviour/trade.md, "Trade credit").
+            let keep_for_wages = (workers.len() as i64).max(self.headcount) * self.wage;
+            let terms = if self.p.credit && best.terms > 0 && !self.payables.behind(&best.seller, t) { best.terms } else { 0 };
+            let room = if terms > 0 { (self.last_demand * best.unit * terms / 30 - self.payables.owing()).max(0) } else { 0 };
+            let pending = self.payables.pending(t);
+            let affordable = (acct.balance - pending - keep_for_wages + room).div_euclid(best.unit.max(1));
+            if have < mid {
+                let q = best.min.max(top - have).min(affordable);
+                if q >= best.min {
+                    self.on_order += q;
+                    let why = format!(
+                        "Restocking: {stock} in stock and {} on order, below {mid} (the middle of our band of last month's sales, {}): ordering {q}{} from {}, the cheapest of our suppliers at {}{}.",
+                        self.on_order - q,
+                        self.last_demand,
+                        if q < top - have { format!(", as many as we can pay for (up to {top} would fill our band)") } else { String::new() },
+                        best.seller,
+                        money(best.unit),
+                        if terms > 0 { format!(", on its terms (to pay within {terms} days of delivery)") } else { String::new() }
+                    );
+                    let mut st = order::<Then>(
+                        &Ordering {
+                            me: me.clone(),
+                            seller: best.seller.clone(),
+                            seller_account: best.account.clone(),
+                            kind: self.p.kind.clone(),
+                            quantity: q,
+                            unit_price: best.unit,
+                            to: None,
+                            at: self.at.premises.clone(),
+                            from: acct.account.clone(),
+                            why,
+                            retry_of: None,
+                            for_days: None,
+                            terms: (terms > 0).then_some(terms),
+                        },
+                        cx,
+                    );
+                    st.then = Some(Then::Restocked { seller: best.seller.clone(), quantity: q, unit: best.unit });
+                    steps.push(st);
+                }
+            }
+        }
+
+        // ---- the owner's draw (a business run by its owner alone): every so often, what it holds beyond the money for
+        // its stock (the top of its band, or a supplier's least order if that is more) goes to its owner ----
+        if self.p.draw_days > 0 && trading {
+            if self.next_draw < 0 {
+                self.next_draw = t + self.p.draw_days * DAY;
+            }
+            if t >= self.next_draw {
+                self.next_draw = t + self.p.draw_days * DAY;
+                // (At what its supplier charges now, and a tenth over: kept to the last unit, a rise in the price left it
+                // one item short of the least order, and it never bought again.)
+                let top = (self.p.lengnick.phi_high_bps * self.p.stock_for(self.last_demand) + 9999).div_euclid(10_000);
+                let least = offers.first().map_or(0, |o| o.min);
+                let unit = self.unit_cost.max(offers.first().map_or(0, |o| o.unit));
+                let keep = (top.max(least) * unit * 11 + 9).div_euclid(10) + self.payables.owing();
+                if acct.balance > keep {
+                    let (s, _) = distribute::<Then>(&self.book, &me, &Self::payer(&acct), acct.balance - keep, &format!("We hold {} and keep {} for stock: the rest is our owner's", money(acct.balance), money(keep)), &money);
+                    steps.extend(s);
+                }
+            }
+        }
+
+        // ---- serving: paid orders, oldest first, as far as today's hands and our stock go ----
+        let day = t.div_euclid(DAY);
+        if day != self.used_day {
+            self.used_day = day;
+            self.used.clear();
+        }
+        let present = self.present(pic, t, &workers);
+        // Every paid order joins the queue: what customers wanted, served or not.
+        let due = self.orders.due(&self.book, t, |_| true);
+        for o in due.paid {
+            if o.kind != self.p.kind || o.unit_price < self.price {
+                let why = format!("An order {}: refunding it.", if o.kind != self.p.kind { format!("for {}, which we don't sell", o.kind) } else { "below our price".to_string() });
+                steps.push(self.fill_with(cx, &o, 0, 0, &[], &why, &acct.account));
+                continue;
+            }
+            self.sold += o.quantity;
+            self.queue.push(Queued { o, served: 0, since: t });
+        }
+        // Each worker's time left today; serving is shared evenly among those here, as the work is.
+        let room_of = |s: &Self, w: &str| -> i64 {
+            if s.p.work_day(t) {
+                (s.p.working_day * s.body.hours_bps(w, t) / 10_000 - s.used.get(w).copied().unwrap_or(0)).max(0)
+            } else {
+                0
+            }
+        };
+        // (Who serves today: those here with the most time between them, the work shared evenly.)
+        let crew: Vec<String> = team(&present, |w| room_of(self, w)).0;
+        let mut left = (stock - self.reserved).max(0);
+        let ids: Vec<String> = self.queue.iter().map(|x| x.o.id.clone()).collect();
+        for id in ids {
+            let Some(x) = self.queue.iter().find(|x| x.o.id == id).cloned() else { continue };
+            let want = x.o.quantity - x.served;
+            let min_room = crew.iter().map(|w| room_of(self, w)).min().unwrap_or(0);
+            let per_unit = self.pace.per_unit(&crew);
+            let q = want.min(left).min(min_room * crew.len() as i64 / per_unit);
+            // (An order for a fortnight's shopping is served over the fortnight: it's what the household uses until then.)
+            let within = x.o.for_days.unwrap_or(self.p.serve_within_days);
+            let out = if left == 0 || q == want { Out::Done } else if t - x.since >= within * DAY { Out::Late } else { Out::Wait };
+            if q == 0 && matches!(out, Out::Wait) {
+                break; // no hands left today: the rest wait their turn
+            }
+            let share = if q > 0 { (q * per_unit + crew.len() as i64 - 1).div_euclid(crew.len() as i64) } else { 0 };
+            left -= q;
+            for w in &crew {
+                if share > 0 {
+                    *self.used.entry(w.clone()).or_insert(0) += share;
+                }
+            }
+            let before = x.served;
+            let served = x.served + q;
+            let finished = !matches!(out, Out::Wait);
+            if let Some(i) = self.queue.iter().position(|y| y.o.id == id) {
+                if finished {
+                    self.queue.remove(i);
+                } else {
+                    self.queue[i].served = served;
+                }
+            }
+            if finished && served < x.o.quantity {
+                self.turned_away += x.o.quantity - served;
+            }
+            let why = if !finished {
+                format!("Serving {q} of the {} {} {} ordered today; the rest tomorrow.", x.o.quantity, x.o.kind, x.o.buyer)
+            } else if served == x.o.quantity {
+                format!("Serving an order paid in full: {served} {}{}.", x.o.kind, if before > 0 { " (the last of it)" } else { "" })
+            } else if left == 0 && !matches!(out, Out::Late) {
+                format!("Out of stock: served {served} of the {} ordered; refunding the rest.", x.o.quantity)
+            } else {
+                format!("We couldn't serve all of an order within {within} days: served {served} of the {} ordered; refunding the rest.", x.o.quantity)
+            };
+            let mut st = self.fill_with(cx, &x.o, q, if finished { served } else { -1 }, if q > 0 { &crew } else { &[] }, &why, &acct.account);
+            // (Orders are sent one at a time, each when the last is done, and a delivery takes the crew out: one that comes up after the
+            // close finds the crew gone, so it is not sent: it waits for tomorrow, as an order not got to in the day does.)
+            if q > 0 && !operator && self.p.open_until > 0 {
+                st.lapses_at = Some(day * DAY + self.p.open_until);
+            }
+            self.reserved += q;
+            st.then = Some(Then::Served { order: x.o.clone(), q, share, crew: crew.clone(), before, finished, since: x.since, day, t });
+            steps.push(st);
+        }
+        for o in due.unpaid {
+            steps.push(decline::<Then>(&o, &me, "An order unpaid for a week: declining it."));
+        }
+        for (a, x) in self.orders.unclaimed(&self.book) {
+            self.orders.refunded(&a);
+            steps.push(send_back::<Then>(&a, x, &acct.account, cx));
+        }
+        steps
+    }
+}
+
+/// The actor: the shop's plan, run as an office's steps, with its body's beliefs for the truth audits.
+pub struct ShopActor<B: Body>(Stepper<Shop<B>>);
+
+impl<B: Body> Actor for ShopActor<B> {
+    fn step(&mut self, pic: &Picture, cx: &mut Cx) -> crate::Action {
+        self.0.step(pic, cx)
+    }
+    fn beliefs(&self) -> Vec<crate::Belief> {
+        self.0.plan.body.beliefs(&self.0.plan.book)
+    }
+    fn sent(&mut self, action: &str) {
+        self.0.sent(action);
+    }
+    fn save(&self) -> Result<Value, String> {
+        self.0.save()
+    }
+}
+
+/// firm.retailer.
+pub struct Retailer;
+
+/// The manifest the TS module wrote, with this port's own parameters added (their meaning in `source`).
+pub fn manifest() -> Value {
+    let mut m: Value = serde_json::from_str(MANIFEST).expect("the TS manifest");
+    m["version"] = json!("0.16.0");
+    let params = m["params"].as_object_mut().expect("params");
+    let add = |p: &mut serde_json::Map<String, Value>, k: &str, default: Value, unit: Option<&str>, what: &str| {
+        let mut v = json!({ "schema": { "type": if default.is_string() { "string" } else { "integer" }, "description": what }, "default": default, "source": "placeholder" });
+        if let Some(u) = unit {
+            v["unit"] = json!(u);
+        }
+        p.insert(k.into(), v);
+    };
+    add(params, "price_adjust_bps", json!(5000), Some("bps"), "how much of the imbalance of supply and demand a month's price step answers (docs/behaviour/prices.md)");
+    add(params, "rival_weight_bps", json!(2500), Some("bps"), "how much of the gap to rivals' median price a month's step closes");
+    add(params, "clearance_cover_bps", json!(30_000), Some("bps"), "stock beyond this share of a month's demand is cleared at a discount");
+    add(params, "clearance_floor_bps", json!(8000), Some("bps"), "the lowest a clearance sale takes a price, as a share of marginal cost");
+    add(params, "rival_days", json!(60), Some("days"), "how old a rival's price list may be and still count");
+    add(params, "rivals_board", json!(""), None, "what sellers advertise to households, searched monthly for the prices a shop is compared with (none: only the lists it has been shown)");
+    m
+}
+
+impl Kind for Retailer {
+    fn name(&self) -> &'static str {
+        "firm.retailer"
+    }
+    fn version(&self) -> &'static str {
+        "0.16.0"
+    }
+    fn doc(&self) -> &'static str {
+        "docs/behaviour/retailer.md"
+    }
+    fn manifest(&self) -> Value {
+        manifest()
+    }
+    fn cadence(&self, _: &Ctx) -> i64 {
+        DAY
+    }
+    fn first_wake(&self, ctx: &Ctx) -> i64 {
+        (fact(&ctx.entity, "first-wake") % 24) as i64 * 3600
+    }
+    fn create(&self, ctx: &Ctx) -> Result<Box<dyn Actor>, String> {
+        let p = Params::read(ctx)?;
+        Ok(Box::new(ShopActor(Stepper::new(Shop::new(ctx, p, PlainBody::new(&ctx.entity))))))
+    }
+    fn restore(&self, _: &Ctx, saved: Value) -> Result<Box<dyn Actor>, String> {
+        Ok(Box::new(ShopActor(Stepper::<Shop<PlainBody>>::restore(saved)?)))
+    }
+}
+
+/// A shop over another body (lane C1's, at integration): its kind is made the same way.
+pub fn make<B: Body>(ctx: &Ctx, body: B) -> Result<Box<dyn Actor>, String> {
+    Ok(Box::new(ShopActor(Stepper::new(Shop::new(ctx, Params::read(ctx)?, body)))))
+}
+pub fn restore_with<B: Body>(saved: Value) -> Result<Box<dyn Actor>, String> {
+    Ok(Box::new(ShopActor(Stepper::<Shop<B>>::restore(saved)?)))
+}
+
+
+#[cfg(test)]
+mod tests;
