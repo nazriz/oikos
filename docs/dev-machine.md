@@ -76,3 +76,18 @@ oikos run worlds/town-300.yaml --until 7776000 --log lean --record-observations 
   given). A before and after that is to say anything of towns in general is `--towns 3` on each side; `oikos diff` says
   on its first line what each side was (docs/measurement.md, "Running a batch").
 - Write to a folder outside `runs/` that you remove yourself; never remove anything under `runs/`.
+
+## Disk tidy
+
+`bun scripts/disk-tidy.ts` (dry run: prints what it would remove and why; `--apply` deletes; `--inventory FILE` writes the
+table of every run and worktree). The rule that matters most: a run with any evidence of model calls (a cost.json that
+records a real model, `claude-code/`, `codex/`, `*.calls.*`, debriefs, PILOT.txt, a batch that seats a model with no
+mock-only cost.json beside it, a pilot's or translator's name) is training data and is never deleted or altered; when
+unsure it is a model run. Only code-only runs older than 3 days are touched: `test-*` scratch whole; unreferenced ones
+whole; ones with a STATUS or a mention in `docs/`, or holding a `*.dataset`, lose only their large logs (`*.jsonl`,
+`*.jsonl.zst` of 50 MB or more; anchors, summaries, `measure/`, STATUS and datasets stay). Worktrees follow
+`worktree-clean.ts` plus a protected list (merge-main, the running agents' trees, wave copies, anything made in the last
+day); an old agent lock is lifted only with `--unlock-pid PID` for that pid. It also sweeps `/private/tmp` of `oikos-*`,
+`forms-trained*` and `sz-*` folders older than a day. Tests no longer leave those: `scripts/tmp-preload.ts` (in
+`bunfig.toml`) points TMPDIR at one folder per test process and a reaper removes it when the process ends, killed or not.
+Not touched: caches in the home folder (huggingface models) and `/private/tmp/claude-*`.
