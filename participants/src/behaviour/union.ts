@@ -28,17 +28,31 @@ interface Dispute {
   until?: number;
   stoppages: number;
   members: string[];
+  standing?: { id: string; riseBps: number }; // the best offer made so far
 }
 
 /** What the union says it takes up for its members: its public notice. */
 const unionHears = (me: string, hears: Hears[]) => hearingNotice(me, "The union takes up for its members", hears.map((h) => ({ ...h, can: ["represent"] as Hears["can"] })), { members_of: me, members_apply: true });
+
+/**
+ * Whether a union stops striking (docs/behaviour/unions.md, "Concession"): the pay the next stoppage would cost its
+ * members (their number, the days of it, a day's pay in the industry) is at least what the rest of the gap to its claim
+ * would add for them over a year (the same pay, 365 days, the gap's share). Not a settlement: where this lands follows
+ * the gap, the length of the stoppages and nothing else. (A day's pay is on both sides of it, so the comparison is of
+ * days: a stoppage of d days against a rise worth 365 x gap days of pay. The pay is what it needs to know to weigh it.)
+ */
+export function stopsStriking(o: { members: number; days: number; payPerDay: number; claimBps: number; standingBps: number }): { stop: boolean; cost: number; gain: number } {
+  const cost = o.members * o.days * o.payPerDay;
+  const gain = Math.floor((o.members * o.payPerDay * 365 * Math.max(0, o.claimBps - o.standingBps)) / 10_000);
+  return { stop: o.payPerDay > 0 && cost >= gain, cost, gain };
+}
 
 export const organiser: BehaviourModule = {
   name: "union.organiser",
   answers: {"office": "the union's office", "acts": "What it acts on: an application to join; its members' votes on its ballots; and an employer's answer to a claim it has made."},
   issues: P.UNION,
   opens: (p, me) => ((p.hears ?? []).length ? [unionHears(me, p.hears)] : []),
-  version: "0.6.1", // 0.6.1: draws are named for the day and which time that is, never the hour or the moment (docs/reliability.md, "Draws and the moment"); 0.6.0: takes up a member's grievance with their employer, where the world says it hears such (docs/behaviour/frictions.md)
+  version: "0.7.0", // 0.7.0: weighs its members' lost pay: after a stoppage it strikes again only while the pay a stoppage costs them is less than the rest of the gap would add over a year, else it takes the standing offer or lets the dispute rest (docs/behaviour/unions.md, "Concession"); 0.6.1: draws are named for the day and which time that is, never the hour or the moment (docs/reliability.md, "Draws and the moment"); 0.6.0: takes up a member's grievance with their employer, where the world says it hears such (docs/behaviour/frictions.md)
   doc: "docs/behaviour/unions.md",
   cadence: () => DAY,
   firstWake: (ctx) => 9 * 3600 + ctx.rng("first-wake").below(3600),
@@ -62,6 +76,9 @@ export const organiser: BehaviourModule = {
         notice_days: 0, // notice of action
         compliance_bps: 10_000, // how often it keeps to the law when the law forbids an action it would take
         stoppage_days: [1, 2, 3] as number[], // each stoppage, longer each time (placeholder)
+        // A day's pay in each industry it organises, in the smallest unit (the profile's wages; none for an industry: it
+        // cannot weigh what a stoppage costs its members there, and goes on until it is offered what it accepts).
+        pay_per_day: {} as Record<string, number>,
         between_days: 7, // after a stoppage, an improved offer awaited this long before the next
         price_kind: "goods", // prices tracked for the claim (the published index of this kind's price)
         dues: 0, // a month, in the smallest unit (the world's profile)
@@ -205,6 +222,8 @@ export const organiser: BehaviourModule = {
           const offers = addressedToUs("wage_offer").filter((o) => o.data?.claim === x.claim);
           const best = offers.sort((a, b) => b.at - a.at)[0];
           for (const o of offers) handled.add(o.id);
+          // The best offer made so far stands, though the paper it came on is read.
+          for (const o of offers) if (Number(o.data?.rise_bps) > (x.standing?.riseBps ?? -1)) x.standing = { id: o.id, riseBps: Number(o.data?.rise_bps) };
           const enough = (o: StatementRecord) => Number(o.data?.rise_bps) * 10_000 >= x.claimBps * p.accept_share_bps;
           if (best && (x.stage === "claimed") && enough(best)) {
             x.stage = "settling";
@@ -246,6 +265,28 @@ export const organiser: BehaviourModule = {
           // Approved (or back from a stoppage) without an offer we accept: notice of the next stoppage.
           if (x.stage === "claimed" && x.ballot && t - x.since >= p.between_days * DAY) {
             const days = p.stoppage_days[Math.min(x.stoppages, p.stoppage_days.length - 1)]!;
+            // After a stoppage, what the next costs our members in pay against what the rest of the gap would add for
+            // them over a year (Hicks 1932, the resistance curve: resistance falls as the cost of holding out rises).
+            // If the cost is the larger, we stop striking: we take the offer standing, if it is more than nothing; else
+            // the dispute rests, and we claim again in three months.
+            const daily = p.pay_per_day[industryAt.get(employer) ?? ""];
+            if (x.stoppages > 0 && daily !== undefined && daily > 0) {
+              const standing = x.standing?.riseBps ?? 0;
+              const { stop, cost, gain } = stopsStriking({ members: members.length, days, payPerDay: daily, claimBps: x.claimBps, standingBps: standing });
+              if (stop) {
+                if (x.standing && standing > 0) {
+                  x.stage = "settling";
+                  x.since = t;
+                  steps.push(because(`${x.stoppages} stoppage${x.stoppages > 1 ? "s" : ""} at ${employer}: another ${days} day${days > 1 ? "s" : ""} would cost our ${members.length} members ${moneyNow(cost)} in pay, and the ${(x.claimBps - standing) / 100}% still between us and our claim would add ${moneyNow(gain)} over a year: no more stoppages. Accepting the ${standing / 100}% offered.`,
+                    say("offer_accepted", `We accept the offer of ${standing / 100}%.`, { to: [employer], visible: [me, employer], basis: x.standing.id, data: { employer, claim: x.claim, rise_bps: standing } })));
+                } else {
+                  steps.push(because(`${x.stoppages} stoppage${x.stoppages > 1 ? "s" : ""} at ${employer}, and no offer: another ${days} day${days > 1 ? "s" : ""} would cost our members ${moneyNow(cost)} in pay against ${moneyNow(gain)} more over a year if the claim were met: no more stoppages. We'll claim again in three months.`));
+                  disputes.delete(employer);
+                  agreedAt.set(employer, t - p.bargain_every_days * DAY + 90 * DAY);
+                }
+                continue;
+              }
+            }
             // The notice states the ballot's figures, as a notice of protected action does. The law as we read it: the
             // soonest a stoppage can start without breaching a law in force, a day at a time; if none within a month
             // (the ballot doesn't meet the law, say), no action, unless we don't comply.

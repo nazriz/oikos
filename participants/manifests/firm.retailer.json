@@ -1,6 +1,6 @@
 {
   "name": "firm.retailer",
-  "version": "0.15.0",
+  "version": "0.16.0",
   "doc": "docs/behaviour/retailer.md",
   "params": {
     "adjust": {

@@ -9,7 +9,7 @@ import type { LookRequest, Observation, StatementRecord } from "../contracts";
 import { channels } from "../contracts";
 import { need, params, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
 import { ask, nextLook, because, Book, publishedPrice as buildingPrice, DAY, MONTH, ownAccount, Pace, pay, say, type Step, usd, withdraw, outOfTime, team } from "./common";
-import { type AdjustParams, Bargaining, LabourPlan, Staffing, stepper, terminationLaw, WindingUp } from "./firms";
+import { type AdjustParams, Bargaining, LabourPlan, Takings, Staffing, stepper, terminationLaw, WindingUp } from "./firms";
 import { Borrowing } from "./credit";
 import { distribute, LENGNICK, movePrice, moveWage, payOut } from "./lengnick";
 import { Deliveries, goodsPrices, held, order, OrderBook, Payables, priceList, UNDELIVERABLE, type Order } from "./trade";
@@ -27,7 +27,7 @@ export const retailer: BehaviourModule = {
   name: "firm.retailer",
   issues: [P.JOB_ADVERTISEMENT, ...P.TRADE, P.REMEDY_ANSWER, ...P.VENUE_ANSWERS],
   issuesWith: (p) => ({ ...P.staffingOwn({ role: p.role ?? "shop assistant", industry: p.industry, workplace: p.workplace, notice_days: p.notice_days ?? 14 }), police: p.police }),
-  version: "0.15.0", // 0.15.0: where the world's law lets an employer cut hours, a surplus of hands is met first by cutting everyone's hours to what the trade needs, by a paper to each worker, and a shop serves in its staff's hours (docs/behaviour/firms.md, "Hours before heads"); 0.14.0: reviews its staff and closes its month on a day of its own, not on one every shop shares, and expects at first the trade it was staffed for, not its first month's sales alone (docs/behaviour/firms.md, "When a shop reviews its staff"); 0.13.0: buys its stock on the supplier's terms where it states them (docs/behaviour/trade.md, "Trade credit"), so stock no longer competes with the wage bill in the week it is bought; borrows again as its bank allows; no dividend while wages are owed or anyone is under notice (docs/behaviour/firms.md, "Before a dividend"); 0.12.1: returns of tax withheld are filed on the days the law states (docs/behaviour/firms.md, "Returns on the law's days"); 0.12.0: 0.12.0: adjusts its staff as firms do (docs/behaviour/firms.md, "Adjusting labour"): sales smoothed over months, staff held through a dip and let go only when the surplus has lasted what ending the job costs, redundancy pay under the world's law; a business of one can be founded in a run and is closed when its owner gives it up (docs/behaviour/entry.md); 0.11.0: everyday frictions (docs/behaviour/frictions.md): pay that comes short, at the world's rate and its character's; asked, told or ordered to put right short pay or goods said to be faulty; 0.10.0: wants of its own (docs/behaviour/firm-wants.md): a character from its owner's values, which answers a worker who asks for a rise, and a record of its own; 0.9.1: a business of one buys stock when it runs low (daily), keeps its stock money at today's price, follows its owner's home, and closes when its owner has gone; 0.9.0: a business run by its owner alone (operator), stocked for a few days and drawn on by its owner; 0.8.4: takes on the share of its hands the world gives by the day; 0.8.3: registers the share of its jobs the world gives for shops (firms.md, "Jobs an employer does not register")
+  version: "0.16.0", // 0.16.0: after a stoppage its offer follows what the stoppage cost it in sales, not a fixed share of the gap (docs/behaviour/unions.md, "Concession"); 0.15.0: where the world's law lets an employer cut hours, a surplus of hands is met first by cutting everyone's hours to what the trade needs, by a paper to each worker, and a shop serves in its staff's hours (docs/behaviour/firms.md, "Hours before heads"); 0.14.0: reviews its staff and closes its month on a day of its own, not on one every shop shares, and expects at first the trade it was staffed for, not its first month's sales alone (docs/behaviour/firms.md, "When a shop reviews its staff"); 0.13.0: buys its stock on the supplier's terms where it states them (docs/behaviour/trade.md, "Trade credit"), so stock no longer competes with the wage bill in the week it is bought; borrows again as its bank allows; no dividend while wages are owed or anyone is under notice (docs/behaviour/firms.md, "Before a dividend"); 0.12.1: returns of tax withheld are filed on the days the law states (docs/behaviour/firms.md, "Returns on the law's days"); 0.12.0: 0.12.0: adjusts its staff as firms do (docs/behaviour/firms.md, "Adjusting labour"): sales smoothed over months, staff held through a dip and let go only when the surplus has lasted what ending the job costs, redundancy pay under the world's law; a business of one can be founded in a run and is closed when its owner gives it up (docs/behaviour/entry.md); 0.11.0: everyday frictions (docs/behaviour/frictions.md): pay that comes short, at the world's rate and its character's; asked, told or ordered to put right short pay or goods said to be faulty; 0.10.0: wants of its own (docs/behaviour/firm-wants.md): a character from its owner's values, which answers a worker who asks for a rise, and a record of its own; 0.9.1: a business of one buys stock when it runs low (daily), keeps its stock money at today's price, follows its owner's home, and closes when its owner has gone; 0.9.0: a business run by its owner alone (operator), stocked for a few days and drawn on by its owner; 0.8.4: takes on the share of its hands the world gives by the day; 0.8.3: registers the share of its jobs the world gives for shops (firms.md, "Jobs an employer does not register")
   doc: "docs/behaviour/retailer.md",
   cadence: () => DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(24) * 3600,
@@ -141,7 +141,8 @@ export const retailer: BehaviourModule = {
       remedy: (m, _from, t, why) => (m.matter === "underpaid" && m.about && payAccount ? staffing.payInFull(book, t, payAccount, m.about, why) : undefined) });
     const borrowing = new Borrowing(me, p.lender, p.borrow_again_days >= 0 ? { again_days: p.borrow_again_days } : {});
     const payables = new Payables(me); // what we owe suppliers for stock delivered on their terms
-    const bargaining = new Bargaining(me);
+    const takings = new Takings(); // what customers have paid us: what a day without our work costs in sales (Bargaining)
+    const bargaining = new Bargaining(me, { takingsPerDay: (t) => takings.perDay(t) });
     const winding = new WindingUp(me, { short_days: p.short_days, wind_up_days: p.wind_up_days, idle_days: p.idle_days, reprice_days: p.reprice_days, reprice_bps: p.reprice_bps });
     // Our premises, as the sites we see show them (for selling them if we close).
     const premisesOf = (obs: Observation) => {
@@ -552,6 +553,7 @@ export const retailer: BehaviourModule = {
             continue;
           }
           sold += o.quantity;
+          takings.add(t, o.quantity * o.unitPrice);
           queue.push({ o, served: 0, since: t });
         }
         // Each worker's time left today; serving is shared evenly among those here, as the work is.

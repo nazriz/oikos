@@ -14,7 +14,7 @@ import { standingClaims } from "../law";
 import { need, params, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
 import { ask, Asked, Directions, goSee, ownerLooks, visited, VISIT_MAX, nextLook, because, Book, prohibitions, holdsOf, noting, cellsOf, commitmentOf, DAY, Letters, lotOf, ownAccount, record, say, sign, type Step, usd, withdraw, outOfTime, team, StandingWork, CounterWork } from "./common";
 import { Deliveries, goodsPrices, held, order } from "./trade";
-import { Bargaining, receipts, Staffing, stepper, WindingUp } from "./firms";
+import { Bargaining, receipts, Staffing, Takings, stepper, WindingUp } from "./firms";
 import * as P from "./papers";
 
 /** Who the registry says owns a lot: the latest standing ownership claim, following transfers. */
@@ -323,7 +323,7 @@ export const builder: BehaviourModule = {
   answers: {"office": "the builder's office", "acts": "What it acts on: a construction agreement signed with it, built once a permit for the site is in force and invoiced as agreed. Its prices are published.", "report": true},
   issues: [P.JOB_ADVERTISEMENT, P.ORDER],
   issuesWith: (p) => P.staffingOwn({ role: "construction worker", industry: p.industry, workplace: p.workplace, notice_days: p.notice_days ?? 14 }),
-  version: "0.13.1", // 0.13.1: returns of tax withheld are filed on the days the law states (docs/behaviour/firms.md, "Returns on the law's days"); 0.13.0: 0.13.0: takes repair orders from a client who has paid for them (`repair_task`; none by default: nothing changes), done by its crew in its own hours, oldest first; 0.12.3: takes on the share of its hands the world gives by the day, and pays them for the days there is building to do; 0.12.2: registers the share of its jobs the world gives for its kind; 0.12.1: with what 0.11.2 changed; 0.12.0: goes to a lot before building on it, sees its sites as its crew works on them, and gives notice of building work; no longer shown the town
+  version: "0.14.0", // 0.14.0: after a stoppage its offer follows what the stoppage cost it in takings, not a fixed share of the gap (docs/behaviour/unions.md, "Concession"); 0.13.1: returns of tax withheld are filed on the days the law states (docs/behaviour/firms.md, "Returns on the law's days"); 0.13.0: 0.13.0: takes repair orders from a client who has paid for them (`repair_task`; none by default: nothing changes), done by its crew in its own hours, oldest first; 0.12.3: takes on the share of its hands the world gives by the day, and pays them for the days there is building to do; 0.12.2: registers the share of its jobs the world gives for its kind; 0.12.1: with what 0.11.2 changed; 0.12.0: goes to a lot before building on it, sees its sites as its crew works on them, and gives notice of building work; no longer shown the town
   doc: "docs/behaviour/institutions.md",
   cadence: () => DAY,
   create(ctx: ParticipantContext) {
@@ -428,7 +428,8 @@ export const builder: BehaviourModule = {
     const repairs: { id: string; orderer: string; structure: string; units: number; left: number; at: number; refused: number; flying?: number }[] = [];
     // Hourly pay: the wage over the hours it pays for (working days in the period x the working day).
     let wage: number = p.wage; // (an enterprise agreement raises it)
-    const bargaining = new Bargaining(ctx.entity);
+    const takings = new Takings(); // money paid into our account by others: what a day without our crew costs us (Bargaining)
+    const bargaining = new Bargaining(ctx.entity, { takingsPerDay: (t) => takings.perDay(t) });
     const hourly = () => Math.ceil((wage * 3600) / ((p.period / DAY) * (p.work_days / 7) * p.working_day));
     return Object.assign(stepper(
       (obs) => {
@@ -438,6 +439,7 @@ export const builder: BehaviourModule = {
         letters.take(obs, book);
         const own = p.repair_task ? ownAccount(obs) : undefined;
         if (own) for (const [from, c] of receipts(obs, own.account)) paidIn.set(from, (paidIn.get(from) ?? 0) + c);
+        { const acc = ownAccount(obs); if (acc) for (const [, c] of receipts(obs, acc.account)) takings.add(obs.t, c); }
         // (The register's answer comes with the observation after we ask: a lot it has no plan of is not on it.)
         for (const lot of plansOut) if (!book.records.has(lot)) noPlan.add(lot);
         plansOut.clear();

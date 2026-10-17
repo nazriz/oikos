@@ -66,7 +66,11 @@ test("an offer too low: a ballot, notice, stoppages without pay, then an agreeme
   const org = officeAt(config, "union-organiser").params;
   // (Since union 0.5.0 it bargains wherever members in the industries it organises work, as they tell it, and at any
   // workplace it is told of besides: here it organises no industry, and is told of factory-1.)
-  Object.assign(org, { employers: ["factory-1"], industries: ["none"], first_claim_days: 5, claim_margin_bps: 5000, accept_share_bps: 9000 });
+  // (The claim is a little over what the works can offer, 18.7% of its capacity to pay, and the union holds out for nearly all of
+  // it: 99%. Until 2026-10-17 it claimed 50% and an employer conceded half the gap after each stoppage, all of it after three; the
+  // concession now follows what a stoppage costs, and a union that claims far more than anyone concedes keeps striking, as
+  // it should: the rules are unit-tested in participants/test/strikes.test.ts. A gap of 0.6% is worth 2.2 days' pay: it strikes for 1 day, then 2, then takes the offer.)
+  Object.assign(org, { employers: ["factory-1"], industries: ["none"], first_claim_days: 5, claim_margin_bps: 1930, accept_share_bps: 9900 });
   const staff = config.world.records.filter((r: any) => r.record === "agreement" && r.terms.template === "employment" && r.terms.parties[0] === "factory-1").map((r: any) => r.terms.parties[1]);
   const register = config.world.records.find((r: any) => r.id === "union-register");
   for (const c of staff) {
@@ -118,7 +122,9 @@ test("an offer too low: a ballot, notice, stoppages without pay, then an agreeme
   // No making at the works by anyone who is out. (Someone taken on after the stoppage was called is no party to it,
   // and works: one was, in this town, since 2026-10-08.)
   expect(ev.some((e) => e.event === "worked" && e.task === "make" && e.at === "factory-1-works" && e.t > first.at + DAY / 2 && e.t < back.at && e.performers.some((p: string) => strikers.includes(p)))).toBe(false);
-  // The offers rise after each stoppage, and it ends in an agreement.
+  // The offers never fall after a stoppage, and it ends in an agreement: the union, weighing what another stoppage would cost its
+  // members against the rest of the gap, takes the offer standing instead of a third.
+  expect(stops.length).toBe(2);
   const offers = recs.filter((r) => r.kind === "wage_offer" && r.speaks_for === "factory-1").map((r) => r.data.rise_bps);
   for (let i = 1; i < offers.length; i++) expect(offers[i]).toBeGreaterThanOrEqual(offers[i - 1]);
   expect(recs.some((r) => r.kind === "enterprise_agreement" && r.data.employer === "factory-1")).toBe(true);

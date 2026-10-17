@@ -1,6 +1,6 @@
 {
   "name": "union.organiser",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "doc": "docs/behaviour/unions.md",
   "params": {
     "accept_share_bps": {
@@ -139,6 +139,13 @@
     "part": {
       "schema": {},
       "source": "the world gives it (no default)"
+    },
+    "pay_per_day": {
+      "schema": {
+        "type": "object"
+      },
+      "default": {},
+      "source": "placeholder"
     },
     "price_kind": {
       "schema": {

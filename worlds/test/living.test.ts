@@ -82,7 +82,8 @@ test("a spec without `living` generates what it generated before (byte for byte)
   // (Re-taken on 2026-10-16 at the review of the foundations, finding 6: the council's appointments officer is an office of the town, its posts name their authority (`appointed_by`), and every generated system is owned by the organisation whose post it holds; 8dc56724... until then.)
   // (Re-taken on 2026-10-17 at foundations F9 and F10: three public forms for what a person files with an office that decides (generator 0.60.0) and a row of the table of work for `take`, which had none; 033bebfc... until then.)
 // (Re-taken on 2026-10-17 at the housing and vacant-post faults (fix-housing), on the merge with the seated twins: the council's appointments officer is a councillor's post, watches the city's own offices and hires for the city where none of its staff is left to second; au-vic names the police among the posts the council fills; a death wakes those in the same space; e82365d7... until then.)
-  expect(hash(c)).toBe("640002cd9f8730df0af3361082fa2ee2d2ed462cdd2d6abc035b06e945886109");
+  // (Re-taken on 2026-10-17 at the strikes by cost (gd-strikes): the union organiser is given each industry's day's pay (`pay_per_day`, generator), so the generated config moves, and with it the state; 640002cd... until then.)
+  expect(hash(c)).toBe("563726a3c24ea127415bc0b00cc2fdc78b62dfa48a9ce038cbe68343e750bed4");
   const text = JSON.stringify(c);
   expect(text).not.toContain('"started"');
   expect(text).not.toContain("attach_mean");
