@@ -265,7 +265,7 @@ export const auditor: BehaviourModule = {
     };
     const found = (run: Run, id: string, nth: number | undefined, f: Finding): Step =>
       because(`Examined ${nth !== undefined ? `decision ${id}` : "the statement"} of ${run.body.entity}: ${f.agrees === null ? "cannot be told from the file" : f.agrees ? "agrees with the law" : "does not agree"}.`,
-        say(KIND.finding, `Audit finding on ${id}: ${f.says}.`, { visible: [me], basis: id, data: { audit: run.key, item: id, ...(nth !== undefined ? { nth } : {}), agrees: f.agrees, says: f.says } }));
+        say(KIND.finding, `Audit finding on ${id}: ${f.says}.`, { visible: [me], ...(nth !== undefined ? { basis: id } : {}), data: { audit: run.key, item: id, ...(nth !== undefined ? { nth } : {}), agrees: f.agrees, says: f.says } }));
     return stepper(
       (obs) => void book.absorb(obs),
       (obs) => {
