@@ -1125,7 +1125,7 @@ impl CitizenMind {
             "want": want,
             "sharers": list.iter().map(|(who, how)| json!({ "who": who, "how": how })).collect::<Vec<_>>(),
             "shape": shape.name(),
-            "open": { "dues": dues_open.iter().map(|&c| json!({ "cents": c, "words": if c > 0 { format!("{} a month", common::money_words(c, world)) } else { "nothing".into() } })).collect::<Vec<_>>(),
+            "open": { "dues": dues_open.iter().map(|&c| Due { cents: c, words: if c > 0 { format!("{} a month", common::money_words(c, world)) } else { "nothing".into() } }).collect::<Vec<_>>(),
                 "every_days": f.every_days, "starts_in_days": f.starts_in_days, "lasts_minutes": f.lasts_minutes, "place": "their own home" },
             "means": { "income": common::money_words(life.monthly_income, world), "savings": common::money_words(life.savings, world) },
             "dark": founding::dark_of(&w.about, &record_now, self.za()),
@@ -1740,4 +1740,12 @@ pub fn fill_founder(x: &Json, me: &str) -> Json {
         Json::Object(m) => Json::Object(m.iter().map(|(k, y)| (k.clone(), fill_founder(y, me))).collect()),
         _ => x.clone(),
     }
+}
+
+/// A due as a founding's brief states it (ComposeBrief `open.dues[]`: the amount in the world's smallest unit and in
+/// words).
+#[derive(serde::Serialize)]
+struct Due {
+    cents: i64,
+    words: String,
 }

@@ -88,14 +88,14 @@ fn is_space(c: char) -> bool {
     c.is_whitespace()
 }
 
-/// The run of characters before byte `end` that are none of `stop` (and not white space): `([^\s...]+)` ending at `end`.
+/// The run of characters before byte `end` that are none of `stop` (and not a space of any kind): `([^\s...]+)` ending at `end`.
 fn run_before<'a>(text: &'a str, end: usize, stop: &[char]) -> &'a str {
     let head = &text[..end];
     let start = head.char_indices().rev().take_while(|(_, c)| !is_space(*c) && !stop.contains(c)).last().map(|(i, _)| i).unwrap_or(end);
     &text[start..end]
 }
 
-/// The run of characters from byte `start` that are none of `stop` (and not white space).
+/// The run of characters from byte `start` that are none of `stop` (and not a space of any kind).
 fn run_from<'a>(text: &'a str, start: usize, stop: &[char]) -> &'a str {
     let tail = &text[start..];
     let len = tail.char_indices().find(|(_, c)| is_space(*c) || stop.contains(c)).map(|(i, _)| i).unwrap_or(tail.len());

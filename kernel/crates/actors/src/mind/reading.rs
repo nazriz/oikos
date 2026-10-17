@@ -32,7 +32,7 @@
 //! - `combine_askings`: the mean of two lines is truncated toward 0, as `Math.trunc` (Rust integer division).
 //! - `reading_params` and `reading_dial` return `Err` where TS threw; a size that is not a whole number is an `Err`
 //!   too (TS: "a size is a whole number from 0 to 10000").
-//! - `words_of` trims as JavaScript's `trim` (white space and the byte-order mark).
+//! - `words_of` trims as JavaScript's `trim` (spaces of every kind and the byte-order mark).
 
 use super::math;
 use super::person::Value;
