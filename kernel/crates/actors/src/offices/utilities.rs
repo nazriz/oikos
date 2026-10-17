@@ -195,6 +195,7 @@ impl Kind for Water {
             readings: BTreeMap::new(),
             out: false,
             out_since: 0,
+            gone_to: (0, BTreeSet::new()),
             last_day: -1,
             next_bill: 0,
             billing_every: 0,
@@ -226,6 +227,10 @@ struct WaterWorks {
     readings: BTreeMap<String, (i64, i64)>,
     out: bool,
     out_since: i64,
+    /// This round's meters gone to (the round's first day, and the structures): each is gone to once a round, read or
+    /// not (a building still going up has no meter yet), as TS spliced its round's list.
+    #[serde(default)]
+    gone_to: (i64, BTreeSet<String>),
     last_day: i64,
     next_bill: i64,
     billing_every: i64,
@@ -532,8 +537,12 @@ impl Plan for WaterWorks {
         }
         let roll = self.roll();
         let (readings, unmetered) = self.meter_book();
+        if self.gone_to.0 != begins {
+            self.gone_to = (begins, BTreeSet::new());
+        }
+        let gone = &self.gone_to.1;
         let to_read: Vec<String> = {
-            let mut v: Vec<String> = roll.lot_of.keys().filter(|h| !unmetered.contains(*h) && readings.get(*h).is_none_or(|(_, at)| *at < begins)).cloned().collect();
+            let mut v: Vec<String> = roll.lot_of.keys().filter(|h| !unmetered.contains(*h) && !gone.contains(*h) && readings.get(*h).is_none_or(|(_, at)| *at < begins)).cloned().collect();
             v.sort();
             v.truncate(VISIT_MAX);
             v
@@ -543,6 +552,7 @@ impl Plan for WaterWorks {
         }
         self.out = true;
         self.out_since = pic.t;
+        self.gone_to.1.extend(to_read.iter().cloned());
         vec![go_see(&self.p.meters, &to_read)]
     }
 

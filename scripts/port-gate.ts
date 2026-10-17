@@ -18,7 +18,7 @@
 // FAIL if the Rust world's state hash differs between 1 and 14 threads. Nothing here tunes anything. The report is
 // `<out>/gate.json` and the text on stdout; exit 1 on any FAIL.
 
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 const argv = process.argv.slice(2);
@@ -58,20 +58,30 @@ function sh(cmd: string[], cwd: string, env: Record<string, string> = {}): { cod
 function batch(side: "ts" | "rust", profile: string, n: number, dir: string, env: Record<string, string> = {}): string {
   if (has("reuse") && !fresh.has(side) && existsSync(join(dir, "measure"))) return dir;
   const cwd = side === "ts" ? tsDir : rustDir;
-  const r = sh(["bun", "orchestrator/src/cli.ts", "run", world, "--seeds", String(n), "--until", String(days * 86_400), "--set", `profile=${profile}`, ...sets.flatMap((s) => ["--set", s]), "--out", dir, "--overwrite"], cwd, { ...(side === "rust" ? rustEnv : {}), ...env });
+  // (Disk first: a batch is not started with under 40 GB free on the volume the runs go to.)
+  if (!dry) {
+    const df = Bun.spawnSync(["df", "-k", out], { stdout: "pipe" }).stdout.toString().trim().split("\n").at(-1)!.split(/\s+/);
+    const freeGb = Number(df[3]) / 1024 / 1024;
+    if (freeGb < 40) throw new Error(`only ${freeGb.toFixed(0)} GB free under ${out}: the gate pauses (free space, then run again with --reuse)`);
+  }
+  const r = sh(["bun", "orchestrator/src/cli.ts", "run", world, "--seeds", String(n), "--parallel", flag("parallel", "5")!, "--until", String(days * 86_400), "--set", `profile=${profile}`, ...sets.flatMap((s) => ["--set", s]), "--out", dir, "--overwrite"], cwd, { ...(side === "rust" ? rustEnv : {}), ...env });
   if (r.code !== 0) throw new Error(`the ${side} batch for ${profile} failed`);
+  dropLogs(dir);
   return dir;
 }
 
-/** The state hash at the end of each run's log in a batch folder, by run. */
+/** The state hash at the end of each run in a batch folder, by run (from the runs' summaries, so the logs can go). */
 function endHashes(dir: string): string[] {
   if (dry) return [];
-  const logs = readdirSync(dir, { recursive: true }).map(String).filter((f) => f.endsWith(".jsonl") && !f.includes("anchors"));
-  return logs.sort().map((f) => {
-    const lines = readFileSync(join(dir, f), "utf8").trimEnd().split("\n");
-    const end = JSON.parse(lines.at(-1)!);
-    return end.kind === "end" ? String(end.body.state_hash) : "unfinished";
-  });
+  return readdirSync(dir).filter((f) => f.endsWith(".summary.json")).sort()
+    .map((f) => String(JSON.parse(readFileSync(join(dir, f), "utf8")).stateHash ?? "unfinished"));
+}
+
+/** A batch's logs, once its measures are extracted: deleted, unless --keep-logs (a 1,000-person year is large; the
+ * measures, summaries and cost are what the gate reads). Never for a run that asked a model (none here do). */
+function dropLogs(dir: string) {
+  if (dry || has("keep-logs")) return;
+  for (const f of readdirSync(dir)) if (/\.jsonl(\.zst)?$/.test(f) || f.endsWith(".blog")) rmSync(join(dir, f));
 }
 
 interface ProfileVerdict { profile: string; fail: string[]; named: { query: string; key: string; measure: string; z: number; base: number; change: number }[]; measures: number; breaches?: { ts: string[]; rust: string[] }; threads?: { one: string[]; fourteen: string[] } }
