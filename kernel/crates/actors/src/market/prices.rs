@@ -287,9 +287,12 @@ impl ExportRoom {
         self.returned = 0;
     }
     /// This month's room, given the offer's total quantity (an upper bound the seller can read) and the share of it
-    /// already shipped this month. Before it has learned any, the whole offer is open to it.
-    pub fn open(&self, offer_quantity: i64) -> i64 {
-        let cap = self.room.unwrap_or(offer_quantity).min(offer_quantity);
+    /// already shipped this month. Before it has learned any, the share the offer names for it, as `share` plans on
+    /// (the generator's split is a prior, docs/behaviour/boundary.md "Exports"); with none named, the whole offer.
+    /// (Opening the whole offer to every factory before any had learned sent each its whole output abroad in the first
+    /// month, keeping nothing for the shops, which ran out: integration, 2026-10-18.)
+    pub fn open(&self, offer_quantity: i64, named: Option<i64>) -> i64 {
+        let cap = self.room.or(named).unwrap_or(offer_quantity).min(offer_quantity);
         (cap - self.shipped).max(0)
     }
     /// The share of the offer a seller plans on: the room it has found, else the share the offer names for it, else the
@@ -442,13 +445,14 @@ mod tests {
     #[test]
     fn an_exporter_finds_its_share_of_the_outsides_appetite_by_what_comes_back() {
         let mut r = ExportRoom::default();
-        assert_eq!(r.open(500), 500, "before it has learned any, the whole offer is open to it");
+        assert_eq!(r.open(500, None), 500, "before it has learned any, with no share named, the whole offer is open to it");
+        assert_eq!(r.open(500, Some(120)), 120, "with a share named for it, that share");
         r.shipped(300);
         r.sent_back(100);
-        assert_eq!(r.open(500), 200, "this month's room is what is left of the offer");
+        assert_eq!(r.open(500, None), 200, "this month's room is what is left of the offer");
         r.month_end(1000);
         assert_eq!(r.found(), Some(200), "what was accepted");
-        assert_eq!(r.open(500), 200);
+        assert_eq!(r.open(500, Some(120)), 200, "once learned, what it found, whatever was named");
         r.shipped(200);
         r.month_end(1000);
         assert_eq!(r.found(), Some(220), "nothing came back: probe 10% upward");

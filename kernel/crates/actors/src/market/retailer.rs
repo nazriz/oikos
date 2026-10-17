@@ -304,6 +304,13 @@ pub struct Shop<B: Body> {
     ours: BTreeMap<String, (String, i64)>,
     /// Supplier -> when it last came up short.
     short_at: BTreeMap<String, i64>,
+    /// The supplier we last restocked from (we stay with it unless another is cheaper by more than the switching
+    /// threshold, `supplier_switch_bps`).
+    #[serde(default)]
+    supplier: Option<String>,
+    /// The switching threshold (bps of the price), from the params.
+    #[serde(default)]
+    switch_bps: i64,
     suppliers: BTreeSet<String>,
     next_trade_look: i64,
     next_rival_look: i64,
@@ -367,6 +374,8 @@ impl<B: Body> Shop<B> {
             on_order: 0,
             ours: BTreeMap::new(),
             short_at: BTreeMap::new(),
+            supplier: None,
+            switch_bps: ctx.param("supplier_switch_bps", 100).unwrap_or(100),
             suppliers: p.suppliers.iter().cloned().collect(),
             next_trade_look: 0,
             next_rival_look: 0,
@@ -1027,6 +1036,20 @@ impl<B: Body> Shop<B> {
             let short = |s: &str| self.short_at.get(s).is_some_and(|at| t - at < 7 * DAY);
             short(&a.seller).cmp(&short(&b.seller)).then(a.unit.cmp(&b.unit)).then(self.standing_of(&a.seller).cmp(&self.standing_of(&b.seller))).then_with(|| a.seller.cmp(&b.seller))
         });
+        // We stay with the supplier we buy from unless another is cheaper by more than the switching threshold (or ours
+        // came up short): a buyer does not move its whole custom for a fraction of a per cent, as households in
+        // Lengnick's model move only for a price at least 1% lower (Lengnick 2013, Table 1; switching costs: Klemperer
+        // 1995). Without it every shop moved its whole order each week to whichever factory was a penny cheaper, and
+        // the factories' trade swung between nothing and tens of thousands (integration, 2026-10-18).
+        if let (Some(cur), Some(first)) = (self.supplier.clone(), offers.first().map(|o| o.unit)) {
+            if let Some(i) = offers.iter().position(|o| o.seller == cur) {
+                let short = self.short_at.get(&cur).is_some_and(|at| t - at < 7 * DAY);
+                if !short && i > 0 && (offers[i].unit - first) * 10_000 <= first * self.switch_bps {
+                    let o = offers.remove(i);
+                    offers.insert(0, o);
+                }
+            }
+        }
         if self.unit_cost == 0 {
             if let Some(o) = offers.first() {
                 self.unit_cost = o.unit;
@@ -1237,6 +1260,7 @@ impl<B: Body> Shop<B> {
             let mid = ((l.phi_low_bps + l.phi_high_bps) * self.p.stock_for(self.last_demand) + 19_999).div_euclid(20_000);
             let have = stock + self.on_order;
             let best = &offers[0];
+            self.supplier = Some(best.seller.clone());
             // As much as we can pay for, keeping the next pay period's wages aside (and at least the supplier's minimum).
             // On the supplier's terms (if it states any, and we are not behind with it), what we can order is what we can
             // pay for out of what we expect to sell in the time it gives, less what we already owe it: stock no longer
@@ -1472,6 +1496,7 @@ pub fn manifest() -> Value {
     add(params, "rival_weight_bps", json!(2500), Some("bps"), "how much of the gap to rivals' median price a month's step closes");
     add(params, "clearance_cover_bps", json!(30_000), Some("bps"), "stock beyond this share of a month's demand is cleared at a discount");
     add(params, "clearance_floor_bps", json!(8000), Some("bps"), "the lowest a clearance sale takes a price, as a share of marginal cost");
+    add(params, "supplier_switch_bps", json!(100), Some("bps"), "a shop moves its restocking to another supplier only when it is cheaper by more than this share of the price (Lengnick 2013's 1% for households, to confirm for buyers)");
     add(params, "rival_days", json!(60), Some("days"), "how old a rival's price list may be and still count");
     add(params, "rivals_board", json!(""), None, "what sellers advertise to households, searched monthly for the prices a shop is compared with (none: only the lists it has been shown)");
     m

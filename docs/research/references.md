@@ -871,3 +871,9 @@ No document was opened for this step; every entry below is named from memory and
 | Income elasticities by broad group | Clements and Selvanathan, "Understanding consumption patterns" (Empirical Economics 19, 1994) **(to confirm)** | profiles' `spending.demand` |
 | A town's mix of shops: spending by category from a household expenditure survey divides the shops among kinds; a seller's purchases and wages as shares of sales (Australian Industry; Annual Business Survey; KNBS Economic Survey, Census of Establishments); business counts by industry (ABS Counts of Australian Businesses, Cat. 8165.0; ONS UK Business: Activity, Size and Location) **(all figures from memory, to confirm; counts not entered)** | profiles' `spending.demand.kinds[].seller`; `worlds/generator/shopmix.ts` |
 | Budget shares | ABS, Household Expenditure Survey 2015-16 (Cat. 6530.0); ONS, Family spending in the UK, FYE 2023; KNBS, Kenya Integrated Household Budget Survey 2015/16 **(all to confirm the regrouping)** | au-vic, gb-eng, ke-nakuru `spending.demand` |
+
+## Buyers staying with a supplier (integration, 2026-10-18)
+
+| Idea | Citation | Used in |
+|---|---|---|
+| Buyers move only for a price lower by a threshold | Lengnick, "Agent-based macroeconomics: A baseline model" (JEBO 86, 2013), Table 1 (households, 1%); Klemperer, "Competition when consumers have switching costs" (Rev. Econ. Stud. 62, 1995) **(to confirm the 1% for wholesale buying)** | `firm.retailer` `supplier_switch_bps`; docs/behaviour/prices.md |

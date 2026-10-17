@@ -856,7 +856,7 @@ impl<B: Body> Factory<B> {
                 self.next_shipment = t + 7 * DAY;
                 let l = self.p.lengnick;
                 let keep = ((l.phi_low_bps + l.phi_high_bps) * self.last_domestic / 2 + 9999).div_euclid(10_000);
-                let room = self.room.open(d.i("quantity").unwrap_or(0));
+                let room = self.room.open(d.i("quantity").unwrap_or(0), d.get("quantities").and_then(|x| x.get(&me)).and_then(Value::as_i64));
                 let q = (left - keep).min(room);
                 if q > 0 && abroad_ok {
                     let unit = d.i("unit_price").unwrap_or(0);

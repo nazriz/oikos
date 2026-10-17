@@ -48,3 +48,16 @@ world price rises (Armington 1969). Boundary doc: boundary.md.
 `world.rent_portal` publishes `rental_evidence` (homes let and standing by type and bedrooms) from the public rental
 listings and when each came down. The landlord (lane C1) feeds it to `oikos_rules::rent`. `market::rents` reads the same
 listings for a landlord that wants its own reading (days on market as the test of an asking rent).
+
+## Staying with a supplier (integration, 2026-10-18)
+
+A shop restocks from the supplier it bought from last unless another is cheaper by more than `supplier_switch_bps`
+(default 100: 1% of the price) or its own came up short in the last week. Basis: households in Lengnick (2013,
+Table 1) move to a firm only for a price at least 1% lower; buyers face switching costs (Klemperer 1995). The 1% for a
+shop's wholesale buying is ME-16's to confirm. Without it, native prices a penny apart sent every shop's whole order
+to a different factory each week; factories' trade swung between nothing and tens of thousands of units, they bought
+inputs for demand that vanished, and laid people off for want of cash (a gb-eng town at about 10% unemployment).
+
+Before an exporter has learned its room, it plans on the share the outside's offer names for it (the generator's
+split, read as a prior), not the whole offer: opened whole to every factory, the first month sent each factory's whole
+output abroad and left the shops empty.
