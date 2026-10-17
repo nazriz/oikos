@@ -5782,3 +5782,60 @@ two by the tests.
 digests, a parcel view, live attach, a year at 10,000, a mock-pilot test of the whole page. **Revisit if** indexing a
 year at 10,000 takes over an hour, a fold disagrees with the kernel, or the owner finds the people-as-roof-lights
 metaphor misleads (then markers beside buildings, as the plan had).
+
+## 2026-10-18 · Port lane G: the explorer's data layer in Rust, and the experiment harness (no model called)
+
+**Built.**
+- **The explorer's data layer** (`kernel/crates/explore`, `docs/explorer.md`, "The data layer (Rust)"): ported from the
+  TS explorer (`renderer/src/indexer.ts`, `store.ts`, `trace.ts`, `world.ts`, `panels.ts`, `server.ts`), not
+  reinvented. A run index in memory, fed a line at a time (a finished `.jsonl`/`.jsonl.zst`, or a live run's stream):
+  every kept line by ordinal and by every id it names, by day, the act behind each effect, the tracks; the causal trace;
+  who decided by role (self, person, system, seat, world); the panels; debriefs never indexed. The same routes as the
+  TS server (`/api/runs`, `/api/r/<run>/...`) from a small 127.0.0.1 HTTP service (std only), and `oikos-explore`
+  (`serve`, `index`). `oikos explore --rust` (or `OIKOS_EXPLORE_API`) makes the Three.js explorer read from it; the TS
+  index stays the default until the cut-over. A live run attaches through `RunSpec::live` (a poller) or by feeding an
+  `Index` the caller holds: `kernel/tests/explore_live.rs` does so from the host's event stream, answers the service
+  mid-run, and ends equal to the finished log indexed. On a real 1.43-million-line, 1,003-person log it indexes in
+  about 5 s (640 MB) and equals the TS index in counts and tracks and in 20 sampled traces; it differs only where the TS
+  index mislisted 3 people who arrive mid-run (fixed in Rust).
+- **The experiment harness** (`orchestrator/src/experiment.ts`, `oikos experiment run|report`, `docs/experiments.md`):
+  a base town per seed run to the fork day with the post held by its code twin; forks of it with a different steward
+  in one post (the post's code; nobody; a model, by name), over several seeds; the (seed, arm) jobs dealt to worker
+  processes (slots), each worker running its forks together so the seats' calls overlap; each fork's measures
+  (counts and times read from its log, never a judgment), its seat's usage and cost read back from the log's own
+  annotations, and a report: each measure per arm with mean, sd and range over the seeds, and each arm's difference from
+  the reference seed by seed. Mock models (`mock/diligent`, `delay:<days>`, `skip:<n>`) make the whole of it run with no
+  model; a real model is a `SeatFactory` given to `runExperiment`. `experiments/weather-stewards.ts` runs today (the
+  weather bureau, five arms, three seeds); `experiments/tribunal-stewards.json` is the TARA shape for once
+  `tribunal.member` is in the engine. Each fork's log is binary and names the base's; `oikos-kernel export` makes it
+  JSONL. Host: `flush`, so a snapshot can be resumed in another process.
+- **Proved**: a `mock/diligent` arm has the code arm's state hash (a steward that acts as the code does leaves the same
+  world); `nobody` warns of nothing; a three-days-late model's first warning is three days later; the same spec gives
+  the same numbers in this process and across two workers; a fork's exported log verifies.
+
+**Decided fresh.**
+- **Forking with live seats is served through the light host** (`RustWorld`, a `SeatController` per seat), not through
+  `run.ts`'s 1,600-line loop. A model steward takes the post at the fork day as a new officeholder would, from what the
+  office's files and the world show it; the seat's own memory is not carried across a fork. That keeps a base free of
+  model state, so every arm has the same past; a base held by a model, branching into arms that share its past, needs
+  the host's state (notebook, knowledge, translator) saved and restored with the snapshot, and is a second experiment shape.
+- **A job names the arm and the seed, and the worker is told the spec as data** (a test changed `untilDay` and the
+  worker, reloading the file, did not see it: the hashes differed). Functions (`prepare`, measure makers, seat
+  factories) come from the spec file; everything else crosses as JSON.
+- **Experiment output is never overwritten** (a run is training data): a second run needs another folder.
+- **Two guard tests changed, each narrowly** (the explorer's helper; for sign-off): `kernel/tests/determinism_lint.rs`
+  skips `crates/explore` (a read-only viewer outside the world: hash maps, floats, a status clock; nothing it computes
+  is read back), and `renderer/test/read-only.test.ts` lets only `rust.ts` start a process, checked to be `oikos-explore` alone.
+
+**Left for real-model experiments.** The `SeatFactory` for a real provider (reuse `createLlmParticipant` and the
+translator arrangement with a minimal `LlmIO` whose `annotate` is the world's; debriefs at an arm's end); a spending
+limit per arm (a paid API needs the owner's go-ahead; Codex on his subscription is the default); more seeds, since a
+real model's answers are not reproducible; the TARA post's code in the engine (lane E) and a real town around the
+weather bureau (until every lane has merged, kinds the engine lacks stand idle); measures from `measure/` (the Parquet
+queries) on an exported fork log, which the harness does not yet run. **Revisit if** forking a model seat's own memory
+is wanted (then snapshot the host's state beside the engine's), or a run's arms need to share more than the base's day.
+
+**Tests.** `orchestrator/test/experiment.test.ts` (7), `kernel/tests/explore_live.rs`, `kernel/crates/explore/tests/`
+(16), `renderer/test/` (11, with the Rust-against-TS comparison); `cargo test`, `bun run typecheck`,
+`bun run test:fast`.
+

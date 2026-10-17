@@ -56,6 +56,8 @@ jsonschema = { version = "0.30", default-features = false }
 
 [dev-dependencies]
 proptest = "1"
+# The explorer's data layer attaches to a live run through the stream (tests/explore_live.rs); it reads, and the kernel never depends on it.
+oikos-explore = { path = "crates/explore" }
 
 [profile.test]
 opt-level = 1

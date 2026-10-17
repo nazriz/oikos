@@ -852,6 +852,7 @@ dependencies = [
  "oikos-actors",
  "oikos-contracts",
  "oikos-core",
+ "oikos-explore",
  "oikos-perception",
  "oikos-resolver",
  "oikos-rules",

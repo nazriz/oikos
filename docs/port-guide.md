@@ -311,7 +311,9 @@ docs updated where the Rust decides fresh, risks it fixes updated in `docs/risks
 **Lane G, the explorer and experiments (1 Sonnet, can start now; reads logs only, independent of the actors).** The
 explorer's data layer in `kernel/crates/explore` (section 9), ported from the `explorer` branch; then the experiment
 harness on F's snapshot and fork: many seeds and forks across cores, each with a different steward or none, measures
-collected per fork set (the unit of an experiment is a set of forks).
+collected per fork set (the unit of an experiment is a set of forks). **Built** (docs/explorer.md, docs/experiments.md,
+docs/decisions.md 2026-10-18): the data layer in `kernel/crates/explore` with its service and `oikos-explore`; the harness in
+`orchestrator/src/experiment.ts` (`oikos experiment`).
 
 **Lane N, names and ordinary dates (1 Sonnet, can start now; docs/design/names-and-dates.md).** The profiles'
 `names` and `calendar` sections with sources (research agents, one a profile, as the profile pattern does); names drawn
