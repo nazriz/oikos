@@ -315,7 +315,7 @@ impl Kind for Clerk {
         "office.clerk"
     }
     fn version(&self) -> &'static str {
-        "0.3.0"
+        "0.3.1"
     }
     fn doc(&self) -> &'static str {
         "docs/behaviour/office-books.md"

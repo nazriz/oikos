@@ -18,7 +18,7 @@
 
 use crate::common::{addressed_to, bases_of, data, filed_before, out_of_time, work::ReportOf, work::Routine, Book, Fields, Part, StandingWork, DAY};
 use crate::offices::police::{as_text, param, spread};
-use crate::offices::staff::{lift, Own, Staff, StaffOpts, StaffThen, Want};
+use crate::firms::staffing::{Own, Staffing, StaffingOpts, Want};
 use crate::papers::agreements;
 use crate::steps::{arg, because, call, json, say, Done, Plan, Say, Step, Stepper, Visible};
 use crate::{Actor, Ctx, Cx, Kind, Picture};
@@ -162,9 +162,9 @@ impl Kind for Principal {
         };
         let me = ctx.entity.clone();
         let part = Part::from_param(&p.part);
-        let staff = Staff::new(
+        let staff = Staffing::new(
             &me,
-            StaffOpts { period: p.period, notice_days: p.notice_days, workplace: Some(p.workplace.clone()), role: p.role.clone(), industry: Some(p.industry.clone()), own: Own::RoleOrUnnamed, hire: true, pay: true },
+            StaffingOpts { workplace: Some(p.workplace.clone()), industry: Some(p.industry.clone()), own: Some(Own::RoleOrUnnamed), ..StaffingOpts::new(p.period, p.notice_days, &p.role) },
         );
         Ok(Box::new(Stepper::new(School {
             routines: StandingWork::new(&me, part, []),
@@ -188,7 +188,6 @@ impl Kind for Principal {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 enum Then {
-    Staff(StaffThen),
     Lesson,
 }
 
@@ -199,7 +198,7 @@ struct School {
     p: Params,
     part: Part,
     book: Book,
-    staff: Staff,
+    staff: Staffing,
     routines: StandingWork,
     view: Option<oikos_sight::SiteStructure>,
     /// Papers of ours sent and not yet seen back on the file (enrolments answered, certificates given).
@@ -246,13 +245,13 @@ impl Plan for School {
         let workers = self.staff.workers(&self.book, t);
         if self.part != Part::Staff {
             let want = Want {
-                target: self.p.teachers.max(0) as usize,
+                target: self.p.teachers.max(0),
                 wage: self.p.wage,
                 can_post: (workers.len() as i64) < self.p.teachers,
                 why: Some(format!("The school's establishment is {} teachers; we have {}: posting a job.", self.p.teachers, workers.len())),
                 ..Default::default()
             };
-            steps.extend(lift(self.staff.routine(pic, &self.book, &self.p.account, &want, cx), Then::Staff));
+            steps.extend(self.staff.routine(pic, &self.book, cx, &self.p.account, &want));
         }
 
         // ---- the roll, from the school's own file ----
@@ -378,9 +377,8 @@ impl Plan for School {
         Some((pic.t.div_euclid(DAY) + 1) * DAY + self.p.starts)
     }
 
-    fn then(&mut self, token: &Then, done: Done, cx: &mut Cx) -> Vec<Step<Then>> {
+    fn then(&mut self, token: &Then, done: Done, _cx: &mut Cx) -> Vec<Step<Then>> {
         match token {
-            Then::Staff(s) => lift(self.staff.then(s, done, cx), Then::Staff),
             Then::Lesson => {
                 if !done.applied() {
                     self.routines.undid(&self.p.teach_task, 1);

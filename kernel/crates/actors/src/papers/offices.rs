@@ -22,6 +22,10 @@ pub const KINDS: &[&str] = &[
     "acquisition_notice",
     "approval",
     "asset_register",
+    "audit_answer",
+    "audit_finding",
+    "audit_report",
+    "audit_request",
     "ballot",
     "ballot_result",
     "birth_registration",
@@ -983,6 +987,163 @@ impl Paper for PermitObjection {
     const KIND: &'static str = "permit_objection";
 }
 
+/// The audit office's request to a body the audit law names, in public and addressed to no one: this named thing (the count
+/// of its decisions of a kind in a period, one of them by its number, or its statement of payments), by this day.
+///
+/// Written by: the auditor (auditor.ts; a seat's form `audit_request`). Read by: the body asked (`Audited`).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AuditRequest {
+    /// The audit's key (the body's role, the check and the period).
+    pub audit: String,
+    /// The role of the body asked (`support`, `town_finance`).
+    pub body: String,
+    /// `count`, `nth` or `statement`.
+    pub ask: String,
+    #[serde(default, deserialize_with = "lenient::opt_int", skip_serializing_if = "Option::is_none")]
+    pub nth: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
+    #[serde(deserialize_with = "lenient::int")]
+    pub from: i64,
+    #[serde(deserialize_with = "lenient::int")]
+    pub to: i64,
+    #[serde(deserialize_with = "lenient::int")]
+    pub answer_by: i64,
+}
+impl Paper for AuditRequest {
+    const KIND: &'static str = "audit_request";
+}
+
+/// A body's answer to an audit request, from its own books, to the auditor alone: the count, the nth decision with the
+/// claim and the record it was made on, or its statement of payments.
+///
+/// Written by: the audited body (`Audited`: the finance officer; the support office). Read by: the auditor.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AuditAnswer {
+    /// The request answered.
+    pub request: String,
+    pub audit: String,
+    pub ask: String,
+    #[serde(default, deserialize_with = "lenient::opt_int", skip_serializing_if = "Option::is_none")]
+    pub nth: Option<i64>,
+    #[serde(default, deserialize_with = "lenient::opt_int", skip_serializing_if = "Option::is_none")]
+    pub count: Option<i64>,
+    /// For `nth`: whether the body has a decision by that number, and if so its file (a decision, the claim, the pay
+    /// reported for the claimant, whether the body pays another payment for age).
+    #[serde(default, deserialize_with = "lenient::opt_yes", skip_serializing_if = "Option::is_none")]
+    pub found: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub file: Option<Value>,
+    /// For `statement`: the payments in its books and the bank's record of them (null: it holds no books).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub statement: Option<Value>,
+}
+impl Paper for AuditAnswer {
+    const KIND: &'static str = "audit_answer";
+}
+
+/// The audit office's working paper on one item: whether the decision agrees with the law and the procedure published
+/// for its kind (`agrees`), or cannot be told from the file (null), and what was found in the law's terms. Seen by the
+/// office alone; the report is what is published.
+///
+/// Written by: the auditor. Read by: the auditor (a new holder of the post reads its run from these).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AuditFinding {
+    pub audit: String,
+    pub item: String,
+    #[serde(default, deserialize_with = "lenient::opt_int", skip_serializing_if = "Option::is_none")]
+    pub nth: Option<i64>,
+    #[serde(default, deserialize_with = "lenient::opt_yes")]
+    pub agrees: Option<bool>,
+    pub says: String,
+}
+impl Paper for AuditFinding {
+    const KIND: &'static str = "audit_finding";
+}
+
+/// One decision found not to agree, as a report lists it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AuditDisagreement {
+    pub item: String,
+    #[serde(deserialize_with = "lenient::int")]
+    pub nth: i64,
+    pub finding: String,
+}
+
+/// The audit office's public report on a body for a period: for decisions, the count, the sample and how many agree with
+/// the law; for accounts, whether the books and the bank's record reconcile. It names no claimant and judges nothing.
+///
+/// Written by: the auditor. Read by: the council, the ombudsman, the tribunal and the body audited (public); the auditor.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AuditReport {
+    pub audit: String,
+    /// The entity audited.
+    pub body: String,
+    /// `decisions` or `accounts`.
+    pub check: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
+    #[serde(deserialize_with = "lenient::int")]
+    pub period: i64,
+    #[serde(deserialize_with = "lenient::int")]
+    pub from: i64,
+    #[serde(deserialize_with = "lenient::int")]
+    pub to: i64,
+    /// The day the law says the report is due.
+    #[serde(default, deserialize_with = "lenient::opt_int", skip_serializing_if = "Option::is_none")]
+    pub due: Option<i64>,
+    // ---- decisions
+    /// How many decisions the body made in the period (null: it did not say).
+    #[serde(default, deserialize_with = "lenient::opt_int")]
+    pub population: Option<i64>,
+    #[serde(default, deserialize_with = "lenient::opt_int", skip_serializing_if = "Option::is_none")]
+    pub sample: Option<i64>,
+    #[serde(default, deserialize_with = "lenient::opt_int", skip_serializing_if = "Option::is_none")]
+    pub agreed: Option<i64>,
+    #[serde(default, deserialize_with = "lenient::opt_int", skip_serializing_if = "Option::is_none")]
+    pub not_agreed: Option<i64>,
+    #[serde(default, deserialize_with = "lenient::opt_int", skip_serializing_if = "Option::is_none")]
+    pub not_checked: Option<i64>,
+    #[serde(default, deserialize_with = "lenient::opt_int", skip_serializing_if = "Option::is_none")]
+    pub not_found: Option<i64>,
+    #[serde(default, deserialize_with = "lenient::opt_int", skip_serializing_if = "Option::is_none")]
+    pub not_answered: Option<i64>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub disagreements: Vec<AuditDisagreement>,
+    // ---- accounts
+    #[serde(default, deserialize_with = "lenient::opt_yes", skip_serializing_if = "Option::is_none")]
+    pub reconciles: Option<bool>,
+    #[serde(default, deserialize_with = "lenient::opt_int", skip_serializing_if = "Option::is_none")]
+    pub matched: Option<i64>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub in_books_not_bank: Vec<AuditUnmatched>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub in_bank_not_books: Vec<AuditUnmatched>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub differ: Vec<AuditDiffer>,
+}
+impl Paper for AuditReport {
+    const KIND: &'static str = "audit_report";
+}
+
+/// A payment on one side of a statement and not the other.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AuditUnmatched {
+    pub id: String,
+    #[serde(deserialize_with = "lenient::int")]
+    pub amount: i64,
+}
+
+/// A payment whose sum differs between the books and the bank's record.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AuditDiffer {
+    pub id: String,
+    #[serde(deserialize_with = "lenient::int")]
+    pub books: i64,
+    #[serde(deserialize_with = "lenient::int")]
+    pub bank: i64,
+}
+
 /// The building inspector's note of a site it went to see, on its own file: which notice, which structure, what it
 /// found. The office's memory of what it has inspected (a successor reads it, and its report counts from it).
 ///
@@ -1677,7 +1838,7 @@ mod tests {
     #[test]
     fn every_type_is_in_kinds() {
         let all = [
-            AcquisitionNotice::KIND, Approval::KIND, AssetRegister::KIND, Ballot::KIND, BallotResult::KIND, BuildingInspection::KIND, PermitNotice::KIND, PermitObjection::KIND,
+            AcquisitionNotice::KIND, Approval::KIND, AssetRegister::KIND, AuditAnswer::KIND, AuditFinding::KIND, AuditReport::KIND, AuditRequest::KIND, Ballot::KIND, BallotResult::KIND, BuildingInspection::KIND, PermitNotice::KIND, PermitObjection::KIND,
             BirthRegistration::KIND, Budget::KIND, BuildingNotice::KIND,
             ComplaintNotice::KIND, DeathCertificate::KIND,
             DeathRegistration::KIND, DemolitionOrder::KIND, Direction::KIND, DisposalDocket::KIND,
@@ -1910,5 +2071,38 @@ mod tests {
             "open": [{ "what": "cases to decide", "about": "rec.8", "says": "application rec.8 by p.1", "since": 700000, "amount": 40000, "due": 900000 }],
             "over": [{ "what": "cases", "not_listed": 3 }] }));
         assert_eq!(b.list.unwrap().ripe, 2);
+    }
+
+    #[test]
+    fn the_audit_papers_as_the_auditor_writes_them() {
+        let q = round::<AuditRequest>(json!({ "audit": "support|decisions|2", "body": "support", "ask": "nth", "nth": 7, "kind": "benefit_decision", "from": 2592000, "to": 5184000, "answer_by": 5700000 }));
+        assert_eq!((q.ask.as_str(), q.nth), ("nth", Some(7)));
+        // A seat's form writes the dates and the number as decimal strings.
+        let q = round::<AuditRequest>(json!({ "audit": "k", "body": "town_finance", "ask": "statement", "from": "0", "to": "2592000", "answer_by": "3000000" }));
+        assert_eq!((q.from, q.to, q.nth), (0, 2_592_000, None));
+        let a = round::<AuditAnswer>(json!({ "request": "rec.4", "audit": "support|decisions|2", "ask": "nth", "nth": 7, "found": true, "file": { "decision": { "id": "rec.2" } } }));
+        assert_eq!(a.found, Some(true));
+        let a = round::<AuditAnswer>(json!({ "request": "rec.5", "audit": "k", "ask": "count", "count": 41 }));
+        assert_eq!(a.count, Some(41));
+        let a = round::<AuditAnswer>(json!({ "request": "rec.6", "audit": "k", "ask": "statement", "statement": null }));
+        assert!(a.statement.is_none());
+        let f = round::<AuditFinding>(json!({ "audit": "k", "item": "rec.2", "nth": 7, "agrees": false, "says": "granted, though the claim does not meet the conditions" }));
+        assert_eq!(f.agrees, Some(false));
+        let f = round::<AuditFinding>(json!({ "audit": "k", "item": "k#3", "nth": 3, "agrees": null, "says": "no decision by that number" }));
+        assert_eq!(f.agrees, None);
+    }
+
+    #[test]
+    fn an_audit_report_of_decisions_and_one_of_accounts() {
+        let r = round::<AuditReport>(json!({ "audit": "support|decisions|1", "body": "support-office", "check": "decisions", "kind": "benefit_decision", "period": 1, "from": 0, "to": 2592000, "due": 3000000,
+            "population": 40, "sample": 4, "agreed": 3, "not_agreed": 1, "not_checked": 0, "not_found": 0, "not_answered": 0,
+            "disagreements": [{ "item": "rec.2", "nth": 7, "finding": "granted though not met" }] }));
+        assert_eq!((r.population, r.disagreements.len()), (Some(40), 1));
+        // A body that did not answer the count: the population is null.
+        let r = round::<AuditReport>(json!({ "audit": "k", "body": "b", "check": "decisions", "kind": "benefit_decision", "period": 2, "from": 0, "to": 1, "due": 2, "population": null, "sample": 0, "agreed": 0, "not_agreed": 0, "not_checked": 0, "not_found": 0, "not_answered": 1, "disagreements": [] }));
+        assert_eq!((r.population, r.not_answered), (None, Some(1)));
+        let r = round::<AuditReport>(json!({ "audit": "town_finance|accounts|1", "body": "finance", "check": "accounts", "period": 1, "from": 0, "to": 2592000, "due": 3000000,
+            "reconciles": false, "matched": 9, "in_books_not_bank": [{ "id": "rec.3", "amount": 100 }], "in_bank_not_books": [], "differ": [{ "id": "rec.4", "books": 100, "bank": 90 }], "not_answered": 0 }));
+        assert_eq!((r.reconciles, r.matched, r.differ.len()), (Some(false), Some(9), 1));
     }
 }
