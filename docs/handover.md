@@ -145,9 +145,9 @@ Costs and counts are in the reviews. The wave-2 plan is `docs/waves/wave-2/plan.
   read what words mean) is answered by B; read 12m for the rest, the arrangement first.
 - **Names and ordinary dates.** A plan, `docs/design/names-and-dates.md`, awaiting him; the first step touches the
   kernel's resolver and the translator's prompt.
-- **Hours before heads.** Firms cutting hours before staff: not built; it needs an hours term in agreements and a
+- **Hours before heads.** Firms cutting hours before staff: not built (ME-10); it needs an hours term in agreements and a
   sourced law per place (decisions 2026-10-12 "Firms respond to a shock", item 3).
-- **Shops sized by catchment.** Measured 2026-10-13 and not built: geography explains a tenth to a quarter of shops'
+- **Shops sized by catchment.** Measured 2026-10-13 and not built (ME-5): geography explains a tenth to a quarter of shops'
   uneven trade and sizing by it would worsen the fit (decisions 2026-10-13 "Shops sized by catchment"). The cause is on
   the knowing/citizen side (which shops a household is shown); redundancies in Victoria are now near the sourced rate.
 - **The budget line taught to the translator.** See the translator item above and decisions "Opening caseloads of the
@@ -204,6 +204,7 @@ Costs and counts are in the reviews. The wave-2 plan is `docs/waves/wave-2/plan.
 
 ## 8. Known weak spots: do not trust these
 
+- **The risk register, `docs/risks.md`,** is the one place gaps and doubtful assumptions live (2026-10-17), with what each could do to an experiment; read its summary before planning one. The lines below are a short list from before it.
 - **Sources marked "(to confirm)"** in profiles and `docs/research/references.md`. Search for the phrase; several
   profiles' tax returns, rents and possession figures are recalled, not opened. Only some profiles have sourced
   possession figures (`justice.md`, "The profiles' figures").

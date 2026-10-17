@@ -1,6 +1,7 @@
 # The renderer: seeing a run, down to one person and why (plan, 2026-10-16)
 
-**Status:** a plan, awaiting the owner. Nothing here is built. V0.md promised it as stage 3 and its definition of done
+**Status:** first version built 2026-10-17 as the pilot explorer (`oikos explore`, `docs/explorer.md`); section 11
+says what was built, how it differs from this plan, and what remains. The rest of this document is the plan as approved. V0.md promised it as stage 3 and its definition of done
 point 3: "Opening the renderer on any run shows the town, lets you zoom to a single citizen, and shows what happened to
 them and why." The platform's purpose is to observe gradual disempowerment (`docs/design/gradual-disempowerment.md`);
 this is how a person sees it happen: who decided what about whom, human or system, and what it did to them.
@@ -256,3 +257,41 @@ run up to 3,000 people; V13 is what makes it true at 10,000.
 section 3); indexing a year at 10,000 takes over an hour (then index by month in parallel, the fold per month resuming
 from the month's snapshot); or WebGPU and its fallback cannot draw 10,000 markers at 60 frames a second on the owner's
 machine (then people are points in one draw call, which any GPU can).
+
+## 11. What was built (2026-10-17), and what remains
+
+The owner asked for "something way more exciting, visual, innovative" after the first pilot viewer, merged with what it
+shows. Built in one pass as `renderer/` and `oikos explore` (docs/explorer.md), steps V1 to V11 in a first form.
+
+**As planned:** a separate package; Bun serving on 127.0.0.1 under a path prefix; Three.js `WebGPURenderer` (WebGPU,
+WebGL 2 by itself where it is missing; both checked headless), an isometric orthographic camera turnable round; one
+streaming pass to an index outside the run, named by the head hash and remade only when the log changes; the log read
+only through `logLines`; folds in TypeScript; postings by a generic scan for known ids; chains (effect to action to act,
+basis both ways, standing instructions, a code citizen's decision, a seat's draft and sitting); tracks (where at each
+midnight, the day's moves, money and sense of agency by day); the citizen, organisation, office (backlog) and building
+panels; the causal trace as a column of links; overlays for who decided and hardship; no debriefs; classes by role.
+`measure/src/consequential.ts` holds the consequential-acts list, as the plan asked.
+
+**Different from the plan, and why:**
+- *Frames and postings in files and Bun's SQLite, not a varint-coded postings table*: plain `Uint32Array` blobs per id;
+  small enough at 3,000 people (180 MB for a 90-day pilot), simpler. Revisit at 10,000 for a year.
+- *No WASM.* Indexing is bounded by reading and decompressing the log (about 50 s of a 3,000-person pilot's 70 to 130 s;
+  the rest is the pilot viewer's own fold and the twin), and nothing on the client is slow enough to need it. Revisit if
+  indexing a year at 10,000 takes over an hour (the plan's own trigger) or if the client folds money itself.
+- *People are drawn one by one at every zoom*, as lights on the roof of the building they are in, hopping between
+  buildings when they move: the owner asked for people moving through the day. The log has no routes, so the hop is an
+  arc over the travel time, never a path along a street; this is said in the legend's source and the docs.
+- *The pilot viewer's data is reused whole* (`pilot-view/src/build.ts`, with a new `debriefs: false`): a seat's words,
+  draft, sign-off, outcome, consequences, sitting and twin pair come from it, so the two views cannot disagree.
+- *The twin is shown per act* (the twin's matching decision beside the seat's), not as a second town side by side.
+- *"Who decided" counts every consequential change by its class*, wages and rent included, so systems and people
+  dominate; the overlay can isolate one class ("model seat" shows exactly where seats' decisions landed).
+
+**What remains:** the money-weeks track and money conservation checked in every snapshot (money is folded by day and
+checked on the fixture only); the kernel-hash check of folded records (the panel folds a person's record without
+`records.ts`'s digests); a parcel view (spaces as slabs); the live attach (V12); scale (V13: a year at 10,000, frames
+by month, where-days loaded a year at a time; the client already fetches moves in 8-day chunks); a mock-pilot
+integration test of the whole page (the tests are a hand-built log, the read-only guard and the server; the two
+living-7 pilots and a 1,000-person code run were checked by hand in headless Chrome); hardship's variables from the
+mind's needs (only the record's agency and money now); orgs' premises for offices of the outside world (they act from
+the town's edge).

@@ -1,0 +1,29 @@
+# Automatic pass/fail on every push to main and every pull request, on the self-hosted runner on the run server
+# (Mac mini). Registering that runner is the owner's step: docs/ci-runner.md. Until it is registered, jobs queue.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A newer push to the same branch or PR replaces the one still running.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: [self-hosted, macOS, oikos-mini]
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tools on the PATH
+        run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"; echo "/opt/homebrew/bin" >> "$GITHUB_PATH"; echo "$HOME/.bun/bin" >> "$GITHUB_PATH"
+      - run: bun install
+      - run: bun run kernel
+      - run: bun run typecheck
+      - name: Kernel tests
+        run: bun scripts/slots.ts --weight half --what "ci cargo test" -- cargo test --release --manifest-path kernel/Cargo.toml --workspace -q
+      - name: Whole suite
+        run: bun run test:all

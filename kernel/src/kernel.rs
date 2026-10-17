@@ -440,9 +440,11 @@ fn each<T: Sync, R: Send>(items: &[T], threads: usize, f: impl Fn(&T) -> R + Syn
 }
 
 /// How many threads observations are made ready on: `OIKOS_KERNEL_THREADS` if set (1: one at a time, as they're asked
-/// for), else the machine's cores, up to eight. No result depends on it.
+/// for), else one. No result depends on it. (It was the machine's cores, up to eight, until 2026-10-17: on a shared
+/// machine the threads cost a third more CPU time for a 1,000-person year and gave no wall time back; a run holds one
+/// slot, so one core. docs/decisions.md, "Where a year's time goes".)
 fn threads() -> usize {
-    std::env::var("OIKOS_KERNEL_THREADS").ok().and_then(|x| x.parse::<usize>().ok()).filter(|n| *n > 0).unwrap_or_else(|| std::thread::available_parallelism().map_or(1, |n| n.get()).min(8))
+    std::env::var("OIKOS_KERNEL_THREADS").ok().and_then(|x| x.parse::<usize>().ok()).filter(|n| *n > 0).unwrap_or(1)
 }
 
 pub struct Kernel {

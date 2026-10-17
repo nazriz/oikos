@@ -59,3 +59,5 @@ opt-level = 1
 # it's done, and refused in the ordinary way.
 [profile.release]
 overflow-checks = true
+lto = "fat"
+codegen-units = 1

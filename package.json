@@ -8,7 +8,9 @@
     "translator",
     "orchestrator",
     "worlds",
-    "measure"
+    "measure",
+    "pilot-view",
+    "renderer"
   ],
   "scripts": {
     "test": "bun test",
